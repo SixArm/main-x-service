@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.andiamo.co.uk)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:en.m.wikipedia.org)",
+      "WebSearch",
+      "WebFetch(domain:www.berlitz.com)",
+      "WebFetch(domain:grokipedia.com)"
+    ]
+  }
+}

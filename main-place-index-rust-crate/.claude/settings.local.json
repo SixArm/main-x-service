@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.gov.wales)",
+      "WebFetch(domain:academic.oup.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
+    ]
+  }
+}
