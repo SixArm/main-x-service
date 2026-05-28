@@ -1,0 +1,142 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}API docs &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list" aria-label="Breadcrumb trail">
+    <li class="breadcrumb-list-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-list-item" aria-current="page">API docs</li>
+  </ol>
+</nav>
+
+<section aria-label="API documentation">
+  <h2>API documentation</h2>
+
+  <div class="information-callout" aria-label="API docs overview">
+    <p>
+      The {{ app_display }} exposes three API surfaces. Use the
+      interactive OpenAPI explorer at
+      <a href="/swagger-ui">/swagger-ui</a> for try-it-yourself; the
+      sections below are a quick navigable reference grouped by domain.
+    </p>
+  </div>
+
+  <h3>Quick examples</h3>
+  <div class="diff" role="group" aria-label="API surfaces">
+    <article class="card" role="region" aria-label="REST API example">
+      <h4>REST (JSON)</h4>
+      <div class="mockup-shell" aria-label="REST API curl example">curl -X POST http://localhost:8080/api/{{ entity_plural }} \
+  -H 'Content-Type: application/json' \
+  -d '{ "label": "Sample {{ entity_singular }}" }'</div>
+    </article>
+    <article class="card" role="region" aria-label="FHIR API example">
+      <h4>FHIR R5</h4>
+      <div class="mockup-shell" aria-label="FHIR API curl example">curl http://localhost:8080/fhir/Person/abc-123 \
+  -H 'Accept: application/fhir+json'</div>
+    </article>
+    <article class="card" role="region" aria-label="Health check example">
+      <h4>Health probe</h4>
+      <div class="mockup-shell" aria-label="Health check curl example">curl http://localhost:8080/api/health</div>
+    </article>
+  </div>
+
+  <h3>Endpoints by group</h3>
+  <nav class="accordion-nav" aria-label="Endpoint groups">
+    <ol class="accordion-list" aria-label="Endpoint groups list">
+      {% for group in groups %}
+        <li class="accordion-list-item" aria-label="{{ group.label }}">
+          <details {% if loop.first %}open{% endif %}>
+            <summary>
+              <span class="badge"
+                    data-type="{{ group.badge_type }}"
+                    aria-label="{{ group.label }} group">{{ group.label }}</span>
+              <span class="hint">{{ group.count }} endpoint{% if group.count != 1 %}s{% endif %}</span>
+            </summary>
+            <table class="data-table" aria-label="{{ group.label }} endpoints">
+              <thead class="data-table-head">
+                <tr class="data-table-row">
+                  <th class="data-table-th" scope="col">Method</th>
+                  <th class="data-table-th" scope="col">Path</th>
+                  <th class="data-table-th" scope="col">Purpose</th>
+                </tr>
+              </thead>
+              <tbody class="data-table-body">
+                {% for ep in group.endpoints %}
+                  <tr class="data-table-row">
+                    <td class="data-table-td">
+                      {% if ep.method == "GET" %}
+                        <span class="badge" data-type="info" aria-label="HTTP method GET">GET</span>
+                      {% elif ep.method == "POST" %}
+                        <span class="badge" data-type="success" aria-label="HTTP method POST">POST</span>
+                      {% elif ep.method == "PUT" %}
+                        <span class="badge" data-type="warning" aria-label="HTTP method PUT">PUT</span>
+                      {% elif ep.method == "DELETE" %}
+                        <span class="badge" data-type="error" aria-label="HTTP method DELETE">DELETE</span>
+                      {% else %}
+                        <span class="badge" aria-label="HTTP method {{ ep.method }}">{{ ep.method }}</span>
+                      {% endif %}
+                    </td>
+                    <td class="data-table-td"><code>{{ ep.path }}</code></td>
+                    <td class="data-table-td">{{ ep.purpose }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </details>
+        </li>
+      {% endfor %}
+    </ol>
+  </nav>
+
+  <h3>Response envelope</h3>
+  <p>
+    All REST endpoints return a JSON envelope:
+  </p>
+  <pre class="code-block" aria-label="REST success response envelope"><code>{
+  "success": true,
+  "data": { /* … */ },
+  "error": null
+}</code></pre>
+  <p>
+    Error responses use the same envelope with <code>success: false</code>:
+  </p>
+  <pre class="code-block" aria-label="REST error response envelope"><code>{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Family name is required",
+    "details": { "field": "name.family" }
+  }
+}</code></pre>
+
+  <h3>HTTP status codes</h3>
+  <ol class="summary-list" aria-label="Common HTTP status codes">
+    <li class="summary-list-item">
+      <dl>
+        <dt><span class="badge" data-type="success" aria-label="2xx">2xx</span> Success</dt>
+        <dd>200 OK, 201 Created, 204 Deleted (no content)</dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt><span class="badge" data-type="warning" aria-label="4xx">4xx</span> Client errors</dt>
+        <dd>400 Bad Request, 404 Not Found, <strong>409 Conflict</strong> (duplicate on create), <strong>422 Validation Error</strong></dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt><span class="badge" data-type="error" aria-label="5xx">5xx</span> Server errors</dt>
+        <dd>500 Internal Server Error, 503 Service Unavailable</dd>
+      </dl>
+    </li>
+  </ol>
+
+  <div class="action-bar" role="toolbar" aria-label="Docs actions">
+    <a class="button" href="/swagger-ui" aria-label="Open interactive Swagger UI">Open Swagger UI</a>
+    <a class="button" href="/api/health" aria-label="Run health probe">Probe /api/health</a>
+    <a class="button" href="/tour" aria-label="Run guided tour">Take the tour</a>
+  </div>
+</section>
+{% endblock content %}

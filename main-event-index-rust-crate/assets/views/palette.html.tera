@@ -1,0 +1,192 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}Palette &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list" aria-label="Breadcrumb trail">
+    <li class="breadcrumb-list-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-list-item" aria-current="page">Palette</li>
+  </ol>
+</nav>
+
+<section aria-label="Color palette editor"
+         x-data='{
+           tokens: {{ tokens | json_encode | safe }},
+           overrides: JSON.parse(localStorage.getItem("lily-palette") || "{}"),
+           applied: 0,
+           apply(name, value) {
+             if (value &amp;&amp; /^#[0-9a-fA-F]{6}$/.test(value)) {
+               this.overrides[name] = value;
+               document.documentElement.style.setProperty("--" + name, value);
+             } else {
+               delete this.overrides[name];
+               document.documentElement.style.removeProperty("--" + name);
+             }
+             localStorage.setItem("lily-palette", JSON.stringify(this.overrides));
+             this.applied = Object.keys(this.overrides).length;
+             if (window.lily &amp;&amp; window.lily.toast) {
+               window.lily.toast(this.applied + " override(s) active", "info");
+             }
+           },
+           current(name, fallback) {
+             return this.overrides[name] || fallback;
+           },
+           reset() {
+             var self = this;
+             Object.keys(this.overrides).forEach(function (k) {
+               document.documentElement.style.removeProperty("--" + k);
+             });
+             this.overrides = {};
+             this.applied = 0;
+             localStorage.removeItem("lily-palette");
+             if (window.lily &amp;&amp; window.lily.toast) {
+               window.lily.toast("Palette reset to defaults", "warning");
+             }
+           },
+           init() {
+             var self = this;
+             Object.keys(this.overrides).forEach(function (k) {
+               document.documentElement.style.setProperty("--" + k, self.overrides[k]);
+             });
+             this.applied = Object.keys(this.overrides).length;
+           }
+         }'
+         x-init="init()">
+  <h2>Color palette</h2>
+
+  <div class="information-callout" aria-label="Palette explainer">
+    <p>
+      Customize any NHS UK design token. Overrides are stored in
+      <code>localStorage["lily-palette"]</code> as a flat
+      <code>{ "nhs-blue": "#0000ee", &hellip; }</code> map and applied as
+      CSS custom properties on <code>&lt;html&gt;</code>. The live preview
+      below recolors as you type. Settings → Accent color is a
+      single-token shortcut for the most common case.
+    </p>
+  </div>
+
+  <div class="action-bar" role="toolbar" aria-label="Palette controls">
+    <span class="action-bar-count">
+      <span x-text="applied"></span> override<span x-show="applied !== 1">s</span> active
+    </span>
+    <button class="button"
+            type="button"
+            aria-label="Reset palette to defaults"
+            @click="reset()">Reset all</button>
+    <a class="button" href="/settings" aria-label="Open accent shortcut">Accent shortcut</a>
+  </div>
+
+  <div class="diff" role="group" aria-label="Token editor and live preview">
+    <article class="card" role="region" aria-label="Token editor">
+      <h3>Tokens</h3>
+      <p>
+        <span class="hint" aria-label="Token group hint">
+          Grouped by NHS UK design-token category. Each row has a swatch
+          group plus a custom-hex picker.
+        </span>
+      </p>
+      {% for group in groups %}
+        <h4>{{ group.label }}</h4>
+        <ol class="summary-list" x-bind:aria-label="'{{ group.label }} tokens'">
+          {% for tok in group.tokens %}
+            <li class="summary-list-item">
+              <dl>
+                <dt>
+                  <code>--{{ tok.name }}</code>
+                  <span class="hint" aria-label="Default value">default {{ tok.default }}</span>
+                </dt>
+                <dd>
+                  <div class="color-picker"
+                       role="radiogroup"
+                       aria-label="{{ tok.name }} swatches">
+                    {% for sw in swatch_palette %}
+                      <button class="color-picker-button"
+                              type="button"
+                              role="radio"
+                              x-bind:aria-label="'Set {{ tok.name }} to {{ sw }}'"
+                              x-bind:aria-checked="overrides['{{ tok.name }}'] === '{{ sw }}' ? 'true' : 'false'"
+                              style="background-color: {{ sw }}"
+                              @click="apply('{{ tok.name }}', '{{ sw }}')"></button>
+                    {% endfor %}
+                  </div>
+                  <input class="color-input"
+                         type="color"
+                         x-bind:aria-label="'Custom {{ tok.name }} color'"
+                         x-bind:value="current('{{ tok.name }}', '{{ tok.default }}')"
+                         @change="apply('{{ tok.name }}', $event.target.value)">
+                  <button class="action-bar-button"
+                          type="button"
+                          x-bind:aria-label="'Clear {{ tok.name }} override'"
+                          x-show="overrides['{{ tok.name }}']"
+                          @click="apply('{{ tok.name }}', '')">Clear</button>
+                </dd>
+              </dl>
+            </li>
+          {% endfor %}
+        </ol>
+      {% endfor %}
+    </article>
+
+    <article class="card" role="region" aria-label="Live preview">
+      <h3>Live preview</h3>
+      <p>
+        <span class="hint" aria-label="Preview hint">
+          Every component below reads CSS variables. Changes apply
+          immediately as you click a swatch.
+        </span>
+      </p>
+
+      <h4>Buttons</h4>
+      <div class="action-bar" role="toolbar" aria-label="Button preview">
+        <button class="button" type="button" aria-label="Primary preview">Primary</button>
+        <button class="button" type="button" disabled aria-label="Disabled preview">Disabled</button>
+        <button class="action-bar-button" type="button" aria-label="Action-bar-button preview">Destructive</button>
+      </div>
+
+      <h4>Badges</h4>
+      <p>
+        <span class="badge" data-type="success" aria-label="Success badge preview">Success</span>
+        <span class="badge" data-type="info" aria-label="Info badge preview">Info</span>
+        <span class="badge" data-type="warning" aria-label="Warning badge preview">Warning</span>
+        <span class="badge" data-type="error" aria-label="Error badge preview">Error</span>
+      </p>
+
+      <h4>Alerts</h4>
+      <div class="alert" role="alert" aria-label="Info alert preview" data-type="info">
+        Routine information alert.
+      </div>
+      <div class="alert" role="alert" aria-label="Warning alert preview" data-type="warning">
+        Warning alert.
+      </div>
+      <div class="alert" role="alert" aria-label="Error alert preview" data-type="error">
+        Critical alert.
+      </div>
+
+      <h4>RAG indicator</h4>
+      <p>
+        <span class="red-amber-green-view" role="img" data-status="green" aria-label="Green status preview">Green</span>
+        &nbsp;
+        <span class="red-amber-green-view" role="img" data-status="amber" aria-label="Amber status preview">Amber</span>
+        &nbsp;
+        <span class="red-amber-green-view" role="img" data-status="red" aria-label="Red status preview">Red</span>
+      </p>
+
+      <h4>Star rating</h4>
+      <p>
+        <span class="five-star-rating-view" role="img" aria-label="4 of 5 stars preview">★★★★☆</span>
+      </p>
+
+      <h4>Sparkline</h4>
+      <p>
+        <span class="sparkline" aria-label="Sparkline preview">
+          <svg viewBox="0 0 100 30" width="200" height="40" role="img" aria-hidden="true">
+            <polyline fill="none" stroke="currentColor" stroke-width="1.5"
+                      points="0,20 10,18 20,22 30,15 40,12 50,8 60,10 70,6 80,9 90,4 100,2"/>
+          </svg>
+        </span>
+      </p>
+    </article>
+  </div>
+</section>
+{% endblock content %}

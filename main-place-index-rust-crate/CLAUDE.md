@@ -3,7 +3,7 @@
 The Main Place Index is a critical enterprise system that maintains a
 centralized registry of place identities across multiple areas.
 
-@AGENTS/share/overview.md
+@agents/share/overview.md
 
 ## Table of Contents
 
@@ -49,7 +49,7 @@ Based on [schema.org/Place](https://schema.org/Place):
   - GLN exact match (deterministic, short-circuits to 1.0)
 - **Score Breakdown**: Full per-component score breakdown in API responses
 
-@AGENTS/share/match-search-merge.md
+@agents/share/match-search-merge.md
 
 ### Data Quality & Validation
 
@@ -70,13 +70,13 @@ Based on [schema.org/Place](https://schema.org/Place):
 @AGENTS/restful.md
 @AGENTS/testing.md
 
-@AGENTS/share/auditability.md
-@AGENTS/share/availability.md
-@AGENTS/share/match-search-merge.md
-@AGENTS/share/observability.md
-@AGENTS/share/privacy.md
-@AGENTS/share/restful.md
-@AGENTS/share/technology.md
+@agents/share/auditability.md
+@agents/share/availability.md
+@agents/share/match-search-merge.md
+@agents/share/observability.md
+@agents/share/privacy.md
+@agents/share/restful.md
+@agents/share/technology.md
 
 ## Quick Start
 

@@ -1,0 +1,83 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}FHIR &mdash; {{ record.label }} &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list" aria-label="Breadcrumb trail">
+    <li class="breadcrumb-list-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-list-item"><a href="/{{ entity_plural }}">{{ entity_plural | capitalize }}</a></li>
+    <li class="breadcrumb-list-item"><a href="/{{ entity_plural }}/{{ record.id }}">{{ record.label }}</a></li>
+    <li class="breadcrumb-list-item" aria-current="page">FHIR</li>
+  </ol>
+</nav>
+
+<section aria-label="FHIR resource view">
+  <h2>FHIR resource &mdash; {{ record.label }}</h2>
+
+  <div class="information-callout" aria-label="FHIR resource notice">
+    <h3>HL7 FHIR R5</h3>
+    <p>
+      This page renders the {{ entity_singular }} as a FHIR R5
+      <code>{{ fhir_resource_type }}</code> resource. The "Download" link
+      points at the live FHIR endpoint <code>GET /fhir/{{ fhir_resource_type }}/{id}</code>,
+      which is the authoritative source. Use the JSON below for inspection
+      or import into a FHIR-compatible system.
+    </p>
+  </div>
+
+  <div class="action-bar" role="toolbar" aria-label="FHIR actions">
+    <a class="button"
+       href="/fhir/{{ fhir_resource_type }}/{{ record.id }}"
+       download="{{ fhir_resource_type | lower }}-{{ record.id }}.json"
+       aria-label="Download FHIR JSON">Download JSON</a>
+    <button class="clipboard-copy-button"
+            type="button"
+            aria-label="Copy FHIR JSON to clipboard"
+            data-clipboard-text="{{ fhir_json }}"
+            data-copied-message="FHIR resource copied">Copy to clipboard</button>
+    <a class="button"
+       href="/{{ entity_plural }}/{{ record.id }}/export"
+       aria-label="View GDPR export instead">GDPR export</a>
+    <a class="button"
+       href="/{{ entity_plural }}/{{ record.id }}"
+       aria-label="Back to {{ entity_singular }} detail">Back</a>
+  </div>
+
+  <ol class="summary-list" aria-label="FHIR metadata">
+    <li class="summary-list-item">
+      <dl>
+        <dt>Resource type</dt>
+        <dd><code>{{ fhir_resource_type }}</code></dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt>FHIR ID</dt>
+        <dd><code>{{ record.id }}</code></dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt>FHIR version</dt>
+        <dd><code>R5</code></dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt>Generated at</dt>
+        <dd><time datetime="{{ generated_at }}">{{ generated_at }}</time></dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt>Content type</dt>
+        <dd><code>application/fhir+json</code></dd>
+      </dl>
+    </li>
+  </ol>
+
+  <h3>FHIR JSON payload</h3>
+  <pre class="code-block" aria-label="FHIR JSON payload"><code>{{ fhir_json_pretty }}</code></pre>
+</section>
+{% endblock content %}

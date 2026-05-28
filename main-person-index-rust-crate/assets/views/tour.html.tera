@@ -1,0 +1,120 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}Tour &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list" aria-label="Breadcrumb trail">
+    <li class="breadcrumb-list-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-list-item" aria-current="page">Tour</li>
+  </ol>
+</nav>
+
+<section aria-label="Guided tour"
+         x-data='{
+           steps: JSON.parse(localStorage.getItem("lily-tour-steps") || "[]"),
+           isDone(key) { return this.steps.indexOf(key) !== -1; },
+           toggle(key) {
+             var i = this.steps.indexOf(key);
+             if (i >= 0) this.steps.splice(i, 1); else this.steps.push(key);
+             localStorage.setItem("lily-tour-steps", JSON.stringify(this.steps));
+           },
+           reset() {
+             this.steps = [];
+             localStorage.removeItem("lily-tour-steps");
+             if (window.lily &amp;&amp; window.lily.toast) {
+               window.lily.toast("Tour progress reset", "info");
+             }
+           },
+           progress(total) {
+             return total > 0 ? Math.round(100 * this.steps.length / total) : 0;
+           }
+         }'>
+  <h2>Guided tour</h2>
+
+  <div class="information-callout" aria-label="Tour explainer">
+    <p>
+      Eight stops covering the {{ entity_plural }}-index web UI: list and detail
+      pages, edit form (with identifiers, addresses, contacts, documents),
+      duplicate review, system audit, settings, and the keyboard shortcuts.
+      Progress is saved in <code>localStorage["lily-tour-steps"]</code>.
+    </p>
+  </div>
+
+  <div class="action-bar" role="toolbar" aria-label="Tour controls">
+    <span class="action-bar-count">
+      <span x-text="steps.length"></span> / 8 completed
+    </span>
+    <progress class="progress"
+              aria-label="Tour completion"
+              max="100"
+              x-bind:value="progress(8)"></progress>
+    <button class="button"
+            type="button"
+            aria-label="Reset tour progress"
+            @click="reset()">Reset</button>
+  </div>
+
+  <div class="tour" aria-label="Guided tour of the {{ app_display }}">
+    <ol class="tour-list" aria-label="Tour steps, in order">
+      {% for step in steps %}
+        <li class="tour-list-item"
+            x-bind:aria-label="'{{ step.title }}: ' + (isDone('{{ step.key }}') ? 'completed' : 'pending')">
+          <header>
+            <span class="badge"
+                  x-bind:data-type="isDone('{{ step.key }}') ? 'success' : 'info'"
+                  x-bind:aria-label="isDone('{{ step.key }}') ? 'Step {{ loop.index }} completed' : 'Step {{ loop.index }} pending'">
+              <span x-text="isDone('{{ step.key }}') ? '✓' : '{{ loop.index }}'"></span>
+            </span>
+            <strong>{{ step.title }}</strong>
+            {% if step.shortcut %}
+              &middot;
+              {% for k in step.shortcut %}
+                <kbd class="kbd">{{ k }}</kbd>
+              {% endfor %}
+            {% endif %}
+          </header>
+          <p>{{ step.body | safe }}</p>
+          <div class="action-bar" role="toolbar" aria-label="Tour step actions">
+            {% if step.href %}
+              <a class="button"
+                 href="{{ step.href }}"
+                 aria-label="Open: {{ step.title }}">{{ step.cta | default(value="Open") }}</a>
+            {% endif %}
+            <button class="button"
+                    type="button"
+                    x-bind:aria-label="isDone('{{ step.key }}') ? 'Mark step {{ loop.index }} as not done' : 'Mark step {{ loop.index }} as done'"
+                    x-bind:aria-pressed="isDone('{{ step.key }}') ? 'true' : 'false'"
+                    @click="toggle('{{ step.key }}')">
+              <span x-show="!isDone('{{ step.key }}')">Mark done</span>
+              <span x-show="isDone('{{ step.key }}')">Mark not done</span>
+            </button>
+          </div>
+        </li>
+      {% endfor %}
+    </ol>
+  </div>
+
+  <h3>Next steps</h3>
+  <ol class="summary-list" aria-label="Further reading">
+    <li class="summary-list-item">
+      <dl>
+        <dt>Keyboard shortcuts</dt>
+        <dd>Press <kbd class="kbd">?</kbd> anywhere to open the shortcut overlay.</dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt>OpenAPI spec</dt>
+        <dd>Browse the REST surface at <a href="/api/health">/api/health</a> &middot; full spec via the Swagger UI behind <code>/swagger-ui</code>.</dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt>Theme</dt>
+        <dd>Switch between NHS UK / Dark / High contrast via the picker in the header.</dd>
+      </dl>
+    </li>
+  </ol>
+</section>
+{% endblock content %}

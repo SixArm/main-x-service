@@ -1,57 +1,57 @@
-# Testing Strategy & Guide
+# Testing strategy — Main Thing Index
 
-## Test Categories
+## Test categories
 
-### Unit Tests (104 tests)
+### Unit tests
 
-Located in `#[cfg(test)] mod tests` within each source file.
+Embedded in source files via `#[cfg(test)] mod tests`. Run with `cargo test --lib`.
 
-| Module                  | Tests | What's Covered                                                                                                                                                                                                  |
-| ----------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `models::place`         | 6     | Construction, defaults, address/geo, serialization, soft delete                                                                                                                                                 |
-| `models::address`       | 4     | Construction, fields, serialization, partial                                                                                                                                                                    |
-| `models::geo`           | 7     | Construction, elevation, Haversine (same point, known distance, short, antipodal), serialization                                                                                                                |
-| `models::place_type`    | 4     | Display, equality, serialization, Other variant                                                                                                                                                                 |
-| `models::identifier`    | 3     | GLN, custom, serialization                                                                                                                                                                                      |
-| `models::amenity`       | 2     | Construction, with value                                                                                                                                                                                        |
-| `models::opening_hours` | 2     | Construction, serialization                                                                                                                                                                                     |
-| `models::consent`       | 4     | Active, revoked, expired by date, not yet expired                                                                                                                                                               |
-| `matching::name`        | 8     | Exact, case-insensitive, similar, different, empty, both empty, substring, prefix bonus                                                                                                                         |
-| `matching::address`     | 5     | Identical, different, partial, no overlap, case-insensitive                                                                                                                                                     |
-| `matching::geo`         | 7     | Same point, close, moderate, far, within radius (true/false), custom reference                                                                                                                                  |
-| `matching::identifier`  | 7     | Matching/different GLN, empty, mixed, has_gln_match (true, false type, false value)                                                                                                                             |
-| `matching::phonetic`    | 10    | Robert, Rupert, match, no match, Ashcraft, empty, single char, case, Washington, place names                                                                                                                    |
-| `matching::scoring`     | 8     | Identical places, name only, different, GLN deterministic, confidence levels, weights sum, fuzzy, phonetic bonus                                                                                                |
-| `validation`            | 19    | Valid place, empty/whitespace name, invalid lat/lon, valid coords, invalid/valid GLN, invalid/valid URL, invalid/valid telephone, address missing fields, address with locality, multiple errors, normalization |
-| `privacy`               | 8     | Mask telephone/fax/geo, preserve name, no sensitive fields, short phone, GDPR export, export fields                                                                                                             |
+| Module                  | What's covered                                                                                                  |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `models::thing`         | Construction, defaults, address/geo, serialization, soft delete                                                 |
+| `models::address`       | Construction, fields, serialization, partial                                                                    |
+| `models::geo`           | Construction, elevation, Haversine (same point, known distance, short, antipodal), serialization                |
+| `models::thing_type`    | Display, equality, serialization, `Other` variant                                                               |
+| `models::identifier`    | GLN, custom, serialization                                                                                      |
+| `models::amenity`       | Construction, with value                                                                                        |
+| `models::opening_hours` | Construction, serialization                                                                                     |
+| `models::consent`       | Active, revoked, expired by date, not yet expired                                                               |
+| `matching::name`        | Exact, case-insensitive, similar, different, empty, both empty, substring, prefix bonus                         |
+| `matching::address`     | Identical, different, partial, no overlap, case-insensitive                                                     |
+| `matching::geo`         | Same point, close, moderate, far, within radius (true/false), custom reference                                  |
+| `matching::identifier`  | Matching/different GLN, empty, mixed, `has_gln_match` (true, false type, false value)                           |
+| `matching::phonetic`    | Robert, Rupert, match, no match, Ashcraft, empty, single char, case, Washington, thing names                    |
+| `matching::scoring`     | Identical things, name only, different, GLN deterministic, confidence levels, weights sum, fuzzy, phonetic bonus|
+| `validation`            | Valid thing, empty/whitespace name, invalid lat/lon, GLN format, URL, telephone, address, normalization         |
+| `privacy`               | Mask telephone/fax/geo, preserve name, no sensitive fields, short phone, GDPR export, export fields             |
 
-### Integration Tests (67 tests)
+### Integration tests
 
-Located in `tests/` directory. Test end-to-end workflows and edge cases.
+In `tests/`. Run with `cargo test --tests`.
 
-| File                        | Tests | What's Covered                                                                                                                                                                                                                                                            |
-| --------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `integration_matching.rs`   | 7     | Exact duplicate, typo match, completely different, same name different city, GLN override, name only, batch candidates                                                                                                                                                    |
-| `integration_validation.rs` | 3     | Validate-normalize workflow, invalid place handling, full lifecycle                                                                                                                                                                                                       |
-| `integration_privacy.rs`    | 4     | Mask-export workflow, full GDPR export, immutability, soft delete export                                                                                                                                                                                                  |
-| `integration_models.rs`     | 16    | Full construction serialization, soft delete timestamps, unique IDs, place hierarchy, geo distance symmetry/triangle inequality, multiple identifier types, consent lifecycle/serialization, all place types, full week opening hours, address default/equality           |
-| `integration_scoring.rs`    | 24    | Unicode names, long names, single char, reversed words, address edge cases, geo poles/date line/radius boundary, identifier edge cases, Soundex consistency, custom weights, confidence boundaries, score range validation, phonetic bonus, all components, batch sorting |
-| `integration_edge_cases.rs` | 13    | Boundary coordinates, GLN length validation, URL protocols, address minimal/empty fields, multi-word normalization, idempotent normalization, all sensitive fields masking, empty phone masking, GDPR field preservation, combined workflows, GLN deterministic override  |
+| File                          | What's covered                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `integration_matching.rs`     | Exact duplicate, typo match, completely different, same name different city, GLN override, name only, batch         |
+| `integration_validation.rs`   | Validate-normalize workflow, invalid thing handling, full lifecycle                                                 |
+| `integration_privacy.rs`      | Mask-export workflow, full GDPR export, immutability, soft delete export                                            |
+| `integration_models.rs`       | Construction serialization, soft delete timestamps, unique IDs, thing hierarchy, geo symmetry, consent lifecycle    |
+| `integration_scoring.rs`      | Unicode names, edge cases, geo poles/date line, identifier edge cases, custom weights, confidence boundaries        |
+| `integration_edge_cases.rs`   | Boundary coordinates, GLN length, URL protocols, address minimal/empty fields, GLN deterministic override           |
 
-### Benchmark Tests (16 benchmarks)
+### Benchmark tests
 
-Located in `benches/` directory. Uses Criterion for statistical benchmarking.
+In `benches/`. Run with `cargo bench` (Criterion).
 
-| File                        | Benchmarks | What's Measured                                                                                                              |
-| --------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `matching_bench.rs`         | 9          | name_similarity (exact/fuzzy/different), geo_similarity (close/far), soundex (short/long), full_place_match, batch_match_100 |
-| `validation_bench.rs`       | 3          | validate_simple, validate_full, normalize_place                                                                              |
-| `searching_bench.rs`        | 2          | search_by_name_100, search_by_name_fuzzy_100                                                                                 |
-| `database_reading_bench.rs` | 2          | place_construction, place_batch_construction_100                                                                             |
-| `database_writing_bench.rs` | 2          | place_create_and_validate, place_create_and_normalize                                                                        |
-| `privacy_bench.rs`          | 4          | mask_place, mask_place_minimal, gdpr_export, gdpr_export_batch_100                                                           |
+| File                        | What's measured                                                                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `matching_bench.rs`         | `name_similarity` (exact/fuzzy/different), `geo_similarity` (close/far), Soundex (short/long), full match, batch_match_100   |
+| `validation_bench.rs`       | `validate_simple`, `validate_full`, `normalize_thing`                                                                        |
+| `searching_bench.rs`        | `search_by_name_100`, `search_by_name_fuzzy_100`                                                                             |
+| `database_reading_bench.rs` | `thing_construction`, `thing_batch_construction_100`                                                                         |
+| `database_writing_bench.rs` | `thing_create_and_validate`, `thing_create_and_normalize`                                                                    |
+| `privacy_bench.rs`          | `mask_thing`, `mask_thing_minimal`, `gdpr_export`, `gdpr_export_batch_100`                                                   |
 
-## Running Tests
+## Running tests
 
 ```bash
 # All tests
@@ -61,7 +61,7 @@ cargo test
 cargo test --lib
 
 # Specific module
-cargo test --lib models::place
+cargo test --lib models::thing
 cargo test --lib matching::scoring
 
 # Integration tests only
@@ -80,9 +80,9 @@ cargo bench
 cargo bench -- name_similarity
 ```
 
-## Writing New Tests
+## Writing new tests
 
-### Unit Test Pattern
+### Unit test pattern
 
 ```rust
 #[cfg(test)]
@@ -103,7 +103,7 @@ mod tests {
 }
 ```
 
-### Integration Test Pattern
+### Integration test pattern
 
 ```rust
 // tests/integration_feature.rs
@@ -111,22 +111,18 @@ use main_thing_index::models::thing::Thing;
 
 #[test]
 fn test_end_to_end_workflow() {
-    // Setup
-    let place = Place::new("Test");
+    let thing = Thing::new("Test");
+    let validated = validate_thing(&thing);
+    let matched = compute_match(&thing, &other, &weights);
 
-    // Execute pipeline
-    let validated = validate_place(&place);
-    let matched = compute_match(&place, &other, &weights);
-
-    // Verify
     assert!(validated.is_empty());
     assert!(matched.score > 0.8);
 }
 ```
 
-## Test Data Conventions
+## Test data conventions
 
-- Use well-known places for readability (Central Park, Eiffel Tower, etc.)
+- Use well-known things for readability (Central Park, Eiffel Tower, etc.)
 - Use realistic coordinates (NYC: 40.7829, -73.9654)
 - Use valid GLN format for identifier tests (13 digits)
-- Use `Place::new("name")` for simple test places
+- Use `Thing::new("name")` for simple test things

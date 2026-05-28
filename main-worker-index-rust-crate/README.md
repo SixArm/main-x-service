@@ -521,7 +521,7 @@ docker build -t mpi-server:v1.0.0 .
 ### Manual Deployment
 
 1. Build release binary: `cargo build --release`
-2. Copy binary: `cp target/release/main-worker-index /opt/master-worker-index/`
+2. Copy binary: `cp target/release/main-worker-index /opt/main-worker-index/`
 3. Set up environment: `cp .env.production.example /opt/main-worker-index/.env`
 4. Run migrations: `sea-orm-cli migrate up`
 5. Start service: `./main-worker-index`

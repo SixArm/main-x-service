@@ -1,31 +1,40 @@
-# AGENTS Directory Index
+# AGENTS directory — Main Event Index
 
 Detailed reference documentation for the Main Event Index system.
 
-## Agent Files
+## Documents in this directory
 
-| File                     | Description                                                |
-| ------------------------ | ---------------------------------------------------------- |
-| [models.md](models.md)   | Domain model reference (Event, Identifier, Document, etc.) |
-| [restful.md](restful.md) | RESTful API endpoint reference                             |
-| [testing.md](testing.md) | Testing strategy, coverage, and guide                      |
+| Document | Description |
+|----------|-------------|
+| [models.md](models.md) | Domain model reference (FHIR/event-style record) |
+| [matching.md](matching.md) | Matching algorithm reference |
+| [restful.md](restful.md) | RESTful API and library API reference |
+| [testing.md](testing.md) | Testing strategy and guide |
 
-## Monorepo Agent Share Files
+## Shared documents (project root)
 
-| File                                                           | Description                          |
-| -------------------------------------------------------------- | ------------------------------------ |
-| [overview.md](../AGENTS/share/overview.md)                     | Project overview and features        |
-| [auditability.md](../AGENTS/share/auditability.md)             | Audit logging and event streaming    |
-| [availability.md](../AGENTS/share/availability.md)             | Availability, scaling, health checks |
-| [match-search-merge.md](../AGENTS/share/match-search-merge.md) | Match, search, merge algorithms      |
-| [observability.md](../AGENTS/share/observability.md)           | Tracing, metrics, OpenTelemetry      |
-| [privacy.md](../AGENTS/share/privacy.md)                       | Data masking, GDPR, consent          |
-| [restful.md](../AGENTS/share/restful.md)                       | RESTful API guidance                 |
-| [technology.md](../AGENTS/share/technology.md)                 | Technology stack reference           |
+The shared reference docs live at the project root under [`../../agents/share/`](../../agents/share/).
 
-## See Also
+| Document | Description |
+|----------|-------------|
+| [overview.md](../../agents/share/overview.md) | High-level project overview |
+| [architecture.md](../../agents/share/architecture.md) | Layered architecture |
+| [web-stack.md](../../agents/share/web-stack.md) | Loco / Tera / HTMX / Alpine / Lily |
+| [technology.md](../../agents/share/technology.md) | Tech stack summary |
+| [stack-for-rust-loco.md](../../agents/share/stack-for-rust-loco.md) | Full dependency inventory |
+| [match-search-merge.md](../../agents/share/match-search-merge.md) | Match / search / merge workflows |
+| [dataflow.md](../../agents/share/dataflow.md) | Create / search / merge data flows |
+| [privacy.md](../../agents/share/privacy.md) | Masking, GDPR, consent |
+| [auditability.md](../../agents/share/auditability.md) | Audit logging and event streaming |
+| [availability.md](../../agents/share/availability.md) | Health checks, scaling |
+| [observability.md](../../agents/share/observability.md) | Tracing + OpenTelemetry summary |
+| [restful.md](../../agents/share/restful.md) | REST API conventions |
+| [postgresql.md](../../agents/share/postgresql.md) | PostgreSQL setup |
+| [compliance-for-healthcare.md](../../agents/share/compliance-for-healthcare.md) | HIPAA, NHS, … |
+| [compliance-for-technology.md](../../agents/share/compliance-for-technology.md) | ISO, GDPR, … |
 
-- [../CLAUDE.md](../CLAUDE.md) - Project overview and instructions
-- [../plan.md](../plan.md) - Implementation plan
-- [../tasks.md](../tasks.md) - Task summary
-- [../index.md](../index.md) - Project index
+## See also
+
+- [`../CLAUDE.md`](../CLAUDE.md) — project overview (loaded by Claude Code)
+- [`../README.md`](../README.md) — README (when present)
+- [`../index.md`](../index.md) — project index

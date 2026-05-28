@@ -39,7 +39,7 @@ pub struct MergeRecord {
     /// Match score that triggered the merge review
     pub match_score: Option<f64>,
 
-    /// Snapshot of data transferred from duplicate to master
+    /// Snapshot of data transferred from duplicate to main
     pub transferred_data: Option<serde_json::Value>,
 
     /// When the merge was performed
@@ -52,7 +52,7 @@ pub struct MergeRequest {
     /// The main/surviving worker ID
     pub main_worker_id: Uuid,
 
-    /// The duplicate worker ID to merge into master
+    /// The duplicate worker ID to merge into main
     pub duplicate_worker_id: Uuid,
 
     /// Reason for the merge

@@ -44,7 +44,7 @@ USER mpi
 WORKDIR /app
 
 # Copy binary from builder stage
-COPY --from=builder /app/target/release/main_worker_index /app/master_worker_index-server
+COPY --from=builder /app/target/release/main_worker_index /app/main_worker_index-server
 
 # Copy migrations for runtime schema management
 COPY --chown=mpi:mpi migrations ./migrations

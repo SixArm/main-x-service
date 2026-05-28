@@ -1,0 +1,167 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}{{ record.label }} &mdash; {{ entity_plural | capitalize }} &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list" aria-label="Breadcrumb trail">
+    <li class="breadcrumb-list-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-list-item"><a href="/{{ entity_plural }}">{{ entity_plural | capitalize }}</a></li>
+    <li class="breadcrumb-list-item" aria-current="page">{{ record.label }}</li>
+  </ol>
+</nav>
+
+{% if healthcare %}
+<div class="medical-banner"
+     role="region"
+     aria-live="polite"
+     aria-label="Patient summary"
+     data-type="info"
+     data-context="medical">
+  <div class="medical-banner-box" data-context="medical">
+    <strong>{{ record.label }}</strong>
+    {% if healthcare.nhs_number %}
+      <span>NHS:
+        <span class="united-kingdom-national-health-service-number-view"
+              aria-label="UK NHS number {{ healthcare.nhs_number }}">{{ healthcare.nhs_number }}</span>
+      </span>
+    {% endif %}
+    {% if healthcare.ssn %}
+      <span>SSN:
+        <span class="united-states-social-security-number-view"
+              aria-label="US Social Security number, last four digits {{ healthcare.ssn_last4 }}">{{ healthcare.ssn }}</span>
+      </span>
+    {% endif %}
+    {% if healthcare.birth_date %}
+      <span>DOB: <time datetime="{{ healthcare.birth_date }}">{{ healthcare.birth_date }}</time></span>
+    {% endif %}
+  </div>
+
+  {% for alert in healthcare.alerts %}
+    <div class="medical-banner-box-for-danger"
+         role="region"
+         aria-label="Alert: {{ alert.title }}"
+         data-type="danger">
+      <strong>{{ alert.title }}.</strong> {{ alert.detail }}
+    </div>
+  {% endfor %}
+
+  {% for advice in healthcare.advice %}
+    <div class="medical-banner-box-for-advice"
+         role="region"
+         aria-label="Advice: {{ advice.title }}"
+         data-type="advice">
+      <strong>{{ advice.title }}.</strong> {{ advice.detail }}
+    </div>
+  {% endfor %}
+</div>
+
+{% for instruction in healthcare.care_instructions %}
+  <div class="care-card" role="region" aria-label="Care instruction: {{ instruction.title }}">
+    <h3>{{ instruction.title }}</h3>
+    <p>{{ instruction.body }}</p>
+    {% if instruction.urgency %}
+      <p>
+        <span class="badge"
+              data-type="{{ instruction.urgency_type }}"
+              aria-label="Urgency: {{ instruction.urgency }}">{{ instruction.urgency }}</span>
+      </p>
+    {% endif %}
+  </div>
+{% endfor %}
+{% endif %}
+
+<section aria-label="{{ entity_singular | capitalize }} detail">
+  <h2>{{ record.label }}</h2>
+
+  <div class="action-bar" role="toolbar" aria-label="{{ entity_singular | capitalize }} actions">
+    <a class="button" href="/{{ entity_plural }}/{{ record.id }}/edit" aria-label="Edit {{ entity_singular }}">Edit</a>
+    <a class="button" href="/{{ entity_plural }}/{{ record.id }}/audit" aria-label="View audit log">Audit log</a>
+    <a class="button" href="/{{ entity_plural }}/{{ record.id }}/export" aria-label="GDPR data export">Export</a>
+    <a class="button" href="/{{ entity_plural }}/{{ record.id }}/fhir" aria-label="FHIR resource view">FHIR</a>
+    <a class="button" href="/{{ entity_plural }}/{{ record.id }}/consents" aria-label="Manage consents">Consents</a>
+    <a class="button" href="/{{ entity_plural }}/{{ record.id }}/links" aria-label="View linked records">Links</a>
+    <a class="button" href="/{{ entity_plural }}/{{ record.id }}/qr" aria-label="QR code share">QR</a>
+    <a class="button" href="/{{ entity_plural }}/{{ record.id }}/quality" aria-label="Data quality score">Quality</a>
+    <a class="button" href="/{{ entity_plural }}/{{ record.id }}/notes" aria-label="View notes thread">Notes</a>
+    <button class="action-bar-button"
+            type="button"
+            aria-label="Delete {{ entity_singular }}"
+            onclick="document.getElementById('delete-confirm').showModal()">
+      Delete
+    </button>
+  </div>
+
+  <ol class="summary-list" aria-label="{{ entity_singular | capitalize }} summary">
+    <li class="summary-list-item">
+      <dl>
+        <dt>ID</dt>
+        <dd><code>{{ record.id }}</code></dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt>Label</dt>
+        <dd>{{ record.label }}</dd>
+      </dl>
+    </li>
+    {% if record.subtitle %}
+    <li class="summary-list-item">
+      <dl>
+        <dt>Subtitle</dt>
+        <dd>{{ record.subtitle }}</dd>
+      </dl>
+    </li>
+    {% endif %}
+    <li class="summary-list-item">
+      <dl>
+        <dt>Status</dt>
+        <dd>{% if record.active %}Active{% else %}Inactive{% endif %}</dd>
+      </dl>
+    </li>
+    {% if record.created_at %}
+    <li class="summary-list-item">
+      <dl>
+        <dt>Created</dt>
+        <dd><time datetime="{{ record.created_at }}">{{ record.created_at }}</time></dd>
+      </dl>
+    </li>
+    {% endif %}
+    {% if record.updated_at %}
+    <li class="summary-list-item">
+      <dl>
+        <dt>Updated</dt>
+        <dd><time datetime="{{ record.updated_at }}">{{ record.updated_at }}</time></dd>
+      </dl>
+    </li>
+    {% endif %}
+  </ol>
+</section>
+
+<dialog id="delete-confirm"
+        class="alert-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-confirm-title"
+        aria-describedby="delete-confirm-body">
+  <h2 id="delete-confirm-title">Delete this {{ entity_singular }}?</h2>
+  <p id="delete-confirm-body">
+    This will soft-delete <strong>{{ record.label }}</strong>. The audit trail is preserved and the record can be restored.
+  </p>
+  <form method="dialog" class="form" aria-label="Confirm delete">
+    <button class="button"
+            type="submit"
+            value="cancel"
+            aria-label="Cancel delete">Cancel</button>
+    <button class="button"
+            type="submit"
+            value="confirm"
+            aria-label="Confirm delete"
+            hx-delete="/api/{{ entity_plural }}/{{ record.id }}"
+            hx-trigger="click"
+            hx-target="body"
+            hx-push-url="/{{ entity_plural }}"
+            onclick="lily.toast('{{ entity_singular | capitalize }} deleted', 'warning')">Delete</button>
+  </form>
+</dialog>
+{% endblock content %}

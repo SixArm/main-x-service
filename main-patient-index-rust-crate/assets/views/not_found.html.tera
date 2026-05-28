@@ -1,0 +1,53 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}404 Not found &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<section aria-label="Page not found">
+  <h2>404 &mdash; Not found</h2>
+
+  <div class="alert" role="alert" aria-label="Not found explanation" data-type="warning">
+    <p>
+      The page <code>{{ requested_path | default(value="(unknown)") }}</code>
+      does not exist on this server.
+    </p>
+  </div>
+
+  <p>
+    <span class="hint" aria-label="Recovery hint">
+      Double-check the URL, or jump to one of the destinations below.
+    </span>
+  </p>
+
+  <ol class="summary-list" aria-label="Useful destinations">
+    <li class="summary-list-item">
+      <dl>
+        <dt>Home</dt>
+        <dd><a href="/">/</a></dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt>{{ entity_plural | capitalize }} index</dt>
+        <dd><a href="/{{ entity_plural }}">/{{ entity_plural }}</a></dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt>Search</dt>
+        <dd><a href="/{{ entity_plural }}/search">/{{ entity_plural }}/search</a></dd>
+      </dl>
+    </li>
+    <li class="summary-list-item">
+      <dl>
+        <dt>Health</dt>
+        <dd><a href="/health">/health</a></dd>
+      </dl>
+    </li>
+  </ol>
+
+  <a class="back-link"
+     href="javascript:history.length > 1 ? history.back() : (location.href='/')"
+     aria-label="Go back to the previous page">Back</a>
+</section>
+{% endblock content %}

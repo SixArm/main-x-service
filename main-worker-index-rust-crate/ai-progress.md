@@ -137,7 +137,7 @@ Tantivy full-text search:
 
 - Transfers: identifiers, names, addresses, contacts, documents, emergency contacts, tax_id
 - Adds duplicate's name as "old" alias
-- Creates WorkerLink (Replaces) from master to duplicate
+- Creates WorkerLink (Replaces) from main to duplicate
 - Soft-deletes duplicate, publishes Merged event
 - Returns merge record with transferred data snapshot
 

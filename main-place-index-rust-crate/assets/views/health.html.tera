@@ -1,0 +1,162 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}Health &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list" aria-label="Breadcrumb trail">
+    <li class="breadcrumb-list-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-list-item" aria-current="page">Health</li>
+  </ol>
+</nav>
+
+<section aria-label="System health">
+  <h2>System health</h2>
+
+  <div class="card" role="region" aria-label="Overall system status">
+    <h3>Overall status</h3>
+    <p>
+      <span class="red-amber-green-view"
+            role="img"
+            data-status="{{ overall.status }}"
+            aria-label="Overall system status: {{ overall.status | capitalize }}">{{ overall.status | capitalize }}</span>
+      {% if overall.status == "green" %}
+        <span class="badge" data-type="success" aria-label="All systems operational">All systems operational</span>
+      {% elif overall.status == "amber" %}
+        <span class="badge" data-type="warning" aria-label="Degraded">Degraded</span>
+      {% else %}
+        <span class="badge" data-type="error" aria-label="Outage">Outage</span>
+      {% endif %}
+    </p>
+
+    <ol class="summary-list" aria-label="Build and runtime metadata">
+      <li class="summary-list-item">
+        <dl>
+          <dt>Service</dt>
+          <dd><code>{{ service.name }}</code></dd>
+        </dl>
+      </li>
+      <li class="summary-list-item">
+        <dl>
+          <dt>Version</dt>
+          <dd><code>{{ service.version }}</code></dd>
+        </dl>
+      </li>
+      <li class="summary-list-item">
+        <dl>
+          <dt>Uptime</dt>
+          <dd>{{ service.uptime_human }}</dd>
+        </dl>
+      </li>
+      <li class="summary-list-item">
+        <dl>
+          <dt>Checked at</dt>
+          <dd><time datetime="{{ service.checked_at }}">{{ service.checked_at }}</time></dd>
+        </dl>
+      </li>
+    </ol>
+
+    <div class="action-bar" role="toolbar" aria-label="Health actions">
+      <button class="button"
+              type="button"
+              aria-label="Re-run health checks"
+              hx-get="/health"
+              hx-target="body"
+              hx-push-url="true"
+              onclick="lily.toast('Re-running health checks', 'info')">Refresh</button>
+      <a class="button"
+         href="/api/health"
+         aria-label="JSON health endpoint">JSON endpoint</a>
+    </div>
+  </div>
+
+  <h3>Subsystems</h3>
+  <table class="data-table" aria-label="Subsystem health">
+    <thead class="data-table-head">
+      <tr class="data-table-row">
+        <th class="data-table-th" scope="col">Subsystem</th>
+        <th class="data-table-th" scope="col">Status</th>
+        <th class="data-table-th" scope="col">Latency</th>
+        <th class="data-table-th" scope="col">Detail</th>
+      </tr>
+    </thead>
+    <tbody class="data-table-body">
+      {% for s in subsystems %}
+        <tr class="data-table-row">
+          <td class="data-table-td">
+            <strong>{{ s.label }}</strong><br>
+            <span class="hint" aria-label="Subsystem identifier">{{ s.id }}</span>
+          </td>
+          <td class="data-table-td">
+            <span class="red-amber-green-view"
+                  role="img"
+                  data-status="{{ s.status }}"
+                  aria-label="{{ s.label }} status: {{ s.status | capitalize }}">{{ s.status | capitalize }}</span>
+          </td>
+          <td class="data-table-td">
+            <meter class="meter"
+                   aria-label="{{ s.label }} latency {{ s.latency_ms }} milliseconds"
+                   min="0"
+                   max="500"
+                   low="50"
+                   high="200"
+                   optimum="0"
+                   value="{{ s.latency_ms }}">{{ s.latency_ms }} ms</meter>
+            <span>{{ s.latency_ms }} ms</span>
+          </td>
+          <td class="data-table-td">{{ s.detail }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3>Resource utilization</h3>
+  <div class="diff" role="group" aria-label="Resource utilization">
+    {% for r in resources %}
+      <article class="card" role="region" aria-label="{{ r.label }} utilization">
+        <h4>{{ r.label }}</h4>
+        <p>
+          <progress class="progress"
+                    aria-label="{{ r.label }} at {{ r.value }} percent of {{ r.max }} percent"
+                    max="{{ r.max }}"
+                    value="{{ r.value }}">{{ r.value }} / {{ r.max }}</progress>
+        </p>
+        <p>
+          <strong>{{ r.value }} / {{ r.max }}</strong>
+          <span class="hint" aria-label="Resource unit">{{ r.unit }}</span>
+        </p>
+        <p>
+          {% if r.status == "green" %}
+            <span class="badge" data-type="success" aria-label="Within limits">Within limits</span>
+          {% elif r.status == "amber" %}
+            <span class="badge" data-type="warning" aria-label="Approaching limit">Approaching limit</span>
+          {% else %}
+            <span class="badge" data-type="error" aria-label="Over limit">Over limit</span>
+          {% endif %}
+        </p>
+      </article>
+    {% endfor %}
+  </div>
+
+  {% if recent_incidents | length > 0 %}
+    <h3>Recent incidents</h3>
+    <ol class="timeline-list" aria-label="Recent incidents, newest first">
+      {% for i in recent_incidents %}
+        <li class="timeline-list-item">
+          <header>
+            {% if i.severity == "outage" %}
+              <span class="badge" data-type="error" aria-label="Severity: outage">Outage</span>
+            {% elif i.severity == "degraded" %}
+              <span class="badge" data-type="warning" aria-label="Severity: degraded">Degraded</span>
+            {% else %}
+              <span class="badge" data-type="info" aria-label="Severity: {{ i.severity }}">{{ i.severity | capitalize }}</span>
+            {% endif %}
+            <time datetime="{{ i.at }}">{{ i.at }}</time>
+          </header>
+          <p>{{ i.summary }}</p>
+        </li>
+      {% endfor %}
+    </ol>
+  {% endif %}
+</section>
+{% endblock content %}

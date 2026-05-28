@@ -1,33 +1,40 @@
-# AGENTS Directory Index
+# AGENTS directory — Main Worker Index
 
 Detailed reference documentation for the Main Worker Index system.
 
-## Files
+## Documents in this directory
 
-| File                               | Description                                                           |
-| ---------------------------------- | --------------------------------------------------------------------- |
-| [architecture.md](architecture.md) | System architecture, layers, data flow                                |
-| [matching.md](matching.md)         | Matching algorithm reference (probabilistic, deterministic, phonetic) |
-| [models.md](models.md)             | Domain model reference (Worker, Identifier, Document, etc.)           |
-| [restful.md](restful.md)           | RESTful API endpoint reference                                        |
-| [testing.md](testing.md)           | Testing strategy, coverage, and guide                                 |
+| Document | Description |
+|----------|-------------|
+| [models.md](models.md) | Domain model reference (FHIR Practitioner) |
+| [matching.md](matching.md) | Matching algorithm reference |
+| [restful.md](restful.md) | RESTful API and library API reference |
+| [testing.md](testing.md) | Testing strategy and guide |
 
-## Shared Files
+## Shared documents (project root)
 
-| File                                                       | Description                          |
-| ---------------------------------------------------------- | ------------------------------------ |
-| [share/overview.md](share/overview.md)                     | Project overview and features        |
-| [share/auditability.md](share/auditability.md)             | Audit logging and event streaming    |
-| [share/availability.md](share/availability.md)             | Availability, scaling, health checks |
-| [share/match-search-merge.md](share/match-search-merge.md) | Match, search, merge algorithms      |
-| [share/observability.md](share/observability.md)           | Tracing, metrics, OpenTelemetry      |
-| [share/privacy.md](share/privacy.md)                       | Data masking, GDPR, consent          |
-| [share/restful.md](share/restful.md)                       | RESTful API guidance                 |
-| [share/technology.md](share/technology.md)                 | Technology stack reference           |
+The shared reference docs live at the project root under [`../../agents/share/`](../../agents/share/).
 
-## See Also
+| Document | Description |
+|----------|-------------|
+| [overview.md](../../agents/share/overview.md) | High-level project overview |
+| [architecture.md](../../agents/share/architecture.md) | Layered architecture |
+| [web-stack.md](../../agents/share/web-stack.md) | Loco / Tera / HTMX / Alpine / Lily |
+| [technology.md](../../agents/share/technology.md) | Tech stack summary |
+| [stack-for-rust-loco.md](../../agents/share/stack-for-rust-loco.md) | Full dependency inventory |
+| [match-search-merge.md](../../agents/share/match-search-merge.md) | Match / search / merge workflows |
+| [dataflow.md](../../agents/share/dataflow.md) | Create / search / merge data flows |
+| [privacy.md](../../agents/share/privacy.md) | Masking, GDPR, consent |
+| [auditability.md](../../agents/share/auditability.md) | Audit logging and event streaming |
+| [availability.md](../../agents/share/availability.md) | Health checks, scaling |
+| [observability.md](../../agents/share/observability.md) | Tracing + OpenTelemetry summary |
+| [restful.md](../../agents/share/restful.md) | REST API conventions |
+| [postgresql.md](../../agents/share/postgresql.md) | PostgreSQL setup |
+| [compliance-for-healthcare.md](../../agents/share/compliance-for-healthcare.md) | HIPAA, NHS, … |
+| [compliance-for-technology.md](../../agents/share/compliance-for-technology.md) | ISO, GDPR, … |
 
-- [../CLAUDE.md](../CLAUDE.md) - Project overview and instructions
-- [../plan.md](../plan.md) - Implementation plan
-- [../tasks.md](../tasks.md) - Task summary
-- [../index.md](../index.md) - Project index
+## See also
+
+- [`../CLAUDE.md`](../CLAUDE.md) — project overview (loaded by Claude Code)
+- [`../README.md`](../README.md) — README (when present)
+- [`../index.md`](../index.md) — project index

@@ -1,0 +1,121 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}Calendar &mdash; {{ entity_plural | capitalize }} &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list" aria-label="Breadcrumb trail">
+    <li class="breadcrumb-list-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-list-item"><a href="/{{ entity_plural }}">{{ entity_plural | capitalize }}</a></li>
+    <li class="breadcrumb-list-item" aria-current="page">Calendar</li>
+  </ol>
+</nav>
+
+<section aria-label="{{ entity_plural | capitalize }} calendar"
+         x-data='{
+           selected: {{ selected_date | json_encode | safe }},
+           selectedRecords() {
+             return ({{ records_by_date | json_encode | safe }})[this.selected] || [];
+           }
+         }'>
+  <h2>{{ entity_plural | capitalize }} created in {{ month_label }}</h2>
+
+  <div class="action-bar" role="toolbar" aria-label="Month navigation">
+    <a class="button"
+       href="/{{ entity_plural }}/calendar?month={{ prev_month }}"
+       aria-label="Previous month, {{ prev_month_label }}">← {{ prev_month_label }}</a>
+    <a class="button"
+       href="/{{ entity_plural }}/calendar"
+       aria-label="Jump to current month">Today</a>
+    <a class="button"
+       href="/{{ entity_plural }}/calendar?month={{ next_month }}"
+       aria-label="Next month, {{ next_month_label }}">{{ next_month_label }} →</a>
+    <span class="action-bar-count">
+      {{ totals.records }} record{% if totals.records != 1 %}s{% endif %} this month
+    </span>
+  </div>
+
+  <div class="diff" role="group" aria-label="Calendar and details">
+    <article class="card" role="region" aria-label="Calendar grid for {{ month_label }}">
+      <table class="calendar-table" aria-label="{{ month_label }}">
+        <caption class="caption">{{ month_label }}</caption>
+        <thead class="calendar-table-head">
+          <tr class="calendar-table-row">
+            {% for d in weekday_labels %}
+              <th class="calendar-table-th" scope="col" aria-label="{{ d.full }}">{{ d.short }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="calendar-table-body">
+          {% for week in weeks %}
+            <tr class="calendar-table-row">
+              {% for day in week %}
+                <td class="calendar-table-td"
+                    x-bind:data-selected="selected === '{{ day.iso }}'"
+                    x-bind:aria-current="selected === '{{ day.iso }}' ? 'date' : 'false'">
+                  {% if day.in_month %}
+                    <button type="button"
+                            aria-label="{{ day.iso }}, {{ day.count }} record{% if day.count != 1 %}s{% endif %}"
+                            @click="selected = '{{ day.iso }}'"
+                            x-bind:aria-pressed="selected === '{{ day.iso }}' ? 'true' : 'false'">
+                      <strong>{{ day.day }}</strong>
+                      {% if day.count > 0 %}
+                        <span class="badge"
+                              data-type="{% if day.count >= 5 %}success{% elif day.count >= 2 %}info{% else %}warning{% endif %}"
+                              aria-label="{{ day.count }} record{% if day.count != 1 %}s{% endif %}">{{ day.count }}</span>
+                      {% endif %}
+                    </button>
+                  {% else %}
+                    <span class="hint" aria-label="Outside current month">{{ day.day }}</span>
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="calendar-table-foot">
+          <tr class="calendar-table-row">
+            <td class="calendar-table-td" colspan="7">
+              <span class="hint" aria-label="Legend">
+                Numbers in cells are <strong>records created on that day</strong>.
+                Click any day to filter the list on the right.
+              </span>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </article>
+
+    <article class="card" role="region" aria-label="Records on selected date">
+      <h3>
+        <span x-text="selected">{{ selected_date }}</span>
+      </h3>
+      <p>
+        <span class="hint"
+              aria-label="Selected-day record count"
+              x-text="selectedRecords().length + ' record(s) on this day.'"></span>
+      </p>
+      <ol class="summary-list" aria-label="Records on selected date">
+        <template x-for="r in selectedRecords()" :key="r.id">
+          <li class="summary-list-item">
+            <dl>
+              <dt>
+                <a x-bind:href="'/{{ entity_plural }}/' + r.id"
+                   x-bind:aria-label="'Open ' + r.label"
+                   x-text="r.label"></a>
+              </dt>
+              <dd>
+                <code x-text="r.id"></code>
+                <span class="hint" x-show="r.subtitle">&middot; <span x-text="r.subtitle"></span></span>
+              </dd>
+            </dl>
+          </li>
+        </template>
+        <li class="summary-list-item" x-show="selectedRecords().length === 0">
+          <span class="hint" aria-label="No records">No {{ entity_plural }} created on this day.</span>
+        </li>
+      </ol>
+    </article>
+  </div>
+</section>
+{% endblock content %}

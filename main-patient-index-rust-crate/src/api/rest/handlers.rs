@@ -608,11 +608,11 @@ pub async fn merge_patients(
     Json(req): Json<crate::models::MergeRequest>,
 ) -> impl IntoResponse {
     // Fetch both patients
-    let master = match state.patient_repository.get_by_id(&req.main_patient_id).await {
+    let main = match state.patient_repository.get_by_id(&req.main_patient_id).await {
         Ok(Some(p)) => p,
         Ok(None) => {
             return (StatusCode::NOT_FOUND, Json(ApiResponse::<crate::models::MergeResponse>::error(
-                "NOT_FOUND", format!("Master patient {} not found", req.main_patient_id)
+                "NOT_FOUND", format!("Main patient {} not found", req.main_patient_id)
             )));
         }
         Err(e) => {
@@ -636,8 +636,8 @@ pub async fn merge_patients(
         }
     };
 
-    // Merge data from duplicate into master
-    let mut merged = master.clone();
+    // Merge data from duplicate into main
+    let mut merged = main.clone();
     let mut transferred = serde_json::Map::new();
 
     // Transfer identifiers not already present
@@ -687,13 +687,13 @@ pub async fn merge_patients(
         }
     }
 
-    // Transfer tax_id if master doesn't have one
+    // Transfer tax_id if main doesn't have one
     if merged.tax_id.is_none() && duplicate.tax_id.is_some() {
         merged.tax_id = duplicate.tax_id.clone();
         transferred.insert("tax_id".into(), serde_json::to_value(&duplicate.tax_id).unwrap_or_default());
     }
 
-    // Add a link from master → replaces duplicate
+    // Add a link from main → replaces duplicate
     merged.links.push(crate::models::PatientLink {
         other_patient_id: duplicate.id,
         link_type: crate::models::LinkType::Replaces,
@@ -716,7 +716,7 @@ pub async fn merge_patients(
         tracing::warn!("Failed to remove duplicate from search index: {}", e);
     }
 
-    // Update search index for master
+    // Update search index for main
     if let Err(e) = state.search_engine.index_patient(&merged) {
         tracing::warn!("Failed to update search index for merged patient: {}", e);
     }

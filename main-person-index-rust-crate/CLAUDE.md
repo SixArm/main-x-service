@@ -3,7 +3,7 @@
 The Main Person Index (MPI) is a critical healthcare system that maintains a
 centralized registry of person identities across healthcare providers.
 
-@AGENTS/share/overview.md
+@agents/share/overview.md
 
 ## Table of Contents
 
@@ -56,13 +56,13 @@ centralized registry of person identities across healthcare providers.
 @AGENTS/restful.md
 @AGENTS/testing.md
 
-@AGENTS/share/auditability.md
-@AGENTS/share/availability.md
-@AGENTS/share/match-search-merge.md
-@AGENTS/share/observability.md
-@AGENTS/share/privacy.md
-@AGENTS/share/restful.md
-@AGENTS/share/technology.md
+@agents/share/auditability.md
+@agents/share/availability.md
+@agents/share/match-search-merge.md
+@agents/share/observability.md
+@agents/share/privacy.md
+@agents/share/restful.md
+@agents/share/technology.md
 
 ### Data Quality & Validation
 

@@ -1,0 +1,314 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}Consents &mdash; {{ record.label }} &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list" aria-label="Breadcrumb trail">
+    <li class="breadcrumb-list-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-list-item"><a href="/{{ entity_plural }}">{{ entity_plural | capitalize }}</a></li>
+    <li class="breadcrumb-list-item"><a href="/{{ entity_plural }}/{{ record.id }}">{{ record.label }}</a></li>
+    <li class="breadcrumb-list-item" aria-current="page">Consents</li>
+  </ol>
+</nav>
+
+<section aria-label="Consent management"
+         x-data="{ drawerOpen: false }">
+  <h2>Consents &mdash; {{ record.label }}</h2>
+
+  <div class="information-callout" aria-label="Consent notice">
+    <p>
+      Consent records track this {{ entity_singular }}'s permissions under
+      GDPR Article 7 / HIPAA Authorization. Revoking a consent does not
+      delete it &mdash; the record remains in the audit trail with status
+      <strong>Revoked</strong>.
+    </p>
+  </div>
+
+  <div class="action-bar" role="toolbar" aria-label="Consent actions">
+    <span class="action-bar-count">
+      {{ stats.active }} active &middot;
+      {{ stats.revoked }} revoked &middot;
+      {{ stats.expired }} expired
+    </span>
+    <button class="button"
+            type="button"
+            aria-label="Grant a new consent"
+            aria-haspopup="dialog"
+            x-bind:aria-expanded="drawerOpen ? 'true' : 'false'"
+            @click="drawerOpen = true">Grant new consent</button>
+  </div>
+
+  {% if consents | length == 0 %}
+    <div class="alert" role="alert" aria-label="Empty consent list" data-type="info">
+      No consents on file for this {{ entity_singular }}.
+    </div>
+  {% else %}
+    <table class="data-table" aria-label="Consent records">
+      <thead class="data-table-head">
+        <tr class="data-table-row">
+          <th class="data-table-th" scope="col">Type</th>
+          <th class="data-table-th" scope="col">Status</th>
+          <th class="data-table-th" scope="col">Granted</th>
+          <th class="data-table-th" scope="col">Expires</th>
+          <th class="data-table-th" scope="col">Method</th>
+          <th class="data-table-th" scope="col">Purpose</th>
+          <th class="data-table-th" scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="data-table-body">
+        {% for c in consents %}
+          <tr class="data-table-row">
+            <td class="data-table-td"><strong>{{ c.consent_type }}</strong></td>
+            <td class="data-table-td">
+              {% if c.status == "Active" %}
+                <span class="badge" data-type="success" aria-label="Status: Active">Active</span>
+              {% elif c.status == "Revoked" %}
+                <span class="badge" data-type="error" aria-label="Status: Revoked">Revoked</span>
+              {% elif c.status == "Expired" %}
+                <span class="badge" data-type="warning" aria-label="Status: Expired">Expired</span>
+              {% else %}
+                <span class="badge" aria-label="Status: {{ c.status }}">{{ c.status }}</span>
+              {% endif %}
+            </td>
+            <td class="data-table-td">
+              {% if c.granted_date %}
+                <time datetime="{{ c.granted_date }}">{{ c.granted_date }}</time>
+              {% else %}
+                &mdash;
+              {% endif %}
+            </td>
+            <td class="data-table-td">
+              {% if c.expiry_date %}
+                <time datetime="{{ c.expiry_date }}">{{ c.expiry_date }}</time>
+              {% else %}
+                <span class="hint" aria-label="No expiry">No expiry</span>
+              {% endif %}
+            </td>
+            <td class="data-table-td">{{ c.method | default(value="—") }}</td>
+            <td class="data-table-td">{{ c.purpose | default(value="—") }}</td>
+            <td class="data-table-td">
+              {% if c.status == "Active" %}
+                <button class="action-bar-button"
+                        type="button"
+                        aria-label="Revoke {{ c.consent_type }} consent"
+                        onclick="document.getElementById('revoke-confirm-{{ c.id }}').showModal()">
+                  Revoke
+                </button>
+
+                <dialog id="revoke-confirm-{{ c.id }}"
+                        class="alert-dialog"
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-labelledby="revoke-confirm-{{ c.id }}-title"
+                        aria-describedby="revoke-confirm-{{ c.id }}-body">
+                  <h2 id="revoke-confirm-{{ c.id }}-title">Revoke {{ c.consent_type }}?</h2>
+                  <p id="revoke-confirm-{{ c.id }}-body">
+                    This will mark the consent as <strong>Revoked</strong> with today's date.
+                    Existing processing under this consent before today remains lawful, but
+                    new processing of this {{ entity_singular }}'s data for
+                    <em>{{ c.consent_type }}</em> must stop.
+                  </p>
+                  <form method="dialog" class="form" aria-label="Confirm revoke">
+                    <button class="button" type="submit" value="cancel" aria-label="Cancel revoke">Cancel</button>
+                    <button class="button"
+                            type="submit"
+                            value="confirm"
+                            aria-label="Confirm revoke"
+                            hx-post="/api/{{ entity_plural }}/{{ record.id }}/consents/{{ c.id }}/revoke"
+                            hx-target="closest tr"
+                            hx-swap="outerHTML"
+                            onclick="lily.toast('{{ c.consent_type }} consent revoked', 'warning')">Revoke</button>
+                  </form>
+                </dialog>
+              {% else %}
+                <span class="hint" aria-label="No action available">No action</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+  <div class="drawer-backdrop"
+       x-show="drawerOpen"
+       x-transition.opacity
+       @click="drawerOpen = false"
+       aria-hidden="true"></div>
+
+  <aside class="drawer"
+         role="dialog"
+         aria-modal="true"
+         aria-label="Grant new consent"
+         x-bind:data-open="drawerOpen ? 'true' : 'false'"
+         @keydown.escape.window="drawerOpen = false">
+    <header>
+      <h3>Grant new consent</h3>
+      <button class="action-bar-button"
+              type="button"
+              aria-label="Close consent drawer"
+              @click="drawerOpen = false">&times;</button>
+    </header>
+
+    <form class="form"
+          aria-label="Grant consent form"
+          hx-post="/api/{{ entity_plural }}/{{ record.id }}/consents"
+          hx-target="body"
+          hx-push-url="/{{ entity_plural }}/{{ record.id }}/consents"
+          @submit="lily.toast('Consent granted', 'success'); drawerOpen = false">
+      <div class="field" aria-label="Consent type field" data-required>
+        <label class="label" for="consent-type">Type</label>
+        <span class="hint" id="consent-type-hint">Lawful basis category for the consent.</span>
+        <select class="select"
+                id="consent-type"
+                name="consent_type"
+                aria-label="Consent type"
+                aria-describedby="consent-type-hint"
+                required>
+          <option class="option" value="DataProcessing">Data processing</option>
+          <option class="option" value="DataSharing">Data sharing</option>
+          <option class="option" value="Marketing">Marketing</option>
+          <option class="option" value="Research">Research</option>
+          <option class="option" value="EmergencyAccess">Emergency access</option>
+        </select>
+      </div>
+
+      <div class="field" aria-label="Method field">
+        <label class="label" for="consent-method">Method</label>
+        <span class="hint" id="consent-method-hint">How the consent was obtained.</span>
+        <select class="select"
+                id="consent-method"
+                name="method"
+                aria-label="Consent method"
+                aria-describedby="consent-method-hint">
+          <option class="option" value="written">Written</option>
+          <option class="option" value="electronic">Electronic</option>
+          <option class="option" value="verbal">Verbal (witnessed)</option>
+          <option class="option" value="implied">Implied (regulated)</option>
+        </select>
+      </div>
+
+      <div class="field" aria-label="Purpose field">
+        <label class="label" for="consent-purpose">Purpose</label>
+        <span class="hint" id="consent-purpose-hint">Free-text description of the specific use.</span>
+        <input class="text-input"
+               type="text"
+               id="consent-purpose"
+               name="purpose"
+               aria-label="Consent purpose"
+               aria-describedby="consent-purpose-hint"
+               placeholder="e.g. inclusion in cardiology cohort study 2026-CC-42">
+      </div>
+
+      <div class="field" aria-label="Expiry field">
+        <label class="label" for="consent-expiry">Expires (optional)</label>
+        <span class="hint" id="consent-expiry-hint">Leave blank for no expiry.</span>
+        <input class="text-input"
+               type="date"
+               id="consent-expiry"
+               name="expiry_date"
+               aria-label="Consent expiry date"
+               aria-describedby="consent-expiry-hint">
+      </div>
+
+      <div class="field"
+           aria-label="Signature field"
+           data-required
+           x-data='{
+             empty: true,
+             dataUrl: "",
+             ctx: null,
+             drawing: false,
+             init() {
+               var canvas = this.$refs.pad;
+               var rect = canvas.getBoundingClientRect();
+               canvas.width = rect.width;
+               canvas.height = 120;
+               var ctx = canvas.getContext("2d");
+               ctx.lineWidth = 2;
+               ctx.lineCap = "round";
+               ctx.strokeStyle = "#231f20";
+               this.ctx = ctx;
+             },
+             point(evt) {
+               var canvas = this.$refs.pad;
+               var rect = canvas.getBoundingClientRect();
+               var t = evt.touches ? evt.touches[0] : evt;
+               return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+             },
+             start(evt) {
+               this.drawing = true;
+               var p = this.point(evt);
+               this.ctx.beginPath();
+               this.ctx.moveTo(p.x, p.y);
+             },
+             move(evt) {
+               if (!this.drawing) return;
+               evt.preventDefault();
+               var p = this.point(evt);
+               this.ctx.lineTo(p.x, p.y);
+               this.ctx.stroke();
+               this.empty = false;
+             },
+             end() {
+               if (!this.drawing) return;
+               this.drawing = false;
+               this.dataUrl = this.$refs.pad.toDataURL("image/png");
+             },
+             clear() {
+               this.ctx.clearRect(0, 0, this.$refs.pad.width, this.$refs.pad.height);
+               this.empty = true;
+               this.dataUrl = "";
+               if (window.lily &amp;&amp; window.lily.toast) {
+                 window.lily.toast("Signature cleared", "info");
+               }
+             }
+           }'
+           x-init="init()">
+        <label class="label" for="consent-signature">Signature</label>
+        <span class="hint" id="consent-signature-hint">
+          Required for written / electronic methods. Draw with your finger
+          (touch) or mouse. The captured image is stored alongside the
+          consent for audit.
+        </span>
+        <div class="signature-pad"
+             aria-label="Consent signature pad"
+             style="touch-action: none; width: 100%; height: 120px;">
+          <canvas id="consent-signature"
+                  x-ref="pad"
+                  aria-label="Signature canvas"
+                  style="display: block; width: 100%; height: 100%;"
+                  @mousedown="start($event)"
+                  @mousemove="move($event)"
+                  @mouseup="end()"
+                  @mouseleave="end()"
+                  @touchstart.prevent="start($event)"
+                  @touchmove.prevent="move($event)"
+                  @touchend="end()"></canvas>
+        </div>
+        <input type="hidden" name="signature" x-bind:value="dataUrl">
+        <div class="action-bar" role="toolbar" aria-label="Signature actions">
+          <button class="button"
+                  type="button"
+                  aria-label="Clear signature"
+                  x-bind:disabled="empty"
+                  @click="clear()">Clear</button>
+          <span class="action-bar-count" x-show="!empty">
+            <span class="badge" data-type="success" aria-label="Signature captured">Captured</span>
+          </span>
+          <span class="hint" x-show="empty" aria-label="No signature yet">Not yet signed.</span>
+        </div>
+      </div>
+
+      <div class="action-bar" role="toolbar" aria-label="Drawer actions">
+        <button class="button" type="submit" aria-label="Grant consent">Grant</button>
+        <button class="button"
+                type="button"
+                aria-label="Close drawer without granting"
+                @click="drawerOpen = false">Cancel</button>
+      </div>
+    </form>
+  </aside>
+</section>
+{% endblock content %}

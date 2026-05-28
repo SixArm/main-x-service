@@ -1,0 +1,146 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}Metrics &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list" aria-label="Breadcrumb trail">
+    <li class="breadcrumb-list-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-list-item" aria-current="page">Metrics</li>
+  </ol>
+</nav>
+
+<section aria-label="Performance metrics">
+  <h2>Metrics</h2>
+
+  <form class="form"
+        aria-label="Metrics time range"
+        method="get"
+        action="/metrics"
+        hx-get="/metrics"
+        hx-target="body"
+        hx-push-url="true"
+        hx-trigger="change">
+    <div class="field" aria-label="Time range field">
+      <label class="label" for="range">Time range</label>
+      <select class="select"
+              id="range"
+              name="range"
+              aria-label="Time range">
+        <option class="option" value="1h"  {% if range == "1h"  %}selected{% endif %}>Last hour</option>
+        <option class="option" value="6h"  {% if range == "6h"  %}selected{% endif %}>Last 6 hours</option>
+        <option class="option" value="24h" {% if range == "24h" %}selected{% endif %}>Last 24 hours</option>
+        <option class="option" value="7d"  {% if range == "7d"  %}selected{% endif %}>Last 7 days</option>
+      </select>
+    </div>
+  </form>
+
+  <h3>System overview</h3>
+  <div class="diff" role="group" aria-label="System metric cards">
+    {% for m in system_metrics %}
+      <article class="card" role="region" aria-label="{{ m.label }} card">
+        <header>
+          <h4>{{ m.label }}</h4>
+          <p>
+            <strong>{{ m.current }}</strong>
+            <span class="hint" aria-label="Unit">{{ m.unit }}</span>
+            {% if m.delta_pct > 0 %}
+              <span class="badge" data-type="warning" aria-label="Trend up {{ m.delta_pct }} percent">▲ {{ m.delta_pct }}%</span>
+            {% elif m.delta_pct < 0 %}
+              <span class="badge" data-type="success" aria-label="Trend down {{ m.delta_pct }} percent">▼ {{ m.delta_pct }}%</span>
+            {% else %}
+              <span class="badge" data-type="info" aria-label="Trend flat">– 0%</span>
+            {% endif %}
+          </p>
+        </header>
+        <div class="sparkline" aria-label="{{ m.label }} sparkline">
+          <svg viewBox="0 0 100 30" width="100%" height="40" role="img" aria-hidden="true">
+            <polyline fill="none" stroke="currentColor" stroke-width="1.5" points="{{ m.points }}"/>
+          </svg>
+        </div>
+        <p>
+          <span class="hint" aria-label="{{ m.label }} sparkline label">
+            {{ range_label }} &middot; min {{ m.min }} &middot; max {{ m.max }}
+          </span>
+        </p>
+      </article>
+    {% endfor %}
+  </div>
+
+  <h3>Per-endpoint latency</h3>
+  <table class="data-table" aria-label="Per-endpoint latency">
+    <thead class="data-table-head">
+      <tr class="data-table-row">
+        <th class="data-table-th" scope="col">Endpoint</th>
+        <th class="data-table-th" scope="col">Health</th>
+        <th class="data-table-th" scope="col">p50</th>
+        <th class="data-table-th" scope="col">p95</th>
+        <th class="data-table-th" scope="col">p99</th>
+        <th class="data-table-th" scope="col">Req/sec</th>
+        <th class="data-table-th" scope="col">Trend</th>
+      </tr>
+    </thead>
+    <tbody class="data-table-body">
+      {% for e in endpoints %}
+        <tr class="data-table-row">
+          <td class="data-table-td"><code>{{ e.method }} {{ e.path }}</code></td>
+          <td class="data-table-td">
+            <span class="red-amber-green-view"
+                  role="img"
+                  data-status="{{ e.status }}"
+                  aria-label="{{ e.path }} status: {{ e.status | capitalize }}">{{ e.status | capitalize }}</span>
+          </td>
+          <td class="data-table-td">{{ e.p50_ms }} ms</td>
+          <td class="data-table-td">
+            <meter class="meter"
+                   aria-label="{{ e.path }} p95 {{ e.p95_ms }} milliseconds"
+                   min="0" max="500" low="100" high="300" optimum="0"
+                   value="{{ e.p95_ms }}">{{ e.p95_ms }} ms</meter>
+            <span>{{ e.p95_ms }} ms</span>
+          </td>
+          <td class="data-table-td">{{ e.p99_ms }} ms</td>
+          <td class="data-table-td">{{ e.rps }}</td>
+          <td class="data-table-td">
+            <div class="sparkline" aria-label="{{ e.path }} request-rate sparkline">
+              <svg viewBox="0 0 100 20" width="100" height="20" role="img" aria-hidden="true">
+                <polyline fill="none" stroke="currentColor" stroke-width="1.5" points="{{ e.points }}"/>
+              </svg>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3>Errors by class</h3>
+  <ol class="summary-list" aria-label="Errors grouped by HTTP status class">
+    {% for err in error_classes %}
+      <li class="summary-list-item">
+        <dl>
+          <dt>
+            {% if err.class == "2xx" %}
+              <span class="badge" data-type="success" aria-label="HTTP class 2xx">2xx</span>
+            {% elif err.class == "4xx" %}
+              <span class="badge" data-type="warning" aria-label="HTTP class 4xx">4xx</span>
+            {% elif err.class == "5xx" %}
+              <span class="badge" data-type="error" aria-label="HTTP class 5xx">5xx</span>
+            {% else %}
+              <span class="badge" data-type="info" aria-label="HTTP class {{ err.class }}">{{ err.class }}</span>
+            {% endif %}
+            <span>{{ err.description }}</span>
+          </dt>
+          <dd>
+            <strong>{{ err.count }}</strong>
+            <span class="hint" aria-label="Share of total">({{ err.pct }}%)</span>
+          </dd>
+        </dl>
+      </li>
+    {% endfor %}
+  </ol>
+
+  <div class="action-bar" role="toolbar" aria-label="Metrics actions">
+    <a class="button" href="/health" aria-label="Open system health page">System health</a>
+    <a class="button" href="/api/health" aria-label="Open JSON health endpoint">JSON endpoint</a>
+  </div>
+</section>
+{% endblock content %}

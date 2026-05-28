@@ -1,12 +1,12 @@
-# Domain Model Reference
+# Domain model reference — Main Thing Index
 
-Based on [schema.org/Place](https://schema.org/Place).
+Based on [schema.org/Thing](https://schema.org/Thing). The Thing model is intentionally generic so it can represent a wide range of physical and digital assets; the schema currently reuses the GLN-based identifier and PostalAddress structures from the place lineage.
 
-## Place
+## Thing
 
-`src/models/place.rs`
+`src/models/thing.rs`
 
-Core entity representing a physical place.
+Core entity representing a thing.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -14,7 +14,7 @@ Core entity representing a physical place.
 | `name` | `String` | Primary name (required) |
 | `alternate_name` | `Option<String>` | Alternate name / alias |
 | `description` | `Option<String>` | Description |
-| `place_type` | `Option<PlaceType>` | Classification |
+| `thing_type` | `Option<ThingType>` | Classification |
 | `address` | `Option<PostalAddress>` | Structured address |
 | `geo` | `Option<GeoCoordinates>` | Coordinates |
 | `telephone` | `Option<String>` | Phone (international format) |
@@ -22,9 +22,9 @@ Core entity representing a physical place.
 | `url` | `Option<String>` | Website URL |
 | `global_location_number` | `Option<String>` | 13-digit GLN |
 | `branch_code` | `Option<String>` | Branch code |
-| `contained_in_place` | `Option<Uuid>` | Parent place ID |
+| `contained_in_thing` | `Option<Uuid>` | Parent thing ID |
 | `keywords` | `Vec<String>` | Tags |
-| `identifiers` | `Vec<PlaceIdentifier>` | External identifiers |
+| `identifiers` | `Vec<ThingIdentifier>` | External identifiers |
 | `amenity_features` | `Vec<AmenityFeature>` | Features |
 | `opening_hours` | `Vec<OpeningHoursSpecification>` | Hours |
 | `is_accessible_for_free` | `Option<bool>` | Free access |
@@ -36,7 +36,7 @@ Core entity representing a physical place.
 | `created_at` | `DateTime<Utc>` | Creation timestamp |
 | `updated_at` | `DateTime<Utc>` | Last update timestamp |
 
-Methods: `Place::new(name)`, `place.soft_delete()`
+Methods: `Thing::new(name)`, `thing.soft_delete()`
 
 ## PostalAddress
 
@@ -62,13 +62,13 @@ Methods: `Place::new(name)`, `place.soft_delete()`
 
 Methods: `GeoCoordinates::new(lat, lon)`, `geo.distance_to(&other)` (Haversine, returns meters)
 
-## PlaceType
+## ThingType
 
-`src/models/place_type.rs`
+`src/models/thing_type.rs`
 
 Enum variants: `LocalBusiness`, `CivicStructure`, `AdministrativeArea`, `Landform`, `Park`, `Airport`, `Hospital`, `School`, `Library`, `Museum`, `Restaurant`, `Hotel`, `Other(String)`
 
-## PlaceIdentifier
+## ThingIdentifier
 
 `src/models/identifier.rs`
 
@@ -77,9 +77,9 @@ Enum variants: `LocalBusiness`, `CivicStructure`, `AdministrativeArea`, `Landfor
 | `identifier_type` | `IdentifierType` |
 | `value` | `String` |
 
-IdentifierType variants: `GlobalLocationNumber`, `BranchCode`, `Fips`, `Gnis`, `OpenStreetMap`, `Custom(String)`
+`IdentifierType` variants: `GlobalLocationNumber`, `BranchCode`, `Fips`, `Gnis`, `OpenStreetMap`, `Custom(String)`
 
-Methods: `PlaceIdentifier::new(type, value)`, `PlaceIdentifier::gln(value)`
+Methods: `ThingIdentifier::new(type, value)`, `ThingIdentifier::gln(value)`
 
 ## AmenityFeature
 
@@ -107,13 +107,13 @@ Methods: `PlaceIdentifier::new(type, value)`, `PlaceIdentifier::gln(value)`
 | Field | Type |
 |-------|------|
 | `id` | `Uuid` |
-| `place_id` | `Uuid` |
+| `thing_id` | `Uuid` |
 | `consent_type` | `ConsentType` |
 | `status` | `ConsentStatus` |
 | `granted_at` | `DateTime<Utc>` |
 | `expires_at` | `Option<DateTime<Utc>>` |
 
-ConsentType: `DataProcessing`, `DataSharing`, `Marketing`, `Research`
-ConsentStatus: `Active`, `Revoked`, `Expired`
+`ConsentType`: `DataProcessing`, `DataSharing`, `Marketing`, `Research`
+`ConsentStatus`: `Active`, `Revoked`, `Expired`
 
 Methods: `consent.is_active()` (checks status and expiration)

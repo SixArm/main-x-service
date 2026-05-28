@@ -3,7 +3,7 @@
 The Main Worker Index (MPI) is a critical healthcare system that maintains a
 centralized registry of worker identities across healthcare providers.
 
-@AGENTS/share/overview.md
+@agents/share/overview.md
 
 ## Table of Contents
 
@@ -56,13 +56,13 @@ centralized registry of worker identities across healthcare providers.
 @AGENTS/restful.md
 @AGENTS/testing.md
 
-@AGENTS/share/auditability.md
-@AGENTS/share/availability.md
-@AGENTS/share/match-search-merge.md
-@AGENTS/share/observability.md
-@AGENTS/share/privacy.md
-@AGENTS/share/restful.md
-@AGENTS/share/technology.md
+@agents/share/auditability.md
+@agents/share/availability.md
+@agents/share/match-search-merge.md
+@agents/share/observability.md
+@agents/share/privacy.md
+@agents/share/restful.md
+@agents/share/technology.md
 
 ### Data Quality & Validation
 
@@ -154,9 +154,9 @@ cargo run --release
 **Worker Merge Flow:**
 
 1. HTTP POST /merge -> REST API Handler
-2. Fetch master and duplicate from database
-3. Transfer data from duplicate to master
-4. Update master in database
+2. Fetch main and duplicate from database
+3. Transfer data from duplicate to main
+4. Update main in database
 5. Soft-delete duplicate
 6. Update search index
 7. Publish Merged event
@@ -319,7 +319,7 @@ curl -X POST http://localhost:8080/api/workers/match \
 ```bash
 curl -X POST http://localhost:8080/api/workers/merge \
   -H "Content-Type: application/json" \
-  -d '{ "main_worker_id": "uuid-master", "duplicate_worker_id": "uuid-dup", "merge_reason": "Confirmed duplicate" }'
+  -d '{ "main_worker_id": "uuid-main", "duplicate_worker_id": "uuid-dup", "merge_reason": "Confirmed duplicate" }'
 ```
 
 **Batch Deduplication:**

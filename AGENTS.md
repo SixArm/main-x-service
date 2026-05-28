@@ -1,50 +1,89 @@
-# Main X Index Rust crate
+# Main X Index Rust crates
 
-@AGENTS/share/overview.md
+@agents/share/overview.md
 
-Subprojects:
+## Subprojects
 
-- [Main Person Index Rust crate](main-person-index-rust-crate)
-- [Main Place Index Rust crate](main-place-index-rust-crate)
-- [Main Thing Index Rust crate](main-thing-index-rust-crate/)
-- [Main Event Index Rust crate](main-event-index-rust-crate/)
+- [Main Person Index Rust crate](main-person-index-rust-crate/)
 - [Main Patient Index Rust crate](main-patient-index-rust-crate/)
 - [Main Worker Index Rust crate](main-worker-index-rust-crate/)
+- [Main Place Index Rust crate](main-place-index-rust-crate/)
+- [Main Thing Index Rust crate](main-thing-index-rust-crate/)
+- [Main Event Index Rust crate](main-event-index-rust-crate/)
 
-## Features
+## Shared reference docs
 
-### Data Management
+@agents/share/index.md
+
+@agents/share/architecture.md
+@agents/share/dataflow.md
+@agents/share/match-search-merge.md
+@agents/share/match.md
+@agents/share/search.md
+@agents/share/merge.md
+@agents/share/privacy.md
+@agents/share/auditability.md
+@agents/share/availability.md
+@agents/share/observability.md
+@agents/share/restful.md
+@agents/share/technology.md
+@agents/share/stack-for-rust-loco.md
+@agents/share/web-stack.md
+@agents/share/postgresql.md
+@agents/share/locales.md
+@agents/share/compliance-for-healthcare.md
+@agents/share/compliance-for-technology.md
+
+## Common features
+
+### Data management
 
 - Create, read, update, and delete (CRUD) records
-- Soft delete support with complete audit trails
-- Identifier management; multiple identifiers per record.
-- Identity document management; multiple identity documents per record.
-- Contact information management; multiple contacts per record.
+- Soft delete with complete audit trails
+- Multiple identifiers per record (type + system + value)
+- Identity documents (passport, driver's license, etc., where the entity supports them)
+- Multiple contacts per record (phone / email / address)
 - Automatic event stream publishing for all CRUD operations
 
 ### Matching
 
-- **Probabilistic Matching**: Advanced fuzzy matching algorithms
-- **Deterministic Matching**: Rule-based exact matching
-- **Configurable Scoring**: Customizable match thresholds and weights
-- **Match Components**:
-  - String matching (Jaro-Winkler, Levenshtein, Soundex phonetic)
-  - Date matching with error tolerance
-  - Identifier matching
-  - Identification document matching
-- **Score Breakdown**: Full per-component score breakdown in API responses
+- **Probabilistic matching** — weighted fuzzy scoring
+- **Deterministic matching** — rule-based with short-circuit (tax-ID, document, GLN, …)
+- **Configurable scoring** — thresholds and weights are tunable
+- **Components** — string similarity (Jaro-Winkler, Levenshtein, Soundex), date proximity, geo (Haversine), identifier exact-match
+- **Score breakdown** — full per-component scores in API responses
 
-@AGENTS/index.md
+### Data quality & validation
 
-### Data Quality & Validation
+- Required-field enforcement
+- Date / range validation (no future birth dates, lat/lon bounds, GLN check digit, …)
+- Email and phone format checks
+- Address validation (requires locality, postal code, or country)
+- Document validation (number required, expiry check, issue-before-expiry)
+- Phone normalization (E.164-like)
+- Address standardization (title-case locality, uppercase region/country, abbreviation expansion)
+- Validation integrated into create/update handlers (returns `422`)
 
-- Required field enforcement
-- Date validation
-- ID format validation
-- Email format validation
-- Phone number digit count validation
-- Address validation (requires city, postal code, or country)
-- Document validation (required number, expiry check, issue-before-expiry)
-- Phone number normalization (E.164-like format)
-- Address standardization (title-case city, uppercase state/country, expand abbreviations)
-- Validation integrated into create and update handlers (returns 422)
+### Web UI
+
+Every crate ships a server-rendered UI on top of its REST API. See [agents/share/web-stack.md](agents/share/web-stack.md).
+
+- Loco.rs framework conventions
+- Tera templates
+- HTMX for server-driven AJAX
+- Alpine.js for light client-side state
+- Lily Design System (HTML Headless) for accessible component structure; NHS UK theme bundled as `lily.css` provides the visual layer
+
+Run with: `cargo run --bin web` (binds `0.0.0.0:5150`).
+
+## Per-crate docs
+
+Each crate ships its own:
+
+- `AGENTS.md` — directory of the crate's reference docs
+- `AGENTS/index.md` — index of `AGENTS/*` files
+- `AGENTS/models.md` — domain model reference
+- `AGENTS/matching.md` — per-crate matching tuning
+- `AGENTS/restful.md` — REST API surface
+- `AGENTS/testing.md` — test layout
+- `CLAUDE.md` — project overview (loaded by Claude Code at session start)

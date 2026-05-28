@@ -21,7 +21,7 @@ pub struct MergeRecord {
     /// Unique merge operation identifier
     pub id: Uuid,
 
-    /// The master/surviving patient record ID
+    /// The main/surviving patient record ID
     pub main_patient_id: Uuid,
 
     /// The duplicate/merged patient record ID (now inactive)
@@ -39,7 +39,7 @@ pub struct MergeRecord {
     /// Match score that triggered the merge review
     pub match_score: Option<f64>,
 
-    /// Snapshot of data transferred from duplicate to master
+    /// Snapshot of data transferred from duplicate to main
     pub transferred_data: Option<serde_json::Value>,
 
     /// When the merge was performed
@@ -49,10 +49,10 @@ pub struct MergeRecord {
 /// Request to merge two patient records
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct MergeRequest {
-    /// The master/surviving patient ID
+    /// The main/surviving patient ID
     pub main_patient_id: Uuid,
 
-    /// The duplicate patient ID to merge into master
+    /// The duplicate patient ID to merge into main
     pub duplicate_patient_id: Uuid,
 
     /// Reason for the merge

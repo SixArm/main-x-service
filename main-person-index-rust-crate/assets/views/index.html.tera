@@ -1,0 +1,206 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}{{ entity_plural | capitalize }} &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<section aria-label="{{ entity_plural | capitalize }} index"
+         x-data="{ open: false, selected: [] }">
+  <h2>{{ entity_plural | capitalize }}</h2>
+
+  <div class="action-bar" role="toolbar" aria-label="{{ entity_plural | capitalize }} actions">
+    <button class="button"
+            type="button"
+            aria-label="Toggle new {{ entity_singular }} form"
+            aria-expanded="false"
+            x-bind:aria-expanded="open ? 'true' : 'false'"
+            @click="open = !open">
+      <span x-show="!open">New {{ entity_singular }}</span>
+      <span x-show="open">Cancel</span>
+    </button>
+    <a class="button"
+       href="/{{ entity_plural }}/import"
+       aria-label="Bulk-import {{ entity_plural }} from CSV">Import CSV</a>
+  </div>
+
+  <div class="card"
+       role="region"
+       aria-label="Create a new {{ entity_singular }}"
+       x-show="open"
+       x-transition>
+    <h3>Create a new {{ entity_singular }}</h3>
+    <form class="form"
+          aria-label="Create {{ entity_singular }} form"
+          hx-post="/{{ entity_plural }}"
+          hx-target="#{{ entity_plural }}-tbody"
+          hx-swap="afterbegin">
+      <div class="field" aria-label="Label field" data-required>
+        <label class="label" for="label">Label</label>
+        <span class="hint" id="label-hint">A short, human-readable label.</span>
+        <input class="text-input"
+               type="text"
+               id="label"
+               name="label"
+               aria-label="Label"
+               aria-describedby="label-hint"
+               required>
+      </div>
+      <button class="button" type="submit" aria-label="Create {{ entity_singular }}">Create</button>
+    </form>
+  </div>
+
+  {% if records | length == 0 %}
+    <p><span class="hint" aria-label="Empty list">No {{ entity_plural }} yet.</span></p>
+  {% else %}
+    <div class="action-bar"
+         role="toolbar"
+         aria-label="Bulk actions"
+         x-show="selected.length > 0"
+         x-transition
+         x-bind:data-selected-count="selected.length">
+      <span class="action-bar-count" x-text="selected.length + ' selected'"></span>
+      <button class="action-bar-button"
+              type="button"
+              aria-label="Bulk delete selected"
+              onclick="document.getElementById('bulk-delete-confirm').showModal()">Delete</button>
+      <button class="action-bar-button"
+              type="button"
+              aria-label="Bulk merge selected"
+              x-bind:disabled="selected.length !== 2"
+              onclick="document.getElementById('bulk-merge-confirm').showModal()">Merge</button>
+      <button class="action-bar-clear"
+              type="button"
+              aria-label="Clear selection"
+              @click="selected = []">&times;</button>
+    </div>
+
+    <table class="data-table" aria-label="{{ entity_plural | capitalize }}">
+      <thead class="data-table-head">
+        <tr class="data-table-row">
+          <th class="data-table-th" scope="col">
+            <label class="label" for="select-all">
+              <input class="checkbox-input"
+                     type="checkbox"
+                     id="select-all"
+                     aria-label="Select all {{ entity_plural }} on this page"
+                     @change="selected = $event.target.checked
+                              ? Array.from(document.querySelectorAll('.row-select')).map(el =&gt; el.value)
+                              : []">
+              <span class="screen-reader-span">Select all</span>
+            </label>
+          </th>
+          <th class="data-table-th" scope="col">Label</th>
+          <th class="data-table-th" scope="col">Subtitle</th>
+          <th class="data-table-th" scope="col">Status</th>
+        </tr>
+      </thead>
+      <tbody class="data-table-body" id="{{ entity_plural }}-tbody">
+        {% for r in records %}
+          <tr class="data-table-row" x-bind:data-selected="selected.includes('{{ r.id }}')">
+            <td class="data-table-td">
+              <input class="checkbox-input row-select"
+                     type="checkbox"
+                     value="{{ r.id }}"
+                     aria-label="Select {{ r.label }}"
+                     x-model="selected">
+            </td>
+            <td class="data-table-td">
+              <a href="/{{ entity_plural }}/{{ r.id }}">{{ r.label }}</a>
+            </td>
+            <td class="data-table-td">{{ r.subtitle | default(value="") }}</td>
+            <td class="data-table-td">
+              {% if r.active %}
+                <span class="badge" data-type="success" aria-label="Active">Active</span>
+              {% else %}
+                <span class="badge" data-type="error" aria-label="Inactive">Inactive</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if pagination and pagination.total_pages > 1 %}
+      <nav class="pagination-nav" aria-label="{{ entity_plural | capitalize }} pagination">
+        <ol class="pagination-list" aria-label="Page links">
+          {% if pagination.has_prev %}
+            <li class="pagination-list-item">
+              <a class="pagination-link"
+                 href="/{{ entity_plural }}?page={{ pagination.page - 1 }}"
+                 aria-label="Previous page">Previous</a>
+            </li>
+          {% endif %}
+          {% for p in pagination.pages %}
+            <li class="pagination-list-item">
+              {% if p == pagination.page %}
+                <span aria-current="page" aria-label="Page {{ p }}, current">{{ p }}</span>
+              {% else %}
+                <a class="pagination-link"
+                   href="/{{ entity_plural }}?page={{ p }}"
+                   aria-label="Page {{ p }}">{{ p }}</a>
+              {% endif %}
+            </li>
+          {% endfor %}
+          {% if pagination.has_next %}
+            <li class="pagination-list-item">
+              <a class="pagination-link"
+                 href="/{{ entity_plural }}?page={{ pagination.page + 1 }}"
+                 aria-label="Next page">Next</a>
+            </li>
+          {% endif %}
+        </ol>
+      </nav>
+    {% endif %}
+
+    <dialog id="bulk-delete-confirm"
+            class="alert-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="bulk-delete-title"
+            aria-describedby="bulk-delete-body">
+      <h2 id="bulk-delete-title">Delete selected {{ entity_plural }}?</h2>
+      <p id="bulk-delete-body">
+        Soft-delete <strong x-text="selected.length"></strong> {{ entity_plural }}.
+        Each record remains in the audit trail and can be restored within 30 days.
+      </p>
+      <form method="dialog" class="form" aria-label="Confirm bulk delete">
+        <button class="button" type="submit" value="cancel" aria-label="Cancel bulk delete">Cancel</button>
+        <button class="button"
+                type="submit"
+                value="confirm"
+                aria-label="Confirm bulk delete"
+                hx-post="/api/{{ entity_plural }}/bulk-delete"
+                x-bind:hx-vals="JSON.stringify({ ids: selected })"
+                hx-target="body"
+                hx-push-url="/{{ entity_plural }}"
+                @click="lily.toast(selected.length + ' {{ entity_plural }} deleted', 'warning')">Delete</button>
+      </form>
+    </dialog>
+
+    <dialog id="bulk-merge-confirm"
+            class="alert-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="bulk-merge-title"
+            aria-describedby="bulk-merge-body">
+      <h2 id="bulk-merge-title">Merge the two selected {{ entity_plural }}?</h2>
+      <p id="bulk-merge-body">
+        Merge requires exactly two selected {{ entity_plural }}. The first becomes the
+        surviving record; the second is soft-deleted with a <em>Replaces</em> link.
+        Action is reversible from the audit log.
+      </p>
+      <form method="dialog" class="form" aria-label="Confirm bulk merge">
+        <button class="button" type="submit" value="cancel" aria-label="Cancel bulk merge">Cancel</button>
+        <button class="button"
+                type="submit"
+                value="confirm"
+                aria-label="Confirm bulk merge"
+                hx-post="/api/{{ entity_plural }}/merge"
+                x-bind:hx-vals="JSON.stringify({ main_id: selected[0], duplicate_id: selected[1] })"
+                hx-target="body"
+                hx-push-url="/{{ entity_plural }}"
+                @click="lily.toast('Merge completed', 'success')">Merge</button>
+      </form>
+    </dialog>
+  {% endif %}
+</section>
+{% endblock content %}

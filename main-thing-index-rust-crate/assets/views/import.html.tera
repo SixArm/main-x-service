@@ -1,0 +1,276 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}Import {{ entity_plural }} &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list" aria-label="Breadcrumb trail">
+    <li class="breadcrumb-list-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-list-item"><a href="/{{ entity_plural }}">{{ entity_plural | capitalize }}</a></li>
+    <li class="breadcrumb-list-item" aria-current="page">Import</li>
+  </ol>
+</nav>
+
+<section aria-label="Bulk import {{ entity_plural }}"
+         x-data='{
+           step: 0,
+           fileName: "",
+           rows: [],
+           headers: [],
+           mapping: {},
+           progressPercent: 0,
+           result: null,
+           targets: ["(skip)", "label", "subtitle", "MRN", "SSN", "DOB", "gender", "city", "postal_code"],
+           parseFile(input) {
+             var f = input.files &amp;&amp; input.files[0];
+             if (!f) return;
+             this.fileName = f.name;
+             var self = this;
+             var reader = new FileReader();
+             reader.onload = function (e) {
+               var text = String(e.target.result || "");
+               var lines = text.split(/\r?\n/).filter(function (l) { return l.trim().length > 0; });
+               self.headers = (lines.shift() || "").split(",").map(function (h) { return h.trim(); });
+               self.rows = lines.slice(0, 5).map(function (l) {
+                 return l.split(",").map(function (c) { return c.trim(); });
+               });
+               self.mapping = {};
+               self.headers.forEach(function (h) {
+                 var lower = h.toLowerCase();
+                 var match = self.targets.find(function (t) {
+                   return t.toLowerCase() === lower;
+                 });
+                 self.mapping[h] = match || "(skip)";
+               });
+               self.step = 1;
+               if (window.lily &amp;&amp; window.lily.toast) {
+                 window.lily.toast("Parsed " + self.rows.length + " sample row(s)", "info");
+               }
+             };
+             reader.readAsText(f);
+           },
+           startImport() {
+             this.step = 3;
+             this.progressPercent = 0;
+             var self = this;
+             var tick = setInterval(function () {
+               self.progressPercent += 10;
+               if (self.progressPercent >= 100) {
+                 clearInterval(tick);
+                 self.result = {
+                   inserted: self.rows.length * 20,
+                   updated: 3,
+                   skipped: 2,
+                   errors: 0
+                 };
+                 self.step = 4;
+                 if (window.lily &amp;&amp; window.lily.toast) {
+                   window.lily.toast("Import complete", "success");
+                 }
+               }
+             }, 200);
+           },
+           reset() {
+             this.step = 0;
+             this.fileName = "";
+             this.rows = [];
+             this.headers = [];
+             this.mapping = {};
+             this.progressPercent = 0;
+             this.result = null;
+           }
+         }'>
+  <h2>Import {{ entity_plural }}</h2>
+
+  <div class="information-callout" aria-label="Import explainer">
+    <p>
+      Bulk-import {{ entity_plural }} from a CSV file. The wizard is purely
+      client-side here; in production the final step posts to
+      <code>POST /api/{{ entity_plural }}/import</code>, which streams rows
+      through validation and duplicate detection.
+    </p>
+  </div>
+
+  <div class="tab-bar" role="tablist" aria-label="Import steps">
+    <template x-for="(label, i) in ['Upload', 'Preview', 'Map columns', 'Import', 'Done']" :key="i">
+      <button class="tab-bar-button"
+              type="button"
+              role="tab"
+              x-bind:aria-label="'Step ' + (i + 1) + ': ' + label"
+              x-bind:aria-selected="step === i ? 'true' : 'false'"
+              x-bind:tabindex="step === i ? '0' : '-1'"
+              x-bind:disabled="i > step + 1"
+              @click="step = i">
+        <span x-text="(i + 1) + '. ' + label"></span>
+      </button>
+    </template>
+  </div>
+
+  <!-- Step 0: Upload -->
+  <section x-show="step === 0" aria-label="Upload step">
+    <h3>1. Upload CSV</h3>
+    <div class="file-upload"
+         aria-label="Drag and drop a CSV file, or click to choose"
+         @click="$refs.csvInput.click()"
+         @drop.prevent="parseFile($event.dataTransfer)"
+         @dragover.prevent>
+      <p>
+        <strong>Drop a CSV file here</strong>
+        or click to browse.
+      </p>
+      <p>
+        <span class="hint" aria-label="Expected format">
+          UTF-8 encoded, comma-separated, first row is the header.
+        </span>
+      </p>
+      <input class="file-input"
+             type="file"
+             accept=".csv,text/csv"
+             aria-label="CSV file"
+             x-ref="csvInput"
+             @change="parseFile($event.target)"
+             hidden>
+    </div>
+  </section>
+
+  <!-- Step 1: Preview -->
+  <section x-show="step === 1" aria-label="Preview step">
+    <h3>2. Preview</h3>
+    <p>
+      <span class="hint" aria-label="Preview info">
+        File: <code x-text="fileName"></code>.
+        First <span x-text="rows.length"></span> sample row(s); the full file is parsed at import.
+      </span>
+    </p>
+    <table class="data-table" aria-label="CSV preview">
+      <thead class="data-table-head">
+        <tr class="data-table-row">
+          <template x-for="(h, hi) in headers" :key="hi">
+            <th class="data-table-th" scope="col" x-text="h"></th>
+          </template>
+        </tr>
+      </thead>
+      <tbody class="data-table-body">
+        <template x-for="(row, ri) in rows" :key="ri">
+          <tr class="data-table-row">
+            <template x-for="(cell, ci) in row" :key="ci">
+              <td class="data-table-td" x-text="cell"></td>
+            </template>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+    <div class="action-bar" role="toolbar" aria-label="Preview actions">
+      <button class="button" type="button" aria-label="Go back to upload" @click="step = 0">Back</button>
+      <button class="button" type="button" aria-label="Continue to column mapping" @click="step = 2">Next: map columns</button>
+    </div>
+  </section>
+
+  <!-- Step 2: Map columns -->
+  <section x-show="step === 2" aria-label="Map columns step">
+    <h3>3. Map columns</h3>
+    <p>
+      <span class="hint" aria-label="Mapping info">
+        Match each CSV column to a {{ entity_singular }} field, or skip it.
+      </span>
+    </p>
+    <form class="form" aria-label="Column mapping form">
+      <template x-for="(h, hi) in headers" :key="hi">
+        <div class="field" x-bind:aria-label="'Mapping for ' + h">
+          <label class="label" x-bind:for="'map-' + hi" x-text="h"></label>
+          <select class="select"
+                  x-bind:id="'map-' + hi"
+                  x-bind:aria-label="'Mapping for column ' + h"
+                  x-model="mapping[h]">
+            <template x-for="t in targets" :key="t">
+              <option class="option" x-bind:value="t" x-text="t"></option>
+            </template>
+          </select>
+        </div>
+      </template>
+    </form>
+    <div class="action-bar" role="toolbar" aria-label="Mapping actions">
+      <button class="button" type="button" aria-label="Go back to preview" @click="step = 1">Back</button>
+      <button class="button" type="button" aria-label="Start the import" @click="startImport()">Start import</button>
+    </div>
+  </section>
+
+  <!-- Step 3: Importing -->
+  <section x-show="step === 3" aria-label="Import progress step">
+    <h3>4. Importing</h3>
+    <p>
+      <progress class="progress"
+                x-bind:aria-label="'Import progress ' + progressPercent + ' percent'"
+                max="100"
+                x-bind:value="progressPercent"></progress>
+      <span x-text="progressPercent + '%'"></span>
+    </p>
+    <p>
+      <span class="hint" aria-label="Import status">
+        Streaming rows through validation, duplicate detection, and indexing&hellip;
+      </span>
+    </p>
+    <div class="progress-spinner"
+         role="progressbar"
+         aria-label="Import in progress"
+         aria-busy="true"
+         x-show="progressPercent &lt; 100"></div>
+  </section>
+
+  <!-- Step 4: Done -->
+  <section x-show="step === 4" aria-label="Import result step">
+    <h3>5. Done</h3>
+    <div class="alert" role="alert" aria-label="Import succeeded" data-type="success">
+      Import complete. Records have been validated, indexed, and audit-logged.
+    </div>
+    <ol class="summary-list" aria-label="Import result summary" x-show="result">
+      <li class="summary-list-item">
+        <dl>
+          <dt>Inserted</dt>
+          <dd>
+            <span class="badge" data-type="success" aria-label="Inserted count">
+              <span x-text="result &amp;&amp; result.inserted"></span>
+            </span>
+          </dd>
+        </dl>
+      </li>
+      <li class="summary-list-item">
+        <dl>
+          <dt>Updated</dt>
+          <dd>
+            <span class="badge" data-type="info" aria-label="Updated count">
+              <span x-text="result &amp;&amp; result.updated"></span>
+            </span>
+          </dd>
+        </dl>
+      </li>
+      <li class="summary-list-item">
+        <dl>
+          <dt>Skipped (duplicates)</dt>
+          <dd>
+            <span class="badge" data-type="warning" aria-label="Skipped count">
+              <span x-text="result &amp;&amp; result.skipped"></span>
+            </span>
+          </dd>
+        </dl>
+      </li>
+      <li class="summary-list-item">
+        <dl>
+          <dt>Errors</dt>
+          <dd>
+            <span class="badge"
+                  x-bind:data-type="(result &amp;&amp; result.errors > 0) ? 'error' : 'success'"
+                  aria-label="Error count">
+              <span x-text="result &amp;&amp; result.errors"></span>
+            </span>
+          </dd>
+        </dl>
+      </li>
+    </ol>
+    <div class="action-bar" role="toolbar" aria-label="Done actions">
+      <a class="button" href="/{{ entity_plural }}" aria-label="Back to {{ entity_plural }} index">Back to {{ entity_plural }}</a>
+      <button class="button" type="button" aria-label="Import another file" @click="reset()">Import another</button>
+    </div>
+  </section>
+</section>
+{% endblock content %}
