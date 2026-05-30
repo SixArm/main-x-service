@@ -4,12 +4,12 @@
 
 ## Subprojects
 
-- [Main Person Index Rust crate](main-person-index-rust-crate/)
+- [Main Person Service Rust crate](main-person-service-rust-crate/)
 - [Main Patient Index Rust crate](main-patient-index-rust-crate/)
-- [Main Worker Index Rust crate](main-worker-index-rust-crate/)
-- [Main Place Index Rust crate](main-place-index-rust-crate/)
-- [Main Thing Index Rust crate](main-thing-index-rust-crate/)
-- [Main Event Index Rust crate](main-event-index-rust-crate/)
+- [Main Worker Service Rust crate](main-worker-service-rust-crate/)
+- [Main Place Service Rust crate](main-place-service-rust-crate/)
+- [Main Thing Service Rust crate](main-thing-service-rust-crate/)
+- [Main Event Service Rust crate](main-event-service-rust-crate/)
 
 ## Shared reference docs
 

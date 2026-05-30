@@ -1,0 +1,329 @@
+{% extends "layout.html.tera" %}
+
+{% block title %}API tokens &mdash; {{ app_display }}{% endblock title %}
+
+{% block content %}
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list" aria-label="Breadcrumb trail">
+    <li class="breadcrumb-list-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-list-item"><a href="/settings">Settings</a></li>
+    <li class="breadcrumb-list-item" aria-current="page">API tokens</li>
+  </ol>
+</nav>
+
+<section aria-label="API tokens"
+         x-data='{
+           revealed: {},
+           revealTimers: {},
+           justCreated: null,
+           generateOpen: false,
+           newLabel: "",
+           newScopes: ["read"],
+           newExpiry: "P30D",
+           availableScopes: [
+             { id: "read", label: "Read", hint: "GET endpoints only" },
+             { id: "write", label: "Write", hint: "POST / PUT / DELETE on entity records" },
+             { id: "match", label: "Match", hint: "POST /api/{{ entity_plural }}/match + /check-duplicates" },
+             { id: "merge", label: "Merge", hint: "POST /api/{{ entity_plural }}/merge" },
+             { id: "admin", label: "Admin", hint: "Audit, dedup scans, permanent delete" }
+           ],
+           reveal(id) {
+             this.revealed[id] = 10;
+             if (this.revealTimers[id]) clearInterval(this.revealTimers[id]);
+             var self = this;
+             this.revealTimers[id] = setInterval(function () {
+               self.revealed[id] = self.revealed[id] - 1;
+               if (self.revealed[id] <= 0) {
+                 clearInterval(self.revealTimers[id]);
+                 delete self.revealed[id];
+                 delete self.revealTimers[id];
+               }
+             }, 1000);
+           },
+           hide(id) {
+             if (this.revealTimers[id]) clearInterval(this.revealTimers[id]);
+             delete this.revealed[id];
+             delete this.revealTimers[id];
+           },
+           isRevealed(id) { return this.revealed[id] !== undefined &amp;&amp; this.revealed[id] > 0; },
+           remaining(id) { return this.revealed[id] || 0; },
+           copySecret(secret, label) {
+             if (navigator.clipboard) {
+               navigator.clipboard.writeText(secret).then(function () {
+                 window.lily.toast("Copied " + label + " to clipboard", "success");
+               });
+             } else {
+               window.lily.toast("Clipboard not available", "error");
+             }
+           },
+           toggleScope(id) {
+             var i = this.newScopes.indexOf(id);
+             if (i === -1) this.newScopes.push(id);
+             else this.newScopes.splice(i, 1);
+           },
+           generate() {
+             if (!this.newLabel) { window.lily.toast("Label is required", "error"); return; }
+             if (this.newScopes.length === 0) { window.lily.toast("At least one scope is required", "error"); return; }
+             var raw = "tok_" + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+             this.justCreated = {
+               id: "new-" + Date.now(),
+               label: this.newLabel,
+               scopes: this.newScopes.slice(),
+               expiry: this.newExpiry,
+               secret: raw
+             };
+             this.generateOpen = false;
+             this.newLabel = "";
+             this.newScopes = ["read"];
+             this.newExpiry = "P30D";
+             window.lily.toast("Token generated — copy it now", "success");
+           },
+           dismissJustCreated() { this.justCreated = null; }
+         }'>
+  <h2>API tokens</h2>
+  <p>
+    <span class="hint" aria-label="Token guidance">
+      Personal API tokens authenticate as you on the REST API. Treat
+      them like passwords: never commit them, never paste into chat,
+      never reveal on a shared screen. Revoke immediately if exposed.
+    </span>
+  </p>
+
+  <div class="action-bar" role="toolbar" aria-label="Token actions">
+    <button class="button"
+            type="button"
+            aria-label="Generate a new API token"
+            @click="generateOpen = true">+ Generate new token</button>
+    <a class="button"
+       href="/settings"
+       aria-label="Back to settings">&larr; Settings</a>
+  </div>
+
+  <!-- Just-created banner: shown ONCE after generation -->
+  <div class="alert"
+       role="alert"
+       data-type="warning"
+       aria-label="One-time token reveal"
+       x-show="justCreated"
+       x-transition>
+    <h3>One-time reveal &mdash; copy this token now</h3>
+    <p>
+      This is the only time you will see the full token value. After you
+      dismiss this banner the token is masked permanently and cannot be
+      recovered. If you lose it, revoke and generate a new one.
+    </p>
+    <p>
+      <strong>Label:</strong> <span x-text="justCreated &amp;&amp; justCreated.label"></span>
+    </p>
+    <div class="secret-input" aria-label="New token value" data-state="revealed">
+      <code class="secret-input-value"
+            aria-label="Full token value"
+            x-text="justCreated &amp;&amp; justCreated.secret"></code>
+      <button class="clipboard-copy-button"
+              type="button"
+              aria-label="Copy token to clipboard"
+              data-copied-message="Token copied"
+              @click="copySecret(justCreated.secret, justCreated.label)">Copy</button>
+    </div>
+    <p>
+      <button class="button"
+              type="button"
+              aria-label="I have copied the token, dismiss this banner"
+              @click="dismissJustCreated()">I have copied it &mdash; dismiss</button>
+    </p>
+  </div>
+
+  {% if tokens | length == 0 %}
+    <div class="alert" role="alert" aria-label="Empty token list" data-type="info">
+      No API tokens. Click <strong>Generate new token</strong> above to
+      create one.
+    </div>
+  {% else %}
+    <table class="data-table" aria-label="API tokens">
+      <thead class="data-table-head">
+        <tr class="data-table-row">
+          <th class="data-table-th" scope="col">Label</th>
+          <th class="data-table-th" scope="col">Scopes</th>
+          <th class="data-table-th" scope="col">Token</th>
+          <th class="data-table-th" scope="col">Created</th>
+          <th class="data-table-th" scope="col">Last used</th>
+          <th class="data-table-th" scope="col">Expires</th>
+          <th class="data-table-th" scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="data-table-body">
+        {% for token in tokens %}
+          <tr class="data-table-row">
+            <td class="data-table-td">
+              <strong>{{ token.label }}</strong>
+            </td>
+            <td class="data-table-td">
+              <div class="tag-group" aria-label="Token scopes">
+                {% for scope in token.scopes %}
+                  <span class="tag"
+                        aria-label="Scope: {{ scope }}"
+                        {% if scope == "admin" %}data-type="warning"{% endif %}>{{ scope }}</span>
+                {% endfor %}
+              </div>
+            </td>
+            <td class="data-table-td">
+              <div class="secret-input"
+                   aria-label="Masked token"
+                   x-bind:data-state="isRevealed('{{ token.id }}') ? 'revealed' : 'masked'">
+                <code class="secret-input-value"
+                      aria-label="Token value"
+                      x-text="isRevealed('{{ token.id }}') ? '{{ token.preview_full }}' : '••••••••••••{{ token.last4 }}'"></code>
+                <button class="secret-input-toggle"
+                        type="button"
+                        aria-label="Reveal token for 10 seconds"
+                        x-show="!isRevealed('{{ token.id }}')"
+                        @click="reveal('{{ token.id }}')">Reveal</button>
+                <button class="secret-input-toggle"
+                        type="button"
+                        x-show="isRevealed('{{ token.id }}')"
+                        @click="hide('{{ token.id }}')"
+                        x-bind:aria-label="'Hide token (auto-hides in ' + remaining('{{ token.id }}') + ' seconds)'">
+                  Hide (<span x-text="remaining('{{ token.id }}')"></span>s)
+                </button>
+                <button class="clipboard-copy-button"
+                        type="button"
+                        aria-label="Copy token to clipboard"
+                        data-copied-message="Token copied"
+                        @click="copySecret('{{ token.preview_full }}', '{{ token.label }}')">Copy</button>
+              </div>
+            </td>
+            <td class="data-table-td">
+              <time datetime="{{ token.created_at }}">{{ token.created_at }}</time>
+            </td>
+            <td class="data-table-td">
+              {% if token.last_used_at %}
+                <time datetime="{{ token.last_used_at }}">{{ token.last_used_at }}</time>
+              {% else %}
+                <span class="hint" aria-label="Never used">never</span>
+              {% endif %}
+            </td>
+            <td class="data-table-td">
+              {% if token.expires_at %}
+                <time datetime="{{ token.expires_at }}">{{ token.expires_at }}</time>
+              {% else %}
+                <span class="hint" aria-label="No expiry">never</span>
+              {% endif %}
+            </td>
+            <td class="data-table-td">
+              <button class="action-bar-button"
+                      type="button"
+                      data-destructive
+                      aria-label="Revoke {{ token.label }}"
+                      onclick="document.getElementById('revoke-confirm-{{ token.id }}').showModal()">
+                Revoke
+              </button>
+
+              <dialog id="revoke-confirm-{{ token.id }}"
+                      class="alert-dialog"
+                      role="alertdialog"
+                      aria-modal="true"
+                      aria-labelledby="revoke-confirm-{{ token.id }}-title"
+                      aria-describedby="revoke-confirm-{{ token.id }}-body">
+                <h2 id="revoke-confirm-{{ token.id }}-title">Revoke token?</h2>
+                <p id="revoke-confirm-{{ token.id }}-body">
+                  Revoking <strong>{{ token.label }}</strong> takes effect
+                  immediately. Any client or script currently using it
+                  will start receiving <code>401 Unauthorized</code> on
+                  the next request. This action cannot be undone.
+                </p>
+                <form method="dialog" class="form" aria-label="Confirm revoke">
+                  <button class="button" type="submit" value="cancel" aria-label="Cancel">Cancel</button>
+                  <button class="button"
+                          type="submit"
+                          value="confirm"
+                          data-destructive
+                          aria-label="Revoke {{ token.label }}"
+                          hx-delete="/api/tokens/{{ token.id }}"
+                          hx-target="closest tr"
+                          hx-swap="outerHTML"
+                          onclick="lily.toast('Revoked {{ token.label }}', 'success')">Revoke</button>
+                </form>
+              </dialog>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+  <!-- Generate-token drawer -->
+  <aside class="drawer"
+         role="dialog"
+         aria-modal="true"
+         aria-label="Generate new API token"
+         x-bind:data-open="generateOpen ? 'true' : 'false'"
+         x-show="generateOpen"
+         x-transition>
+    <h3>Generate new API token</h3>
+    <form class="form" aria-label="New token form" @submit.prevent="generate()">
+      <div class="field" aria-label="Label field" data-required>
+        <label class="label" for="new-token-label">Label</label>
+        <span class="hint" id="new-token-label-hint">
+          Where will you use this token? e.g. "ETL pipeline", "CLI dev",
+          "warehouse sync".
+        </span>
+        <input class="text-input"
+               type="text"
+               id="new-token-label"
+               name="label"
+               required
+               aria-label="Token label"
+               aria-describedby="new-token-label-hint"
+               x-model="newLabel">
+      </div>
+
+      <fieldset class="fieldset" aria-label="Scopes">
+        <legend>Scopes &mdash; one or more</legend>
+        <template x-for="scope in availableScopes" :key="scope.id">
+          <div class="field">
+            <label class="label">
+              <input class="checkbox-input"
+                     type="checkbox"
+                     x-bind:value="scope.id"
+                     x-bind:checked="newScopes.includes(scope.id)"
+                     x-bind:aria-label="'Grant scope: ' + scope.label"
+                     @change="toggleScope(scope.id)">
+              <strong x-text="scope.label"></strong>
+              <span class="hint" x-text="scope.hint"></span>
+            </label>
+          </div>
+        </template>
+      </fieldset>
+
+      <div class="field" aria-label="Expiry field">
+        <label class="label" for="new-token-expiry">Expiry</label>
+        <select class="select"
+                id="new-token-expiry"
+                aria-label="Token expiry"
+                x-model="newExpiry">
+          <option class="option" value="P7D">7 days</option>
+          <option class="option" value="P30D">30 days</option>
+          <option class="option" value="P90D">90 days</option>
+          <option class="option" value="P365D">1 year</option>
+          <option class="option" value="">No expiry (not recommended)</option>
+        </select>
+      </div>
+
+      <div class="action-bar" role="toolbar" aria-label="New-token actions">
+        <button class="button"
+                type="submit"
+                aria-label="Generate token">Generate</button>
+        <button class="button"
+                type="button"
+                aria-label="Cancel"
+                @click="generateOpen = false">Cancel</button>
+      </div>
+    </form>
+  </aside>
+
+  <div class="drawer-backdrop"
+       aria-hidden="true"
+       x-show="generateOpen"
+       @click="generateOpen = false"></div>
+</section>
+{% endblock content %}

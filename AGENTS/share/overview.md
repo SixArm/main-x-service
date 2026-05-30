@@ -4,12 +4,12 @@ The **Main X Index** family of crates implements a federated identity index — 
 
 | Crate | Entity | Purpose |
 |-------|--------|---------|
-| [main-person-index](../../main-person-index-rust-crate) | Person | General person identity registry (healthcare-aware) |
+| [main-person-service](../../main-person-service-rust-crate) | Person | General person identity registry (healthcare-aware) |
 | [main-patient-index](../../main-patient-index-rust-crate) | Patient | Healthcare-specific patient identity registry |
-| [main-worker-index](../../main-worker-index-rust-crate) | Worker | Workforce / professional identity registry |
-| [main-place-index](../../main-place-index-rust-crate) | Place | Geographic place registry (schema.org/Place) |
-| [main-thing-index](../../main-thing-index-rust-crate) | Thing | Generic thing / asset registry |
-| [main-event-index](../../main-event-index-rust-crate) | Event | Time-bounded event registry |
+| [main-worker-service](../../main-worker-service-rust-crate) | Worker | Workforce / professional identity registry |
+| [main-place-service](../../main-place-service-rust-crate) | Place | Geographic place registry (schema.org/Place) |
+| [main-thing-service](../../main-thing-service-rust-crate) | Thing | Generic thing / asset registry |
+| [main-event-service](../../main-event-service-rust-crate) | Event | Time-bounded event registry |
 
 ## What every crate provides
 

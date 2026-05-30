@@ -59,7 +59,7 @@ Per-crate runtime branching happens at the Rust level via
 `"place"` / `"thing"` / `"event"`) and the Tera context variables
 `entity_singular` / `entity_plural` / `app_display`.
 
-When syncing, the canonical source is `main-person-index-rust-crate/`;
+When syncing, the canonical source is `main-person-service-rust-crate/`;
 copy from there to the other 5 crates.
 
 Verify uniformity:
@@ -85,6 +85,7 @@ done
 | `GET /docs` | `docs` | API documentation landing with collapsible endpoint groups |
 | `GET /palette` | `palette` | Full NHS-token color customizer with live preview |
 | `GET /notifications` | `notifications` | Persistent notification center with severity filter + mark-read / dismiss |
+| `GET /tokens` | `tokens` | Personal API tokens with `secret-input` reveal/hide/copy + just-generated one-time-reveal banner + generate-token `drawer` + per-row Revoke |
 | `GET /dev/500` | `dev_error` | Verifies the 500 page renders |
 | `GET /{entity_plural}` | `index` | Data-table + bulk-select + `?page=N` |
 | `GET /{entity_plural}/import` | `import` | 5-step CSV import wizard |
@@ -93,6 +94,8 @@ done
 | `GET /{entity_plural}/review-queue` | `review_queue` | Dedup queue (`?status=`, `?quality=`, `?page=N`) |
 | `GET /{entity_plural}/review-queue/kanban` | `review_queue_kanban` | Kanban board view with HTML5 drag-and-drop between status columns |
 | `GET /{entity_plural}/deduplicate` | `deduplicate` | 4-step batch-dedup wizard: config (range sliders + dry-run) → PIN verify (`pin-input-div`, demo `1357`) → simulated running → results summary |
+| `GET /{entity_plural}/trash` | `trash` | Soft-deleted records: paginated data-table with restore + permanent-delete per-row, bulk `dropdown-menu` (Restore / Delete forever / Export JSON) |
+| `GET /{entity_plural}/starred` | `starred` | Per-browser starred records; Alpine `x-show`-filters server-seeded candidates against `localStorage["lily-starred-{plural}"]` |
 | `GET /{entity_plural}/compare` | `compare` | Side-by-side match (`?a=&b=&review_id=`) |
 | `GET /{entity_plural}/search` | `search_page` | Full-page search (`?q=&fuzzy=&phonetic=&mask_sensitive=&page=N`) |
 | `GET /{entity_plural}/search/partial` | `search_partial` | HTMX fragment |
@@ -105,6 +108,7 @@ done
 | `GET /{entity_plural}/:id/links` | `links` | Replaces / ReplacedBy / Refer / Seealso graph |
 | `GET /{entity_plural}/:id/qr` | `qr` | QR-code share view (server-rendered SVG placeholder) |
 | `GET /{entity_plural}/:id/quality` | `quality` | Data-quality score with star/face ratings + improvement suggestions |
+| `GET /{entity_plural}/:id/sign` | `sign` | Signature capture (new `signature-pad` canvas + per-stroke undo + typed-name + acknowledgement gate); `?purpose=consent\|witness\|acknowledgement\|authorisation\|other` server-side allowlisted |
 | `GET /static/*` | `ServeDir` | Bundled `lily.css`, `htmx.min.js`, `alpine.min.js` |
 | _anything else_ | `not_found` | Styled 404 fallback (preserves the requested URI) |
 
@@ -281,6 +285,48 @@ The most complex page. 4 list editors plus base fields.
 - **Real wiring**: list / grant / revoke against the consents
   repository.
 
+### `sign.html.tera` — `GET /{entity_plural}/:id/sign?purpose=…`
+
+- **Components**: `breadcrumb-nav` (4-level: Home / {plural} / {record}
+  / Sign), `information-callout` (explains the wire payload), `form`
+  with two `fieldset`s — Context (`select` purpose + `text-input` name
+  + `datetime-local` signed-at) and Signature (the new
+  **`signature-pad`** + per-canvas `action-bar` with Undo / Clear),
+  acknowledgement `checkbox-input`, submit `action-bar`, on-submit
+  success `alert` with `details` + `code-block` showing a truncated
+  data-URL preview.
+- **`signature-pad` contract**: `<div class="signature-pad">` carries
+  `aria-label` + dynamic `data-state="empty"` / `"drawn"`. Inside: an
+  `<canvas class="signature-pad-canvas">` with `role="img"` +
+  `aria-label` + `style="touch-action: none;"` (the CSS rule defers
+  scroll/zoom gestures to the drawing logic), a dashed
+  `signature-pad-baseline` and an italic `signature-pad-placeholder`
+  ("Sign here") both `aria-hidden="true"`. The pad listens for
+  `pointerdown` / `pointermove` / `pointerup` / `pointerleave` /
+  `pointercancel`, uses `canvas.setPointerCapture(pointerId)` for
+  finger/pen-off-edge tolerance, and stores per-stroke arrays so
+  `Undo` can pop one stroke and `redraw()` the rest. The canvas is
+  resized to `devicePixelRatio` and the 2D context scaled to match,
+  so high-DPI screens get crisp strokes. The toolbar buttons disable
+  themselves when `!hasSignature()`.
+- **State**: `purpose`, `signedByName`, `signedAt` (defaults to
+  `new Date().toISOString().slice(0, 16)`), `acknowledged`,
+  `strokes: Vec<Vec<{x, y}>>`, `current` (in-progress stroke),
+  `dataUrl` (PNG base64 produced on submit), `saved` (banner
+  visibility), `canSubmit()` (`hasSignature && signedByName &&
+  acknowledged`).
+- **Context**: `record: {id, label, ...}`, `purpose: String`. The
+  query `?purpose` is server-side allowlisted (`consent`, `witness`,
+  `acknowledgement`, `authorisation`, `other`) and defaults to
+  `consent` on missing or invalid input — this avoids stored-XSS risk
+  from inserting unescaped user-provided text into the page.
+- **Real wiring**: `POST /api/{plural}/{id}/signatures` with
+  `{ purpose, signed_by_name, signed_at, image_png_base64,
+  audit_user_ip, audit_user_agent }`. The signature record should
+  append to the audit log and (for `purpose=consent`) update the
+  related `Consent` row's `granted_signature_id`. The show page's
+  action-bar carries a "Sign" button to `?purpose=consent`.
+
 ### `links.html.tera` — `GET /{entity_plural}/:id/links`
 
 - **Components**: `breadcrumb-nav`, `information-callout`, `action-bar`
@@ -339,6 +385,62 @@ The most complex page. 4 list editors plus base fields.
   /api/{plural}/deduplicate` REST endpoint behind PIN verification
   (production should `POST /api/auth/verify-pin` server-side rather
   than checking the demo constant client-side).
+
+### `starred.html.tera` — `GET /{entity_plural}/starred`
+
+- **Components**: `breadcrumb-nav` (Home / {plural} / Starred),
+  summary `hint` (with live count from `visibleCount()`), top
+  `action-bar` ("← All {plural}" link + "Clear all"
+  `action-bar-button` gated by `alert-dialog`, only visible when
+  `starred.length > 0`), empty-state `alert` (only visible when
+  `starred.length === 0`, with a tiny inline ☆ icon to demonstrate
+  the affordance), `data-table` (only visible when
+  `starred.length > 0`) with star toggle column + Label + Subtitle +
+  Status, per-row `x-show="isStarred(id)"` to hide unstarred rows
+  with `x-transition`, "Clear all" `alert-dialog`.
+- **State**: `x-data` holds `starred: Vec<String>` (seeded from
+  `localStorage["lily-starred-{plural}"]`), `isStarred(id)`,
+  `toggleStar(id, label)` (mutates + persists + toasts),
+  `clearAll()` (empties + removes the key + toasts),
+  `visibleCount()`.
+- **Context**: `candidates: Vec<{id, label, subtitle, active}>`.
+  Scaffold seeds 6 records; production should send all records the
+  user has permission to view and let the page filter, or accept
+  a `?ids=…` query parameter for a server-side pre-filter.
+- **Cross-page coupling**: the same `star-button` (with identical
+  Alpine helpers `isStarred` / `toggleStar`) appears as a column on
+  `index.html.tera` and as the leading button in `show.html.tera`'s
+  action-bar. All three pages read and write the same
+  `localStorage["lily-starred-{plural}"]` key, so toggles propagate
+  across tabs on next render.
+
+### `trash.html.tera` — `GET /{entity_plural}/trash`
+
+- **Components**: `breadcrumb-nav`, summary `hint`, top `action-bar`
+  with "← Active {plural}" link, empty-state `alert`, bulk
+  `action-bar` (visible when `selected.length > 0`) hosting a new
+  **`dropdown-menu`** (Restore selected / Permanently delete selected
+  / Export selected as JSON), bulk-purge `alert-dialog`, `data-table`
+  with select-all checkbox + per-row checkbox + Label + Soft-deleted
+  at + Deleted by + Reason + Actions (Restore button HTMX-posting to
+  `/api/{plural}/{id}/restore`; Delete-forever button gated by per-row
+  `alert-dialog` HTMX-deleting via `/api/{plural}/{id}/purge`),
+  `pagination-nav`. Trashed rows carry `data-state="trashed"` for
+  muted + italic styling.
+- **`dropdown-menu` contract**: trigger button with
+  `aria-haspopup="menu"` + dynamic `aria-expanded`; menu list with
+  `role="menu"`; items with `role="menuitem"` + `tabindex="-1"`;
+  destructive items carry `data-destructive`. Alpine handles
+  open/close, click-outside-closes (`@click.outside`), arrow-key /
+  Home / End navigation, Escape closes + returns focus to trigger.
+- **Context**: `items: Vec<{id, label, deleted_at, deleted_by,
+  reason}>`, `pagination`. Scaffold seeds 4 tombstones (including
+  one nullable `deleted_by` / `reason` to exercise the
+  `default(value="…")` filters and one GDPR Article 17 erasure row).
+- **Real wiring**: `Repository::list_soft_deleted(page, limit)` +
+  the planned `POST /api/{plural}/{id}/restore` + `DELETE
+  /api/{plural}/{id}/purge` REST endpoints. The index page's top
+  `action-bar` carries a "Trash" link to this page.
 
 ### `compare.html.tera` — `GET /{entity_plural}/compare?a=&b=&review_id=`
 
@@ -419,7 +521,43 @@ The most complex page. 4 list editors plus base fields.
   (Display, Diagnostics), 4 `switch-button`s (`role="switch"`,
   `aria-checked` toggle): mask sensitive default, show inactive,
   toasts on, show technical detail; `select` page-size; Save / Reset
-  action-bar.
+  action-bar; top `action-bar` carries "API tokens" link to `/tokens`.
+
+### `tokens.html.tera` — `GET /tokens`
+
+- **Components**: `breadcrumb-nav` (Home / Settings / API tokens),
+  guidance `hint` paragraph, top `action-bar` ("+ Generate new token"
+  + back to Settings), one-time-reveal `alert` (`data-type="warning"`,
+  shown only when `justCreated` is non-null) containing a `secret-input`
+  with `data-state="revealed"` and `clipboard-copy-button` plus a
+  Dismiss button (clears `justCreated` permanently), `data-table`
+  with Label + `tag-group` of scope tags (`admin` scope renders
+  `data-type="warning"`) + masked **`secret-input`** with reveal/hide
+  toggle + clipboard-copy + Created + Last used (or "never") + Expires
+  (or "never") + Revoke `action-bar-button` gated by per-row
+  `alert-dialog`, generate-token `drawer` with label `text-input` +
+  `fieldset` of scope `checkbox-input`s (template-iterated from
+  `availableScopes`) + expiry `select`, `drawer-backdrop`.
+- **`secret-input` contract**: inline-flex container with
+  `aria-label`, `data-state="masked"` / `"revealed"`; child
+  `secret-input-value` `<code>` carries the token text (`user-select:
+  all` for triple-click); child `secret-input-toggle` `<button>` is
+  the Reveal / Hide button; Reveal arms a 10-second Alpine
+  `setInterval` countdown that auto-hides; Hide button's
+  `aria-label` interpolates the remaining seconds for screen readers;
+  always-available `clipboard-copy-button` sibling.
+- **Context**: `tokens: Vec<{id, label, scopes: Vec<String>,
+  preview_full, last4, created_at, last_used_at?, expires_at?}>`.
+  Scaffold seeds 4 tokens including one with null `last_used_at`
+  (renders "never"), one with null `expires_at` (admin break-glass,
+  renders "never"), and one with `admin` scope to exercise the
+  warning-styled tag.
+- **Real wiring**: `TokenRepository::list_for_user(user_id)` +
+  `POST /api/tokens` (returns the secret exactly once in the response
+  body) + `DELETE /api/tokens/{id}` (revoke). Token generation is
+  intentionally client-side in the scaffold so the secret never
+  round-trips through server response logs; production swaps the
+  Alpine `generate()` for an `hx-post`.
 
 ### `tour.html.tera` — `GET /tour`
 
@@ -554,6 +692,7 @@ where it appears.
 | `diff` | `<div>` | `diff` | `role="group"`, `aria-label`; CSS grid 2-col → 1-col < 768 px | `compare`, `health`, `metrics`, `home` |
 | `dialog` | `<dialog>` | `dialog` | `role="dialog"`, `aria-modal`, `aria-labelledby` | `layout` (shortcuts) |
 | `drawer` | `<aside>` | `drawer` | `role="dialog"`, `aria-modal`, `aria-label`, `data-open` | `search`, `consents`, `links` |
+| `dropdown-menu` / `-button` / `-list` / `-list-item` / `-item` | `<div>` / `<button>` / `<ol>` / `<li>` / `<button>` | same | `aria-label` on trigger; `aria-haspopup="menu"` + dynamic `aria-expanded` on trigger; `role="menu"` on list; `role="none"` on list-items; `role="menuitem"` + `tabindex="-1"` on items; destructive items carry `data-destructive`; arrow-key / Home / End navigation + Escape-closes-and-returns-focus + click-outside-closes via Alpine | `trash` (bulk action menu) |
 | `email-input` | `<input type="email">` | `email-input` | `aria-label` | `edit` (telecom + emergency contact) |
 | `error-message` | `<span>` | `error-message` | `role="alert"` | `edit` (per field), `edit` (validation in tag-inputs) |
 | `error-summary` | `<div>` | `error-summary` | `role="alert"`, `aria-labelledby`, `tabindex="-1"` | `edit` |
@@ -583,10 +722,13 @@ where it appears.
 | `range-input` | `<input type="range">` | `range-input` | `aria-label`, `aria-describedby`, `min`, `max`, `step` | `deduplicate` (threshold + auto-merge-threshold sliders) |
 | `red-amber-green-view` | `<span>` | `red-amber-green-view` | `role="img"`, `aria-label`, `data-status="red"`/`"amber"`/`"green"` | `health`, `metrics` |
 | `search-input` | `<input type="search">` | `search-input` | `role="searchbox"`, `aria-label` | `home`, `search` |
+| `secret-input` / `-value` / `-toggle` | `<div>` / `<code>` / `<button>` | same | `aria-label`, `data-state="masked"` / `"revealed"`; value carries `user-select: all`; reveal/hide toggle with `aria-label` interpolating remaining-seconds; sibling `clipboard-copy-button` for always-available copy | `tokens` |
+| `signature-pad` / `-canvas` / `-baseline` / `-placeholder` / `-toolbar` | `<div>` / `<canvas>` / `<div>` / `<span>` / `<div>` | same | `aria-label` on container + dynamic `data-state="empty"` / `"drawn"`; canvas has `role="img"` + `aria-label` + `style="touch-action: none;"`; baseline + placeholder are `aria-hidden="true"`; toolbar buttons disable themselves when `!hasSignature()`; pointer / touch / pen unified via `pointer*` events with `setPointerCapture` for off-edge tolerance; DPR-aware resize | `sign` |
 | `select` | `<select>` | `select` | `aria-label` | every page with a dropdown |
 | `skip-link` | `<a>` | `skip-link` | `aria-label`, `href="#main-content"` | `layout` |
 | `sonner` | `<div>` | `sonner` | `role="status"`, `aria-live="polite"`, `aria-label` | `layout` (`#toast-region`) |
 | `sparkline` | `<div>` | `sparkline` | `aria-label`; wraps inline-SVG `<polyline>` | `metrics` |
+| `star-button` / `-icon` | `<button>` / `<span>` | same | `role="switch"`, `aria-label`, dynamic `aria-pressed`, `data-state="on"` / `"off"`; icon span carries `aria-hidden="true"` and the ★ / ☆ character (text, no SVG dependency); warm-yellow when `data-state="on"`, slight scale-up on hover/focus when on | `starred`, `index` (column), `show` (action-bar) |
 | `summary-list` / `summary-list-item` | `<ol>` / `<li>` | same | `aria-label` | `show`, `export`, `fhir`, `health`, `audit`, `audit_recent`, `metrics`, `review_queue`, `not_found`, `home`, `edit` (emergency contacts), `tour`, `import` |
 | `switch-button` | `<button>` | `switch-button` | `role="switch"`, `aria-label`, `aria-checked` | `settings` |
 | `tab-bar` / `tab-bar-button` | `<div>` / `<button>` | same | `role="tablist"`, `role="tab"`, `aria-selected`, `tabindex` | `import` (step indicator) |
@@ -676,21 +818,22 @@ during this work, beyond the base NHS theme:
 | `lily-accent` | `#RRGGBB` hex (absent = NHS blue) | settings color picker | head FOUC bootstrap, settings Alpine |
 | `lily-palette` | JSON map `{ "nhs-blue": "#…", … }` | `/palette` Alpine | `/palette` Alpine (re-applies on `x-init`); CSS custom-property overrides on `<html>` |
 | `lily-notifications` | JSON array of notification objects | `/notifications` Alpine | `/notifications` Alpine (read on `x-init`, written on every mutation) |
+| `lily-starred-{plural}` | JSON array of record IDs (per entity, e.g. `lily-starred-persons`) | `star-button` `toggleStar()` on `/{plural}` index + `/{plural}/{id}` show + `/{plural}/starred` | all three pages on x-data init |
 
 ## Conventions
 
 ### Per-crate uniformity
 
 When adding a new view: build it in
-`main-person-index-rust-crate/`, smoke-test, then sync to the other 5
+`main-person-service-rust-crate/`, smoke-test, then sync to the other 5
 crates with the standard pattern:
 
 ```bash
-SRC=/Users/jph/git/sixarm/main-x-index/main-person-index-rust-crate
-for d in main-event-index-rust-crate main-patient-index-rust-crate \
-         main-place-index-rust-crate main-thing-index-rust-crate \
-         main-worker-index-rust-crate; do
-  DST=/Users/jph/git/sixarm/main-x-index/$d
+SRC=/Users/jph/git/sixarm/main-x-service/main-person-service-rust-crate
+for d in main-event-service-rust-crate main-patient-index-rust-crate \
+         main-place-service-rust-crate main-thing-service-rust-crate \
+         main-worker-service-rust-crate; do
+  DST=/Users/jph/git/sixarm/main-x-service/$d
   cp "$SRC/<file>" "$DST/<file>"
 done
 ```

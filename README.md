@@ -6,12 +6,12 @@
 
 | Crate | Entity | Path |
 |-------|--------|------|
-| Main Person Index | Person | [main-person-index-rust-crate](main-person-index-rust-crate/) |
+| Main Person Service | Person | [main-person-service-rust-crate](main-person-service-rust-crate/) |
 | Main Patient Index | Patient | [main-patient-index-rust-crate](main-patient-index-rust-crate/) |
-| Main Worker Index | Worker | [main-worker-index-rust-crate](main-worker-index-rust-crate/) |
-| Main Place Index | Place | [main-place-index-rust-crate](main-place-index-rust-crate/) |
-| Main Thing Index | Thing | [main-thing-index-rust-crate](main-thing-index-rust-crate/) |
-| Main Event Index | Event | [main-event-index-rust-crate](main-event-index-rust-crate/) |
+| Main Worker Service | Worker | [main-worker-service-rust-crate](main-worker-service-rust-crate/) |
+| Main Place Service | Place | [main-place-service-rust-crate](main-place-service-rust-crate/) |
+| Main Thing Service | Thing | [main-thing-service-rust-crate](main-thing-service-rust-crate/) |
+| Main Event Service | Event | [main-event-service-rust-crate](main-event-service-rust-crate/) |
 
 Each crate is self-contained: it owns its REST API, its persistence schema, its matching algorithm, and its web UI. They share an architecture and a documentation layout, not code.
 
