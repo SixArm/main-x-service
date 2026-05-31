@@ -4,12 +4,19 @@
 
 ## Subprojects
 
-- [Main Person Service Rust crate](main-person-service-rust-crate/)
-- [Main Patient Index Rust crate](main-patient-index-rust-crate/)
-- [Main Worker Service Rust crate](main-worker-service-rust-crate/)
-- [Main Place Service Rust crate](main-place-service-rust-crate/)
-- [Main Thing Service Rust crate](main-thing-service-rust-crate/)
-- [Main Event Service Rust crate](main-event-service-rust-crate/)
+Each per-crate `spec.md` is the **single source of truth** for that
+crate. All service crates follow the same SDD shape (numbered
+sections 1–18, with §13 holding the live task queue). See any of the
+per-crate `AGENTS/spec-driven-development.md` files for the discipline.
+
+| Crate | Entity | Spec | Index |
+|---|---|---|---|
+| [Person Service](person-service-rust-crate/) | Person (general; healthcare-aware) | [spec](person-service-rust-crate/spec.md) | [index](person-service-rust-crate/index.md) |
+| [Main Patient Index](main-patient-index-rust-crate/) | Patient (healthcare-specific) | — | — |
+| [Worker Service](worker-service-rust-crate/) | Worker (workforce / professional) | [spec](worker-service-rust-crate/spec.md) | [index](worker-service-rust-crate/index.md) |
+| [Place Service](place-service-rust-crate/) | Place (schema.org/Place) | [spec](place-service-rust-crate/spec.md) | [index](place-service-rust-crate/index.md) |
+| [Thing Service](thing-service-rust-crate/) | Thing (schema.org/Thing — generic) | [spec](thing-service-rust-crate/spec.md) | [index](thing-service-rust-crate/index.md) |
+| [Event Service](event-service-rust-crate/) | Event (schema.org/Event — time-bounded) | [spec](event-service-rust-crate/spec.md) | [index](event-service-rust-crate/index.md) |
 
 ## Shared reference docs
 
@@ -78,12 +85,19 @@ Run with: `cargo run --bin web` (binds `0.0.0.0:5150`).
 
 ## Per-crate docs
 
-Each crate ships its own:
+Each service crate ships an identical doc set:
 
+- `spec.md` — **single source of truth** (numbered §1–§18, live tasks in §13)
+- `index.md` — navigation aid with worked examples
+- `README.md` / `CLAUDE.md` — user-facing intro (must stay consistent with the spec); `CLAUDE.md` is loaded by Claude Code at session start
 - `AGENTS.md` — directory of the crate's reference docs
 - `AGENTS/index.md` — index of `AGENTS/*` files
+- `AGENTS/spec-driven-development.md` — SDD discipline (three-part PRs, section mapping, anti-patterns)
 - `AGENTS/models.md` — domain model reference
 - `AGENTS/matching.md` — per-crate matching tuning
 - `AGENTS/restful.md` — REST API surface
 - `AGENTS/testing.md` — test layout
-- `CLAUDE.md` — project overview (loaded by Claude Code at session start)
+
+There is intentionally no `plan.md` and no `tasks.md`: plan content
+lives in `spec.md §8–§12`, task content in `spec.md §13`, status /
+roadmap in `spec.md §14–§15`, open questions in `spec.md §16`.

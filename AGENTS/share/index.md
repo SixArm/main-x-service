@@ -1,5 +1,24 @@
 # AGENTS instructions
 
+## Spec-driven development — single source of truth
+
+Every service crate carries its own `spec.md` as the **canonical
+artefact**. Code conforms to the spec; not the other way around.
+
+- A behavioural change PR has **three parts**: spec edit + code edit
+  + test edit. All in one PR.
+- The live work queue for each crate lives in its `spec.md §13`.
+- Open questions live in `spec.md §16` until resolved.
+- See `<crate>/AGENTS/spec-driven-development.md` for the discipline.
+
+Per-crate `spec.md`:
+
+- [person-service/spec.md](../../person-service-rust-crate/spec.md)
+- [event-service/spec.md](../../event-service-rust-crate/spec.md)
+- [worker-service/spec.md](../../worker-service-rust-crate/spec.md)
+- [place-service/spec.md](../../place-service-rust-crate/spec.md)
+- [thing-service/spec.md](../../thing-service-rust-crate/spec.md)
+
 ## Overview
 
 - Professional: Enterprise-grade, high-performance, production-ready

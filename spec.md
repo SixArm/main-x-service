@@ -59,7 +59,7 @@ Per-crate runtime branching happens at the Rust level via
 `"place"` / `"thing"` / `"event"`) and the Tera context variables
 `entity_singular` / `entity_plural` / `app_display`.
 
-When syncing, the canonical source is `main-person-service-rust-crate/`;
+When syncing, the canonical source is `person-service-rust-crate/`;
 copy from there to the other 5 crates.
 
 Verify uniformity:
@@ -825,14 +825,14 @@ during this work, beyond the base NHS theme:
 ### Per-crate uniformity
 
 When adding a new view: build it in
-`main-person-service-rust-crate/`, smoke-test, then sync to the other 5
+`person-service-rust-crate/`, smoke-test, then sync to the other 5
 crates with the standard pattern:
 
 ```bash
-SRC=/Users/jph/git/sixarm/main-x-service/main-person-service-rust-crate
-for d in main-event-service-rust-crate main-patient-index-rust-crate \
-         main-place-service-rust-crate main-thing-service-rust-crate \
-         main-worker-service-rust-crate; do
+SRC=/Users/jph/git/sixarm/main-x-service/person-service-rust-crate
+for d in event-service-rust-crate main-patient-index-rust-crate \
+         place-service-rust-crate thing-service-rust-crate \
+         worker-service-rust-crate; do
   DST=/Users/jph/git/sixarm/main-x-service/$d
   cp "$SRC/<file>" "$DST/<file>"
 done

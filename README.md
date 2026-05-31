@@ -1,4 +1,4 @@
-# Main X Index Rust crates
+# Main X Service
 
 @agents/share/overview.md
 
@@ -6,12 +6,11 @@
 
 | Crate | Entity | Path |
 |-------|--------|------|
-| Main Person Service | Person | [main-person-service-rust-crate](main-person-service-rust-crate/) |
-| Main Patient Index | Patient | [main-patient-index-rust-crate](main-patient-index-rust-crate/) |
-| Main Worker Service | Worker | [main-worker-service-rust-crate](main-worker-service-rust-crate/) |
-| Main Place Service | Place | [main-place-service-rust-crate](main-place-service-rust-crate/) |
-| Main Thing Service | Thing | [main-thing-service-rust-crate](main-thing-service-rust-crate/) |
-| Main Event Service | Event | [main-event-service-rust-crate](main-event-service-rust-crate/) |
+| Person Service | Person | [person-service-rust-crate](person-service-rust-crate/) |
+| Place Service | Place | [place-service-rust-crate](place-service-rust-crate/) |
+| Thing Service | Thing | [thing-service-rust-crate](thing-service-rust-crate/) |
+| Event Service | Event | [event-service-rust-crate](event-service-rust-crate/) |
+| Worker Service | Worker | [worker-service-rust-crate](worker-service-rust-crate/) |
 
 Each crate is self-contained: it owns its REST API, its persistence schema, its matching algorithm, and its web UI. They share an architecture and a documentation layout, not code.
 
@@ -136,8 +135,8 @@ Per-crate reference docs live in `<crate>/AGENTS/`:
 
 ## Status
 
-All six crates compile cleanly and pass their lib tests (629 tests total). The web binary boots from each crate and serves the home page, entity index, HTMX partial, and static assets.
+All crates compile cleanly and pass their lib tests (629 tests total). The web binary boots from each crate and serves the home page, entity index, HTMX partial, and static assets.
 
 ## License
 
-Each crate is dual-licensed; see the individual `Cargo.toml` for terms.
+Each crate is multi-licensed; see the individual `Cargo.toml` for terms.
