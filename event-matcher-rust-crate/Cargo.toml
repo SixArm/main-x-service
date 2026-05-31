@@ -1,0 +1,28 @@
+[package]
+name = "event-matcher"
+version = "0.5.0"
+edition = "2024"
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Deterministic and probabilistic matching of schema.org/Event records (ISO 8601 date-times, external event IDs, locations, categories) with explainable per-field score breakdowns."
+license = "MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause"
+repository = "https://github.com/sixarm/event-matcher-rust-crate"
+readme = "README.md"
+keywords = ["event", "matching", "schema-org", "scheduling", "deduplication"]
+categories = ["science", "data-structures"]
+include = ["src/**/*", "LICENSE.md", "README.md", "CHANGELOG.md"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+unicode-normalization = "0.1"
+strsim = "0.11"
+thiserror = "2.0"
+soundex = "0.2"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.5"
+
+[[bench]]
+name = "match_pair"
+harness = false

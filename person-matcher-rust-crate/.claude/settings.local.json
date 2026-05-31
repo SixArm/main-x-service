@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:pmc.ncbi.nlm.nih.gov)",
+      "WebFetch(domain:www.healthit.gov)",
+      "Bash(cargo test:*)",
+      "Bash(cargo run)",
+      "Bash(cargo run:*)",
+      "Bash(cargo doc:*)",
+      "Bash(cargo build:*)",
+      "Bash(tree:*)",
+      "Bash(cargo clippy *)",
+      "Bash(cargo fmt *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(cargo update *)",
+      "Bash(cargo audit *)",
+      "Bash(cargo outdated *)",
+      "Bash(cargo search *)",
+      "Bash(cargo info *)",
+      "Bash(cargo publish *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'audit: vulnerabilities={d[\\\\\"vulnerabilities\\\\\"][\\\\\"count\\\\\"]}, warnings={len\\(d[\\\\\"warnings\\\\\"]\\)}'\\)\")",
+      "Bash(grep *)",
+      "Bash(cargo bench *)",
+      "Bash(chmod +x /Users/jph/git/person-matcher/person-matcher-rust-crate/scripts/spec-drift-check.sh)",
+      "Bash(bash *)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,14 @@
+# spec-drift-check.sh allowlist.
+#
+# Path patterns (extended regex) whose changes do NOT require a
+# corresponding update to spec.md.  Keep this file short: every
+# exception erodes the spec/code invariant the check exists to enforce.
+#
+# Format: one path pattern per line.  Blank lines and lines starting
+# with `#` are ignored.  Patterns are matched against paths returned
+# by `git diff --name-only`.
+
+# Internal refactors of matcher.rs that only touch the test module are
+# allowed without a spec update.  (The check operates at file granularity;
+# this allowance is documented here so reviewers know to look closer.)
+# — none currently —

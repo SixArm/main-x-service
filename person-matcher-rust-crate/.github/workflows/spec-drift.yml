@@ -1,0 +1,31 @@
+# Spec-drift CI check (spec.md §23 T-7).
+#
+# Fails a pull request that modifies a watched source file (currently
+# src/matcher.rs) without also updating spec.md, unless the changed
+# paths match an allowlist pattern in `.spec-allow`.
+#
+# Rationale: the crate practises spec-driven development — spec.md is
+# the single source of truth.  Behaviour changes that land in code
+# without a matching spec update silently break the discipline.
+
+name: spec-drift
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: spec vs code
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout (full history needed for diff vs base)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run spec-drift check
+        run: bash scripts/spec-drift-check.sh "${{ github.base_ref }}" "${{ github.event.pull_request.head.sha }}"

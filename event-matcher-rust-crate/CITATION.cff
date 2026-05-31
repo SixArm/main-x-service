@@ -1,0 +1,31 @@
+cff-version: 0.1.0
+title: Event matcher Rust crate
+message: >-
+  If you use this work and you want to cite it,
+  then you can use the metadata from this file.
+type: software
+authors:
+  - given-names: Joel Parker
+    family-names: Henderson
+    email: joel@joelparkerhenderson.com
+    affiliation: joelparkerhenderson.com
+    orcid: 'https://orcid.org/0009-0000-4681-282X'
+identifiers:
+  - type: url
+    value: 'https://github.com/sixarm/Event-matcher-rust-crate/'
+    description: Event matcher Rust crate
+repository-code: 'https://github.com/sixarm/Event-matcher-rust-crate/'
+abstract: >-
+  Deterministic and probabilistic matching of geographic places
+  (landmarks, natural features, chain branches, administrative areas)
+  for de-duplication and record linkage. Combines Haversine distance,
+  external place identifiers (Google, OSM, Wikidata, GeoNames, and
+  others), ISO 3166-1 alpha-2 country codes, coarse-grained categories,
+  and weight-renormalised per-field score breakdowns.
+keywords:
+  - place
+  - matching
+  - geographic
+  - geocoding
+  - deduplication
+license: See license file

@@ -1,0 +1,30 @@
+[package]
+name = "person-matcher"
+version = "0.3.0"
+edition = "2024"
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Person matcher for healthcare information exchange: deterministic and probabilistic matching with multinational national identifiers (UK NHS / FR NIR / ES TSI / IE IHI / UK NI H&C / US SSN), E.164 phone normalisation, address parsing, nickname dictionary, email scoring, and explainable per-field breakdowns."
+license = "MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause"
+repository = "https://github.com/sixarm/person-matcher-rust-crate"
+readme = "README.md"
+keywords = ["person", "matching", "healthcare", "identity", "fhir"]
+categories = ["science", "data-structures", "value-formatting"]
+include = ["src/**/*", "LICENSE.md", "README.md", "CHANGELOG.md"]
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+unicode-normalization = "0.1"
+strsim = "0.11"
+thiserror = "2.0"
+soundex = "0.2"
+nhs-number = "1.0"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.5"
+
+[[bench]]
+name = "match_pair"
+harness = false
