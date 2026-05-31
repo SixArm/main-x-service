@@ -4,160 +4,86 @@ See [`../spec.md`](../spec.md) §4 for the formal rules. This guide is the opera
 
 ## Why normalise at all?
 
-The research base is unanimous: most accuracy gains come from data standardisation, not from cleverer scoring. Garbage in, garbage out — no Jaro-Winkler trick rescues an apostrophe mismatch or a casing difference in a postcode.
+The research base is unanimous: most accuracy gains come from data standardisation, not from cleverer scoring. Garbage in, garbage out — no Jaro-Winkler trick rescues an apostrophe mismatch or a casing difference in a URL host.
 
 ## What we normalise
 
 | Input | Algorithm | Source | Spec |
 |---|---|---|---|
-| Names | NFKD + drop combining marks + drop ASCII punctuation + lowercase + collapse whitespace | `src/normalizer.rs::normalize_name` | §4.1 |
-| Postcodes | Strip whitespace + uppercase | `src/normalizer.rs::normalize_postcode` | §4.2 |
-| Phone numbers (legacy) | Keep digits + strip `0044` / `+44` / leading `0` (UK-centric) | `src/normalizer.rs::normalize_phone` | §4.3.1 |
-| Phone numbers (E.164) | Match `+CC` / `00CC` / default-country trunk, strip national trunk prefix, validate NSN length, return `+CCNNN…` | `src/normalizer.rs::normalize_phone_e164` | §4.3.2 |
-| Address-line abbreviations | Whole-token expansion of `St` → `Street`, `Rd` → `Road`, `Ave` → `Avenue`, `N` → `North`, … | `src/normalizer.rs::expand_street_abbreviations` | §4.5.1 |
-| Address line (full) | Abbreviation expansion + name-normalisation pipeline | `src/normalizer.rs::normalize_address_line` | §4.5 |
-| Address-line parsing | Extract `house_number` (leading digits + optional alphabetic suffix), `unit` (Flat / Apt / Suite / …), `street` (normalised remainder) | `src/normalizer.rs::parse_address_line` | §4.5 |
-| Email | Trim + lowercase + reject if missing `@` / empty localpart / empty domain; opt-in Gmail dot- and `+tag`-folding | `src/normalizer.rs::normalize_email` | §4.4 |
-| Phonetic | Name normalisation then American Soundex | `src/normalizer.rs::phonetic_code` | §4.6 |
+| Names | NFKD + drop combining marks + drop ASCII punctuation + lowercase + collapse whitespace | `src/normalizer.rs::normalize_name` | §4 |
+| Free-form text | Lowercase + NFKD + collapse whitespace + trim (punctuation retained) | `src/normalizer.rs::normalize_text` | §4 |
+| URLs | Lowercase scheme + host; drop trailing slash on path root; preserve path / query / fragment | `src/normalizer.rs::normalize_url` | §4 |
+| Phonetic codes | `normalize_name` then 4-character American Soundex | `src/normalizer.rs::phonetic_code` | §4 |
 
 All normalisers are **idempotent**: `f(f(x)) == f(x)`. If you add one that isn't, document the reason in `spec.md` and add a property test.
 
 ## Input → output tables
 
-### Names
+### Names (`Normalizer::normalize_name`)
 
 | Input | Output |
 |---|---|
 | `"Eiffel Tower"` | `"eiffel tower"` |
-| `"  John  Smith  "` | `"john smith"` |
-| `"O'Brien"` | `"obrien"` |
-| `"MARY-JANE"` | `"maryjane"` |
-| `"José"` | `"jose"` |
+| `"  Pride and  Prejudice  "` | `"pride and prejudice"` |
+| `"O'Reilly's Practical Rust"` | `"oreillys practical rust"` |
+| `"WAR-AND-PEACE"` | `"warandpeace"` |
+| `"Café Society"` | `"cafe society"` |
 | `"Siân"` | `"sian"` |
-| `"Łukasz"` | `"łukasz"` (`ł` has no NFKD decomposition) |
+| `"Łódź"` | `"łodz"` (stroked `ł` survives NFKD; combining acute on `ó` / `ź` is stripped) |
 | `""` / `"   "` | `""` |
 
-### Postcodes
+### Free-form text (`Normalizer::normalize_text`)
+
+Used for `description` and `disambiguating_description`. Punctuation is **retained** so the text stays readable.
 
 | Input | Output |
 |---|---|
-| `"CF10 1AA"` | `"CF101AA"` |
-| `"cf101aa"` | `"CF101AA"` |
-| `"  sw1a 2aa "` | `"SW1A2AA"` |
+| `"  The   Eiffel Tower.  "` | `"the eiffel tower."` |
+| `"A 1813 novel by Jane Austen."` | `"a 1813 novel by jane austen."` |
+| `"Roman à clef"` | `"roman a clef"` |
+| `""` / `"   "` | `""` |
+
+### URLs (`Normalizer::normalize_url`)
+
+| Input | Output |
+|---|---|
+| `"HTTPS://Example.ORG/"` | `"https://example.org"` |
+| `"https://en.wikipedia.org/wiki/Eiffel_Tower"` | `"https://en.wikipedia.org/wiki/Eiffel_Tower"` |
+| `"https://Example.org/Path/"` | `"https://example.org/Path/"` (trailing-slash trim only on root path) |
+| `"https://example.org/?utm=foo"` | `"https://example.org/?utm=foo"` (query preserved) |
+| `"https://example.org#section"` | `"https://example.org#section"` (fragment preserved) |
+| `""` / `"   "` | `""` |
+
+### Phonetic codes (`Normalizer::phonetic_code`)
+
+Classic 4-character American Soundex: first letter (uppercased) + three digits, padded with `0` if fewer consonant digits are available. Vowels (`A E I O U`) and `H W Y` are ignored. Adjacent consonants mapping to the same digit collapse.
+
+| Letters | Digit |
+|---|---|
+| B F P V | 1 |
+| C G J K Q S X Z | 2 |
+| D T | 3 |
+| L | 4 |
+| M N | 5 |
+| R | 6 |
+
+| Input | Code |
+|---|---|
+| `"Robert"` | `"R163"` |
+| `"Rupert"` | `"R163"` |
+| `"Ashcraft"` | `"A261"` |
+| `"Smith"` | `"S530"` |
+| `"Smyth"` | `"S530"` |
 | `""` | `""` |
 
-### Phone numbers (legacy)
-
-| Input | Output |
-|---|---|
-| `"07700 900123"` | `"7700900123"` |
-| `"+44 7700 900123"` | `"7700900123"` |
-| `"0044 7700 900123"` | `"7700900123"` |
-| `"(029) 2034 5678"` | `"2920345678"` |
-
-### Phone numbers (E.164)
-
-| Input | `default_country` | Output |
-|---|---|---|
-| `"+44 7700 900123"` | any | `Some("+447700900123")` |
-| `"07700 900123"` | `Some("GB")` | `Some("+447700900123")` |
-| `"01 23 45 67 89"` | `Some("FR")` | `Some("+33123456789")` |
-| `"(415) 555-1234"` | `Some("US")` | `Some("+14155551234")` |
-| `"07700 900123"` | `None` | `None` (no default and no international marker) |
-| `""` | any | `None` |
-
-### Email
-
-| Input | `gmail_dot_folding` | Output |
-|---|---|---|
-| `"  Alice@Example.ORG  "` | `false` | `Some("alice@example.org")` |
-| `"j.smith@gmail.com"` | `true` | `Some("jsmith@gmail.com")` |
-| `"jsmith+work@googlemail.com"` | `true` | `Some("jsmith@googlemail.com")` |
-| `"j.smith@example.org"` | `true` | `Some("j.smith@example.org")` (non-Gmail domain unaffected) |
-| `"no-at-sign"` | any | `None` |
-| `"a@b@c"` | any | `None` |
-
-## International phone numbers
-
-`Normalizer::normalize_phone_e164` consults `COUNTRY_PHONE_TABLE` in `src/normalizer.rs`. Each entry records:
-
-- ISO 3166-1 alpha-2 country code (`GB`, `FR`, `US`, …).
-- Dial code (1–3 digits, no leading `+`).
-- National trunk prefix (`Option<&'static str>` — typically `Some("0")`, but Lithuania uses `Some("8")` and several countries use `None`).
-- NSN length range — minimum and maximum digits in the national-significant number, used to reject malformed inputs.
-
-Supported jurisdictions are enumerated in `spec.md` §4.3.2.
-
-When adding a new country:
-
-1. Add an entry to `COUNTRY_PHONE_TABLE`, citing the ITU-T E.164 country code and the national numbering plan's NSN range.
-2. Extend `spec.md` §4.3.2 supported-country list.
-3. Add a unit test in `src/normalizer.rs::tests` for the within-country happy path and at least one integration test in `tests/integration_tests.rs` if matcher behaviour changes.
-
-## Address parsing
-
-`Normalizer::parse_address_line` is a best-effort structural decomposition:
-
-```text
-"Flat 2A, 10 Downing Street"  →  ParsedAddressLine {
-    unit:         Some("flat 2a"),
-    house_number: Some("10"),
-    street:       "downing street",
-}
-```
-
-Stages (`spec.md` §4.5):
-
-1. **Unit prefix.** First token matched against `{flat, apartment, apt, unit, suite, ste, room, rm}`. If recognised, the next alphanumeric run is the identifier; result is `format!("{keyword} {identifier}")` lowercased.
-2. **House number.** Leading run of ASCII digits, optionally followed by a single alphabetic suffix (`"10A"`). The suffix is taken **only when not followed by another alphanumeric**, so `"10 Apple Tree Lane"` does not absorb the `A` of `Apple`.
-3. **Street.** Remainder, run through `normalize_address_line` (= `expand_street_abbreviations` + `normalize_name`).
-
-The matcher's line-1 sub-score combines a Jaro-Winkler similarity on `parsed.street` with an exact-match score on `parsed.house_number`: `0.6 × street + 0.4 × house number` when both sides have a house number; street similarity alone otherwise (`spec.md` §6.4).
-
-### Adding a new street abbreviation
-
-1. Add an entry to `STREET_ABBREVIATIONS` in `src/normalizer.rs`. Keep the long form lowercase so it survives the downstream name pipeline unchanged.
-2. Extend `spec.md` §4.5.1.
-3. Add a unit test covering the new abbreviation and at least one combined-pipeline assertion.
-
-### Adding a new unit prefix
-
-1. Add the keyword to `UNIT_PREFIXES` in `src/normalizer.rs`.
-2. Extend `spec.md` §4.5.
-3. Add a unit test asserting `parse_address_line` returns the keyword + identifier.
-
-## Email normalisation
-
-`Normalizer::normalize_email(email, gmail_dot_folding)` (`spec.md` §4.4):
-
-1. Trim surrounding whitespace.
-2. Lowercase the whole string.
-3. Reject inputs with anything other than exactly one `@`, an empty localpart, or an empty domain (return `None`).
-4. If `gmail_dot_folding` is `true` and the domain is `gmail.com` or `googlemail.com`, strip every `.` from the localpart and drop any `+tag` suffix.
-
-The matcher emits `Some(1.0)` / `Some(0.0)` for normalised equality, `None` when either side is missing or fails to canonicalise (`spec.md` §6.9).
-
-## Phonetic codes
-
-`Normalizer::phonetic_code(name)` runs the name through `normalize_name` and then American Soundex. The matcher only consults phonetic codes when `MatchConfig::use_phonetic_matching` is on. The phonetic bonus is bounded (`0.05`-weighted, only fires when the gate `> 0.9`) and never lowers the overall score (`spec.md` §6.2).
-
-American Soundex is tuned for English-language names and may lose information on non-English digraphs. A locale-aware encoder (Double Metaphone, Daitch-Mokotoff) is tracked as OQ-E.
-
-## Matcher wiring (phone path)
-
-`MatchingEngine::score_phone` prefers the E.164 form and falls back to the legacy national-significant form (`spec.md` §6.8):
-
-1. Compute `normalize_phone_e164(phone1, cc)` and `normalize_phone_e164(phone2, cc)` where `cc = MatchConfig::phone_default_country` (default `Some("GB")`).
-2. If both parse, `phone_score = 1.0` iff the canonical strings are equal, else `0.0`.
-3. Otherwise compare `normalize_phone(phone1) == normalize_phone(phone2)`.
-
-Cross-country deployments should set `phone_default_country` to the predominant jurisdiction (or `None` to refuse to guess). The fallback preserves behaviour for inputs the country table does not cover.
+The name is first run through `normalize_name`, so `"Robért"` and `"Robert"` produce the same code.
 
 ## What we do not normalise
 
 - **`local_id`** — intentionally not normalised AND not scored. Different sources may issue colliding values.
-- **`country_code_as_iso_3166_1_alpha_2`** — stored as supplied (`"GB"`, `"gb"`, etc.); the matcher compares case-insensitively after trim but does NOT rewrite the stored value. See OQ-B.
-- **`PlaceId::value`** — trimmed at construction, otherwise compared verbatim. Different schemes have different canonical forms; the crate makes no per-scheme assumptions.
+- **`identifier.value`** — trimmed at construction by `Identifier::new`, otherwise compared verbatim. Different vocabularies (`isbn`, `doi`, `gtin`, `wikidata`, …) have different canonical forms; the crate makes no per-scheme assumptions. Consumers MUST canonicalise upstream if ISBN-10 ↔ ISBN-13, with-hyphens ↔ without-hyphens, etc., matter.
+- **`identifier.property_id`** — trimmed at construction, otherwise case-sensitive. `"wikidata"` and `"WikiData"` are distinct schemes.
+- **`subject_of`, `owner`** — preserved as supplied, not scored.
 
 ## Adding a new normaliser
 
@@ -168,10 +94,14 @@ Cross-country deployments should set `phone_default_country` to the predominant 
 
 ## Pitfalls
 
-- Don't collapse double-barrelled names (`Lloyd-Webber`) into a single word without thinking — current `normalize_name` drops the hyphen, yielding `lloydwebber`. This is intentional but worth knowing.
-- Don't lowercase postcodes; the canonical form is uppercase.
-- Don't trust that `char::is_ascii_punctuation` covers Unicode punctuation. It does not — `’` (curly apostrophe, U+2019) would survive. If you need broader stripping, propose it via the spec.
-- Don't compare `normalize_phone` output across countries — it's UK-centric and will silently collapse French / Italian national numbers to lookalike digit strings. Use `normalize_phone_e164` (or rely on the matcher, which already does) for multi-country data.
-- Don't add a new country to `COUNTRY_PHONE_TABLE` without explicit trunk-prefix and NSN-range provenance. Guessing the range produces false-negative matches when legitimate numbers fall outside it.
-- Don't extend the address parser to apply position-aware heuristics for `"St"` (Saint vs Street) without a corresponding spec update (see OQ-D).
-- Don't add house-number ranges to the `house_number` field (`"123-125 High St"`). The current parser captures only the leading number; widening this changes the equality semantics of the matcher's line-1 sub-score.
+- **Smart quotes.** `Normalizer::normalize_name` strips ASCII punctuation only. The curly apostrophe `’` (U+2019) is NOT recognised. Upstream code MUST convert smart quotes to ASCII first, or names like `"O’Brien"` and `"O'Brien"` will not match.
+- **Stroked letters.** Latin letters with an integral stroke (`ł`, `ø`, `ð`) do NOT decompose under NFKD. They survive normalisation, lowercased. This is intentional and stable.
+- **URL query strings.** `Normalizer::normalize_url` does not strip query parameters. `?utm_source=foo` will defeat URL equality. If you need that, normalise upstream.
+- **URL percent-encoding.** Not canonicalised. `%20` vs `+` vs literal space are three different strings to the matcher.
+- **Punycode.** Not decoded. `xn--…` and the unicode host form do not match.
+
+## Trade-offs (deliberate)
+
+- **No address parsing.** `Thing` has no address field — addresses belong on `Place` records in the sibling `place-matcher` crate.
+- **No phone normalisation.** `Thing` has no phone field — phone numbers belong on `Person` / `Place` records in the sibling crates.
+- **No identifier canonicalisation.** Vocabulary-specific rules (ISBN-10 ↔ ISBN-13, GTIN check digits, DOI case) belong upstream; the matcher compares opaque strings. See `spec.md` §10 OQ-B for the open question.

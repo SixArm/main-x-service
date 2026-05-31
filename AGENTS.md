@@ -9,14 +9,31 @@ crate. All service crates follow the same SDD shape (numbered
 sections 1–18, with §13 holding the live task queue). See any of the
 per-crate `AGENTS/spec-driven-development.md` files for the discipline.
 
+### Service crates
+
 | Crate | Entity | Spec | Index |
 |---|---|---|---|
 | [Person Service](person-service-rust-crate/) | Person (general; healthcare-aware) | [spec](person-service-rust-crate/spec.md) | [index](person-service-rust-crate/index.md) |
-| [Main Patient Index](main-patient-index-rust-crate/) | Patient (healthcare-specific) | — | — |
 | [Worker Service](worker-service-rust-crate/) | Worker (workforce / professional) | [spec](worker-service-rust-crate/spec.md) | [index](worker-service-rust-crate/index.md) |
 | [Place Service](place-service-rust-crate/) | Place (schema.org/Place) | [spec](place-service-rust-crate/spec.md) | [index](place-service-rust-crate/index.md) |
 | [Thing Service](thing-service-rust-crate/) | Thing (schema.org/Thing — generic) | [spec](thing-service-rust-crate/spec.md) | [index](thing-service-rust-crate/index.md) |
 | [Event Service](event-service-rust-crate/) | Event (schema.org/Event — time-bounded) | [spec](event-service-rust-crate/spec.md) | [index](event-service-rust-crate/index.md) |
+
+### Matcher crates
+
+The matcher crates are reusable, dependency-light Rust libraries for
+pairwise record comparison. They follow their own SDD shape (see each
+crate's `spec.md` for its full §1–§25 structure), distinct from the
+service-crate shape (§1–§18). Use them standalone, or embed them in
+the corresponding service crate's matching layer.
+
+| Crate | Entity | Spec | Index |
+|---|---|---|---|
+| [Person Matcher](person-matcher-rust-crate/) | Person | [spec](person-matcher-rust-crate/spec.md) | [index](person-matcher-rust-crate/index.md) |
+| [Worker Matcher](worker-matcher-rust-crate/) | Worker | [spec](worker-matcher-rust-crate/spec.md) | [index](worker-matcher-rust-crate/index.md) |
+| [Place Matcher](place-matcher-rust-crate/) | Place | [spec](place-matcher-rust-crate/spec.md) | [index](place-matcher-rust-crate/index.md) |
+| [Thing Matcher](thing-matcher-rust-crate/) | Thing | [spec](thing-matcher-rust-crate/spec.md) | [index](thing-matcher-rust-crate/index.md) |
+| [Event Matcher](event-matcher-rust-crate/) | Event | [spec](event-matcher-rust-crate/spec.md) | [index](event-matcher-rust-crate/index.md) |
 
 ## Shared reference docs
 
@@ -36,6 +53,7 @@ per-crate `AGENTS/spec-driven-development.md` files for the discipline.
 @agents/share/technology.md
 @agents/share/stack-for-rust-loco.md
 @agents/share/web-stack.md
+@agents/share/web-pages.md
 @agents/share/postgresql.md
 @agents/share/locales.md
 @agents/share/compliance-for-healthcare.md

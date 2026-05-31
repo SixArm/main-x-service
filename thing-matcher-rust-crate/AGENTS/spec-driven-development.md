@@ -13,23 +13,25 @@ This crate practises **spec-driven development**: the specification ([`../spec.m
 
 | You're changing… | Update spec section |
 |---|---|
-| The list of `Place` fields or any `Place` field's semantics | §3.1 |
-| `Place`-builder ergonomics | §3.2 |
-| `Address` fields or scoring weights | §3.3, §6.4 |
-| `PlaceCategory` variants | §3.4 |
-| `PlaceId` or `PlaceIdScheme` variants | §3.5 |
-| `Confidence` band boundaries | §3.6 |
-| `MatchBreakdown` / `MatchResult` shape | §3.7 |
+| The list of `Thing` fields or any `Thing` field's semantics | §3.1 |
+| `ThingBuilder` ergonomics | §3.2 |
+| `Identifier` shape or validation | §3.3 |
+| Default weights or threshold; new preset; new `MatchConfig` knob | §3.4, §7 |
+| `SimilarityAlgorithm` variants | §3.5 |
+| `MatchResult` shape | §3.6 |
+| `MatchBreakdown` shape | §3.7 |
+| `Confidence` band boundaries | §3.8 |
 | `MatchingError` variants | §3.9 |
-| Normalisation behaviour (name, postcode, phone, email, phonetic, address) | §4 |
+| Normalisation behaviour (name / text / url / phonetic) | §4 |
 | Deterministic-match rules | §5.1 |
-| Probabilistic-match pipeline | §5.2 |
-| Strict-mode behaviour | §5.2.3 |
+| Probabilistic-match pipeline | §5.2, §5.10 |
 | Batch entry points | §5.3 |
+| Determinism / safety guarantees | §5.5 |
+| Strict-mode behaviour | §5.11 |
 | Per-field scoring algorithm for any component | §6.* |
-| Default weights or threshold; new preset; new `MatchConfig` knob | §7 |
-| Determinism / safety guarantees | §8 |
-| SemVer policy or `#[non_exhaustive]` posture | §9 |
+| Performance budget / stability / tuning posture | §7 |
+| Public API surface (re-exports) | §8 |
+| Spec-drift discipline | §9 |
 | Open Question resolution | move from §10 into the relevant section |
 | A new worked example | §11 |
 | A new public symbol or rename | §12 (glossary) |
@@ -90,7 +92,7 @@ If you have a genuinely spec-irrelevant change (e.g. an internal refactor of a p
 - "The spec is wrong; let me just fix it to match the code" — without first confirming the code's behaviour is the *intended* behaviour, you are laundering a bug into a feature.
 - Adding behaviour gated by a flag that the spec does not mention.
 - "It's only a refactor" used to justify a behavioural shift.
-- Citing `spec.md §23` — the spec runs §1–§13. Earlier doc revisions had a section §23 that was retired; if you see a reference to §23 anywhere, fix it.
+- Citing `spec.md §23` or other sections beyond §13 — the spec runs §1–§13. Earlier place-flavoured doc revisions had sections beyond §13 that were retired; if you see a reference to them anywhere, fix it.
 
 ## Document hierarchy
 

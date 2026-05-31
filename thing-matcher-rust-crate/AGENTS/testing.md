@@ -17,13 +17,13 @@ Run everything: `cargo test`. Run a single test: `cargo test test_name`. Show st
 
 ## Required coverage
 
-Every public item re-exported from `lib.rs` MUST be exercised by at least one test or doctest. The doctests on `Place`, `MatchingEngine`, `MatchConfig`, `Scorer`, and `Normalizer` are the primary worked examples — keep them honest by running `cargo test --doc` before any release.
+Every public item re-exported from `lib.rs` MUST be exercised by at least one test or doctest. The doctests on `Thing`, `ThingBuilder`, `Identifier`, `MatchingEngine`, `MatchConfig`, `Scorer`, and `Normalizer` are the primary worked examples — keep them honest by running `cargo test --doc` before any release.
 
 When you add a new public item, add a doctest. When you add behaviour to an existing item, add at least one integration test that pins it. See [spec-driven-development.md](./spec-driven-development.md).
 
 ## Naming conventions
 
-- `<thing>_<expected>` or `test_<thing>_<expected>` — e.g. `perfect_match_all_fields`, `coordinates_score_far_apart_decays_to_zero`, `place_id_equality_is_scheme_scoped`.
+- `<subject>_<expected>` or `test_<subject>_<expected>` — e.g. `perfect_match_all_fields`, `url_score_trailing_slash_equals_root`, `identifier_equality_is_scheme_scoped`.
 - Use plain English in `assert!` messages when the assertion is non-obvious: `assert!(result.is_match, "expected aliases to match");`.
 - Keep the test name a complete English clause readable in the `cargo test` output.
 
@@ -33,13 +33,13 @@ Synthetic data only. Reuse the existing illustrative fixtures rather than invent
 
 | Fixture kind | Conventional choice |
 |---|---|
-| Landmark coordinates | Eiffel Tower (48.8582, 2.2945), Big Ben (51.5007, -0.1247), Statue of Liberty, Wembley Stadium (51.5558, -0.2797). Public knowledge, not personal data. |
-| UK postcodes | `CF10 1AA`, `SW1A 2AA`, `EC4M 7BB`, etc. |
-| UK phones | Drama-reserved `07700 900xxx` ranges. |
-| US phones | Fictitious `(415) 555-…` and similar `555-01xx`. |
-| Emails | RFC 2606 reserved `example.org`, `example.com`, `example.net`. Gmail-folding cases MAY use `@gmail.com` with synthetic localparts (`jsmith`, `j.smith`). |
-| Wikidata QIDs | `Q243` (Eiffel Tower), `Q41940` (Snowdon / Yr Wyddfa), other well-known QIDs. |
-| Google Place IDs | The crate uses public IDs in spec examples; for new tests use invented `ChIJ_xyz`-style strings when the value need not be meaningful. |
+| Landmark things | Eiffel Tower / La Tour Eiffel, Big Ben, Statue of Liberty. Public knowledge, not personal data. |
+| Book things | Pride and Prejudice (ISBN `9780141439518`), Hamlet, The Brothers Karamazov. |
+| Wikidata QIDs | `Q243` (Eiffel Tower), `Q170583` (Pride and Prejudice), `Q41940` (Snowdon / Yr Wyddfa), other well-known QIDs. |
+| ISBNs | Real ISBNs of public-domain or canonical works. `9780141439518`, `9780486264646`, etc. |
+| DOIs | Conventional `10.1038/…` form on a real paper, e.g. `10.1038/nature12373`. |
+| Owners | Fictional or institutional names — `"Penguin Random House"`, `"British Library"` — never real individuals. |
+| URLs | RFC 2606 reserved `example.org`, `example.com`, `example.net` for invented URLs. Real Wikipedia / Wikidata URLs are fine for `same_as`. |
 
 ## Test independence
 
@@ -55,9 +55,9 @@ Synthetic data only. Reuse the existing illustrative fixtures rather than invent
 
 ## What belongs in unit vs integration
 
-- **Unit tests** validate a *function*: `normalize_phone("+44 7700 900123")` returns `"7700900123"`.
-- **Integration tests** validate a *flow*: build two places, run `match_places`, assert on the result and breakdown.
-- **Property tests** validate a *universal property*: "score is in `[0.0, 1.0]` for any well-formed `Place` pair".
+- **Unit tests** validate a *function*: `normalize_url("HTTPS://Example.ORG/")` returns `"https://example.org"`.
+- **Integration tests** validate a *flow*: build two things, run `match_things`, assert on the result and breakdown.
+- **Property tests** validate a *universal property*: "score is in `[0.0, 1.0]` for any well-formed `Thing` pair".
 - Do not duplicate. If integration covers a happy path, do not add a redundant unit test that asserts the same thing.
 
 ## Doctest hygiene
@@ -65,11 +65,11 @@ Synthetic data only. Reuse the existing illustrative fixtures rather than invent
 - Keep doctests short; one expected behaviour per block.
 - Use `# use ...;` hidden lines to make examples runnable without cluttering the rendered docs.
 - If a doctest needs `unwrap()`, it is fine — doctests are demonstrations, not production code. Prefer `expect("...")` with a clear message when the unwrap could plausibly fail.
-- Doctests on `MatchingEngine`, `MatchConfig`, `Scorer`, `Normalizer`, `Place`, and `PlaceBuilder` are the primary worked examples downstream users will encounter. Treat them as part of the public API surface — breaking them is a behavioural change.
+- Doctests on `MatchingEngine`, `MatchConfig`, `Scorer`, `Normalizer`, `Thing`, `ThingBuilder`, and `Identifier` are the primary worked examples downstream users will encounter. Treat them as part of the public API surface — breaking them is a behavioural change.
 
 ## Performance tests
 
-- The `criterion` harness at `benches/match_pair.rs` exercises hot paths: single-pair `match_places` (identical / fuzzy / unrelated), `deterministic_match`, `rank_one_to_many` parameterised by `n ∈ {10, 100, 1000}`, and a config-variant sweep.
+- The `criterion` harness at `benches/match_pair.rs` exercises hot paths: single-pair `match_things` (identical / fuzzy / unrelated), `deterministic_match`, `rank_one_to_many` parameterised by `n ∈ {10, 100, 1000}`, and a config-variant sweep.
 - Run with `cargo bench`. Use `--quick` for a smoke check during PR review; HTML reports land in `target/criterion/`.
 - PRs that touch `MatchingEngine`, `Normalizer`, or `Scorer` SHOULD post before / after timings for at least one representative bench.
 
@@ -81,7 +81,7 @@ Synthetic data only. Reuse the existing illustrative fixtures rather than invent
 
 ## Negative tests
 
-- Always include at least one negative case: a clear non-match, a missing-field place, an out-of-range coordinate (lat > 90, lon > 180, NaN), an empty `PlaceId` value (must yield `None` from `PlaceId::new`), an email without `@`.
+- Always include at least one negative case: a clear non-match, a missing-name `Thing`, an empty `Identifier` value (must yield `None` from `Identifier::new`), a URL pair that differs only on the path (so `url_score` is `Some(0.0)`, not `Some(1.0)`), a `same_as` Jaccard with zero overlap.
 - Negative tests guard against the "accidentally matches everything" failure mode that probabilistic systems are prone to.
 
 ## Pinning a `spec.md` section

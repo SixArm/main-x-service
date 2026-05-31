@@ -67,12 +67,15 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 - [AGENTS/architecture.md](./AGENTS/architecture.md) — Module layout, layering rules, dependency graph.
 - [AGENTS/coding-style.md](./AGENTS/coding-style.md) — Rust style, naming, doc comments, error handling.
 - [AGENTS/testing.md](./AGENTS/testing.md) — Test pyramid, naming, fixtures, coverage expectations.
-- [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) — Deterministic and probabilistic scoring, weights, phonetics.
-- [AGENTS/normalization.md](./AGENTS/normalization.md) — Name, postcode, phone, NHS-number, and phonetic normalisation rules.
+- [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) — Deterministic and probabilistic scoring, weights, phonetics; carries the verbatim spec §12 detail.
+- [AGENTS/normalization.md](./AGENTS/normalization.md) — Name, postcode, phone, identifier, and phonetic normalisation rules; carries the verbatim spec §14 detail.
 - [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md) — PII, data protection, clinical-safety guardrails.
 - [AGENTS/release.md](./AGENTS/release.md) — Versioning, CHANGELOG, publishing checklist.
 - [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md) — How `spec.md` is maintained as the single source of truth.
-- [AGENTS/national-worker-identifiers.md](./AGENTS/national-worker-identifiers.md) — Reference table of the original 35 supported national workeral identifier schemes (jurisdiction, endonym, ISO 3166-1 code, format). The 7 T-17.1 schemes (BR CPF, CN RRN, IN Aadhaar, JP My Number, MX CURP, NZ NHI, ZA ID) bring the total to 42 and are documented inline in `src/identifiers.rs` plus spec FR-85..FR-91.
+- [AGENTS/national-person-identifiers.md](./AGENTS/national-person-identifiers.md) — Reference table of the supported national identifier schemes (jurisdiction, endonym, ISO 3166-1 code, format). 42 schemes total.
+- [AGENTS/delivered-tasks.md](./AGENTS/delivered-tasks.md) — Archive of delivered §23.1 + T-1..T-16 tasks (originally inline in `spec.md §23`).
+- [AGENTS/delivered-tasks-2.md](./AGENTS/delivered-tasks-2.md) — Archive of delivered T-17..T-32 plus project-level acceptance criteria.
+- [AGENTS/roadmap-research.md](./AGENTS/roadmap-research.md) — Archive of research-spike outcomes (T-17, T-9, T-19, T-14) originally inline in `spec.md §21.4`.
 
 ---
 

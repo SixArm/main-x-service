@@ -41,10 +41,11 @@ matching constants), see [`AGENTS/`](AGENTS/).
 
 The Person Service is a general-purpose centralised registry of
 **person identities**. It sits alongside the more domain-specific
-[Patient](../main-patient-index-rust-crate/) and
-[Worker](../worker-service-rust-crate/) indices and gives callers one
+[Worker](../worker-service-rust-crate/) index and gives callers one
 canonical record per real-world person regardless of how many source
-systems hold a shard of that identity.
+systems hold a shard of that identity. It is healthcare-aware (tax ID,
+identity documents, emergency contacts) so it can stand in as a patient
+registry where a dedicated clinical index is not warranted.
 
 ### 1.2 Vision
 

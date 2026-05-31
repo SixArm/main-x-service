@@ -186,6 +186,18 @@ Same name, same category, same country — but `coordinates_score ≈ 0.0` at ~3
 - Add a `### Behaviour Change` subsection under the next CHANGELOG entry.
 - Bump the minor version (pre-1.0 minor bumps may carry breaking behaviour by convention).
 
+## Tuning guidance
+
+| Symptom | Knob to move |
+|---|---|
+| Too many false positives in the top of the ranking | Raise `match_threshold`; raise `name_weight` or `place_ids_weight`; consider `strict()` preset. |
+| Too many false negatives near the threshold | Lower `match_threshold`; widen `coordinates_scale_metres`; turn on `use_phonetic_matching`; consider `lenient()` preset. |
+| Chain branches on the same street collapsing into one match | Tighten `coordinates_scale_metres` (e.g. `10.0`); raise `coordinates_weight`. |
+| Coarsely-located records under-scoring on coordinates | Widen `coordinates_scale_metres` (e.g. `200.0`); lower `coordinates_weight`. |
+| Category disagreement not being punished enough | Raise `category_weight`. |
+| Cross-country phone collisions | Set `phone_default_country` to the predominant jurisdiction, or `None` to refuse to guess. |
+| Gmail localpart variants not matching | Set `gmail_dot_folding = true`. |
+
 ## Open algorithm questions
 
 See [`../spec.md`](../spec.md) §10 for the live list (OQ-A through OQ-H). When you have an opinion, propose a resolution in `spec.md` as a PR, not as a unilateral code change.

@@ -89,7 +89,7 @@ The Tera templates render the headless component contracts: each interactive ele
 
 Route ordering note: the literal segments (`/review-queue`, `/review-queue/kanban`, `/deduplicate`, `/trash`, `/starred`, `/compare`, `/import`, `/calendar`, `/map`, `/search`, `/search/partial`) are registered **before** the dynamic `/:id` so they take precedence in the matchit router. The per-record action paths (`/:id/edit`, `/:id/audit`, etc.) sit as siblings of `/:id` and disambiguate by suffix.
 
-`{entity_plural}` is per crate: `persons`, `patients`, `workers`, `places`, `things`, `events`.
+`{entity_plural}` is per crate: `persons`, `workers`, `places`, `things`, `events`.
 
 ## Wiring patterns
 
@@ -123,9 +123,9 @@ Templates extend `layout.html.tera`. Every template receives this context by def
 
 | Variable | Type | Source |
 |----------|------|--------|
-| `app_display` | string | `AppContext::default().app_display` (per crate, e.g. "Main Patient Index") |
+| `app_display` | string | `AppContext::default().app_display` (per crate, e.g. "Person Service", "Event Service") |
 | `entity_singular` | string | per crate, e.g. `"patient"` |
-| `entity_plural` | string | per crate, e.g. `"patients"` |
+| `entity_plural` | string | per crate, e.g. `"persons"` |
 
 HTMX attributes (`hx-get`, `hx-target`, `hx-trigger`, `hx-swap`) and Alpine attributes (`x-data`, `x-show`, `x-model`, `x-transition`) appear directly in markup — no client build step.
 

@@ -7,15 +7,14 @@ See [`../spec.md`](../spec.md) §9 for the formal versioning policy.
 - Pre-1.0 (current): minor bumps MAY contain breaking API changes, per Cargo convention. Document them clearly under "Breaking" in the CHANGELOG entry.
 - Post-1.0: strict SemVer.
 - Default-weight or default-threshold changes count as behaviour changes. Bump minor and call out under "Behaviour Change" in `CHANGELOG.md`.
-- The `0.4.0` release is the first under the geographic thing-matcher domain. Subsequent minor bumps should preserve the 0.4.x public surface unless a deliberate breaking change is documented.
+- The `0.4.0` release is the first under the schema.org/Thing domain. Subsequent minor bumps should preserve the 0.4.x public surface unless a deliberate breaking change is documented.
 
 ## `#[non_exhaustive]` implications
 
 The following items carry `#[non_exhaustive]`:
 
-- `Place` and `Address` — gaining fields is non-breaking. Downstream code MUST construct via `Place::builder()` and `Address::new()` rather than struct-literal syntax.
-- `PlaceCategory` and `PlaceIdScheme` — gaining variants is non-breaking. Downstream `match` statements MUST include a `_ => …` arm.
-- `MatchingError` — gaining variants is non-breaking.
+- `Thing` — gaining fields is non-breaking. Downstream code MUST construct via `Thing::builder()` rather than struct-literal syntax.
+- `MatchingError` — gaining variants is non-breaking. Downstream `match` statements MUST include a `_ => …` arm.
 
 Removing fields or variants from a `#[non_exhaustive]` item is breaking. Renaming a serde key is also breaking.
 

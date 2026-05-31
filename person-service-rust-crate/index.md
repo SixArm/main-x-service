@@ -1,9 +1,10 @@
 # Person Service — Index
 
 Centralised registry of person identities. Healthcare-aware (carries
-the same NHS#/SSN/identity-document fields as the patient index), with
-probabilistic + deterministic matching, real-time and batch
-deduplication, HIPAA-grade audit, GDPR Article 15 export, and a
+NHS#/SSN, identity-document, and emergency-contact fields so it can
+stand in as a patient registry where a dedicated clinical index is not
+warranted), with probabilistic + deterministic matching, real-time and
+batch deduplication, HIPAA-grade audit, GDPR Article 15 export, and a
 FHIR R5 Person surface.
 
 This page is a **navigation aid with worked examples**. For canonical

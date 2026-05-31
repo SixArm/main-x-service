@@ -67,12 +67,15 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 - [AGENTS/architecture.md](./AGENTS/architecture.md) — Module layout, layering rules, dependency graph.
 - [AGENTS/coding-style.md](./AGENTS/coding-style.md) — Rust style, naming, doc comments, error handling.
 - [AGENTS/testing.md](./AGENTS/testing.md) — Test pyramid, naming, fixtures, coverage expectations.
-- [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) — Deterministic and probabilistic scoring, weights, phonetics.
-- [AGENTS/normalization.md](./AGENTS/normalization.md) — Name, postcode, phone, NHS-number, and phonetic normalisation rules.
+- [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) — Deterministic and probabilistic scoring, weights, phonetics. Includes the "Detailed Algorithm Specifications" appendix originally in `spec.md` §12.
+- [AGENTS/normalization.md](./AGENTS/normalization.md) — Name, postcode, phone, NHS-number, and phonetic normalisation rules. Includes the "Detailed Normalisation Specifications" appendix originally in `spec.md` §14.
 - [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md) — PII, data protection, clinical-safety guardrails.
 - [AGENTS/release.md](./AGENTS/release.md) — Versioning, CHANGELOG, publishing checklist.
 - [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md) — How `spec.md` is maintained as the single source of truth.
-- [AGENTS/national-person-identifiers.md](./AGENTS/national-person-identifiers.md) — Reference table of the original 35 supported national personal identifier schemes (jurisdiction, endonym, ISO 3166-1 code, format). The 7 T-17.1 schemes (BR CPF, CN RRN, IN Aadhaar, JP My Number, MX CURP, NZ NHI, ZA ID) bring the total to 42 and are documented inline in `src/identifiers.rs` plus spec FR-85..FR-91.
+- [AGENTS/national-person-identifiers.md](./AGENTS/national-person-identifiers.md) — Reference table for the 42 supported national personal identifier schemes (jurisdiction, endonym, ISO 3166-1 code, format) plus the 9 passport-format validators (FR-77). The original 35 + the T-17.1 batch (BR CPF, CN RRN, IN Aadhaar, JP My Number, MX CURP, NZ NHI, ZA ID) bring the total to 42; per-parser algorithms live in this file and in `src/identifiers.rs` rustdoc.
+- [AGENTS/roadmap-research.md](./AGENTS/roadmap-research.md) — Long-form research-spike outcomes (T-9 phonetic encoder, T-14 address parser, T-17 next-batch identifiers, T-19 broader phone country table) originally in `spec.md` §21.4.
+- [AGENTS/delivered-tasks.md](./AGENTS/delivered-tasks.md) — Carry-over `[x]` list of shipped work that was previously in `spec.md` §23.1.
+- [AGENTS/delivered-tasks-detail.md](./AGENTS/delivered-tasks-detail.md) — Per-task acceptance criteria for every delivered task (originally in `spec.md` §23.2).
 
 ---
 

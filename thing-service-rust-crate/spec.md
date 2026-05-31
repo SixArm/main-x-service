@@ -44,8 +44,8 @@ objects — books, papers, software, digital assets, devices, products,
 instances of any physical or virtual object. The domain model is
 faithful to [schema.org/Thing](https://schema.org/Thing) and is the
 most general entity in the Main X Index family: anything that does not
-fit one of the more opinionated sibling crates (`person`, `patient`,
-`worker`, `event`, `place`) belongs here.
+fit one of the more opinionated sibling crates (`person`, `worker`,
+`event`, `place`) belongs here.
 
 ### 1.2 Vision
 

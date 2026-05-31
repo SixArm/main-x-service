@@ -2,20 +2,7 @@
 
 **Crate:** `event-matcher` &nbsp;·&nbsp; **Version targeted:** `0.4.0` (place matcher — historical) &nbsp;·&nbsp; **Status:** partially superseded
 
-> **Notice — domain change in 0.5.0.** This document was authored against the 0.4.x **place matcher** surface (matching landmarks, natural features, chain branches, administrative areas). From 0.5.0 the crate matches **schema.org/Event** records (festivals, conferences, concerts, sports fixtures, screenings, hackathons, meetups). The following sections of this spec remain accurate for 0.5.0 and **do not** require translation: §4 (text normalisation), §6.1 (string similarity primitives), §6.3 (Gaussian decay shape, now reused for temporal proximity), §8 (determinism and safety posture), and §9 (SemVer policy). Sections describing the data model (§1, §3, §5), per-field scoring weights (§7), and worked examples are **out of date** until the spec is rewritten; consult `src/` and [`README.md`](./README.md) for the live 0.5.0 surface, and [`CHANGELOG.md`](./CHANGELOG.md) for the full rename / removal / addition list. The high-level translation table is:
->
-> | 0.4.x concept | 0.5.0 concept |
-> |---|---|
-> | `Place` | `Event` |
-> | `PlaceBuilder` | `EventBuilder` |
-> | `PlaceCategory` (Hotel, Cafe, Museum, …) | `EventCategory` (`MusicEvent`, `Festival`, `ConferenceEvent`, …) |
-> | `PlaceId` / `PlaceIdScheme` (Google, OSM, Wikidata, …) | `EventId` / `EventIdScheme` (Eventbrite, Meetup, Ticketmaster, Wikidata, …) |
-> | `latitude`/`longitude` on `Place` | `Location.latitude` / `Location.longitude` inside `Event.location` |
-> | `address` on `Place` | `Location.address` |
-> | `phone`, `email` | (removed — not schema.org/Event properties) |
-> | `coordinates_score` | `start_date_score` for time; `location_score` for venue/coords |
-> | `Scorer::coordinates_score(d, scale)` over Haversine | retained, plus new `Scorer::start_date_score(d, scale)` over `Scorer::seconds_between` |
-> | Deterministic rule: shared `place_id` OR same name + same postcode | shared `event_id` OR same name + same `start_date` instant |
+> **Notice — domain change in 0.5.0.** This document was authored against the 0.4.x **place matcher** surface. From 0.5.0 the crate matches **schema.org/Event** records. Sections that remain accurate for 0.5.0 (no translation needed): §4 (text normalisation), §6.1 (string similarity primitives), §6.3 (Gaussian decay shape, reused for temporal proximity), §8 (determinism / safety), §9 (SemVer policy). Sections describing the data model (§1, §3, §5), per-field scoring weights (§7), and worked examples are **out of date** until the spec is rewritten; consult `src/`, [`README.md`](./README.md), and [`CHANGELOG.md`](./CHANGELOG.md) for the live 0.5.0 surface. High-level rename table: `Place → Event`, `PlaceBuilder → EventBuilder`, `PlaceCategory → EventCategory`, `PlaceId / PlaceIdScheme → EventId / EventIdScheme` (Eventbrite, Meetup, Ticketmaster, Wikidata, …), `latitude` / `longitude` on `Place` → `Location.latitude` / `Location.longitude` inside `Event.location`, `address` on `Place` → `Location.address`, `phone` / `email` removed, `coordinates_score` → `start_date_score` (time) + `location_score` (venue / coords), deterministic rule becomes "shared `event_id` OR same name + same `start_date` instant". `Scorer::coordinates_score(d, scale)` over Haversine is retained, plus new `Scorer::start_date_score(d, scale)` over `Scorer::seconds_between`.
 
 This document is the living, single source of truth (SSOT) for the place-matcher surface of the crate. Every other document in the repository (`README.md`, `index.md`, `AGENTS.md`, `AGENTS/*.md`, `CHANGELOG.md`) summarises or quotes this file — none contradicts or extends it. When prose elsewhere disagrees with this file, this file wins; when this file disagrees with the code, see §9.
 
@@ -58,17 +45,14 @@ Data engineers, GIS practitioners, and deduplication-pipeline authors who need a
 The following terms are used throughout this spec with the meanings defined here. Other documents in the repository MUST use the same vocabulary.
 
 - **Place** — a single record about a geographic place, as represented by the `Place` struct (§3.1). May describe a landmark, natural feature, chain-store branch, administrative area, or any other geographically-located entity.
-- **Match** — the verdict that two `Place` records refer to the same geographic place. Verdicts come in two flavours, deterministic and probabilistic, with sharply different guarantees.
 - **Deterministic match** — a boolean verdict from `MatchingEngine::deterministic_match` (§5.1). Returns `true` only when an objective, transitive criterion is satisfied. Never produces a score.
-- **Probabilistic match** — a `MatchResult` from `MatchingEngine::match_places` (§5.2) carrying a score, an `is_match` boolean, a `Confidence` band, and a `MatchBreakdown`.
-- **Per-field breakdown** — the `MatchBreakdown` struct (§3.7) containing one `Option<f64>` per scored component. `None` means "not scored on at least one side"; `Some(s)` carries a value in `[0.0, 1.0]`.
-- **Renormalisation** — the rule in §5.10 by which the weighted sum is divided by the sum of *participating* weights, so missing fields neither contribute to nor penalise the overall score.
-- **Confidence band** — a coarse `High` / `Medium` / `Low` bucket derived from the probabilistic score (§3.6). Bands are fixed; they do **not** follow `match_threshold`.
+- **Probabilistic match** — a `MatchResult` from `MatchingEngine::match_places` (§5.2) carrying a score, an `is_match` boolean, a `Confidence` band, and a `MatchBreakdown` (one `Option<f64>` per scored component).
+- **Renormalisation** — divide the weighted sum by the sum of *participating* weights, so missing fields neither contribute to nor penalise the overall score (§5.2.2).
+- **Confidence band** — a coarse `High` / `Medium` / `Low` bucket derived from the score (§3.6). Fixed bands; independent of `match_threshold`.
 - **Normalisation** — the deterministic, idempotent text transformations in `Normalizer` (§4) applied before comparison.
-- **Scheme-local identifier** — a `PlaceId` is identified by both its `scheme` (e.g. `Wikidata`) and its `value`. Identifiers from different schemes never match each other, even if the value string is identical (§3.5).
-- **Score** — a real number in `[0.0, 1.0]`, where `1.0` means "identical" and `0.0` means "no observable similarity".
-- **Weight** — a dimensionless multiplier on a component score. Weights need not sum to `1.0`; the renormaliser handles that.
-- **Strict mode** — the `MatchConfig::strict_mode` flag (§5.2.3): when `true`, the probabilistic `is_match` boolean additionally requires `deterministic_match` to return `true`.
+- **Scheme-local identifier** — a `PlaceId` is identified by both its `scheme` and its `value`. Identifiers from different schemes never match, even with identical value strings (§3.5).
+- **Score** — a real number in `[0.0, 1.0]`. **Weight** — a dimensionless multiplier on a component score; weights need not sum to `1.0`.
+- **Strict mode** — `MatchConfig::strict_mode` (§5.2.3): when `true`, `is_match` additionally requires `deterministic_match` to return `true`.
 
 ---
 
@@ -107,49 +91,11 @@ pub struct Place {
 
 #### 3.1.1 Field semantics
 
-The "Scored" column distinguishes fields the probabilistic matcher uses (§6) from fields that are data-only (round-trip honesty; not used in the score).
+Scored fields (probabilistic matcher consults — §6): `name`, `alternate_names` (§6.1); `latitude`, `longitude` (§6.3, decimal degrees, `[-90, 90]` / `[-180, 180]`); `category` (§6.5); `place_ids` (§6.7, sharing any `(scheme, value)` pair is a deterministic match); `address` (§6.4, partial addresses first-class); `phone` (§6.8); `email` (§6.9); `country_code_as_iso_3166_1_alpha_2` (§6.6, ISO 3166-1 alpha-2, compared case-insensitively after trim).
 
-| Field | Type | Scored? | Meaning |
-|---|---|---|---|
-| `name` | `Option<String>` | yes (§6.1) | Primary canonical name, e.g. `"Eiffel Tower"`. |
-| `alternate_names` | `Vec<String>` | yes (§6.1) | Aliases / endonyms / translations, e.g. `["La Tour Eiffel", "Tour Eiffel"]`. Default empty. |
-| `latitude` | `Option<f64>` | yes (§6.3) | Decimal degrees. Conventionally `[-90.0, 90.0]`. |
-| `longitude` | `Option<f64>` | yes (§6.3) | Decimal degrees. Conventionally `[-180.0, 180.0]`. |
-| `category` | `Option<PlaceCategory>` | yes (§6.5) | Coarse-grained classification (§3.4). |
-| `place_ids` | `Vec<PlaceId>` | yes (§6.7) | External scheme-scoped identifiers. Sharing any pair is a deterministic match. |
-| `address` | `Option<Address>` | yes (§6.4) | Postal address (§3.3). Optional; partial addresses are first-class. |
-| `phone` | `Option<String>` | yes (§6.8) | Primary contact phone. Normalised before comparison. |
-| `email` | `Option<String>` | yes (§6.9) | Primary contact email. Normalised before comparison. |
-| `local_id` | `Option<String>` | **no** | Originating-system identifier. Stored for round-trip; the matcher MUST NOT score it (different sources may collide). |
-| `altitude_as_metre` | `Option<f64>` | **no** | Object height above mean sea level (rooftop, aircraft cruise). May be negative. |
-| `elevation_as_metre` | `Option<f64>` | **no** | Ground-surface height above mean sea level (summit, town centre). May be negative. |
-| `area_as_metre_2` | `Option<f64>` | **no** | Footprint in square metres. |
-| `country_code_as_iso_3166_1_alpha_2` | `Option<String>` | yes (§6.6) | ISO 3166-1 alpha-2 code. Stored as supplied; compared case-insensitively after trim. |
-| `maximum_capacity_count` | `Option<u32>` | **no** | Legal / seating capacity. `0` is meaningful; absence is `None`. |
+Data-only fields (round-trip honesty; **not** scored): `local_id` (originating-system identifier — sources may collide); `altitude_as_metre` (object height a.s.l.); `elevation_as_metre` (ground-surface height a.s.l.); `area_as_metre_2` (footprint); `maximum_capacity_count` (`0` is meaningful, absence is `None`).
 
-Latitude or longitude values that are non-finite or fall outside the conventional ranges MUST be stored as supplied (round-trip honesty) but MUST be treated as missing by the coordinates scorer (§6.3).
-
-#### 3.1.2 JSON shape
-
-```json
-{
-  "name": "Eiffel Tower",
-  "alternate_names": ["La Tour Eiffel"],
-  "latitude": 48.858222,
-  "longitude": 2.2945,
-  "category": "Monument",
-  "place_ids": [{"scheme": "Wikidata", "value": "Q243"}],
-  "address": null,
-  "phone": null,
-  "email": null,
-  "local_id": null,
-  "altitude_as_metre": null,
-  "elevation_as_metre": null,
-  "area_as_metre_2": null,
-  "country_code_as_iso_3166_1_alpha_2": "FR",
-  "maximum_capacity_count": null
-}
-```
+Latitude or longitude values that are non-finite or fall outside the conventional ranges MUST be stored as supplied (round-trip honesty) but MUST be treated as missing by the coordinates scorer (§6.3). JSON shape is the direct serde derivation of `Place`; see `examples/basic_usage.rs` for a populated payload.
 
 ### 3.2 `PlaceBuilder`
 
@@ -158,28 +104,7 @@ Latitude or longitude values that are non-finite or fall outside the conventiona
 pub struct PlaceBuilder { /* private fields */ }
 ```
 
-Fluent builder for `Place`. All string setters accept `impl Into<String>`. Setters mirror `Place`'s fields one-for-one, with the following additions:
-
-| Setter | Action |
-|---|---|
-| `name(impl Into<String>)` | Set the primary name. |
-| `alternate_names(Vec<String>)` | **Replace** the entire alternate-names list. |
-| `add_alternate_name(impl Into<String>)` | **Append** a single alternate name. |
-| `latitude(f64)` | Set latitude. |
-| `longitude(f64)` | Set longitude. |
-| `category(PlaceCategory)` | Set the category. |
-| `place_ids(Vec<PlaceId>)` | **Replace** the entire `place_ids` list. |
-| `add_place_id(PlaceId)` | **Append** a single `PlaceId`. |
-| `address(Address)` | Set the postal address. |
-| `phone(impl Into<String>)` | Set the phone. |
-| `email(impl Into<String>)` | Set the email. |
-| `local_id(impl Into<String>)` | Set the originating-system identifier. |
-| `altitude_as_metre(f64)` | Set altitude. |
-| `elevation_as_metre(f64)` | Set elevation. |
-| `area_as_metre_2(f64)` | Set area. |
-| `country_code_as_iso_3166_1_alpha_2(impl Into<String>)` | Set country code. |
-| `maximum_capacity_count(u32)` | Set capacity. |
-| `build() -> Place` | Consume the builder and produce the `Place`. |
+Fluent builder for `Place`. All string setters accept `impl Into<String>`. Setters mirror `Place`'s fields one-for-one. Both `alternate_names(Vec<String>)` and `place_ids(Vec<PlaceId>)` **replace** the entire list; `add_alternate_name(impl Into<String>)` and `add_place_id(PlaceId)` **append** a single element. `build() -> Place` consumes the builder.
 
 `PlaceBuilder` is `#[derive(Default)]`. All fields start unset (`None` / empty `Vec`).
 
@@ -215,46 +140,7 @@ pub enum PlaceCategory {
 }
 ```
 
-`PlaceCategory` carries **35 unit variants plus one carrying `Other(String)`** (36 in total). Equality is structural: `PlaceCategory::Other("foo")` matches `PlaceCategory::Other("foo")` but not `PlaceCategory::Other("bar")` and not any enumerated variant. Adding a new variant is non-breaking (`#[non_exhaustive]`).
-
-| Variant | One-line meaning |
-|---|---|
-| `Hotel` | Lodging: hotel, inn, hostel, or similar overnight accommodation. |
-| `Restaurant` | Sit-down restaurant or eatery serving prepared meals. |
-| `Cafe` | Cafe, coffee shop, or tearoom. |
-| `Bar` | Bar, pub, tavern, or other primarily-alcohol establishment. |
-| `Shop` | Retail shop or store selling goods to the public. |
-| `Mall` | Shopping mall or multi-tenant retail complex. |
-| `Hospital` | Hospital, clinic, or other medical facility. |
-| `School` | Primary, secondary, or other school (pre-tertiary). |
-| `University` | University, college, or other tertiary educational institution. |
-| `Library` | Public, academic, or private library. |
-| `Museum` | Museum or gallery exhibiting cultural or scientific artefacts. |
-| `Theatre` | Theatre for live performance. |
-| `Cinema` | Cinema or movie theatre. |
-| `Park` | Park or other public green space. |
-| `Beach` | Beach or coastal shoreline open to the public. |
-| `Stadium` | Stadium or large outdoor sporting venue. |
-| `Airport` | Airport or airfield. |
-| `RailwayStation` | Railway, train, or metro station. |
-| `BusStation` | Bus station or coach terminal. |
-| `Bank` | Bank branch or banking facility. |
-| `PostOffice` | Post office or postal branch. |
-| `Government` | Government building or civic facility. |
-| `Monument` | Monument, memorial, or commemorative structure. |
-| `ReligiousBuilding` | Place of worship: church, mosque, temple, synagogue, or similar. |
-| `Cemetery` | Cemetery, graveyard, or burial ground. |
-| `Mountain` | Mountain, peak, or other terrain high point. |
-| `Lake` | Lake, pond, or other enclosed body of water. |
-| `River` | River, stream, or other flowing watercourse. |
-| `City` | City — large populated settlement. |
-| `Town` | Town — medium-sized populated settlement. |
-| `Village` | Village — small populated settlement. |
-| `Neighborhood` | Neighbourhood or district within a larger settlement. |
-| `OfficeBuilding` | Office building or commercial workplace. |
-| `Residence` | Residence: house, flat, apartment, or other dwelling. |
-| `Warehouse` | Warehouse or storage facility. |
-| `Other(String)` | Catch-all. The carried string participates in equality. |
+`PlaceCategory` carries **35 unit variants plus one carrying `Other(String)`** (36 in total). Variants cover lodging, food / drink, retail, education, civic, transport, geography, residential, and commercial categories (full list in source: `src/models/place_category.rs`). Equality is structural: `PlaceCategory::Other("foo")` matches `PlaceCategory::Other("foo")` but not `PlaceCategory::Other("bar")` and not any enumerated variant. Adding a new variant is non-breaking (`#[non_exhaustive]`).
 
 ### 3.5 `PlaceId` and `PlaceIdScheme`
 
@@ -271,24 +157,11 @@ pub struct PlaceId {
 }
 ```
 
-`PlaceIdScheme` carries **9 unit variants plus `Other(String)`** (10 in total).
+`PlaceIdScheme` carries **9 unit variants plus `Other(String)`** (10 in total): `Google`, `OsmNode`, `OsmWay`, `OsmRelation`, `GeoNames`, `Wikidata`, `Foursquare`, `Here`, `Mapbox`. Per-scheme format conventions (informational) are documented in `src/models/place_id.rs`.
 
 - `PlaceId::new(scheme, value) -> Option<Self>` MUST trim surrounding whitespace from `value` and MUST return `None` if the trimmed value is empty.
 - Equality MUST be `(scheme, value)`-structural. No per-scheme canonicalisation is performed.
 - Cross-scheme identifiers MUST NEVER match: a `(Google, "abc")` and an `(OsmNode, "abc")` denote different things.
-
-| Scheme | Format convention (informational) |
-|---|---|
-| `Google` | Google Place ID, opaque string typically prefixed `ChIJ…`. |
-| `OsmNode` | OpenStreetMap node — single point feature. Numeric ID, conventionally prefixed `N` in OSM URIs. |
-| `OsmWay` | OpenStreetMap way — line or area feature. Numeric ID, conventionally prefixed `W`. |
-| `OsmRelation` | OpenStreetMap relation — multi-feature aggregate. Numeric ID, conventionally prefixed `R`. |
-| `GeoNames` | GeoNames numeric `geonameid`. |
-| `Wikidata` | Wikidata QID, e.g. `Q243` for the Eiffel Tower. |
-| `Foursquare` | Foursquare venue identifier. |
-| `Here` | HERE Technologies place identifier. |
-| `Mapbox` | Mapbox place / feature identifier. |
-| `Other(String)` | Catch-all. The carried string participates in equality. |
 
 ### 3.6 `Confidence`
 
@@ -356,40 +229,17 @@ pub type Result<T> = std::result::Result<T, MatchingError>;
 
 All normalisers in `Normalizer` are stateless associated functions and **idempotent**: `f(f(x)) == f(x)`. They are also **deterministic** (no clocks, no RNGs) and allocate at most a single new `String`.
 
+> Per-rule example tables are maintained in [`AGENTS/normalization.md`](AGENTS/normalization.md); this section pins the algorithms.
+
 ### 4.1 Names — `Normalizer::normalize_name`
 
-Pipeline (in order):
-
-1. NFKD-decompose (`é` → `e` + combining acute).
-2. Drop combining marks (diacritics).
-3. Drop ASCII punctuation (apostrophes, hyphens, full stops, …).
-4. Lowercase.
-5. Collapse consecutive whitespace to single ASCII spaces; trim ends.
-
-Examples:
-
-| Input | Output |
-|---|---|
-| `"Eiffel Tower"` | `"eiffel tower"` |
-| `"  John  Smith  "` | `"john smith"` |
-| `"O'Brien"` | `"obrien"` |
-| `"MARY-JANE"` | `"maryjane"` |
-| `"José"` | `"jose"` |
-| `"Siân"` | `"sian"` |
-| `"Łukasz"` | `"łukasz"` (`ł` has no NFKD decomposition) |
-| `""` / `"   "` | `""` |
+Pipeline (in order): NFKD-decompose (`é` → `e` + combining acute); drop combining marks (diacritics); drop ASCII punctuation; lowercase; collapse consecutive whitespace to single ASCII spaces and trim. Example: `"O'Brien"` → `"obrien"`; `"José"` → `"jose"`; `"Łukasz"` → `"łukasz"` (`ł` has no NFKD decomposition).
 
 **Known limit:** non-ASCII punctuation (e.g. the curly apostrophe `’` U+2019) is **not** stripped. Upstream code should convert to ASCII first.
 
 ### 4.2 Postcodes — `Normalizer::normalize_postcode`
 
-Drop all whitespace; uppercase. No locale-specific validation.
-
-| Input | Output |
-|---|---|
-| `"cf10 1aa"` | `"CF101AA"` |
-| `"  SW1A 2AA "` | `"SW1A2AA"` |
-| `""` | `""` |
+Drop all whitespace; uppercase. No locale-specific validation. `"cf10 1aa"` → `"CF101AA"`.
 
 ### 4.3 Phone numbers
 
@@ -415,9 +265,7 @@ Match `+CC` / `00CC` / default-country trunk; strip the national trunk prefix; v
 
 `default_country` is an ISO 3166-1 alpha-2 code (`"GB"`, `"FR"`, `"US"`, …); pass `None` to refuse to assume a default — only explicit `+CC` / `00CC` inputs will parse.
 
-Supported countries (per the in-code `COUNTRY_PHONE_TABLE`): `GB`, `FR`, `DE`, `ES`, `IE`, `IT`, `NL`, `BE`, `PT`, `CH`, `AT`, `SE`, `NO`, `DK`, `FI`, `PL`, `AU`, `NZ`, `US`, `CA`, `JP`, `CN`, `IN`, `BR`, `MX`, `ZA`, `BG`, `CZ`, `EE`, `GR`, `HR`, `IS`, `LI`, `LT`, `LV`, `MT`, `RO`, `SI`, `SK`. Each entry pins the dial code, the national trunk prefix (`"0"` for most of Europe and Asia; `"8"` for Lithuania; `None` for NANP / Spain / Portugal / several others), and the min / max NSN length.
-
-The matching engine MUST prefer the E.164 form when both inputs canonicalise, and MUST fall back to the legacy form otherwise (§6.8).
+Supported countries (per the in-code `COUNTRY_PHONE_TABLE`, **39 entries**): `GB`, `FR`, `DE`, `ES`, `IE`, `IT`, `NL`, `BE`, `PT`, `CH`, `AT`, `SE`, `NO`, `DK`, `FI`, `PL`, `AU`, `NZ`, `US`, `CA`, `JP`, `CN`, `IN`, `BR`, `MX`, `ZA`, `BG`, `CZ`, `EE`, `GR`, `HR`, `IS`, `LI`, `LT`, `LV`, `MT`, `RO`, `SI`, `SK`. Each entry pins the dial code, the national trunk prefix (`"0"` for most of Europe and Asia; `"8"` for Lithuania; `None` for NANP / Spain / Portugal / several others), and the min / max NSN length. The matching engine MUST prefer the E.164 form when both inputs canonicalise, and MUST fall back to the legacy form otherwise (§6.8).
 
 ### 4.4 Email — `Normalizer::normalize_email`
 
@@ -430,16 +278,7 @@ fn normalize_email(email: &str, gmail_dot_folding: bool) -> Option<String>;
 3. Reject inputs without exactly one `@`, or with an empty localpart or domain (return `None`).
 4. If `gmail_dot_folding` is `true` AND the domain is `gmail.com` or `googlemail.com`, strip every `.` from the localpart and drop any `+tag` suffix.
 
-Examples:
-
-| Input | `gmail_dot_folding` | Output |
-|---|---|---|
-| `"  Alice@Example.ORG  "` | `false` | `Some("alice@example.org")` |
-| `"j.smith@gmail.com"` | `true` | `Some("jsmith@gmail.com")` |
-| `"jsmith+work@googlemail.com"` | `true` | `Some("jsmith@googlemail.com")` |
-| `"j.smith@example.org"` | `true` | `Some("j.smith@example.org")` (non-Gmail domain unaffected) |
-| `"no-at-sign"` | any | `None` |
-| `"a@b@c"` | any | `None` |
+Examples: `"  Alice@Example.ORG  "` → `Some("alice@example.org")`; `"j.smith+work@gmail.com"` with folding → `Some("jsmith@gmail.com")`; non-Gmail domains never fold; `"no-at-sign"` and `"a@b@c"` return `None`. See [`AGENTS/normalization.md`](AGENTS/normalization.md) for the full table.
 
 ### 4.5 Address-line parsing — `ParsedAddressLine`, `Normalizer::parse_address_line`
 
@@ -544,65 +383,23 @@ The single exception is `name_phonetic_score`: when `MatchConfig::use_phonetic_m
 
 ## 6. Per-field scoring algorithms
 
-Each component returns `Option<f64>` in `[0.0, 1.0]`. A `None` means the component did not participate (§5.4).
+Each component returns `Option<f64>` in `[0.0, 1.0]`. A `None` means the component did not participate (§5.4). Per-algorithm pseudocode, edge cases, and lookup tables are maintained in [`AGENTS/matching-algorithm.md`](AGENTS/matching-algorithm.md); the contracts below are normative.
 
 ### 6.1 Name — `name_score`
 
-`collect_names(p)` gathers `p.name` plus `p.alternate_names`, skipping empty / whitespace-only strings. The matcher computes the similarity for every pair drawn from `collect_names(p1) × collect_names(p2)` (after `normalize_name` on each side) using `MatchConfig::name_algorithm`, and returns the maximum.
-
-`MatchConfig::name_algorithm` selects one of:
-
-- `JaroWinkler` — `Scorer::jaro_winkler_similarity` (favours common prefixes; good for short names).
-- `Levenshtein` — `Scorer::levenshtein_similarity`, computed as `1 - (edit_distance / max_len)`.
-- `Exact` — `Scorer::exact_match` (binary, case-sensitive).
-- `Combined` — `0.7 * JaroWinkler + 0.3 * Levenshtein`. **Default.**
-
-Edge cases for the underlying scorers: two empty strings score `1.0`; one empty and one non-empty scores `0.0`.
-
-`name_score` is `None` when either side has no usable names.
+`collect_names(p)` gathers `p.name` plus `p.alternate_names`, skipping empty / whitespace-only strings. The matcher computes the similarity for every pair drawn from `collect_names(p1) × collect_names(p2)` (after `normalize_name` on each side) using `MatchConfig::name_algorithm`, and returns the maximum. Algorithm selector values: `JaroWinkler` (prefix-biased; good for short names), `Levenshtein` (`1 - edit_distance / max_len`), `Exact` (binary, case-sensitive), `Combined = 0.7 * JaroWinkler + 0.3 * Levenshtein` (**default**). Two empty strings score `1.0`; empty vs non-empty scores `0.0`. `name_score` is `None` when either side has no usable names.
 
 ### 6.2 Phonetic — `name_phonetic_score`
 
-Only computed when `MatchConfig::use_phonetic_matching = true`. For every pair across `collect_names`, compute `Normalizer::phonetic_code(name)` on each side and take the maximum equality (`1.0` if any pair of non-empty codes matches, else `0.0`).
-
-`name_phonetic_score` contributes only as a **bonus**: when `> 0.9`, the weighted-sum reducer adds `name_phonetic_score * 0.05` to the weighted sum and `0.05` to the total weight (§5.2.2). The bonus MUST NOT lower the overall score: if the gate does not fire, the bonus is simply not added.
-
-`name_phonetic_score` is `None` when phonetic matching is off, or when either side has no usable names.
+Only computed when `MatchConfig::use_phonetic_matching = true`. For every pair across `collect_names`, compute `Normalizer::phonetic_code(name)` on each side; result is `1.0` if any pair of non-empty codes matches, else `0.0`. Bonus-only: when `> 0.9`, the weighted-sum reducer adds `name_phonetic_score * 0.05` to weighted sum and `0.05` to total weight (§5.2.2). The bonus MUST NOT lower the overall score. `None` when phonetic matching is off, or either side has no usable names.
 
 ### 6.3 Coordinates — `coordinates_score`
 
-Compute the Haversine distance and apply Gaussian decay:
-
-```text
-d = Scorer::haversine_metres(lat1, lon1, lat2, lon2)
-s = MatchConfig::coordinates_scale_metres
-coordinates_score = exp(-(d / s)^2)
-```
-
-Contract for the decay function:
-
-- `d == 0` → `1.0`.
-- `d == s` → `1/e` (~`0.368`).
-- `d == 3 * s` → ~`0.0001`.
-- Non-finite `d`, non-positive `s`, negative `d` → `0.0`.
-
-`Scorer::haversine_metres` uses mean Earth radius `6_371_000.0` m on a sphere. The function is total over `f64`; non-finite inputs produce `NaN` without panic. The implementation handles equator and date-line crossings correctly.
-
-`coordinates_score` is `None` when any of `lat1`, `lon1`, `lat2`, `lon2` is missing, non-finite, or outside the conventional ranges (`[-90, 90]` for latitude, `[-180, 180]` for longitude).
+Compute `d = Scorer::haversine_metres(lat1, lon1, lat2, lon2)`, apply Gaussian decay `exp(-(d / s)^2)` where `s = MatchConfig::coordinates_scale_metres`. Contract: `d == 0 → 1.0`; `d == s → 1/e ≈ 0.368`; `d == 3s → ~0.0001`; non-finite `d`, non-positive `s`, negative `d` → `0.0`. `Scorer::haversine_metres` uses mean Earth radius `6_371_000.0` m on a sphere; total over `f64`; handles equator and date-line crossings. `coordinates_score` is `None` when any of `lat1`, `lon1`, `lat2`, `lon2` is missing, non-finite, or outside `[-90, 90]` / `[-180, 180]`.
 
 ### 6.4 Address — `address_score`
 
-When both sides have an `address`, run a weight-renormalised average across populated sub-components:
-
-| Sub-component | Sub-weight | Sub-score |
-|---|---|---|
-| Postcode | `0.5` | `1.0` if `normalize_postcode(a) == normalize_postcode(b)`, else `0.0`. |
-| City | `0.3` | `Scorer::jaro_winkler_similarity` on the normalised city names. |
-| Line 1 | `0.2` | `parse_address_line` on each side; with house numbers present on both, `0.6 * jaro_winkler(street) + 0.4 * (house_number_a == house_number_b)`. Otherwise the street similarity alone. |
-
-If no sub-component is populated on both sides, the address score is the neutral `0.5`.
-
-`address_score` is `None` only when at least one side has no `address` at all (the entire `Option<Address>` is `None`).
+When both sides have an `address`, run a weight-renormalised average across populated sub-components with sub-weights **Postcode 0.5**, **City 0.3**, **Line 1 0.2**. Postcode sub-score: `1.0` iff `normalize_postcode(a) == normalize_postcode(b)` else `0.0`. City sub-score: `jaro_winkler_similarity` on normalised city names. Line-1 sub-score: `parse_address_line` on each side; with house numbers present on both, `0.6 * jaro_winkler(street) + 0.4 * (house_number_a == house_number_b)`; otherwise street similarity alone. If no sub-component is populated on both sides, address score is neutral `0.5`. `None` only when at least one side has `Option<Address>` of `None`.
 
 ### 6.5 Category — `category_score`
 
@@ -618,13 +415,11 @@ If no sub-component is populated on both sides, the address score is the neutral
 
 ### 6.8 Phone — `phone_score`
 
-Compute `normalize_phone_e164(phone, cc)` for both sides where `cc = MatchConfig::phone_default_country`. If both canonicalise, `1.0` iff the canonical strings are equal, else `0.0`. Otherwise (either side fails to canonicalise) compare `normalize_phone(phone)` on both sides: `1.0` iff equal, else `0.0`.
-
-`phone_score` is `None` only when either side has `phone = None`.
+Compute `normalize_phone_e164(phone, cc)` for both sides with `cc = MatchConfig::phone_default_country`. If both canonicalise, `1.0` iff equal, else `0.0`. Otherwise fall back to `normalize_phone(phone)` (UK-centric legacy) on both: `1.0` iff equal, else `0.0`. `None` only when either side has `phone = None`.
 
 ### 6.9 Email — `email_score`
 
-Compute `normalize_email(email, gmail_dot_folding)` for both sides. `1.0` iff both canonicalise and are equal; `0.0` if both canonicalise but differ. `None` if either side has `email = None`, or if either side fails to canonicalise (`normalize_email` returned `None`).
+Compute `normalize_email(email, gmail_dot_folding)` for both sides. `1.0` iff both canonicalise and are equal; `0.0` if both canonicalise but differ. `None` if either side has `email = None`, or if either side fails to canonicalise.
 
 ---
 
@@ -694,15 +489,7 @@ Under strict mode, `is_match` additionally requires `deterministic_match`. `scor
 
 ### 7.4 Tuning guidance
 
-| Symptom | Knob to move |
-|---|---|
-| Too many false positives in the top of the ranking | Raise `match_threshold`; raise `name_weight` or `place_ids_weight`; consider `strict()` preset. |
-| Too many false negatives near the threshold | Lower `match_threshold`; widen `coordinates_scale_metres`; turn on `use_phonetic_matching`; consider `lenient()` preset. |
-| Chain branches on the same street collapsing into one match | Tighten `coordinates_scale_metres` (e.g. `10.0`); raise `coordinates_weight`. |
-| Coarsely-located records under-scoring on coordinates | Widen `coordinates_scale_metres` (e.g. `200.0`); lower `coordinates_weight`. |
-| Category disagreement not being punished enough | Raise `category_weight`. |
-| Cross-country phone collisions | Set `phone_default_country` to the predominant jurisdiction, or `None` to refuse to guess. |
-| Gmail localpart variants not matching | Set `gmail_dot_folding = true`. |
+Tuning recipes (false positives → raise `match_threshold`; chain-branch collapse → tighten `coordinates_scale_metres`; cross-country phone collisions → pin or null out `phone_default_country`; etc.) live in [`AGENTS/matching-algorithm.md`](AGENTS/matching-algorithm.md). The defaults table above remains normative.
 
 ---
 
@@ -807,135 +594,18 @@ Sketch of the per-field scores under default weights:
 
 Renormalised: `weighted_sum / total_weight ≈ (0.20 + 0.291 + 0.10 + 0.05) / 0.65 ≈ 0.984`. Default threshold `0.80` → `is_match = true`; `Confidence::High`.
 
-### 11.2 Big Ben / Elizabeth Tower — cartesian-product name scoring
+### 11.2 Other illustrative scenarios
 
-```rust
-let big_ben = Place::builder()
-    .name("Big Ben")
-    .latitude(51.500_7)
-    .longitude(-0.124_7)
-    .build();
+The following pinned scenarios live as runnable tests in `tests/integration_tests.rs` and as worked examples in [`AGENTS/matching-algorithm.md`](AGENTS/matching-algorithm.md):
 
-let liz_tower = Place::builder()
-    .name("Elizabeth Tower")
-    .add_alternate_name("Big Ben")
-    .latitude(51.500_72)
-    .longitude(-0.124_65)
-    .build();
+- **Big Ben / Elizabeth Tower** — cartesian-product name scoring across `name` × `alternate_names` picks the best pair (Big Ben ≈ Big Ben → ~1.0).
+- **Two Starbucks branches — same name, different cities** — coordinates dominate and drag the renormalised score well below `0.80` despite `name_score = 1.0`, `category_score = 1.0`, `country_code_score = 1.0`.
+- **Shared Google Place ID** — `deterministic_match` short-circuits to `true` even with wholly different names.
+- **Snowdon / Yr Wyddfa** — bilingual names match via the alternate-name cartesian product; `elevation_as_metre` is data-only (§3.1.1).
+- **Wembley stadium with capacity / footprint** — `area_as_metre_2`, `maximum_capacity_count` round-trip through serde but are not scored.
+- **Batch screening (`rank_one_to_many`)** — deterministic descending-score ordering with ascending-index tiebreak (§5.3).
 
-let r = MatchingEngine::default_config().match_places(&big_ben, &liz_tower);
-assert!(r.is_match);
-```
-
-The cartesian product (§6.1) yields four name comparisons: `(Big Ben, Elizabeth Tower)`, `(Big Ben, Big Ben)`, plus the symmetric pairs. The maximum is `(Big Ben, Big Ben) ≈ 1.0`. Coordinates match within a metre or two; `is_match = true`.
-
-### 11.3 Two Starbucks branches — same name, different cities
-
-```rust
-let manhattan = Place::builder()
-    .name("Starbucks")
-    .latitude(40.7589)
-    .longitude(-73.9851)
-    .category(PlaceCategory::Cafe)
-    .country_code_as_iso_3166_1_alpha_2("US")
-    .build();
-
-let los_angeles = Place::builder()
-    .name("Starbucks")
-    .latitude(34.0522)
-    .longitude(-118.2437)
-    .category(PlaceCategory::Cafe)
-    .country_code_as_iso_3166_1_alpha_2("US")
-    .build();
-
-let r = MatchingEngine::default_config().match_places(&manhattan, &los_angeles);
-// r.is_match == false; coordinates_score decays essentially to 0
-```
-
-`name_score = 1.0`, `category_score = 1.0`, `country_code_score = 1.0` — yet `coordinates_score ≈ 0.0` (separation ~3940 km, far beyond `3 × scale`). With `coordinates_weight = 0.30` dominating, the renormalised total drops well below `0.80`.
-
-### 11.4 Shared Google Place ID — deterministic short-circuit
-
-```rust
-let id = PlaceId::new(PlaceIdScheme::Google, "ChIJLU7jZClu5kcR4PcOOO6p3I0").unwrap();
-let a = Place::builder().name("Eiffel Tower").add_place_id(id.clone()).build();
-let b = Place::builder().name("Wholly Different Name").add_place_id(id).build();
-
-assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
-```
-
-`deterministic_match` short-circuits on the shared `(Google, "ChIJ…")` pair. Names and coordinates are irrelevant.
-
-### 11.5 Mt Snowdon / Yr Wyddfa — bilingual names plus elevation
-
-```rust
-let snowdon = Place::builder()
-    .name("Snowdon")
-    .add_alternate_name("Yr Wyddfa")
-    .latitude(53.068_5)
-    .longitude(-4.076_2)
-    .category(PlaceCategory::Mountain)
-    .country_code_as_iso_3166_1_alpha_2("GB")
-    .elevation_as_metre(1085.0)
-    .build();
-
-let yr_wyddfa = Place::builder()
-    .name("Yr Wyddfa")
-    .latitude(53.068_5)
-    .longitude(-4.076_2)
-    .category(PlaceCategory::Mountain)
-    .country_code_as_iso_3166_1_alpha_2("GB")
-    .elevation_as_metre(1085.0)
-    .build();
-
-let r = MatchingEngine::default_config().match_places(&snowdon, &yr_wyddfa);
-assert!(r.is_match);
-```
-
-The English / Welsh names match via the alternate-name cartesian product. `elevation_as_metre` is data-only — it round-trips through serde but does not contribute to the score (§3.1.1).
-
-### 11.6 Stadium with capacity and footprint — data-only fields
-
-```rust
-let wembley = Place::builder()
-    .name("Wembley Stadium")
-    .latitude(51.555_8)
-    .longitude(-0.279_7)
-    .category(PlaceCategory::Stadium)
-    .country_code_as_iso_3166_1_alpha_2("GB")
-    .area_as_metre_2(40_000.0)
-    .maximum_capacity_count(90_000)
-    .build();
-```
-
-`area_as_metre_2` and `maximum_capacity_count` round-trip through serde and are visible to downstream consumers, but the matcher does not consult them (§3.1.1).
-
-### 11.7 Batch screening — `rank_one_to_many`
-
-```rust
-let query = Place::builder()
-    .name("Eiffel Tower")
-    .latitude(48.858_222)
-    .longitude(2.294_500)
-    .build();
-
-let candidates = vec![
-    Place::builder().name("Statue of Liberty").latitude(40.689_2).longitude(-74.044_5).build(),
-    Place::builder().name("Tour Eiffel").latitude(48.858_3).longitude(2.294_5).build(),
-    Place::builder().name("Big Ben").latitude(51.500_7).longitude(-0.124_7).build(),
-];
-
-let engine = MatchingEngine::default_config();
-let ranked = engine.rank_one_to_many(&query, &candidates);
-
-// `ranked[0]` is the best match, paired with its original index.
-assert_eq!(ranked[0].0, 1);     // Tour Eiffel
-assert!(ranked[0].1.is_match);
-```
-
-The output is sorted by descending `score` with ties broken by ascending original index, so the ordering is deterministic across calls with the same inputs (§5.3). For a no-sort variant that preserves input order, use `match_one_to_many` instead.
-
-### 11.8 Strict mode — fuzzy match without deterministic agreement
+### 11.3 Strict mode — fuzzy match without deterministic agreement
 
 ```rust
 let a = Place::builder()
@@ -970,31 +640,7 @@ Strict mode (§5.2.3) tightens only the `is_match` boolean. The renormalised `sc
 
 ## 12. Glossary cross-reference
 
-| Symbol | One-line meaning | Defined in |
-|---|---|---|
-| `Address` | Postal address with optional line1/line2/city/county/postcode/country. | §3.3 |
-| `Confidence` | High / Medium / Low band derived from probabilistic score. | §3.6 |
-| `MatchBreakdown` | Per-field `Option<f64>` contributions returned with every `MatchResult`. | §3.7 |
-| `MatchConfig` | Tunable weights, threshold, algorithm, presets. | §3.8 / §7 |
-| `MatchResult` | `{ score, is_match, confidence, breakdown }` returned by `match_places`. | §3.7 |
-| `MatchingEngine` | The engine. Immutable after construction. `Send + Sync`. | §5 |
-| `MatchingError` | Sum-type for fallible operations. Only variant today is `MissingField`. | §3.9 |
-| `Normalizer` | Stateless namespace for text normalisation. | §4 |
-| `ParsedAddressLine` | `{ house_number, unit, street }` decomposition of an address line. | §4.5 |
-| `Place` | Core place record. 15 fields, every one optional or defaulting to empty. | §3.1 |
-| `PlaceBuilder` | Fluent builder for `Place`. | §3.2 |
-| `PlaceCategory` | 35 enumerated variants plus `Other(String)`. | §3.4 |
-| `PlaceId` | `{ scheme, value }`. Scheme-local equality. | §3.5 |
-| `PlaceIdScheme` | 9 enumerated variants plus `Other(String)`. | §3.5 |
-| `Result<T>` | Alias for `std::result::Result<T, MatchingError>`. | §3.9 |
-| `Scorer` | Stateless namespace for similarity primitives (string, geographic). | §6 |
-| `SimilarityAlgorithm` | `JaroWinkler` / `Levenshtein` / `Exact` / `Combined`. | §6.1 |
-| `deterministic_match` | Boolean verdict. Shared place ID OR equal normalised name + postcode. | §5.1 |
-| `match_one_to_many` | Score query against candidate slice; preserve input order. | §5.3 |
-| `match_places` | Probabilistic single-pair match. Returns `MatchResult`. | §5.2 |
-| `rank_one_to_many` | Score and sort by descending score; deterministic ascending-index tiebreak. | §5.3 |
-| Renormalisation | Divide weighted sum by sum of participating weights. Missing fields skip. | §5.2.2 |
-| Strict mode | `is_match` additionally requires `deterministic_match`. | §5.2.3 |
+Public types and their defining section: `Place` §3.1, `PlaceBuilder` §3.2, `Address` §3.3, `PlaceCategory` §3.4, `PlaceId` / `PlaceIdScheme` §3.5, `Confidence` §3.6, `MatchResult` / `MatchBreakdown` §3.7, `MatchConfig` §3.8 / §7, `MatchingError` / `Result<T>` §3.9, `Normalizer` §4, `ParsedAddressLine` §4.5, `MatchingEngine` §5, `SimilarityAlgorithm` §6.1, `Scorer` §6. Methods: `deterministic_match` §5.1, `match_places` §5.2, `match_one_to_many` / `rank_one_to_many` §5.3. Concepts: Renormalisation §5.2.2; Strict mode §5.2.3.
 
 ---
 

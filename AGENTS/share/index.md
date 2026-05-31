@@ -64,3 +64,4 @@ Per-crate `spec.md`:
 | [technology.md](technology.md)                                   | Technology stack summary (alias for the Loco doc)      |
 | [stack-for-rust-loco.md](stack-for-rust-loco.md)                 | Stack for Rust, Loco (web, database, search, …)        |
 | [web-stack.md](web-stack.md)                                     | Loco, Tera, HTMX, Alpine, Lily HTML Headless           |
+| [web-pages.md](web-pages.md)                                     | Per-page contracts for all 26 web-tier pages           |

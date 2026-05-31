@@ -28,6 +28,7 @@ Shared reference docs live at the project root under
 | [stack-for-rust-loco.md](../agents/share/stack-for-rust-loco.md) | Full Rust + Loco dependency stack |
 | [technology.md](../agents/share/technology.md) | Tech stack summary |
 | [web-stack.md](../agents/share/web-stack.md) | Loco / Tera / HTMX / Alpine / Lily HTML Headless |
+| [web-pages.md](../agents/share/web-pages.md) | Per-page contracts for all 26 web-tier pages |
 | [match-search-merge.md](../agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [match.md](../agents/share/match.md) | Matching algorithms |
 | [search.md](../agents/share/search.md) | Search (Tantivy) |

@@ -108,3 +108,167 @@ Consumers reading `MatchBreakdown` directly are unaffected — every per-field s
 See spec §22 for the live list: OQ-7 (phonetic-bonus weighting). Resolved in 0.3.0: OQ-1 (middle-name scoring), OQ-2 (email / local_id scoring), OQ-3 (`#[non_exhaustive]`), OQ-4 (address arithmetic, T-3), OQ-5 (strict-mode enforcement).
 
 When you have an opinion, propose a resolution in `spec.md` as a PR, not as a unilateral code change.
+
+---
+
+## Detailed algorithm specifications (extracted from spec.md §12)
+
+The verbatim §12 per-algorithm detail is archived here so the spec can keep only a summary table. Update both surfaces in lockstep.
+
+### 12.1 Deterministic Matching
+
+`deterministic_match` returns `true` iff **any** of the following hold:
+
+1. **UK NHS Number agreement.** Both records have a `uk_nhs_number`, both parse via `identifiers::parse_uk_nhs_number`, and the canonical forms are equal.
+2. **France NIR agreement.** Both records have an `fr_nir`, both parse via `identifiers::parse_fr_nir`, and the canonical forms are equal.
+3. **España TSI agreement.** Both records have an `es_tsi`, both parse via `identifiers::parse_es_tsi`, and the canonical forms are equal.
+4. **Éire IHI agreement.** Both records have an `ie_ihi`, both parse via `identifiers::parse_ie_ihi`, and the canonical forms are equal.
+5. **UK Northern Ireland H&C Number agreement.** Both records have a `uk_hc_number`, both parse via `identifiers::parse_uk_hc_number`, and the canonical forms are equal.
+6. **US SSN agreement.** Both records have a `us_ssn`, both parse via `identifiers::parse_us_ssn`, and the canonical forms are equal.
+7. **Australia IHI agreement.** Both records have an `au_ihi`, both parse via `identifiers::parse_au_ihi`, and the canonical forms are equal.
+8. **Germany KVNR agreement.** Both records have a `de_kvnr`, both parse via `identifiers::parse_de_kvnr`, and the canonical forms are equal.
+9. **Italy *Codice Fiscale* agreement.** Both records have an `it_cf`, both parse via `identifiers::parse_it_cf`, and the canonical forms are equal.
+10. **Netherlands BSN agreement.** Both records have an `nl_bsn`, both parse via `identifiers::parse_nl_bsn`, and the canonical forms are equal.
+11. **Sweden *Workernummer* agreement.** Both records have an `se_workernummer`, both parse via `identifiers::parse_se_workernummer`, and the canonical forms are equal.
+12. **UK Scotland CHI Number agreement.** Both records have a `uk_chi_number`, both parse via `identifiers::parse_uk_chi_number`, and the canonical forms are equal.
+13. **T-27 schemes agreement.** Same shape for `be_nn`, `bg_egn`, `cz_rc`, `dk_cpr`, `ee_ik`, `es_dni`, `fi_hetu`, `hr_oib`, `is_kt`, `lt_ak`, `lv_pk`, `mt_id`, `no_fnr`, `pl_pesel`, `ro_cnp`, `si_emso`, `sk_rc`, `uk_nino` — each is scheme-local and any pair with equal canonical form fires.
+14. **T-28 schemes agreement.** Same shape for `gr_dss`, `li_id`, `nl_id`, `pl_nip`, `pt_nif`.
+14a. **T-17.1 schemes agreement.** Same shape for `br_cpf`, `cn_rrn`, `in_aadhaar`, `jp_my_number`, `mx_curp`, `nz_nhi`, `za_id` — each is scheme-local and any pair with equal canonical form fires (FR-85..FR-91).
+15. **Passport-book agreement.** At least one `(country, number)` pair is shared across the two workers' `passport_books` lists after the canonicalisation performed by `PassportBook::new` (FR-52). Cross-country values with the same `number` MUST NOT match.
+16. **Demographic tuple agreement.**
+   - Normalised given names equal AND
+   - Normalised family names equal AND
+   - Dates of birth are exactly equal AND
+   - Genders are equal OR at least one is `None` (missing gender does not fail this branch).
+
+Otherwise it returns `false`.
+
+National identifiers are scheme-local: a UK NHS Number is only ever compared against another UK NHS Number, never against an H&C Number that happens to share the same 10 digits.
+
+### 12.2 Component Scoring
+
+| Field | Score function | Score domain |
+|---|---|---|
+| UK NHS Number | Exact equality of canonical form from `parse_uk_nhs_number`; both must parse. | `{0.0, 1.0}`, else `None` |
+| France NIR | Exact equality of canonical form from `parse_fr_nir`; both must parse. | `{0.0, 1.0}`, else `None` |
+| España TSI | Exact equality of canonical form from `parse_es_tsi`; both must parse. | `{0.0, 1.0}`, else `None` |
+| Éire IHI | Exact equality of canonical form from `parse_ie_ihi`; both must parse. | `{0.0, 1.0}`, else `None` |
+| UK NI H&C Number | Exact equality of canonical form from `parse_uk_hc_number`; both must parse. | `{0.0, 1.0}`, else `None` |
+| US SSN | Exact equality of canonical form from `parse_us_ssn`; both must parse. | `{0.0, 1.0}`, else `None` |
+| Australia IHI | Exact equality of canonical form from `parse_au_ihi`; both must parse. | `{0.0, 1.0}`, else `None` |
+| Germany KVNR | Exact equality of canonical form from `parse_de_kvnr`; both must parse. | `{0.0, 1.0}`, else `None` |
+| Italy *Codice Fiscale* | Exact equality of canonical form from `parse_it_cf`; both must parse. | `{0.0, 1.0}`, else `None` |
+| Netherlands BSN | Exact equality of canonical form from `parse_nl_bsn`; both must parse. | `{0.0, 1.0}`, else `None` |
+| Sweden *Workernummer* | Exact equality of canonical form from `parse_se_workernummer`; both must parse. | `{0.0, 1.0}`, else `None` |
+| UK Scotland CHI | Exact equality of canonical form from `parse_uk_chi_number`; both must parse. | `{0.0, 1.0}`, else `None` |
+| Passport book | `Some(1.0)` if any `(country, number)` pair is shared across `passport_books` on both sides; `Some(0.0)` if both non-empty but disjoint; `None` if either empty. See §6.4a. | `{0.0, 1.0}`, else `None` |
+| Given name | `name_algorithm` applied to normalised strings; raised to `0.9` when both names appear in the same class of `MatchConfig::nickname_table`. When both workers have a `middle_name`, the final score is `0.95 × given_sim + 0.05 × middle_sim` (FR-49). | `[0.0, 1.0]` |
+| Family name | Same as given name (table-driven boost applies symmetrically; default English table contains no family-name entries). | `[0.0, 1.0]` |
+| Date of birth | Exact equality, or `0.5` for a same-year day/month transposition. | `{0.0, 0.5, 1.0}` |
+| Gender | Exact equality. | `{0.0, 1.0}` |
+| Blood type | Exact equality of `BloodType` enum value. Stable for life so disagreement is reliable evidence of non-match; weak positive signal because many people share a type. | `{0.0, 1.0}`, else `None` |
+| Multiple birth | Exact equality of FHIR `Patient.multipleBirth` integer (1-indexed birth order). Primary purpose: disambiguate identical twins who otherwise share name + DOB + address. See FR-82. | `{0.0, 1.0}`, else `None` |
+| Place of birth | City Jaro-Winkler blended with country exact match (`0.7 × city + 0.3 × country` when both present; single signal when only one); `None` when no comparable subset exists. See §12.4a. | `[0.0, 1.0]`, else `None` |
+| Date of death | Exact equality, or `0.5` for a same-year day/month transposition (same heuristic as date of birth). See FR-83. | `{0.0, 0.5, 1.0}`, else `None` |
+| Place of death | Same scoring rule as place of birth — city + country blend via the shared `score_named_place` helper. See FR-84 / §12.4a. | `[0.0, 1.0]`, else `None` |
+| Address | Sub-score; see §12.4. | `[0.0, 1.0]` |
+| Phone | Exact equality after normalisation. | `{0.0, 1.0}` |
+| Email | Exact equality of canonical form from `normalize_email`; both must parse. | `{0.0, 1.0}`, else `None` |
+| Phonetic names | Average of given-name and family-name Soundex equality. | `{0.0, 0.5, 1.0}` |
+
+A component scores `None` whenever input data is missing or unparseable on either side.
+
+### 12.3 Probabilistic Scoring
+
+```text
+weighted_sum   = Σ_field  score_field × weight_field   (over fields with score = Some)
+total_weight   = Σ_field  weight_field                  (over the same fields)
+if phonetic_score is Some(s) and s > 0.9:
+    weighted_sum  += s × 0.05
+    total_weight  += 0.05
+score = weighted_sum / total_weight   (or 0.0 if total_weight == 0)
+is_match = score >= match_threshold
+```
+
+Notes:
+- Weights are renormalised against participating fields. A record with only name and DOB does NOT silently get a low score for "missing" NHS number — the missing field is simply not counted.
+- The phonetic bonus is asymmetric: it only ever pushes the score up.
+
+### 12.4 Address Sub-Score
+
+Given both `Address` values, scores are computed where both sides have a value:
+
+| Sub-component | Comparison | Weight in sub-score |
+|---|---|---|
+| Postcode | Exact equality of normalised postcode (`0.0` or `1.0`). | 0.5 |
+| City | Jaro-Winkler on normalised city. | 0.3 |
+| Line 1 | Structured sub-score on `(house_number, street)` — see below. | 0.2 |
+
+#### 12.4.1 Line 1 Structured Sub-Score
+
+For line 1, each side is parsed via `Normalizer::parse_address_line` into a `ParsedAddressLine { house_number, unit, street }`. The sub-score is computed as:
+
+1. `street_sim` = Jaro-Winkler similarity of `parsed1.street` and `parsed2.street` (both are abbreviation-expanded and name-normalised, so `"High Street"` and `"High St"` produce equal strings and score `1.0`).
+2. `house_score` = `Some(1.0)` if both `house_number`s are present and equal; `Some(0.0)` if both are present and differ; `None` if either is absent.
+3. If `house_score` is `Some(h)`, the line-1 sub-score is `0.6 * street_sim + 0.4 * h`; otherwise it is `street_sim`.
+
+The `unit` field (`"Flat 2A"`, `"Apt 5"`, …) is parsed and exposed on `ParsedAddressLine` but is intentionally **not** mixed into the line-1 sub-score: real-world data records unit information inconsistently (sometimes on `line1`, sometimes on `line2`, sometimes omitted), and weighting it would penalise legitimate matches between records that simply use different conventions. Consumers that need stricter unit-level matching can use `parse_address_line` directly.
+
+Address sub-score = `Σ(score × weight) / Σ(weight)` over the contributions that fired, where the per-component weights are postcode = `0.5`, city = `0.3`, line 1 = `0.2`. If nothing fires, **0.5** is returned (neutral). This is the weighted-average form: each sub-component contributes a raw `[0.0, 1.0]` score, the matcher accumulates `score × weight` and `weight` separately, then divides at the end so postcode dominates as documented and the result is bounded in `[0.0, 1.0]` independent of how many sub-components fired. Resolves §22 OQ-4 (T-3).
+
+#### 12.4.2 Best-of Across Historical Addresses
+
+For `MatchBreakdown::address_score`, the engine considers every pair drawn from `(p1.address ∪ p1.previous_addresses) × (p2.address ∪ p2.previous_addresses)`. Each pair is scored via the §12.4 algorithm and the **highest** score across the cartesian product is reported. This catches the "worker moved house" failure mode where the current addresses no longer agree but a prior address still matches the other side.
+
+`address_score` is `None` only when **at least one side has no address data at all** (neither current nor historical). If one side has only a `previous_addresses` entry and the other has only a current `address`, they are compared and a score is produced (FR-48; addresses the §21.2 medium-term roadmap item).
+
+For very large `previous_addresses` lists, the cartesian product can grow quadratically. In practice records carry at most 2–3 historical addresses; consumers that ingest large histories SHOULD trim the list before matching.
+
+### 12.4a Place-of-Birth Sub-Score
+
+`MatchingEngine::score_birth_place` consumes `Worker::birth_place: Option<Address>` (FHIR `Patient.birthPlace`). Unlike the current-address sub-score (§12.4), it considers only the `city` and `country` sub-fields — street and postcode are not meaningful for a birth place. The implementation delegates to the shared `score_named_place` free helper, which is also used by `score_death_place` (§12.4b).
+
+Algorithm:
+
+1. If either side has no `birth_place`, return `None`.
+2. Let `city = Jaro-Winkler(normalize_name(p1.city), normalize_name(p2.city))` when both sides have a city, else `None`.
+3. Let `country = 1.0` if both `country` strings normalise equal, `0.0` if both are present but differ, `None` if either is absent.
+4. Blend:
+   - Both present: `0.7 × city + 0.3 × country`.
+   - Only city: `city`.
+   - Only country: `country`.
+   - Neither: `None`.
+
+Diacritics are absorbed by the shared name-normalisation pipeline (so `"Zürich"` and `"Zurich"` score identically). The sub-score is bounded `[0.0, 1.0]`.
+
+### 12.4b Place-of-Death Sub-Score
+
+`MatchingEngine::score_death_place` consumes `Worker::death_place: Option<Address>`. The algorithm is identical to the place-of-birth sub-score (§12.4a) — both go through the shared `score_named_place(&Address, &Address) -> Option<f64>` free helper. The same city/country blend (`0.7 × city + 0.3 × country`, single-signal fallbacks) applies. The sub-score is bounded `[0.0, 1.0]`, returns `None` when neither side has comparable sub-fields, and is independent from the `birth_place` and `address` sub-scores (FR-84).
+
+### 12.4c Date-of-Death Sub-Score
+
+`MatchingEngine::score_death_date` consumes `Worker::death_date: Option<NaiveDate>` and reuses the existing `score_dob_pair` free helper: exact equality yields `1.0`, a same-year day/month transposition yields `0.5`, otherwise `0.0`. Returns `None` when either side is absent. The transposition heuristic is justified by the same DD/MM ↔ MM/DD data-entry-error mode that motivates FR-12 for the date of birth (FR-83).
+
+### 12.5 Confidence Bands
+
+`MatchResult::confidence` is a fixed-band classification of `score`. It is independent of `match_threshold`: the same `score` always maps to the same band regardless of preset.
+
+| Confidence | Score range |
+|---|---|
+| `High` | `score >= 0.90` |
+| `Medium` | `0.75 <= score < 0.90` |
+| `Low` | `score < 0.75` |
+
+Boundaries are inclusive on the low side (a score of exactly `0.90` is `High`; exactly `0.75` is `Medium`). `Confidence::from_score(f64) -> Confidence` is total over `f64`: NaN and negative scores degrade to `Low`; scores above `1.0` are `High`. Bands are consultative — `is_match` remains the authoritative go/no-go signal.
+
+---
+
+### 12.6 Batch Scoring
+
+`MatchingEngine::match_one_to_many(query, candidates)` iterates `candidates` and produces one `MatchResult` per candidate via the same `match_workers` pipeline (§12.3). The output `Vec<MatchResult>` is parallel to the input slice; index `i` in the output corresponds to index `i` in `candidates`. Empty candidates yield an empty `Vec`.
+
+`MatchingEngine::rank_one_to_many(query, candidates)` returns a `Vec<(usize, MatchResult)>` where the `usize` is the original index in `candidates`. The vector is sorted by descending `MatchResult::score`. Ties are broken by ascending original index so the ranking is fully deterministic across calls.
+
+Neither function performs blocking (candidate pre-filtering). Consumers that need blocking — e.g. only score candidates whose family-name Soundex equals the query's, or whose postcode outward code matches — MUST pre-filter the slice themselves. This keeps the crate a pure scoring library with no implicit indexing strategy.
+
+The engine is `Send + Sync`, so parallel batch scoring (`rayon::par_iter`, `tokio::task::spawn_blocking`, …) is the consumer's choice. The crate intentionally does not take a parallelism dependency.
