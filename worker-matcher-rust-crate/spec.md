@@ -303,6 +303,18 @@ Statement coverage SHOULD be `>= 90%` on `src/`. Every public function MUST have
 
 Delivered as task T-6. The harness lives in `tests/property_tests.rs` and uses `proptest` with **1000 cases per property**. Properties: `normalize_name` idempotence + output-shape invariants; `score ∈ [0.0, 1.0]` for arbitrary worker pairs; self-match → `is_match` + `Confidence::High`; `match_workers` + `deterministic_match` symmetry; DOB sub-score order-independence; `Confidence::from_score` monotonicity; `MatchConfig::default()` and arbitrary `Worker` JSON round-trips. `proptest` persists shrunk failure seeds in `tests/property_tests.proptest-regressions`.
 
+### 18.5 Adapter-Contract Tests
+
+`tests/adapter_contract.rs` (13 tests) pins the public-API surface
+that downstream service adapters depend on. Every public builder method,
+every `MatchingEngine` entry point, every `MatchBreakdown` field, every
+`MatchConfig` preset, and every enum variant the downstream calls is
+touched. Renaming or removing any of these symbols breaks the matcher's
+own CI before publish — making cross-crate breakage deliberate. See
+[`AGENTS/testing.md`](AGENTS/testing.md) for the per-section breakdown.
+
+---
+
 ## 19. Build, Tooling, and Release
 
 ### 19.1 Toolchain

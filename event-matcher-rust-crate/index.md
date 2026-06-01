@@ -99,6 +99,7 @@ The rules of the road. Quick orientation, golden rules, workflow, file layout.
 | Run a single test | `cargo test test_name` |
 | Show test stdout | `cargo test -- --nocapture` |
 | Run property tests only | `cargo test --test property_tests` |
+| Pin the public API | `cargo test --test adapter_contract` (downstream-service-adapter contract guardrail) |
 | Lint | `cargo clippy --all-targets -- -D warnings` |
 | Format | `cargo fmt` |
 | Run the demo | `cargo run` |

@@ -431,6 +431,17 @@ Three-part-PR rule: a behavioural change is one PR that contains a spec edit, a 
 
 ---
 
+
+### Adapter-Contract Tests (CI guardrail)
+
+`tests/adapter_contract.rs` (10 tests) pins the public-API surface
+that downstream service adapters depend on. Every public builder method,
+every `MatchingEngine` entry point, every `MatchBreakdown` field, every
+`MatchConfig` preset, and every enum variant the downstream calls is
+touched. Renaming or removing any of these symbols fails the matcher's
+own CI before publish — making cross-crate breakage deliberate. See
+[`AGENTS/testing.md`](AGENTS/testing.md) for the per-section breakdown.
+
 ## 10. Open questions
 
 - **OQ-A — Soundex vs. Metaphone for non-English names.** Soundex was designed for English surnames and is known to be weak for many non-English orthographies. Should `MatchConfig` gain a `phonetic_encoder` enum (Soundex / Double Metaphone / NYSIIS)? Decision deferred until a multilingual evaluation corpus is available.

@@ -73,3 +73,46 @@ The list in [`../spec.md`](../spec.md) §18.2 is the spec — each scenario MUST
 
 - Always include at least one negative case: a clear non-match, a missing-field worker, an unparseable NHS number.
 - Negative tests guard against the "accidentally matches everything" failure mode that probabilistic systems are prone to.
+
+## Adapter Contract Tests
+
+`tests/adapter_contract.rs` pins the **public API surface** that downstream
+consumers (`worker-service` via its `to_matcher_worker` adapter) depend on. The
+test exists so a rename, removal, or signature change to any public symbol
+breaks the matcher's own CI **before** publish — not after publish silently
+breaks downstream services.
+
+Run with: `cargo test --test adapter_contract`
+
+### Coverage (13 tests)
+
+The suite touches every symbol called by the service-side adapter:
+
+- `Worker::builder()` + every fluent builder method (demographic, contact,
+  identifier, address slots).
+- WorkerBuilder surface, the matcher's short-form `uk_nhs_number` slot (distinct from person-matcher's longer name — pinning this catches future renames before they break downstream), 40+ national identifiers, PassportBook surface.
+- `MatchingEngine::default_config`, `MatchingEngine::new`,
+  `match_workers`, `deterministic_match`, `match_one_to_many`.
+- `MatchResult {{ score, is_match, confidence, breakdown }}` field shape.
+- `MatchBreakdown` per-component `Option<f64>` fields used by the adapter
+  for explainability.
+- `MatchConfig::strict / ::default / ::lenient` forming a monotonic
+  threshold ladder (strict ≥ default ≥ lenient).
+- `Confidence::{{High, Medium, Low}}` variants and `from_score` bucketing.
+- `MatchResult` round-trip through `serde_json` (services persist results).
+- Builder is `Sized` and returnable by value.
+
+### When to update this test
+
+Update `tests/adapter_contract.rs` **in the same PR** as any public-API
+change. The purpose is to make every breaking change deliberate — never
+silent. The corresponding service-side test, `worker-service`'s
+`tests/duplicate_detection.rs`, will already pass against the new shape
+because it lives outside this crate.
+
+### Precedent
+
+A real prior incident: the worker-matcher renamed `se_personnummer` to
+`se_workernummer` on crates.io 0.3.0, which broke `person-service`
+silently. With the contract test in place, the rename would have failed
+the matcher's CI before publish.

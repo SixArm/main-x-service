@@ -539,6 +539,17 @@ When `spec.md` and the code disagree, the **code** is what is shipped to users â
 
 ---
 
+
+### Adapter-Contract Tests (CI guardrail)
+
+`tests/adapter_contract.rs` (14 tests) pins the public-API surface
+that downstream service adapters depend on. Every public builder method,
+every `MatchingEngine` entry point, every `MatchBreakdown` field, every
+`MatchConfig` preset, and every enum variant the downstream calls is
+touched. Renaming or removing any of these symbols fails the matcher's
+own CI before publish â€” making cross-crate breakage deliberate. See
+[`AGENTS/testing.md`](AGENTS/testing.md) for the per-section breakdown.
+
 ## 10. Open questions
 
 The following design questions are deliberately unresolved. Proposing a resolution is welcome; do so in a PR rather than a unilateral code change.

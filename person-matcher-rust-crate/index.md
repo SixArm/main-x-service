@@ -95,6 +95,7 @@ The rules of the road. Workflow, golden rules, and links to topic-specific guide
 |---|---|
 | Build | `cargo build` |
 | Run tests | `cargo test` (includes `tests/property_tests.rs` — 1000 proptest cases per property) |
+| Pin the public API | `cargo test --test adapter_contract` (downstream-service-adapter contract guardrail) |
 | Run benchmarks | `cargo bench` (use `--quick` for a smoke run; HTML reports land in `target/criterion/`) |
 | Run property tests only | `cargo test --test property_tests` |
 | Lint | `cargo clippy --all-targets -- -D warnings` |
