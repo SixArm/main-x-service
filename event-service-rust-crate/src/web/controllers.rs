@@ -2850,3 +2850,16 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
         .replace('\'', "&#x27;")
 }
+
+/// `GET /metrics.prom` — Prometheus text-exposition format for scraping.
+///
+/// Returns the contents of the process-wide registry (see
+/// [`crate::metrics::METRICS`]) with content type
+/// `text/plain; version=0.0.4; charset=utf-8`. Configure your scraper
+/// with `metrics_path: /metrics.prom` — the canonical `/metrics`
+/// endpoint serves the human-readable HTML dashboard.
+pub async fn prometheus() -> Response {
+    use axum::http::header::CONTENT_TYPE;
+    let body = crate::metrics::METRICS.render();
+    ([(CONTENT_TYPE, crate::metrics::CONTENT_TYPE)], body).into_response()
+}

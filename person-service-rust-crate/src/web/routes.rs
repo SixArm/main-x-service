@@ -18,6 +18,7 @@ pub fn router() -> WebResult<Router> {
         .route("/", get(controllers::home))
         .route("/health", get(controllers::health))
         .route("/metrics", get(controllers::metrics))
+        .route("/metrics.prom", get(controllers::prometheus))
         .route("/tour", get(controllers::tour))
         .route("/docs", get(controllers::docs))
         .route("/palette", get(controllers::palette))

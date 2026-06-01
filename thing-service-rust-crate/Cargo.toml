@@ -29,7 +29,7 @@ sea-orm-migration = { version = "1.1", features = ["sqlx-postgres", "runtime-tok
 bigdecimal = { version = "0.4", features = ["serde"] }
 
 # Web Framework (full-stack)
-loco-rs = "0.14"
+loco-rs = { version = "0.14", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
 
 # Templating
 tera = "1.20"
@@ -70,6 +70,9 @@ async-trait = "0.1"
 # Fuzzy Matching & String Processing
 strsim = "0.11"
 fuzzy-matcher = "0.3"
+
+# Prometheus metrics (text exposition for /metrics.prom)
+prometheus = "0.13"
 
 # Sibling matcher crate
 thing-matcher = "0.4.0"

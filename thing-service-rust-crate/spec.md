@@ -294,7 +294,8 @@ user ID, IP, user agent, timestamp.
 | Throughput | ≥ 1 000 req/sec single instance |
 | Availability | HADR; stateless app tier; PostgreSQL replication |
 | Fault tolerance | Graceful shutdown; connection pooling; health checks; non-root containers |
-| Observability | OTLP traces / metrics / logs; `traceparent` per request |
+| Observability | OTLP traces / metrics / logs; `traceparent` per request; Prometheus text-exposition scrape at `GET /metrics.prom` (canonical `/metrics` serves the HTML dashboard) |
+| Background jobs | Loco `BackgroundQueue` backed by **PostgreSQL** (`bg_pg`) — same database as application data; no external broker (no Redis, no SQLite) |
 
 ## 8. Architecture
 

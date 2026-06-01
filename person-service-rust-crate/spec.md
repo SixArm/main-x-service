@@ -224,7 +224,7 @@ builder shape:
 - `birth_date` → `date_of_birth`; `gender` → `gender`
 - First `addresses[]` → `address` (rest → `previous_addresses`); `state` renamed `county`, `postal_code` → `postcode`
 - First telecom of each `ContactPointSystem` → `phone` / `mobile` / `email`
-- `identifiers[]` routed to country-specific slots by `system` URI (e.g. `https://fhir.nhs.uk/Id/nhs-number` → `united_kingdom_national_health_service_number`); falls back to `IdentifierType` when no URI hint
+- `identifiers[]` routed to country-specific slots by `system` URI (e.g. `https://fhir.nhs.uk/Id/nhs-number` → `uk_nhs_number`); falls back to `IdentifierType` when no URI hint
 - `tax_id` defaults to `us_ssn` unless a typed identifier overrides
 - `IdentityDocument` of type `Passport` → `passport_books` (one per passport)
 
@@ -298,7 +298,8 @@ parameters: `name`, `family`, `given`, `identifier`, `birthdate`,
 | Throughput | ≥ 1 000 req/sec single instance |
 | Availability | HADR; stateless app tier; PostgreSQL replication |
 | Fault tolerance | Graceful shutdown; connection pooling; health checks; non-root containers |
-| Observability | OTLP traces / metrics / logs; `traceparent` per request; JSON logs in production |
+| Observability | OTLP traces / metrics / logs; `traceparent` per request; JSON logs in production; Prometheus text-exposition scrape at `GET /metrics.prom` (canonical `/metrics` serves the HTML dashboard) |
+| Background jobs | Loco `BackgroundQueue` backed by **PostgreSQL** (`bg_pg`) — same database as application data; no external broker (no Redis, no SQLite) |
 | Security | Argon2 password hashing (when auth lands); JWT (planned); TLS at the edge |
 
 ## 8. Architecture

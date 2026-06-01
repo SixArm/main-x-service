@@ -21,6 +21,7 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod matching;
+pub mod metrics;
 pub mod models;
 pub mod observability;
 pub mod privacy;

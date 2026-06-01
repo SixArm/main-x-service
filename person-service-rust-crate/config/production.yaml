@@ -45,7 +45,8 @@ database:
   dangerously_recreate: false
 
 queue:
-  uri: "{{ get_env(name=\"REDIS_URL\") }}"
+  kind: Postgres
+  uri: "{{ get_env(name=\"DATABASE_URL\") }}"
   dangerously_flush: false
 
 auth:

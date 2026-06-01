@@ -39,7 +39,8 @@ database:
   dangerously_recreate: false
 
 queue:
-  uri: "{{ get_env(name=\"REDIS_URL\", default=\"redis://127.0.0.1\") }}"
+  kind: Postgres
+  uri: "{{ get_env(name=\"DATABASE_URL\", default=\"postgres://localhost/place_service_development\") }}"
   dangerously_flush: false
 
 auth:

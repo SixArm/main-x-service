@@ -213,7 +213,7 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
 
     // System-URI fast paths (most specific first).
     if sys.contains("nhs.uk") || sys.contains("uk-nhs") || sys.contains("nhs-number") {
-        return b.united_kingdom_national_health_service_number(val);
+        return b.uk_nhs_number(val);
     }
     if sys.contains("us-ssn") || sys.contains("ssa.gov") {
         return b.us_ssn(val);
@@ -341,7 +341,7 @@ mod tests {
         ));
         let m = to_matcher_person(&svc);
         assert_eq!(
-            m.united_kingdom_national_health_service_number.as_deref(),
+            m.uk_nhs_number.as_deref(),
             Some("943 476 5919")
         );
     }

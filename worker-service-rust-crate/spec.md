@@ -227,9 +227,9 @@ fields (`id`, `active`, `worker_type`, `deceased_datetime`,
 `managing_organization`, `links`, `created_at`, …) are dropped.
 
 The matcher's `uk_nhs_number` slot is the per-worker equivalent of
-the person matcher's
-`united_kingdom_national_health_service_number` — same algorithm,
-shorter method name. The service's worker-specific
+the person matcher's `uk_nhs_number` (both crates settled on the
+shorter method name once published to crates.io). The service's
+worker-specific
 `IdentifierType::ODS` (NHS Organisation Data Service code) has no
 country-slot counterpart and falls through unmapped; surface it on
 the matcher side only if a future matcher release adds an ODS
@@ -299,7 +299,8 @@ Bidirectional Practitioner resource conversion under
 | Throughput | ≥ 1 000 req/sec single instance |
 | Availability | HADR; stateless app tier; PostgreSQL replication |
 | Fault tolerance | Graceful shutdown; connection pooling; health checks; non-root containers |
-| Observability | OTLP traces / metrics / logs; `traceparent` per request |
+| Observability | OTLP traces / metrics / logs; `traceparent` per request; Prometheus text-exposition scrape at `GET /metrics.prom` (canonical `/metrics` serves the HTML dashboard) |
+| Background jobs | Loco `BackgroundQueue` backed by **PostgreSQL** (`bg_pg`) — same database as application data; no external broker (no Redis, no SQLite) |
 
 ## 8. Architecture
 
