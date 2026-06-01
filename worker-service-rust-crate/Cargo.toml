@@ -71,8 +71,8 @@ async-trait = "0.1"
 strsim = "0.11"
 fuzzy-matcher = "0.3"
 
-# Sibling matcher crate (canonical reference algorithm; reached via adapter)
-worker-matcher = { path = "../worker-matcher-rust-crate" }
+# Sibling matcher crate
+worker-matcher = "0.3.0"
 
 # Security
 argon2 = "0.5"

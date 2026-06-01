@@ -71,8 +71,8 @@ async-trait = "0.1"
 strsim = "0.11"
 fuzzy-matcher = "0.3"
 
-# Sibling matcher crate (canonical reference algorithm; reached via adapter)
-place-matcher = { path = "../place-matcher-rust-crate" }
+# Sibling matcher crate
+place-matcher = "0.4.0"
 
 # Geo
 geo = "0.29"

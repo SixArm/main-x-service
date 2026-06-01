@@ -72,7 +72,7 @@ strsim = "0.11"
 fuzzy-matcher = "0.3"
 
 # Sibling matcher crate (canonical reference algorithm; reached via adapter)
-person-matcher = { path = "../person-matcher-rust-crate" }
+person-matcher = "0.3.0"
 
 # Security
 argon2 = "0.5"

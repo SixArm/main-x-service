@@ -202,6 +202,41 @@ Match quality (configurable thresholds):
 | Possible | ≥ 0.50 |
 | Unlikely | < 0.50 |
 
+#### Interoperability with `person-matcher`
+
+The service embeds the sibling `person-matcher` crate (path dependency
+declared in `Cargo.toml`) and re-exports it from
+`src/matching/mod.rs` as `matcher_lib`. The matcher crate is the
+**canonical reference algorithm** — it carries 40+ national-identifier
+parsers (UK NHS, FR NIR, US SSN, BR CPF, IN Aadhaar, …), passport-book
+matching, blood-type signals, nickname tables, and three tuned config
+presets (`strict` / `default` / `lenient`) that the in-service matcher
+does not duplicate.
+
+Bridge: [`src/matching/adapter.rs`](src/matching/adapter.rs) exposes
+`to_matcher_person(&service::Person) -> person_matcher::Person`. The
+projection lifts the service's FHIR-shaped record (named `HumanName`,
+`Vec<Identifier>` with FHIR system URIs, `Vec<Address>`,
+`Vec<ContactPoint>`, `Vec<IdentityDocument>`) into the matcher's flat
+builder shape:
+
+- `name.family` → `family_name`; first/second `name.given` → `given_name` / `middle_name`
+- `birth_date` → `date_of_birth`; `gender` → `gender`
+- First `addresses[]` → `address` (rest → `previous_addresses`); `state` renamed `county`, `postal_code` → `postcode`
+- First telecom of each `ContactPointSystem` → `phone` / `mobile` / `email`
+- `identifiers[]` routed to country-specific slots by `system` URI (e.g. `https://fhir.nhs.uk/Id/nhs-number` → `united_kingdom_national_health_service_number`); falls back to `IdentifierType` when no URI hint
+- `tax_id` defaults to `us_ssn` unless a typed identifier overrides
+- `IdentityDocument` of type `Passport` → `passport_books` (one per passport)
+
+Registry-only fields (`id`, `active`, `deceased_datetime`,
+`managing_organization`, `links`, `created_at`, …) are dropped — they
+have no matcher counterpart. The projection is **lossy by design** so
+callers can use the reference algorithm without rewriting their
+domain model. See [`AGENTS/matching.md`](AGENTS/matching.md) for the
+in-service algorithm and the matcher crate's
+[`spec.md §12`](../person-matcher-rust-crate/spec.md) for the
+canonical algorithm.
+
 ### 6.3 Search
 
 Powered by Tantivy across 11 indexed fields. Full-text + fuzzy +

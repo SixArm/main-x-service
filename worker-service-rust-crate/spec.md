@@ -205,6 +205,39 @@ Match quality (configurable thresholds):
 | Possible | ≥ 0.50 |
 | Unlikely | < 0.50 |
 
+#### Interoperability with `worker-matcher`
+
+The service embeds the sibling `worker-matcher` crate (declared in
+`Cargo.toml`) and re-exports it from `src/matching/mod.rs` as
+`matcher_lib`. The matcher crate is the **canonical reference
+algorithm** — it carries 40+ national-identifier parsers (UK NHS,
+FR NIR, US SSN, BR CPF, IN Aadhaar, …), passport-book matching,
+blood-type signals, nickname tables, and three tuned config presets
+(`strict` / `default` / `lenient`) that the in-service matcher does
+not duplicate.
+
+Bridge: [`src/matching/adapter.rs`](src/matching/adapter.rs) exposes
+`to_matcher_worker(&service::Worker) -> worker_matcher::Worker`. The
+projection lifts the service's FHIR-shaped record into the matcher's
+flat builder shape using the same routing rules as the person bridge
+(name flattening, telecom sampling by `ContactPointSystem`, address
+field renames, identifier routing by `system` URI with type-based
+fallbacks, passport documents → `passport_books`). Service-only
+fields (`id`, `active`, `worker_type`, `deceased_datetime`,
+`managing_organization`, `links`, `created_at`, …) are dropped.
+
+The matcher's `uk_nhs_number` slot is the per-worker equivalent of
+the person matcher's
+`united_kingdom_national_health_service_number` — same algorithm,
+shorter method name. The service's worker-specific
+`IdentifierType::ODS` (NHS Organisation Data Service code) has no
+country-slot counterpart and falls through unmapped; surface it on
+the matcher side only if a future matcher release adds an ODS
+parser. See [`AGENTS/matching.md`](AGENTS/matching.md) for the
+in-service algorithm and the matcher crate's
+[`spec.md §12`](../worker-matcher-rust-crate/spec.md) for the
+canonical algorithm.
+
 ### 6.3 Search
 
 Tantivy across 11 indexed fields (name, identifiers — including NPI

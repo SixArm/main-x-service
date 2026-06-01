@@ -8,11 +8,20 @@ use crate::config::MatchingConfig;
 use crate::models::Event;
 use crate::Result;
 
+pub mod adapter;
 pub mod algorithms;
 pub mod phonetic;
 pub mod scoring;
 
 pub use scoring::{DeterministicScorer, MatchQuality, ProbabilisticScorer};
+
+/// Re-export the canonical `event-matcher` library so callers can reach
+/// `MatchingEngine`, `MatchConfig`, `MatchResult`, `MatchBreakdown`, the
+/// `Event` builder, and the `EventCategory` / `EventIdScheme` enums
+/// without taking a separate dependency. Pair this with
+/// [`adapter::to_matcher_event`] to score two service `Event` records
+/// through the reference algorithm.
+pub use ::event_matcher as matcher_lib;
 
 /// One candidate event with its score and per-component breakdown.
 #[derive(Debug, Clone)]

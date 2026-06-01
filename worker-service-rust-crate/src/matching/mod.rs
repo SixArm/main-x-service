@@ -4,11 +4,19 @@ use crate::models::Worker;
 use crate::config::MatchingConfig;
 use crate::Result;
 
+pub mod adapter;
 pub mod algorithms;
 pub mod phonetic;
 pub mod scoring;
 
 pub use scoring::{ProbabilisticScorer, DeterministicScorer, MatchQuality};
+
+/// Re-export the canonical `worker-matcher` library so callers can reach
+/// `MatchingEngine`, `MatchConfig`, `MatchResult`, `MatchBreakdown`, the
+/// `Worker` builder, and all 40+ national-identifier slots without taking
+/// a separate dependency. Pair this with [`adapter::to_matcher_worker`] to
+/// score two service `Worker` records through the reference algorithm.
+pub use ::worker_matcher as matcher_lib;
 
 /// Match result containing a worker and their match score
 #[derive(Debug, Clone)]

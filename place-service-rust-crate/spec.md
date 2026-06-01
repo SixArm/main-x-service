@@ -215,6 +215,44 @@ Match quality (configurable thresholds):
 | Possible | ≥ 0.60 |
 | Unlikely | < 0.60 |
 
+#### Interoperability with `place-matcher`
+
+The service embeds the sibling `place-matcher` crate (path dependency
+declared in `Cargo.toml`) and re-exports it from
+`src/matching/mod.rs` as `matcher_lib`. The matcher crate is the
+**canonical reference algorithm** — it carries the full
+`PlaceCategory` vocabulary (34 variants), `PlaceIdScheme` for
+external IDs (Google, OSM nodes/ways/relations, GeoNames, Wikidata,
+Foursquare, Here, Mapbox, …), Haversine + Gaussian-decay geo scoring,
+weight renormalisation for missing fields, and three tuned config
+presets (`strict` / `default` / `lenient`) that the in-service
+matcher does not duplicate.
+
+Bridge: [`src/matching/adapter.rs`](src/matching/adapter.rs) exposes
+`to_matcher_place(&service::Place) -> place_matcher::Place`. The
+projection lifts the service's schema.org-shaped record (`PostalAddress`,
+`GeoCoordinates`, `PlaceType`, `Vec<PlaceIdentifier>`) into the
+matcher's flat builder shape:
+
+- `name` → `name`; `alternate_name` (Option) → first entry of `alternate_names`
+- `place_type` → `category` (12-variant service enum → 34-variant matcher vocabulary, with `Other(s)` flowing through)
+- `address.street_address` → `line1`; `address_locality` → `city`; `address_region` → `county`; `postal_code` → `postcode`; `address_country` → `country` (and `country_code_as_iso_3166_1_alpha_2` if 2-character)
+- `geo.latitude` / `.longitude` / `.elevation` → bare `f64` slots + `elevation_as_metre`
+- `telephone` → `phone`
+- `global_location_number` → `add_place_id(Other("GLN"), value)`
+- `branch_code` → `add_place_id(Other("BranchCode"), value)`
+- `identifiers[]` routed to `PlaceIdScheme` via `map_identifier_scheme` (`OpenStreetMap` → `OsmNode`; `Fips` / `Gnis` / `Custom(s)` → `Other(name)`)
+- `maximum_attendee_capacity` → `maximum_capacity_count`
+
+Registry-only fields (`id`, `is_deleted`, `created_at`, `keywords`,
+`amenity_features`, `opening_hours`, `description`, `fax_number`,
+`url`, `public_access`, `smoking_allowed`, …) are dropped — they
+have no matcher counterpart. See
+[`AGENTS/matching.md`](AGENTS/matching.md) for the in-service
+algorithm and the matcher crate's
+[`spec.md §5–§7`](../place-matcher-rust-crate/spec.md) for the
+canonical algorithm.
+
 ### 6.3 Search
 
 Tantivy across `name`, `alternate_name`, `identifiers`, address

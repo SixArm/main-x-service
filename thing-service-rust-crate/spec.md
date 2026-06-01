@@ -207,6 +207,42 @@ Match quality (configurable thresholds):
 | Possible | ≥ 0.60 |
 | Unlikely | < 0.60 |
 
+#### Interoperability with `thing-matcher`
+
+The service embeds the sibling `thing-matcher` crate (declared in
+`Cargo.toml`) and re-exports it from `src/matching/mod.rs` as
+`matcher_lib`. The matcher crate is the **canonical reference
+algorithm** — it scores 10 schema.org/Thing components (the service
+scores 5), exposes 12 tunable config knobs including three presets
+(`strict` / `default` / `lenient`), and uses an opaque `(property_id,
+value)` identifier shape that accepts any vocabulary the service can
+emit.
+
+Bridge: [`src/matching/adapter.rs`](src/matching/adapter.rs) exposes
+`to_matcher_thing(&service::Thing) -> thing_matcher::Thing`. The
+projection lifts the service's `Thing` (schema.org-shaped with the
+`PropertyValue` identifier wrapper) into the matcher's builder:
+
+- `name`, `description`, `disambiguating_description`, `url`,
+  `main_entity_of_page`, `owner` map 1:1
+- `alternate_names: Vec<String>` → `alternate_names`
+- `additional_type` (singular) → first entry of `additional_types`
+- `subject_of` (singular) → first entry of `subject_of`
+- `images: Vec<String>` → first entry of `image` (matcher takes one)
+- `same_as: Vec<String>` → `same_as`
+- `identifiers[]` mapped via `map_identifier_property`: schema.org
+  canonical tokens (`doi`, `isbn`, `issn`, `gtin`, `sku`, `mpn`,
+  `serialNumber`, `uri`, `uuid`); `Custom(s)` passes the carried
+  label through verbatim. Identifier `name` / `url` metadata is
+  dropped (the matcher does not consume it).
+
+Registry-only fields (`id`, `is_deleted`, `created_at`,
+`updated_at`, `potential_action`) are dropped — they have no
+matcher counterpart. See [`AGENTS/matching.md`](AGENTS/matching.md)
+for the in-service algorithm and the matcher crate's
+[`spec.md §5–§6`](../thing-matcher-rust-crate/spec.md) for the
+canonical algorithm.
+
 ### 6.3 Search
 
 Tantivy across `name`, `alternate_names`, `description`,

@@ -229,6 +229,67 @@ Match quality:
 | Possible | ≥ 0.50 |
 | Unlikely | < 0.50 |
 
+#### Interoperability with `event-matcher`
+
+The service embeds the sibling `event-matcher` crate (declared in
+`Cargo.toml`) and re-exports it from `src/matching/mod.rs` as
+`matcher_lib`. The matcher crate is the **canonical reference
+algorithm** — it carries an `EventCategory` enum (24 schema.org/Event
+subtypes plus `Other(s)`), `EventIdScheme` for ticketing-system IDs
+(Eventbrite, Meetup, Ticketmaster, Songkick, Bandsintown, Facebook,
+Luma, Wikidata, Google Calendar, iCalendar UID), per-field weight
+renormalisation, and Haversine + Gaussian-decay geo scoring that the
+in-service matcher does not duplicate.
+
+Bridge: [`src/matching/adapter.rs`](src/matching/adapter.rs) exposes
+`to_matcher_event(&service::Event) -> event_matcher::Event`. The
+projection lifts the service's schema.org/Event-shaped record into
+the matcher's flat builder shape, including the typing conversions
+the two crates disagree on:
+
+- Time fields: `DateTime<Utc>` → RFC 3339 strings for `start_date`,
+  `end_date`, `door_time`, `previous_start_date`
+- `event_status` → matcher `EventStatus` (`Completed` collapses to
+  `EventScheduled` — no matcher counterpart)
+- `event_attendance_mode` → matcher `EventAttendanceMode`
+  (`Offline` → `OfflineEventAttendanceMode`, …)
+- `event_type` → matcher `EventCategory` via `map_event_type`; the
+  service's operational subtypes (`Appointment`, `Encounter`,
+  `Shift`, `Incident`, `Generic`, `Session`, `Course`) flow through
+  as `Other(name)` so the scheme name still participates in
+  `(scheme, value)` equality
+- `Location`: matcher takes a single `Location` struct; the service
+  carries `Vec<Location>` (`Place`, `PostalAddress`, `Virtual`,
+  `Text`). The first populated entry is dispatched variant-aware:
+  `Place` → venue name + address + lat/lon; `Virtual` →
+  `virtual_url` + venue name; `PostalAddress` → address only;
+  `Text` → venue name only
+- `organizers: Vec<Party>` → first non-empty `Party.name` →
+  matcher `organizer` (single string)
+- `performers: Vec<Party>` → `Vec<String>` of names
+- `identifiers[]` mapped via `map_identifier_scheme`: `system` URI
+  hints win (matches `eventbrite`, `meetup`, `ticketmaster`,
+  `songkick`, `bandsintown`, `facebook`/`fb.com`, `lu.ma`/`luma`,
+  `google`/`calendar.google`, `wikidata`, `ical`/`vcal`); otherwise
+  the `IdentifierType` enum (`BookingNumber`, `ConfirmationCode`,
+  `TicketNumber`, `EncounterId`, `TransactionId`, `ExternalRef`,
+  `Tax`, `Other`) flows through as `Other(name)`
+- Capacity caps (`maximum_attendee_capacity` /
+  `maximum_physical_attendee_capacity` /
+  `maximum_virtual_attendee_capacity`),
+  `is_accessible_for_free`, and `super_event` (UUID → string) pass
+  through unchanged
+
+Service-only fields (`id`, `active`, `duration`, `time_zone`,
+`all_day`, `image`, `same_as`, `disambiguating_description`,
+`attendees`, `sponsors`, `funders`, `contributors`, `about`,
+`works`, `sub_events`, `offers`, `links`, audit timestamps) are
+dropped — they have no matcher counterpart. See
+[`AGENTS/matching.md`](AGENTS/matching.md) for the in-service
+algorithm and the matcher crate's
+[`spec.md §5–§7`](../event-matcher-rust-crate/spec.md) for the
+canonical algorithm.
+
 ### 6.3 Search
 
 Tantivy across `name`, `alternate_names`, `description`, `keywords`,
