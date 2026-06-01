@@ -2,12 +2,12 @@
 name = "event-service"
 version = "0.2.0"
 edition = "2024"
-authors = ["MPI Development Team"]
-description = "Event Service (MPI) - A healthcare event identification and matching system"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/sixarm/event-service-rust-crate"
-keywords = ["healthcare", "mpi", "event-matcher", "fhir", "hl7"]
-categories = ["science", "database"]
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Event Service - An event administration microservice that interoperates with the event-matcher crate"
+license = "Apache-2.0 OR BSD-3-Clause OR GPL-2-or-later OR MIT"
+repository = "https://github.com/sixarm/main-x-service/event-service-rust-crate"
+keywords = ["event-matcher", "microservice"]
+categories = ["database"]
 
 [dependencies]
 # Async Runtime
