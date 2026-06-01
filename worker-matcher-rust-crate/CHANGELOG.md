@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — adapter-contract test (CI guardrail for the public API)
+
+- New `tests/adapter_contract.rs` (13 tests). Pins every public
+  symbol downstream service adapters depend on: builder methods,
+  `MatchingEngine::default_config` / `::new` / `match_*` /
+  `deterministic_match` / `match_one_to_many`, `MatchResult` field
+  shape (`score`, `is_match`, `confidence`, `breakdown`), the
+  `MatchBreakdown` per-component fields the adapter inspects,
+  `MatchConfig::strict` / `::default` / `::lenient` forming a
+  monotonic threshold ladder, `Confidence::{High, Medium, Low}`,
+  and `MatchResult` JSON round-trip.
+- A rename or removal of any of the above breaks this test, failing
+  the matcher's own CI **before** publish — making cross-crate
+  breakage deliberate. Precedent: worker-matcher 0.3.0 renamed
+  `se_personnummer` → `se_workernummer`, silently breaking
+  `person-service`; the contract test would have caught that.
+- Documented in `AGENTS/testing.md` and `index.md` (Common Tasks
+  table) and cross-referenced from `spec.md` (§18.5 for person /
+  worker — full §1–§25 shape; §9 callout for place / thing / event —
+  shorter §1–§13 shape).
+
 ### Added (spec/code drift CI check, T-7)
 - First CI workflow in the repo: `.github/workflows/spec-drift.yml`. Runs on every pull request to `main`. Fetches full git history and invokes `scripts/spec-drift-check.sh` to enforce that any `src/matcher.rs` change is accompanied by a `spec.md` update in the same PR.
 - New `scripts/spec-drift-check.sh` (POSIX bash, no extra deps). Resolves the base ref, computes the changed-file set via `git merge-base` + `git diff --name-only`, applies the watched-file pattern (`^src/matcher\.rs$`), and consults `.spec-allow` for path-pattern exceptions. Exits gracefully if the base ref cannot be resolved (e.g. fork CI) so it never produces spurious failures.

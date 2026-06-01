@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] → 0.4.0
 
+### Added — adapter-contract test (CI guardrail for the public API)
+
+- New `tests/adapter_contract.rs` (12 tests). Pins every public
+  symbol downstream service adapters depend on: builder methods,
+  `MatchingEngine::default_config` / `::new` / `match_*` /
+  `deterministic_match` / `match_one_to_many`, `MatchResult` field
+  shape (`score`, `is_match`, `confidence`, `breakdown`), the
+  `MatchBreakdown` per-component fields the adapter inspects,
+  `MatchConfig::strict` / `::default` / `::lenient` forming a
+  monotonic threshold ladder, `Confidence::{High, Medium, Low}`,
+  and `MatchResult` JSON round-trip.
+- A rename or removal of any of the above breaks this test, failing
+  the matcher's own CI **before** publish — making cross-crate
+  breakage deliberate. Precedent: worker-matcher 0.3.0 renamed
+  `se_personnummer` → `se_workernummer`, silently breaking
+  `person-service`; the contract test would have caught that.
+- Documented in `AGENTS/testing.md` and `index.md` (Common Tasks
+  table) and cross-referenced from `spec.md` (§18.5 for person /
+  worker — full §1–§25 shape; §9 callout for place / thing / event —
+  shorter §1–§13 shape).
+
 **Migration note.** 0.4.0 is the first release of `place-matcher` as a geographic place-matcher library. Prior 0.3.x releases targeted a different domain entirely. There is **no smooth upgrade path** from 0.3.x to 0.4.0 — every public type has different fields, every scoring component has different semantics, and the `MatchConfig` weight table has been replaced. Downstream code must be rewritten against the new surface; treat the upgrade as an integration project, not a version bump. Pin to `0.3.x` if you depend on the prior behaviour and migrate when ready.
 
 ### Breaking — domain

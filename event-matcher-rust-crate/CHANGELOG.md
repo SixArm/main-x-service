@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] → 0.5.0
 
+### Added — adapter-contract test (CI guardrail for the public API)
+
+- New `tests/adapter_contract.rs` (14 tests). Pins every public
+  symbol downstream service adapters depend on: builder methods,
+  `MatchingEngine::default_config` / `::new` / `match_*` /
+  `deterministic_match` / `match_one_to_many`, `MatchResult` field
+  shape (`score`, `is_match`, `confidence`, `breakdown`), the
+  `MatchBreakdown` per-component fields the adapter inspects,
+  `MatchConfig::strict` / `::default` / `::lenient` forming a
+  monotonic threshold ladder, `Confidence::{High, Medium, Low}`,
+  and `MatchResult` JSON round-trip.
+- A rename or removal of any of the above breaks this test, failing
+  the matcher's own CI **before** publish — making cross-crate
+  breakage deliberate. Precedent: worker-matcher 0.3.0 renamed
+  `se_personnummer` → `se_workernummer`, silently breaking
+  `person-service`; the contract test would have caught that.
+- Documented in `AGENTS/testing.md` and `index.md` (Common Tasks
+  table) and cross-referenced from `spec.md` (§18.5 for person /
+  worker — full §1–§25 shape; §9 callout for place / thing / event —
+  shorter §1–§13 shape).
+
 **Domain change.** 0.5.0 repurposes the crate from geographic *place* matching to **event matcher** modelled on [schema.org/Event](https://schema.org/Event). Prior 0.4.x releases matched landmarks, natural features, chain branches, and administrative areas; 0.5.0 matches festivals, conferences, concerts, sports fixtures, screenings, hackathons, meetups, theatre runs, and other instances of `schema:Event`. There is **no smooth upgrade path** from 0.4.x. Every public type, scoring component, and `MatchConfig` weight has been renamed or replaced. Pin to `0.4.x` for the place-matcher behaviour; treat the upgrade as an integration project against the new surface.
 
 ### Breaking — crate name
