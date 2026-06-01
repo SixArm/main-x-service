@@ -1,7 +1,7 @@
 # Person Service (MPI)
 
-The Person Service (MPI) is a critical healthcare system that maintains a
-centralized registry of person identities across healthcare providers.
+The Person Service is an identity-registry system that maintains a
+centralized registry of person identities across source systems.
 
 @agents/share/overview.md
 

@@ -13,7 +13,7 @@ per-crate `AGENTS/spec-driven-development.md` files for the discipline.
 
 | Crate | Entity | Spec | Index |
 |---|---|---|---|
-| [Person Service](person-service-rust-crate/) | Person (general; healthcare-aware) | [spec](person-service-rust-crate/spec.md) | [index](person-service-rust-crate/index.md) |
+| [Person Service](person-service-rust-crate/) | Person (general) | [spec](person-service-rust-crate/spec.md) | [index](person-service-rust-crate/index.md) |
 | [Worker Service](worker-service-rust-crate/) | Worker (workforce / professional) | [spec](worker-service-rust-crate/spec.md) | [index](worker-service-rust-crate/index.md) |
 | [Place Service](place-service-rust-crate/) | Place (schema.org/Place) | [spec](place-service-rust-crate/spec.md) | [index](place-service-rust-crate/index.md) |
 | [Thing Service](thing-service-rust-crate/) | Thing (schema.org/Thing — generic) | [spec](thing-service-rust-crate/spec.md) | [index](thing-service-rust-crate/index.md) |

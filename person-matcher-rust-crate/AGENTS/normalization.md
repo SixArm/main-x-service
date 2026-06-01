@@ -226,7 +226,7 @@ NANP (`+1`) numbers are returned with US's `iso_alpha2` because both US and CA s
 Algorithm:
 
 1. Trim surrounding whitespace.
-2. Lowercase the entire address (RFC 5321 makes the domain case-insensitive; healthcare data overwhelmingly treats the localpart case-insensitively too).
+2. Lowercase the entire address (RFC 5321 makes the domain case-insensitive; real-world data overwhelmingly treats the localpart case-insensitively too).
 3. Split on `@`. Reject (`None`) unless there is exactly one `@` and both localpart and domain are non-empty.
 4. If `gmail_dot_folding` is `true` and the domain is `gmail.com` or `googlemail.com`:
    - Truncate the localpart at the first `+` (drops `+tag` suffix).
@@ -249,7 +249,7 @@ Examples:
 
 `MatchingEngine::match_persons` calls `normalize_email` on both sides; `MatchBreakdown::email_score` is `Some(1.0)` for equal canonical forms, `Some(0.0)` for distinct canonical forms when both parse, and `None` when either input is absent or fails to parse.
 
-`local_id` is **not** scored. Different organisations may issue colliding values (a person's MRN at hospital A and another person's MRN at hospital B can be byte-equal), so positional matching would produce false positives.
+`local_id` is **not** scored. Different organisations may issue colliding values (a person's MRN at site A and another person's MRN at site B can be byte-equal), so positional matching would produce false positives.
 
 ### Address Line Normalisation
 

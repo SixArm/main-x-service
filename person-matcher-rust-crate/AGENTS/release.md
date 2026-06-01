@@ -39,7 +39,7 @@ If a CHANGELOG entry doesn't have a corresponding spec edit, one of them is wron
 
 ## Yanking
 
-- Yank a release (`cargo yank --version X.Y.Z`) only for clinical-safety bugs or licence/legal issues.
+- Yank a release (`cargo yank --version X.Y.Z`) only for data-safety bugs or licence/legal issues.
 - Document the reason in the CHANGELOG entry for that version, marked `[YANKED]`.
 
 ## Dependency Updates

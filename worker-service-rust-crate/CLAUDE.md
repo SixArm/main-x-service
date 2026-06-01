@@ -1,7 +1,7 @@
 # Worker Service (MPI)
 
-The Worker Service (MPI) is a critical healthcare system that maintains a
-centralized registry of worker identities across healthcare providers.
+The Worker Service is an identity-registry system that maintains a
+centralized registry of worker identities across source systems.
 
 @agents/share/overview.md
 

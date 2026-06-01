@@ -59,7 +59,7 @@ See [`testing.md`](./testing.md).
 
 ## Generics
 
-- Avoid generics unless they earn their keep. The crate is not a framework; small concrete types are easier to reason about for clinical-adjacent code.
+- Avoid generics unless they earn their keep. The crate is not a framework; small concrete types are easier to reason about for identity-adjacent code.
 - Where generics are warranted (`PersonBuilder::united_kingdom_national_health_service_number<S: Into<String>>(...)`, `NicknameTable::with_class<I, S>(...)`), keep the bound minimal and document the intent.
 
 ## Dependencies

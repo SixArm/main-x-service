@@ -56,8 +56,8 @@ of that event:
   (party + approximate time, identifier + organisation, partial title +
   venue) and return ranked candidates with per-component score breakdowns.
 - Detect duplicates in real time on create *and* in batch on demand —
-  for example, the same appointment created by both the patient portal
-  and the front-desk EHR.
+  for example, the same booking created by both a self-service portal
+  and the operational system of record.
 - Expose a stable cross-system identifier so downstream analytics,
   billing, and notifications refer to one event ID per real-world
   occurrence.
@@ -472,7 +472,7 @@ Layered: [`AGENTS/testing.md`](AGENTS/testing.md).
 
 | Standard | Mechanism |
 |---|---|
-| HIPAA (when used clinically) | Audit log, access tracking, encryption-at-rest, soft delete |
+| HIPAA (when records carry PHI) | Audit log, access tracking, encryption-at-rest, soft delete |
 | GDPR Art. 15 | `GET /api/v1/events/{id}/export` |
 | GDPR Art. 17 | Soft delete + consent revocation |
 | HL7 FHIR R5 | Stub; mapping pending (§6.8, OQ-1) |
@@ -584,8 +584,8 @@ clearly described manual check confirms the acceptance criterion.
 ## 16. Open Questions
 
 - **OQ-1 — FHIR mapping.** Encounter or Appointment (or both)?
-  Encounter fits clinical visits; Appointment fits scheduling. A
-  "best-fit by `event_type`" dispatch is a third option.
+  Encounter fits domain visits / interactions; Appointment fits
+  scheduling. A "best-fit by `event_type`" dispatch is a third option.
 - **OQ-2 — Capacity invariant strictness.** Should we reject events
   where `remaining > maximum_total` outright (422), or accept and
   warn? Today: reject.

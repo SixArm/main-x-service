@@ -12,7 +12,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 | Question | Answer |
 |---|---|
-| What does the crate do? | Pairwise person-record matching (deterministic + probabilistic) for healthcare information exchange. |
+| What does the crate do? | Pairwise person-record matching (deterministic + probabilistic) for identity exchange. |
 | Where is the canonical spec? | [`spec.md`](./spec.md). |
 | Where does new behaviour get specified? | In `spec.md` first, then code. |
 | What is the build command? | `cargo build` |
@@ -31,7 +31,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 1. **Spec-first.** If you change observable behaviour, update [`spec.md`](./spec.md) in the same change. If the spec is silent, propose a spec update before writing code.
 2. **Pure library.** No IO, no logging, no global state inside `src/` (excluding `src/main.rs`, which is a demo binary).
-3. **No `unsafe`.** This is a clinical-adjacent library. `unsafe` is forbidden.
+3. **No `unsafe`.** This is an identity-adjacent library. `unsafe` is forbidden.
 4. **Deterministic.** No clocks, no RNGs, no environment variables. Same inputs ⇒ same outputs, byte-for-byte.
 5. **Explainability over cleverness.** Every probabilistic match returns a per-field breakdown. Don't add black boxes.
 6. **Diacritic-correct.** Unicode diacritics (`â`, `ŷ`, `é`, `ü`, `ł`, …) must round-trip through normalisation. Don't break this.

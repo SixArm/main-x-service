@@ -40,7 +40,7 @@
 
 ## 1. Purpose and Vision
 
-A reusable, transparent, auditable Rust library to determine whether two worker demographic records refer to the same worker. Targets HIE scenarios where demographic data and national-style identifiers from disparate source systems must be reconciled. Small, dependency-light, side-effect-free: combines deterministic + probabilistic matching; explainable per-field breakdowns; configurable; handles 42 national identifier schemes (see [`AGENTS/national-person-identifiers.md`](AGENTS/national-person-identifiers.md)), passport books, alphanumeric postcodes, E.164 phone numbers across 39 jurisdictions, and diacritic-rich names; trustworthy for clinical-adjacent workflows (no silent fallbacks, no surprise IO).
+A reusable, transparent, auditable Rust library to determine whether two worker demographic records refer to the same worker. Targets identity-exchange scenarios where demographic data and national-style identifiers from disparate source systems must be reconciled. Small, dependency-light, side-effect-free: combines deterministic + probabilistic matching; explainable per-field breakdowns; configurable; handles 42 national identifier schemes (see [`AGENTS/national-person-identifiers.md`](AGENTS/national-person-identifiers.md)), passport books, alphanumeric postcodes, E.164 phone numbers across 39 jurisdictions, and diacritic-rich names; trustworthy for identity-adjacent workflows (no silent fallbacks, no surprise IO).
 
 **Non-goals.** Persistent storage / databases / indexing; network calls / telemetry; ML or trained classifiers; bulk-pipeline / blocking; cross-scheme identifier translation.
 
@@ -56,7 +56,7 @@ A reusable, transparent, auditable Rust library to determine whether two worker 
 
 ## 3. Stakeholders and Users
 
-Crate maintainer (Joel Parker Henderson — overall ownership). Crate consumers (Rust developers — stable, documented, SemVer-predictable API). Healthcare integrators (reusable matching primitive that drops into HIE pipelines without IO / runtimes / hidden state). Clinical safety reviewers (explainability + auditability of every match decision). Information governance teams (assurance no PII leaves the process or is logged). End users with diacritic names (correctness on `â`, `ŷ`, `é`, `ü`, `ö`, `ł`).
+Crate maintainer (Joel Parker Henderson — overall ownership). Crate consumers (Rust developers — stable, documented, SemVer-predictable API). Identity-exchange integrators (reusable matching primitive that drops into HIE pipelines without IO / runtimes / hidden state). Audit reviewers (explainability + auditability of every match decision). Information governance teams (assurance no PII leaves the process or is logged). End users with diacritic names (correctness on `â`, `ŷ`, `é`, `ü`, `ö`, `ł`).
 
 ---
 
@@ -322,7 +322,7 @@ Bump `Cargo.toml` per SemVer → update `CHANGELOG.md` → update this spec if b
 
 ## 20. Security, Privacy, and Compliance
 
-No IO (library reads no files, makes no network calls, opens no sockets). No logging of PII (no logging in library code at all). No global state (no thread-locals, no `static mut`, no lazy_statics carrying worker data). Memory hygiene — input strings are caller-owned; the library borrows; no zeroing because the library does not hold PII beyond a single call. GDPR — the library is a pure function; consumer applications carry GDPR responsibility for records they pass in. Clinical safety — no algorithm is perfect (§5); consumers MUST treat probabilistic matches as recommendations, not decisions. Full guidance in [`AGENTS/security-and-privacy.md`](AGENTS/security-and-privacy.md).
+No IO (library reads no files, makes no network calls, opens no sockets). No logging of PII (no logging in library code at all). No global state (no thread-locals, no `static mut`, no lazy_statics carrying worker data). Memory hygiene — input strings are caller-owned; the library borrows; no zeroing because the library does not hold PII beyond a single call. GDPR — the library is a pure function; consumer applications carry GDPR responsibility for records they pass in. Safety — no algorithm is perfect (§5); consumers MUST treat probabilistic matches as recommendations, not decisions. Full guidance in [`AGENTS/security-and-privacy.md`](AGENTS/security-and-privacy.md).
 
 ---
 
@@ -346,7 +346,7 @@ Resolved questions (OQ-1..OQ-6) are archived in [`AGENTS/delivered-tasks.md`](AG
 
 ### 22.1 Risks
 
-Misuse as clinical oracle (Med/High) → documentation + per-call `MatchBreakdown`. Diacritic-heavy false negatives (Med/Med) → NFKD + T-9.1 opt-in encoder. Spec/code drift (High/Med) → T-7 CI. Soundex over-clustering (Med/Low) → phonetic is bonus-only. `nhs-number` unmaintained (Low/Med) → pin minor + vendored fallback. Cross-scheme identifier confusion (Med/High) → scheme-local matching (FR-13 / §12.1). ES TSI lenient validation (Med/Low) — deliberate.
+Misuse as decision oracle (Med/High) → documentation + per-call `MatchBreakdown`. Diacritic-heavy false negatives (Med/Med) → NFKD + T-9.1 opt-in encoder. Spec/code drift (High/Med) → T-7 CI. Soundex over-clustering (Med/Low) → phonetic is bonus-only. `nhs-number` unmaintained (Low/Med) → pin minor + vendored fallback. Cross-scheme identifier confusion (Med/High) → scheme-local matching (FR-13 / §12.1). ES TSI lenient validation (Med/Low) — deliberate.
 
 ---
 

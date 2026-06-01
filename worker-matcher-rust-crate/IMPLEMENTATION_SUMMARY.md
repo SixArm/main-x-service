@@ -330,7 +330,7 @@ thiserror = "1.0"                                    # Error handling
 - No logging of worker data
 - Suitable for GDPR compliance
 
-### Medical Standards
+### Standards
 - Based on peer-reviewed research
 - Transparent scoring (audit trail)
 - Configurable thresholds

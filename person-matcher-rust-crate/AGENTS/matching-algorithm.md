@@ -6,7 +6,7 @@ The authoritative description lives in [`../spec.md`](../spec.md) §12 and §13.
 
 `MatchingEngine` exposes four entry points:
 
-1. **`deterministic_match(&p1, &p2) -> bool`** — binary, fast, defensible. Use when a regulator or clinician must see a clear yes/no.
+1. **`deterministic_match(&p1, &p2) -> bool`** — binary, fast, defensible. Use when a regulator or operator must see a clear yes/no.
 2. **`match_persons(&p1, &p2) -> MatchResult`** — score, threshold, per-field breakdown. Use to triage a single pair.
 3. **`match_one_to_many(&query, candidates) -> Vec<MatchResult>`** — score the query against a candidate slice; the output is parallel to the input. The building block for an MPI screening workflow (see spec §12.6 / FR-45).
 4. **`rank_one_to_many(&query, candidates) -> Vec<(usize, MatchResult)>`** — same scoring, sorted by descending score with deterministic ascending-index tiebreak (FR-46).

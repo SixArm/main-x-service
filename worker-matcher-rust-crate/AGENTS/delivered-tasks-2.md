@@ -116,7 +116,7 @@ Status legend: `[x]` done, `[ ]` open.
 - [x] Add `MatchConfig::multiple_birth_weight` (default 0.05) and `MatchBreakdown::multiple_birth_score` (with `#[serde(default)]`).
 - [x] `score_multiple_birth` helper: `Some(1.0)` for equal values, `Some(0.0)` for different, `None` when either side is missing.
 - [x] Not part of `deterministic_match` (too weak alone) and not part of `Worker::validate`'s identifying-field set.
-- **Acceptance:** 6 integration tests pin: match, identical-twin disambiguation (the canonical clinical failure mode), missing-on-one-side `None`, not-part-of-deterministic invariant, serde round-trip carrying the field, legacy-payload deserialisation to `None`.
+- **Acceptance:** 6 integration tests pin: match, identical-twin disambiguation (the canonical failure mode), missing-on-one-side `None`, not-part-of-deterministic invariant, serde round-trip carrying the field, legacy-payload deserialisation to `None`.
 
 **T-32 — Date-of-death and place-of-death scoring.** ✅ Delivered.
 - [x] Add `Worker::death_date: Option<NaiveDate>` and `Worker::death_place: Option<Address>` (both with `#[serde(default)]`).

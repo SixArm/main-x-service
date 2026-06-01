@@ -40,7 +40,7 @@ matching constants), see [`AGENTS/`](AGENTS/).
 ### 1.1 Purpose
 
 The Worker Service is a centralised registry of **workforce and
-professional identities**: clinicians, contractors, drivers, hospital
+professional identities**: operators, contractors, drivers, site
 staff, field engineers — anyone whose role + credentials matter to
 the caller.
 
@@ -52,7 +52,7 @@ identity:
 
 - Carry credential / licence / professional-identifier fields (NPI,
   DEA, board licence, employee number) alongside the same
-  healthcare-aware fields the patient and person indices use.
+  fields the person index uses.
 - Match probabilistically and deterministically against arbitrary
   input (typed name, partial NPI, credential number, …) and return
   ranked candidates with per-component score breakdowns.
@@ -118,7 +118,7 @@ identity:
 |---|---|
 | **Worker** | The canonical record for an employee / contractor / professional |
 | **Credential** | An `IdentityDocument` entry with type, number, issuing authority, expiry |
-| **NPI** | National Provider Identifier (US healthcare); 10-digit identifier |
+| **NPI** | National Provider Identifier (US); 10-digit identifier |
 | **DEA** | Drug Enforcement Administration registration number |
 | **Match quality** | Definite / Probable / Possible / Unlikely buckets |
 | **Soft delete** | `active = false`; rows are never `DELETE`d |
@@ -414,7 +414,7 @@ Layered: [`AGENTS/testing.md`](AGENTS/testing.md).
 | HL7 FHIR R5 | Practitioner resource bidirectional conversion |
 | ISO/IEC 27001 | Operational controls (deployment-side) |
 
-Healthcare-specific:
+Domain-specific compliance:
 [`agents/share/compliance-for-healthcare.md`](../agents/share/compliance-for-healthcare.md).
 
 ## 13. Tasks

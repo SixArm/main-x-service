@@ -1,6 +1,6 @@
 # Worker matcher — Documentation Index
 
-A Rust crate for pairwise worker-record matching (deterministic and probabilistic) in healthcare information exchange scenarios.
+A Rust crate for pairwise worker-record matching (deterministic and probabilistic) in identity exchange scenarios.
 
 > **Crate:** `worker-matcher` v0.3.0 &nbsp;·&nbsp; **Edition:** Rust 2024 &nbsp;·&nbsp; **Licence:** MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause
 >

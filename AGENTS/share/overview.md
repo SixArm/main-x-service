@@ -6,7 +6,7 @@ The **Main X Index** family of crates implements a federated identity index — 
 
 | Crate | Entity | Purpose |
 |-------|--------|---------|
-| [person-service](../../person-service-rust-crate) | Person | General person identity registry (healthcare-aware) |
+| [person-service](../../person-service-rust-crate) | Person | General person identity registry |
 | [worker-service](../../worker-service-rust-crate) | Worker | Workforce / professional identity registry |
 | [place-service](../../place-service-rust-crate) | Place | Geographic place registry (schema.org/Place) |
 | [thing-service](../../thing-service-rust-crate) | Thing | Generic thing / asset registry (schema.org/Thing) |

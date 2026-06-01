@@ -1,6 +1,6 @@
 # Worker Service (MPI)
 
-A high-performance, enterprise-grade Worker Service system built with Rust for healthcare organizations.
+A high-performance, enterprise-grade Worker Service system built with Rust.
 
 [![Rust](https://img.shields.io/badge/rust-1.93%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
@@ -8,7 +8,7 @@ A high-performance, enterprise-grade Worker Service system built with Rust for h
 
 ## Overview
 
-The Worker Service (MPI) is a critical healthcare system that maintains a centralized registry of worker identities across multiple healthcare facilities. This production-ready implementation provides:
+The Worker Service is an identity-registry system that maintains a centralized registry of worker identities across multiple source systems. This production-ready implementation provides:
 
 - ✅ **Worker matcher**: Probabilistic and deterministic matching algorithms
 - ✅ **Full-Text Search**: Powered by Tantivy for fast, accurate worker searches

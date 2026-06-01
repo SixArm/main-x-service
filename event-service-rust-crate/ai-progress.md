@@ -8,7 +8,7 @@ claude plan.md
 
 ## Project Overview
 
-Event Service (MPI) - A healthcare event identification and matching system built with Rust. Production-ready with 15 API endpoints, 34 unit tests, and comprehensive feature set.
+Event Service - An event identity-registry system built with Rust. Production-ready with 15 API endpoints, 34 unit tests, and comprehensive feature set.
 
 ## Phase Summary
 

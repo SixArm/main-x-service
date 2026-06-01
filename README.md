@@ -61,7 +61,7 @@ cargo bench
 | `GET /static/js/htmx.min.js` | HTMX 2.0.4 |
 | `GET /static/js/alpine.min.js` | Alpine 3.14.8 |
 
-`{plural}` is `persons` / `patients` / `workers` / `places` / `things` / `events`.
+`{plural}` is `persons` / `workers` / `places` / `things` / `events`.
 
 ## Documentation
 

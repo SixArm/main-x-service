@@ -1,6 +1,6 @@
 # Security and Privacy — Agent Guide
 
-This is a clinical-adjacent library. Treat every line of code as if a worker's care might depend on it (because it might).
+This is an identity-adjacent library. Treat every line of code as if a worker's care might depend on it (because it might).
 
 ## Hard Rules
 
@@ -16,16 +16,16 @@ This is a clinical-adjacent library. Treat every line of code as if a worker's c
 ## Threat Model (Brief)
 
 - **In scope:** correctness, side-effect freedom, deterministic output.
-- **Out of scope:** confidentiality of in-memory data (the caller owns the records), input validation of clinically valid date ranges, sanitising data that goes back to a database.
+- **Out of scope:** confidentiality of in-memory data (the caller owns the records), input validation of valid date ranges, sanitising data that goes back to a database.
 
 ## GDPR and Equivalent Regimes
 
 The library handles personal data passed to it by the caller but does not store, log, or transmit it. Responsibility for lawful processing under GDPR (or any equivalent data-protection regime that applies to the consumer) sits with the calling application. Do not introduce code that changes this stance.
 
-## Clinical Safety
+## Data Safety
 
 - Probabilistic matches are *suggestions*, never decisions.
-- Every `MatchResult` carries a `MatchBreakdown`. Downstream apps SHOULD surface it to clinicians, not just the boolean `is_match`.
+- Every `MatchResult` carries a `MatchBreakdown`. Downstream apps SHOULD surface it to operators, not just the boolean `is_match`.
 - Default threshold (0.85) is conservative. If you propose lowering it, justify with data and discuss in a `spec.md` PR.
 
 ## Dependencies

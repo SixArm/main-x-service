@@ -5,7 +5,7 @@ objects — books, papers, digital assets, devices, products, software,
 or any other "thing" — modelled one-to-one on
 [schema.org/Thing](https://schema.org/Thing). It is the most general
 entity in the Main X Index family; if your record doesn't fit one of
-the more opinionated sibling crates (`person`, `patient`, `worker`,
+the more opinionated sibling crates (`person`, `worker`,
 `event`), it goes here.
 
 The Thing service shares its architecture with every other Main X

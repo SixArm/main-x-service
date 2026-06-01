@@ -8,7 +8,7 @@ claude plan.md
 
 ## Project Overview
 
-Worker Service (MPI) - A healthcare worker identification and matching system built with Rust. Production-ready with 15 API endpoints, 34 unit tests, and comprehensive feature set.
+Worker Service - A worker identity-registry system built with Rust. Production-ready with 15 API endpoints, 34 unit tests, and comprehensive feature set.
 
 ## Phase Summary
 

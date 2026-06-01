@@ -210,7 +210,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for more.
 
 ## Compliance
 
-- **HIPAA** (when used clinically): audit log, soft delete, access
+- **HIPAA** (when records include protected health information): audit log, soft delete, access
   control, encryption at rest.
 - **GDPR**: right of access (`/events/{id}/export`), right to
   erasure (soft delete), consent management.

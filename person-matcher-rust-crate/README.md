@@ -1,6 +1,6 @@
 # Person matcher Rust Crate
 
-A comprehensive Rust library for matching person records in healthcare information exchanges.
+A comprehensive Rust library for matching person records for identity exchanges.
 
 > **Documentation index:** [`index.md`](./index.md) is the top-level map of every doc in this repo (spec, AGENTS guides, CHANGELOG, examples). Start there if you're new.
 
@@ -134,13 +134,13 @@ println!("Phonetic name score: {:?}", result.breakdown.phonetic_name_score);
 
 The `Person` struct supports:
 
-- **United Kingdom National Health Service Number**: 10-digit healthcare identifier with Modulus-11 check digit
+- **United Kingdom National Health Service Number**: 10-digit national personal identifier with Modulus-11 check digit
 - **Name Fields**: First, middle, and Family names
 - **Date of Birth**: Birth date for age verification
 - **Gender**: Male, Female, Other, Unknown
 - **Address**: Multi-line address with postcode
 - **Contact**: Phone, mobile, email
-- **Local ID**: Hospital/practice-specific identifier
+- **Local ID**: Site / source-system-specific identifier
 
 ## Matching Algorithm
 
@@ -410,7 +410,7 @@ let b = Person::builder().given_name("X").family_name("Y")
 assert_eq!(engine.match_persons(&a, &b).breakdown.email_score, Some(1.0));
 ```
 
-Note that `local_id` is **not** scored: different organisations may issue colliding values (different persons' MRNs from hospitals A and B can be byte-equal), so positional matching would produce false positives.
+Note that `local_id` is **not** scored: different organisations may issue colliding values (different persons' MRNs from sites A and B can be byte-equal), so positional matching would produce false positives.
 
 ## Nickname Matching
 

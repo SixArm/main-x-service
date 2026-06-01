@@ -43,29 +43,32 @@ The Person Service is a general-purpose centralised registry of
 **person identities**. It sits alongside the more domain-specific
 [Worker](../worker-service-rust-crate/) index and gives callers one
 canonical record per real-world person regardless of how many source
-systems hold a shard of that identity. It is healthcare-aware (tax ID,
-identity documents, emergency contacts) so it can stand in as a patient
-registry where a dedicated clinical index is not warranted.
+systems hold a shard of that identity. It carries the structured
+fields (tax ID, identity documents, emergency contacts, multi-country
+national identifiers) needed to stand in as a domain-specific identity
+registry where a dedicated index is not warranted.
 
 ### 1.2 Vision
 
-A single, healthcare-aware person identity surface that:
+A single person identity surface that:
 
-- Carries every field the patient index does (tax ID, identity documents,
-  emergency contacts) so it can stand in as a patient index where a full
-  healthcare deployment is not warranted.
+- Carries the structured fields (tax ID, identity documents,
+  emergency contacts, multi-country national identifiers) needed to
+  stand in as a domain-specific identity registry where a dedicated
+  index is not warranted.
 - Matches probabilistically and deterministically against arbitrary
   input, returning ranked candidates with per-component score breakdowns.
 - Detects duplicates in real time on create *and* in batch on demand,
   routing them through a review queue with auto-merge for high-confidence
   matches.
-- Emits HIPAA-grade audit logs and event-streaming records for every
-  CRUD / merge / link operation.
+- Emits audit logs and event-streaming records for every CRUD / merge
+  / link operation, suitable for HIPAA-grade trails where applicable.
 
 ### 1.3 Non-goals
 
-- **Not** a system of record for clinical encounters, observations, or
-  conditions — link out to the EHR or to the patient index.
+- **Not** a system of record for domain-specific records (e.g.
+  encounters, observations, transactions, conditions) — link out
+  to the dedicated domain index.
 - **Not** a workforce credentialing system — use the Worker Service.
 - **Not** an authentication / authorisation provider — JWT middleware
   is planned (§15) but identity proofing is out of scope.
@@ -430,7 +433,7 @@ Layered: [`AGENTS/testing.md`](AGENTS/testing.md).
 | ISO/IEC 27001 | Operational controls (deployment-side) |
 | ISO/IEC 42001:2023 | AIMS controls (where matcher tuning is ML-driven) |
 
-Healthcare-specific:
+Domain-specific compliance:
 [`agents/share/compliance-for-healthcare.md`](../agents/share/compliance-for-healthcare.md).
 Technology compliance:
 [`agents/share/compliance-for-technology.md`](../agents/share/compliance-for-technology.md).
@@ -478,9 +481,10 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   - **Acceptance:** `bash scripts/spec-drift-check.sh main HEAD`
     exits non-zero on a code-only PR.
 - [ ] **T-8 — `db::audit` rename clean-up.**
-  - [ ] Verify no `patient`-era symbols remain in `src/db/audit.rs`.
-  - **Acceptance:** `cargo check --lib` passes clean; `grep -ri
-    'patient' src/db/` returns no matches.
+  - [ ] Verify no -era symbols remain in `src/db/audit.rs`.
+  - **Acceptance:** `cargo check --lib` passes clean; legacy
+    domain-specific symbols (e.g. `patient`, `mpi`) absent from
+    `src/db/`.
 
 ## 14. Implementation Status
 

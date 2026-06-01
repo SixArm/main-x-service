@@ -125,7 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Public `BloodType` enum (8 ABO+RhD variants) with canonical short-form serde rename (`"A+"`, `"AB-"`, etc.) — spec FR-78/79/80, §8.2a, task T-29.
 - `BloodType::parse(s)` ingests canonical, lowercase, word (`"A positive"`, `"A pos"`), `+VE`/`-VE`, separator (`A_pos`, `A-neg`), and zero-to-O (`"0+"`) variants. Rare phenotypes and unparseable inputs return `None`.
 - `Person::blood_type: Option<BloodType>` with `PersonBuilder::blood_type` setter. `MatchConfig::blood_type_weight` (default `0.05`); `MatchBreakdown::blood_type_score` (`Some(1.0)` for agreement, `Some(0.0)` for disagreement, `None` for missing).
-- Blood type is **not** part of `deterministic_match` (too weak as a positive signal alone) and **not** an identifying field for `Person::validate`. The disagreement signal surfaces in the breakdown so downstream consumers can flag clinically suspicious mismatches even when the overall score remains high.
+- Blood type is **not** part of `deterministic_match` (too weak as a positive signal alone) and **not** an identifying field for `Person::validate`. The disagreement signal surfaces in the breakdown so downstream consumers can flag suspicious mismatches even when the overall score remains high.
 
 ### API surface (T-29)
 - `Person`, `PersonBuilder`, `MatchConfig`, and `MatchBreakdown` each gain one new field. Code constructing `MatchConfig { … }` via struct-literal syntax MUST add `blood_type_weight` (or use `..MatchConfig::default()`). `Person::blood_type` carries `#[serde(default)]` so legacy JSON payloads deserialise with `None`.
@@ -209,7 +209,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Probabilistic `score` and `confidence` are unchanged across strict and non-strict configurations — strict mode tightens only the binary `is_match` decision.
 
 ### Behaviour change
-- Records that produced `is_match = true` under `MatchConfig::strict()` purely on a high fuzzy score (e.g. typo near-clones) now produce `is_match = false`. The fix narrows the false-positive surface for clinical workflows. Consumers that relied on the previous behaviour should switch to `MatchConfig::default()` (threshold 0.85, no determinism requirement) or read the `score` / `confidence` fields directly.
+- Records that produced `is_match = true` under `MatchConfig::strict()` purely on a high fuzzy score (e.g. typo near-clones) now produce `is_match = false`. The fix narrows the false-positive surface for production workflows. Consumers that relied on the previous behaviour should switch to `MatchConfig::default()` (threshold 0.85, no determinism requirement) or read the `score` / `confidence` fields directly.
 
 ### Added (batch API)
 - Batch scoring (spec FR-45 / FR-46, §12.6, task T-15).

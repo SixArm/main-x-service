@@ -1,9 +1,9 @@
 # Worker Service — Index
 
 Centralised registry of workforce and professional identities:
-clinicians, contractors, drivers, hospital staff, field engineers.
+operators, contractors, drivers, site staff, field engineers.
 Carries credential / licence / professional-identifier fields (NPI,
-DEA, board licence, employee number) alongside healthcare-aware
+DEA, board licence, employee number) alongside the structured
 demographics. Probabilistic + deterministic matching, real-time and
 batch deduplication, HIPAA-grade audit, GDPR Article 15 export, and a
 FHIR R5 Practitioner surface.
@@ -66,7 +66,7 @@ FHIR R5 Practitioner mounted under `/fhir/Practitioner/*`. See
 
 ## Worked examples
 
-### Create a worker (clinician with NPI)
+### Create a worker (professional with NPI)
 
 ```bash
 curl -X POST http://localhost:8080/api/workers \

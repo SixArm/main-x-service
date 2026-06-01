@@ -14,9 +14,9 @@
 
 ## 1. Purpose and Vision
 
-A reusable, transparent, auditable Rust library to determine whether two person demographic records refer to the same person. Targets healthcare information exchange (HIE) scenarios reconciling data and national-style identifiers from disparate source systems into a single best-guess decision.
+A reusable, transparent, auditable Rust library to determine whether two person demographic records refer to the same person. Targets identity exchange scenarios reconciling data and national-style identifiers from disparate source systems into a single best-guess decision.
 
-**Vision.** Small, dependency-light, side-effect-free; combines deterministic and probabilistic matching; per-field `MatchBreakdown` on every score; configurable without sacrificing safe defaults; handles 42 national-identifier schemes (§6.4 / `AGENTS/national-person-identifiers.md`), a `PassportBook` model (multi-country / multi-book / time-varying), alphanumeric postcodes, international E.164 phones across 39 jurisdictions, diacritic-rich personal names; trustworthy for clinical-adjacent workflows (audit trail, no silent fallbacks, no surprise IO).
+**Vision.** Small, dependency-light, side-effect-free; combines deterministic and probabilistic matching; per-field `MatchBreakdown` on every score; configurable without sacrificing safe defaults; handles 42 national-identifier schemes (§6.4 / `AGENTS/national-person-identifiers.md`), a `PassportBook` model (multi-country / multi-book / time-varying), alphanumeric postcodes, international E.164 phones across 39 jurisdictions, diacritic-rich personal names; trustworthy for identity-adjacent workflows (audit trail, no silent fallbacks, no surprise IO).
 
 **Non-Goals.** Persistent storage / databases / indexing; network calls / telemetry / background work; ML models; bulk pipelines beyond the delivered `match_one_to_many` / `rank_one_to_many`; cross-scheme identifier translation (requires a registry the library deliberately does not consult).
 
@@ -32,7 +32,7 @@ A reusable, transparent, auditable Rust library to determine whether two person 
 
 ## 3. Stakeholders and Users
 
-Crate maintainer (Joel Parker Henderson); Rust crate consumers (stable documented public API, predictable SemVer); healthcare integrators (reusable matching primitive that drops into HIE pipelines without IO, runtimes, or hidden state); clinical safety reviewers (explainability + auditability); information-governance teams (no PII leaves the process or is logged); end users with diacritic names (Unicode correctness — `â`, `ŷ`, `é`, `ü`, `ö`, `ł`).
+Crate maintainer (Joel Parker Henderson); Rust crate consumers (stable documented public API, predictable SemVer); identity-exchange integrators (reusable matching primitive that drops into HIE pipelines without IO, runtimes, or hidden state); audit reviewers (explainability + auditability); information-governance teams (no PII leaves the process or is logged); end users with diacritic names (Unicode correctness — `â`, `ŷ`, `é`, `ü`, `ö`, `ł`).
 
 ---
 
@@ -332,7 +332,7 @@ Pre-1.0: minor bumps MAY contain breaking changes (per Cargo convention) — doc
 
 ## 20. Security, Privacy, and Compliance
 
-No IO (no file / network / socket). No logging of PII (no logging in library code at all). No global state (no thread-locals, no `static mut`, no lazy_statics holding person data). Memory hygiene: input strings are caller-owned; the library borrows them and holds no PII beyond a single call (no zeroing required). GDPR: the library is a pure function; consumers carry GDPR responsibility for the records they pass in. Clinical safety: per §5, no algorithm is perfect — consumers MUST treat probabilistic matches as recommendations, not decisions.
+No IO (no file / network / socket). No logging of PII (no logging in library code at all). No global state (no thread-locals, no `static mut`, no lazy_statics holding person data). Memory hygiene: input strings are caller-owned; the library borrows them and holds no PII beyond a single call (no zeroing required). GDPR: the library is a pure function; consumers carry GDPR responsibility for the records they pass in. Safety: per §5, no algorithm is perfect — consumers MUST treat probabilistic matches as recommendations, not decisions.
 
 ---
 
@@ -359,7 +359,7 @@ Open questions are tracked here until resolved.
 
 ### 22.1 Risks
 
-- Misuse as a clinical decision oracle (Med/High) — documentation; require `MatchBreakdown` on every call.
+- Misuse as a decision oracle (Med/High) — documentation; require `MatchBreakdown` on every call.
 - Diacritic-heavy name false negatives (Med/Med) — NFKD pipeline; T-9.1 phonetic encoder follow-up.
 - Spec / code drift (High/Med) — T-7 CI check.
 - Soundex collisions cluster too aggressively (Med/Low) — phonetic is bonus-only.

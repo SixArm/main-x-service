@@ -8,7 +8,7 @@ claude plan.md
 
 ## Project Overview
 
-Person Service (MPI) - A healthcare person identification and matching system built with Rust. Production-ready with 15 API endpoints, 34 unit tests, and comprehensive feature set.
+Person Service - A person identity-registry system built with Rust. Production-ready with 15 API endpoints, 34 unit tests, and comprehensive feature set.
 
 ## Phase Summary
 

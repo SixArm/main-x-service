@@ -4,7 +4,7 @@ Based on [schema.org/Thing](https://schema.org/Thing). The Thing model is
 the most general entity in the Main X Index family: a stable identity
 for any arbitrary discrete object — a book, a paper, a digital asset, a
 device, a product, etc. — anything that doesn't fit one of the more
-opinionated sibling crates (`person`, `patient`, `worker`, `event`).
+opinionated sibling crates (`person`, `worker`, `event`).
 
 ## Thing
 

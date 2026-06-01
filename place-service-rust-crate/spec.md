@@ -40,8 +40,8 @@ matching constants), see [`AGENTS/`](AGENTS/).
 ### 1.1 Purpose
 
 The Place Service is a centralised registry of **geographic places**:
-hospitals, clinics, branches, civic structures, landforms,
-administrative areas, business locations — anything modelled by
+sites, branches, civic structures, landforms, administrative areas,
+business locations — anything modelled by
 [schema.org/Place](https://schema.org/Place).
 
 ### 1.2 Vision
