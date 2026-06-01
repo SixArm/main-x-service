@@ -130,3 +130,41 @@ fn test_end_to_end_workflow() {
 - Use realistic coordinates (NYC: 40.7829, -73.9654)
 - Use valid GLN format for identifier tests (13 digits)
 - Use `Place::new("name")` for simple test places
+
+## Bridge Integration Tests
+
+`tests/duplicate_detection.rs` is a black-box test that drives the
+service-side domain model through [`matching::adapter::to_matcher_place`]
+and asserts on `MatchingEngine::match_places` output. The suite pins
+**both sides of the contract** — the adapter's field-routing rules and
+the matcher's scoring algorithm — so a regression on either side fails
+a test here.
+
+Run with: `cargo test --test duplicate_detection`
+
+### Coverage (14 tests)
+
+| Category | What it pins |
+|---|---|
+| Identical / near-duplicate | identical-clone score ≥ 0.95, name-typo fuzzy match, ordering invariants (closer-evidence outscores farther) |
+| Deterministic short-circuits | GLN deterministic short-circuit, OSM identifier → `OsmNode` scheme, geo-distance ranking (closer > farther), PlaceType match/mismatch, antipodal-coordinates negative case |
+| Negative cases | unrelated records score low, common-name + divergent demographics not flagged as duplicate |
+| Field-routing pinning | per-adapter mapping tests (telecom → phone/email, address field renames, identifier-system-URI routing) |
+| Edge cases | sparse records, empty fields, config presets |
+
+### Running
+
+```bash
+cargo test --test duplicate_detection                       # all bridge tests
+cargo test --test duplicate_detection identical             # just the identical-clone tests
+cargo test --test duplicate_detection -- --nocapture        # with stdout
+```
+
+### When to add a new test here
+
+Add a bridge test when:
+
+- The adapter (`src/matching/adapter.rs`) gains a new routing rule.
+- The place-matcher crate exposes a new scoring component the service
+  needs to surface.
+- A regression escapes the adapter's own `#[cfg(test)] mod tests`.

@@ -377,6 +377,11 @@ Layered: [`AGENTS/testing.md`](AGENTS/testing.md).
   validation, privacy. ~100 tests.
 - **Integration tests** — `tests/integration_*.rs`; end-to-end
   workflows.
+- **Bridge integration tests** — `tests/duplicate_detection.rs`;
+  drives service-side records through `adapter::to_matcher_thing` and
+  asserts on `MatchingEngine::match_things` end-to-end. Covers
+  identical clones, name typos, deterministic identifier short-circuits,
+  field-routing pinning, and config-preset invariants. 15 tests.
 - **Benchmarks** — Criterion: matching, search, validation, privacy.
 - **CI** — `test.yml`, `quality.yml`, `security.yml`.
 
@@ -439,7 +444,7 @@ clearly described manual check confirms the acceptance criterion.
 | REST API | 15 endpoints + OpenAPI/Swagger + CORS + structured errors |
 | Validation | Required `name`, URL formats, per-type identifier formats, normalisation |
 | Privacy | Per-field masking (`owner`, identifier `value`), GDPR export, consent model |
-| Web UI | Loco / Tera / HTMX / Alpine / Lily HTML Headless + NHS UK theme |
+| Web UI | Loco / Tera / HTMX / Alpine / Lily HTML Headless + United Kingdom National Health Service England theme |
 | Tests | ~100 unit + integration_* + Criterion benchmarks |
 
 ### 14.2 Open gaps → tasks

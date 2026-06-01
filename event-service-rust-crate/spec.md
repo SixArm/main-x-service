@@ -465,6 +465,11 @@ Layered: [`AGENTS/testing.md`](AGENTS/testing.md).
   validation, privacy, models, time-interval algebra. 62+ tests.
 - **Integration tests** — `tests/`; full HTTP request/response
   cycles against real PostgreSQL + Tantivy.
+- **Bridge integration tests** — `tests/duplicate_detection.rs`;
+  drives service-side records through `adapter::to_matcher_event` and
+  asserts on `MatchingEngine::match_events` end-to-end. Covers
+  identical clones, name typos, deterministic identifier short-circuits,
+  field-routing pinning, and config-preset invariants. 16 tests.
 - **Benchmarks** — Criterion for matching, search, validation.
 - **CI** — `test.yml`, `quality.yml`, `security.yml`.
 
@@ -541,7 +546,7 @@ clearly described manual check confirms the acceptance criterion.
 | Merging | Transfer + alias + link + soft-delete + snapshot + event |
 | Validation | Required fields, format checks, time-window guards, `422` |
 | Privacy | Field masking, GDPR export, consent model |
-| Web UI | Loco / Tera / HTMX / Alpine / Lily HTML Headless + NHS UK theme |
+| Web UI | Loco / Tera / HTMX / Alpine / Lily HTML Headless + United Kingdom National Health Service England theme |
 | Docker | Multi-stage Dockerfile, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 

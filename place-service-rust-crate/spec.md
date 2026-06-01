@@ -404,6 +404,11 @@ Layered: [`AGENTS/testing.md`](AGENTS/testing.md).
   workflows + edge cases (unicode names, geo poles, date line, GLN
   deterministic override, address normalisation edge cases, GDPR
   field preservation). 67 tests.
+- **Bridge integration tests** — `tests/duplicate_detection.rs`;
+  drives service-side records through `adapter::to_matcher_place` and
+  asserts on `MatchingEngine::match_places` end-to-end. Covers
+  identical clones, name typos, deterministic identifier short-circuits,
+  field-routing pinning, and config-preset invariants. 14 tests.
 - **Benchmarks** — Criterion: 16 — matching, search, validation,
   privacy.
 - **CI** — `test.yml`, `quality.yml`, `security.yml`.
@@ -482,7 +487,7 @@ clearly described manual check confirms the acceptance criterion.
 | Validation | Coordinate bounds, GLN check, URL protocol, telephone format, address completeness, `422` |
 | Normalisation | Title-case locality, uppercase region/country, abbreviation expansion |
 | Privacy | Phone / fax masking, geo-coordinate rounding (2 dp), GDPR export |
-| Web UI | Loco / Tera / HTMX / Alpine / Lily HTML Headless + NHS UK theme |
+| Web UI | Loco / Tera / HTMX / Alpine / Lily HTML Headless + United Kingdom National Health Service England theme |
 | Tests | 171 tests + 16 Criterion benchmarks |
 
 ### 14.2 Open gaps → tasks

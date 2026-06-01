@@ -27,6 +27,33 @@ use thing_service::matching::identifier::{
 use thing_service::matching::phonetic::{soundex, soundex_match};
 ```
 
+
+### Adapter to the canonical `thing-matcher` crate
+
+The service embeds the sibling `thing-matcher` crate and re-exports it
+from `src/matching/mod.rs` as `matcher_lib`. Pair it with
+`adapter::to_matcher_thing` to score two service records through the
+canonical algorithm:
+
+```rust
+use thing_service::matching::adapter::to_matcher_thing;
+use thing_service::matching::matcher_lib::{MatchingEngine, MatchConfig};
+
+let engine = MatchingEngine::new(MatchConfig::default());
+let result = engine.match_things(
+    &to_matcher_thing(&a),
+    &to_matcher_thing(&b),
+);
+// result.score: f64 in [0.0, 1.0]
+// result.is_match: bool
+// result.confidence: High | Medium | Low
+// result.breakdown: per-field Option<f64>
+```
+
+Field-routing rules are documented inline in
+[`src/matching/adapter.rs`](../src/matching/adapter.rs) and pinned by
+[`tests/duplicate_detection.rs`](../tests/duplicate_detection.rs).
+
 ### Validation
 
 ```rust
@@ -86,6 +113,18 @@ let masked = mask_thing(&thing);
 let export = gdpr_export(&thing); // Full JSON for data portability
 ```
 
+
+### Prometheus metrics
+
+| Method | Path             | Description                                                                  |
+| ------ | ---------------- | ---------------------------------------------------------------------------- |
+| GET    | `/metrics.prom`  | Prometheus text-exposition format (`text/plain; version=0.0.4`) for scraping |
+
+The canonical `/metrics` endpoint serves the HTML performance dashboard;
+configure your scraper with `metrics_path: /metrics.prom`. The metric
+inventory (entity-CRUD counters, HTTP request counter, latency
+histograms) is in [`src/metrics.rs`](../src/metrics.rs).
+
 ## RESTful API endpoints
 
 | Method | Path                      | Description           |
@@ -113,6 +152,6 @@ let export = gdpr_export(&thing); // Full JSON for data portability
 | GET    | `/`                                   | Home page                                                      |
 | GET    | `/things`                             | Thing index                                                    |
 | GET    | `/things/search/partial?q=…`          | HTMX search fragment                                           |
-| GET    | `/static/css/lily.css`                | NHS UK theme that styles Lily HTML Headless components         |
+| GET    | `/static/css/lily.css`                | United Kingdom National Health Service England theme that styles Lily HTML Headless components         |
 | GET    | `/static/js/htmx.min.js`              | HTMX 2.0.4                                                     |
 | GET    | `/static/js/alpine.min.js`            | Alpine 3.14.8                                                  |

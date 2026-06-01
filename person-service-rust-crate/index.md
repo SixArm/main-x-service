@@ -222,6 +222,66 @@ for (k, v) in &result.breakdown {
 }
 ```
 
+### Match via the canonical `person-matcher` bridge
+
+Use the sibling `person-matcher` crate as the reference algorithm. The
+service re-exports it as `matcher_lib`, and `adapter::to_matcher_person`
+projects the service's domain model into the matcher's input shape
+(including national-identifier routing by FHIR `system` URI, address
+field renaming, and identifier-scheme dispatch).
+
+```rust,no_run
+use person_service::matching::adapter::to_matcher_person;
+use person_service::matching::matcher_lib::{Confidence, MatchConfig, MatchingEngine};
+use person_service::models::*;
+
+let dob = chrono::NaiveDate::from_ymd_opt(1980, 5, 15).unwrap();
+let name_a = HumanName {
+    use_type: None,
+    family: "Williams".into(),
+    given: vec!["Alice".into()],
+    prefix: vec![],
+    suffix: vec![],
+};
+let name_b = HumanName {
+    use_type: None,
+    family: "Williams".into(),
+    given: vec!["Alyce".into()], // typo
+    prefix: vec![],
+    suffix: vec![],
+};
+
+let mut a = Person::new(name_a, Gender::Female);
+a.birth_date = Some(dob);
+// Add a UK NHS number identifier; the adapter routes it by the FHIR system URI.
+a.identifiers.push(Identifier::new(
+    IdentifierType::Other,
+    "https://fhir.nhs.uk/Id/nhs-number".into(),
+    "943 476 5919".into(),
+));
+let mut b = Person::new(name_b, Gender::Female);
+b.birth_date = Some(dob);
+b.identifiers.push(Identifier::new(
+    IdentifierType::Other,
+    "https://fhir.nhs.uk/Id/nhs-number".into(),
+    "9434765919".into(), // same NHS number, different formatting
+));
+
+let engine = MatchingEngine::new(MatchConfig::default());
+let result = engine.match_persons(&to_matcher_person(&a), &to_matcher_person(&b));
+
+assert!(result.is_match, "near-duplicate should classify as match");
+assert_eq!(result.confidence, Confidence::High);
+println!("score   = {:.3}", result.score);
+println!("conf    = {:?}", result.confidence);
+// `result.breakdown` carries per-field Option<f64> for an auditable trail.
+```
+
+End-to-end pinning lives in
+[`tests/duplicate_detection.rs`](tests/duplicate_detection.rs); the
+adapter source is [`src/matching/adapter.rs`](src/matching/adapter.rs).
+
+
 ### Validate and normalise
 
 ```rust

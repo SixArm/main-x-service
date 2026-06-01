@@ -242,6 +242,40 @@ println!("  name: {:.3}", result.breakdown.name_score);
 println!("  geo:  {:.3}", result.breakdown.geo_score);
 ```
 
+### Match via the canonical `place-matcher` bridge
+
+Use the sibling `place-matcher` crate as the reference algorithm. The
+service re-exports it as `matcher_lib`, and `adapter::to_matcher_place`
+projects the service's domain model into the matcher's input shape
+(including national-identifier routing by FHIR `system` URI, address
+field renaming, and identifier-scheme dispatch).
+
+```rust,no_run
+use place_service::matching::adapter::to_matcher_place;
+use place_service::matching::matcher_lib::{Confidence, MatchConfig, MatchingEngine};
+use place_service::models::*;
+
+let mut a = Place::new("Central Park");
+a.global_location_number = Some("0614141999996".into());
+a.geo = Some(GeoCoordinates { latitude: 40.7829, longitude: -73.9654, elevation: None });
+let mut b = Place::new("Centrl Park"); // typo
+b.global_location_number = Some("0614141999996".into()); // same GLN
+
+let engine = MatchingEngine::new(MatchConfig::default());
+let result = engine.match_places(&to_matcher_place(&a), &to_matcher_place(&b));
+
+assert!(result.is_match, "near-duplicate should classify as match");
+assert_eq!(result.confidence, Confidence::High);
+println!("score   = {:.3}", result.score);
+println!("conf    = {:?}", result.confidence);
+// `result.breakdown` carries per-field Option<f64> for an auditable trail.
+```
+
+End-to-end pinning lives in
+[`tests/duplicate_detection.rs`](tests/duplicate_detection.rs); the
+adapter source is [`src/matching/adapter.rs`](src/matching/adapter.rs).
+
+
 ### Geo distance and radius
 
 ```rust

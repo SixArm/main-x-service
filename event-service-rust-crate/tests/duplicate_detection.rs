@@ -1,0 +1,397 @@
+//! End-to-end duplicate-detection integration tests for the
+//! event-service ↔ event-matcher bridge.
+//!
+//! Exercises the schema.org/Event identity model: DateTime → ISO 8601
+//! string projection, `Vec<Location>` → first matcher `Location` dispatch
+//! (Place / PostalAddress / Virtual / Text), `Vec<Party>` → single matcher
+//! organizer / performers list, identifier scheme mapping by system URI
+//! (Eventbrite, Meetup, Wikidata, Google Calendar, iCalendar).
+
+use chrono::{DateTime, Duration, TimeZone, Utc};
+
+use event_service::matching::adapter::to_matcher_event;
+use event_service::matching::matcher_lib::{Confidence, MatchingEngine};
+use event_service::models::{
+    identifier::{Identifier, IdentifierType},
+    Address, AddressUse, Event, EventStatus, EventType, Location, Party, PartyKind, Place,
+    VirtualLocation,
+};
+
+// -------- builders -----------------------------------------------------------
+
+fn start_at(year: i32, month: u32, day: u32, hour: u32) -> DateTime<Utc> {
+    Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).unwrap()
+}
+
+fn event(name: &str, start: DateTime<Utc>) -> Event {
+    let mut e = Event::new(name, start);
+    e.event_type = EventType::Conference;
+    e.event_status = EventStatus::Scheduled;
+    e
+}
+
+fn conference() -> Event {
+    let mut e = event("Annual Conference", start_at(2026, 6, 1, 9));
+    e.end_date = Some(start_at(2026, 6, 1, 17));
+    e.location = vec![Location::Place(Place {
+        id: None,
+        name: "Greek Theatre".into(),
+        address: Some(Address {
+            use_type: Some(AddressUse::Work),
+            line1: None,
+            line2: None,
+            city: Some("Berkeley".into()),
+            state: Some("CA".into()),
+            postal_code: Some("94720".into()),
+            country: Some("US".into()),
+        }),
+        latitude: Some(37.873),
+        longitude: Some(-122.255),
+        url: None,
+    })];
+    e.organizers = vec![Party {
+        kind: PartyKind::Organization,
+        id: None,
+        name: "Cal Performances".into(),
+        email: None,
+        url: None,
+    }];
+    e
+}
+
+fn engine() -> MatchingEngine {
+    MatchingEngine::default_config()
+}
+
+// =============================================================================
+// Identical / near-duplicate cases
+// =============================================================================
+
+#[test]
+fn identical_clones_score_near_one_high_confidence() {
+    let a = conference();
+    let b = a.clone();
+
+    let result = engine().match_events(&to_matcher_event(&a), &to_matcher_event(&b));
+
+    assert!(
+        result.score >= 0.95,
+        "identical clones should score ≥ 0.95, got {}",
+        result.score
+    );
+    assert_eq!(result.confidence, Confidence::High);
+    assert!(result.is_match);
+}
+
+#[test]
+fn typo_in_name_still_matches_when_time_and_location_agree() {
+    let a = conference();
+    let mut b = conference();
+    b.name = "Annual Conferance".into(); // typo
+
+    let result = engine().match_events(&to_matcher_event(&a), &to_matcher_event(&b));
+    assert!(
+        result.score >= 0.85,
+        "name typo with matching time+location should score ≥ 0.85, got {}",
+        result.score
+    );
+    assert!(result.is_match);
+}
+
+#[test]
+fn closer_start_dates_outscore_farther_start_dates_for_same_name() {
+    // Same name + same location pair, only `start_date` varies. The matcher
+    // uses Gaussian-decay over the start-time delta, so closer → higher
+    // score. Assert the *ranking*, not an absolute threshold.
+    let start = start_at(2026, 6, 1, 9);
+    let mut close_a = conference();
+    let mut close_b = conference();
+    close_a.start_date = start;
+    close_b.start_date = start + Duration::minutes(15); // 15 min drift
+
+    let mut far_a = conference();
+    let mut far_b = conference();
+    far_a.start_date = start;
+    far_b.start_date = start + Duration::days(30); // 30 days off
+
+    let close = engine().match_events(&to_matcher_event(&close_a), &to_matcher_event(&close_b));
+    let far = engine().match_events(&to_matcher_event(&far_a), &to_matcher_event(&far_b));
+
+    assert!(
+        close.score > far.score,
+        "close start_date (15 min) must outscore far (30 days): close={} far={}",
+        close.score,
+        far.score
+    );
+}
+
+// =============================================================================
+// Deterministic short-circuits — strong identifiers
+// =============================================================================
+
+#[test]
+fn shared_eventbrite_identifier_via_system_uri_is_deterministic() {
+    let mut a = event("Tech Talk", start_at(2026, 7, 15, 18));
+    a.identifiers.push(Identifier {
+        use_type: None,
+        identifier_type: IdentifierType::ExternalRef,
+        system: "https://eventbrite.com/event-id".into(),
+        value: "123456789".into(),
+        assigner: None,
+    });
+    let mut b = event("Tech Talk (Updated)", start_at(2026, 7, 15, 18));
+    b.identifiers.push(Identifier {
+        use_type: None,
+        identifier_type: IdentifierType::ExternalRef,
+        system: "https://eventbrite.com/event-id".into(),
+        value: "123456789".into(),
+        assigner: None,
+    });
+
+    let ma = to_matcher_event(&a);
+    let mb = to_matcher_event(&b);
+
+    assert!(
+        engine().deterministic_match(&ma, &mb),
+        "shared Eventbrite ID must trigger deterministic_match"
+    );
+    let result = engine().match_events(&ma, &mb);
+    assert_eq!(result.breakdown.event_ids_score, Some(1.0));
+}
+
+#[test]
+fn icalendar_uid_routing_via_system_uri() {
+    let mut a = event("Standup", start_at(2026, 7, 16, 9));
+    a.identifiers.push(Identifier {
+        use_type: None,
+        identifier_type: IdentifierType::Other,
+        system: "urn:ietf:rfc:5545:ical".into(),
+        value: "20260716T090000Z-standup@example.com".into(),
+        assigner: None,
+    });
+    let mut b = event("Standup", start_at(2026, 7, 16, 9));
+    b.identifiers.push(Identifier {
+        use_type: None,
+        identifier_type: IdentifierType::Other,
+        system: "urn:ietf:rfc:5545:ical".into(),
+        value: "20260716T090000Z-standup@example.com".into(),
+        assigner: None,
+    });
+
+    assert!(
+        engine().deterministic_match(&to_matcher_event(&a), &to_matcher_event(&b)),
+        "shared iCalendar UID must trigger deterministic_match"
+    );
+}
+
+#[test]
+fn booking_number_via_type_fallback_when_no_system_hint() {
+    // No system URI → adapter falls back to the IdentifierType enum and
+    // emits an Other("BookingNumber") scheme.
+    let mut a = event("Dinner", start_at(2026, 8, 1, 19));
+    a.identifiers.push(Identifier {
+        use_type: None,
+        identifier_type: IdentifierType::BookingNumber,
+        system: "https://reservations.example.com".into(),
+        value: "ABCD-1234".into(),
+        assigner: None,
+    });
+    let mut b = event("Dinner reservation", start_at(2026, 8, 1, 19));
+    b.identifiers.push(Identifier {
+        use_type: None,
+        identifier_type: IdentifierType::BookingNumber,
+        system: "https://reservations.example.com".into(),
+        value: "ABCD-1234".into(),
+        assigner: None,
+    });
+
+    let ma = to_matcher_event(&a);
+    let mb = to_matcher_event(&b);
+    assert_eq!(ma.event_ids.len(), 1, "BookingNumber should land as one EventId");
+    // Same (scheme, value) on each side → identifier-axis equality.
+    let result = engine().match_events(&ma, &mb);
+    assert_eq!(result.breakdown.event_ids_score, Some(1.0));
+}
+
+// =============================================================================
+// Location dispatch — Place vs Virtual vs PostalAddress
+// =============================================================================
+
+#[test]
+fn virtual_location_url_match_drives_location_score() {
+    let mut a = event("Webinar", start_at(2026, 6, 1, 10));
+    a.location = vec![Location::Virtual(VirtualLocation {
+        name: Some("Zoom".into()),
+        url: "https://example.zoom.us/j/123".into(),
+    })];
+    let mut b = event("Webinar", start_at(2026, 6, 1, 10));
+    b.location = vec![Location::Virtual(VirtualLocation {
+        name: Some("Zoom".into()),
+        url: "https://example.zoom.us/j/123".into(),
+    })];
+
+    let result = engine().match_events(&to_matcher_event(&a), &to_matcher_event(&b));
+    assert!(
+        result.breakdown.location_score.unwrap_or(0.0) >= 0.5,
+        "shared virtual-meeting URL must drive a positive location_score, got {:?}",
+        result.breakdown.location_score
+    );
+}
+
+#[test]
+fn place_location_geo_propagates_into_matcher_location() {
+    let mut a = event("Gig", start_at(2026, 6, 1, 20));
+    a.location = vec![Location::Place(Place {
+        id: None,
+        name: "Greek Theatre".into(),
+        address: None,
+        latitude: Some(37.8730),
+        longitude: Some(-122.2547),
+        url: None,
+    })];
+
+    let m = to_matcher_event(&a);
+    let loc = m.location.as_ref().unwrap();
+    assert_eq!(loc.venue_name.as_deref(), Some("Greek Theatre"));
+    assert_eq!(loc.latitude, Some(37.8730));
+}
+
+// =============================================================================
+// Organizer / party dispatch
+// =============================================================================
+
+#[test]
+fn first_organizer_name_propagates_to_matcher_organizer_slot() {
+    let mut a = event("Show", start_at(2026, 8, 1, 20));
+    a.organizers = vec![
+        Party {
+            kind: PartyKind::Organization,
+            id: None,
+            name: "Cal Performances".into(),
+            email: None,
+            url: None,
+        },
+        Party {
+            kind: PartyKind::Organization,
+            id: None,
+            name: "Co-sponsor".into(),
+            email: None,
+            url: None,
+        },
+    ];
+
+    let m = to_matcher_event(&a);
+    assert_eq!(
+        m.organizer.as_deref(),
+        Some("Cal Performances"),
+        "first organizer name must populate matcher.organizer (single string slot)"
+    );
+}
+
+#[test]
+fn performers_pass_through_as_string_vec() {
+    let mut a = event("Concert", start_at(2026, 9, 1, 20));
+    a.performers = vec![
+        Party {
+            kind: PartyKind::Person,
+            id: None,
+            name: "Alice".into(),
+            email: None,
+            url: None,
+        },
+        Party {
+            kind: PartyKind::Person,
+            id: None,
+            name: "Bob".into(),
+            email: None,
+            url: None,
+        },
+    ];
+    let m = to_matcher_event(&a);
+    assert_eq!(m.performers, vec!["Alice".to_string(), "Bob".to_string()]);
+}
+
+// =============================================================================
+// Negative cases
+// =============================================================================
+
+#[test]
+fn completely_different_events_score_low_and_do_not_match() {
+    let a = conference();
+    let mut b = event("Beach Party", start_at(2030, 1, 1, 12));
+    b.location = vec![Location::Place(Place {
+        id: None,
+        name: "Bondi Beach".into(),
+        address: None,
+        latitude: Some(-33.89),
+        longitude: Some(151.27),
+        url: None,
+    })];
+    b.event_type = EventType::Social;
+
+    let result = engine().match_events(&to_matcher_event(&a), &to_matcher_event(&b));
+    assert!(
+        result.score < 0.50,
+        "unrelated events should score < 0.50, got {}",
+        result.score
+    );
+    assert!(!result.is_match);
+}
+
+#[test]
+fn same_name_far_apart_dates_does_not_short_circuit() {
+    let mut a = event("Annual Gala", start_at(2024, 6, 1, 19));
+    a.location = vec![]; // remove location to force time to dominate
+    let mut b = event("Annual Gala", start_at(2030, 6, 1, 19));
+    b.location = vec![];
+
+    let result = engine().match_events(&to_matcher_event(&a), &to_matcher_event(&b));
+    assert!(
+        result.score < 0.90,
+        "same name 6-years apart must not hit High band, got {}",
+        result.score
+    );
+}
+
+// =============================================================================
+// Field-routing pinning
+// =============================================================================
+
+#[test]
+fn event_type_conference_maps_to_matcher_conference_event() {
+    use event_service::matching::matcher_lib::EventCategory;
+    let e = event("Talk", start_at(2026, 6, 1, 10));
+    let m = to_matcher_event(&e);
+    assert_eq!(m.category, Some(EventCategory::ConferenceEvent));
+}
+
+#[test]
+fn event_status_scheduled_maps_to_matcher_event_scheduled() {
+    use event_service::matching::matcher_lib::EventStatus as MEventStatus;
+    let e = event("Talk", start_at(2026, 6, 1, 10));
+    let m = to_matcher_event(&e);
+    assert_eq!(m.event_status, Some(MEventStatus::EventScheduled));
+}
+
+#[test]
+fn start_date_serialises_to_rfc3339() {
+    let e = event("Talk", start_at(2026, 6, 1, 9));
+    let m = to_matcher_event(&e);
+    assert!(
+        m.start_date.as_deref().unwrap().starts_with("2026-06-01T09:00:00"),
+        "start_date must be RFC 3339 with UTC offset, got {:?}",
+        m.start_date
+    );
+}
+
+// =============================================================================
+// Edge cases
+// =============================================================================
+
+#[test]
+fn sparse_records_do_not_panic_and_stay_in_range() {
+    let a = event("", start_at(2026, 1, 1, 0));
+    let b = event("X", start_at(2026, 1, 1, 0));
+    let result = engine().match_events(&to_matcher_event(&a), &to_matcher_event(&b));
+    assert!(result.score >= 0.0 && result.score <= 1.0);
+}

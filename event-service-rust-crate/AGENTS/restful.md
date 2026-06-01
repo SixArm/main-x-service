@@ -1,6 +1,47 @@
 # RESTful API Reference
 
-All endpoints are mounted under `/api/v1`.
+All REST endpoints are mounted under `/api/v1`.
+
+## Library API — bridge to the canonical `event-matcher` crate
+
+The service embeds the sibling `event-matcher` crate and re-exports it
+from `src/matching/mod.rs` as `matcher_lib`. Pair it with
+`adapter::to_matcher_event` to score two service records through the
+canonical algorithm:
+
+```rust
+use event_service::matching::adapter::to_matcher_event;
+use event_service::matching::matcher_lib::{MatchingEngine, MatchConfig};
+
+let engine = MatchingEngine::new(MatchConfig::default());
+let result = engine.match_events(
+    &to_matcher_event(&a),
+    &to_matcher_event(&b),
+);
+// result.score: f64 in [0.0, 1.0]
+// result.is_match: bool
+// result.confidence: High | Medium | Low
+// result.breakdown: per-field Option<f64>
+```
+
+Field-routing rules are documented inline in
+[`src/matching/adapter.rs`](../src/matching/adapter.rs) (DateTime →
+RFC 3339; `Vec<Location>` → first variant-dispatched matcher
+`Location`; `Vec<Party>` → first organizer name + performers
+`Vec<String>`; identifier `system` URI → `EventIdScheme`) and pinned
+by [`tests/duplicate_detection.rs`](../tests/duplicate_detection.rs).
+
+## Prometheus metrics
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/metrics.prom` | Prometheus text-exposition format (`text/plain; version=0.0.4`) for scraping |
+
+The canonical `/metrics` endpoint serves the HTML performance
+dashboard; configure your scraper with `metrics_path: /metrics.prom`.
+The metric inventory (entity-CRUD counters, HTTP request counter,
+latency histograms) is in
+[`src/metrics.rs`](../src/metrics.rs).
 
 ## Health
 

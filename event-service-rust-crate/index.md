@@ -210,6 +210,39 @@ println!("  start:    {:.3}", result.breakdown.start_score);
 println!("  location: {:.3}", result.breakdown.location_score);
 ```
 
+### Match via the canonical `event-matcher` bridge
+
+Use the sibling `event-matcher` crate as the reference algorithm. The
+service re-exports it as `matcher_lib`, and `adapter::to_matcher_event`
+projects the service's domain model into the matcher's input shape
+(including national-identifier routing by FHIR `system` URI, address
+field renaming, and identifier-scheme dispatch).
+
+```rust,no_run
+use event_service::matching::adapter::to_matcher_event;
+use event_service::matching::matcher_lib::{Confidence, MatchConfig, MatchingEngine};
+use event_service::models::*;
+
+use chrono::{TimeZone, Utc};
+let start = Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap();
+let mut a = Event::new("Annual Conference", start);
+let mut b = Event::new("Annual Conferance", start); // typo, same time
+
+let engine = MatchingEngine::new(MatchConfig::default());
+let result = engine.match_events(&to_matcher_event(&a), &to_matcher_event(&b));
+
+assert!(result.is_match, "near-duplicate should classify as match");
+assert_eq!(result.confidence, Confidence::High);
+println!("score   = {:.3}", result.score);
+println!("conf    = {:?}", result.confidence);
+// `result.breakdown` carries per-field Option<f64> for an auditable trail.
+```
+
+End-to-end pinning lives in
+[`tests/duplicate_detection.rs`](tests/duplicate_detection.rs); the
+adapter source is [`src/matching/adapter.rs`](src/matching/adapter.rs).
+
+
 ### Privacy mask + GDPR export
 
 ```rust

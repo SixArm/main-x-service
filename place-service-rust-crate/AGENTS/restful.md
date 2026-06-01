@@ -28,6 +28,33 @@ use place_service_rust_crate::matching::identifier::{identifier_similarity, has_
 use place_service_rust_crate::matching::phonetic::{soundex, soundex_match};
 ```
 
+
+### Adapter to the canonical `place-matcher` crate
+
+The service embeds the sibling `place-matcher` crate and re-exports it
+from `src/matching/mod.rs` as `matcher_lib`. Pair it with
+`adapter::to_matcher_place` to score two service records through the
+canonical algorithm:
+
+```rust
+use place_service::matching::adapter::to_matcher_place;
+use place_service::matching::matcher_lib::{MatchingEngine, MatchConfig};
+
+let engine = MatchingEngine::new(MatchConfig::default());
+let result = engine.match_places(
+    &to_matcher_place(&a),
+    &to_matcher_place(&b),
+);
+// result.score: f64 in [0.0, 1.0]
+// result.is_match: bool
+// result.confidence: High | Medium | Low
+// result.breakdown: per-field Option<f64>
+```
+
+Field-routing rules are documented inline in
+[`src/matching/adapter.rs`](../src/matching/adapter.rs) and pinned by
+[`tests/duplicate_detection.rs`](../tests/duplicate_detection.rs).
+
 ### Validation
 
 ```rust
@@ -102,6 +129,18 @@ let within_5km = within_radius(&nyc, &lax, 5000.0); // false
 
 let similarity = geo_similarity(&nyc, &lax); // ~0.0003
 ```
+
+
+### Prometheus metrics
+
+| Method | Path             | Description                                                                  |
+| ------ | ---------------- | ---------------------------------------------------------------------------- |
+| GET    | `/metrics.prom`  | Prometheus text-exposition format (`text/plain; version=0.0.4`) for scraping |
+
+The canonical `/metrics` endpoint serves the HTML performance dashboard;
+configure your scraper with `metrics_path: /metrics.prom`. The metric
+inventory (entity-CRUD counters, HTTP request counter, latency
+histograms) is in [`src/metrics.rs`](../src/metrics.rs).
 
 ## RESTful API Endpoints
 

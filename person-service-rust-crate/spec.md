@@ -89,7 +89,7 @@ A single person identity surface that:
 - Per-field privacy masking, GDPR Article 15 export, consent model.
 - REST API (Axum) + FHIR R5 Person + gRPC stub.
 - Server-rendered web UI (Loco / Tera / HTMX / Alpine / Lily HTML
-  Headless + NHS UK theme).
+  Headless + United Kingdom National Health Service England theme).
 - PostgreSQL persistence via SeaORM, with migrations.
 - Observability (tracing + OpenTelemetry OTLP).
 
@@ -418,6 +418,11 @@ Layered: [`AGENTS/testing.md`](AGENTS/testing.md).
   scoring, validation, privacy, models. ~100 tests.
 - **Integration tests** — `tests/`; full HTTP request/response cycles
   against real PostgreSQL + Tantivy.
+- **Bridge integration tests** — `tests/duplicate_detection.rs`;
+  drives service-side records through `adapter::to_matcher_person` and
+  asserts on `MatchingEngine::match_persons` end-to-end. Covers
+  identical clones, name typos, deterministic identifier short-circuits,
+  field-routing pinning, and config-preset invariants. 14 tests.
 - **Benchmarks** — Criterion suites for matching, search, validation.
 - **CI** — `test.yml`, `quality.yml` (`fmt --check` + `clippy`),
   `security.yml`.
@@ -505,7 +510,7 @@ PR; split larger tasks (`T-12a`, `T-12b`).
 | Merging | Transfer + alias + link + soft-delete + snapshot + event |
 | Validation | Required fields, format checks, phone normalisation, address standardisation, `422` |
 | Privacy | Field masking, GDPR export, consent model |
-| Web UI | Loco / Tera / HTMX / Alpine / Lily HTML Headless + NHS UK theme |
+| Web UI | Loco / Tera / HTMX / Alpine / Lily HTML Headless + United Kingdom National Health Service England theme |
 | Docker | Multi-stage Dockerfile, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 | Documentation | README, CLAUDE.md, AGENTS/* set, architecture, deploy guide, this spec |

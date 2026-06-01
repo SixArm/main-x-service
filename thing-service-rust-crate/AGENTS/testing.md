@@ -122,3 +122,41 @@ fn test_end_to_end_workflow() {
   Programming Language), papers — never place-flavoured data.
 - Use real ISBNs/DOIs in tests where format validation matters.
 - Use `Thing::new("name")` for simple test things.
+
+## Bridge Integration Tests
+
+`tests/duplicate_detection.rs` is a black-box test that drives the
+service-side domain model through [`matching::adapter::to_matcher_thing`]
+and asserts on `MatchingEngine::match_things` output. The suite pins
+**both sides of the contract** — the adapter's field-routing rules and
+the matcher's scoring algorithm — so a regression on either side fails
+a test here.
+
+Run with: `cargo test --test duplicate_detection`
+
+### Coverage (15 tests)
+
+| Category | What it pins |
+|---|---|
+| Identical / near-duplicate | identical-clone score ≥ 0.95, name-typo fuzzy match, ordering invariants (closer-evidence outscores farther) |
+| Deterministic short-circuits | shared DOI/ISBN/UUID deterministic short-circuits, different ISBNs reject, SKU non-deterministic distinction (service-side filter), `Custom(s)` property_id passthrough, shared `same_as` URL contribution |
+| Negative cases | unrelated records score low, common-name + divergent demographics not flagged as duplicate |
+| Field-routing pinning | per-adapter mapping tests (telecom → phone/email, address field renames, identifier-system-URI routing) |
+| Edge cases | sparse records, empty fields, config presets |
+
+### Running
+
+```bash
+cargo test --test duplicate_detection                       # all bridge tests
+cargo test --test duplicate_detection identical             # just the identical-clone tests
+cargo test --test duplicate_detection -- --nocapture        # with stdout
+```
+
+### When to add a new test here
+
+Add a bridge test when:
+
+- The adapter (`src/matching/adapter.rs`) gains a new routing rule.
+- The thing-matcher crate exposes a new scoring component the service
+  needs to surface.
+- A regression escapes the adapter's own `#[cfg(test)] mod tests`.

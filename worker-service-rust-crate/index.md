@@ -214,6 +214,55 @@ for (k, v) in &result.breakdown {
 }
 ```
 
+### Match via the canonical `worker-matcher` bridge
+
+Use the sibling `worker-matcher` crate as the reference algorithm. The
+service re-exports it as `matcher_lib`, and `adapter::to_matcher_worker`
+projects the service's domain model into the matcher's input shape
+(including national-identifier routing by FHIR `system` URI, address
+field renaming, and identifier-scheme dispatch).
+
+```rust,no_run
+use worker_service::matching::adapter::to_matcher_worker;
+use worker_service::matching::matcher_lib::{Confidence, MatchConfig, MatchingEngine};
+use worker_service::models::*;
+
+let dob = chrono::NaiveDate::from_ymd_opt(1970, 4, 1).unwrap();
+let name_a = HumanName {
+    use_type: None,
+    family: "Patel".into(),
+    given: vec!["Asha".into()],
+    prefix: vec![],
+    suffix: vec![],
+};
+let name_b = HumanName {
+    use_type: None,
+    family: "Patel".into(),
+    given: vec!["Ashaa".into()], // typo
+    prefix: vec![],
+    suffix: vec![],
+};
+
+let mut a = Worker::new(name_a, Gender::Female);
+a.birth_date = Some(dob);
+let mut b = Worker::new(name_b, Gender::Female);
+b.birth_date = Some(dob);
+
+let engine = MatchingEngine::new(MatchConfig::default());
+let result = engine.match_workers(&to_matcher_worker(&a), &to_matcher_worker(&b));
+
+assert!(result.is_match, "near-duplicate should classify as match");
+assert_eq!(result.confidence, Confidence::High);
+println!("score   = {:.3}", result.score);
+println!("conf    = {:?}", result.confidence);
+// `result.breakdown` carries per-field Option<f64> for an auditable trail.
+```
+
+End-to-end pinning lives in
+[`tests/duplicate_detection.rs`](tests/duplicate_detection.rs); the
+adapter source is [`src/matching/adapter.rs`](src/matching/adapter.rs).
+
+
 ### Validate and normalise
 
 ```rust

@@ -241,6 +241,39 @@ println!("deterministic={}", result.breakdown.deterministic_match);
 //                                          → true
 ```
 
+### Match via the canonical `thing-matcher` bridge
+
+Use the sibling `thing-matcher` crate as the reference algorithm. The
+service re-exports it as `matcher_lib`, and `adapter::to_matcher_thing`
+projects the service's domain model into the matcher's input shape
+(including national-identifier routing by FHIR `system` URI, address
+field renaming, and identifier-scheme dispatch).
+
+```rust,no_run
+use thing_service::matching::adapter::to_matcher_thing;
+use thing_service::matching::matcher_lib::{Confidence, MatchConfig, MatchingEngine};
+use thing_service::models::*;
+
+let mut a = Thing::new("Pride and Prejudice");
+a.identifiers = vec![ThingIdentifier::isbn("9780141439518")];
+let mut b = Thing::new("Stolz und Vorurteil"); // German translation
+b.identifiers = vec![ThingIdentifier::isbn("9780141439518")]; // same ISBN
+
+let engine = MatchingEngine::new(MatchConfig::default());
+let result = engine.match_things(&to_matcher_thing(&a), &to_matcher_thing(&b));
+
+assert!(result.is_match, "near-duplicate should classify as match");
+assert_eq!(result.confidence, Confidence::High);
+println!("score   = {:.3}", result.score);
+println!("conf    = {:?}", result.confidence);
+// `result.breakdown` carries per-field Option<f64> for an auditable trail.
+```
+
+End-to-end pinning lives in
+[`tests/duplicate_detection.rs`](tests/duplicate_detection.rs); the
+adapter source is [`src/matching/adapter.rs`](src/matching/adapter.rs).
+
+
 ### Privacy mask + GDPR export
 
 ```rust

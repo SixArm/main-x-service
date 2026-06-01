@@ -27,6 +27,33 @@ Matching API is in `src/matching/`:
 - `DeterministicMatcher` — Rule-based exact matching
 - `MatchResult` — Score + breakdown per component
 
+
+### Adapter to the canonical `worker-matcher` crate
+
+The service embeds the sibling `worker-matcher` crate and re-exports it
+from `src/matching/mod.rs` as `matcher_lib`. Pair it with
+`adapter::to_matcher_worker` to score two service records through the
+canonical algorithm:
+
+```rust
+use worker_service::matching::adapter::to_matcher_worker;
+use worker_service::matching::matcher_lib::{MatchingEngine, MatchConfig};
+
+let engine = MatchingEngine::new(MatchConfig::default());
+let result = engine.match_workers(
+    &to_matcher_worker(&a),
+    &to_matcher_worker(&b),
+);
+// result.score: f64 in [0.0, 1.0]
+// result.is_match: bool
+// result.confidence: High | Medium | Low
+// result.breakdown: per-field Option<f64>
+```
+
+Field-routing rules are documented inline in
+[`src/matching/adapter.rs`](../src/matching/adapter.rs) and pinned by
+[`tests/duplicate_detection.rs`](../tests/duplicate_detection.rs).
+
 ### Validation
 
 Validation API is in `src/validation/`:
@@ -42,6 +69,18 @@ Privacy API is in `src/privacy/`:
 - `mask_worker(&Worker) -> Worker` — Mask sensitive fields
 - `export_worker_data(&Worker) -> Value` — GDPR data export
 - `has_active_consent(&[Consent], ConsentType) -> bool` — Consent checking
+
+
+### Prometheus metrics
+
+| Method | Path             | Description                                                                  |
+| ------ | ---------------- | ---------------------------------------------------------------------------- |
+| GET    | `/metrics.prom`  | Prometheus text-exposition format (`text/plain; version=0.0.4`) for scraping |
+
+The canonical `/metrics` endpoint serves the HTML performance dashboard;
+configure your scraper with `metrics_path: /metrics.prom`. The metric
+inventory (entity-CRUD counters, HTTP request counter, latency
+histograms) is in [`src/metrics.rs`](../src/metrics.rs).
 
 ## RESTful API Endpoints
 
