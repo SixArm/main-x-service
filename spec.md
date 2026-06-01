@@ -161,8 +161,8 @@ The layout is the centerpiece. It carries:
   - `nav.navigation-menu` with the primary nav `<ul>` (Home / Plural /
     Search / Review queue / Audit / Health / Metrics / Tour /
     Settings)
-  - `.theme-picker` with `theme-select` (NHS UK / Dark / High
-    contrast)
+  - `.theme-picker` with `theme-select` (United Kingdom National Health Service England / United Kingdom National Health Service Wales /
+    Dark / High contrast)
   - `.locale-picker` with a 47-option `select` (English + 46 locales
     from `agents/share/locales.md`)
 - `main#main-content.page-wrapper` carrying `{% block content %}`
@@ -198,7 +198,7 @@ APIs. They never throw on failure: `localStorage` access is wrapped in
 A short script in `<head>` (before `<body>`) reads two
 `localStorage` keys synchronously:
 
-- `lily-theme` — if `dark` or `high-contrast`, sets
+- `lily-theme` — if `dark`, `high-contrast`, or `nhs-wales`, sets
   `<html data-theme="…">`
 - `lily-locale` — if matches `^[a-z]{2}$`, sets `<html lang="…"
   dir="ltr|rtl">` (RTL for ar / fa / ur)
@@ -271,7 +271,7 @@ When present, the overlay renders:
 
 ## CSS conventions
 
-The bundled `lily.css` (NHS UK theme) is treated as the consumer-
+The bundled `lily.css` (United Kingdom National Health Service England theme) is treated as the consumer-
 supplied skin for the Lily HTML Headless contracts. Custom CSS added
 during this work, beyond the base NHS theme:
 
@@ -316,7 +316,7 @@ during this work, beyond the base NHS theme:
 
 | Key | Format | Set by | Read by |
 |---|---|---|---|
-| `lily-theme` | `"dark"` \| `"high-contrast"` (absent = NHS UK) | theme picker | head FOUC bootstrap, theme bridge |
+| `lily-theme` | `"dark"` \| `"high-contrast"` \| `"nhs-wales"` (absent = United Kingdom National Health Service England) | theme picker | head FOUC bootstrap, theme bridge |
 | `lily-locale` | `[a-z]{2}` ISO 639-1 (absent = `en`) | locale picker | head FOUC bootstrap, locale bridge |
 | `lily-settings` | JSON | `/settings` Alpine | settings page |
 | `lily-tour-steps` | JSON array of step keys | `/tour` Alpine | tour page |

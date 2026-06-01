@@ -97,7 +97,7 @@ Every crate ships a server-rendered UI on top of its REST API. See [agents/share
 - Tera templates
 - HTMX for server-driven AJAX
 - Alpine.js for light client-side state
-- Lily Design System (HTML Headless) for accessible component structure; NHS UK theme bundled as `lily.css` provides the visual layer
+- Lily Design System (HTML Headless) for accessible component structure; United Kingdom National Health Service England theme bundled as `lily.css` provides the visual layer
 
 Run with: `cargo run --bin web` (binds `0.0.0.0:5150`).
 

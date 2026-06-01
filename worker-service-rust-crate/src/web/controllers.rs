@@ -164,7 +164,7 @@ fn default_metrics_range() -> String {
 
 /// `GET /palette` — full NHS-token color customizer.
 ///
-/// Scaffold: lists every NHS UK design-token grouped by category
+/// Scaffold: lists every United Kingdom National Health Service England design-token grouped by category
 /// (Blues / Neutrals / Greens / Highlights / Focus). For each token,
 /// renders a swatch `color-picker` (radio group) plus a custom-hex
 /// `color-input` and a Clear button. Overrides are stored in

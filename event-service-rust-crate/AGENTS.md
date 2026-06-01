@@ -71,7 +71,7 @@ cargo bench
 | `GET /` | Home page (full HTML) |
 | `GET /events` | Entity index (full HTML) |
 | `GET /events/search/partial?q=…` | HTMX fragment for live search |
-| `GET /static/css/lily.css` | NHS UK theme that styles the Lily HTML Headless components |
+| `GET /static/css/lily.css` | United Kingdom National Health Service England theme that styles the Lily HTML Headless components |
 | `GET /static/js/htmx.min.js` | HTMX 2.0.4 |
 | `GET /static/js/alpine.min.js` | Alpine 3.14.8 |
 

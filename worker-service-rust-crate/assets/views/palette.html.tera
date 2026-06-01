@@ -57,7 +57,7 @@
 
   <div class="information-callout" aria-label="Palette explainer">
     <p>
-      Customize any NHS UK design token. Overrides are stored in
+      Customize any United Kingdom National Health Service England design token. Overrides are stored in
       <code>localStorage["lily-palette"]</code> as a flat
       <code>{ "nhs-blue": "#0000ee", &hellip; }</code> map and applied as
       CSS custom properties on <code>&lt;html&gt;</code>. The live preview
@@ -82,7 +82,7 @@
       <h3>Tokens</h3>
       <p>
         <span class="hint" aria-label="Token group hint">
-          Grouped by NHS UK design-token category. Each row has a swatch
+          Grouped by United Kingdom National Health Service England design-token category. Each row has a swatch
           group plus a custom-hex picker.
         </span>
       </p>

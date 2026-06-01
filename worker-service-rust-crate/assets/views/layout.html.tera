@@ -17,7 +17,7 @@
       var rtl = { ar: 1, fa: 1, ur: 1 };
       try {
         var t = localStorage.getItem('lily-theme');
-        if (t === 'dark' || t === 'high-contrast') {
+        if (t === 'dark' || t === 'high-contrast' || t === 'nhs-wales') {
           document.documentElement.setAttribute('data-theme', t);
         }
         var loc = localStorage.getItem('lily-locale');
@@ -76,28 +76,102 @@
 
   <header class="header" aria-label="Site header">
     <h1>{{ app_display }}</h1>
-    <nav class="navigation-menu" aria-label="Primary navigation">
-      <ul>
-        <li><a href="/">Home</a></li>
-        <li><a href="/{{ entity_plural }}">{{ entity_plural | capitalize }}</a></li>
-        <li><a href="/{{ entity_plural }}/search">Search</a></li>
-        <li><a href="/{{ entity_plural }}/review-queue">Review queue</a></li>
-        <li><a href="/audit">Audit</a></li>
-        <li><a href="/notifications" aria-label="Notification center">Notifications</a></li>
-        <li><a href="/health">Health</a></li>
-        <li><a href="/metrics">Metrics</a></li>
-        <li><a href="/tour">Tour</a></li>
-        <li><a href="/docs">API docs</a></li>
-        <li><a href="/settings">Settings</a></li>
-      </ul>
-    </nav>
+    <div class="dropdown-menu"
+         aria-label="Primary navigation menu"
+         x-data='{
+           open: false,
+           activeIdx: 0,
+           toggle() {
+             this.open = !this.open;
+             this.activeIdx = 0;
+             if (this.open) this.$nextTick(() => this.focusItem(0));
+           },
+           close() { this.open = false; },
+           focusItem(idx) {
+             var items = this.$root.querySelectorAll("[role=menuitem]");
+             if (items.length === 0) return;
+             this.activeIdx = (idx + items.length) % items.length;
+             items[this.activeIdx].focus();
+           },
+           onKey(evt) {
+             if (evt.key === "ArrowDown") { evt.preventDefault(); this.focusItem(this.activeIdx + 1); }
+             else if (evt.key === "ArrowUp") { evt.preventDefault(); this.focusItem(this.activeIdx - 1); }
+             else if (evt.key === "Home") { evt.preventDefault(); this.focusItem(0); }
+             else if (evt.key === "End") {
+               evt.preventDefault();
+               var items = this.$root.querySelectorAll("[role=menuitem]");
+               this.focusItem(items.length - 1);
+             }
+             else if (evt.key === "Escape") { this.close(); this.$refs.menuTrigger.focus(); }
+           }
+         }'
+         @click.outside="close()">
+      <button class="hamburger-menu"
+              type="button"
+              aria-label="Open primary navigation menu"
+              aria-haspopup="menu"
+              aria-controls="primary-nav-dropdown"
+              x-ref="menuTrigger"
+              x-bind:aria-expanded="open ? 'true' : 'false'"
+              @click="toggle()"
+              @keydown.arrow-down.prevent="if (!open) { toggle(); } else { focusItem(0); }">
+        <span aria-hidden="true">&#9776;</span>
+        <span>Menu</span>
+      </button>
+      <nav class="navigation-menu"
+           aria-label="Primary navigation"
+           x-show="open"
+           x-transition
+           x-bind:aria-hidden="open ? 'false' : 'true'">
+        <ol class="dropdown-menu-list"
+            id="primary-nav-dropdown"
+            role="menu"
+            aria-label="Primary navigation links"
+            @keydown="onKey($event)">
+          <li class="dropdown-menu-list-item" role="none">
+            <a class="dropdown-menu-item" role="menuitem" tabindex="-1" href="/" @click="close()">Home</a>
+          </li>
+          <li class="dropdown-menu-list-item" role="none">
+            <a class="dropdown-menu-item" role="menuitem" tabindex="-1" href="/{{ entity_plural }}" @click="close()">{{ entity_plural | capitalize }}</a>
+          </li>
+          <li class="dropdown-menu-list-item" role="none">
+            <a class="dropdown-menu-item" role="menuitem" tabindex="-1" href="/{{ entity_plural }}/search" @click="close()">Search</a>
+          </li>
+          <li class="dropdown-menu-list-item" role="none">
+            <a class="dropdown-menu-item" role="menuitem" tabindex="-1" href="/{{ entity_plural }}/review-queue" @click="close()">Review queue</a>
+          </li>
+          <li class="dropdown-menu-list-item" role="none">
+            <a class="dropdown-menu-item" role="menuitem" tabindex="-1" href="/audit" @click="close()">Audit</a>
+          </li>
+          <li class="dropdown-menu-list-item" role="none">
+            <a class="dropdown-menu-item" role="menuitem" tabindex="-1" href="/notifications" aria-description="Notification center" @click="close()">Notifications</a>
+          </li>
+          <li class="dropdown-menu-list-item" role="none">
+            <a class="dropdown-menu-item" role="menuitem" tabindex="-1" href="/health" @click="close()">Health</a>
+          </li>
+          <li class="dropdown-menu-list-item" role="none">
+            <a class="dropdown-menu-item" role="menuitem" tabindex="-1" href="/metrics" @click="close()">Metrics</a>
+          </li>
+          <li class="dropdown-menu-list-item" role="none">
+            <a class="dropdown-menu-item" role="menuitem" tabindex="-1" href="/tour" @click="close()">Tour</a>
+          </li>
+          <li class="dropdown-menu-list-item" role="none">
+            <a class="dropdown-menu-item" role="menuitem" tabindex="-1" href="/docs" @click="close()">API docs</a>
+          </li>
+          <li class="dropdown-menu-list-item" role="none">
+            <a class="dropdown-menu-item" role="menuitem" tabindex="-1" href="/settings" @click="close()">Settings</a>
+          </li>
+        </ol>
+      </nav>
+    </div>
 
     <div class="theme-picker" aria-label="Theme picker">
       <label class="label" for="theme-select">Theme</label>
       <select id="theme-select"
               class="theme-select"
               aria-label="Choose a visual theme">
-        <option class="theme-select-option" value="">NHS UK (default)</option>
+        <option class="theme-select-option" value="">United Kingdom National Health Service England (default)</option>
+        <option class="theme-select-option" value="nhs-wales">United Kingdom National Health Service Wales (GIG Cymru)</option>
         <option class="theme-select-option" value="dark">Dark</option>
         <option class="theme-select-option" value="high-contrast">High contrast</option>
       </select>
@@ -197,7 +271,8 @@
               { label: "Color palette",         hint: "Full NHS token customizer",                   href: "/palette" },
               { label: "Settings",              hint: "Per-browser preferences",                     href: "/settings" },
               { label: "Show keyboard shortcuts", hint: "Open the shortcuts dialog",  kb: ["?"],     action: "shortcuts" },
-              { label: "Switch theme: NHS UK (default)", hint: "Light theme",                        action: "theme:" },
+              { label: "Switch theme: United Kingdom National Health Service England (default)", hint: "Light theme",                        action: "theme:" },
+              { label: "Switch theme: United Kingdom National Health Service Wales (GIG Cymru)", hint: "Pantone 534 navy + Pantone 465 gold", action: "theme:nhs-wales" },
               { label: "Switch theme: Dark",    hint: "Inverted neutrals",                            action: "theme:dark" },
               { label: "Switch theme: High contrast", hint: "Pure black on white",                   action: "theme:high-contrast" },
               { label: "Reset palette",         hint: "Clear all token overrides",                   action: "palette:reset" }
@@ -589,7 +664,7 @@
       picker.value = current;
       picker.addEventListener('change', function () {
         var t = picker.value;
-        if (t === 'dark' || t === 'high-contrast') {
+        if (t === 'dark' || t === 'high-contrast' || t === 'nhs-wales') {
           document.documentElement.setAttribute('data-theme', t);
           try { localStorage.setItem('lily-theme', t); } catch (e) { /* ignore */ }
         } else {

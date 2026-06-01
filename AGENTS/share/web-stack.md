@@ -1,6 +1,6 @@
 # Web stack: Loco, Tera, HTMX, Alpine, Lily (HTML Headless)
 
-Each Main X Index crate ships a server-rendered web UI on top of the existing Axum REST API. The stack favors progressive enhancement: the server returns HTML, HTMX swaps fragments on user interaction, Alpine adds small client-side state, and the Lily Design System (HTML Headless) provides accessible component structure and ARIA semantics. Visual styling is supplied by the consumer (currently the NHS UK theme bundled as `lily.css`).
+Each Main X Index crate ships a server-rendered web UI on top of the existing Axum REST API. The stack favors progressive enhancement: the server returns HTML, HTMX swaps fragments on user interaction, Alpine adds small client-side state, and the Lily Design System (HTML Headless) provides accessible component structure and ARIA semantics. Visual styling is supplied by the consumer (currently the United Kingdom National Health Service England theme bundled as `lily.css`).
 
 ## Components
 
@@ -13,7 +13,7 @@ Each Main X Index crate ships a server-rendered web UI on top of the existing Ax
 | Server-driven AJAX | [HTMX](https://htmx.org) | 2.0.4 | `assets/static/js/htmx.min.js` |
 | Client-side reactivity | [Alpine.js](https://alpinejs.dev) | 3.14.8 | `assets/static/js/alpine.min.js` |
 | Component contracts | [Lily Design System — HTML Headless](https://lilydesignsystem.github.io) | 414 components | reference: `~/git/lilydesignsystem/lily-design-system/lily-design-system-html-headless/components/` |
-| Visual styling | NHS UK theme (consumer-supplied for headless components) | bundled | `assets/static/css/lily.css` |
+| Visual styling | United Kingdom National Health Service England theme (consumer-supplied for headless components) | bundled | `assets/static/css/lily.css` |
 
 The Tera templates render the headless component contracts: each interactive element uses the canonical class name, ARIA role, and `aria-label` from the headless component spec. The bundled `lily.css` is the consumer-supplied skin; it can be swapped for any theme that styles the same class names without touching the templates.
 
@@ -305,7 +305,7 @@ When present, the overlay renders:
 - **Progressive enhancement.** Pages render fully on first GET; HTMX adds interactivity, Alpine adds local state.
 - **Co-located with the Rust crate.** Templates and assets sit beside the Rust source, version-controlled together.
 - **Loco-compatible.** The directory layout and YAML configs follow Loco conventions so a future `cargo loco …` workflow drops in.
-- **Headless contracts, swappable theme.** Templates encode only Lily HTML Headless contracts (semantics + ARIA + class names). The visual layer (`lily.css`, currently NHS UK) can be replaced without touching templates.
+- **Headless contracts, swappable theme.** Templates encode only Lily HTML Headless contracts (semantics + ARIA + class names). The visual layer (`lily.css`, currently United Kingdom National Health Service England) can be replaced without touching templates.
 
 ## Smoke-testing locally
 

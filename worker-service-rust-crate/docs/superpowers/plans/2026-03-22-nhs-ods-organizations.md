@@ -164,7 +164,7 @@ Create `src/models/ods.rs`:
 //! NHS ODS (Organisation Data Service) domain types
 //!
 //! Models for organization roles, relationships, succession,
-//! and ODS-specific reference data aligned with the NHS England
+//! and ODS-specific reference data aligned with the United Kingdom National Health Service England
 //! Organisation Data Terminology FHIR API.
 
 use chrono::NaiveDate;
@@ -414,10 +414,10 @@ pub struct PostcodeGeography {
     /// Integrated Care Board name
     pub icb_name: Option<String>,
 
-    /// NHS England Region code
+    /// United Kingdom National Health Service England Region code
     pub nhs_england_region: Option<String>,
 
-    /// NHS England Region name
+    /// United Kingdom National Health Service England Region name
     pub nhs_england_region_name: Option<String>,
 
     /// Parliamentary Constituency code
@@ -544,7 +544,7 @@ Create `src/models/codesystem.rs`:
 //!
 //! Reference data for NHS ODS CodeSystems including organisation roles,
 //! relationships, record classes, practitioner roles, and geographic names.
-//! These are aligned with the NHS England Organisation Data Terminology FHIR API.
+//! These are aligned with the United Kingdom National Health Service England Organisation Data Terminology FHIR API.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

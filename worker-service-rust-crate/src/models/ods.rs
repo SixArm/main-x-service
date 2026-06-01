@@ -1,7 +1,7 @@
 //! NHS ODS (Organisation Data Service) domain types
 //!
 //! Models for organization roles, relationships, succession,
-//! and ODS-specific reference data aligned with the NHS England
+//! and ODS-specific reference data aligned with the United Kingdom National Health Service England
 //! Organisation Data Terminology FHIR API.
 
 use chrono::NaiveDate;

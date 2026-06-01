@@ -112,7 +112,7 @@
     <li class="summary-list-item">
       <dl>
         <dt>Theme</dt>
-        <dd>Switch between NHS UK / Dark / High contrast via the picker in the header.</dd>
+        <dd>Switch between United Kingdom National Health Service England / United Kingdom National Health Service Wales / Dark / High contrast via the picker in the header.</dd>
       </dl>
     </li>
   </ol>

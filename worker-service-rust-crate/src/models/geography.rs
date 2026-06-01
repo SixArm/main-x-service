@@ -32,10 +32,10 @@ pub struct PostcodeGeography {
     /// Integrated Care Board name
     pub icb_name: Option<String>,
 
-    /// NHS England Region code
+    /// United Kingdom National Health Service England Region code
     pub nhs_england_region: Option<String>,
 
-    /// NHS England Region name
+    /// United Kingdom National Health Service England Region name
     pub nhs_england_region_name: Option<String>,
 
     /// Parliamentary Constituency code

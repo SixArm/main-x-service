@@ -2,7 +2,7 @@
 //!
 //! Reference data for NHS ODS CodeSystems including organisation roles,
 //! relationships, record classes, practitioner roles, and geographic names.
-//! These are aligned with the NHS England Organisation Data Terminology FHIR API.
+//! These are aligned with the United Kingdom National Health Service England Organisation Data Terminology FHIR API.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

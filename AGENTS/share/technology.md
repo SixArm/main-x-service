@@ -16,7 +16,7 @@ This is the short summary. The full inventory (with feature flags and rationale)
 - **HTMX** 2.0 — server-driven AJAX
 - **Alpine.js** 3.14 — light client-side reactivity
 - **Lily Design System — HTML Headless** — accessible component contracts (ARIA + semantic HTML + class names; no CSS)
-- **NHS UK theme** (`lily.css`) — consumer-supplied visual layer that styles the Lily class names
+- **United Kingdom National Health Service England theme** (`lily.css`) — consumer-supplied visual layer that styles the Lily class names
 - **tower-http** 0.6 — CORS, compression, tracing, `ServeDir` (`fs` feature)
 
 ## Data

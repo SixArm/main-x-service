@@ -1,4 +1,4 @@
-/* NHS UK Design System — CSS Design Tokens & Component Styles */
+/* United Kingdom National Health Service England Design System — CSS Design Tokens & Component Styles */
 
 /* ============================================================
    Design Tokens
@@ -2494,6 +2494,25 @@ article[class*="card"] {
 :root[data-theme="high-contrast"] .alert,
 :root[data-theme="high-contrast"] .information-callout {
   border: 2px solid var(--nhs-black);
+}
+
+/* United Kingdom National Health Service Wales (GIG Cymru): darker navy primary + Celtic-knot gold accent.
+   Source: United Kingdom National Health Service Wales Logo Guidelines, July 2022, Version 2.
+   - Pantone 534 → #325A8A (primary)
+   - Pantone 465 → #CFAB7A (gold ring around the Celtic knot)
+   - Black:      #231F20 (warm off-black, same as United Kingdom National Health Service England)
+   - Frutiger primary, Verdana / Arial fallback. */
+:root[data-theme="nhs-wales"] {
+  --nhs-dark-blue: #1f3d61;
+  --nhs-blue: #325a8a;
+  --nhs-bright-blue: #4474a8;
+  --nhs-light-blue: #6f8db0;
+  --nhs-aqua-blue: #4d8baa;
+  --nhs-warm-yellow: #cfab7a;
+  --nhs-orange: #cfab7a;
+  --nhs-focus-color: #cfab7a;
+  --nhs-focus-text-color: #231f20;
+  --nhs-font-family: "Frutiger W01", Frutiger, Verdana, Arial, sans-serif;
 }
 
 /* theme-select: the dropdown lives in the header; keep it compact */

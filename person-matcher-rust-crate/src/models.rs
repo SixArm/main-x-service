@@ -657,7 +657,7 @@ pub struct Person {
     pub se_personnummer: Option<String>,
 
     /// United Kingdom (Scotland) CHI Number (Community Health Index) —
-    /// 10-digit identifier used by NHS Scotland. Shares the Mod-11
+    /// 10-digit identifier used by United Kingdom National Health Service Scotland. Shares the Mod-11
     /// algorithm of the United Kingdom National Health Service Number but is
     /// scheme-local. Parsed via [`crate::identifiers::parse_uk_chi_number`].
     #[serde(default)]
@@ -1301,7 +1301,7 @@ impl PersonBuilder {
 
     /// Set the United Kingdom (Scotland) CHI Number (Community Health Index).
     ///
-    /// 10-digit identifier issued by NHS Scotland, sharing the Mod-11
+    /// 10-digit identifier issued by United Kingdom National Health Service Scotland, sharing the Mod-11
     /// algorithm of the United Kingdom National Health Service Number but
     /// scheme-local. Stored verbatim;
     /// parsing happens at match time via
