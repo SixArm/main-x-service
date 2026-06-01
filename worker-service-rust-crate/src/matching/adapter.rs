@@ -221,7 +221,7 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
         return b.mx_curp(val);
     }
     if sys.contains("personnummer") {
-        return b.se_personnummer(val);
+        return b.se_workernummer(val);
     }
     if sys.contains("kvnr") {
         return b.de_kvnr(val);
