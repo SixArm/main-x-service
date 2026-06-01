@@ -162,7 +162,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Slovenia EMŠO** (`si_emso`) — 13 digits, weighted Mod-11.
   - **Slovakia *Rodné číslo*** (`sk_rc`) — 9 or 10 digits, Mod-11 divisibility.
   - **UK NINO** (`uk_nino`) — format `AA999999A` with admin-prefix blacklist.
-- Each scheme adds a `Person` field, builder setter, `MatchConfig` weight (default 0.30), `MatchBreakdown` score (with `#[serde(default)]`), and a deterministic-match branch. All are scheme-local — the three UK Mod-11 schemes (NHS, NI H&C, Scotland CHI) and the format-only UK NINO never cross-match.
+- Each scheme adds a `Person` field, builder setter, `MatchConfig` weight (default 0.30), `MatchBreakdown` score (with `#[serde(default)]`), and a deterministic-match branch. All are scheme-local — the three UK Mod-11 schemes (United Kingdom National Health Service Number, NI H&C, Scotland CHI) and the format-only UK NINO never cross-match.
 
 ### API surface (eighteen new schemes)
 - `Person`, `PersonBuilder`, `MatchConfig`, and `MatchBreakdown` each gain 18 new fields. Code constructing `MatchConfig { … }` via struct-literal syntax MUST add the 18 new `*_weight` fields (use `..MatchConfig::default()` to absorb them automatically).
@@ -224,8 +224,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Italy *Codice Fiscale*** — 16-character alphanumeric tax identifier with Mod-26 check via odd/even position tables. Parser: `parse_it_cf`. Builder: `it_cf`. `MatchBreakdown::it_cf_score`.
   - **Netherlands BSN** — 9-digit *Burgerservicenummer* with the 11-test (`9d₁ + 8d₂ + … + 2d₈ − d₉ ≡ 0 mod 11`); rejects all-zero. Parser: `parse_nl_bsn`. Builder: `nl_bsn`. `MatchBreakdown::nl_bsn_score`.
   - **Sweden *Personnummer*** — 10- or 12-digit personal identity number with Luhn check; accepts `-` / `+` separators; canonicalises preserving input length. Parser: `parse_se_personnummer`. Builder: `se_personnummer`. `MatchBreakdown::se_personnummer_score`.
-  - **UK Scotland CHI Number** — 10-digit Community Health Index Number with Mod-11 check (same algorithm as NHS Number); scheme-local. Parser: `parse_uk_chi_number`. Builder: `uk_chi_number`. `MatchBreakdown::uk_chi_number_score`.
-- Each scheme is **scheme-local**: no two schemes ever cross-match, even when the underlying digits coincide. This is enforced for AU IHI vs IE IHI (different lengths), and for the three UK Mod-11 schemes (NHS Number, NI H&C Number, Scotland CHI Number) which share an algorithm but distinct `Person` fields.
+  - **UK Scotland CHI Number** — 10-digit Community Health Index Number with Mod-11 check (same algorithm as United Kingdom National Health Service Number); scheme-local. Parser: `parse_uk_chi_number`. Builder: `uk_chi_number`. `MatchBreakdown::uk_chi_number_score`.
+- Each scheme is **scheme-local**: no two schemes ever cross-match, even when the underlying digits coincide. This is enforced for AU IHI vs IE IHI (different lengths), and for the three UK Mod-11 schemes (United Kingdom National Health Service Number, NI H&C Number, Scotland CHI Number) which share an algorithm but distinct `Person` fields.
 
 ### API surface (six new schemes)
 - `Person`, `PersonBuilder`, `MatchConfig`, and `MatchBreakdown` each gain six new fields. Code constructing any of them via struct-literal syntax MUST add the fields (use `..MatchConfig::default()` to absorb the new weights automatically; the breakdown is built only by the engine so no consumer construction is expected).
@@ -241,7 +241,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Dependencies
 - Upgraded `thiserror` from `1.0` to `2.0` (no public-API impact; `MatchingError` still derives `thiserror::Error`).
-- Upgraded `nhs-number` from `0.3.0` to `1.0` (no public-API impact; `parse_uk_nhs_number` and `parse_uk_hc_number` continue to delegate to `NHSNumber::from_str` and read the `[i8; 10]` `digits` field).
+- Upgraded `united-kingdom-national-health-service-number` (aliased upstream `nhs-number`) from `0.3.0` to `1.0` (no public-API impact; `parse_united_kingdom_national_health_service_number` and `parse_uk_hc_number` continue to delegate to `NHSNumber::from_str` and read the `[i8; 10]` `digits` field).
 - `cargo audit` reports zero vulnerabilities across the 85-crate dependency closure.
 
 ### Manifest
@@ -326,11 +326,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Phonetic name matching (Soundex)
 - Text normalization utilities:
   - Name normalization (diacritics, punctuation, case)
-  - NHS number normalization
+  - United Kingdom National Health Service Number normalization
   - Postcode normalization (whitespace strip + uppercase)
   - Phone number normalization (international prefix `0044`, dialling code `44`, trunk `0`)
 - Address comparison with postcode, city, and street matching
-- Support for NHS-format check-digit identifiers
+- Support for United Kingdom National Health Service Number-format check-digit identifiers
 - Diacritic handling via NFKD decomposition (Siân → Sian, José → Jose)
 - Three matching configurations: Default, Strict, Lenient
 - Comprehensive test suite (31 tests total):
@@ -351,7 +351,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fast in-memory matching
 - Configurable weights and thresholds
 - Unicode diacritic handling via NFKD decomposition
-- NHS-format check-digit identifier handling
+- United Kingdom National Health Service Number-format check-digit identifier handling
 - Detailed matching breakdowns for transparency
 - Full test coverage
 

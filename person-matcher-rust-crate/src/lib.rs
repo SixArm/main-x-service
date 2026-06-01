@@ -21,7 +21,7 @@
 //! | Module | Purpose |
 //! |---|---|
 //! | [`models`]       | Data structures: [`Person`], [`PersonBuilder`], [`Address`], [`Gender`]. |
-//! | [`identifiers`]  | National healthcare identifier parsers — UK NHS, FR NIR, ES TSI, IE IHI, UK H&C. |
+//! | [`identifiers`]  | National healthcare identifier parsers — UK United Kingdom National Health Service Number, FR NIR, ES TSI, IE IHI, UK H&C. |
 //! | [`normalizer`]   | Text normalisation: names, postcodes, phone numbers, phonetic codes. |
 //! | [`scorer`]       | String-similarity primitives: Jaro-Winkler, Levenshtein, exact, combined. |
 //! | [`matcher`]      | Orchestration: [`MatchingEngine`], [`MatchConfig`], [`MatchResult`]. |
@@ -62,13 +62,13 @@
 //! ```
 //! use person_matcher::{MatchingEngine, Person};
 //!
-//! // NHS-format numbers in two textual layouts.
-//! let a = Person::builder().uk_nhs_number("943 476 5919").build();
-//! let b = Person::builder().uk_nhs_number("9434765919").build();
+//! // United Kingdom National Health Service Numbers in two textual layouts.
+//! let a = Person::builder().united_kingdom_national_health_service_number("943 476 5919").build();
+//! let b = Person::builder().united_kingdom_national_health_service_number("9434765919").build();
 //!
 //! let engine = MatchingEngine::default_config();
 //! assert!(engine.deterministic_match(&a, &b),
-//!     "same NHS number with different formatting must match deterministically");
+//!     "same United Kingdom National Health Service Number with different formatting must match deterministically");
 //! ```
 //!
 //! ## Inspecting the per-field breakdown
@@ -93,8 +93,9 @@
 //! assert_eq!(result.breakdown.date_of_birth_score, Some(1.0));
 //! assert!(result.breakdown.given_name_score.unwrap() > 0.99);
 //! assert!(result.breakdown.family_name_score.unwrap() > 0.99);
-//! // NHS number was missing on both — score is `None`, not `0.0`.
-//! assert_eq!(result.breakdown.uk_nhs_number_score, None);
+//! // United Kingdom National Health Service Number was missing on both —
+//! // score is `None`, not `0.0`.
+//! assert_eq!(result.breakdown.united_kingdom_national_health_service_number_score, None);
 //! ```
 //!
 //! ## Configuration presets

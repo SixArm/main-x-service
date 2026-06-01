@@ -10,8 +10,8 @@ This is a clinical-adjacent library. Treat every line of code as if a person's c
 4. **No PII in fixtures, examples, doctests, or comments.** Use the synthetic names in `examples/` and `tests/`. National identifiers must round-trip through their parsers as illustrative-only values (see `AGENTS/testing.md` Fixtures section).
 5. **No logging.** Not even at debug level. If a downstream service wants to log, that is their decision and their threat model.
 6. **No panics on user data.** Use `Option`/`Result`. If you must panic, panic on programmer error (an invariant violation), not data error.
-7. **No unwrapping of national identifiers.** A malformed UK NHS Number, France NIR, España TSI, Éire IHI, UK NI H&C Number, or US SSN is normal user input, not a bug. Parsers return `Option<String>`; honour that contract.
-8. **Identifiers are scheme-local.** An NHS Number and an H&C Number that happen to share the same 10 digits refer to different persons in different registries. Do not cross-match them — the matcher's `deterministic_match` and per-scheme `MatchBreakdown` fields encode this; do not regress it.
+7. **No unwrapping of national identifiers.** A malformed UK United Kingdom National Health Service Number, France NIR, España TSI, Éire IHI, UK NI H&C Number, or US SSN is normal user input, not a bug. Parsers return `Option<String>`; honour that contract.
+8. **Identifiers are scheme-local.** A United Kingdom National Health Service Number and an H&C Number that happen to share the same 10 digits refer to different persons in different registries. Do not cross-match them — the matcher's `deterministic_match` and per-scheme `MatchBreakdown` fields encode this; do not regress it.
 
 ## Threat Model (Brief)
 

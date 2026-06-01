@@ -27,7 +27,7 @@
 
 - Library code returns `crate::Result<T>` (alias for `Result<T, MatchingError>`).
 - New error variants go in `src/error.rs`. Update [`../spec.md`](../spec.md) §15 in the same change.
-- Do not `unwrap()` `NHSNumber::from_str`. If parsing fails, return `None` from a scorer — never a 0.0 score with a discarded error.
+- Do not `unwrap()` `UnitedKingdomNationalHealthServiceNumber::from_str` (the local alias for the upstream `NHSNumber` type). If parsing fails, return `None` from a scorer — never a 0.0 score with a discarded error.
 
 ## Doc Comments
 
@@ -60,7 +60,7 @@ See [`testing.md`](./testing.md).
 ## Generics
 
 - Avoid generics unless they earn their keep. The crate is not a framework; small concrete types are easier to reason about for clinical-adjacent code.
-- Where generics are warranted (`PersonBuilder::uk_nhs_number<S: Into<String>>(...)`, `NicknameTable::with_class<I, S>(...)`), keep the bound minimal and document the intent.
+- Where generics are warranted (`PersonBuilder::united_kingdom_national_health_service_number<S: Into<String>>(...)`, `NicknameTable::with_class<I, S>(...)`), keep the bound minimal and document the intent.
 
 ## Dependencies
 

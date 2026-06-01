@@ -19,13 +19,13 @@ The list in [`../spec.md`](../spec.md) §18.2 is the spec — each scenario MUST
 
 ## Naming Conventions
 
-- `test_<thing>_<expected>` — e.g. `test_fuzzy_name_match`, `test_nhs_number_mismatch`.
+- `test_<thing>_<expected>` — e.g. `test_fuzzy_name_match`, `test_united_kingdom_national_health_service_number_mismatch`.
 - Use plain English in `assert!` messages when the assertion is non-obvious: `assert!(result.is_match, "expected fuzzy name to match");`.
 
 ## Fixtures
 
 - Synthetic data only. Reuse the existing illustrative fixtures rather than inventing new ones; they are deliberately uncommon to avoid accidentally resembling real records.
-- Do **not** use real-looking NHS numbers in tests beyond the existing illustrative `1234567890`-style synthetics. If you need a deterministic NHS-number-valid value, check it against `NHSNumber::from_str`.
+- Do **not** use real-looking United Kingdom National Health Service Numbers in tests beyond the existing illustrative `1234567890`-style synthetics. If you need a deterministic United Kingdom National Health Service Number-valid value, check it against `NHSNumber::from_str` (the upstream type from the `united-kingdom-national-health-service-number` crate, aliased locally as `UnitedKingdomNationalHealthServiceNumber`).
 - Postcodes: reuse the existing illustrative alphanumeric postcode fixtures (e.g. `CF10 1AA`). Do not use a postcode tied to a real address.
 - Phone numbers: reuse the existing illustrative ranges (e.g. `07700 900xxx`, which is a drama-reserved range that is not allocated to a real subscriber). For non-UK examples, prefer fictitious area codes (`+33 1 23 45 67 89`, `(415) 555-1234`).
 - Email addresses: use `example.org`, `example.com`, or `example.net` (RFC 2606 reserved); for Gmail-specific dot-folding cases the `@gmail.com` domain is acceptable with synthetic localparts (`jsmith`, `j.smith`).
@@ -71,5 +71,5 @@ The list in [`../spec.md`](../spec.md) §18.2 is the spec — each scenario MUST
 
 ## Negative Tests
 
-- Always include at least one negative case: a clear non-match, a missing-field person, an unparseable NHS number.
+- Always include at least one negative case: a clear non-match, a missing-field person, an unparseable United Kingdom National Health Service Number.
 - Negative tests guard against the "accidentally matches everything" failure mode that probabilistic systems are prone to.

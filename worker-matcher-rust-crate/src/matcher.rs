@@ -75,7 +75,7 @@ use serde::{Deserialize, Serialize};
 ///     de_kvnr_weight: 0.30,
 ///     it_cf_weight: 0.30,
 ///     nl_bsn_weight: 0.30,
-///     se_workernummer_weight: 0.30,
+///     se_personnummer_weight: 0.30,
 ///     uk_chi_number_weight: 0.30,
 ///     be_nn_weight: 0.30,
 ///     bg_egn_weight: 0.30,
@@ -165,8 +165,8 @@ pub struct MatchConfig {
     /// Weight for Netherlands BSN match (only contributes if both parse).
     pub nl_bsn_weight: f64,
 
-    /// Weight for Sweden *Workernummer* match (only contributes if both parse).
-    pub se_workernummer_weight: f64,
+    /// Weight for Sweden *Personnummer* match (only contributes if both parse).
+    pub se_personnummer_weight: f64,
 
     /// Weight for United Kingdom (Scotland) CHI Number match (only contributes if both parse).
     pub uk_chi_number_weight: f64,
@@ -191,7 +191,7 @@ pub struct MatchConfig {
     pub is_kt_weight: f64,
     /// Weight for Lithuania *Asmens kodas* match (only contributes if both parse).
     pub lt_ak_weight: f64,
-    /// Weight for Latvia *Workeras kods* match (only contributes if both parse).
+    /// Weight for Latvia *Personas kods* match (only contributes if both parse).
     pub lv_pk_weight: f64,
     /// Weight for Malta National ID match (only contributes if both parse).
     pub mt_id_weight: f64,
@@ -366,7 +366,7 @@ impl Default for MatchConfig {
             de_kvnr_weight: 0.30,
             it_cf_weight: 0.30,
             nl_bsn_weight: 0.30,
-            se_workernummer_weight: 0.30,
+            se_personnummer_weight: 0.30,
             uk_chi_number_weight: 0.30,
             be_nn_weight: 0.30,
             bg_egn_weight: 0.30,
@@ -622,9 +622,9 @@ pub struct MatchBreakdown {
     /// Score for Netherlands BSN equality (`1.0` or `0.0`), or `None` if either side did not parse.
     #[serde(default)]
     pub nl_bsn_score: Option<f64>,
-    /// Score for Sweden *Workernummer* equality (`1.0` or `0.0`), or `None` if either side did not parse.
+    /// Score for Sweden *Personnummer* equality (`1.0` or `0.0`), or `None` if either side did not parse.
     #[serde(default)]
-    pub se_workernummer_score: Option<f64>,
+    pub se_personnummer_score: Option<f64>,
     /// Score for United Kingdom (Scotland) CHI Number equality (`1.0` or `0.0`), or `None` if either side did not parse.
     #[serde(default)]
     pub uk_chi_number_score: Option<f64>,
@@ -658,7 +658,7 @@ pub struct MatchBreakdown {
     /// Score for Lithuania *Asmens kodas* equality (`1.0` or `0.0`), or `None`.
     #[serde(default)]
     pub lt_ak_score: Option<f64>,
-    /// Score for Latvia *Workeras kods* equality (`1.0` or `0.0`), or `None`.
+    /// Score for Latvia *Personas kods* equality (`1.0` or `0.0`), or `None`.
     #[serde(default)]
     pub lv_pk_score: Option<f64>,
     /// Score for Malta National ID equality (`1.0` or `0.0`), or `None`.
@@ -971,7 +971,7 @@ impl MatchingEngine {
     /// - Both Germany KVNRs parse and are equal.
     /// - Both Italy *Codice Fiscale* values parse and are equal.
     /// - Both Netherlands BSNs parse and are equal.
-    /// - Both Sweden *Workernummer* values parse and are equal.
+    /// - Both Sweden *Personnummer* values parse and are equal.
     /// - Both UK Scotland CHI Numbers parse and are equal.
     /// - The workers share at least one `(country, number)` passport-book
     ///   pair after canonicalisation (see [`crate::PassportBook`]).
@@ -1035,9 +1035,9 @@ impl MatchingEngine {
             return true;
         }
         if identifier_equal(
-            &worker1.se_workernummer,
-            &worker2.se_workernummer,
-            identifiers::parse_se_workernummer,
+            &worker1.se_personnummer,
+            &worker2.se_personnummer,
+            identifiers::parse_se_personnummer,
         ) {
             return true;
         }
@@ -1243,10 +1243,10 @@ impl MatchingEngine {
                 &worker2.nl_bsn,
                 identifiers::parse_nl_bsn,
             ),
-            se_workernummer_score: identifier_score(
-                &worker1.se_workernummer,
-                &worker2.se_workernummer,
-                identifiers::parse_se_workernummer,
+            se_personnummer_score: identifier_score(
+                &worker1.se_personnummer,
+                &worker2.se_personnummer,
+                identifiers::parse_se_personnummer,
             ),
             uk_chi_number_score: identifier_score(
                 &worker1.uk_chi_number,
@@ -1427,9 +1427,9 @@ impl MatchingEngine {
             weighted_sum += score * self.config.nl_bsn_weight;
             total_weight += self.config.nl_bsn_weight;
         }
-        if let Some(score) = breakdown.se_workernummer_score {
-            weighted_sum += score * self.config.se_workernummer_weight;
-            total_weight += self.config.se_workernummer_weight;
+        if let Some(score) = breakdown.se_personnummer_score {
+            weighted_sum += score * self.config.se_personnummer_weight;
+            total_weight += self.config.se_personnummer_weight;
         }
         if let Some(score) = breakdown.uk_chi_number_score {
             weighted_sum += score * self.config.uk_chi_number_weight;

@@ -21,23 +21,23 @@
 //! | Germany | KVNR (Krankenversichertennummer) | [`parse_de_kvnr`] |
 //! | Italy | *Codice Fiscale* (CF) | [`parse_it_cf`] |
 //! | Netherlands | BSN (*Burgerservicenummer*) | [`parse_nl_bsn`] |
-//! | Sweden | *Workernummer* | [`parse_se_workernummer`] |
+//! | Sweden | *Personnummer* | [`parse_se_personnummer`] |
 //! | Australia | IHI (Individual Healthcare Identifier) | [`parse_au_ihi`] |
 //! | Belgium | National Number (*Rijksregisternummer*) | [`parse_be_nn`] |
 //! | Bulgaria | EGN (*Edinen grazhdanski nomer*) | [`parse_bg_egn`] |
 //! | Czech Republic | *Rodné číslo* | [`parse_cz_rc`] |
-//! | Denmark | CPR (*Centrale Workerregister*) | [`parse_dk_cpr`] |
+//! | Denmark | CPR (*Centrale Personregister*) | [`parse_dk_cpr`] |
 //! | Estonia | *Isikukood* | [`parse_ee_ik`] |
 //! | España (Spain) | DNI/NIE | [`parse_es_dni`] |
 //! | Finland | HETU (*Henkilötunnus*) | [`parse_fi_hetu`] |
 //! | Croatia | OIB (*Osobni identifikacijski broj*) | [`parse_hr_oib`] |
 //! | Iceland | *Kennitala* | [`parse_is_kt`] |
 //! | Lithuania | *Asmens kodas* | [`parse_lt_ak`] |
-//! | Latvia | *Workeras kods* | [`parse_lv_pk`] |
+//! | Latvia | *Personas kods* | [`parse_lv_pk`] |
 //! | Malta | National ID | [`parse_mt_id`] |
 //! | Norway | *Fødselsnummer* | [`parse_no_fnr`] |
 //! | Poland | PESEL | [`parse_pl_pesel`] |
-//! | Romania | CNP (*Cod Numeric Workeral*) | [`parse_ro_cnp`] |
+//! | Romania | CNP (*Cod Numeric Personal*) | [`parse_ro_cnp`] |
 //! | Slovenia | EMŠO (*Enotna Matična Številka Občana*) | [`parse_si_emso`] |
 //! | Slovakia | *Rodné číslo* | [`parse_sk_rc`] |
 //! | Greece | DSS investor share | [`parse_gr_dss`] |
@@ -242,7 +242,7 @@ pub fn parse_fr_nir(s: &str) -> Option<String> {
 ///
 /// Spain's healthcare identification is fragmented across 17 autonomous
 /// communities, each of which issues its own TSI card with a region-specific
-/// format. The national-level *Código de Identificación Workeral del Sistema
+/// format. The national-level *Código de Identificación Personal del Sistema
 /// Nacional de Salud* (CIP-SNS) provides a uniform 16-character code with
 /// the canonical structure `LLLLDDDDDDXXXXXX` (4 letters + 6 digits + 6
 /// alphanumerics), but regional formats are also encountered in practice.
@@ -717,9 +717,9 @@ pub fn parse_nl_bsn(s: &str) -> Option<String> {
     if sum % 11 == 0 { Some(digits) } else { None }
 }
 
-/// Parse a Sweden *Workernummer*.
+/// Parse a Sweden *Personnummer*.
 ///
-/// The Swedish workeral identity number is the national identifier
+/// The Swedish personal identity number is the national identifier
 /// used for taxation, healthcare, banking, and similar purposes. It
 /// comes in two textual layouts:
 ///
@@ -747,33 +747,33 @@ pub fn parse_nl_bsn(s: &str) -> Option<String> {
 /// # Examples
 ///
 /// ```
-/// use worker_matcher::identifiers::parse_se_workernummer;
+/// use worker_matcher::identifiers::parse_se_personnummer;
 ///
-/// // Synthetic 10-digit workernummer with verified Luhn (sum 40, mod 10 = 0).
+/// // Synthetic 10-digit personnummer with verified Luhn (sum 40, mod 10 = 0).
 /// assert_eq!(
-///     parse_se_workernummer("4603243850"),
+///     parse_se_personnummer("4603243850"),
 ///     Some("4603243850".to_string()),
 /// );
 /// assert_eq!(
-///     parse_se_workernummer("460324-3850"),
+///     parse_se_personnummer("460324-3850"),
 ///     Some("4603243850".to_string()),
 /// );
 ///
 /// // 12-digit form canonicalises with the century preserved.
 /// assert_eq!(
-///     parse_se_workernummer("19460324-3850"),
+///     parse_se_personnummer("19460324-3850"),
 ///     Some("194603243850".to_string()),
 /// );
 ///
 /// // Wrong Luhn:
-/// assert_eq!(parse_se_workernummer("4603243851"), None);
+/// assert_eq!(parse_se_personnummer("4603243851"), None);
 ///
 /// // Wrong length, non-digits, empty:
-/// assert_eq!(parse_se_workernummer("12345"),       None);
-/// assert_eq!(parse_se_workernummer("ABCDEFGHIJ"),  None);
-/// assert_eq!(parse_se_workernummer(""),            None);
+/// assert_eq!(parse_se_personnummer("12345"),       None);
+/// assert_eq!(parse_se_personnummer("ABCDEFGHIJ"),  None);
+/// assert_eq!(parse_se_personnummer(""),            None);
 /// ```
-pub fn parse_se_workernummer(s: &str) -> Option<String> {
+pub fn parse_se_personnummer(s: &str) -> Option<String> {
     let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
     let luhn_digits: &str = match digits.len() {
         10 => &digits,
@@ -919,7 +919,7 @@ pub fn parse_uk_chi_number(s: &str) -> Option<String> {
 }
 
 // ----------------------------------------------------------------------------
-// Additional national workeral identifiers (T-27).
+// Additional national personal identifiers (T-27).
 //
 // Each parser canonicalises whitespace + (where applicable) case, and verifies
 // the scheme's check digit / check character. Parsers return Option<String>;
@@ -1020,7 +1020,7 @@ pub fn parse_cz_rc(s: &str) -> Option<String> {
     }
 }
 
-/// Parse a Denmark CPR (*Centrale Workerregister*).
+/// Parse a Denmark CPR (*Centrale Personregister*).
 ///
 /// 10 digits `DDMMYYNNNN`. Format-only validation; the historical Modulus-11
 /// check was abandoned in 2007.
@@ -1062,7 +1062,7 @@ fn baltic_cascade_check(digits: &str) -> Option<u32> {
     if r2 < 10 { Some(r2) } else { Some(0) }
 }
 
-/// Parse an Estonia *Isikukood* (Workeral Identification Code).
+/// Parse an Estonia *Isikukood* (Personal Identification Code).
 ///
 /// 11 digits `GYYMMDDNNNC`. Check digit uses a cascading Mod-11 algorithm.
 ///
@@ -1259,7 +1259,7 @@ pub fn parse_lt_ak(s: &str) -> Option<String> {
     }
 }
 
-/// Parse a Latvia *Workeras kods*.
+/// Parse a Latvia *Personas kods*.
 ///
 /// 11 digits `DDMMYYCZZZK`. Check uses weights `[1,6,3,7,9,10,5,8,4,2]`
 /// over the first 10 digits; `check = ((1101 − Σ) mod 11) mod 10`.
@@ -1394,7 +1394,7 @@ pub fn parse_pl_pesel(s: &str) -> Option<String> {
     }
 }
 
-/// Parse a Romania CNP (*Cod Numeric Workeral*).
+/// Parse a Romania CNP (*Cod Numeric Personal*).
 ///
 /// 13 digits `SYYMMDDJJNNNK`. Check uses weights "279146358279" (`[2,7,9,1,
 /// 4,6,3,5,8,2,7,9]`) over the first 12 digits; `r = Σ mod 11`; check is
@@ -1522,7 +1522,7 @@ pub fn parse_uk_nino(s: &str) -> Option<String> {
 }
 
 // ----------------------------------------------------------------------------
-// Five additional workeral national identifiers (T-28).
+// Five additional personal national identifiers (T-28).
 // ----------------------------------------------------------------------------
 
 /// Parse a Greece DSS (Dematerialised Securities System) investor share code.
@@ -2680,12 +2680,12 @@ mod tests {
         assert_eq!(parse_nl_bsn("ABCDEFGHI"), None);
     }
 
-    // ---------- parse_se_workernummer ----------
+    // ---------- parse_se_personnummer ----------
 
     #[test]
     fn se_pnr_ten_digit_form_parses() {
         assert_eq!(
-            parse_se_workernummer("4603243850"),
+            parse_se_personnummer("4603243850"),
             Some("4603243850".into()),
         );
     }
@@ -2693,11 +2693,11 @@ mod tests {
     #[test]
     fn se_pnr_with_separator_canonicalises_to_ten_digit() {
         assert_eq!(
-            parse_se_workernummer("460324-3850"),
+            parse_se_personnummer("460324-3850"),
             Some("4603243850".into()),
         );
         assert_eq!(
-            parse_se_workernummer("460324+3850"),
+            parse_se_personnummer("460324+3850"),
             Some("4603243850".into()),
         );
     }
@@ -2705,11 +2705,11 @@ mod tests {
     #[test]
     fn se_pnr_twelve_digit_form_preserves_century() {
         assert_eq!(
-            parse_se_workernummer("19460324-3850"),
+            parse_se_personnummer("19460324-3850"),
             Some("194603243850".into()),
         );
         assert_eq!(
-            parse_se_workernummer("194603243850"),
+            parse_se_personnummer("194603243850"),
             Some("194603243850".into()),
         );
     }
@@ -2717,26 +2717,26 @@ mod tests {
     #[test]
     fn se_pnr_second_valid_vector() {
         assert_eq!(
-            parse_se_workernummer("8112310092"),
+            parse_se_personnummer("8112310092"),
             Some("8112310092".into()),
         );
     }
 
     #[test]
     fn se_pnr_rejects_wrong_luhn() {
-        assert_eq!(parse_se_workernummer("4603243851"), None);
+        assert_eq!(parse_se_personnummer("4603243851"), None);
     }
 
     #[test]
     fn se_pnr_rejects_wrong_length() {
-        assert_eq!(parse_se_workernummer("12345"), None);
-        assert_eq!(parse_se_workernummer("12345678901"), None);
-        assert_eq!(parse_se_workernummer(""), None);
+        assert_eq!(parse_se_personnummer("12345"), None);
+        assert_eq!(parse_se_personnummer("12345678901"), None);
+        assert_eq!(parse_se_personnummer(""), None);
     }
 
     #[test]
     fn se_pnr_rejects_letters() {
-        assert_eq!(parse_se_workernummer("ABCDEFGHIJ"), None);
+        assert_eq!(parse_se_personnummer("ABCDEFGHIJ"), None);
     }
 
     // ---------- parse_au_ihi ----------
@@ -2820,7 +2820,7 @@ mod tests {
     }
 
     // ----------------------------------------------------------------------
-    // Eighteen additional national workeral identifiers (T-27).
+    // Eighteen additional national personal identifiers (T-27).
     // ----------------------------------------------------------------------
 
     // ---------- parse_be_nn ----------
@@ -3134,7 +3134,7 @@ mod tests {
     }
 
     // ----------------------------------------------------------------------
-    // T-28: Five additional workeral identifiers.
+    // T-28: Five additional personal identifiers.
     // ----------------------------------------------------------------------
 
     // ---------- parse_gr_dss ----------

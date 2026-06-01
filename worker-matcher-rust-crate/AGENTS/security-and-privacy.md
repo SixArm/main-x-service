@@ -20,7 +20,7 @@ This is a clinical-adjacent library. Treat every line of code as if a worker's c
 
 ## GDPR and Equivalent Regimes
 
-The library handles workeral data passed to it by the caller but does not store, log, or transmit it. Responsibility for lawful processing under GDPR (or any equivalent data-protection regime that applies to the consumer) sits with the calling application. Do not introduce code that changes this stance.
+The library handles personal data passed to it by the caller but does not store, log, or transmit it. Responsibility for lawful processing under GDPR (or any equivalent data-protection regime that applies to the consumer) sits with the calling application. Do not introduce code that changes this stance.
 
 ## Clinical Safety
 

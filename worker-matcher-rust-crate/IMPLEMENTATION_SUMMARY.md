@@ -16,7 +16,7 @@ The implementation is based on peer-reviewed research on worker matcher in healt
 
 ### Key Research Papers
 
-1. **"Worker matcher within a Health Information Exchange"** (PMC4696093)
+1. **"Person matcher within a Health Information Exchange"** (PMC4696093)
    - Finding: Error rates average 8% and can reach 20%
    - Finding: Only 53% successful match rate in VA/DoD HIE
    - Recommendation: Use multiple demographic identifiers

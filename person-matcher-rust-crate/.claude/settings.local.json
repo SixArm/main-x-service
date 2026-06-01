@@ -23,7 +23,13 @@
       "Bash(grep *)",
       "Bash(cargo bench *)",
       "Bash(chmod +x /Users/jph/git/person-matcher/person-matcher-rust-crate/scripts/spec-drift-check.sh)",
-      "Bash(bash *)"
+      "Bash(bash *)",
+      "Bash(awk 'NR==13 || NR==24 || NR==305 || NR==366 || NR==414' /Users/jph/git/sixarm/main-x-service/person-matcher-rust-crate/index.md /Users/jph/git/sixarm/main-x-service/person-matcher-rust-crate/AGENTS.md /Users/jph/git/sixarm/main-x-service/person-matcher-rust-crate/spec.md)",
+      "Bash(cargo check *)",
+      "Bash(awk NR==2 || NR==14 || NR==33 || NR==45 *)",
+      "Bash(awk -F'\\\\t' '{ if \\(NF != 10\\) print \"wrong column count on line\", NR, \"fields=\" NF }' /tmp/new-national-person-identifiers.tsv)",
+      "Read(//Users/jph/git/sixarm/main-x-service/worker-matcher-rust-crate/AGENTS/**)",
+      "Bash(xargs -0 sed -i '' -e 's/placeal/personal/g' -e 's/Placeas/Personas/g' -e 's/placenummer/personnummer/g' -e 's/Placenummer/Personnummer/g')"
     ],
     "deny": [],
     "ask": []

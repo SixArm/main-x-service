@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Worker`, `WorkerBuilder`, `MatchConfig`, and `MatchBreakdown` each gain 7 new fields. Code constructing `MatchConfig { … }` via struct-literal syntax MUST add `br_cpf_weight`, `cn_rrn_weight`, `in_aadhaar_weight`, `jp_my_number_weight`, `mx_curp_weight`, `nz_nhi_weight`, `za_id_weight` (or use `..MatchConfig::default()`). All new `Worker` fields carry `#[serde(default)]` so legacy JSON deserialises with `None`.
 
 ### Decided (more national identifiers, T-17, no code change)
-- T-17 research spike completed. The original T-17 candidate list (CHI, KVNR, Codice Fiscale, BSN, PESEL, Workernummer, IHI) all shipped under T-23 / T-27 / T-28 — total scheme coverage is now **35**. Gap analysis vs the 39-jurisdiction phone table identified the **7 jurisdictions where the crate parses phones but not identifiers** as the recommended next batch: Brazil CPF, China RRN, India Aadhaar, Japan My Number, Mexico CURP, New Zealand NHI, South Africa ID.
+- T-17 research spike completed. The original T-17 candidate list (CHI, KVNR, Codice Fiscale, BSN, PESEL, Personnummer, IHI) all shipped under T-23 / T-27 / T-28 — total scheme coverage is now **35**. Gap analysis vs the 39-jurisdiction phone table identified the **7 jurisdictions where the crate parses phones but not identifiers** as the recommended next batch: Brazil CPF, China RRN, India Aadhaar, Japan My Number, Mexico CURP, New Zealand NHI, South Africa ID.
 - Each of the 7 has a per-scheme parser sketch and check-digit algorithm documented in spec.md §21.4 (BR uses two weighted Mod-11 digits, CN combines Mod-11 with date-substring validation, IN uses Verhoeff, MX requires structural validation + Mod-10, ZA layers Luhn over a date-encoding 13-digit format, etc.).
 - Implementation follow-up tracked as **T-17.1** in spec §23.2 (follows the per-scheme pattern from T-23 / T-27 / T-28; no new architectural decisions needed). Brings total coverage to 42 schemes once shipped.
 
@@ -130,8 +130,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### API surface (T-29)
 - `Worker`, `WorkerBuilder`, `MatchConfig`, and `MatchBreakdown` each gain one new field. Code constructing `MatchConfig { … }` via struct-literal syntax MUST add `blood_type_weight` (or use `..MatchConfig::default()`). `Worker::blood_type` carries `#[serde(default)]` so legacy JSON payloads deserialise with `None`.
 
-### Added (five further workeral IDs + nine passport-format validators)
-- Driven by `AGENTS/national-worker-identifiers.tsv` (spec FR-72..77, task T-28). Total workeral-identifier schemes supported: **35**.
+### Added (five further personal IDs + nine passport-format validators)
+- Driven by `AGENTS/national-worker-identifiers.tsv` (spec FR-72..77, task T-28). Total personal-identifier schemes supported: **35**.
   - **Greece DSS** (`gr_dss`) — 10-digit Hellenic Central Securities Depository investor share code, format-only.
   - **Liechtenstein National ID** (`li_id`) — 2 letters + 8–9 digits (spec text and example differ; parser accepts both), format-only with renewal caveat.
   - **Netherlands National ID** (`nl_id`) — 9-character `[A-Z\O]{2}[A-Z0-9\O]{6}[0-9]` (the `O` letter is banned to avoid confusion with the digit `0`), distinct from the BSN.
@@ -142,7 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### API surface (T-28)
 - `Worker`, `WorkerBuilder`, `MatchConfig`, and `MatchBreakdown` each gain 5 new fields. Code constructing `MatchConfig { … }` via struct-literal syntax MUST add the new `*_weight` fields (or use `..MatchConfig::default()`).
 
-### Added (eighteen additional national workeral identifiers)
+### Added (eighteen additional national personal identifiers)
 - Eighteen new identifier parsers (spec FR-54..71, task T-27). Total scheme count: **30**.
   - **Belgium NN** (`be_nn`) — 11 digits, Mod-97 (pre-2000 + "2"-prefixed post-2000).
   - **Bulgaria EGN** (`bg_egn`) — 10 digits, weighted Mod-11.
@@ -154,7 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Croatia OIB** (`hr_oib`) — 11 digits, ISO 7064 MOD 11,10.
   - **Iceland *Kennitala*** (`is_kt`) — 10 digits, weighted Mod-11.
   - **Lithuania *Asmens kodas*** (`lt_ak`) — 11 digits, cascading Mod-11.
-  - **Latvia *Workeras kods*** (`lv_pk`) — 11 digits, weighted Mod-11.
+  - **Latvia *Personas kods*** (`lv_pk`) — 11 digits, weighted Mod-11.
   - **Malta National ID** (`mt_id`) — 7 digits + letter from `{M, G, A, P, L, H, B, Z}`.
   - **Norway *Fødselsnummer*** (`no_fnr`) — 11 digits, dual Mod-11.
   - **Poland PESEL** (`pl_pesel`) — 11 digits, weighted Mod-10.
@@ -223,7 +223,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Germany KVNR** — 10-character *Krankenversichertennummer* (letter + 9 digits) with Mod-10 check via letter-ordinal expansion. Parser: `parse_de_kvnr`. Builder: `de_kvnr`. `MatchBreakdown::de_kvnr_score`.
   - **Italy *Codice Fiscale*** — 16-character alphanumeric tax identifier with Mod-26 check via odd/even position tables. Parser: `parse_it_cf`. Builder: `it_cf`. `MatchBreakdown::it_cf_score`.
   - **Netherlands BSN** — 9-digit *Burgerservicenummer* with the 11-test (`9d₁ + 8d₂ + … + 2d₈ − d₉ ≡ 0 mod 11`); rejects all-zero. Parser: `parse_nl_bsn`. Builder: `nl_bsn`. `MatchBreakdown::nl_bsn_score`.
-  - **Sweden *Workernummer*** — 10- or 12-digit workeral identity number with Luhn check; accepts `-` / `+` separators; canonicalises preserving input length. Parser: `parse_se_workernummer`. Builder: `se_workernummer`. `MatchBreakdown::se_workernummer_score`.
+  - **Sweden *Personnummer*** — 10- or 12-digit personal identity number with Luhn check; accepts `-` / `+` separators; canonicalises preserving input length. Parser: `parse_se_personnummer`. Builder: `se_personnummer`. `MatchBreakdown::se_personnummer_score`.
   - **UK Scotland CHI Number** — 10-digit Community Health Index Number with Mod-11 check (same algorithm as NHS Number); scheme-local. Parser: `parse_uk_chi_number`. Builder: `uk_chi_number`. `MatchBreakdown::uk_chi_number_score`.
 - Each scheme is **scheme-local**: no two schemes ever cross-match, even when the underlying digits coincide. This is enforced for AU IHI vs IE IHI (different lengths), and for the three UK Mod-11 schemes (NHS Number, NI H&C Number, Scotland CHI Number) which share an algorithm but distinct `Worker` fields.
 
@@ -343,7 +343,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Research Basis
 - Implemented based on findings from:
-  - "Worker matcher within a Health Information Exchange" (Grannis et al., 2014)
+  - "Person matcher within a Health Information Exchange" (Grannis et al., 2014)
   - "Patient Identification Techniques – Approaches, Implications, and Findings" (Reisman, 2020)
 
 ### Features

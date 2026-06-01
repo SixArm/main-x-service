@@ -106,7 +106,7 @@ This means cross-country deployments should set `phone_default_country` to the p
 ## Pitfalls
 
 - ❌ Don't collapse double-barrelled surnames (`Lloyd-Webber`) into a single word without thinking — current `normalize_name` drops the hyphen, yielding `lloydwebber`. This is intentional but worth knowing.
-- ❌ Don't apply name normalisation to NHS numbers — the `nhs-number` crate has its own parser. Calling `normalize_name` on a digit string would happen to work but couples concerns.
+- ❌ Don't apply name normalisation to United Kingdom National Health Service Numbers — the `united-kingdom-national-health-service-number` crate has its own parser. Calling `normalize_name` on a digit string would happen to work but couples concerns.
 - ❌ Don't lowercase postcodes; the canonical form is uppercase.
 - ❌ Don't trust that `Char::is_ascii_punctuation` covers Unicode punctuation. It does not — `’` (curly apostrophe, U+2019) would survive. If you need broader stripping, propose it via the spec.
 - ❌ Don't compare `normalize_phone` output across countries — it's UK-centric and will silently collapse French / Italian national numbers to lookalike digit strings. Use `normalize_phone_e164` (or rely on the matcher, which already does) for multi-country data.
@@ -338,8 +338,8 @@ The "American" Soundex is used pragmatically; a locale-aware phonetic algorithm 
 
 Each scheme has its own canonical form. Two inputs that represent the same identifier in different textual layouts MUST canonicalise to the same string.
 
-**UK NHS Number** (`parse_uk_nhs_number`):
-1. Delegated to `nhs_number::NHSNumber::from_str`, which accepts the 10-digit compact form (`"9434765919"`) or the 12-character spaced form (`"943 476 5919"`).
+**UK United Kingdom National Health Service Number** (`parse_united_kingdom_national_health_service_number`):
+1. Delegated to `united_kingdom_national_health_service_number::NHSNumber::from_str`, which accepts the 10-digit compact form (`"9434765919"`) or the 12-character spaced form (`"943 476 5919"`).
 2. Canonical form: 10 digits, no spaces.
 
 **France NIR** (`parse_fr_nir`):
@@ -363,8 +363,8 @@ Each scheme has its own canonical form. Two inputs that represent the same ident
 3. Canonical form: the 7-digit string.
 
 **UK NI H&C Number** (`parse_uk_hc_number`):
-1. Identical algorithm to UK NHS Number (`parse_uk_nhs_number`).
-2. Exposed as a distinct function so that the calling code retains scheme provenance — an NHS Number and an H&C Number with the same 10 digits refer to different persons in different registries and MUST NOT cross-match.
+1. Identical algorithm to UK United Kingdom National Health Service Number (`parse_united_kingdom_national_health_service_number`).
+2. Exposed as a distinct function so that the calling code retains scheme provenance — a United Kingdom National Health Service Number and an H&C Number with the same 10 digits refer to different persons in different registries and MUST NOT cross-match.
 
 **US SSN** (`parse_us_ssn`):
 1. Keep only ASCII digits.
@@ -416,6 +416,6 @@ Each scheme has its own canonical form. Two inputs that represent the same ident
 3. Multiply the first 9 digits by weights `10, 9, 8, 7, 6, 5, 4, 3, 2`; sum; take mod 11.
 4. The check digit (position 10) MUST equal `(11 − (sum mod 11)) mod 11`. A computed check of `10` indicates an invalid identifier and is rejected.
 5. Canonical form: the 10-digit compact string.
-6. The CHI Number shares the Mod-11 algorithm with the UK NHS Number and UK NI H&C Number but is scheme-local; cross-scheme matching is forbidden.
+6. The CHI Number shares the Mod-11 algorithm with the UK United Kingdom National Health Service Number and UK NI H&C Number but is scheme-local; cross-scheme matching is forbidden.
 
 For the remaining 24 schemes (T-27 / T-28 / T-17.1) the per-parser algorithm is summarised in `spec.md` §6.4 and lives canonically in `src/identifiers.rs` rustdoc. See `AGENTS/national-person-identifiers.md` for the cross-reference table.

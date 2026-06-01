@@ -649,12 +649,12 @@ pub struct Worker {
     #[serde(default)]
     pub nl_bsn: Option<String>,
 
-    /// Sweden *Workernummer* — 10- or 12-digit workeral identity number
+    /// Sweden *Personnummer* — 10- or 12-digit personal identity number
     /// (`YYMMDDNNNC` or `YYYYMMDDNNNC` with optional `-` / `+`
     /// separator). Parsed via
-    /// [`crate::identifiers::parse_se_workernummer`].
+    /// [`crate::identifiers::parse_se_personnummer`].
     #[serde(default)]
-    pub se_workernummer: Option<String>,
+    pub se_personnummer: Option<String>,
 
     /// United Kingdom (Scotland) CHI Number (Community Health Index) —
     /// 10-digit identifier used by NHS Scotland. Shares the Mod-11
@@ -678,12 +678,12 @@ pub struct Worker {
     #[serde(default)]
     pub cz_rc: Option<String>,
 
-    /// Denmark CPR (*Centrale Workerregister*). 10 digits, format only.
+    /// Denmark CPR (*Centrale Personregister*). 10 digits, format only.
     /// Parsed via [`crate::identifiers::parse_dk_cpr`].
     #[serde(default)]
     pub dk_cpr: Option<String>,
 
-    /// Estonia *Isikukood* (Workeral Identification Code). 11 digits, cascading Mod-11.
+    /// Estonia *Isikukood* (Personal Identification Code). 11 digits, cascading Mod-11.
     /// Parsed via [`crate::identifiers::parse_ee_ik`].
     #[serde(default)]
     pub ee_ik: Option<String>,
@@ -713,7 +713,7 @@ pub struct Worker {
     #[serde(default)]
     pub lt_ak: Option<String>,
 
-    /// Latvia *Workeras kods*. 11 digits, weighted Mod-11.
+    /// Latvia *Personas kods*. 11 digits, weighted Mod-11.
     /// Parsed via [`crate::identifiers::parse_lv_pk`].
     #[serde(default)]
     pub lv_pk: Option<String>,
@@ -733,7 +733,7 @@ pub struct Worker {
     #[serde(default)]
     pub pl_pesel: Option<String>,
 
-    /// Romania CNP (*Cod Numeric Workeral*). 13 digits, weighted Mod-11.
+    /// Romania CNP (*Cod Numeric Personal*). 13 digits, weighted Mod-11.
     /// Parsed via [`crate::identifiers::parse_ro_cnp`].
     #[serde(default)]
     pub ro_cnp: Option<String>,
@@ -808,7 +808,7 @@ pub struct Worker {
     #[serde(default)]
     pub in_aadhaar: Option<String>,
 
-    /// Japan My Number (*個人番号*). 12-digit workeral identification
+    /// Japan My Number (*個人番号*). 12-digit personal identification
     /// number with weighted Mod-11 check digit. Parsed at match time via
     /// [`crate::identifiers::parse_jp_my_number`].
     #[serde(default)]
@@ -992,7 +992,7 @@ impl Worker {
             || self.de_kvnr.is_some()
             || self.it_cf.is_some()
             || self.nl_bsn.is_some()
-            || self.se_workernummer.is_some()
+            || self.se_personnummer.is_some()
             || self.uk_chi_number.is_some()
             || self.be_nn.is_some()
             || self.bg_egn.is_some()
@@ -1068,7 +1068,7 @@ pub struct WorkerBuilder {
     de_kvnr: Option<String>,
     it_cf: Option<String>,
     nl_bsn: Option<String>,
-    se_workernummer: Option<String>,
+    se_personnummer: Option<String>,
     uk_chi_number: Option<String>,
     be_nn: Option<String>,
     bg_egn: Option<String>,
@@ -1280,19 +1280,19 @@ impl WorkerBuilder {
         self
     }
 
-    /// Set the Sweden *Workernummer*.
+    /// Set the Sweden *Personnummer*.
     ///
-    /// 10- or 12-digit workeral identity number with a Luhn check
+    /// 10- or 12-digit personal identity number with a Luhn check
     /// computed over the 10-digit form. Stored verbatim; parsing happens
-    /// at match time via [`crate::identifiers::parse_se_workernummer`].
+    /// at match time via [`crate::identifiers::parse_se_personnummer`].
     ///
     /// ```
     /// # use worker_matcher::Worker;
-    /// let p = Worker::builder().se_workernummer("19460324-3850").build();
-    /// assert_eq!(p.se_workernummer.as_deref(), Some("19460324-3850"));
+    /// let p = Worker::builder().se_personnummer("19460324-3850").build();
+    /// assert_eq!(p.se_personnummer.as_deref(), Some("19460324-3850"));
     /// ```
-    pub fn se_workernummer<S: Into<String>>(mut self, value: S) -> Self {
-        self.se_workernummer = Some(value.into());
+    pub fn se_personnummer<S: Into<String>>(mut self, value: S) -> Self {
+        self.se_personnummer = Some(value.into());
         self
     }
 
@@ -1331,13 +1331,13 @@ impl WorkerBuilder {
         self
     }
 
-    /// Set the Denmark CPR (*Centrale Workerregister*). 10 digits.
+    /// Set the Denmark CPR (*Centrale Personregister*). 10 digits.
     pub fn dk_cpr<S: Into<String>>(mut self, value: S) -> Self {
         self.dk_cpr = Some(value.into());
         self
     }
 
-    /// Set the Estonia *Isikukood* (Workeral Identification Code). 11 digits.
+    /// Set the Estonia *Isikukood* (Personal Identification Code). 11 digits.
     pub fn ee_ik<S: Into<String>>(mut self, value: S) -> Self {
         self.ee_ik = Some(value.into());
         self
@@ -1373,7 +1373,7 @@ impl WorkerBuilder {
         self
     }
 
-    /// Set the Latvia *Workeras kods*. 11 digits.
+    /// Set the Latvia *Personas kods*. 11 digits.
     pub fn lv_pk<S: Into<String>>(mut self, value: S) -> Self {
         self.lv_pk = Some(value.into());
         self
@@ -1397,7 +1397,7 @@ impl WorkerBuilder {
         self
     }
 
-    /// Set the Romania CNP (*Cod Numeric Workeral*). 13 digits.
+    /// Set the Romania CNP (*Cod Numeric Personal*). 13 digits.
     pub fn ro_cnp<S: Into<String>>(mut self, value: S) -> Self {
         self.ro_cnp = Some(value.into());
         self
@@ -1763,7 +1763,7 @@ impl WorkerBuilder {
             de_kvnr: self.de_kvnr,
             it_cf: self.it_cf,
             nl_bsn: self.nl_bsn,
-            se_workernummer: self.se_workernummer,
+            se_personnummer: self.se_personnummer,
             uk_chi_number: self.uk_chi_number,
             be_nn: self.be_nn,
             bg_egn: self.bg_egn,
@@ -1874,7 +1874,7 @@ mod tests {
         assert!(p.de_kvnr.is_none());
         assert!(p.it_cf.is_none());
         assert!(p.nl_bsn.is_none());
-        assert!(p.se_workernummer.is_none());
+        assert!(p.se_personnummer.is_none());
         assert!(p.uk_chi_number.is_none());
         assert!(p.given_name.is_none());
         assert!(p.family_name.is_none());
@@ -1902,7 +1902,7 @@ mod tests {
             .de_kvnr("A123456780")
             .it_cf("RSSMRA85T10A562S")
             .nl_bsn("111222333")
-            .se_workernummer("4603243850")
+            .se_personnummer("4603243850")
             .uk_chi_number("0101701233")
             .build();
         assert_eq!(p.uk_nhs_number.as_deref(), Some("9434765919"));
@@ -1915,7 +1915,7 @@ mod tests {
         assert_eq!(p.de_kvnr.as_deref(), Some("A123456780"));
         assert_eq!(p.it_cf.as_deref(), Some("RSSMRA85T10A562S"));
         assert_eq!(p.nl_bsn.as_deref(), Some("111222333"));
-        assert_eq!(p.se_workernummer.as_deref(), Some("4603243850"));
+        assert_eq!(p.se_personnummer.as_deref(), Some("4603243850"));
         assert_eq!(p.uk_chi_number.as_deref(), Some("0101701233"));
     }
 

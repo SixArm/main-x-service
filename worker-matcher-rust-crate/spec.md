@@ -98,7 +98,7 @@ The library supports **42 national identifier schemes** (one parser per scheme i
 - **FR-14** A malformed identifier on either side yields `<scheme>_score = None` (not `0.0`).
 - **FR-29** `deterministic_match` returns `true` on any same-scheme canonical-form pair, on a passport-book hit (FR-52), or on demographic-tuple agreement (§12.1).
 - **FR-12 / FR-25..FR-28 / FR-32** — Original 6: UK NHS, FR NIR, ES TSI, IE IHI, UK NI H&C, US SSN.
-- **FR-39..FR-44** — T-23 (6): AU IHI, DE KVNR, IT CF, NL BSN, SE Workernummer, UK Scotland CHI (scheme-local even when 10 digits agree with UK NHS / UK NI H&C).
+- **FR-39..FR-44** — T-23 (6): AU IHI, DE KVNR, IT CF, NL BSN, SE Personnummer, UK Scotland CHI (scheme-local even when 10 digits agree with UK NHS / UK NI H&C).
 - **FR-54..FR-71** — T-27 (18): BE NN, BG EGN, CZ RČ, DK CPR, EE IK, ES DNI, FI HETU, HR OIB, IS KT, LT AK, LV PK, MT ID, NO FNR, PL PESEL, RO CNP, SI EMŠO, SK RČ, UK NINO.
 - **FR-72..FR-77** — T-28: 5 ID schemes (GR DSS, LI ID, NL ID, PL NIP, PT NIF) + 9 passport-format validators (CY, CZ, LI, LT, MT, NL, PT, RO, SK; no `Worker` field, data flows via `passport_books`).
 - **FR-85..FR-91** — T-17.1 (7): BR CPF, CN RRN, IN Aadhaar, JP My Number, MX CURP, NZ NHI, ZA ID. Brings total to **42**.
@@ -381,8 +381,8 @@ Single source of truth for outstanding work; absorbs what an SDD workflow would 
 
 ## 25. References
 
-1. Grannis SJ et al. *Worker matcher within a Health Information Exchange.* AMIA, 2014. `help/worker-matcher-within-a-health-information-exchange.pdf`.
-2. Reisman M. *Patient Identification Techniques.* NCVHS, 2020. `help/healthit-worker-matcher-aggregation-and-linking-2019-08-16.pdf`.
+1. Grannis SJ et al. *Person matcher within a Health Information Exchange.* AMIA, 2014. `help/patient-matching-within-a-health-information-exchange.pdf`.
+2. Reisman M. *Patient Identification Techniques.* NCVHS, 2020. `help/healthit-patient-matching-aggregation-and-linking-2019-08-16.pdf`.
 3. Winkler WE. *String Comparator Metrics and Enhanced Decision Rules in the Fellegi-Sunter Model of Record Linkage.* US Census Bureau, 1990.
 4. `nhs-number` crate: https://docs.rs/nhs-number
 5. Unicode Technical Report #15: *Unicode Normalization Forms.*

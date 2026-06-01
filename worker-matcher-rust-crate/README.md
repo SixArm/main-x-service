@@ -8,7 +8,7 @@ A comprehensive Rust library for matching worker records in healthcare informati
 
 This crate implements both **deterministic** and **probabilistic** worker matcher algorithms based on research from:
 
-- [Worker matcher within a Health Information Exchange](https://pmc.ncbi.nlm.nih.gov/articles/PMC4696093/)
+- [Person matcher within a Health Information Exchange](https://pmc.ncbi.nlm.nih.gov/articles/PMC4696093/)
 - [Patient Identification Techniques – Approaches, Implications, and Findings](https://pmc.ncbi.nlm.nih.gov/articles/PMC7442501/)
 
 ## Features
@@ -18,7 +18,7 @@ This crate implements both **deterministic** and **probabilistic** worker matche
 - ✅ **Batch API**: `match_one_to_many` scores one query against many candidates (output parallel to input); `rank_one_to_many` returns the same scores sorted by descending score with a deterministic tiebreak — the building block for screening against a master worker index
 - ✅ **String Similarity Algorithms**: Jaro-Winkler and Levenshtein distance
 - ✅ **NHS-Format Identifier Support**: Validation and normalization via the `nhs-number` crate
-- ✅ **Multinational National Identifiers** (**42 schemes**): UK NHS Number, France NIR, España TSI, Éire IHI, UK Northern Ireland H&C Number, United States SSN, Australia IHI, Germany KVNR, Italy *Codice Fiscale*, Netherlands BSN, Sweden *Workernummer*, UK Scotland CHI Number, Belgium National Number, Bulgaria EGN, Czech *Rodné číslo*, Denmark CPR, Estonia *Isikukood*, Spain DNI/NIE, Finland HETU, Croatia OIB, Iceland *Kennitala*, Lithuania *Asmens kodas*, Latvia *Workeras kods*, Malta National ID, Norway *Fødselsnummer*, Poland PESEL, Romania CNP, Slovenia EMŠO, Slovakia *Rodné číslo*, UK NINO, Greece DSS, Liechtenstein National ID, Netherlands National ID, Poland NIP, Portugal NIF, Brazil CPF, China Resident Identity Card, India Aadhaar, Japan My Number, Mexico CURP, New Zealand NHI, South Africa ID — each scheme-local with its own parser, weight, and breakdown score. Plus **9 per-country passport-format validators** (CY, CZ, LI, LT, MT, NL, PT, RO, SK) that feed the multi-country `PassportBook` model.
+- ✅ **Multinational National Identifiers** (**42 schemes**): UK NHS Number, France NIR, España TSI, Éire IHI, UK Northern Ireland H&C Number, United States SSN, Australia IHI, Germany KVNR, Italy *Codice Fiscale*, Netherlands BSN, Sweden *Personnummer*, UK Scotland CHI Number, Belgium National Number, Bulgaria EGN, Czech *Rodné číslo*, Denmark CPR, Estonia *Isikukood*, Spain DNI/NIE, Finland HETU, Croatia OIB, Iceland *Kennitala*, Lithuania *Asmens kodas*, Latvia *Personas kods*, Malta National ID, Norway *Fødselsnummer*, Poland PESEL, Romania CNP, Slovenia EMŠO, Slovakia *Rodné číslo*, UK NINO, Greece DSS, Liechtenstein National ID, Netherlands National ID, Poland NIP, Portugal NIF, Brazil CPF, China Resident Identity Card, India Aadhaar, Japan My Number, Mexico CURP, New Zealand NHI, South Africa ID — each scheme-local with its own parser, weight, and breakdown score. Plus **9 per-country passport-format validators** (CY, CZ, LI, LT, MT, NL, PT, RO, SK) that feed the multi-country `PassportBook` model.
 - ✅ **Passport Books**: `Vec<PassportBook>` on `Worker` carries one entry per book with explicit country provenance — supports dual / multi-citizenship, accumulates historical book numbers as passports are renewed, and treats any shared `(country, number)` pair as a deterministic match (cross-country with same digits never matches)
 - ✅ **Phonetic Matching**: Soundex-like algorithm for names (handles "Stephen" vs "Steven")
 - ✅ **Blood Type Matching**: `BloodType` enum (8 ABO+RhD variants) with a lenient parser accepting canonical (`A+`), word (`A positive`), and zero-to-O (`0+`) variants. Blood type is stable for life, so disagreement is a strong negative signal even though agreement alone is weak.
@@ -487,7 +487,7 @@ Contributions welcome! Please ensure:
 
 ## References
 
-1. Grannis SJ, et al. "Worker matcher within a Health Information Exchange." AMIA Annu Symp Proc. 2014.
+1. Grannis SJ, et al. "Person matcher within a Health Information Exchange." AMIA Annu Symp Proc. 2014.
 2. Reisman M. "Patient Identification Techniques – Approaches, Implications, and Findings." NCVHS. 2020.
 
 ## Contact

@@ -122,7 +122,7 @@ impl Scorer {
 
     /// Weighted combination of Jaro-Winkler (0.7) and Levenshtein (0.3).
     ///
-    /// Defaults are tuned for workeral names. Jaro-Winkler dominates because
+    /// Defaults are tuned for personal names. Jaro-Winkler dominates because
     /// it handles short-string prefix matches better; Levenshtein contributes
     /// stability for longer or rearranged inputs.
     ///

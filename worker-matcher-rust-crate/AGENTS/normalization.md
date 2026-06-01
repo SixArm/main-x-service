@@ -408,7 +408,7 @@ Each scheme has its own canonical form. Two inputs that represent the same ident
 4. Apply the "11-test": `9·d₁ + 8·d₂ + 7·d₃ + 6·d₄ + 5·d₅ + 4·d₆ + 3·d₇ + 2·d₈ − d₉ ≡ 0 (mod 11)`.
 5. Canonical form: the 9-digit compact string.
 
-**Sweden *Workernummer*** (`parse_se_workernummer`):
+**Sweden *Personnummer*** (`parse_se_personnummer`):
 1. Keep only ASCII digits.
 2. Accept exactly 10 or 12 digits; reject anything else.
 3. For Luhn validation use the 10-digit form (drop the leading century from a 12-digit input).

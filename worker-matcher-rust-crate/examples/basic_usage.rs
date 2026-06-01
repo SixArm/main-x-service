@@ -468,7 +468,7 @@ fn main() {
         ("DE KVNR", "a 123 456 780", "A123456780"),
         ("IT CF", "rss mra 85t 10a 562s", "RSSMRA85T10A562S"),
         ("NL BSN", "111-222-333", "111222333"),
-        ("SE Workernummer", "460324-3850", "4603243850"),
+        ("SE Personnummer", "460324-3850", "4603243850"),
         ("UK CHI", "010 170 1233", "0101701233"),
     ] {
         let parsed = match label {
@@ -476,7 +476,7 @@ fn main() {
             "DE KVNR" => identifiers::parse_de_kvnr(raw),
             "IT CF" => identifiers::parse_it_cf(raw),
             "NL BSN" => identifiers::parse_nl_bsn(raw),
-            "SE Workernummer" => identifiers::parse_se_workernummer(raw),
+            "SE Personnummer" => identifiers::parse_se_personnummer(raw),
             "UK CHI" => identifiers::parse_uk_chi_number(raw),
             _ => unreachable!(),
         };

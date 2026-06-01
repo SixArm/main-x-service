@@ -11,7 +11,7 @@ fn main() {
 
     // Create two person records with similar information
     let person1 = Person::builder()
-        .uk_nhs_number("123 456 7890")
+        .united_kingdom_national_health_service_number("123 456 7890")
         .given_name("Catherine")
         .family_name("Williams")
         .date_of_birth(NaiveDate::from_ymd_opt(1985, 3, 15).unwrap())
@@ -20,7 +20,7 @@ fn main() {
         .build();
 
     let person2 = Person::builder()
-        .uk_nhs_number("1234567890") // Same NHS, different format
+        .united_kingdom_national_health_service_number("1234567890") // Same United Kingdom National Health Service Number, different format
         .given_name("Katherine") // Different spelling
         .family_name("Williams")
         .date_of_birth(NaiveDate::from_ymd_opt(1985, 3, 15).unwrap())
@@ -47,8 +47,8 @@ fn main() {
     println!("Detailed Breakdown:");
     println!("------------------");
 
-    if let Some(score) = result.breakdown.uk_nhs_number_score {
-        println!("UK NHS Number:   {:.0}%", score * 100.0);
+    if let Some(score) = result.breakdown.united_kingdom_national_health_service_number_score {
+        println!("UK United Kingdom National Health Service Number: {:.0}%", score * 100.0);
     }
 
     if let Some(score) = result.breakdown.given_name_score {
@@ -80,7 +80,7 @@ fn main() {
     // Demonstrate deterministic matching
     let is_deterministic = engine.deterministic_match(&person1, &person2);
     println!(
-        "Deterministic Match (NHS number exact): {}",
+        "Deterministic Match (United Kingdom National Health Service Number exact): {}",
         is_deterministic
     );
 

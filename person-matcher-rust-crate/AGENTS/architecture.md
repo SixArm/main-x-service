@@ -10,8 +10,9 @@ lib.rs               (re-exports only)
    └── matcher       (orchestration — depends on the others)
          │
          ├── models         (data types, no logic)
-         ├── identifiers    (parse_uk_nhs_number, parse_fr_nir, parse_es_tsi,
-         │                   parse_ie_ihi, parse_uk_hc_number, parse_us_ssn)
+         ├── identifiers    (parse_united_kingdom_national_health_service_number,
+         │                   parse_fr_nir, parse_es_tsi, parse_ie_ihi,
+         │                   parse_uk_hc_number, parse_us_ssn)
          ├── normalizer     (text + phone + address + email + phonetic transforms)
          ├── scorer         (similarity primitives)
          ├── nicknames      (NicknameTable equivalence-class lookup)

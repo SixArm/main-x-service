@@ -10,7 +10,7 @@
 //!
 //! | Jurisdiction | Identifier | Parser |
 //! |---|---|---|
-//! | United Kingdom — England, Wales, Isle of Man | NHS Number | [`parse_uk_nhs_number`] |
+//! | United Kingdom — England, Wales, Isle of Man | United Kingdom National Health Service Number | [`parse_united_kingdom_national_health_service_number`] |
 //! | France | NIR (*Numéro d'Inscription au Répertoire*) | [`parse_fr_nir`] |
 //! | España (Spain) | TSI (*Tarjeta Sanitaria Individual*) / CIP-SNS | [`parse_es_tsi`] |
 //! | Éire (Ireland) | IHI (Individual Health Identifier) | [`parse_ie_ihi`] |
@@ -91,8 +91,9 @@
 //! ## Design notes
 //!
 //! - Parsing is **format-only** unless the scheme has an integral check
-//!   digit (NIR has a Modulus-97 key; H&C / NHS structurally accept any
-//!   10-digit number through the `nhs-number` crate's `FromStr`).
+//!   digit (NIR has a Modulus-97 key; H&C / United Kingdom National Health
+//!   Service structurally accept any 10-digit number through the
+//!   `united-kingdom-national-health-service-number` crate's `FromStr`).
 //! - These parsers do not consult external registries; they verify only
 //!   what can be derived from the identifier's own structure.
 //! - Country-specific semantic ranges (e.g. valid French department codes,
@@ -104,41 +105,45 @@
 //! ```
 //! use person_matcher::identifiers;
 //!
-//! // UK NHS Number — accepts the canonical "XXX XXX XXXX" layout.
+//! // UK United Kingdom National Health Service Number — accepts the
+//! // canonical "XXX XXX XXXX" layout.
 //! assert_eq!(
-//!     identifiers::parse_uk_nhs_number("943 476 5919"),
+//!     identifiers::parse_united_kingdom_national_health_service_number("943 476 5919"),
 //!     Some("9434765919".to_string()),
 //! );
 //!
-//! // Anything that does not match the NHS layout returns None.
-//! assert_eq!(identifiers::parse_uk_nhs_number("not-a-number"), None);
+//! // Anything that does not match the United Kingdom National Health Service
+//! // Number layout returns None.
+//! assert_eq!(identifiers::parse_united_kingdom_national_health_service_number("not-a-number"), None);
 //! ```
 
-use nhs_number::NHSNumber;
+use united_kingdom_national_health_service_number::NHSNumber as UnitedKingdomNationalHealthServiceNumber;
 use std::str::FromStr;
 
-/// Parse a United Kingdom NHS Number (England, Wales, Isle of Man).
+/// Parse a United Kingdom National Health Service Number (England, Wales,
+/// Isle of Man).
 ///
-/// Wraps [`nhs_number::NHSNumber::from_str`], which accepts the 10-digit
-/// compact layout (`"9434765919"`) and the spaced layout (`"943 476 5919"`).
-/// On success, the canonical 10-digit form is returned.
+/// Wraps [`united_kingdom_national_health_service_number::NHSNumber::from_str`],
+/// which accepts the 10-digit compact layout (`"9434765919"`) and the spaced
+/// layout (`"943 476 5919"`). On success, the canonical 10-digit form is
+/// returned.
 ///
-/// The NHS Number applies to England, Wales, and the Isle of Man. Northern
-/// Ireland uses a separate H&C Number that follows the same Modulus-11
-/// algorithm — see [`parse_uk_hc_number`].
+/// The United Kingdom National Health Service Number applies to England,
+/// Wales, and the Isle of Man. Northern Ireland uses a separate H&C Number
+/// that follows the same Modulus-11 algorithm — see [`parse_uk_hc_number`].
 ///
 /// # Examples
 ///
 /// ```
-/// use person_matcher::identifiers::parse_uk_nhs_number;
+/// use person_matcher::identifiers::parse_united_kingdom_national_health_service_number;
 ///
-/// assert_eq!(parse_uk_nhs_number("9434765919"),   Some("9434765919".to_string()));
-/// assert_eq!(parse_uk_nhs_number("943 476 5919"), Some("9434765919".to_string()));
-/// assert_eq!(parse_uk_nhs_number("ABCDEFGHIJ"),   None);
-/// assert_eq!(parse_uk_nhs_number("123"),          None);
+/// assert_eq!(parse_united_kingdom_national_health_service_number("9434765919"),   Some("9434765919".to_string()));
+/// assert_eq!(parse_united_kingdom_national_health_service_number("943 476 5919"), Some("9434765919".to_string()));
+/// assert_eq!(parse_united_kingdom_national_health_service_number("ABCDEFGHIJ"),   None);
+/// assert_eq!(parse_united_kingdom_national_health_service_number("123"),          None);
 /// ```
-pub fn parse_uk_nhs_number(s: &str) -> Option<String> {
-    let parsed = NHSNumber::from_str(s).ok()?;
+pub fn parse_united_kingdom_national_health_service_number(s: &str) -> Option<String> {
+    let parsed = UnitedKingdomNationalHealthServiceNumber::from_str(s).ok()?;
     let mut canonical = String::with_capacity(10);
     for &d in &parsed.digits {
         canonical.push(char::from_digit(d as u32, 10)?);
@@ -342,16 +347,17 @@ pub fn parse_ie_ihi(s: &str) -> Option<String> {
 /// The H&C Number is Northern Ireland's national healthcare identifier,
 /// issued by HSC (Health and Social Care). Structurally it is a 10-digit
 /// number with a Modulus-11 check digit — the same algorithm used by the
-/// UK NHS Number.
+/// UK United Kingdom National Health Service Number.
 ///
-/// This parser delegates to the same logic as [`parse_uk_nhs_number`]: it
-/// accepts either the compact 10-digit form or the spaced
-/// `"XXX XXX XXXX"` form and returns the canonical 10-digit string.
+/// This parser delegates to the same logic as
+/// [`parse_united_kingdom_national_health_service_number`]: it accepts
+/// either the compact 10-digit form or the spaced `"XXX XXX XXXX"` form and
+/// returns the canonical 10-digit string.
 ///
 /// The two parsers are intentionally separate so that callers track *which*
 /// scheme an identifier belongs to: a number that parses successfully as
-/// both an NHS Number and an H&C Number still refers to two distinct people
-/// in two distinct registries.
+/// both a United Kingdom National Health Service Number and an H&C Number
+/// still refers to two distinct people in two distinct registries.
 ///
 /// # Examples
 ///
@@ -363,7 +369,7 @@ pub fn parse_ie_ihi(s: &str) -> Option<String> {
 /// assert_eq!(parse_uk_hc_number("not-a-number"), None);
 /// ```
 pub fn parse_uk_hc_number(s: &str) -> Option<String> {
-    parse_uk_nhs_number(s)
+    parse_united_kingdom_national_health_service_number(s)
 }
 
 /// Parse a United States Social Security Number (SSN).
@@ -854,7 +860,7 @@ pub fn parse_au_ihi(s: &str) -> Option<String> {
 /// `DDMMYY` is the holder's date of birth, `SSS` is a 3-digit
 /// sequence with the third digit encoding sex (odd = male, even =
 /// female), and `C` is a Mod-11 check digit computed in the same
-/// fashion as the UK NHS Number.
+/// fashion as the UK United Kingdom National Health Service Number.
 ///
 /// Check rule (Mod-11):
 ///
@@ -865,8 +871,9 @@ pub fn parse_au_ihi(s: &str) -> Option<String> {
 ///    check of `10` indicates an invalid identifier and is rejected.
 ///
 /// Non-digit characters are stripped before validation. The canonical
-/// form is the 10-digit compact string. Although the NHS Number and
-/// the CHI Number share the same Mod-11 algorithm, the two are
+/// form is the 10-digit compact string. Although the United Kingdom
+/// National Health Service Number and the CHI Number share the same
+/// Mod-11 algorithm, the two are
 /// **scheme-local** in this crate and never cross-match (per spec
 /// FR-13 / §12.1).
 ///
@@ -2325,26 +2332,26 @@ pub fn parse_sk_passport(s: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    // ---------- parse_uk_nhs_number ----------
+    // ---------- parse_united_kingdom_national_health_service_number ----------
 
     #[test]
-    fn uk_nhs_number_compact_form_parses() {
-        assert_eq!(parse_uk_nhs_number("9434765919"), Some("9434765919".into()));
+    fn united_kingdom_national_health_service_number_compact_form_parses() {
+        assert_eq!(parse_united_kingdom_national_health_service_number("9434765919"), Some("9434765919".into()));
     }
 
     #[test]
-    fn uk_nhs_number_spaced_form_parses_to_same_canonical() {
+    fn united_kingdom_national_health_service_number_spaced_form_parses_to_same_canonical() {
         assert_eq!(
-            parse_uk_nhs_number("943 476 5919"),
-            parse_uk_nhs_number("9434765919"),
+            parse_united_kingdom_national_health_service_number("943 476 5919"),
+            parse_united_kingdom_national_health_service_number("9434765919"),
         );
     }
 
     #[test]
-    fn uk_nhs_number_rejects_letters_and_short_input() {
-        assert_eq!(parse_uk_nhs_number("ABCDEFGHIJ"), None);
-        assert_eq!(parse_uk_nhs_number("123"), None);
-        assert_eq!(parse_uk_nhs_number(""), None);
+    fn united_kingdom_national_health_service_number_rejects_letters_and_short_input() {
+        assert_eq!(parse_united_kingdom_national_health_service_number("ABCDEFGHIJ"), None);
+        assert_eq!(parse_united_kingdom_national_health_service_number("123"), None);
+        assert_eq!(parse_united_kingdom_national_health_service_number(""), None);
     }
 
     // ---------- parse_fr_nir ----------
@@ -2471,14 +2478,14 @@ mod tests {
     // ---------- parse_uk_hc_number ----------
 
     #[test]
-    fn uk_hc_number_matches_nhs_number_semantics() {
+    fn uk_hc_number_matches_united_kingdom_national_health_service_number_semantics() {
         assert_eq!(
             parse_uk_hc_number("9434765919"),
-            parse_uk_nhs_number("9434765919"),
+            parse_united_kingdom_national_health_service_number("9434765919"),
         );
         assert_eq!(
             parse_uk_hc_number("943 476 5919"),
-            parse_uk_nhs_number("943 476 5919"),
+            parse_united_kingdom_national_health_service_number("943 476 5919"),
         );
     }
 

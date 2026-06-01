@@ -17,7 +17,7 @@ fn dob(y: i32, m: u32, d: u32) -> NaiveDate {
 
 fn build_alice() -> Person {
     Person::builder()
-        .uk_nhs_number("943 476 5919")
+        .united_kingdom_national_health_service_number("943 476 5919")
         .given_name("Alice")
         .middle_name("Marie")
         .family_name("Williams")
@@ -37,7 +37,7 @@ fn build_alice() -> Person {
 
 fn build_alyce_fuzzy(seed: &Person) -> Person {
     Person::builder()
-        .uk_nhs_number("943 476 5919")
+        .united_kingdom_national_health_service_number("943 476 5919")
         .given_name("Alyce")
         .middle_name("Mary")
         .family_name(seed.family_name.clone().unwrap_or_default())
@@ -57,7 +57,7 @@ fn build_alyce_fuzzy(seed: &Person) -> Person {
 
 fn build_unrelated() -> Person {
     Person::builder()
-        .uk_nhs_number("400 000 0004")
+        .united_kingdom_national_health_service_number("400 000 0004")
         .given_name("Bob")
         .family_name("Jones")
         .date_of_birth(dob(1965, 11, 30))
@@ -75,7 +75,7 @@ fn make_candidate(idx: usize) -> Person {
     let last = ["Smith", "Jones", "Brown", "Taylor", "Williams", "Davies"];
     let cities = ["London", "Cardiff", "Edinburgh", "Belfast", "Manchester"];
     Person::builder()
-        .uk_nhs_number(format!("943 476 59{:02}", idx % 100))
+        .united_kingdom_national_health_service_number(format!("943 476 59{:02}", idx % 100))
         .given_name(if idx.is_multiple_of(7) {
             "Alyce"
         } else {

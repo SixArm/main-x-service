@@ -5,7 +5,7 @@ This file continues [`delivered-tasks.md`](delivered-tasks.md) with tasks T-17 t
 Status legend: `[x]` done, `[ ]` open.
 
 **T-17 — Add more national identifier schemes (research spike).** ✅ Delivered (recommendation; implementation tracked as T-17.1).
-- [x] The original T-17 candidate list (UK Scotland CHI, DE KVNR, IT Codice Fiscale, NL BSN, PL PESEL, SE Workernummer, AU IHI) **all shipped** under T-23 / T-27 / T-28 / T-30; total identifier-scheme coverage is now 35.
+- [x] The original T-17 candidate list (UK Scotland CHI, DE KVNR, IT Codice Fiscale, NL BSN, PL PESEL, SE Personnummer, AU IHI) **all shipped** under T-23 / T-27 / T-28 / T-30; total identifier-scheme coverage is now 35.
 - [x] Survey of the next batch: `AGENTS/roadmap-research.md` identifies the **7 jurisdictions where the crate already parses phones but not identifiers** (BR CPF, CN RRN, IN Aadhaar, JP My Number, MX CURP, NZ NHI, ZA ID) as the recommended next tranche. Closes the symmetry between the phone surface (39 jurisdictions post-T-19) and the identifier surface (35 schemes).
 - [x] Per-scheme parser sketch + check-digit algorithm in `AGENTS/roadmap-research.md` for each of the 7. Highlights: BR CPF uses two weighted Mod-11 digits, CN RRN combines weighted Mod-11 with date-substring validation, IN Aadhaar uses Verhoeff, MX CURP requires structural validation + date substring + Mod-10 check digit, ZA ID layers Luhn over a date-encoding 13-digit format.
 - **Acceptance:** Met — recommendation in `AGENTS/roadmap-research.md` with per-scheme parser sketch and check-digit specification.
@@ -60,7 +60,7 @@ Status legend: `[x]` done, `[ ]` open.
 - [x] Add `parse_de_kvnr` (letter + 9 digits Mod-10 German *Krankenversichertennummer*).
 - [x] Add `parse_it_cf` (16-character alphanumeric Mod-26 Italian *Codice Fiscale*).
 - [x] Add `parse_nl_bsn` (9-digit 11-test Dutch *Burgerservicenummer*).
-- [x] Add `parse_se_workernummer` (10- or 12-digit Luhn Swedish workeral identity number).
+- [x] Add `parse_se_personnummer` (10- or 12-digit Luhn Swedish personal identity number).
 - [x] Add `parse_uk_chi_number` (10-digit Mod-11 Scottish Community Health Index Number).
 - [x] Extend `Worker`, `WorkerBuilder`, `MatchConfig` (per-scheme weight 0.30), `MatchBreakdown` (per-scheme `Option<f64>` with `#[serde(default)]`), `MatchingEngine` deterministic and breakdown paths, and `Worker::validate`.
 - **Acceptance:** 6 × 6 unit tests in `src/identifiers.rs` (canonical / wrong check / wrong length / wrong chars / format variants / empty); per-scheme integration tests covering deterministic match, mismatch, unparseable yields `None`, and breakdown carries each score; cross-scheme: AU IHI ↔ IE IHI scheme-local; UK CHI ↔ UK NHS and UK CHI ↔ UK NI H&C scheme-local. Met by `tests/integration_tests.rs` §12 (extended polyglot block) and `src/identifiers.rs::tests`.
@@ -83,12 +83,12 @@ Status legend: `[x]` done, `[ ]` open.
 - [x] `MatchingEngine` deterministic path: `true` when any `(country, number)` pair is shared across the two workers' lists. Cross-country values with the same `number` never cross-match.
 - **Acceptance:** Unit tests in `src/models.rs::tests` pin constructor canonicalisation, invalid input rejection (bad country / empty number), date setters, serde round-trip (including legacy payloads without date fields). Integration tests in `tests/integration_tests.rs` §21 pin: single-pair deterministic match (with mixed case + whitespace inputs); multi-country any-pair match; same digits different country never match; historical-book pair still matches; one-side-empty → `None`; both-non-empty disjoint → `0.0`; dates are metadata; serde round-trip; legacy Worker JSON deserialises with empty `passport_books`.
 
-**T-27 — Eighteen additional national workeral identifiers.** ✅ Delivered.
+**T-27 — Eighteen additional national personal identifiers.** ✅ Delivered.
 - [x] Add 18 new parsers to `src/identifiers.rs`: `parse_be_nn` (Belgium Mod-97), `parse_bg_egn` (Bulgaria weighted Mod-11), `parse_cz_rc` (Czech Mod-11 divisibility), `parse_dk_cpr` (Denmark format-only), `parse_ee_ik` (Estonia cascading Mod-11), `parse_es_dni` (Spain DNI/NIE Mod-23 letter), `parse_fi_hetu` (Finland Mod-31 letter), `parse_hr_oib` (Croatia ISO 7064 MOD 11,10), `parse_is_kt` (Iceland Mod-11), `parse_lt_ak` (Lithuania cascading Mod-11), `parse_lv_pk` (Latvia weighted Mod-11), `parse_mt_id` (Malta format + letter), `parse_no_fnr` (Norway dual Mod-11), `parse_pl_pesel` (Poland weighted Mod-10), `parse_ro_cnp` (Romania Mod-11), `parse_si_emso` (Slovenia Mod-11), `parse_sk_rc` (Slovakia Mod-11), `parse_uk_nino` (UK format with prefix blacklist).
 - [x] Extend `Worker`, `WorkerBuilder`, `MatchConfig` (per-scheme weight 0.30), `MatchBreakdown` (per-scheme `Option<f64>` with `#[serde(default)]`), `MatchingEngine` deterministic and breakdown paths, and `Worker::validate` to cover the 18 new schemes. Total: 30 schemes.
 - **Acceptance:** ≥4 unit tests per parser pinning canonical / wrong-check / wrong-length / format-variant cases; integration tests pin deterministic match per scheme and verify three UK Mod-11 schemes (NHS / NI H&C / Scotland CHI) remain scheme-local plus NINO never cross-matches. Met by `src/identifiers.rs::tests` and `tests/integration_tests.rs` §21a.
 
-**T-28 — Five further workeral IDs + nine passport-format validators.** ✅ Delivered.
+**T-28 — Five further personal IDs + nine passport-format validators.** ✅ Delivered.
 - [x] Drive from `AGENTS/national-worker-identifiers.tsv`.
 - [x] Add five Worker-field identifiers: `gr_dss` (Greece DSS, format-only 10 digits), `li_id` (Liechtenstein National ID, 2 letters + 8–9 digits, format-only with renewal caveat), `nl_id` (Netherlands National ID, 9-char `[A-Z\O]{2}[A-Z0-9\O]{6}[0-9]`), `pl_nip` (Poland NIP, 10 digits weighted Mod-11), `pt_nif` (Portugal NIF, 9 digits weighted Mod-11). Total Worker-field schemes: **35**.
 - [x] Add nine passport-format validators in the `identifiers` module (Cyprus, Czech, Liechtenstein, Lithuania, Malta, Netherlands, Portugal, Romania, Slovakia). These are pure format validators with no Worker field; passport data is canonically stored via `Worker::passport_books: Vec<PassportBook>`.

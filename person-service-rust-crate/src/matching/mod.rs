@@ -4,11 +4,19 @@ use crate::models::Person;
 use crate::config::MatchingConfig;
 use crate::Result;
 
+pub mod adapter;
 pub mod algorithms;
 pub mod phonetic;
 pub mod scoring;
 
 pub use scoring::{ProbabilisticScorer, DeterministicScorer, MatchQuality};
+
+/// Re-export the canonical `person-matcher` library so callers can reach
+/// `MatchingEngine`, `MatchConfig`, `MatchResult`, `MatchBreakdown`, the
+/// `Person` builder, and all 40+ national-identifier slots without taking
+/// a separate dependency. Pair this with [`adapter::to_matcher_person`] to
+/// score two service `Person` records through the reference algorithm.
+pub use ::person_matcher as matcher_lib;
 
 /// Match result containing a person and their match score
 #[derive(Debug, Clone)]

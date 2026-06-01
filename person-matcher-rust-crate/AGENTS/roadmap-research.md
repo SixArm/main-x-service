@@ -4,7 +4,7 @@ This file archives the long-form research-spike write-ups that were previously i
 
 ## T-17 — More national identifier schemes: **survey complete; recommended next batch is the 7 phone-table-covered jurisdictions without an identifier parser**.
 
-**Question.** Which national personal / healthcare identifier schemes should be added next, beyond the 35 schemes already shipped (UK NHS, FR NIR, ES TSI, IE IHI, UK NI H&C, US SSN, AU IHI, DE KVNR, IT CF, NL BSN, SE Personnummer, UK Scotland CHI, BE NN, BG EGN, CZ RČ, DK CPR, EE IK, ES DNI, FI HETU, HR OIB, IS KT, LT AK, LV PK, MT ID, NO FNR, PL PESEL, RO CNP, SI EMŠO, SK RČ, UK NINO, GR DSS, LI ID, NL ID, PL NIP, PT NIF)?
+**Question.** Which national personal / healthcare identifier schemes should be added next, beyond the 35 schemes already shipped (UK United Kingdom National Health Service Number, FR NIR, ES TSI, IE IHI, UK NI H&C, US SSN, AU IHI, DE KVNR, IT CF, NL BSN, SE Personnummer, UK Scotland CHI, BE NN, BG EGN, CZ RČ, DK CPR, EE IK, ES DNI, FI HETU, HR OIB, IS KT, LT AK, LV PK, MT ID, NO FNR, PL PESEL, RO CNP, SI EMŠO, SK RČ, UK NINO, GR DSS, LI ID, NL ID, PL NIP, PT NIF)?
 
 **Sample size and prioritisation principle.** The crate already covers **39 phone jurisdictions** (post-T-19) and **35 national identifier schemes** across 33 distinct jurisdictions. The natural next batch is the **7 jurisdictions where the crate parses phones but not identifiers** — that closes the symmetry between the two surfaces and unlocks `deterministic_match` for person populations the crate already invests in elsewhere.
 
@@ -86,7 +86,7 @@ parse_za_id("9001015009087") -> Option<String>
 **Risk and mitigation.**
 
 - **Sentinel data.** Several schemes have known structurally-valid-but-policy-blocked test vectors (e.g. BR CPF `11111111111`, IN Aadhaar prefix-restricted ranges). The parsers SHOULD reject these explicitly so they cannot become production matches.
-- **PII sensitivity.** CN RRN, KR RRN, ZA ID encode date-of-birth and demographic information in the number itself. The crate already treats identifiers as opaque strings at match time, so this doesn't change the matching contract — but consumers should be aware that storing these values is more disclosure than storing a UK NHS Number.
+- **PII sensitivity.** CN RRN, KR RRN, ZA ID encode date-of-birth and demographic information in the number itself. The crate already treats identifiers as opaque strings at match time, so this doesn't change the matching contract — but consumers should be aware that storing these values is more disclosure than storing a UK United Kingdom National Health Service Number.
 - **Format generation drift.** NZ NHI (2019 revision), CN RRN (1999 18-digit reform vs older 15-digit form), and CURP (2010 revision) all have generation-pair concerns. Each parser SHOULD accept the current generation and document the legacy form's behaviour.
 - **Spec links for parser implementers.** See `AGENTS/national-person-identifiers.tsv` as the canonical reference for the broader 35-scheme set; the next-batch jurisdictions will get TSV rows added when each parser ships.
 

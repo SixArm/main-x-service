@@ -51,7 +51,7 @@ pub type Result<T> = std::result::Result<T, MatchingError>;
 /// ```
 /// use person_matcher::MatchingError;
 ///
-/// let e = MatchingError::MissingField("nhs_number".into());
+/// let e = MatchingError::MissingField("united_kingdom_national_health_service_number".into());
 /// // `Display` is provided by `thiserror`.
 /// assert!(e.to_string().contains("Missing required field"));
 /// ```
@@ -69,8 +69,8 @@ mod tests {
 
     #[test]
     fn missing_field_display() {
-        let e = MatchingError::MissingField("nhs_number".into());
-        assert_eq!(e.to_string(), "Missing required field: nhs_number");
+        let e = MatchingError::MissingField("united_kingdom_national_health_service_number".into());
+        assert_eq!(e.to_string(), "Missing required field: united_kingdom_national_health_service_number");
     }
 
     #[test]

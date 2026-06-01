@@ -97,8 +97,8 @@ Status legend: `[x]` done.
 - **Acceptance:** Unit tests pin empty-candidates, order preservation, individual-equivalence, ranking ordering, tie-break determinism, and call-to-call determinism. Integration tests pin filtered consumption, confidence-band carry-through, and `Arc`-shared threadsafe batch scoring. Met by `tests/integration_tests.rs` §20 and `src/matcher.rs::tests`.
 
 **T-16 — Multinational national-identifier support.** Delivered.
-- [x] Add `identifiers` module with `parse_uk_nhs_number`, `parse_fr_nir`, `parse_es_tsi`, `parse_ie_ihi`, `parse_uk_hc_number`.
-- [x] Extend `Person` with `uk_nhs_number`, `fr_nir`, `es_tsi`, `ie_ihi`, `uk_hc_number` (each `Option<String>`).
+- [x] Add `identifiers` module with `parse_united_kingdom_national_health_service_number`, `parse_fr_nir`, `parse_es_tsi`, `parse_ie_ihi`, `parse_uk_hc_number`.
+- [x] Extend `Person` with `united_kingdom_national_health_service_number`, `fr_nir`, `es_tsi`, `ie_ihi`, `uk_hc_number` (each `Option<String>`).
 - [x] Extend `MatchConfig` with per-scheme weights (all default `0.30`).
 - [x] Extend `MatchBreakdown` with per-scheme `Option<f64>` scores.
 - [x] `deterministic_match` returns `true` on any same-scheme identifier equality; identifiers across schemes never cross-match.
@@ -164,7 +164,7 @@ Status legend: `[x]` done.
 - [x] Add `parse_se_personnummer` (10- or 12-digit Luhn Swedish personal identity number).
 - [x] Add `parse_uk_chi_number` (10-digit Mod-11 Scottish Community Health Index Number).
 - [x] Extend `Person`, `PersonBuilder`, `MatchConfig` (per-scheme weight 0.30), `MatchBreakdown` (per-scheme `Option<f64>` with `#[serde(default)]`), `MatchingEngine` deterministic and breakdown paths, and `Person::validate`.
-- **Acceptance:** 6 × 6 unit tests in `src/identifiers.rs` (canonical / wrong check / wrong length / wrong chars / format variants / empty); per-scheme integration tests covering deterministic match, mismatch, unparseable yields `None`, and breakdown carries each score; cross-scheme: AU IHI ↔ IE IHI scheme-local; UK CHI ↔ UK NHS and UK CHI ↔ UK NI H&C scheme-local. Met by `tests/integration_tests.rs` §12 (extended polyglot block) and `src/identifiers.rs::tests`.
+- **Acceptance:** 6 × 6 unit tests in `src/identifiers.rs` (canonical / wrong check / wrong length / wrong chars / format variants / empty); per-scheme integration tests covering deterministic match, mismatch, unparseable yields `None`, and breakdown carries each score; cross-scheme: AU IHI ↔ IE IHI scheme-local; UK CHI ↔ UK United Kingdom National Health Service Number and UK CHI ↔ UK NI H&C scheme-local. Met by `tests/integration_tests.rs` §12 (extended polyglot block) and `src/identifiers.rs::tests`.
 
 **T-24 — `previous_addresses` best-of scoring.** Delivered.
 - [x] Extend `score_address` to take the highest score across every pair drawn from `(p1.address ∪ p1.previous_addresses) × (p2.address ∪ p2.previous_addresses)`.
@@ -187,7 +187,7 @@ Status legend: `[x]` done.
 **T-27 — Eighteen additional national personal identifiers.** Delivered.
 - [x] Add 18 new parsers to `src/identifiers.rs`: `parse_be_nn` (Belgium Mod-97), `parse_bg_egn` (Bulgaria weighted Mod-11), `parse_cz_rc` (Czech Mod-11 divisibility), `parse_dk_cpr` (Denmark format-only), `parse_ee_ik` (Estonia cascading Mod-11), `parse_es_dni` (Spain DNI/NIE Mod-23 letter), `parse_fi_hetu` (Finland Mod-31 letter), `parse_hr_oib` (Croatia ISO 7064 MOD 11,10), `parse_is_kt` (Iceland Mod-11), `parse_lt_ak` (Lithuania cascading Mod-11), `parse_lv_pk` (Latvia weighted Mod-11), `parse_mt_id` (Malta format + letter), `parse_no_fnr` (Norway dual Mod-11), `parse_pl_pesel` (Poland weighted Mod-10), `parse_ro_cnp` (Romania Mod-11), `parse_si_emso` (Slovenia Mod-11), `parse_sk_rc` (Slovakia Mod-11), `parse_uk_nino` (UK format with prefix blacklist).
 - [x] Extend `Person`, `PersonBuilder`, `MatchConfig` (per-scheme weight 0.30), `MatchBreakdown` (per-scheme `Option<f64>` with `#[serde(default)]`), `MatchingEngine` deterministic and breakdown paths, and `Person::validate` to cover the 18 new schemes. Total: 30 schemes.
-- **Acceptance:** ≥4 unit tests per parser pinning canonical / wrong-check / wrong-length / format-variant cases; integration tests pin deterministic match per scheme and verify three UK Mod-11 schemes (NHS / NI H&C / Scotland CHI) remain scheme-local plus NINO never cross-matches. Met by `src/identifiers.rs::tests` and `tests/integration_tests.rs` §21a.
+- **Acceptance:** ≥4 unit tests per parser pinning canonical / wrong-check / wrong-length / format-variant cases; integration tests pin deterministic match per scheme and verify three UK Mod-11 schemes (United Kingdom National Health Service Number / NI H&C / Scotland CHI) remain scheme-local plus NINO never cross-matches. Met by `src/identifiers.rs::tests` and `tests/integration_tests.rs` §21a.
 
 **T-28 — Five further personal IDs + nine passport-format validators.** Delivered.
 - [x] Drive from `AGENTS/national-person-identifiers.tsv`.

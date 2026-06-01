@@ -10,7 +10,7 @@ A Rust crate for pairwise worker-record matching (deterministic and probabilisti
 
 | Capability | Where it lives |
 |---|---|
-| **Multinational national identifiers** (**42 schemes**) — UK NHS / FR NIR / ES TSI / IE IHI / UK NI H&C / US SSN / AU IHI / DE KVNR / IT CF / NL BSN / SE Workernummer / UK Scotland CHI / BE NN / BG EGN / CZ RČ / DK CPR / EE IK / ES DNI / FI HETU / HR OIB / IS KT / LT AK / LV PK / MT ID / NO FNR / PL PESEL / RO CNP / SI EMŠO / SK RČ / UK NINO / GR DSS / LI ID / NL ID / PL NIP / PT NIF / BR CPF / CN RRN / IN Aadhaar / JP My Number / MX CURP / NZ NHI / ZA ID | `src/identifiers.rs`, spec §6.4 / §14.5 |
+| **Multinational national identifiers** (**42 schemes**) — UK NHS / FR NIR / ES TSI / IE IHI / UK NI H&C / US SSN / AU IHI / DE KVNR / IT CF / NL BSN / SE Personnummer / UK Scotland CHI / BE NN / BG EGN / CZ RČ / DK CPR / EE IK / ES DNI / FI HETU / HR OIB / IS KT / LT AK / LV PK / MT ID / NO FNR / PL PESEL / RO CNP / SI EMŠO / SK RČ / UK NINO / GR DSS / LI ID / NL ID / PL NIP / PT NIF / BR CPF / CN RRN / IN Aadhaar / JP My Number / MX CURP / NZ NHI / ZA ID | `src/identifiers.rs`, spec §6.4 / §14.5 |
 | **Passport-number format validators** (9 jurisdictions) — CY, CZ, LI, LT, MT, NL, PT, RO, SK | `src/identifiers.rs`, spec §6.4a (`PassportBook`) |
 | **Blood type** — `BloodType` enum (8 ABO+RhD variants); strong negative signal | `src/models.rs`, spec §8.2a / §12.2 |
 | **Place of birth** — `Worker::birth_place: Option<Address>` (FHIR parity); city + country sub-score | `src/matcher.rs::score_birth_place`, spec §12.4a |
@@ -67,7 +67,7 @@ The rules of the road. Workflow, golden rules, and links to topic-specific guide
 - [security-and-privacy.md](./AGENTS/security-and-privacy.md) — PII, data protection, clinical safety.
 - [release.md](./AGENTS/release.md) — Versioning and publishing.
 - [spec-driven-development.md](./AGENTS/spec-driven-development.md) — How `spec.md` is maintained as the single source of truth.
-- [national-worker-identifiers.md](./AGENTS/national-worker-identifiers.md) — Reference table of the supported national workeral identifier schemes (42 total post-T-17.1; the TSV / .md reference table covers the original 35 — the 7 T-17.1 schemes are documented in `src/identifiers.rs` and spec FR-85..FR-91).
+- [national-worker-identifiers.md](./AGENTS/national-worker-identifiers.md) — Reference table of the supported national personal identifier schemes (42 total post-T-17.1; the TSV / .md reference table covers the original 35 — the 7 T-17.1 schemes are documented in `src/identifiers.rs` and spec FR-85..FR-91).
 
 ---
 

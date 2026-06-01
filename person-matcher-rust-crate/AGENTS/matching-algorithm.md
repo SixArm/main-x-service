@@ -19,7 +19,7 @@ In production, downstream services typically call both deterministic and probabi
 
 Returns `true` iff **any one** of the following holds:
 
-- Both UK NHS Numbers parse and are equal.
+- Both UK United Kingdom National Health Service Numbers parse and are equal.
 - Both France NIRs parse and are equal.
 - Both España TSIs parse and are equal.
 - Both Éire IHIs parse and are equal.
@@ -27,7 +27,7 @@ Returns `true` iff **any one** of the following holds:
 - Both US SSNs parse and are equal.
 - Normalised given name matches AND normalised family name matches AND DOB matches exactly AND gender matches (or at least one is missing).
 
-Identifiers are scheme-local: an NHS Number and an H&C Number with the same 10 digits do **not** cross-match. If you change this logic, update spec §12.1 and add an integration test.
+Identifiers are scheme-local: a United Kingdom National Health Service Number and an H&C Number with the same 10 digits do **not** cross-match. If you change this logic, update spec §12.1 and add an integration test.
 
 ## Probabilistic Pipeline
 
@@ -39,7 +39,7 @@ Identifiers are scheme-local: an NHS Number and an H&C Number with the same 10 d
 6. `is_match = score >= match_threshold`.
 7. `confidence = Confidence::from_score(score)` — see spec §12.5.
 
-The weight-renormalisation step is important: missing data must not penalise the score. A person with name + DOB only must score 1.0 if both fields match — not be dragged down by "missing NHS number" treated as a zero.
+The weight-renormalisation step is important: missing data must not penalise the score. A person with name + DOB only must score 1.0 if both fields match — not be dragged down by "missing United Kingdom National Health Service Number" treated as a zero.
 
 The `Confidence` band is **independent of `match_threshold`**: `score >= 0.90 → High`, `>= 0.75 → Medium`, else `Low`. Treat `confidence` as a triage hint; `is_match` (which incorporates the configured threshold) remains the authoritative go/no-go signal.
 
@@ -47,7 +47,7 @@ The `Confidence` band is **independent of `match_threshold`**: `score >= 0.90 �
 
 | Field | Function | Notes |
 |---|---|---|
-| NHS number | Exact equality of parsed `NHSNumber` | Both must parse, else `None`. |
+| United Kingdom National Health Service Number | Exact equality of parsed `NHSNumber` | Both must parse, else `None`. |
 | Given name | `name_algorithm` on normalised strings, then nickname lift to `≥ 0.9` if `nickname_table.are_equivalent(a, b)`; when both sides have a `middle_name`, blended as `0.95 × given + 0.05 × middle` (FR-49) | Default `Combined` (0.7 JW + 0.3 Lev); default table is empty. |
 | Family name | Same as above | Default English table contains no family-name entries. |
 | Date of birth | Exact equality (`1.0`), or same-year day/month transposition (`0.5`) — see §12.2 / FR-38 | Either both `Some` or `None`. The transposition heuristic only affects the probabilistic score; `deterministic_match` still requires exact equality. |
@@ -119,7 +119,7 @@ The following sections were lifted from `spec.md` §12 to keep the spec terse. T
 
 `deterministic_match` returns `true` iff **any** of the following hold:
 
-1. **UK NHS Number agreement.** Both records have a `uk_nhs_number`, both parse via `identifiers::parse_uk_nhs_number`, and the canonical forms are equal.
+1. **UK United Kingdom National Health Service Number agreement.** Both records have a `united_kingdom_national_health_service_number`, both parse via `identifiers::parse_united_kingdom_national_health_service_number`, and the canonical forms are equal.
 2. **France NIR agreement.** Both records have an `fr_nir`, both parse via `identifiers::parse_fr_nir`, and the canonical forms are equal.
 3. **España TSI agreement.** Both records have an `es_tsi`, both parse via `identifiers::parse_es_tsi`, and the canonical forms are equal.
 4. **Éire IHI agreement.** Both records have an `ie_ihi`, both parse via `identifiers::parse_ie_ihi`, and the canonical forms are equal.
@@ -143,13 +143,13 @@ The following sections were lifted from `spec.md` §12 to keep the spec terse. T
 
 Otherwise it returns `false`.
 
-National identifiers are scheme-local: a UK NHS Number is only ever compared against another UK NHS Number, never against an H&C Number that happens to share the same 10 digits.
+National identifiers are scheme-local: a UK United Kingdom National Health Service Number is only ever compared against another UK United Kingdom National Health Service Number, never against an H&C Number that happens to share the same 10 digits.
 
 ### Component Scoring — Full Table
 
 | Field | Score function | Score domain |
 |---|---|---|
-| UK NHS Number | Exact equality of canonical form from `parse_uk_nhs_number`; both must parse. | `{0.0, 1.0}`, else `None` |
+| UK United Kingdom National Health Service Number | Exact equality of canonical form from `parse_united_kingdom_national_health_service_number`; both must parse. | `{0.0, 1.0}`, else `None` |
 | France NIR | Exact equality of canonical form from `parse_fr_nir`; both must parse. | `{0.0, 1.0}`, else `None` |
 | España TSI | Exact equality of canonical form from `parse_es_tsi`; both must parse. | `{0.0, 1.0}`, else `None` |
 | Éire IHI | Exact equality of canonical form from `parse_ie_ihi`; both must parse. | `{0.0, 1.0}`, else `None` |
@@ -191,7 +191,7 @@ is_match = score >= match_threshold
 ```
 
 Notes:
-- Weights are renormalised against participating fields. A record with only name and DOB does NOT silently get a low score for "missing" NHS number — the missing field is simply not counted.
+- Weights are renormalised against participating fields. A record with only name and DOB does NOT silently get a low score for "missing" United Kingdom National Health Service Number — the missing field is simply not counted.
 - The phonetic bonus is asymmetric: it only ever pushes the score up.
 
 ### Address Sub-Score

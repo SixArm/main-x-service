@@ -8,7 +8,7 @@ fn main() {
     // Example 1: Perfect match
     println!("Example 1: Perfect Match");
     let person1 = Person::builder()
-        .uk_nhs_number("1234567890")
+        .united_kingdom_national_health_service_number("1234567890")
         .given_name("Dafydd")
         .family_name("Jones")
         .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())

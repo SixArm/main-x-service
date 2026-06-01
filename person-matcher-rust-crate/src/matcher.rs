@@ -9,7 +9,8 @@
 //! ## Two strategies, one engine
 //!
 //! - [`MatchingEngine::deterministic_match`] — fast, binary, defensible.
-//!   Returns `true` iff either both NHS numbers parse to the same value or
+//!   Returns `true` iff either both United Kingdom National Health Service
+//!   Numbers parse to the same value or
 //!   the normalised name + DOB + gender all match exactly.
 //! - [`MatchingEngine::match_persons`] — weighted probabilistic scoring,
 //!   returning a [`MatchResult`] with per-field [`MatchBreakdown`].
@@ -65,7 +66,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// let custom = MatchConfig {
 ///     match_threshold: 0.80,
-///     uk_nhs_number_weight: 0.30,
+///     united_kingdom_national_health_service_number_weight: 0.30,
 ///     fr_nir_weight: 0.30,
 ///     es_tsi_weight: 0.30,
 ///     ie_ihi_weight: 0.30,
@@ -135,8 +136,9 @@ pub struct MatchConfig {
     /// Threshold score for considering two persons a match (`0.0..=1.0`).
     pub match_threshold: f64,
 
-    /// Weight for UK NHS Number match (only contributes if both parse).
-    pub uk_nhs_number_weight: f64,
+    /// Weight for UK United Kingdom National Health Service Number match
+    /// (only contributes if both parse).
+    pub united_kingdom_national_health_service_number_weight: f64,
 
     /// Weight for France NIR match (only contributes if both parse).
     pub fr_nir_weight: f64,
@@ -356,7 +358,7 @@ impl Default for MatchConfig {
     fn default() -> Self {
         Self {
             match_threshold: 0.85,
-            uk_nhs_number_weight: 0.30,
+            united_kingdom_national_health_service_number_weight: 0.30,
             fr_nir_weight: 0.30,
             es_tsi_weight: 0.30,
             ie_ihi_weight: 0.30,
@@ -592,9 +594,10 @@ fn default_confidence() -> Confidence {
 /// flagged. Do not throw it away in downstream services.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchBreakdown {
-    /// Score for UK NHS Number equality (`1.0` or `0.0`), or `None` if either side did not parse.
+    /// Score for UK United Kingdom National Health Service Number equality
+    /// (`1.0` or `0.0`), or `None` if either side did not parse.
     #[serde(default)]
-    pub uk_nhs_number_score: Option<f64>,
+    pub united_kingdom_national_health_service_number_score: Option<f64>,
     /// Score for France NIR equality (`1.0` or `0.0`), or `None` if either side did not parse.
     #[serde(default)]
     pub fr_nir_score: Option<f64>,
@@ -961,7 +964,7 @@ impl MatchingEngine {
     ///
     /// Returns `true` iff **any** of the following hold:
     ///
-    /// - Both UK NHS Numbers parse and are equal.
+    /// - Both UK United Kingdom National Health Service Numbers parse and are equal.
     /// - Both France NIRs parse and are equal.
     /// - Both España TSIs parse and are equal.
     /// - Both Éire IHIs parse and are equal.
@@ -979,23 +982,25 @@ impl MatchingEngine {
     ///   matches, **and** date of birth matches, **and** gender matches (or
     ///   is missing on at least one side).
     ///
-    /// National identifiers from different schemes never cross-match: an
-    /// NHS Number is only ever compared against another NHS Number, never
+    /// National identifiers from different schemes never cross-match: a
+    /// United Kingdom National Health Service Number is only ever compared
+    /// against another United Kingdom National Health Service Number, never
     /// against an H&C Number that happens to share the same 10 digits.
     ///
     /// ```
     /// use person_matcher::{MatchingEngine, Person};
     ///
-    /// // Same NHS number, different formatting → match.
-    /// let a = Person::builder().uk_nhs_number("943 476 5919").build();
-    /// let b = Person::builder().uk_nhs_number("9434765919").build();
+    /// // Same United Kingdom National Health Service Number, different
+    /// // formatting → match.
+    /// let a = Person::builder().united_kingdom_national_health_service_number("943 476 5919").build();
+    /// let b = Person::builder().united_kingdom_national_health_service_number("9434765919").build();
     /// assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     /// ```
     pub fn deterministic_match(&self, person1: &Person, person2: &Person) -> bool {
         if identifier_equal(
-            &person1.uk_nhs_number,
-            &person2.uk_nhs_number,
-            identifiers::parse_uk_nhs_number,
+            &person1.united_kingdom_national_health_service_number,
+            &person2.united_kingdom_national_health_service_number,
+            identifiers::parse_united_kingdom_national_health_service_number,
         ) {
             return true;
         }
@@ -1197,10 +1202,10 @@ impl MatchingEngine {
 
     fn calculate_breakdown(&self, person1: &Person, person2: &Person) -> MatchBreakdown {
         MatchBreakdown {
-            uk_nhs_number_score: identifier_score(
-                &person1.uk_nhs_number,
-                &person2.uk_nhs_number,
-                identifiers::parse_uk_nhs_number,
+            united_kingdom_national_health_service_number_score: identifier_score(
+                &person1.united_kingdom_national_health_service_number,
+                &person2.united_kingdom_national_health_service_number,
+                identifiers::parse_united_kingdom_national_health_service_number,
             ),
             fr_nir_score: identifier_score(
                 &person1.fr_nir,
@@ -1387,9 +1392,9 @@ impl MatchingEngine {
         let mut total_weight = 0.0;
         let mut weighted_sum = 0.0;
 
-        if let Some(score) = breakdown.uk_nhs_number_score {
-            weighted_sum += score * self.config.uk_nhs_number_weight;
-            total_weight += self.config.uk_nhs_number_weight;
+        if let Some(score) = breakdown.united_kingdom_national_health_service_number_score {
+            weighted_sum += score * self.config.united_kingdom_national_health_service_number_weight;
+            total_weight += self.config.united_kingdom_national_health_service_number_weight;
         }
         if let Some(score) = breakdown.fr_nir_score {
             weighted_sum += score * self.config.fr_nir_weight;
@@ -1998,7 +2003,7 @@ mod tests {
     fn config_default_values() {
         let c = MatchConfig::default();
         assert!((c.match_threshold - 0.85).abs() < 1e-9);
-        assert!((c.uk_nhs_number_weight - 0.30).abs() < 1e-9);
+        assert!((c.united_kingdom_national_health_service_number_weight - 0.30).abs() < 1e-9);
         assert!(c.use_phonetic_matching);
         assert!(!c.strict_mode);
     }
@@ -2018,7 +2023,7 @@ mod tests {
         let json = serde_json::to_string(&cfg).expect("serialise");
         let back: MatchConfig = serde_json::from_str(&json).expect("deserialise");
         assert!((cfg.match_threshold - back.match_threshold).abs() < 1e-12);
-        assert!((cfg.uk_nhs_number_weight - back.uk_nhs_number_weight).abs() < 1e-12);
+        assert!((cfg.united_kingdom_national_health_service_number_weight - back.united_kingdom_national_health_service_number_weight).abs() < 1e-12);
         assert_eq!(cfg.use_phonetic_matching, back.use_phonetic_matching);
         assert!(matches!(back.name_algorithm, SimilarityAlgorithm::Combined));
         assert_eq!(cfg.strict_mode, back.strict_mode);
@@ -2054,7 +2059,7 @@ mod tests {
         assert!((cfg.match_threshold - 0.80).abs() < 1e-12);
         assert!(cfg.gmail_dot_folding);
         // Other fields come from default().
-        assert!((cfg.uk_nhs_number_weight - 0.30).abs() < 1e-12);
+        assert!((cfg.united_kingdom_national_health_service_number_weight - 0.30).abs() < 1e-12);
         assert!(matches!(cfg.name_algorithm, SimilarityAlgorithm::Combined));
         assert_eq!(cfg.phone_default_country.as_deref(), Some("GB"));
     }
@@ -2089,7 +2094,7 @@ mod tests {
             .family_name("Smith")
             .date_of_birth(dob(1980, 5, 15))
             .gender(Gender::Male)
-            .uk_nhs_number("9434765919")
+            .united_kingdom_national_health_service_number("9434765919")
             .build();
         let result = MatchingEngine::default_config().match_persons(&p, &p.clone());
         assert!(result.is_match);
@@ -2145,23 +2150,23 @@ mod tests {
     }
 
     #[test]
-    fn unparseable_uk_nhs_number_is_none_not_zero() {
+    fn unparseable_united_kingdom_national_health_service_number_is_none_not_zero() {
         let a = Person::builder()
-            .uk_nhs_number("not-a-number")
+            .united_kingdom_national_health_service_number("not-a-number")
             .given_name("John")
             .family_name("Smith")
             .date_of_birth(dob(1980, 5, 15))
             .build();
         let b = Person::builder()
-            .uk_nhs_number("also-not-a-number")
+            .united_kingdom_national_health_service_number("also-not-a-number")
             .given_name("John")
             .family_name("Smith")
             .date_of_birth(dob(1980, 5, 15))
             .build();
         let r = MatchingEngine::default_config().match_persons(&a, &b);
         assert_eq!(
-            r.breakdown.uk_nhs_number_score, None,
-            "unparseable NHS numbers should not produce a 0.0 penalty"
+            r.breakdown.united_kingdom_national_health_service_number_score, None,
+            "unparseable United Kingdom National Health Service Numbers should not produce a 0.0 penalty"
         );
         assert!(r.is_match, "should still match on demographics");
     }
@@ -2241,13 +2246,13 @@ mod tests {
     // ---------- deterministic match ----------
 
     #[test]
-    fn deterministic_uk_nhs_match_overrides_demographics() {
+    fn deterministic_united_kingdom_national_health_service_number_match_overrides_demographics() {
         let a = Person::builder()
-            .uk_nhs_number("943 476 5919")
+            .united_kingdom_national_health_service_number("943 476 5919")
             .given_name("Bob")
             .build();
         let b = Person::builder()
-            .uk_nhs_number("9434765919")
+            .united_kingdom_national_health_service_number("9434765919")
             .given_name("Alice") // intentionally different
             .build();
         assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
@@ -2360,7 +2365,7 @@ mod tests {
         // sensible threshold. Strict mode must allow it.
         let cfg = MatchConfig::strict();
         let p1 = Person::builder()
-            .uk_nhs_number("9434765919")
+            .united_kingdom_national_health_service_number("9434765919")
             .given_name("John")
             .family_name("Smith")
             .date_of_birth(dob(1980, 5, 15))

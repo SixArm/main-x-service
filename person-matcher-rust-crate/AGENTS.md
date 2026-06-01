@@ -21,7 +21,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 | What is the format command? | `cargo fmt` |
 | Where do public types live? | `src/lib.rs` re-exports; defined under `src/{models,matcher,scorer,normalizer,nicknames,identifiers,error}.rs`. |
 | Where are demo runs? | `cargo run` and `cargo run --example basic_usage`. |
-| Which national identifier schemes are supported? | **42 personal-identifier schemes** plus 9 per-country passport-format validators feeding `PassportBook`. The personal-identifier list (one Person field per scheme): UK NHS, FR NIR, ES TSI, IE IHI, UK NI H&C, US SSN, AU IHI, DE KVNR, IT CF, NL BSN, SE Personnummer, UK Scotland CHI, BE NN, BG EGN, CZ RČ, DK CPR, EE IK, ES DNI, FI HETU, HR OIB, IS KT, LT AK, LV PK, MT ID, NO FNR, PL PESEL, RO CNP, SI EMŠO, SK RČ, UK NINO, GR DSS, LI ID, NL ID, PL NIP, PT NIF, plus the T-17.1 batch: BR CPF, CN RRN, IN Aadhaar, JP My Number, MX CURP, NZ NHI, ZA ID. Passport-format validators: CY, CZ, LI, LT, MT, NL, PT, RO, SK. One parser per scheme in `src/identifiers.rs`; never cross-match across schemes. |
+| Which national identifier schemes are supported? | **42 personal-identifier schemes** plus 9 per-country passport-format validators feeding `PassportBook`. The personal-identifier list (one Person field per scheme): UK United Kingdom National Health Service Number, FR NIR, ES TSI, IE IHI, UK NI H&C, US SSN, AU IHI, DE KVNR, IT CF, NL BSN, SE Personnummer, UK Scotland CHI, BE NN, BG EGN, CZ RČ, DK CPR, EE IK, ES DNI, FI HETU, HR OIB, IS KT, LT AK, LV PK, MT ID, NO FNR, PL PESEL, RO CNP, SI EMŠO, SK RČ, UK NINO, GR DSS, LI ID, NL ID, PL NIP, PT NIF, plus the T-17.1 batch: BR CPF, CN RRN, IN Aadhaar, JP My Number, MX CURP, NZ NHI, ZA ID. Passport-format validators: CY, CZ, LI, LT, MT, NL, PT, RO, SK. One parser per scheme in `src/identifiers.rs`; never cross-match across schemes. |
 | How do I record passports? | `Person::passport_books: Vec<PassportBook>`. Each `PassportBook` carries an ISO 3166-1 alpha-2 `country`, a `number`, and optional `issued` / `expires` dates. A person may carry several books (multi-country, current + historical). The matcher treats any shared `(country, number)` pair across the two persons' lists as a match; cross-country values with the same number never cross-match. See spec §6.4a / §8.6. |
 | Which phone-number jurisdictions are recognised by E.164 normalisation? | 39 countries (covers every national-identifier scheme jurisdiction the crate parses) — see spec §14.3.2 / §21.4 (T-19) for the full table. |
 
@@ -68,7 +68,7 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 - [AGENTS/coding-style.md](./AGENTS/coding-style.md) — Rust style, naming, doc comments, error handling.
 - [AGENTS/testing.md](./AGENTS/testing.md) — Test pyramid, naming, fixtures, coverage expectations.
 - [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) — Deterministic and probabilistic scoring, weights, phonetics. Includes the "Detailed Algorithm Specifications" appendix originally in `spec.md` §12.
-- [AGENTS/normalization.md](./AGENTS/normalization.md) — Name, postcode, phone, NHS-number, and phonetic normalisation rules. Includes the "Detailed Normalisation Specifications" appendix originally in `spec.md` §14.
+- [AGENTS/normalization.md](./AGENTS/normalization.md) — Name, postcode, phone, united-kingdom-national-health-service-number, and phonetic normalisation rules. Includes the "Detailed Normalisation Specifications" appendix originally in `spec.md` §14.
 - [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md) — PII, data protection, clinical-safety guardrails.
 - [AGENTS/release.md](./AGENTS/release.md) — Versioning, CHANGELOG, publishing checklist.
 - [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md) — How `spec.md` is maintained as the single source of truth.
@@ -88,7 +88,7 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 - ❌ Do not silently widen or narrow the public API; every re-export from `lib.rs` is part of the SemVer contract.
 - ❌ Do not add panicking unwraps in library code. `Option`/`Result` is the answer.
 - ❌ Do not log person data. Do not `Debug`-format records into traces.
-- ❌ Do not cross-match national identifiers across schemes (e.g. a UK NHS Number against a UK NI H&C Number with the same digits). Per spec §12.1 / FR-13, identifiers are scheme-local.
+- ❌ Do not cross-match national identifiers across schemes (e.g. a UK United Kingdom National Health Service Number against a UK NI H&C Number with the same digits). Per spec §12.1 / FR-13, identifiers are scheme-local.
 - ❌ Do not score `local_id`. Different organisations may issue colliding values (resolved §22 OQ-2).
 - ❌ Do not seed `NicknameTable::english()`'s exact contents into tests as a stable assumption — the dictionary may gain entries in minor releases. Test against `with_class` constructs you control.
 

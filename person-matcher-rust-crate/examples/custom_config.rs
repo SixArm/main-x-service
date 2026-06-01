@@ -54,7 +54,7 @@ fn main() {
     // Custom configuration - prioritize demographic data over national identifiers
     let custom_config = MatchConfig {
         match_threshold: 0.80,
-        uk_nhs_number_weight: 0.10, // Reduced weight
+        united_kingdom_national_health_service_number_weight: 0.10, // Reduced weight
         fr_nir_weight: 0.10,
         es_tsi_weight: 0.10,
         ie_ihi_weight: 0.10,
@@ -125,9 +125,9 @@ fn main() {
     println!();
 
     // National-identifier-focused configuration
-    let nhs_config = MatchConfig {
+    let uknhsn_config = MatchConfig {
         match_threshold: 0.90,
-        uk_nhs_number_weight: 0.60, // Very high weight
+        united_kingdom_national_health_service_number_weight: 0.60, // Very high weight
         fr_nir_weight: 0.60,
         es_tsi_weight: 0.60,
         ie_ihi_weight: 0.60,
@@ -190,10 +190,10 @@ fn main() {
         phone_default_country: Some("GB".into()),
     };
 
-    let nhs_engine = MatchingEngine::new(nhs_config);
-    let nhs_result = nhs_engine.match_persons(&person1, &person2);
-    println!("NHS-Focused Config:");
-    println!("  Score: {:.2}%", nhs_result.score * 100.0);
-    println!("  Match: {}", nhs_result.is_match);
-    println!("  Note: No NHS numbers provided, so match relies on names/DOB");
+    let uknhsn_engine = MatchingEngine::new(uknhsn_config);
+    let uknhsn_result = uknhsn_engine.match_persons(&person1, &person2);
+    println!("United Kingdom National Health Service Number-Focused Config:");
+    println!("  Score: {:.2}%", uknhsn_result.score * 100.0);
+    println!("  Match: {}", uknhsn_result.is_match);
+    println!("  Note: No United Kingdom National Health Service Numbers provided, so match relies on names/DOB");
 }

@@ -55,7 +55,7 @@ person-matcher/
 - Comprehensive demographic data structure
 - Builder pattern for ergonomic construction
 - Support for:
-  - NHS numbers
+  - United Kingdom National Health Service Numbers
   - Full names (first, middle, last)
   - Date of birth
   - Gender
@@ -71,7 +71,7 @@ person-matcher/
 ##### Default Weight Configuration
 | Field | Weight | Rationale |
 |-------|--------|-----------|
-| NHS Number | 30% | Strongest identifier when available |
+| United Kingdom National Health Service Number | 30% | Strongest identifier when available |
 | Family Name | 20% | Less likely to change than Given name |
 | Date of Birth | 20% | Reliable identifier |
 | Given Name | 15% | Subject to nicknames/variations |
@@ -95,7 +95,7 @@ Standardization for consistent matching:
 - **Names**: Remove diacritics, punctuation, normalize case
 - **Postcodes**: Uppercase, remove spaces
 - **Phone**: Remove formatting; strip `0044` international prefix, `44` dialling code, and a single leading trunk `0`
-- **NHS Numbers**: Extract digits only
+- **United Kingdom National Health Service Numbers**: Extract digits only
 - **Phonetic**: Soundex algorithm for names
 
 ## Algorithm Details
@@ -104,8 +104,8 @@ Standardization for consistent matching:
 
 Returns `true` if ANY of these conditions are met:
 
-1. **NHS Number Match**
-   - Normalized NHS numbers are identical
+1. **United Kingdom National Health Service Number Match**
+   - Normalized United Kingdom National Health Service Numbers are identical
    - Handles various formats (spaces, hyphens)
 
 2. **Complete Demographics Match**
@@ -124,7 +124,7 @@ Returns `true` if ANY of these conditions are met:
 
 **Scoring Example:**
 ```
-NHS Number:    1.0 × 0.30 = 0.30
+United Kingdom National Health Service Number: 1.0 × 0.30 = 0.30
 Given Name:    0.85 × 0.15 = 0.1275
 Family Name:     1.0 × 0.20 = 0.20
 Date of Birth: 1.0 × 0.20 = 0.20
@@ -169,13 +169,13 @@ Normalizes various formats by stripping the international prefix `0044`, the dia
 ## Test Coverage
 
 ### Unit Tests (14 tests)
-- Normalizer: Names, postcodes, phones, NHS numbers, phonetics
+- Normalizer: Names, postcodes, phones, United Kingdom National Health Service Numbers, phonetics
 - Scorer: Jaro-Winkler, Levenshtein, exact match, optional fields
 - Matcher: Exact match, fuzzy match, no match, deterministic matching
 
 ### Integration Tests (17 tests)
 - Perfect matches (all fields)
-- NHS number mismatches
+- United Kingdom National Health Service Number mismatches
 - Common name typos
 - Phonetic name matching
 - Names with diacritics
@@ -216,14 +216,14 @@ Total: 32/32 tests passed (100%)
 ### Scenario 1: High Confidence Match
 ```
 Input:
-  Person 1: NHS=1234567890, Name="John Smith", DOB=1980-05-15
-  Person 2: NHS=1234567890, Name="Jon Smith", DOB=1980-05-15
+  Person 1: United-Kingdom-National-Health-Service-Number=1234567890, Name="John Smith", DOB=1980-05-15
+  Person 2: United-Kingdom-National-Health-Service-Number=1234567890, Name="Jon Smith", DOB=1980-05-15
 
 Output:
   Score: 98.6%
   Match: YES
   Confidence: High
-  Reason: NHS number exact match + high name similarity
+  Reason: United Kingdom National Health Service Number exact match + high name similarity
 ```
 
 ### Scenario 2: Medium Confidence Match
@@ -277,7 +277,7 @@ All weights and thresholds are configurable:
 ```rust
 MatchConfig {
     match_threshold: 0.90,
-    nhs_number_weight: 0.40,
+    united_kingdom_national_health_service_number_weight: 0.40,
     given_name_weight: 0.15,
     // ... customize all fields
 }
@@ -287,7 +287,7 @@ MatchConfig {
 
 ### Current Limitations
 1. **No Machine Learning**: Rule-based system only
-2. **Single Identifier Scheme**: Optimised for NHS-format check-digit identifiers
+2. **Single Identifier Scheme**: Optimised for United Kingdom National Health Service Number-format check-digit identifiers
 3. **In-Memory Only**: No database persistence
 4. **Pairwise Matching**: Processes pairs, not batches
 5. **No Learning**: Doesn't adapt from feedback
@@ -296,7 +296,7 @@ MatchConfig {
 1. **Nicknames**: May not match (Robert vs Bob)
 2. **Name Changes**: Marriage name changes require previous names
 3. **Transposed Dates**: DD/MM vs MM/DD errors not detected
-4. **Duplicate NHS Numbers**: Assumes NHS numbers are unique
+4. **Duplicate United Kingdom National Health Service Numbers**: Assumes United Kingdom National Health Service Numbers are unique
 
 ## Future Enhancements
 

@@ -442,7 +442,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Research Basis
 - Implemented based on findings from:
-  - "Event matcher within a Health Information Exchange" (Grannis et al., 2014)
+  - "Person matcher within a Health Information Exchange" (Grannis et al., 2014)
   - "Patient Identification Techniques – Approaches, Implications, and Findings" (Reisman, 2020)
 
 ### Features

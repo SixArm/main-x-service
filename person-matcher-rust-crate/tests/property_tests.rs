@@ -177,7 +177,7 @@ proptest! {
         let back: MatchConfig = serde_json::from_str(&json).expect("deserialise");
         // Compare field-by-field on the public f64 weights.
         prop_assert!((original.match_threshold - back.match_threshold).abs() < 1e-12);
-        prop_assert!((original.uk_nhs_number_weight - back.uk_nhs_number_weight).abs() < 1e-12);
+        prop_assert!((original.united_kingdom_national_health_service_number_weight - back.united_kingdom_national_health_service_number_weight).abs() < 1e-12);
         prop_assert!((original.given_name_weight - back.given_name_weight).abs() < 1e-12);
         prop_assert!((original.family_name_weight - back.family_name_weight).abs() < 1e-12);
         prop_assert!((original.date_of_birth_weight - back.date_of_birth_weight).abs() < 1e-12);

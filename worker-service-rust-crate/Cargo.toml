@@ -2,12 +2,12 @@
 name = "worker-service"
 version = "0.2.0"
 edition = "2024"
-authors = ["MPI Development Team"]
-description = "Worker Service (MPI) - A healthcare worker identification and matching system"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/sixarm/worker-service-rust-crate"
-keywords = ["healthcare", "mpi", "worker-matcher", "fhir", "hl7"]
-categories = ["science", "database"]
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Worker Service - A worker administration microservice that interoperates with the worker-matcher crate"
+license = "Apache-2.0 OR BSD-3-Clause OR GPL-2-or-later OR MIT"
+repository = "https://github.com/sixarm/main-x-service/worker-service-rust-crate"
+keywords = ["worker-matcher", "microservice"]
+categories = ["database"]
 
 [dependencies]
 # Async Runtime
@@ -70,6 +70,9 @@ async-trait = "0.1"
 # Fuzzy Matching & String Processing
 strsim = "0.11"
 fuzzy-matcher = "0.3"
+
+# Sibling matcher crate (canonical reference algorithm; reached via adapter)
+worker-matcher = { path = "../worker-matcher-rust-crate" }
 
 # Security
 argon2 = "0.5"

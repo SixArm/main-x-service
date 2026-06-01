@@ -191,7 +191,7 @@ Every field is `Option<f64>`: `None` = not scored; `Some(v)` ∈ `[0.0, 1.0]`. O
 
 ### 9.2 Dependency Graph
 
-`matcher → normalizer / scorer / models / identifiers / error`; `identifiers → nhs-number`; `models → serde / chrono`; `scorer → strsim`; `normalizer → unicode-normalization / soundex`; `error → thiserror`. No cycles. `lib.rs` only re-exports.
+`matcher → normalizer / scorer / models / identifiers / error`; `identifiers → united-kingdom-national-health-service-number`; `models → serde / chrono`; `scorer → strsim`; `normalizer → unicode-normalization / soundex`; `error → thiserror`. No cycles. `lib.rs` only re-exports.
 
 ### 9.3 Layering Rules
 
@@ -273,7 +273,7 @@ Invariants: normalisers SHOULD be idempotent; identifier parsers are scheme-loca
 
 ## 15. Error Model
 
-`MatchingError` is a `thiserror`-derived enum with `#[non_exhaustive]` (future variants do not break SemVer). One variant: `MissingField(String)`. `type Result<T> = std::result::Result<T, MatchingError>;`. `MissingField` is returned by `Person::validate` when no name / identifier / `passport_books` entry is populated. The matching engine is infallible; identifier parsers return `Option<String>` rather than `Result` (the parser is the source of truth); `MatchConfig::default` / `strict` / `lenient` are infallible. Earlier `InvalidData` / `InvalidNhsNumber` / `InvalidDate` / `ConfigError` variants were removed in T-13 (OQ-6).
+`MatchingError` is a `thiserror`-derived enum with `#[non_exhaustive]` (future variants do not break SemVer). One variant: `MissingField(String)`. `type Result<T> = std::result::Result<T, MatchingError>;`. `MissingField` is returned by `Person::validate` when no name / identifier / `passport_books` entry is populated. The matching engine is infallible; identifier parsers return `Option<String>` rather than `Result` (the parser is the source of truth); `MatchConfig::default` / `strict` / `lenient` are infallible. Earlier `InvalidData` / `InvalidUnitedKingdomNationalHealthServiceNumber` / `InvalidDate` / `ConfigError` variants were removed in T-13 (OQ-6).
 
 ---
 
@@ -302,7 +302,7 @@ Unit tests (`src/*.rs` `#[cfg(test)]` modules), integration tests (`tests/integr
 
 ### 18.2 Required Scenarios
 
-Scenario classes (each ≥ one test): matching baselines (perfect / unrelated / missing-field); name variants (typographic / phonetic / diacritic / apostrophe); address handling (abbreviation, house-number, unit prefix, directional, mismatched-house penalty); phone normalisation (`+CC` / `00CC` / `07…`, E.164 within-country, cross-country disambiguation, legacy fallback); deterministic identifier-only match (one test per scheme: 42 + passport-book); scheme locality (UK NHS ≠ UK NI H&C ≠ UK CHI; AU IHI ≠ IE IHI; NL ID ≠ NL BSN; PL NIP ≠ PL PESEL; UK NINO never cross-matches); per-parser validation (canonical / case-whitespace / check-digit / length / character / variant); configuration modes (strict rejects nickname-only; lenient admits more partial; demographics-alone deterministic); DOB transposition (`0.5` swap; deterministic rejects; cross-year doesn't fire); `Person::validate` (rejects empty; accepts solo identifier / non-empty `passport_books`); serde round-trips for `Person` and `MatchResult` (all 42 identifiers, `#[serde(default)]` legacy defaulting); nicknames lift to ≥ 0.9 one-way (default empty table); email canonical equality (opt-in Gmail folding, `local_id` not scored).
+Scenario classes (each ≥ one test): matching baselines (perfect / unrelated / missing-field); name variants (typographic / phonetic / diacritic / apostrophe); address handling (abbreviation, house-number, unit prefix, directional, mismatched-house penalty); phone normalisation (`+CC` / `00CC` / `07…`, E.164 within-country, cross-country disambiguation, legacy fallback); deterministic identifier-only match (one test per scheme: 42 + passport-book); scheme locality (UK United Kingdom National Health Service Number ≠ UK NI H&C ≠ UK CHI; AU IHI ≠ IE IHI; NL ID ≠ NL BSN; PL NIP ≠ PL PESEL; UK NINO never cross-matches); per-parser validation (canonical / case-whitespace / check-digit / length / character / variant); configuration modes (strict rejects nickname-only; lenient admits more partial; demographics-alone deterministic); DOB transposition (`0.5` swap; deterministic rejects; cross-year doesn't fire); `Person::validate` (rejects empty; accepts solo identifier / non-empty `passport_books`); serde round-trips for `Person` and `MatchResult` (all 42 identifiers, `#[serde(default)]` legacy defaulting); nicknames lift to ≥ 0.9 one-way (default empty table); email canonical equality (opt-in Gmail folding, `local_id` not scored).
 
 ### 18.3 Coverage Goals
 
@@ -363,7 +363,7 @@ Open questions are tracked here until resolved.
 - Diacritic-heavy name false negatives (Med/Med) — NFKD pipeline; T-9.1 phonetic encoder follow-up.
 - Spec / code drift (High/Med) — T-7 CI check.
 - Soundex collisions cluster too aggressively (Med/Low) — phonetic is bonus-only.
-- `nhs-number` dep becomes unmaintained (Low/Med) — pin minor version; vendored fallback documented.
+- `united-kingdom-national-health-service-number` dep becomes unmaintained (Low/Med) — pin minor version; vendored fallback documented.
 - Cross-scheme identifier confusion (Med/High) — FR-13 forbids cross-scheme equality; consumers must record provenance at ingest.
 - ES TSI lenient validation admits malformed regional values (Med/Low) — deliberate; consumers may layer a community-specific check.
 
@@ -411,4 +411,4 @@ Full list in [`AGENTS/delivered-tasks.md`](AGENTS/delivered-tasks.md); covers th
 2. Reisman M. *Patient Identification Techniques.* NCVHS, 2020. (`help/`)
 3. Winkler WE. *String Comparator Metrics and Enhanced Decision Rules in the Fellegi-Sunter Model of Record Linkage.* US Census Bureau, 1990.
 4. Unicode Technical Report #15 — *Unicode Normalization Forms.*
-5. Crates: `nhs-number` (Mod-11 check digit), `strsim`, `soundex`, `unicode-normalization`.
+5. Crates: `united-kingdom-national-health-service-number` (Mod-11 check digit; aliases the upstream `nhs-number` crate), `strsim`, `soundex`, `unicode-normalization`.

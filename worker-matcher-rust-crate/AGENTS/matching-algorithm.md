@@ -129,7 +129,7 @@ The verbatim §12 per-algorithm detail is archived here so the spec can keep onl
 8. **Germany KVNR agreement.** Both records have a `de_kvnr`, both parse via `identifiers::parse_de_kvnr`, and the canonical forms are equal.
 9. **Italy *Codice Fiscale* agreement.** Both records have an `it_cf`, both parse via `identifiers::parse_it_cf`, and the canonical forms are equal.
 10. **Netherlands BSN agreement.** Both records have an `nl_bsn`, both parse via `identifiers::parse_nl_bsn`, and the canonical forms are equal.
-11. **Sweden *Workernummer* agreement.** Both records have an `se_workernummer`, both parse via `identifiers::parse_se_workernummer`, and the canonical forms are equal.
+11. **Sweden *Personnummer* agreement.** Both records have an `se_personnummer`, both parse via `identifiers::parse_se_personnummer`, and the canonical forms are equal.
 12. **UK Scotland CHI Number agreement.** Both records have a `uk_chi_number`, both parse via `identifiers::parse_uk_chi_number`, and the canonical forms are equal.
 13. **T-27 schemes agreement.** Same shape for `be_nn`, `bg_egn`, `cz_rc`, `dk_cpr`, `ee_ik`, `es_dni`, `fi_hetu`, `hr_oib`, `is_kt`, `lt_ak`, `lv_pk`, `mt_id`, `no_fnr`, `pl_pesel`, `ro_cnp`, `si_emso`, `sk_rc`, `uk_nino` — each is scheme-local and any pair with equal canonical form fires.
 14. **T-28 schemes agreement.** Same shape for `gr_dss`, `li_id`, `nl_id`, `pl_nip`, `pt_nif`.
@@ -159,7 +159,7 @@ National identifiers are scheme-local: a UK NHS Number is only ever compared aga
 | Germany KVNR | Exact equality of canonical form from `parse_de_kvnr`; both must parse. | `{0.0, 1.0}`, else `None` |
 | Italy *Codice Fiscale* | Exact equality of canonical form from `parse_it_cf`; both must parse. | `{0.0, 1.0}`, else `None` |
 | Netherlands BSN | Exact equality of canonical form from `parse_nl_bsn`; both must parse. | `{0.0, 1.0}`, else `None` |
-| Sweden *Workernummer* | Exact equality of canonical form from `parse_se_workernummer`; both must parse. | `{0.0, 1.0}`, else `None` |
+| Sweden *Personnummer* | Exact equality of canonical form from `parse_se_personnummer`; both must parse. | `{0.0, 1.0}`, else `None` |
 | UK Scotland CHI | Exact equality of canonical form from `parse_uk_chi_number`; both must parse. | `{0.0, 1.0}`, else `None` |
 | Passport book | `Some(1.0)` if any `(country, number)` pair is shared across `passport_books` on both sides; `Some(0.0)` if both non-empty but disjoint; `None` if either empty. See §6.4a. | `{0.0, 1.0}`, else `None` |
 | Given name | `name_algorithm` applied to normalised strings; raised to `0.9` when both names appear in the same class of `MatchConfig::nickname_table`. When both workers have a `middle_name`, the final score is `0.95 × given_sim + 0.05 × middle_sim` (FR-49). | `[0.0, 1.0]` |

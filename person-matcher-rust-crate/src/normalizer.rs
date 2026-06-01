@@ -27,8 +27,10 @@
 //!
 //! ## What this module deliberately does *not* do
 //!
-//! - It does not validate NHS numbers — that is delegated to the
-//!   `nhs-number` crate at the call-site (see [`crate::matcher`]).
+//! - It does not validate United Kingdom National Health Service Numbers —
+//!   that is delegated to the
+//!   `united-kingdom-national-health-service-number` crate at the call-site
+//!   (see [`crate::matcher`]).
 //! - It does not normalise email addresses or middle names (see spec
 //!   tasks T-11 and OQ-1 respectively).
 //! - It does not handle non-ASCII punctuation such as the curly apostrophe

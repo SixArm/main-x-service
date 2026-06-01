@@ -19,7 +19,7 @@
 //! use chrono::NaiveDate;
 //!
 //! let p = Person::builder()
-//!     .uk_nhs_number("9434765919")
+//!     .united_kingdom_national_health_service_number("9434765919")
 //!     .given_name("Dafydd")
 //!     .family_name("Jones")
 //!     .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
@@ -572,7 +572,7 @@ impl PassportBook {
 ///     .build();
 ///
 /// assert_eq!(p.given_name.as_deref(), Some("Siân"));
-/// assert!(p.uk_nhs_number.is_none());
+/// assert!(p.united_kingdom_national_health_service_number.is_none());
 /// ```
 ///
 /// `Person` round-trips through `serde`.
@@ -587,12 +587,12 @@ impl PassportBook {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Person {
-    /// United Kingdom NHS Number (England, Wales, Isle of Man) — a 10-digit
-    /// Modulus-11 identifier parsed via
-    /// [`crate::identifiers::parse_uk_nhs_number`]. Whitespace tolerated in
-    /// the spaced `"XXX XXX XXXX"` layout.
+    /// United Kingdom National Health Service Number (England, Wales, Isle of
+    /// Man) — a 10-digit Modulus-11 identifier parsed via
+    /// [`crate::identifiers::parse_united_kingdom_national_health_service_number`].
+    /// Whitespace tolerated in the spaced `"XXX XXX XXXX"` layout.
     #[serde(default)]
-    pub uk_nhs_number: Option<String>,
+    pub united_kingdom_national_health_service_number: Option<String>,
 
     /// France NIR (*Numéro d'Inscription au Répertoire*) — the 15-character
     /// national identifier with a Modulus-97 check key. Parsed via
@@ -613,8 +613,8 @@ pub struct Person {
     pub ie_ihi: Option<String>,
 
     /// United Kingdom Northern Ireland H&C Number (Health and Care Number)
-    /// — a 10-digit Modulus-11 identifier issued by HSC. Shares the NHS
-    /// Number algorithm. Parsed via
+    /// — a 10-digit Modulus-11 identifier issued by HSC. Shares the United
+    /// Kingdom National Health Service Number algorithm. Parsed via
     /// [`crate::identifiers::parse_uk_hc_number`].
     #[serde(default)]
     pub uk_hc_number: Option<String>,
@@ -658,8 +658,8 @@ pub struct Person {
 
     /// United Kingdom (Scotland) CHI Number (Community Health Index) —
     /// 10-digit identifier used by NHS Scotland. Shares the Mod-11
-    /// algorithm of the NHS Number but is scheme-local. Parsed via
-    /// [`crate::identifiers::parse_uk_chi_number`].
+    /// algorithm of the United Kingdom National Health Service Number but is
+    /// scheme-local. Parsed via [`crate::identifiers::parse_uk_chi_number`].
     #[serde(default)]
     pub uk_chi_number: Option<String>,
 
@@ -954,7 +954,7 @@ impl Person {
     /// Validate that the person carries at least one identifying field.
     ///
     /// Returns `Ok(())` if any of the following is set: a name (`given_name`
-    /// or `family_name`), or any national identifier (`uk_nhs_number`,
+    /// or `family_name`), or any national identifier (`united_kingdom_national_health_service_number`,
     /// `fr_nir`, `es_tsi`, `ie_ihi`, `uk_hc_number`). Otherwise returns
     /// [`crate::MatchingError::MissingField`].
     ///
@@ -967,7 +967,7 @@ impl Person {
     /// use person_matcher::Person;
     ///
     /// assert!(Person::builder().given_name("Ada").build().validate().is_ok());
-    /// assert!(Person::builder().uk_nhs_number("9434765919").build().validate().is_ok());
+    /// assert!(Person::builder().united_kingdom_national_health_service_number("9434765919").build().validate().is_ok());
     /// assert!(Person::builder().ie_ihi("1234567").build().validate().is_ok());
     /// assert!(Person::builder().us_ssn("123-45-6789").build().validate().is_ok());
     /// assert!(Person::builder().de_kvnr("A123456780").build().validate().is_ok());
@@ -982,7 +982,7 @@ impl Person {
     /// ```
     pub fn validate(&self) -> crate::Result<()> {
         let has_name = self.given_name.is_some() || self.family_name.is_some();
-        let has_identifier = self.uk_nhs_number.is_some()
+        let has_identifier = self.united_kingdom_national_health_service_number.is_some()
             || self.fr_nir.is_some()
             || self.es_tsi.is_some()
             || self.ie_ihi.is_some()
@@ -1047,18 +1047,18 @@ impl Person {
 /// use chrono::NaiveDate;
 ///
 /// let p: Person = PersonBuilder::default()
-///     .uk_nhs_number("9434765919")
+///     .united_kingdom_national_health_service_number("9434765919")
 ///     .given_name(String::from("Owen"))   // owned String
 ///     .family_name("Williams")            // &str
 ///     .date_of_birth(NaiveDate::from_ymd_opt(1972, 11, 4).unwrap())
 ///     .gender(Gender::Male)
 ///     .build();
 ///
-/// assert_eq!(p.uk_nhs_number.as_deref(), Some("9434765919"));
+/// assert_eq!(p.united_kingdom_national_health_service_number.as_deref(), Some("9434765919"));
 /// ```
 #[derive(Default)]
 pub struct PersonBuilder {
-    uk_nhs_number: Option<String>,
+    united_kingdom_national_health_service_number: Option<String>,
     fr_nir: Option<String>,
     es_tsi: Option<String>,
     ie_ihi: Option<String>,
@@ -1120,19 +1120,21 @@ pub struct PersonBuilder {
 }
 
 impl PersonBuilder {
-    /// Set the United Kingdom NHS Number (England, Wales, Isle of Man).
+    /// Set the United Kingdom National Health Service Number (England, Wales,
+    /// Isle of Man).
     ///
     /// The string is stored verbatim; normalisation and validation happen at
-    /// match time via [`crate::identifiers::parse_uk_nhs_number`]. Whitespace
-    /// in the canonical `"XXX XXX XXXX"` layout is permitted.
+    /// match time via
+    /// [`crate::identifiers::parse_united_kingdom_national_health_service_number`].
+    /// Whitespace in the canonical `"XXX XXX XXXX"` layout is permitted.
     ///
     /// ```
     /// # use person_matcher::Person;
-    /// let p = Person::builder().uk_nhs_number("943 476 5919").build();
-    /// assert_eq!(p.uk_nhs_number.as_deref(), Some("943 476 5919"));
+    /// let p = Person::builder().united_kingdom_national_health_service_number("943 476 5919").build();
+    /// assert_eq!(p.united_kingdom_national_health_service_number.as_deref(), Some("943 476 5919"));
     /// ```
-    pub fn uk_nhs_number<S: Into<String>>(mut self, value: S) -> Self {
-        self.uk_nhs_number = Some(value.into());
+    pub fn united_kingdom_national_health_service_number<S: Into<String>>(mut self, value: S) -> Self {
+        self.united_kingdom_national_health_service_number = Some(value.into());
         self
     }
 
@@ -1184,7 +1186,8 @@ impl PersonBuilder {
 
     /// Set the United Kingdom Northern Ireland H&C (Health and Care) Number.
     ///
-    /// A 10-digit Modulus-11 identifier sharing the NHS Number algorithm.
+    /// A 10-digit Modulus-11 identifier sharing the United Kingdom National
+    /// Health Service Number algorithm.
     /// Stored verbatim; parsing happens at match time via
     /// [`crate::identifiers::parse_uk_hc_number`].
     ///
@@ -1299,7 +1302,8 @@ impl PersonBuilder {
     /// Set the United Kingdom (Scotland) CHI Number (Community Health Index).
     ///
     /// 10-digit identifier issued by NHS Scotland, sharing the Mod-11
-    /// algorithm of the NHS Number but scheme-local. Stored verbatim;
+    /// algorithm of the United Kingdom National Health Service Number but
+    /// scheme-local. Stored verbatim;
     /// parsing happens at match time via
     /// [`crate::identifiers::parse_uk_chi_number`].
     ///
@@ -1753,7 +1757,7 @@ impl PersonBuilder {
     /// ```
     pub fn build(self) -> Person {
         Person {
-            uk_nhs_number: self.uk_nhs_number,
+            united_kingdom_national_health_service_number: self.united_kingdom_national_health_service_number,
             fr_nir: self.fr_nir,
             es_tsi: self.es_tsi,
             ie_ihi: self.ie_ihi,
@@ -1864,7 +1868,7 @@ mod tests {
     #[test]
     fn person_builder_starts_empty() {
         let p = Person::builder().build();
-        assert!(p.uk_nhs_number.is_none());
+        assert!(p.united_kingdom_national_health_service_number.is_none());
         assert!(p.fr_nir.is_none());
         assert!(p.es_tsi.is_none());
         assert!(p.ie_ihi.is_none());
@@ -1892,7 +1896,7 @@ mod tests {
     #[test]
     fn person_builder_carries_all_national_identifiers() {
         let p = Person::builder()
-            .uk_nhs_number("9434765919")
+            .united_kingdom_national_health_service_number("9434765919")
             .fr_nir("180127512345642")
             .es_tsi("ABCD123456XY1234")
             .ie_ihi("1234567")
@@ -1905,7 +1909,7 @@ mod tests {
             .se_personnummer("4603243850")
             .uk_chi_number("0101701233")
             .build();
-        assert_eq!(p.uk_nhs_number.as_deref(), Some("9434765919"));
+        assert_eq!(p.united_kingdom_national_health_service_number.as_deref(), Some("9434765919"));
         assert_eq!(p.fr_nir.as_deref(), Some("180127512345642"));
         assert_eq!(p.es_tsi.as_deref(), Some("ABCD123456XY1234"));
         assert_eq!(p.ie_ihi.as_deref(), Some("1234567"));
@@ -1941,7 +1945,7 @@ mod tests {
         );
         assert!(
             Person::builder()
-                .uk_nhs_number("9434765919")
+                .united_kingdom_national_health_service_number("9434765919")
                 .build()
                 .validate()
                 .is_ok()
@@ -1956,7 +1960,7 @@ mod tests {
     #[test]
     fn person_round_trips_through_serde() {
         let p = Person::builder()
-            .uk_nhs_number("9434765919")
+            .united_kingdom_national_health_service_number("9434765919")
             .given_name("Carys")
             .family_name("Pritchard")
             .date_of_birth(chrono::NaiveDate::from_ymd_opt(1990, 6, 1).unwrap())

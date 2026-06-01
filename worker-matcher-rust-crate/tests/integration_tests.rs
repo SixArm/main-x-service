@@ -796,7 +796,7 @@ fn test_custom_weights_can_swing_outcome() {
         de_kvnr_weight: 0.0,
         it_cf_weight: 0.0,
         nl_bsn_weight: 0.0,
-        se_workernummer_weight: 0.0,
+        se_personnummer_weight: 0.0,
         uk_chi_number_weight: 0.0,
         be_nn_weight: 0.0,
         bg_egn_weight: 0.0,
@@ -1574,44 +1574,44 @@ fn test_nl_bsn_mismatch_scores_zero() {
     assert_eq!(r.breakdown.nl_bsn_score, Some(0.0));
 }
 
-// ---- Sweden Workernummer ----
+// ---- Sweden Personnummer ----
 
 const PNR_A_SE: &str = "4603243850";
 const PNR_B_SE: &str = "8112310092";
 
 #[test]
-fn test_se_workernummer_separator_variants_match_deterministically() {
-    let p1 = Worker::builder().se_workernummer("460324-3850").build();
-    let p2 = Worker::builder().se_workernummer(PNR_A_SE).build();
+fn test_se_personnummer_separator_variants_match_deterministically() {
+    let p1 = Worker::builder().se_personnummer("460324-3850").build();
+    let p2 = Worker::builder().se_personnummer(PNR_A_SE).build();
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
 #[test]
-fn test_se_workernummer_ten_and_twelve_digit_forms_do_not_cross_match() {
+fn test_se_personnummer_ten_and_twelve_digit_forms_do_not_cross_match() {
     // The 10-digit form `460324-3850` and the 12-digit form
     // `19460324-3850` canonicalise to different strings, so they do
     // not deterministically match. Consumers needing cross-form
     // matching should normalise upstream.
-    let p1 = Worker::builder().se_workernummer("460324-3850").build();
-    let p2 = Worker::builder().se_workernummer("19460324-3850").build();
+    let p1 = Worker::builder().se_personnummer("460324-3850").build();
+    let p2 = Worker::builder().se_personnummer("19460324-3850").build();
     let r = MatchingEngine::default_config().match_workers(&p1, &p2);
-    assert_eq!(r.breakdown.se_workernummer_score, Some(0.0));
+    assert_eq!(r.breakdown.se_personnummer_score, Some(0.0));
 }
 
 #[test]
-fn test_se_workernummer_mismatch_scores_zero() {
+fn test_se_personnummer_mismatch_scores_zero() {
     let p1 = Worker::builder()
-        .se_workernummer(PNR_A_SE)
+        .se_personnummer(PNR_A_SE)
         .given_name("Karl")
         .family_name("Andersson")
         .build();
     let p2 = Worker::builder()
-        .se_workernummer(PNR_B_SE)
+        .se_personnummer(PNR_B_SE)
         .given_name("Karl")
         .family_name("Andersson")
         .build();
     let r = MatchingEngine::default_config().match_workers(&p1, &p2);
-    assert_eq!(r.breakdown.se_workernummer_score, Some(0.0));
+    assert_eq!(r.breakdown.se_personnummer_score, Some(0.0));
 }
 
 // ---- Australia IHI ----
@@ -1723,7 +1723,7 @@ fn test_breakdown_carries_independent_score_per_scheme() {
         .de_kvnr(KVNR_A_DE)
         .it_cf(CF_A_IT)
         .nl_bsn(BSN_A_NL)
-        .se_workernummer(PNR_A_SE)
+        .se_personnummer(PNR_A_SE)
         .uk_chi_number(CHI_A_UK)
         .given_name("Polyglot")
         .family_name("Worker")
@@ -1740,7 +1740,7 @@ fn test_breakdown_carries_independent_score_per_scheme() {
     assert_eq!(r.breakdown.de_kvnr_score, Some(1.0));
     assert_eq!(r.breakdown.it_cf_score, Some(1.0));
     assert_eq!(r.breakdown.nl_bsn_score, Some(1.0));
-    assert_eq!(r.breakdown.se_workernummer_score, Some(1.0));
+    assert_eq!(r.breakdown.se_personnummer_score, Some(1.0));
     assert_eq!(r.breakdown.uk_chi_number_score, Some(1.0));
     assert!(r.is_match);
 }
@@ -1800,7 +1800,7 @@ fn test_validate_accepts_any_single_national_identifier() {
     );
     assert!(
         Worker::builder()
-            .se_workernummer(PNR_A_SE)
+            .se_personnummer(PNR_A_SE)
             .build()
             .validate()
             .is_ok()
@@ -2877,7 +2877,7 @@ fn test_batch_match_one_to_many_threadsafe_under_arc() {
 }
 
 // ============================================================
-// §21a. Eighteen additional national workeral identifiers (T-27)
+// §21a. Eighteen additional national personal identifiers (T-27)
 // ============================================================
 //
 // Each scheme: deterministic match by identifier alone, mismatch
@@ -3161,7 +3161,7 @@ fn test_eighteen_new_schemes_each_validate_solo() {
 }
 
 // ============================================================
-// §21b. Five additional workeral identifiers (T-28)
+// §21b. Five additional personal identifiers (T-28)
 // ============================================================
 
 #[test]
@@ -4135,7 +4135,7 @@ fn test_serialization_round_trip_carries_all_identifiers() {
         .de_kvnr(KVNR_A_DE)
         .it_cf(CF_A_IT)
         .nl_bsn(BSN_A_NL)
-        .se_workernummer(PNR_A_SE)
+        .se_personnummer(PNR_A_SE)
         .uk_chi_number(CHI_A_UK)
         .given_name("Polyglot")
         .family_name("Worker")

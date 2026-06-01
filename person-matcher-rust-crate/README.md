@@ -13,12 +13,12 @@ This crate implements both **deterministic** and **probabilistic** person matche
 
 ## Features
 
-- ✅ **Deterministic Matching**: Exact matches on NHS numbers and key demographics
+- ✅ **Deterministic Matching**: Exact matches on United Kingdom National Health Service Numbers and key demographics
 - ✅ **Probabilistic Matching**: Fuzzy matching with configurable scoring thresholds and a `Confidence` band (High/Medium/Low) derived from the score for triage UIs
 - ✅ **Batch API**: `match_one_to_many` scores one query against many candidates (output parallel to input); `rank_one_to_many` returns the same scores sorted by descending score with a deterministic tiebreak — the building block for screening against a master person index
 - ✅ **String Similarity Algorithms**: Jaro-Winkler and Levenshtein distance
-- ✅ **NHS-Format Identifier Support**: Validation and normalization via the `nhs-number` crate
-- ✅ **Multinational National Identifiers** (**42 schemes**): UK NHS Number, France NIR, España TSI, Éire IHI, UK Northern Ireland H&C Number, United States SSN, Australia IHI, Germany KVNR, Italy *Codice Fiscale*, Netherlands BSN, Sweden *Personnummer*, UK Scotland CHI Number, Belgium National Number, Bulgaria EGN, Czech *Rodné číslo*, Denmark CPR, Estonia *Isikukood*, Spain DNI/NIE, Finland HETU, Croatia OIB, Iceland *Kennitala*, Lithuania *Asmens kodas*, Latvia *Personas kods*, Malta National ID, Norway *Fødselsnummer*, Poland PESEL, Romania CNP, Slovenia EMŠO, Slovakia *Rodné číslo*, UK NINO, Greece DSS, Liechtenstein National ID, Netherlands National ID, Poland NIP, Portugal NIF, Brazil CPF, China Resident Identity Card, India Aadhaar, Japan My Number, Mexico CURP, New Zealand NHI, South Africa ID — each scheme-local with its own parser, weight, and breakdown score. Plus **9 per-country passport-format validators** (CY, CZ, LI, LT, MT, NL, PT, RO, SK) that feed the multi-country `PassportBook` model.
+- ✅ **United Kingdom National Health Service Number-Format Identifier Support**: Validation and normalization via the `united-kingdom-national-health-service-number` crate (aliased from upstream `nhs-number`)
+- ✅ **Multinational National Identifiers** (**42 schemes**): UK United Kingdom National Health Service Number, France NIR, España TSI, Éire IHI, UK Northern Ireland H&C Number, United States SSN, Australia IHI, Germany KVNR, Italy *Codice Fiscale*, Netherlands BSN, Sweden *Personnummer*, UK Scotland CHI Number, Belgium National Number, Bulgaria EGN, Czech *Rodné číslo*, Denmark CPR, Estonia *Isikukood*, Spain DNI/NIE, Finland HETU, Croatia OIB, Iceland *Kennitala*, Lithuania *Asmens kodas*, Latvia *Personas kods*, Malta National ID, Norway *Fødselsnummer*, Poland PESEL, Romania CNP, Slovenia EMŠO, Slovakia *Rodné číslo*, UK NINO, Greece DSS, Liechtenstein National ID, Netherlands National ID, Poland NIP, Portugal NIF, Brazil CPF, China Resident Identity Card, India Aadhaar, Japan My Number, Mexico CURP, New Zealand NHI, South Africa ID — each scheme-local with its own parser, weight, and breakdown score. Plus **9 per-country passport-format validators** (CY, CZ, LI, LT, MT, NL, PT, RO, SK) that feed the multi-country `PassportBook` model.
 - ✅ **Passport Books**: `Vec<PassportBook>` on `Person` carries one entry per book with explicit country provenance — supports dual / multi-citizenship, accumulates historical book numbers as passports are renewed, and treats any shared `(country, number)` pair as a deterministic match (cross-country with same digits never matches)
 - ✅ **Phonetic Matching**: Soundex-like algorithm for names (handles "Stephen" vs "Steven")
 - ✅ **Blood Type Matching**: `BloodType` enum (8 ABO+RhD variants) with a lenient parser accepting canonical (`A+`), word (`A positive`), and zero-to-O (`0+`) variants. Blood type is stable for life, so disagreement is a strong negative signal even though agreement alone is weak.
@@ -58,14 +58,14 @@ fn main() {
         .given_name("John")
         .family_name("Smith")
         .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
-        .nhs_number("1234567890")
+        .united_kingdom_national_health_service_number("1234567890")
         .build();
 
     let person2 = Person::builder()
         .given_name("Jon")  // Typo
         .family_name("Smith")
         .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
-        .nhs_number("1234567890")
+        .united_kingdom_national_health_service_number("1234567890")
         .build();
 
     // Create matching engine with default config
@@ -94,7 +94,7 @@ let lenient_engine = MatchingEngine::new(MatchConfig::lenient());
 // Custom configuration
 let custom_config = MatchConfig {
     match_threshold: 0.90,
-    nhs_number_weight: 0.40,  // Increase NHS number importance
+    united_kingdom_national_health_service_number_weight: 0.40,  // Increase United Kingdom National Health Service Number importance
     given_name_weight: 0.15,
     family_name_weight: 0.20,
     date_of_birth_weight: 0.15,
@@ -112,7 +112,7 @@ let engine = MatchingEngine::new(custom_config);
 let is_deterministic_match = engine.deterministic_match(&person1, &person2);
 
 if is_deterministic_match {
-    println!("Exact match on NHS number or all key demographics");
+    println!("Exact match on United Kingdom National Health Service Number or all key demographics");
 }
 ```
 
@@ -122,7 +122,7 @@ if is_deterministic_match {
 let result = engine.match_persons(&person1, &person2);
 
 println!("Overall score: {:.2}", result.score);
-println!("NHS number score: {:?}", result.breakdown.nhs_number_score);
+println!("United Kingdom National Health Service Number score: {:?}", result.breakdown.united_kingdom_national_health_service_number_score);
 println!("Given name score: {:?}", result.breakdown.given_name_score);
 println!("Family name score: {:?}", result.breakdown.family_name_score);
 println!("Date of birth score: {:?}", result.breakdown.date_of_birth_score);
@@ -134,7 +134,7 @@ println!("Phonetic name score: {:?}", result.breakdown.phonetic_name_score);
 
 The `Person` struct supports:
 
-- **NHS Number**: NHS-format 10-digit healthcare identifier with Modulus-11 check digit
+- **United Kingdom National Health Service Number**: 10-digit healthcare identifier with Modulus-11 check digit
 - **Name Fields**: First, middle, and Family names
 - **Date of Birth**: Birth date for age verification
 - **Gender**: Male, Female, Other, Unknown
@@ -148,7 +148,7 @@ The matching engine uses a weighted scoring system:
 
 | Field         | Default Weight | Purpose                             |
 | ------------- | -------------- | ----------------------------------- |
-| NHS Number    | 30%            | Strongest identifier when available |
+| United Kingdom National Health Service Number | 30%            | Strongest identifier when available |
 | Family Name   | 20%            | Critical demographic                |
 | Date of Birth | 20%            | Age verification                    |
 | Given Name    | 15%            | Important but subject to nicknames  |
@@ -168,7 +168,7 @@ The matching engine uses a weighted scoring system:
    - Names: lowercase, remove diacritics, trim spaces
    - Postcodes: uppercase, remove spaces
    - Phone numbers: remove formatting, handle country codes
-   - NHS numbers: digits only
+   - United Kingdom National Health Service Numbers: digits only
 
 3. **Multi-Factor Approach**: Following research recommendations, matching uses multiple demographic fields rather than relying on a single identifier.
 
@@ -220,7 +220,7 @@ Indicative numbers on a 2024 Apple Silicon machine: single-pair fuzzy match ~4 �
 - ✅ Phonetic name matching
 - ✅ Phone number normalization
 - ✅ Address comparison
-- ✅ NHS number validation
+- ✅ United Kingdom National Health Service Number validation
 - ✅ Deterministic matching
 - ✅ Strict vs lenient modes
 - ✅ Missing field handling
@@ -250,7 +250,7 @@ This runs example scenarios including:
 ## Limitations
 
 1. **No Machine Learning**: This is a rule-based system, not ML/AI
-2. **Single Identifier Scheme**: Optimised for NHS-format check-digit identifiers; other national identifier schemes are not currently validated
+2. **Single Identifier Scheme**: Optimised for United Kingdom National Health Service Number-format check-digit identifiers; other national identifier schemes are not currently validated
 3. **No Persistent Storage**: In-memory matching only
 4. **No Batch Processing**: Processes pairs of persons
 
