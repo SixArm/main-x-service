@@ -107,6 +107,10 @@ harness = false
 name = "validation_bench"
 harness = false
 
+[[bench]]
+name = "bridge_bench"
+harness = false
+
 [profile.release]
 opt-level = 3
 lto = true
