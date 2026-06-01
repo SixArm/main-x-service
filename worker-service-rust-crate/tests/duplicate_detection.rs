@@ -224,7 +224,7 @@ fn ods_organisation_code_falls_through_unmapped() {
         "https://fhir.nhs.uk/Id/ods-organization-code".into(),
         "RXX01".into(),
     ));
-    let mut b = worker("Jones", "Sara");
+    let b = worker("Jones", "Sara");
 
     let ma = to_matcher_worker(&a);
     let result = engine().match_workers(&ma, &to_matcher_worker(&b));

@@ -16,7 +16,7 @@ use worker_service::{
 
 #[tokio::test]
 async fn test_health_check() {
-    let app = common::create_test_router();
+    let app = common::create_test_router().await;
 
     let response = app
         .oneshot(
@@ -41,7 +41,7 @@ async fn test_health_check() {
 
 #[tokio::test]
 async fn test_create_worker() {
-    let app = common::create_test_router();
+    let app = common::create_test_router().await;
 
     let family_name = common::unique_worker_name("Create");
 
@@ -85,7 +85,7 @@ async fn test_create_worker() {
 
 #[tokio::test]
 async fn test_create_and_get_worker() {
-    let app = common::create_test_router();
+    let app = common::create_test_router().await;
 
     let family_name = common::unique_worker_name("CreateGet");
 
@@ -151,7 +151,7 @@ async fn test_create_and_get_worker() {
 
 #[tokio::test]
 async fn test_update_worker() {
-    let app = common::create_test_router();
+    let app = common::create_test_router().await;
 
     let family_name = common::unique_worker_name("Update");
 
@@ -216,7 +216,7 @@ async fn test_update_worker() {
 
 #[tokio::test]
 async fn test_delete_worker() {
-    let app = common::create_test_router();
+    let app = common::create_test_router().await;
 
     let family_name = common::unique_worker_name("Delete");
 
@@ -284,7 +284,7 @@ async fn test_delete_worker() {
 
 #[tokio::test]
 async fn test_search_workers() {
-    let app = common::create_test_router();
+    let app = common::create_test_router().await;
 
     let family_name = common::unique_worker_name("Search");
 
@@ -343,7 +343,7 @@ async fn test_search_workers() {
 
 #[tokio::test]
 async fn test_get_worker_not_found() {
-    let app = common::create_test_router();
+    let app = common::create_test_router().await;
 
     let response = app
         .oneshot(
