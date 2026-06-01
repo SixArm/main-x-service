@@ -1,6 +1,6 @@
 [package]
 name = "worker-service"
-version = "0.2.0"
+version = "0.5.0"
 edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Worker Service - A worker administration microservice that interoperates with the worker-matcher crate"

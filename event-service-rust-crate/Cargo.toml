@@ -1,6 +1,6 @@
 [package]
 name = "event-service"
-version = "0.2.0"
+version = "0.5.0"
 edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Event Service - An event administration microservice that interoperates with the event-matcher crate"
