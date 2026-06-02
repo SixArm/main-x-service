@@ -12,7 +12,7 @@
 | Event Service | Event | [event-service-rust-crate](event-service-rust-crate/) |
 | Worker Service | Worker | [worker-service-rust-crate](worker-service-rust-crate/) |
 
-Each crate is self-contained: it owns its REST API, its persistence schema, its matching algorithm, and its web UI. They share an architecture and a documentation layout, not code.
+Each crate is self-contained: it owns its REST API, its persistence schema, and its matching algorithm. They share an architecture and a documentation layout, not code.
 
 ## What every crate does
 
@@ -25,11 +25,10 @@ Each crate is self-contained: it owns its REST API, its persistence schema, its 
 - **Privacy controls** — per-field masking, GDPR export, consent records
 - **Event streaming** of CRUD operations
 - **REST API** (Axum) with OpenAPI/Swagger
-- **Server-rendered web UI** — Loco / Tera / HTMX / Alpine / Lily Design System
 - **gRPC stub** (Tonic) for high-throughput callers
 - **Observability** — `tracing` + OpenTelemetry OTLP
 
-See [agents/share/web-stack.md](agents/share/web-stack.md) for the web UI tier and [agents/share/technology.md](agents/share/technology.md) for the full dependency inventory.
+See [agents/share/technology.md](agents/share/technology.md) for the full dependency inventory.
 
 ## Running
 
@@ -39,29 +38,12 @@ From any subproject root:
 # REST + gRPC API
 cargo run --release
 
-# Server-rendered web UI (Loco / Tera / HTMX / Alpine / Lily)
-cargo run --bin web
-# → http://0.0.0.0:5150 (override with PORT=…)
-
 # Tests
 cargo test --lib
 
 # Benchmarks (where available)
 cargo bench
 ```
-
-## Endpoints (web UI)
-
-| Path | Returns |
-|------|---------|
-| `GET /` | Home page (full HTML, Tera-rendered) |
-| `GET /{plural}` | Entity index (full HTML) |
-| `GET /{plural}/search/partial?q=…` | HTMX fragment for live search |
-| `GET /static/css/lily.css` | Lily Design System styles |
-| `GET /static/js/htmx.min.js` | HTMX 2.0.4 |
-| `GET /static/js/alpine.min.js` | Alpine 3.14.8 |
-
-`{plural}` is `persons` / `workers` / `places` / `things` / `events`.
 
 ## Documentation
 
@@ -72,7 +54,6 @@ Top-level reference docs in [`agents/share/`](agents/share/):
 | [overview.md](agents/share/overview.md) | High-level project overview |
 | [architecture.md](agents/share/architecture.md) | Layered architecture |
 | [stack-for-rust-loco.md](agents/share/stack-for-rust-loco.md) | Full Rust + Loco dependency stack |
-| [web-stack.md](agents/share/web-stack.md) | Loco / Tera / HTMX / Alpine / Lily |
 | [technology.md](agents/share/technology.md) | Tech stack summary |
 | [match-search-merge.md](agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [match.md](agents/share/match.md) | Matching algorithms |
@@ -102,17 +83,13 @@ Per-crate reference docs live in `<crate>/AGENTS/`:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Client (browser / curl / SDK)                               │
+│ Client (curl / SDK / gRPC client)                           │
 └────────────────────────────┬────────────────────────────────┘
                              │
-            ┌────────────────┴────────────────┐
-            │                                 │
-┌───────────▼────────────┐       ┌────────────▼─────────────┐
-│ Web UI (Loco/Tera/     │       │ REST API (Axum)          │
-│ HTMX/Alpine/Lily)      │       │  + OpenAPI/Swagger UI    │
-│ /, /{plural}, /static  │       │ /api/<plural>/…          │
-└───────────┬────────────┘       └────────────┬─────────────┘
-            │                                 │
+            ┌────────────────▼────────────────┐
+            │ REST API (Axum) + gRPC (Tonic)  │
+            │ + OpenAPI/Swagger UI            │
+            │ /api/<plural>/…                 │
             └────────────────┬────────────────┘
                              │
             ┌────────────────▼────────────────┐
@@ -135,7 +112,7 @@ Per-crate reference docs live in `<crate>/AGENTS/`:
 
 ## Status
 
-All crates compile cleanly and pass their lib tests (629 tests total). The web binary boots from each crate and serves the home page, entity index, HTMX partial, and static assets.
+Backend-only Rust services. All crates compile cleanly and pass their lib tests.
 
 ## License
 

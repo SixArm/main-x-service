@@ -9,8 +9,8 @@ the more opinionated sibling crates (`person`, `worker`,
 `event`), it goes here.
 
 The Thing service shares its architecture with every other Main X
-Index crate: REST + gRPC + server-rendered web UI on top of PostgreSQL,
-Tantivy, and an event stream.
+Index crate: REST + gRPC API on top of PostgreSQL, Tantivy, and an
+event stream.
 
 @agents/share/overview.md
 
@@ -70,18 +70,6 @@ Tantivy, and an event stream.
 - Consent model with `DataProcessing` / `DataSharing` / `Marketing` /
   `Research` types and `Active` / `Revoked` / `Expired` statuses
 
-### Web UI (Loco / Tera / HTMX / Alpine / Lily)
-
-See [`agents/share/web-stack.md`](../agents/share/web-stack.md) for the
-shared web-tier reference.
-
-| Path | Returns |
-|------|---------|
-| `GET /` | Home page |
-| `GET /things` | Thing index |
-| `GET /things/search/partial?q=…` | HTMX fragment |
-| `GET /static/*` | Lily CSS, HTMX JS, Alpine JS |
-
 @AGENTS/index.md
 @AGENTS/matching.md
 @AGENTS/models.md
@@ -95,7 +83,6 @@ shared web-tier reference.
 @agents/share/privacy.md
 @agents/share/restful.md
 @agents/share/technology.md
-@agents/share/web-stack.md
 
 ## Quick start
 
@@ -109,9 +96,6 @@ cd thing-service-rust-crate
 
 # REST API
 cargo run --release
-
-# Web UI
-cargo run --bin web    # → http://0.0.0.0:5150
 
 # Tests
 cargo test --lib
@@ -205,7 +189,6 @@ curl -X POST http://localhost:8080/api/things/deduplicate \
 | `DATABASE_MIN_CONNECTIONS` | Pool min | 2 |
 | `SERVER_HOST` | REST bind address | `0.0.0.0` |
 | `SERVER_PORT` | REST port | `8080` |
-| `PORT` | Web UI port | `5150` |
 | `SEARCH_INDEX_PATH` | Tantivy index dir | `./search_index` |
 | `MATCHING_THRESHOLD` | Default match threshold | `0.7` |
 | `RUST_LOG` | Log filter | `info` |

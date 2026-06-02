@@ -144,14 +144,3 @@ histograms) is in [`src/metrics.rs`](../src/metrics.rs).
 | GET    | `/api/things/{id}/audit`  | Audit logs            |
 | GET    | `/api/audit/recent`       | Recent audit activity |
 | GET    | `/api/audit/user`         | User audit logs       |
-
-## Web UI endpoints
-
-| Method | Path                                  | Description                                                    |
-|--------|---------------------------------------|----------------------------------------------------------------|
-| GET    | `/`                                   | Home page                                                      |
-| GET    | `/things`                             | Thing index                                                    |
-| GET    | `/things/search/partial?q=…`          | HTMX search fragment                                           |
-| GET    | `/static/css/lily.css`                | United Kingdom National Health Service England theme that styles Lily HTML Headless components         |
-| GET    | `/static/js/htmx.min.js`              | HTMX 2.0.4                                                     |
-| GET    | `/static/js/alpine.min.js`            | Alpine 3.14.8                                                  |

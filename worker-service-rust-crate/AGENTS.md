@@ -27,8 +27,6 @@ Shared reference docs live at the project root under
 | [architecture.md](../agents/share/architecture.md) | Layered architecture |
 | [stack-for-rust-loco.md](../agents/share/stack-for-rust-loco.md) | Full Rust + Loco dependency stack |
 | [technology.md](../agents/share/technology.md) | Tech stack summary |
-| [web-stack.md](../agents/share/web-stack.md) | Loco / Tera / HTMX / Alpine / Lily HTML Headless |
-| [web-pages.md](../agents/share/web-pages.md) | Per-page contracts for all 26 web-tier pages |
 | [match-search-merge.md](../agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [match.md](../agents/share/match.md) | Matching algorithms |
 | [search.md](../agents/share/search.md) | Search (Tantivy) |
@@ -51,10 +49,6 @@ Shared reference docs live at the project root under
 # REST + gRPC API
 cargo run --release
 
-# Server-rendered web UI (Loco / Tera / HTMX / Alpine / Lily)
-cargo run --bin web         # → http://0.0.0.0:5150
-PORT=5180 cargo run --bin web
-
 # Tests
 cargo test --lib                                # unit
 cargo test --tests                              # integration (needs DATABASE_URL)
@@ -63,20 +57,6 @@ DATABASE_URL=… cargo test --test api_integration_test
 # Benchmarks
 cargo bench
 ```
-
-## Web UI URL surface
-
-| Path | Returns |
-|------|---------|
-| `GET /` | Home page (full HTML) |
-| `GET /workers` | Entity index (full HTML) |
-| `GET /workers/search/partial?q=…` | HTMX fragment for live search |
-| `GET /static/css/lily.css` | United Kingdom National Health Service England theme that styles the Lily HTML Headless components |
-| `GET /static/js/htmx.min.js` | HTMX 2.0.4 |
-| `GET /static/js/alpine.min.js` | Alpine 3.14.8 |
-
-See [`../agents/share/web-stack.md`](../agents/share/web-stack.md) for
-the full web tier reference and the complete per-entity URL surface.
 
 ## Doc hierarchy quick reference
 

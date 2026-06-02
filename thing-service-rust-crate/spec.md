@@ -8,9 +8,9 @@
 > **Three-part PRs.** A behavioural change is one PR: spec edit + code
 > edit + test edit. See [`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md).
 
-For shared infrastructure (web tier, technology stack, observability,
-compliance), see the project-root [`spec.md`](../spec.md),
-[`AGENTS.md`](../AGENTS.md), and [`agents/share/*`](../agents/share/).
+For shared infrastructure (technology stack, observability,
+compliance), see the project-root [`AGENTS.md`](../AGENTS.md) and
+[`agents/share/*`](../agents/share/).
 For per-crate reference detail (architecture, model field tables,
 matching constants), see [`AGENTS/`](AGENTS/).
 
@@ -87,7 +87,6 @@ A stable identity for any "thing" with:
 - Record merging with link tracking and JSON snapshots.
 - Per-field privacy masking, GDPR Article 15 export, consent records.
 - REST API (Axum) + gRPC stub.
-- Server-rendered web UI.
 - PostgreSQL persistence via SeaORM.
 
 ### 2.2 Out of scope (today)
@@ -294,7 +293,7 @@ user ID, IP, user agent, timestamp.
 | Throughput | ≥ 1 000 req/sec single instance |
 | Availability | HADR; stateless app tier; PostgreSQL replication |
 | Fault tolerance | Graceful shutdown; connection pooling; health checks; non-root containers |
-| Observability | OTLP traces / metrics / logs; `traceparent` per request; Prometheus text-exposition scrape at `GET /metrics.prom` (canonical `/metrics` serves the HTML dashboard) |
+| Observability | OTLP traces / metrics / logs; `traceparent` per request |
 | Background jobs | Loco `BackgroundQueue` backed by **PostgreSQL** (`bg_pg`) — same database as application data; no external broker (no Redis, no SQLite) |
 
 ## 8. Architecture
@@ -318,8 +317,6 @@ src/
 ├── validation/            # boundary validators + normalisers
 ├── privacy/               # masking + GDPR export
 ├── api/                   # REST + gRPC (stub)
-├── web/                   # Loco app + Tera views
-└── bin/web.rs             # cargo run --bin web (binds 0.0.0.0:5150)
 ```
 
 ### 8.2 Layering rules
@@ -444,7 +441,6 @@ clearly described manual check confirms the acceptance criterion.
 | REST API | 15 endpoints + OpenAPI/Swagger + CORS + structured errors |
 | Validation | Required `name`, URL formats, per-type identifier formats, normalisation |
 | Privacy | Per-field masking (`owner`, identifier `value`), GDPR export, consent model |
-| Web UI | Loco / Tera / HTMX / Alpine / Lily HTML Headless + United Kingdom National Health Service England theme |
 | Tests | ~100 unit + integration_* + Criterion benchmarks |
 
 ### 14.2 Open gaps → tasks
@@ -499,15 +495,12 @@ clearly described manual check confirms the acceptance criterion.
 - AGENTS reference set: [`AGENTS/index.md`](AGENTS/index.md).
 - Shared docs: [`agents/share/index.md`](../agents/share/index.md).
 - SDD discipline: [`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md).
-- Project-root web spec: [`../spec.md`](../spec.md).
 
 ## 18. Change Control
 
 Material changes to this spec — domain-model fields, match-quality
 thresholds, API-surface shape, compliance scope — MUST land in the
-same commit as the corresponding code change. The cross-crate
-uniformity invariant in the project-root [`spec.md`](../spec.md)
-applies to web tier files only; this per-crate spec is local to the
+same commit as the corresponding code change. This per-crate spec is local to the
 Thing Service.
 
 Bullet what changed, not how: every spec edit should be a diff a

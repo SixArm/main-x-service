@@ -46,23 +46,19 @@ specifications, …) tailored to library-style work.
 - **Event streaming** of every CRUD operation
 - **Audit logging** (HIPAA-style trail for who/what/when)
 - **REST API** (Axum) with OpenAPI / Swagger
-- **Server-rendered web UI** (Loco / Tera / HTMX / Alpine / Lily Design System HTML Headless)
 - **gRPC API** stub (Tonic) for high-throughput callers
 - **Observability** (tracing + OpenTelemetry OTLP)
 - **PostgreSQL persistence** via SeaORM with migrations
 
-See [stack-for-rust-loco.md](stack-for-rust-loco.md) for the dependency stack, and [web-stack.md](web-stack.md) for the server-rendered UI tier.
+See [stack-for-rust-loco.md](stack-for-rust-loco.md) for the dependency stack.
 
 ## Running
 
 Every subproject ships the same entry points:
 
 ```bash
-# REST API server (existing)
+# REST API server
 cargo run --release
-
-# Server-rendered web UI (Loco / Tera / HTMX / Alpine / Lily)
-cargo run --bin web
 
 # Tests
 cargo test --lib
@@ -70,5 +66,3 @@ cargo test --lib
 # Benchmarks (where available)
 cargo bench
 ```
-
-The web UI binds to `http://0.0.0.0:5150` by default (override with `PORT=…`).

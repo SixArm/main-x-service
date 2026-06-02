@@ -8,9 +8,9 @@
 > **Three-part PRs.** A behavioural change is one PR: spec edit + code
 > edit + test edit. See [`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md).
 
-For shared infrastructure (web tier, technology stack, observability,
-compliance), see the project-root [`spec.md`](../spec.md),
-[`AGENTS.md`](../AGENTS.md), and [`agents/share/*`](../agents/share/).
+For shared infrastructure (technology stack, observability,
+compliance), see the project-root [`AGENTS.md`](../AGENTS.md) and
+[`agents/share/*`](../agents/share/).
 For per-crate reference detail (architecture, model field tables,
 matching constants), see [`AGENTS/`](AGENTS/).
 
@@ -88,7 +88,6 @@ identity:
 - Record merging with link tracking and JSON snapshots.
 - Per-field privacy masking, GDPR Article 15 export, consent records.
 - REST API (Axum) + FHIR R5 Practitioner + gRPC stub.
-- Server-rendered web UI.
 - PostgreSQL persistence via SeaORM.
 
 ### 2.2 Out of scope (today)
@@ -109,7 +108,6 @@ identity:
 | API integrators | Stable REST + FHIR surface for worker CRUD, match, merge |
 | Operations / DBA | PostgreSQL schema + migration discipline; backups |
 | Compliance officer | HIPAA audit trail, GDPR export, consent records |
-| Frontend / portal teams | Server-rendered UI + JSON API |
 | Other Main X Index crates | Cross-references via `worker_id` |
 
 ## 4. Glossary
@@ -299,7 +297,7 @@ Bidirectional Practitioner resource conversion under
 | Throughput | ≥ 1 000 req/sec single instance |
 | Availability | HADR; stateless app tier; PostgreSQL replication |
 | Fault tolerance | Graceful shutdown; connection pooling; health checks; non-root containers |
-| Observability | OTLP traces / metrics / logs; `traceparent` per request; Prometheus text-exposition scrape at `GET /metrics.prom` (canonical `/metrics` serves the HTML dashboard) |
+| Observability | OTLP traces / metrics / logs; `traceparent` per request |
 | Background jobs | Loco `BackgroundQueue` backed by **PostgreSQL** (`bg_pg`) — same database as application data; no external broker (no Redis, no SQLite) |
 
 ## 8. Architecture
@@ -322,8 +320,6 @@ src/
 ├── privacy/                 # masking + GDPR export + consent
 ├── config/                  # env loading + Config struct
 ├── observability/           # OTLP setup
-├── web/                     # Loco app + Tera views + Axum web router
-├── bin/web.rs               # cargo run --bin web (binds 0.0.0.0:5150)
 ├── error.rs
 └── lib.rs
 ```
@@ -464,9 +460,8 @@ clearly described manual check confirms the acceptance criterion.
     `expiry_date = today + 25d` produces the event + metric.
 - [ ] **T-8 — Role + assignment history timeline.**
   - [ ] Per-worker timeline of role / organisation assignments.
-  - [ ] Surface in the web UI on the worker show page.
   - **Acceptance:** new assignment creates a timeline entry visible
-    in `/workers/{id}/timeline`.
+    via `GET /api/workers/{id}/timeline`.
 
 ## 14. Implementation Status
 
@@ -487,7 +482,6 @@ clearly described manual check confirms the acceptance criterion.
 | Merging | Transfer + alias + link + soft-delete + snapshot + event |
 | Validation | Required fields, format checks, phone normalisation, address standardisation, `422` |
 | Privacy | Field masking, GDPR export, consent model |
-| Web UI | Loco / Tera / HTMX / Alpine / Lily HTML Headless + United Kingdom National Health Service England theme |
 | Docker | Multi-stage Dockerfile, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 
@@ -550,15 +544,12 @@ clearly described manual check confirms the acceptance criterion.
 - AGENTS reference set: [`AGENTS/index.md`](AGENTS/index.md).
 - Shared docs: [`agents/share/index.md`](../agents/share/index.md).
 - SDD discipline: [`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md).
-- Project-root web spec: [`../spec.md`](../spec.md).
 
 ## 18. Change Control
 
 Material changes to this spec — domain-model fields, match-quality
 thresholds, API-surface shape, compliance scope — MUST land in the
-same commit as the corresponding code change. The cross-crate
-uniformity invariant in the project-root [`spec.md`](../spec.md)
-applies to web tier files only; this per-crate spec is local to the
+same commit as the corresponding code change. This per-crate spec is local to the
 Worker Service.
 
 Bullet what changed, not how: every spec edit should be a diff a

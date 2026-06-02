@@ -1,6 +1,6 @@
 # Technology stack
 
-This is the short summary. The full inventory (with feature flags and rationale) is in [stack-for-rust-loco.md](stack-for-rust-loco.md). The web tier is documented separately in [web-stack.md](web-stack.md).
+This is the short summary. The full inventory (with feature flags and rationale) is in [stack-for-rust-loco.md](stack-for-rust-loco.md).
 
 ## Runtime
 
@@ -11,13 +11,8 @@ This is the short summary. The full inventory (with feature flags and rationale)
 ## Web
 
 - **Axum** 0.7 — HTTP handlers, extractors, routing
-- **Loco.rs** 0.14 — full-stack conventions (config, hooks, workers, static middleware)
-- **Tera** 1.20 — server-rendered templates
-- **HTMX** 2.0 — server-driven AJAX
-- **Alpine.js** 3.14 — light client-side reactivity
-- **Lily Design System — HTML Headless** — accessible component contracts (ARIA + semantic HTML + class names; no CSS)
-- **United Kingdom National Health Service England theme** (`lily.css`) — consumer-supplied visual layer that styles the Lily class names
-- **tower-http** 0.6 — CORS, compression, tracing, `ServeDir` (`fs` feature)
+- **Loco.rs** 0.14 — backend conventions (config, hooks, workers)
+- **tower-http** 0.6 — CORS, compression, tracing
 
 ## Data
 

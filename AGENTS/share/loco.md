@@ -2,19 +2,20 @@
 
 https://loco.rs/
 
+The Main X Index service crates use Loco's backend conventions
+(config, hooks, workers, REST API) without its view/template tier —
+they are backend-only services. There is no Tera, HTMX, Alpine, or
+Lily Design System integration.
+
 ## Stack
 
 Use:
 
-- Lily Design System HTML Headless (~/git/lilydesignsystem/lily-design-system/lily-design-system-html-headless)
-- Tera templates
-- HTMX JavaScript
-- Alpine.js JavaScript
 - Tantivy search engine
 - OpenTelemetry metrics
 - Prometheus metrics
 
-## Background jobs 
+## Background jobs
 
 https://loco.rs/docs/processing/workers/
 

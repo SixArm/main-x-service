@@ -17,7 +17,7 @@ tokio = { version = "1.49", features = ["full"] }
 axum = { version = "0.7", features = ["macros", "multipart", "ws"] }
 hyper = { version = "1.8", features = ["full"] }
 tower = { version = "0.5", features = ["full"] }
-tower-http = { version = "0.6", features = ["cors", "trace", "compression-full", "fs"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -28,11 +28,8 @@ sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls"
 sea-orm-migration = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
 
-# Web Framework (full-stack)
+# Web Framework (Loco conventions; web/template tier removed)
 loco-rs = { version = "0.14", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
-
-# Templating
-tera = "1.20"
 
 # Search Engine
 tantivy = "0.22"

@@ -52,8 +52,6 @@ the corresponding service crate's matching layer.
 @agents/share/restful.md
 @agents/share/technology.md
 @agents/share/stack-for-rust-loco.md
-@agents/share/web-stack.md
-@agents/share/web-pages.md
 @agents/share/postgresql.md
 @agents/share/locales.md
 @agents/share/compliance-for-healthcare.md
@@ -88,18 +86,6 @@ the corresponding service crate's matching layer.
 - Phone normalization (E.164-like)
 - Address standardization (title-case locality, uppercase region/country, abbreviation expansion)
 - Validation integrated into create/update handlers (returns `422`)
-
-### Web UI
-
-Every crate ships a server-rendered UI on top of its REST API. See [agents/share/web-stack.md](agents/share/web-stack.md).
-
-- Loco.rs framework conventions
-- Tera templates
-- HTMX for server-driven AJAX
-- Alpine.js for light client-side state
-- Lily Design System (HTML Headless) for accessible component structure; United Kingdom National Health Service England theme bundled as `lily.css` provides the visual layer
-
-Run with: `cargo run --bin web` (binds `0.0.0.0:5150`).
 
 ## Per-crate docs
 

@@ -233,9 +233,6 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 | **Async Runtime**               | Tokio                                | Asynchronous I/O and concurrency         |
 | **Web Framework**               | Axum                                 | HTTP server and routing                  |
 | **Web Framework**               | Loco                                 | HTTP server and routing                  |
-| **Web Templating**              | Tera                                 | HTTP server and routing                  |
-| **Web Page Server Interaction** | HTMX                                 | JavaScript to extend AJAX in HTML        |
-| **Web Page Client Interaction** | Alpine.js                            | JavaScript to extend UI/UX in HTML       |
 | **Database**                    | PostgreSQL 18+                       | Data persistence                         |
 | **ORM**                         | SeaORM                               | Async database object-relational mapper  |
 | **Search Engine**               | Tantivy                              | Full-text search indexing                |
@@ -670,8 +667,7 @@ Built with excellent Rust crates:
 - [Tokio](https://tokio.rs/) - Async runtime
 - [Axum](https://github.com/tokio-rs/axum) - Web framework
 - [SeaORM](https://www.sea-ql.org/SeaORM/) - Async ORM and query builder
-- [Loco](https://loco.rs/) - Full-stack web framework
-- [Tera](https://keats.github.io/tera/) - Template engine
+- [Loco](https://loco.rs/) - Web framework conventions (backend-only)
 - [OpenTelemetry](https://opentelemetry.io/) - Observability framework
 - [Tantivy](https://github.com/tantivy-search/tantivy) - Search engine
 - [Serde](https://serde.rs/) - Serialization

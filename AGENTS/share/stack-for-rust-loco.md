@@ -4,8 +4,7 @@
 | -------------------- | ------------------------------------------ | ---------------------------------------- |
 | **Language**         | Rust 1.93+ 2024 Edition                    | Systems programming, performance, safety |
 | **Async Runtime**    | Tokio                                      | Asynchronous I/O and concurrency         |
-| **Web Framework**    | Axum, Loco                                 | HTTP server and routing                  |
-| **Web Pages**        | Tera, HTMX, Alpine.js                      | Web pages with templates, AJAX, UI/UX    |
+| **Web Framework**    | Axum, Loco                                 | HTTP server and routing (backend-only)   |
 | **Database**         | PostgreSQL 18+                             | Data persistence                         |
 | **ORM**              | SeaORM                                     | Async database object-relational mapper  |
 | **Search Engine**    | Tantivy                                    | Full-text search indexing                |

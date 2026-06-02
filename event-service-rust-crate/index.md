@@ -22,17 +22,13 @@ behaviour, read [`spec.md`](spec.md).
 | [`AGENTS/matching.md`](AGENTS/matching.md) | Match weights, components, deterministic rules, Soundex. |
 | [`AGENTS/restful.md`](AGENTS/restful.md) | Endpoint catalogue + library API. |
 | [`AGENTS/testing.md`](AGENTS/testing.md) | Unit / integration / benchmark layout. |
-| [`agents/share/*`](../agents/share/) | Project-wide cross-crate references (architecture, web stack, compliance, …). |
+| [`agents/share/*`](../agents/share/) | Project-wide cross-crate references (architecture, technology stack, compliance, …). |
 
 ## Quick start
 
 ```bash
 # REST + gRPC API
 cargo run --release
-
-# Web UI (Loco / Tera / HTMX / Alpine / Lily)
-cargo run --bin web                    # → http://0.0.0.0:5150
-PORT=5180 cargo run --bin web
 
 # Tests
 cargo test --lib                       # unit (~60+)
@@ -260,7 +256,6 @@ let export = gdpr_export(&event);         // full JSON for data portability
 | `DATABASE_MIN_CONNECTIONS` / `DATABASE_MAX_CONNECTIONS` | Pool sizes | `2` / `10` |
 | `SERVER_HOST` | REST bind address | `0.0.0.0` |
 | `SERVER_PORT` | REST port | `8080` |
-| `PORT` | Web UI port (`cargo run --bin web`) | `5150` |
 | `SEARCH_INDEX_PATH` | Tantivy index directory | `./data/search_index` |
 | `MATCHING_THRESHOLD` | Default match cutoff | `0.85` |
 | `OTLP_ENDPOINT` | OpenTelemetry collector | `http://localhost:4317` |
@@ -282,12 +277,8 @@ src/
 ├── privacy/            # Masking + GDPR export + consent
 ├── config/             # Env loading + Config struct
 ├── observability/      # OpenTelemetry setup
-├── web/                # Loco app + Tera views + Axum web router
-├── bin/web.rs          # cargo run --bin web
 └── error.rs
 
-assets/views/           # Tera templates (HTMX + Alpine + Lily)
-assets/static/          # lily.css, htmx.min.js, alpine.min.js
 config/                 # development.yaml, test.yaml, production.yaml
 migrations/             # SeaORM up.sql / down.sql pairs
 tests/                  # Integration tests

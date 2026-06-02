@@ -3,13 +3,9 @@
 //! This module owns a process-wide [`Registry`] populated with a fixed set
 //! of counters and histograms. Application code increments the global
 //! [`METRICS`] via `crate::metrics::METRICS` (e.g.
-//! `METRICS.worker_created_total.inc()`). The web tier exposes the registry
-//! at `GET /metrics.prom` in Prometheus text-exposition format
-//! ([`crate::web::controllers::prometheus`]).
-//!
-//! `/metrics` is intentionally left to the existing HTML dashboard; the
-//! `.prom` suffix marks the machine-readable scrape endpoint. Configure
-//! the scraper with `metrics_path: /metrics.prom`.
+//! `METRICS.worker_created_total.inc()`). The registry can be rendered to
+//! Prometheus text-exposition format via [`MetricsRegistry::render_text`]
+//! and served from any HTTP handler that wants to expose it for scraping.
 //!
 //! # Metric inventory
 //!

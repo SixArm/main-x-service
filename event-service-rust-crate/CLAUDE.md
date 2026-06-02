@@ -143,12 +143,6 @@ sea-orm-cli migrate up
 cargo run --release
 ```
 
-### Web UI
-
-```bash
-cargo run --bin web   # binds 0.0.0.0:5150
-```
-
 ## API examples
 
 Create an event:

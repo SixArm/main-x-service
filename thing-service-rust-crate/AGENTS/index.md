@@ -21,8 +21,6 @@ The shared reference docs live at the project root under
 |----------|-------------|
 | [overview.md](../../agents/share/overview.md) | High-level project overview |
 | [architecture.md](../../agents/share/architecture.md) | Layered architecture |
-| [web-stack.md](../../agents/share/web-stack.md) | Loco / Tera / HTMX / Alpine / Lily HTML Headless |
-| [web-pages.md](../../agents/share/web-pages.md) | Per-page contracts for all 26 web-tier pages |
 | [technology.md](../../agents/share/technology.md) | Tech stack summary |
 | [stack-for-rust-loco.md](../../agents/share/stack-for-rust-loco.md) | Full dependency inventory |
 | [match-search-merge.md](../../agents/share/match-search-merge.md) | Match / search / merge workflows |

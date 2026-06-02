@@ -31,10 +31,6 @@ behaviour, read [`spec.md`](spec.md).
 # REST API
 cargo run --release
 
-# Web UI (Loco / Tera / HTMX / Alpine / Lily)
-cargo run --bin web                    # → http://0.0.0.0:5150
-PORT=5180 cargo run --bin web
-
 # Tests
 cargo test --lib                       # 104 unit
 cargo test --tests                     # 67 integration
@@ -314,7 +310,6 @@ let export = gdpr_export(&place);
 | `DATABASE_MIN_CONNECTIONS` / `DATABASE_MAX_CONNECTIONS` | Pool sizes | `2` / `10` |
 | `SERVER_HOST` | REST bind address | `0.0.0.0` |
 | `SERVER_PORT` | REST port | `8080` |
-| `PORT` | Web UI port (`cargo run --bin web`) | `5150` |
 | `SEARCH_INDEX_PATH` | Tantivy index directory | `./search_index` |
 | `MATCHING_THRESHOLD` | Default match cutoff | `0.7` |
 | `OTLP_ENDPOINT` | OpenTelemetry collector | `http://localhost:4317` |
@@ -332,11 +327,7 @@ src/
 ├── validation/         # validate_place, normalize_place
 ├── privacy/            # mask_place, gdpr_export
 ├── api/                # REST + gRPC (stub)
-├── web/                # Loco app + Tera views + Axum web router
-└── bin/web.rs          # cargo run --bin web
 
-assets/views/           # Tera templates (HTMX + Alpine + Lily)
-assets/static/          # lily.css, htmx.min.js, alpine.min.js
 config/                 # development.yaml, test.yaml, production.yaml
 migrations/             # SeaORM up.sql / down.sql pairs
 tests/                  # integration_* (matching, validation, privacy, models, scoring, edge_cases)

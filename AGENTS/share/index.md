@@ -22,7 +22,6 @@ Per-crate `spec.md`:
 ## Overview
 
 - Professional: Enterprise-grade, high-performance, production-ready
-- Web pages: Loco.rs framework, Tera templates, HTMX AJAX, Alpine.js UI/UX, Lily Design System HTML Headless
 - RESTful API: Modern HTTP API with OpenAPI/Swagger documentation
 - gRPC API: High-performance Remote Procedure Call (RPC) framework
 - Data Quality: Validation, standardization, normalization, merging
@@ -62,6 +61,5 @@ Per-crate `spec.md`:
 | [privacy.md](privacy.md)                                         | Data masking, GDPR, consent                            |
 | [restful.md](restful.md)                                         | RESTful API guidance                                   |
 | [technology.md](technology.md)                                   | Technology stack summary (alias for the Loco doc)      |
-| [stack-for-rust-loco.md](stack-for-rust-loco.md)                 | Stack for Rust, Loco (web, database, search, …)        |
-| [web-stack.md](web-stack.md)                                     | Loco, Tera, HTMX, Alpine, Lily HTML Headless           |
-| [web-pages.md](web-pages.md)                                     | Per-page contracts for all 26 web-tier pages           |
+| [stack-for-rust-loco.md](stack-for-rust-loco.md)                 | Stack for Rust, Loco (database, search, …)             |
+| [loco.md](loco.md)                                               | Loco framework (backend-only conventions)              |

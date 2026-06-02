@@ -8,9 +8,9 @@
 > **Three-part PRs.** A behavioural change is one PR: spec edit + code
 > edit + test edit. See [`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md).
 
-For shared infrastructure (web tier, technology stack, observability,
-compliance), see the project-root [`spec.md`](../spec.md),
-[`AGENTS.md`](../AGENTS.md), and [`agents/share/*`](../agents/share/).
+For shared infrastructure (technology stack, observability,
+compliance), see the project-root [`AGENTS.md`](../AGENTS.md) and
+[`agents/share/*`](../agents/share/).
 For per-crate reference detail (architecture, model field tables,
 matching constants), see [`AGENTS/`](AGENTS/).
 
@@ -63,8 +63,7 @@ One canonical place record regardless of how many source systems
 
 ### 1.3 Non-goals
 
-- **Not** a tile server — `tile-server integration` is a roadmap
-  item (§15) for the web UI map view; the API does not serve tiles.
+- **Not** a tile server — the API does not serve map tiles.
 - **Not** a routing engine — places have coordinates; turn-by-turn
   is out of scope.
 - **Not** a geocoder — reverse-geocoding endpoint is a roadmap item.
@@ -88,7 +87,6 @@ One canonical place record regardless of how many source systems
 - Per-field privacy masking (phone / fax / coordinate rounding),
   GDPR Article 15 export, consent records.
 - REST API (Axum) + gRPC stub.
-- Server-rendered web UI.
 - PostgreSQL persistence via SeaORM, with PostGIS for spatial.
 
 ### 2.2 Out of scope (today)
@@ -311,7 +309,7 @@ user ID, IP, user agent, timestamp.
 | Throughput | ≥ 1 000 req/sec single instance |
 | Availability | HADR; stateless app tier; PostgreSQL replication |
 | Fault tolerance | Graceful shutdown; connection pooling; health checks; non-root containers |
-| Observability | OTLP traces / metrics / logs; `traceparent` per request; Prometheus text-exposition scrape at `GET /metrics.prom` (canonical `/metrics` serves the HTML dashboard) |
+| Observability | OTLP traces / metrics / logs; `traceparent` per request |
 | Background jobs | Loco `BackgroundQueue` backed by **PostgreSQL** (`bg_pg`) — same database as application data; no external broker (no Redis, no SQLite) |
 
 ## 8. Architecture
@@ -341,8 +339,6 @@ src/
 ├── validation/            # boundary validators + address normalisation
 ├── privacy/               # masking + GDPR export
 ├── api/                   # REST + gRPC (stub)
-├── web/                   # Loco app + Tera views
-└── bin/web.rs             # cargo run --bin web (binds 0.0.0.0:5150)
 ```
 
 ### 8.2 Layering rules
@@ -487,7 +483,6 @@ clearly described manual check confirms the acceptance criterion.
 | Validation | Coordinate bounds, GLN check, URL protocol, telephone format, address completeness, `422` |
 | Normalisation | Title-case locality, uppercase region/country, abbreviation expansion |
 | Privacy | Phone / fax masking, geo-coordinate rounding (2 dp), GDPR export |
-| Web UI | Loco / Tera / HTMX / Alpine / Lily HTML Headless + United Kingdom National Health Service England theme |
 | Tests | 171 tests + 16 Criterion benchmarks |
 
 ### 14.2 Open gaps → tasks
@@ -522,19 +517,16 @@ clearly described manual check confirms the acceptance criterion.
   validation, DR runbook, backup / restore, CI/CD pipeline.
 - **Feature enhancements** — complete gRPC; Fluvio production +
   consumers; **OSM import pipeline**; **GeoJSON export**;
-  **tile-server integration for the web UI map view**; **map-tile
-  clustering for high-density searches**; **reverse-geocoding
-  endpoint**.
+  **map-tile clustering for high-density searches**;
+  **reverse-geocoding endpoint**.
 
 ## 16. Open Questions
 
-- **OQ-1 — Tile server.** Self-host a tile server (e.g. tegola,
-  martin) or proxy to an external one for the web UI map view?
-- **OQ-2 — Coordinate precision masking.** Today we round to 2 dp
+- **OQ-1 — Coordinate precision masking.** Today we round to 2 dp
   (~1 km). Is that the right default for a private-residence
   privacy view, or should we offer multiple buckets (`coarse` /
   `medium` / `precise`)?
-- **OQ-3 — Hierarchy cycle detection.** Validation rejects on insert,
+- **OQ-2 — Hierarchy cycle detection.** Validation rejects on insert,
   but we have no online "no two paths from A to B" check. Acceptable?
 
 ## 17. References
@@ -546,15 +538,12 @@ clearly described manual check confirms the acceptance criterion.
 - AGENTS reference set: [`AGENTS/index.md`](AGENTS/index.md).
 - Shared docs: [`agents/share/index.md`](../agents/share/index.md).
 - SDD discipline: [`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md).
-- Project-root web spec: [`../spec.md`](../spec.md).
 
 ## 18. Change Control
 
 Material changes to this spec — domain-model fields, match-quality
 thresholds, API-surface shape, compliance scope — MUST land in the
-same commit as the corresponding code change. The cross-crate
-uniformity invariant in the project-root [`spec.md`](../spec.md)
-applies to web tier files only; this per-crate spec is local to the
+same commit as the corresponding code change. This per-crate spec is local to the
 Place Service.
 
 Bullet what changed, not how: every spec edit should be a diff a

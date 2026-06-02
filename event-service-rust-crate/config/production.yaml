@@ -9,13 +9,6 @@ server:
   binding: 0.0.0.0
   host: "{{ get_env(name=\"HOST\", default=\"http://localhost\") }}"
   middlewares:
-    static:
-      enable: true
-      must_exist: true
-      precompressed: true
-      folder:
-        uri: "/static"
-        path: "assets/static"
     compression:
       enable: true
     etag:
