@@ -45,6 +45,7 @@ impl AppContext {
 pub struct WebState {
     pub tera: Arc<Tera>,
     pub app: AppContext,
+    pub themes: Vec<Theme>,
 }
 
 impl WebState {
@@ -52,6 +53,7 @@ impl WebState {
         Ok(Self {
             tera: Arc::new(engine()?),
             app: AppContext::person(),
+            themes: scan_themes(),
         })
     }
 
@@ -59,6 +61,7 @@ impl WebState {
     pub fn context(&self) -> Context {
         let mut ctx = Context::new();
         self.app.apply(&mut ctx);
+        ctx.insert("themes", &self.themes);
         ctx
     }
 
@@ -72,4 +75,73 @@ impl WebState {
 pub fn engine() -> WebResult<Tera> {
     let pattern = "assets/views/**/*.tera";
     Tera::new(pattern).map_err(WebError::Load)
+}
+
+/// A single visual theme discovered under
+/// `assets/static/css/themes/`. `slug` is the filename stem
+/// (e.g. `"dark"` from `dark.css`); `label` is the human-readable
+/// label rendered in the picker UI.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Theme {
+    pub slug: String,
+    pub label: String,
+}
+
+/// Scan `assets/static/css/themes/*.css` at WebState-construction
+/// time. Returns the discovered themes sorted alphabetically by slug,
+/// or an empty `Vec` if the directory does not exist (so callers do
+/// not have to special-case offline test environments).
+fn scan_themes() -> Vec<Theme> {
+    let dir = std::path::Path::new("assets/static/css/themes");
+    let entries = match std::fs::read_dir(dir) {
+        Ok(it) => it,
+        Err(_) => return Vec::new(),
+    };
+    let mut slugs: Vec<String> = entries
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let path = e.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("css") {
+                return None;
+            }
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
+        })
+        .collect();
+    slugs.sort();
+    slugs.dedup();
+    slugs
+        .into_iter()
+        .map(|slug| {
+            let label = label_for_slug(&slug);
+            Theme { slug, label }
+        })
+        .collect()
+}
+
+/// Map a theme slug (filename stem) to a human-readable label.
+/// Slugs without an explicit mapping get title-case-by-first-letter
+/// treatment.
+fn label_for_slug(slug: &str) -> String {
+    match slug {
+        "cmyk" => "CMYK".to_string(),
+        "lofi" => "Lo-fi".to_string(),
+        "caramellatte" => "Caramel latte".to_string(),
+        "united-kingdom-national-health-service-england" =>
+            "United Kingdom NHS England".to_string(),
+        "united-kingdom-national-health-service-scotland" =>
+            "United Kingdom NHS Scotland".to_string(),
+        "united-kingdom-national-health-service-wales-patients" =>
+            "United Kingdom NHS Wales (Patients)".to_string(),
+        "united-kingdom-national-health-service-wales-practitioners" =>
+            "United Kingdom NHS Wales (Practitioners)".to_string(),
+        s => {
+            let mut chars = s.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(c) => c.to_ascii_uppercase().to_string() + chars.as_str(),
+            }
+        }
+    }
 }

@@ -174,45 +174,8 @@
       <select id="theme-select"
               class="theme-select"
               aria-label="Choose a visual theme">
-        <option class="theme-select-option" value="abyss">Abyss</option>
-        <option class="theme-select-option" value="acid">Acid</option>
-        <option class="theme-select-option" value="aqua">Aqua</option>
-        <option class="theme-select-option" value="autumn">Autumn</option>
-        <option class="theme-select-option" value="black">Black</option>
-        <option class="theme-select-option" value="bumblebee">Bumblebee</option>
-        <option class="theme-select-option" value="business">Business</option>
-        <option class="theme-select-option" value="caramellatte">Caramel latte</option>
-        <option class="theme-select-option" value="cmyk">CMYK</option>
-        <option class="theme-select-option" value="coffee">Coffee</option>
-        <option class="theme-select-option" value="corporate">Corporate</option>
-        <option class="theme-select-option" value="cupcake">Cupcake</option>
-        <option class="theme-select-option" value="cyberpunk">Cyberpunk</option>
-        <option class="theme-select-option" value="dark">Dark</option>
-        <option class="theme-select-option" value="dim">Dim</option>
-        <option class="theme-select-option" value="dracula">Dracula</option>
-        <option class="theme-select-option" value="emerald">Emerald</option>
-        <option class="theme-select-option" value="fantasy">Fantasy</option>
-        <option class="theme-select-option" value="forest">Forest</option>
-        <option class="theme-select-option" value="garden">Garden</option>
-        <option class="theme-select-option" value="halloween">Halloween</option>
-        <option class="theme-select-option" value="lemonade">Lemonade</option>
-        <option class="theme-select-option" value="light" selected>Light (default)</option>
-        <option class="theme-select-option" value="lofi">Lo-fi</option>
-        <option class="theme-select-option" value="luxury">Luxury</option>
-        <option class="theme-select-option" value="night">Night</option>
-        <option class="theme-select-option" value="nord">Nord</option>
-        <option class="theme-select-option" value="pastel">Pastel</option>
-        <option class="theme-select-option" value="retro">Retro</option>
-        <option class="theme-select-option" value="silk">Silk</option>
-        <option class="theme-select-option" value="sunset">Sunset</option>
-        <option class="theme-select-option" value="synthwave">Synthwave</option>
-        <option class="theme-select-option" value="united-kingdom-national-health-service-england">United Kingdom NHS England</option>
-        <option class="theme-select-option" value="united-kingdom-national-health-service-scotland">United Kingdom NHS Scotland</option>
-        <option class="theme-select-option" value="united-kingdom-national-health-service-wales-patients">United Kingdom NHS Wales (Patients)</option>
-        <option class="theme-select-option" value="united-kingdom-national-health-service-wales-practitioners">United Kingdom NHS Wales (Practitioners)</option>
-        <option class="theme-select-option" value="valentine">Valentine</option>
-        <option class="theme-select-option" value="winter">Winter</option>
-        <option class="theme-select-option" value="wireframe">Wireframe</option>
+        {% for theme in themes %}<option class="theme-select-option" value="{{ theme.slug }}"{% if theme.slug == "light" %} selected{% endif %}>{{ theme.label }}{% if theme.slug == "light" %} (default){% endif %}</option>
+        {% endfor %}
       </select>
     </div>
 
@@ -310,46 +273,8 @@
               { label: "Color palette",         hint: "Full NHS token customizer",                   href: "/palette" },
               { label: "Settings",              hint: "Per-browser preferences",                     href: "/settings" },
               { label: "Show keyboard shortcuts", hint: "Open the shortcuts dialog",  kb: ["?"],     action: "shortcuts" },
-              { label: "Switch theme: Abyss", hint: "Theme: Abyss", action: "theme:abyss" },
-              { label: "Switch theme: Acid", hint: "Theme: Acid", action: "theme:acid" },
-              { label: "Switch theme: Aqua", hint: "Theme: Aqua", action: "theme:aqua" },
-              { label: "Switch theme: Autumn", hint: "Theme: Autumn", action: "theme:autumn" },
-              { label: "Switch theme: Black", hint: "Theme: Black", action: "theme:black" },
-              { label: "Switch theme: Bumblebee", hint: "Theme: Bumblebee", action: "theme:bumblebee" },
-              { label: "Switch theme: Business", hint: "Theme: Business", action: "theme:business" },
-              { label: "Switch theme: Caramel latte", hint: "Theme: Caramel latte", action: "theme:caramellatte" },
-              { label: "Switch theme: CMYK", hint: "Theme: CMYK", action: "theme:cmyk" },
-              { label: "Switch theme: Coffee", hint: "Theme: Coffee", action: "theme:coffee" },
-              { label: "Switch theme: Corporate", hint: "Theme: Corporate", action: "theme:corporate" },
-              { label: "Switch theme: Cupcake", hint: "Theme: Cupcake", action: "theme:cupcake" },
-              { label: "Switch theme: Cyberpunk", hint: "Theme: Cyberpunk", action: "theme:cyberpunk" },
-              { label: "Switch theme: Dark", hint: "Theme: Dark", action: "theme:dark" },
-              { label: "Switch theme: Dim", hint: "Theme: Dim", action: "theme:dim" },
-              { label: "Switch theme: Dracula", hint: "Theme: Dracula", action: "theme:dracula" },
-              { label: "Switch theme: Emerald", hint: "Theme: Emerald", action: "theme:emerald" },
-              { label: "Switch theme: Fantasy", hint: "Theme: Fantasy", action: "theme:fantasy" },
-              { label: "Switch theme: Forest", hint: "Theme: Forest", action: "theme:forest" },
-              { label: "Switch theme: Garden", hint: "Theme: Garden", action: "theme:garden" },
-              { label: "Switch theme: Halloween", hint: "Theme: Halloween", action: "theme:halloween" },
-              { label: "Switch theme: Lemonade", hint: "Theme: Lemonade", action: "theme:lemonade" },
-              { label: "Switch theme: Light (default)", hint: "Theme: Light", action: "theme:light" },
-              { label: "Switch theme: Lo-fi", hint: "Theme: Lo-fi", action: "theme:lofi" },
-              { label: "Switch theme: Luxury", hint: "Theme: Luxury", action: "theme:luxury" },
-              { label: "Switch theme: Night", hint: "Theme: Night", action: "theme:night" },
-              { label: "Switch theme: Nord", hint: "Theme: Nord", action: "theme:nord" },
-              { label: "Switch theme: Pastel", hint: "Theme: Pastel", action: "theme:pastel" },
-              { label: "Switch theme: Retro", hint: "Theme: Retro", action: "theme:retro" },
-              { label: "Switch theme: Silk", hint: "Theme: Silk", action: "theme:silk" },
-              { label: "Switch theme: Sunset", hint: "Theme: Sunset", action: "theme:sunset" },
-              { label: "Switch theme: Synthwave", hint: "Theme: Synthwave", action: "theme:synthwave" },
-              { label: "Switch theme: United Kingdom NHS England", hint: "Theme: United Kingdom NHS England", action: "theme:united-kingdom-national-health-service-england" },
-              { label: "Switch theme: United Kingdom NHS Scotland", hint: "Theme: United Kingdom NHS Scotland", action: "theme:united-kingdom-national-health-service-scotland" },
-              { label: "Switch theme: United Kingdom NHS Wales (Patients)", hint: "Theme: United Kingdom NHS Wales (Patients)", action: "theme:united-kingdom-national-health-service-wales-patients" },
-              { label: "Switch theme: United Kingdom NHS Wales (Practitioners)", hint: "Theme: United Kingdom NHS Wales (Practitioners)", action: "theme:united-kingdom-national-health-service-wales-practitioners" },
-              { label: "Switch theme: Valentine", hint: "Theme: Valentine", action: "theme:valentine" },
-              { label: "Switch theme: Winter", hint: "Theme: Winter", action: "theme:winter" },
-              { label: "Switch theme: Wireframe", hint: "Theme: Wireframe", action: "theme:wireframe" }
-              { label: "Reset palette",         hint: "Clear all token overrides",                   action: "palette:reset" }
+{% for theme in themes %}              {{ "{ " }}label: "Switch theme: {{ theme.label }}{% if theme.slug == "light" %} (default){% endif %}", hint: "Theme: {{ theme.label }}", action: "theme:{{ theme.slug }}" {{ "}" }}{% if not loop.last %},{% endif %}
+              {% endfor %}              { label: "Reset palette",         hint: "Clear all token overrides",                   action: "palette:reset" }
             ],
             filtered() {
               var q = this.query.trim().toLowerCase();
