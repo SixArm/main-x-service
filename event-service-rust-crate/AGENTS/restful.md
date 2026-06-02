@@ -37,11 +37,10 @@ by [`tests/duplicate_detection.rs`](../tests/duplicate_detection.rs).
 |---|---|---|
 | GET | `/metrics.prom` | Prometheus text-exposition format (`text/plain; version=0.0.4`) for scraping |
 
-The canonical `/metrics` endpoint serves the HTML performance
-dashboard; configure your scraper with `metrics_path: /metrics.prom`.
-The metric inventory (entity-CRUD counters, HTTP request counter,
-latency histograms) is in
-[`src/metrics.rs`](../src/metrics.rs).
+Configure your scraper with `metrics_path: /metrics.prom`. The metric
+inventory (entity-CRUD counters, HTTP request counter, latency
+histograms) is in [`src/metrics.rs`](../src/metrics.rs). The handler
+is [`api::rest::handlers::metrics_prom`](../src/api/rest/handlers.rs).
 
 ## Health
 

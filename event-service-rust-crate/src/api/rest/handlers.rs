@@ -40,6 +40,26 @@ pub async fn health_check() -> impl IntoResponse {
     })
 }
 
+/// Prometheus metrics endpoint (text-exposition format).
+///
+/// Renders [`crate::metrics::METRICS`] for scraping. Mounted at the
+/// root (`/metrics.prom`) — not under `/api/v1` — so a default
+/// Prometheus scrape config (`metrics_path: /metrics.prom`) finds it.
+#[utoipa::path(
+    get,
+    path = "/metrics.prom",
+    tag = "observability",
+    responses(
+        (status = 200, description = "Prometheus text-exposition format", content_type = "text/plain; version=0.0.4; charset=utf-8")
+    )
+)]
+pub async fn metrics_prom() -> impl IntoResponse {
+    (
+        [(axum::http::header::CONTENT_TYPE, crate::metrics::CONTENT_TYPE)],
+        crate::metrics::METRICS.render(),
+    )
+}
+
 // ---------------------------------------------------------------------------
 // Event CRUD
 // ---------------------------------------------------------------------------

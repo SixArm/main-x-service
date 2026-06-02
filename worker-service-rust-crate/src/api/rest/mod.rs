@@ -30,6 +30,7 @@ use crate::Result;
     ),
     paths(
         handlers::health_check,
+        handlers::metrics_prom,
         handlers::create_worker,
         handlers::get_worker,
         handlers::update_worker,
@@ -84,6 +85,7 @@ use crate::Result;
     ),
     tags(
         (name = "health", description = "Health check endpoint"),
+        (name = "observability", description = "Prometheus metrics endpoint"),
         (name = "workers", description = "Worker management endpoints"),
         (name = "search", description = "Worker search endpoints"),
         (name = "matching", description = "Worker matcher endpoints"),
@@ -123,6 +125,7 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         .nest("/api/v1", api_routes)
+        .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
 }
