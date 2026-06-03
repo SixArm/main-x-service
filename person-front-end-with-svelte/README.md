@@ -50,12 +50,58 @@ Set in `.env`. Because the variable is prefixed with `PUBLIC_`, SvelteKit expose
 ## Testing
 
 ```bash
-pnpm test         # vitest unit tests (no live service required)
-pnpm test:e2e     # playwright smoke tests (no live service required)
-pnpm check        # svelte-check type-check
+pnpm test              # vitest unit tests (no live service required)
+pnpm test:e2e          # playwright smoke tests (no live service required)
+pnpm test:integration  # playwright integration tests — requires live service
+pnpm check             # svelte-check type-check
 ```
 
-The unit tests mock `fetch`. The Playwright suite asserts the page shells render even when the API is down (the page shows a banner; layout still mounts).
+The unit tests mock `fetch`. The smoke suite (`tests/e2e/`) asserts the page shells render even when the API is down (the page shows a banner; layout still mounts).
+
+### Integration tests (live Person Service)
+
+`tests/integration/golden-paths.spec.ts` drives the live SvelteKit preview against a running `person-service-rust-crate` over real HTTP. Coverage:
+
+| Test | Spec FR | What it asserts |
+| --- | --- | --- |
+| `list renders the seeded person` | FR-1 | Search box → SVAR Grid shows the seeded row. |
+| `create lands on detail page` | FR-3 | Form POST → 200 → redirect to detail; verified via direct REST GET. |
+| `second create surfaces match candidates` | FR-3 | Duplicate POST → 409 → MatchResultsList renders inline. |
+| `detail page shows nested fields` | FR-5 | ID, birth date, gender visible. |
+| `edit persists` | FR-6 | PUT → detail re-fetches updated birth date. |
+| `soft-delete hides record` | FR-7 | DELETE → record either gone or `active: false`. |
+| `match check renders breakdown` | FR-8 | POST `/match` → MatchResultsList header + at least one row. |
+| `merge soft-deletes duplicate` | FR-9 | POST `/merge` → main survives, duplicate `active: false` or 404. |
+| `audit log lists entries` | — | `/audit` route renders entries or the empty-state. |
+
+Each test creates its own records with a timestamped family name and cleans up via REST `DELETE` in `afterAll`, so the suite is safely re-runnable.
+
+#### Running locally
+
+```bash
+# 1. Start the Rust service (Postgres + Axum) in the background
+(cd ../person-service-rust-crate && docker compose up -d)
+
+# 2. Wait for the service to report healthy (first Rust build can take ~5 min)
+curl -sf http://localhost:8080/api/health && echo ok
+
+# 3. Run the integration suite — health-checks then runs Playwright
+bin/e2e
+
+# Forward Playwright flags as usual:
+bin/e2e --headed
+bin/e2e --ui
+bin/e2e tests/integration/golden-paths.spec.ts -g "FR-9"
+
+# 4. Tear down when done
+(cd ../person-service-rust-crate && docker compose down)
+```
+
+To target a different service URL:
+
+```bash
+PUBLIC_API_BASE_URL=http://staging.example:8080 bin/e2e
+```
 
 ## Project layout
 

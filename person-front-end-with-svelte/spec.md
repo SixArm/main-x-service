@@ -187,13 +187,24 @@ The front-end is stateless. No local DB, no client-side cache layer beyond Svelt
 
 ## 11. Testing Strategy
 
-| Layer | Tool | Scope |
-| --- | --- | --- |
-| Unit | Vitest + jsdom | `ApiClient` envelope handling, `ApiError` mapping, `PersonRepository` wiring. |
-| E2E smoke | Playwright | Page-shell rendering for every MVP route without requiring a live service. |
-| Live integration | (manual) | Run `pnpm dev` against a running `person-service-rust-crate`; click through CRUD/match/merge. |
+| Layer | Tool | Scope | Run |
+| --- | --- | --- | --- |
+| Unit | Vitest + jsdom | `ApiClient` envelope handling, `ApiError` mapping, `PersonRepository` wiring. | `pnpm test` |
+| E2E smoke | Playwright (project `smoke`) | Page-shell rendering for every MVP route. Does not need a live service — the page renders an error banner if the API call fails. | `pnpm test:e2e` |
+| Live integration | Playwright (project `integration`) | Golden-path flows that drive the live SvelteKit preview against a running `person-service-rust-crate`. Covers FR-1 / FR-3 / FR-5 / FR-6 / FR-7 / FR-8 / FR-9 plus per-record audit. Self-cleanup via REST `DELETE` in `afterAll`. | `bin/e2e` (health-checks then runs) or `pnpm test:integration` |
 
-Run: `pnpm test`, `pnpm test:e2e`.
+The integration suite assumes a running Person Service at
+`PUBLIC_API_BASE_URL` (default `http://localhost:8080`). Bring it up
+with the service's docker-compose:
+
+```bash
+(cd ../person-service-rust-crate && docker compose up -d)
+bin/e2e
+```
+
+Each integration test creates its own records with a timestamped
+family name so the suite is idempotent across runs. Records are
+soft-deleted via the REST API in `afterAll`.
 
 ## 12. Compliance
 
@@ -216,6 +227,7 @@ Run: `pnpm test`, `pnpm test:e2e`.
 - [x] T-10: Merge UI with preview.
 - [x] T-11: Vitest unit tests for `ApiClient` + `PersonRepository`.
 - [x] T-12: Playwright e2e smoke for every MVP route.
+- [x] T-12a: Playwright **integration** suite (`tests/integration/golden-paths.spec.ts`) driving the live preview against a running `person-service-rust-crate`. 9 tests covering FR-1, FR-3 (×2 — happy path + 409 duplicate), FR-5, FR-6, FR-7, FR-8, FR-9, and per-record audit. Idempotent (timestamped family names + REST `DELETE` cleanup). Run with `bin/e2e` or `pnpm test:integration`. Harness is validated (svelte-check clean, playwright `--list` discovers all 9 tests, smoke project still 6/6, bin/e2e exits 1 with a clear message when the service is down). **End-to-end validation against a live service is blocked on a pre-existing issue in the service crate — see OQ-5.**
 - [ ] T-13: SSR-safe load functions using `event.fetch` for SEO-irrelevant but warm-cache wins.
 - [ ] T-14: Integrate Lily Headless components beyond Button (Dialog for merge confirm, Combobox for identifier system, Banner for error states).
 - [ ] T-15: Identifier / address / emergency-contact edit (currently read-only on detail; edit form re-PUTs whole record but no UI to add/remove sub-records).
@@ -257,6 +269,7 @@ Run: `pnpm test`, `pnpm test:e2e`.
 - **OQ-2**: Should the create route call `check-duplicates` for an inline preview before the actual `create` POST, or rely solely on the 409 round-trip? Round-trip is simpler; preview is friendlier. Operator feedback needed.
 - **OQ-3**: When the service returns `403`/`401` (post-auth), how should the UI redirect? Tied to whatever auth flow the service chooses (JWT vs session vs OAuth).
 - **OQ-4**: Drift policy: per project decision 2026-06-02 we keep API client + types in each front-end project. Revisit when the third sibling front-end ships if drift becomes painful.
+- **OQ-5** (2026-06-03): Live integration validation is blocked on two pre-existing issues in `person-service-rust-crate`. (a) The `Dockerfile` runtime stage references debian packages (`libpq5`, `libssl3`, `ca-certificates`) that aren't available in `debian:bookworm-slim`'s default repos, so `docker compose build` fails. (b) The crate is library-only — `Cargo.toml` declares no `[[bin]]` target and there is no `src/main.rs`, so `cargo run --release` fails with "a bin target must be available." The Dockerfile separately copies `target/release/person_service`, which `cargo build` never produces. **Action item, not for this front-end repo:** the service crate needs either (a) a `src/main.rs` that calls `person_service::api::rest::serve(state)` plus a `[[bin]]` target, **or** the existing `serve()` function wired into a Loco-style binary. Once that lands, validate `bin/e2e` against a live stack and capture the output here. Postgres-only (sidestepping the broken Dockerfile via `postgres:17-alpine`) was confirmed runnable.
 
 ## 17. References
 

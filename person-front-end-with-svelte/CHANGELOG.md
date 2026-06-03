@@ -9,7 +9,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Live-service integration test suite** at `tests/integration/golden-paths.spec.ts`. 8 Playwright tests driving the live SvelteKit preview against a running `person-service-rust-crate` over real HTTP. Covers spec §6 FR-1 (search-finds-record), FR-3 (create lands on detail page) + the 409-duplicate inline path, FR-5 (detail renders nested fields), FR-6 (edit PUTs the full Person), FR-7 (soft-delete hides record), FR-8 (match check renders score), FR-9 (merge soft-deletes the duplicate), and per-record audit log presence.
+- `playwright.config.ts` refactored to two projects: `smoke` (existing, no service needed; `tests/e2e/`) and `integration` (new, live service required; `tests/integration/`). The webServer command now bakes `PUBLIC_API_BASE_URL` into the preview build so the front-end talks to the configured service.
+- `bin/e2e` wrapper script that health-checks the service at `PUBLIC_API_BASE_URL/api/health` before running Playwright. Forwards extra args (`--headed`, `--ui`, etc.) to playwright.
+- `package.json` adds `test:integration` script. `test:e2e` now scoped to the `smoke` project.
+
+### Documentation
+
+- `spec.md §11 Testing Strategy` extended with a 3-row layer table (unit / smoke / integration) plus run commands and a section on test idempotency.
+- `spec.md §13 Tasks` marks T-12a integration suite as complete with harness-level validation (svelte-check clean, playwright `--list` discovers all 9 tests, smoke project still 6/6, `bin/e2e` exits 1 with a clear message when the service is down).
+- `spec.md §16 OQ-5` records the live-stack validation blocker: the `person-service-rust-crate` Dockerfile build fails (missing apt packages in debian:bookworm-slim) and `cargo run --release` fails (no `[[bin]]` target, no `src/main.rs`) even though `target/release/person_service` is referenced by the Dockerfile. The service crate needs a `main.rs` wiring `api::rest::serve` to a runnable binary before live integration can be exercised end-to-end.
+
+### Validation status
+
+| Stage | Result |
+| --- | --- |
+| `svelte-check` | ✅ 0 errors, 0 warnings (352 files) |
+| `pnpm test` (vitest unit) | ✅ 8/8 |
+| `pnpm test:e2e` (smoke; refactored config) | ✅ 6/6 |
+| `pnpm exec playwright test --project=integration --list` | ✅ 9 tests discovered |
+| `bin/e2e` with no service running | ✅ exits 1, prints the bring-up instructions |
+| `bin/e2e` against a live service | ⛔ blocked on OQ-5 — service crate has no runnable binary today |
 
 ## [0.1.0] — 2026-06-02
 
