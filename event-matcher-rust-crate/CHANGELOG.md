@@ -73,6 +73,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-Earlier history has moved to
-[`CHANGELOG-archive.md`](./CHANGELOG-archive.md) to keep this file
-under 40 KB.
+Earlier history has moved to keep this file under 40 KB:
+
+- [`CHANGELOG-archive.md`](./CHANGELOG-archive.md) — released
+  place-matcher versions ([0.3.0], [0.1.0]) and the [0.4.0] inherited
+  history.
+- [`CHANGELOG-pre-event-rebrand.md`](./CHANGELOG-pre-event-rebrand.md)
+  — pre-0.5.0 "Unreleased" entries authored under the
+  `place-matcher` name that never shipped.

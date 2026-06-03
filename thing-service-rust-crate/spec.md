@@ -488,10 +488,12 @@ clearly described manual check confirms the acceptance criterion.
 
 ## 17. References
 
-- Sibling specs: [person-service](../person-service-rust-crate/spec.md),
+- Sibling service specs: [person-service](../person-service-rust-crate/spec.md),
   [event-service](../event-service-rust-crate/spec.md),
   [worker-service](../worker-service-rust-crate/spec.md),
   [place-service](../place-service-rust-crate/spec.md).
+- Sibling matcher spec: [thing-matcher](../thing-matcher-rust-crate/spec.md).
+- Front-end consumer: [thing-front-end-with-svelte](../thing-front-end-with-svelte/spec.md) — SvelteKit + SVAR DataGrid + Lily Headless UI over this service's REST API.
 - AGENTS reference set: [`AGENTS/index.md`](AGENTS/index.md).
 - Shared docs: [`agents/share/index.md`](../agents/share/index.md).
 - SDD discipline: [`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md).

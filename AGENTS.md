@@ -35,6 +35,23 @@ the corresponding service crate's matching layer.
 | [Thing Matcher](thing-matcher-rust-crate/) | Thing | [spec](thing-matcher-rust-crate/spec.md) | [index](thing-matcher-rust-crate/index.md) |
 | [Event Matcher](event-matcher-rust-crate/) | Event | [spec](event-matcher-rust-crate/spec.md) | [index](event-matcher-rust-crate/index.md) |
 
+### Front-end projects
+
+SvelteKit front-ends sit alongside their service crates. Each is an
+independent SPA built on SvelteKit 2 + Svelte 5 runes + SVAR Svelte
+DataGrid + Lily Design System Svelte Headless, calling the sibling
+service's REST API. Their per-project `spec.md` follows the same
+§1–§18 SDD shape as the service crates. Drift between front-ends is
+accepted (see `feedback_front_end_drift` memory) — no shared package.
+
+| Project | Consumes | Spec | Changelog |
+|---|---|---|---|
+| [person-front-end-with-svelte](person-front-end-with-svelte/) | [person-service](person-service-rust-crate/) | [spec](person-front-end-with-svelte/spec.md) | [CHANGELOG](person-front-end-with-svelte/CHANGELOG.md) |
+| [worker-front-end-with-svelte](worker-front-end-with-svelte/) | [worker-service](worker-service-rust-crate/) | [spec](worker-front-end-with-svelte/spec.md) | [CHANGELOG](worker-front-end-with-svelte/CHANGELOG.md) |
+| [place-front-end-with-svelte](place-front-end-with-svelte/) | [place-service](place-service-rust-crate/) | [spec](place-front-end-with-svelte/spec.md) | [CHANGELOG](place-front-end-with-svelte/CHANGELOG.md) |
+| [thing-front-end-with-svelte](thing-front-end-with-svelte/) | [thing-service](thing-service-rust-crate/) | [spec](thing-front-end-with-svelte/spec.md) | [CHANGELOG](thing-front-end-with-svelte/CHANGELOG.md) |
+| [event-front-end-with-svelte](event-front-end-with-svelte/) | [event-service](event-service-rust-crate/) | [spec](event-front-end-with-svelte/spec.md) | [CHANGELOG](event-front-end-with-svelte/CHANGELOG.md) |
+
 ## Shared reference docs
 
 @agents/share/index.md
@@ -101,6 +118,14 @@ Each service crate ships an identical doc set:
 - `AGENTS/matching.md` — per-crate matching tuning
 - `AGENTS/restful.md` — REST API surface
 - `AGENTS/testing.md` — test layout
+
+Each front-end project ships a thinner doc set:
+
+- `spec.md` — §1–§18 SDD shape (same as service crates)
+- `README.md` — user-facing intro (routes, quick start, env vars)
+- `CLAUDE.md` — one-line `@AGENTS.md` include
+- `AGENTS.md` — agent guide (ground rules: Svelte 5 runes only, SPA mode, drift accepted)
+- `CHANGELOG.md` — Keep a Changelog format; v0.1.0 inaugural entry
 
 There is intentionally no `plan.md` and no `tasks.md`: plan content
 lives in `spec.md §8–§12`, task content in `spec.md §13`, status /

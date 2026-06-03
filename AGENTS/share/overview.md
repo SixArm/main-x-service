@@ -29,6 +29,24 @@ specifications, …) tailored to library-style work.
 | [thing-matcher](../../thing-matcher-rust-crate) | Thing | Generic thing / asset matching |
 | [event-matcher](../../event-matcher-rust-crate) | Event | Time-bounded event matching with window-overlap |
 
+### Front-end projects
+
+Operator-facing web UIs — one independent SvelteKit SPA per entity,
+calling the sibling service's REST API. Stack: SvelteKit 2, Svelte 5
+runes, SVAR Svelte DataGrid, Lily Design System Svelte Headless,
+TypeScript strict. Per-project `spec.md` follows the same §1–§18 SDD
+shape as the service crates.
+
+| Project | Consumes | Purpose |
+|---|---|---|
+| [person-front-end-with-svelte](../../person-front-end-with-svelte) | person-service | Operator UI for Person CRUD / search / match / merge / audit |
+| [worker-front-end-with-svelte](../../worker-front-end-with-svelte) | worker-service | Operator UI for Worker CRUD / search / match / merge / audit |
+| [place-front-end-with-svelte](../../place-front-end-with-svelte) | place-service | Operator UI for Place CRUD / search / match / merge / audit (PostalAddress + GeoCoordinates + GLN) |
+| [thing-front-end-with-svelte](../../thing-front-end-with-svelte) | thing-service | Operator UI for Thing CRUD / search / match / merge / audit (PropertyValue identifiers — DOI / ISBN / GTIN / …) |
+| [event-front-end-with-svelte](../../event-front-end-with-svelte) | event-service | Operator UI for Event CRUD / search / match / merge / audit (time window + Location union + Party / Offer) — calls under `/api/v1/` |
+
+Per-project decision (2026-06-02): drift between front-ends is accepted; there is no shared `mxi-svelte-core` package. Copy-adapt from a sibling when scaffolding a new front-end.
+
 ## What every crate provides
 
 - **CRUD** on the domain entity with soft-delete and full audit trail
