@@ -399,11 +399,17 @@ mod tests {
 
         let result = scorer.calculate_score(&person1, &person2);
 
-        // With NAME (0.30) + DOB (0.25) + GENDER (0.10) = 0.65
-        // No address, identifiers, tax_id, or documents, so those contribute 0
-        assert!(result.score >= 0.60, "Exact match on name/dob/gender should score >= 0.60, got {}", result.score);
-        assert!(!scorer.is_match(result.score)); // 0.65 < threshold of 0.85
-        assert_eq!(scorer.classify_match(result.score), MatchQuality::Possible);
+        // Per spec change 2026-06-03, weights renormalise over present
+        // components. Identical name + DOB + gender (no address /
+        // identifier / tax_id / document on either side) is
+        // (1*0.30 + 1*0.25 + 1*0.10) / (0.30 + 0.25 + 0.10) = 1.0.
+        assert!(
+            result.score >= 0.99,
+            "Exact match on name+DOB+gender should renormalise to 1.0, got {}",
+            result.score,
+        );
+        assert!(scorer.is_match(result.score));
+        assert_eq!(scorer.classify_match(result.score), MatchQuality::Definite);
     }
 
     #[test]
@@ -419,8 +425,12 @@ mod tests {
 
         let result = scorer.calculate_score(&person1, &person2);
 
-        assert!(result.score > 0.60, "Fuzzy match should score > 0.60, got {}", result.score);
-        assert!(result.score < 0.80);
+        // Post-renormalisation: name ~0.93 (Jaro-Winkler) + DOB ~0.95
+        // (day off by 1) + gender 1.0, weighted average over 0.65 of
+        // weight, lands in the probable / certain band rather than the
+        // possible band the old non-renormalised sum (~0.55) produced.
+        assert!(result.score > 0.85, "Fuzzy near-match should score > 0.85, got {}", result.score);
+        assert!(result.score < 1.0);
     }
 
     #[test]
@@ -512,7 +522,11 @@ mod tests {
         person2.gender = Gender::Female;
 
         let result = scorer.calculate_score(&person1, &person2);
-        assert!(result.score < 0.30, "No matching fields should score very low, got {}", result.score);
+        // Post-renormalisation: low name (Smith vs Johnson), low DOB
+        // (15 years apart), 0 gender — averaged over 0.65 of weight.
+        // The result is still well below the 0.85 threshold, but the
+        // renormalisation moves it up from the old ~0.10 to ~0.20.
+        assert!(result.score < 0.40, "Unrelated records should score well below threshold, got {}", result.score);
         assert!(!scorer.is_match(result.score));
     }
 
