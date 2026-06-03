@@ -39,13 +39,28 @@ interface CreatedPerson {
 
 // ─── Tiny REST helpers ─────────────────────────────────────────────
 
+// Generate a per-record DOB that is unique within the run so that the
+// matcher's renormalised weighted-average score for two *different*
+// seeded records stays below the 0.85 duplicate-detection threshold.
+// Two E2E_* records that share family+DOB+gender now correctly score
+// as a duplicate (post-scoring-renormalisation fix in the service);
+// each test therefore needs distinct demographics per record except
+// where it *explicitly* wants to exercise the 409 path.
+let uniqueDobCounter = 0;
+function uniqueDob(): string {
+    uniqueDobCounter += 1;
+    const d = new Date(Date.UTC(1970, 0, 1));
+    d.setUTCDate(d.getUTCDate() + uniqueDobCounter * 17);
+    return d.toISOString().slice(0, 10);
+}
+
 async function apiCreatePerson(
     request: APIRequestContext,
     family: string,
     given: string,
-    extra: Record<string, unknown> = {},
+    extra: { birth_date?: string } & Record<string, unknown> = {},
 ): Promise<CreatedPerson> {
-    const birth_date = "1985-04-12";
+    const birth_date = (extra.birth_date as string | undefined) ?? uniqueDob();
     const res = await request.post(`${API_BASE}/api/persons`, {
         data: {
             name: { family, given: [given] },
@@ -112,12 +127,13 @@ test.describe("Person front-end ↔ Person Service golden paths", () => {
 
     test("FR-5: detail page shows nested identity fields", async ({ page }) => {
         await page.goto(`/persons/${created.id}`);
-        await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+        const main = page.getByRole("main");
+        await expect(main.getByRole("heading", { level: 1 })).toHaveText(
             new RegExp(`${created.given}\\s+${created.family}`),
         );
-        await expect(page.getByText(created.id)).toBeVisible();
-        await expect(page.getByText(created.birth_date)).toBeVisible();
-        await expect(page.getByText("female")).toBeVisible();
+        await expect(main.getByText(created.id)).toBeVisible();
+        await expect(main.getByText(created.birth_date)).toBeVisible();
+        await expect(main.getByText("female")).toBeVisible();
     });
 
     // ─── Write flows ───────────────────────────────────────────────
@@ -144,9 +160,12 @@ test.describe("Person front-end ↔ Person Service golden paths", () => {
         page,
         request,
     }) => {
-        // Seed A directly via API.
+        // Seed A directly via API with a *fixed* birth_date so the
+        // second UI POST can replay it exactly and reliably trigger
+        // the duplicate detector.
         const family = uniqueFamily("dup");
-        const first = await apiCreatePerson(request, family, "Carlos");
+        const sharedDob = "1981-09-23";
+        const first = await apiCreatePerson(request, family, "Carlos", { birth_date: sharedDob });
         cleanup.push(first.id);
 
         // Now try to create A again via the UI — service should 409
@@ -155,7 +174,7 @@ test.describe("Person front-end ↔ Person Service golden paths", () => {
         await page.goto("/persons/new");
         await page.getByLabel(/Family name/).fill(family);
         await page.getByLabel(/Given names/).fill("Carlos");
-        await page.getByLabel(/Birth date/).fill("1985-04-12");
+        await page.getByLabel(/Birth date/).fill(sharedDob);
         await page.getByRole("button", { name: "Create" }).click();
 
         // The submit handler throws a synthesised error so the form

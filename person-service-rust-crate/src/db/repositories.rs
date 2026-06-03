@@ -150,7 +150,9 @@ impl SeaOrmPersonRepository {
         let new_person = persons::ActiveModel {
             id: Set(person.id),
             active: Set(person.active),
-            gender: Set(format!("{:?}", person.gender)),
+            // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
+            // Gender's serde rename_all="lowercase" produces the same shape.
+            gender: Set(format!("{:?}", person.gender).to_lowercase()),
             birth_date: Set(person.birth_date),
             deceased: Set(person.deceased),
             deceased_datetime: Set(person.deceased_datetime),
@@ -261,11 +263,14 @@ impl SeaOrmPersonRepository {
     ) -> Result<Person> {
         use crate::models::{Gender, NameUse, ContactPointSystem, ContactPointUse, LinkType, IdentifierType, IdentifierUse};
 
-        // Parse gender
-        let gender = match db_person.gender.as_str() {
-            "Male" => Gender::Male,
-            "Female" => Gender::Female,
-            "Other" => Gender::Other,
+        // Parse gender. DB stores lowercase per CHECK constraint
+        // ('male'/'female'/'other'/'unknown'); accept PascalCase too
+        // so rows written by older code (when persisted via the
+        // legacy `format!("{:?}", …)` path) still round-trip.
+        let gender = match db_person.gender.to_lowercase().as_str() {
+            "male" => Gender::Male,
+            "female" => Gender::Female,
+            "other" => Gender::Other,
             _ => Gender::Unknown,
         };
 
@@ -554,7 +559,9 @@ impl PersonRepository for SeaOrmPersonRepository {
         let update_model = persons::ActiveModel {
             id: Set(person.id),
             active: Set(person.active),
-            gender: Set(format!("{:?}", person.gender)),
+            // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
+            // Gender's serde rename_all="lowercase" produces the same shape.
+            gender: Set(format!("{:?}", person.gender).to_lowercase()),
             birth_date: Set(person.birth_date),
             deceased: Set(person.deceased),
             deceased_datetime: Set(person.deceased_datetime),

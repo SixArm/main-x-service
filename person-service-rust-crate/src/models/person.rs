@@ -7,31 +7,44 @@ use utoipa::ToSchema;
 
 use super::{Address, ContactPoint, Gender, Identifier, IdentityDocument, EmergencyContact};
 
-/// Person resource
+/// Person resource.
+///
+/// Server-generated fields (`id`, `created_at`, `updated_at`) and all
+/// collection-typed fields default to sensible empty values when
+/// missing from an incoming JSON body. Callers POSTing a new person
+/// therefore only need to supply `name` + the demographic fields they
+/// know — the service fills the rest. This is what the front-end's
+/// `PersonRepository.create()` relies on.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Person {
-    /// Unique person identifier
+    /// Unique person identifier — generated server-side on create.
+    #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
     /// Person identifiers (MRN, SSN, etc.)
+    #[serde(default)]
     pub identifiers: Vec<Identifier>,
 
     /// Active status
+    #[serde(default = "default_true")]
     pub active: bool,
 
     /// Person name
     pub name: HumanName,
 
     /// Additional names
+    #[serde(default)]
     pub additional_names: Vec<HumanName>,
 
     /// Telecom contacts
+    #[serde(default)]
     pub telecom: Vec<ContactPoint>,
 
     /// Gender
     pub gender: Gender,
 
     /// Birth date
+    #[serde(default)]
     pub birth_date: Option<NaiveDate>,
 
     /// Tax ID number (CPF, SSN, TIN, etc.)
@@ -47,43 +60,64 @@ pub struct Person {
     pub emergency_contacts: Vec<EmergencyContact>,
 
     /// Deceased indicator
+    #[serde(default)]
     pub deceased: bool,
 
     /// Deceased date/time
+    #[serde(default)]
     pub deceased_datetime: Option<DateTime<Utc>>,
 
     /// Addresses
+    #[serde(default)]
     pub addresses: Vec<Address>,
 
     /// Marital status
+    #[serde(default)]
     pub marital_status: Option<String>,
 
     /// Multiple birth indicator
+    #[serde(default)]
     pub multiple_birth: Option<bool>,
 
     /// Photo attachments
+    #[serde(default)]
     pub photo: Vec<String>,
 
     /// Managing organization
+    #[serde(default)]
     pub managing_organization: Option<Uuid>,
 
     /// Links to other person records
+    #[serde(default)]
     pub links: Vec<PersonLink>,
 
-    /// Created timestamp
+    /// Created timestamp — set server-side on create.
+    #[serde(default = "Utc::now")]
     pub created_at: DateTime<Utc>,
 
-    /// Updated timestamp
+    /// Updated timestamp — set server-side on create and on update.
+    #[serde(default = "Utc::now")]
     pub updated_at: DateTime<Utc>,
 }
 
-/// Human name representation
+fn default_true() -> bool {
+    true
+}
+
+/// Human name representation.
+///
+/// `prefix` and `suffix` are optional in the public contract — callers
+/// MAY omit them (the front-end and FHIR Person resource often do).
+/// They round-trip as empty arrays when omitted.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct HumanName {
+    #[serde(default)]
     pub use_type: Option<NameUse>,
     pub family: String,
     pub given: Vec<String>,
+    #[serde(default)]
     pub prefix: Vec<String>,
+    #[serde(default)]
     pub suffix: Vec<String>,
 }
 

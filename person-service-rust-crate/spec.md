@@ -308,9 +308,10 @@ parameters: `name`, `family`, `given`, `identifier`, `birthdate`,
 
 ```
 src/
+├── main.rs                  # binary entry: Config::from_env → AppState → api::rest::serve
 ├── api/
 │   ├── mod.rs               # ApiResponse, ApiError
-│   ├── rest/                # REST API (Axum) — 15 endpoints
+│   ├── rest/                # REST API (Axum) — 15 endpoints, mounted at /api
 │   ├── fhir/                # FHIR R5 Person + bundle stubs
 │   └── grpc/                # Tonic stub
 ├── models/                  # Person, HumanName, Identifier, …
@@ -325,6 +326,16 @@ src/
 ├── error.rs
 └── lib.rs
 ```
+
+`src/main.rs` is the binary target (`cargo run --release` /
+`target/release/person-service`). It calls `Config::from_env()` (reads
+the env-var table documented on `Config::from_env`, with defaults), opens
+the database pool via `db::create_connection`, opens / creates the
+Tantivy index at `config.search.index_path`, constructs the
+`ProbabilisticMatcher`, builds `AppState`, and hands off to
+`api::rest::serve(state)`. Migrations are NOT auto-run — the bring-up
+sequence in [`README.md`](./README.md) shows how to apply
+`migrations/*` before launching.
 
 ### 8.2 Layering rules
 

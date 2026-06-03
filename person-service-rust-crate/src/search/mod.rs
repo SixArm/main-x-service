@@ -79,6 +79,12 @@ impl SearchEngine {
         writer.commit()
             .map_err(|e| crate::Error::Search(format!("Failed to commit: {}", e)))?;
 
+        // Force reader to pick up the new segment so a search issued
+        // immediately after this call (as the create / update / merge
+        // handlers do via the audit-then-search dance in the e2e
+        // suite) sees the new record. Without this the default
+        // `OnCommitWithDelay` policy lets queries observe a stale view.
+        self.index.reload()?;
         Ok(())
     }
 
@@ -128,6 +134,7 @@ impl SearchEngine {
         writer.commit()
             .map_err(|e| crate::Error::Search(format!("Failed to commit: {}", e)))?;
 
+        self.index.reload()?;
         Ok(())
     }
 
@@ -171,17 +178,44 @@ impl SearchEngine {
         Ok(person_ids)
     }
 
-    /// Search for persons with fuzzy matching
+    /// Search for persons with fuzzy matching.
+    ///
+    /// Multi-token queries (e.g. `"E2E_search_test"` which the default
+    /// text tokenizer splits as `["e2e", "search", "test"]`) are
+    /// supported: each alphanumeric run becomes its own `FuzzyTermQuery`
+    /// with edit distance 2, combined with `Occur::Should`, and any
+    /// match across `family_name`, `given_names`, or `full_name`
+    /// counts. A query that tokenizes to nothing returns an empty
+    /// result rather than an error.
     pub fn fuzzy_search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
 
-        // Build fuzzy query for family name
-        let term = Term::from_field_text(schema.family_name, query_str);
-        let fuzzy_query = FuzzyTermQuery::new(term, 2, true);
+        // Split on non-alphanumeric runs (matches the default Tantivy
+        // SimpleTokenizer behaviour) and lowercase (matches the default
+        // LowerCaseFilter that TEXT fields apply at index time).
+        let tokens: Vec<String> = query_str
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|s| !s.is_empty())
+            .map(|t| t.to_lowercase())
+            .collect();
 
+        if tokens.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let fuzzy_fields = [schema.family_name, schema.given_names, schema.full_name];
+        let mut subqueries: Vec<(Occur, Box<dyn Query>)> = Vec::new();
+        for token in &tokens {
+            for field in fuzzy_fields {
+                let term = Term::from_field_text(field, token);
+                subqueries.push((Occur::Should, Box::new(FuzzyTermQuery::new(term, 2, true))));
+            }
+        }
+
+        let bool_query = BooleanQuery::new(subqueries);
         let top_docs = searcher
-            .search(&fuzzy_query, &TopDocs::with_limit(limit))
+            .search(&bool_query, &TopDocs::with_limit(limit))
             .map_err(|e| crate::Error::Search(format!("Fuzzy search failed: {}", e)))?;
 
         let mut person_ids = Vec::new();
@@ -210,9 +244,41 @@ impl SearchEngine {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
 
-        // Build fuzzy query for family name
-        let name_term = Term::from_field_text(schema.family_name, family_name);
-        let name_query: Box<dyn Query> = Box::new(FuzzyTermQuery::new(name_term, 2, true));
+        // Build fuzzy query for family name. The `family_name` field
+        // is TEXT, so the indexer lowercases + splits on
+        // non-alphanumeric. FuzzyTermQuery does NOT pre-process its
+        // term — we have to match the indexer's normalisation
+        // ourselves. For underscored or compound family names
+        // (`"E2E_seed_…"`) we fan out one fuzzy clause per
+        // alphanumeric run so duplicate detection finds them.
+        let tokens: Vec<String> = family_name
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|s| !s.is_empty())
+            .map(|t| t.to_lowercase())
+            .collect();
+        if tokens.is_empty() {
+            return Ok(Vec::new());
+        }
+        let name_query: Box<dyn Query> = if tokens.len() == 1 {
+            Box::new(FuzzyTermQuery::new(
+                Term::from_field_text(schema.family_name, &tokens[0]),
+                2,
+                true,
+            ))
+        } else {
+            let subqueries: Vec<(Occur, Box<dyn Query>)> = tokens
+                .iter()
+                .map(|t| {
+                    let q: Box<dyn Query> = Box::new(FuzzyTermQuery::new(
+                        Term::from_field_text(schema.family_name, t),
+                        2,
+                        true,
+                    ));
+                    (Occur::Should, q)
+                })
+                .collect();
+            Box::new(BooleanQuery::new(subqueries))
+        };
 
         // If birth year provided, add it to the query
         let final_query: Box<dyn Query> = if let Some(year) = birth_year {
@@ -265,6 +331,7 @@ impl SearchEngine {
         writer.commit()
             .map_err(|e| crate::Error::Search(format!("Failed to commit deletion: {}", e)))?;
 
+        self.index.reload()?;
         Ok(())
     }
 

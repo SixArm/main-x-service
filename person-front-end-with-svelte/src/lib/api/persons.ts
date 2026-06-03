@@ -30,21 +30,25 @@ export class PersonRepository {
     }
 
     async search(opts: SearchOptions): Promise<{ items: Person[]; total: number }> {
-        const data = await this.http.get<Person[] | { items: Person[]; total?: number }>(
-            "/api/persons/search",
-            {
-                query: {
-                    q: opts.q,
-                    limit: opts.limit,
-                    offset: opts.offset,
-                    fuzzy: opts.fuzzy,
-                    phonetic: opts.phonetic,
-                    mask_sensitive: opts.mask_sensitive,
-                },
+        type SearchEnvelope =
+            | Person[]
+            | { items: Person[]; total?: number }
+            | { persons: Person[]; total?: number };
+        const data = await this.http.get<SearchEnvelope>("/api/persons/search", {
+            query: {
+                q: opts.q,
+                limit: opts.limit,
+                offset: opts.offset,
+                fuzzy: opts.fuzzy,
+                phonetic: opts.phonetic,
+                mask_sensitive: opts.mask_sensitive,
             },
-        );
+        });
         if (Array.isArray(data)) return { items: data, total: data.length };
-        return { items: data.items, total: data.total ?? data.items.length };
+        // Service emits `{persons, total, query, offset, limit}`; older
+        // shape was `{items, total}`. Normalise both.
+        const items = "items" in data ? data.items : data.persons;
+        return { items, total: data.total ?? items.length };
     }
 
     get(id: string): Promise<Person> {

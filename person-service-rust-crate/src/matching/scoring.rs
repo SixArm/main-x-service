@@ -84,7 +84,13 @@ impl ProbabilisticScorer {
             };
         }
 
-        // Weight factors for each component (probabilistic)
+        // Weight factors for each component (probabilistic). When BOTH
+        // sides lack the underlying data for a component we drop the
+        // component from the sum AND its weight from the denominator
+        // so the final score is the weighted average over the present
+        // components rather than penalising absent ones. Two records
+        // with identical name+DOB+gender (and no address / identifier /
+        // tax_id / documents) therefore score 1.0, not 0.65.
         const NAME_WEIGHT: f64 = 0.30;
         const DOB_WEIGHT: f64 = 0.25;
         const GENDER_WEIGHT: f64 = 0.10;
@@ -93,14 +99,43 @@ impl ProbabilisticScorer {
         const TAX_ID_WEIGHT: f64 = 0.10;
         const DOCUMENT_WEIGHT: f64 = 0.05;
 
-        // Calculate weighted total score
-        let total_score = (name_score * NAME_WEIGHT)
-            + (birth_date_score * DOB_WEIGHT)
-            + (gender_score * GENDER_WEIGHT)
-            + (address_score * ADDRESS_WEIGHT)
-            + (identifier_score * IDENTIFIER_WEIGHT)
-            + (tax_id_score * TAX_ID_WEIGHT)
-            + (document_score * DOCUMENT_WEIGHT);
+        let mut weighted_sum = 0.0_f64;
+        let mut weight_sum = 0.0_f64;
+
+        // Name is required, so it always contributes.
+        weighted_sum += name_score * NAME_WEIGHT;
+        weight_sum += NAME_WEIGHT;
+
+        if person.birth_date.is_some() && candidate.birth_date.is_some() {
+            weighted_sum += birth_date_score * DOB_WEIGHT;
+            weight_sum += DOB_WEIGHT;
+        }
+
+        // Gender is always set (enum has Unknown), so it always contributes.
+        weighted_sum += gender_score * GENDER_WEIGHT;
+        weight_sum += GENDER_WEIGHT;
+
+        if !person.addresses.is_empty() && !candidate.addresses.is_empty() {
+            weighted_sum += address_score * ADDRESS_WEIGHT;
+            weight_sum += ADDRESS_WEIGHT;
+        }
+
+        if !person.identifiers.is_empty() && !candidate.identifiers.is_empty() {
+            weighted_sum += identifier_score * IDENTIFIER_WEIGHT;
+            weight_sum += IDENTIFIER_WEIGHT;
+        }
+
+        if person.effective_tax_id().is_some() && candidate.effective_tax_id().is_some() {
+            weighted_sum += tax_id_score * TAX_ID_WEIGHT;
+            weight_sum += TAX_ID_WEIGHT;
+        }
+
+        if !person.documents.is_empty() && !candidate.documents.is_empty() {
+            weighted_sum += document_score * DOCUMENT_WEIGHT;
+            weight_sum += DOCUMENT_WEIGHT;
+        }
+
+        let total_score = if weight_sum > 0.0 { weighted_sum / weight_sum } else { 0.0 };
 
         let breakdown = MatchScoreBreakdown {
             name_score,

@@ -21,8 +21,19 @@
             const created = await repo.create(value);
             if (created.id) goto(`/persons/${created.id}`);
         } catch (err) {
-            if (err instanceof ApiError && err.isConflict && Array.isArray(err.details)) {
-                duplicates = err.details as MatchResult[];
+            if (err instanceof ApiError && err.isConflict) {
+                // Service emits one of:
+                //   • `MatchResult[]` directly                 (legacy)
+                //   • `{ has_duplicates, potential_matches }`  (current)
+                // Normalise both into the MatchResult[] the UI renders.
+                const details = err.details as
+                    | MatchResult[]
+                    | { has_duplicates?: boolean; potential_matches?: MatchResult[] }
+                    | null;
+                const extracted: MatchResult[] = Array.isArray(details)
+                    ? details
+                    : (details?.potential_matches ?? []);
+                duplicates = extracted;
                 throw new Error(`Duplicates detected (${duplicates.length}) — review below before resubmitting.`);
             }
             throw err;

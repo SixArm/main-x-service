@@ -123,8 +123,11 @@ pub fn create_router(state: AppState) -> Router {
         .route("/audit/user", get(handlers::get_user_audit_logs))
         .with_state(state);
 
+    // Mount under `/api`. Documented in AGENTS/restful.md and
+    // consumed by `../person-front-end-with-svelte` at `/api/persons`.
+    // The Event service uses `/api/v1`; Person does not.
     Router::new()
-        .nest("/api/v1", api_routes)
+        .nest("/api", api_routes)
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
