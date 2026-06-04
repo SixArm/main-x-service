@@ -1,0 +1,71 @@
+[package]
+name = "course-service"
+version = "0.1.0"
+edition = "2024"
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Course Service — a course-administration microservice modelled on schema.org/Course; interoperates with the course-matcher crate"
+license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
+repository = "https://github.com/sixarm/main-x-service/course-service-rust-crate"
+keywords = ["course-matcher", "education", "microservice"]
+categories = ["database"]
+
+[lib]
+name = "course_service"
+path = "src/lib.rs"
+
+[[bin]]
+name = "course-service"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.49", features = ["full"] }
+
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid", "with-json"] }
+
+# Search
+tantivy = "0.22"
+
+# OpenAPI documentation
+utoipa = { version = "5.4", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "8.1", features = ["axum"] }
+
+# Common types
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.18", features = ["serde", "v4"] }
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Error handling
+thiserror = "2.0"
+
+# Env / config
+dotenvy = "0.15"
+
+# Sibling matcher crate (embedded via re-export so the service uses the
+# canonical algorithm rather than maintaining a fork).
+course-matcher = { path = "../course-matcher-rust-crate" }
+
+# `dyn CourseRepository` needs object-safe async via async_trait.
+async-trait = "0.1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

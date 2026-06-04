@@ -1,0 +1,58 @@
+# Compose file — read transparently by `podman compose up`.
+#
+# Brings up Postgres + course-service for local development. The
+# Dockerfile references its sibling course-matcher-rust-crate via the
+# build context, so this file is invoked from the repo root.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: course-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-course}
+      POSTGRES_USER: ${POSTGRES_USER:-course_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-course_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - course_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-course_user} -d ${POSTGRES_DB:-course}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - course-network
+
+  course-service:
+    build:
+      context: ..
+      dockerfile: course-service-rust-crate/Dockerfile
+    container_name: course-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-course_user}:${POSTGRES_PASSWORD:-course_password}@postgres:5432/${POSTGRES_DB:-course}
+      DATABASE_MAX_CONNECTIONS: 10
+      DATABASE_MIN_CONNECTIONS: 2
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      SEARCH_INDEX_PATH: /app/data/search_index
+      MATCHING_THRESHOLD: 0.85
+      RUST_LOG: info
+    ports:
+      - "${COURSE_SERVICE_PORT:-8084}:8080"
+    networks:
+      - course-network
+
+networks:
+  course-network:
+    driver: bridge
+
+volumes:
+  course_postgres_data:
+    driver: local

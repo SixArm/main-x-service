@@ -1,0 +1,106 @@
+<script lang="ts">
+    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
+    import LabeledField from "$lib/forms/LabeledField.svelte";
+    import FieldRow from "$lib/forms/FieldRow.svelte";
+    import CourseIdentifierInput from "$lib/components/CourseIdentifierInput.svelte";
+    import { CourseRepository } from "$lib/api/courses.js";
+    import { EDUCATIONAL_LEVEL_OPTIONS } from "$lib/api/types.js";
+    import type { CourseIdentifier, EducationalLevel, MatchRequest, MatchResult } from "$lib/api/types.js";
+
+    const repo = CourseRepository.withFetch();
+
+    let name = $state("");
+    let courseCode = $state("");
+    let providerId = $state("");
+    let threshold = $state(0.7);
+    let educationalLevel = $state<string>("");
+    let identifiers = $state<CourseIdentifier[]>([]);
+    let keywordsRaw = $state("");
+    let teachesRaw = $state("");
+    let sameAsRaw = $state("");
+
+    let results = $state<MatchResult[]>([]);
+    let error = $state<string | null>(null);
+    let loading = $state(false);
+
+    async function runMatch(e: SubmitEvent) {
+        e.preventDefault();
+        loading = true;
+        error = null;
+        try {
+            const req: MatchRequest = {
+                name,
+                course_code: courseCode || undefined,
+                provider_id: providerId || undefined,
+                educational_level: educationalLevel
+                    ? (educationalLevel as EducationalLevel)
+                    : undefined,
+                keywords: keywordsRaw.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
+                teaches: teachesRaw.split("\n").map((s) => s.trim()).filter(Boolean),
+                identifiers: identifiers.length > 0 ? identifiers : undefined,
+                same_as: sameAsRaw.split("\n").map((s) => s.trim()).filter(Boolean),
+                threshold,
+            };
+            results = await repo.match(req);
+        } catch (err) {
+            error = err instanceof Error ? err.message : String(err);
+            results = [];
+        } finally {
+            loading = false;
+        }
+    }
+</script>
+
+<svelte:head><title>Match check · Course Service</title></svelte:head>
+
+<header><h1>Match check</h1></header>
+
+<section class="surface stack">
+    <form onsubmit={runMatch} class="stack">
+        <FieldRow>
+            <LabeledField label="Name" for="m-name" required>
+                <input id="m-name" bind:value={name} required />
+            </LabeledField>
+            <LabeledField label="Course code" for="m-code">
+                <input id="m-code" bind:value={courseCode} />
+            </LabeledField>
+            <LabeledField label="Provider ID" for="m-prov">
+                <input id="m-prov" bind:value={providerId} />
+            </LabeledField>
+            <LabeledField label="Threshold" for="m-threshold" hint="0.0 – 1.0">
+                <input id="m-threshold" type="number" step="0.05" min="0" max="1" bind:value={threshold} />
+            </LabeledField>
+        </FieldRow>
+        <FieldRow>
+            <LabeledField label="Educational level" for="m-level">
+                <select id="m-level" bind:value={educationalLevel}>
+                    <option value="">—</option>
+                    {#each EDUCATIONAL_LEVEL_OPTIONS as l}
+                        <option value={l}>{l}</option>
+                    {/each}
+                </select>
+            </LabeledField>
+        </FieldRow>
+        <LabeledField label="Keywords" for="m-kw" hint="Comma- or newline-separated">
+            <input id="m-kw" bind:value={keywordsRaw} />
+        </LabeledField>
+        <LabeledField label="Teaches (competencies)" for="m-teaches" hint="One per line">
+            <textarea id="m-teaches" rows={2} bind:value={teachesRaw}></textarea>
+        </LabeledField>
+        <LabeledField label="Same-as URLs" for="m-sameas" hint="One per line">
+            <textarea id="m-sameas" rows={2} bind:value={sameAsRaw}></textarea>
+        </LabeledField>
+        <section class="stack">
+            <h2 class="small">Identifiers</h2>
+            <CourseIdentifierInput bind:identifiers />
+        </section>
+        {#if error}<div class="banner error">{error}</div>{/if}
+        <button type="submit" class="button primary" disabled={loading}>
+            {loading ? "Matching…" : "Find matches"}
+        </button>
+    </form>
+</section>
+
+{#if results.length > 0}
+    <MatchResultsList {results} />
+{/if}

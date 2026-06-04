@@ -11,6 +11,7 @@ The **Main X Index** family of crates implements a federated identity index — 
 | [place-service](../../place-service-rust-crate) | Place | Geographic place registry (schema.org/Place) |
 | [thing-service](../../thing-service-rust-crate) | Thing | Generic thing / asset registry (schema.org/Thing) |
 | [event-service](../../event-service-rust-crate) | Event | Time-bounded event registry (schema.org/Event) |
+| [course-service](../../course-service-rust-crate) | Course | Course-identity registry (schema.org/Course) — template + `CourseInstance` sub-resource for specific offerings |
 
 ### Matcher crates
 
@@ -28,6 +29,7 @@ specifications, …) tailored to library-style work.
 | [place-matcher](../../place-matcher-rust-crate) | Place | Geographic / postal-address / venue matching |
 | [thing-matcher](../../thing-matcher-rust-crate) | Thing | Generic thing / asset matching |
 | [event-matcher](../../event-matcher-rust-crate) | Event | Time-bounded event matching with window-overlap |
+| [course-matcher](../../course-matcher-rust-crate) | Course | Course matching — name (Jaro-Winkler), provider-scoped course code, educational level, keywords / teaches Jaccard, deterministic short-circuits on DOI / Wikidata / OER / LOM / URI / UUID |
 
 ### Front-end projects
 
@@ -44,6 +46,7 @@ shape as the service crates.
 | [place-front-end-with-svelte](../../place-front-end-with-svelte) | place-service | Operator UI for Place CRUD / search / match / merge / audit (PostalAddress + GeoCoordinates + GLN) |
 | [thing-front-end-with-svelte](../../thing-front-end-with-svelte) | thing-service | Operator UI for Thing CRUD / search / match / merge / audit (PropertyValue identifiers — DOI / ISBN / GTIN / …) |
 | [event-front-end-with-svelte](../../event-front-end-with-svelte) | event-service | Operator UI for Event CRUD / search / match / merge / audit (time window + Location union + Party / Offer) — calls under `/api/v1/` |
+| [course-front-end-with-svelte](../../course-front-end-with-svelte) | course-service | Operator UI for Course CRUD / search / match / merge / audit (schema.org/Course: course code, educational level, keywords, teaches, syllabus sections, instances sub-resource) |
 
 Per-project decision (2026-06-02): drift between front-ends is accepted; there is no shared `mxi-svelte-core` package. Copy-adapt from a sibling when scaffolding a new front-end.
 

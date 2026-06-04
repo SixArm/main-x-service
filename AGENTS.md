@@ -18,6 +18,7 @@ per-crate `AGENTS/spec-driven-development.md` files for the discipline.
 | [Place Service](place-service-rust-crate/) | Place (schema.org/Place) | [spec](place-service-rust-crate/spec.md) | [index](place-service-rust-crate/index.md) |
 | [Thing Service](thing-service-rust-crate/) | Thing (schema.org/Thing — generic) | [spec](thing-service-rust-crate/spec.md) | [index](thing-service-rust-crate/index.md) |
 | [Event Service](event-service-rust-crate/) | Event (schema.org/Event — time-bounded) | [spec](event-service-rust-crate/spec.md) | [index](event-service-rust-crate/index.md) |
+| [Course Service](course-service-rust-crate/) | Course (schema.org/Course) — template + `CourseInstance` sub-resource | [spec](course-service-rust-crate/spec.md) | [index](course-service-rust-crate/index.md) |
 
 ### Matcher crates
 
@@ -34,6 +35,7 @@ the corresponding service crate's matching layer.
 | [Place Matcher](place-matcher-rust-crate/) | Place | [spec](place-matcher-rust-crate/spec.md) | [index](place-matcher-rust-crate/index.md) |
 | [Thing Matcher](thing-matcher-rust-crate/) | Thing | [spec](thing-matcher-rust-crate/spec.md) | [index](thing-matcher-rust-crate/index.md) |
 | [Event Matcher](event-matcher-rust-crate/) | Event | [spec](event-matcher-rust-crate/spec.md) | [index](event-matcher-rust-crate/index.md) |
+| [Course Matcher](course-matcher-rust-crate/) | Course | [spec](course-matcher-rust-crate/spec.md) | [index](course-matcher-rust-crate/index.md) |
 
 ### Front-end projects
 
@@ -51,6 +53,7 @@ accepted (see `feedback_front_end_drift` memory) — no shared package.
 | [place-front-end-with-svelte](place-front-end-with-svelte/) | [place-service](place-service-rust-crate/) | [spec](place-front-end-with-svelte/spec.md) | [CHANGELOG](place-front-end-with-svelte/CHANGELOG.md) |
 | [thing-front-end-with-svelte](thing-front-end-with-svelte/) | [thing-service](thing-service-rust-crate/) | [spec](thing-front-end-with-svelte/spec.md) | [CHANGELOG](thing-front-end-with-svelte/CHANGELOG.md) |
 | [event-front-end-with-svelte](event-front-end-with-svelte/) | [event-service](event-service-rust-crate/) | [spec](event-front-end-with-svelte/spec.md) | [CHANGELOG](event-front-end-with-svelte/CHANGELOG.md) |
+| [course-front-end-with-svelte](course-front-end-with-svelte/) | [course-service](course-service-rust-crate/) | [spec](course-front-end-with-svelte/spec.md) | [CHANGELOG](course-front-end-with-svelte/CHANGELOG.md) |
 
 ## Shared reference docs
 

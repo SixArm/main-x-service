@@ -1,0 +1,9 @@
+target
+*.bak
+.DS_Store
+.env
+.env.local
+*.log
+search_index/
+data/
+test-results/

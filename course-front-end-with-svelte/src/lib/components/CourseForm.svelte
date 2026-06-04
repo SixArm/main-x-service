@@ -1,0 +1,202 @@
+<script lang="ts">
+    import type { Course } from "$lib/api/types.js";
+    import { COURSE_STATUSES, EDUCATIONAL_LEVEL_OPTIONS } from "$lib/api/types.js";
+    import { createForm } from "$lib/forms/form.svelte.js";
+    import LabeledField from "$lib/forms/LabeledField.svelte";
+    import FieldRow from "$lib/forms/FieldRow.svelte";
+    import CourseIdentifierInput from "./CourseIdentifierInput.svelte";
+
+    let props: {
+        initial: Course;
+        submitLabel?: string;
+        onsubmit: (course: Course) => Promise<void>;
+    } = $props();
+    const submitLabel = $derived(props.submitLabel ?? "Save");
+
+    function withDefaults(c: Course): Course {
+        return {
+            ...c,
+            alternate_names: c.alternate_names ?? [],
+            identifiers: c.identifiers ?? [],
+            image: c.image ?? [],
+            same_as: c.same_as ?? [],
+            keywords: c.keywords ?? [],
+            teaches: c.teaches ?? [],
+            available_language: c.available_language ?? [],
+            status: c.status ?? "draft",
+        };
+    }
+
+    // svelte-ignore state_referenced_locally
+    const form = createForm<Course>({
+        initial: withDefaults(props.initial),
+        validate(value) {
+            const errors: Record<string, string> = {};
+            if (!value.name.trim()) errors.name = "Required";
+            const urlFields: [keyof Course, string][] = [
+                ["url", "URL"],
+                ["additional_type", "Additional type"],
+                ["license", "License URL"],
+            ];
+            for (const [field, label] of urlFields) {
+                const v = value[field];
+                if (typeof v === "string" && v.length > 0 && !/^https?:\/\//i.test(v)) {
+                    errors[field as string] = `${label} must start with http(s)://`;
+                }
+            }
+            if (typeof value.course_code === "string" && value.course_code.length > 100) {
+                errors.course_code = "Max 100 chars";
+            }
+            if (typeof value.number_of_credits === "number" && value.number_of_credits < 0) {
+                errors.number_of_credits = "Must be ≥ 0";
+            }
+            return errors;
+        },
+        onSubmit: (value) => props.onsubmit(value),
+    });
+
+    let alternateNamesJoined = $derived((form.value.alternate_names ?? []).join("\n"));
+    let sameAsJoined = $derived((form.value.same_as ?? []).join("\n"));
+    let keywordsJoined = $derived((form.value.keywords ?? []).join(", "));
+    let teachesJoined = $derived((form.value.teaches ?? []).join("\n"));
+    let availableLangJoined = $derived((form.value.available_language ?? []).join(", "));
+
+    function updateAlternateNames(value: string) {
+        form.value.alternate_names = value.split("\n").map((s) => s.trim()).filter(Boolean);
+    }
+    function updateSameAs(value: string) {
+        form.value.same_as = value.split("\n").map((s) => s.trim()).filter(Boolean);
+    }
+    function updateKeywords(value: string) {
+        form.value.keywords = value.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+    }
+    function updateTeaches(value: string) {
+        form.value.teaches = value.split("\n").map((s) => s.trim()).filter(Boolean);
+    }
+    function updateAvailableLanguage(value: string) {
+        form.value.available_language = value
+            .split(/[,\s]+/)
+            .map((s) => s.trim().toLowerCase())
+            .filter(Boolean);
+    }
+
+    function isStringLevel(l: Course["educational_level"]): l is Exclude<NonNullable<Course["educational_level"]>, { Custom: string }> {
+        return typeof l === "string";
+    }
+
+    function handleSubmit(e: SubmitEvent) {
+        e.preventDefault();
+        void form.submit();
+    }
+</script>
+
+<form onsubmit={handleSubmit} class="stack">
+    <FieldRow>
+        <LabeledField label="Name" for="name" required error={form.errors.name}>
+            <input id="name" bind:value={form.value.name} required />
+        </LabeledField>
+        <LabeledField label="Course code" for="course-code" hint="Provider-scoped (e.g. CS101)" error={form.errors.course_code}>
+            <input id="course-code" bind:value={form.value.course_code} maxlength="100" />
+        </LabeledField>
+        <LabeledField label="Status" for="status">
+            <select id="status" bind:value={form.value.status}>
+                {#each COURSE_STATUSES as s}<option value={s}>{s}</option>{/each}
+            </select>
+        </LabeledField>
+    </FieldRow>
+
+    <LabeledField label="Description" for="desc">
+        <textarea id="desc" rows={3} bind:value={form.value.description}></textarea>
+    </LabeledField>
+
+    <FieldRow>
+        <LabeledField label="URL" for="url" error={form.errors.url}>
+            <input id="url" type="url" bind:value={form.value.url} />
+        </LabeledField>
+        <LabeledField label="License" for="license" error={form.errors.license}>
+            <input id="license" type="url" bind:value={form.value.license} />
+        </LabeledField>
+        <LabeledField label="Number of credits" for="credits" error={form.errors.number_of_credits}>
+            <input id="credits" type="number" min="0" bind:value={form.value.number_of_credits} />
+        </LabeledField>
+    </FieldRow>
+
+    <FieldRow>
+        <LabeledField label="Educational level" for="level">
+            <select
+                id="level"
+                value={isStringLevel(form.value.educational_level) ? form.value.educational_level : ""}
+                onchange={(e) => {
+                    const v = (e.target as HTMLSelectElement).value;
+                    form.value.educational_level = (v || null) as Course["educational_level"];
+                }}
+            >
+                <option value="">—</option>
+                {#each EDUCATIONAL_LEVEL_OPTIONS as l}<option value={l}>{l}</option>{/each}
+            </select>
+        </LabeledField>
+        <LabeledField label="Typical age range" for="age" hint="e.g. 18-22">
+            <input id="age" bind:value={form.value.typical_age_range} />
+        </LabeledField>
+        <LabeledField label="Time required" for="duration" hint="ISO 8601 (e.g. PT45H)">
+            <input id="duration" bind:value={form.value.time_required} />
+        </LabeledField>
+    </FieldRow>
+
+    <LabeledField label="Alternate names" for="alt-names" hint="One per line">
+        <textarea
+            id="alt-names"
+            rows={3}
+            value={alternateNamesJoined}
+            oninput={(e) => updateAlternateNames((e.target as HTMLTextAreaElement).value)}
+        ></textarea>
+    </LabeledField>
+
+    <LabeledField label="Keywords" for="keywords" hint="Comma- or newline-separated">
+        <input
+            id="keywords"
+            value={keywordsJoined}
+            oninput={(e) => updateKeywords((e.target as HTMLInputElement).value)}
+        />
+    </LabeledField>
+
+    <LabeledField label="Teaches (competencies)" for="teaches" hint="One per line">
+        <textarea
+            id="teaches"
+            rows={3}
+            value={teachesJoined}
+            oninput={(e) => updateTeaches((e.target as HTMLTextAreaElement).value)}
+        ></textarea>
+    </LabeledField>
+
+    <LabeledField label="Available languages" for="langs" hint="BCP-47 codes (e.g. en fr de)">
+        <input
+            id="langs"
+            value={availableLangJoined}
+            oninput={(e) => updateAvailableLanguage((e.target as HTMLInputElement).value)}
+        />
+    </LabeledField>
+
+    <LabeledField label="Same-as URLs" for="same-as" hint="Wikidata, OER catalog, etc. — one per line">
+        <textarea
+            id="same-as"
+            rows={3}
+            value={sameAsJoined}
+            oninput={(e) => updateSameAs((e.target as HTMLTextAreaElement).value)}
+        ></textarea>
+    </LabeledField>
+
+    <section class="stack">
+        <h2 class="small">Identifiers</h2>
+        <CourseIdentifierInput bind:identifiers={form.value.identifiers!} />
+    </section>
+
+    {#if form.submitError}<div class="banner error">{form.submitError}</div>{/if}
+
+    <div class="row">
+        <button type="submit" class="button primary" disabled={form.submitting}>
+            {form.submitting ? "Saving…" : submitLabel}
+        </button>
+        <button type="button" class="button" onclick={() => form.reset()} disabled={form.submitting}>Reset</button>
+    </div>
+</form>
