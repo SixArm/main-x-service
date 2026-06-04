@@ -91,10 +91,10 @@ cd worker-service-rust-crate
 cp .env.example .env
 
 # Start all services (PostgreSQL + MPI)
-docker-compose up -d
+podman compose up -d
 
 # View logs
-docker-compose logs -f mpi-server
+podman compose logs -f mpi-server
 
 # Access the API
 curl http://localhost:8080/api/health
@@ -106,7 +106,7 @@ curl http://localhost:8080/api/health
 - **Swagger UI**: http://localhost:8080/swagger-ui
 - **pgAdmin** (optional): http://localhost:5050
   ```bash
-  docker-compose --profile tools up -d
+  podman compose --profile tools up -d
   ```
 
 See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
@@ -371,7 +371,7 @@ cargo test --lib -- --nocapture               # With output
 
 ```bash
 cargo test --test api_integration_test        # All integration tests
-docker-compose -f docker-compose.test.yml up  # Run with Docker
+podman compose -f docker-compose.test.yml up  # Run with Docker
 ```
 
 ### Test Coverage
@@ -399,9 +399,9 @@ docker-compose -f docker-compose.test.yml up  # Run with Docker
 See [DEPLOY.md](DEPLOY.md) for comprehensive deployment guide.
 
 ```bash
-docker-compose up -d                                    # Development
-docker-compose -f docker-compose.test.yml up            # Testing
-docker build -t mpi-server:v1.0.0 . && docker run ...  # Production
+podman compose up -d                                    # Development
+podman compose -f docker-compose.test.yml up            # Testing
+podman build -t mpi-server:v1.0.0 . && podman run ...  # Production
 ```
 
 ## Security & Compliance

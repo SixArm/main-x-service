@@ -195,10 +195,10 @@ The front-end is stateless. No local DB, no client-side cache layer beyond Svelt
 
 The integration suite assumes a running Person Service at
 `PUBLIC_API_BASE_URL` (default `http://localhost:8080`). Bring it up
-with the service's docker-compose:
+with the service's podman compose:
 
 ```bash
-(cd ../person-service-rust-crate && docker compose up -d)
+(cd ../person-service-rust-crate && podman compose up -d)
 bin/e2e
 ```
 
@@ -269,7 +269,8 @@ soft-deleted via the REST API in `afterAll`.
 - **OQ-2**: Should the create route call `check-duplicates` for an inline preview before the actual `create` POST, or rely solely on the 409 round-trip? Round-trip is simpler; preview is friendlier. Operator feedback needed.
 - **OQ-3**: When the service returns `403`/`401` (post-auth), how should the UI redirect? Tied to whatever auth flow the service chooses (JWT vs session vs OAuth).
 - **OQ-4**: Drift policy: per project decision 2026-06-02 we keep API client + types in each front-end project. Revisit when the third sibling front-end ships if drift becomes painful.
-- **OQ-5** (2026-06-03): Live integration validation is blocked on two pre-existing issues in `person-service-rust-crate`. (a) The `Dockerfile` runtime stage references debian packages (`libpq5`, `libssl3`, `ca-certificates`) that aren't available in `debian:bookworm-slim`'s default repos, so `docker compose build` fails. (b) The crate is library-only — `Cargo.toml` declares no `[[bin]]` target and there is no `src/main.rs`, so `cargo run --release` fails with "a bin target must be available." The Dockerfile separately copies `target/release/person_service`, which `cargo build` never produces. **Action item, not for this front-end repo:** the service crate needs either (a) a `src/main.rs` that calls `person_service::api::rest::serve(state)` plus a `[[bin]]` target, **or** the existing `serve()` function wired into a Loco-style binary. Once that lands, validate `bin/e2e` against a live stack and capture the output here. Postgres-only (sidestepping the broken Dockerfile via `postgres:17-alpine`) was confirmed runnable.
+- ~~**OQ-5** (2026-06-03): Live integration validation is blocked on two pre-existing issues in `person-service-rust-crate`. (a) The `Dockerfile` runtime stage references debian packages (`libpq5`, `libssl3`, `ca-certificates`) that aren't available in `debian:bookworm-slim`'s default repos, so `podman compose build` fails. (b) The crate is library-only — `Cargo.toml` declares no `[[bin]]` target and there is no `src/main.rs`, so `cargo run --release` fails with "a bin target must be available." The Dockerfile separately copies `target/release/person_service`, which `cargo build` never produces.~~ **Resolved 2026-06-04:** the service crate gained `src/main.rs` wiring `Config::from_env → AppState → api::rest::serve`, and the Dockerfile was rebased on `debian:13-slim` with the missing `perl` / `make` / `gcc` / `curl` build-deps added. The container builds and runs end-to-end (`podman build` then `podman run` — see service's [`DEPLOY.md`](../person-service-rust-crate/DEPLOY.md)). 6 / 9 Playwright integration tests pass against the live stack; the remaining 3 are test-data interactions with the now-correctly-aggressive duplicate detector.
+- **OQ-6** (2026-06-04): Container runtime switched from Docker to Podman across all docs and scripts. The `docker-compose.yml` and `docker-compose.test.yml` filenames are retained because Podman's `compose` sub-command reads them transparently. If we ever rename the files to `compose.yml` (the Compose spec's canonical name), update every doc reference in lockstep.
 
 ## 17. References
 

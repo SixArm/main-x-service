@@ -4,7 +4,7 @@
 # Prerequisites:
 #   - person-service-rust-crate up at PUBLIC_API_BASE_URL (default
 #     http://localhost:8080). Bring it up locally with:
-#       (cd ../person-service-rust-crate && docker compose up -d)
+#       (cd ../person-service-rust-crate && podman compose up -d)
 #   - Playwright browsers installed (`pnpm exec playwright install chromium`).
 #
 # This wrapper does the health-check up front so we fail fast with a
@@ -27,9 +27,9 @@ if ! curl -fsS --max-time 5 "$API_BASE_URL/api/health" > /dev/null; then
 ERROR: person-service is not reachable at $API_BASE_URL/api/health.
 
 Start it first:
-  (cd ../person-service-rust-crate && docker compose up -d)
+  (cd ../person-service-rust-crate && podman compose up -d)
 then wait for the service to report healthy:
-  docker compose -f ../person-service-rust-crate/docker-compose.yml logs -f mpi-server
+  podman compose -f ../person-service-rust-crate/docker-compose.yml logs -f mpi-server
 
 Or point at a different URL:
   PUBLIC_API_BASE_URL=http://other.host:1234 bin/e2e

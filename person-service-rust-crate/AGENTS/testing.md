@@ -54,8 +54,8 @@ Integration tests are in `tests/` and test full HTTP request/response cycles aga
 ### Running Integration Tests
 
 ```bash
-# With Docker
-docker-compose -f docker-compose.test.yml up
+# With Podman (recognises docker-compose.yml as-is)
+podman compose -f docker-compose.test.yml up
 
 # Locally (requires running PostgreSQL)
 DATABASE_URL=postgres://user:pass@localhost/mpi_test cargo test --test api_integration_test

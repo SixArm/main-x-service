@@ -1,12 +1,16 @@
-# Multi-stage Dockerfile for Worker Service
-# Stage 1: Build stage with full Rust toolchain
-FROM rust:1.93-slim as builder
+# Multi-stage Containerfile for Worker Service.
+#
+# Container runtime: Podman (Docker-compatible).
+# Base image:        debian:13-slim (Trixie).
+#
+# Stage 1: build with the full Rust toolchain.
+FROM rust:1.93-slim AS builder
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    libpq-dev \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        pkg-config \
+        libssl-dev \
+        libpq-dev \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
@@ -23,13 +27,15 @@ COPY migrations ./migrations
 RUN cargo build --release
 
 # Stage 2: Runtime stage with minimal dependencies
-FROM debian:bookworm-slim
+FROM debian:13-slim
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    libpq5 \
-    libssl3 \
-    ca-certificates \
+# Runtime libraries: libpq5 (PostgreSQL client), libssl3 (openssl),
+# ca-certificates (HTTPS chains), curl (HEALTHCHECK below).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq5 \
+        libssl3 \
+        ca-certificates \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user for security (don't run as root)

@@ -125,7 +125,7 @@ optional email / URL.
 git clone https://github.com/sixarm/event-service-rust-crate.git
 cd event-service-rust-crate
 cp .env.example .env
-docker-compose up -d
+podman compose up -d
 curl http://localhost:8080/api/v1/health
 ```
 

@@ -14,6 +14,7 @@ Use:
 - Tantivy search engine
 - OpenTelemetry metrics
 - Prometheus metrics
+- Podman containerization with Debian 13 slim
 
 ## Background jobs
 

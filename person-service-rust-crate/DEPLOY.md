@@ -24,7 +24,7 @@ This guide covers deploying the Person Service (MPI) system using Docker and Doc
 
 ```bash
 docker --version
-docker-compose --version
+podman compose --version
 ```
 
 ## Quick Start (Development)
@@ -50,20 +50,20 @@ nano .env
 
 ```bash
 # Build the MPI server image
-docker-compose build
+podman compose build
 
 # Start all services (PostgreSQL + MPI Server)
-docker-compose up -d
+podman compose up -d
 
 # View logs
-docker-compose logs -f mpi-server
+podman compose logs -f mpi-server
 ```
 
 ### 4. Run Database Migrations
 
 ```bash
 # Access the MPI server container
-docker-compose exec mpi-server bash
+podman compose exec mpi-server bash
 
 # Inside the container, run migrations
 sea-orm-cli migrate up --database-url=$DATABASE_URL
@@ -95,7 +95,7 @@ curl http://localhost:8080/api/health
 To enable pgAdmin:
 
 ```bash
-docker-compose --profile tools up -d
+podman compose --profile tools up -d
 ```
 
 ## Production Deployment
@@ -120,7 +120,7 @@ nano .env.production
 
 ```bash
 # Build with production optimizations
-docker build -t mpi-server:latest .
+podman build -t mpi-server:latest .
 
 # Tag for registry
 docker tag mpi-server:latest your-registry.com/person_service-server:v1.0.0
@@ -146,7 +146,7 @@ ssh production-server
 docker pull your-registry.com/person_service-server:v1.0.0
 
 # Start with production compose file
-docker-compose -f docker-compose.production.yml up -d
+podman compose -f podman compose.production.yml up -d
 ```
 
 ### 5. Production Checklist
@@ -168,13 +168,13 @@ Run the full test suite using Docker Compose:
 
 ```bash
 # Build test image and run tests
-docker-compose -f docker-compose.test.yml up --build
+podman compose -f docker-compose.test.yml up --build
 
 # View test results
-docker-compose -f docker-compose.test.yml logs test-runner
+podman compose -f docker-compose.test.yml logs test-runner
 
 # Clean up test containers
-docker-compose -f docker-compose.test.yml down -v
+podman compose -f docker-compose.test.yml down -v
 ```
 
 ### Expected Test Output
@@ -238,7 +238,7 @@ RUST_BACKTRACE=0
 Starts only essential services (PostgreSQL + MPI Server):
 
 ```bash
-docker-compose up -d
+podman compose up -d
 ```
 
 #### Tools Profile
@@ -246,7 +246,7 @@ docker-compose up -d
 Includes pgAdmin for database management:
 
 ```bash
-docker-compose --profile tools up -d
+podman compose --profile tools up -d
 ```
 
 ## Database Migrations
@@ -256,7 +256,7 @@ docker-compose --profile tools up -d
 #### Method 1: Inside Container
 
 ```bash
-docker-compose exec mpi-server bash
+podman compose exec mpi-server bash
 sea-orm-cli migrate up
 exit
 ```
@@ -281,7 +281,7 @@ mpi-migrations:
 Then:
 
 ```bash
-docker-compose up mpi-migrations
+podman compose up mpi-migrations
 ```
 
 ### Creating New Migrations
@@ -312,7 +312,7 @@ Health checks are configured in `docker-compose.yml`:
 
 ```bash
 # View container health status
-docker-compose ps
+podman compose ps
 
 # View health check logs
 docker inspect mpi-server --format='{{json .State.Health}}'
@@ -322,17 +322,17 @@ docker inspect mpi-server --format='{{json .State.Health}}'
 
 ```bash
 # View all logs
-docker-compose logs
+podman compose logs
 
 # Follow logs
-docker-compose logs -f
+podman compose logs -f
 
 # View specific service logs
-docker-compose logs mpi-server
-docker-compose logs postgres
+podman compose logs mpi-server
+podman compose logs postgres
 
 # View last 100 lines
-docker-compose logs --tail=100 mpi-server
+podman compose logs --tail=100 mpi-server
 ```
 
 ### Metrics
@@ -356,7 +356,7 @@ docker stats mpi-server
 **Check logs**:
 
 ```bash
-docker-compose logs mpi-server
+podman compose logs mpi-server
 ```
 
 **Common issues**:
@@ -370,7 +370,7 @@ docker-compose logs mpi-server
 **Test database connectivity**:
 
 ```bash
-docker-compose exec postgres psql -U mpi_user -d mpi -c "SELECT 1;"
+podman compose exec postgres psql -U mpi_user -d mpi -c "SELECT 1;"
 ```
 
 **Common issues**:
@@ -384,16 +384,16 @@ docker-compose exec postgres psql -U mpi_user -d mpi -c "SELECT 1;"
 **Reset database** (CAUTION: Destroys all data):
 
 ```bash
-docker-compose down -v
-docker-compose up -d postgres
+podman compose down -v
+podman compose up -d postgres
 # Wait for PostgreSQL to be ready
-docker-compose exec postgres psql -U mpi_user -d mpi
+podman compose exec postgres psql -U mpi_user -d mpi
 # Inside psql:
 DROP SCHEMA public CASCADE;
 CREATE SCHEMA public;
 \q
 # Run migrations
-docker-compose exec mpi-server sea-orm-cli migrate up
+podman compose exec mpi-server sea-orm-cli migrate up
 ```
 
 ### Search Index Issues
@@ -401,8 +401,8 @@ docker-compose exec mpi-server sea-orm-cli migrate up
 **Reset search index**:
 
 ```bash
-docker-compose exec mpi-server rm -rf /app/data/search_index/*
-docker-compose restart mpi-server
+podman compose exec mpi-server rm -rf /app/data/search_index/*
+podman compose restart mpi-server
 ```
 
 ### High Memory Usage
@@ -444,10 +444,10 @@ PGADMIN_PORT=5051
 
 ```bash
 # Create backup
-docker-compose exec postgres pg_dump -U mpi_user mpi > backup-$(date +%Y%m%d).sql
+podman compose exec postgres pg_dump -U mpi_user mpi > backup-$(date +%Y%m%d).sql
 
 # Restore from backup
-docker-compose exec -T postgres psql -U mpi_user mpi < backup-20231228.sql
+podman compose exec -T postgres psql -U mpi_user mpi < backup-20231228.sql
 ```
 
 ### Search Index Backup
@@ -458,7 +458,7 @@ docker cp mpi-server:/app/data/search_index ./search_index_backup
 
 # Restore search index
 docker cp ./search_index_backup mpi-server:/app/data/search_index
-docker-compose restart mpi-server
+podman compose restart mpi-server
 ```
 
 ## Security Best Practices
@@ -518,7 +518,7 @@ For high-availability deployments:
 Example:
 
 ```bash
-docker-compose up -d --scale mpi-server=3
+podman compose up -d --scale mpi-server=3
 ```
 
 ### Vertical Scaling

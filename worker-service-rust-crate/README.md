@@ -133,10 +133,10 @@ cd worker-service-rust-crate
 cp .env.example .env
 
 # Start all services (PostgreSQL + MPI)
-docker-compose up -d
+podman compose up -d
 
 # View logs
-docker-compose logs -f mpi-server
+podman compose logs -f mpi-server
 
 # Access the API
 curl http://localhost:8080/api/health
@@ -148,7 +148,7 @@ curl http://localhost:8080/api/health
 - **Swagger UI**: http://localhost:8080/swagger-ui
 - **pgAdmin** (optional): http://localhost:5050
   ```bash
-  docker-compose --profile tools up -d
+  podman compose --profile tools up -d
   ```
 
 See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
@@ -185,29 +185,29 @@ cargo run --release
 
 ```bash
 # Start services
-docker-compose up -d
+podman compose up -d
 
 # Run migrations (first time)
-docker-compose exec mpi-server sea-orm-cli migrate up
+podman compose exec mpi-server sea-orm-cli migrate up
 
 # View logs
-docker-compose logs -f
+podman compose logs -f
 
 # Stop services
-docker-compose down
+podman compose down
 ```
 
 ### Testing Environment
 
 ```bash
 # Run all tests in Docker
-docker-compose -f docker-compose.test.yml up --build
+podman compose -f docker-compose.test.yml up --build
 
 # View test results
-docker-compose -f docker-compose.test.yml logs test-runner
+podman compose -f docker-compose.test.yml logs test-runner
 
 # Clean up
-docker-compose -f docker-compose.test.yml down -v
+podman compose -f docker-compose.test.yml down -v
 ```
 
 ### Production Deployment
@@ -217,10 +217,10 @@ docker-compose -f docker-compose.test.yml down -v
 cp .env.production.example .env.production
 
 # Build production image
-docker build -t mpi-server:v1.0.0 .
+podman build -t mpi-server:v1.0.0 .
 
 # Run with production config
-docker run -p 8080:8080 --env-file .env.production mpi-server:v1.0.0
+podman run -p 8080:8080 --env-file .env.production mpi-server:v1.0.0
 ```
 
 See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
@@ -476,7 +476,7 @@ cargo test --test api_integration_test
 cargo test --test api_integration_test test_create_worker
 
 # Run with Docker (recommended)
-docker-compose -f docker-compose.test.yml up --build
+podman compose -f docker-compose.test.yml up --build
 ```
 
 ### Test Coverage
@@ -506,13 +506,13 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment guide.
 
 ```bash
 # Development
-docker-compose up -d
+podman compose up -d
 
 # Testing
-docker-compose -f docker-compose.test.yml up
+podman compose -f docker-compose.test.yml up
 
 # Production build
-docker build -t mpi-server:v1.0.0 .
+podman build -t mpi-server:v1.0.0 .
 ```
 
 ### Manual Deployment

@@ -35,7 +35,7 @@ DATABASE_URL=postgres://… cargo test --test api_integration_test
 Or via Docker Compose:
 
 ```bash
-docker-compose -f docker-compose.test.yml up
+podman compose -f docker-compose.test.yml up
 ```
 
 Current tests:

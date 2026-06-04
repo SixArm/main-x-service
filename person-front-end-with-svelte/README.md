@@ -80,7 +80,7 @@ Each test creates its own records with a timestamped family name and cleans up v
 
 ```bash
 # 1. Start the Rust service (Postgres + Axum) in the background
-(cd ../person-service-rust-crate && docker compose up -d)
+(cd ../person-service-rust-crate && podman compose up -d)
 
 # 2. Wait for the service to report healthy (first Rust build can take ~5 min)
 curl -sf http://localhost:8080/api/health && echo ok
@@ -94,7 +94,7 @@ bin/e2e --ui
 bin/e2e tests/integration/golden-paths.spec.ts -g "FR-9"
 
 # 4. Tear down when done
-(cd ../person-service-rust-crate && docker compose down)
+(cd ../person-service-rust-crate && podman compose down)
 ```
 
 To target a different service URL:
