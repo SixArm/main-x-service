@@ -62,6 +62,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
+- **Batch dedup** (T-7c, FR-9). `POST /api/courses/deduplicate`:
+  - Pages through every active Course via
+    `CourseRepository::list(100, offset)`.
+  - For each probe, blocks via `search_by_name_and_provider`, dedupes
+    reverse pairs via `canonical_pair` (lexicographic UUID ordering).
+  - Below `threshold` → skipped.
+  - Above `auto_merge_threshold` → auto-merge inline (same fold +
+    record_merge + audit + `CourseMerged` event pipeline as the
+    interactive merge handler; soft-deleted ids are tracked in-memory
+    so the same row isn't auto-merged twice in the same pass).
+  - Between thresholds → `ReviewQueueItem { status: Pending,
+    detection_method: "BatchScan", … }` returned in the response
+    body (DB-backed review queue persistence deferred).
+  - Validates `threshold ∈ [0,1]`, `auto_merge_threshold ∈ [0,1]`,
+    `auto_merge_threshold ≥ threshold`; 422 otherwise.
 - **Match + Merge handlers** (T-7b, FR-6 + FR-8).
   - `POST /api/courses/match` — scores the request body against every
     blocked candidate (via `search_by_name_and_provider`), returns

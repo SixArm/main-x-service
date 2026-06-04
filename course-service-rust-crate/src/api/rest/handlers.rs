@@ -1,9 +1,9 @@
 //! REST handlers.
 //!
-//! FR-1..FR-8 + FR-14..FR-18 are wired against the repository, search
+//! FR-1..FR-9 + FR-14..FR-18 are wired against the repository, search
 //! engine, matcher, validation, audit, streaming, and privacy modules.
-//! FR-9 (batch dedup) still returns `501 Not Implemented` via
-//! [`not_implemented`].
+//! Only the `not_implemented` shim remains, parked behind a couple of
+//! placeholder routes the spec lists as out-of-scope for MVP.
 //!
 //! Error mapping:
 //! - `Error::NotFound` → 404
@@ -24,7 +24,10 @@ use uuid::Uuid;
 use super::state::AppState;
 use crate::api::ApiResponse;
 use crate::db::audit::AuditContext;
-use crate::models::{Course, CourseInstance, MergeRecord, MergeRequest, MergeResponse, MergeStatus};
+use crate::models::{
+    BatchDeduplicationRequest, BatchDeduplicationResponse, Course, CourseInstance, MergeRecord,
+    MergeRequest, MergeResponse, MergeStatus, ReviewQueueItem, ReviewStatus,
+};
 use crate::streaming::{CourseEvent, EventKind};
 use crate::validation::{ValidationError, validate_course, validate_instance};
 
@@ -691,6 +694,185 @@ async fn score_all_blocked_candidates(
         .collect();
     scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
     Ok(scored)
+}
+
+// ────────────────── Batch dedup (FR-9) ──────────────────
+
+/// FR-9 — scan every active Course, score against blocked candidates,
+/// auto-merge above `auto_merge_threshold`, queue everything else
+/// above `threshold` for review.
+pub async fn deduplicate(
+    State(state): State<AppState>,
+    Json(req): Json<BatchDeduplicationRequest>,
+) -> impl IntoResponse {
+    if !(0.0..=1.0).contains(&req.threshold)
+        || !(0.0..=1.0).contains(&req.auto_merge_threshold)
+        || req.auto_merge_threshold < req.threshold
+    {
+        return validation_response(vec![ValidationError {
+            field: "thresholds".into(),
+            message: "thresholds must be in [0, 1] with auto_merge_threshold >= threshold".into(),
+        }]);
+    }
+
+    match run_batch_dedup(&state, &req).await {
+        Ok(resp) => Json(ApiResponse::success(resp)).into_response(),
+        Err(e) => error_response(e),
+    }
+}
+
+const DEDUP_PAGE: u64 = 100;
+
+async fn run_batch_dedup(
+    state: &AppState,
+    req: &BatchDeduplicationRequest,
+) -> crate::Result<BatchDeduplicationResponse> {
+    use std::collections::HashSet;
+
+    let mut response = BatchDeduplicationResponse {
+        courses_scanned: 0,
+        duplicates_found: 0,
+        auto_merged: 0,
+        queued_for_review: 0,
+        review_items: Vec::new(),
+    };
+    let mut seen_pairs: HashSet<(Uuid, Uuid)> = HashSet::new();
+    let mut soft_deleted: HashSet<Uuid> = HashSet::new();
+    let mut offset: u64 = 0;
+
+    loop {
+        let page = state.course_repository.list(DEDUP_PAGE, offset).await?;
+        if page.is_empty() {
+            break;
+        }
+        let page_len = page.len() as u64;
+        response.courses_scanned += page_len;
+
+        for probe in &page {
+            if soft_deleted.contains(&probe.id) {
+                continue;
+            }
+            let candidate_ids = state.search_engine.search_by_name_and_provider(
+                &probe.name,
+                probe.provider_id,
+                req.max_candidates as usize,
+            )?;
+
+            for sid in candidate_ids {
+                let Ok(cid) = Uuid::parse_str(&sid) else { continue };
+                if cid == probe.id || soft_deleted.contains(&cid) {
+                    continue;
+                }
+                let pair = canonical_pair(probe.id, cid);
+                if !seen_pairs.insert(pair) {
+                    continue;
+                }
+                let Some(candidate) = state.course_repository.get_by_id(&cid).await? else {
+                    continue;
+                };
+
+                let r = state.matcher.match_courses(probe, &candidate);
+                if r.score < req.threshold {
+                    continue;
+                }
+                response.duplicates_found += 1;
+
+                if r.score >= req.auto_merge_threshold {
+                    auto_merge(state, probe, &candidate, r.score).await?;
+                    soft_deleted.insert(candidate.id);
+                    response.auto_merged += 1;
+                } else {
+                    response.review_items.push(ReviewQueueItem {
+                        id: Uuid::new_v4(),
+                        course_id_a: probe.id,
+                        course_id_b: candidate.id,
+                        match_score: r.score,
+                        match_quality: confidence_label(r.confidence).to_string(),
+                        detection_method: "BatchScan".to_string(),
+                        score_breakdown: serde_json::to_value(&r.breakdown).ok(),
+                        status: ReviewStatus::Pending,
+                        reviewed_by: None,
+                        created_at: Utc::now(),
+                        reviewed_at: None,
+                    });
+                    response.queued_for_review += 1;
+                }
+            }
+        }
+
+        offset += DEDUP_PAGE;
+        if page_len < DEDUP_PAGE {
+            break;
+        }
+    }
+    Ok(response)
+}
+
+/// Auto-merge `duplicate` into `main` inside the batch scan. Mirrors
+/// the side effects of `merge_courses` but is awaited inline so the
+/// dedup loop can keep accurate counters.
+async fn auto_merge(
+    state: &AppState,
+    main: &Course,
+    duplicate: &Course,
+    score: f64,
+) -> crate::Result<()> {
+    let (merged, transferred) = fold_duplicate_into_main(main, duplicate);
+    let updated = state.course_repository.update(&merged).await?;
+    if let Err(e) = state.search_engine.delete_course(&main.id.to_string()) {
+        tracing::warn!("auto_merge: removing main segment failed: {e}");
+    }
+    if let Err(e) = state.search_engine.index_course(&updated) {
+        tracing::warn!("auto_merge: reindex main failed: {e}");
+    }
+    state.course_repository.soft_delete(&duplicate.id).await?;
+    if let Err(e) = state.search_engine.delete_course(&duplicate.id.to_string()) {
+        tracing::warn!("auto_merge: removing duplicate segment failed: {e}");
+    }
+
+    let merge_record = MergeRecord {
+        id: Uuid::new_v4(),
+        main_course_id: updated.id,
+        duplicate_course_id: duplicate.id,
+        status: MergeStatus::Completed,
+        merged_by: Some("system:batch-dedup".into()),
+        merge_reason: Some("auto-merge above auto_merge_threshold".into()),
+        match_score: Some(score),
+        transferred_data: Some(transferred),
+        merged_at: Utc::now(),
+    };
+    let merge_record = state.course_repository.record_merge(&merge_record).await?;
+
+    record_update(
+        state,
+        "Course",
+        updated.id,
+        Some(main),
+        &updated,
+        EventKind::CourseUpdated,
+    )
+    .await;
+    record_delete(
+        state,
+        "Course",
+        duplicate.id,
+        Some(duplicate),
+        EventKind::CourseDeleted,
+    )
+    .await;
+    record_create(
+        state,
+        "CourseMerge",
+        merge_record.id,
+        &merge_record,
+        EventKind::CourseMerged,
+    )
+    .await;
+    Ok(())
+}
+
+fn canonical_pair(a: Uuid, b: Uuid) -> (Uuid, Uuid) {
+    if a < b { (a, b) } else { (b, a) }
 }
 
 // ────────────────── Privacy (FR-15, FR-16) ──────────────────

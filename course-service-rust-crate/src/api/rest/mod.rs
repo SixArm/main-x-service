@@ -40,10 +40,7 @@ pub fn create_router(state: AppState) -> Router {
             post(handlers::check_duplicates),
         )
         .route("/courses/merge", post(handlers::merge_courses))
-        .route(
-            "/courses/deduplicate",
-            get(handlers::not_implemented).post(handlers::not_implemented),
-        )
+        .route("/courses/deduplicate", post(handlers::deduplicate))
         // Course CRUD by id.
         .route(
             "/courses/:id",
