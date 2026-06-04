@@ -62,6 +62,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
+- **Privacy** (T-10, FR-15 + FR-16). `src/privacy/mod.rs`:
+  - `mask_course(&Course) -> Course` — clears the course `provider_id`
+    and every nested `instances[*].instructor_ids`; replaces each
+    `instructor_names[*]` with `[REDACTED]`. Returns a fresh value;
+    the input is not mutated.
+  - `export_course(&Course) -> Value` — GDPR Article-15 envelope
+    `{exported_at, source, schema, course}` wrapping the full
+    unmasked record so a data subject (provider, instructor, or
+    learner) can be served the data we hold.
+  - `GET /api/courses/{id}/masked` (FR-16) and
+    `GET /api/courses/{id}/export` (FR-15) wired.
 - **Audit + event streaming** (T-9, FR-14 / FR-17 / FR-18).
   - `src/db/audit.rs` — `AuditLogRepository::{log_create, log_update,
     log_delete, list_for_entity, list_recent}`. `AuditEntry` is the

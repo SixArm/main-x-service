@@ -443,6 +443,32 @@ fn not_found_response(msg: &str) -> axum::response::Response {
     (StatusCode::NOT_FOUND, Json(body)).into_response()
 }
 
+// ────────────────── Privacy (FR-15, FR-16) ──────────────────
+
+/// FR-16 — masked view of a Course.
+pub async fn masked_course(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    match state.course_repository.get_by_id(&id).await {
+        Ok(Some(c)) => Json(ApiResponse::success(crate::privacy::mask_course(&c))).into_response(),
+        Ok(None) => not_found_response("Course not found"),
+        Err(e) => error_response(e),
+    }
+}
+
+/// FR-15 — GDPR Article-15 portability export.
+pub async fn export_course_data(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    match state.course_repository.get_by_id(&id).await {
+        Ok(Some(c)) => Json(ApiResponse::success(crate::privacy::export_course(&c))).into_response(),
+        Ok(None) => not_found_response("Course not found"),
+        Err(e) => error_response(e),
+    }
+}
+
 // ────────────────── Audit / streaming hooks (FR-17, FR-18) ──────────────────
 
 #[derive(Debug, Deserialize)]

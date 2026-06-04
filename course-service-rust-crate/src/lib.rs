@@ -15,6 +15,7 @@ pub mod db;
 pub mod error;
 pub mod matching;
 pub mod models;
+pub mod privacy;
 pub mod search;
 pub mod streaming;
 pub mod validation;
