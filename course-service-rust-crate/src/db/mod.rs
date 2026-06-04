@@ -20,13 +20,13 @@ use crate::config::DatabaseConfig;
 use crate::models::{
     Course, CourseIdentifier, CourseInstance, CourseInstanceStatus, CourseLink, CourseMode,
     CourseStatus, EducationalLevel, IdentifierType, InteractivityType, LearningResourceType,
-    LinkType, Schedule,
+    LinkType, MergeRecord, Schedule,
 };
 
 pub mod audit;
 pub mod models;
 
-use models::{course_identifiers, course_instances, course_links, courses};
+use models::{course_identifiers, course_instances, course_links, course_merge_records, courses};
 
 /// Open a connection pool from a `DatabaseConfig`.
 pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {
@@ -64,6 +64,12 @@ pub trait CourseRepository: Send + Sync {
         course_id: &Uuid,
         instance_id: &Uuid,
     ) -> Result<()>;
+
+    /// Merge bookkeeping (T-7b / FR-8). Inserts a row into
+    /// `course_merge_records` describing the fold of `duplicate` into
+    /// `main`. The handler is responsible for the actual data
+    /// transfer + soft-delete of the duplicate.
+    async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord>;
 }
 
 pub struct SeaOrmCourseRepository {
@@ -246,6 +252,22 @@ impl CourseRepository for SeaOrmCourseRepository {
         active.updated_at = Set(Utc::now());
         active.update(&self.db).await.map_err(map_db)?;
         Ok(())
+    }
+
+    async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord> {
+        let active = course_merge_records::ActiveModel {
+            id: Set(rec.id),
+            main_course_id: Set(rec.main_course_id),
+            duplicate_course_id: Set(rec.duplicate_course_id),
+            status: Set(enum_to_string(&rec.status)?),
+            merged_by: Set(rec.merged_by.clone()),
+            merge_reason: Set(rec.merge_reason.clone()),
+            match_score: Set(rec.match_score),
+            transferred_data: Set(rec.transferred_data.clone()),
+            merged_at: Set(rec.merged_at),
+        };
+        active.insert(&self.db).await.map_err(map_db)?;
+        Ok(rec.clone())
     }
 }
 

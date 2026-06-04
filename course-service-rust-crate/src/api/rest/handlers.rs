@@ -1,9 +1,9 @@
 //! REST handlers.
 //!
-//! FR-1..FR-5 + FR-7 are wired against the repository, search engine,
-//! matcher, and validation module. FR-6 (match-against-existing),
-//! FR-8 (merge), FR-9 (batch dedup), FR-14..FR-16 (audit / privacy)
-//! continue to return `501 Not Implemented` via [`not_implemented`].
+//! FR-1..FR-8 + FR-14..FR-18 are wired against the repository, search
+//! engine, matcher, validation, audit, streaming, and privacy modules.
+//! FR-9 (batch dedup) still returns `501 Not Implemented` via
+//! [`not_implemented`].
 //!
 //! Error mapping:
 //! - `Error::NotFound` → 404
@@ -17,13 +17,14 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::state::AppState;
 use crate::api::ApiResponse;
 use crate::db::audit::AuditContext;
-use crate::models::{Course, CourseInstance};
+use crate::models::{Course, CourseInstance, MergeRecord, MergeRequest, MergeResponse, MergeStatus};
 use crate::streaming::{CourseEvent, EventKind};
 use crate::validation::{ValidationError, validate_course, validate_instance};
 
@@ -443,6 +444,255 @@ fn not_found_response(msg: &str) -> axum::response::Response {
     (StatusCode::NOT_FOUND, Json(body)).into_response()
 }
 
+// ────────────────── Match + Merge (FR-6, FR-8) ──────────────────
+
+/// FR-6 — score a Course request against blocked candidates. Returns
+/// every blocked candidate with its `ScoredCandidate`, sorted by
+/// descending score (the front-end can apply its own threshold).
+pub async fn match_course(
+    State(state): State<AppState>,
+    Json(probe): Json<Course>,
+) -> impl IntoResponse {
+    if probe.name.trim().is_empty() {
+        let body: ApiResponse<()> = ApiResponse::error(
+            "VALIDATION_FAILED",
+            "match request requires a non-empty `name` for blocking",
+        );
+        return (StatusCode::UNPROCESSABLE_ENTITY, Json(body)).into_response();
+    }
+    match score_all_blocked_candidates(&state, &probe).await {
+        Ok(hits) => Json(ApiResponse::success(hits)).into_response(),
+        Err(e) => error_response(e),
+    }
+}
+
+/// FR-8 — fold a duplicate into a main course.
+pub async fn merge_courses(
+    State(state): State<AppState>,
+    Json(req): Json<MergeRequest>,
+) -> impl IntoResponse {
+    if req.main_course_id == req.duplicate_course_id {
+        return validation_response(vec![ValidationError {
+            field: "duplicate_course_id".into(),
+            message: "main_course_id and duplicate_course_id must differ".into(),
+        }]);
+    }
+
+    let main = match state.course_repository.get_by_id(&req.main_course_id).await {
+        Ok(Some(c)) => c,
+        Ok(None) => return not_found_response("main course not found"),
+        Err(e) => return error_response(e),
+    };
+    let duplicate = match state.course_repository.get_by_id(&req.duplicate_course_id).await {
+        Ok(Some(c)) => c,
+        Ok(None) => return not_found_response("duplicate course not found"),
+        Err(e) => return error_response(e),
+    };
+
+    let match_result = state.matcher.match_courses(&main, &duplicate);
+
+    let (merged, transferred) = fold_duplicate_into_main(&main, &duplicate);
+
+    let updated = match state.course_repository.update(&merged).await {
+        Ok(c) => c,
+        Err(crate::Error::NotFound) => return not_found_response("main course not found"),
+        Err(e) => return error_response(e),
+    };
+    if let Err(e) = state.search_engine.delete_course(&main.id.to_string()) {
+        tracing::warn!("removing main course segment during merge failed: {e}");
+    }
+    if let Err(e) = state.search_engine.index_course(&updated) {
+        tracing::warn!("re-indexing main course during merge failed: {e}");
+    }
+
+    if let Err(e) = state.course_repository.soft_delete(&duplicate.id).await {
+        tracing::warn!("soft-deleting duplicate during merge failed: {e}");
+    }
+    if let Err(e) = state.search_engine.delete_course(&duplicate.id.to_string()) {
+        tracing::warn!("removing duplicate course segment during merge failed: {e}");
+    }
+
+    let merge_record = MergeRecord {
+        id: Uuid::new_v4(),
+        main_course_id: updated.id,
+        duplicate_course_id: duplicate.id,
+        status: MergeStatus::Completed,
+        merged_by: req.merged_by.clone(),
+        merge_reason: req.merge_reason.clone(),
+        match_score: Some(match_result.score),
+        transferred_data: Some(transferred),
+        merged_at: Utc::now(),
+    };
+    let merge_record = match state.course_repository.record_merge(&merge_record).await {
+        Ok(r) => r,
+        Err(e) => return error_response(e),
+    };
+
+    // FR-17 / FR-18 — audit + event for both sides + the merge itself.
+    record_update(
+        &state,
+        "Course",
+        updated.id,
+        Some(&main),
+        &updated,
+        EventKind::CourseUpdated,
+    )
+    .await;
+    record_delete(
+        &state,
+        "Course",
+        duplicate.id,
+        Some(&duplicate),
+        EventKind::CourseDeleted,
+    )
+    .await;
+    record_create(
+        &state,
+        "CourseMerge",
+        merge_record.id,
+        &merge_record,
+        EventKind::CourseMerged,
+    )
+    .await;
+
+    Json(ApiResponse::success(MergeResponse {
+        merge_record,
+        main_course: updated,
+    }))
+    .into_response()
+}
+
+/// Fold `duplicate` into a copy of `main`, returning the merged
+/// `Course` and a JSON snapshot of what was transferred (for the
+/// `course_merge_records.transferred_data` column + audit trail).
+///
+/// Strategy: union-by-value-equality for free-text Vec<String>
+/// collections; dedupe identifiers by `(scheme, value)`; preserve the
+/// duplicate's primary name as a `[former]` alternate on main; do not
+/// touch the parent's status / version / lifecycle scalars.
+fn fold_duplicate_into_main(
+    main: &Course,
+    duplicate: &Course,
+) -> (Course, serde_json::Value) {
+    let mut merged = main.clone();
+
+    // Alternate names — record the duplicate's primary name explicitly
+    // ("former") so reverse-lookup queries can still find it.
+    let former = format!("[former] {}", duplicate.name);
+    merge_unique(&mut merged.alternate_names, std::iter::once(former.clone()));
+    merge_unique(&mut merged.alternate_names, duplicate.alternate_names.iter().cloned());
+
+    // Free-text / URL collections — union.
+    merge_unique(&mut merged.image, duplicate.image.iter().cloned());
+    merge_unique(&mut merged.same_as, duplicate.same_as.iter().cloned());
+    merge_unique(&mut merged.keywords, duplicate.keywords.iter().cloned());
+    merge_unique(&mut merged.about, duplicate.about.iter().cloned());
+    merge_unique(&mut merged.in_language, duplicate.in_language.iter().cloned());
+    merge_unique(&mut merged.teaches, duplicate.teaches.iter().cloned());
+    merge_unique(&mut merged.assesses, duplicate.assesses.iter().cloned());
+    merge_unique(
+        &mut merged.competency_required,
+        duplicate.competency_required.iter().cloned(),
+    );
+    merge_unique(
+        &mut merged.course_prerequisites,
+        duplicate.course_prerequisites.iter().cloned(),
+    );
+    merge_unique(
+        &mut merged.available_language,
+        duplicate.available_language.iter().cloned(),
+    );
+    merge_unique(
+        &mut merged.financial_aid_eligible,
+        duplicate.financial_aid_eligible.iter().cloned(),
+    );
+
+    // Identifiers — dedupe by (scheme, value).
+    for ident in &duplicate.identifiers {
+        let already = merged.identifiers.iter().any(|i| {
+            std::mem::discriminant(&i.property_id) == std::mem::discriminant(&ident.property_id)
+                && i.value == ident.value
+        });
+        if !already {
+            merged.identifiers.push(ident.clone());
+        }
+    }
+
+    // Add a Replaces link from main → duplicate so the audit chain
+    // stays navigable. Avoid duplicating an existing link.
+    let already_links = merged.links.iter().any(|l| {
+        l.other_course_id == duplicate.id
+            && matches!(l.link_type, crate::models::LinkType::Replaces)
+    });
+    if !already_links {
+        merged.links.push(crate::models::CourseLink {
+            other_course_id: duplicate.id,
+            link_type: crate::models::LinkType::Replaces,
+        });
+    }
+
+    let transferred = serde_json::json!({
+        "from_course_id": duplicate.id,
+        "from_name": duplicate.name,
+        "identifiers_added": duplicate.identifiers.len(),
+        "alternate_names_added": 1 + duplicate.alternate_names.len(),
+        "keywords_added": duplicate.keywords.len(),
+        "teaches_added": duplicate.teaches.len(),
+        "same_as_added": duplicate.same_as.len(),
+    });
+
+    (merged, transferred)
+}
+
+fn merge_unique<I: IntoIterator<Item = String>>(target: &mut Vec<String>, incoming: I) {
+    for v in incoming {
+        if !target.iter().any(|t| t == &v) {
+            target.push(v);
+        }
+    }
+}
+
+/// Variant of `find_probable_duplicates` that returns every blocked
+/// candidate (not just `is_match=true`), sorted by descending score.
+/// Powers FR-6.
+async fn score_all_blocked_candidates(
+    state: &AppState,
+    probe: &Course,
+) -> crate::Result<Vec<ScoredCandidate>> {
+    let ids = state.search_engine.search_by_name_and_provider(
+        &probe.name,
+        probe.provider_id,
+        BLOCK_CANDIDATE_LIMIT,
+    )?;
+
+    let mut candidates: Vec<Course> = Vec::with_capacity(ids.len());
+    for sid in ids {
+        let Ok(uuid) = Uuid::parse_str(&sid) else { continue };
+        if Some(uuid) == Some(probe.id) && probe.id != Uuid::nil() {
+            continue;
+        }
+        if let Some(c) = state.course_repository.get_by_id(&uuid).await? {
+            candidates.push(c);
+        }
+    }
+
+    let mut scored: Vec<ScoredCandidate> = candidates
+        .iter()
+        .map(|c| {
+            let r = state.matcher.match_courses(probe, c);
+            ScoredCandidate {
+                course_id: c.id,
+                score: r.score,
+                is_match: r.is_match,
+                confidence: confidence_label(r.confidence),
+                breakdown: r.breakdown,
+            }
+        })
+        .collect();
+    scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    Ok(scored)
+}
+
 // ────────────────── Privacy (FR-15, FR-16) ──────────────────
 
 /// FR-16 — masked view of a Course.
@@ -667,4 +917,68 @@ fn error_response(e: crate::Error) -> axum::response::Response {
     };
     let body: ApiResponse<()> = ApiResponse::error(code, e.to_string());
     (status, Json(body)).into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{CourseIdentifier, IdentifierType, LinkType};
+
+    fn ident(scheme: IdentifierType, value: &str) -> CourseIdentifier {
+        CourseIdentifier {
+            property_id: scheme,
+            value: value.into(),
+            name: None,
+            url: None,
+        }
+    }
+
+    #[test]
+    fn fold_unions_collections_and_dedupes_identifiers() {
+        let mut main = Course::new("Intro to CS");
+        main.keywords = vec!["programming".into()];
+        main.same_as = vec!["https://wikidata.org/wiki/Q1".into()];
+        main.identifiers = vec![ident(IdentifierType::Doi, "10.1234/abc")];
+
+        let mut dup = Course::new("Introduction to Computer Science");
+        dup.keywords = vec!["programming".into(), "algorithms".into()];
+        dup.same_as = vec!["https://wikidata.org/wiki/Q1".into()];
+        dup.identifiers = vec![
+            ident(IdentifierType::Doi, "10.1234/abc"),         // already on main
+            ident(IdentifierType::Wikidata, "Q12345"),         // new
+        ];
+
+        let (merged, transferred) = fold_duplicate_into_main(&main, &dup);
+
+        // alternate_names captures the former primary name.
+        assert!(merged
+            .alternate_names
+            .iter()
+            .any(|n| n.starts_with("[former]")));
+        // free-text union — no duplicates.
+        assert_eq!(merged.keywords.len(), 2);
+        assert_eq!(merged.same_as.len(), 1);
+        // identifier dedupe by (scheme, value).
+        assert_eq!(merged.identifiers.len(), 2);
+        // a Replaces link was added pointing at the duplicate.
+        assert!(
+            merged
+                .links
+                .iter()
+                .any(|l| l.other_course_id == dup.id && matches!(l.link_type, LinkType::Replaces))
+        );
+        // transferred snapshot carries the duplicate id.
+        assert_eq!(transferred["from_course_id"], serde_json::json!(dup.id));
+    }
+
+    #[test]
+    fn fold_does_not_mutate_inputs() {
+        let main = Course::new("A");
+        let dup = Course::new("B");
+        let snapshot_main = serde_json::to_value(&main).unwrap();
+        let snapshot_dup = serde_json::to_value(&dup).unwrap();
+        let _ = fold_duplicate_into_main(&main, &dup);
+        assert_eq!(serde_json::to_value(&main).unwrap(), snapshot_main);
+        assert_eq!(serde_json::to_value(&dup).unwrap(), snapshot_dup);
+    }
 }

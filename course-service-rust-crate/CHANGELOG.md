@@ -62,6 +62,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
+- **Match + Merge handlers** (T-7b, FR-6 + FR-8).
+  - `POST /api/courses/match` — scores the request body against every
+    blocked candidate (via `search_by_name_and_provider`), returns
+    `ScoredCandidate[]` sorted by descending score; the front-end
+    applies its own threshold. Empty `name` → 422.
+  - `POST /api/courses/merge` — folds `duplicate_course_id` into
+    `main_course_id`. Pure `fold_duplicate_into_main` helper unions
+    free-text collections (`alternate_names`, `keywords`, `same_as`,
+    `image`, `about`, `in_language`, `teaches`, `assesses`,
+    `competency_required`, `course_prerequisites`,
+    `available_language`, `financial_aid_eligible`), records the
+    duplicate's primary name as `[former] <name>` on
+    `alternate_names`, dedupes identifiers by `(scheme, value)`, and
+    appends a `LinkType::Replaces` link from main → duplicate. Then:
+    update main + reindex, soft-delete duplicate + remove from index,
+    insert a `course_merge_records` row, audit + emit
+    `CourseUpdated` + `CourseDeleted` + `CourseMerged` events.
+    `MergeResponse { merge_record, main_course }` mirrors the
+    family-wide shape. `CourseRepository::record_merge` is the new
+    write surface.
 - **Privacy** (T-10, FR-15 + FR-16). `src/privacy/mod.rs`:
   - `mask_course(&Course) -> Course` — clears the course `provider_id`
     and every nested `instances[*].instructor_ids`; replaces each

@@ -303,7 +303,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 - [x] T-4: Tantivy `SearchEngine::index_course` + `search` + `fuzzy_search` + `search_by_name_and_provider` + `delete_course` (reader-reload after every commit).
 - [x] T-5: Validation module enforcing FR-21..FR-28 (`src/validation/`; nested-instance errors carry path prefixes).
 - [x] T-6: Adapter `matching::adapter::to_matcher_course` + `CourseMatcher` drives `course_matcher::MatchingEngine` (1:1 enum routing for `IdentifierScheme` / `EducationalLevel` / `LearningResourceType`).
-- [~] T-7: REST handlers — FR-1..FR-5 + FR-7 wired (create with duplicate detection, get, update, soft-delete, search, check-duplicates). FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup) still 501.
+- [~] T-7: REST handlers — FR-1..FR-8 wired (create with duplicate detection, get, update, soft-delete, search, match-against-existing, check-duplicates, merge). FR-9 batch dedup still 501.
 - [x] T-8: Instance sub-resource handlers FR-10..FR-13 — `CourseRepository::{list,get,create,update,soft_delete}_instance` + four handlers under `/api/courses/{id}/instances`. FR-10 ordering done in-memory after JSONB hydration.
 - [x] T-9: Audit handlers + event-stream publisher — `AuditLogRepository` writes `audit_log` rows on create/update/delete (Course + CourseInstance); `InMemoryEventPublisher` (`Arc<dyn EventPublisher>` on AppState) emits `CourseEvent` per FR-18. `GET /api/courses/{id}/audit` and `GET /api/audit/recent` wired. Fluvio adapter under feature flag still pending.
 - [x] T-10: Privacy module — `mask_course` (clears `provider_id`, instance `instructor_ids`, masks `instructor_names`) + `export_course` (GDPR Article-15 envelope). `GET /api/courses/{id}/masked` (FR-16) + `GET /api/courses/{id}/export` (FR-15) wired.
@@ -323,7 +323,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 | Search engine | ✅ index / fuzzy / exact / blocking-query / delete |
 | Validation | ✅ FR-21..FR-28 |
 | Matching adapter | ✅ drives `course_matcher::MatchingEngine` |
-| REST handlers | 🚧 FR-1..FR-5 + FR-7 wired; FR-6/8/9, audit, privacy still 501 |
+| REST handlers | 🚧 FR-1..FR-8 + FR-14..FR-16 wired; only FR-9 batch dedup still 501 |
 | Audit / streaming | ✅ in-memory MVP; Fluvio adapter under flag pending |
 | Privacy | ✅ mask + GDPR export (FR-15, FR-16) |
 | Tests | ✅ 27 unit + 14 bridge (`tests/duplicate_detection.rs`) |

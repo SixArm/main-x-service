@@ -34,18 +34,12 @@ pub fn create_router(state: AppState) -> Router {
         // MUST be declared before the `/:id` catch-all so Axum's path-
         // segment router doesn't shadow them.
         .route("/courses/search", get(handlers::search_courses))
-        .route(
-            "/courses/match",
-            get(handlers::not_implemented).post(handlers::not_implemented),
-        )
+        .route("/courses/match", post(handlers::match_course))
         .route(
             "/courses/check-duplicates",
             post(handlers::check_duplicates),
         )
-        .route(
-            "/courses/merge",
-            get(handlers::not_implemented).post(handlers::not_implemented),
-        )
+        .route("/courses/merge", post(handlers::merge_courses))
         .route(
             "/courses/deduplicate",
             get(handlers::not_implemented).post(handlers::not_implemented),
