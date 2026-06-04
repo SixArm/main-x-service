@@ -62,6 +62,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
+- **Criterion benchmark suite** (T-13). Three benches establish
+  perf baselines:
+  - `benches/matching_bench.rs` — `match_courses` on a fully-populated
+    pair, the deterministic short-circuit path, and `find_matches`
+    ranking 100 candidates.
+  - `benches/search_bench.rs` — `index_course` on one row,
+    exact `search`, `fuzzy_search`, and `search_by_name_and_provider`
+    all against a 100-row index.
+  - `benches/validation_bench.rs` — `validate_course` on a
+    populated record exercising every FR-21..FR-28 branch.
+  `criterion = "0.5"` added as dev-dep with three `[[bench]]`
+  targets. Run with `cargo bench`.
 - **Batch dedup** (T-7c, FR-9). `POST /api/courses/deduplicate`:
   - Pages through every active Course via
     `CourseRepository::list(100, offset)`.

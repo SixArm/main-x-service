@@ -309,7 +309,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 - [x] T-10: Privacy module — `mask_course` (clears `provider_id`, instance `instructor_ids`, masks `instructor_names`) + `export_course` (GDPR Article-15 envelope). `GET /api/courses/{id}/masked` (FR-16) + `GET /api/courses/{id}/export` (FR-15) wired.
 - [x] T-11: Bridge test pinning matcher contract + per-field routing (`tests/duplicate_detection.rs`, 14 tests covering identical / typo / deterministic short-circuits / negatives / routing / config presets).
 - [ ] T-12: Integration test exercising create / search / detail / edit / soft-delete / match / merge / dedup / audit.
-- [ ] T-13: Benchmark suite (matching, search, validation).
+- [x] T-13: Criterion benchmark suite — `benches/matching_bench.rs` (pair scoring + deterministic short-circuit + rank-of-100), `benches/search_bench.rs` (index + exact + fuzzy + blocking query on a 100-row index), `benches/validation_bench.rs` (populated-record pass).
 - [ ] T-14: OpenAPI schema completion via utoipa derive annotations.
 - [ ] T-15: Authentication middleware (JWT) — coordinated with the family-wide auth rollout.
 
