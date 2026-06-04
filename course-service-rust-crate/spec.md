@@ -303,7 +303,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 - [x] T-4: Tantivy `SearchEngine::index_course` + `search` + `fuzzy_search` + `search_by_name_and_provider` + `delete_course` (reader-reload after every commit).
 - [x] T-5: Validation module enforcing FR-21..FR-28 (`src/validation/`; nested-instance errors carry path prefixes).
 - [x] T-6: Adapter `matching::adapter::to_matcher_course` + `CourseMatcher` drives `course_matcher::MatchingEngine` (1:1 enum routing for `IdentifierScheme` / `EducationalLevel` / `LearningResourceType`).
-- [ ] T-7: REST handlers for FR-1..FR-13 (replacing the `501` stubs).
+- [~] T-7: REST handlers — FR-1..FR-5 + FR-7 wired (create with duplicate detection, get, update, soft-delete, search, check-duplicates). FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup) still 501.
 - [ ] T-8: Instance sub-resource handlers FR-10..FR-13 with transactional create / update / delete.
 - [ ] T-9: Audit handlers + event-stream publisher (in-memory MVP; Fluvio adapter under feature flag).
 - [ ] T-10: Privacy module (masking + GDPR export) and FR-15 / FR-16.
@@ -323,7 +323,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 | Search engine | ✅ index / fuzzy / exact / blocking-query / delete |
 | Validation | ✅ FR-21..FR-28 |
 | Matching adapter | ✅ drives `course_matcher::MatchingEngine` |
-| REST handlers | ❌ stubs return 501 |
+| REST handlers | 🚧 FR-1..FR-5 + FR-7 wired; FR-6/8/9, audit, privacy still 501 |
 | Audit / streaming | ❌ |
 | Privacy | ❌ |
 | Tests | ❌ |

@@ -26,6 +26,18 @@ impl<T> ApiResponse<T> {
             error: Some(ApiError { code: code.into(), message: message.into(), details: None }),
         }
     }
+    pub fn error_with_details<D: Serialize>(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        details: D,
+    ) -> Self {
+        let details = serde_json::to_value(details).ok();
+        Self {
+            success: false,
+            data: None,
+            error: Some(ApiError { code: code.into(), message: message.into(), details }),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

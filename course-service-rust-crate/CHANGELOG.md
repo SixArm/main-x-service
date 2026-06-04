@@ -48,6 +48,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `maximum_attendee_capacity ≥ enrolled_count`. Nested-instance
   errors carry an `instances[i].` path prefix so the `422` body
   points the caller at the exact field.
+- **REST handlers FR-1..FR-5 + FR-7** (T-7, partial). `POST /api/courses`
+  validates → blocks via `search_by_name_and_provider` → scores
+  candidates → returns `201` + `Course` on success, `409` +
+  ranked `ScoredCandidate[]` on duplicate, `422` + field errors on
+  validation failure. `GET /api/courses/{id}`, `PUT`, `DELETE`
+  (soft-delete) wired against the SeaORM repository. `GET
+  /api/courses/search` runs `search` or `fuzzy_search` (per
+  `?fuzzy=true`), falls back to `list` for empty queries, returns
+  the `{items, total}` envelope FR-19 mandates. `POST
+  /api/courses/check-duplicates` runs the same blocker + scorer as
+  the create handler without writing. `ApiResponse::error_with_details`
+  surfaces validation errors and ranked candidates under `details`.
+  FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
+  FR-14..FR-16 (audit / privacy) continue to return 501.
 - **Tests.** 27/27 unit tests pass — enum round-trip, active-model
   carrying, index lifecycle, exact / fuzzy / provider-scoped search,
   index deletion, identical-records-score-one, DOI deterministic

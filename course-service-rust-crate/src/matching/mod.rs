@@ -7,6 +7,7 @@
 //! field-routing rules.
 
 use course_matcher::{MatchConfig, MatchingEngine};
+use serde::Serialize;
 
 use crate::config::MatchingConfig;
 use crate::models::Course;
@@ -98,7 +99,7 @@ pub enum MatchConfidence {
     Low,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct MatchBreakdown {
     pub name_score: Option<f64>,
     pub course_code_score: Option<f64>,
