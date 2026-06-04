@@ -66,7 +66,7 @@ pub struct CourseInstance {
 
 /// schema.org/CourseInstance.courseMode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum CourseMode {
     Online,
     Onsite,
@@ -75,7 +75,7 @@ pub enum CourseMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum CourseInstanceStatus {
     #[default]
     Scheduled,

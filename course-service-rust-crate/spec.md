@@ -304,7 +304,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 - [x] T-5: Validation module enforcing FR-21..FR-28 (`src/validation/`; nested-instance errors carry path prefixes).
 - [x] T-6: Adapter `matching::adapter::to_matcher_course` + `CourseMatcher` drives `course_matcher::MatchingEngine` (1:1 enum routing for `IdentifierScheme` / `EducationalLevel` / `LearningResourceType`).
 - [~] T-7: REST handlers — FR-1..FR-5 + FR-7 wired (create with duplicate detection, get, update, soft-delete, search, check-duplicates). FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup) still 501.
-- [ ] T-8: Instance sub-resource handlers FR-10..FR-13 with transactional create / update / delete.
+- [x] T-8: Instance sub-resource handlers FR-10..FR-13 — `CourseRepository::{list,get,create,update,soft_delete}_instance` + four handlers under `/api/courses/{id}/instances`. FR-10 ordering done in-memory after JSONB hydration.
 - [ ] T-9: Audit handlers + event-stream publisher (in-memory MVP; Fluvio adapter under feature flag).
 - [ ] T-10: Privacy module (masking + GDPR export) and FR-15 / FR-16.
 - [x] T-11: Bridge test pinning matcher contract + per-field routing (`tests/duplicate_detection.rs`, 14 tests covering identical / typo / deterministic short-circuits / negatives / routing / config presets).

@@ -22,8 +22,8 @@ use uuid::Uuid;
 
 use super::state::AppState;
 use crate::api::ApiResponse;
-use crate::models::Course;
-use crate::validation::{ValidationError, validate_course};
+use crate::models::{Course, CourseInstance};
+use crate::validation::{ValidationError, validate_course, validate_instance};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct HealthResponse {
@@ -229,6 +229,88 @@ pub async fn search_courses(
     }
     let total = items.len();
     Json(ApiResponse::success(SearchResponse { items, total })).into_response()
+}
+
+// ────────────────── Instance sub-resource (FR-10..FR-13) ──────────────────
+
+/// FR-10 — list instances ordered `schedule.start_date DESC NULLS LAST`.
+pub async fn list_instances(
+    State(state): State<AppState>,
+    Path(course_id): Path<Uuid>,
+) -> impl IntoResponse {
+    if let Err(e) = require_course_exists(&state, &course_id).await {
+        return e;
+    }
+    match state.course_repository.list_instances(&course_id).await {
+        Ok(items) => Json(ApiResponse::success(items)).into_response(),
+        Err(e) => error_response(e),
+    }
+}
+
+/// FR-11 — create instance.
+pub async fn create_instance(
+    State(state): State<AppState>,
+    Path(course_id): Path<Uuid>,
+    Json(mut instance): Json<CourseInstance>,
+) -> impl IntoResponse {
+    if let Err(e) = require_course_exists(&state, &course_id).await {
+        return e;
+    }
+    instance.course_id = course_id;
+    let errs = validate_instance(&instance);
+    if !errs.is_empty() {
+        return validation_response(errs);
+    }
+    match state.course_repository.create_instance(&instance).await {
+        Ok(created) => (StatusCode::CREATED, Json(ApiResponse::success(created))).into_response(),
+        Err(e) => error_response(e),
+    }
+}
+
+/// FR-12 — replace instance.
+pub async fn update_instance_handler(
+    State(state): State<AppState>,
+    Path((course_id, instance_id)): Path<(Uuid, Uuid)>,
+    Json(mut instance): Json<CourseInstance>,
+) -> impl IntoResponse {
+    instance.course_id = course_id;
+    instance.id = instance_id;
+    let errs = validate_instance(&instance);
+    if !errs.is_empty() {
+        return validation_response(errs);
+    }
+    match state.course_repository.update_instance(&instance).await {
+        Ok(updated) => Json(ApiResponse::success(updated)).into_response(),
+        Err(crate::Error::NotFound) => not_found_response("CourseInstance not found"),
+        Err(e) => error_response(e),
+    }
+}
+
+/// FR-13 — soft-delete instance.
+pub async fn delete_instance(
+    State(state): State<AppState>,
+    Path((course_id, instance_id)): Path<(Uuid, Uuid)>,
+) -> impl IntoResponse {
+    match state
+        .course_repository
+        .soft_delete_instance(&course_id, &instance_id)
+        .await
+    {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(crate::Error::NotFound) => not_found_response("CourseInstance not found"),
+        Err(e) => error_response(e),
+    }
+}
+
+async fn require_course_exists(
+    state: &AppState,
+    course_id: &Uuid,
+) -> std::result::Result<(), axum::response::Response> {
+    match state.course_repository.get_by_id(course_id).await {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => Err(not_found_response("Course not found")),
+        Err(e) => Err(error_response(e)),
+    }
 }
 
 /// FR-7 — duplicate check (no write).

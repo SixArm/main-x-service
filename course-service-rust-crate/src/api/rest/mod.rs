@@ -57,16 +57,16 @@ pub fn create_router(state: AppState) -> Router {
                 .put(handlers::update_course)
                 .delete(handlers::delete_course),
         )
-        // CourseInstance sub-resource — pending T-8.
+        // CourseInstance sub-resource (T-8, FR-10..FR-13).
         .route(
             "/courses/:id/instances",
-            get(handlers::not_implemented).post(handlers::not_implemented),
+            get(handlers::list_instances).post(handlers::create_instance),
         )
         .route(
             "/courses/:id/instances/:instance_id",
             get(handlers::not_implemented)
-                .put(handlers::not_implemented)
-                .delete(handlers::not_implemented),
+                .put(handlers::update_instance_handler)
+                .delete(handlers::delete_instance),
         )
         // Privacy / GDPR — pending T-10.
         .route("/courses/:id/export", get(handlers::not_implemented))

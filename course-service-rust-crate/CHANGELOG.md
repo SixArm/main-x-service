@@ -62,6 +62,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
+- **Instance sub-resource** (T-8). `CourseRepository` grows
+  `list_instances` / `get_instance` / `create_instance` /
+  `update_instance` / `soft_delete_instance`. Round-trips the
+  `course_instances` row plus its JSONB `schedule` blob. Four new
+  handlers under `/api/courses/{id}/instances`:
+  - `GET` — lists active instances, sorted `schedule.start_date DESC
+    NULLS LAST` (sort in-memory after hydration since `schedule` is
+    JSONB). FR-10.
+  - `POST` — validates via `validate_instance`, returns `201`. FR-11.
+  - `PUT /{instance_id}` — replaces. FR-12.
+  - `DELETE /{instance_id}` — soft-delete. FR-13.
+  Parent-course existence is enforced for FR-10 / FR-11 (returns
+  `404` if the course is missing or soft-deleted).
+- **Changed.** `CourseInstanceStatus` and `CourseMode` now serialise
+  as `snake_case` so `EnrollmentOpen` round-trips against the DB
+  `CHECK` constraint as `enrollment_open` (was `enrollmentopen`).
 - **Bridge test** (T-11). `tests/duplicate_detection.rs` drives
   service-side `Course` records through `to_matcher_course` and the
   canonical `MatchingEngine`, pinning identical-clone scoring,

@@ -18,13 +18,14 @@ use uuid::Uuid;
 use crate::Result;
 use crate::config::DatabaseConfig;
 use crate::models::{
-    Course, CourseIdentifier, CourseLink, CourseStatus, EducationalLevel, IdentifierType,
-    InteractivityType, LearningResourceType, LinkType,
+    Course, CourseIdentifier, CourseInstance, CourseInstanceStatus, CourseLink, CourseMode,
+    CourseStatus, EducationalLevel, IdentifierType, InteractivityType, LearningResourceType,
+    LinkType, Schedule,
 };
 
 pub mod models;
 
-use models::{course_identifiers, course_links, courses};
+use models::{course_identifiers, course_instances, course_links, courses};
 
 /// Open a connection pool from a `DatabaseConfig`.
 pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {
@@ -47,6 +48,21 @@ pub trait CourseRepository: Send + Sync {
     async fn update(&self, course: &Course) -> Result<Course>;
     async fn soft_delete(&self, id: &Uuid) -> Result<()>;
     async fn list(&self, limit: u64, offset: u64) -> Result<Vec<Course>>;
+
+    // CourseInstance sub-resource (T-8, FR-10..FR-13).
+    async fn list_instances(&self, course_id: &Uuid) -> Result<Vec<CourseInstance>>;
+    async fn get_instance(
+        &self,
+        course_id: &Uuid,
+        instance_id: &Uuid,
+    ) -> Result<Option<CourseInstance>>;
+    async fn create_instance(&self, instance: &CourseInstance) -> Result<CourseInstance>;
+    async fn update_instance(&self, instance: &CourseInstance) -> Result<CourseInstance>;
+    async fn soft_delete_instance(
+        &self,
+        course_id: &Uuid,
+        instance_id: &Uuid,
+    ) -> Result<()>;
 }
 
 pub struct SeaOrmCourseRepository {
@@ -148,6 +164,92 @@ impl CourseRepository for SeaOrmCourseRepository {
         }
         Ok(out)
     }
+
+    // ──────────── CourseInstance sub-resource ────────────
+
+    async fn list_instances(&self, course_id: &Uuid) -> Result<Vec<CourseInstance>> {
+        let rows = course_instances::Entity::find()
+            .filter(course_instances::Column::CourseId.eq(*course_id))
+            .filter(course_instances::Column::DeletedAt.is_null())
+            .all(&self.db)
+            .await
+            .map_err(map_db)?;
+        let mut out = rows
+            .into_iter()
+            .map(hydrate_instance)
+            .collect::<Result<Vec<_>>>()?;
+        // FR-10 — `schedule.start_date DESC NULLS LAST`. Schedule is
+        // JSONB so we sort in-memory after hydration.
+        out.sort_by(|a, b| schedule_start(b).cmp(&schedule_start(a)));
+        Ok(out)
+    }
+
+    async fn get_instance(
+        &self,
+        course_id: &Uuid,
+        instance_id: &Uuid,
+    ) -> Result<Option<CourseInstance>> {
+        let row = course_instances::Entity::find_by_id(*instance_id)
+            .filter(course_instances::Column::CourseId.eq(*course_id))
+            .one(&self.db)
+            .await
+            .map_err(map_db)?;
+        let Some(row) = row else { return Ok(None) };
+        if row.deleted_at.is_some() {
+            return Ok(None);
+        }
+        Ok(Some(hydrate_instance(row)?))
+    }
+
+    async fn create_instance(&self, instance: &CourseInstance) -> Result<CourseInstance> {
+        let active = to_instance_active(instance, false)?;
+        active.insert(&self.db).await.map_err(map_db)?;
+        self.get_instance(&instance.course_id, &instance.id)
+            .await?
+            .ok_or_else(|| crate::Error::Database("instance not found after insert".into()))
+    }
+
+    async fn update_instance(&self, instance: &CourseInstance) -> Result<CourseInstance> {
+        let exists = course_instances::Entity::find_by_id(instance.id)
+            .filter(course_instances::Column::CourseId.eq(instance.course_id))
+            .one(&self.db)
+            .await
+            .map_err(map_db)?;
+        let Some(row) = exists else { return Err(crate::Error::NotFound) };
+        if row.deleted_at.is_some() {
+            return Err(crate::Error::NotFound);
+        }
+        let active = to_instance_active(instance, true)?;
+        active.update(&self.db).await.map_err(map_db)?;
+        self.get_instance(&instance.course_id, &instance.id)
+            .await?
+            .ok_or(crate::Error::NotFound)
+    }
+
+    async fn soft_delete_instance(
+        &self,
+        course_id: &Uuid,
+        instance_id: &Uuid,
+    ) -> Result<()> {
+        let row = course_instances::Entity::find_by_id(*instance_id)
+            .filter(course_instances::Column::CourseId.eq(*course_id))
+            .one(&self.db)
+            .await
+            .map_err(map_db)?
+            .ok_or(crate::Error::NotFound)?;
+        if row.deleted_at.is_some() {
+            return Err(crate::Error::NotFound);
+        }
+        let mut active: course_instances::ActiveModel = row.into();
+        active.deleted_at = Set(Some(Utc::now()));
+        active.updated_at = Set(Utc::now());
+        active.update(&self.db).await.map_err(map_db)?;
+        Ok(())
+    }
+}
+
+fn schedule_start(i: &CourseInstance) -> Option<chrono::DateTime<chrono::Utc>> {
+    i.schedule.as_ref().and_then(|s| s.start_date)
 }
 
 // ────────────────── Domain ↔ DB conversion ──────────────────
@@ -277,6 +379,61 @@ fn hydrate_course(
         links,
         provider_id: row.provider_id,
         deleted_at: row.deleted_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    })
+}
+
+// ────────────────── Instance round-trip ──────────────────
+
+fn to_instance_active(
+    i: &CourseInstance,
+    is_update: bool,
+) -> Result<course_instances::ActiveModel> {
+    let now = Utc::now();
+    Ok(course_instances::ActiveModel {
+        id: Set(i.id),
+        course_id: Set(i.course_id),
+        name: Set(i.name.clone()),
+        course_mode: Set(i.course_mode.as_ref().map(enum_to_string).transpose()?),
+        status: Set(enum_to_string(&i.status)?),
+        in_language: Set(to_json(&i.in_language)?),
+        location: Set(i.location.clone()),
+        location_id: Set(i.location_id),
+        instructor_ids: Set(to_json(&i.instructor_ids)?),
+        instructor_names: Set(to_json(&i.instructor_names)?),
+        maximum_attendee_capacity: Set(i.maximum_attendee_capacity.map(|v| v as i32)),
+        enrolled_count: Set(i.enrolled_count.map(|v| v as i32)),
+        enrollment_opens: Set(i.enrollment_opens),
+        enrollment_closes: Set(i.enrollment_closes),
+        schedule: Set(i.schedule.as_ref().map(to_json).transpose()?),
+        created_at: Set(i.created_at),
+        updated_at: Set(if is_update { now } else { i.updated_at }),
+        deleted_at: Set(None),
+    })
+}
+
+fn hydrate_instance(row: course_instances::Model) -> Result<CourseInstance> {
+    Ok(CourseInstance {
+        id: row.id,
+        course_id: row.course_id,
+        name: row.name,
+        course_mode: row
+            .course_mode
+            .as_deref()
+            .map(enum_from_string::<CourseMode>)
+            .transpose()?,
+        status: enum_from_string::<CourseInstanceStatus>(&row.status)?,
+        in_language: from_json(row.in_language)?,
+        location: row.location,
+        location_id: row.location_id,
+        instructor_ids: from_json(row.instructor_ids)?,
+        instructor_names: from_json(row.instructor_names)?,
+        maximum_attendee_capacity: row.maximum_attendee_capacity.map(|v| v as u32),
+        enrolled_count: row.enrolled_count.map(|v| v as u32),
+        enrollment_opens: row.enrollment_opens,
+        enrollment_closes: row.enrollment_closes,
+        schedule: row.schedule.map(from_json::<Schedule>).transpose()?,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
