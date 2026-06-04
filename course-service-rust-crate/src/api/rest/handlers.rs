@@ -22,7 +22,9 @@ use uuid::Uuid;
 
 use super::state::AppState;
 use crate::api::ApiResponse;
+use crate::db::audit::AuditContext;
 use crate::models::{Course, CourseInstance};
+use crate::streaming::{CourseEvent, EventKind};
 use crate::validation::{ValidationError, validate_course, validate_instance};
 
 #[derive(Debug, Clone, Serialize)]
@@ -133,6 +135,7 @@ pub async fn create_course(
     if let Err(e) = state.search_engine.index_course(&created) {
         tracing::warn!("indexing course after create failed: {e}");
     }
+    record_create(&state, "Course", created.id, &created, EventKind::CourseCreated).await;
     (StatusCode::CREATED, Json(ApiResponse::success(created))).into_response()
 }
 
@@ -160,6 +163,15 @@ pub async fn update_course(
     if !errs.is_empty() {
         return validation_response(errs);
     }
+    // Snapshot the existing row so the audit entry can carry old/new
+    // values. Failure to read the prior state is non-fatal — the
+    // update itself is the source of truth.
+    let prior = state
+        .course_repository
+        .get_by_id(&id)
+        .await
+        .ok()
+        .flatten();
     let updated = match state.course_repository.update(&course).await {
         Ok(c) => c,
         Err(crate::Error::NotFound) => return not_found_response("Course not found"),
@@ -171,6 +183,15 @@ pub async fn update_course(
     if let Err(e) = state.search_engine.index_course(&updated) {
         tracing::warn!("re-indexing course after update failed: {e}");
     }
+    record_update(
+        &state,
+        "Course",
+        updated.id,
+        prior.as_ref(),
+        &updated,
+        EventKind::CourseUpdated,
+    )
+    .await;
     Json(ApiResponse::success(updated)).into_response()
 }
 
@@ -179,11 +200,18 @@ pub async fn delete_course(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
+    let prior = state
+        .course_repository
+        .get_by_id(&id)
+        .await
+        .ok()
+        .flatten();
     match state.course_repository.soft_delete(&id).await {
         Ok(()) => {
             if let Err(e) = state.search_engine.delete_course(&id.to_string()) {
                 tracing::warn!("removing course segment after soft-delete failed: {e}");
             }
+            record_delete(&state, "Course", id, prior.as_ref(), EventKind::CourseDeleted).await;
             StatusCode::NO_CONTENT.into_response()
         }
         Err(crate::Error::NotFound) => not_found_response("Course not found"),
@@ -262,7 +290,10 @@ pub async fn create_instance(
         return validation_response(errs);
     }
     match state.course_repository.create_instance(&instance).await {
-        Ok(created) => (StatusCode::CREATED, Json(ApiResponse::success(created))).into_response(),
+        Ok(created) => {
+            record_instance_create(&state, course_id, &created).await;
+            (StatusCode::CREATED, Json(ApiResponse::success(created))).into_response()
+        }
         Err(e) => error_response(e),
     }
 }
@@ -279,8 +310,17 @@ pub async fn update_instance_handler(
     if !errs.is_empty() {
         return validation_response(errs);
     }
+    let prior = state
+        .course_repository
+        .get_instance(&course_id, &instance_id)
+        .await
+        .ok()
+        .flatten();
     match state.course_repository.update_instance(&instance).await {
-        Ok(updated) => Json(ApiResponse::success(updated)).into_response(),
+        Ok(updated) => {
+            record_instance_update(&state, course_id, prior.as_ref(), &updated).await;
+            Json(ApiResponse::success(updated)).into_response()
+        }
         Err(crate::Error::NotFound) => not_found_response("CourseInstance not found"),
         Err(e) => error_response(e),
     }
@@ -291,12 +331,21 @@ pub async fn delete_instance(
     State(state): State<AppState>,
     Path((course_id, instance_id)): Path<(Uuid, Uuid)>,
 ) -> impl IntoResponse {
+    let prior = state
+        .course_repository
+        .get_instance(&course_id, &instance_id)
+        .await
+        .ok()
+        .flatten();
     match state
         .course_repository
         .soft_delete_instance(&course_id, &instance_id)
         .await
     {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Ok(()) => {
+            record_instance_delete(&state, course_id, instance_id, prior.as_ref()).await;
+            StatusCode::NO_CONTENT.into_response()
+        }
         Err(crate::Error::NotFound) => not_found_response("CourseInstance not found"),
         Err(e) => error_response(e),
     }
@@ -392,6 +441,195 @@ fn validation_response(errs: Vec<ValidationError>) -> axum::response::Response {
 fn not_found_response(msg: &str) -> axum::response::Response {
     let body: ApiResponse<()> = ApiResponse::error("NOT_FOUND", msg);
     (StatusCode::NOT_FOUND, Json(body)).into_response()
+}
+
+// ────────────────── Audit / streaming hooks (FR-17, FR-18) ──────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct AuditQuery {
+    #[serde(default = "default_limit")]
+    pub limit: u64,
+}
+
+/// FR-14 — entries for a Course (and any child whose audit row carries
+/// the same `entity_id` once the merge / instance handlers tag them
+/// against the parent). Newest first.
+pub async fn audit_for_course(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(q): Query<AuditQuery>,
+) -> impl IntoResponse {
+    match state.audit_log.list_for_entity(id, q.limit).await {
+        Ok(rows) => Json(ApiResponse::success(rows)).into_response(),
+        Err(e) => error_response(e),
+    }
+}
+
+/// System-wide recent-activity tail, newest first.
+pub async fn audit_recent(
+    State(state): State<AppState>,
+    Query(q): Query<AuditQuery>,
+) -> impl IntoResponse {
+    match state.audit_log.list_recent(q.limit).await {
+        Ok(rows) => Json(ApiResponse::success(rows)).into_response(),
+        Err(e) => error_response(e),
+    }
+}
+
+async fn record_create(
+    state: &AppState,
+    entity_type: &str,
+    entity_id: Uuid,
+    new_value: &impl Serialize,
+    event_kind: EventKind,
+) {
+    let new_json = serde_json::to_value(new_value).unwrap_or(serde_json::Value::Null);
+    if let Err(e) = state
+        .audit_log
+        .log_create(entity_type, entity_id, new_json.clone(), &AuditContext::default())
+        .await
+    {
+        tracing::warn!("audit_log.log_create failed: {e}");
+    }
+    let evt = CourseEvent::course(event_kind, entity_id, new_json);
+    if let Err(e) = state.event_publisher.publish(evt).await {
+        tracing::warn!("event_publisher.publish failed: {e}");
+    }
+}
+
+async fn record_update(
+    state: &AppState,
+    entity_type: &str,
+    entity_id: Uuid,
+    old: Option<&impl Serialize>,
+    new_value: &impl Serialize,
+    event_kind: EventKind,
+) {
+    let old_json = old
+        .map(|v| serde_json::to_value(v).unwrap_or(serde_json::Value::Null))
+        .unwrap_or(serde_json::Value::Null);
+    let new_json = serde_json::to_value(new_value).unwrap_or(serde_json::Value::Null);
+    if let Err(e) = state
+        .audit_log
+        .log_update(
+            entity_type,
+            entity_id,
+            old_json,
+            new_json.clone(),
+            &AuditContext::default(),
+        )
+        .await
+    {
+        tracing::warn!("audit_log.log_update failed: {e}");
+    }
+    let evt = CourseEvent::course(event_kind, entity_id, new_json);
+    if let Err(e) = state.event_publisher.publish(evt).await {
+        tracing::warn!("event_publisher.publish failed: {e}");
+    }
+}
+
+async fn record_delete(
+    state: &AppState,
+    entity_type: &str,
+    entity_id: Uuid,
+    old: Option<&impl Serialize>,
+    event_kind: EventKind,
+) {
+    let old_json = old
+        .map(|v| serde_json::to_value(v).unwrap_or(serde_json::Value::Null))
+        .unwrap_or(serde_json::Value::Null);
+    if let Err(e) = state
+        .audit_log
+        .log_delete(entity_type, entity_id, old_json.clone(), &AuditContext::default())
+        .await
+    {
+        tracing::warn!("audit_log.log_delete failed: {e}");
+    }
+    let evt = CourseEvent::course(event_kind, entity_id, old_json);
+    if let Err(e) = state.event_publisher.publish(evt).await {
+        tracing::warn!("event_publisher.publish failed: {e}");
+    }
+}
+
+async fn record_instance_create(state: &AppState, course_id: Uuid, instance: &CourseInstance) {
+    let payload = serde_json::to_value(instance).unwrap_or(serde_json::Value::Null);
+    if let Err(e) = state
+        .audit_log
+        .log_create("CourseInstance", course_id, payload.clone(), &AuditContext::default())
+        .await
+    {
+        tracing::warn!("audit_log.log_create (instance) failed: {e}");
+    }
+    let evt = CourseEvent::instance(
+        EventKind::CourseInstanceCreated,
+        course_id,
+        instance.id,
+        payload,
+    );
+    if let Err(e) = state.event_publisher.publish(evt).await {
+        tracing::warn!("event_publisher.publish (instance) failed: {e}");
+    }
+}
+
+async fn record_instance_update(
+    state: &AppState,
+    course_id: Uuid,
+    prior: Option<&CourseInstance>,
+    updated: &CourseInstance,
+) {
+    let old_json = prior
+        .map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null))
+        .unwrap_or(serde_json::Value::Null);
+    let new_json = serde_json::to_value(updated).unwrap_or(serde_json::Value::Null);
+    if let Err(e) = state
+        .audit_log
+        .log_update(
+            "CourseInstance",
+            course_id,
+            old_json,
+            new_json.clone(),
+            &AuditContext::default(),
+        )
+        .await
+    {
+        tracing::warn!("audit_log.log_update (instance) failed: {e}");
+    }
+    let evt = CourseEvent::instance(
+        EventKind::CourseInstanceUpdated,
+        course_id,
+        updated.id,
+        new_json,
+    );
+    if let Err(e) = state.event_publisher.publish(evt).await {
+        tracing::warn!("event_publisher.publish (instance) failed: {e}");
+    }
+}
+
+async fn record_instance_delete(
+    state: &AppState,
+    course_id: Uuid,
+    instance_id: Uuid,
+    prior: Option<&CourseInstance>,
+) {
+    let payload = prior
+        .map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null))
+        .unwrap_or(serde_json::Value::Null);
+    if let Err(e) = state
+        .audit_log
+        .log_delete("CourseInstance", course_id, payload.clone(), &AuditContext::default())
+        .await
+    {
+        tracing::warn!("audit_log.log_delete (instance) failed: {e}");
+    }
+    let evt = CourseEvent::instance(
+        EventKind::CourseInstanceDeleted,
+        course_id,
+        instance_id,
+        payload,
+    );
+    if let Err(e) = state.event_publisher.publish(evt).await {
+        tracing::warn!("event_publisher.publish (instance) failed: {e}");
+    }
 }
 
 fn error_response(e: crate::Error) -> axum::response::Response {

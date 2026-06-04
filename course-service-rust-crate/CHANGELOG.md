@@ -62,6 +62,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
+- **Audit + event streaming** (T-9, FR-14 / FR-17 / FR-18).
+  - `src/db/audit.rs` — `AuditLogRepository::{log_create, log_update,
+    log_delete, list_for_entity, list_recent}`. `AuditEntry` is the
+    public read shape.
+  - `src/streaming/mod.rs` — `CourseEvent` (with `course` / `instance`
+    constructors), `EventKind` (`CourseCreated`, `CourseUpdated`,
+    `CourseDeleted`, `CourseMerged`, `CourseInstanceCreated`,
+    `CourseInstanceUpdated`, `CourseInstanceDeleted` — PascalCase),
+    `EventPublisher` trait, `InMemoryEventPublisher` MVP capturing
+    events in an `Arc<Mutex<Vec<_>>>` so the planned integration
+    suite (T-12) can assert on them.
+  - `AppState` now carries `audit_log: Arc<AuditLogRepository>` and
+    `event_publisher: Arc<dyn EventPublisher>`.
+  - Create / update / soft-delete handlers for Course AND
+    CourseInstance call `audit_log.log_*` and `event_publisher.publish`
+    fire-and-forget (warn on failure, do not fail the request).
+  - `GET /api/courses/{id}/audit` and `GET /api/audit/recent` wired
+    with an optional `?limit=` (default 20). Fluvio adapter under
+    feature flag deferred.
 - **Instance sub-resource** (T-8). `CourseRepository` grows
   `list_instances` / `get_instance` / `create_instance` /
   `update_instance` / `soft_delete_instance`. Round-trips the

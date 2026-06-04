@@ -71,9 +71,9 @@ pub fn create_router(state: AppState) -> Router {
         // Privacy / GDPR — pending T-10.
         .route("/courses/:id/export", get(handlers::not_implemented))
         .route("/courses/:id/masked", get(handlers::not_implemented))
-        // Audit — pending T-9.
-        .route("/courses/:id/audit", get(handlers::not_implemented))
-        .route("/audit/recent", get(handlers::not_implemented))
+        // Audit (T-9, FR-14 + FR-17).
+        .route("/courses/:id/audit", get(handlers::audit_for_course))
+        .route("/audit/recent", get(handlers::audit_recent))
         .with_state(state);
 
     Router::new()

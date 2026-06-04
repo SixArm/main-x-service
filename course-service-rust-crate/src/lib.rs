@@ -16,6 +16,7 @@ pub mod error;
 pub mod matching;
 pub mod models;
 pub mod search;
+pub mod streaming;
 pub mod validation;
 
 pub use error::{Error, Result};

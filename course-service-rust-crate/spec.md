@@ -305,7 +305,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 - [x] T-6: Adapter `matching::adapter::to_matcher_course` + `CourseMatcher` drives `course_matcher::MatchingEngine` (1:1 enum routing for `IdentifierScheme` / `EducationalLevel` / `LearningResourceType`).
 - [~] T-7: REST handlers — FR-1..FR-5 + FR-7 wired (create with duplicate detection, get, update, soft-delete, search, check-duplicates). FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup) still 501.
 - [x] T-8: Instance sub-resource handlers FR-10..FR-13 — `CourseRepository::{list,get,create,update,soft_delete}_instance` + four handlers under `/api/courses/{id}/instances`. FR-10 ordering done in-memory after JSONB hydration.
-- [ ] T-9: Audit handlers + event-stream publisher (in-memory MVP; Fluvio adapter under feature flag).
+- [x] T-9: Audit handlers + event-stream publisher — `AuditLogRepository` writes `audit_log` rows on create/update/delete (Course + CourseInstance); `InMemoryEventPublisher` (`Arc<dyn EventPublisher>` on AppState) emits `CourseEvent` per FR-18. `GET /api/courses/{id}/audit` and `GET /api/audit/recent` wired. Fluvio adapter under feature flag still pending.
 - [ ] T-10: Privacy module (masking + GDPR export) and FR-15 / FR-16.
 - [x] T-11: Bridge test pinning matcher contract + per-field routing (`tests/duplicate_detection.rs`, 14 tests covering identical / typo / deterministic short-circuits / negatives / routing / config presets).
 - [ ] T-12: Integration test exercising create / search / detail / edit / soft-delete / match / merge / dedup / audit.
@@ -324,7 +324,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 | Validation | ✅ FR-21..FR-28 |
 | Matching adapter | ✅ drives `course_matcher::MatchingEngine` |
 | REST handlers | 🚧 FR-1..FR-5 + FR-7 wired; FR-6/8/9, audit, privacy still 501 |
-| Audit / streaming | ❌ |
+| Audit / streaming | ✅ in-memory MVP; Fluvio adapter under flag pending |
 | Privacy | ❌ |
 | Tests | ✅ 27 unit + 14 bridge (`tests/duplicate_detection.rs`) |
 

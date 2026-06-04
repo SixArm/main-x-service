@@ -23,6 +23,7 @@ use crate::models::{
     LinkType, Schedule,
 };
 
+pub mod audit;
 pub mod models;
 
 use models::{course_identifiers, course_instances, course_links, courses};
