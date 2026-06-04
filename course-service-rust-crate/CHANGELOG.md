@@ -62,12 +62,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
-- **Tests.** 27/27 unit tests pass — enum round-trip, active-model
-  carrying, index lifecycle, exact / fuzzy / provider-scoped search,
-  index deletion, identical-records-score-one, DOI deterministic
-  short-circuit, find-matches ordering, adapter routing rules, and
-  11 new validation tests covering every FR-21..FR-28 branch plus
-  the nested-instance path-prefix invariant.
+- **Bridge test** (T-11). `tests/duplicate_detection.rs` drives
+  service-side `Course` records through `to_matcher_course` and the
+  canonical `MatchingEngine`, pinning identical-clone scoring,
+  Jaro-Winkler typo tolerance, all three deterministic short-circuits
+  (DOI / Wikidata / `same_as` URL / shared-provider + course-code),
+  negative cases (LMS-id alone, same code at different providers,
+  wholly unrelated titles), per-enum field routing
+  (`provider_id`, `EducationalLevel`, `LearningResourceType`,
+  `Custom` identifier scheme labels), and the strict-⊆-default
+  config-preset invariant. 14/14 pass. `matching::matcher_lib` is now
+  a plain `pub use`, not test-gated, so the bridge can import the
+  matcher types without re-declaring the dependency.
+- **Tests.** 27/27 unit + 14/14 bridge — enum round-trip,
+  active-model carrying, index lifecycle, exact / fuzzy / provider-
+  scoped search, index deletion, identical-records-score-one, DOI
+  deterministic short-circuit, find-matches ordering, adapter
+  routing rules, every FR-21..FR-28 validation branch, and the full
+  matcher-contract bridge suite.
 
 ## [0.1.0] — 2026-06-04
 

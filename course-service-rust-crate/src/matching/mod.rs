@@ -14,7 +14,10 @@ use crate::models::Course;
 
 pub mod adapter;
 
-#[cfg(test)]
+/// Re-export of the canonical `course-matcher` library crate so
+/// callers (integration tests, the bridge suite under `tests/`) can
+/// access `MatchingEngine`, `MatchConfig`, `Confidence`, etc without
+/// adding the matcher as their own direct dependency.
 pub use course_matcher as matcher_lib;
 
 /// Wraps `course_matcher::MatchingEngine` with the service's

@@ -307,7 +307,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 - [ ] T-8: Instance sub-resource handlers FR-10..FR-13 with transactional create / update / delete.
 - [ ] T-9: Audit handlers + event-stream publisher (in-memory MVP; Fluvio adapter under feature flag).
 - [ ] T-10: Privacy module (masking + GDPR export) and FR-15 / FR-16.
-- [ ] T-11: Bridge test pinning matcher contract + per-field routing.
+- [x] T-11: Bridge test pinning matcher contract + per-field routing (`tests/duplicate_detection.rs`, 14 tests covering identical / typo / deterministic short-circuits / negatives / routing / config presets).
 - [ ] T-12: Integration test exercising create / search / detail / edit / soft-delete / match / merge / dedup / audit.
 - [ ] T-13: Benchmark suite (matching, search, validation).
 - [ ] T-14: OpenAPI schema completion via utoipa derive annotations.
@@ -326,7 +326,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 | REST handlers | 🚧 FR-1..FR-5 + FR-7 wired; FR-6/8/9, audit, privacy still 501 |
 | Audit / streaming | ❌ |
 | Privacy | ❌ |
-| Tests | ❌ |
+| Tests | ✅ 27 unit + 14 bridge (`tests/duplicate_detection.rs`) |
 
 ## 15. Roadmap
 
