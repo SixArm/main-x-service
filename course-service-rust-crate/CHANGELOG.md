@@ -23,7 +23,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   enums map to lowercase / kebab-case strings via a small
   serde-backed helper; collection fields ride on JSONB columns.
   `instances` + `syllabus_sections` deferred to T-8 (sub-resource).
-  3/3 unit tests pass.
+- **Tantivy `SearchEngine`** (T-4). `CourseIndex` + `CourseIndexSchema`
+  in `src/search/index.rs` carry `id` (STRING / stored) and TEXT
+  fields for `name`, `alternate_names`, `course_code` (STRING),
+  `provider_id` (STRING), `provider_name`, `keywords`, `teaches`,
+  `identifiers`. `SearchEngine::index_course` / `search` /
+  `fuzzy_search` / `search_by_name_and_provider` / `delete_course`
+  follow the family pattern (reader reload after every commit;
+  multi-token fuzzy via `BooleanQuery` of `FuzzyTermQuery` per
+  alphanumeric run).
+- **Matching adapter** (T-6). `matching::adapter::to_matcher_course`
+  projects the rich service `Course` down to the slim
+  `course_matcher::Course` shape, with 1:1 routing of
+  `IdentifierType → IdentifierScheme`, `EducationalLevel`, and
+  `LearningResourceType`. `CourseMatcher::match_courses` and
+  `find_matches` now drive `course_matcher::MatchingEngine` for real,
+  no longer stubbed.
+- **Tests.** 16/16 unit tests pass — enum round-trip, active-model
+  carrying, index lifecycle, exact / fuzzy / provider-scoped search,
+  index deletion, identical-records-score-one, DOI deterministic
+  short-circuit, find-matches ordering, adapter routing rules.
 
 ## [0.1.0] — 2026-06-04
 

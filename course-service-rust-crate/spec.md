@@ -300,9 +300,9 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 - [x] T-1: Scaffold skeleton (Cargo.toml, src/, migrations, Dockerfile, docker-compose, spec, AGENTS docs).
 - [x] T-2: SeaORM entity modules in `db/models.rs` matching the migration schema.
 - [x] T-3: `SeaOrmCourseRepository` CRUD + soft-delete (courses + identifiers + links round-trip; transactional). Audit-log writes still pending alongside T-9 event publisher.
-- [ ] T-4: Tantivy `SearchEngine::index_course` + `search` + `search_by_name_and_provider` (reader-reload after every commit).
+- [x] T-4: Tantivy `SearchEngine::index_course` + `search` + `fuzzy_search` + `search_by_name_and_provider` + `delete_course` (reader-reload after every commit).
 - [ ] T-5: Validation module enforcing FR-21..FR-28.
-- [ ] T-6: Adapter `matching::adapter::to_matcher_course` + integration with `course_matcher::MatchingEngine`.
+- [x] T-6: Adapter `matching::adapter::to_matcher_course` + `CourseMatcher` drives `course_matcher::MatchingEngine` (1:1 enum routing for `IdentifierScheme` / `EducationalLevel` / `LearningResourceType`).
 - [ ] T-7: REST handlers for FR-1..FR-13 (replacing the `501` stubs).
 - [ ] T-8: Instance sub-resource handlers FR-10..FR-13 with transactional create / update / delete.
 - [ ] T-9: Audit handlers + event-stream publisher (in-memory MVP; Fluvio adapter under feature flag).
@@ -320,9 +320,9 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 | Skeleton (compiles, REST routes return 501) | 🚧 in progress |
 | SeaORM entities | ✅ |
 | Repository CRUD | ✅ (courses + identifiers + links; instances + syllabus pending T-8) |
-| Search engine | ❌ stub |
+| Search engine | ✅ index / fuzzy / exact / blocking-query / delete |
 | Validation | ❌ |
-| Matching adapter | ❌ stub |
+| Matching adapter | ✅ drives `course_matcher::MatchingEngine` |
 | REST handlers | ❌ stubs return 501 |
 | Audit / streaming | ❌ |
 | Privacy | ❌ |
