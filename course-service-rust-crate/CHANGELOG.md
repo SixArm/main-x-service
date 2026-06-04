@@ -9,7 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **SeaORM entities** (T-2). One module per migration table in
+  `src/db/models.rs`: `providers`, `courses`, `course_identifiers`,
+  `course_links`, `course_instances`, `syllabus_sections`,
+  `audit_log`, `course_match_scores`, `course_merge_records`. JSONB
+  columns typed as `serde_json::Value` and rehydrated by the
+  repository.
+- **`SeaOrmCourseRepository` CRUD** (T-3). `create` / `get_by_id` /
+  `update` / `soft_delete` / `list` round-trip courses + identifiers
+  + links transactionally. Status / link-type / interactivity-type
+  enums map to lowercase / kebab-case strings via a small
+  serde-backed helper; collection fields ride on JSONB columns.
+  `instances` + `syllabus_sections` deferred to T-8 (sub-resource).
+  3/3 unit tests pass.
 
 ## [0.1.0] — 2026-06-04
 

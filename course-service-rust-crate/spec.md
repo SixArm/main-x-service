@@ -298,8 +298,8 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 ## 13. Tasks
 
 - [x] T-1: Scaffold skeleton (Cargo.toml, src/, migrations, Dockerfile, docker-compose, spec, AGENTS docs).
-- [ ] T-2: SeaORM entity modules in `db/models.rs` matching the migration schema.
-- [ ] T-3: `SeaOrmCourseRepository` CRUD + soft-delete + audit-log writes.
+- [x] T-2: SeaORM entity modules in `db/models.rs` matching the migration schema.
+- [x] T-3: `SeaOrmCourseRepository` CRUD + soft-delete (courses + identifiers + links round-trip; transactional). Audit-log writes still pending alongside T-9 event publisher.
 - [ ] T-4: Tantivy `SearchEngine::index_course` + `search` + `search_by_name_and_provider` (reader-reload after every commit).
 - [ ] T-5: Validation module enforcing FR-21..FR-28.
 - [ ] T-6: Adapter `matching::adapter::to_matcher_course` + integration with `course_matcher::MatchingEngine`.
@@ -318,8 +318,8 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 | Area | Status |
 |---|---|
 | Skeleton (compiles, REST routes return 501) | 🚧 in progress |
-| SeaORM entities | ❌ |
-| Repository CRUD | ❌ |
+| SeaORM entities | ✅ |
+| Repository CRUD | ✅ (courses + identifiers + links; instances + syllabus pending T-8) |
 | Search engine | ❌ stub |
 | Validation | ❌ |
 | Matching adapter | ❌ stub |
