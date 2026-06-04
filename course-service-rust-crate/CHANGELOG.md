@@ -39,10 +39,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `LearningResourceType`. `CourseMatcher::match_courses` and
   `find_matches` now drive `course_matcher::MatchingEngine` for real,
   no longer stubbed.
-- **Tests.** 16/16 unit tests pass — enum round-trip, active-model
+- **Validation module** (T-5). `src/validation/` enforces FR-21..FR-28:
+  required non-blank `name`, `course_code` 1..=100 chars, sane
+  credits cap, plausible BCP-47 codes on `in_language` and
+  `available_language`, `http(s)://` scheme check on every URL field
+  (course `url`, `image[*]`, `same_as[*]`, identifier `url`),
+  `schedule.end_date ≥ start_date`, ordered enrollment window, and
+  `maximum_attendee_capacity ≥ enrolled_count`. Nested-instance
+  errors carry an `instances[i].` path prefix so the `422` body
+  points the caller at the exact field.
+- **Tests.** 27/27 unit tests pass — enum round-trip, active-model
   carrying, index lifecycle, exact / fuzzy / provider-scoped search,
   index deletion, identical-records-score-one, DOI deterministic
-  short-circuit, find-matches ordering, adapter routing rules.
+  short-circuit, find-matches ordering, adapter routing rules, and
+  11 new validation tests covering every FR-21..FR-28 branch plus
+  the nested-instance path-prefix invariant.
 
 ## [0.1.0] — 2026-06-04
 
