@@ -23,7 +23,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `additional_type`, `course_code`, `typical_age_range`,
   `time_required`, `version`, `audience`, `educational_use`) to
   `undefined` so the omitted-key branch of the service's serde
-  default fires.
+  default fires. The same normalisation runs over nested
+  `identifiers[*].url` and `identifiers[*].name` — an identifier
+  row whose URL was tabbed-through-but-left-blank had the same
+  failure mode.
+
+### Changed
+
+- **Stale comment about duplicate-detection response shape.** The
+  create page's 409 handler still claimed the service wrapped
+  candidates in `{ has_duplicates, potential_matches }`. The
+  Course Service ships a flat `MatchResult[]` directly under
+  `error.details`. Comment updated to reflect the actual contract;
+  the wrapper-tolerant code stays as forward-compatibility for any
+  future sibling-service shape change.
 - **Courses list page returned zero hits on initial load.** The
   page sent `q: q || "*"` thinking `"*"` was a wildcard, but the
   service treats the query as a literal Tantivy term — the asterisk

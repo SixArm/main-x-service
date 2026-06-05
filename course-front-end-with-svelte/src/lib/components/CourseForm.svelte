@@ -33,7 +33,9 @@
      * strings fail `"".startsWith("http://")` → 422). Empty strings
      * on optional fields are a form-UI artefact, not a real value;
      * convert them to `undefined` before submit so the omitted-key
-     * branch of the service's serde default fires.
+     * branch of the service's serde default fires. Identifier URLs
+     * follow the same rule — `identifier.url = ""` would otherwise
+     * trip the per-identifier FR-25 branch.
      */
     function normalizeForWire(c: Course): Course {
         const blankToUndef = <T,>(v: T): T | undefined =>
@@ -51,6 +53,11 @@
             version: blankToUndef(c.version),
             audience: blankToUndef(c.audience),
             educational_use: blankToUndef(c.educational_use),
+            identifiers: c.identifiers?.map((i) => ({
+                ...i,
+                url: blankToUndef(i.url),
+                name: blankToUndef(i.name),
+            })),
         };
     }
 

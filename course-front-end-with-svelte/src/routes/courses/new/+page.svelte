@@ -18,8 +18,11 @@
             if (created.id) goto(`/courses/${created.id}`);
         } catch (err) {
             if (err instanceof ApiError && err.isConflict) {
-                // Service wraps the duplicates in { has_duplicates, potential_matches };
-                // older shape was a bare MatchResult[]. Normalise both.
+                // The Course Service ships `details` as a flat
+                // MatchResult[]. A sibling family service was rumoured
+                // to wrap it in `{ has_duplicates, potential_matches }`;
+                // keep the wrapper-aware branch so this page survives a
+                // future service-side shape change without redeploy.
                 const details = err.details as
                     | MatchResult[]
                     | { has_duplicates?: boolean; potential_matches?: MatchResult[] }
