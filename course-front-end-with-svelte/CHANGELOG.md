@@ -27,6 +27,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **spec.md §7 + §10 SSR pointers named T-7 instead of T-13.** T-7
   was "Detail / edit / soft-delete" (already shipped). The SSR /
   `event.fetch` follow-up lives at §13 T-13. Both pointers re-aimed.
+- **spec.md §16 OQ-4 was stale.** Said "revisit when the third
+  sibling front-end ships" — six entity front-ends have long since
+  shipped (person / worker / place / thing / event / course). The
+  trigger condition fired iterations ago. Marked resolved with a
+  note that the drift policy held up: this session's shape-
+  mismatch sweep (e.g. `ScoredCandidate` adding `name` +
+  `course_code`) fixed cleanly per-project without needing a
+  shared package. No `mxi-svelte-core`; copy-adapt per project.
+
 - **spec.md §15 Roadmap was misaligned with the just-cut v0.2.0.**
   Said v0.2 would carry "SSR-safe load functions; Lily Dialog/
   Combobox integration; identifier/address edit UI" — none of
