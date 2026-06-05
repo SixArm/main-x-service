@@ -27,6 +27,33 @@
         };
     }
 
+    /**
+     * Strip blank string fields so the wire shape doesn't ship
+     * `url: ""` and trip the service's FR-25 scheme check (empty
+     * strings fail `"".startsWith("http://")` → 422). Empty strings
+     * on optional fields are a form-UI artefact, not a real value;
+     * convert them to `undefined` before submit so the omitted-key
+     * branch of the service's serde default fires.
+     */
+    function normalizeForWire(c: Course): Course {
+        const blankToUndef = <T,>(v: T): T | undefined =>
+            typeof v === "string" && v.trim() === "" ? undefined : v;
+        return {
+            ...c,
+            description: blankToUndef(c.description),
+            disambiguating_description: blankToUndef(c.disambiguating_description),
+            url: blankToUndef(c.url),
+            license: blankToUndef(c.license),
+            additional_type: blankToUndef(c.additional_type),
+            course_code: blankToUndef(c.course_code),
+            typical_age_range: blankToUndef(c.typical_age_range),
+            time_required: blankToUndef(c.time_required),
+            version: blankToUndef(c.version),
+            audience: blankToUndef(c.audience),
+            educational_use: blankToUndef(c.educational_use),
+        };
+    }
+
     // svelte-ignore state_referenced_locally
     const form = createForm<Course>({
         initial: withDefaults(props.initial),
@@ -52,7 +79,7 @@
             }
             return errors;
         },
-        onSubmit: (value) => props.onsubmit(value),
+        onSubmit: (value) => props.onsubmit(normalizeForWire(value)),
     });
 
     let alternateNamesJoined = $derived((form.value.alternate_names ?? []).join("\n"));

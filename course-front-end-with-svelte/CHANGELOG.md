@@ -11,6 +11,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **Blank optional URL fields would 422 on create/edit.** The form
+  bound `<input type="url">` to optional Course fields, so leaving
+  `url` / `license` / `additional_type` blank shipped `""` on the
+  wire. The service's FR-25 scheme check
+  (`url.starts_with("http://")`) rejects empty strings — users who
+  filled only the required `name` field got 422 from a benign
+  blank URL. Added a `normalizeForWire` step on submit that maps
+  blank strings on every optional text field
+  (`description`, `disambiguating_description`, `url`, `license`,
+  `additional_type`, `course_code`, `typical_age_range`,
+  `time_required`, `version`, `audience`, `educational_use`) to
+  `undefined` so the omitted-key branch of the service's serde
+  default fires.
 - **Courses list page returned zero hits on initial load.** The
   page sent `q: q || "*"` thinking `"*"` was a wildcard, but the
   service treats the query as a literal Tantivy term — the asterisk
