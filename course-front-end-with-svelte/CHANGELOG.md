@@ -9,7 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **`API_BASE_URL` default pointed at the wrong service.** The
+  fallback was `http://localhost:8080` — the person-service slot in
+  the Main X Index family. Course Service runs on host port 8084
+  (docker-compose default + every README / index.md / AGENTS doc).
+  A developer running `pnpm dev` without setting
+  `PUBLIC_API_BASE_URL` silently routed every API call to the
+  wrong service (or to nothing). Default updated to 8084 with a
+  comment explaining the family-port-allocation gotcha.
 
 ## [0.2.0] — 2026-06-05
 
