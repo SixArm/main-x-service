@@ -24,6 +24,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   shipped `PUBLIC_API_BASE_URL=http://localhost:8080` AND a leftover
   "Person Service" comment from the sibling copy-adapt. All three
   realigned to 8084 with notes on the family port allocation.
+- **spec.md §7 + §10 SSR pointers named T-7 instead of T-13.** T-7
+  was "Detail / edit / soft-delete" (already shipped). The SSR /
+  `event.fetch` follow-up lives at §13 T-13. Both pointers re-aimed.
+- **spec.md §15 Roadmap was misaligned with the just-cut v0.2.0.**
+  Said v0.2 would carry "SSR-safe load functions; Lily Dialog/
+  Combobox integration; identifier/address edit UI" — none of
+  those shipped in v0.2 (which was bug fixes + realignment). The
+  v0.4 bullet talked about scaffolding sibling front-ends "for
+  Worker / Place / Course / Event" — but this IS the Course
+  front-end and the other five entity front-ends already exist
+  in the family. Re-cut: v0.2 = shipped; v0.3 = SSR + Lily +
+  instance/syllabus edit UI; v0.4 = auth; v0.5+ = batch dedup UI,
+  masked toggle, GDPR download.
 
 ## [0.2.0] — 2026-06-05
 

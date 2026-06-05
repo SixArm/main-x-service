@@ -123,7 +123,7 @@ A web interface that:
 - **Time to first interaction**: under 1 s on a warm dev server.
 - **Accessibility**: WAI-ARIA conformance for forms, focus management on navigation.
 - **TypeScript**: strict + `noUncheckedIndexedAccess`.
-- **No SSR data fetch in MVP**: pages mount and `fetch()` from the browser; SSR fetch is a v0.2 follow-up (T-7 below).
+- **No SSR data fetch in MVP**: pages mount and `fetch()` from the browser; SSR fetch is tracked in §13 T-13 (warm-cache wins for SEO-irrelevant routes).
 - **Errors**: every `ApiError` rendered with its `code` and `message`; 422 `details` rendered field-by-field where possible.
 
 ## 8. Architecture
@@ -183,7 +183,7 @@ Envelope handling is centralised in `ApiClient`; per-endpoint methods on `Course
 
 The front-end is stateless. No local DB, no client-side cache layer beyond Svelte component state. Page reloads re-fetch from the service.
 
-(Roadmap: introduce SvelteKit `+page.ts` load functions with `event.fetch` for SSR hydration — T-7.)
+(Roadmap: introduce SvelteKit `+page.ts` load functions with `event.fetch` for SSR hydration — §13 T-13.)
 
 ## 11. Testing Strategy
 
@@ -247,9 +247,21 @@ Run: `pnpm test`, `pnpm test:e2e`.
 
 ## 15. Roadmap
 
-- **v0.2**: SSR-safe load functions; Lily Dialog/Combobox integration; identifier/address edit UI.
-- **v0.3**: Auth integration (once Course Service ships auth — §15 of service spec).
-- **v0.4**: Sibling scaffolds for Worker / Place / Course / Event front-ends (copy-adapt from this scaffold; accept drift per project decision 2026-06-02).
+- **v0.2** (shipped 2026-06-05): bug-fix sweep against the now-real
+  Course Service surface — `ScoredCandidate` alignment, blank-string
+  URL normalisation, inert match-page threshold, dashboard health
+  badge, empty-search `"*"` wildcard, inert phonetic checkbox,
+  `API_BASE_URL` default + README/`.env.example` port realignment.
+  Plus spec.md §13 / §14 counter realignment + CHANGELOG.
+- **v0.3** (next): SSR-safe load functions using `event.fetch` for
+  warm-cache SEO-irrelevant wins (T-13); Lily Dialog (merge
+  confirm) + Combobox (identifier system) integration (T-14);
+  instance / syllabus-section edit UI (T-15 — the genuine
+  remaining sub-resource gap).
+- **v0.4**: Auth integration once Course Service ships JWT (T-15 of
+  service spec — blocked on the family-wide rollout).
+- **v0.5+**: Batch dedup results UI (T-18), masked-view toggle on
+  detail (T-19), GDPR-export download (T-20).
 
 ## 16. Open Questions
 
