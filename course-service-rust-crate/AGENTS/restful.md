@@ -40,15 +40,12 @@ use course_service::matching::{CourseMatcher, MatchResult, MatchConfidence};
 
 | Field | Type | Notes |
 |---|---|---|
-| `q` | string | Free-text query against `name`, `alternate_names`, `description`, `keywords`, `teaches`, `course_code`, `identifier_value` |
-| `limit` | usize | Default 10, capped at 100 |
-| `offset` | usize | Pagination |
-| `fuzzy` | bool | Multi-token `FuzzyTermQuery` with edit-distance 2 (mirrors person-service post-fix) |
-| `phonetic` | bool | Soundex-augmented |
-| `educational_level` | string | Filter to one EducationalLevel |
-| `language` | string | BCP-47 filter |
-| `provider_id` | uuid | Filter to one provider |
-| `mask_sensitive` | bool | Mask instructor / provider personal identifiers |
+| `q` | string | Free-text query against `name`, `alternate_names`, `keywords`, `teaches`, identifier values. Empty / whitespace falls back to `repository.list` (paginated). |
+| `limit` | u64 | Default 20 |
+| `offset` | u64 | Pagination |
+| `fuzzy` | bool | Multi-token `FuzzyTermQuery` with edit distance 2 (one fuzzy clause per alphanumeric run). |
+| `phonetic` | bool | Accepted for API parity with sibling services; currently a no-op in the search path. The matcher's Soundex bonus on `name_score` fires on `/match` and `/check-duplicates`. |
+| `mask_sensitive` | bool | Accepted for API parity; masking is exposed at `/api/courses/{id}/masked` (FR-16). |
 
 Response normalises to `{ items: Course[], total: usize }` per
 spec.md FR-19.
@@ -117,11 +114,18 @@ Error envelope:
 | 409 | Duplicate detected (on create) |
 | 422 | Validation error |
 | 500 | Internal error |
-| 501 | Endpoint not yet implemented (MVP scaffold) |
+| 501 | Endpoint not yet implemented (MVP scaffold) — only `GET /api/courses` (list-all-without-search) remains 501; the rest are wired. |
+
+## OpenAPI
+
+The full spec is rendered at runtime by [`utoipa`](https://docs.rs/utoipa):
+
+- Interactive: `GET /swagger-ui`
+- Raw JSON: `GET /api-docs/openapi.json`
 
 ## Source files
 
 - `src/api/mod.rs` — `ApiResponse`, `ApiError`
-- `src/api/rest/mod.rs` — router setup, `serve`
-- `src/api/rest/handlers.rs` — endpoint handlers (stubs in MVP)
+- `src/api/rest/mod.rs` — router setup, `serve`, `ApiDoc` aggregator
+- `src/api/rest/handlers.rs` — endpoint handlers (FR-1..FR-9 + FR-14..FR-18 wired)
 - `src/api/rest/state.rs` — `AppState`

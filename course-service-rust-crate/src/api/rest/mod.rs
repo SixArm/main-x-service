@@ -41,6 +41,7 @@ use crate::Result;
         handlers::deduplicate,
         handlers::list_instances,
         handlers::create_instance,
+        handlers::get_instance,
         handlers::update_instance_handler,
         handlers::delete_instance,
         handlers::masked_course,
@@ -130,7 +131,7 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route(
             "/courses/:id/instances/:instance_id",
-            get(handlers::not_implemented)
+            get(handlers::get_instance)
                 .put(handlers::update_instance_handler)
                 .delete(handlers::delete_instance),
         )

@@ -429,6 +429,36 @@ pub async fn update_instance_handler(
     }
 }
 
+/// Read one instance. Mirror of FR-10's list shape but for a single
+/// row — not numbered in the spec but trivially follows from the
+/// existing list+update+delete trio.
+#[utoipa::path(
+    get, path = "/api/courses/{id}/instances/{instance_id}",
+    params(
+        ("id" = uuid::Uuid, Path,),
+        ("instance_id" = uuid::Uuid, Path,),
+    ),
+    responses(
+        (status = 200, body = CourseInstance),
+        (status = 404, body = ApiError),
+    ),
+    tag = "instances",
+)]
+pub async fn get_instance(
+    State(state): State<AppState>,
+    Path((course_id, instance_id)): Path<(Uuid, Uuid)>,
+) -> impl IntoResponse {
+    match state
+        .course_repository
+        .get_instance(&course_id, &instance_id)
+        .await
+    {
+        Ok(Some(i)) => Json(ApiResponse::success(i)).into_response(),
+        Ok(None) => not_found_response("CourseInstance not found"),
+        Err(e) => error_response(e),
+    }
+}
+
 /// FR-13 — soft-delete instance.
 #[utoipa::path(
     delete, path = "/api/courses/{id}/instances/{instance_id}",

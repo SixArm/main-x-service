@@ -62,7 +62,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
+### Added
+
+- **`GET /api/courses/{id}/instances/{instance_id}`** — wires the
+  single-instance read path that was stuck on `not_implemented` even
+  though `list` / `create` / `update` / `delete` were all
+  shipped. Drives the existing `CourseRepository::get_instance` so
+  the front-end can deep-link straight to one offering without
+  fetching the whole parent. Annotated for OpenAPI.
+
 ### Fixed
+
+- **AGENTS/restful.md SearchQuery table was aspirational.** Listed
+  `educational_level` / `language` / `provider_id` query filters
+  that were never implemented and described the handlers as "stubs
+  in MVP". Rewrote against the actual `SearchQuery` struct: `q` /
+  `limit` / `offset` / `fuzzy` / `phonetic` (no-op) /
+  `mask_sensitive` (no-op), with notes on the empty-query → `list`
+  fallback and where the Soundex behaviour actually lives. Added a
+  pointer to the live `/swagger-ui` + `/api-docs/openapi.json`
+  endpoints.
 
 - **`GET /api/courses/{id}` was returning `instances: []`.** FR-2
   mandates the embedded instances collection, but the T-3 repository
