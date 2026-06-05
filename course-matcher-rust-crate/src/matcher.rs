@@ -95,6 +95,22 @@ impl MatchingEngine {
         }
     }
 
+    /// One-to-many: score `query` against each `candidate` and return
+    /// results **in the same order as `candidates`** (no rank, no
+    /// filter). Mirrors `person_matcher::MatchingEngine::match_one_to_many`
+    /// so callers that work across the matcher family share a single
+    /// call shape.
+    ///
+    /// Use [`MatchingEngine::rank`] when you want the results sorted
+    /// by descending score, or [`MatchingEngine::find_matches`] when
+    /// you also want the filter applied.
+    pub fn match_one_to_many(&self, query: &Course, candidates: &[Course]) -> Vec<MatchResult> {
+        candidates
+            .iter()
+            .map(|c| self.match_courses(query, c))
+            .collect()
+    }
+
     /// One-to-many: score `query` against each `candidate`, return
     /// `(index, result)` sorted by score descending.
     pub fn rank(&self, query: &Course, candidates: &[Course]) -> Vec<(usize, MatchResult)> {
@@ -393,6 +409,29 @@ mod tests {
         let b = Course::new("CourceScience"); // tiny typo, Soundex same
         let with = name_score(&a, &b);
         assert!(with <= 0.95 + f64::EPSILON);
+    }
+
+    #[test]
+    fn match_one_to_many_preserves_input_order() {
+        let engine = MatchingEngine::default_config();
+        let query = Course::new("CS101");
+        let cands = vec![
+            Course::new("HIS200"),
+            Course::new("CS101 Introduction"),
+            Course::new("CS101"),
+        ];
+        let out = engine.match_one_to_many(&query, &cands);
+        assert_eq!(out.len(), 3);
+        // Exact match should be the third entry — preserves input order.
+        assert!(out[2].score >= out[1].score);
+        assert!(out[1].score >= out[0].score);
+    }
+
+    #[test]
+    fn match_one_to_many_empty_input_returns_empty() {
+        let engine = MatchingEngine::default_config();
+        let query = Course::new("Anything");
+        assert!(engine.match_one_to_many(&query, &[]).is_empty());
     }
 
     #[test]

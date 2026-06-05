@@ -65,19 +65,54 @@ pub struct CourseIdentifier {
     pub value: String,
 }
 
+/// The scheme under which an identifier's `value` is published.
+///
+/// Schemes marked **deterministic** (DOI / Wikidata / LOM / OER /
+/// URI / UUID) are globally unique by construction — a match on
+/// these pins the final score to `1.0` via the R-0 short-circuit.
+/// Schemes marked **provider-scoped** (LMS course-id, course-code,
+/// platform-slug, ISCED, ROR) only make sense in the context of
+/// their issuing organisation and are intentionally NOT
+/// deterministic: `CS101` in Canvas at one school is not the same
+/// row as `CS101` in Canvas at another.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IdentifierScheme {
+    /// Learning Management System course-id (Canvas / Moodle /
+    /// Blackboard / etc). Provider-scoped. Example: `canvas-12345`.
     LmsCourseId,
+    /// Provider's catalog code (e.g. `CS101`, `MATH 220`).
+    /// Provider-scoped — short-circuits only via R-1
+    /// (`provider_id + course_code`).
     CourseCode,
+    /// MOOC / online-learning platform slug. Provider-scoped.
+    /// Example: `coursera:learn-to-program`, `edx:MITx/6.00.1x`.
     PlatformSlug,
+    /// Open Education Resource identifier (OERCommons, MERLOT, …).
+    /// **Deterministic.** Example: `oercommons:60132`.
     Oer,
+    /// Digital Object Identifier. **Deterministic.**
+    /// Example: `10.1234/intro-cs`.
     Doi,
+    /// IEEE Learning Object Metadata identifier. **Deterministic.**
+    /// Example: `lom:OEM-2025-CS-101`.
     Lom,
+    /// Wikidata entity id. **Deterministic.** Example: `Q12345`.
     Wikidata,
+    /// UNESCO International Standard Classification of Education
+    /// programme code. Provider-scoped (classifies the field, not
+    /// the offering). Example: `0613` (Software & applications dev).
     Isced,
+    /// Research Organization Registry id for the issuing provider.
+    /// Provider-scoped. Example: `ror-021nxhr62`.
     Ror,
+    /// Generic URI / URN. **Deterministic.**
+    /// Example: `urn:isbn:978-0-13-468599-1`.
     Uri,
+    /// Bare UUID. **Deterministic.**
+    /// Example: `550e8400-e29b-41d4-a716-446655440000`.
     Uuid,
+    /// Free-form custom scheme with a caller-supplied label.
+    /// Provider-scoped. Example: `Custom("KhanCourse")`.
     Custom(String),
 }
 

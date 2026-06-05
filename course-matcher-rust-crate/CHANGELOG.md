@@ -11,6 +11,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **`MatchingEngine::match_one_to_many`** (T-10). Returns
+  `Vec<MatchResult>` in the same order as the candidate slice (no
+  rank, no filter). Mirrors `person_matcher::MatchingEngine::match_one_to_many`
+  so cross-family callers share one signature; existing `rank`
+  remains for the sorted-by-score variant and `find_matches` for the
+  filtered + sorted view.
+- **`IdentifierScheme` doc polish** (T-9). Every variant now carries
+  a one-line example and is tagged **deterministic** vs
+  **provider-scoped** so consumers can read off which schemes trigger
+  the R-0 short-circuit at a glance.
+- **Cross-link**: T-7 (service-side adapter + bridge test) and T-8
+  (criterion benches) are now ticked in `spec.md §23` with pointers
+  into the embedding `course-service` crate where the work landed.
 - **Soundex phonetic bonus** (T-6). `src/phonetic.rs` ships the
   classic American Soundex encoder (first letter + 3 digits; H/W/Y
   ignored except as initial; consonant-run collapse). `name_score`
