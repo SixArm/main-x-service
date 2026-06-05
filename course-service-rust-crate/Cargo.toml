@@ -1,6 +1,6 @@
 [package]
 name = "course-service"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Course Service — a course-administration microservice modelled on schema.org/Course; interoperates with the course-matcher crate"

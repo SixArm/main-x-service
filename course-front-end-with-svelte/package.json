@@ -1,6 +1,6 @@
 {
   "name": "course-front-end-with-svelte",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "SvelteKit front-end for the Course Service (Main X Index). Uses SVAR Svelte DataGrid and the Lily Design System Svelte Headless primitives.",

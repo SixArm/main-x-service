@@ -9,6 +9,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.0] — 2026-06-05
+
 ### Added
 
 - **index.md "Quick examples" updated for T-6 + T-10.** Previously
