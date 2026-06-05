@@ -280,9 +280,9 @@ PostgreSQL via SeaORM. Migrations under `migrations/` (numbered SQL
 
 | Layer | Tool | Scope |
 |---|---|---|
-| Unit | `cargo test --lib` | model construction + serde round-trip; matcher adapter; validation rules. |
-| Integration | `cargo test --test api_integration_test` | full HTTP cycle against a Postgres test container (docker-compose.test.yml). |
-| Bridge | `cargo test --test duplicate_detection` | mirror the pattern used by sibling services: drive `course-matcher::MatchingEngine` through the service-side `Course` and pin scoring behaviour. |
+| Unit | `cargo test --lib` | 35 tests across db / matching / matching::adapter / search / validation / streaming / privacy / handlers. |
+| Bridge | `cargo test --test duplicate_detection` | 14 tests pinning the service↔canonical-matcher contract. |
+| Integration | `cargo test --test api_integration_test -- --ignored` | 12 `#[ignore]`-tagged tests over the full Axum router with real Postgres + Tantivy. Requires `DATABASE_URL` against a migrated DB (see `docker-compose.yml`'s `postgres` service). |
 | Benchmarks | `cargo bench` | matching + search + validation (Criterion). |
 
 See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
@@ -332,11 +332,17 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 
 ## 15. Roadmap
 
-- **v0.2**: T-2..T-7 land; full CRUD + search + matching + dedup wired up.
-- **v0.3**: Instance sub-resource (T-8) + audit / streaming (T-9).
-- **v0.4**: Privacy + bridge tests + benches (T-10..T-13).
-- **v0.5**: JWT auth (T-15) coordinated with family-wide auth rollout.
-- **v0.6**: LMS round-trip (LTI / xAPI import / export) — out of MVP, captured here so it stays on the radar.
+- **v0.1**: Scaffold (T-1).
+- **v0.2** (shipped): T-2..T-14 — full CRUD + search + matching +
+  merge + dedup + instance sub-resource + audit + streaming +
+  privacy + bridge tests + integration tests + benches + OpenAPI.
+- **v0.3** (next): JWT auth (T-15) coordinated with the family-wide
+  auth rollout; Fluvio streaming adapter under a feature flag.
+- **v0.4**: Syllabus-section sub-resource handlers + repository
+  round-trip (currently the column ships JSONB, but no read/write
+  API).
+- **v0.5+**: LMS round-trip (LTI / xAPI import / export) — out of
+  MVP, captured here so it stays on the radar.
 
 ## 16. Open Questions
 
@@ -350,10 +356,13 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
   `organization-service` shared by `course`, `event`, `worker`? The
   Person Service has an inline `Organization` model with the same
   pattern. Defer until two consumers ask for it.
-- **OQ-3**: Should the matcher's deterministic-identifier set include
-  `CourseCode`? Today: no, because `CS101` exists at many providers.
-  Yes for the **same provider** — leaves room for `(provider_id,
-  course_code)` short-circuit. To be decided in T-6.
+- **OQ-3** *(resolved in T-6)*: Should the matcher's deterministic-
+  identifier set include `CourseCode`? **No** — `CS101` exists at
+  many providers, so a globally-unique deterministic short-circuit
+  would mis-merge. **Yes when the same provider matches both
+  records** — the matcher implements this via rule R-1
+  (`provider_id + normalised(course_code)` → score 1.0) without
+  promoting `CourseCode` to the `is_deterministic()` set.
 - **OQ-4**: Internationalisation of `EducationalLevel`. The schema.org
   vocabulary doesn't fully cover non-English systems (e.g. UK A-levels,
   German Abitur, French Baccalauréat). The `Custom(String)` escape

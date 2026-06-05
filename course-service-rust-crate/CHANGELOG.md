@@ -73,6 +73,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **spec.md §11 / §15 / §16 stale milestones.**
+  - §11 Testing Strategy referenced a
+    `docker-compose.test.yml` that has never existed; rewrote
+    against the real `--ignored` integration flow + the regular
+    docker-compose.yml's postgres service. Filled in per-layer
+    test counts (35 unit / 14 bridge / 12 integration).
+  - §15 Roadmap listed v0.2..v0.4 as future work though every
+    task in those buckets (T-2..T-14) has landed. Re-cut the
+    roadmap: v0.2 = shipped, v0.3 = JWT auth + Fluvio adapter,
+    v0.4 = syllabus-section sub-resource (the actual remaining
+    gap), v0.5+ = LMS round-trip.
+  - §16 OQ-3 ("Should `CourseCode` be deterministic? To be decided
+    in T-6") marked **resolved**: provider-scoped via rule R-1
+    (`provider_id + normalised(course_code)` → 1.0), not promoted
+    to the `is_deterministic()` set.
+
 - **spec.md §9 / §13 / §14 still had stale "MVP scaffold" claims.**
   §9 said `501` was returned "for any endpoint not yet implemented
   in the MVP scaffold" — true at v0.1 but only `GET /api/courses`
