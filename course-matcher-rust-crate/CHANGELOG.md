@@ -9,7 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Soundex phonetic bonus** (T-6). `src/phonetic.rs` ships the
+  classic American Soundex encoder (first letter + 3 digits; H/W/Y
+  ignored except as initial; consonant-run collapse). `name_score`
+  in `src/matcher.rs` applies a `+0.05` bonus when both course
+  names produce the same Soundex code and the underlying
+  Jaro-Winkler is `< 0.95`. The result is capped at `0.95` so a
+  phonetic hit nudges Medium-band scores up but never single-
+  handedly mints a High-confidence classification.
+- Unit tests: 4 in `phonetic::tests` (Robert/Rupert, classic
+  examples, empty input, pad short codes, homophone-pair helper)
+  plus 3 in `matcher::tests` (bonus fires on homophones, no-fire on
+  unrelated names, cap respected on near-clones).
+- 19/19 lib tests pass (was 12).
 
 ## [0.1.0] — 2026-06-04
 

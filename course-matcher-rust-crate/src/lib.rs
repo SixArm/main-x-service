@@ -41,6 +41,7 @@ pub mod course;
 pub mod error;
 pub mod matcher;
 pub mod normalize;
+pub mod phonetic;
 pub mod scoring;
 
 pub use config::MatchConfig;

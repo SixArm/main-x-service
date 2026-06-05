@@ -314,7 +314,7 @@ SeaORM / Axum / Tantivy dependencies.
 - [x] T-3: `MatchConfig` + presets per §7.
 - [x] T-4: `normalize::{fold, course_code, fold_set}` per §8.
 - [x] T-5: Unit tests covering deterministic short-circuits + probabilistic ordering.
-- [ ] T-6: Phonetic (Soundex) bonus on `name` component.
+- [x] T-6: Phonetic (Soundex) bonus on `name` component — `src/phonetic.rs` + `+0.05` bonus applied inside `name_score` when both names produce the same Soundex code and Jaro-Winkler is `< 0.95`. Capped at `0.95` so a phonetic hit nudges Medium-band scores but never single-handedly mints High confidence.
 - [ ] T-7: `course-service`-side adapter + bridge test
       (`tests/duplicate_detection.rs`).
 - [ ] T-8: Criterion benches for name, full match, rank-of-100.

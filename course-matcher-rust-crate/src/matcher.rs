@@ -17,7 +17,16 @@ use strsim::jaro_winkler;
 use crate::config::MatchConfig;
 use crate::course::{Course, CourseIdentifier, EducationalLevel};
 use crate::normalize;
+use crate::phonetic;
 use crate::scoring::{weighted_average, Confidence, MatchBreakdown, MatchResult};
+
+/// Soundex bonus applied to `name_score` when the two name codes
+/// match and the underlying Jaro-Winkler hasn't already cleared the
+/// High-confidence band (≥ 0.95). The cap at 0.95 means a phonetic
+/// match nudges a Medium-band score upward but never single-handedly
+/// classifies a record pair as High confidence.
+const PHONETIC_BONUS: f64 = 0.05;
+const PHONETIC_CEILING: f64 = 0.95;
 
 pub struct MatchingEngine {
     config: MatchConfig,
@@ -173,6 +182,12 @@ fn name_score(a: &Course, b: &Course) -> f64 {
     for alt in &b.alternate_names {
         let alt_n = normalize::fold(alt);
         best = best.max(jaro_winkler(&an, &alt_n));
+    }
+    // T-6: Soundex bonus on the primary names. Capped so a phonetic
+    // hit can lift a Medium-band score but not single-handedly mint a
+    // High-confidence match.
+    if best < PHONETIC_CEILING && phonetic::same(&an, &bn) {
+        best = (best + PHONETIC_BONUS).min(PHONETIC_CEILING);
     }
     best
 }
@@ -340,6 +355,44 @@ mod tests {
         // similarity, which is high but won't always cross 0.85 on
         // name alone. Just assert directionality.
         assert!(r.score > 0.80, "expected > 0.80, got {}", r.score);
+    }
+
+    #[test]
+    fn phonetic_bonus_lifts_homophone_pair() {
+        // Tokens with the same Soundex code but a small Jaro-Winkler
+        // gap: the bonus should push `name_score` up by exactly
+        // PHONETIC_BONUS, clamped at PHONETIC_CEILING.
+        let a = Course::new("Smyth");
+        let b = Course::new("Smith");
+        let with_bonus = name_score(&a, &b);
+        // Without the bonus, baseline Jaro-Winkler is < 0.95.
+        let base = strsim::jaro_winkler("smyth", "smith");
+        assert!(base < 0.95);
+        let expected = (base + 0.05_f64).min(0.95);
+        assert!(
+            (with_bonus - expected).abs() < 1e-9,
+            "expected {expected}, got {with_bonus} (base {base})"
+        );
+    }
+
+    #[test]
+    fn phonetic_bonus_does_not_fire_on_non_homophones() {
+        // Different Soundex codes → bonus must NOT fire.
+        let a = Course::new("Jones");
+        let b = Course::new("Smith");
+        let with = name_score(&a, &b);
+        let base = strsim::jaro_winkler("jones", "smith");
+        assert!((with - base).abs() < 1e-9, "expected base {base}, got {with}");
+    }
+
+    #[test]
+    fn phonetic_bonus_capped_at_ceiling() {
+        // Two names that already score very high — bonus should not
+        // push the result over the cap.
+        let a = Course::new("CourseScience");
+        let b = Course::new("CourceScience"); // tiny typo, Soundex same
+        let with = name_score(&a, &b);
+        assert!(with <= 0.95 + f64::EPSILON);
     }
 
     #[test]
