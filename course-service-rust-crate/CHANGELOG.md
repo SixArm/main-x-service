@@ -62,6 +62,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
+### Fixed
+
+- **`GET /api/courses/{id}` was returning `instances: []`.** FR-2
+  mandates the embedded instances collection, but the T-3 repository
+  rounds-trip leaves the field empty (instances live in their own
+  child table). The `get_course` handler now calls
+  `list_instances(&id)` after the repository fetch and embeds the
+  result. List + update views stay cheap (no hydration). The
+  front-end detail view's `course.instances` rendering becomes
+  populated for the first time.
+
 ### Changed
 
 - **`ScoredCandidate` wire shape** — added flat `name` and optional

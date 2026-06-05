@@ -163,8 +163,11 @@ pub async fn create_course(
     (StatusCode::CREATED, Json(ApiResponse::success(created))).into_response()
 }
 
-/// FR-2 — get by id (includes the in-memory child collections that the
-/// repository hydrates today; instances + syllabus are deferred to T-8).
+/// FR-2 — get by id. Embeds the `instances` collection so a single
+/// fetch carries the full record (the sub-resource handlers still
+/// exist for mutation; this is the read shape the front-end's
+/// detail view expects). Syllabus sections remain deferred until
+/// the syllabus sub-resource lands.
 #[utoipa::path(
     get, path = "/api/courses/{id}",
     params(("id" = uuid::Uuid, Path,)),
@@ -178,11 +181,18 @@ pub async fn get_course(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    match state.course_repository.get_by_id(&id).await {
-        Ok(Some(c)) => Json(ApiResponse::success(c)).into_response(),
-        Ok(None) => not_found_response("Course not found"),
-        Err(e) => error_response(e),
+    let mut course = match state.course_repository.get_by_id(&id).await {
+        Ok(Some(c)) => c,
+        Ok(None) => return not_found_response("Course not found"),
+        Err(e) => return error_response(e),
+    };
+    match state.course_repository.list_instances(&id).await {
+        Ok(instances) => course.instances = instances,
+        Err(e) => {
+            tracing::warn!("hydrating instances on GET course failed: {e}");
+        }
     }
+    Json(ApiResponse::success(course)).into_response()
 }
 
 /// FR-3 — replace.
