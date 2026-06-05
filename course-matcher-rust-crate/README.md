@@ -3,8 +3,12 @@
 A small, library-friendly Rust crate for pairwise matching of
 course records modelled on [schema.org/Course](https://schema.org/Course).
 
-> **Status.** MVP — public API stable, unit tests in place, Soundex
-> phonetic bonus + bridge tests pending (`spec.md §13`).
+> **Status.** Stable. Public API + 21 unit tests; Soundex phonetic
+> bonus (`+0.05` on the `name` component, capped at `0.95`) ships
+> as T-6. Service-side bridge — 14 contract tests pinning identifier
+> routing + deterministic short-circuits — lives in the embedding
+> `course-service` crate at
+> [`tests/duplicate_detection.rs`](../course-service-rust-crate/tests/duplicate_detection.rs).
 
 ## Quick start
 
@@ -81,9 +85,12 @@ themselves and adapt their richer Course shape down to ours.
 ## Test + build
 
 ```bash
-cargo test --lib       # unit tests
-cargo bench            # criterion benches (pending T-8)
+cargo test --lib       # 21 unit tests (encoder + scoring + normalisation + bonus)
 cargo doc --open       # rustdoc
+
+# Benches live in the embedding service crate so they exercise the
+# adapter + facade path that production calls:
+cd ../course-service-rust-crate && cargo bench
 ```
 
 ## License

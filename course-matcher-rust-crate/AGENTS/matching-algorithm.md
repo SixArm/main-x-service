@@ -103,9 +103,25 @@ assert_eq!(r.score, 1.0);
 assert!(r.breakdown.deterministic_match);
 ```
 
+## Phonetic bonus (T-6)
+
+`src/phonetic.rs` ships the classic American Soundex encoder. Inside
+`name_score`:
+
+```
+if best < 0.95 && phonetic::same(&name_a, &name_b) {
+    best = (best + 0.05).min(0.95);
+}
+```
+
+Cap at `0.95` is intentional — a phonetic hit nudges Medium-band
+scores upward but never single-handedly mints a High-confidence
+classification. Soundex is initial-letter-preserving by design, so
+the bonus only fires when both course names start with the same
+letter (e.g. `Smyth` ↔ `Smith` matches; `Catherine` ↔ `Katheryn`
+does not).
+
 ## Open questions
 
 - Should `LmsCourseId` become deterministic *within an LMS instance*?
   Today: no. Could be a future field `CourseIdentifier::scope`.
-- Phonetic (Soundex) bonus on `name`. Not yet wired up; tracked in
-  spec.md §13 task queue.
