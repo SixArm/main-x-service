@@ -9,7 +9,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-Nocourse yet.
+### Fixed
+
+- **Match / dedup result rendering.** `MatchResult` was typed as
+  `{ course: Course, score, confidence, breakdown }` but the service
+  emits a flat `ScoredCandidate` with `course_id` + `name` +
+  `course_code` at the top level. Pages backed by
+  `/api/courses/match` and `/api/courses/check-duplicates` would
+  have rendered blank names and broken detail links in production.
+  Realigned `MatchResult` to the wire shape and updated
+  `MatchResultsList.svelte` to read `r.name` / `r.course_code` /
+  `r.course_id` directly. svelte-check 0/0, vitest 9/9.
 
 ## [0.1.0] — 2026-06-02
 

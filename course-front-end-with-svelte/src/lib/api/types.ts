@@ -230,9 +230,19 @@ export interface MatchBreakdown {
     deterministic_match?: boolean;
 }
 
+/**
+ * Flat match result emitted by `/api/courses/match`,
+ * `/api/courses/check-duplicates`, and (via `review_items`) by
+ * `/api/courses/deduplicate`. Carries the candidate `course_id`
+ * plus a slim in-line summary (`name`, `course_code`) so the UI
+ * can render a hit list without a per-row round-trip.
+ */
 export interface MatchResult {
-    course: Course;
+    course_id: string;
+    name: string;
+    course_code?: string | null;
     score: number;
+    is_match: boolean;
     confidence: MatchConfidence;
     breakdown?: MatchBreakdown;
 }

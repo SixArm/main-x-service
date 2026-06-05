@@ -62,6 +62,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
+### Changed
+
+- **`ScoredCandidate` wire shape** — added flat `name` and optional
+  `course_code` fields next to the existing `course_id`, so the
+  front-end can render `/api/courses/match` /
+  `/api/courses/check-duplicates` hit lists without a per-row
+  round-trip back to `GET /api/courses/{id}`. Both
+  `find_probable_duplicates` and `score_all_blocked_candidates`
+  populate them from the hydrated candidate. Schema and
+  OpenAPI spec updated automatically via the existing `ToSchema`
+  derive.
+
+### Added
+
 - **Integration test suite** (T-12). `tests/api_integration_test.rs`
   drives `tower::ServiceExt::oneshot` against the full Axum router
   with real PostgreSQL + Tantivy + the in-memory event publisher.

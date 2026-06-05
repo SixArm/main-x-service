@@ -19,13 +19,13 @@
             {#each results as r}
                 <li class="result">
                     <header>
-                        <strong>{r.course.name}</strong>
+                        <strong>{r.name}</strong>
                         <span class="quality" data-quality={r.confidence}>{r.confidence}</span>
                         <span class="score">{(r.score * 100).toFixed(0)}%</span>
                     </header>
                     <div class="meta small muted">
-                        {#if r.course.course_code}{r.course.course_code}{/if}
-                        {#if r.course.id} · <a href={`/courses/${r.course.id}`}>{r.course.id.slice(0, 8)}…</a>{/if}
+                        {#if r.course_code}{r.course_code}{/if}
+                        {#if r.course_id} · <a href={`/courses/${r.course_id}`}>{r.course_id.slice(0, 8)}…</a>{/if}
                     </div>
                     {#if r.breakdown}
                         <details>

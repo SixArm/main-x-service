@@ -102,11 +102,15 @@ pub struct SearchResponse {
     pub total: usize,
 }
 
-/// `MatchResult` carries the candidate id so the front-end can navigate
-/// back to the matched record from a duplicate-detection response.
+/// Flat match result. Carries the candidate `course_id` plus a slim
+/// in-line summary (`name`, `course_code`) so the front-end can render
+/// a match list without an N+1 round-trip back to the API.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ScoredCandidate {
     pub course_id: Uuid,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub course_code: Option<String>,
     pub score: f64,
     pub is_match: bool,
     pub confidence: &'static str,
@@ -516,6 +520,8 @@ async fn find_probable_duplicates(
             let r = state.matcher.match_courses(probe, c);
             ScoredCandidate {
                 course_id: c.id,
+                name: c.name.clone(),
+                course_code: c.course_code.clone(),
                 score: r.score,
                 is_match: r.is_match,
                 confidence: confidence_label(r.confidence),
@@ -807,6 +813,8 @@ async fn score_all_blocked_candidates(
             let r = state.matcher.match_courses(probe, c);
             ScoredCandidate {
                 course_id: c.id,
+                name: c.name.clone(),
+                course_code: c.course_code.clone(),
                 score: r.score,
                 is_match: r.is_match,
                 confidence: confidence_label(r.confidence),
