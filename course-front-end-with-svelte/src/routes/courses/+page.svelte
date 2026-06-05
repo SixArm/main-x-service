@@ -11,7 +11,6 @@
     let loading = $state(false);
     let error = $state<string | null>(null);
     let fuzzy = $state(true);
-    let phonetic = $state(false);
 
     const repo = CourseRepository.withFetch();
 
@@ -19,7 +18,12 @@
         loading = true;
         error = null;
         try {
-            const res = await repo.search({ q: q || "*", limit: 50, fuzzy, phonetic });
+            // The service falls back to `list` when `q` is empty,
+            // which is the "show all" behaviour this page wants on
+            // initial load. Sending `"*"` would hit the Tantivy
+            // search path with a literal `*` term and return zero
+            // hits.
+            const res = await repo.search({ q: q.trim(), limit: 50, fuzzy });
             courses = res.items;
             total = res.total;
         } catch (err) {
@@ -51,7 +55,6 @@
     <SearchBox bind:value={query} placeholder="Search by name, identifier…" onsearch={runSearch} />
     <div class="row small">
         <label><input type="checkbox" bind:checked={fuzzy} /> Fuzzy</label>
-        <label><input type="checkbox" bind:checked={phonetic} /> Phonetic (Soundex)</label>
         <span class="muted" style="margin-left: auto">
             {loading ? "Loading…" : `${total} record${total === 1 ? "" : "s"}`}
         </span>

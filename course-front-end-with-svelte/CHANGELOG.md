@@ -11,6 +11,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **Courses list page returned zero hits on initial load.** The
+  page sent `q: q || "*"` thinking `"*"` was a wildcard, but the
+  service treats the query as a literal Tantivy term — the asterisk
+  matched nothing and the grid loaded empty. The service falls
+  back to `list` when `q` is empty / whitespace, which is the
+  "show all" behaviour the page actually wants. Now sends
+  `q: q.trim()` so the empty initial load hits the list path.
+- **Phonetic-search checkbox was inert.** The service's
+  `SearchQuery` accepts a `phonetic` parameter for API parity with
+  sibling services but documents it as a no-op (search dispatches
+  only on `fuzzy`). Removed the checkbox until the service grows a
+  real Soundex search path; the matcher-level Soundex bonus
+  (course-matcher T-6) continues to fire on `match` /
+  `check-duplicates` independently.
 - **Dashboard health badge never reported "down".** The check
   `h.status?.toLowerCase().includes("ok") || ... ? "ok" : "ok"` had
   identical branches, so the badge always showed healthy even when
