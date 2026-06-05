@@ -29,7 +29,7 @@ Navigation aid + worked examples. The behavioural source of truth is
 ### Create a course
 
 ```bash
-curl -X POST http://localhost:8080/api/courses \
+curl -X POST http://localhost:8084/api/courses \
   -H "content-type: application/json" \
   -d '{
     "name": "Introduction to Computer Science",
@@ -50,7 +50,7 @@ curl -X POST http://localhost:8080/api/courses \
 ### Check for duplicates without writing
 
 ```bash
-curl -X POST http://localhost:8080/api/courses/check-duplicates \
+curl -X POST http://localhost:8084/api/courses/check-duplicates \
   -H "content-type: application/json" \
   -d '{
     "name": "Intro to CS",
@@ -62,7 +62,7 @@ curl -X POST http://localhost:8080/api/courses/check-duplicates \
 ### Add an instance
 
 ```bash
-curl -X POST http://localhost:8080/api/courses/{course_id}/instances \
+curl -X POST http://localhost:8084/api/courses/{course_id}/instances \
   -H "content-type: application/json" \
   -d '{
     "course_id": "{course_id}",
@@ -82,20 +82,22 @@ curl -X POST http://localhost:8080/api/courses/{course_id}/instances \
 ### Match a candidate
 
 ```bash
-curl -X POST http://localhost:8080/api/courses/match \
+# Body is a `Course` shape (only `name` is required). The match
+# handler returns every blocked candidate sorted by descending
+# score; clients apply their own threshold downstream.
+curl -X POST http://localhost:8084/api/courses/match \
   -H "content-type: application/json" \
   -d '{
     "name": "Intro Comp Sci",
     "course_code": "CS101",
-    "educational_level": "Undergraduate",
-    "threshold": 0.7
+    "educational_level": "Undergraduate"
   }'
 ```
 
 ### Merge confirmed duplicates
 
 ```bash
-curl -X POST http://localhost:8080/api/courses/merge \
+curl -X POST http://localhost:8084/api/courses/merge \
   -H "content-type: application/json" \
   -d '{
     "main_course_id":      "uuid-main",
@@ -103,3 +105,10 @@ curl -X POST http://localhost:8080/api/courses/merge \
     "merge_reason":        "Same course code, same provider, identical syllabus"
   }'
 ```
+
+### Explore the full API
+
+The binary serves an OpenAPI 3 document and Swagger UI:
+
+- Interactive: <http://localhost:8084/swagger-ui>
+- Raw JSON: <http://localhost:8084/api-docs/openapi.json>

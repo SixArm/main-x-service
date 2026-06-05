@@ -73,6 +73,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **index.md curl examples were unreachable.** Used
+  `http://localhost:8080` while docker-compose maps the service to
+  host port 8084 — copy-pasting any example from the index hit the
+  wrong (or no) service. Rewrote every example to 8084.
+- **index.md match example shipped `threshold` in the body.** Same
+  drift as the front-end's match page: the handler accepts a
+  `Course`-shaped body, the `threshold` field is silently dropped
+  on the wire. Removed it and added a comment naming where the
+  threshold cutoff actually applies (client-side, post-response).
+  Added a Swagger UI / OpenAPI pointer to the bottom of the
+  "worked examples" block.
+
 - **AGENTS/testing.md was advertising aspirational tests.** Unit-
   test table marked `matching::adapter`, `validation`, `search`,
   `privacy` as "planned T-X" for tasks that all shipped; bench
