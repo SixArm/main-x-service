@@ -30,6 +30,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **spec §14 test counters were off** — unit tests claimed 8 (real
+  is 9: 5 client + 4 courses), Playwright smoke claimed 6 (real is
+  5). `pnpm install` / `pnpm test` "pending manual verification"
+  ticks marked as verified — both have been running clean through
+  every change in the recent session.
+- **spec §13 T-15 named Person-shape sub-records.** Leftover from
+  copy-adaption from a sibling project — `address` and
+  `emergency-contact` aren't Course fields. Re-scoped to instance /
+  syllabus-section edit UI which is the genuine remaining gap;
+  identifier add/remove already shipped via `CourseIdentifierInput`.
+- **README "Status: MVP scaffold"** updated to reflect that the
+  routes are live and the testing harness is verified; only
+  instance / syllabus-section edit UI and the operator walkthrough
+  remain.
 - **Stale comment about duplicate-detection response shape.** The
   create page's 409 handler still claimed the service wrapped
   candidates in `{ has_duplicates, potential_matches }`. The

@@ -218,7 +218,7 @@ Run: `pnpm test`, `pnpm test:e2e`.
 - [x] T-12: Playwright e2e smoke for every MVP route.
 - [ ] T-13: SSR-safe load functions using `event.fetch` for SEO-irrelevant but warm-cache wins.
 - [ ] T-14: Integrate Lily Headless components beyond Button (Dialog for merge confirm, Combobox for identifier system, Banner for error states).
-- [ ] T-15: Identifier / address / emergency-contact edit (currently read-only on detail; edit form re-PUTs whole record but no UI to add/remove sub-records).
+- [ ] T-15: Instance / syllabus-section edit UI (currently the detail page renders instances read-only; the service ships full CRUD on `/api/courses/{id}/instances/{instance_id}` so it is purely a UI gap). Identifier add/remove already covered by `CourseIdentifierInput`.
 - [ ] T-16: Theming tokens in `app.css` extracted to a small theme module.
 - [ ] T-17: `check-duplicates` endpoint wired into create form (preview before commit).
 - [ ] T-18: Batch deduplicate-scan results UI.
@@ -239,11 +239,11 @@ Run: `pnpm test`, `pnpm test:e2e`.
 | Audit view | ✅ |
 | Match check | ✅ |
 | Merge UI | ✅ |
-| Unit tests | ✅ (8 tests across `client.test.ts` + `courses.test.ts`) |
-| E2E smoke | ✅ (6 tests) |
-| `pnpm install` verified | ❌ — manual step pending |
-| `pnpm test` verified | ❌ — manual step pending |
-| Live integration | ❌ — pending operator walkthrough |
+| Unit tests | ✅ 9 tests (5 in `client.test.ts` + 4 in `courses.test.ts`) |
+| E2E smoke | ✅ 5 Playwright tests in `e2e/courses.spec.ts` |
+| `pnpm install` verified | ✅ |
+| `pnpm test` verified | ✅ |
+| Live integration | ❌ — pending operator walkthrough against a running service |
 
 ## 15. Roadmap
 
