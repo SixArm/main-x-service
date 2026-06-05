@@ -11,6 +11,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **Dashboard health badge never reported "down".** The check
+  `h.status?.toLowerCase().includes("ok") || ... ? "ok" : "ok"` had
+  identical branches, so the badge always showed healthy even when
+  the service responded with a degraded status. The service also
+  emits `"healthy"` (not `"ok"`/`"up"`), so the substring matcher
+  fell through to the dead "ok" branch anyway. Now matches
+  `healthy` / `ok` / `up` against an affirmative set and surfaces
+  the reported status as a banner when the badge flips to "down".
 - **Match-page threshold was inert.** `MatchRequest` carried
   `threshold` + `max_candidates` but the service's `/api/courses/match`
   handler accepts a `Course`-shaped body — those fields were

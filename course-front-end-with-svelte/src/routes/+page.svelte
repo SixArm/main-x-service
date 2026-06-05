@@ -12,7 +12,19 @@
         const repo = CourseRepository.withFetch();
         try {
             const h = await repo.health();
-            healthStatus = h.status?.toLowerCase().includes("ok") || h.status?.toLowerCase().includes("up") ? "ok" : "ok";
+            // Service emits `{ status: "healthy", ... }`. Accept any
+            // affirmative string ("healthy" / "ok" / "up") as healthy;
+            // anything else surfaces as a degraded "down" so the badge
+            // is honest when the service is reachable but reporting
+            // trouble.
+            const s = h.status?.toLowerCase() ?? "";
+            healthStatus =
+                s.includes("healthy") || s.includes("ok") || s.includes("up")
+                    ? "ok"
+                    : "down";
+            if (healthStatus === "down") {
+                healthMessage = `Service reports status: ${h.status ?? "(empty)"}`;
+            }
         } catch (err) {
             healthStatus = "down";
             healthMessage = err instanceof Error ? err.message : String(err);
