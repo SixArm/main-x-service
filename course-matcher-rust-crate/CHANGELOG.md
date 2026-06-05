@@ -11,6 +11,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **index.md "Quick examples" updated for T-6 + T-10.** Previously
+  only Identical / DOI / Ranking examples. Added a Phonetic name
+  bonus block (Smyth↔Smith with the initial-letter caveat) and a
+  `match_one_to_many` block showing the input-order variant
+  alongside `rank` so readers can pick the right shape for their
+  use case.
 - **AGENTS/testing.md realigned post-T-6/T-10.** Coverage table
   was missing the `phonetic` module entirely (added with the four
   Russell-style tests + the homophone-pair helper) and didn't
