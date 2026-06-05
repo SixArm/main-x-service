@@ -11,9 +11,11 @@ Sits between the [Thing Service](../thing-service-rust-crate/)
 [Event Service](../event-service-rust-crate/) (occurrences with
 locations and parties).
 
-> **Status.** MVP scaffold — REST routes return `501 Not Implemented`;
-> models, migrations, docs, and the binary boot path are complete.
-> Track per-endpoint work in [`spec.md §13 Tasks`](spec.md#13-tasks).
+> **Status.** Production-ready MVP. FR-1..FR-9 (CRUD / search /
+> match / merge / dedup) + FR-10..FR-13 (instance sub-resource) +
+> FR-14..FR-18 (audit / streaming / privacy) are all wired. Only
+> JWT auth (T-15) remains, blocked on the family-wide auth rollout.
+> See [`spec.md §13`](spec.md#13-tasks) for the per-task ledger.
 
 ## Quick start
 
@@ -63,6 +65,11 @@ REST routes mount under `/api/courses/*` and `/api/courses/{id}/instances/*`.
 See [`AGENTS/restful.md`](AGENTS/restful.md) for the full list. All
 endpoints return the standard `{success, data, error}` envelope.
 
+Interactive OpenAPI 3 documentation ships with the binary:
+
+- Swagger UI: `http://localhost:8084/swagger-ui`
+- Raw spec: `http://localhost:8084/api-docs/openapi.json`
+
 The Event Service uses `/api/v1/`; Course does NOT — direct `/api`.
 
 ## Configuration
@@ -82,15 +89,27 @@ The Event Service uses `/api/v1/`; Course does NOT — direct `/api`.
 ## Testing
 
 ```bash
-cargo test --lib                              # unit tests
-DATABASE_URL=… cargo test --test api_integration_test
-cargo test --test duplicate_detection         # bridge tests (planned T-11)
-cargo bench                                   # criterion benches (planned T-13)
+# 35 unit tests (matcher facade, search index, validation, db
+# helpers, streaming, privacy, repository conversions).
+cargo test --lib
+
+# 14 bridge tests pinning the service ↔ canonical course-matcher
+# contract (identical clones, deterministic short-circuits, per-enum
+# routing, config presets).
+cargo test --test duplicate_detection
+
+# 12 DB-backed integration tests. Skipped by default — opt in with
+# `--ignored` after the Postgres bring-up below.
+DATABASE_URL=postgres://course_user:course_password@localhost:5434/course \
+  cargo test --test api_integration_test -- --ignored
+
+# Three criterion benches (matching, search, validation).
+cargo bench
 ```
 
-See [`AGENTS/testing.md`](AGENTS/testing.md) for the test layout
-and [`docker-compose.test.yml`](docker-compose.test.yml) for the test
-Postgres bring-up.
+See [`AGENTS/testing.md`](AGENTS/testing.md) for the layout and
+[`docker-compose.yml`](docker-compose.yml) for the dev Postgres
+bring-up the integration suite expects to be migrated against.
 
 ## Compliance
 
@@ -101,11 +120,24 @@ Postgres bring-up.
 
 ## Status
 
-- **MVP scaffold**: complete. Models, migrations, REST routes,
-  binary boot path, docs.
-- **Next milestones** (T-2..T-7): SeaORM entities, repository CRUD,
-  Tantivy search engine, validation, matcher adapter, REST handler
-  implementations.
+- **Persistence**: SeaORM entities + transactional repository CRUD
+  (T-2 / T-3); CourseInstance sub-resource (T-8); merge bookkeeping.
+- **Search**: Tantivy `SearchEngine` with exact / fuzzy / blocking
+  queries; reader reload after every commit (T-4).
+- **Matching**: canonical [`course-matcher`](../course-matcher-rust-crate/)
+  driven through the service-side adapter (T-6); 14 bridge tests
+  pin the contract (T-11).
+- **Validation**: FR-21..FR-28 with nested-instance path prefixes
+  (T-5).
+- **REST**: FR-1..FR-9 + FR-14..FR-18 wired (T-7 / T-8 / T-9 / T-10);
+  OpenAPI via utoipa (T-14).
+- **Audit + streaming**: `AuditLogRepository` + in-memory
+  `EventPublisher` MVP (T-9). Fluvio adapter under feature flag
+  pending.
+- **Privacy**: `mask_course` + GDPR Article-15 export (T-10).
+- **Tests**: 35 unit + 14 bridge + 12 #[ignore]-tagged integration
+  (T-12) + 3 criterion benches (T-13).
+- **Auth**: JWT (T-15) blocked on the family-wide rollout.
 
 ## License
 

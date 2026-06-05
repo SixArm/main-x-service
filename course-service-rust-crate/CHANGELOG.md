@@ -73,6 +73,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **README was advertising the wrong product.** Status block
+  claimed "MVP scaffold — REST routes return 501 Not Implemented"
+  long after FR-1..FR-9 and FR-14..FR-18 shipped. Testing block
+  marked the bridge suite (T-11) and benches (T-13) as planned
+  even though both had landed, and linked to a
+  `docker-compose.test.yml` that has never existed. "Next
+  milestones (T-2..T-7)" listed a backlog that was 100% complete.
+  Rewrote the Status, API, Testing, and Status-summary sections
+  against the current state and added the
+  `/swagger-ui` + `/api-docs/openapi.json` pointers.
+
 - **AGENTS/restful.md SearchQuery table was aspirational.** Listed
   `educational_level` / `language` / `provider_id` query filters
   that were never implemented and described the handlers as "stubs
