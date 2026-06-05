@@ -19,6 +19,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `PUBLIC_API_BASE_URL` silently routed every API call to the
   wrong service (or to nothing). Default updated to 8084 with a
   comment explaining the family-port-allocation gotcha.
+- **README + `.env.example` carried the same 8080 mistake.** README
+  prereq + configuration table both said default 8080; `.env.example`
+  shipped `PUBLIC_API_BASE_URL=http://localhost:8080` AND a leftover
+  "Person Service" comment from the sibling copy-adapt. All three
+  realigned to 8084 with notes on the family port allocation.
 
 ## [0.2.0] — 2026-06-05
 

@@ -27,7 +27,7 @@ SvelteKit front-end for the **[Course Service](../course-service-rust-crate/)** 
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Course Service — see [`../course-service-rust-crate/README.md`](../course-service-rust-crate/README.md). Default: `http://localhost:8080`.
+- A running Course Service — see [`../course-service-rust-crate/README.md`](../course-service-rust-crate/README.md). Default: `http://localhost:8084` (the family allocates `8080` to person-service).
 
 ## Quick start
 
@@ -43,7 +43,7 @@ Open <http://localhost:5173>.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PUBLIC_API_BASE_URL` | `http://localhost:8080` | Course Service REST base URL |
+| `PUBLIC_API_BASE_URL` | `http://localhost:8084` | Course Service REST base URL |
 
 Set in `.env`. Because the variable is prefixed with `PUBLIC_`, SvelteKit exposes it to the client bundle.
 
