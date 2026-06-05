@@ -73,6 +73,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **AGENTS/testing.md was advertising aspirational tests.** Unit-
+  test table marked `matching::adapter`, `validation`, `search`,
+  `privacy` as "planned T-X" for tasks that all shipped; bench
+  block tagged "planned T-13" though benches landed; integration
+  block referenced a `docker-compose.test.yml` that has never
+  existed. Rewrote against the real layout: 35 unit tests broken
+  down per-module (db / matching / matching::adapter / search /
+  validation / streaming / privacy / handlers), the 14 bridge tests,
+  the 12 #[ignore]-tagged integration tests with the actual
+  Postgres bring-up commands, and the three criterion benches.
+
 - **README was advertising the wrong product.** Status block
   claimed "MVP scaffold — REST routes return 501 Not Implemented"
   long after FR-1..FR-9 and FR-14..FR-18 shipped. Testing block

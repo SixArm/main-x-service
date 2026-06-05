@@ -5,72 +5,92 @@
 ### Unit tests
 
 Embedded in source files via `#[cfg(test)] mod tests`. Run with
-`cargo test --lib`.
+`cargo test --lib` — 35 tests total today.
 
-| Module | What's covered |
-|---|---|
-| `models::course` | Construction, serde round-trip, `Course::new` defaults |
-| `models::course_instance` | Schedule shape, status enum, serde round-trip |
-| `models::identifier` | `IdentifierType::is_deterministic` for every variant |
-| `matching::adapter` | Service-`Course` → matcher-`Course` field routing (planned T-6) |
-| `validation` | FR-21..FR-28 (planned T-5) |
-| `search` | Schema creation, index lifecycle (planned T-4) |
-| `privacy` | Masking + GDPR export (planned T-10) |
+| Module | Tests | What's covered |
+|---|---|---|
+| `db` (`src/db/mod.rs`) | 3 | `CourseStatus` / `LinkType` round-trip through the enum-string helper; `to_course_active` field carrying |
+| `matching` (`src/matching/mod.rs`) | 3 | Identical-records score 1.0, DOI deterministic short-circuit, `find_matches` rank ordering |
+| `matching::adapter` (`src/matching/adapter.rs`) | 3 | `provider_id` UUID → matcher `String`; `IdentifierType` 1:1 routing; `EducationalLevel` 1:1 routing |
+| `search::index` (`src/search/index.rs`) | 2 | Empty-index has 0 docs; `create_or_open` round-trips |
+| `search` (`src/search/mod.rs`) | 5 | Index + exact search, fuzzy search tolerates typo, provider-scoped blocking query, delete removes from index, `tokenise` handles underscores |
+| `validation` (`src/validation/mod.rs`) | 11 | Every FR-21..FR-28 branch plus the nested-instance `instances[i].field` path-prefix invariant |
+| `streaming` (`src/streaming/mod.rs`) | 2 | `InMemoryEventPublisher` publish/observe; `EventKind` PascalCase serialisation |
+| `privacy` (`src/privacy/mod.rs`) | 4 | Mask clears `provider_id` + instructor refs; mask leaves non-sensitive fields; mask doesn't mutate input; export envelope shape |
+| `api::rest::handlers` (`src/api/rest/handlers.rs`) | 2 | `fold_duplicate_into_main` unions collections + dedupes identifiers; fold doesn't mutate inputs |
 
-### Integration tests
+### Bridge tests
 
-In `tests/`. Run with `cargo test --tests`. Require Postgres
-via `docker-compose.test.yml`.
-
-| File | Coverage |
-|---|---|
-| `tests/api_integration_test.rs` | Health + CRUD + search + match + merge + audit |
-| `tests/duplicate_detection.rs` | Bridge test pinning matcher contract (T-11) |
-| `tests/common/mod.rs` | Shared test harness, test-app construction |
-
-### Bridge integration tests
-
-`tests/duplicate_detection.rs` drives the service-side `Course`
-through `matching::adapter::to_matcher_course` and asserts on
-`course_matcher::MatchingEngine::match_courses` output. The suite
-pins **both sides of the contract** — the adapter's field-routing
-rules and the matcher's scoring algorithm — so a regression on
-either side fails a test here.
+`tests/duplicate_detection.rs` — 14 tests. Drive service-side
+`Course` records through `matching::adapter::to_matcher_course`
+and assert on `course_matcher::MatchingEngine::match_courses`
+output. The suite pins **both sides of the contract** (the
+adapter's field-routing rules AND the matcher's scoring) so a
+regression on either side fails here.
 
 Run with: `cargo test --test duplicate_detection`
 
-When to add a new bridge test:
+Coverage: identical-clone scoring (≥0.95, High band), name-typo
+fuzzy match, all three deterministic short-circuits (DOI /
+Wikidata / `same_as` URL / shared provider+code), negatives
+(LMS-id alone, same code at different providers, unrelated
+titles), per-enum routing (`provider_id`, `EducationalLevel`,
+`LearningResourceType`, `Custom` label), strict-⊆-default config
+preset invariant.
+
+Add a new bridge test when:
 
 - The adapter (`src/matching/adapter.rs`) gains a new routing rule.
 - The course-matcher crate exposes a new scoring component the
   service needs to surface.
 - A regression escapes the adapter's own `#[cfg(test)] mod tests`.
 
+### Integration tests
+
+`tests/api_integration_test.rs` — 12 tests, all `#[ignore]`-tagged
+so `cargo test --lib` stays fast. Drive `tower::ServiceExt::oneshot`
+against the full Axum router with real PostgreSQL + Tantivy + the
+in-memory event publisher.
+
+Run with:
+
+```bash
+# Bring up Postgres + apply migrations once (see README.md for the
+# manual psql loop; auto-migrate is out of scope for MVP).
+podman compose up -d postgres
+
+DATABASE_URL=postgres://course_user:course_password@localhost:5434/course \
+  cargo test --test api_integration_test -- --ignored
+```
+
+Coverage: health, full lifecycle (create + GET + PUT + soft-delete),
+422 validation, search hit, check-duplicates, match, merge, batch
+dedup response shape, instance sub-resource round-trip, audit log
+records CREATE then UPDATE, masked view clears provider, GDPR export
+envelope shape.
+
+`tests/common/mod.rs` builds `AppState` against env-configured
+Postgres + a process-shared Tantivy `TempDir` (concurrent tests
+share an index; unique timestamped names avoid collisions inside
+the shared DB).
+
 ### Benchmark tests
 
-In `benches/` (planned T-13). Use Criterion.
+`benches/` — 3 criterion benches. Run with `cargo bench`.
 
 | File | What's measured |
 |---|---|
-| `benches/matching_bench.rs` | Name match, full course match, soundex |
-| `benches/search_bench.rs` | Index, full-text, fuzzy |
-| `benches/validation_bench.rs` | FR-21..FR-28 |
+| `benches/matching_bench.rs` | `match_courses` on populated pair, deterministic short-circuit, `find_matches` rank-of-100 |
+| `benches/search_bench.rs` | `index_course`, exact `search`, `fuzzy_search`, `search_by_name_and_provider` (all against a 100-row index) |
+| `benches/validation_bench.rs` | `validate_course` on a record exercising every FR-21..FR-28 branch |
 
 ## Running tests
 
 ```bash
-# All unit tests
-cargo test --lib
-
-# Integration tests (requires Postgres)
-podman compose -f docker-compose.test.yml up -d
-DATABASE_URL=… cargo test --tests
-
-# Bridge tests
-cargo test --test duplicate_detection
-
-# Benchmarks
-cargo bench
+cargo test --lib                              # 35 unit tests, no DB needed
+cargo test --test duplicate_detection         # 14 bridge tests, no DB needed
+cargo test --test api_integration_test -- --ignored   # 12 integration tests, DB required
+cargo bench                                   # 3 criterion benches
 ```
 
 ## Writing new tests
@@ -99,10 +119,23 @@ mod tests {
 
 ### Integration-test pattern
 
-Use `tests/common/mod.rs::create_test_app_state` to build an
-`AppState` with a per-test tempdir Tantivy index. Each test creates
-its own records with a timestamped name so re-runs are idempotent.
-Cleanup via `softDelete` in `Drop` or `tear_down`.
+Use `tests/common/mod.rs::create_test_router` to build the full
+router against env-configured Postgres + the shared Tantivy
+tempdir. Each test creates its own records via
+`common::course_json("Suffix")` which emits a UUID-zeros id +
+unique timestamped name so re-runs are idempotent against the
+shared DB.
+
+```rust
+#[tokio::test]
+#[ignore]
+async fn some_flow_works() {
+    let app = common::create_test_router().await;
+    let body = common::course_json("SomeFlow");
+    let (status, env) = send(&app, Method::POST, "/api/courses", Some(body)).await;
+    assert_eq!(status, StatusCode::CREATED);
+}
+```
 
 ## Test-data conventions
 
