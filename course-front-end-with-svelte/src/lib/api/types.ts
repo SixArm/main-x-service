@@ -247,6 +247,13 @@ export interface MatchResult {
     breakdown?: MatchBreakdown;
 }
 
+/**
+ * Probe body for `POST /api/courses/match`. The service accepts a
+ * `Course`-shaped body (every field is optional except `name` —
+ * empty / blank `name` → 422). Result thresholds live client-side:
+ * the service returns every blocked candidate sorted by descending
+ * score, and the UI applies its own threshold as a filter.
+ */
 export interface MatchRequest {
     name?: string;
     course_code?: string;
@@ -256,8 +263,6 @@ export interface MatchRequest {
     teaches?: string[];
     identifiers?: CourseIdentifier[];
     same_as?: string[];
-    threshold?: number;
-    max_candidates?: number;
 }
 
 // ─── Merge ───────────────────────────────────────────────────────────

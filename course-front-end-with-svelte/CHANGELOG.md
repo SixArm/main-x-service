@@ -11,6 +11,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **Match-page threshold was inert.** `MatchRequest` carried
+  `threshold` + `max_candidates` but the service's `/api/courses/match`
+  handler accepts a `Course`-shaped body — those fields were
+  silently dropped on the wire, so the threshold slider had no
+  effect. Dropped both fields from `MatchRequest`, doc-commented the
+  wire shape, and reapplied the threshold as a client-side
+  `$derived` filter (`results = rawResults.filter(r => r.score >=
+  threshold)`). Slider relabelled "Display threshold" so the UX is
+  honest about where the cutoff is applied.
 - **Match / dedup result rendering.** `MatchResult` was typed as
   `{ course: Course, score, confidence, breakdown }` but the service
   emits a flat `ScoredCandidate` with `course_id` + `name` +

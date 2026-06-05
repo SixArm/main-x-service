@@ -19,9 +19,13 @@
     let teachesRaw = $state("");
     let sameAsRaw = $state("");
 
-    let results = $state<MatchResult[]>([]);
+    let rawResults = $state<MatchResult[]>([]);
     let error = $state<string | null>(null);
     let loading = $state(false);
+    // Service returns every blocked candidate sorted by score; we
+    // filter client-side so the threshold slider is responsive without
+    // an extra round-trip.
+    let results = $derived(rawResults.filter((r) => r.score >= threshold));
 
     async function runMatch(e: SubmitEvent) {
         e.preventDefault();
@@ -39,12 +43,11 @@
                 teaches: teachesRaw.split("\n").map((s) => s.trim()).filter(Boolean),
                 identifiers: identifiers.length > 0 ? identifiers : undefined,
                 same_as: sameAsRaw.split("\n").map((s) => s.trim()).filter(Boolean),
-                threshold,
             };
-            results = await repo.match(req);
+            rawResults = await repo.match(req);
         } catch (err) {
             error = err instanceof Error ? err.message : String(err);
-            results = [];
+            rawResults = [];
         } finally {
             loading = false;
         }
@@ -67,7 +70,7 @@
             <LabeledField label="Provider ID" for="m-prov">
                 <input id="m-prov" bind:value={providerId} />
             </LabeledField>
-            <LabeledField label="Threshold" for="m-threshold" hint="0.0 – 1.0">
+            <LabeledField label="Display threshold" for="m-threshold" hint="Client-side filter (0.0 – 1.0)">
                 <input id="m-threshold" type="number" step="0.05" min="0" max="1" bind:value={threshold} />
             </LabeledField>
         </FieldRow>
