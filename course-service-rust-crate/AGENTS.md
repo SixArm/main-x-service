@@ -44,6 +44,12 @@ Shared reference docs live at the project root under
 | Database access | `src/db/` |
 | Search index | `src/search/` |
 | Matcher adapter | `src/matching/` (thin wrapper over [`course-matcher`](../course-matcher-rust-crate/)) |
-| Validation | `src/validation/` (planned, T-5) |
-| Privacy | `src/privacy/` (planned, T-10) |
+| Validation | `src/validation/` (T-5, FR-21..FR-28) |
+| Privacy | `src/privacy/` (T-10, mask + GDPR Article-15 export) |
+| Audit log | `src/db/audit.rs` (T-9) |
+| Event streaming | `src/streaming/` (T-9, in-memory MVP; Fluvio under flag deferred) |
+| Bridge tests | [`tests/duplicate_detection.rs`](tests/duplicate_detection.rs) (T-11) |
+| Integration tests | [`tests/api_integration_test.rs`](tests/api_integration_test.rs) (T-12, `#[ignore]`-tagged) |
+| Benchmarks | `benches/` (T-13, three criterion files) |
+| OpenAPI | served at `/swagger-ui` + `/api-docs/openapi.json` (T-14) |
 | Migrations | `migrations/` |

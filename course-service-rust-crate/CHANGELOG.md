@@ -73,6 +73,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **spec.md §9 / §13 / §14 still had stale "MVP scaffold" claims.**
+  §9 said `501` was returned "for any endpoint not yet implemented
+  in the MVP scaffold" — true at v0.1 but only `GET /api/courses`
+  (list-without-search) remains 501 today. §13 T-3 said
+  "audit-log writes still pending alongside T-9 event publisher" —
+  T-9 shipped iterations ago. §14 Implementation-Status table
+  showed "Skeleton...REST routes return 501 🚧 in progress",
+  "instances + syllabus pending T-8", and "Tests 27 unit + 14
+  bridge" — all outdated. Rewrote the row set against current
+  numbers (35 unit + 14 bridge + 12 integration + 3 benches; 9
+  SeaORM modules; T-6 phonetic bonus called out).
+
+- **AGENTS.md `Where work lives` table** marked `src/validation/`
+  and `src/privacy/` as "(planned, T-5/T-10)" though both shipped.
+  Promoted both rows and added entries for audit / streaming /
+  bridge tests / integration tests / benchmarks / OpenAPI so the
+  table maps the whole current surface.
+
 - **AGENTS/models.md `CourseInstanceStatus` column omitted the wire
   shape.** Listed the Rust variants in PascalCase but didn't mention
   the snake_case JSON / DB encoding (`enrollment_open`, not

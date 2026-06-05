@@ -256,8 +256,10 @@ Complete endpoint reference: [`AGENTS/restful.md`](AGENTS/restful.md).
 
 All REST endpoints return `{ "success": bool, "data": …, "error": … }`.
 HTTP status codes follow REST conventions: `409` for duplicate
-detection on create, `422` for validation failure, `501` for any
-endpoint not yet implemented in the MVP scaffold.
+detection on create, `422` for validation failure, `501` only for
+`GET /api/courses` (list-all-without-search, intentionally
+unimplemented — clients should call `/api/courses/search` with an
+empty `q` for the same effect).
 
 ## 10. Persistence
 
@@ -299,7 +301,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 
 - [x] T-1: Scaffold skeleton (Cargo.toml, src/, migrations, Dockerfile, docker-compose, spec, AGENTS docs).
 - [x] T-2: SeaORM entity modules in `db/models.rs` matching the migration schema.
-- [x] T-3: `SeaOrmCourseRepository` CRUD + soft-delete (courses + identifiers + links round-trip; transactional). Audit-log writes still pending alongside T-9 event publisher.
+- [x] T-3: `SeaOrmCourseRepository` CRUD + soft-delete (courses + identifiers + links round-trip; transactional). Audit-log writes landed with T-9.
 - [x] T-4: Tantivy `SearchEngine::index_course` + `search` + `fuzzy_search` + `search_by_name_and_provider` + `delete_course` (reader-reload after every commit).
 - [x] T-5: Validation module enforcing FR-21..FR-28 (`src/validation/`; nested-instance errors carry path prefixes).
 - [x] T-6: Adapter `matching::adapter::to_matcher_course` + `CourseMatcher` drives `course_matcher::MatchingEngine` (1:1 enum routing for `IdentifierScheme` / `EducationalLevel` / `LearningResourceType`).
@@ -317,16 +319,16 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 
 | Area | Status |
 |---|---|
-| Skeleton (compiles, REST routes return 501) | 🚧 in progress |
-| SeaORM entities | ✅ |
-| Repository CRUD | ✅ (courses + identifiers + links; instances + syllabus pending T-8) |
+| Skeleton (compiles, binary runs end-to-end) | ✅ |
+| SeaORM entities | ✅ 9 modules (providers, courses, identifiers, links, instances, syllabus_sections, audit_log, course_match_scores, course_merge_records) |
+| Repository CRUD | ✅ courses + identifiers + links + instances + merge records; syllabus_sections still UI-only |
 | Search engine | ✅ index / fuzzy / exact / blocking-query / delete |
 | Validation | ✅ FR-21..FR-28 |
-| Matching adapter | ✅ drives `course_matcher::MatchingEngine` |
-| REST handlers | ✅ FR-1..FR-9 + FR-14..FR-18 |
+| Matching adapter | ✅ drives `course_matcher::MatchingEngine` (with T-6 Soundex bonus) |
+| REST handlers | ✅ FR-1..FR-9 + FR-14..FR-18 (+ OpenAPI/Swagger UI) |
 | Audit / streaming | ✅ in-memory MVP; Fluvio adapter under flag pending |
 | Privacy | ✅ mask + GDPR export (FR-15, FR-16) |
-| Tests | ✅ 27 unit + 14 bridge (`tests/duplicate_detection.rs`) |
+| Tests | ✅ 35 unit + 14 bridge + 12 `#[ignore]` integration + 3 criterion benches |
 
 ## 15. Roadmap
 
