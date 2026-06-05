@@ -5,7 +5,7 @@
 Embedded in `#[cfg(test)] mod tests` blocks in each source file.
 Run with `cargo test --lib`.
 
-### Coverage targets
+### Coverage targets (21 tests today)
 
 | Module | What's covered |
 |---|---|
@@ -13,7 +13,8 @@ Run with `cargo test --lib`.
 | `config` | Default weights sum to 1.0; `strict()` / `lenient()` thresholds. |
 | `normalize` | `fold`, `course_code`, `fold_set` — pin each rule. |
 | `scoring` | `weighted_average` ignores `None`; `Confidence::classify` boundaries. |
-| `matcher` | Identical → 1.0; DOI short-circuit; same-provider course-code short-circuit; same_as overlap; unrelated → low; rank ordering. |
+| `phonetic` | Russell-style examples (`Smith` → `S530`, `Robert` → `R163`); empty input returns `None`; short-code zero-padding; `same()` helper matches phonetic pairs while respecting the initial-letter contract. |
+| `matcher` | Identical → 1.0; DOI short-circuit; same-provider course-code short-circuit; same_as overlap; unrelated → low; rank ordering; `match_one_to_many` preserves input order + handles empty input; Soundex bonus fires on homophones, doesn't fire on unrelated names, capped at `0.95`. |
 
 ### Pattern
 
@@ -46,13 +47,18 @@ service-side bridge test in the same PR.
 
 ## Benchmarks
 
-Out of MVP scope. Once `criterion` is wired in, the benches live
-under `benches/` and cover:
+Benches live in the embedding
+[`course-service-rust-crate/benches/matching_bench.rs`](../../course-service-rust-crate/benches/matching_bench.rs)
+so the baseline reflects the production path (adapter +
+`CourseMatcher` facade) rather than the bare library. Run with
+`cargo bench` from that crate. Coverage:
 
-- Name match (exact, near-match, unrelated).
-- Full `match_courses` (worst-case all-components).
-- `rank` against N = 50 / 100 / 1000 candidates.
-- `normalize::fold` throughput.
+- `match_courses/populated_pair` — full all-components scoring on
+  two fully-populated courses.
+- `match_courses/deterministic_short_circuit` — R-0 path via a DOI
+  identifier match.
+- `find_matches/rank_100_candidates` — ranking 100 candidates,
+  the typical block-and-score path.
 
 ## When tests fail
 
@@ -64,3 +70,5 @@ Symptom decoder:
 | New false-positive at 1.0 | A new variant added to `IdentifierScheme::is_deterministic` without bridge-test coverage. |
 | Stale serde shape | Variant renamed in `IdentifierScheme` / `EducationalLevel` / `LearningResourceType` without coordinating with the service-side adapter. |
 | Course-code component disappears | A test forgot to set `provider_id` on both sides. |
+| Phonetic bonus suddenly stops firing | Soundex is initial-letter-preserving; check that both names share the first letter (`Smyth↔Smith` matches; `Catherine↔Katheryn` does not). |
+| Phonetic bonus never caps | The bonus must clamp at `0.95`; an unbounded `best += 0.05` would let a near-typo + Soundex match cross into High confidence. |

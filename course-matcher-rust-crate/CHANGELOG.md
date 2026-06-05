@@ -11,6 +11,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **AGENTS/testing.md realigned post-T-6/T-10.** Coverage table
+  was missing the `phonetic` module entirely (added with the four
+  Russell-style tests + the homophone-pair helper) and didn't
+  mention the new `match_one_to_many` / Soundex-bonus tests on
+  `matcher`. Benchmarks section claimed "Out of MVP scope. Once
+  criterion is wired in..." though benches live in the embedding
+  course-service crate at
+  [`benches/matching_bench.rs`](../course-service-rust-crate/benches/matching_bench.rs).
+  Updated both, and added two new symptom-decoder rows ("Phonetic
+  bonus suddenly stops firing" / "...never caps") so future
+  failures decode straight to the underlying invariant.
+
 - **`MatchingEngine::match_one_to_many`** (T-10). Returns
   `Vec<MatchResult>` in the same order as the candidate slice (no
   rank, no filter). Mirrors `person_matcher::MatchingEngine::match_one_to_many`
