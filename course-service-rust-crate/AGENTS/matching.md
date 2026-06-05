@@ -96,7 +96,7 @@ The 0.85 default matches the family-wide convention.
 
 ## Service-side adapter
 
-`src/matching/adapter.rs` (planned T-6) maps the service's
+`src/matching/adapter.rs` (T-6, shipped) maps the service's
 `Course` record into `course_matcher::Course`. Field-routing rules:
 
 - `Course.name` → `course_matcher::Course::name`.
@@ -112,4 +112,16 @@ The 0.85 default matches the family-wide convention.
 - `Course.keywords` / `Course.teaches` / `Course.assesses` → matcher fields.
 
 The adapter is the pinch point for any field-name drift; bridge
-tests in `tests/duplicate_detection.rs` (T-11) pin the mapping.
+tests in `tests/duplicate_detection.rs` (T-11, 14 tests) pin the
+mapping.
+
+## Phonetic bonus (matcher T-6)
+
+The matcher applies a `+0.05` Soundex bonus to `name_score` when
+both course names produce the same Soundex code and the
+underlying Jaro-Winkler is `< 0.95`. The result is capped at
+`0.95` — a phonetic hit lifts a Medium-band score upward but never
+single-handedly mints a High-confidence classification.
+
+Soundex is initial-letter-preserving: `Smyth ↔ Smith` matches
+(both `S530`); `Catherine ↔ Katheryn` does not.

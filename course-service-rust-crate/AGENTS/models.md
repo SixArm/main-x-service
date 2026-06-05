@@ -101,7 +101,7 @@ per parent Course (`course_id`).
 | `course_id` | `Uuid` | FK to Course |
 | `name` | `Option<String>` | Override of parent name (e.g. "CS101 — Fall 2026") |
 | `course_mode` | `Option<CourseMode>` | `Online` / `Onsite` / `Blended` / `SelfPaced` |
-| `status` | `CourseInstanceStatus` | `Scheduled` (default) / `EnrollmentOpen` / `EnrollmentClosed` / `InProgress` / `Completed` / `Cancelled` |
+| `status` | `CourseInstanceStatus` | Rust variants: `Scheduled` (default) / `EnrollmentOpen` / `EnrollmentClosed` / `InProgress` / `Completed` / `Cancelled`. JSON wire shape is snake_case (`scheduled`, `enrollment_open`, `enrollment_closed`, `in_progress`, `completed`, `cancelled`) to match the DB CHECK constraint. |
 | `schedule` | `Option<Schedule>` | Window + sessions |
 | `in_language` | `Vec<String>` | Language for this instance |
 | `location` / `location_id` | free-text or FK | Physical / virtual location |
@@ -201,7 +201,7 @@ as the sibling services: `MergeRequest` /
 
 ## Database mapping
 
-SeaORM entity modules (in `src/db/models.rs`, planned T-2) map to
+SeaORM entity modules (in `src/db/models.rs`, T-2 shipped) map to
 these tables:
 
 - `providers` — issuing organisations.

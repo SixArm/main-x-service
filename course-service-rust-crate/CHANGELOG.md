@@ -73,6 +73,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **AGENTS/models.md `CourseInstanceStatus` column omitted the wire
+  shape.** Listed the Rust variants in PascalCase but didn't mention
+  the snake_case JSON / DB encoding (`enrollment_open`, not
+  `EnrollmentOpen` or `enrollmentopen`). A client writing
+  `"status": "EnrollmentOpen"` from this table alone would have
+  hit a serde-rejected payload. Added the JSON wire-shape note.
+- **AGENTS/models.md + AGENTS/matching.md "planned T-2 / T-6"
+  pointers** dropped to "shipped" — both modules have been live
+  for several iterations. Also added a Phonetic-bonus subsection
+  to AGENTS/matching.md pointing at the matcher's T-6 work
+  (`+0.05` capped at `0.95`, initial-letter-preserving).
+
 - **index.md curl examples were unreachable.** Used
   `http://localhost:8080` while docker-compose maps the service to
   host port 8084 — copy-pasting any example from the index hit the
