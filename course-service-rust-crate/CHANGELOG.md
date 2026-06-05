@@ -62,6 +62,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
+- **Integration test suite** (T-12). `tests/api_integration_test.rs`
+  drives `tower::ServiceExt::oneshot` against the full Axum router
+  with real PostgreSQL + Tantivy + the in-memory event publisher.
+  12 tests, all `#[ignore]`-tagged so `cargo test --lib` stays fast:
+  - `health_returns_ok`
+  - `create_get_update_softdelete_lifecycle`
+  - `validation_failure_returns_422_with_details`
+  - `search_finds_created_record`
+  - `check_duplicates_flags_a_clone`
+  - `match_endpoint_returns_ranked_candidates`
+  - `merge_folds_duplicate_into_main`
+  - `batch_dedup_returns_response_shape`
+  - `instance_subresource_round_trips`
+  - `audit_log_records_create_then_update`
+  - `masked_view_clears_provider_and_instructors`
+  - `gdpr_export_envelopes_the_record`
+  `tests/common/mod.rs` builds `AppState` against env-configured
+  Postgres + a process-shared Tantivy `TempDir`. Run with
+  `cargo test --test api_integration_test -- --ignored` against a
+  migrated DB (see `podman compose up -d`).
 - **OpenAPI via utoipa** (T-14). Every wired handler carries a
   `#[utoipa::path]` block; every public domain type (`Course`,
   `CourseInstance`, `Schedule`, `Session`, `CourseIdentifier`,
