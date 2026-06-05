@@ -19,11 +19,12 @@ use axum::{
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use super::state::AppState;
-use crate::api::ApiResponse;
-use crate::db::audit::AuditContext;
+use crate::api::{ApiError, ApiResponse};
+use crate::db::audit::{AuditContext, AuditEntry};
 use crate::models::{
     BatchDeduplicationRequest, BatchDeduplicationResponse, Course, CourseInstance, MergeRecord,
     MergeRequest, MergeResponse, MergeStatus, ReviewQueueItem, ReviewStatus,
@@ -31,7 +32,7 @@ use crate::models::{
 use crate::streaming::{CourseEvent, EventKind};
 use crate::validation::{ValidationError, validate_course, validate_instance};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct HealthResponse {
     pub status: &'static str,
     pub service: &'static str,
@@ -40,6 +41,11 @@ pub struct HealthResponse {
 
 /// Health check — always returns `200 healthy` so orchestrators can
 /// distinguish "process is up" from "process can talk to DB".
+#[utoipa::path(
+    get, path = "/api/health",
+    responses((status = 200, description = "service is up", body = HealthResponse)),
+    tag = "health",
+)]
 pub async fn health(State(_state): State<AppState>) -> impl IntoResponse {
     Json(ApiResponse::success(HealthResponse {
         status: "healthy",
@@ -60,7 +66,7 @@ pub async fn not_implemented(State(_state): State<AppState>) -> impl IntoRespons
 
 // ────────────────── Query / body types ──────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ListQuery {
     #[serde(default = "default_limit")]
     pub limit: u64,
@@ -68,7 +74,7 @@ pub struct ListQuery {
     pub offset: u64,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Default, ToSchema, IntoParams)]
 pub struct SearchQuery {
     pub q: Option<String>,
     #[serde(default = "default_limit")]
@@ -90,7 +96,7 @@ fn default_limit() -> u64 {
     20
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct SearchResponse {
     pub items: Vec<Course>,
     pub total: usize,
@@ -98,7 +104,7 @@ pub struct SearchResponse {
 
 /// `MatchResult` carries the candidate id so the front-end can navigate
 /// back to the matched record from a duplicate-detection response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ScoredCandidate {
     pub course_id: Uuid,
     pub score: f64,
@@ -110,6 +116,16 @@ pub struct ScoredCandidate {
 // ────────────────── Handlers (FR-1..FR-5, FR-7) ──────────────────
 
 /// FR-1 — create with duplicate detection.
+#[utoipa::path(
+    post, path = "/api/courses",
+    request_body = Course,
+    responses(
+        (status = 201, description = "Created", body = Course),
+        (status = 409, description = "Probable duplicate", body = ApiError),
+        (status = 422, description = "Validation failure", body = ApiError),
+    ),
+    tag = "courses",
+)]
 pub async fn create_course(
     State(state): State<AppState>,
     Json(course): Json<Course>,
@@ -145,6 +161,15 @@ pub async fn create_course(
 
 /// FR-2 — get by id (includes the in-memory child collections that the
 /// repository hydrates today; instances + syllabus are deferred to T-8).
+#[utoipa::path(
+    get, path = "/api/courses/{id}",
+    params(("id" = uuid::Uuid, Path,)),
+    responses(
+        (status = 200, body = Course),
+        (status = 404, body = ApiError),
+    ),
+    tag = "courses",
+)]
 pub async fn get_course(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -157,6 +182,17 @@ pub async fn get_course(
 }
 
 /// FR-3 — replace.
+#[utoipa::path(
+    put, path = "/api/courses/{id}",
+    params(("id" = uuid::Uuid, Path,)),
+    request_body = Course,
+    responses(
+        (status = 200, body = Course),
+        (status = 404, body = ApiError),
+        (status = 422, body = ApiError),
+    ),
+    tag = "courses",
+)]
 pub async fn update_course(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -200,6 +236,15 @@ pub async fn update_course(
 }
 
 /// FR-4 — soft delete.
+#[utoipa::path(
+    delete, path = "/api/courses/{id}",
+    params(("id" = uuid::Uuid, Path,)),
+    responses(
+        (status = 204, description = "Soft-deleted"),
+        (status = 404, body = ApiError),
+    ),
+    tag = "courses",
+)]
 pub async fn delete_course(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -224,6 +269,12 @@ pub async fn delete_course(
 }
 
 /// FR-5 — search.
+#[utoipa::path(
+    get, path = "/api/courses/search",
+    params(SearchQuery),
+    responses((status = 200, body = SearchResponse)),
+    tag = "search",
+)]
 pub async fn search_courses(
     State(state): State<AppState>,
     Query(q): Query<SearchQuery>,
@@ -266,6 +317,15 @@ pub async fn search_courses(
 // ────────────────── Instance sub-resource (FR-10..FR-13) ──────────────────
 
 /// FR-10 — list instances ordered `schedule.start_date DESC NULLS LAST`.
+#[utoipa::path(
+    get, path = "/api/courses/{id}/instances",
+    params(("id" = uuid::Uuid, Path,)),
+    responses(
+        (status = 200, body = Vec<CourseInstance>),
+        (status = 404, body = ApiError),
+    ),
+    tag = "instances",
+)]
 pub async fn list_instances(
     State(state): State<AppState>,
     Path(course_id): Path<Uuid>,
@@ -280,6 +340,17 @@ pub async fn list_instances(
 }
 
 /// FR-11 — create instance.
+#[utoipa::path(
+    post, path = "/api/courses/{id}/instances",
+    params(("id" = uuid::Uuid, Path,)),
+    request_body = CourseInstance,
+    responses(
+        (status = 201, body = CourseInstance),
+        (status = 404, body = ApiError),
+        (status = 422, body = ApiError),
+    ),
+    tag = "instances",
+)]
 pub async fn create_instance(
     State(state): State<AppState>,
     Path(course_id): Path<Uuid>,
@@ -303,6 +374,20 @@ pub async fn create_instance(
 }
 
 /// FR-12 — replace instance.
+#[utoipa::path(
+    put, path = "/api/courses/{id}/instances/{instance_id}",
+    params(
+        ("id" = uuid::Uuid, Path,),
+        ("instance_id" = uuid::Uuid, Path,),
+    ),
+    request_body = CourseInstance,
+    responses(
+        (status = 200, body = CourseInstance),
+        (status = 404, body = ApiError),
+        (status = 422, body = ApiError),
+    ),
+    tag = "instances",
+)]
 pub async fn update_instance_handler(
     State(state): State<AppState>,
     Path((course_id, instance_id)): Path<(Uuid, Uuid)>,
@@ -331,6 +416,18 @@ pub async fn update_instance_handler(
 }
 
 /// FR-13 — soft-delete instance.
+#[utoipa::path(
+    delete, path = "/api/courses/{id}/instances/{instance_id}",
+    params(
+        ("id" = uuid::Uuid, Path,),
+        ("instance_id" = uuid::Uuid, Path,),
+    ),
+    responses(
+        (status = 204, description = "Soft-deleted"),
+        (status = 404, body = ApiError),
+    ),
+    tag = "instances",
+)]
 pub async fn delete_instance(
     State(state): State<AppState>,
     Path((course_id, instance_id)): Path<(Uuid, Uuid)>,
@@ -367,6 +464,12 @@ async fn require_course_exists(
 }
 
 /// FR-7 — duplicate check (no write).
+#[utoipa::path(
+    post, path = "/api/courses/check-duplicates",
+    request_body = Course,
+    responses((status = 200, body = Vec<ScoredCandidate>)),
+    tag = "matching",
+)]
 pub async fn check_duplicates(
     State(state): State<AppState>,
     Json(course): Json<Course>,
@@ -452,6 +555,15 @@ fn not_found_response(msg: &str) -> axum::response::Response {
 /// FR-6 — score a Course request against blocked candidates. Returns
 /// every blocked candidate with its `ScoredCandidate`, sorted by
 /// descending score (the front-end can apply its own threshold).
+#[utoipa::path(
+    post, path = "/api/courses/match",
+    request_body = Course,
+    responses(
+        (status = 200, body = Vec<ScoredCandidate>),
+        (status = 422, body = ApiError),
+    ),
+    tag = "matching",
+)]
 pub async fn match_course(
     State(state): State<AppState>,
     Json(probe): Json<Course>,
@@ -470,6 +582,16 @@ pub async fn match_course(
 }
 
 /// FR-8 — fold a duplicate into a main course.
+#[utoipa::path(
+    post, path = "/api/courses/merge",
+    request_body = MergeRequest,
+    responses(
+        (status = 200, body = MergeResponse),
+        (status = 404, body = ApiError),
+        (status = 422, body = ApiError),
+    ),
+    tag = "matching",
+)]
 pub async fn merge_courses(
     State(state): State<AppState>,
     Json(req): Json<MergeRequest>,
@@ -701,6 +823,15 @@ async fn score_all_blocked_candidates(
 /// FR-9 — scan every active Course, score against blocked candidates,
 /// auto-merge above `auto_merge_threshold`, queue everything else
 /// above `threshold` for review.
+#[utoipa::path(
+    post, path = "/api/courses/deduplicate",
+    request_body = BatchDeduplicationRequest,
+    responses(
+        (status = 200, body = BatchDeduplicationResponse),
+        (status = 422, body = ApiError),
+    ),
+    tag = "matching",
+)]
 pub async fn deduplicate(
     State(state): State<AppState>,
     Json(req): Json<BatchDeduplicationRequest>,
@@ -878,6 +1009,15 @@ fn canonical_pair(a: Uuid, b: Uuid) -> (Uuid, Uuid) {
 // ────────────────── Privacy (FR-15, FR-16) ──────────────────
 
 /// FR-16 — masked view of a Course.
+#[utoipa::path(
+    get, path = "/api/courses/{id}/masked",
+    params(("id" = uuid::Uuid, Path,)),
+    responses(
+        (status = 200, body = Course),
+        (status = 404, body = ApiError),
+    ),
+    tag = "privacy",
+)]
 pub async fn masked_course(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -890,6 +1030,15 @@ pub async fn masked_course(
 }
 
 /// FR-15 — GDPR Article-15 portability export.
+#[utoipa::path(
+    get, path = "/api/courses/{id}/export",
+    params(("id" = uuid::Uuid, Path,)),
+    responses(
+        (status = 200, description = "GDPR Article-15 portability envelope"),
+        (status = 404, body = ApiError),
+    ),
+    tag = "privacy",
+)]
 pub async fn export_course_data(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -903,7 +1052,7 @@ pub async fn export_course_data(
 
 // ────────────────── Audit / streaming hooks (FR-17, FR-18) ──────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
 pub struct AuditQuery {
     #[serde(default = "default_limit")]
     pub limit: u64,
@@ -912,6 +1061,15 @@ pub struct AuditQuery {
 /// FR-14 — entries for a Course (and any child whose audit row carries
 /// the same `entity_id` once the merge / instance handlers tag them
 /// against the parent). Newest first.
+#[utoipa::path(
+    get, path = "/api/courses/{id}/audit",
+    params(
+        ("id" = uuid::Uuid, Path,),
+        AuditQuery,
+    ),
+    responses((status = 200, body = Vec<AuditEntry>)),
+    tag = "audit",
+)]
 pub async fn audit_for_course(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -924,6 +1082,12 @@ pub async fn audit_for_course(
 }
 
 /// System-wide recent-activity tail, newest first.
+#[utoipa::path(
+    get, path = "/api/audit/recent",
+    params(AuditQuery),
+    responses((status = 200, body = Vec<AuditEntry>)),
+    tag = "audit",
+)]
 pub async fn audit_recent(
     State(state): State<AppState>,
     Query(q): Query<AuditQuery>,

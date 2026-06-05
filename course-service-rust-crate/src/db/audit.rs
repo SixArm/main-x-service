@@ -8,6 +8,7 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::models::audit_log;
@@ -16,7 +17,7 @@ use crate::Result;
 /// Public view of one audit-log row. Mirrors the column set with
 /// camelCase-friendly serde rename so the JSON envelope matches the
 /// rest of the API surface.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuditEntry {
     pub id: Uuid,
     pub entity_type: String,

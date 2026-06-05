@@ -1,9 +1,10 @@
 //! schema.org/Syllabus — a section of a Course's content.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Syllabus {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,

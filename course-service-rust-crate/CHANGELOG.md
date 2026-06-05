@@ -62,6 +62,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   surfaces validation errors and ranked candidates under `details`.
   FR-6 (match-against-existing), FR-8 (merge), FR-9 (batch dedup),
   FR-14..FR-16 (audit / privacy) continue to return 501.
+- **OpenAPI via utoipa** (T-14). Every wired handler carries a
+  `#[utoipa::path]` block; every public domain type (`Course`,
+  `CourseInstance`, `Schedule`, `Session`, `CourseIdentifier`,
+  `IdentifierType`, `CourseLink`, `LinkType`, `CourseStatus`,
+  `EducationalLevel`, `LearningResourceType`, `InteractivityType`,
+  `EducationalCredential`, `CredentialCategory`, `Syllabus`,
+  `Provider`, `ProviderKind`, `MergeRequest`/`Response`/`Record`/
+  `Status`, `BatchDeduplicationRequest`/`Response`, `ReviewQueueItem`/
+  `ReviewStatus`, `MatchBreakdown`, `ValidationError`, `AuditEntry`,
+  plus handler-local `HealthResponse`, `SearchQuery`, `SearchResponse`,
+  `ScoredCandidate`, `AuditQuery`) derives `ToSchema`. `SearchQuery`
+  and `AuditQuery` also derive `IntoParams` so query-string args are
+  documented. `ApiDoc` aggregator + Swagger UI mounted at
+  `/swagger-ui`; raw OpenAPI 3 JSON at `/api-docs/openapi.json`.
+  Tagged into 7 groups (`health`, `courses`, `instances`, `search`,
+  `matching`, `privacy`, `audit`).
 - **Criterion benchmark suite** (T-13). Three benches establish
   perf baselines:
   - `benches/matching_bench.rs` — `match_courses` on a fully-populated

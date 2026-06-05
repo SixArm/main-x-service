@@ -1,8 +1,9 @@
 //! schema.org/EducationalOccupationalCredential.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EducationalCredential {
     pub name: String,
     #[serde(default)]
@@ -18,7 +19,7 @@ pub struct EducationalCredential {
     pub url: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum CredentialCategory {
     Certificate,
     Diploma,

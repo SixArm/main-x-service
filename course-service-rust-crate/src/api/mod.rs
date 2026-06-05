@@ -3,9 +3,12 @@
 pub mod rest;
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Standard JSON envelope. Always exactly one of `data` / `error` is
-/// set. `success = error.is_none()`.
+/// set. `success = error.is_none()`. Swagger sees the inner `data`
+/// type directly via `#[utoipa::path(responses(body = T))]`; the
+/// envelope itself is internal plumbing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiResponse<T> {
     pub success: bool,
@@ -40,7 +43,7 @@ impl<T> ApiResponse<T> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApiError {
     pub code: String,
     pub message: String,

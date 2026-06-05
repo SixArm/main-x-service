@@ -8,6 +8,7 @@
 
 use course_matcher::{MatchConfig, MatchingEngine};
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::config::MatchingConfig;
 use crate::models::Course;
@@ -102,7 +103,7 @@ pub enum MatchConfidence {
     Low,
 }
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, ToSchema)]
 pub struct MatchBreakdown {
     pub name_score: Option<f64>,
     pub course_code_score: Option<f64>,

@@ -2,9 +2,10 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum ReviewStatus {
     Pending,
     Confirmed,
@@ -12,7 +13,7 @@ pub enum ReviewStatus {
     AutoMerged,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ReviewQueueItem {
     pub id: Uuid,
     pub course_id_a: Uuid,
@@ -30,7 +31,7 @@ pub struct ReviewQueueItem {
     pub reviewed_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct BatchDeduplicationRequest {
     #[serde(default = "default_threshold")]
     pub threshold: f64,
@@ -50,7 +51,7 @@ fn default_auto_merge_threshold() -> f64 {
     0.95
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct BatchDeduplicationResponse {
     pub courses_scanned: u64,
     pub duplicates_found: u64,

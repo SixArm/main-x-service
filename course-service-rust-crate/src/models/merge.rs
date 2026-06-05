@@ -2,11 +2,12 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::Course;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MergeRequest {
     pub main_course_id: Uuid,
     pub duplicate_course_id: Uuid,
@@ -16,13 +17,13 @@ pub struct MergeRequest {
     pub merged_by: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum MergeStatus {
     Completed,
     Reversed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MergeRecord {
     pub id: Uuid,
     pub main_course_id: Uuid,
@@ -39,7 +40,7 @@ pub struct MergeRecord {
     pub merged_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MergeResponse {
     pub merge_record: MergeRecord,
     pub main_course: Course,

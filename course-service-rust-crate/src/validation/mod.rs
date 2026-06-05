@@ -20,11 +20,12 @@
 //! them as `{field, message}` pairs under a `422` response.
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::models::{Course, CourseInstance};
 
 /// One validation failure. Pair maps cleanly to the REST `422` body.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, ToSchema)]
 pub struct ValidationError {
     pub field: String,
     pub message: String,

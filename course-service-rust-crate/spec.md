@@ -310,7 +310,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the full layout.
 - [x] T-11: Bridge test pinning matcher contract + per-field routing (`tests/duplicate_detection.rs`, 14 tests covering identical / typo / deterministic short-circuits / negatives / routing / config presets).
 - [ ] T-12: Integration test exercising create / search / detail / edit / soft-delete / match / merge / dedup / audit.
 - [x] T-13: Criterion benchmark suite — `benches/matching_bench.rs` (pair scoring + deterministic short-circuit + rank-of-100), `benches/search_bench.rs` (index + exact + fuzzy + blocking query on a 100-row index), `benches/validation_bench.rs` (populated-record pass).
-- [ ] T-14: OpenAPI schema completion via utoipa derive annotations.
+- [x] T-14: OpenAPI schema via utoipa derive annotations. Every wired handler carries `#[utoipa::path]`; every public domain type derives `ToSchema`; `SearchQuery` + `AuditQuery` derive `IntoParams`. `ApiDoc` aggregator + Swagger UI at `/swagger-ui`, raw spec at `/api-docs/openapi.json`.
 - [ ] T-15: Authentication middleware (JWT) — coordinated with the family-wide auth rollout.
 
 ## 14. Implementation Status

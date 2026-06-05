@@ -7,8 +7,9 @@
 //! deterministic schemes.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CourseIdentifier {
     pub property_id: IdentifierType,
     pub value: String,
@@ -20,7 +21,7 @@ pub struct CourseIdentifier {
     pub url: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum IdentifierType {
     /// LMS course-id (Canvas, Moodle, Blackboard, …).
     LmsCourseId,

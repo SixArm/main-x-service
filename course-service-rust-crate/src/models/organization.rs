@@ -1,9 +1,10 @@
 //! Provider organisation (schema.org/Organization specialised).
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Provider {
     pub id: Uuid,
     pub name: String,
@@ -17,7 +18,7 @@ pub struct Provider {
     pub kind: Option<ProviderKind>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum ProviderKind {
     University,
     College,

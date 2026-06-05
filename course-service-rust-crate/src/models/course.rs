@@ -7,13 +7,14 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::{CourseIdentifier, CourseInstance, EducationalCredential, Syllabus};
 
 /// A course — the *template* / abstract description. Specific offerings
 /// live in the `instances` collection as `CourseInstance` records.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Course {
     /// Server-generated UUID. Defaults to a fresh v4 on missing input.
     #[serde(default = "Uuid::new_v4")]
@@ -220,7 +221,7 @@ impl Course {
 }
 
 /// Course lifecycle state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum CourseStatus {
     /// Draft — not yet visible to learners.
@@ -236,7 +237,7 @@ pub enum CourseStatus {
 
 /// schema.org/educationalLevel — common buckets. `Custom` keeps the
 /// surface extensible without forking the enum.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum EducationalLevel {
     Beginner,
     Intermediate,
@@ -254,7 +255,7 @@ pub enum EducationalLevel {
 }
 
 /// schema.org/learningResourceType — coarse buckets.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum LearningResourceType {
     Lecture,
     Tutorial,
@@ -271,7 +272,7 @@ pub enum LearningResourceType {
 }
 
 /// schema.org/interactivityType.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum InteractivityType {
     /// Hands-on (problem-solving, simulation, role-play).
@@ -283,13 +284,13 @@ pub enum InteractivityType {
 }
 
 /// schema.org-style cross-references between Course records.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CourseLink {
     pub other_course_id: Uuid,
     pub link_type: LinkType,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum LinkType {
     /// This course replaces `other`.

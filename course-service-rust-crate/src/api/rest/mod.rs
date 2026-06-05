@@ -1,16 +1,16 @@
-//! REST API surface — Axum router + state.
+//! REST API surface — Axum router + state + OpenAPI doc.
 //!
 //! Routes mount under `/api` (matches `spec.md §9` and the front-end's
-//! `CourseRepository`). FR-1..FR-5 + FR-7 are wired against the real
-//! repository / search engine / matcher. The rest still return
-//! `501 Not Implemented` until their per-task work in `spec.md §13`
-//! lands.
+//! `CourseRepository`). Swagger UI is served at `/swagger-ui` with the
+//! raw OpenAPI 3 JSON at `/api-docs/openapi.json`.
 
 use axum::{
     Router,
     routing::{get, post},
 };
 use tower_http::cors::CorsLayer;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use sea_orm::DatabaseConnection;
 
@@ -21,6 +21,83 @@ pub use state::AppState;
 
 use crate::Result;
 
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "Course Service API",
+        version = "0.1.0",
+        description = "schema.org/Course-aligned identity registry — CRUD, search, matching, merging, audit, privacy."
+    ),
+    paths(
+        handlers::health,
+        handlers::create_course,
+        handlers::get_course,
+        handlers::update_course,
+        handlers::delete_course,
+        handlers::search_courses,
+        handlers::check_duplicates,
+        handlers::match_course,
+        handlers::merge_courses,
+        handlers::deduplicate,
+        handlers::list_instances,
+        handlers::create_instance,
+        handlers::update_instance_handler,
+        handlers::delete_instance,
+        handlers::masked_course,
+        handlers::export_course_data,
+        handlers::audit_for_course,
+        handlers::audit_recent,
+    ),
+    components(schemas(
+        crate::api::ApiError,
+        crate::models::Course,
+        crate::models::CourseStatus,
+        crate::models::EducationalLevel,
+        crate::models::LearningResourceType,
+        crate::models::InteractivityType,
+        crate::models::CourseLink,
+        crate::models::LinkType,
+        crate::models::CourseIdentifier,
+        crate::models::IdentifierType,
+        crate::models::CourseInstance,
+        crate::models::CourseMode,
+        crate::models::CourseInstanceStatus,
+        crate::models::Schedule,
+        crate::models::course_instance::Session,
+        crate::models::EducationalCredential,
+        crate::models::CredentialCategory,
+        crate::models::Syllabus,
+        crate::models::Provider,
+        crate::models::ProviderKind,
+        crate::models::MergeRequest,
+        crate::models::MergeResponse,
+        crate::models::MergeRecord,
+        crate::models::MergeStatus,
+        crate::models::BatchDeduplicationRequest,
+        crate::models::BatchDeduplicationResponse,
+        crate::models::ReviewQueueItem,
+        crate::models::ReviewStatus,
+        crate::matching::MatchBreakdown,
+        crate::validation::ValidationError,
+        crate::db::audit::AuditEntry,
+        handlers::HealthResponse,
+        handlers::SearchQuery,
+        handlers::SearchResponse,
+        handlers::ScoredCandidate,
+        handlers::AuditQuery,
+    )),
+    tags(
+        (name = "health",     description = "Liveness probe"),
+        (name = "courses",    description = "Course CRUD"),
+        (name = "instances",  description = "CourseInstance sub-resource"),
+        (name = "search",     description = "Full-text + fuzzy search"),
+        (name = "matching",   description = "Match / dedup / merge"),
+        (name = "privacy",    description = "Masking + GDPR export"),
+        (name = "audit",      description = "Audit log queries"),
+    ),
+)]
+pub struct ApiDoc;
+
 /// Build the REST router with the given application state.
 pub fn create_router(state: AppState) -> Router {
     let api_routes = Router::new()
@@ -30,9 +107,7 @@ pub fn create_router(state: AppState) -> Router {
             "/courses",
             get(handlers::not_implemented).post(handlers::create_course),
         )
-        // `/search`, `/match`, `/check-duplicates`, `/merge`, `/deduplicate`
-        // MUST be declared before the `/:id` catch-all so Axum's path-
-        // segment router doesn't shadow them.
+        // Literal segments declared before the `/:id` catch-all.
         .route("/courses/search", get(handlers::search_courses))
         .route("/courses/match", post(handlers::match_course))
         .route(
@@ -69,6 +144,7 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         .nest("/api", api_routes)
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
 }
 

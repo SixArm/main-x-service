@@ -6,9 +6,10 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CourseInstance {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
@@ -65,7 +66,7 @@ pub struct CourseInstance {
 }
 
 /// schema.org/CourseInstance.courseMode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CourseMode {
     Online,
@@ -74,7 +75,7 @@ pub enum CourseMode {
     SelfPaced,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CourseInstanceStatus {
     #[default]
@@ -90,7 +91,7 @@ pub enum CourseInstanceStatus {
 /// `start_date`/`end_date` window or an explicit list of session
 /// times; both are optional so this also accommodates self-paced
 /// offerings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Schedule {
     #[serde(default)]
     pub start_date: Option<DateTime<Utc>>,
@@ -108,7 +109,7 @@ pub struct Schedule {
     pub sessions: Vec<Session>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Session {
     pub start: DateTime<Utc>,
     #[serde(default)]
