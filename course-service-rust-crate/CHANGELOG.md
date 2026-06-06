@@ -9,7 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **OpenAPI `info.version` was hardcoded `0.1.0`.** After the
+  v0.2.0 cut, the spec served at `/api-docs/openapi.json` (and
+  rendered by Swagger UI) still advertised v0.1.0 — any consumer
+  pulling the schema for codegen would have stamped the wrong
+  version on generated clients. Replaced the literal with
+  `env!("CARGO_PKG_VERSION")` so the OpenAPI info can't drift
+  from the crate version again.
+- **`handlers.rs` doc comments overstated the `not_implemented`
+  surface.** Header doc claimed "a couple of placeholder routes",
+  and the handler's own doc said "every endpoint not yet ticked
+  off in `spec.md §13` routes here". Only one route uses the shim
+  (`GET /api/courses`, deliberately parked per §9); §13 itself is
+  fully closed except T-15 (auth). Rewrote both doc comments to
+  name the single endpoint and explain why it stays.
 
 ## [0.2.0] — 2026-06-05
 

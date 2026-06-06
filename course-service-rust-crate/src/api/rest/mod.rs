@@ -25,7 +25,9 @@ use crate::Result;
 #[openapi(
     info(
         title = "Course Service API",
-        version = "0.1.0",
+        // Sourced from Cargo.toml at compile time so the OpenAPI
+        // info block can't drift away from the crate version.
+        version = env!("CARGO_PKG_VERSION"),
         description = "schema.org/Course-aligned identity registry — CRUD, search, matching, merging, audit, privacy."
     ),
     paths(

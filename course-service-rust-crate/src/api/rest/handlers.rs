@@ -2,8 +2,10 @@
 //!
 //! FR-1..FR-9 + FR-14..FR-18 are wired against the repository, search
 //! engine, matcher, validation, audit, streaming, and privacy modules.
-//! Only the `not_implemented` shim remains, parked behind a couple of
-//! placeholder routes the spec lists as out-of-scope for MVP.
+//! The `not_implemented` shim is parked behind one route only:
+//! `GET /api/courses` (list-all-without-search), which spec.md §9
+//! intentionally leaves out of scope — clients call
+//! `/api/courses/search` with an empty `q` for the same effect.
 //!
 //! Error mapping:
 //! - `Error::NotFound` → 404
@@ -54,8 +56,11 @@ pub async fn health(State(_state): State<AppState>) -> impl IntoResponse {
     }))
 }
 
-/// Catch-all stub handler — every endpoint not yet ticked off in
-/// `spec.md §13` routes here.
+/// The `501` shim, kept as a deliberate marker for the one endpoint
+/// `GET /api/courses` (list-all-without-search) that spec.md §9
+/// intentionally parks. Removing the handler would orphan the route
+/// declaration in `mod.rs`; keeping it stable lets the router
+/// table double as documentation.
 pub async fn not_implemented(State(_state): State<AppState>) -> impl IntoResponse {
     let body: ApiResponse<()> = ApiResponse::error(
         "NOT_IMPLEMENTED",
