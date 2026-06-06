@@ -11,6 +11,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **Dockerfile non-root user was named `mpi`** (Master Patient
+  Index) — leftover from the person-service copy-adapt. Renamed
+  to `course` across the `useradd`, `USER`, and four `--chown`
+  references so the layer audit and any future ps-output during
+  troubleshooting names the actual service, not its sibling.
+  Behavioural no-op (same uid 1000, same /app layout); cleanup
+  only.
 - **OpenAPI `info.version` was hardcoded `0.1.0`.** After the
   v0.2.0 cut, the spec served at `/api-docs/openapi.json` (and
   rendered by Swagger UI) still advertised v0.1.0 — any consumer

@@ -41,14 +41,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd --create-home --uid 1000 --shell /bin/bash mpi
-RUN mkdir -p /app/data/search_index && chown -R mpi:mpi /app
+RUN useradd --create-home --uid 1000 --shell /bin/bash course
+RUN mkdir -p /app/data/search_index && chown -R course:course /app
 
-USER mpi
+USER course
 WORKDIR /app
 
-COPY --from=builder --chown=mpi:mpi /app/course-service/target/release/course-service /app/course-service
-COPY --chown=mpi:mpi course-service-rust-crate/migrations ./migrations
+COPY --from=builder --chown=course:course /app/course-service/target/release/course-service /app/course-service
+COPY --chown=course:course course-service-rust-crate/migrations ./migrations
 
 EXPOSE 8080
 
