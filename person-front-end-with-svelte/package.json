@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "lily-design-system-svelte-headless": "file:../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless",
+    "lily-design-system-svelte-locale-picker": "file:../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker",
     "lily-design-system-svelte-theme-picker": "file:../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-picker",
     "wx-svelte-core": "^2.5.3",
     "wx-svelte-grid": "^2.6.2"

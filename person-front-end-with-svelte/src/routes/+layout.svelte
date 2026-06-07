@@ -48,6 +48,36 @@
         "wireframe"
     ];
 
+    import LocalePicker from "lily-design-system-svelte-locale-picker/LocalePicker.svelte";
+
+    const LOCALES = [
+        "ar",
+        "cy",
+        "de",
+        "en",
+        "en_GB",
+        "en_US",
+        "es",
+        "fa",
+        "fr",
+        "fr_CA",
+        "he",
+        "hi",
+        "it",
+        "ja",
+        "ko",
+        "nl",
+        "pl",
+        "pt",
+        "pt_BR",
+        "ru",
+        "sv",
+        "tr",
+        "ur",
+        "zh",
+        "zh_TW"
+    ];
+
     // Lily headless example — uncomment after `pnpm install` resolves the
     // file: dependency to use Lily's accessibility-primitive Button:
     // import Button from "lily-design-system-svelte-headless/src/lib/components/Button/Button.svelte";
@@ -86,6 +116,15 @@
                 themesUrl="/assets/themes/"
                 themes={THEMES}
                 storageKey="lily-theme"
+            />
+        </div>
+        <div class="locale-section">
+            <LocalePicker
+                label="Language"
+                locales={LOCALES}
+                defaultValue="en"
+                storageKey="lily-locale"
+                detectFromNavigator
             />
         </div>
     </aside>
@@ -140,6 +179,30 @@
         margin-bottom: 0.25rem;
     }
     .theme-section :global(.theme-picker label) {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: 0.875rem;
+        color: var(--mxi-color-fg);
+    }
+
+    .locale-section {
+        margin-top: 0.75rem;
+    }
+    .locale-section :global(fieldset) {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+    .locale-section :global(legend) {
+        font-size: 0.875rem;
+        color: var(--mxi-color-fg);
+        margin-bottom: 0.25rem;
+    }
+    .locale-section :global(label) {
         display: flex;
         align-items: center;
         gap: 0.375rem;
