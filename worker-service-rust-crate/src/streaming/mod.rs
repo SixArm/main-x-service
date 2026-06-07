@@ -1,4 +1,17 @@
-//! Event streaming with Fluvio
+//! Event streaming for worker lifecycle changes.
+//!
+//! Every CRUD/merge/link operation publishes a
+//! [`WorkerEvent`](crate::streaming::WorkerEvent) so downstream consumers
+//! (audit pipelines, projections, other services) can react. The
+//! [`EventProducer`](crate::streaming::EventProducer) trait abstracts the
+//! transport; the bundled
+//! [`InMemoryEventPublisher`](crate::streaming::InMemoryEventPublisher) is the
+//! default in-process implementation, with Fluvio intended as the production
+//! broker. [`EventConsumer`](crate::streaming::EventConsumer) is the (stubbed)
+//! read side.
+//!
+//! Events are serde-tagged on `event_type`, so the JSON wire form carries a
+//! discriminator field naming the variant.
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -10,20 +23,67 @@ use crate::Result;
 pub mod producer;
 pub mod consumer;
 
-/// Worker event types
+/// A lifecycle event emitted when a worker record changes.
+///
+/// Serialized with an internal `event_type` tag identifying the variant.
+/// Use [`timestamp`](WorkerEvent::timestamp) and
+/// [`worker_id`](WorkerEvent::worker_id) to read the common fields without
+/// matching every variant.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "event_type")]
 pub enum WorkerEvent {
-    Created { worker: Worker, timestamp: DateTime<Utc> },
-    Updated { worker: Worker, timestamp: DateTime<Utc> },
-    Deleted { worker_id: Uuid, timestamp: DateTime<Utc> },
-    Merged { source_id: Uuid, target_id: Uuid, timestamp: DateTime<Utc> },
-    Linked { worker_id: Uuid, linked_id: Uuid, timestamp: DateTime<Utc> },
-    Unlinked { worker_id: Uuid, unlinked_id: Uuid, timestamp: DateTime<Utc> },
+    /// A new worker was created; carries the full record.
+    Created {
+        /// The newly created worker record.
+        worker: Worker,
+        /// When the event occurred.
+        timestamp: DateTime<Utc>,
+    },
+    /// An existing worker was updated; carries the new record state.
+    Updated {
+        /// The updated worker record.
+        worker: Worker,
+        /// When the event occurred.
+        timestamp: DateTime<Utc>,
+    },
+    /// A worker was (soft) deleted; carries only the affected ID.
+    Deleted {
+        /// The ID of the deleted worker.
+        worker_id: Uuid,
+        /// When the event occurred.
+        timestamp: DateTime<Utc>,
+    },
+    /// Two workers were merged: `source_id` was merged into `target_id`.
+    Merged {
+        /// The ID of the worker that was merged away (the duplicate).
+        source_id: Uuid,
+        /// The ID of the surviving worker (the main record).
+        target_id: Uuid,
+        /// When the event occurred.
+        timestamp: DateTime<Utc>,
+    },
+    /// A link was created from `worker_id` to `linked_id`.
+    Linked {
+        /// The originating worker ID.
+        worker_id: Uuid,
+        /// The worker ID that was linked to.
+        linked_id: Uuid,
+        /// When the event occurred.
+        timestamp: DateTime<Utc>,
+    },
+    /// A link from `worker_id` to `unlinked_id` was removed.
+    Unlinked {
+        /// The originating worker ID.
+        worker_id: Uuid,
+        /// The worker ID that was unlinked.
+        unlinked_id: Uuid,
+        /// When the event occurred.
+        timestamp: DateTime<Utc>,
+    },
 }
 
 impl WorkerEvent {
-    /// Get the timestamp of the event
+    /// Returns the event's timestamp regardless of variant.
     pub fn timestamp(&self) -> DateTime<Utc> {
         match self {
             WorkerEvent::Created { timestamp, .. } => *timestamp,
@@ -35,7 +95,9 @@ impl WorkerEvent {
         }
     }
 
-    /// Get the worker ID involved in the event
+    /// Returns the primary worker ID involved in the event. For `Merged` this
+    /// is the merge source; for `Linked`/`Unlinked` it is the originating
+    /// worker.
     pub fn worker_id(&self) -> Uuid {
         match self {
             WorkerEvent::Created { worker, .. } => worker.id,
@@ -48,19 +110,21 @@ impl WorkerEvent {
     }
 }
 
-/// Event producer trait
+/// Publishing side of the event stream. Implementations deliver a
+/// [`WorkerEvent`] to the configured transport. Must be `Send + Sync` so it
+/// can live in shared application state behind an `Arc`.
 pub trait EventProducer: Send + Sync {
-    /// Publish a worker event
+    /// Publishes a single worker event, returning an error if delivery fails.
     fn publish(&self, event: WorkerEvent) -> Result<()>;
 }
 
 pub use producer::InMemoryEventPublisher;
 
-/// Event consumer trait
+/// Consuming side of the event stream (currently a stub interface).
 pub trait EventConsumer {
-    /// Subscribe to worker events
+    /// Begins a subscription to the worker event topic.
     fn subscribe(&mut self) -> Result<()>;
 
-    /// Process the next event
+    /// Returns the next available event, or `None` when none is pending.
     fn next_event(&mut self) -> Result<Option<WorkerEvent>>;
 }

@@ -1,4 +1,19 @@
-//! Search functionality using Tantivy
+//! Full-text person search backed by the Tantivy index.
+//!
+//! [`SearchEngine`](crate::search::SearchEngine) wraps a [`PersonIndex`](crate::search::index::PersonIndex) and is the only type the
+//! rest of the service touches. It flattens a [`Person`](crate::models::Person) into a Tantivy
+//! document, supports plain, fuzzy, and name+year ("blocking") queries,
+//! and keeps the reader fresh after each write so create/update/merge
+//! handlers see their own writes immediately.
+//!
+//! Search returns person *IDs* (as strings); callers then hydrate the
+//! full records from the repository. Index internals (schema, stats,
+//! reader/writer lifecycle) live in [`index`](crate::search::index); the query helpers live in
+//! [`query`](crate::search::query).
+//!
+//! Examples are omitted here because constructing an engine requires an
+//! on-disk index directory (typically a `tempfile::tempdir()` in tests);
+//! see the module test suite for end-to-end usage.
 
 use tantivy::{
     collector::TopDocs,
@@ -11,24 +26,31 @@ use std::path::Path;
 use crate::models::Person;
 use crate::Result;
 
+/// Tantivy index wrapper: schema, reader/writer, and stats.
 pub mod index;
+/// Query-building helpers for the search engine.
 pub mod query;
 
 pub use index::{PersonIndex, PersonIndexSchema, IndexStats};
 
-/// Search engine for person records
+/// Full-text search engine over indexed [`Person`] records.
+///
+/// Owns a [`PersonIndex`] and exposes index/search/delete operations.
+/// All search methods return person IDs as strings.
 pub struct SearchEngine {
+    /// The underlying Tantivy index wrapper.
     index: PersonIndex,
 }
 
 impl SearchEngine {
-    /// Create a new search engine instance
+    /// Open the index at `index_path`, creating it if absent.
     pub fn new<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let index = PersonIndex::create_or_open(index_path)?;
         Ok(Self { index })
     }
 
-    /// Index a person record
+    /// Index a single person, committing and reloading so the new
+    /// document is immediately searchable.
     pub fn index_person(&self, person: &Person) -> Result<()> {
         let mut writer = self.index.writer(50)?;
         let schema = self.index.schema();
@@ -88,7 +110,8 @@ impl SearchEngine {
         Ok(())
     }
 
-    /// Bulk index multiple persons
+    /// Index many persons in one writer batch (single commit), then
+    /// reload the reader.
     pub fn index_persons(&self, persons: &[Person]) -> Result<()> {
         let mut writer = self.index.writer(100)?;
         let schema = self.index.schema();
@@ -138,7 +161,8 @@ impl SearchEngine {
         Ok(())
     }
 
-    /// Search for persons by query string
+    /// Run a parsed query across name and identifier fields, returning
+    /// up to `limit` matching person IDs.
     pub fn search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
@@ -234,7 +258,13 @@ impl SearchEngine {
         Ok(person_ids)
     }
 
-    /// Search by name and birth year (for blocking in matching)
+    /// Fuzzy-match a family name, optionally boosted by birth year, for
+    /// candidate "blocking" in the matching pipeline.
+    ///
+    /// The family name is tokenized and each run becomes an
+    /// edit-distance-2 fuzzy clause; a present `birth_year` is added as a
+    /// `Should` clause so same-year records rank higher without
+    /// excluding others.
     pub fn search_by_name_and_year(
         &self,
         family_name: &str,
@@ -320,7 +350,8 @@ impl SearchEngine {
         Ok(person_ids)
     }
 
-    /// Remove a person from the index
+    /// Delete the indexed document with the given person ID, then
+    /// reload the reader.
     pub fn delete_person(&self, person_id: &str) -> Result<()> {
         let mut writer = self.index.writer(50)?;
         let schema = self.index.schema();
@@ -335,17 +366,20 @@ impl SearchEngine {
         Ok(())
     }
 
-    /// Get index statistics
+    /// Return index statistics (e.g. document count).
     pub fn stats(&self) -> Result<IndexStats> {
         self.index.stats()
     }
 
-    /// Optimize the index
+    /// Merge index segments to reclaim space and speed queries.
     pub fn optimize(&self) -> Result<()> {
         self.index.optimize()
     }
 
-    /// Manually reload the index reader (useful for tests to ensure documents are visible)
+    /// Force the reader to observe the latest committed segments.
+    ///
+    /// Useful in tests (and after writes) to guarantee a subsequent
+    /// query sees freshly indexed documents.
     pub fn reload(&self) -> Result<()> {
         self.index.reload()
     }
@@ -359,6 +393,7 @@ mod tests {
     use tempfile::TempDir;
     use uuid::Uuid;
 
+    /// Build a minimal male person with the given name and birth date.
     fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Person {
         Person {
             id: Uuid::new_v4(),
@@ -391,6 +426,7 @@ mod tests {
         }
     }
 
+    /// An indexed person is found by an exact family-name query.
     #[test]
     fn test_index_and_search_person() {
         let temp_dir = TempDir::new().unwrap();
@@ -405,6 +441,7 @@ mod tests {
         assert_eq!(results[0], person.id.to_string());
     }
 
+    /// A typo'd query (Smyth) still finds the indexed Smith via fuzzy search.
     #[test]
     fn test_fuzzy_search() {
         let temp_dir = TempDir::new().unwrap();
@@ -420,6 +457,7 @@ mod tests {
         assert_eq!(results[0], person.id.to_string());
     }
 
+    /// Bulk indexing three persons yields a document count of three.
     #[test]
     fn test_bulk_indexing() {
         let temp_dir = TempDir::new().unwrap();
@@ -438,6 +476,7 @@ mod tests {
         assert_eq!(stats.num_docs, 3);
     }
 
+    /// Deleting an indexed person removes it from search results.
     #[test]
     fn test_delete_person() {
         let temp_dir = TempDir::new().unwrap();
@@ -457,6 +496,7 @@ mod tests {
         assert_eq!(results.len(), 0);
     }
 
+    /// Name+year blocking search finds the matching record.
     #[test]
     fn test_search_by_name_and_year() {
         let temp_dir = TempDir::new().unwrap();

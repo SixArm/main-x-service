@@ -15,22 +15,37 @@ use tantivy::{
 
 use crate::Result;
 
+/// The Tantivy [`Schema`] plus typed handles to each [`Field`], built
+/// once and reused for every index/query operation.
 #[derive(Clone)]
 pub struct CourseIndexSchema {
+    /// The built Tantivy schema.
     pub schema: Schema,
+    /// Stored course UUID (STRING) — the retrievable primary key.
     pub id: Field,
+    /// Course name (TEXT) — fuzzy/full-text searchable.
     pub name: Field,
+    /// Alternate names (TEXT).
     pub alternate_names: Field,
+    /// Provider catalog code (STRING) — exact-match filterable.
     pub course_code: Field,
+    /// Provider UUID (STRING) — exact-match filter for blocking.
     pub provider_id: Field,
+    /// Provider name (TEXT).
     pub provider_name: Field,
+    /// Joined keyword tokens (TEXT).
     pub keywords: Field,
+    /// Joined `teaches` competency tokens (TEXT).
     pub teaches: Field,
+    /// Joined identifier values (TEXT).
     pub identifiers: Field,
+    /// Active flag as `"true"`/`"false"` (STRING, FAST).
     pub active: Field,
 }
 
 impl CourseIndexSchema {
+    /// Build the schema, registering every field with its index options
+    /// (STRING for exact-match fields, TEXT for full-text fields).
     pub fn new() -> Self {
         let mut b = Schema::builder();
         let id = b.add_text_field("id", STRING | STORED);
@@ -61,18 +76,24 @@ impl CourseIndexSchema {
 }
 
 impl Default for CourseIndexSchema {
+    /// Same as [`CourseIndexSchema::new`].
     fn default() -> Self {
         Self::new()
     }
 }
 
+/// An open Tantivy index together with its schema and a live reader.
 pub struct CourseIndex {
+    /// The underlying Tantivy index.
     index: Index,
+    /// Cached schema + field handles.
     schema: CourseIndexSchema,
+    /// Reader configured to reload on commit.
     reader: IndexReader,
 }
 
 impl CourseIndex {
+    /// Create a brand-new index in an empty directory at `path`.
     pub fn create<P: AsRef<Path>>(path: P) -> Result<Self> {
         let schema = CourseIndexSchema::new();
         let index = Index::create_in_dir(path, schema.schema.clone())
@@ -85,6 +106,7 @@ impl CourseIndex {
         Ok(Self { index, schema, reader })
     }
 
+    /// Open an existing index previously created at `path`.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let schema = CourseIndexSchema::new();
         let index = Index::open_in_dir(path)
@@ -97,6 +119,8 @@ impl CourseIndex {
         Ok(Self { index, schema, reader })
     }
 
+    /// Open the index if a `meta.json` already exists at `path`,
+    /// otherwise create a fresh one. The boot-time entry point.
     pub fn create_or_open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let p = path.as_ref();
         if p.join("meta.json").exists() {
@@ -106,22 +130,29 @@ impl CourseIndex {
         }
     }
 
+    /// Acquire a writer with a `heap_mb`-megabyte budget for the
+    /// in-memory indexing buffer.
     pub fn writer(&self, heap_mb: usize) -> Result<IndexWriter> {
         self.index
             .writer(heap_mb * 1_000_000)
             .map_err(|e| crate::Error::Search(format!("create writer: {e}")))
     }
 
+    /// Borrow the underlying Tantivy index (for query-parser setup).
     pub fn index(&self) -> &Index { &self.index }
+    /// Borrow the schema + field handles.
     pub fn schema(&self) -> &CourseIndexSchema { &self.schema }
+    /// Borrow the live reader.
     pub fn reader(&self) -> &IndexReader { &self.reader }
 
+    /// Force the reader to pick up the latest committed segments.
     pub fn reload(&self) -> Result<()> {
         self.reader
             .reload()
             .map_err(|e| crate::Error::Search(format!("reload: {e}")))
     }
 
+    /// Document and segment counts for the current searcher.
     pub fn stats(&self) -> Result<IndexStats> {
         let searcher = self.reader.searcher();
         Ok(IndexStats {
@@ -131,9 +162,13 @@ impl CourseIndex {
     }
 }
 
+/// Lightweight snapshot of index size, returned by
+/// [`CourseIndex::stats`] / [`SearchEngine::stats`](super::SearchEngine::stats).
 #[derive(Debug, Clone)]
 pub struct IndexStats {
+    /// Number of live (non-deleted) documents.
     pub num_docs: usize,
+    /// Number of on-disk segments.
     pub num_segments: usize,
 }
 
@@ -142,6 +177,7 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    /// A freshly-created index reports zero documents.
     #[test]
     fn empty_index_has_zero_docs() {
         let dir = TempDir::new().unwrap();
@@ -149,6 +185,7 @@ mod tests {
         assert_eq!(idx.stats().unwrap().num_docs, 0);
     }
 
+    /// `create_or_open` creates then re-opens the same directory cleanly.
     #[test]
     fn create_or_open_round_trips() {
         let dir = TempDir::new().unwrap();

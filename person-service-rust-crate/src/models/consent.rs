@@ -1,4 +1,12 @@
-//! Consent management models
+//! Consent-management models for GDPR-style data-governance.
+//!
+//! A [`Consent`] record captures that a person granted (or later
+//! revoked) permission of a given [`ConsentType`] (data processing,
+//! sharing, marketing, research, emergency access). The privacy layer
+//! ([`crate::privacy`]) checks active consent before performing
+//! consent-gated operations.
+//!
+//! All enums serialize lowercase to match the wire/DB contract.
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -63,7 +71,8 @@ pub struct Consent {
     /// How consent was obtained (e.g., "written", "electronic", "verbal")
     pub method: Option<String>,
 
-    /// Record timestamps
+    /// When this consent record was created.
     pub created_at: DateTime<Utc>,
+    /// When this consent record was last modified.
     pub updated_at: DateTime<Utc>,
 }

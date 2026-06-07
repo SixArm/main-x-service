@@ -1,9 +1,15 @@
+//! Criterion benchmarks proxying the database-write preparation cost.
+//!
+//! Without a live database, these measure the boundary work that precedes an
+//! insert: constructing a place and either validating it or normalizing it.
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use place_service::models::address::PostalAddress;
 use place_service::models::geo::GeoCoordinates;
 use place_service::models::place::Place;
 use place_service::validation::{normalize_place, validate_place};
 
+/// Benchmark constructing and validating a place (the create-time check).
 fn bench_place_create_validate(c: &mut Criterion) {
     c.bench_function("place_create_and_validate", |b| {
         b.iter(|| {
@@ -22,6 +28,7 @@ fn bench_place_create_validate(c: &mut Criterion) {
     });
 }
 
+/// Benchmark constructing and normalizing a place (the create-time cleanup).
 fn bench_place_create_normalize(c: &mut Criterion) {
     c.bench_function("place_create_and_normalize", |b| {
         b.iter_batched(

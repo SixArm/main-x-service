@@ -33,9 +33,13 @@ pub struct Metrics {
     /// service-specific metrics beyond this default set.
     pub registry: Registry,
 
+    /// Count of place records created.
     pub place_created_total: Counter,
+    /// Count of place records updated.
     pub place_updated_total: Counter,
+    /// Count of place records deleted.
     pub place_deleted_total: Counter,
+    /// Count of place match operations performed.
     pub place_matched_total: Counter,
 
     /// HTTP requests, labeled by method, path, and status code.

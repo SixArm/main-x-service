@@ -1,4 +1,20 @@
-//! Identifier model definition
+//! The [`Identifier`] model — external identity keys for a person.
+//!
+//! An identifier is a `(type, system, value)` triple: the
+//! [`IdentifierType`] says what kind of key it is (MRN, SSN, passport,
+//! …), the `system` URI names the issuing namespace, and `value` is the
+//! key itself. The matching engine uses exact identifier matches as a
+//! strong (often short-circuiting) signal of identity.
+//!
+//! # Examples
+//!
+//! ```
+//! use person_service::models::{Identifier, IdentifierType};
+//!
+//! let ssn = Identifier::ssn("123-45-6789".to_string());
+//! assert_eq!(ssn.identifier_type, IdentifierType::SSN);
+//! assert_eq!(ssn.system, "http://hl7.org/fhir/sid/us-ssn");
+//! ```
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -22,6 +38,8 @@ pub struct Identifier {
     pub assigner: Option<String>,
 }
 
+/// Intended use of an [`Identifier`], mirroring the FHIR
+/// `identifier-use` value set.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum IdentifierUse {
@@ -37,6 +55,11 @@ pub enum IdentifierUse {
     Old,
 }
 
+/// The kind of an [`Identifier`].
+///
+/// Serializes UPPERCASE (`IdentifierType::MRN` ⇄ `"MRN"`). Unknown
+/// values deserialize to [`Other`](IdentifierType::Other) rather than
+/// failing, so forward-compatible payloads are accepted.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum IdentifierType {
@@ -57,6 +80,11 @@ pub enum IdentifierType {
     Other,
 }
 
+/// Renders the canonical UPPERCASE code (e.g. `MRN`, `SSN`, `OTHER`).
+///
+/// This is the form persisted to the database and emitted in FHIR
+/// coding `code` fields, so it must stay aligned with the serde
+/// representation.
 impl std::fmt::Display for IdentifierType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -72,7 +100,22 @@ impl std::fmt::Display for IdentifierType {
 }
 
 impl Identifier {
-    /// Create a new identifier
+    /// Create an identifier from an explicit type, system, and value.
+    ///
+    /// `use_type` and `assigner` default to `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use person_service::models::{Identifier, IdentifierType};
+    ///
+    /// let id = Identifier::new(
+    ///     IdentifierType::NPI,
+    ///     "http://hl7.org/fhir/sid/us-npi".to_string(),
+    ///     "1234567890".to_string(),
+    /// );
+    /// assert_eq!(id.value, "1234567890");
+    /// ```
     pub fn new(
         identifier_type: IdentifierType,
         system: String,
@@ -87,7 +130,10 @@ impl Identifier {
         }
     }
 
-    /// Create a Medical Record Number identifier
+    /// Create a Medical Record Number identifier scoped to a facility.
+    ///
+    /// The `system` URI is derived from the facility name so MRNs from
+    /// different facilities don't collide.
     pub fn mrn(facility: String, value: String) -> Self {
         Self::new(
             IdentifierType::MRN,
@@ -96,7 +142,8 @@ impl Identifier {
         )
     }
 
-    /// Create a Social Security Number identifier
+    /// Create a US Social Security Number identifier with the standard
+    /// HL7 SSN system URI.
     pub fn ssn(value: String) -> Self {
         Self::new(
             IdentifierType::SSN,

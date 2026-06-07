@@ -4,5 +4,5 @@
 - Health check endpoints for orchestration
 - Graceful shutdown
 - Horizontal scaling support (stateless design)
-- Docker health checks
+- Podman container health checks
 - Non-root container execution

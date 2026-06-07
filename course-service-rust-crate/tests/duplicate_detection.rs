@@ -23,10 +23,12 @@ use course_service::models::{
 
 // ────────────────── builders ──────────────────
 
+/// Build a bare `Course` with just a name (all other fields defaulted).
 fn course(name: &str) -> Course {
     Course::new(name)
 }
 
+/// Build a bare identifier (scheme + value, no name/url).
 fn ident(scheme: IdentifierType, value: &str) -> CourseIdentifier {
     CourseIdentifier {
         property_id: scheme,
@@ -36,6 +38,7 @@ fn ident(scheme: IdentifierType, value: &str) -> CourseIdentifier {
     }
 }
 
+/// Construct a matching engine with the default config preset.
 fn engine() -> MatchingEngine {
     MatchingEngine::new(MatchConfig::default())
 }
@@ -44,6 +47,7 @@ fn engine() -> MatchingEngine {
 // Identical / near-duplicate cases
 // =============================================================================
 
+/// Identical clones score ≥ 0.95, classify High, and are a match.
 #[test]
 fn identical_clones_score_high_and_classify_as_match() {
     let mut a = course("Introduction to Computer Science");
@@ -58,6 +62,7 @@ fn identical_clones_score_high_and_classify_as_match() {
     assert!(r.is_match);
 }
 
+/// A single-character name typo still classifies as a match (Jaro-Winkler).
 #[test]
 fn name_typo_still_classifies_via_jaro_winkler() {
     let a = course("Linear Algebra");
@@ -73,6 +78,7 @@ fn name_typo_still_classifies_via_jaro_winkler() {
 // Deterministic short-circuits (FR-20 / matcher §R-0..R-2)
 // =============================================================================
 
+/// A shared DOI short-circuits to score 1.0 despite different names.
 #[test]
 fn doi_short_circuits_to_one_even_with_different_names() {
     let mut a = course("CS101");
@@ -87,6 +93,7 @@ fn doi_short_circuits_to_one_even_with_different_names() {
     assert_eq!(r.confidence, Confidence::High);
 }
 
+/// A shared Wikidata id short-circuits to score 1.0.
 #[test]
 fn wikidata_short_circuits_to_one() {
     let mut a = course("alpha");
@@ -99,6 +106,7 @@ fn wikidata_short_circuits_to_one() {
     assert!((r.score - 1.0).abs() < 1e-9);
 }
 
+/// Same provider + normalised course code short-circuits to score 1.0.
 #[test]
 fn same_provider_plus_course_code_short_circuits() {
     let provider = Uuid::new_v4();
@@ -114,6 +122,7 @@ fn same_provider_plus_course_code_short_circuits() {
     assert!((r.score - 1.0).abs() < 1e-9);
 }
 
+/// A shared `same_as` URL short-circuits to score 1.0.
 #[test]
 fn shared_same_as_url_short_circuits() {
     let mut a = course("Intro to Stats");
@@ -126,6 +135,7 @@ fn shared_same_as_url_short_circuits() {
     assert!((r.score - 1.0).abs() < 1e-9);
 }
 
+/// A shared LMS course id does NOT short-circuit (non-deterministic scheme).
 #[test]
 fn lms_course_id_does_not_short_circuit() {
     // LmsCourseId is intentionally NOT in `is_deterministic()`:
@@ -145,6 +155,7 @@ fn lms_course_id_does_not_short_circuit() {
 // Negative cases
 // =============================================================================
 
+/// Unrelated titles stay below the match threshold and classify Low.
 #[test]
 fn unrelated_courses_do_not_classify_as_match() {
     // With only `name` present, the renormalised weighted-sum reduces
@@ -161,6 +172,7 @@ fn unrelated_courses_do_not_classify_as_match() {
     assert_eq!(r.confidence, Confidence::Low);
 }
 
+/// An identical course code at different providers does NOT short-circuit.
 #[test]
 fn same_course_code_at_different_providers_does_not_short_circuit() {
     let mut a = course("Intro to CS");
@@ -182,6 +194,7 @@ fn same_course_code_at_different_providers_does_not_short_circuit() {
 // Field-routing pinning — guards the adapter's per-enum rewires
 // =============================================================================
 
+/// Adapter pins: a `provider_id` UUID routes through to the matcher string.
 #[test]
 fn provider_id_uuid_routes_through_to_matcher_string() {
     let provider = Uuid::new_v4();
@@ -196,6 +209,7 @@ fn provider_id_uuid_routes_through_to_matcher_string() {
     assert!(r.is_match);
 }
 
+/// Adapter pins: `educational_level` maps one-to-one into the breakdown.
 #[test]
 fn educational_level_routes_one_to_one() {
     let mut a = course("Quantum Mechanics");
@@ -207,6 +221,7 @@ fn educational_level_routes_one_to_one() {
     assert!(r.breakdown.educational_level_score.unwrap_or(0.0) >= 0.99);
 }
 
+/// Adapter pins: `learning_resource_type` carries through the projection.
 #[test]
 fn learning_resource_type_carries_through() {
     let mut a = course("Topology");
@@ -218,6 +233,7 @@ fn learning_resource_type_carries_through() {
     ));
 }
 
+/// Adapter pins: a custom identifier scheme round-trips its label.
 #[test]
 fn custom_identifier_scheme_round_trips_label() {
     let mut a = course("X");
@@ -233,6 +249,8 @@ fn custom_identifier_scheme_round_trips_label() {
 // Config presets
 // =============================================================================
 
+/// The strict preset raises the threshold (its matches are a subset of
+/// default's) while leaving raw scores unchanged.
 #[test]
 fn strict_preset_raises_threshold() {
     let strict = MatchingEngine::new(MatchConfig::strict());

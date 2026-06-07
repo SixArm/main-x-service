@@ -1,11 +1,39 @@
-//! Emergency contact model
+//! Emergency contacts attached to a worker.
+//!
+//! An [`EmergencyContact`] is a denormalized "who to call" record (name,
+//! relationship, telecom, optional address). It is *not* itself a worker and
+//! does not participate in matching; the validation layer requires the name
+//! and relationship to be present.
+//!
+//! # Examples
+//!
+//! ```
+//! use worker_service::models::EmergencyContact;
+//! use worker_service::models::{ContactPoint, ContactPointSystem};
+//!
+//! let contact = EmergencyContact {
+//!     name: "Jane Doe".into(),
+//!     relationship: "spouse".into(),
+//!     telecom: vec![ContactPoint {
+//!         system: ContactPointSystem::Phone,
+//!         value: "+1-202-555-0143".into(),
+//!         use_type: None,
+//!     }],
+//!     address: None,
+//!     is_primary: true,
+//! };
+//! assert!(contact.is_primary);
+//! ```
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::{Address, ContactPoint};
 
-/// Emergency contact for a worker
+/// An emergency contact for a worker — who to reach in an emergency.
+///
+/// At most one contact per worker is normally flagged
+/// [`is_primary`](Self::is_primary).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EmergencyContact {
     /// Contact's full name
@@ -29,6 +57,7 @@ mod tests {
     use super::*;
     use crate::models::ContactPointSystem;
 
+    /// A contact built via struct literal exposes its fields as set.
     #[test]
     fn test_emergency_contact_creation() {
         let contact = EmergencyContact {
@@ -50,6 +79,7 @@ mod tests {
         assert!(contact.address.is_none());
     }
 
+    /// A contact (including a nested address) survives a JSON round-trip.
     #[test]
     fn test_emergency_contact_serialization() {
         let contact = EmergencyContact {

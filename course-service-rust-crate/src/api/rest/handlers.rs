@@ -34,10 +34,15 @@ use crate::models::{
 use crate::streaming::{CourseEvent, EventKind};
 use crate::validation::{ValidationError, validate_course, validate_instance};
 
+/// Body of the `GET /api/health` liveness probe. All three fields are
+/// `'static` since they are baked in at compile time.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct HealthResponse {
+    /// Always `"healthy"` — presence of the field is the signal.
     pub status: &'static str,
+    /// Service identifier, fixed to `"course-service"`.
     pub service: &'static str,
+    /// Crate version, sourced from `CARGO_PKG_VERSION` at compile time.
     pub version: &'static str,
 }
 
@@ -71,21 +76,31 @@ pub async fn not_implemented(State(_state): State<AppState>) -> impl IntoRespons
 
 // ────────────────── Query / body types ──────────────────
 
+/// Pagination query string for plain list endpoints. Reserved for the
+/// `GET /api/courses` route (currently parked behind `not_implemented`).
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct ListQuery {
+    /// Page size; defaults to 20 via `default_limit`.
     #[serde(default = "default_limit")]
     pub limit: u64,
+    /// Rows to skip before the page; defaults to 0.
     #[serde(default)]
     pub offset: u64,
 }
 
+/// Query string for `GET /api/courses/search`. An empty / absent `q`
+/// falls back to a paged `list` rather than a full-text query.
 #[derive(Debug, Deserialize, Default, ToSchema, IntoParams)]
 pub struct SearchQuery {
+    /// Free-text query; empty/absent → paged list of all courses.
     pub q: Option<String>,
+    /// Maximum hits to return; defaults to 20 via `default_limit`.
     #[serde(default = "default_limit")]
     pub limit: u64,
+    /// Rows to skip (only meaningful on the empty-query list path).
     #[serde(default)]
     pub offset: u64,
+    /// When `true`, route through the Tantivy fuzzy matcher.
     #[serde(default)]
     pub fuzzy: bool,
     /// Accepted for API parity with sibling services; currently a
@@ -97,13 +112,18 @@ pub struct SearchQuery {
     pub mask_sensitive: bool,
 }
 
+/// Default page size (20) used by `#[serde(default = ...)]` on the
+/// `limit` fields of [`ListQuery`], [`SearchQuery`], and [`AuditQuery`].
 fn default_limit() -> u64 {
     20
 }
 
+/// Envelope for search results — the hydrated course rows plus a count.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SearchResponse {
+    /// Hydrated course records for this page of hits.
     pub items: Vec<Course>,
+    /// Number of items in `items` (this page, not the global total).
     pub total: usize,
 }
 
@@ -112,13 +132,20 @@ pub struct SearchResponse {
 /// a match list without an N+1 round-trip back to the API.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ScoredCandidate {
+    /// Id of the matched candidate course.
     pub course_id: Uuid,
+    /// Candidate's primary name (inlined to avoid an extra fetch).
     pub name: String,
+    /// Candidate's course code, when present.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub course_code: Option<String>,
+    /// Overall match score in `[0.0, 1.0]`.
     pub score: f64,
+    /// `true` when the score cleared the matcher's threshold.
     pub is_match: bool,
+    /// Human label for the confidence band (`"High"` / `"Medium"` / `"Low"`).
     pub confidence: &'static str,
+    /// Per-component score breakdown from the matcher.
     pub breakdown: crate::matching::MatchBreakdown,
 }
 
@@ -501,6 +528,9 @@ pub async fn delete_instance(
     }
 }
 
+/// Guard used by the instance sub-resource handlers: confirm the parent
+/// course exists before touching its instances. Returns the ready-made
+/// `404` (or `500`) response in the `Err` arm so callers can early-return.
 async fn require_course_exists(
     state: &AppState,
     course_id: &Uuid,
@@ -531,6 +561,9 @@ pub async fn check_duplicates(
 
 // ────────────────── Helpers ──────────────────
 
+/// Upper bound on candidates pulled from the search-engine blocker
+/// before the (more expensive) matcher scores each one. Caps the
+/// per-request matcher fan-out for create / match / check-duplicates.
 const BLOCK_CANDIDATE_LIMIT: usize = 50;
 
 /// Run the search-engine blocker → repository hydrate → matcher score
@@ -579,6 +612,8 @@ async fn find_probable_duplicates(
     Ok(scored)
 }
 
+/// Map a [`MatchConfidence`](crate::matching::MatchConfidence) band to
+/// its stable wire string for `ScoredCandidate.confidence`.
 fn confidence_label(c: crate::matching::MatchConfidence) -> &'static str {
     match c {
         crate::matching::MatchConfidence::High => "High",
@@ -587,6 +622,8 @@ fn confidence_label(c: crate::matching::MatchConfidence) -> &'static str {
     }
 }
 
+/// Build a `422 Unprocessable Entity` response carrying the field-scoped
+/// validation errors in the envelope's `details`.
 fn validation_response(errs: Vec<ValidationError>) -> axum::response::Response {
     let body: ApiResponse<Vec<ValidationError>> = ApiResponse::error_with_details(
         "VALIDATION_FAILED",
@@ -596,6 +633,7 @@ fn validation_response(errs: Vec<ValidationError>) -> axum::response::Response {
     (StatusCode::UNPROCESSABLE_ENTITY, Json(body)).into_response()
 }
 
+/// Build a `404 Not Found` response with the given human-readable message.
 fn not_found_response(msg: &str) -> axum::response::Response {
     let body: ApiResponse<()> = ApiResponse::error("NOT_FOUND", msg);
     (StatusCode::NOT_FOUND, Json(body)).into_response()
@@ -820,6 +858,8 @@ fn fold_duplicate_into_main(
     (merged, transferred)
 }
 
+/// Append each `incoming` string to `target` unless an equal value is
+/// already present — an order-preserving set union for `Vec<String>`.
 fn merge_unique<I: IntoIterator<Item = String>>(target: &mut Vec<String>, incoming: I) {
     for v in incoming {
         if !target.iter().any(|t| t == &v) {
@@ -905,8 +945,14 @@ pub async fn deduplicate(
     }
 }
 
+/// Page size for the batch-dedup scan's repository pagination — bounds
+/// memory per loop iteration while keeping round-trips low.
 const DEDUP_PAGE: u64 = 100;
 
+/// Drive the FR-9 batch scan: page through every active course, block +
+/// score candidates, auto-merge above the threshold, and queue the rest
+/// for review. A `seen_pairs` set keeps each unordered pair scored once,
+/// and `soft_deleted` skips rows already folded away this run.
 async fn run_batch_dedup(
     state: &AppState,
     req: &BatchDeduplicationRequest,
@@ -1055,6 +1101,9 @@ async fn auto_merge(
     Ok(())
 }
 
+/// Order a pair of ids deterministically (smaller first) so an
+/// unordered `(a, b)` pair has a single key in the dedup `seen_pairs`
+/// set regardless of scan order.
 fn canonical_pair(a: Uuid, b: Uuid) -> (Uuid, Uuid) {
     if a < b { (a, b) } else { (b, a) }
 }
@@ -1105,8 +1154,11 @@ pub async fn export_course_data(
 
 // ────────────────── Audit / streaming hooks (FR-17, FR-18) ──────────────────
 
+/// Query string for the two audit endpoints — caps how many newest-first
+/// rows are returned.
 #[derive(Debug, Deserialize, ToSchema, IntoParams)]
 pub struct AuditQuery {
+    /// Maximum audit rows to return; defaults to 20 via `default_limit`.
     #[serde(default = "default_limit")]
     pub limit: u64,
 }
@@ -1151,6 +1203,9 @@ pub async fn audit_recent(
     }
 }
 
+/// FR-17/FR-18 side effects for a create: write a `CREATE` audit row
+/// (new values only) and publish the corresponding event. Both failures
+/// are logged and swallowed so the primary write still succeeds.
 async fn record_create(
     state: &AppState,
     entity_type: &str,
@@ -1172,6 +1227,9 @@ async fn record_create(
     }
 }
 
+/// FR-17/FR-18 side effects for an update: write an `UPDATE` audit row
+/// (old + new values) and publish the event. Failures are logged and
+/// swallowed. A `None` prior serialises to JSON null.
 async fn record_update(
     state: &AppState,
     entity_type: &str,
@@ -1203,6 +1261,9 @@ async fn record_update(
     }
 }
 
+/// FR-17/FR-18 side effects for a (soft) delete: write a `DELETE` audit
+/// row (old values only) and publish the event. Failures are logged and
+/// swallowed.
 async fn record_delete(
     state: &AppState,
     entity_type: &str,
@@ -1226,6 +1287,9 @@ async fn record_delete(
     }
 }
 
+/// Audit + event side effects for creating a `CourseInstance`. The audit
+/// row is keyed on the parent `course_id` so the parent's audit history
+/// surfaces instance changes too.
 async fn record_instance_create(state: &AppState, course_id: Uuid, instance: &CourseInstance) {
     let payload = serde_json::to_value(instance).unwrap_or(serde_json::Value::Null);
     if let Err(e) = state
@@ -1246,6 +1310,8 @@ async fn record_instance_create(state: &AppState, course_id: Uuid, instance: &Co
     }
 }
 
+/// Audit + event side effects for updating a `CourseInstance`, keyed on
+/// the parent `course_id`. A `None` prior serialises to JSON null.
 async fn record_instance_update(
     state: &AppState,
     course_id: Uuid,
@@ -1280,6 +1346,8 @@ async fn record_instance_update(
     }
 }
 
+/// Audit + event side effects for soft-deleting a `CourseInstance`,
+/// keyed on the parent `course_id`.
 async fn record_instance_delete(
     state: &AppState,
     course_id: Uuid,
@@ -1307,6 +1375,10 @@ async fn record_instance_delete(
     }
 }
 
+/// Central error → HTTP mapping shared by every handler. Maps the
+/// domain [`Error`](enum@crate::Error) variants to status + stable code
+/// (404 / 422 / 409, everything else 500) and wraps the message in the
+/// standard failure envelope.
 fn error_response(e: crate::Error) -> axum::response::Response {
     let (status, code) = match &e {
         crate::Error::NotFound => (StatusCode::NOT_FOUND, "NOT_FOUND"),
@@ -1323,6 +1395,8 @@ mod tests {
     use super::*;
     use crate::models::{CourseIdentifier, IdentifierType, LinkType};
 
+    /// Compact constructor for a bare identifier (scheme + value, no
+    /// name/url) used to build merge fixtures.
     fn ident(scheme: IdentifierType, value: &str) -> CourseIdentifier {
         CourseIdentifier {
             property_id: scheme,
@@ -1332,6 +1406,9 @@ mod tests {
         }
     }
 
+    /// `fold_duplicate_into_main` unions free-text collections without
+    /// introducing duplicates, dedupes identifiers by (scheme, value),
+    /// records the former primary name, and adds a `Replaces` link.
     #[test]
     fn fold_unions_collections_and_dedupes_identifiers() {
         let mut main = Course::new("Intro to CS");
@@ -1370,6 +1447,8 @@ mod tests {
         assert_eq!(transferred["from_course_id"], serde_json::json!(dup.id));
     }
 
+    /// `fold_duplicate_into_main` is pure with respect to its inputs:
+    /// neither the `main` nor the `duplicate` argument is mutated.
     #[test]
     fn fold_does_not_mutate_inputs() {
         let main = Course::new("A");

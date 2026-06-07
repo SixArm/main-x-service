@@ -1,4 +1,14 @@
 //! REST handlers for events.
+//!
+//! One async function per route (CRUD, search, match, dedup, merge,
+//! privacy export/mask, audit) plus their request/response DTOs and a
+//! few private blocking/conversion helpers. Each public handler carries
+//! a `#[utoipa::path]` attribute that feeds
+//! [`ApiDoc`](crate::api::rest::ApiDoc). Handlers take
+//! [`AppState`](crate::api::rest::AppState) via Axum's `State` extractor
+//! and return `impl IntoResponse`; errors are returned as
+//! [`ApiResponse`](crate::api::ApiResponse) error envelopes with an
+//! appropriate [`StatusCode`](axum::http::StatusCode).
 
 use axum::{
     extract::{Path, Query, State},
@@ -19,10 +29,14 @@ use super::state::AppState;
 // Health
 // ---------------------------------------------------------------------------
 
+/// Body returned by the health-check endpoint.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct HealthResponse {
+    /// Liveness status string (`"healthy"`).
     pub status: String,
+    /// Service name (`"event-service"`).
     pub service: String,
+    /// Crate version from `CARGO_PKG_VERSION`.
     pub version: String,
 }
 
@@ -32,6 +46,8 @@ pub struct HealthResponse {
     tag = "health",
     responses((status = 200, description = "Service is healthy", body = HealthResponse))
 )]
+/// Liveness probe: always returns a 200 [`HealthResponse`] naming the
+/// service and version. Used by orchestrators and load balancers.
 pub async fn health_check() -> impl IntoResponse {
     Json(HealthResponse {
         status: "healthy".into(),
@@ -64,8 +80,11 @@ pub async fn metrics_prom() -> impl IntoResponse {
 // Event CRUD
 // ---------------------------------------------------------------------------
 
+/// Create-event request body: a flattened [`Event`] (the create
+/// endpoint deserializes the event JSON directly).
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateEventRequest {
+    /// The event to create, deserialized inline.
     #[serde(flatten)]
     pub event: Event,
 }
@@ -82,6 +101,9 @@ pub struct CreateEventRequest {
         (status = 500, description = "Internal server error")
     )
 )]
+/// `POST /events` — validate, mint an id if absent, run duplicate
+/// detection (returning `409` with candidates when matches are found),
+/// persist via the repository, index for search, and return `201`.
 pub async fn create_event(
     State(state): State<AppState>,
     Json(mut payload): Json<Event>,
@@ -145,6 +167,7 @@ pub async fn create_event(
         (status = 404, description = "Event not found")
     )
 )]
+/// `GET /events/{id}` — fetch one non-deleted event, or `404`.
 pub async fn get_event(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
     match state.event_repository.get_by_id(&id).await {
         Ok(Some(event)) => (StatusCode::OK, Json(ApiResponse::success(event))),
@@ -176,6 +199,8 @@ pub async fn get_event(State(state): State<AppState>, Path(id): Path<Uuid>) -> i
         (status = 422, description = "Validation error")
     )
 )]
+/// `PUT /events/{id}` — validate, force the body's id to the path id,
+/// replace the event (and its child rows), re-index, return `200`.
 pub async fn update_event(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -219,6 +244,8 @@ pub async fn update_event(
         (status = 500, description = "Internal server error")
     )
 )]
+/// `DELETE /events/{id}` — soft-delete the event and remove it from the
+/// search index; returns `204`.
 pub async fn delete_event(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -244,14 +271,18 @@ pub async fn delete_event(
 // Search
 // ---------------------------------------------------------------------------
 
+/// Query-string parameters for `GET /events/search`.
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
 pub struct SearchQuery {
     /// Free-text query (name / description / keywords / parties / identifiers).
     pub q: String,
+    /// Max results to return (defaults to 10, capped at 100).
     #[serde(default = "default_limit")]
     pub limit: usize,
+    /// Number of leading results to skip (pagination).
     #[serde(default)]
     pub offset: usize,
+    /// Use fuzzy title search instead of exact full-text search.
     #[serde(default)]
     pub fuzzy: bool,
     /// Mask sensitive PII (party emails, etc.) before returning.
@@ -267,16 +298,23 @@ pub struct SearchQuery {
     pub event_type: Option<EventType>,
 }
 
+/// Default `limit` for search when unspecified.
 fn default_limit() -> usize {
     10
 }
 
+/// Paginated search results envelope.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SearchResponse {
+    /// The matching events on this page (post-filter, post-mask).
     pub events: Vec<Event>,
+    /// Number of events on this page.
     pub total: usize,
+    /// Echo of the original query string.
     pub query: String,
+    /// Echo of the requested offset.
     pub offset: usize,
+    /// Echo of the effective (capped) limit.
     pub limit: usize,
 }
 
@@ -287,6 +325,10 @@ pub struct SearchResponse {
     params(SearchQuery),
     responses((status = 200, description = "Search results", body = SearchResponse))
 )]
+/// `GET /events/search` — run a full-text or fuzzy search, hydrate the
+/// hit ids from the repository, apply optional status / type / date
+/// filters and optional masking, and return a paginated
+/// [`SearchResponse`].
 pub async fn search_events(
     State(state): State<AppState>,
     Query(params): Query<SearchQuery>,
@@ -358,32 +400,47 @@ pub async fn search_events(
 // Matching
 // ---------------------------------------------------------------------------
 
+/// Request body for `POST /events/match`: the probe event (flattened)
+/// plus optional score threshold and result limit.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct MatchRequest {
+    /// The event to find matches for, deserialized inline.
     #[serde(flatten)]
     pub event: Event,
+    /// Minimum score to include in results (defaults to 0.5).
     #[serde(default)]
     pub threshold: Option<f64>,
+    /// Max number of matches to return (defaults to 10).
     #[serde(default = "default_match_limit")]
     pub limit: usize,
 }
 
+/// Default `limit` for the match endpoint when unspecified.
 fn default_match_limit() -> usize {
     10
 }
 
+/// One scored candidate returned by match / dedup endpoints.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct MatchResponse {
+    /// The candidate event.
     pub event: Event,
+    /// Overall match score in `[0.0, 1.0]`.
     pub score: f64,
+    /// Human label for the score (`certain` / `probable` / `possible`).
     pub quality: String,
+    /// Which strategy produced the score (`"probabilistic"`).
     pub detection_method: String,
+    /// Optional per-component score breakdown as JSON.
     pub score_breakdown: Option<serde_json::Value>,
 }
 
+/// Collection wrapper for match results.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct MatchResultsResponse {
+    /// The scored matches, best first.
     pub matches: Vec<MatchResponse>,
+    /// Number of matches returned.
     pub total: usize,
 }
 
@@ -394,6 +451,9 @@ pub struct MatchResultsResponse {
     request_body = MatchRequest,
     responses((status = 200, description = "Match results", body = MatchResultsResponse))
 )]
+/// `POST /events/match` — gather blocking candidates by name + date,
+/// score them against the probe event, filter by threshold, and return
+/// the top matches.
 pub async fn match_event(
     State(state): State<AppState>,
     Json(payload): Json<MatchRequest>,
@@ -428,12 +488,19 @@ pub async fn match_event(
 // Duplicate detection
 // ---------------------------------------------------------------------------
 
+/// Result of a duplicate check: whether any candidates crossed the
+/// configured threshold, and the matches themselves.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DuplicateCheckResponse {
+    /// `true` when at least one candidate scored at/above threshold.
     pub has_duplicates: bool,
+    /// The scored potential duplicates.
     pub potential_matches: Vec<MatchResponse>,
 }
 
+/// Shared duplicate-detection core used by both `create_event` and
+/// `check_duplicates`: block by name + date, score, keep candidates at
+/// or above the configured `threshold_score`.
 async fn check_duplicates_internal(state: &AppState, event: &Event) -> Vec<MatchResponse> {
     let candidates = blocking_candidates(state, event).await;
     state
@@ -449,6 +516,9 @@ async fn check_duplicates_internal(state: &AppState, event: &Event) -> Vec<Match
         .unwrap_or_default()
 }
 
+/// Build the candidate set for matching: query the search index for
+/// events with a similar name on the same `start_date` day, hydrate
+/// them from the repository, and exclude the probe event's own id.
 async fn blocking_candidates(state: &AppState, event: &Event) -> Vec<Event> {
     let date = event.start_date.format("%Y-%m-%d").to_string();
     let candidate_ids = state
@@ -470,6 +540,9 @@ async fn blocking_candidates(state: &AppState, event: &Event) -> Vec<Event> {
     candidates
 }
 
+/// Convert an internal [`MatchResult`](crate::matching::MatchResult)
+/// into the API [`MatchResponse`], deriving the `quality` label from
+/// the score and serializing the breakdown to JSON.
 fn to_match_response(m: crate::matching::MatchResult) -> MatchResponse {
     let quality = if m.score >= 0.95 {
         "certain"
@@ -495,6 +568,9 @@ fn to_match_response(m: crate::matching::MatchResult) -> MatchResponse {
     request_body = Event,
     responses((status = 200, description = "Duplicate check result", body = DuplicateCheckResponse))
 )]
+/// `POST /events/check-duplicates` — run duplicate detection for a
+/// candidate event without persisting it; returns a
+/// [`DuplicateCheckResponse`].
 pub async fn check_duplicates(
     State(state): State<AppState>,
     Json(event): Json<Event>,
@@ -521,6 +597,11 @@ pub async fn check_duplicates(
         (status = 404, description = "Event not found")
     )
 )]
+/// `POST /events/merge` — merge a duplicate into a surviving main
+/// event: union identifiers / alternate names / keywords / locations /
+/// parties / `same_as`, record the duplicate's name as an alternate,
+/// link main → `Replaces` duplicate, soft-delete the duplicate, update
+/// indices, publish a `Merged` event, and return the merge record.
 pub async fn merge_events(
     State(state): State<AppState>,
     Json(req): Json<crate::models::MergeRequest>,
@@ -700,6 +781,10 @@ pub async fn merge_events(
     request_body = crate::models::BatchDeduplicationRequest,
     responses((status = 200, description = "Deduplication results", body = crate::models::BatchDeduplicationResponse))
 )]
+/// `POST /events/deduplicate` — scan up to 1000 active events pairwise,
+/// score each pair, de-dupe symmetric pairs, and emit
+/// [`ReviewQueueItem`](crate::models::ReviewQueueItem)s — `AutoMerged`
+/// above the auto-merge threshold, otherwise `Pending` for review.
 pub async fn batch_deduplicate(
     State(state): State<AppState>,
     Json(req): Json<crate::models::BatchDeduplicationRequest>,
@@ -805,6 +890,8 @@ pub async fn batch_deduplicate(
         (status = 404, description = "Event not found")
     )
 )]
+/// `GET /events/{id}/export` — GDPR right-of-access export of one
+/// event's data as JSON, or `404`.
 pub async fn export_event_data(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -841,6 +928,8 @@ pub async fn export_event_data(
         (status = 404, description = "Event not found")
     )
 )]
+/// `GET /events/{id}/masked` — return the event with sensitive fields
+/// (identifier values, party emails) masked, or `404`.
 pub async fn get_event_masked(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -871,12 +960,15 @@ pub async fn get_event_masked(
 // Audit
 // ---------------------------------------------------------------------------
 
+/// Query parameters for the entity / recent audit-log endpoints.
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
 pub struct AuditLogQuery {
+    /// Max log rows to return (defaults to 50, capped at 500).
     #[serde(default = "default_audit_limit")]
     pub limit: i64,
 }
 
+/// Default `limit` for audit-log queries when unspecified.
 fn default_audit_limit() -> i64 {
     50
 }
@@ -888,6 +980,8 @@ fn default_audit_limit() -> i64 {
     params(("id" = Uuid, Path, description = "Event UUID"), AuditLogQuery),
     responses((status = 200, description = "Audit logs retrieved"))
 )]
+/// `GET /events/{id}/audit` — return the audit trail for one event,
+/// newest first.
 pub async fn get_event_audit_logs(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -917,6 +1011,8 @@ pub async fn get_event_audit_logs(
     params(AuditLogQuery),
     responses((status = 200, description = "Recent audit logs retrieved"))
 )]
+/// `GET /audit/recent` — return recent system-wide audit activity,
+/// newest first.
 pub async fn get_recent_audit_logs(
     State(state): State<AppState>,
     Query(params): Query<AuditLogQuery>,
@@ -934,9 +1030,12 @@ pub async fn get_recent_audit_logs(
     }
 }
 
+/// Query parameters for the per-user audit-log endpoint.
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
 pub struct UserAuditLogQuery {
+    /// The acting user id to filter the audit trail by.
     pub user_id: String,
+    /// Max log rows to return (defaults to 50, capped at 500).
     #[serde(default = "default_audit_limit")]
     pub limit: i64,
 }
@@ -948,6 +1047,8 @@ pub struct UserAuditLogQuery {
     params(UserAuditLogQuery),
     responses((status = 200, description = "User audit logs retrieved"))
 )]
+/// `GET /audit/user` — return the audit trail for one user, newest
+/// first.
 pub async fn get_user_audit_logs(
     State(state): State<AppState>,
     Query(params): Query<UserAuditLogQuery>,

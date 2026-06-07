@@ -1,7 +1,12 @@
+//! Integration tests for the privacy workflow ([`mask_thing`] /
+//! [`gdpr_export`]): masking sensitive fields, full GDPR export, and the
+//! immutability of the original record.
+
 use thing_service::models::identifier::ThingIdentifier;
 use thing_service::models::thing::Thing;
 use thing_service::privacy::{gdpr_export, mask_thing};
 
+/// Masking then exporting yields withheld owner and a truncated identifier.
 #[test]
 fn test_mask_then_export_workflow() {
     let mut thing = Thing::new("Private Diary");
@@ -18,6 +23,7 @@ fn test_mask_then_export_workflow() {
     assert!(id_value.ends_with("7890"));
 }
 
+/// A full GDPR export contains all the expected top-level fields.
 #[test]
 fn test_gdpr_export_full_data() {
     let mut thing = Thing::new("GDPR Test");
@@ -35,6 +41,7 @@ fn test_gdpr_export_full_data() {
     assert!(export.get("updated_at").is_some());
 }
 
+/// Masking returns a copy and leaves the original record untouched.
 #[test]
 fn test_mask_does_not_modify_original() {
     let mut thing = Thing::new("Original");
@@ -44,6 +51,7 @@ fn test_mask_does_not_modify_original() {
     assert_eq!(thing.owner.as_deref(), Some("Owner Name"));
 }
 
+/// A soft-deleted thing exports with its delete flag and timestamp set.
 #[test]
 fn test_soft_delete_then_export() {
     let mut thing = Thing::new("Deleted Thing");

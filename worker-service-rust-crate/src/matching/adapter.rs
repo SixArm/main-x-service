@@ -29,7 +29,7 @@
 //! | first telecom `Sms` | `mobile` |
 //! | first telecom `Email` | `email` |
 //! | `tax_id` | `us_ssn` (default; overridable by typed identifier with non-US system URI) |
-//! | `identifiers[]` | country-specific slot via [`route_identifier`] |
+//! | `identifiers[]` | country-specific slot via `route_identifier` |
 //! | `documents[]` of type `Passport` | `passport_books` (one per passport) |
 //!
 //! Service-only fields (`id`, `active`, `worker_type`, `deceased_datetime`,
@@ -121,6 +121,8 @@ pub fn to_matcher_worker(w: &Worker) -> MWorker {
     b.build()
 }
 
+/// Maps the service [`Gender`] enum onto the matcher's `Gender` enum
+/// one-for-one.
 fn map_gender(g: Gender) -> MGender {
     match g {
         Gender::Male => MGender::Male,
@@ -130,6 +132,9 @@ fn map_gender(g: Gender) -> MGender {
     }
 }
 
+/// Returns the value of the first telecom entry whose system matches
+/// `system`, or `None`. Used to fill the matcher's single
+/// `phone`/`mobile`/`email` slots from the service's telecom vector.
 fn first_telecom(telecom: &[ContactPoint], system: ContactPointSystem) -> Option<String> {
     telecom
         .iter()
@@ -137,6 +142,10 @@ fn first_telecom(telecom: &[ContactPoint], system: ContactPointSystem) -> Option
         .map(|c| c.value.clone())
 }
 
+/// Returns `true` when two [`ContactPointSystem`] values are the same variant.
+///
+/// A dedicated comparison (rather than `PartialEq`) keeps the variant list
+/// explicit, so adding a new system forces a deliberate decision here.
 fn matches_system(a: &ContactPointSystem, b: &ContactPointSystem) -> bool {
     matches!(
         (a, b),
@@ -150,7 +159,13 @@ fn matches_system(a: &ContactPointSystem, b: &ContactPointSystem) -> bool {
     )
 }
 
+/// Projects a service [`Address`] onto a matcher `Address`, or `None` if every
+/// field is empty (an all-`None` address carries no matching signal).
+///
+/// Note the field rename: the service's `state` maps to the matcher's
+/// `county`, and `postal_code` to `postcode`.
 fn map_address(a: &Address) -> Option<MAddress> {
+    // Skip addresses where every component is absent.
     let any = a.line1.is_some()
         || a.line2.is_some()
         || a.city.is_some()
@@ -233,6 +248,9 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
         return b.nz_nhi(val);
     }
     if sys.contains("ihi") {
+        // "IHI" is ambiguous between Australia and Ireland; disambiguate by
+        // length — the Australian IHI is a 16-digit number, the Irish one is
+        // shorter — so a 14+-digit value routes to AU, else IE.
         if val.chars().filter(|c| c.is_ascii_digit()).count() >= 14 {
             return b.au_ihi(val);
         }
@@ -252,6 +270,9 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
     }
 }
 
+/// Builds a matcher `PassportBook` from an [`IdentityDocument`], or `None`
+/// when the issuing country is missing/blank (the matcher keys passports by
+/// country + number, so both are required).
 fn build_passport(d: &IdentityDocument) -> Option<MPassport> {
     let country = d.issuing_country.as_deref()?.trim();
     if country.is_empty() {
@@ -274,6 +295,7 @@ mod tests {
     use chrono::Utc;
     use uuid::Uuid;
 
+    /// Builds a minimal service worker with the given family/given name.
     fn svc_worker(family: &str, given: &str) -> Worker {
         Worker {
             id: Uuid::new_v4(),
@@ -307,6 +329,7 @@ mod tests {
         }
     }
 
+    /// Family and given names survive the projection to the matcher worker.
     #[test]
     fn round_trip_names_and_dob() {
         let svc = svc_worker("Williams", "Alice");
@@ -315,6 +338,7 @@ mod tests {
         assert_eq!(m.given_name.as_deref(), Some("Alice"));
     }
 
+    /// An NHS system URI routes the identifier into the `uk_nhs_number` slot.
     #[test]
     fn routes_uk_nhs_by_system_uri() {
         let mut svc = svc_worker("Smith", "John");

@@ -2,11 +2,16 @@
 
 use serde::{Deserialize, Serialize};
 
+/// The outcome of matching two courses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchResult {
+    /// Overall score in `[0.0, 1.0]`.
     pub score: f64,
+    /// True when `score` meets the configured probable-match threshold.
     pub is_match: bool,
+    /// Coarse confidence band derived from `score`.
     pub confidence: Confidence,
+    /// Per-component score breakdown.
     pub breakdown: MatchBreakdown,
 }
 
@@ -21,10 +26,14 @@ impl Default for MatchResult {
     }
 }
 
+/// Coarse confidence band for a match score.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Confidence {
+    /// Definite match (score >= 0.95).
     High,
+    /// Likely match (score >= 0.70).
     Medium,
+    /// Unlikely match (score < 0.70).
     #[default]
     Low,
 }
@@ -43,13 +52,21 @@ impl Confidence {
     }
 }
 
+/// Per-component scores. `None` means the component was skipped because one or
+/// both records lacked the data, so it did not contribute to the weighted sum.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MatchBreakdown {
+    /// Name similarity (Jaro-Winkler).
     pub name_score: Option<f64>,
+    /// Same-provider course-code similarity.
     pub course_code_score: Option<f64>,
+    /// Provider similarity.
     pub provider_score: Option<f64>,
+    /// Educational-level similarity.
     pub educational_level_score: Option<f64>,
+    /// Keywords (Jaccard) similarity.
     pub keywords_score: Option<f64>,
+    /// Teaches / competencies (Jaccard) similarity.
     pub teaches_score: Option<f64>,
     /// True when the deterministic short-circuit fired.
     pub deterministic_match: bool,

@@ -1,138 +1,213 @@
-# Place matcher — documentation index
+# Place matcher Rust Crate
 
-A Rust crate for pairwise matching of geographic-place records (deterministic and probabilistic) for de-duplication and record linkage.
+A Rust library for deciding whether two records describe the same geographic place.
 
-> **Crate:** `place-matcher` v0.4.0 &nbsp;·&nbsp; **Edition:** Rust 2024 &nbsp;·&nbsp; **Licence:** MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause
->
-> **Repository:** https://github.com/sixarm/place-matcher-rust-crate
+> **Documentation index:** [`index.md`](./index.md) is the top-level map of every doc in this repo (spec, AGENTS guides, CHANGELOG, examples). Start there if you're new.
 
----
+## What it does
 
-## Where to start
+`place-matcher` compares pairs of [`Place`] records — landmarks (Eiffel Tower, Big Ben), natural features (Yosemite, Lake Como), chain branches (Starbucks at a given address), administrative areas (cities, neighbourhoods) — and tells you whether they refer to the same place. It is built for de-duplication and record linkage across geographic data sources that disagree on names, encodings, coordinates, and identifier schemes.
 
-| If you are… | Read this first |
-|---|---|
-| A new user of the crate | [README.md](./README.md) |
-| Looking at one worked example end-to-end | [examples/basic_usage.rs](./examples/basic_usage.rs) |
-| A contributor (human or AI) | [AGENTS.md](./AGENTS.md) |
-| A reviewer who needs the authoritative behaviour | [spec.md](./spec.md) |
-| Tracking what changed when | [CHANGELOG.md](./CHANGELOG.md) |
+The crate provides two strategies behind one engine:
 
----
+- **Deterministic** — a hard `bool` from a shared external place ID (Google, OSM, Wikidata, …) or from an identical normalised name plus identical normalised postcode.
+- **Probabilistic** — a weight-renormalised score in `[0.0, 1.0]` over name, coordinates (Haversine distance with a Gaussian decay), address, category, country code, external IDs, phone, and email, with a per-field [`MatchBreakdown`] so every decision is auditable.
 
-## At a glance
+The library is pure: no IO, no clocks, no RNGs, `#![forbid(unsafe_code)]`, `Send + Sync`. It is suitable as a leaf dependency under web servers, batch jobs, or notebooks.
 
-The "Spec section" column points to the authoritative definition in [`spec.md`](./spec.md).
+## Installation
 
-| Capability | Where it lives | Spec section |
+```toml
+[dependencies]
+place-matcher = "0.4"
+```
+
+## Quick start — probabilistic match
+
+```rust
+use place_matcher::{MatchingEngine, Place};
+
+let a = Place::builder()
+    .name("Eiffel Tower")
+    .latitude(48.858_222)
+    .longitude(2.294_500)
+    .build();
+
+let b = Place::builder()
+    .name("La Tour Eiffel")
+    .add_alternate_name("Eiffel Tower")
+    .latitude(48.858_3)
+    .longitude(2.294_5)
+    .build();
+
+let engine = MatchingEngine::default_config();
+let result = engine.match_places(&a, &b);
+
+assert!(result.is_match);
+println!("score = {:.2}", result.score);
+println!("name  = {:?}", result.breakdown.name_score);
+println!("coord = {:?}", result.breakdown.coordinates_score);
+```
+
+The `MatchBreakdown` carries one `Option<f64>` per scored field; a `None` means the field was absent on at least one side and so did not contribute. Missing fields neither raise nor lower the score.
+
+## Quick start — deterministic match
+
+A shared external place ID (any `(scheme, value)` pair across the two records) is enough on its own:
+
+```rust
+use place_matcher::{MatchingEngine, Place, PlaceId, PlaceIdScheme};
+
+let id = PlaceId::new(PlaceIdScheme::Wikidata, "Q243").unwrap();
+
+let a = Place::builder().name("Eiffel Tower").add_place_id(id.clone()).build();
+let b = Place::builder().name("Tour Eiffel").add_place_id(id).build();
+
+let engine = MatchingEngine::default_config();
+assert!(engine.deterministic_match(&a, &b));
+```
+
+Identical normalised name plus identical normalised postcode is also accepted as a deterministic match (useful when no shared external ID is available).
+
+## The `Place` model
+
+| Field | Type | Purpose |
 |---|---|---|
-| Probabilistic match — `MatchingEngine::match_places` returning `MatchResult` with per-field `MatchBreakdown` and `Confidence` band | `src/matcher.rs` | §5.2, §3.7 |
-| Deterministic match — `MatchingEngine::deterministic_match` returning `bool` | `src/matcher.rs` | §5.1 |
-| Batch screening — `match_one_to_many`, `rank_one_to_many` | `src/matcher.rs` | §5.3 |
-| Place data model — `Place`, `Address`, `PlaceCategory`, `PlaceId`, `PlaceIdScheme` | `src/models.rs` | §3.1–§3.5 |
-| External place IDs — Google, OSM (Node / Way / Relation), GeoNames, Wikidata, Foursquare, Here, Mapbox, `Other` | `src/models.rs` | §3.5 |
-| 36-variant `PlaceCategory` enum (`#[non_exhaustive]`) | `src/models.rs` | §3.4 |
-| 15-field `Place` struct (10 scored, 5 data-only) | `src/models.rs` | §3.1.1 |
-| Geographic primitives — `Scorer::haversine_metres`, `Scorer::coordinates_score` (Gaussian decay) | `src/scorer.rs` | §6.3 |
-| String similarity — Jaro-Winkler, Levenshtein, Combined, Exact via `SimilarityAlgorithm` | `src/scorer.rs` | §6.1 |
-| Name handling — diacritics, punctuation, alternate-name cartesian product, optional Soundex bonus | `src/normalizer.rs`, `src/matcher.rs` | §4.1, §6.1, §6.2 |
-| International phone normalisation (E.164) — 39 jurisdictions via `COUNTRY_PHONE_TABLE` | `src/normalizer.rs` | §4.3 |
-| Address parsing — house number / unit / street with English abbreviation expansion | `src/normalizer.rs` | §4.5 |
-| Email normalisation — trim + lowercase + structural validation; optional Gmail dot- and `+tag`-folding | `src/normalizer.rs` | §4.4, §6.9 |
-| Phonetic encoding — American Soundex | `src/normalizer.rs` | §4.6 |
-| Config from JSON — `MatchConfig` derives serde with `#[serde(default)]`; tunings can live in a file | `src/matcher.rs` | §7 |
-| Configuration presets — `default()`, `strict()`, `lenient()` | `src/matcher.rs` | §7.1–§7.3 |
-| Determinism, no-IO, no-unsafe, `Send + Sync`, `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]` | `src/lib.rs` | §8 |
+| `name` | `Option<String>` | Primary canonical name. |
+| `alternate_names` | `Vec<String>` | Aliases, endonyms, translations. The matcher takes the best score across the cartesian product. |
+| `latitude`, `longitude` | `Option<f64>` | Decimal degrees. Non-finite or out-of-range values are treated as missing by the coordinates scorer. |
+| `category` | `Option<PlaceCategory>` | Coarse-grained category (Hotel, Restaurant, Museum, …). `#[non_exhaustive]`. |
+| `place_ids` | `Vec<PlaceId>` | External scheme-scoped identifiers (Google, OSM, Wikidata, GeoNames, Foursquare, Here, Mapbox, Other). |
+| `address` | `Option<Address>` | Postal address. Partial addresses (postcode only, say) are first-class. |
+| `phone` | `Option<String>` | Contact phone. Compared after E.164 normalisation when possible. |
+| `email` | `Option<String>` | Contact email. Compared after canonical-form normalisation. |
+| `local_id` | `Option<String>` | Originating-system identifier. Stored for round-trip but **not** scored — different sources may issue colliding values. |
+| `altitude_as_metre` | `Option<f64>` | Object-above-surface height (rooftop, cruise level). Not scored. |
+| `elevation_as_metre` | `Option<f64>` | Ground-surface reference height (mountain summit). Not scored. |
+| `area_as_metre_2` | `Option<f64>` | Footprint in m². Not scored. |
+| `country_code_as_iso_3166_1_alpha_2` | `Option<String>` | ISO 3166-1 alpha-2 (`"GB"`, `"US"`, `"FR"`). Compared case-insensitively. |
+| `maximum_capacity_count` | `Option<u32>` | Legal / seating capacity. Not scored. |
 
----
+Build records via the fluent [`Place::builder`]; all setters accept `impl Into<String>`.
 
-## Core documents
+## The match pipeline
 
-### [spec.md](./spec.md) — living specification (SSOT)
-The single source of truth. Scope, terminology, data model, normalisation rules, match strategies, per-field scoring, configuration, determinism guarantees, error model, SemVer policy, open questions, worked examples, glossary.
+1. Each scoring component yields `Some(score)` in `[0.0, 1.0]` or `None` (missing on at least one side).
+2. The weighted sum runs over components that scored.
+3. The sum of participating weights divides through — **renormalisation** ensures missing fields do not penalise.
+4. A phonetic-name match (Soundex on normalised names) adds a `0.05`-weighted bonus when the gating phonetic score exceeds `0.9`, only when `use_phonetic_matching` is on. The bonus never lowers a score.
+5. `is_match = score >= match_threshold` (strict mode additionally requires `deterministic_match`).
+6. `confidence = Confidence::from_score(score)` — bands are fixed (`>= 0.90` High, `>= 0.75` Medium, else Low) and **independent** of `match_threshold`.
 
-### [README.md](./README.md) — user-facing overview
-Quick-start examples, the public API at a glance, configuration presets, batch scoring, limitations.
+### Default weights
 
-### [CHANGELOG.md](./CHANGELOG.md) — version history
-Dated, per-version log of additions, behaviour changes, removals, and dependency churn. Kept in lockstep with `Cargo.toml` versions and `spec.md` updates.
-
-### [AGENTS.md](./AGENTS.md) — agent / contributor guide
-The rules of the road. Quick orientation, golden rules, workflow, what not to do, file layout.
-
----
-
-## Agent topic guides ([AGENTS/](./AGENTS/))
-
-Each topic guide cross-references the authoritative section of [`spec.md`](./spec.md).
-
-| Guide | Topic | Authoritative spec section |
+| Component | Weight | Notes |
 |---|---|---|
-| [architecture.md](./AGENTS/architecture.md) | Module layout, layering rules, dependency graph | §3, §8 |
-| [coding-style.md](./AGENTS/coding-style.md) | Rust conventions: naming, idioms, error handling, doc comments | §8, §9 |
-| [testing.md](./AGENTS/testing.md) | Test pyramid, fixtures, property tests, doctests | (all) |
-| [matching-algorithm.md](./AGENTS/matching-algorithm.md) | Deterministic and probabilistic scoring, weights, coordinates | §5, §6, §7 |
-| [normalization.md](./AGENTS/normalization.md) | Name, postcode, phone, email, address, phonetic rules | §4 |
-| [security-and-privacy.md](./AGENTS/security-and-privacy.md) | Personal-data handling, no-IO posture, threat model | §8 |
-| [release.md](./AGENTS/release.md) | Versioning, CHANGELOG, publishing checklist | §9 |
-| [spec-driven-development.md](./AGENTS/spec-driven-development.md) | How `spec.md` is maintained as the SSOT | §10 |
+| Name | `0.20` | Best of cartesian product across primary + alternates, via the configured `SimilarityAlgorithm` (default `Combined` = 0.7 × Jaro-Winkler + 0.3 × Levenshtein). |
+| Coordinates | `0.30` | Gaussian decay `exp(-(d/s)^2)` over the Haversine distance. Default scale `s = 50` m. |
+| Address | `0.10` | Postcode `0.5`, city `0.3`, line 1 `0.2` — weight-renormalised across populated sub-fields; empty address scores neutral `0.5`. |
+| Category | `0.10` | `1.0` if equal, `0.0` if both set and differ, `None` if either missing. |
+| Country code | `0.05` | Case-insensitive equality after trim. |
+| Place IDs | `0.15` | `1.0` if any `(scheme, value)` pair is shared, `0.0` if both non-empty but no overlap, `None` if either empty. |
+| Phone | `0.03` | E.164 equality preferred; falls back to the legacy national-significant form when E.164 cannot be derived. |
+| Email | `0.02` | Canonical-form equality; optional Gmail dot-and-`+tag` folding. |
+| Phonetic bonus | `+0.05` when gated | Bonus only — never lowers a score. |
 
----
+## Configuration presets
 
-## Supporting files
+```rust
+use place_matcher::{MatchConfig, MatchingEngine};
 
-- [Cargo.toml](./Cargo.toml) — manifest, dependencies, crate metadata.
-- [CITATION.cff](./CITATION.cff) — citation metadata.
-- [CONTRIBUTING.md](./CONTRIBUTING.md) — how to contribute.
-- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) — community standards.
-- [LICENSE.md](./LICENSE.md) — multi-licence offering.
-- [src/](./src/) — crate source.
-- [tests/](./tests/) — integration tests and property tests.
-- [examples/](./examples/) — runnable examples (`basic_usage.rs`, `custom_config.rs`).
-- [benches/](./benches/) — criterion benchmarks (`match_pair.rs`).
+let strict  = MatchingEngine::new(MatchConfig::strict());  // threshold 0.95, requires deterministic
+let default = MatchingEngine::default_config();            // threshold 0.80
+let lenient = MatchingEngine::new(MatchConfig::lenient()); // threshold 0.65, phonetic on
+```
 
----
+- **Default (0.80)** — balanced for everyday de-duplication.
+- **Strict (0.95)** — for downstream systems that must rely on the answer; `is_match` additionally requires `deterministic_match`. `score` and `confidence` are unaffected.
+- **Lenient (0.65)** — for triaging large candidate sets where false negatives are costlier than false positives.
 
-## Common tasks
+Every field of `MatchConfig` is overridable; the config is `Serialize + Deserialize` (with `#[serde(default)]`) so tunings can live in a file:
 
-| Task | Command |
-|---|---|
-| Build | `cargo build` |
-| Run unit + integration + property + doctest | `cargo test` |
-| Run a single test | `cargo test test_name` |
-| Show test stdout | `cargo test -- --nocapture` |
-| Run property tests only | `cargo test --test property_tests` |
-| Pin the public API | `cargo test --test adapter_contract` (downstream-service-adapter contract guardrail) |
-| Lint | `cargo clippy --all-targets -- -D warnings` |
-| Format | `cargo fmt` |
-| Run the demo | `cargo run` |
-| Run an example | `cargo run --example basic_usage` (or `--example custom_config`) |
-| Run benchmarks | `cargo bench` (use `--quick` for a smoke run; HTML reports in `target/criterion/`) |
-| Build API docs | `cargo doc --no-deps --open` |
-| Pre-publish dry run | `cargo publish --dry-run` |
+```rust
+use place_matcher::MatchConfig;
 
----
+let cfg: MatchConfig = serde_json::from_str(r#"{
+    "match_threshold": 0.85,
+    "coordinates_scale_metres": 25.0
+}"#).unwrap();
+```
 
-## Common questions
+## Batch scoring
 
-| Question | Answer |
-|---|---|
-| How do I match two places? | Build two `Place` values, then call `MatchingEngine::default_config().match_places(&a, &b)`. See [README.md](./README.md) and [`spec.md` §5.2](./spec.md). |
-| What does the default config do? | `match_threshold = 0.80`, weighted sum across name (0.20), coordinates (0.30, Gaussian decay scale 50 m), address (0.10), category (0.10), country code (0.05), place IDs (0.15), phone (0.03), email (0.02). See [`spec.md` §7.1](./spec.md). |
-| When should I use strict mode? | When false positives are more dangerous than false negatives — `MatchConfig::strict()` raises the threshold to 0.95 and additionally requires `deterministic_match` for `is_match = true`. See [`spec.md` §5.2.3, §7.2](./spec.md). |
-| When should I use lenient mode? | When triaging large candidate sets where false negatives are worse than false positives — `MatchConfig::lenient()` lowers the threshold to 0.65 and turns on the phonetic bonus. See [`spec.md` §7.3](./spec.md). |
-| Where are the algorithms documented? | Per-field scoring algorithms in [`spec.md` §6](./spec.md); pipeline overview in [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md). |
-| Why are some breakdown fields `None`? | The renormalisation rule: missing fields neither contribute to nor penalise the score. See [`spec.md` §5.4](./spec.md). |
-| How do `place_ids` short-circuit? | Two places sharing any one `(scheme, value)` pair are a `deterministic_match`. See [`spec.md` §5.1, §6.7](./spec.md). |
-| What is "data-only" vs "scored"? | Five fields (`local_id`, `altitude_as_metre`, `elevation_as_metre`, `area_as_metre_2`, `maximum_capacity_count`) round-trip through serde for downstream consumers but are not consulted by the matcher. See [`spec.md` §3.1.1](./spec.md). |
+```rust
+use place_matcher::{MatchingEngine, Place};
 
----
+let engine = MatchingEngine::default_config();
+let query = Place::builder().name("Eiffel Tower").build();
+let candidates = vec![
+    Place::builder().name("Big Ben").build(),
+    Place::builder().name("Eiffel Tower").build(),
+    Place::builder().name("Statue of Liberty").build(),
+];
 
-## Project conventions at a glance
+// Parallel to the input slice:
+let results = engine.match_one_to_many(&query, &candidates);
 
-- **Specification-first.** Behavioural changes update [`spec.md`](./spec.md) in the same PR as the code. See [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md).
-- **Pure library.** No IO, no logging, no global state — see [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md).
-- **Deterministic.** Same inputs always produce the same outputs, byte-for-byte.
-- **Diacritic-correct.** Unicode diacritics survive normalisation — see [AGENTS/normalization.md](./AGENTS/normalization.md).
-- **Explainable.** Every probabilistic match returns a per-field breakdown. See [`spec.md` §3.7](./spec.md).
-- **`#[non_exhaustive]` everywhere it matters.** `Place`, `Address`, `PlaceCategory`, `PlaceIdScheme`, `MatchingError` — adding fields / variants is non-breaking. See [`spec.md` §9.1](./spec.md).
+// Sorted by descending score, deterministic tiebreak on original index:
+let ranked = engine.rank_one_to_many(&query, &candidates);
+let (best_idx, best) = &ranked[0];
+println!("best is candidate[{best_idx}] with score {:.2}", best.score);
+```
+
+The engine is `Send + Sync`. Wrap calls in `rayon::par_iter` (or any parallelism primitive) without changes to this crate. Candidate pre-filtering — Soundex prefix blocking, country-code blocking, postcode outward-code blocking — is intentionally a consumer concern.
+
+## Geographic primitives
+
+`Scorer` exposes the geographic helpers the engine uses internally:
+
+```rust
+use place_matcher::Scorer;
+
+let d = Scorer::haversine_metres(51.507_22, -0.127_5, 48.853_0, 2.349_2);
+let s = Scorer::coordinates_score(d, 50.0);
+println!("London-Paris: {:.1} km, score @ scale=50 m: {s:.6}", d / 1000.0);
+```
+
+`Scorer::haversine_metres` is total over `f64` (non-finite inputs return `NaN`, no panic) and works across the equator and the date line. `Scorer::coordinates_score` returns `exp(-(d/s)^2)` clamped to `[0.0, 1.0]`; pathological inputs (negative distance, non-positive scale, non-finite) return `0.0`.
+
+## Determinism and safety
+
+- **`#![forbid(unsafe_code)]`** at the crate root.
+- **No IO.** The library does not read files, open sockets, or log.
+- **No clocks, no RNGs, no environment variables.** Same inputs always produce the same outputs.
+- **No panics** in library code; every fallible parser returns `None` and every fallible operation returns `Result`.
+- **`Send + Sync`.** Engines are immutable after construction and cheap to clone.
+- **Serde-clean.** Every public data type round-trips through `serde_json` (and any other `serde` format).
+
+## Limitations / out of scope
+
+- **Not a geocoder.** This crate does not turn addresses into coordinates or coordinates into addresses.
+- **Not a router.** No path-finding, no distance-along-a-network — only great-circle (Haversine) distance.
+- **Not an address-parsing service.** `Normalizer::parse_address_line` is a best-effort structural decomposition for matching purposes, not a postal-reference lookup.
+- **No machine learning.** Scoring is rule-based and transparent; weights are tuneable but the algorithm is fixed.
+- **No persistence layer.** The crate scores pairs in memory; storage and indexing belong upstream.
+- **No locale-aware street-type vocabulary.** Only the English `St` / `Rd` / `Ave` / `N` / … abbreviations are expanded. Locale-aware vocabularies are an Open Question.
+
+## License
+
+MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause — see [`LICENSE.md`](./LICENSE.md).
+
+## Contributing
+
+Contributions welcome. Before opening a PR:
+
+- `cargo fmt`
+- `cargo clippy --all-targets -- -D warnings`
+- `cargo test`
+
+See [`AGENTS.md`](./AGENTS.md) for the working guide and [`spec.md`](./spec.md) for the authoritative behaviour spec.
+
+## Contact
+
+Joel Parker Henderson — <joel@joelparkerhenderson.com>.

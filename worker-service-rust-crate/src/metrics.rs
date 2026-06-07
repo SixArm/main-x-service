@@ -1,8 +1,8 @@
 //! Prometheus metrics for the worker service.
 //!
-//! This module owns a process-wide [`Registry`] populated with a fixed set
-//! of counters and histograms. Application code increments the global
-//! [`METRICS`] via `crate::metrics::METRICS` (e.g.
+//! This module owns a process-wide [`Registry`](prometheus::Registry)
+//! populated with a fixed set of counters and histograms. Application code
+//! increments the global [`METRICS`](crate::metrics::METRICS) (e.g.
 //! `METRICS.worker_created_total.inc()`). The REST API exposes the
 //! registry at `GET /metrics.prom` in Prometheus text-exposition format
 //! (see [`crate::api::rest::handlers::metrics_prom`]). Configure your
@@ -34,9 +34,13 @@ pub struct Metrics {
     /// service-specific metrics beyond this default set.
     pub registry: Registry,
 
+    /// Count of worker records created.
     pub worker_created_total: Counter,
+    /// Count of worker records updated.
     pub worker_updated_total: Counter,
+    /// Count of worker records soft-deleted.
     pub worker_deleted_total: Counter,
+    /// Count of worker match operations performed.
     pub worker_matched_total: Counter,
 
     /// HTTP requests, labeled by method, path, and status code.
@@ -50,6 +54,10 @@ pub struct Metrics {
 }
 
 impl Metrics {
+    /// Constructs the metric set and registers every collector with a fresh
+    /// registry. Called once via [`METRICS`]; the `.expect(...)` calls are
+    /// safe because all opts are static and registration of freshly-built
+    /// collectors cannot collide.
     fn new() -> Self {
         let registry = Registry::new();
 
@@ -176,6 +184,7 @@ pub const CONTENT_TYPE: &str = "text/plain; version=0.0.4; charset=utf-8";
 mod tests {
     use super::*;
 
+    /// Rendering the registry includes the registered counters and histograms.
     #[test]
     fn render_includes_default_counters() {
         METRICS.worker_created_total.inc();

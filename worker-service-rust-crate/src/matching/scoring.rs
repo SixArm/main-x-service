@@ -1,7 +1,18 @@
-//! Match scoring calculations
+//! Match scoring calculations.
 //!
-//! This module combines individual matching algorithm scores into
-//! overall match scores using configurable weights.
+//! Combines the per-component scores from
+//! [`algorithms`](crate::matching::algorithms) into a single overall match
+//! score. Two strategies live here:
+//!
+//! - [`ProbabilisticScorer`] — a weighted sum across name, birth date,
+//!   gender, address, identifier, tax ID, and document, with deterministic
+//!   short-circuits for an exact tax-ID or document-number match.
+//! - [`DeterministicScorer`] — a rule-based points system where strong
+//!   identity signals short-circuit to a perfect score and weaker rules
+//!   contribute fractional confidence.
+//!
+//! Both produce a [`MatchResult`] carrying the score and a full
+//! [`MatchScoreBreakdown`]; [`MatchQuality`] buckets a score for display.
 
 use crate::models::Worker;
 use crate::config::MatchingConfig;
@@ -12,19 +23,29 @@ use super::algorithms::{
     tax_id_matching, document_matching,
 };
 
-/// Probabilistic scoring strategy
+/// Weighted, fuzzy ("probabilistic") scoring strategy.
+///
+/// Each component contributes its `[0,1]` score times a fixed weight; the
+/// weights sum to 1.0 so the overall score is also in `[0,1]`. Strong
+/// deterministic signals (tax ID, document number) bypass the weighting.
 pub struct ProbabilisticScorer {
     /// Configuration for matching thresholds and weights
     config: MatchingConfig,
 }
 
 impl ProbabilisticScorer {
-    /// Create a new probabilistic scorer with configuration
+    /// Creates a scorer that uses the given threshold configuration.
     pub fn new(config: MatchingConfig) -> Self {
         Self { config }
     }
 
-    /// Calculate match score between two workers
+    /// Scores `candidate` against `worker`, returning the overall score plus
+    /// a per-component breakdown.
+    ///
+    /// An exact tax-ID match short-circuits to 1.0 and an exact document
+    /// match to 0.98; otherwise the result is the weighted sum (name 0.30,
+    /// birth date 0.25, gender/address/identifier/tax-ID 0.10 each, document
+    /// 0.05).
     pub fn calculate_score(
         &self,
         worker: &Worker,
@@ -84,7 +105,8 @@ impl ProbabilisticScorer {
             };
         }
 
-        // Weight factors for each component (probabilistic)
+        // Weight factors for each component (probabilistic). These sum to 1.0
+        // so the weighted total is itself a value in [0, 1].
         const NAME_WEIGHT: f64 = 0.30;
         const DOB_WEIGHT: f64 = 0.25;
         const GENDER_WEIGHT: f64 = 0.10;
@@ -119,12 +141,13 @@ impl ProbabilisticScorer {
         }
     }
 
-    /// Check if a match score meets the threshold
+    /// Returns `true` when `score` meets the configured threshold.
     pub fn is_match(&self, score: f64) -> bool {
         score >= self.config.threshold_score
     }
 
-    /// Classify match quality
+    /// Buckets `score` into a [`MatchQuality`]: Definite (≥0.95), Probable
+    /// (≥ threshold), Possible (≥0.50), else Unlikely.
     pub fn classify_match(&self, score: f64) -> MatchQuality {
         if score >= 0.95 {
             MatchQuality::Definite
@@ -138,19 +161,33 @@ impl ProbabilisticScorer {
     }
 }
 
-/// Deterministic scoring strategy
+/// Rule-based ("deterministic") scoring strategy.
+///
+/// Applies an ordered set of rules: an exact tax ID, identifier, or document
+/// match short-circuits to a perfect score, while name+DOB+gender agreement
+/// and address agreement each contribute fractional points. The final score
+/// is points earned over points available.
 pub struct DeterministicScorer {
-    /// Configuration for matching
+    /// Held for API symmetry with [`ProbabilisticScorer`]; the deterministic
+    /// rules use fixed thresholds rather than the configured score, so the
+    /// field is currently unused (hence the leading underscore).
     _config: MatchingConfig,
 }
 
 impl DeterministicScorer {
-    /// Create a new deterministic scorer
+    /// Creates a deterministic scorer. The config is retained but the rule
+    /// thresholds are fixed constants.
     pub fn new(config: MatchingConfig) -> Self {
         Self { _config: config }
     }
 
-    /// Calculate match score using strict rules
+    /// Scores `candidate` against `worker` using the rule set.
+    ///
+    /// Rules 0/1/1b (tax ID, identifier, document exact match) short-circuit
+    /// to 1.0. Otherwise each of name (≥0.90), DOB (≥0.95), and gender (=1.0)
+    /// earns one point out of three available, and — when both records have
+    /// addresses — a strong address match (≥0.80) earns a fourth point. The
+    /// returned score is earned/available.
     pub fn calculate_score(
         &self,
         worker: &Worker,
@@ -271,13 +308,15 @@ impl DeterministicScorer {
         }
     }
 
-    /// Check if a match score meets deterministic criteria
+    /// Returns `true` when `score` clears the deterministic bar of 0.75
+    /// (at least three of four rules satisfied).
     pub fn is_match(&self, score: f64) -> bool {
         score >= 0.75 // Require at least 3/4 rules to match
     }
 }
 
-/// Match quality classification
+/// Coarse confidence bucket for a match score, used in API responses and the
+/// review queue.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MatchQuality {
     /// Definite match (score >= 0.95)
@@ -291,7 +330,8 @@ pub enum MatchQuality {
 }
 
 impl MatchQuality {
-    /// Get string representation
+    /// Returns the lower-case wire string for this quality
+    /// ("definite"/"probable"/"possible"/"unlikely").
     pub fn as_str(&self) -> &'static str {
         match self {
             MatchQuality::Definite => "definite",
@@ -301,7 +341,7 @@ impl MatchQuality {
         }
     }
 
-    /// Check if this quality indicates a match
+    /// Returns `true` for qualities treated as a match (Definite or Probable).
     pub fn is_match(&self) -> bool {
         matches!(self, MatchQuality::Definite | MatchQuality::Probable)
     }
@@ -313,6 +353,7 @@ mod tests {
     use crate::models::{HumanName, Gender};
     use chrono::NaiveDate;
 
+    /// Builds a matching config with a 0.85 threshold for the tests.
     fn create_test_config() -> MatchingConfig {
         MatchingConfig {
             threshold_score: 0.85,
@@ -321,6 +362,7 @@ mod tests {
         }
     }
 
+    /// Builds a minimal male "John <name>" worker with the given birth date.
     fn create_test_worker(name: &str, dob: Option<NaiveDate>) -> Worker {
         Worker {
             id: uuid::Uuid::new_v4(),
@@ -354,6 +396,7 @@ mod tests {
         }
     }
 
+    /// Matching name/DOB/gender (but nothing else) lands in the Possible band.
     #[test]
     fn test_exact_match_scores_high() {
         let config = create_test_config();
@@ -372,6 +415,7 @@ mod tests {
         assert_eq!(scorer.classify_match(result.score), MatchQuality::Possible);
     }
 
+    /// A name typo plus a one-day DOB slip yields a moderate score.
     #[test]
     fn test_fuzzy_match_scores_moderate() {
         let config = create_test_config();
@@ -389,6 +433,7 @@ mod tests {
         assert!(result.score < 0.80);
     }
 
+    /// Different name and DOB score below the Possible band.
     #[test]
     fn test_no_match_scores_low() {
         let config = create_test_config();
@@ -406,6 +451,7 @@ mod tests {
         assert!(!scorer.is_match(result.score));
     }
 
+    /// Deterministic scoring on a clean name/DOB/gender match clears 0.75.
     #[test]
     fn test_deterministic_exact_match() {
         let config = create_test_config();
@@ -421,6 +467,7 @@ mod tests {
         assert!(scorer.is_match(result.score));
     }
 
+    /// Representative scores map to the expected quality buckets.
     #[test]
     fn test_match_quality_classification() {
         assert_eq!(ProbabilisticScorer::new(create_test_config())
@@ -436,6 +483,7 @@ mod tests {
             .classify_match(0.30), MatchQuality::Unlikely);
     }
 
+    /// Name, DOB, gender, address, and identifier all matching scores high.
     #[test]
     fn test_probabilistic_all_fields_match() {
         let config = create_test_config();
@@ -467,6 +515,7 @@ mod tests {
         assert!(result.score > 0.80, "All fields matching should score very high, got {}", result.score);
     }
 
+    /// Divergent name, DOB, and gender score very low.
     #[test]
     fn test_probabilistic_no_fields_match() {
         let config = create_test_config();
@@ -482,6 +531,7 @@ mod tests {
         assert!(!scorer.is_match(result.score));
     }
 
+    /// A name match with a divergent DOB lands in the middle of the range.
     #[test]
     fn test_probabilistic_partial_match() {
         let config = create_test_config();
@@ -496,6 +546,7 @@ mod tests {
         assert!(result.score < 0.80, "Only name match should not score too high, got {}", result.score);
     }
 
+    /// A shared tax ID forces a 1.0 score even when names/DOBs differ.
     #[test]
     fn test_deterministic_tax_id_match_short_circuits() {
         let config = create_test_config();
@@ -511,6 +562,7 @@ mod tests {
         assert_eq!(result.breakdown.tax_id_score, 1.0);
     }
 
+    /// A shared exact identifier short-circuits to a 1.0 score.
     #[test]
     fn test_deterministic_identifier_match() {
         let config = create_test_config();
@@ -526,6 +578,7 @@ mod tests {
         assert_eq!(result.score, 1.0, "Exact identifier match should short-circuit to 1.0");
     }
 
+    /// The Definite/Probable boundary sits exactly at 0.95.
     #[test]
     fn test_score_boundary_0_95() {
         let scorer = ProbabilisticScorer::new(create_test_config());
@@ -533,6 +586,7 @@ mod tests {
         assert_eq!(scorer.classify_match(0.949), MatchQuality::Probable);
     }
 
+    /// is_match is inclusive at the configured threshold (here 0.70).
     #[test]
     fn test_score_boundary_0_70() {
         let config = MatchingConfig {

@@ -9,6 +9,16 @@
 //! For per-area detail (domain model, matching, REST surface, testing),
 //! see the `AGENTS/*` files under [`AGENTS/`](../AGENTS/).
 
+// Always start with high quality coding conventions.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::clippy::pedantic)]
+
+// When we build for MUSL static, use faster memory allocator.
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub mod api;
 pub mod config;
 pub mod db;
@@ -20,4 +30,6 @@ pub mod search;
 pub mod streaming;
 pub mod validation;
 
+/// Crate-wide [`enum@Error`] enum and [`Result`] alias, re-exported at the
+/// crate root for convenient `course_service::{Error, Result}` use.
 pub use error::{Error, Result};

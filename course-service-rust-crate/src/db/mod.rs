@@ -44,21 +44,31 @@ pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnec
 /// blocks plain `async fn` in trait methods until we move to RPITIT).
 #[async_trait::async_trait]
 pub trait CourseRepository: Send + Sync {
+    /// Insert a new course (plus its identifier/link child rows).
     async fn create(&self, course: &Course) -> Result<Course>;
+    /// Fetch a course by id, returning `None` if absent or soft-deleted.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Course>>;
+    /// Update an existing course, replacing its child rows.
     async fn update(&self, course: &Course) -> Result<Course>;
+    /// Soft-delete a course (sets `deleted_at`, clears `active`).
     async fn soft_delete(&self, id: &Uuid) -> Result<()>;
+    /// List non-deleted courses, newest first, with limit/offset paging.
     async fn list(&self, limit: u64, offset: u64) -> Result<Vec<Course>>;
 
     // CourseInstance sub-resource (T-8, FR-10..FR-13).
+    /// List a course's non-deleted instances (FR-10 ordering applied).
     async fn list_instances(&self, course_id: &Uuid) -> Result<Vec<CourseInstance>>;
+    /// Fetch one instance scoped to its parent course.
     async fn get_instance(
         &self,
         course_id: &Uuid,
         instance_id: &Uuid,
     ) -> Result<Option<CourseInstance>>;
+    /// Insert a new instance under its parent course.
     async fn create_instance(&self, instance: &CourseInstance) -> Result<CourseInstance>;
+    /// Update an existing instance.
     async fn update_instance(&self, instance: &CourseInstance) -> Result<CourseInstance>;
+    /// Soft-delete one instance scoped to its parent course.
     async fn soft_delete_instance(
         &self,
         course_id: &Uuid,
@@ -72,11 +82,15 @@ pub trait CourseRepository: Send + Sync {
     async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord>;
 }
 
+/// SeaORM-backed [`CourseRepository`] implementation over a PostgreSQL
+/// connection pool.
 pub struct SeaOrmCourseRepository {
+    /// The shared SeaORM connection pool.
     db: DatabaseConnection,
 }
 
 impl SeaOrmCourseRepository {
+    /// Wrap an existing connection pool in a repository.
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
@@ -271,12 +285,16 @@ impl CourseRepository for SeaOrmCourseRepository {
     }
 }
 
+/// Pull an instance's schedule start date for FR-10 in-memory sorting.
 fn schedule_start(i: &CourseInstance) -> Option<chrono::DateTime<chrono::Utc>> {
     i.schedule.as_ref().and_then(|s| s.start_date)
 }
 
 // ────────────────── Domain ↔ DB conversion ──────────────────
 
+/// Build a `courses` SeaORM `ActiveModel` from a domain [`Course`],
+/// serialising collection fields to JSONB. On update, `updated_at` is
+/// stamped to now; on insert the model's own timestamp is kept.
 fn to_course_active(course: &Course, is_update: bool) -> Result<courses::ActiveModel> {
     let now = Utc::now();
     Ok(courses::ActiveModel {
@@ -342,6 +360,10 @@ fn to_course_active(course: &Course, is_update: bool) -> Result<courses::ActiveM
     })
 }
 
+/// Reconstruct a domain [`Course`] from its `courses` row plus the
+/// child identifier/link collections, deserialising JSONB columns.
+/// Sub-resources (`syllabus_sections`, `instances`) are left empty —
+/// they load via their own endpoints.
 fn hydrate_course(
     row: courses::Model,
     identifiers: Vec<CourseIdentifier>,
@@ -409,6 +431,8 @@ fn hydrate_course(
 
 // ────────────────── Instance round-trip ──────────────────
 
+/// Build a `course_instances` `ActiveModel` from a domain
+/// [`CourseInstance`], serialising collection/schedule fields to JSONB.
 fn to_instance_active(
     i: &CourseInstance,
     is_update: bool,
@@ -436,6 +460,8 @@ fn to_instance_active(
     })
 }
 
+/// Reconstruct a domain [`CourseInstance`] from its row, deserialising
+/// JSONB columns and widening the stored `i32` counts back to `u32`.
 fn hydrate_instance(row: course_instances::Model) -> Result<CourseInstance> {
     Ok(CourseInstance {
         id: row.id,
@@ -464,6 +490,9 @@ fn hydrate_instance(row: course_instances::Model) -> Result<CourseInstance> {
 
 // ────────────────── Child-table round-trip ──────────────────
 
+/// Insert each [`CourseIdentifier`] as a `course_identifiers` child row
+/// under `course_id`. Generic over the connection so it runs inside a
+/// transaction.
 async fn insert_identifiers<C>(
     conn: &C,
     course_id: Uuid,
@@ -487,6 +516,8 @@ where
     Ok(())
 }
 
+/// Insert each [`CourseLink`] as a `course_links` child row under
+/// `course_id`. Generic over the connection so it runs in a transaction.
 async fn insert_links<C>(conn: &C, course_id: Uuid, links: &[CourseLink]) -> Result<()>
 where
     C: sea_orm::ConnectionTrait,
@@ -504,6 +535,7 @@ where
     Ok(())
 }
 
+/// Load and deserialise all `course_identifiers` rows for `course_id`.
 async fn load_identifiers(
     db: &DatabaseConnection,
     course_id: Uuid,
@@ -525,6 +557,7 @@ async fn load_identifiers(
         .collect()
 }
 
+/// Load and deserialise all `course_links` rows for `course_id`.
 async fn load_links(db: &DatabaseConnection, course_id: Uuid) -> Result<Vec<CourseLink>> {
     let rows = course_links::Entity::find()
         .filter(course_links::Column::CourseId.eq(course_id))
@@ -543,18 +576,25 @@ async fn load_links(db: &DatabaseConnection, course_id: Uuid) -> Result<Vec<Cour
 
 // ────────────────── Helpers ──────────────────
 
+/// Map a SeaORM error into the crate's [`Error::Database`](crate::Error).
 fn map_db(e: sea_orm::DbErr) -> crate::Error {
     crate::Error::Database(e.to_string())
 }
 
+/// Serialise a value to a JSONB `serde_json::Value`, mapping failures to
+/// [`Error::Database`](crate::Error).
 fn to_json<T: Serialize>(v: &T) -> Result<serde_json::Value> {
     serde_json::to_value(v).map_err(|e| crate::Error::Database(e.to_string()))
 }
 
+/// Deserialise a JSONB value back into `T`, mapping failures to
+/// [`Error::Database`](crate::Error).
 fn from_json<T: for<'de> Deserialize<'de>>(j: serde_json::Value) -> Result<T> {
     serde_json::from_value(j).map_err(|e| crate::Error::Database(e.to_string()))
 }
 
+/// Serialise a string-valued enum to its bare string form (used for
+/// `status`-style columns stored as `TEXT` rather than JSONB).
 fn enum_to_string<T: Serialize>(v: &T) -> Result<String> {
     let json = serde_json::to_value(v).map_err(|e| crate::Error::Database(e.to_string()))?;
     json.as_str()
@@ -562,6 +602,8 @@ fn enum_to_string<T: Serialize>(v: &T) -> Result<String> {
         .ok_or_else(|| crate::Error::Database("enum did not serialise to a string".into()))
 }
 
+/// Inverse of [`enum_to_string`]: parse a bare string back into a
+/// string-valued enum `T`.
 fn enum_from_string<T: for<'de> Deserialize<'de>>(s: &str) -> Result<T> {
     serde_json::from_value(serde_json::Value::String(s.to_string()))
         .map_err(|e| crate::Error::Database(e.to_string()))
@@ -572,6 +614,7 @@ mod tests {
     use super::*;
     use crate::models::CourseStatus;
 
+    /// Every `CourseStatus` survives an enum→string→enum round-trip.
     #[test]
     fn course_status_round_trips_through_string() {
         for status in [
@@ -586,6 +629,7 @@ mod tests {
         }
     }
 
+    /// Every `LinkType` survives an enum→string→enum round-trip.
     #[test]
     fn link_type_round_trips_through_string() {
         for lt in [
@@ -601,6 +645,7 @@ mod tests {
         }
     }
 
+    /// `to_course_active` copies scalar fields onto the ActiveModel.
     #[test]
     fn course_active_model_carries_all_scalar_fields() {
         let mut course = Course::new("Intro to CS");

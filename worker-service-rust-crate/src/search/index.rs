@@ -1,4 +1,11 @@
-//! Search index management with Tantivy
+//! Tantivy index lifecycle and schema for the worker search engine.
+//!
+//! Defines [`WorkerIndexSchema`] (the field set and their Tantivy options),
+//! [`WorkerIndex`] (the index, schema, and reader bundled together with
+//! create/open/writer/reader/stats helpers), and [`IndexStats`] (a small
+//! count summary). [`crate::search::SearchEngine`] sits on top of this module
+//! and is the type application code normally uses; this module owns the
+//! lower-level Tantivy plumbing.
 
 use tantivy::{
     schema::{Schema, Field, STORED, TEXT, STRING, FAST},
@@ -8,26 +15,47 @@ use std::path::Path;
 
 use crate::Result;
 
-/// Fields in the worker search index
+/// The worker search index schema: the built [`Schema`] plus a [`Field`]
+/// handle for each indexed column.
+///
+/// Holding the field handles alongside the schema avoids repeated name
+/// look-ups when building documents and queries. `TEXT` fields are tokenized
+/// for full-text search; `STRING` fields are stored verbatim for exact-match
+/// filtering; `STORED` fields are retrievable from hits; `FAST` fields support
+/// fast filtering.
 #[derive(Clone)]
 pub struct WorkerIndexSchema {
+    /// The compiled Tantivy schema describing all fields below.
     pub schema: Schema,
+    /// Worker UUID string — stored, exact-match only (not tokenized).
     pub id: Field,
+    /// Family/last name — tokenized full-text and stored.
     pub family_name: Field,
+    /// Space-joined given names — tokenized full-text and stored.
     pub given_names: Field,
+    /// "Given Family" combined name — tokenized full-text and stored.
     pub full_name: Field,
+    /// Birth date as an ISO string — exact-match and stored.
     pub birth_date: Field,
+    /// Lower-cased gender label — exact-match and stored.
     pub gender: Field,
+    /// Primary-address postal code — exact-match and stored.
     pub postal_code: Field,
+    /// Primary-address city — tokenized full-text and stored.
     pub city: Field,
+    /// Primary-address state/region — exact-match and stored.
     pub state: Field,
+    /// Space-joined `TYPE:value` identifier tokens — tokenized and stored.
     pub identifiers: Field,
+    /// Worker type/role — exact-match and stored (for role filtering).
     pub worker_type: Field,
+    /// Active flag ("true"/"false") — exact-match, FAST for filtering.
     pub active: Field,
 }
 
 impl WorkerIndexSchema {
-    /// Create the worker index schema
+    /// Builds the worker index schema, registering every field with its
+    /// Tantivy options and capturing the resulting [`Field`] handles.
     pub fn new() -> Self {
         let mut schema_builder = Schema::builder();
 
@@ -78,20 +106,31 @@ impl WorkerIndexSchema {
 }
 
 impl Default for WorkerIndexSchema {
+    /// Equivalent to [`WorkerIndexSchema::new`].
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Worker search index
+/// A worker search index: the Tantivy [`Index`], its [`WorkerIndexSchema`],
+/// and a long-lived [`IndexReader`].
+///
+/// The reader reloads on commit (with a small delay), so searches see new
+/// documents shortly after a writer commits; call [`reload`](Self::reload) to
+/// force visibility immediately (used in tests). Writers are created on demand
+/// per write via [`writer`](Self::writer).
 pub struct WorkerIndex {
+    /// The underlying Tantivy index (segments on disk).
     index: Index,
+    /// Field handles and compiled schema for this index.
     schema: WorkerIndexSchema,
+    /// Shared reader that serves searchers; reloads on commit.
     reader: IndexReader,
 }
 
 impl WorkerIndex {
-    /// Create a new index at the given path
+    /// Creates a brand-new index in `index_path` (which must not already hold
+    /// one) using the worker schema, and builds a commit-reloading reader.
     pub fn create<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let schema_def = WorkerIndexSchema::new();
         let index = Index::create_in_dir(index_path, schema_def.schema.clone())
@@ -110,7 +149,8 @@ impl WorkerIndex {
         })
     }
 
-    /// Open an existing index at the given path
+    /// Opens an existing index in `index_path`, reconstructing the field
+    /// handles and a commit-reloading reader. Errors if no index is present.
     pub fn open<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let schema_def = WorkerIndexSchema::new();
         let index = Index::open_in_dir(index_path)
@@ -129,9 +169,12 @@ impl WorkerIndex {
         })
     }
 
-    /// Create or open an index
+    /// Opens the index at `index_path` if one exists there, otherwise creates
+    /// it. Existence is detected by the presence of Tantivy's `meta.json`.
     pub fn create_or_open<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let path = index_path.as_ref();
+        // Tantivy writes a meta.json into the index dir; its presence means an
+        // index already exists here.
         let meta_path = path.join("meta.json");
 
         if meta_path.exists() {
@@ -141,35 +184,39 @@ impl WorkerIndex {
         }
     }
 
-    /// Get an index writer
+    /// Creates a new [`IndexWriter`] with a buffer of `heap_size_mb` megabytes.
+    /// Callers are responsible for committing and dropping the writer.
     pub fn writer(&self, heap_size_mb: usize) -> Result<IndexWriter> {
+        // Tantivy's writer heap is specified in bytes.
         self.index
             .writer(heap_size_mb * 1_000_000)
             .map_err(|e| crate::Error::Search(format!("Failed to create writer: {}", e)))
     }
 
-    /// Get the index
+    /// Returns the underlying Tantivy [`Index`] (needed to build query parsers).
     pub fn index(&self) -> &Index {
         &self.index
     }
 
-    /// Get the schema
+    /// Returns the [`WorkerIndexSchema`] with the field handles.
     pub fn schema(&self) -> &WorkerIndexSchema {
         &self.schema
     }
 
-    /// Get the reader
+    /// Returns the shared [`IndexReader`]; call `.searcher()` on it to run a
+    /// query.
     pub fn reader(&self) -> &IndexReader {
         &self.reader
     }
 
-    /// Manually reload the reader (useful for tests)
+    /// Forces the reader to reload so the latest committed documents become
+    /// visible immediately, rather than after the on-commit delay.
     pub fn reload(&self) -> Result<()> {
         self.reader.reload()
             .map_err(|e| crate::Error::Search(format!("Failed to reload reader: {}", e)))
     }
 
-    /// Get index statistics
+    /// Returns the live document count and segment count for the index.
     pub fn stats(&self) -> Result<IndexStats> {
         let searcher = self.reader.searcher();
         let num_docs = searcher.num_docs() as usize;
@@ -181,8 +228,11 @@ impl WorkerIndex {
         })
     }
 
-    /// Optimize the index (wait for merges to complete)
+    /// Waits for background segment merges to finish, consolidating the index
+    /// for faster queries and reclaimed space.
     pub fn optimize(&self) -> Result<()> {
+        // Creating then immediately blocking on the writer's merge threads
+        // forces pending merges to complete.
         let writer = self.writer(50)?;
         writer
             .wait_merging_threads()
@@ -191,10 +241,12 @@ impl WorkerIndex {
     }
 }
 
-/// Index statistics
+/// A snapshot of index size: how many live documents and segments it holds.
 #[derive(Debug, Clone)]
 pub struct IndexStats {
+    /// Number of live (non-deleted) documents.
     pub num_docs: usize,
+    /// Number of on-disk segments (lower is better after optimization).
     pub num_segments: usize,
 }
 
@@ -203,6 +255,7 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    /// A freshly created index starts with zero documents.
     #[test]
     fn test_create_index() {
         let temp_dir = TempDir::new().unwrap();
@@ -212,6 +265,7 @@ mod tests {
         assert_eq!(stats.num_docs, 0);
     }
 
+    /// The schema exposes the expected field handles.
     #[test]
     fn test_schema_fields() {
         let schema = WorkerIndexSchema::new();
@@ -225,6 +279,7 @@ mod tests {
         let _ = schema.gender;
     }
 
+    /// The first call creates the index; a second call opens the same one.
     #[test]
     fn test_create_or_open() {
         let temp_dir = TempDir::new().unwrap();
@@ -238,6 +293,7 @@ mod tests {
         assert_eq!(index2.stats().unwrap().num_docs, 0);
     }
 
+    /// Adding and committing a document raises the live count to one.
     #[test]
     fn test_index_worker_and_retrieve() {
         let temp_dir = TempDir::new().unwrap();
@@ -265,6 +321,7 @@ mod tests {
         assert_eq!(stats.num_docs, 1, "Index should contain 1 document");
     }
 
+    /// A fuzzy term query finds "johnson" from the typo "jonson".
     #[test]
     fn test_fuzzy_search_typo() {
         use tantivy::collector::TopDocs;
@@ -294,6 +351,7 @@ mod tests {
         assert_eq!(top_docs.len(), 1, "Fuzzy search should find 'johnson' with typo 'jonson'");
     }
 
+    /// Deleting by the `id` term drops the document count back to zero.
     #[test]
     fn test_delete_worker_from_index() {
         use tantivy::schema::Term;
@@ -331,6 +389,7 @@ mod tests {
         assert_eq!(worker_index.stats().unwrap().num_docs, 0, "Document should be deleted");
     }
 
+    /// Searching an empty index returns no hits.
     #[test]
     fn test_search_no_results() {
         use tantivy::collector::TopDocs;
@@ -349,6 +408,7 @@ mod tests {
         assert_eq!(top_docs.len(), 0, "Search on empty index should return 0 results");
     }
 
+    /// An AND of name + exact birth date selects one of two same-name workers.
     #[test]
     fn test_search_by_name_and_year_filter() {
         use tantivy::collector::TopDocs;

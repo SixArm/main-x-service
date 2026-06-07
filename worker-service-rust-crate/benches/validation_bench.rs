@@ -1,4 +1,8 @@
-//! Benchmarks for worker validation and normalization
+//! Criterion benchmarks for the validation / normalization layer.
+//!
+//! Times worker validation across simple, fully-populated, and invalid
+//! records, plus phone normalization (several input formats) and address
+//! standardization (full and minimal). Run with `cargo bench`.
 
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
 use chrono::{NaiveDate, Utc};
@@ -7,6 +11,7 @@ use uuid::Uuid;
 use worker_service::models::*;
 use worker_service::validation::{validate_worker, normalize_phone, standardize_address};
 
+/// Builds a minimal [`Worker`] fixture; the more complex benches extend it.
 fn create_test_worker(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Worker {
     let now = Utc::now();
     Worker {
@@ -41,6 +46,7 @@ fn create_test_worker(family: &str, given: &str, birth_date: Option<NaiveDate>) 
     }
 }
 
+/// Benchmarks validating a minimal valid worker (name + DOB).
 fn bench_validate_simple_worker(c: &mut Criterion) {
     let worker = create_test_worker(
         "Smith",
@@ -55,6 +61,8 @@ fn bench_validate_simple_worker(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks validating a fully-populated worker (telecom, address,
+/// document, emergency contact, tax id) — the worst case for validation cost.
 fn bench_validate_complex_worker(c: &mut Criterion) {
     let mut worker = create_test_worker(
         "Smith",
@@ -114,6 +122,8 @@ fn bench_validate_complex_worker(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks validating a worker that triggers several errors (blank name,
+/// bad email, empty emergency contact) — the error-collection path.
 fn bench_validate_invalid_worker(c: &mut Criterion) {
     let mut worker = create_test_worker("", "", None);
     worker.telecom.push(ContactPoint {
@@ -136,6 +146,8 @@ fn bench_validate_invalid_worker(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks phone normalization across US-formatted, international, and
+/// raw-digit inputs.
 fn bench_normalize_phone(c: &mut Criterion) {
     c.bench_function("normalize_phone_us_format", |b| {
         b.iter(|| {
@@ -156,6 +168,7 @@ fn bench_normalize_phone(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks address standardization for a full address and a minimal one.
 fn bench_standardize_address(c: &mut Criterion) {
     let addr = Address {
         use_type: None,

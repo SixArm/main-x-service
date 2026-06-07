@@ -9,7 +9,7 @@ use utoipa::ToSchema;
 
 /// ODSOrganisationRole — reference data for Primary and Non-Primary Roles
 ///
-/// CodeSystem: https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSOrganisationRole
+/// CodeSystem: <https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSOrganisationRole>
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OdsRoleReference {
     /// Role ID (e.g. "RO197", "RO76")
@@ -22,7 +22,7 @@ pub struct OdsRoleReference {
 
 /// ODSRelationship — reference data for relationship types
 ///
-/// CodeSystem: https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSRelationship
+/// CodeSystem: <https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSRelationship>
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OdsRelationshipReference {
     /// Relationship Type ID (e.g. "RE4", "RE6")
@@ -33,7 +33,7 @@ pub struct OdsRelationshipReference {
 
 /// ODSRecordClass — reference data for record classes
 ///
-/// CodeSystem: https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSRecordClass
+/// CodeSystem: <https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSRecordClass>
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OdsRecordClassReference {
     /// Record class code (e.g. "RC1", "RC2")
@@ -84,6 +84,7 @@ pub struct GeographyNameReference {
 mod tests {
     use super::*;
 
+    /// An [`OdsRoleReference`] stores its primary-role flag.
     #[test]
     fn test_ods_role_reference() {
         let role = OdsRoleReference {
@@ -94,6 +95,7 @@ mod tests {
         assert!(role.is_primary_role_type);
     }
 
+    /// An [`OdsRelationshipReference`] stores its relationship code.
     #[test]
     fn test_ods_relationship_reference() {
         let rel = OdsRelationshipReference {
@@ -103,6 +105,7 @@ mod tests {
         assert_eq!(rel.relationship_id, "RE4");
     }
 
+    /// A [`PractitionerRoleReference`] stores its role code and category.
     #[test]
     fn test_practitioner_role_reference() {
         let role = PractitionerRoleReference {
@@ -113,6 +116,7 @@ mod tests {
         assert_eq!(role.role_code, "PGP");
     }
 
+    /// A [`GeographyNameReference`] stores its geography type.
     #[test]
     fn test_geography_name_reference() {
         let geo = GeographyNameReference {
@@ -123,6 +127,7 @@ mod tests {
         assert_eq!(geo.geography_type, "Local Authority");
     }
 
+    /// An [`OdsRecordClassReference`] stores its code.
     #[test]
     fn test_ods_record_class_reference() {
         let rc = OdsRecordClassReference {
@@ -132,6 +137,7 @@ mod tests {
         assert_eq!(rc.code, "RC1");
     }
 
+    /// An [`OdsRoleReference`] survives a JSON round-trip.
     #[test]
     fn test_ods_role_reference_serialization() {
         let role = OdsRoleReference {

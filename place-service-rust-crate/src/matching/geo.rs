@@ -1,22 +1,94 @@
+//! Geo-coordinate similarity, derived from Haversine great-circle distance.
+//!
+//! The matcher needs a *bounded* similarity in `[0.0, 1.0]`, but distance is
+//! unbounded, so this module maps distance through a reciprocal decay:
+//! `1 / (1 + d/ref)`. At zero distance the score is 1.0; at the reference
+//! distance it is exactly 0.5; beyond that it tails toward 0.0. The
+//! reference distance is the knob that sets how quickly proximity decays
+//! into dissimilarity.
+//!
+//! See [`GeoCoordinates::distance_to`](crate::models::geo::GeoCoordinates::distance_to)
+//! for the underlying Haversine calculation.
+//!
+//! # Examples
+//!
+//! ```
+//! use place_service::models::geo::GeoCoordinates;
+//! use place_service::matching::geo::{geo_similarity, within_radius};
+//!
+//! let a = GeoCoordinates::new(40.7829, -73.9654);
+//! assert!((geo_similarity(&a, &a) - 1.0).abs() < 1e-9);
+//! assert!(within_radius(&a, &a, 1.0));
+//! ```
+
 use crate::models::geo::GeoCoordinates;
 
-/// Geo similarity based on Haversine distance.
-/// Returns 1.0 for same point, decays toward 0.0 as distance increases.
+/// Geo similarity using the default 1 km reference distance.
+///
+/// Equivalent to [`geo_similarity_with_reference`] with `reference_km = 1.0`:
+/// points 1 km apart score 0.5. Returns 1.0 for the same point and decays
+/// toward 0.0 as the points move apart.
+///
+/// # Examples
+///
+/// ```
+/// use place_service::models::geo::GeoCoordinates;
+/// use place_service::matching::geo::geo_similarity;
+///
+/// let nyc = GeoCoordinates::new(40.7128, -74.0060);
+/// let london = GeoCoordinates::new(51.5074, -0.1278);
+/// assert!(geo_similarity(&nyc, &london) < 0.001);
+/// ```
 pub fn geo_similarity(a: &GeoCoordinates, b: &GeoCoordinates) -> f64 {
     geo_similarity_with_reference(a, b, 1.0)
 }
 
-/// Geo similarity with configurable reference distance (km).
+/// Geo similarity with a caller-chosen reference distance, in kilometers.
+///
+/// Computes `1 / (1 + d/ref)` where `d` is the Haversine distance in km. A
+/// larger `reference_km` decays more slowly (more tolerant of distance); a
+/// smaller one decays faster (stricter). At `d == reference_km` the score is
+/// 0.5.
+///
+/// # Examples
+///
+/// ```
+/// use place_service::models::geo::GeoCoordinates;
+/// use place_service::matching::geo::geo_similarity_with_reference;
+///
+/// let a = GeoCoordinates::new(40.7829, -73.9654);
+/// let b = GeoCoordinates::new(40.7929, -73.9754);
+/// // A looser reference yields a higher similarity for the same gap.
+/// let tight = geo_similarity_with_reference(&a, &b, 0.1);
+/// let loose = geo_similarity_with_reference(&a, &b, 10.0);
+/// assert!(loose > tight);
+/// ```
 pub fn geo_similarity_with_reference(
     a: &GeoCoordinates,
     b: &GeoCoordinates,
     reference_km: f64,
 ) -> f64 {
+    // Haversine returns meters; the decay formula works in kilometers.
     let dist_km = a.distance_to(b) / 1000.0;
     1.0 / (1.0 + dist_km / reference_km)
 }
 
-/// Check if two coordinates are within a given radius (meters).
+/// Returns whether two coordinates lie within `radius_m` meters of each other.
+///
+/// A hard boolean cutoff (inclusive) used for geo-radius search, distinct
+/// from the graded [`geo_similarity`] score.
+///
+/// # Examples
+///
+/// ```
+/// use place_service::models::geo::GeoCoordinates;
+/// use place_service::matching::geo::within_radius;
+///
+/// let a = GeoCoordinates::new(40.7829, -73.9654);
+/// let b = GeoCoordinates::new(40.7830, -73.9655);
+/// assert!(within_radius(&a, &b, 100.0));
+/// assert!(!within_radius(&a, &b, 0.1));
+/// ```
 pub fn within_radius(a: &GeoCoordinates, b: &GeoCoordinates, radius_m: f64) -> bool {
     a.distance_to(b) <= radius_m
 }
@@ -25,6 +97,7 @@ pub fn within_radius(a: &GeoCoordinates, b: &GeoCoordinates, radius_m: f64) -> b
 mod tests {
     use super::*;
 
+    /// A point compared with itself scores ~1.0.
     #[test]
     fn test_same_point() {
         let geo = GeoCoordinates::new(40.7829, -73.9654);
@@ -32,6 +105,7 @@ mod tests {
         assert!((score - 1.0).abs() < 0.001);
     }
 
+    /// Points a few meters apart score very high.
     #[test]
     fn test_close_points() {
         let a = GeoCoordinates::new(40.7829, -73.9654);
@@ -40,6 +114,7 @@ mod tests {
         assert!(score > 0.95, "Score: {score}");
     }
 
+    /// Points about a kilometer apart score in the mid range.
     #[test]
     fn test_moderate_distance() {
         let a = GeoCoordinates::new(40.7580, -73.9855);
@@ -49,6 +124,7 @@ mod tests {
         assert!(score < 0.9, "Score: {score}");
     }
 
+    /// Transatlantic points score near 0.0.
     #[test]
     fn test_far_apart() {
         let nyc = GeoCoordinates::new(40.7128, -74.0060);
@@ -57,6 +133,7 @@ mod tests {
         assert!(score < 0.001, "Score: {score}");
     }
 
+    /// Nearby points fall inside a 100 m radius.
     #[test]
     fn test_within_radius_true() {
         let a = GeoCoordinates::new(40.7829, -73.9654);
@@ -64,6 +141,7 @@ mod tests {
         assert!(within_radius(&a, &b, 100.0));
     }
 
+    /// Far-apart points fall outside a 1 km radius.
     #[test]
     fn test_within_radius_false() {
         let nyc = GeoCoordinates::new(40.7128, -74.0060);
@@ -71,6 +149,7 @@ mod tests {
         assert!(!within_radius(&nyc, &london, 1000.0));
     }
 
+    /// A looser reference yields higher similarity than a tighter one.
     #[test]
     fn test_custom_reference() {
         let a = GeoCoordinates::new(40.7829, -73.9654);

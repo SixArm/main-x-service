@@ -1,4 +1,11 @@
-//! Consent management models
+//! Consent management models.
+//!
+//! A [`Consent`] record captures permission attached to an event —
+//! for example, consent to share data about a clinical encounter, or a
+//! media-release consent for recording a performance. Consent has a
+//! [`ConsentType`] (what it covers) and a [`ConsentStatus`]
+//! (active / revoked / expired). The privacy layer consults these
+//! records when honoring GDPR and data-sharing rules.
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -65,7 +72,8 @@ pub struct Consent {
     /// How consent was obtained (e.g., "written", "electronic", "verbal")
     pub method: Option<String>,
 
-    /// Record timestamps
+    /// When this consent record was created.
     pub created_at: DateTime<Utc>,
+    /// When this consent record was last modified.
     pub updated_at: DateTime<Utc>,
 }

@@ -1,4 +1,48 @@
-//! Worker matcher algorithms and scoring
+//! The worker-matching engine: algorithms, scoring, and matcher strategies.
+//!
+//! Matching answers the question "do these two worker records describe the
+//! same person?" by producing a confidence score in `[0.0, 1.0]` plus a
+//! per-component [`MatchScoreBreakdown`](crate::matching::MatchScoreBreakdown).
+//! Two strategies are offered behind the
+//! [`WorkerMatcher`](crate::matching::WorkerMatcher) trait:
+//!
+//! - [`ProbabilisticMatcher`](crate::matching::ProbabilisticMatcher) — a
+//!   weighted, fuzzy combination of name, birth date, gender, address,
+//!   identifier, tax-ID, and document scores.
+//! - [`DeterministicMatcher`](crate::matching::DeterministicMatcher) —
+//!   rule-based scoring with short-circuits (an exact tax-ID or identifier
+//!   match pins the score to 1.0).
+//!
+//! Submodules:
+//! - [`algorithms`](crate::matching::algorithms) — the individual component
+//!   comparison functions.
+//! - [`phonetic`](crate::matching::phonetic) — Soundex phonetic encoding used
+//!   as a name-score bonus.
+//! - [`scoring`](crate::matching::scoring) — the
+//!   [`ProbabilisticScorer`](crate::matching::ProbabilisticScorer) /
+//!   [`DeterministicScorer`](crate::matching::DeterministicScorer) that
+//!   combine the component scores and classify
+//!   [`MatchQuality`](crate::matching::MatchQuality).
+//! - [`adapter`](crate::matching::adapter) — bridges service
+//!   [`Worker`](crate::models::Worker) records into the canonical
+//!   `worker-matcher` crate (re-exported here as
+//!   [`matcher_lib`](crate::matching::matcher_lib)).
+//!
+//! # Examples
+//!
+//! ```
+//! use worker_service::matching::{ProbabilisticMatcher, WorkerMatcher};
+//! use worker_service::config::MatchingConfig;
+//!
+//! let matcher = ProbabilisticMatcher::new(MatchingConfig {
+//!     threshold_score: 0.85,
+//!     exact_match_score: 1.0,
+//!     fuzzy_match_score: 0.8,
+//! });
+//! // A score at or above the threshold counts as a match.
+//! assert!(matcher.is_match(0.90));
+//! assert!(!matcher.is_match(0.50));
+//! ```
 
 use crate::models::Worker;
 use crate::config::MatchingConfig;
@@ -18,28 +62,61 @@ pub use scoring::{ProbabilisticScorer, DeterministicScorer, MatchQuality};
 /// score two service `Worker` records through the reference algorithm.
 pub use ::worker_matcher as matcher_lib;
 
-/// Match result containing a worker and their match score
+/// The outcome of comparing a query worker against one candidate: the
+/// candidate, the overall [`score`](Self::score), and the per-component
+/// [`breakdown`](Self::breakdown) that produced it.
 #[derive(Debug, Clone)]
 pub struct MatchResult {
+    /// The candidate worker that was scored.
     pub worker: Worker,
+    /// Overall confidence score in `[0.0, 1.0]`.
     pub score: f64,
+    /// Per-component scores that were combined into [`score`](Self::score).
     pub breakdown: MatchScoreBreakdown,
 }
 
-/// Breakdown of match score components
+/// The individual component scores that make up a [`MatchResult::score`].
+///
+/// Each field is a score in `[0.0, 1.0]` for one comparison axis. Serializable
+/// so the breakdown can be surfaced verbatim in API responses and review-queue
+/// items.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MatchScoreBreakdown {
+    /// Name similarity (Jaro-Winkler / Levenshtein / Soundex).
     pub name_score: f64,
+    /// Birth-date proximity score.
     pub birth_date_score: f64,
+    /// Gender agreement score.
     pub gender_score: f64,
+    /// Best-pair address similarity.
     pub address_score: f64,
+    /// Best identifier (type + system + value) match.
     pub identifier_score: f64,
+    /// Tax-ID exact-match score (1.0 or 0.0).
     pub tax_id_score: f64,
+    /// Best identity-document (type + number) match.
     pub document_score: f64,
 }
 
 impl MatchScoreBreakdown {
-    /// Get a summary of which components matched well
+    /// Returns a human-readable summary listing the components that scored
+    /// strongly, using per-component thresholds (e.g. name ≥ 0.90, address
+    /// ≥ 0.80). Returns `"no strong matches"` when nothing clears its bar.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use worker_service::matching::MatchScoreBreakdown;
+    ///
+    /// let b = MatchScoreBreakdown {
+    ///     name_score: 0.96, birth_date_score: 0.0, gender_score: 1.0,
+    ///     address_score: 0.0, identifier_score: 0.0, tax_id_score: 0.0,
+    ///     document_score: 0.0,
+    /// };
+    /// let s = b.summary();
+    /// assert!(s.contains("name"));
+    /// assert!(s.contains("gender"));
+    /// ```
     pub fn summary(&self) -> String {
         let mut parts = Vec::new();
 
@@ -73,36 +150,46 @@ impl MatchScoreBreakdown {
     }
 }
 
-/// Worker matcher trait
+/// The strategy interface shared by all matchers. Implementors are `Send +
+/// Sync` so they can be held in shared application state behind an `Arc`.
 pub trait WorkerMatcher: Send + Sync {
-    /// Match a worker against a candidate
+    /// Scores `worker` against a single `candidate`, returning the candidate,
+    /// the overall score, and the component breakdown.
     fn match_workers(&self, worker: &Worker, candidate: &Worker) -> Result<MatchResult>;
 
-    /// Find potential matches for a worker
+    /// Scores `worker` against every candidate, keeps those that clear the
+    /// threshold, and returns them sorted by descending score.
     fn find_matches(&self, worker: &Worker, candidates: &[Worker]) -> Result<Vec<MatchResult>>;
 
-    /// Check if a score meets the matching threshold
+    /// Returns `true` when `score` is at or above this matcher's threshold.
     fn is_match(&self, score: f64) -> bool;
 }
 
-/// Probabilistic matching strategy
+/// A [`WorkerMatcher`] that combines weighted, fuzzy component scores into an
+/// overall probabilistic confidence.
 pub struct ProbabilisticMatcher {
+    /// The underlying scorer holding the weights and threshold config.
     scorer: ProbabilisticScorer,
 }
 
 impl ProbabilisticMatcher {
+    /// Builds a probabilistic matcher from the given matching configuration.
     pub fn new(config: MatchingConfig) -> Self {
         Self {
             scorer: ProbabilisticScorer::new(config),
         }
     }
 
-    /// Get the configured threshold (not implemented yet)
+    /// Returns the match threshold.
+    ///
+    /// Currently hard-coded to `0.85`; wiring this through to the config is
+    /// tracked as a TODO in the source.
     pub fn threshold(&self) -> f64 {
         0.85 // TODO: expose config properly
     }
 
-    /// Classify match quality
+    /// Classifies a raw score into a coarse [`MatchQuality`] band (definite /
+    /// probable / possible / unlikely).
     pub fn classify_match(&self, score: f64) -> MatchQuality {
         self.scorer.classify_match(score)
     }
@@ -117,10 +204,12 @@ impl WorkerMatcher for ProbabilisticMatcher {
         let mut matches: Vec<MatchResult> = candidates
             .iter()
             .map(|candidate| self.scorer.calculate_score(worker, candidate))
+            // Drop anything below the configured threshold up front.
             .filter(|result| self.is_match(result.score))
             .collect();
 
-        // Sort by score descending
+        // Sort best-first. `partial_cmp` can yield `None` only for NaN scores,
+        // which the scorer never produces; treat any such case as "equal".
         matches.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)
@@ -135,12 +224,15 @@ impl WorkerMatcher for ProbabilisticMatcher {
     }
 }
 
-/// Deterministic matching strategy
+/// A [`WorkerMatcher`] that applies rule-based deterministic scoring with
+/// short-circuits (e.g. an exact tax-ID match pins the score to 1.0).
 pub struct DeterministicMatcher {
+    /// The underlying rule-based scorer.
     scorer: DeterministicScorer,
 }
 
 impl DeterministicMatcher {
+    /// Builds a deterministic matcher from the given matching configuration.
     pub fn new(config: MatchingConfig) -> Self {
         Self {
             scorer: DeterministicScorer::new(config),
@@ -157,10 +249,11 @@ impl WorkerMatcher for DeterministicMatcher {
         let mut matches: Vec<MatchResult> = candidates
             .iter()
             .map(|candidate| self.scorer.calculate_score(worker, candidate))
+            // Keep only candidates that satisfy the deterministic threshold.
             .filter(|result| self.is_match(result.score))
             .collect();
 
-        // Sort by score descending
+        // Sort best-first (see the probabilistic impl for the NaN rationale).
         matches.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)
@@ -181,6 +274,7 @@ mod tests {
     use crate::models::{HumanName, Gender};
     use chrono::NaiveDate;
 
+    /// Builds a baseline matching config with the default 0.85 threshold.
     fn create_test_config() -> MatchingConfig {
         MatchingConfig {
             threshold_score: 0.85,
@@ -189,6 +283,7 @@ mod tests {
         }
     }
 
+    /// Builds a minimal male [`Worker`] with the given name parts and DOB.
     fn create_test_worker(family: &str, given: &str, dob: Option<NaiveDate>) -> Worker {
         Worker {
             id: uuid::Uuid::new_v4(),
@@ -222,6 +317,7 @@ mod tests {
         }
     }
 
+    /// `find_matches` returns the strong candidates, best score first.
     #[test]
     fn test_probabilistic_find_matches() {
         let config = MatchingConfig {
@@ -251,6 +347,7 @@ mod tests {
         }
     }
 
+    /// Two identical workers clear the deterministic match threshold.
     #[test]
     fn test_deterministic_matcher() {
         let config = create_test_config();
@@ -265,6 +362,7 @@ mod tests {
         assert!(matcher.is_match(result.score));
     }
 
+    /// `summary` lists every component that scored above its bar.
     #[test]
     fn test_match_score_breakdown_summary() {
         let breakdown = MatchScoreBreakdown {
@@ -283,6 +381,7 @@ mod tests {
         assert!(summary.contains("gender"));
     }
 
+    /// An exact match scores above the threshold and counts as a match.
     #[test]
     fn test_probabilistic_matcher_with_threshold() {
         let config = MatchingConfig {
@@ -302,6 +401,7 @@ mod tests {
         assert!(matcher.is_match(result.score));
     }
 
+    /// `find_matches` results are always sorted by descending score.
     #[test]
     fn test_match_result_ordering_by_score() {
         let config = MatchingConfig {
@@ -330,6 +430,7 @@ mod tests {
         }
     }
 
+    /// An empty candidate list yields no matches (no panic).
     #[test]
     fn test_empty_candidates_list() {
         let config = create_test_config();

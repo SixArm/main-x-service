@@ -1,7 +1,13 @@
+//! Criterion benchmarks approximating name-based search.
+//!
+//! Models a linear scan that scores a query against 100 candidate names via
+//! `name_similarity`, for both an exact query and a fuzzy (misspelled) one.
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use place_service::matching::name::name_similarity;
 use place_service::models::place::Place;
 
+/// Benchmark scoring an exact-match query against 100 names.
 fn bench_search_by_name(c: &mut Criterion) {
     let places: Vec<Place> = (0..100)
         .map(|i| Place::new(&format!("Place {i}")))
@@ -17,6 +23,7 @@ fn bench_search_by_name(c: &mut Criterion) {
     });
 }
 
+/// Benchmark scoring a fuzzy (misspelled) query against 100 names.
 fn bench_search_by_name_fuzzy(c: &mut Criterion) {
     let places: Vec<Place> = (0..100)
         .map(|i| Place::new(&format!("Place {i}")))

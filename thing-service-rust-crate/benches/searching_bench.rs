@@ -1,7 +1,11 @@
+//! Criterion benchmarks approximating name search: scoring a query against
+//! 100 records, for exact and fuzzy queries.
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use thing_service::matching::name::name_similarity;
 use thing_service::models::thing::Thing;
 
+/// Benchmark scoring an exact-name query against 100 records.
 fn bench_search_by_name(c: &mut Criterion) {
     let things: Vec<Thing> = (0..100)
         .map(|i| Thing::new(&format!("Thing {i}")))
@@ -17,6 +21,7 @@ fn bench_search_by_name(c: &mut Criterion) {
     });
 }
 
+/// Benchmark scoring a fuzzy (typo) query against 100 records.
 fn bench_search_by_name_fuzzy(c: &mut Criterion) {
     let things: Vec<Thing> = (0..100)
         .map(|i| Thing::new(&format!("Thing {i}")))

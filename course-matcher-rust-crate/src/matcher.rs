@@ -28,11 +28,13 @@ use crate::scoring::{weighted_average, Confidence, MatchBreakdown, MatchResult};
 const PHONETIC_BONUS: f64 = 0.05;
 const PHONETIC_CEILING: f64 = 0.95;
 
+/// The course matcher: holds a [`MatchConfig`] and scores course pairs.
 pub struct MatchingEngine {
     config: MatchConfig,
 }
 
 impl MatchingEngine {
+    /// Build a matcher with the given configuration.
     pub fn new(config: MatchConfig) -> Self {
         Self { config }
     }
@@ -42,6 +44,7 @@ impl MatchingEngine {
         Self::new(MatchConfig::default())
     }
 
+    /// Borrow the engine's configuration.
     pub fn config(&self) -> &MatchConfig {
         &self.config
     }

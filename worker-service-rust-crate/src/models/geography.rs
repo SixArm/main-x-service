@@ -55,6 +55,7 @@ pub struct PostcodeGeography {
 mod tests {
     use super::*;
 
+    /// A fully populated [`PostcodeGeography`] exposes its fields as set.
     #[test]
     fn test_postcode_geography_construction() {
         let geo = PostcodeGeography {
@@ -75,6 +76,7 @@ mod tests {
         assert_eq!(geo.local_authority_name.as_deref(), Some("Westminster"));
     }
 
+    /// A [`PostcodeGeography`] with sparse fields survives a JSON round-trip.
     #[test]
     fn test_postcode_geography_serialization() {
         let geo = PostcodeGeography {

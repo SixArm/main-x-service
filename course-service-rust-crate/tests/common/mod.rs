@@ -54,6 +54,8 @@ pub async fn create_test_app_state() -> AppState {
     AppState::new(db, search_engine, matcher, config)
 }
 
+/// Convenience wrapper: build the test [`AppState`] and mount it on the
+/// full production router, ready to drive via `oneshot`.
 pub async fn create_test_router() -> Router {
     let state = create_test_app_state().await;
     create_router(state)

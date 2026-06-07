@@ -1,4 +1,10 @@
-//! Application state for REST API
+//! Shared application state injected into every REST handler.
+//!
+//! [`AppState`] bundles the database connection and the service singletons
+//! (repository, event publisher, audit log, search engine, matcher, config)
+//! behind `Arc`s so it is cheap to clone into Axum's per-request state. The
+//! trait-object fields ([`WorkerRepository`], [`EventProducer`],
+//! [`WorkerMatcher`]) keep handlers decoupled from concrete implementations.
 
 use std::sync::Arc;
 use sea_orm::DatabaseConnection;
@@ -35,7 +41,14 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Create a new application state
+    /// Builds the application state from the long-lived dependencies the
+    /// server owns. Internally it wires the secondary services together: an
+    /// [`InMemoryEventPublisher`] is created first, then an
+    /// [`AuditLogRepository`] over a clone of `db`, and finally a
+    /// [`SeaOrmWorkerRepository`] configured with both so every write emits an
+    /// event and an audit entry. All services are wrapped in `Arc`s (and the
+    /// repository/matcher boxed as trait objects) so the returned [`AppState`]
+    /// is cheap to clone into Axum's per-request state.
     pub fn new(
         db: DatabaseConnection,
         search_engine: SearchEngine,

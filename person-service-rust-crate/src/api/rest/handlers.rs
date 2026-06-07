@@ -1,4 +1,11 @@
-//! REST API request handlers
+//! Axum handler functions and their request/response DTOs.
+//!
+//! Each handler takes [`AppState`] plus extracted path/query/JSON inputs
+//! and returns an [`ApiResponse`](crate::api::ApiResponse)-wrapped body with an appropriate HTTP
+//! status. The flow follows the create/match/merge/search pipelines:
+//! validation, real-time duplicate detection, persistence via the
+//! repository, and search-index synchronization. The `#[utoipa::path]`
+//! attributes feed [`ApiDoc`](crate::api::rest::ApiDoc) for OpenAPI/Swagger.
 
 use axum::{
     extract::{Path, Query, State},
@@ -15,15 +22,18 @@ use crate::models::Person;
 use crate::api::ApiResponse;
 use super::state::AppState;
 
-/// Health check response
+/// Body returned by the health-check endpoint.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct HealthResponse {
+    /// Liveness status string (always `"healthy"` when reachable).
     pub status: String,
+    /// Service name (`"person-service"`).
     pub service: String,
+    /// Crate version from `CARGO_PKG_VERSION`.
     pub version: String,
 }
 
-/// Health check endpoint
+/// Liveness probe; returns a static [`HealthResponse`].
 #[utoipa::path(
     get,
     path = "/api/v1/health",
@@ -60,14 +70,18 @@ pub async fn metrics_prom() -> impl IntoResponse {
     )
 }
 
-/// Create person request
+/// Create-person request body (a flattened [`Person`]).
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreatePersonRequest {
+    /// The person to create; flattened so the JSON is a bare Person.
     #[serde(flatten)]
     pub person: Person,
 }
 
-/// Create a new person
+/// Validate, duplicate-check, persist, and index a new person.
+///
+/// Returns `422` on validation failure, `409` with candidate matches if
+/// real-time duplicate detection fires, `201` on success.
 #[utoipa::path(
     post,
     path = "/api/v1/persons",
@@ -297,17 +311,23 @@ pub struct SearchQuery {
     pub mask_sensitive: bool,
 }
 
+/// Default search result limit (serde default for [`SearchQuery::limit`]).
 fn default_limit() -> usize {
     10
 }
 
-/// Search results response
+/// Paginated search results body.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SearchResponse {
+    /// The matched persons for this page (possibly masked).
     pub persons: Vec<Person>,
+    /// Count of persons in this page (not the global total).
     pub total: usize,
+    /// Echo of the query string searched.
     pub query: String,
+    /// Offset applied for pagination.
     pub offset: usize,
+    /// Page size applied (capped at 100).
     pub limit: usize,
 }
 
@@ -393,7 +413,7 @@ pub async fn search_persons(
     }
 }
 
-/// Match request payload
+/// Match request payload: a probe person plus filter options.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct MatchRequest {
     /// Person to match against existing records
@@ -409,24 +429,32 @@ pub struct MatchRequest {
     pub limit: usize,
 }
 
+/// Default match-result limit (serde default for [`MatchRequest::limit`]).
 fn default_match_limit() -> usize {
     10
 }
 
-/// Match result with score
+/// One scored candidate in a match/duplicate-check response.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct MatchResponse {
+    /// The candidate person record.
     pub person: Person,
+    /// Overall match score in `[0.0, 1.0]`.
     pub score: f64,
+    /// Human label: `"certain"` / `"probable"` / `"possible"`.
     pub quality: String,
+    /// How the match was produced (e.g. `"probabilistic"`).
     pub detection_method: String,
+    /// Optional per-component score breakdown as JSON.
     pub score_breakdown: Option<serde_json::Value>,
 }
 
-/// Match results response
+/// Wrapper holding all matches for a match request.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct MatchResultsResponse {
+    /// Scored candidates above the threshold, capped at the limit.
     pub matches: Vec<MatchResponse>,
+    /// Count of returned matches.
     pub total: usize,
 }
 
@@ -532,14 +560,22 @@ pub async fn match_person(
 
 // ─── Duplicate Detection ────────────────────────────────────────────────────
 
-/// Response for duplicate checking
+/// Result of a duplicate check.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DuplicateCheckResponse {
+    /// `true` if any candidate scored above the review threshold.
     pub has_duplicates: bool,
+    /// The candidates that triggered the flag (score ≥ 0.7).
     pub potential_matches: Vec<MatchResponse>,
 }
 
-/// Internal duplicate detection logic shared by create_person and the explicit endpoint.
+/// Shared duplicate-detection core for `create_person` and
+/// `check_duplicates`.
+///
+/// Blocks on the search index by family name + birth year, excludes the
+/// probe's own id, scores candidates with the matcher, and returns those
+/// at or above the 0.7 review threshold (max 10). Errors degrade to an
+/// empty result rather than failing the caller.
 async fn check_duplicates_internal(state: &AppState, person: &Person) -> Vec<MatchResponse> {
     let family_name = &person.name.family;
     let birth_year = person.birth_date.map(|d| d.year());
@@ -623,6 +659,14 @@ pub async fn check_duplicates(
         (status = 500, description = "Merge error")
     )
 )]
+/// Fold a duplicate record into a main record.
+///
+/// Transfers non-duplicate identifiers, names (the duplicate's primary
+/// name becomes an `Old` alias), addresses, contacts, documents,
+/// emergency contacts, and tax id; adds a `Replaces` link; updates and
+/// re-indexes main; soft-deletes and de-indexes the duplicate; publishes
+/// a `Merged` event; and returns a [`MergeRecord`](crate::models::MergeRecord)
+/// snapshot of what was transferred. `404` if either id is missing.
 pub async fn merge_persons(
     State(state): State<AppState>,
     Json(req): Json<crate::models::MergeRequest>,
@@ -782,6 +826,13 @@ pub async fn merge_persons(
         (status = 500, description = "Internal server error")
     )
 )]
+/// Scan active persons pairwise and queue likely duplicates for review.
+///
+/// For each person, compares against the subsequent records (upper
+/// triangle, so each unordered pair is scored once via `seen_pairs`).
+/// Pairs at/above `auto_merge_threshold` are marked `AutoMerged`; those
+/// at/above `threshold` are queued `Pending`. Does not itself merge —
+/// it only produces review-queue items.
 pub async fn batch_deduplicate(
     State(state): State<AppState>,
     Json(req): Json<crate::models::BatchDeduplicationRequest>,
@@ -965,6 +1016,7 @@ pub struct AuditLogQuery {
     pub limit: i64,
 }
 
+/// Default audit-log result limit (serde default for the `limit` fields).
 fn default_audit_limit() -> i64 {
     50
 }

@@ -1,3 +1,10 @@
+//! Integration tests for the domain models.
+//!
+//! These exercise the public model types end to end — construction, Serde
+//! round-trips, the soft-delete lifecycle, place hierarchy, geo-distance
+//! properties (symmetry, triangle inequality), the full identifier and
+//! place-type enums, consent lifecycle, and a full week of opening hours.
+
 use place_service::models::address::PostalAddress;
 use place_service::models::amenity::AmenityFeature;
 use place_service::models::consent::{Consent, ConsentStatus, ConsentType};
@@ -12,6 +19,7 @@ use uuid::Uuid;
 
 // -- Place lifecycle tests --
 
+/// A fully-populated place survives a JSON serialize/deserialize round-trip.
 #[test]
 fn test_place_full_construction_and_serialization() {
     let mut place = Place::new("Eiffel Tower");
@@ -63,6 +71,7 @@ fn test_place_full_construction_and_serialization() {
     assert_eq!(deserialized.id, place.id);
 }
 
+/// Soft-delete sets the flag and a deletion timestamp at/after creation.
 #[test]
 fn test_place_soft_delete_timestamps() {
     let mut place = Place::new("Temporary Place");
@@ -78,6 +87,7 @@ fn test_place_soft_delete_timestamps() {
     assert!(place.deleted_at.unwrap() >= created);
 }
 
+/// Each new place gets a distinct id.
 #[test]
 fn test_place_ids_are_unique() {
     let a = Place::new("Place A");
@@ -85,6 +95,7 @@ fn test_place_ids_are_unique() {
     assert_ne!(a.id, b.id);
 }
 
+/// A child place can reference its parent via `contained_in_place`.
 #[test]
 fn test_place_contained_in_place_hierarchy() {
     let parent = Place::new("New York City");
@@ -95,6 +106,7 @@ fn test_place_contained_in_place_hierarchy() {
 
 // -- GeoCoordinates integration tests --
 
+/// Haversine distance is symmetric: d(a,b) == d(b,a).
 #[test]
 fn test_geo_distance_symmetry() {
     let nyc = GeoCoordinates::new(40.7128, -74.0060);
@@ -104,6 +116,7 @@ fn test_geo_distance_symmetry() {
     assert!((d1 - d2).abs() < 0.01, "Distance should be symmetric: {d1} vs {d2}");
 }
 
+/// Haversine distance respects the triangle inequality.
 #[test]
 fn test_geo_distance_triangle_inequality() {
     let nyc = GeoCoordinates::new(40.7128, -74.0060);
@@ -119,6 +132,7 @@ fn test_geo_distance_triangle_inequality() {
 
 // -- Identifier integration tests --
 
+/// All identifier types (including `Custom`) round-trip through JSON.
 #[test]
 fn test_multiple_identifier_types() {
     let place = Place::new("Test");
@@ -142,6 +156,7 @@ fn test_multiple_identifier_types() {
 
 // -- Consent integration tests --
 
+/// Active consent becomes inactive once revoked.
 #[test]
 fn test_consent_lifecycle() {
     let place_id = Uuid::new_v4();
@@ -162,6 +177,7 @@ fn test_consent_lifecycle() {
     assert!(!consent.is_active());
 }
 
+/// Every `ConsentType` variant round-trips through JSON.
 #[test]
 fn test_consent_all_types_serialization() {
     let types = [
@@ -179,6 +195,7 @@ fn test_consent_all_types_serialization() {
 
 // -- PlaceType integration tests --
 
+/// Every `PlaceType` variant has a non-empty Display and round-trips JSON.
 #[test]
 fn test_all_place_types_display_and_roundtrip() {
     let types = [
@@ -207,6 +224,7 @@ fn test_all_place_types_display_and_roundtrip() {
 
 // -- OpeningHours integration tests --
 
+/// A seven-day opening-hours schedule round-trips through JSON.
 #[test]
 fn test_opening_hours_full_week() {
     let days = [
@@ -231,6 +249,7 @@ fn test_opening_hours_full_week() {
 
 // -- PostalAddress integration tests --
 
+/// A default `PostalAddress` has all fields unset.
 #[test]
 fn test_address_default() {
     let addr = PostalAddress::default();
@@ -241,6 +260,7 @@ fn test_address_default() {
     assert!(addr.postal_code.is_none());
 }
 
+/// Cloned addresses compare equal.
 #[test]
 fn test_address_equality() {
     let a = PostalAddress {

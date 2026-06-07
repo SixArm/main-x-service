@@ -1,4 +1,17 @@
-//! Record merge models
+//! Models for the worker record-merge workflow.
+//!
+//! When two worker records are confirmed duplicates, one is chosen as the
+//! surviving *main* record and the other becomes the *duplicate*. This module
+//! carries the three shapes that flow through that operation:
+//!
+//! - [`MergeRequest`] — the inbound API request (which two records, why).
+//! - [`MergeRecord`] — the persisted audit record of a merge, including a JSON
+//!   snapshot of the data transferred from duplicate to main.
+//! - [`MergeResponse`] — the outbound API response (the record plus the merged
+//!   main worker).
+//!
+//! [`MergeStatus`] tracks whether a merge is [`Completed`](MergeStatus::Completed)
+//! or was later [`Reversed`](MergeStatus::Reversed).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

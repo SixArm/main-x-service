@@ -1,4 +1,9 @@
-//! Benchmarks for person search engine
+//! Criterion benchmarks for the Tantivy-backed search engine.
+//!
+//! Measures single and bulk indexing, the main query paths (exact,
+//! fuzzy, name+year, no-results) against a 1000-record index, and
+//! delete+reindex. Each bench builds its index in a `TempDir`. Run with
+//! `cargo bench`.
 
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
 use chrono::{NaiveDate, Utc};
@@ -8,6 +13,7 @@ use uuid::Uuid;
 use person_service::models::*;
 use person_service::search::SearchEngine;
 
+/// Build a minimal [`Person`] for indexing/search benchmarks.
 fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Person {
     let now = Utc::now();
     Person {
@@ -51,6 +57,7 @@ const FAMILY_NAMES: &[&str] = &[
     "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson",
 ];
 
+/// Given-name pool for generating realistic test data.
 const GIVEN_NAMES: &[&str] = &[
     "James", "Robert", "John", "Michael", "David",
     "William", "Richard", "Joseph", "Thomas", "Charles",
@@ -58,6 +65,7 @@ const GIVEN_NAMES: &[&str] = &[
     "Elizabeth", "Susan", "Jessica", "Sarah", "Karen",
 ];
 
+/// Benchmark indexing a single person.
 fn bench_index_single_person(c: &mut Criterion) {
     let temp_dir = TempDir::new().unwrap();
     let engine = SearchEngine::new(temp_dir.path()).unwrap();
@@ -70,6 +78,7 @@ fn bench_index_single_person(c: &mut Criterion) {
     });
 }
 
+/// Benchmark bulk-indexing 50 persons into a fresh index.
 fn bench_index_bulk_persons(c: &mut Criterion) {
     let persons_50: Vec<Person> = (0..50)
         .map(|i| {
@@ -93,6 +102,8 @@ fn bench_index_bulk_persons(c: &mut Criterion) {
     });
 }
 
+/// Benchmark query paths (exact, limit-50, fuzzy, name+year, miss)
+/// against a 1000-record index.
 fn bench_search_queries(c: &mut Criterion) {
     // Set up index with 1000 persons
     let temp_dir = TempDir::new().unwrap();
@@ -141,6 +152,7 @@ fn bench_search_queries(c: &mut Criterion) {
     });
 }
 
+/// Benchmark deleting (and reindexing away) a single person.
 fn bench_delete_person(c: &mut Criterion) {
     c.bench_function("delete_and_reindex_person", |b| {
         b.iter_with_setup(

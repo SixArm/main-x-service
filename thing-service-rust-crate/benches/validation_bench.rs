@@ -1,8 +1,12 @@
+//! Criterion benchmarks for validation and normalization: a minimal record,
+//! a fully-populated record, and in-place normalization.
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use thing_service::models::identifier::ThingIdentifier;
 use thing_service::models::thing::Thing;
 use thing_service::validation::{normalize_thing, validate_thing};
 
+/// Benchmark `validate_thing` on a name-only record.
 fn bench_validate_simple(c: &mut Criterion) {
     let thing = Thing::new("Simple Thing");
     c.bench_function("validate_simple_thing", |b| {
@@ -10,6 +14,7 @@ fn bench_validate_simple(c: &mut Criterion) {
     });
 }
 
+/// Benchmark `validate_thing` on a fully-populated record (URLs + identifiers).
 fn bench_validate_full(c: &mut Criterion) {
     let mut thing = Thing::new("Full Thing");
     thing.description = Some("A description.".into());
@@ -26,6 +31,7 @@ fn bench_validate_full(c: &mut Criterion) {
     });
 }
 
+/// Benchmark in-place `normalize_thing` (trim, scheme-lowercase, dedupe).
 fn bench_normalize(c: &mut Criterion) {
     c.bench_function("normalize_thing", |b| {
         b.iter_batched(

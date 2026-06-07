@@ -1,16 +1,34 @@
-//! HL7 FHIR R5 API implementation
+//! HL7 FHIR R5 interop for the Person resource.
+//!
+//! Provides the bidirectional mapping between the internal domain
+//! [`Person`](crate::models::Person) and the wire-level [`FhirPerson`](crate::api::fhir::FhirPerson): [`to_fhir_person`](crate::api::fhir::to_fhir_person) for
+//! outbound responses and [`from_fhir_person`](crate::api::fhir::from_fhir_person) for inbound requests. The
+//! FHIR resource shapes live in [`resources`](crate::api::fhir::resources), bundle handling in
+//! [`bundle`](crate::api::fhir::bundle), search-parameter parsing in [`search_parameters`](crate::api::fhir::search_parameters), and
+//! the Axum endpoints in [`handlers`](crate::api::fhir::handlers). The conversions are intentionally
+//! lossy where the domain model has no equivalent field (noted by inline
+//! `TODO`s).
 
 use crate::models::{Person, Address, ContactPoint, Identifier};
 use crate::Result;
 
+/// FHIR resource type definitions (Person, Identifier, …).
 pub mod resources;
+/// FHIR Bundle (search-set) construction.
 pub mod bundle;
+/// FHIR search-parameter parsing.
 pub mod search_parameters;
+/// FHIR endpoint handlers.
 pub mod handlers;
 
 pub use resources::{FhirPerson, FhirOperationOutcome};
 
-/// Convert internal Person model to FHIR Person resource
+/// Map an internal [`Person`] to its FHIR R5 [`FhirPerson`] form.
+///
+/// Copies identity, names (primary + additional), telecom, gender, birth
+/// date, deceased status, addresses, marital status, multiple-birth,
+/// links, and managing organization, populating FHIR `Reference`s where
+/// the domain holds bare ids. Enum values are lowercased to FHIR codes.
 pub fn to_fhir_person(person: &Person) -> FhirPerson {
     use resources::*;
 
@@ -205,7 +223,14 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
     fhir_person
 }
 
-/// Convert FHIR Person resource to internal Person model
+/// Map an inbound FHIR [`FhirPerson`] to the internal [`Person`].
+///
+/// Parses the id (generating a fresh UUID when absent), the first name
+/// entry (required — errors otherwise), gender, birth date, deceased
+/// flag, identifiers, addresses, and telecom. Fields the domain does not
+/// yet round-trip (additional names, marital status, multiple birth,
+/// org reference) are left at defaults. Returns
+/// [`crate::Error::Validation`] on an invalid UUID or a missing name.
 pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
     use crate::models::{HumanName, NameUse, Gender, ContactPointSystem, ContactPointUse};
     use crate::api::fhir::resources::FhirDeceased;

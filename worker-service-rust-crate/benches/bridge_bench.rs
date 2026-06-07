@@ -23,6 +23,7 @@ use worker_service::models::{
 
 // -------- fixtures -----------------------------------------------------------
 
+/// A bare [`Worker`] (name + gender only) — the cheap end of the adapter cost.
 fn minimal_worker() -> Worker {
     let mut w = Worker::new(
         HumanName {
@@ -40,6 +41,8 @@ fn minimal_worker() -> Worker {
     w
 }
 
+/// A fully-populated [`Worker`] (identifiers, telecom, addresses, document,
+/// tax id) exercising every adapter routing branch — the expensive case.
 fn rich_worker() -> Worker {
     let mut w = minimal_worker();
     w.birth_date = NaiveDate::from_ymd_opt(1970, 4, 1);
@@ -87,6 +90,7 @@ fn rich_worker() -> Worker {
     w
 }
 
+/// The default-config [`MatchingEngine`] used by the bridge benchmarks.
 fn engine() -> MatchingEngine {
     MatchingEngine::new(MatchConfig::default())
 }
@@ -95,6 +99,8 @@ fn engine() -> MatchingEngine {
 // Group 1: adapter projection cost (minimal vs rich record)
 // =============================================================================
 
+/// Benchmarks the adapter projection alone (`to_matcher_worker`) on minimal
+/// and rich records.
 fn bench_adapter_only(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_adapter_only");
     let minimal = minimal_worker();
@@ -120,6 +126,8 @@ fn bench_adapter_only(c: &mut Criterion) {
 // Group 2: end-to-end bridge — adapter + engine
 // =============================================================================
 
+/// Benchmarks the full bridge (adapter + engine) on cloned minimal and rich
+/// pairs.
 fn bench_end_to_end(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_end_to_end");
     let engine = engine();
@@ -154,6 +162,8 @@ fn bench_end_to_end(c: &mut Criterion) {
 // Group 3: one-vs-many — the realistic dedup-on-create path
 // =============================================================================
 
+/// Benchmarks the realistic dedup path: one query scored against 10/50/100
+/// varied candidates, taking the best score.
 fn bench_one_to_many(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_one_to_many");
     let engine = engine();

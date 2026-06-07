@@ -3,6 +3,25 @@
 //! An event is a time-bounded occurrence (conference, appointment,
 //! shift, encounter, sale, screening, …) with a location, parties,
 //! optional offers, and links to other events.
+//!
+//! [`Event`] is the aggregate root of the whole crate: the matching,
+//! search, validation, and privacy layers all operate on it. Only
+//! [`Event::start_date`] and [`Event::name`] are conceptually required;
+//! everything else defaults to empty or `None` via [`Event::new`].
+//!
+//! # Examples
+//!
+//! ```
+//! use event_service::models::Event;
+//! use chrono::{TimeZone, Utc};
+//!
+//! let start = Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap();
+//! let mut event = Event::new("Summer Festival", start);
+//! event.end_date = Some(start + chrono::Duration::hours(8));
+//! event.keywords.push("music".into());
+//! assert_eq!(event.name, "Summer Festival");
+//! assert!(event.identifiers.is_empty());
+//! ```
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -99,8 +118,11 @@ pub struct Event {
     // -----------------------------------------------------------------------
     // Status, mode, type
     // -----------------------------------------------------------------------
+    /// Lifecycle status (schema.org/eventStatus).
     pub event_status: EventStatus,
+    /// How attendees join (schema.org/eventAttendanceMode).
     pub event_attendance_mode: EventAttendanceMode,
+    /// Event subtype classification (local enum).
     pub event_type: EventType,
 
     // -----------------------------------------------------------------------
@@ -195,23 +217,30 @@ pub struct Event {
     // -----------------------------------------------------------------------
     // Cross-event links (merge / refer / see-also)
     // -----------------------------------------------------------------------
+    /// Typed links to other events (merge `Replaces`/`ReplacedBy`,
+    /// `Refer`, `Seealso`).
     #[serde(default)]
     pub links: Vec<EventLink>,
 
     // -----------------------------------------------------------------------
     // Audit timestamps
     // -----------------------------------------------------------------------
+    /// When this record was first created (set by [`Event::new`]).
     pub created_at: DateTime<Utc>,
+    /// When this record was last modified.
     pub updated_at: DateTime<Utc>,
 }
 
-/// A typed link from one event to another.
+/// A typed link from one event to another (merge / refer / see-also).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EventLink {
+    /// The ID of the event being linked to.
     pub other_event_id: Uuid,
+    /// The semantics of the link.
     pub link_type: LinkType,
 }
 
+/// The semantics of an [`EventLink`].
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LinkType {
@@ -228,7 +257,27 @@ pub enum LinkType {
 
 impl Event {
     /// Construct a new event with required fields. All optional
-    /// fields default to empty / `None`; `id` is generated.
+    /// fields default to empty / `None`; `id` is generated (UUID v4)
+    /// and `created_at` / `updated_at` are set to now.
+    ///
+    /// `active` is `true` and the status / mode / type take their
+    /// [`Default`] values (`Scheduled` / `Offline` / `Generic`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use event_service::models::Event;
+    /// use event_service::models::{EventStatus, EventAttendanceMode, EventType};
+    /// use chrono::{TimeZone, Utc};
+    ///
+    /// let start = Utc.with_ymd_and_hms(2026, 1, 15, 9, 0, 0).unwrap();
+    /// let event = Event::new("Annual Conference", start);
+    /// assert!(event.active);
+    /// assert_eq!(event.event_status, EventStatus::Scheduled);
+    /// assert_eq!(event.event_attendance_mode, EventAttendanceMode::Offline);
+    /// assert_eq!(event.event_type, EventType::Generic);
+    /// assert!(event.end_date.is_none());
+    /// ```
     pub fn new(name: impl Into<String>, start_date: DateTime<Utc>) -> Self {
         let now = Utc::now();
         Self {
@@ -278,7 +327,26 @@ impl Event {
         }
     }
 
-    /// First identifier value whose type matches, if any.
+    /// First identifier value whose type matches `kind`, if any.
+    ///
+    /// Used to pull out a strong identifier (booking / ticket /
+    /// confirmation / encounter / transaction) for deterministic
+    /// matching and for display.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use event_service::models::{Event, Identifier, IdentifierType};
+    /// use chrono::{TimeZone, Utc};
+    ///
+    /// let start = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+    /// let mut event = Event::new("Show", start);
+    /// event.identifiers.push(Identifier::new(
+    ///     IdentifierType::TicketNumber, "box-office".into(), "T-42".into(),
+    /// ));
+    /// assert_eq!(event.identifier_value(IdentifierType::TicketNumber), Some("T-42"));
+    /// assert_eq!(event.identifier_value(IdentifierType::BookingNumber), None);
+    /// ```
     pub fn identifier_value(&self, kind: super::IdentifierType) -> Option<&str> {
         self.identifiers
             .iter()
@@ -293,10 +361,12 @@ mod tests {
     use crate::models::{Address, Location, Party, PartyKind, Place, VirtualLocation};
     use chrono::TimeZone;
 
+    /// A fixed timestamp used across the tests for reproducibility.
     fn jan_2026() -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 1, 15, 9, 0, 0).unwrap()
     }
 
+    /// `new` leaves all collections empty and applies enum defaults.
     #[test]
     fn new_event_defaults() {
         let event = Event::new("Annual Conference", jan_2026());
@@ -311,6 +381,7 @@ mod tests {
         assert!(event.end_date.is_none());
     }
 
+    /// A fully populated event survives a JSON round-trip unchanged.
     #[test]
     fn roundtrip_serde() {
         let mut event = Event::new("Concert", jan_2026());
@@ -355,6 +426,8 @@ mod tests {
         assert_eq!(back.keywords, vec!["music".to_string()]);
     }
 
+    /// Every `Location` variant serializes via its `kind` tag and
+    /// deserializes back to the same value.
     #[test]
     fn location_variants_roundtrip() {
         // Each Location variant should serialize via its `kind` tag.

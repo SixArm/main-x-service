@@ -1,3 +1,31 @@
+//! Privacy controls for [`Thing`](crate::models::thing::Thing) records.
+//!
+//! Two operations support data-protection regimes:
+//!
+//! - [`mask_thing`](crate::privacy::mask_thing) returns a copy with sensitive
+//!   fields obscured, for privacy-conscious display (e.g. the masked-view
+//!   endpoint). Most schema.org/Thing properties are public bibliographic
+//!   data, so only `owner` and identifier values/URLs are touched.
+//! - [`gdpr_export`](crate::privacy::gdpr_export) returns the record's full
+//!   JSON, unmodified, for a
+//!   GDPR Article 15 data-portability request.
+//!
+//! # Examples
+//!
+//! ```
+//! use thing_service::models::identifier::ThingIdentifier;
+//! use thing_service::models::thing::Thing;
+//! use thing_service::privacy::mask_thing;
+//!
+//! let mut thing = Thing::new("Private Diary");
+//! thing.owner = Some("Jane Doe".into());
+//! thing.identifiers = vec![ThingIdentifier::serial_number("SN-1234567890")];
+//!
+//! let masked = mask_thing(&thing);
+//! assert_eq!(masked.owner.as_deref(), Some("[owner withheld]"));
+//! assert!(masked.identifiers[0].value.starts_with("****"));
+//! ```
+
 use crate::models::thing::Thing;
 use serde_json::Value;
 
@@ -22,6 +50,9 @@ pub fn mask_thing(thing: &Thing) -> Thing {
     masked
 }
 
+/// Mask an identifier value, keeping only its last four characters behind a
+/// `****` prefix. Values of four characters or fewer are fully redacted to
+/// `"****"` so nothing identifying leaks from short strings.
 fn mask_value(v: &str) -> String {
     if v.len() <= 4 {
         return "****".to_string();
@@ -40,6 +71,7 @@ mod tests {
     use super::*;
     use crate::models::identifier::ThingIdentifier;
 
+    /// A present `owner` is replaced with the withheld placeholder.
     #[test]
     fn test_mask_owner() {
         let mut thing = Thing::new("Private Diary");
@@ -48,6 +80,7 @@ mod tests {
         assert_eq!(masked.owner.as_deref(), Some("[owner withheld]"));
     }
 
+    /// An identifier value keeps only its last four characters.
     #[test]
     fn test_mask_identifier_value() {
         let mut thing = Thing::new("Test");
@@ -58,6 +91,7 @@ mod tests {
         assert!(v.ends_with("7890"));
     }
 
+    /// A per-identifier `url` is cleared during masking.
     #[test]
     fn test_mask_identifier_url_cleared() {
         let mut thing = Thing::new("Test");
@@ -68,6 +102,7 @@ mod tests {
         assert!(masked.identifiers[0].url.is_none());
     }
 
+    /// A short (≤4 char) identifier value is fully redacted to `****`.
     #[test]
     fn test_mask_short_identifier() {
         let mut thing = Thing::new("Test");
@@ -76,6 +111,7 @@ mod tests {
         assert_eq!(masked.identifiers[0].value, "****");
     }
 
+    /// The public `name` is left untouched by masking.
     #[test]
     fn test_mask_preserves_name() {
         let thing = Thing::new("Pride and Prejudice");
@@ -83,6 +119,7 @@ mod tests {
         assert_eq!(masked.name, "Pride and Prejudice");
     }
 
+    /// Masking preserves each identifier's `property_id` (only the value/url change).
     #[test]
     fn test_mask_preserves_property_id() {
         let mut thing = Thing::new("Test");
@@ -94,6 +131,7 @@ mod tests {
         );
     }
 
+    /// Masking a record with no sensitive fields is a no-op.
     #[test]
     fn test_mask_no_sensitive_fields() {
         let thing = Thing::new("Public Thing");
@@ -102,6 +140,7 @@ mod tests {
         assert!(masked.identifiers.is_empty());
     }
 
+    /// GDPR export carries field values through unmodified.
     #[test]
     fn test_gdpr_export_preserves_fields() {
         let mut thing = Thing::new("Export Test");
@@ -111,6 +150,7 @@ mod tests {
         assert_eq!(export["description"], "A test thing");
     }
 
+    /// GDPR export includes every top-level field for data portability.
     #[test]
     fn test_gdpr_export_has_all_top_level_fields() {
         let thing = Thing::new("Full Export");

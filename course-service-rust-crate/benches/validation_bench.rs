@@ -11,6 +11,9 @@ use course_service::models::{
 };
 use course_service::validation::validate_course;
 
+/// Build a fully-populated course (one nested instance, identifiers,
+/// URLs, languages, credits) so a single validate pass exercises every
+/// FR-21..FR-28 branch at least once.
 fn populated_course() -> Course {
     let mut c = Course::new("Introduction to Computer Science");
     c.course_code = Some("CS101".into());
@@ -55,6 +58,7 @@ fn populated_course() -> Course {
     c
 }
 
+/// Benchmark a single `validate_course` pass over the populated record.
 fn bench_validate_populated(c: &mut Criterion) {
     let course = populated_course();
     c.bench_function("validation/validate_course/populated", |b| {

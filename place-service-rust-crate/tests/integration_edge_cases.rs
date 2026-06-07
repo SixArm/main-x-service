@@ -1,3 +1,10 @@
+//! Integration tests for boundary conditions and cross-module workflows.
+//!
+//! These pin validation boundaries (coordinate limits, GLN length, URL
+//! schemes, minimal/empty addresses), normalization edge cases, privacy
+//! masking of all sensitive fields, and full end-to-end pipelines that chain
+//! validate → normalize → match / mask → export.
+
 use place_service::matching::scoring::{compute_match, MatchWeights};
 use place_service::models::address::PostalAddress;
 use place_service::models::geo::GeoCoordinates;
@@ -9,6 +16,7 @@ use place_service::validation::{normalize_place, validate_place};
 
 // -- Validation edge cases --
 
+/// Coordinates exactly at the WGS-84 limits are valid.
 #[test]
 fn test_validate_boundary_coordinates() {
     // Exactly at boundaries should be valid
@@ -20,6 +28,7 @@ fn test_validate_boundary_coordinates() {
     assert!(validate_place(&place).is_empty());
 }
 
+/// Coordinates just past the limits are rejected.
 #[test]
 fn test_validate_just_past_boundary() {
     let mut place = Place::new("Invalid");
@@ -30,6 +39,7 @@ fn test_validate_just_past_boundary() {
     assert!(!validate_place(&place).is_empty());
 }
 
+/// Only an exactly-13-digit GLN passes; 12 or 14 digits fail.
 #[test]
 fn test_validate_gln_exactly_13_digits() {
     let mut place = Place::new("Test");
@@ -43,6 +53,7 @@ fn test_validate_gln_exactly_13_digits() {
     assert!(!validate_place(&place).is_empty());
 }
 
+/// `http`/`https` URLs pass; other schemes (e.g. `ftp`) fail.
 #[test]
 fn test_validate_url_protocols() {
     let mut place = Place::new("Test");
@@ -57,6 +68,7 @@ fn test_validate_url_protocols() {
     assert!(!validate_place(&place).is_empty());
 }
 
+/// A single locating field (postal code or country alone) satisfies the rule.
 #[test]
 fn test_validate_address_minimal() {
     let mut place = Place::new("Test");
@@ -82,6 +94,7 @@ fn test_validate_address_minimal() {
     assert!(validate_place(&place).is_empty());
 }
 
+/// Empty-string locating fields count as absent and fail validation.
 #[test]
 fn test_validate_empty_string_address_fields() {
     let mut place = Place::new("Test");
@@ -98,6 +111,7 @@ fn test_validate_empty_string_address_fields() {
 
 // -- Normalization edge cases --
 
+/// Multi-word localities are title-cased word by word.
 #[test]
 fn test_normalize_multi_word_locality() {
     let mut place = Place::new("Test");
@@ -114,6 +128,7 @@ fn test_normalize_multi_word_locality() {
     assert_eq!(addr.address_region.as_deref(), Some("CA"));
 }
 
+/// Normalization is idempotent on already-normalized input.
 #[test]
 fn test_normalize_already_normalized() {
     let mut place = Place::new("Test Place");
@@ -130,6 +145,7 @@ fn test_normalize_already_normalized() {
     assert_eq!(addr.address_region.as_deref(), Some("NY"));
 }
 
+/// Normalizing a place without an address still trims the name.
 #[test]
 fn test_normalize_no_address() {
     let mut place = Place::new("  Trimmed  ");
@@ -140,6 +156,7 @@ fn test_normalize_no_address() {
 
 // -- Privacy edge cases --
 
+/// Masking redacts phone, fax, and geo while keeping non-sensitive fields.
 #[test]
 fn test_mask_place_with_all_sensitive_fields() {
     let mut place = Place::new("Full Privacy Test");
@@ -166,6 +183,7 @@ fn test_mask_place_with_all_sensitive_fields() {
     assert_eq!(masked.name, "Full Privacy Test");
 }
 
+/// An empty phone string masks to `****`.
 #[test]
 fn test_mask_place_empty_phone() {
     let mut place = Place::new("Test");
@@ -174,6 +192,7 @@ fn test_mask_place_empty_phone() {
     assert_eq!(masked.telephone.as_deref(), Some("****"));
 }
 
+/// GDPR export preserves every populated field, including arrays.
 #[test]
 fn test_gdpr_export_preserves_all_fields() {
     let mut place = Place::new("GDPR Test");
@@ -193,6 +212,7 @@ fn test_gdpr_export_preserves_all_fields() {
     assert_eq!(export["keywords"].as_array().unwrap().len(), 2);
 }
 
+/// A soft-deleted record exports its deletion flag and timestamp.
 #[test]
 fn test_gdpr_export_soft_deleted_place() {
     let mut place = Place::new("Deleted");
@@ -205,6 +225,7 @@ fn test_gdpr_export_soft_deleted_place() {
 
 // -- Combined workflow tests --
 
+/// Full validate → normalize → match pipeline yields a strong match.
 #[test]
 fn test_validate_normalize_match_workflow() {
     // Simulate the full pipeline: validate -> normalize -> match
@@ -240,6 +261,7 @@ fn test_validate_normalize_match_workflow() {
     assert!(result.score > 0.95, "Normalized places should match well: {}", result.score);
 }
 
+/// Full validate → normalize → mask → export pipeline preserves redaction.
 #[test]
 fn test_validate_normalize_mask_export_workflow() {
     let mut place = Place::new("  Sensitive Place  ");
@@ -270,6 +292,7 @@ fn test_validate_normalize_mask_export_workflow() {
     assert!(export["telephone"].as_str().unwrap().ends_with("****"));
 }
 
+/// A shared GLN pins the score to 1.0 despite every other field differing.
 #[test]
 fn test_gln_deterministic_trumps_everything() {
     // Even with completely different names, addresses, geo, and types,

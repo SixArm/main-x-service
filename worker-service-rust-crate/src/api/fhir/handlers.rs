@@ -1,4 +1,12 @@
-//! FHIR R5 API handlers
+//! Axum handlers for the FHIR R5 `/fhir/Worker` endpoints.
+//!
+//! Each handler bridges the FHIR wire format and the internal model: it
+//! converts with [`to_fhir_worker`] / [`from_fhir_worker`], reuses the same
+//! repository and search engine as the REST API via the shared [`AppState`],
+//! and reports errors as a FHIR [`FhirOperationOutcome`] (rather than the REST
+//! [`crate::api::ApiResponse`] envelope) so responses stay FHIR-conformant.
+//! Search returns a FHIR `Bundle` of type `searchset`. No doctests — these
+//! require a live [`AppState`].
 
 use axum::{
     extract::{Path, Query, State},
@@ -12,7 +20,9 @@ use uuid::Uuid;
 use crate::api::rest::AppState;
 use super::{FhirWorker, FhirOperationOutcome, to_fhir_worker, from_fhir_worker};
 
-/// FHIR search parameters
+/// Query parameters for `GET /fhir/Worker`, named per the FHIR search-parameter
+/// spec (`name`, `family`, `given`, `identifier`, `birthdate`, `gender`,
+/// `_count`) via `#[serde(rename)]`.
 #[derive(Debug, Deserialize)]
 pub struct FhirSearchParams {
     /// Worker name (any part)
@@ -44,7 +54,8 @@ pub struct FhirSearchParams {
     pub count: Option<usize>,
 }
 
-/// Get FHIR Worker by ID
+/// `GET /fhir/Worker/{id}` — returns the worker as a FHIR resource, a
+/// `not-found` outcome (`404`), or a `database-error` outcome (`500`).
 pub async fn get_fhir_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -65,7 +76,9 @@ pub async fn get_fhir_worker(
     }
 }
 
-/// Create FHIR Worker
+/// `POST /fhir/Worker` — parses the FHIR body into the internal model
+/// (`400` invalid outcome on failure), assigns a UUID if absent, persists,
+/// indexes, and returns the created resource (`201`).
 pub async fn create_fhir_worker(
     State(state): State<AppState>,
     Json(fhir_worker): Json<FhirWorker>,
@@ -102,7 +115,8 @@ pub async fn create_fhir_worker(
     }
 }
 
-/// Update FHIR Worker
+/// `PUT /fhir/Worker/{id}` — parses the body, forces its id to the path id,
+/// updates, re-indexes, and returns the updated resource (`200`).
 pub async fn update_fhir_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -138,7 +152,8 @@ pub async fn update_fhir_worker(
     }
 }
 
-/// Delete FHIR Worker
+/// `DELETE /fhir/Worker/{id}` — soft-deletes the worker, returning `204`
+/// (empty body) or a `database-error` outcome (`500`).
 pub async fn delete_fhir_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -154,7 +169,9 @@ pub async fn delete_fhir_worker(
     }
 }
 
-/// Search FHIR Workers
+/// `GET /fhir/Worker?...` — searches by the first provided name parameter
+/// (`name`, else `family`, else `given`; `400` if none), hydrates hits, and
+/// returns them as a FHIR `searchset` `Bundle`. `_count` caps the page (≤100).
 pub async fn search_fhir_workers(
     State(state): State<AppState>,
     Query(params): Query<FhirSearchParams>,

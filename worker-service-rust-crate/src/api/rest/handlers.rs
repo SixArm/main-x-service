@@ -1,4 +1,16 @@
-//! REST API request handlers
+//! Axum handler functions for every REST endpoint, plus their
+//! request/response DTOs.
+//!
+//! Each handler extracts [`AppState`] and the request body/query, runs the
+//! relevant business logic (validation, duplicate detection, matching,
+//! merging, masking, audit queries), and returns an [`ApiResponse`] wrapped in
+//! the appropriate HTTP status. The `#[utoipa::path(...)]` attributes feed the
+//! OpenAPI document assembled in [`super::ApiDoc`]; the route table that maps
+//! paths to these functions lives in [`super::create_router`].
+//!
+//! Handlers are not shown with runnable doctests: they require a live
+//! [`AppState`] (database, search index, matcher) that cannot be constructed
+//! in a doctest. Behaviour is pinned by the integration tests in `tests/`.
 
 use axum::{
     extract::{Path, Query, State},
@@ -15,15 +27,19 @@ use crate::models::Worker;
 use crate::api::ApiResponse;
 use super::state::AppState;
 
-/// Health check response
+/// Body of the `/api/v1/health` response: a fixed liveness probe payload.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct HealthResponse {
+    /// Always `"healthy"` while the process can serve requests.
     pub status: String,
+    /// Service name (`"worker-service"`), useful when probing many services.
     pub service: String,
+    /// Crate version from `CARGO_PKG_VERSION`, for deploy verification.
     pub version: String,
 }
 
-/// Health check endpoint
+/// Liveness probe: returns a static [`HealthResponse`] for orchestrators
+/// (Docker/Kubernetes health checks). Performs no I/O.
 #[utoipa::path(
     get,
     path = "/api/v1/health",
@@ -60,14 +76,21 @@ pub async fn metrics_prom() -> impl IntoResponse {
     )
 }
 
-/// Create worker request
+/// Create-worker request body: a flattened [`Worker`], so the JSON is the
+/// worker object itself rather than a nested `{ "worker": { ... } }`.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateWorkerRequest {
+    /// The worker to create (flattened into the top-level JSON object).
     #[serde(flatten)]
     pub worker: Worker,
 }
 
-/// Create a new worker
+/// Creates a worker after validation and real-time duplicate detection.
+///
+/// Pipeline: validate (`422` on failure) → assign a UUID if missing →
+/// check duplicates (`409` with candidate matches in `error.details` if any)
+/// → persist via the repository → index in the search engine (a failure here
+/// is logged, not fatal) → `201` with the stored worker.
 #[utoipa::path(
     post,
     path = "/api/v1/workers",
@@ -140,7 +163,8 @@ pub async fn create_worker(
     }
 }
 
-/// Get a worker by ID
+/// Fetches a single worker by UUID. `200` with the record, `404` if no
+/// active worker has that id, `500` on a database error.
 #[utoipa::path(
     get,
     path = "/api/v1/workers/{id}",
@@ -179,7 +203,9 @@ pub async fn get_worker(
     }
 }
 
-/// Update a worker
+/// Updates an existing worker. Validates the payload (`422` on failure),
+/// forces the body's `id` to match the path id, persists the update, and
+/// refreshes the search index (index failure is logged, not fatal).
 #[utoipa::path(
     put,
     path = "/api/v1/workers/{id}",
@@ -234,7 +260,8 @@ pub async fn update_worker(
     }
 }
 
-/// Delete a worker (soft delete)
+/// Soft-deletes a worker (marks inactive; the row is retained for audit)
+/// and removes it from the search index. Returns `204 No Content`.
 #[utoipa::path(
     delete,
     path = "/api/v1/workers/{id}",
@@ -270,7 +297,7 @@ pub async fn delete_worker(
     }
 }
 
-/// Search query parameters
+/// Query parameters for `/workers/search` (full-text + pagination + masking).
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
 pub struct SearchQuery {
     /// Search query string
@@ -297,21 +324,33 @@ pub struct SearchQuery {
     pub mask_sensitive: bool,
 }
 
+/// Serde default for [`SearchQuery::limit`] when the client omits it.
 fn default_limit() -> usize {
     10
 }
 
-/// Search results response
+/// Body of a successful `/workers/search` response: the page of hits plus the
+/// echoed-back pagination parameters.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SearchResponse {
+    /// The workers on this page (already masked if `mask_sensitive` was set).
     pub workers: Vec<Worker>,
+    /// Number of workers returned on this page (i.e. `workers.len()`).
     pub total: usize,
+    /// The query string that was searched, echoed back.
     pub query: String,
+    /// The pagination offset that was applied.
     pub offset: usize,
+    /// The effective page size (capped at 100).
     pub limit: usize,
 }
 
-/// Search for workers
+/// Full-text worker search with pagination and optional masking.
+///
+/// Caps `limit` at 100, asks the search engine for `offset + limit` ids
+/// (fuzzy or exact per the query), then skips/takes for the requested page
+/// and hydrates each id from the repository, optionally masking sensitive
+/// fields. Ids present in the index but missing from the DB are skipped.
 #[utoipa::path(
     get,
     path = "/api/v1/workers/search",
@@ -393,7 +432,7 @@ pub async fn search_workers(
     }
 }
 
-/// Match request payload
+/// Body of `/workers/match`: the probe worker plus optional scoring controls.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct MatchRequest {
     /// Worker to match against existing records
@@ -409,28 +448,43 @@ pub struct MatchRequest {
     pub limit: usize,
 }
 
+/// Serde default for [`MatchRequest::limit`] when the client omits it.
 fn default_match_limit() -> usize {
     10
 }
 
-/// Match result with score
+/// A single scored candidate returned by the match / duplicate endpoints.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct MatchResponse {
+    /// The candidate worker that was scored against the probe.
     pub worker: Worker,
+    /// Overall similarity score in `[0.0, 1.0]`.
     pub score: f64,
+    /// Human-readable bucket: `"certain"` (≥0.95), `"probable"` (≥0.7),
+    /// else `"possible"`.
     pub quality: String,
+    /// How this candidate surfaced (e.g. `"probabilistic"`,
+    /// `"duplicate_detection"`, `"batch_deduplication"`).
     pub detection_method: String,
+    /// Per-component score breakdown as JSON, when available.
     pub score_breakdown: Option<serde_json::Value>,
 }
 
-/// Match results response
+/// Body of a successful `/workers/match` response: the scored candidates.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct MatchResultsResponse {
+    /// Candidates that met the threshold, best first, capped at `limit`.
     pub matches: Vec<MatchResponse>,
+    /// Number of matches returned (i.e. `matches.len()`).
     pub total: usize,
 }
 
-/// Match a worker against existing records
+/// Scores a probe worker against existing records.
+///
+/// Uses the search engine to fetch blocking candidates (by family name and
+/// birth year), hydrates them, runs the matcher, filters by the requested
+/// threshold (default 0.5), caps to `limit`, and labels each with a quality
+/// bucket. This keeps scoring O(candidates) rather than O(all workers).
 #[utoipa::path(
     post,
     path = "/api/v1/workers/match",
@@ -532,14 +586,21 @@ pub async fn match_worker(
 
 // ─── Duplicate Detection ────────────────────────────────────────────────────
 
-/// Response for duplicate checking
+/// Body of `/workers/check-duplicates` (and the `409` details on create).
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DuplicateCheckResponse {
+    /// `true` when at least one candidate scored at or above the review
+    /// threshold (0.7).
     pub has_duplicates: bool,
+    /// The candidate matches above threshold, best first.
     pub potential_matches: Vec<MatchResponse>,
 }
 
-/// Internal duplicate detection logic shared by create_worker and the explicit endpoint.
+/// Shared duplicate-detection core used by both [`create_worker`] (pre-insert
+/// gate) and [`check_duplicates`] (explicit check). Blocks on family name +
+/// birth year, skips the probe's own id, scores candidates, and returns those
+/// at or above the 0.7 review threshold (capped at 10). Returns an empty vec
+/// on any search/match error so a detection failure never blocks a create.
 async fn check_duplicates_internal(state: &AppState, worker: &Worker) -> Vec<MatchResponse> {
     let family_name = &worker.name.family;
     let birth_year = worker.birth_date.map(|d| d.year());
@@ -586,7 +647,8 @@ async fn check_duplicates_internal(state: &AppState, worker: &Worker) -> Vec<Mat
         .collect()
 }
 
-/// Check for duplicates without creating a worker
+/// Runs duplicate detection for a candidate worker without persisting it.
+/// Always returns `200`; the body reports whether duplicates were found.
 #[utoipa::path(
     post,
     path = "/api/v1/workers/check-duplicates",
@@ -611,7 +673,15 @@ pub async fn check_duplicates(
 
 // ─── Record Merging ─────────────────────────────────────────────────────────
 
-/// Merge two worker records
+/// Merges a duplicate worker into a surviving main worker.
+///
+/// Fetches both (`404` if either is missing), copies the duplicate's
+/// identifiers, names (its primary name becomes an `Old` alias), addresses,
+/// contacts, documents, emergency contacts, and tax id into main (de-duping
+/// where it can), adds a `Replaces` link, persists main, soft-deletes the
+/// duplicate, updates the search index, publishes a `Merged` event, and
+/// returns a [`crate::models::MergeRecord`] with a snapshot of transferred
+/// data.
 #[utoipa::path(
     post,
     path = "/api/v1/workers/merge",
@@ -771,7 +841,13 @@ pub async fn merge_workers(
 
 // ─── Batch Deduplication ────────────────────────────────────────────────────
 
-/// Run batch deduplication across all workers
+/// Scans all active workers pairwise for duplicates.
+///
+/// For each worker, blocks against the workers that follow it (so each pair is
+/// considered once), scores them, and for pairs at or above `threshold`
+/// records a [`crate::models::ReviewQueueItem`] — `AutoMerged` when the score
+/// clears `auto_merge_threshold`, otherwise `Pending`. A `seen_pairs` set
+/// guards against re-recording the same unordered pair.
 #[utoipa::path(
     post,
     path = "/api/v1/workers/deduplicate",
@@ -875,7 +951,8 @@ pub async fn batch_deduplicate(
 
 // ─── Data Export (GDPR Right of Access) ─────────────────────────────────────
 
-/// Export all data for a worker (GDPR right of access)
+/// Exports all stored data for a worker as JSON (GDPR right of access).
+/// `200` with the export document, `404` if not found.
 #[utoipa::path(
     get,
     path = "/api/v1/workers/{id}/export",
@@ -915,7 +992,8 @@ pub async fn export_worker_data(
     }
 }
 
-/// Get a worker with sensitive data masked
+/// Returns a worker with sensitive fields (tax id, document numbers, phone,
+/// email, address) masked for least-privilege display. `404` if not found.
 #[utoipa::path(
     get,
     path = "/api/v1/workers/{id}/masked",
@@ -957,7 +1035,7 @@ pub async fn get_worker_masked(
 
 // ─── Audit Log Endpoints ────────────────────────────────────────────────────
 
-/// Audit log query parameters
+/// Query parameters shared by the per-worker and recent audit endpoints.
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
 pub struct AuditLogQuery {
     /// Maximum number of results (default: 50, max: 500)
@@ -965,11 +1043,12 @@ pub struct AuditLogQuery {
     pub limit: i64,
 }
 
+/// Serde default for the audit-query `limit` fields when the client omits it.
 fn default_audit_limit() -> i64 {
     50
 }
 
-/// Get audit logs for a specific worker
+/// Returns the audit trail for one worker, newest first (limit capped at 500).
 #[utoipa::path(
     get,
     path = "/api/v1/workers/{id}/audit",
@@ -1002,7 +1081,7 @@ pub async fn get_worker_audit_logs(
     }
 }
 
-/// Get recent audit logs
+/// Returns the most recent audit entries system-wide (limit capped at 500).
 #[utoipa::path(
     get,
     path = "/api/v1/audit/recent",
@@ -1031,7 +1110,7 @@ pub async fn get_recent_audit_logs(
     }
 }
 
-/// User audit log query parameters
+/// Query parameters for the by-user audit endpoint.
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
 pub struct UserAuditLogQuery {
     /// User ID to filter by
@@ -1042,7 +1121,7 @@ pub struct UserAuditLogQuery {
     pub limit: i64,
 }
 
-/// Get audit logs by user
+/// Returns audit entries performed by a given user (limit capped at 500).
 #[utoipa::path(
     get,
     path = "/api/v1/audit/user",

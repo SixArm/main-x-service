@@ -1,4 +1,10 @@
-//! Application state for REST API
+//! [`AppState`](crate::api::rest::state::AppState): the shared services every REST handler is given.
+//!
+//! Axum clones `AppState` per request, so every field is cheap to clone
+//! (an `Arc` or a pooled connection). It bundles the database, person
+//! repository, event publisher, audit log, search engine, matcher, and
+//! configuration behind trait objects so handlers stay decoupled from
+//! concrete implementations.
 
 use std::sync::Arc;
 use sea_orm::DatabaseConnection;
@@ -35,7 +41,13 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Create a new application state
+    /// Assemble the shared state, wiring the repository to an in-memory
+    /// event publisher and the audit log.
+    ///
+    /// Takes owned `search_engine`, `matcher`, and `config` and wraps
+    /// them in `Arc`s. The repository is built with both the event
+    /// publisher and audit log attached, so every mutation through it
+    /// emits events and audit rows.
     pub fn new(
         db: DatabaseConnection,
         search_engine: SearchEngine,

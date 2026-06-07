@@ -1,4 +1,11 @@
-//! Application state for REST API
+//! Shared application state for the REST API.
+//!
+//! [`AppState`](crate::api::rest::AppState) bundles every service an
+//! Axum handler needs — the DB connection, the event repository, the
+//! event publisher, the audit log, the search engine, the matcher, and
+//! the config — behind cheap [`Arc`](std::sync::Arc) clones (the struct
+//! derives [`Clone`]). One instance is built at startup and shared
+//! across all requests via Axum's `with_state`.
 
 use std::sync::Arc;
 use sea_orm::DatabaseConnection;
@@ -35,7 +42,12 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Create a new application state
+    /// Assemble an [`AppState`] from the four externally-built pieces
+    /// (DB connection, search engine, matcher, config). Internally
+    /// wires an in-memory event publisher and an audit-log repository,
+    /// then constructs the [`SeaOrmEventRepository`] with both attached
+    /// so every CRUD write also streams an event and records an audit
+    /// entry.
     pub fn new(
         db: DatabaseConnection,
         search_engine: SearchEngine,

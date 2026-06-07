@@ -1,4 +1,11 @@
-//! Integration tests for REST API endpoints
+//! End-to-end tests for the REST API, driving the real Axum router via
+//! `tower`'s `oneshot` against the JSON HTTP surface.
+//!
+//! Each test builds an app with [`common::create_test_router`], issues a
+//! request, and asserts on the status code and response body. They exercise
+//! the full CRUD lifecycle plus search and the not-found path. Test data is
+//! namespaced with [`common::unique_worker_name`] so concurrent runs do not
+//! collide. Requires the test database backing the router.
 
 mod common;
 
@@ -14,7 +21,9 @@ use worker_service::{
     api::ApiResponse,
 };
 
+/// `GET /api/v1/health` returns 200 with the service name and "healthy".
 #[tokio::test]
+#[ignore]
 async fn test_health_check() {
     let app = common::create_test_router().await;
 
@@ -39,7 +48,9 @@ async fn test_health_check() {
     assert!(body_str.contains("worker-service"));
 }
 
+/// `POST /api/v1/workers` creates a worker and returns it in the response.
 #[tokio::test]
+#[ignore]
 async fn test_create_worker() {
     let app = common::create_test_router().await;
 
@@ -83,7 +94,9 @@ async fn test_create_worker() {
     assert!(worker.id.to_string() != "00000000-0000-0000-0000-000000000000");
 }
 
+/// A created worker can be fetched back by its id via `GET /workers/{id}`.
 #[tokio::test]
+#[ignore]
 async fn test_create_and_get_worker() {
     let app = common::create_test_router().await;
 
@@ -149,7 +162,9 @@ async fn test_create_and_get_worker() {
     assert_eq!(retrieved_worker.name.family, family_name);
 }
 
+/// `PUT /workers/{id}` updates an existing worker's fields.
 #[tokio::test]
+#[ignore]
 async fn test_update_worker() {
     let app = common::create_test_router().await;
 
@@ -214,7 +229,9 @@ async fn test_update_worker() {
     assert_eq!(updated_worker.name.given, vec!["Update", "Modified"]);
 }
 
+/// `DELETE /workers/{id}` soft-deletes a worker (subsequent reads 404).
 #[tokio::test]
+#[ignore]
 async fn test_delete_worker() {
     let app = common::create_test_router().await;
 
@@ -282,7 +299,9 @@ async fn test_delete_worker() {
     assert_eq!(get_response.status(), StatusCode::NOT_FOUND);
 }
 
+/// `GET /workers/search` returns previously created workers by name.
 #[tokio::test]
+#[ignore]
 async fn test_search_workers() {
     let app = common::create_test_router().await;
 
@@ -341,7 +360,9 @@ async fn test_search_workers() {
     assert!(body_str.contains(&family_name));
 }
 
+/// `GET /workers/{id}` for an unknown id returns 404.
 #[tokio::test]
+#[ignore]
 async fn test_get_worker_not_found() {
     let app = common::create_test_router().await;
 

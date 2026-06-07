@@ -99,6 +99,9 @@ use crate::Result;
         (name = "audit",      description = "Audit log queries"),
     ),
 )]
+/// utoipa OpenAPI document aggregating every path, schema, and tag for
+/// the Course Service REST API. Rendered at `/swagger-ui` and served as
+/// JSON at `/api-docs/openapi.json`.
 pub struct ApiDoc;
 
 /// Build the REST router with the given application state.
@@ -167,7 +170,10 @@ pub async fn serve(state: AppState) -> Result<()> {
     Ok(())
 }
 
-/// Builder hook for the binary entry point.
+/// Builder hook for the binary entry point. Assembles an [`AppState`]
+/// from the connection pool, search engine, matcher, and config; the
+/// repository, audit log, and event publisher are constructed inside
+/// [`AppState::new`].
 pub fn build_state(
     db: DatabaseConnection,
     search_engine: crate::search::SearchEngine,

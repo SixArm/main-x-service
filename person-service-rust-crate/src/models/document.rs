@@ -1,4 +1,18 @@
-//! Identity document model
+//! The [`IdentityDocument`] model — passports, licenses, and the like.
+//!
+//! An identity document is a stronger, often government-issued proof of
+//! identity than a bare [`crate::models::Identifier`]. The matcher can
+//! short-circuit on an exact `(document_type, number)` match. The
+//! [`DocumentType`] enum serializes to SCREAMING_SNAKE_CASE codes
+//! (e.g. `"DRIVERS_LICENSE"`) to match the wire/DB contract.
+//!
+//! # Examples
+//!
+//! ```
+//! use person_service::models::DocumentType;
+//!
+//! assert_eq!(format!("{}", DocumentType::Passport), "PASSPORT");
+//! ```
 
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
@@ -36,6 +50,10 @@ pub enum DocumentType {
     Other,
 }
 
+/// Renders the canonical SCREAMING_SNAKE_CASE code (e.g. `PASSPORT`).
+///
+/// Kept in lock-step with the serde `rename` attributes so the textual
+/// form is stable across the wire, the database, and logs.
 impl std::fmt::Display for DocumentType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -81,6 +99,8 @@ pub struct IdentityDocument {
 mod tests {
     use super::*;
 
+    /// Every `DocumentType` has a non-empty `Display` code, and a few
+    /// representative ones render to their exact expected strings.
     #[test]
     fn test_document_type_variants() {
         let types = vec![
@@ -104,6 +124,8 @@ mod tests {
         assert_eq!(format!("{}", DocumentType::Other), "OTHER");
     }
 
+    /// An `IdentityDocument` survives a JSON round-trip with its type,
+    /// number, country, dates, and verified flag intact.
     #[test]
     fn test_document_serialization() {
         let doc = IdentityDocument {

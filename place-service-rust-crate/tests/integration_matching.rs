@@ -1,3 +1,10 @@
+//! Integration tests for the matching pipeline.
+//!
+//! These drive [`compute_match`] against whole-record fixtures to exercise
+//! duplicate detection: exact duplicates, name typos, unrelated places, the
+//! same name in different cities, GLN deterministic override, name-only
+//! matches, and ranking a batch of candidates.
+
 use place_service::models::address::PostalAddress;
 use place_service::models::geo::GeoCoordinates;
 use place_service::models::identifier::PlaceIdentifier;
@@ -5,6 +12,8 @@ use place_service::models::place::Place;
 use place_service::models::place_type::PlaceType;
 use place_service::matching::scoring::{compute_match, MatchConfidence, MatchWeights};
 
+/// Build a `Place` from optional components, attaching geo and address only
+/// when their inputs are supplied. Keeps the test bodies terse.
 fn make_place(
     name: &str,
     place_type: Option<PlaceType>,
@@ -30,6 +39,7 @@ fn make_place(
     p
 }
 
+/// Two identical full records score Certain.
 #[test]
 fn test_exact_duplicate_detection() {
     let a = make_place("Central Park", Some(PlaceType::Park), Some(40.7829), Some(-73.9654), Some("New York"), Some("US"));
@@ -39,6 +49,7 @@ fn test_exact_duplicate_detection() {
     assert_eq!(result.confidence, MatchConfidence::Certain);
 }
 
+/// A name typo plus near-identical other fields still scores a probable match.
 #[test]
 fn test_typo_in_name_still_matches() {
     let a = make_place("Central Park", Some(PlaceType::Park), Some(40.7829), Some(-73.9654), Some("New York"), Some("US"));
@@ -47,6 +58,7 @@ fn test_typo_in_name_still_matches() {
     assert!(result.score > 0.7, "Expected probable match, got {}", result.score);
 }
 
+/// Two unrelated landmarks score Unlikely.
 #[test]
 fn test_completely_different_places() {
     let a = make_place("Central Park", Some(PlaceType::Park), Some(40.7829), Some(-73.9654), Some("New York"), Some("US"));
@@ -56,6 +68,7 @@ fn test_completely_different_places() {
     assert_eq!(result.confidence, MatchConfidence::Unlikely);
 }
 
+/// Same business name in different cities does not score a certain match.
 #[test]
 fn test_same_name_different_city() {
     let a = make_place("Main Street Cafe", Some(PlaceType::Restaurant), Some(40.7128), Some(-74.0060), Some("New York"), Some("US"));
@@ -64,6 +77,7 @@ fn test_same_name_different_city() {
     assert!(result.score < 0.9, "Score: {}", result.score);
 }
 
+/// A shared GLN pins the score to 1.0 even with mismatched names.
 #[test]
 fn test_gln_deterministic_overrides_name_mismatch() {
     let mut a = Place::new("Store Alpha");
@@ -75,6 +89,7 @@ fn test_gln_deterministic_overrides_name_mismatch() {
     assert!(result.breakdown.deterministic_match);
 }
 
+/// Exact name match with no other fields still scores Certain.
 #[test]
 fn test_matching_with_name_only() {
     let a = Place::new("Golden Gate Bridge");
@@ -83,6 +98,7 @@ fn test_matching_with_name_only() {
     assert!(result.score > 0.95, "Score: {}", result.score);
 }
 
+/// Scoring a batch of candidates ranks the true duplicate first.
 #[test]
 fn test_batch_matching_multiple_candidates() {
     let target = make_place("Central Park", Some(PlaceType::Park), Some(40.7829), Some(-73.9654), Some("New York"), Some("US"));

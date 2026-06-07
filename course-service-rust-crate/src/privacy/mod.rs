@@ -34,6 +34,7 @@ pub fn mask_course(c: &Course) -> Course {
     out
 }
 
+/// Placeholder text substituted for redacted free-text fields.
 const MASK_LABEL: &str = "[REDACTED]";
 
 /// GDPR Article-15 portability export. Wraps the full unmasked
@@ -41,12 +42,19 @@ const MASK_LABEL: &str = "[REDACTED]";
 /// where the snapshot was taken.
 #[derive(Debug, Clone, Serialize)]
 pub struct CourseExport<'a> {
+    /// When the snapshot was taken.
     pub exported_at: DateTime<Utc>,
+    /// Originating service name.
     pub source: &'static str,
+    /// schema.org type URL the record conforms to.
     pub schema: &'static str,
+    /// Borrowed reference to the full, unmasked course.
     pub course: &'a Course,
 }
 
+/// Serialise an FR-15 export envelope wrapping `c` to JSON. Falls back
+/// to `Value::Null` only if serialisation somehow fails (it cannot for
+/// this always-serialisable shape).
 pub fn export_course(c: &Course) -> Value {
     let envelope = CourseExport {
         exported_at: Utc::now(),
@@ -64,6 +72,7 @@ mod tests {
 
     use crate::models::{CourseInstance, CourseInstanceStatus};
 
+    /// Test fixture: an instance with instructor refs and names to mask.
     fn instance(course_id: Uuid) -> CourseInstance {
         CourseInstance {
             id: Uuid::new_v4(),
@@ -86,6 +95,7 @@ mod tests {
         }
     }
 
+    /// Masking clears provider_id and instructor refs/names.
     #[test]
     fn masking_clears_provider_and_instructor_refs() {
         let mut c = Course::new("Intro to CS");
@@ -98,6 +108,7 @@ mod tests {
         assert_eq!(inst.instructor_names, vec![MASK_LABEL, MASK_LABEL]);
     }
 
+    /// Masking leaves non-sensitive fields (name, code, keywords) intact.
     #[test]
     fn masking_leaves_non_sensitive_fields_intact() {
         let mut c = Course::new("Intro to CS");
@@ -109,6 +120,7 @@ mod tests {
         assert_eq!(masked.keywords, vec!["programming".to_string()]);
     }
 
+    /// Masking operates on a copy and never mutates the input.
     #[test]
     fn masking_does_not_mutate_input() {
         let mut c = Course::new("Intro to CS");
@@ -118,6 +130,7 @@ mod tests {
         assert_eq!(c.provider_id, Some(provider));
     }
 
+    /// The export envelope carries source/schema metadata plus the record.
     #[test]
     fn export_envelope_carries_metadata_and_record() {
         let c = Course::new("Intro to CS");

@@ -1,3 +1,12 @@
+//! Integration tests for the scoring components and the combined scorer.
+//!
+//! These cover edge cases across each matching component (name, address, geo,
+//! identifier, phonetic) and the [`compute_match`] aggregator: Unicode and
+//! reversed names, sparse addresses, antipodal/date-line geo, multi-identifier
+//! lists, Soundex consistency, custom weights, confidence boundaries, score
+//! range invariants, the phonetic bonus, all-component matches, and batch
+//! ranking.
+
 use place_service::matching::name::name_similarity;
 use place_service::matching::address::address_similarity;
 use place_service::matching::geo::{geo_similarity, geo_similarity_with_reference, within_radius};
@@ -12,12 +21,14 @@ use place_service::models::place_type::PlaceType;
 
 // -- Name matching edge cases --
 
+/// Accented vs unaccented names score highly similar.
 #[test]
 fn test_name_similarity_unicode() {
     let score = name_similarity("Café de Flore", "Cafe de Flore");
     assert!(score > 0.8, "Unicode name similarity: {score}");
 }
 
+/// Identical long names score exactly 1.0.
 #[test]
 fn test_name_similarity_very_long_names() {
     let a = "The Very Long Name of an Incredibly Important Historical Place in Downtown";
@@ -26,6 +37,7 @@ fn test_name_similarity_very_long_names() {
     assert!((score - 1.0).abs() < f64::EPSILON);
 }
 
+/// Two different single characters score in `[0.0, 1.0)`.
 #[test]
 fn test_name_similarity_single_character() {
     let score = name_similarity("A", "B");
@@ -33,6 +45,7 @@ fn test_name_similarity_single_character() {
     assert!(score >= 0.0);
 }
 
+/// Reversed word order scores partial, not perfect.
 #[test]
 fn test_name_similarity_reversed_words() {
     let score = name_similarity("Park Central", "Central Park");
@@ -42,6 +55,7 @@ fn test_name_similarity_reversed_words() {
 
 // -- Address matching edge cases --
 
+/// Addresses sharing only a matching country score 1.0 (adaptive weighting).
 #[test]
 fn test_address_similarity_only_country() {
     let a = PostalAddress {
@@ -62,6 +76,7 @@ fn test_address_similarity_only_country() {
     assert!((score - 1.0).abs() < f64::EPSILON);
 }
 
+/// Two empty addresses share no field and score 0.0.
 #[test]
 fn test_address_similarity_empty_addresses() {
     let a = PostalAddress::new();
@@ -70,6 +85,7 @@ fn test_address_similarity_empty_addresses() {
     assert!((score - 0.0).abs() < f64::EPSILON);
 }
 
+/// Near-identical postal codes score high but below 1.0.
 #[test]
 fn test_address_similarity_similar_postal_codes() {
     let a = PostalAddress {
@@ -93,6 +109,7 @@ fn test_address_similarity_similar_postal_codes() {
 
 // -- Geo matching edge cases --
 
+/// Pole-to-pole coordinates score near 0.0.
 #[test]
 fn test_geo_similarity_north_south_poles() {
     let north = GeoCoordinates::new(90.0, 0.0);
@@ -101,6 +118,7 @@ fn test_geo_similarity_north_south_poles() {
     assert!(score < 0.001, "Pole-to-pole score: {score}");
 }
 
+/// Points straddling the date line are correctly measured as close.
 #[test]
 fn test_geo_similarity_date_line() {
     let a = GeoCoordinates::new(0.0, 179.99);
@@ -110,6 +128,7 @@ fn test_geo_similarity_date_line() {
     assert!(dist < 3000.0, "Date line distance should be small: {dist}m");
 }
 
+/// `within_radius` is inclusive at the boundary and excludes a too-tight radius.
 #[test]
 fn test_geo_within_radius_boundary() {
     let a = GeoCoordinates::new(40.7829, -73.9654);
@@ -121,6 +140,7 @@ fn test_geo_within_radius_boundary() {
     assert!(!within_radius(&a, &b, 0.1));
 }
 
+/// A larger reference distance yields a higher similarity for the same gap.
 #[test]
 fn test_geo_reference_distance_effect() {
     let a = GeoCoordinates::new(40.7829, -73.9654);
@@ -136,6 +156,7 @@ fn test_geo_reference_distance_effect() {
 
 // -- Identifier matching edge cases --
 
+/// Lists sharing identifiers score 1.0.
 #[test]
 fn test_identifier_similarity_multiple_matches() {
     let a = vec![
@@ -150,6 +171,7 @@ fn test_identifier_similarity_multiple_matches() {
     assert!((score - 1.0).abs() < f64::EPSILON);
 }
 
+/// Same type but different values score 0.0.
 #[test]
 fn test_identifier_no_match_different_values() {
     let a = vec![PlaceIdentifier::new(IdentifierType::Fips, "36061")];
@@ -158,6 +180,7 @@ fn test_identifier_no_match_different_values() {
     assert!((score - 0.0).abs() < f64::EPSILON);
 }
 
+/// A shared GLN is detected even among other identifier types.
 #[test]
 fn test_gln_match_among_many_identifiers() {
     let a = vec![
@@ -174,6 +197,7 @@ fn test_gln_match_among_many_identifiers() {
 
 // -- Phonetic matching edge cases --
 
+/// Soundex is deterministic and always four characters.
 #[test]
 fn test_soundex_codes_consistency() {
     // Same name produces same code every time
@@ -183,12 +207,14 @@ fn test_soundex_codes_consistency() {
     assert_eq!(code1.len(), 4);
 }
 
+/// All-numeric input yields the empty `"0000"` code.
 #[test]
 fn test_soundex_numeric_input() {
     let code = soundex("123");
     assert_eq!(code, "0000");
 }
 
+/// Misspelled place names still phonetically match.
 #[test]
 fn test_soundex_match_similar_place_names() {
     assert!(soundex_match("Manhattan", "Manhatan"));
@@ -197,6 +223,7 @@ fn test_soundex_match_similar_place_names() {
 
 // -- Scoring integration tests --
 
+/// Name-heavy weights outscore geo-heavy weights when names match but geo differs.
 #[test]
 fn test_match_with_custom_weights() {
     let mut a = Place::new("Test Place");
@@ -229,6 +256,7 @@ fn test_match_with_custom_weights() {
         result_name.score, result_geo.score);
 }
 
+/// Confidence classification is correct exactly at and just below each threshold.
 #[test]
 fn test_match_confidence_boundaries() {
     assert_eq!(MatchConfidence::from_score(0.95), MatchConfidence::Certain);
@@ -241,6 +269,7 @@ fn test_match_confidence_boundaries() {
     assert_eq!(MatchConfidence::from_score(1.0), MatchConfidence::Certain);
 }
 
+/// Every score across a cross-product of inputs stays in `[0.0, 1.0]`.
 #[test]
 fn test_match_score_always_in_range() {
     let places = [
@@ -259,6 +288,7 @@ fn test_match_score_always_in_range() {
     }
 }
 
+/// The phonetic bonus lifts the score for sounds-alike misspellings.
 #[test]
 fn test_match_phonetic_bonus_applied() {
     // Names that sound alike but are spelled differently
@@ -270,6 +300,7 @@ fn test_match_phonetic_bonus_applied() {
     assert!(result.score > 0.85, "With phonetic bonus: {}", result.score);
 }
 
+/// No phonetic bonus is added when the score is already at/above 0.95.
 #[test]
 fn test_match_no_phonetic_bonus_when_score_high() {
     // Identical names - phonetic match is true but no bonus applied (score already >= 0.95)
@@ -280,6 +311,7 @@ fn test_match_no_phonetic_bonus_when_score_high() {
     assert!((result.score - 1.0).abs() < f64::EPSILON);
 }
 
+/// A match with every component present populates the full breakdown.
 #[test]
 fn test_match_with_all_components() {
     let mut a = Place::new("Central Park");
@@ -308,6 +340,7 @@ fn test_match_with_all_components() {
     assert!((result.breakdown.identifier_score - 1.0).abs() < f64::EPSILON);
 }
 
+/// Candidate scores rank exact > partial > different.
 #[test]
 fn test_batch_matching_sorted_by_relevance() {
     let target = Place::new("Central Park");

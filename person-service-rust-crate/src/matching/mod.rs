@@ -1,12 +1,30 @@
-//! Person matcher algorithms and scoring
+//! Person matching: algorithms, scoring, and matcher strategies.
+//!
+//! This is the matching layer's public face. It defines the
+//! [`PersonMatcher`](crate::matching::PersonMatcher) trait and two concrete strategies —
+//! [`ProbabilisticMatcher`](crate::matching::ProbabilisticMatcher) (weighted fuzzy) and
+//! [`DeterministicMatcher`](crate::matching::DeterministicMatcher) (rule-based) — both of which delegate the
+//! numeric work to the scorers in [`scoring`](crate::matching::scoring). The per-field algorithms
+//! live in [`algorithms`](crate::matching::algorithms) and the Soundex phonetic helper in
+//! [`phonetic`](crate::matching::phonetic).
+//!
+//! [`MatchResult`](crate::matching::MatchResult) pairs a candidate with its overall score and a
+//! per-component [`MatchScoreBreakdown`](crate::matching::MatchScoreBreakdown). The crate also re-exports the
+//! canonical sibling `person-matcher` library as [`matcher_lib`](crate::matching::matcher_lib); pair
+//! it with [`adapter::to_matcher_person`](crate::matching::adapter::to_matcher_person) to score service records
+//! through the reference engine.
 
 use crate::models::Person;
 use crate::config::MatchingConfig;
 use crate::Result;
 
+/// Adapter from the service `Person` to the canonical matcher's `Person`.
 pub mod adapter;
+/// Per-field comparison algorithms (name, DOB, gender, address, …).
 pub mod algorithms;
+/// Soundex phonetic encoding and similarity.
 pub mod phonetic;
+/// Probabilistic and deterministic scoring strategies.
 pub mod scoring;
 
 pub use scoring::{ProbabilisticScorer, DeterministicScorer, MatchQuality};
@@ -18,28 +36,44 @@ pub use scoring::{ProbabilisticScorer, DeterministicScorer, MatchQuality};
 /// score two service `Person` records through the reference algorithm.
 pub use ::person_matcher as matcher_lib;
 
-/// Match result containing a person and their match score
+/// A scored candidate: the matched person plus its overall score and
+/// per-component breakdown.
 #[derive(Debug, Clone)]
 pub struct MatchResult {
+    /// The candidate person that was scored.
     pub person: Person,
+    /// Overall match score in `[0.0, 1.0]`.
     pub score: f64,
+    /// Per-component contribution to the overall score.
     pub breakdown: MatchScoreBreakdown,
 }
 
-/// Breakdown of match score components
+/// The seven per-field scores that feed the overall match score.
+///
+/// Each field is in `[0.0, 1.0]`. Serialized into API responses so
+/// callers can see *why* two records matched.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MatchScoreBreakdown {
+    /// Name similarity (family + given + prefix/suffix).
     pub name_score: f64,
+    /// Birth-date proximity.
     pub birth_date_score: f64,
+    /// Gender agreement.
     pub gender_score: f64,
+    /// Best postal-address similarity.
     pub address_score: f64,
+    /// Best identifier (type+system+value) match.
     pub identifier_score: f64,
+    /// Tax-ID exact match (deterministic signal).
     pub tax_id_score: f64,
+    /// Best identity-document (type+number) match.
     pub document_score: f64,
 }
 
 impl MatchScoreBreakdown {
-    /// Get a summary of which components matched well
+    /// Return a comma-joined list of the components that matched
+    /// strongly (each above its own confidence cutoff), or
+    /// `"no strong matches"` when none did.
     pub fn summary(&self) -> String {
         let mut parts = Vec::new();
 
@@ -73,36 +107,46 @@ impl MatchScoreBreakdown {
     }
 }
 
-/// Person matcher trait
+/// A strategy for scoring one person against others.
+///
+/// Implemented by [`ProbabilisticMatcher`] and [`DeterministicMatcher`].
+/// `Send + Sync` so an `Arc<dyn PersonMatcher>` can be shared across
+/// async request handlers.
 pub trait PersonMatcher: Send + Sync {
-    /// Match a person against a candidate
+    /// Score `person` against a single `candidate`.
     fn match_persons(&self, person: &Person, candidate: &Person) -> Result<MatchResult>;
 
-    /// Find potential matches for a person
+    /// Score `person` against every candidate, returning only those that
+    /// meet the threshold, sorted by score descending.
     fn find_matches(&self, person: &Person, candidates: &[Person]) -> Result<Vec<MatchResult>>;
 
-    /// Check if a score meets the matching threshold
+    /// Return `true` when a score meets this matcher's threshold.
     fn is_match(&self, score: f64) -> bool;
 }
 
-/// Probabilistic matching strategy
+/// [`PersonMatcher`] backed by the weighted-average scorer.
 pub struct ProbabilisticMatcher {
+    /// The underlying weighted-average scorer.
     scorer: ProbabilisticScorer,
 }
 
 impl ProbabilisticMatcher {
+    /// Create a probabilistic matcher from a [`MatchingConfig`].
     pub fn new(config: MatchingConfig) -> Self {
         Self {
             scorer: ProbabilisticScorer::new(config),
         }
     }
 
-    /// Get the configured threshold (not implemented yet)
+    /// Return the threshold used for classification.
+    ///
+    /// Currently a hard-coded `0.85`; wiring this to the config is a
+    /// known TODO.
     pub fn threshold(&self) -> f64 {
         0.85 // TODO: expose config properly
     }
 
-    /// Classify match quality
+    /// Bucket a score into a [`MatchQuality`] via the underlying scorer.
     pub fn classify_match(&self, score: f64) -> MatchQuality {
         self.scorer.classify_match(score)
     }
@@ -135,12 +179,14 @@ impl PersonMatcher for ProbabilisticMatcher {
     }
 }
 
-/// Deterministic matching strategy
+/// [`PersonMatcher`] backed by the rule-based scorer.
 pub struct DeterministicMatcher {
+    /// The underlying rule-based scorer.
     scorer: DeterministicScorer,
 }
 
 impl DeterministicMatcher {
+    /// Create a deterministic matcher from a [`MatchingConfig`].
     pub fn new(config: MatchingConfig) -> Self {
         Self {
             scorer: DeterministicScorer::new(config),
@@ -181,6 +227,7 @@ mod tests {
     use crate::models::{HumanName, Gender};
     use chrono::NaiveDate;
 
+    /// Build a default config with an 0.85 probable threshold.
     fn create_test_config() -> MatchingConfig {
         MatchingConfig {
             threshold_score: 0.85,
@@ -189,6 +236,7 @@ mod tests {
         }
     }
 
+    /// Build a minimal male person with the given family/given name and DOB.
     fn create_test_person(family: &str, given: &str, dob: Option<NaiveDate>) -> Person {
         Person {
             id: uuid::Uuid::new_v4(),
@@ -221,6 +269,7 @@ mod tests {
         }
     }
 
+    /// find_matches returns above-threshold candidates, best first.
     #[test]
     fn test_probabilistic_find_matches() {
         let config = MatchingConfig {
@@ -250,6 +299,7 @@ mod tests {
         }
     }
 
+    /// The deterministic matcher flags identical records as a match.
     #[test]
     fn test_deterministic_matcher() {
         let config = create_test_config();
@@ -264,6 +314,7 @@ mod tests {
         assert!(matcher.is_match(result.score));
     }
 
+    /// summary() lists the strongly-matching components.
     #[test]
     fn test_match_score_breakdown_summary() {
         let breakdown = MatchScoreBreakdown {
@@ -282,6 +333,7 @@ mod tests {
         assert!(summary.contains("gender"));
     }
 
+    /// An exact match clears a low (0.60) configured threshold.
     #[test]
     fn test_probabilistic_matcher_with_threshold() {
         let config = MatchingConfig {
@@ -301,6 +353,7 @@ mod tests {
         assert!(matcher.is_match(result.score));
     }
 
+    /// find_matches results are sorted by descending score.
     #[test]
     fn test_match_result_ordering_by_score() {
         let config = MatchingConfig {
@@ -329,6 +382,7 @@ mod tests {
         }
     }
 
+    /// An empty candidate list yields no matches.
     #[test]
     fn test_empty_candidates_list() {
         let config = create_test_config();

@@ -1,8 +1,12 @@
+//! Criterion benchmarks for the privacy operations: masking (rich and
+//! minimal records) and GDPR export (single and 100-record batch).
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use thing_service::models::identifier::ThingIdentifier;
 use thing_service::models::thing::Thing;
 use thing_service::privacy::{gdpr_export, mask_thing};
 
+/// Benchmark `mask_thing` on a record with owner and identifiers.
 fn bench_mask_thing(c: &mut Criterion) {
     let mut thing = Thing::new("Benchmark Thing");
     thing.owner = Some("Owner Name".into());
@@ -16,6 +20,7 @@ fn bench_mask_thing(c: &mut Criterion) {
     });
 }
 
+/// Benchmark `mask_thing` on a name-only record (no sensitive fields).
 fn bench_mask_thing_minimal(c: &mut Criterion) {
     let thing = Thing::new("Minimal Thing");
     c.bench_function("mask_thing_minimal", |b| {
@@ -23,6 +28,7 @@ fn bench_mask_thing_minimal(c: &mut Criterion) {
     });
 }
 
+/// Benchmark `gdpr_export` on a single record.
 fn bench_gdpr_export(c: &mut Criterion) {
     let mut thing = Thing::new("Export Thing");
     thing.description = Some("A test thing for benchmarking".into());
@@ -34,6 +40,7 @@ fn bench_gdpr_export(c: &mut Criterion) {
     });
 }
 
+/// Benchmark `gdpr_export` across a batch of 100 records.
 fn bench_gdpr_export_batch(c: &mut Criterion) {
     let things: Vec<Thing> = (0..100)
         .map(|i| {

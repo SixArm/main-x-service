@@ -30,6 +30,7 @@ pub async fn create_test_app_state() -> AppState {
     AppState::new(db, search_engine, matcher, config)
 }
 
+/// Build a fully-wired test [`Router`] over a fresh test [`AppState`].
 pub async fn create_test_router() -> Router {
     let state = create_test_app_state().await;
     create_router(state)

@@ -97,7 +97,18 @@ pub struct Organization {
 }
 
 impl Organization {
-    /// Create a new organization
+    /// Creates a new active organization with a fresh [`Uuid`] and current
+    /// timestamps; all ODS fields and collections start empty/`None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use worker_service::models::Organization;
+    ///
+    /// let org = Organization::new("Example NHS Trust".into());
+    /// assert!(org.active);
+    /// assert!(org.ods_code.is_none());
+    /// ```
     pub fn new(name: String) -> Self {
         let now = Utc::now();
         Self {
@@ -125,24 +136,30 @@ impl Organization {
         }
     }
 
-    /// Get the primary role for this organisation, if any
+    /// Returns the organisation's primary role, if one is assigned.
+    ///
+    /// Per the ODS model each organisation has exactly one primary role; this
+    /// returns the first role flagged [`is_primary`](OrganizationRole::is_primary).
     pub fn primary_role(&self) -> Option<&OrganizationRole> {
         self.roles.iter().find(|r| r.is_primary)
     }
 
-    /// Get active relationships only
+    /// Returns only the relationships whose status is
+    /// [`OdsStatus::Active`], filtering out inactive/historical ones.
     pub fn active_relationships(&self) -> Vec<&OrganizationRelationship> {
         self.relationships.iter().filter(|r| r.status == OdsStatus::Active).collect()
     }
 
-    /// Get predecessor organisations from succession records
+    /// Returns succession records pointing to *predecessor* organisations
+    /// (those this organisation absorbed or replaced).
     pub fn predecessors(&self) -> Vec<&OrganizationSuccession> {
         self.successions.iter()
             .filter(|s| s.succession_type == SuccessionType::Predecessor)
             .collect()
     }
 
-    /// Get successor organisations from succession records
+    /// Returns succession records pointing to *successor* organisations
+    /// (those that took over from this one).
     pub fn successors(&self) -> Vec<&OrganizationSuccession> {
         self.successions.iter()
             .filter(|s| s.succession_type == SuccessionType::Successor)
@@ -155,6 +172,7 @@ mod tests {
     use super::*;
     use crate::models::ods::*;
 
+    /// `new` produces an active org with empty ODS fields and collections.
     #[test]
     fn test_organization_new_defaults() {
         let org = Organization::new("NHS Trust".to_string());
@@ -169,6 +187,7 @@ mod tests {
         assert!(org.periods.is_empty());
     }
 
+    /// ODS metadata fields can be set and read back.
     #[test]
     fn test_organization_with_ods_fields() {
         let mut org = Organization::new("Guy's and St Thomas' NHS Foundation Trust".to_string());
@@ -183,6 +202,7 @@ mod tests {
         assert_eq!(org.assigning_authority.as_deref(), Some("HSCIC"));
     }
 
+    /// `primary_role` returns the single role flagged primary.
     #[test]
     fn test_organization_primary_role() {
         let mut org = Organization::new("Test Trust".to_string());
@@ -207,6 +227,7 @@ mod tests {
         assert_eq!(primary.role_code, "RO197");
     }
 
+    /// `predecessors`/`successors` partition succession records by direction.
     #[test]
     fn test_organization_predecessors_successors() {
         let mut org = Organization::new("Merged Trust".to_string());
@@ -232,6 +253,7 @@ mod tests {
         assert!(org.successors()[0].has_forward_succession);
     }
 
+    /// An organization survives a JSON round-trip with ODS fields intact.
     #[test]
     fn test_organization_serialization_roundtrip() {
         let mut org = Organization::new("Test Org".to_string());
@@ -244,6 +266,7 @@ mod tests {
         assert_eq!(deser.record_class, Some(RecordClass::Site));
     }
 
+    /// Legacy JSON lacking ODS fields deserializes via `#[serde(default)]`.
     #[test]
     fn test_organization_deserialize_without_ods_fields() {
         // Verify #[serde(default)] works for existing data without ODS fields

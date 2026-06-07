@@ -27,21 +27,32 @@ use crate::models::{Course, CourseInstance};
 /// One validation failure. Pair maps cleanly to the REST `422` body.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, ToSchema)]
 pub struct ValidationError {
+    /// Dotted/indexed path to the offending field (e.g.
+    /// `instances[0].enrollment_closes`).
     pub field: String,
+    /// Human-readable explanation of the failure.
     pub message: String,
 }
 
 impl ValidationError {
+    /// Construct a field-scoped error from any string-like inputs.
     fn new(field: impl Into<String>, message: impl Into<String>) -> Self {
         Self { field: field.into(), message: message.into() }
     }
 }
 
+/// FR-22 upper bound on `course_code` length.
 const COURSE_CODE_MAX: usize = 100;
+/// FR-24 minimum plausible BCP-47 code length.
 const BCP47_MIN: usize = 2;
+/// FR-24 maximum plausible BCP-47 code length.
 const BCP47_MAX: usize = 35;
+/// FR-23 sanity cap on `number_of_credits`.
 const CREDITS_MAX: u32 = 10_000;
 
+/// Validate a [`Course`] against FR-21..FR-28, recursing into nested
+/// instances. Returns an empty `Vec` when the record is valid;
+/// otherwise one [`ValidationError`] per failing field.
 pub fn validate_course(c: &Course) -> Vec<ValidationError> {
     let mut errs = Vec::new();
 
@@ -133,6 +144,9 @@ pub fn validate_course(c: &Course) -> Vec<ValidationError> {
     errs
 }
 
+/// Validate a [`CourseInstance`] against FR-24 and FR-26..FR-28
+/// (language codes, schedule ordering, enrollment-window ordering,
+/// capacity vs. enrolled count). Returns an empty `Vec` when valid.
 pub fn validate_instance(inst: &CourseInstance) -> Vec<ValidationError> {
     let mut errs = Vec::new();
 
@@ -181,6 +195,8 @@ pub fn validate_instance(inst: &CourseInstance) -> Vec<ValidationError> {
     errs
 }
 
+/// Whether `s` is an `http://` or `https://` URL (case-insensitive,
+/// after trimming). The FR-25 web-URL gate.
 fn is_http_url(s: &str) -> bool {
     let lower = s.trim().to_ascii_lowercase();
     lower.starts_with("http://") || lower.starts_with("https://")
@@ -208,6 +224,7 @@ mod tests {
 
     use crate::models::{CourseIdentifier, IdentifierType, Schedule};
 
+    /// Test fixture: a course that passes every FR-21..FR-28 rule.
     fn valid_course() -> Course {
         let mut c = Course::new("Intro to CS");
         c.course_code = Some("CS101".into());
@@ -216,11 +233,13 @@ mod tests {
         c
     }
 
+    /// A fully-valid course produces no errors.
     #[test]
     fn valid_course_has_no_errors() {
         assert!(validate_course(&valid_course()).is_empty());
     }
 
+    /// FR-21: a whitespace-only name is rejected.
     #[test]
     fn blank_name_is_rejected() {
         let mut c = valid_course();
@@ -229,6 +248,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.field == "name"));
     }
 
+    /// FR-22: a course_code longer than the cap is rejected.
     #[test]
     fn over_length_course_code_is_rejected() {
         let mut c = valid_course();
@@ -237,6 +257,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.field == "course_code"));
     }
 
+    /// FR-22: an empty-but-present course_code is rejected.
     #[test]
     fn empty_course_code_is_rejected() {
         let mut c = valid_course();
@@ -245,6 +266,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.field == "course_code"));
     }
 
+    /// FR-25: a non-http(s) `url` scheme is rejected.
     #[test]
     fn non_http_url_is_rejected() {
         let mut c = valid_course();
@@ -253,6 +275,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.field == "url"));
     }
 
+    /// FR-25: an identifier's `url` must also be http(s).
     #[test]
     fn identifier_url_must_be_http() {
         let mut c = valid_course();
@@ -266,6 +289,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.field == "identifiers[0].url"));
     }
 
+    /// FR-24: single-char and leading-hyphen language codes are rejected.
     #[test]
     fn implausible_language_code_is_rejected() {
         let mut c = valid_course();
@@ -278,6 +302,7 @@ mod tests {
         );
     }
 
+    /// FR-26: an instance schedule ending before it starts is rejected.
     #[test]
     fn schedule_end_before_start_is_rejected() {
         let mut inst = CourseInstance {
@@ -312,9 +337,10 @@ mod tests {
         assert!(errs.iter().any(|e| e.field == "schedule.end_date"));
     }
 
+    /// FR-27: enrollment closing before it opens is rejected.
     #[test]
     fn enrollment_window_must_be_ordered() {
-        let mut inst = CourseInstance {
+        let inst = CourseInstance {
             id: uuid::Uuid::new_v4(),
             course_id: uuid::Uuid::new_v4(),
             name: None,
@@ -337,6 +363,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.field == "enrollment_closes"));
     }
 
+    /// FR-28: enrolled_count exceeding capacity is rejected.
     #[test]
     fn enrolled_cannot_exceed_capacity() {
         let inst = CourseInstance {
@@ -362,6 +389,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.field == "maximum_attendee_capacity"));
     }
 
+    /// Nested instance errors carry an `instances[i].` field prefix.
     #[test]
     fn nested_instance_errors_are_path_prefixed() {
         let mut c = valid_course();

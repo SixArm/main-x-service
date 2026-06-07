@@ -1,4 +1,10 @@
-//! Audit log repository for tracking changes
+//! Audit log repository: HIPAA-style write/query of the `audit_log` table.
+//!
+//! [`AuditLogRepository`] records who did what, when, and to which entity,
+//! capturing old/new JSON snapshots plus request provenance (user id, IP,
+//! user agent). The `log_create` / `log_update` / `log_delete` helpers are
+//! thin wrappers over the private `log_action` insert. Query helpers back
+//! the audit REST endpoints (per-entity, recent, per-user history).
 
 use sea_orm::*;
 use uuid::Uuid;
@@ -7,18 +13,22 @@ use serde_json::Value as JsonValue;
 use crate::Result;
 use super::models::audit_log;
 
-/// Audit log repository for recording changes
+/// Reads and writes the `audit_log` table.
+///
+/// Holds a cloned [`DatabaseConnection`]; construct one per shared
+/// application state and wrap in an `Arc` to share across handlers.
 pub struct AuditLogRepository {
+    /// The SeaORM connection used for every audit query/insert.
     db: DatabaseConnection,
 }
 
 impl AuditLogRepository {
-    /// Create a new audit log repository
+    /// Wrap a database connection in an audit repository.
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
 
-    /// Log a create action
+    /// Record a `CREATE`: stores `new_values`, with no prior snapshot.
     pub async fn log_create(
         &self,
         entity_type: &str,
@@ -40,7 +50,7 @@ impl AuditLogRepository {
         ).await
     }
 
-    /// Log an update action
+    /// Record an `UPDATE`: stores both the prior and new JSON snapshots.
     pub async fn log_update(
         &self,
         entity_type: &str,
@@ -63,7 +73,7 @@ impl AuditLogRepository {
         ).await
     }
 
-    /// Log a delete action
+    /// Record a `DELETE`: stores the prior snapshot, with no new values.
     pub async fn log_delete(
         &self,
         entity_type: &str,
@@ -85,7 +95,10 @@ impl AuditLogRepository {
         ).await
     }
 
-    /// Log a generic action
+    /// Insert one audit row. Shared backend for the typed `log_*` helpers.
+    ///
+    /// Stamps a fresh UUID and the current UTC time; `old_values` /
+    /// `new_values` are `None` for the side that does not apply.
     async fn log_action(
         &self,
         action: &str,
@@ -115,7 +128,7 @@ impl AuditLogRepository {
         Ok(())
     }
 
-    /// Get audit logs for a specific entity
+    /// Return up to `limit` audit rows for one entity, newest first.
     pub async fn get_logs_for_entity(
         &self,
         entity_type: &str,
@@ -133,7 +146,7 @@ impl AuditLogRepository {
         Ok(logs)
     }
 
-    /// Get recent audit logs
+    /// Return the `limit` most recent audit rows system-wide.
     pub async fn get_recent_logs(&self, limit: u64) -> Result<Vec<audit_log::Model>> {
         let logs = audit_log::Entity::find()
             .order_by_desc(audit_log::Column::Timestamp)
@@ -144,7 +157,7 @@ impl AuditLogRepository {
         Ok(logs)
     }
 
-    /// Get audit logs by user
+    /// Return up to `limit` audit rows for one user id, newest first.
     pub async fn get_logs_by_user(
         &self,
         user_id: &str,

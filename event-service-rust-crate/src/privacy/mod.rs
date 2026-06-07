@@ -28,6 +28,9 @@ pub fn mask_event(event: &Event) -> Event {
     masked
 }
 
+/// Mask each party's email in place and strip its external `id`, so a
+/// masked view never leaks personal contact details or cross-service
+/// references.
 fn mask_parties(parties: &mut [Party]) {
     for p in parties {
         if let Some(ref email) = p.email {
@@ -77,6 +80,8 @@ mod tests {
     use crate::models::{Identifier, IdentifierType, Party, PartyKind};
     use chrono::{TimeZone, Utc};
 
+    /// Only the last 4 chars stay visible; separators are preserved and
+    /// short values pass through unchanged.
     #[test]
     fn mask_value_keeps_last_4() {
         // Last 4 chars remain visible; alphanumerics before are masked,
@@ -85,6 +90,7 @@ mod tests {
         assert_eq!(mask_value("short", 10), "short");
     }
 
+    /// `mask_event` masks identifier values (potential access tokens).
     #[test]
     fn mask_event_masks_identifiers() {
         let mut event = Event::new("Concert", Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap());
@@ -98,6 +104,7 @@ mod tests {
         assert_eq!(masked.identifiers[0].value, "*-**7654");
     }
 
+    /// `mask_event` masks party emails, strips external IDs, keeps names.
     #[test]
     fn mask_event_masks_party_emails() {
         let mut event = Event::new("X", Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap());
@@ -117,6 +124,7 @@ mod tests {
         assert_eq!(masked.attendees[0].name, "Alice");
     }
 
+    /// The GDPR export includes the core stored fields.
     #[test]
     fn export_includes_all_fields() {
         let event = Event::new("X", Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap());

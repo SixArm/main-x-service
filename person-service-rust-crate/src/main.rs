@@ -12,8 +12,18 @@
 //! or by psql-piping the `up.sql` files in numbered order. See
 //! [`README.md`](../../README.md) for the bring-up sequence.
 
+/// Process-wide allocator override for MUSL static builds.
+///
+/// MUSL's default allocator is slow under multi-threaded load; swapping
+/// in MiMalloc materially improves throughput for release containers.
+/// Gated on `target_env = "musl"` so glibc/macOS builds keep the system
+/// allocator.
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use person_service::{
-    api::rest::{serve, AppState},
+    api::rest::{AppState, serve},
     config::Config,
     db::create_connection,
     matching::ProbabilisticMatcher,
@@ -21,6 +31,11 @@ use person_service::{
 };
 use tracing_subscriber::EnvFilter;
 
+/// Binary entry point: run [`run`] and map its error to an exit code.
+///
+/// Keeps `run` as a fallible `Result`-returning function so the boot
+/// sequence can use `?`, while `main` translates any failure into a
+/// non-zero process exit (printing the error to stderr first).
 #[tokio::main]
 async fn main() -> std::process::ExitCode {
     if let Err(err) = run().await {
@@ -30,6 +45,12 @@ async fn main() -> std::process::ExitCode {
     std::process::ExitCode::SUCCESS
 }
 
+/// The actual boot sequence: load config, init tracing, open the
+/// database and search index, build the matcher and [`AppState`], then
+/// serve the REST API until shutdown.
+///
+/// Returns a boxed error on any startup failure (config, DB connect,
+/// search-index open, or server bind/run).
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
 
@@ -38,7 +59,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new(&config.observability.log_level))
         .unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::fmt().with_env_filter(filter).compact().init();
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .compact()
+        .init();
 
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
@@ -49,10 +73,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let db = create_connection(&config.database).await?;
-    tracing::info!(url = mask_db_url(&config.database.url), "database connected");
+    tracing::info!(
+        url = mask_db_url(&config.database.url),
+        "database connected"
+    );
 
     let search_engine = SearchEngine::new(&config.search.index_path)?;
-    tracing::info!(path = config.search.index_path.as_str(), "search index ready");
+    tracing::info!(
+        path = config.search.index_path.as_str(),
+        "search index ready"
+    );
 
     let matcher = ProbabilisticMatcher::new(config.matching.clone());
     let state = AppState::new(db, search_engine, matcher, config);
@@ -61,7 +91,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// Strip credentials before logging the connection URL.
+/// Redact the `user:password` portion of a database URL for safe
+/// logging.
+///
+/// Replaces everything between `://` and the `@` host separator with
+/// `<credentials>`, so connection logs never leak secrets. URLs without
+/// both markers are returned unchanged.
 fn mask_db_url(url: &str) -> String {
     if let Some(at) = url.find('@') {
         if let Some(scheme_end) = url.find("://") {

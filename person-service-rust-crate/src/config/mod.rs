@@ -1,8 +1,16 @@
-//! Configuration management for the MPI system
+//! Configuration management for the MPI system.
+//!
+//! [`Config`](crate::config::Config) is the single, fully-populated settings tree consumed at
+//! startup (`main`). Each subsection ([`ServerConfig`](crate::config::ServerConfig),
+//! [`DatabaseConfig`](crate::config::DatabaseConfig), …) groups related knobs. [`Config::default`](crate::config::Config::default)
+//! supplies sensible local-dev values, and [`Config::from_env`](crate::config::Config::from_env) layers
+//! environment variables / a `.env` file on top of those defaults.
+//! Numeric env vars are parsed via the `parse_env` helper, which
+//! surfaces a [`crate::Error::Config`] on malformed input.
 
 use serde::{Deserialize, Serialize};
 
-/// Main configuration structure
+/// Top-level configuration tree for the service.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Server configuration
@@ -24,47 +32,72 @@ pub struct Config {
     pub streaming: StreamingConfig,
 }
 
+/// HTTP/gRPC server bind settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
+    /// Bind address for the REST server (e.g. `0.0.0.0`).
     pub host: String,
+    /// TCP port for the REST/HTTP server.
     pub port: u16,
+    /// TCP port reserved for the (stubbed) gRPC server.
     pub grpc_port: u16,
 }
 
+/// PostgreSQL connection and pool settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
+    /// Connection URL (`postgres://user:pass@host/db`).
     pub url: String,
+    /// Maximum size of the connection pool.
     pub max_connections: u32,
+    /// Minimum number of idle connections kept warm.
     pub min_connections: u32,
 }
 
+/// Tantivy full-text search settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchConfig {
+    /// Filesystem directory for the search index.
     pub index_path: String,
+    /// Tantivy reader/writer cache budget in megabytes.
     pub cache_size_mb: usize,
 }
 
+/// Matching-engine thresholds and scores.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchingConfig {
+    /// Minimum overall score to treat two records as a match.
     pub threshold_score: f64,
+    /// Score assigned to a deterministic exact match.
     pub exact_match_score: f64,
+    /// Score assigned to a fuzzy (non-exact) match.
     pub fuzzy_match_score: f64,
 }
 
+/// Observability (tracing / OpenTelemetry / logging) settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservabilityConfig {
+    /// `service.name` reported to the OTLP collector.
     pub service_name: String,
+    /// OTLP collector endpoint (gRPC or HTTP).
     pub otlp_endpoint: String,
+    /// `tracing-subscriber` log-level / filter directive.
     pub log_level: String,
 }
 
+/// Event-streaming (Fluvio/broker) settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamingConfig {
+    /// Broker connection URL.
     pub broker_url: String,
+    /// Topic to publish person events onto.
     pub topic: String,
 }
 
 impl Default for Config {
+    /// Local-development defaults: binds `0.0.0.0:8080`, a localhost
+    /// PostgreSQL URL, an on-disk search index, and the standard
+    /// matching thresholds. [`Config::from_env`] overrides these.
     fn default() -> Self {
         Self {
             server: ServerConfig {
@@ -166,6 +199,9 @@ impl Config {
     }
 }
 
+/// Parse an environment variable into `T`, returning `Ok(None)` when the
+/// variable is unset and `Err(Error::Config)` when it is set but cannot
+/// be parsed (the message includes the variable name and raw value).
 fn parse_env<T: std::str::FromStr>(name: &str) -> crate::Result<Option<T>>
 where
     T::Err: std::fmt::Display,

@@ -1,138 +1,247 @@
-# Thing matcher — documentation index
+# Thing matcher Rust Crate
 
-A Rust crate for pairwise matching of geographic-place records (deterministic and probabilistic) for de-duplication and record linkage.
+A Rust library for deciding whether two records describe the same
+[`schema.org/Thing`](https://schema.org/Thing).
 
-> **Crate:** `thing-matcher` v0.4.0 &nbsp;·&nbsp; **Edition:** Rust 2024 &nbsp;·&nbsp; **Licence:** MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause
->
-> **Repository:** https://github.com/sixarm/thing-matcher-rust-crate
+## What it does
 
----
+`thing-matcher` compares pairs of [`Thing`] records — books, articles,
+landmarks, products, organisations, people, events, or any other entity
+that can be described with the
+[`schema.org/Thing`](https://schema.org/Thing) vocabulary — and tells you
+whether they refer to the same item. It is built for de-duplication and
+record linkage across data sources that disagree on names, encodings, and
+identifier schemes.
 
-## Where to start
+The crate provides two strategies behind one engine:
 
-| If you are… | Read this first |
-|---|---|
-| A new user of the crate | [README.md](./README.md) |
-| Looking at one worked example end-to-end | [examples/basic_usage.rs](./examples/basic_usage.rs) |
-| A contributor (human or AI) | [AGENTS.md](./AGENTS.md) |
-| A reviewer who needs the authoritative behaviour | [spec.md](./spec.md) |
-| Tracking what changed when | [CHANGELOG.md](./CHANGELOG.md) |
+- **Deterministic** — a hard `bool` when both records share a
+  scheme-scoped `identifier` (Wikidata QID, ISBN, DOI, GTIN, …), or a
+  `sameAs` reference URL, or a canonical `url`.
+- **Probabilistic** — a weight-renormalised score in `[0.0, 1.0]` over
+  `name`, `description`, `disambiguatingDescription`, `identifier`,
+  `url`, `sameAs`, `image`, `mainEntityOfPage`, and `additionalType`,
+  with a per-field [`MatchBreakdown`] so every decision is auditable.
 
----
+The library is pure: no IO, no clocks, no RNGs, `#![forbid(unsafe_code)]`,
+`Send + Sync`. It is suitable as a leaf dependency under web servers,
+batch jobs, or notebooks.
 
-## At a glance
+## Installation
 
-The "Spec section" column points to the authoritative definition in [`spec.md`](./spec.md).
+```toml
+[dependencies]
+thing-matcher = "0.4"
+```
 
-| Capability | Where it lives | Spec section |
+## Quick start — probabilistic match
+
+```rust
+use thing_matcher::{MatchingEngine, Thing};
+
+let a = Thing::builder()
+    .name("Eiffel Tower")
+    .url("https://www.toureiffel.paris/")
+    .build();
+
+let b = Thing::builder()
+    .name("La Tour Eiffel")
+    .add_alternate_name("Eiffel Tower")
+    .url("https://www.toureiffel.paris/")
+    .build();
+
+let engine = MatchingEngine::default_config();
+let result = engine.match_things(&a, &b);
+
+assert!(result.is_match);
+println!("score = {:.2}", result.score);
+println!("name  = {:?}", result.breakdown.name_score);
+println!("url   = {:?}", result.breakdown.url_score);
+```
+
+The `MatchBreakdown` carries one `Option<f64>` per scored field; a `None`
+means the field was absent on at least one side and so did not
+contribute. Missing fields neither raise nor lower the score.
+
+## Quick start — deterministic match
+
+A shared external identifier — any `(property_id, value)` pair across
+the two records — is enough on its own:
+
+```rust
+use thing_matcher::{Identifier, MatchingEngine, Thing};
+
+let id = Identifier::new("wikidata", "Q243").unwrap();
+
+let a = Thing::builder().name("Eiffel Tower").add_identifier(id.clone()).build();
+let b = Thing::builder().name("Tour Eiffel").add_identifier(id).build();
+
+let engine = MatchingEngine::default_config();
+assert!(engine.deterministic_match(&a, &b));
+```
+
+A shared `sameAs` URL or a shared canonical `url` is also accepted as a
+deterministic match — `sameAs` exists in `schema.org` precisely to point
+at "a reference Web page that unambiguously indicates the item's
+identity".
+
+## The `Thing` model
+
+The `Thing` data model mirrors the
+[`schema.org/Thing`](https://schema.org/Thing) vocabulary:
+
+| Rust field | schema.org property | Purpose |
 |---|---|---|
-| Probabilistic match — `MatchingEngine::match_places` returning `MatchResult` with per-field `MatchBreakdown` and `Confidence` band | `src/matcher.rs` | §5.2, §3.7 |
-| Deterministic match — `MatchingEngine::deterministic_match` returning `bool` | `src/matcher.rs` | §5.1 |
-| Batch screening — `match_one_to_many`, `rank_one_to_many` | `src/matcher.rs` | §5.3 |
-| Place data model — `Place`, `Address`, `PlaceCategory`, `PlaceId`, `PlaceIdScheme` | `src/models.rs` | §3.1–§3.5 |
-| External place IDs — Google, OSM (Node / Way / Relation), GeoNames, Wikidata, Foursquare, Here, Mapbox, `Other` | `src/models.rs` | §3.5 |
-| 36-variant `PlaceCategory` enum (`#[non_exhaustive]`) | `src/models.rs` | §3.4 |
-| 15-field `Place` struct (10 scored, 5 data-only) | `src/models.rs` | §3.1.1 |
-| Geographic primitives — `Scorer::haversine_metres`, `Scorer::coordinates_score` (Gaussian decay) | `src/scorer.rs` | §6.3 |
-| String similarity — Jaro-Winkler, Levenshtein, Combined, Exact via `SimilarityAlgorithm` | `src/scorer.rs` | §6.1 |
-| Name handling — diacritics, punctuation, alternate-name cartesian product, optional Soundex bonus | `src/normalizer.rs`, `src/matcher.rs` | §4.1, §6.1, §6.2 |
-| International phone normalisation (E.164) — 39 jurisdictions via `COUNTRY_PHONE_TABLE` | `src/normalizer.rs` | §4.3 |
-| Address parsing — house number / unit / street with English abbreviation expansion | `src/normalizer.rs` | §4.5 |
-| Email normalisation — trim + lowercase + structural validation; optional Gmail dot- and `+tag`-folding | `src/normalizer.rs` | §4.4, §6.9 |
-| Phonetic encoding — American Soundex | `src/normalizer.rs` | §4.6 |
-| Config from JSON — `MatchConfig` derives serde with `#[serde(default)]`; tunings can live in a file | `src/matcher.rs` | §7 |
-| Configuration presets — `default()`, `strict()`, `lenient()` | `src/matcher.rs` | §7.1–§7.3 |
-| Determinism, no-IO, no-unsafe, `Send + Sync`, `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]` | `src/lib.rs` | §8 |
+| `name` | `name` | Primary canonical name. |
+| `alternate_names` | `alternateName` | Aliases, endonyms, translations. The matcher takes the best score across the cartesian product. |
+| `description` | `description` | Free-form description. Compared as text. |
+| `disambiguating_description` | `disambiguatingDescription` | Short disambiguating description. Compared as text. |
+| `identifiers` | `identifier` (as `PropertyValue`) | Scheme-scoped external identifiers. Sharing one is a deterministic match. |
+| `url` | `url` | Canonical URL. Compared after URL normalisation. |
+| `image` | `image` | URL of a representative image. |
+| `same_as` | `sameAs` | Reference URLs that unambiguously identify the item. |
+| `main_entity_of_page` | `mainEntityOfPage` | Page (URL) for which this thing is the main entity. |
+| `additional_types` | `additionalType` | Additional types from external vocabularies (e.g. `https://schema.org/Landmark`). |
+| `subject_of` | `subjectOf` | Works or events about this thing (URLs). |
+| `owner` | `owner` | Person or organisation that owns this thing. |
+| `local_id` | — | Originating-system identifier. Not scored. |
 
----
+Build records via the fluent [`Thing::builder`]; all setters accept
+`impl Into<String>`.
 
-## Core documents
+## The match pipeline
 
-### [spec.md](./spec.md) — living specification (SSOT)
-The single source of truth. Scope, terminology, data model, normalisation rules, match strategies, per-field scoring, configuration, determinism guarantees, error model, SemVer policy, open questions, worked examples, glossary.
+1. Each scoring component yields `Some(score)` in `[0.0, 1.0]` or `None`
+   (missing on at least one side).
+2. The weighted sum runs over components that scored.
+3. The sum of participating weights divides through — **renormalisation**
+   ensures missing fields do not penalise.
+4. A phonetic-name match (Soundex on normalised names) adds a
+   `0.05`-weighted bonus when the gating phonetic score exceeds `0.9`,
+   only when `use_phonetic_matching` is on. The bonus never lowers a
+   score.
+5. `is_match = score >= match_threshold` (strict mode additionally
+   requires `deterministic_match`).
+6. `confidence = Confidence::from_score(score)` — bands are fixed (`>=
+   0.90` High, `>= 0.75` Medium, else Low) and **independent** of
+   `match_threshold`.
 
-### [README.md](./README.md) — user-facing overview
-Quick-start examples, the public API at a glance, configuration presets, batch scoring, limitations.
+### Default weights
 
-### [CHANGELOG.md](./CHANGELOG.md) — version history
-Dated, per-version log of additions, behaviour changes, removals, and dependency churn. Kept in lockstep with `Cargo.toml` versions and `spec.md` updates.
-
-### [AGENTS.md](./AGENTS.md) — agent / contributor guide
-The rules of the road. Quick orientation, golden rules, workflow, what not to do, file layout.
-
----
-
-## Agent topic guides ([AGENTS/](./AGENTS/))
-
-Each topic guide cross-references the authoritative section of [`spec.md`](./spec.md).
-
-| Guide | Topic | Authoritative spec section |
+| Component | Weight | Notes |
 |---|---|---|
-| [architecture.md](./AGENTS/architecture.md) | Module layout, layering rules, dependency graph | §3, §8 |
-| [coding-style.md](./AGENTS/coding-style.md) | Rust conventions: naming, idioms, error handling, doc comments | §8, §9 |
-| [testing.md](./AGENTS/testing.md) | Test pyramid, fixtures, property tests, doctests | (all) |
-| [matching-algorithm.md](./AGENTS/matching-algorithm.md) | Deterministic and probabilistic scoring, weights, coordinates | §5, §6, §7 |
-| [normalization.md](./AGENTS/normalization.md) | Name, postcode, phone, email, address, phonetic rules | §4 |
-| [security-and-privacy.md](./AGENTS/security-and-privacy.md) | Personal-data handling, no-IO posture, threat model | §8 |
-| [release.md](./AGENTS/release.md) | Versioning, CHANGELOG, publishing checklist | §9 |
-| [spec-driven-development.md](./AGENTS/spec-driven-development.md) | How `spec.md` is maintained as the SSOT | §10 |
+| Name | `0.30` | Best of cartesian product across primary + alternates, via the configured `SimilarityAlgorithm` (default `Combined` = 0.7 × Jaro-Winkler + 0.3 × Levenshtein). |
+| Description | `0.10` | `Combined` similarity over the normalised text. |
+| Disambiguating description | `0.05` | `Combined` similarity over the normalised text. |
+| Identifiers | `0.25` | `1.0` if any `(property_id, value)` pair is shared, `0.0` if both non-empty but no overlap, `None` if either empty. |
+| URL | `0.05` | Exact equality after URL normalisation. |
+| sameAs | `0.15` | Jaccard set similarity over normalised URLs. |
+| Image | `0.03` | Exact equality after URL normalisation. |
+| mainEntityOfPage | `0.02` | Exact equality after URL normalisation. |
+| additionalType | `0.05` | Jaccard set similarity over normalised URIs. |
+| Phonetic bonus | `+0.05` when gated | Bonus only — never lowers a score. |
 
----
+## Configuration presets
 
-## Supporting files
+```rust
+use thing_matcher::{MatchConfig, MatchingEngine};
 
-- [Cargo.toml](./Cargo.toml) — manifest, dependencies, crate metadata.
-- [CITATION.cff](./CITATION.cff) — citation metadata.
-- [CONTRIBUTING.md](./CONTRIBUTING.md) — how to contribute.
-- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) — community standards.
-- [LICENSE.md](./LICENSE.md) — multi-licence offering.
-- [src/](./src/) — crate source.
-- [tests/](./tests/) — integration tests and property tests.
-- [examples/](./examples/) — runnable examples (`basic_usage.rs`, `custom_config.rs`).
-- [benches/](./benches/) — criterion benchmarks (`match_pair.rs`).
+let strict  = MatchingEngine::new(MatchConfig::strict());  // threshold 0.95, requires deterministic
+let default = MatchingEngine::default_config();            // threshold 0.80
+let lenient = MatchingEngine::new(MatchConfig::lenient()); // threshold 0.65, phonetic on
+```
 
----
+- **Default (0.80)** — balanced for everyday de-duplication.
+- **Strict (0.95)** — for downstream systems that must rely on the
+  answer; `is_match` additionally requires `deterministic_match`. `score`
+  and `confidence` are unaffected.
+- **Lenient (0.65)** — for triaging large candidate sets where false
+  negatives are costlier than false positives.
 
-## Common tasks
+Every field of `MatchConfig` is overridable; the config is `Serialize +
+Deserialize` (with `#[serde(default)]`) so tunings can live in a file:
 
-| Task | Command |
-|---|---|
-| Build | `cargo build` |
-| Run unit + integration + property + doctest | `cargo test` |
-| Run a single test | `cargo test test_name` |
-| Show test stdout | `cargo test -- --nocapture` |
-| Run property tests only | `cargo test --test property_tests` |
-| Pin the public API | `cargo test --test adapter_contract` (downstream-service-adapter contract guardrail) |
-| Lint | `cargo clippy --all-targets -- -D warnings` |
-| Format | `cargo fmt` |
-| Run the demo | `cargo run` |
-| Run an example | `cargo run --example basic_usage` (or `--example custom_config`) |
-| Run benchmarks | `cargo bench` (use `--quick` for a smoke run; HTML reports in `target/criterion/`) |
-| Build API docs | `cargo doc --no-deps --open` |
-| Pre-publish dry run | `cargo publish --dry-run` |
+```rust
+use thing_matcher::MatchConfig;
 
----
+let cfg: MatchConfig = serde_json::from_str(r#"{
+    "match_threshold": 0.85,
+    "name_weight": 0.50
+}"#).unwrap();
+```
 
-## Common questions
+## Batch scoring
 
-| Question | Answer |
-|---|---|
-| How do I match two places? | Build two `Place` values, then call `MatchingEngine::default_config().match_places(&a, &b)`. See [README.md](./README.md) and [`spec.md` §5.2](./spec.md). |
-| What does the default config do? | `match_threshold = 0.80`, weighted sum across name (0.20), coordinates (0.30, Gaussian decay scale 50 m), address (0.10), category (0.10), country code (0.05), place IDs (0.15), phone (0.03), email (0.02). See [`spec.md` §7.1](./spec.md). |
-| When should I use strict mode? | When false positives are more dangerous than false negatives — `MatchConfig::strict()` raises the threshold to 0.95 and additionally requires `deterministic_match` for `is_match = true`. See [`spec.md` §5.2.3, §7.2](./spec.md). |
-| When should I use lenient mode? | When triaging large candidate sets where false negatives are worse than false positives — `MatchConfig::lenient()` lowers the threshold to 0.65 and turns on the phonetic bonus. See [`spec.md` §7.3](./spec.md). |
-| Where are the algorithms documented? | Per-field scoring algorithms in [`spec.md` §6](./spec.md); pipeline overview in [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md). |
-| Why are some breakdown fields `None`? | The renormalisation rule: missing fields neither contribute to nor penalise the score. See [`spec.md` §5.4](./spec.md). |
-| How do `place_ids` short-circuit? | Two places sharing any one `(scheme, value)` pair are a `deterministic_match`. See [`spec.md` §5.1, §6.7](./spec.md). |
-| What is "data-only" vs "scored"? | Five fields (`local_id`, `altitude_as_metre`, `elevation_as_metre`, `area_as_metre_2`, `maximum_capacity_count`) round-trip through serde for downstream consumers but are not consulted by the matcher. See [`spec.md` §3.1.1](./spec.md). |
+```rust
+use thing_matcher::{MatchingEngine, Thing};
 
----
+let engine = MatchingEngine::default_config();
+let query = Thing::builder().name("Eiffel Tower").build();
+let candidates = vec![
+    Thing::builder().name("Big Ben").build(),
+    Thing::builder().name("Eiffel Tower").build(),
+    Thing::builder().name("Statue of Liberty").build(),
+];
 
-## Project conventions at a glance
+// Parallel to the input slice:
+let results = engine.match_one_to_many(&query, &candidates);
 
-- **Specification-first.** Behavioural changes update [`spec.md`](./spec.md) in the same PR as the code. See [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md).
-- **Pure library.** No IO, no logging, no global state — see [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md).
-- **Deterministic.** Same inputs always produce the same outputs, byte-for-byte.
-- **Diacritic-correct.** Unicode diacritics survive normalisation — see [AGENTS/normalization.md](./AGENTS/normalization.md).
-- **Explainable.** Every probabilistic match returns a per-field breakdown. See [`spec.md` §3.7](./spec.md).
-- **`#[non_exhaustive]` everywhere it matters.** `Place`, `Address`, `PlaceCategory`, `PlaceIdScheme`, `MatchingError` — adding fields / variants is non-breaking. See [`spec.md` §9.1](./spec.md).
+// Sorted by descending score, deterministic tiebreak on original index:
+let ranked = engine.rank_one_to_many(&query, &candidates);
+let (best_idx, best) = &ranked[0];
+println!("best is candidate[{best_idx}] with score {:.2}", best.score);
+```
+
+The engine is `Send + Sync`. Wrap calls in `rayon::par_iter` (or any
+parallelism primitive) without changes to this crate. Candidate
+pre-filtering — Soundex prefix blocking, identifier-scheme blocking,
+sameAs-prefix blocking — is intentionally a consumer concern.
+
+## Determinism and safety
+
+- **`#![forbid(unsafe_code)]`** at the crate root.
+- **No IO.** The library does not read files, open sockets, or log.
+- **No clocks, no RNGs, no environment variables.** Same inputs always
+  produce the same outputs.
+- **No panics** in library code; every fallible parser returns `None`
+  and every fallible operation returns `Result`.
+- **`Send + Sync`.** Engines are immutable after construction and cheap
+  to clone.
+- **Serde-clean.** Every public data type round-trips through
+  `serde_json` (and any other `serde` format).
+
+## Limitations / out of scope
+
+- **Not a triple store.** This crate does not store or query
+  schema.org graphs; it only compares pairs of in-memory `Thing`
+  records.
+- **No JSON-LD parser.** Inputs are built via the [`Thing::builder`] —
+  callers are responsible for translating `schema.org` JSON-LD to the
+  `Thing` shape if they need to ingest it.
+- **No full URL canonicalisation.** [`Normalizer::normalize_url`]
+  lowercases the scheme and host and trims a root trailing slash, but
+  does not perform percent-encoding canonicalisation or punycode
+  decoding.
+- **No machine learning.** Scoring is rule-based and transparent;
+  weights are tuneable but the algorithm is fixed.
+- **No persistence layer.** The crate scores pairs in memory; storage
+  and indexing belong upstream.
+
+## License
+
+MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause — see
+[`LICENSE.md`](./LICENSE.md).
+
+## Contributing
+
+Contributions welcome. Before opening a PR:
+
+- `cargo fmt`
+- `cargo clippy --all-targets -- -D warnings`
+- `cargo test`
+
+See [`AGENTS.md`](./AGENTS.md) for the working guide.
+
+## Contact
+
+Joel Parker Henderson — <joel@joelparkerhenderson.com>.

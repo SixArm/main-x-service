@@ -1,4 +1,12 @@
-//! Record merge models
+//! Record-merge models for the deduplication workflow.
+//!
+//! When two records are confirmed to be the same person, one is chosen
+//! as the surviving **main** record and the other as the **duplicate**.
+//! [`MergeRequest`] drives the operation, [`MergeRecord`] is the
+//! persisted audit trail (including a JSON snapshot of transferred
+//! data), and [`MergeResponse`] returns both the record and the updated
+//! main person. See the merge handler in
+//! [`crate::api::rest::handlers`] for the full flow.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -1,81 +1,63 @@
-# Thing Service — Index
+# Thing Service
 
-Generic registry for arbitrary discrete objects — books, papers,
-software, digital assets, devices, products. Domain model aligned
-with [schema.org/Thing](https://schema.org/Thing); identifiers via
-the schema.org [`PropertyValue`](https://schema.org/PropertyValue)
-shape (DOI, ISBN, ISSN, GTIN, SKU, MPN, SerialNumber, URI, UUID,
-Custom). Probabilistic + deterministic matching, real-time and batch
-deduplication, GDPR Article 15 export, audit trail.
+A registry of **thing identities** based on
+[schema.org/Thing](https://schema.org/Thing). The Thing Service is the
+**most general** entity in the Main X Index family — books, papers,
+software, devices, products, digital assets — anything that doesn't fit
+one of the more opinionated sibling crates (`person`, `worker`,
+`event`, `place`, `course`).
 
-This page is a **navigation aid with worked examples**. For canonical
-behaviour, read [`spec.md`](spec.md).
+Identifiers follow
+[schema.org/PropertyValue](https://schema.org/PropertyValue): DOI, ISBN,
+ISSN, GTIN, SKU, MPN, SerialNumber, URI, UUID, or `Custom(String)`.
+The first seven are globally unique and short-circuit matching to
+`1.0` on exact match.
 
-## Documentation map
-
-| File | Role |
-|------|------|
-| [`spec.md`](spec.md) | **Single source of truth.** What the system does, how it is built, NFRs, tasks (§13), open questions (§16). |
-| [`README.md`](README.md) / [`CLAUDE.md`](CLAUDE.md) | User-facing intro — must stay consistent with the spec. |
-| [`AGENTS.md`](AGENTS.md) | Agent-facing entry point — `AGENTS/*` directory + shared docs. |
-| [`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md) | The SDD discipline this crate practises. |
-| [`AGENTS/models.md`](AGENTS/models.md) | Field-by-field domain model reference. |
-| [`AGENTS/matching.md`](AGENTS/matching.md) | Match weights, components, deterministic rules, Soundex. |
-| [`AGENTS/restful.md`](AGENTS/restful.md) | Endpoint catalogue + library API. |
-| [`AGENTS/testing.md`](AGENTS/testing.md) | Unit / integration / benchmark layout. |
-| [`agents/share/*`](../agents/share/) | Project-wide cross-crate references. |
+> **Status.** Behavioural MVP. Models / matching / validation /
+> privacy / matcher-bridge are in tree; REST handlers, persistence,
+> search index, and Docker bring-up are tracked in
+> [`spec.md §13`](spec.md#13-tasks).
 
 ## Quick start
 
+Prerequisites: Rust 1.93+ (2024 edition), PostgreSQL 18+.
+
 ```bash
-# REST API
+cd thing-service-rust-crate
+
+# Configure (Loco-style YAML in config/, env via PORT / DATABASE_URL):
+cp config/development.yaml.example config/development.yaml || true
+
+# Build and run.
 cargo run --release
 
-# Tests
-cargo test --lib                       # unit (~100)
-cargo test --tests                     # integration_*
-cargo bench                            # Criterion
+# Service binds on port 8080 by default:
+curl http://localhost:8080/api/health
 ```
 
-## URL surface (REST)
+## API
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/api/health` | Liveness |
-| POST | `/api/things` | Create — `409` on detected duplicate |
-| GET | `/api/things/{id}` | Read |
-| PUT | `/api/things/{id}` | Update |
-| DELETE | `/api/things/{id}` | Soft delete |
-| GET | `/api/things/search` | Full-text + fuzzy |
-| POST | `/api/things/match` | Score against candidates |
-| POST | `/api/things/duplicates` | Real-time dup check |
-| POST | `/api/things/merge` | Merge survivor + duplicate |
-| POST | `/api/things/deduplicate` | Batch dedup scan |
-| GET | `/api/things/{id}/masked` | Privacy view |
-| GET | `/api/things/{id}/export` | GDPR Art. 15 export |
-| GET | `/api/things/{id}/audit` | Per-record audit |
-| GET | `/api/audit/recent` | System-wide recent audit |
-| GET | `/api/audit/user` | Per-user audit |
+REST routes mount under `/api/things/*`. See
+[`AGENTS/restful.md`](AGENTS/restful.md) for the full list. All
+endpoints return the standard `{success, data, error}` envelope.
 
-This crate does **not** expose a FHIR R5 surface. See
-[`spec.md §9`](spec.md#9-api-surface).
+Interactive OpenAPI 3 documentation:
 
-## Worked examples
+- Swagger UI: `http://localhost:8080/swagger-ui`
+- Raw spec: `http://localhost:8080/api-docs/openapi.json`
 
-### Create a thing (book)
+### Worked example
+
+Create a book by ISBN:
 
 ```bash
 curl -X POST http://localhost:8080/api/things \
   -H 'content-type: application/json' \
   -d '{
     "name": "Pride and Prejudice",
-    "alternate_names": ["First Impressions"],
     "description": "A novel of manners by Jane Austen.",
     "additional_type": "https://schema.org/Book",
     "url": "https://en.wikipedia.org/wiki/Pride_and_Prejudice",
-    "images": ["https://example.com/cover.jpg"],
-    "main_entity_of_page": "https://en.wikipedia.org/wiki/Pride_and_Prejudice",
-    "owner": "Penguin Random House",
     "same_as": [
       "https://www.wikidata.org/wiki/Q170583",
       "https://openlibrary.org/works/OL1394865W"
@@ -86,283 +68,81 @@ curl -X POST http://localhost:8080/api/things \
   }'
 ```
 
-If an existing Thing matches deterministically (same ISBN) or
-heuristically (similar name + URL), the response is `409 Conflict`
-with the candidate matches and per-component breakdown.
-
-### Create a thing (paper)
-
-```bash
-curl -X POST http://localhost:8080/api/things \
-  -H 'content-type: application/json' \
-  -d '{
-    "name": "Attention Is All You Need",
-    "additional_type": "https://schema.org/ScholarlyArticle",
-    "identifiers": [
-      { "property_id": "Doi", "value": "10.48550/arXiv.1706.03762" }
-    ]
-  }'
-```
-
-### Check for duplicates
-
-```bash
-curl -X POST http://localhost:8080/api/things/duplicates \
-  -H 'content-type: application/json' \
-  -d '{
-    "name": "Pride and Prejudice",
-    "identifiers": [
-      { "property_id": "Isbn", "value": "9780141439518" }
-    ]
-  }'
-```
-
-### Search
-
-```bash
-curl "http://localhost:8080/api/things/search?\
-q=Pride+and+Prejudice&limit=10&offset=0&fuzzy=true&mask_sensitive=true"
-```
-
-| Parameter | Meaning |
-|---|---|
-| `q` | Free-text against name / alternate_names / description / identifier values / URL / same_as |
-| `limit` / `offset` | Pagination (limit ≤ 100) |
-| `fuzzy` | Enable Tantivy fuzzy matching |
-| `mask_sensitive` | Apply per-field masking to results |
-
-### Match against existing records
+Match against a typo'd candidate (deterministic short-circuit on
+shared ISBN):
 
 ```bash
 curl -X POST http://localhost:8080/api/things/match \
   -H 'content-type: application/json' \
   -d '{
     "name": "Prde and Prejudice",
-    "identifiers": [
-      { "property_id": "Isbn", "value": "9780141439518" }
-    ],
-    "threshold": 0.7
+    "identifiers": [{ "property_id": "Isbn", "value": "9780141439518" }]
   }'
-```
-
-A deterministic identifier match (same ISBN) short-circuits to
-`score = 1.00, confidence = Certain` regardless of other components.
-
-### Merge
-
-```bash
-curl -X POST http://localhost:8080/api/things/merge \
-  -H 'content-type: application/json' \
-  -d '{
-    "main_thing_id": "11111111-1111-1111-1111-111111111111",
-    "duplicate_thing_id": "22222222-2222-2222-2222-222222222222",
-    "merge_reason": "Confirmed duplicate (same ISBN, different listings)"
-  }'
-```
-
-### Batch deduplication
-
-```bash
-curl -X POST http://localhost:8080/api/things/deduplicate \
-  -H 'content-type: application/json' \
-  -d '{
-    "threshold": 0.70,
-    "auto_merge_threshold": 0.95,
-    "max_candidates": 50
-  }'
-```
-
-### GDPR Article 15 export
-
-```bash
-curl "http://localhost:8080/api/things/{id}/export"
-```
-
-### Masked view
-
-```bash
-curl "http://localhost:8080/api/things/{id}/masked"
-```
-
-Returns the Thing with `owner` → `"[owner withheld]"`, identifier
-`value` → `"****<last 4 chars>"`, and per-identifier `url` cleared.
-`property_id` is preserved.
-
-## Library API examples
-
-### Validate and normalise
-
-```rust
-use thing_service::models::thing::Thing;
-use thing_service::models::identifier::ThingIdentifier;
-use thing_service::validation::{validate_thing, normalize_thing};
-
-let mut thing = Thing::new("Pride and Prejudice");
-thing.description = Some("A novel of manners by Jane Austen.".into());
-thing.additional_type = Some("https://schema.org/Book".into());
-thing.url = Some("https://en.wikipedia.org/wiki/Pride_and_Prejudice".into());
-thing.same_as = vec![
-    "https://www.wikidata.org/wiki/Q170583".into(),
-    "https://openlibrary.org/works/OL1394865W".into(),
-];
-thing.identifiers = vec![ThingIdentifier::isbn("9780141439518")];
-
-let errs = validate_thing(&thing);
-assert!(errs.is_empty(), "validation failed: {errs:?}");
-
-normalize_thing(&mut thing);    // URL schemes lowercased; lists deduped
-```
-
-### Match two things
-
-```rust
-use thing_service::matching::scoring::{compute_match, MatchWeights};
-
-let a = Thing::new("Pride and Prejudice");
-let b = {
-    let mut t = Thing::new("Stolz und Vorurteil");      // translated title
-    t.identifiers = vec![ThingIdentifier::isbn("9780141439518")];
-    t
-};
-let a = {
-    let mut t = a;
-    t.identifiers = vec![ThingIdentifier::isbn("9780141439518")];
-    t
-};
-
-let result = compute_match(&a, &b, &MatchWeights::default());
-println!("score={:.2} confidence={:?}", result.score, result.confidence);
-//                                          → 1.00, Certain
-println!("deterministic={}", result.breakdown.deterministic_match);
-//                                          → true
-```
-
-### Match via the canonical `thing-matcher` bridge
-
-Use the sibling `thing-matcher` crate as the reference algorithm. The
-service re-exports it as `matcher_lib`, and `adapter::to_matcher_thing`
-projects the service's domain model into the matcher's input shape
-(including national-identifier routing by FHIR `system` URI, address
-field renaming, and identifier-scheme dispatch).
-
-```rust,no_run
-use thing_service::matching::adapter::to_matcher_thing;
-use thing_service::matching::matcher_lib::{Confidence, MatchConfig, MatchingEngine};
-use thing_service::models::*;
-
-let mut a = Thing::new("Pride and Prejudice");
-a.identifiers = vec![ThingIdentifier::isbn("9780141439518")];
-let mut b = Thing::new("Stolz und Vorurteil"); // German translation
-b.identifiers = vec![ThingIdentifier::isbn("9780141439518")]; // same ISBN
-
-let engine = MatchingEngine::new(MatchConfig::default());
-let result = engine.match_things(&to_matcher_thing(&a), &to_matcher_thing(&b));
-
-assert!(result.is_match, "near-duplicate should classify as match");
-assert_eq!(result.confidence, Confidence::High);
-println!("score   = {:.3}", result.score);
-println!("conf    = {:?}", result.confidence);
-// `result.breakdown` carries per-field Option<f64> for an auditable trail.
-```
-
-End-to-end pinning lives in
-[`tests/duplicate_detection.rs`](tests/duplicate_detection.rs); the
-adapter source is [`src/matching/adapter.rs`](src/matching/adapter.rs).
-
-
-### Privacy mask + GDPR export
-
-```rust
-use thing_service::privacy::{mask_thing, gdpr_export};
-
-let mut thing = Thing::new("Private Diary");
-thing.owner = Some("Jane Doe".into());
-thing.identifiers = vec![ThingIdentifier::serial_number("SN-1234567890")];
-
-let masked = mask_thing(&thing);
-// owner: "[owner withheld]"
-// identifier value: "****7890"
-
-let export = gdpr_export(&thing);
+# → score 1.0 (deterministic)
 ```
 
 ## Configuration
 
+Configuration is loaded from `config/{development,test,production}.yaml`
+(Loco convention). Environment-overridable variables:
+
 | Variable | Description | Default |
 |---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | _required_ |
-| `DATABASE_MIN_CONNECTIONS` / `DATABASE_MAX_CONNECTIONS` | Pool sizes | `2` / `10` |
-| `SERVER_HOST` | REST bind address | `0.0.0.0` |
-| `SERVER_PORT` | REST port | `8080` |
-| `SEARCH_INDEX_PATH` | Tantivy index directory | `./search_index` |
-| `MATCHING_THRESHOLD` | Default match cutoff | `0.7` |
+| `PORT` | REST bind port | `8080` |
+| `DATABASE_URL` | Postgres connection string | per config file |
+| `SEARCH_INDEX_PATH` | Tantivy index directory | `./data/search_index` |
+| `MATCHING_THRESHOLD` | Probabilistic match cutoff | `0.85` |
+| `RUST_LOG` | tracing-subscriber filter | `info` |
 | `OTLP_ENDPOINT` | OpenTelemetry collector | `http://localhost:4317` |
-| `OTLP_SERVICE_NAME` | OTel `service.name` | `thing-service` |
-| `RUST_LOG` | `tracing-subscriber` filter | `info,thing_service=info` |
 
-## Project layout
+## Testing
 
-```
-src/
-├── lib.rs              # Library root
-├── models/             # Thing, ThingIdentifier, IdentifierType, Consent
-├── matching/           # name, description, url, identifier, phonetic, scoring
-├── validation/         # validate_thing, normalize_thing
-├── privacy/            # mask_thing, gdpr_export
-├── api/                # REST + gRPC (stub)
+```bash
+# Unit tests (models, matching components, validation, privacy).
+cargo test --lib
 
-config/                 # development.yaml, test.yaml, production.yaml
-migrations/             # SeaORM up.sql / down.sql pairs
-tests/                  # integration_* (matching, validation, privacy, models, scoring, edge_cases)
-benches/                # matching, validation, searching, database_reading/writing, privacy
-AGENTS/                 # Reference documentation
+# Bridge tests pinning the service ↔ canonical thing-matcher
+# contract (DOI/ISBN/UUID deterministic short-circuits, SKU
+# non-deterministic distinction, same_as URL contribution).
+cargo test --test duplicate_detection
+
+# Integration tests across the per-pipeline files.
+cargo test --tests
+
+# Criterion benchmarks (matching, validation, search, privacy).
+cargo bench
 ```
 
-## Key types
+See [`AGENTS/testing.md`](AGENTS/testing.md) for the layout.
 
-| Type | Module | Description |
-|---|---|---|
-| `Thing` | `models::thing` | Core entity (schema.org/Thing canonical properties) |
-| `ThingIdentifier` | `models::identifier` | `PropertyValue` shape (`property_id`, `value`, `name?`, `url?`) |
-| `IdentifierType` | `models::identifier` | Doi / Isbn / Issn / Gtin / Sku / Mpn / SerialNumber / Uri / Uuid / Custom |
-| `Consent` | `models::consent` | GDPR consent record |
-| `MatchResult` / `MatchBreakdown` | `matching::scoring` | Score + per-component detail |
-| `MatchWeights` | `matching::scoring` | Configurable scoring weights |
-| `MatchConfidence` | `matching::scoring` | Certain / Probable / Possible / Unlikely |
-| `ValidationError` | `validation` | Field + message |
+## Matching at a glance
 
-## Key functions
+| Component | Weight | Algorithm |
+|---|---:|---|
+| Name | 0.40 | Jaro-Winkler + Soundex phonetic bonus |
+| Identifier | 0.30 | `(property_id, value)` exact, best pair |
+| Description | 0.10 | Jaro-Winkler (case-insensitive) |
+| URL | 0.10 | Scheme/case-normalized host + path |
+| Same-as | 0.10 | Best pair across `same_as` URL lists |
 
-| Function | Module | Description |
-|---|---|---|
-| `compute_match` | `matching::scoring` | Match two things with weighted scoring |
-| `name_similarity` | `matching::name` | Jaro-Winkler |
-| `description_similarity` | `matching::description` | Jaro-Winkler |
-| `url_similarity` | `matching::url` | Scheme/case-normalized host + path |
-| `url_list_similarity` | `matching::url` | Best pair over two URL lists |
-| `identifier_similarity` | `matching::identifier` | Exact `(property_id, value)` |
-| `has_deterministic_match` | `matching::identifier` | Short-circuit detector |
-| `soundex` / `soundex_match` | `matching::phonetic` | 4-char phonetic |
-| `validate_thing` | `validation` | Required + format checks |
-| `normalize_thing` | `validation` | URL scheme lowercase + dedup |
-| `mask_thing` | `privacy` | Owner + identifier masking |
-| `gdpr_export` | `privacy` | GDPR Article 15 export |
+Deterministic short-circuit: any matched DOI / ISBN / ISSN / GTIN /
+MPN / SerialNumber / UUID → 1.0. (SKU / URI / Custom are evidence,
+not pins — they are not globally unique.)
 
-## Status & roadmap
-
-- **Status** — see [`spec.md §14`](spec.md#14-implementation-status).
-- **Tasks** — see [`spec.md §13`](spec.md#13-tasks).
-- **Roadmap** — see [`spec.md §15`](spec.md#15-roadmap).
-- **Open questions** — see [`spec.md §16`](spec.md#16-open-questions).
+See [`AGENTS/matching.md`](AGENTS/matching.md) for the per-component
+detail.
 
 ## Compliance
 
-| Standard | Mechanism |
-|---|---|
-| GDPR Art. 15 | `/api/things/{id}/export` (for personal Things) |
-| GDPR Art. 17 | Soft delete + consent revocation |
-| ISO/IEC 27001 | Operational controls (deployment-side) |
+- **GDPR**: right of access via `GET /api/things/{id}/export`;
+  right to erasure via soft-delete + `/masked` view. Consent records
+  for Things subject to data-protection regimes (e.g. a personal
+  device).
+- **Identifier privacy**: serial numbers and custom identifier values
+  are masked (last 4 visible); identifier URLs stripped from masked
+  view.
 
 ## License
 
-Dual-licensed: Apache-2.0 OR BSD-3-Clause OR GPL-2-or-later OR MIT.
+Dual-licensed under MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only
+OR GPL-3.0-only.

@@ -1,4 +1,9 @@
-//! Benchmarks for person validation and normalization
+//! Criterion benchmarks for validation and normalization.
+//!
+//! Covers [`validate_person`] on simple/complex/invalid records,
+//! [`normalize_phone`] across input formats, and
+//! [`standardize_address`] on full and minimal addresses. All functions
+//! are pure, so these isolate CPU cost. Run with `cargo bench`.
 
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
 use chrono::{NaiveDate, Utc};
@@ -7,6 +12,7 @@ use uuid::Uuid;
 use person_service::models::*;
 use person_service::validation::{validate_person, normalize_phone, standardize_address};
 
+/// Build a minimal [`Person`] for validation benchmarks.
 fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Person {
     let now = Utc::now();
     Person {
@@ -40,6 +46,7 @@ fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) 
     }
 }
 
+/// Benchmark validating a simple, valid person.
 fn bench_validate_simple_person(c: &mut Criterion) {
     let person = create_test_person(
         "Smith",
@@ -54,6 +61,8 @@ fn bench_validate_simple_person(c: &mut Criterion) {
     });
 }
 
+/// Benchmark validating a fully-populated person (telecom, address,
+/// document, emergency contact).
 fn bench_validate_complex_person(c: &mut Criterion) {
     let mut person = create_test_person(
         "Smith",
@@ -113,6 +122,7 @@ fn bench_validate_complex_person(c: &mut Criterion) {
     });
 }
 
+/// Benchmark validating an invalid person (the error-collecting path).
 fn bench_validate_invalid_person(c: &mut Criterion) {
     let mut person = create_test_person("", "", None);
     person.telecom.push(ContactPoint {
@@ -135,6 +145,7 @@ fn bench_validate_invalid_person(c: &mut Criterion) {
     });
 }
 
+/// Benchmark phone normalization across input formats.
 fn bench_normalize_phone(c: &mut Criterion) {
     c.bench_function("normalize_phone_us_format", |b| {
         b.iter(|| {
@@ -155,6 +166,7 @@ fn bench_normalize_phone(c: &mut Criterion) {
     });
 }
 
+/// Benchmark address standardization on full and minimal addresses.
 fn bench_standardize_address(c: &mut Criterion) {
     let addr = Address {
         use_type: None,

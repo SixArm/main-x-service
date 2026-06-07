@@ -12,11 +12,14 @@ use crate::models::{
 /// A single field-level validation failure.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ValidationError {
+    /// Dotted/indexed path to the offending field (e.g. `location[0].name`).
     pub field: String,
+    /// Human-readable explanation of why the field is invalid.
     pub message: String,
 }
 
 impl ValidationError {
+    /// Construct a [`ValidationError`] from a field path and message.
     fn new(field: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             field: field.into(),
@@ -391,6 +394,8 @@ pub fn standardize_address(addr: &Address) -> Address {
     }
 }
 
+/// Expand common street-type abbreviations (St. → Street, Ave. →
+/// Avenue, …) and trim surrounding whitespace.
 fn normalize_street_address(street: &str) -> String {
     street
         .trim()
@@ -406,6 +411,8 @@ fn normalize_street_address(street: &str) -> String {
         .replace("Ct.", "Court")
 }
 
+/// Title-case each whitespace-separated word (first letter upper, rest
+/// lower), collapsing runs of whitespace to single spaces.
 fn title_case(s: &str) -> String {
     s.split_whitespace()
         .map(|word| {
@@ -429,10 +436,12 @@ mod tests {
     use crate::models::{Event, EventAttendanceMode, Location, VirtualLocation};
     use chrono::{TimeZone, Utc};
 
+    /// A fixed start instant for building test events.
     fn start() -> chrono::DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 3, 1, 12, 0, 0).unwrap()
     }
 
+    /// A minimal valid event produces no validation errors.
     #[test]
     fn valid_event_passes() {
         let event = Event::new("Test", start());
@@ -440,6 +449,7 @@ mod tests {
         assert!(errors.is_empty(), "expected no errors, got {:?}", errors);
     }
 
+    /// An empty name yields a `name` error.
     #[test]
     fn empty_name_fails() {
         let event = Event::new("", start());
@@ -447,6 +457,7 @@ mod tests {
         assert!(errors.iter().any(|e| e.field == "name"));
     }
 
+    /// `end_date` before `start_date` yields an `end_date` error.
     #[test]
     fn end_before_start_fails() {
         let mut event = Event::new("Test", start());
@@ -455,6 +466,7 @@ mod tests {
         assert!(errors.iter().any(|e| e.field == "end_date"));
     }
 
+    /// `door_time` after `start_date` yields a `door_time` error.
     #[test]
     fn door_after_start_fails() {
         let mut event = Event::new("Test", start());
@@ -463,6 +475,7 @@ mod tests {
         assert!(errors.iter().any(|e| e.field == "door_time"));
     }
 
+    /// Physical + virtual capacity exceeding total yields an error.
     #[test]
     fn capacity_breakdown_must_sum() {
         let mut event = Event::new("Test", start());
@@ -475,6 +488,7 @@ mod tests {
             .any(|e| e.field == "maximum_attendee_capacity"));
     }
 
+    /// An online event with no virtual location yields a `location` error.
     #[test]
     fn online_requires_virtual_location() {
         let mut event = Event::new("Test", start());
@@ -486,6 +500,7 @@ mod tests {
         assert!(errors.iter().any(|e| e.field == "location"));
     }
 
+    /// An online event with a virtual location validates cleanly.
     #[test]
     fn online_passes_with_virtual_location() {
         let mut event = Event::new("Test", start());
@@ -498,6 +513,7 @@ mod tests {
         assert!(errors.is_empty(), "unexpected errors: {:?}", errors);
     }
 
+    /// Non-ISO durations fail; a valid `PT1H30M` passes.
     #[test]
     fn iso_duration_validation() {
         let mut event = Event::new("Test", start());
@@ -510,6 +526,7 @@ mod tests {
         assert!(!errors.iter().any(|e| e.field == "duration"));
     }
 
+    /// A non-ISO-639-1 language string yields an `in_language` error.
     #[test]
     fn language_code_validation() {
         let mut event = Event::new("Test", start());
@@ -518,11 +535,14 @@ mod tests {
         assert!(errors.iter().any(|e| e.field.starts_with("in_language")));
     }
 
+    /// A US phone number normalizes to E.164-like `+1…` form.
     #[test]
     fn normalize_phone_us() {
         assert_eq!(normalize_phone("(555) 123-4567", "1"), "+15551234567");
     }
 
+    /// Address standardization title-cases city and upper-cases
+    /// state/country.
     #[test]
     fn standardize_address_works() {
         let addr = Address {

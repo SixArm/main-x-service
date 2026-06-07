@@ -59,9 +59,12 @@ impl Course {
     }
 }
 
+/// An external identifier for a course: a scheme plus its value.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CourseIdentifier {
+    /// The scheme under which `value` is published.
     pub scheme: IdentifierScheme,
+    /// The identifier value within `scheme`.
     pub value: String,
 }
 
@@ -132,35 +135,62 @@ impl IdentifierScheme {
     }
 }
 
+/// schema.org/educationalLevel — the intended difficulty or stage of study.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EducationalLevel {
+    /// Introductory level, no prior knowledge assumed.
     Beginner,
+    /// Builds on beginner foundations.
     Intermediate,
+    /// Assumes substantial prior knowledge.
     Advanced,
+    /// Mastery level.
     Expert,
+    /// Primary / elementary schooling.
     PrimaryEducation,
+    /// Secondary / high-school schooling.
     SecondaryEducation,
+    /// Tertiary / higher education in general.
     HigherEducation,
+    /// Undergraduate degree level.
     Undergraduate,
+    /// Graduate (master's) level.
     Graduate,
+    /// Postgraduate (doctoral) level.
     Postgraduate,
+    /// Vocational / trade training.
     Vocational,
+    /// Continuing professional development.
     ProfessionalDevelopment,
+    /// Free-form custom level with a caller-supplied label.
     Custom(String),
 }
 
+/// schema.org/learningResourceType — the form a course offering takes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LearningResourceType {
+    /// Instructor-led lecture.
     Lecture,
+    /// Guided tutorial.
     Tutorial,
+    /// Hands-on workshop.
     Workshop,
+    /// Graded assignment.
     Assignment,
+    /// Reading material.
     Reading,
+    /// Video content.
     Video,
+    /// Audio content.
     Audio,
+    /// Assessment / exam.
     Exam,
+    /// Interactive simulation.
     Simulation,
+    /// Project work.
     Project,
+    /// Discussion / seminar.
     Discussion,
+    /// Free-form custom type with a caller-supplied label.
     Custom(String),
 }

@@ -1,4 +1,31 @@
-//! Person model definition
+//! The [`Person`] domain model — the central identity record of the MPI.
+//!
+//! A [`Person`] aggregates demographics, names, identifiers, contact
+//! points, addresses, documents, and links to other records. It is the
+//! unit that the matching engine compares, the search engine indexes,
+//! and the repository persists (decomposed across several relational
+//! tables by [`crate::db::repositories`]).
+//!
+//! This module also defines the name-related helper types
+//! ([`HumanName`], [`NameUse`]) and the person-to-person link types
+//! ([`PersonLink`], [`LinkType`]) used by the merge workflow.
+//!
+//! # Examples
+//!
+//! ```
+//! use person_service::models::{Person, HumanName, Gender};
+//!
+//! let name = HumanName {
+//!     use_type: None,
+//!     family: "Smith".to_string(),
+//!     given: vec!["John".to_string()],
+//!     prefix: vec![],
+//!     suffix: vec![],
+//! };
+//! let person = Person::new(name, Gender::Male);
+//! assert_eq!(person.full_name(), "John Smith");
+//! assert!(person.active);
+//! ```
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -100,6 +127,7 @@ pub struct Person {
     pub updated_at: DateTime<Utc>,
 }
 
+/// serde default for [`Person::active`] — new records are active.
 fn default_true() -> bool {
     true
 }
@@ -111,35 +139,56 @@ fn default_true() -> bool {
 /// They round-trip as empty arrays when omitted.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct HumanName {
+    /// Intended use of this name (official, nickname, maiden, …).
     #[serde(default)]
     pub use_type: Option<NameUse>,
+    /// Family / last / surname.
     pub family: String,
+    /// Given / first / middle names, in order.
     pub given: Vec<String>,
+    /// Honorific prefixes (e.g. `Dr.`, `Mr.`).
     #[serde(default)]
     pub prefix: Vec<String>,
+    /// Honorific suffixes (e.g. `Jr.`, `III`).
     #[serde(default)]
     pub suffix: Vec<String>,
 }
 
+/// Intended use of a [`HumanName`], mirroring the FHIR `name-use`
+/// value set.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum NameUse {
+    /// The name normally used.
     Usual,
+    /// The official / legal name.
     Official,
+    /// A temporary name.
     Temp,
+    /// A nickname / alias.
     Nickname,
+    /// An anonymous / pseudonymous name.
     Anonymous,
+    /// A former name no longer in use.
     Old,
+    /// A maiden (pre-marriage) name.
     Maiden,
 }
 
-/// Person link to another person record
+/// A typed link from one person record to another.
+///
+/// Created by the merge workflow (e.g. a surviving record gains a
+/// [`LinkType::Replaces`] link to the record it absorbed).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PersonLink {
+    /// The UUID of the person on the other end of the link.
     pub other_person_id: Uuid,
+    /// The semantic relationship this link expresses.
     pub link_type: LinkType,
 }
 
+/// The semantic relationship expressed by a [`PersonLink`], mirroring
+/// the FHIR `link-type` value set.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum LinkType {
@@ -154,7 +203,28 @@ pub enum LinkType {
 }
 
 impl Person {
-    /// Create a new person
+    /// Create a new active person from a name and gender.
+    ///
+    /// Generates a fresh UUID, stamps `created_at` / `updated_at` with
+    /// the current time, marks the record `active`, and leaves every
+    /// collection empty and every optional field `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use person_service::models::{Person, HumanName, Gender};
+    ///
+    /// let name = HumanName {
+    ///     use_type: None,
+    ///     family: "Doe".to_string(),
+    ///     given: vec!["Jane".to_string()],
+    ///     prefix: vec![],
+    ///     suffix: vec![],
+    /// };
+    /// let person = Person::new(name, Gender::Female);
+    /// assert!(person.active);
+    /// assert!(person.identifiers.is_empty());
+    /// ```
     pub fn new(name: HumanName, gender: Gender) -> Self {
         let now = Utc::now();
         Self {
@@ -182,13 +252,38 @@ impl Person {
         }
     }
 
-    /// Get full name as a string
+    /// Render the primary name as `"Given... Family"`.
+    ///
+    /// Given names are space-joined in order, then the family name is
+    /// appended. Used by search indexing and the FHIR `name.text` field.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use person_service::models::{Person, HumanName, Gender};
+    ///
+    /// let name = HumanName {
+    ///     use_type: None,
+    ///     family: "Garcia".to_string(),
+    ///     given: vec!["Maria".to_string(), "Elena".to_string()],
+    ///     prefix: vec![],
+    ///     suffix: vec![],
+    /// };
+    /// let person = Person::new(name, Gender::Female);
+    /// assert_eq!(person.full_name(), "Maria Elena Garcia");
+    /// ```
     pub fn full_name(&self) -> String {
         let given = self.name.given.join(" ");
         format!("{} {}", given, self.name.family)
     }
 
-    /// Get tax ID, falling back to TAX-type identifier if tax_id field is empty
+    /// Return the effective tax identifier for matching.
+    ///
+    /// Prefers the dedicated [`tax_id`](Person::tax_id) field; if that is
+    /// `None`, falls back to the value of the first
+    /// [`TAX`](super::IdentifierType::TAX)-typed entry in `identifiers`.
+    /// The deterministic matcher uses this so a tax ID supplied either
+    /// way short-circuits to a confident match.
     pub fn effective_tax_id(&self) -> Option<&str> {
         if let Some(ref tid) = self.tax_id {
             return Some(tid.as_str());
@@ -204,6 +299,8 @@ mod tests {
     use super::*;
     use crate::models::Gender;
 
+    /// `Person::new` yields an active, non-deceased record with empty
+    /// collections and `None` optionals.
     #[test]
     fn test_person_new_defaults() {
         let name = HumanName {
@@ -232,6 +329,8 @@ mod tests {
         assert!(person.managing_organization.is_none());
     }
 
+    /// A `Person` survives a JSON serialize → deserialize round-trip
+    /// with key demographic fields intact.
     #[test]
     fn test_person_serialization_roundtrip() {
         let name = HumanName {
@@ -255,6 +354,7 @@ mod tests {
         assert_eq!(deserialized.birth_date, person.birth_date);
     }
 
+    /// `full_name` joins multiple given names before the family name.
     #[test]
     fn test_human_name_display() {
         let name = HumanName {
@@ -269,6 +369,7 @@ mod tests {
         assert_eq!(full, "Maria Elena Garcia");
     }
 
+    /// Every `Gender` variant round-trips through JSON.
     #[test]
     fn test_gender_variants() {
         // Test all gender variants serialize/deserialize correctly

@@ -1,3 +1,7 @@
+//! Integration edge-case tests spanning validation, normalization, privacy,
+//! and combined create → validate → normalize → match / mask / export
+//! workflows.
+
 use thing_service::matching::scoring::{compute_match, MatchWeights};
 use thing_service::models::identifier::{IdentifierType, ThingIdentifier};
 use thing_service::models::thing::Thing;
@@ -6,6 +10,7 @@ use thing_service::validation::{normalize_thing, validate_thing};
 
 // -- Validation edge cases --
 
+/// Only http(s) URL schemes are accepted; ftp is rejected.
 #[test]
 fn test_validate_url_protocols() {
     let mut thing = Thing::new("X");
@@ -20,6 +25,7 @@ fn test_validate_url_protocols() {
     assert!(!validate_thing(&thing).is_empty());
 }
 
+/// ISBN-10 and ISBN-13 pass; a short string fails.
 #[test]
 fn test_validate_isbn_length() {
     let mut thing = Thing::new("X");
@@ -34,6 +40,7 @@ fn test_validate_isbn_length() {
     assert!(!validate_thing(&thing).is_empty());
 }
 
+/// GTIN-8 and GTIN-13 pass; an out-of-range length fails.
 #[test]
 fn test_validate_gtin_length() {
     let mut thing = Thing::new("X");
@@ -48,6 +55,7 @@ fn test_validate_gtin_length() {
     assert!(!validate_thing(&thing).is_empty());
 }
 
+/// A `10.…/…` DOI passes; a bare suffix fails.
 #[test]
 fn test_validate_doi_format() {
     let mut thing = Thing::new("X");
@@ -59,6 +67,7 @@ fn test_validate_doi_format() {
     assert!(!validate_thing(&thing).is_empty());
 }
 
+/// A canonical UUID passes; an unparseable string fails.
 #[test]
 fn test_validate_uuid_format() {
     let mut thing = Thing::new("X");
@@ -70,6 +79,7 @@ fn test_validate_uuid_format() {
     assert!(!validate_thing(&thing).is_empty());
 }
 
+/// A Custom identifier skips format checks (any non-empty value is valid).
 #[test]
 fn test_validate_custom_identifier_type_skips_format_check() {
     let mut thing = Thing::new("X");
@@ -82,6 +92,7 @@ fn test_validate_custom_identifier_type_skips_format_check() {
 
 // -- Normalization edge cases --
 
+/// Normalization lowercases the scheme but preserves host/path case.
 #[test]
 fn test_normalize_url_scheme_lowercased() {
     let mut thing = Thing::new("X");
@@ -91,6 +102,7 @@ fn test_normalize_url_scheme_lowercased() {
     assert_eq!(thing.url.as_deref(), Some("https://Example.com/Path"));
 }
 
+/// Normalization removes duplicate `same_as` entries.
 #[test]
 fn test_normalize_dedupes_same_as() {
     let mut thing = Thing::new("X");
@@ -103,6 +115,7 @@ fn test_normalize_dedupes_same_as() {
     assert_eq!(thing.same_as.len(), 2);
 }
 
+/// Normalization removes duplicate alternate names, preserving order.
 #[test]
 fn test_normalize_dedupes_alternate_names() {
     let mut thing = Thing::new("X");
@@ -113,6 +126,7 @@ fn test_normalize_dedupes_alternate_names() {
 
 // -- Privacy edge cases --
 
+/// Masking preserves the identifier's `property_id`.
 #[test]
 fn test_mask_preserves_property_id() {
     let mut thing = Thing::new("X");
@@ -124,6 +138,7 @@ fn test_mask_preserves_property_id() {
     );
 }
 
+/// A short identifier value is fully redacted to `****`.
 #[test]
 fn test_mask_short_identifier_value() {
     let mut thing = Thing::new("X");
@@ -132,6 +147,7 @@ fn test_mask_short_identifier_value() {
     assert_eq!(masked.identifiers[0].value, "****");
 }
 
+/// GDPR export carries schema.org fields through unmodified.
 #[test]
 fn test_gdpr_export_preserves_schema_org_fields() {
     let mut thing = Thing::new("GDPR Test");
@@ -150,6 +166,7 @@ fn test_gdpr_export_preserves_schema_org_fields() {
     assert_eq!(export["same_as"].as_array().unwrap().len(), 1);
 }
 
+/// GDPR export of a soft-deleted thing includes its delete flag/timestamp.
 #[test]
 fn test_gdpr_export_soft_deleted_thing() {
     let mut thing = Thing::new("Deleted");
@@ -161,6 +178,7 @@ fn test_gdpr_export_soft_deleted_thing() {
 
 // -- Combined workflow tests --
 
+/// End to end: validate → normalize → match scores a near-duplicate high.
 #[test]
 fn test_validate_normalize_match_workflow() {
     let mut a = Thing::new("  pride and prejudice  ");
@@ -178,6 +196,7 @@ fn test_validate_normalize_match_workflow() {
     assert!(result.score > 0.9, "normalized should match well: {}", result.score);
 }
 
+/// End to end: validate → normalize → mask → export withholds sensitive data.
 #[test]
 fn test_validate_normalize_mask_export_workflow() {
     let mut thing = Thing::new("  Sensitive Thing  ");
@@ -197,6 +216,7 @@ fn test_validate_normalize_mask_export_workflow() {
     assert_eq!(export["owner"], "[owner withheld]");
 }
 
+/// A shared ISBN forces 1.0 despite divergent names/urls/descriptions.
 #[test]
 fn test_isbn_deterministic_trumps_everything() {
     // Different names, URLs, descriptions — but shared ISBN forces 1.0.

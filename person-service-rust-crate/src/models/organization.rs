@@ -1,4 +1,20 @@
-//! Organization model definition
+//! The [`Organization`] model — a clinic, hospital, or other body.
+//!
+//! Organizations appear as the `managing_organization` of a person and
+//! as the `assigner` of identifiers. They reuse the shared
+//! [`crate::models::Address`], [`crate::models::ContactPoint`], and
+//! [`crate::models::Identifier`] value objects, and can nest via
+//! `part_of` to model a parent/child hierarchy.
+//!
+//! # Examples
+//!
+//! ```
+//! use person_service::models::Organization;
+//!
+//! let org = Organization::new("General Hospital".to_string());
+//! assert!(org.active);
+//! assert!(org.addresses.is_empty());
+//! ```
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -45,7 +61,10 @@ pub struct Organization {
 }
 
 impl Organization {
-    /// Create a new organization
+    /// Create a new active organization from a name.
+    ///
+    /// Generates a fresh UUID, stamps timestamps, marks it `active`, and
+    /// leaves every collection empty and `part_of` unset.
     pub fn new(name: String) -> Self {
         let now = Utc::now();
         Self {

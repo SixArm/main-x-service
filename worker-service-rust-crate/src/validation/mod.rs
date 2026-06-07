@@ -1,18 +1,53 @@
-//! Data quality validation for worker records
+//! Data-quality validation, normalization, and standardization for worker
+//! records.
 //!
-//! Provides validation rules, address standardization,
-//! phone number formatting, and document validation.
+//! [`validate_worker`](crate::validation::validate_worker) runs the full rule
+//! set and returns every problem found (rather than failing fast) so the API
+//! can report them all at once with a 422.
+//! [`normalize_phone`](crate::validation::normalize_phone) and
+//! [`standardize_address`](crate::validation::standardize_address) canonicalise
+//! input at the service boundary so downstream matching sees consistent values.
+//!
+//! # Examples
+//!
+//! ```
+//! use worker_service::validation::normalize_phone;
+//!
+//! assert_eq!(normalize_phone("(555) 123-4567", "1"), "+15551234567");
+//! ```
 
 use crate::models::{Worker, Address, ContactPoint, ContactPointSystem, IdentityDocument};
 
-/// Validation error with field path and message
+/// A single validation failure: the dotted `field` path that failed and a
+/// human-readable `message`. Serializable so it can be returned in API errors.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ValidationError {
+    /// Dotted/indexed path to the offending field (e.g. `"telecom[0].value"`).
     pub field: String,
+    /// Human-readable description of what is wrong.
     pub message: String,
 }
 
-/// Validate a worker record, returning all validation errors found.
+/// Validates a worker against all data-quality rules and returns every error
+/// found (empty vec means valid).
+///
+/// Rules cover required name fields, a non-future birth date, tax-ID format,
+/// and per-element checks of telecom, addresses, documents, and emergency
+/// contacts.
+///
+/// # Examples
+///
+/// ```
+/// use worker_service::validation::validate_worker;
+/// use worker_service::models::{Worker, HumanName, Gender};
+///
+/// let w = Worker::new(
+///     HumanName { use_type: None, family: "Smith".into(),
+///         given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+///     Gender::Male,
+/// );
+/// assert!(validate_worker(&w).is_empty());
+/// ```
 pub fn validate_worker(worker: &Worker) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
@@ -87,7 +122,9 @@ pub fn validate_worker(worker: &Worker) -> Vec<ValidationError> {
     errors
 }
 
-/// Validate a contact point
+/// Validates one contact point under the given field `prefix`: the value must
+/// be non-empty, emails must look like `x@y.z`, and phone/SMS/fax values must
+/// contain at least seven digits.
 fn validate_contact_point(cp: &ContactPoint, prefix: &str) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
@@ -123,7 +160,9 @@ fn validate_contact_point(cp: &ContactPoint, prefix: &str) -> Vec<ValidationErro
     errors
 }
 
-/// Validate an address
+/// Validates one address under the given field `prefix`: it must carry at
+/// least one locating field (city, postal code, or country) so it is more than
+/// a bare street line.
 fn validate_address(addr: &Address, prefix: &str) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
@@ -142,7 +181,9 @@ fn validate_address(addr: &Address, prefix: &str) -> Vec<ValidationError> {
     errors
 }
 
-/// Validate an identity document
+/// Validates one identity document under the given field `prefix`: the number
+/// is required, an expiry date in the past is flagged, and the issue date must
+/// not be after the expiry date.
 fn validate_document(doc: &IdentityDocument, prefix: &str) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
@@ -176,8 +217,20 @@ fn validate_document(doc: &IdentityDocument, prefix: &str) -> Vec<ValidationErro
     errors
 }
 
-/// Normalize/standardize a phone number to E.164-like format.
-/// Strips non-digit characters and prepends country code if missing.
+/// Normalizes a phone number toward E.164 (`+<digits>`).
+///
+/// Strips every non-digit character, then prepends `default_country_code` when
+/// the input lacks one (treating a leading `+` or a country-code prefix as
+/// "already has one"). Returns an empty string for input with no digits.
+///
+/// # Examples
+///
+/// ```
+/// use worker_service::validation::normalize_phone;
+///
+/// assert_eq!(normalize_phone("(555) 123-4567", "1"), "+15551234567");
+/// assert_eq!(normalize_phone("+44 20 7946 0958", "44"), "+442079460958");
+/// ```
 pub fn normalize_phone(phone: &str, default_country_code: &str) -> String {
     let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
 
@@ -204,7 +257,25 @@ pub fn normalize_phone(phone: &str, default_country_code: &str) -> String {
     format!("+{}{}", default_country_code, digits)
 }
 
-/// Standardize an address (trim whitespace, normalize casing, expand abbreviations)
+/// Standardizes an address: trims whitespace, expands street abbreviations in
+/// line 1, title-cases the city, and upper-cases the state and country. The
+/// use type, line 2, and postal code are passed through (trimmed).
+///
+/// # Examples
+///
+/// ```
+/// use worker_service::validation::standardize_address;
+/// use worker_service::models::Address;
+///
+/// let a = Address {
+///     use_type: None, line1: Some("123 main st.".into()), line2: None,
+///     city: Some("new york".into()), state: Some("ny".into()),
+///     postal_code: Some("10001".into()), country: Some("us".into()),
+/// };
+/// let s = standardize_address(&a);
+/// assert_eq!(s.city.as_deref(), Some("New York"));
+/// assert_eq!(s.state.as_deref(), Some("NY"));
+/// ```
 pub fn standardize_address(addr: &Address) -> Address {
     Address {
         use_type: addr.use_type.clone(),
@@ -217,6 +288,8 @@ pub fn standardize_address(addr: &Address) -> Address {
     }
 }
 
+/// Expands common street abbreviations to their full words ("St."→"Street",
+/// "Ave."→"Avenue", …) after trimming, so standardized lines read uniformly.
 fn normalize_street_address(street: &str) -> String {
     let s = street.trim().to_string();
     // Expand common abbreviations
@@ -232,6 +305,8 @@ fn normalize_street_address(street: &str) -> String {
         .replace("Ct.", "Court")
 }
 
+/// Title-cases a string word-by-word: the first letter of each
+/// whitespace-separated word is upper-cased and the rest lower-cased.
 fn title_case(s: &str) -> String {
     s.split_whitespace()
         .map(|word| {
@@ -254,6 +329,7 @@ mod tests {
     use super::*;
     use crate::models::{Gender, HumanName};
 
+    /// A blank family name produces a `name.family` error.
     #[test]
     fn test_validate_missing_family_name() {
         let worker = Worker::new(
@@ -264,6 +340,7 @@ mod tests {
         assert!(errors.iter().any(|e| e.field == "name.family"));
     }
 
+    /// A well-formed worker passes with no errors.
     #[test]
     fn test_validate_valid_worker() {
         let worker = Worker::new(
@@ -274,12 +351,14 @@ mod tests {
         assert!(errors.is_empty());
     }
 
+    /// US numbers normalize to "+1" E.164 form.
     #[test]
     fn test_normalize_phone_us() {
         assert_eq!(normalize_phone("(555) 123-4567", "1"), "+15551234567");
         assert_eq!(normalize_phone("+1-555-123-4567", "1"), "+15551234567");
     }
 
+    /// City is title-cased, state and country upper-cased.
     #[test]
     fn test_standardize_address() {
         let addr = Address {
@@ -297,6 +376,7 @@ mod tests {
         assert_eq!(std.country.as_deref(), Some("US"));
     }
 
+    /// A future birth date produces a `birth_date` error.
     #[test]
     fn test_validate_future_birth_date() {
         let mut worker = Worker::new(
@@ -309,6 +389,7 @@ mod tests {
         assert!(errors.iter().any(|e| e.field == "birth_date"), "Future birth date should produce validation error");
     }
 
+    /// A malformed email value produces a telecom error.
     #[test]
     fn test_validate_invalid_email() {
         let mut worker = Worker::new(
@@ -325,6 +406,7 @@ mod tests {
             "Invalid email should produce validation error");
     }
 
+    /// A too-short phone number produces a telecom error.
     #[test]
     fn test_validate_invalid_phone() {
         let mut worker = Worker::new(
@@ -341,6 +423,7 @@ mod tests {
             "Short phone number should produce validation error");
     }
 
+    /// A tax ID with no alphanumerics produces a `tax_id` error.
     #[test]
     fn test_validate_tax_id_format() {
         let mut worker = Worker::new(
@@ -352,6 +435,7 @@ mod tests {
         assert!(errors.iter().any(|e| e.field == "tax_id"), "Tax ID with no alphanumeric chars should fail");
     }
 
+    /// A document with an empty number produces a `number` error.
     #[test]
     fn test_validate_document_missing_number() {
         use crate::models::{IdentityDocument, DocumentType};
@@ -372,6 +456,7 @@ mod tests {
         assert!(errors.iter().any(|e| e.field.contains("number")), "Empty document number should fail");
     }
 
+    /// A past expiry date produces an "expired" error.
     #[test]
     fn test_validate_document_expired() {
         use crate::models::{IdentityDocument, DocumentType};
@@ -392,6 +477,7 @@ mod tests {
         assert!(errors.iter().any(|e| e.message.contains("expired")), "Expired document should produce error");
     }
 
+    /// An emergency contact with a blank name produces an error.
     #[test]
     fn test_validate_emergency_contact_missing_name() {
         use crate::models::EmergencyContact;
@@ -411,6 +497,7 @@ mod tests {
             "Missing emergency contact name should produce error");
     }
 
+    /// A street-only address with no city/postal/country produces an error.
     #[test]
     fn test_validate_address_incomplete() {
         let mut worker = Worker::new(
@@ -431,12 +518,14 @@ mod tests {
             "Address without city/postal/country should produce error");
     }
 
+    /// An international number already carrying its country code normalizes cleanly.
     #[test]
     fn test_normalize_phone_international() {
         // 11 digits starting with country code
         assert_eq!(normalize_phone("+44 20 7946 0958", "44"), "+442079460958");
     }
 
+    /// Extension text is dropped; output is "+" followed by digits only.
     #[test]
     fn test_normalize_phone_with_extensions() {
         // Extensions should be stripped (only digits kept)
@@ -445,6 +534,7 @@ mod tests {
         assert!(result.chars().skip(1).all(|c| c.is_ascii_digit()), "Should contain only digits after +");
     }
 
+    /// Street abbreviations expand (Ave. -> Avenue) during standardization.
     #[test]
     fn test_standardize_address_abbreviations() {
         let addr = Address {
@@ -460,6 +550,7 @@ mod tests {
         assert!(std.line1.as_ref().unwrap().contains("Avenue"), "Ave. should expand to Avenue, got {:?}", std.line1);
     }
 
+    /// City is title-cased while state and country are upper-cased.
     #[test]
     fn test_standardize_address_case() {
         let addr = Address {

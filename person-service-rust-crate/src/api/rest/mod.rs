@@ -1,4 +1,12 @@
-//! RESTful API implementation with Axum
+//! Axum REST API: OpenAPI doc, router wiring, and server bootstrap.
+//!
+//! [`ApiDoc`](crate::api::rest::ApiDoc) is the utoipa-generated OpenAPI 3 document (served at
+//! `/api-docs/openapi.json` and rendered by Swagger UI at `/swagger-ui`).
+//! [`create_router`](crate::api::rest::create_router) maps every endpoint onto a handler in [`handlers`](crate::api::rest::handlers)
+//! and nests them under `/api`, plus the Prometheus `/metrics.prom`
+//! scrape path and a permissive CORS layer. [`serve`](crate::api::rest::serve) binds the
+//! configured host/port and runs the server. [`AppState`](crate::api::rest::AppState) (re-exported
+//! from [`state`](crate::api::rest::state)) is the shared state injected into each handler.
 
 use axum::{
     Router,
@@ -8,15 +16,18 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+/// REST endpoint handler functions.
 pub mod handlers;
+/// Route grouping helpers.
 pub mod routes;
+/// Shared [`AppState`] definition.
 pub mod state;
 
 pub use state::AppState;
 
 use crate::Result;
 
-/// API documentation
+/// The OpenAPI 3 document: endpoint paths, schemas, and tags.
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -96,7 +107,12 @@ use crate::Result;
 )]
 pub struct ApiDoc;
 
-/// Create the REST API router with application state
+/// Build the fully-wired Axum [`Router`] for the service.
+///
+/// Mounts the entity/search/match/merge/privacy/audit routes under
+/// `/api`, exposes `/metrics.prom` and the Swagger UI, and applies a
+/// permissive CORS layer. The given [`AppState`] is moved into the
+/// router as shared state.
 pub fn create_router(state: AppState) -> Router {
     let api_routes = Router::new()
         // Health
@@ -133,7 +149,10 @@ pub fn create_router(state: AppState) -> Router {
         .layer(CorsLayer::permissive())
 }
 
-/// Start the REST API server
+/// Bind the configured host/port and run the REST server to completion.
+///
+/// Returns [`crate::Error::Api`] if the listener cannot bind or the
+/// server exits with an error.
 pub async fn serve(state: AppState) -> Result<()> {
     let app = create_router(state.clone());
     let addr = format!("{}:{}", state.config.server.host, state.config.server.port);

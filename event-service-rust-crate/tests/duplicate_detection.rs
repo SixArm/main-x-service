@@ -19,10 +19,12 @@ use event_service::models::{
 
 // -------- builders -----------------------------------------------------------
 
+/// Build a fixed top-of-hour UTC timestamp for deterministic tests.
 fn start_at(year: i32, month: u32, day: u32, hour: u32) -> DateTime<Utc> {
     Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).unwrap()
 }
 
+/// Build a scheduled conference-type event with the given name/start.
 fn event(name: &str, start: DateTime<Utc>) -> Event {
     let mut e = Event::new(name, start);
     e.event_type = EventType::Conference;
@@ -30,6 +32,8 @@ fn event(name: &str, start: DateTime<Utc>) -> Event {
     e
 }
 
+/// A fully-populated reference conference (location + organizer) used
+/// as a fixture across the bridge tests.
 fn conference() -> Event {
     let mut e = event("Annual Conference", start_at(2026, 6, 1, 9));
     e.end_date = Some(start_at(2026, 6, 1, 17));
@@ -59,6 +63,7 @@ fn conference() -> Event {
     e
 }
 
+/// A matching engine with the default configuration.
 fn engine() -> MatchingEngine {
     MatchingEngine::default_config()
 }
@@ -67,6 +72,7 @@ fn engine() -> MatchingEngine {
 // Identical / near-duplicate cases
 // =============================================================================
 
+/// An exact clone scores ≥ 0.95 with `High` confidence.
 #[test]
 fn identical_clones_score_near_one_high_confidence() {
     let a = conference();
@@ -83,6 +89,7 @@ fn identical_clones_score_near_one_high_confidence() {
     assert!(result.is_match);
 }
 
+/// A name typo still matches when time and location agree.
 #[test]
 fn typo_in_name_still_matches_when_time_and_location_agree() {
     let a = conference();
@@ -98,6 +105,7 @@ fn typo_in_name_still_matches_when_time_and_location_agree() {
     assert!(result.is_match);
 }
 
+/// Closer start dates outscore farther ones for the same name.
 #[test]
 fn closer_start_dates_outscore_farther_start_dates_for_same_name() {
     // Same name + same location pair, only `start_date` varies. The matcher
@@ -129,6 +137,8 @@ fn closer_start_dates_outscore_farther_start_dates_for_same_name() {
 // Deterministic short-circuits — strong identifiers
 // =============================================================================
 
+/// A shared Eventbrite id (routed by system URI) triggers a
+/// deterministic match.
 #[test]
 fn shared_eventbrite_identifier_via_system_uri_is_deterministic() {
     let mut a = event("Tech Talk", start_at(2026, 7, 15, 18));
@@ -159,6 +169,8 @@ fn shared_eventbrite_identifier_via_system_uri_is_deterministic() {
     assert_eq!(result.breakdown.event_ids_score, Some(1.0));
 }
 
+/// A shared iCalendar UID (routed by system URI) triggers a
+/// deterministic match.
 #[test]
 fn icalendar_uid_routing_via_system_uri() {
     let mut a = event("Standup", start_at(2026, 7, 16, 9));
@@ -184,6 +196,8 @@ fn icalendar_uid_routing_via_system_uri() {
     );
 }
 
+/// With no system hint, a `BookingNumber` falls back to the type enum
+/// and still produces an identifier-axis match.
 #[test]
 fn booking_number_via_type_fallback_when_no_system_hint() {
     // No system URI → adapter falls back to the IdentifierType enum and
@@ -217,6 +231,7 @@ fn booking_number_via_type_fallback_when_no_system_hint() {
 // Location dispatch — Place vs Virtual vs PostalAddress
 // =============================================================================
 
+/// A shared virtual-meeting URL drives a positive location score.
 #[test]
 fn virtual_location_url_match_drives_location_score() {
     let mut a = event("Webinar", start_at(2026, 6, 1, 10));
@@ -238,6 +253,8 @@ fn virtual_location_url_match_drives_location_score() {
     );
 }
 
+/// A `Place` location's name and geo coords propagate into the matcher
+/// `Location`.
 #[test]
 fn place_location_geo_propagates_into_matcher_location() {
     let mut a = event("Gig", start_at(2026, 6, 1, 20));
@@ -260,6 +277,8 @@ fn place_location_geo_propagates_into_matcher_location() {
 // Organizer / party dispatch
 // =============================================================================
 
+/// Only the first organizer name populates the matcher's single
+/// organizer slot.
 #[test]
 fn first_organizer_name_propagates_to_matcher_organizer_slot() {
     let mut a = event("Show", start_at(2026, 8, 1, 20));
@@ -288,6 +307,8 @@ fn first_organizer_name_propagates_to_matcher_organizer_slot() {
     );
 }
 
+/// Every performer name passes through to the matcher's `performers`
+/// string vector, in order.
 #[test]
 fn performers_pass_through_as_string_vec() {
     let mut a = event("Concert", start_at(2026, 9, 1, 20));
@@ -315,6 +336,8 @@ fn performers_pass_through_as_string_vec() {
 // Negative cases
 // =============================================================================
 
+/// Unrelated events (different name, time, place, type) score below
+/// 0.50 and are not flagged as a match.
 #[test]
 fn completely_different_events_score_low_and_do_not_match() {
     let a = conference();
@@ -338,6 +361,8 @@ fn completely_different_events_score_low_and_do_not_match() {
     assert!(!result.is_match);
 }
 
+/// An identical name six years apart must not reach the High band —
+/// time divergence prevents a deterministic short-circuit.
 #[test]
 fn same_name_far_apart_dates_does_not_short_circuit() {
     let mut a = event("Annual Gala", start_at(2024, 6, 1, 19));
@@ -357,6 +382,8 @@ fn same_name_far_apart_dates_does_not_short_circuit() {
 // Field-routing pinning
 // =============================================================================
 
+/// `EventType::Conference` maps to the matcher's
+/// `EventCategory::ConferenceEvent`.
 #[test]
 fn event_type_conference_maps_to_matcher_conference_event() {
     use event_service::matching::matcher_lib::EventCategory;
@@ -365,6 +392,8 @@ fn event_type_conference_maps_to_matcher_conference_event() {
     assert_eq!(m.category, Some(EventCategory::ConferenceEvent));
 }
 
+/// `EventStatus::Scheduled` maps to the matcher's
+/// `EventStatus::EventScheduled`.
 #[test]
 fn event_status_scheduled_maps_to_matcher_event_scheduled() {
     use event_service::matching::matcher_lib::EventStatus as MEventStatus;
@@ -373,6 +402,8 @@ fn event_status_scheduled_maps_to_matcher_event_scheduled() {
     assert_eq!(m.event_status, Some(MEventStatus::EventScheduled));
 }
 
+/// The domain `DateTime<Utc>` start date projects to an RFC 3339
+/// string on the matcher side.
 #[test]
 fn start_date_serialises_to_rfc3339() {
     let e = event("Talk", start_at(2026, 6, 1, 9));
@@ -388,6 +419,8 @@ fn start_date_serialises_to_rfc3339() {
 // Edge cases
 // =============================================================================
 
+/// Near-empty records score without panicking and stay within
+/// `[0.0, 1.0]`.
 #[test]
 fn sparse_records_do_not_panic_and_stay_in_range() {
     let a = event("", start_at(2026, 1, 1, 0));

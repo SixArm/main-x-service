@@ -1,8 +1,15 @@
+//! Integration tests for the validation + normalization pipeline.
+//!
+//! These exercise [`validate_place`] and [`normalize_place`] together against
+//! whole-record fixtures, covering the validate-then-normalize happy path,
+//! the invalid-record case, and a full create lifecycle.
+
 use place_service::models::address::PostalAddress;
 use place_service::models::geo::GeoCoordinates;
 use place_service::models::place::Place;
 use place_service::validation::{validate_place, normalize_place};
 
+/// A valid place validates clean, then normalizes its name and address.
 #[test]
 fn test_validate_then_normalize_workflow() {
     let mut place = Place::new("  test place  ");
@@ -26,6 +33,7 @@ fn test_validate_then_normalize_workflow() {
     assert_eq!(addr.address_country.as_deref(), Some("US"));
 }
 
+/// An invalid place reports multiple errors; normalizing it is still safe.
 #[test]
 fn test_invalid_place_does_not_normalize() {
     let mut place = Place::new("");
@@ -37,6 +45,7 @@ fn test_invalid_place_does_not_normalize() {
     normalize_place(&mut place);
 }
 
+/// A fully-populated place stays valid across normalization (idempotence).
 #[test]
 fn test_full_place_lifecycle_validation() {
     let mut place = Place::new("Test Place");

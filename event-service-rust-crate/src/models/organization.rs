@@ -1,4 +1,10 @@
-//! Organization model definition
+//! Organization model definition.
+//!
+//! An [`Organization`] is a standalone record for a venue operator,
+//! promoter, presenter, clinic, employer, etc. It carries richer
+//! metadata (identifiers, telecom, addresses, hierarchy) than the
+//! lightweight [`Party`](crate::models::Party) reference embedded in an
+//! event's organizer / performer lists.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -49,7 +55,19 @@ pub struct Organization {
 }
 
 impl Organization {
-    /// Create a new organization
+    /// Create a new active organization with the given name. All
+    /// collection fields start empty; `id` is generated (UUID v4) and
+    /// timestamps are set to now.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use event_service::models::Organization;
+    ///
+    /// let org = Organization::new("Cal Performances".into());
+    /// assert!(org.active);
+    /// assert!(org.telecom.is_empty());
+    /// ```
     pub fn new(name: String) -> Self {
         let now = Utc::now();
         Self {

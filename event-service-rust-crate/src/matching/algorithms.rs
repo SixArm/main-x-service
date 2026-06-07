@@ -1,8 +1,25 @@
 //! Component matching algorithms for events.
 //!
 //! Each `mod` here scores a single facet (name, time, location, …)
-//! in [0.0, 1.0]. The scorers in [`crate::matching::scoring`] combine
+//! in `[0.0, 1.0]`. The scorers in [`crate::matching::scoring`] combine
 //! these into an overall match.
+//!
+//! All scorers are pure functions of their inputs (no I/O, no shared
+//! state), which makes them cheap to test and to call in a hot loop
+//! over candidate events.
+//!
+//! # Examples
+//!
+//! ```
+//! use event_service::matching::algorithms::name_matching::match_titles;
+//!
+//! // Identical (case-insensitive) titles score 1.0.
+//! assert!(match_titles("Concert", "concert") > 0.99);
+//! // A small typo still scores high thanks to Jaro-Winkler.
+//! assert!(match_titles("Conference", "Conferance") > 0.85);
+//! // An empty title can never match.
+//! assert_eq!(match_titles("", "Concert"), 0.0);
+//! ```
 
 use chrono::{DateTime, Utc};
 use strsim::{jaro_winkler, normalized_levenshtein};
@@ -13,12 +30,18 @@ use crate::models::{Address, Identifier, Location, Party, Reference};
 // Name / title matching
 // ============================================================================
 
+/// Name / title similarity scoring.
 pub mod name_matching {
     use super::*;
 
     /// Score two event titles. Combines case-insensitive
     /// Jaro-Winkler, normalized Levenshtein, and a Soundex phonetic
     /// floor for sound-alike titles.
+    ///
+    /// Returns `0.0` when either side is empty/whitespace, `1.0` for a
+    /// case-insensitive exact match, otherwise the max of the three
+    /// similarity measures (the phonetic floor is `0.85`, applied only
+    /// when the Soundex codes are equal).
     pub fn match_titles(a: &str, b: &str) -> f64 {
         let a = a.trim();
         let b = b.trim();
@@ -68,6 +91,7 @@ pub mod name_matching {
 // Date / time proximity matching
 // ============================================================================
 
+/// Date / time proximity scoring.
 pub mod time_matching {
     use super::*;
 
@@ -126,10 +150,14 @@ pub mod time_matching {
 // Location matching
 // ============================================================================
 
+/// Location matching, dispatched by [`Location`] variant.
 pub mod location_matching {
     use super::*;
 
-    /// Score the best pairwise location match.
+    /// Score the best pairwise location match across two lists.
+    ///
+    /// Returns `0.0` if either list is empty; otherwise the maximum
+    /// [`match_location`] score over the Cartesian product.
     pub fn match_locations(a: &[Location], b: &[Location]) -> f64 {
         if a.is_empty() || b.is_empty() {
             return 0.0;
@@ -146,6 +174,16 @@ pub mod location_matching {
         best
     }
 
+    /// Score a single pair of locations, dispatching on the variant
+    /// combination:
+    ///
+    /// - `Place ↔ Place`: short-circuit `1.0` when both share an
+    ///   external `id`; else `0.4·name + 0.4·address + 0.2·geo`.
+    /// - `PostalAddress ↔ PostalAddress`: [`match_address`].
+    /// - `Place ↔ PostalAddress`: compares the place's address.
+    /// - `Virtual ↔ Virtual`: case-insensitive URL equality.
+    /// - `Text ↔ Text`: title similarity.
+    /// - any other cross-variant pairing: `0.0`.
     pub fn match_location(a: &Location, b: &Location) -> f64 {
         match (a, b) {
             (Location::Place(p1), Location::Place(p2)) => {
@@ -202,6 +240,9 @@ pub mod location_matching {
         postal * W_POSTAL + city * W_CITY + state * W_STATE + street * W_STREET
     }
 
+    /// Compare two postal codes after stripping dashes: exact `1.0`,
+    /// shared 5-digit prefix `0.95`, shared 3-digit prefix `0.70`,
+    /// else `0.0`. Missing on either side scores `0.0`.
     fn match_postal_codes(a: Option<&str>, b: Option<&str>) -> f64 {
         match (a, b) {
             (Some(x), Some(y)) => {
@@ -221,6 +262,8 @@ pub mod location_matching {
         }
     }
 
+    /// Case-insensitive Jaro-Winkler comparison of an optional text
+    /// field (e.g. city, street). Missing on either side scores `0.0`.
     fn match_text_field(a: Option<&str>, b: Option<&str>) -> f64 {
         match (a, b) {
             (Some(x), Some(y)) => {
@@ -236,6 +279,8 @@ pub mod location_matching {
         }
     }
 
+    /// All-or-nothing comparison of an optional field (e.g. state):
+    /// `1.0` for a case-insensitive exact match, else `0.0`.
     fn match_exact_field(a: Option<&str>, b: Option<&str>) -> f64 {
         match (a, b) {
             (Some(x), Some(y)) if x.trim().eq_ignore_ascii_case(y.trim()) => 1.0,
@@ -243,7 +288,8 @@ pub mod location_matching {
         }
     }
 
-    /// Haversine-with-sigmoid-decay proximity, in [0, 1].
+    /// Haversine-with-sigmoid-decay proximity, in `[0, 1]`. Coincident
+    /// points score `1.0`; the score decays with great-circle distance.
     fn geo_proximity(la1: f64, lo1: f64, la2: f64, lo2: f64) -> f64 {
         let r = 6371.0_f64; // Earth radius km
         let dlat = (la2 - la1).to_radians();
@@ -261,10 +307,12 @@ pub mod location_matching {
 // Party (organizer / performer / attendee) matching
 // ============================================================================
 
+/// Party (organizer / performer / attendee) matching.
 pub mod party_matching {
     use super::*;
 
-    /// Score the best pair across two party lists.
+    /// Score the best pair across two party lists. `0.0` when either
+    /// list is empty.
     pub fn match_parties(a: &[Party], b: &[Party]) -> f64 {
         if a.is_empty() || b.is_empty() {
             return 0.0;
@@ -281,6 +329,11 @@ pub mod party_matching {
         best
     }
 
+    /// Score a single pair of parties:
+    ///
+    /// - Different [`PartyKind`](crate::models::PartyKind) → `0.0`.
+    /// - Same external `id` → `1.0` (deterministic short-circuit).
+    /// - Otherwise `max(name similarity, exact-email match)`.
     pub fn match_party(a: &Party, b: &Party) -> f64 {
         if a.kind != b.kind {
             return 0.0;
@@ -303,10 +356,12 @@ pub mod party_matching {
 // Identifier matching
 // ============================================================================
 
+/// Identifier matching (exact + formatting-tolerant).
 pub mod identifier_matching {
     use super::*;
 
-    /// Best pairwise identifier score across two lists.
+    /// Best pairwise identifier score across two lists. `0.0` when
+    /// either list is empty.
     pub fn match_identifiers(a: &[Identifier], b: &[Identifier]) -> f64 {
         if a.is_empty() || b.is_empty() {
             return 0.0;
@@ -323,6 +378,12 @@ pub mod identifier_matching {
         best
     }
 
+    /// Score a single pair of identifiers:
+    ///
+    /// - Different type or system → `0.0`.
+    /// - Identical normalized value → `1.0`.
+    /// - Identical once dashes/spaces are stripped → `0.98`.
+    /// - Otherwise → `0.0`.
     pub fn match_identifier(a: &Identifier, b: &Identifier) -> f64 {
         if a.identifier_type != b.identifier_type || a.system != b.system {
             return 0.0;
@@ -345,9 +406,12 @@ pub mod identifier_matching {
 // Reference matching (about / works)
 // ============================================================================
 
+/// Reference matching for `about` / `works` lists.
 pub mod reference_matching {
     use super::*;
 
+    /// Best pairwise reference score across two lists. `0.0` when
+    /// either list is empty.
     pub fn match_references(a: &[Reference], b: &[Reference]) -> f64 {
         if a.is_empty() || b.is_empty() {
             return 0.0;
@@ -364,6 +428,8 @@ pub mod reference_matching {
         best
     }
 
+    /// Score a single pair of references: shared external `id` →
+    /// `1.0`; otherwise name similarity.
     pub fn match_reference(a: &Reference, b: &Reference) -> f64 {
         if let (Some(i1), Some(i2)) = (a.id, b.id) {
             if i1 == i2 {
@@ -380,28 +446,34 @@ mod tests {
     use crate::models::{Address, Place};
     use chrono::TimeZone;
 
+    /// Build a fixed UTC timestamp for deterministic time tests.
     fn dt(y: i32, mo: u32, d: u32, h: u32) -> DateTime<Utc> {
         Utc.with_ymd_and_hms(y, mo, d, h, 0, 0).unwrap()
     }
 
+    /// Identical titles score ~1.0.
     #[test]
     fn exact_title_match() {
         let s = name_matching::match_titles("Concert", "Concert");
         assert!(s > 0.99);
     }
 
+    /// A one-letter typo still scores above 0.85 (Jaro-Winkler bonus).
     #[test]
     fn fuzzy_title_match() {
         let s = name_matching::match_titles("Annual Conference", "Annual Conferance");
         assert!(s > 0.85, "got {s}");
     }
 
+    /// An empty title on either side scores 0.0.
     #[test]
     fn empty_titles_score_zero() {
         assert_eq!(name_matching::match_titles("", "anything"), 0.0);
         assert_eq!(name_matching::match_titles("anything", ""), 0.0);
     }
 
+    /// The best match across primary + alternate names wins, even
+    /// cross-list (an alias of A matches the primary of B).
     #[test]
     fn name_with_alternates() {
         let s = name_matching::match_name_with_alternates(
@@ -413,24 +485,28 @@ mod tests {
         assert!(s > 0.99);
     }
 
+    /// Same start instant → ~1.0.
     #[test]
     fn exact_start_date_match() {
         let s = time_matching::match_start_dates(dt(2026, 3, 1, 9), dt(2026, 3, 1, 9));
         assert!(s > 0.99);
     }
 
+    /// One hour apart sits near the half-life (~0.5).
     #[test]
     fn close_start_date_match() {
         let s = time_matching::match_start_dates(dt(2026, 3, 1, 9), dt(2026, 3, 1, 10));
         assert!(s > 0.4 && s < 0.6, "got {s}");
     }
 
+    /// A month apart decays to near zero.
     #[test]
     fn distant_start_date_low() {
         let s = time_matching::match_start_dates(dt(2026, 3, 1, 9), dt(2026, 4, 1, 9));
         assert!(s < 0.1, "got {s}");
     }
 
+    /// Window overlap is the Jaccard ratio of the two intervals.
     #[test]
     fn window_overlap() {
         let s = time_matching::match_window_overlap(
@@ -443,6 +519,7 @@ mod tests {
         assert!((s - 0.5).abs() < 0.01, "got {s}");
     }
 
+    /// Two places sharing an external id match deterministically (1.0).
     #[test]
     fn location_place_id_short_circuits() {
         let id = uuid::Uuid::new_v4();
@@ -468,6 +545,7 @@ mod tests {
         );
     }
 
+    /// Identical postal addresses score ~1.0.
     #[test]
     fn location_address_matches() {
         let a = Address {
@@ -484,6 +562,8 @@ mod tests {
         assert!(s > 0.99, "got {s}");
     }
 
+    /// Two virtual locations with the same URL match (1.0) regardless
+    /// of differing display names.
     #[test]
     fn virtual_url_exact_match() {
         let v1 = crate::models::VirtualLocation {
@@ -501,6 +581,7 @@ mod tests {
         assert_eq!(s, 1.0);
     }
 
+    /// Parties sharing an external id match deterministically (1.0).
     #[test]
     fn party_match_by_id_short_circuits() {
         use crate::models::{Party, PartyKind};
@@ -522,6 +603,7 @@ mod tests {
         assert_eq!(party_matching::match_party(&a, &b), 1.0);
     }
 
+    /// A person and an organization never match, even with equal names.
     #[test]
     fn party_kind_mismatch() {
         use crate::models::{Party, PartyKind};
@@ -542,6 +624,7 @@ mod tests {
         assert_eq!(party_matching::match_party(&a, &b), 0.0);
     }
 
+    /// Identical type + system + value scores 1.0.
     #[test]
     fn identifier_exact_match() {
         use crate::models::{Identifier, IdentifierType};
@@ -550,6 +633,7 @@ mod tests {
         assert_eq!(identifier_matching::match_identifier(&a, &b), 1.0);
     }
 
+    /// Values differing only by dashes/spaces score 0.98 (tolerant).
     #[test]
     fn identifier_formatting_difference() {
         use crate::models::{Identifier, IdentifierType};
@@ -559,6 +643,7 @@ mod tests {
         assert!(s > 0.97 && s < 1.0, "got {s}");
     }
 
+    /// Same value but different type scores 0.0.
     #[test]
     fn identifier_type_mismatch() {
         use crate::models::{Identifier, IdentifierType};

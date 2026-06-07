@@ -1,79 +1,99 @@
-# course-matcher — index
+# course-matcher
 
-| Document | Purpose |
+A small, library-friendly Rust crate for pairwise matching of
+course records modelled on [schema.org/Course](https://schema.org/Course).
+
+> **Status.** Stable. Public API + 21 unit tests; Soundex phonetic
+> bonus (`+0.05` on the `name` component, capped at `0.95`) ships
+> as T-6. Service-side bridge — 14 contract tests pinning identifier
+> routing + deterministic short-circuits — lives in the embedding
+> `course-service` crate at
+> [`tests/duplicate_detection.rs`](../course-service-rust-crate/tests/duplicate_detection.rs).
+
+## Quick start
+
+```rust
+use course_matcher::{Course, IdentifierScheme, MatchConfig, MatchingEngine};
+
+let engine = MatchingEngine::new(MatchConfig::default());
+
+let mut a = Course::new("Introduction to Computer Science");
+a.course_code   = Some("CS101".into());
+a.provider_id   = Some("ror-021nxhr62".into());
+a.keywords      = vec!["programming".into(), "algorithms".into()];
+
+let mut b = Course::new("Intro to Computer Science");
+b.course_code   = Some("CS 101".into());
+b.provider_id   = Some("ror-021nxhr62".into());
+
+let result = engine.match_courses(&a, &b);
+assert!(result.is_match);                 // 1.0 — same provider + same course code
+assert!(result.breakdown.deterministic_match);
+```
+
+## Algorithm
+
+Two strategies:
+
+- **Deterministic** — score 1.0 when both records share (a) a value
+  on a deterministic identifier scheme (DOI, Wikidata, LOM, OER,
+  URI, UUID), (b) `provider_id` + `course_code` (normalised), or
+  (c) a `same_as` URL.
+- **Probabilistic** — weighted average over the components both
+  records actually carry. Absent fields don't penalise the score
+  (renormalisation).
+
+Default weights:
+
+| Component | Weight |
 |---|---|
-| [spec.md](spec.md) | Single source of truth — §1–§25 (matcher shape) |
-| [README.md](README.md) | User-facing intro + quick start |
-| [CHANGELOG.md](CHANGELOG.md) | Keep-a-Changelog history |
-| [AGENTS.md](AGENTS.md) | Agent guide |
-| [CLAUDE.md](CLAUDE.md) | Re-export of `AGENTS.md` for Claude Code |
+| Name (Jaro-Winkler, with alternate-name fallbacks) | 0.35 |
+| Provider-scoped course code | 0.15 |
+| Provider (`provider_id` exact / `provider_name` Jaro-Winkler) | 0.15 |
+| Educational level (with adjacent-ladder partial credit) | 0.10 |
+| Keywords (Jaccard on folded set) | 0.10 |
+| Teaches / competencies (Jaccard) | 0.15 |
 
-| AGENTS/ | Purpose |
-|---|---|
-| [AGENTS/index.md](AGENTS/index.md) | Directory index |
-| [AGENTS/spec-driven-development.md](AGENTS/spec-driven-development.md) | SDD discipline |
-| [AGENTS/matching-algorithm.md](AGENTS/matching-algorithm.md) | The algorithm — components, weights, deterministic rules |
-| [AGENTS/normalization.md](AGENTS/normalization.md) | String normalisation rules |
-| [AGENTS/testing.md](AGENTS/testing.md) | Testing strategy |
+Match `is_match` threshold: 0.85. Confidence bands: ≥0.95 High,
+≥0.70 Medium, otherwise Low.
 
-## Quick examples
+Full derivation: [`spec.md`](spec.md) +
+[`AGENTS/matching-algorithm.md`](AGENTS/matching-algorithm.md).
 
-### Identical courses
+## Public surface
 
 ```rust
-use course_matcher::{Course, MatchConfig, MatchingEngine};
-let engine = MatchingEngine::new(MatchConfig::default());
-let a = Course::new("CS101 Introduction to Computer Science");
-let b = Course::new("CS101 Introduction to Computer Science");
-let r = engine.match_courses(&a, &b);
-assert!(r.score >= 0.99);
+use course_matcher::{
+    Course, CourseIdentifier, IdentifierScheme,
+    EducationalLevel, LearningResourceType,
+    MatchingEngine, MatchConfig,
+    MatchResult, MatchBreakdown, Confidence,
+};
 ```
 
-### DOI short-circuit
+## Dependencies (intentionally tiny)
 
-```rust
-use course_matcher::{Course, CourseIdentifier, IdentifierScheme, MatchingEngine, MatchConfig};
-let engine = MatchingEngine::new(MatchConfig::default());
-let mut a = Course::new("Course A");
-let mut b = Course::new("Completely different title");
-a.identifiers.push(CourseIdentifier { scheme: IdentifierScheme::Doi, value: "10.1234/abc".into() });
-b.identifiers.push(CourseIdentifier { scheme: IdentifierScheme::Doi, value: "10.1234/abc".into() });
-let r = engine.match_courses(&a, &b);
-assert_eq!(r.score, 1.0);
-assert!(r.breakdown.deterministic_match);
+- `strsim` for Jaro-Winkler.
+- `unicode-normalization` for NFKC normalisation.
+- `serde` / `serde_json` for round-trip.
+- `thiserror` for the error enum.
+
+No `axum`, no `tokio`, no `tantivy`. Embedding services (e.g.
+[`course-service`](../course-service-rust-crate/)) bring those
+themselves and adapt their richer Course shape down to ours.
+
+## Test + build
+
+```bash
+cargo test --lib       # 21 unit tests (encoder + scoring + normalisation + bonus)
+cargo doc --open       # rustdoc
+
+# Benches live in the embedding service crate so they exercise the
+# adapter + facade path that production calls:
+cd ../course-service-rust-crate && cargo bench
 ```
 
-### Phonetic name bonus (T-6)
+## License
 
-```rust
-use course_matcher::{Course, MatchingEngine, MatchConfig};
-let engine = MatchingEngine::new(MatchConfig::default());
-// "Smyth" and "Smith" both encode to Soundex S530, so name_score
-// gets a +0.05 bonus (capped at 0.95) on top of the underlying
-// Jaro-Winkler. Catherine ↔ Katheryn would NOT get the bonus —
-// Soundex retains the first letter by design.
-let r = engine.match_courses(&Course::new("Smyth"), &Course::new("Smith"));
-assert!(r.breakdown.name_score.unwrap() > 0.85);
-```
-
-### One-to-many — sorted by score
-
-```rust
-let ranked: Vec<(usize, _)> = engine.rank(&query, &candidates);
-// returned sorted by score descending; (index, MatchResult) per candidate
-```
-
-### One-to-many — input order (T-10)
-
-```rust
-// Parity shape with sibling matcher crates: returns Vec<MatchResult>
-// in the same order as `candidates`, no sort, no threshold filter.
-let results = engine.match_one_to_many(&query, &candidates);
-assert_eq!(results.len(), candidates.len());
-```
-
-## See also
-
-- [`../course-service-rust-crate/`](../course-service-rust-crate/) — embedding service
-- [`../course-front-end-with-svelte/`](../course-front-end-with-svelte/) — front-end consumer
-- Sibling matchers: [person](../person-matcher-rust-crate/), [event](../event-matcher-rust-crate/), [place](../place-matcher-rust-crate/), [thing](../thing-matcher-rust-crate/), [worker](../worker-matcher-rust-crate/)
+Dual-licensed under MIT OR Apache-2.0 OR BSD-3-Clause OR
+GPL-2.0-only OR GPL-3.0-only.

@@ -1,4 +1,14 @@
-//! Repository pattern implementations for database operations
+//! Person persistence via the repository pattern.
+//!
+//! [`PersonRepository`] is the storage-agnostic trait the rest of the
+//! service depends on; [`SeaOrmPersonRepository`] is the PostgreSQL
+//! implementation. The implementation maps the rich domain [`Person`](crate::models::Person)
+//! to/from the normalized child tables (names, identifiers, addresses,
+//! contacts, links), wraps multi-table writes in a transaction, performs
+//! soft deletes, and — when configured — publishes a
+//! [`PersonEvent`](crate::streaming::PersonEvent) and writes an audit row
+//! for every mutation. [`AuditContext`] carries who/where provenance
+//! into those audit rows.
 
 use sea_orm::*;
 use sea_orm::sea_query::Expr;
@@ -9,15 +19,22 @@ use crate::models::{Person, HumanName, Address, ContactPoint, Identifier, Person
 use crate::Result;
 use super::models::*;
 
-/// Audit context for tracking user actions
+/// Request provenance attached to audit-log writes.
+///
+/// Defaults to a `"system"` actor with no network metadata; handlers
+/// populate it from the inbound HTTP request when available.
 #[derive(Debug, Clone)]
 pub struct AuditContext {
+    /// Authenticated user id, or `None` for anonymous/system actions.
     pub user_id: Option<String>,
+    /// Originating client IP address, if known.
     pub ip_address: Option<String>,
+    /// Originating `User-Agent` header, if known.
     pub user_agent: Option<String>,
 }
 
 impl Default for AuditContext {
+    /// A `"system"` actor with no IP or user-agent.
     fn default() -> Self {
         Self {
             user_id: Some("system".to_string()),
@@ -27,37 +44,46 @@ impl Default for AuditContext {
     }
 }
 
-/// Person repository trait
+/// Storage-agnostic CRUD + search interface for [`Person`] records.
+///
+/// `Send + Sync` so it can be shared as `Arc<dyn PersonRepository>`
+/// across async handlers.
 #[async_trait::async_trait]
 pub trait PersonRepository: Send + Sync {
-    /// Create a new person
+    /// Persist a new person (and its child rows) and return the stored form.
     async fn create(&self, person: &Person) -> Result<Person>;
 
-    /// Get a person by ID
+    /// Fetch a non-deleted person by id, or `None` if absent/soft-deleted.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Person>>;
 
-    /// Update a person
+    /// Replace a person and all its child rows, returning the new state.
     async fn update(&self, person: &Person) -> Result<Person>;
 
-    /// Delete a person (soft delete)
+    /// Soft-delete a person (sets `deleted_at`; row is retained).
     async fn delete(&self, id: &Uuid) -> Result<()>;
 
-    /// Search persons by name
+    /// Find persons whose family name matches `query` (case-insensitive).
     async fn search(&self, query: &str) -> Result<Vec<Person>>;
 
-    /// List all active persons (non-deleted)
+    /// Page through active, non-deleted persons via `limit`/`offset`.
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Person>>;
 }
 
-/// SeaORM-based person repository implementation
+/// PostgreSQL [`PersonRepository`] backed by SeaORM.
+///
+/// Optionally fans out to an event publisher and audit log; both are set
+/// via the `with_*` builder methods and are no-ops when absent.
 pub struct SeaOrmPersonRepository {
+    /// The SeaORM connection (cheap to clone, internally pooled).
     db: DatabaseConnection,
+    /// Optional sink for [`PersonEvent`](crate::streaming::PersonEvent)s.
     event_publisher: Option<std::sync::Arc<dyn crate::streaming::EventProducer>>,
+    /// Optional audit-trail writer.
     audit_log: Option<std::sync::Arc<super::audit::AuditLogRepository>>,
 }
 
 impl SeaOrmPersonRepository {
-    /// Create a new repository with the given database connection
+    /// Build a repository over `db` with no event/audit sinks attached.
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
             db,
@@ -66,7 +92,7 @@ impl SeaOrmPersonRepository {
         }
     }
 
-    /// Set the event publisher for this repository
+    /// Attach an event publisher; returns `self` for chaining.
     pub fn with_event_publisher(
         mut self,
         publisher: std::sync::Arc<dyn crate::streaming::EventProducer>,
@@ -75,7 +101,7 @@ impl SeaOrmPersonRepository {
         self
     }
 
-    /// Set the audit log repository
+    /// Attach an audit-log repository; returns `self` for chaining.
     pub fn with_audit_log(
         mut self,
         audit_log: std::sync::Arc<super::audit::AuditLogRepository>,
@@ -84,7 +110,7 @@ impl SeaOrmPersonRepository {
         self
     }
 
-    /// Publish an event if publisher is configured
+    /// Publish `event` if a publisher is set; log and swallow any error.
     fn publish_event(&self, event: crate::streaming::PersonEvent) {
         if let Some(ref publisher) = self.event_publisher {
             if let Err(e) = publisher.publish(event) {
@@ -93,7 +119,10 @@ impl SeaOrmPersonRepository {
         }
     }
 
-    /// Log to audit trail if configured
+    /// Write an audit row for `action` if an audit log is configured.
+    ///
+    /// Dispatches to the matching `log_create`/`log_update`/`log_delete`
+    /// helper; unknown actions are ignored. Errors are logged, not raised.
     async fn log_audit(
         &self,
         action: &str,
@@ -138,7 +167,13 @@ impl SeaOrmPersonRepository {
         }
     }
 
-    /// Convert domain Person model to SeaORM active models
+    /// Explode a domain [`Person`] into the SeaORM active models for the
+    /// parent row and each child table.
+    ///
+    /// The primary name gets `is_primary = true`; the first address and
+    /// first contact are flagged primary by position. Enum fields are
+    /// stringified (`{:?}`) except `gender`, which is lowercased to honor
+    /// the DB CHECK constraint.
     fn to_active_models(&self, person: &Person) -> (
         persons::ActiveModel,
         Vec<person_names::ActiveModel>,
@@ -251,7 +286,12 @@ impl SeaOrmPersonRepository {
         (new_person, names, identifiers, addresses, contacts, links)
     }
 
-    /// Convert database models to domain Person model
+    /// Reassemble a domain [`Person`] from its parent row and child rows.
+    ///
+    /// Parses stringified enums back to their domain variants (unknown
+    /// values fall back to `Other`/`Unknown` or are dropped). Errors if no
+    /// primary name is present. Note `tax_id`, `documents`, and
+    /// `emergency_contacts` are not yet persisted and come back empty.
     fn from_db_models(
         &self,
         db_person: persons::Model,
@@ -436,7 +476,8 @@ impl SeaOrmPersonRepository {
         })
     }
 
-    /// Load all associated data for a person
+    /// Fetch every child row (names/identifiers/addresses/contacts/links)
+    /// for one person, in a fixed tuple order.
     async fn load_associations(&self, person_id: &Uuid) -> Result<(
         Vec<person_names::Model>,
         Vec<person_identifiers::Model>,
@@ -475,6 +516,8 @@ impl SeaOrmPersonRepository {
 
 #[async_trait::async_trait]
 impl PersonRepository for SeaOrmPersonRepository {
+    /// Insert the person and all child rows in one transaction, then
+    /// reload, publish a `Created` event, and write a CREATE audit row.
     async fn create(&self, person: &Person) -> Result<Person> {
         let txn = self.db.begin().await?;
 
@@ -531,6 +574,7 @@ impl PersonRepository for SeaOrmPersonRepository {
         Ok(result)
     }
 
+    /// Load a person and its associations, skipping soft-deleted rows.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Person>> {
         let db_person = persons::Entity::find_by_id(*id)
             .filter(persons::Column::DeletedAt.is_null())
@@ -549,6 +593,9 @@ impl PersonRepository for SeaOrmPersonRepository {
             .map(Some)
     }
 
+    /// Update the parent row, then delete-and-reinsert all child rows in
+    /// one transaction (a simple full-replace), publish an `Updated`
+    /// event, and write an UPDATE audit row with the before/after JSON.
     async fn update(&self, person: &Person) -> Result<Person> {
         // Get old values for audit
         let old_person = self.get_by_id(&person.id).await?;
@@ -637,6 +684,8 @@ impl PersonRepository for SeaOrmPersonRepository {
         Ok(result)
     }
 
+    /// Soft-delete by stamping `deleted_at`/`deleted_by`; child rows are
+    /// retained. Publishes a `Deleted` event and writes a DELETE audit row.
     async fn delete(&self, id: &Uuid) -> Result<()> {
         // Get old values for audit
         let old_person = self.get_by_id(id).await?;
@@ -666,6 +715,8 @@ impl PersonRepository for SeaOrmPersonRepository {
         Ok(())
     }
 
+    /// SQL `LIKE` search over lowercased family name; resolves each
+    /// matched person id to a full record. (Tantivy is the richer path.)
     async fn search(&self, query: &str) -> Result<Vec<Person>> {
         let search_pattern = format!("%{}%", query.to_lowercase());
 
@@ -688,6 +739,8 @@ impl PersonRepository for SeaOrmPersonRepository {
         Ok(persons)
     }
 
+    /// Page through active, non-deleted persons, hydrating each to a full
+    /// record. (One follow-up `get_by_id` per row — fine for modest pages.)
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Person>> {
         let db_persons: Vec<persons::Model> = persons::Entity::find()
             .filter(persons::Column::DeletedAt.is_null())

@@ -1,3 +1,10 @@
+//! Criterion benchmarks for the matching layer.
+//!
+//! Covers the individual scoring components (name Jaro-Winkler, geo Haversine
+//! decay, Soundex) and the combined scorer, plus a one-to-many batch to model
+//! the realistic deduplication path of scoring one query against 100
+//! candidates.
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use place_service::matching::name::name_similarity;
 use place_service::matching::geo::geo_similarity;
@@ -8,6 +15,7 @@ use place_service::models::geo::GeoCoordinates;
 use place_service::models::place::Place;
 use place_service::models::place_type::PlaceType;
 
+/// Benchmark name similarity on exact, fuzzy, and unrelated name pairs.
 fn bench_name_similarity(c: &mut Criterion) {
     c.bench_function("name_similarity_exact", |b| {
         b.iter(|| name_similarity(black_box("Central Park"), black_box("Central Park")))
@@ -20,6 +28,7 @@ fn bench_name_similarity(c: &mut Criterion) {
     });
 }
 
+/// Benchmark geo similarity for close and far coordinate pairs.
 fn bench_geo_similarity(c: &mut Criterion) {
     let a = GeoCoordinates::new(40.7829, -73.9654);
     let b = GeoCoordinates::new(48.8584, 2.2945);
@@ -33,6 +42,7 @@ fn bench_geo_similarity(c: &mut Criterion) {
     });
 }
 
+/// Benchmark Soundex encoding on short and long words.
 fn bench_soundex(c: &mut Criterion) {
     c.bench_function("soundex_short", |b| {
         b.iter(|| soundex(black_box("Park")))
@@ -42,6 +52,7 @@ fn bench_soundex(c: &mut Criterion) {
     });
 }
 
+/// Benchmark the full weighted scorer on two rich, near-duplicate places.
 fn bench_full_match(c: &mut Criterion) {
     let mut a = Place::new("Central Park");
     a.place_type = Some(PlaceType::Park);
@@ -72,6 +83,7 @@ fn bench_full_match(c: &mut Criterion) {
     });
 }
 
+/// Benchmark scoring one query against 100 candidates (the dedup path).
 fn bench_batch_matching(c: &mut Criterion) {
     let target = Place::new("Target Place");
     let candidates: Vec<Place> = (0..100)

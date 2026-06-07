@@ -1,4 +1,9 @@
 //! Benchmarks for event validation and normalization.
+//!
+//! Measures the cost of validating a minimal vs. a richly-populated
+//! event (multi-location, organizer, keywords, languages) and the two
+//! boundary-normalization helpers (phone E.164, address
+//! standardization). Run with `cargo bench`.
 
 use chrono::{TimeZone, Utc};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
@@ -6,10 +11,12 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use event_service::models::*;
 use event_service::validation::{normalize_phone, standardize_address, validate_event};
 
+/// Build a minimal event with the given name at a fixed start time.
 fn make_event(name: &str) -> Event {
     Event::new(name, Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap())
 }
 
+/// Benchmark validating a minimal event (name + start only).
 fn bench_validate_simple_event(c: &mut Criterion) {
     let event = make_event("Annual Conference");
     c.bench_function("validate_simple_event", |b| {
@@ -17,6 +24,8 @@ fn bench_validate_simple_event(c: &mut Criterion) {
     });
 }
 
+/// Benchmark validating a richly-populated mixed-mode event (physical
+/// + virtual location, organizer, keywords, language).
 fn bench_validate_rich_event(c: &mut Criterion) {
     let mut event = make_event("Concert");
     event.event_type = EventType::Music;
@@ -56,12 +65,14 @@ fn bench_validate_rich_event(c: &mut Criterion) {
     });
 }
 
+/// Benchmark E.164-style normalization of a US phone number.
 fn bench_normalize_phone(c: &mut Criterion) {
     c.bench_function("normalize_phone_us", |b| {
         b.iter(|| black_box(normalize_phone(black_box("(555) 123-4567"), black_box("1"))));
     });
 }
 
+/// Benchmark address standardization (case + abbreviation expansion).
 fn bench_standardize_address(c: &mut Criterion) {
     let addr = Address {
         use_type: None,

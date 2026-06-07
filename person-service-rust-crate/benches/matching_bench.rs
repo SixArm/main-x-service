@@ -1,4 +1,9 @@
-//! Benchmarks for person matcher algorithms
+//! Criterion benchmarks for the person matching engine.
+//!
+//! Covers the per-field algorithms (name, DOB, gender, address,
+//! phonetic, tax-id, document), the full [`ProbabilisticMatcher`] and
+//! [`DeterministicMatcher`] on a single pair, and `find_matches`
+//! scaling across 10/100/1000 candidates. Run with `cargo bench`.
 
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
 use chrono::{NaiveDate, Utc};
@@ -14,6 +19,7 @@ use person_service::matching::algorithms::{
 use person_service::matching::phonetic;
 use person_service::config::MatchingConfig;
 
+/// Build a minimal [`Person`] with the given family/given names and DOB.
 fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Person {
     let now = Utc::now();
     Person {
@@ -47,6 +53,7 @@ fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) 
     }
 }
 
+/// Build a test [`Person`] that also carries one address.
 fn create_test_person_with_address(
     family: &str,
     given: &str,
@@ -68,6 +75,7 @@ fn create_test_person_with_address(
     person
 }
 
+/// A matching config with a 0.7 threshold for benchmarks.
 fn create_matching_config() -> MatchingConfig {
     MatchingConfig {
         threshold_score: 0.7,
@@ -76,6 +84,7 @@ fn create_matching_config() -> MatchingConfig {
     }
 }
 
+/// Benchmark name matching (fuzzy, exact, family-only, given variants).
 fn bench_name_matching(c: &mut Criterion) {
     let name1 = HumanName {
         use_type: None,
@@ -120,6 +129,7 @@ fn bench_name_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark birth-date matching (exact, off-by-one, missing).
 fn bench_dob_matching(c: &mut Criterion) {
     let dob1 = NaiveDate::from_ymd_opt(1980, 1, 15);
     let dob2 = NaiveDate::from_ymd_opt(1980, 1, 16);
@@ -143,6 +153,7 @@ fn bench_dob_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark gender matching (same vs different).
 fn bench_gender_matching(c: &mut Criterion) {
     c.bench_function("gender_match_same", |b| {
         b.iter(|| {
@@ -157,6 +168,7 @@ fn bench_gender_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark address matching on a near-identical address pair.
 fn bench_address_matching(c: &mut Criterion) {
     let addr1 = Address {
         use_type: None,
@@ -186,6 +198,7 @@ fn bench_address_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark Soundex encoding and phonetic similarity.
 fn bench_phonetic_matching(c: &mut Criterion) {
     c.bench_function("soundex_encode_short", |b| {
         b.iter(|| {
@@ -212,6 +225,8 @@ fn bench_phonetic_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark the full probabilistic matcher: a single pair and
+/// `find_matches` against 10/100/1000 candidates.
 fn bench_full_person_matcher(c: &mut Criterion) {
     let config = create_matching_config();
     let matcher = ProbabilisticMatcher::new(config);
@@ -260,6 +275,7 @@ fn bench_full_person_matcher(c: &mut Criterion) {
     });
 }
 
+/// Benchmark the deterministic (rule-based) matcher on a pair.
 fn bench_deterministic_matching(c: &mut Criterion) {
     let config = create_matching_config();
     let matcher = DeterministicMatcher::new(config);
@@ -275,6 +291,7 @@ fn bench_deterministic_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark tax-id matching (shared id vs missing).
 fn bench_tax_id_matching(c: &mut Criterion) {
     let mut p1 = create_test_person("Smith", "John", None);
     p1.tax_id = Some("123-45-6789".to_string());
@@ -296,6 +313,7 @@ fn bench_tax_id_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark identity-document matching on a matching passport pair.
 fn bench_document_matching(c: &mut Criterion) {
     let doc1 = IdentityDocument {
         document_type: DocumentType::Passport,

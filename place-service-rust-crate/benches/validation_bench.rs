@@ -1,9 +1,16 @@
+//! Criterion benchmarks for the validation layer.
+//!
+//! Measures `validate_place` on a minimal and a fully-populated record (so the
+//! cost of each rule shows up) and `normalize_place` on a record needing
+//! trimming/title-casing.
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use place_service::models::address::PostalAddress;
 use place_service::models::geo::GeoCoordinates;
 use place_service::models::place::Place;
 use place_service::validation::{normalize_place, validate_place};
 
+/// Benchmark validating a minimal (name-only) place.
 fn bench_validate_simple(c: &mut Criterion) {
     let place = Place::new("Simple Place");
     c.bench_function("validate_simple_place", |b| {
@@ -11,6 +18,7 @@ fn bench_validate_simple(c: &mut Criterion) {
     });
 }
 
+/// Benchmark validating a fully-populated place (every rule exercised).
 fn bench_validate_full(c: &mut Criterion) {
     let mut place = Place::new("Full Place");
     place.geo = Some(GeoCoordinates::new(40.7829, -73.9654));
@@ -30,6 +38,7 @@ fn bench_validate_full(c: &mut Criterion) {
     });
 }
 
+/// Benchmark normalizing a place (uses batched setup to exclude clone cost).
 fn bench_normalize(c: &mut Criterion) {
     c.bench_function("normalize_place", |b| {
         b.iter_batched(

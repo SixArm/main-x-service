@@ -7,7 +7,7 @@
 //! `Person` with country-specific identifier slots and explicit
 //! `phone`/`mobile`/`email`/`address` fields.
 //!
-//! [`to_matcher_person`] performs the lossy but well-defined projection from
+//! [`to_matcher_person`](crate::matching::adapter::to_matcher_person) performs the lossy but well-defined projection from
 //! the service shape to the matcher shape so callers can use the canonical
 //! algorithm without rewriting their domain model.
 //!
@@ -41,7 +41,7 @@
 //! | first telecom `Sms` (mobile) | `mobile` |
 //! | first telecom `Email` | `email` |
 //! | `tax_id` | `us_ssn` (default; overridden if a TAX identifier carries a non-US system URI) |
-//! | `identifiers[]` with `IdentifierType` + `system` URI | country-specific slot via [`route_identifier`] |
+//! | `identifiers[]` with `IdentifierType` + `system` URI | country-specific slot via `route_identifier` |
 //! | `documents[]` of type `Passport` | `passport_books` (one per passport) |
 
 use chrono::Datelike;

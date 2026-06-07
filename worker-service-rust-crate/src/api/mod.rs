@@ -1,4 +1,11 @@
-//! API modules for REST, gRPC, and FHIR
+//! API surface for the worker service: REST, gRPC, and FHIR.
+//!
+//! Submodules: [`rest`](crate::api::rest) (the primary Axum JSON API),
+//! [`fhir`](crate::api::fhir) (HL7 FHIR R5 endpoints), and
+//! [`grpc`](crate::api::grpc) (a Tonic stub). This module also defines the
+//! shared [`ApiResponse`](crate::api::ApiResponse)/[`ApiError`](crate::api::ApiError)
+//! envelope every REST handler returns,
+//! giving clients a uniform `{ success, data, error }` shape.
 
 pub mod rest;
 pub mod grpc;
@@ -7,24 +14,30 @@ pub mod fhir;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// Standard API response wrapper
+/// Uniform success/error envelope wrapping every REST response body.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ApiResponse<T> {
+    /// `true` for success responses, `false` when `error` is populated.
     pub success: bool,
+    /// The payload on success; `None` on error.
     pub data: Option<T>,
+    /// The error detail on failure; `None` on success.
     pub error: Option<ApiError>,
 }
 
-/// API error response
+/// Machine- and human-readable error detail carried in [`ApiResponse::error`].
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ApiError {
+    /// Stable error code (e.g. `INTERNAL_ERROR`, `NOT_FOUND`).
     pub code: String,
+    /// Human-readable error message.
     pub message: String,
+    /// Optional structured details (e.g. per-field validation errors).
     pub details: Option<serde_json::Value>,
 }
 
 impl<T> ApiResponse<T> {
-    /// Create a successful response
+    /// Wraps `data` in a successful response (`success: true`, no error).
     pub fn success(data: T) -> Self {
         Self {
             success: true,
@@ -33,7 +46,8 @@ impl<T> ApiResponse<T> {
         }
     }
 
-    /// Create an error response
+    /// Builds an error response (`success: false`, no data) with the given
+    /// code and message and no structured details.
     pub fn error(code: impl Into<String>, message: impl Into<String>) -> Self {
         ApiResponse {
             success: false,
@@ -48,6 +62,8 @@ impl<T> ApiResponse<T> {
 }
 
 impl<T> From<crate::Error> for ApiResponse<T> {
+    /// Converts any [`crate::Error`] into a generic `INTERNAL_ERROR` response
+    /// carrying the error's `Display` text.
     fn from(err: crate::Error) -> Self {
         ApiResponse {
             success: false,

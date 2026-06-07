@@ -1,4 +1,13 @@
-//! Integration tests for REST API endpoints
+//! Integration tests for the REST API endpoints.
+//!
+//! These tests build a real [`Router`](axum::Router) via
+//! [`common::create_test_router`] (which opens a database connection and
+//! search index from the environment config) and drive it with
+//! `tower::ServiceExt::oneshot` requests, asserting on status codes and
+//! decoded [`ApiResponse`] bodies. They require a reachable PostgreSQL
+//! instance (see `docker-compose.test.yml`) and exercise the full
+//! create / get / update / delete / search lifecycle plus the
+//! not-found path.
 
 mod common;
 
@@ -14,7 +23,9 @@ use person_service::{
     api::ApiResponse,
 };
 
+/// `GET /api/v1/health` returns 200 and identifies the service.
 #[tokio::test]
+#[ignore]
 async fn test_health_check() {
     let app = common::create_test_router().await;
 
@@ -39,7 +50,10 @@ async fn test_health_check() {
     assert!(body_str.contains("person-service"));
 }
 
+/// `POST /api/v1/persons` creates a person and assigns a fresh UUID
+/// (ignoring the all-zero id in the payload).
 #[tokio::test]
+#[ignore]
 async fn test_create_person() {
     let app = common::create_test_router().await;
 
@@ -83,7 +97,10 @@ async fn test_create_person() {
     assert!(person.id.to_string() != "00000000-0000-0000-0000-000000000000");
 }
 
+/// Create a person, then `GET /api/v1/persons/{id}` returns the same
+/// record.
 #[tokio::test]
+#[ignore]
 async fn test_create_and_get_person() {
     let app = common::create_test_router().await;
 
@@ -149,7 +166,10 @@ async fn test_create_and_get_person() {
     assert_eq!(retrieved_person.name.family, family_name);
 }
 
+/// Create a person, then `PUT /api/v1/persons/{id}` persists a changed
+/// given-name list.
 #[tokio::test]
+#[ignore]
 async fn test_update_person() {
     let app = common::create_test_router().await;
 
@@ -214,7 +234,10 @@ async fn test_update_person() {
     assert_eq!(updated_person.name.given, vec!["Update", "Modified"]);
 }
 
+/// Create a person, soft-delete it (204), then confirm a subsequent GET
+/// returns 404.
 #[tokio::test]
+#[ignore]
 async fn test_delete_person() {
     let app = common::create_test_router().await;
 
@@ -282,7 +305,10 @@ async fn test_delete_person() {
     assert_eq!(get_response.status(), StatusCode::NOT_FOUND);
 }
 
+/// Create a person, then `GET /api/v1/persons/search` finds it by family
+/// name (after a brief indexing delay).
 #[tokio::test]
+#[ignore]
 async fn test_search_persons() {
     let app = common::create_test_router().await;
 
@@ -341,7 +367,9 @@ async fn test_search_persons() {
     assert!(body_str.contains(&family_name));
 }
 
+/// `GET /api/v1/persons/{id}` for an unknown id returns 404.
 #[tokio::test]
+#[ignore]
 async fn test_get_person_not_found() {
     let app = common::create_test_router().await;
 

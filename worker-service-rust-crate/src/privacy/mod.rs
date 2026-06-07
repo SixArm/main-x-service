@@ -1,12 +1,37 @@
-//! Privacy and data masking utilities
+//! Privacy and data-masking utilities.
 //!
-//! Provides data masking for sensitive fields, access control helpers,
-//! and consent checking for GDPR compliance.
+//! Supports the privacy endpoints:
+//! [`mask_worker`](crate::privacy::mask_worker) redacts sensitive fields for
+//! the masked-view endpoint,
+//! [`export_worker_data`](crate::privacy::export_worker_data) serialises a
+//! full record for GDPR right-of-access, and
+//! [`has_active_consent`](crate::privacy::has_active_consent) gates
+//! purpose-bound processing.
+//!
+//! # Examples
+//!
+//! ```
+//! use worker_service::privacy::mask_worker;
+//! use worker_service::models::{Worker, HumanName, Gender};
+//!
+//! let mut w = Worker::new(
+//!     HumanName { use_type: None, family: "Smith".into(),
+//!         given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+//!     Gender::Male,
+//! );
+//! w.tax_id = Some("123-45-6789".into());
+//! let masked = mask_worker(&w);
+//! assert_eq!(masked.tax_id.as_deref(), Some("***-**-6789"));
+//! // Non-sensitive fields are untouched.
+//! assert_eq!(masked.name.family, "Smith");
+//! ```
 
 use crate::models::Worker;
 
-/// Mask sensitive fields in a worker record for display.
-/// Returns a new worker with masked data.
+/// Returns a clone of `worker` with sensitive fields redacted: the tax ID,
+/// SSN/TAX/passport/driver's-license identifiers, all document numbers, and
+/// phone/SMS/fax telecom values are masked to their last four characters.
+/// Names, addresses, and email are left untouched.
 pub fn mask_worker(worker: &Worker) -> Worker {
     let mut masked = worker.clone();
 
@@ -50,8 +75,10 @@ pub fn mask_worker(worker: &Worker) -> Worker {
     masked
 }
 
-/// Mask a value, keeping only the last `visible_chars` characters visible.
-/// E.g., "123-45-6789" with visible=4 becomes "***-**-6789"
+/// Masks all but the last `visible_chars` characters of `value`, replacing
+/// each masked *alphanumeric* with `'*'` while leaving punctuation in place
+/// (so "123-45-6789" becomes "***-**-6789"). Values no longer than
+/// `visible_chars` are returned unchanged.
 fn mask_value(value: &str, visible_chars: usize) -> String {
     if value.len() <= visible_chars {
         return value.to_string();
@@ -66,7 +93,9 @@ fn mask_value(value: &str, visible_chars: usize) -> String {
     format!("{}{}", masked_part, &value[visible_start..])
 }
 
-/// Check whether a worker has active consent for a given purpose.
+/// Returns `true` when `consents` contains an entry of the given type that is
+/// [`Active`](crate::models::ConsentStatus::Active) and not past its expiry
+/// date (a `None` expiry is treated as never-expiring).
 pub fn has_active_consent(
     consents: &[crate::models::Consent],
     consent_type: crate::models::ConsentType,
@@ -80,8 +109,10 @@ pub fn has_active_consent(
     })
 }
 
-/// Generate a GDPR data export for a worker (right of access).
-/// Returns a JSON value containing all stored worker data.
+/// Serialises the full worker record to a JSON value for a GDPR
+/// right-of-access export. Falls back to `Value::Null` only if serialisation
+/// fails (which, for the always-serializable [`Worker`], does not happen in
+/// practice).
 pub fn export_worker_data(worker: &Worker) -> serde_json::Value {
     serde_json::to_value(worker).unwrap_or(serde_json::Value::Null)
 }
@@ -90,6 +121,7 @@ pub fn export_worker_data(worker: &Worker) -> serde_json::Value {
 mod tests {
     use super::*;
 
+    /// Masking keeps the last N chars and leaves punctuation in place.
     #[test]
     fn test_mask_value() {
         assert_eq!(mask_value("123-45-6789", 4), "***-**-6789");
@@ -97,6 +129,7 @@ mod tests {
         assert_eq!(mask_value("short", 10), "short");
     }
 
+    /// Tax ID and SSN are masked while the family name is preserved.
     #[test]
     fn test_mask_worker() {
         use crate::models::*;
@@ -115,6 +148,7 @@ mod tests {
         assert_eq!(masked.name.family, "Smith");
     }
 
+    /// Masking an email keeps the last four characters visible.
     #[test]
     fn test_mask_email() {
         // mask_value on an email-like string
@@ -123,18 +157,21 @@ mod tests {
         assert!(masked.contains('*'), "Should contain masked characters");
     }
 
+    /// Masking a phone keeps the last four digits visible.
     #[test]
     fn test_mask_phone() {
         let masked = mask_value("+1-555-123-4567", 4);
         assert!(masked.ends_with("4567"), "Last 4 digits should be visible, got {}", masked);
     }
 
+    /// Masking an SSN yields the canonical "***-**-NNNN" form.
     #[test]
     fn test_mask_ssn() {
         let masked = mask_value("123-45-6789", 4);
         assert_eq!(masked, "***-**-6789");
     }
 
+    /// Values no longer than the visible count are returned unchanged.
     #[test]
     fn test_mask_short_value() {
         // Value shorter than visible_chars should be returned as-is
@@ -143,6 +180,7 @@ mod tests {
         assert_eq!(mask_value("ABCD", 4), "ABCD");
     }
 
+    /// The GDPR export is a JSON object containing the core worker fields.
     #[test]
     fn test_export_worker_data_includes_all_fields() {
         use crate::models::*;
@@ -164,6 +202,7 @@ mod tests {
         assert!(obj.contains_key("id"), "Export should contain id");
     }
 
+    /// An active, unexpired consent of the right type is detected.
     #[test]
     fn test_consent_active_check() {
         use crate::models::{Consent, ConsentType, ConsentStatus};
@@ -185,6 +224,7 @@ mod tests {
         assert!(has_active_consent(&[consent], ConsentType::DataProcessing));
     }
 
+    /// A consent past its expiry date is not treated as active.
     #[test]
     fn test_consent_expired_check() {
         use crate::models::{Consent, ConsentType, ConsentStatus};

@@ -1,4 +1,12 @@
-//! Deduplication review queue models
+//! Models for the deduplication review queue.
+//!
+//! Batch deduplication ([`BatchDeduplicationRequest`] →
+//! [`BatchDeduplicationResponse`]) scans the registry for potential duplicate
+//! pairs. Pairs scoring above the auto-merge threshold are merged
+//! automatically; the rest become [`ReviewQueueItem`]s with status
+//! [`ReviewStatus::Pending`] for a human to confirm or reject. The
+//! per-component score breakdown is preserved so reviewers can see *why* a
+//! pair was flagged.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -72,14 +80,20 @@ pub struct BatchDeduplicationRequest {
     pub auto_merge_threshold: f64,
 }
 
+/// Serde default for [`BatchDeduplicationRequest::threshold`] (0.7): the
+/// minimum score at which a pair is considered a potential duplicate.
 fn default_threshold() -> f64 {
     0.7
 }
 
+/// Serde default for [`BatchDeduplicationRequest::max_candidates`] (50): the
+/// cap on how many candidate workers each worker is compared against.
 fn default_max_candidates() -> usize {
     50
 }
 
+/// Serde default for [`BatchDeduplicationRequest::auto_merge_threshold`]
+/// (0.95): the score at or above which a pair is merged without human review.
 fn default_auto_merge_threshold() -> f64 {
     0.95
 }

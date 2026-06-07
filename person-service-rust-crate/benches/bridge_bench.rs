@@ -22,6 +22,8 @@ use person_service::models::{
 
 // -------- fixtures -----------------------------------------------------------
 
+/// A bare-bones person (name + gender + ids/timestamps) for the cheap
+/// projection path.
 fn minimal_person() -> Person {
     let mut p = Person::new(
         HumanName {
@@ -39,6 +41,8 @@ fn minimal_person() -> Person {
     p
 }
 
+/// A fully-populated person (DOB, tax id, 3 identifiers, 3 telecoms, 3
+/// addresses, a passport) that exercises every adapter routing branch.
 fn rich_person() -> Person {
     let mut p = minimal_person();
     p.birth_date = NaiveDate::from_ymd_opt(1980, 5, 15);
@@ -104,6 +108,7 @@ fn rich_person() -> Person {
     p
 }
 
+/// A matching engine with the default configuration.
 fn engine() -> MatchingEngine {
     MatchingEngine::new(MatchConfig::default())
 }
@@ -112,6 +117,7 @@ fn engine() -> MatchingEngine {
 // Group 1: adapter projection cost (minimal vs rich record)
 // =============================================================================
 
+/// Benchmark the adapter projection alone, for minimal vs rich records.
 fn bench_adapter_only(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_adapter_only");
     let minimal = minimal_person();
@@ -137,6 +143,7 @@ fn bench_adapter_only(c: &mut Criterion) {
 // Group 2: end-to-end bridge — adapter + engine
 // =============================================================================
 
+/// Benchmark the full bridge (adapter + engine) on clone pairs.
 fn bench_end_to_end(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_end_to_end");
     let engine = engine();
@@ -171,6 +178,7 @@ fn bench_end_to_end(c: &mut Criterion) {
 // Group 3: one-vs-many — the realistic dedup-on-create path
 // =============================================================================
 
+/// Benchmark one query against 10/50/100 candidates (the dedup path).
 fn bench_one_to_many(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_one_to_many");
     let engine = engine();

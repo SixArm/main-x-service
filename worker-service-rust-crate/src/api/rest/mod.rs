@@ -1,4 +1,10 @@
-//! RESTful API implementation with Axum
+//! REST API wiring: Axum router, OpenAPI document, and server bootstrap.
+//!
+//! [`create_router`] mounts every handler under `/api/v1`, exposes
+//! `/metrics.prom` and the Swagger UI, and applies a permissive CORS layer;
+//! [`serve`] binds the configured host/port and runs it. [`ApiDoc`] is the
+//! utoipa-generated OpenAPI spec. Handlers live in [`handlers`], shared state
+//! in [`state`].
 
 use axum::{
     Router,
@@ -16,7 +22,8 @@ pub use state::AppState;
 
 use crate::Result;
 
-/// API documentation
+/// utoipa OpenAPI document: aggregates every handler path and schema into the
+/// spec served at `/api-docs/openapi.json` and rendered by the Swagger UI.
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -96,7 +103,9 @@ use crate::Result;
 )]
 pub struct ApiDoc;
 
-/// Create the REST API router with application state
+/// Builds the full Axum [`Router`]: API routes nested under `/api/v1`, the
+/// `/metrics.prom` scrape endpoint, the Swagger UI, and a permissive CORS
+/// layer. Shared [`AppState`] is injected into the API routes.
 pub fn create_router(state: AppState) -> Router {
     let api_routes = Router::new()
         // Health
@@ -130,7 +139,9 @@ pub fn create_router(state: AppState) -> Router {
         .layer(CorsLayer::permissive())
 }
 
-/// Start the REST API server
+/// Builds the router and serves it on `config.server.host:port`, logging the
+/// bind address and Swagger UI URL. Returns a [`crate::Error::Api`] if binding
+/// or serving fails.
 pub async fn serve(state: AppState) -> Result<()> {
     let app = create_router(state.clone());
     let addr = format!("{}:{}", state.config.server.host, state.config.server.port);

@@ -26,6 +26,7 @@ use person_service::models::{
 
 // -------- builders -----------------------------------------------------------
 
+/// Build a single-given-name [`HumanName`].
 fn human_name(family: &str, given: &str) -> HumanName {
     HumanName {
         use_type: None,
@@ -36,6 +37,7 @@ fn human_name(family: &str, given: &str) -> HumanName {
     }
 }
 
+/// Build a female [`Person`] with the given name and stable ids/timestamps.
 fn person(family: &str, given: &str) -> Person {
     let mut p = Person::new(human_name(family, given), Gender::Female);
     p.id = Uuid::new_v4();
@@ -44,12 +46,14 @@ fn person(family: &str, given: &str) -> Person {
     p
 }
 
+/// Build a [`person`] that also carries a birth date.
 fn person_with_dob(family: &str, given: &str, dob: NaiveDate) -> Person {
     let mut p = person(family, given);
     p.birth_date = Some(dob);
     p
 }
 
+/// Build a home-use [`ContactPoint`] of the given system and value.
 fn telecom(system: ContactPointSystem, value: &str) -> ContactPoint {
     ContactPoint {
         system,
@@ -58,6 +62,7 @@ fn telecom(system: ContactPointSystem, value: &str) -> ContactPoint {
     }
 }
 
+/// Build a home-use [`Address`] from its parts.
 fn address(line1: &str, city: &str, state: &str, postal: &str, country: &str) -> Address {
     Address {
         use_type: Some(AddressUse::Home),
@@ -70,6 +75,7 @@ fn address(line1: &str, city: &str, state: &str, postal: &str, country: &str) ->
     }
 }
 
+/// Build an [`Identifier`] in the UK NHS-number system.
 fn nhs_identifier(value: &str) -> Identifier {
     Identifier::new(
         IdentifierType::Other,
@@ -78,6 +84,7 @@ fn nhs_identifier(value: &str) -> Identifier {
     )
 }
 
+/// Build a verified passport [`IdentityDocument`].
 fn passport(country: &str, number: &str) -> IdentityDocument {
     IdentityDocument {
         document_type: DocumentType::Passport,
@@ -90,6 +97,7 @@ fn passport(country: &str, number: &str) -> IdentityDocument {
     }
 }
 
+/// A matching engine with the default configuration.
 fn engine() -> MatchingEngine {
     MatchingEngine::default_config()
 }
@@ -98,6 +106,8 @@ fn engine() -> MatchingEngine {
 // Identical / near-duplicate cases
 // =============================================================================
 
+/// Two identical records score ≥ 0.95, classify as a match, and report
+/// High confidence.
 #[test]
 fn identical_clones_score_near_one_high_confidence() {
     let dob = NaiveDate::from_ymd_opt(1980, 5, 15).unwrap();
@@ -111,6 +121,8 @@ fn identical_clones_score_near_one_high_confidence() {
     assert!(result.is_match, "identical clones must classify as match");
 }
 
+/// A single-letter given-name typo (Alice/Alyce) still fuzzy-matches at
+/// ≥ 0.85.
 #[test]
 fn typo_in_given_name_still_matches_fuzzy() {
     let dob = NaiveDate::from_ymd_opt(1980, 5, 15).unwrap();
@@ -127,6 +139,8 @@ fn typo_in_given_name_still_matches_fuzzy() {
     assert!(result.is_match, "fuzzy typo match should classify as match");
 }
 
+/// An off-by-one DOB stays review-worthy (≥ 0.50) but scores strictly
+/// below the exact-DOB case.
 #[test]
 fn off_by_one_day_dob_softly_penalised_not_dropped() {
     let alice_a = person_with_dob("Williams", "Alice", NaiveDate::from_ymd_opt(1980, 5, 15).unwrap());
@@ -160,6 +174,8 @@ fn off_by_one_day_dob_softly_penalised_not_dropped() {
 // Deterministic short-circuits — national identifiers
 // =============================================================================
 
+/// A shared NHS number (differently formatted) triggers a deterministic
+/// match even when names diverge.
 #[test]
 fn shared_nhs_number_with_different_formatting_is_deterministic_match() {
     // Two records with the same UK NHS number but in different textual layouts.
@@ -191,6 +207,8 @@ fn shared_nhs_number_with_different_formatting_is_deterministic_match() {
     );
 }
 
+/// The service `tax_id` shortcut routes to the matcher's US-SSN slot, so
+/// a shared value drives a High-confidence match.
 #[test]
 fn shared_tax_id_default_routes_to_us_ssn() {
     // Service-side `tax_id` is the shortcut field; the adapter routes it to
@@ -210,6 +228,8 @@ fn shared_tax_id_default_routes_to_us_ssn() {
     assert_eq!(result.confidence, Confidence::High);
 }
 
+/// A shared passport (country + number) is a hard duplicate even when
+/// given names differ.
 #[test]
 fn matching_passport_books_short_circuit() {
     // Passport identity is identified by (issuing_country, number); same
@@ -239,6 +259,7 @@ fn matching_passport_books_short_circuit() {
 // Negative cases
 // =============================================================================
 
+/// Unrelated persons score < 0.70 and never classify as a match.
 #[test]
 fn completely_different_persons_score_low_and_do_not_match() {
     let a = person_with_dob(
@@ -263,6 +284,8 @@ fn completely_different_persons_score_low_and_do_not_match() {
     assert_ne!(result.confidence, Confidence::High);
 }
 
+/// A common name with far-apart DOBs and no shared id must not reach the
+/// strict-match band (false-positive prevention).
 #[test]
 fn same_name_different_dob_and_no_shared_identifier_does_not_short_circuit() {
     // Common name like John Smith with no shared ID and different DOB must
@@ -285,6 +308,8 @@ fn same_name_different_dob_and_no_shared_identifier_does_not_short_circuit() {
 // Field-routing pinning (regression guards for the adapter)
 // =============================================================================
 
+/// The adapter routes the first phone and first email telecom into the
+/// matcher's `phone`/`email` slots (later duplicates ignored).
 #[test]
 fn first_phone_email_telecom_make_it_into_matcher() {
     let mut a = person("Smith", "John");
@@ -297,6 +322,8 @@ fn first_phone_email_telecom_make_it_into_matcher() {
     assert_eq!(m.email.as_deref(), Some("john@example.com"));
 }
 
+/// The first address maps to the matcher's `address`; remaining ones go
+/// to `previous_addresses`.
 #[test]
 fn first_address_becomes_address_rest_become_previous() {
     let mut a = person("Smith", "John");
@@ -314,6 +341,8 @@ fn first_address_becomes_address_rest_become_previous() {
     );
 }
 
+/// The adapter renames FHIR `state`→`county` and `postal_code`→
+/// `postcode` rather than dropping them.
 #[test]
 fn state_renames_to_county_in_matcher_address() {
     // Service uses FHIR's "state"; matcher uses British "county". The adapter
@@ -343,6 +372,8 @@ fn state_renames_to_county_in_matcher_address() {
 // Edge cases — sparse records, type-routed identifiers
 // =============================================================================
 
+/// Sparse records do not panic and yield a score in [0, 1]; a mismatched
+/// gender with no shared fields does not classify as a match.
 #[test]
 fn sparse_records_do_not_panic_and_score_in_range() {
     // Sparse records (one nearly empty, one filled, no shared identifier or
@@ -367,6 +398,8 @@ fn sparse_records_do_not_panic_and_score_in_range() {
     );
 }
 
+/// An identifier carrying the US-SSN FHIR system URI routes to the
+/// matcher's `us_ssn` slot (independent of `tax_id`).
 #[test]
 fn typed_ssn_identifier_with_us_system_uri_routes_to_us_ssn() {
     // When the service-side identifier carries the FHIR-style US SSN system
@@ -396,6 +429,8 @@ fn typed_ssn_identifier_with_us_system_uri_routes_to_us_ssn() {
 // Config presets — strict vs lenient threshold behaviour
 // =============================================================================
 
+/// The raw score is config-independent; strict matches are always a
+/// subset of lenient matches for the same pair.
 #[test]
 fn strict_config_demands_more_evidence_than_lenient_for_same_pair() {
     // A near-duplicate that hits the default match threshold may or may not

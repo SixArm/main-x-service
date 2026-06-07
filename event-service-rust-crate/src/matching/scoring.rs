@@ -12,26 +12,43 @@ use crate::models::{Event, IdentifierType};
 
 /// Component weights for [`ProbabilisticScorer`]. Sum is 1.0.
 mod weights {
+    /// Weight of the name/title component.
     pub const NAME: f64 = 0.20;
+    /// Weight of the start-date component.
     pub const START: f64 = 0.20;
+    /// Weight of the end-date component.
     pub const END: f64 = 0.10;
+    /// Weight of the location component.
     pub const LOCATION: f64 = 0.15;
+    /// Weight of the organizer component.
     pub const ORGANIZER: f64 = 0.10;
+    /// Weight of the performer component.
     pub const PERFORMER: f64 = 0.10;
+    /// Weight of the attendee component.
     pub const ATTENDEE: f64 = 0.05;
+    /// Weight of the identifier component.
     pub const IDENTIFIER: f64 = 0.10;
 }
 
-/// Per-component scoring for an event candidate.
+/// Per-component, weighted-sum scoring for an event candidate.
+///
+/// Computes each component score, applies the strong-identifier
+/// short-circuit, then returns the weighted sum (clamped to
+/// `[0.0, 1.0]`).
 pub struct ProbabilisticScorer {
+    /// Matching configuration (threshold and exact/fuzzy scores).
     config: MatchingConfig,
 }
 
 impl ProbabilisticScorer {
+    /// Construct a scorer from the given [`MatchingConfig`].
     pub fn new(config: MatchingConfig) -> Self {
         Self { config }
     }
 
+    /// Score `candidate` against `event`, returning a [`MatchResult`]
+    /// with the overall score and per-component breakdown. An exact
+    /// strong-identifier match short-circuits to `1.0`.
     pub fn calculate_score(&self, event: &Event, candidate: &Event) -> MatchResult {
         let name = name_matching::match_name_with_alternates(
             &event.name,
@@ -88,10 +105,13 @@ impl ProbabilisticScorer {
         }
     }
 
+    /// `true` when `score` meets or exceeds the configured threshold.
     pub fn is_match(&self, score: f64) -> bool {
         score >= self.config.threshold_score
     }
 
+    /// Bucket a score into a [`MatchQuality`] band (Definite ≥ 0.95,
+    /// Probable ≥ threshold, Possible ≥ 0.50, else Unlikely).
     pub fn classify_match(&self, score: f64) -> MatchQuality {
         if score >= 0.95 {
             MatchQuality::Definite
@@ -109,14 +129,21 @@ impl ProbabilisticScorer {
 /// match; otherwise counts satisfied rules (name+time, location,
 /// parties) as a fraction of available rules.
 pub struct DeterministicScorer {
+    /// Held for symmetry with [`ProbabilisticScorer`]; the
+    /// deterministic rules use fixed thresholds, so the config is
+    /// currently unused (hence the leading underscore).
     _config: MatchingConfig,
 }
 
 impl DeterministicScorer {
+    /// Construct a scorer from the given [`MatchingConfig`].
     pub fn new(config: MatchingConfig) -> Self {
         Self { _config: config }
     }
 
+    /// Score `candidate` against `event` by counting satisfied rules
+    /// over available rules. A strong-identifier exact match
+    /// short-circuits to `1.0`.
     pub fn calculate_score(&self, event: &Event, candidate: &Event) -> MatchResult {
         let identifier =
             identifier_matching::match_identifiers(&event.identifiers, &candidate.identifiers);
@@ -199,14 +226,19 @@ impl DeterministicScorer {
         }
     }
 
+    /// `true` when the deterministic score meets the fixed `0.75`
+    /// threshold.
     pub fn is_match(&self, score: f64) -> bool {
         score >= 0.75
     }
 }
 
 /// Whether `a` and `b` share at least one identifier of a "strong"
-/// type (booking / ticket / confirmation / encounter / transaction).
+/// type (booking / ticket / confirmation / encounter / transaction)
+/// with the same system and (case-insensitive, trimmed) value.
 fn shares_strong_identifier_type(a: &Event, b: &Event) -> bool {
+    /// Whether a given identifier type is "strong" enough to
+    /// short-circuit matching on its own.
     fn strong(t: IdentifierType) -> bool {
         matches!(
             t,
@@ -227,15 +259,22 @@ fn shares_strong_identifier_type(a: &Event, b: &Event) -> bool {
     })
 }
 
+/// Confidence band for a match score.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MatchQuality {
+    /// `>= 0.95` — a definite match.
     Definite,
+    /// `>= threshold` — a likely match.
     Probable,
+    /// `>= 0.50` — a potential match worth reviewing.
     Possible,
+    /// Below the possible band — not a match.
     Unlikely,
 }
 
 impl MatchQuality {
+    /// Lowercase string form (`"definite"`, `"probable"`, …) for
+    /// serialization and the review-queue `match_quality` field.
     pub fn as_str(&self) -> &'static str {
         match self {
             MatchQuality::Definite => "definite",
@@ -245,6 +284,8 @@ impl MatchQuality {
         }
     }
 
+    /// `true` for the `Definite` and `Probable` bands — i.e. quality
+    /// levels that count as an actual match.
     pub fn is_match(&self) -> bool {
         matches!(self, MatchQuality::Definite | MatchQuality::Probable)
     }
@@ -256,6 +297,7 @@ mod tests {
     use crate::models::{Event, EventType, Identifier, IdentifierType};
     use chrono::{TimeZone, Utc};
 
+    /// A baseline matching config used by these tests.
     fn config() -> MatchingConfig {
         MatchingConfig {
             threshold_score: 0.85,
@@ -264,12 +306,15 @@ mod tests {
         }
     }
 
+    /// Build a conference event with the given name on a fixed date.
     fn event(name: &str, hour: u32) -> Event {
         let mut e = Event::new(name, Utc.with_ymd_and_hms(2026, 3, 1, hour, 0, 0).unwrap());
         e.event_type = EventType::Conference;
         e
     }
 
+    /// Name + start alone yield a moderate (not high) probabilistic
+    /// score — events need more corroborating signal.
     #[test]
     fn exact_event_scores_above_threshold() {
         let p = ProbabilisticScorer::new(config());
@@ -282,6 +327,8 @@ mod tests {
         assert!(r.score >= 0.40, "got {}", r.score);
     }
 
+    /// A shared booking number forces the score to 1.0 despite
+    /// otherwise unrelated name and time.
     #[test]
     fn booking_number_short_circuits_to_1_0() {
         let p = ProbabilisticScorer::new(config());
@@ -294,6 +341,8 @@ mod tests {
         assert_eq!(r.score, 1.0);
     }
 
+    /// Identical name + start satisfies rule 1, passing the
+    /// deterministic threshold.
     #[test]
     fn deterministic_name_plus_start_passes() {
         let d = DeterministicScorer::new(config());
@@ -304,6 +353,8 @@ mod tests {
         assert!(d.is_match(r.score));
     }
 
+    /// Matching name but very different time fails the deterministic
+    /// rule (start score too low).
     #[test]
     fn deterministic_name_only_fails() {
         let d = DeterministicScorer::new(config());
@@ -313,6 +364,7 @@ mod tests {
         assert!(!d.is_match(r.score), "score was {}", r.score);
     }
 
+    /// Scores map to the expected quality bands at the boundaries.
     #[test]
     fn match_quality_classification() {
         let p = ProbabilisticScorer::new(config());

@@ -1,4 +1,13 @@
-//! Deduplication review queue models
+//! Deduplication review-queue models.
+//!
+//! A batch deduplication scan ([`crate::api::rest::handlers`]) compares
+//! active persons pairwise and emits a [`ReviewQueueItem`] for each pair
+//! scoring above the configured [`threshold`](BatchDeduplicationRequest::threshold).
+//! Pairs above the [`auto_merge_threshold`](BatchDeduplicationRequest::auto_merge_threshold)
+//! are flagged [`ReviewStatus::AutoMerged`]; the rest are
+//! [`ReviewStatus::Pending`] for a human to confirm or reject.
+//! [`BatchDeduplicationRequest`] / [`BatchDeduplicationResponse`] are
+//! the request/response envelope for that scan.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -72,14 +81,17 @@ pub struct BatchDeduplicationRequest {
     pub auto_merge_threshold: f64,
 }
 
+/// serde default for [`BatchDeduplicationRequest::threshold`] (0.7).
 fn default_threshold() -> f64 {
     0.7
 }
 
+/// serde default for [`BatchDeduplicationRequest::max_candidates`] (50).
 fn default_max_candidates() -> usize {
     50
 }
 
+/// serde default for [`BatchDeduplicationRequest::auto_merge_threshold`] (0.95).
 fn default_auto_merge_threshold() -> f64 {
     0.95
 }

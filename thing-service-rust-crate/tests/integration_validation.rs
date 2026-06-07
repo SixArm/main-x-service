@@ -1,7 +1,11 @@
+//! Integration tests for the validation + normalization workflow
+//! ([`validate_thing`] / [`normalize_thing`]) at the create/update boundary.
+
 use thing_service::models::identifier::ThingIdentifier;
 use thing_service::models::thing::Thing;
 use thing_service::validation::{normalize_thing, validate_thing};
 
+/// A valid thing passes validation, then normalizes (trims) cleanly.
 #[test]
 fn test_validate_then_normalize_workflow() {
     let mut thing = Thing::new("  pride and prejudice  ");
@@ -15,6 +19,7 @@ fn test_validate_then_normalize_workflow() {
     assert_eq!(thing.name, "pride and prejudice");
 }
 
+/// An invalid thing reports multiple errors and still normalizes without panic.
 #[test]
 fn test_invalid_thing_does_not_normalize() {
     let mut thing = Thing::new("");
@@ -28,6 +33,7 @@ fn test_invalid_thing_does_not_normalize() {
     normalize_thing(&mut thing);
 }
 
+/// A fully-populated thing stays valid across validate → normalize → validate.
 #[test]
 fn test_full_thing_lifecycle_validation() {
     let mut thing = Thing::new("Pride and Prejudice");

@@ -1,4 +1,9 @@
-//! Common test utilities for integration tests
+//! Shared helpers for the REST integration tests.
+//!
+//! Builds a real [`AppState`] / [`Router`](axum::Router) from the
+//! environment config (database + search index) and provides a
+//! collision-free name generator so concurrently-run tests do not
+//! clash on unique fields.
 
 use person_service::{
     config::Config,

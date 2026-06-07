@@ -1,4 +1,11 @@
-//! Deduplication review queue models
+//! Deduplication review queue models.
+//!
+//! Batch deduplication ([`BatchDeduplicationRequest`] →
+//! [`BatchDeduplicationResponse`]) scans the index for candidate
+//! duplicate pairs. High-confidence pairs may be auto-merged; the rest
+//! become [`ReviewQueueItem`]s awaiting a human decision
+//! ([`ReviewStatus`]). The default thresholds are supplied by the
+//! private `default_*` helpers below.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -72,14 +79,17 @@ pub struct BatchDeduplicationRequest {
     pub auto_merge_threshold: f64,
 }
 
+/// serde default for [`BatchDeduplicationRequest::threshold`].
 fn default_threshold() -> f64 {
     0.7
 }
 
+/// serde default for [`BatchDeduplicationRequest::max_candidates`].
 fn default_max_candidates() -> usize {
     50
 }
 
+/// serde default for [`BatchDeduplicationRequest::auto_merge_threshold`].
 fn default_auto_merge_threshold() -> f64 {
     0.95
 }

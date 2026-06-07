@@ -10,13 +10,15 @@
 //! `Option<String> organizer`, and a `Vec<EventId>` keyed by
 //! `EventIdScheme`.
 //!
-//! [`to_matcher_event`] performs the projection — including:
+//! [`to_matcher_event`](crate::matching::adapter::to_matcher_event)
+//! performs the projection — including:
 //!
 //! - DateTime → RFC 3339 string
 //! - First `Location` → matcher's `Location` struct (variant-aware)
 //! - First organizer name → `organizer`
 //! - Each performer's name → `performers`
-//! - Each `Identifier` → `EventId` (via [`map_identifier_scheme`])
+//! - Each `Identifier` → `EventId` (via
+//!   [`map_identifier_scheme`](crate::matching::adapter::map_identifier_scheme))
 //! - `EventStatus` / `EventAttendanceMode` / `EventType` → matcher enums
 //!
 //! See `agents/share/match.md` and the matcher crate's `spec.md §5–§7` for
@@ -32,8 +34,13 @@ use crate::models::{
     Address as SAddress, Event, EventAttendanceMode, EventStatus, EventType, Location, Party,
 };
 
-/// Convert a service `Event` into an `event_matcher::Event` ready for
+/// Convert a service [`Event`] into an `event_matcher::Event` ready for
 /// `MatchingEngine::match_events` / `deterministic_match`.
+///
+/// Empty / whitespace-only strings are dropped rather than projected,
+/// and only the *first* populated location and the *first* non-empty
+/// organizer name are carried across (the matcher accepts a single
+/// `Location` and a single organizer).
 pub fn to_matcher_event(e: &Event) -> MEvent {
     let mut b = MEvent::builder().name(e.name.trim());
 
@@ -142,6 +149,10 @@ pub fn to_matcher_event(e: &Event) -> MEvent {
     b.build()
 }
 
+/// Return the first non-empty (trimmed) party name from a `Vec<Party>`.
+///
+/// The matcher carries a single `organizer` string, so when the service
+/// side has several parties we pick the first one with a usable name.
 fn first_party_name(parties: &[Party]) -> Option<String> {
     parties
         .iter()
@@ -149,6 +160,10 @@ fn first_party_name(parties: &[Party]) -> Option<String> {
         .find(|s| !s.is_empty())
 }
 
+/// Map the service `EventStatus` to the matcher `EventStatus`.
+///
+/// The matcher has no `Completed` variant, so a completed event is
+/// projected as `EventScheduled` (it ran on schedule).
 fn map_status(s: EventStatus) -> MStatus {
     match s {
         EventStatus::Scheduled => MStatus::EventScheduled,
@@ -162,6 +177,8 @@ fn map_status(s: EventStatus) -> MStatus {
     }
 }
 
+/// Map the service `EventAttendanceMode` to the matcher equivalent
+/// (`Offline` / `Online` / `Mixed`).
 fn map_attendance_mode(m: EventAttendanceMode) -> MMode {
     match m {
         EventAttendanceMode::Offline => MMode::OfflineEventAttendanceMode,
@@ -211,6 +228,12 @@ pub fn map_event_type(t: &EventType) -> MCategory {
     }
 }
 
+/// Project one service [`Location`] variant onto the matcher's single
+/// `Location` struct.
+///
+/// Each variant contributes whatever fields it carries (venue name,
+/// address, geo coords, virtual URL). Returns `None` when the location
+/// is effectively empty, so the caller can skip to the next candidate.
 fn map_location(l: &Location) -> Option<MLocation> {
     let mut m = MLocation::new();
     let mut any = false;
@@ -261,6 +284,11 @@ fn map_location(l: &Location) -> Option<MLocation> {
     if any { Some(m) } else { None }
 }
 
+/// Project a service [`Address`](crate::models::Address) onto the
+/// matcher's `Address`.
+///
+/// Returns `None` when every field is absent. Note the field rename:
+/// the service's `state` becomes the matcher's British `county`.
 fn map_service_address(a: &SAddress) -> Option<MAddress> {
     let any = a.line1.is_some()
         || a.line2.is_some()
@@ -293,6 +321,11 @@ fn map_service_address(a: &SAddress) -> Option<MAddress> {
     Some(m)
 }
 
+/// Convert one service [`Identifier`] into a matcher `EventId`, deriving
+/// the scheme from its type + system URI via [`map_identifier_scheme`].
+///
+/// Returns `None` when the value is empty (matcher `EventId::new`
+/// rejects blank values).
 fn identifier_to_event_id(id: &Identifier) -> Option<MEventId> {
     MEventId::new(map_identifier_scheme(&id.identifier_type, &id.system), id.value.trim())
 }
@@ -359,10 +392,12 @@ mod tests {
     };
     use chrono::{TimeZone, Utc};
 
+    /// Build a minimal service `Event` with a fixed start date for tests.
     fn svc_event(name: &str) -> Event {
         Event::new(name, Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap())
     }
 
+    /// Name, category, status, and start date survive the projection.
     #[test]
     fn round_trip_basic() {
         let mut e = svc_event("Annual Conference");
@@ -375,6 +410,7 @@ mod tests {
         assert!(m.start_date.is_some());
     }
 
+    /// A `Place` location carries its venue name and latitude across.
     #[test]
     fn place_location_maps_to_venue_name_and_geo() {
         let mut e = svc_event("Gig");
@@ -392,6 +428,7 @@ mod tests {
         assert_eq!(loc.latitude, Some(37.8730));
     }
 
+    /// A `Virtual` location carries its URL into `virtual_url`.
     #[test]
     fn virtual_location_maps_to_virtual_url() {
         let mut e = svc_event("Webinar");
@@ -406,6 +443,7 @@ mod tests {
         );
     }
 
+    /// The first organizer's name becomes the matcher's single organizer.
     #[test]
     fn organizer_takes_first_party_name() {
         let mut e = svc_event("Event");
@@ -420,6 +458,8 @@ mod tests {
         assert_eq!(m.organizer.as_deref(), Some("Cal Performances"));
     }
 
+    /// An Eventbrite `system` URI maps to `EventIdScheme::Eventbrite`
+    /// even when the identifier type is the generic `ExternalRef`.
     #[test]
     fn identifier_eventbrite_recognised_via_system_uri() {
         let mut e = svc_event("Event");

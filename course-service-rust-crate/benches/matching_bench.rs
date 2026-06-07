@@ -11,10 +11,14 @@ use course_service::models::{
     Course, CourseIdentifier, EducationalLevel, IdentifierType, LearningResourceType,
 };
 
+/// Matcher config used by every benchmark (threshold 0.85).
 fn cfg() -> MatchingConfig {
     MatchingConfig { threshold_score: 0.85 }
 }
 
+/// Build a richly populated course (every weighted component present) so
+/// the benchmarks exercise the full probabilistic scoring path rather
+/// than a name-only fast case.
 fn populated_course(provider: Uuid, name: &str, code: &str) -> Course {
     let mut c = Course::new(name);
     c.course_code = Some(code.into());
@@ -38,6 +42,7 @@ fn populated_course(provider: Uuid, name: &str, code: &str) -> Course {
     c
 }
 
+/// Benchmark a single full-component probabilistic pair score.
 fn bench_match_pair(c: &mut Criterion) {
     let matcher = CourseMatcher::new(cfg());
     let provider = Uuid::new_v4();
@@ -51,6 +56,8 @@ fn bench_match_pair(c: &mut Criterion) {
     });
 }
 
+/// Benchmark the deterministic short-circuit path (shared DOI), which
+/// should be markedly cheaper than the full weighted sum.
 fn bench_match_deterministic(c: &mut Criterion) {
     let matcher = CourseMatcher::new(cfg());
     let mut a = Course::new("Linear Algebra");
@@ -71,6 +78,8 @@ fn bench_match_deterministic(c: &mut Criterion) {
     });
 }
 
+/// Benchmark ranking one probe against 100 candidates (the fan-out
+/// pattern behind match / dedup endpoints).
 fn bench_rank_100(c: &mut Criterion) {
     let matcher = CourseMatcher::new(cfg());
     let provider = Uuid::new_v4();

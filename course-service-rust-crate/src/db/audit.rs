@@ -19,19 +19,30 @@ use crate::Result;
 /// rest of the API surface.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuditEntry {
+    /// Audit-row id.
     pub id: Uuid,
+    /// Entity kind (e.g. `"course"`, `"course_instance"`).
     pub entity_type: String,
+    /// Affected entity's id.
     pub entity_id: Uuid,
+    /// Operation: `CREATE`, `UPDATE`, or `DELETE`.
     pub action: String,
+    /// Acting user id, if known.
     pub user_id: Option<String>,
+    /// Originating IP address, if known.
     pub user_ip_address: Option<String>,
+    /// Originating user-agent string, if known.
     pub user_agent: Option<String>,
+    /// Pre-change snapshot (absent for creates).
     pub old_values: Option<JsonValue>,
+    /// Post-change snapshot (absent for deletes).
     pub new_values: Option<JsonValue>,
+    /// When the action occurred.
     pub created_at: chrono::DateTime<Utc>,
 }
 
 impl From<audit_log::Model> for AuditEntry {
+    /// Project a persisted `audit_log` row into the public view.
     fn from(m: audit_log::Model) -> Self {
         Self {
             id: m.id,
@@ -48,22 +59,30 @@ impl From<audit_log::Model> for AuditEntry {
     }
 }
 
+/// Request-scoped actor metadata threaded into each audit write.
 #[derive(Debug, Clone, Default)]
 pub struct AuditContext {
+    /// Acting user id, if authenticated.
     pub user_id: Option<String>,
+    /// Originating IP address.
     pub ip_address: Option<String>,
+    /// Originating user-agent string.
     pub user_agent: Option<String>,
 }
 
+/// Repository for writing and querying the `audit_log` table.
 pub struct AuditLogRepository {
+    /// Shared SeaORM connection pool.
     db: DatabaseConnection,
 }
 
 impl AuditLogRepository {
+    /// Wrap an existing connection pool.
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
 
+    /// Record a `CREATE` with only post-change values.
     pub async fn log_create(
         &self,
         entity_type: &str,
@@ -74,6 +93,7 @@ impl AuditLogRepository {
         self.log_action("CREATE", entity_type, entity_id, None, Some(new_values), ctx).await
     }
 
+    /// Record an `UPDATE` with both pre- and post-change values.
     pub async fn log_update(
         &self,
         entity_type: &str,
@@ -93,6 +113,7 @@ impl AuditLogRepository {
         .await
     }
 
+    /// Record a `DELETE` with only pre-change values.
     pub async fn log_delete(
         &self,
         entity_type: &str,
@@ -103,6 +124,7 @@ impl AuditLogRepository {
         self.log_action("DELETE", entity_type, entity_id, Some(old_values), None, ctx).await
     }
 
+    /// Shared insert path for all three log_* convenience methods.
     async fn log_action(
         &self,
         action: &str,

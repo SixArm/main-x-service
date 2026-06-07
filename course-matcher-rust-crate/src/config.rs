@@ -1,3 +1,8 @@
+//! Matching configuration: per-component weights and the probable-match
+//! threshold. [`MatchConfig::default`] pins the canonical weights; the
+//! [`MatchConfig::strict`] and [`MatchConfig::lenient`] presets adjust only the
+//! threshold.
+
 use serde::{Deserialize, Serialize};
 
 /// Per-component weights + the probable-match threshold. Defaults
@@ -7,11 +12,17 @@ pub struct MatchConfig {
     /// Probable-match cutoff (probabilistic strategy). Default 0.85.
     pub threshold: f64,
 
+    /// Weight of the name component (Jaro-Winkler). Default 0.35.
     pub name_weight: f64,
+    /// Weight of the same-provider course-code component. Default 0.15.
     pub course_code_weight: f64,
+    /// Weight of the provider component. Default 0.15.
     pub provider_weight: f64,
+    /// Weight of the educational-level component. Default 0.10.
     pub educational_level_weight: f64,
+    /// Weight of the keywords (Jaccard) component. Default 0.10.
     pub keywords_weight: f64,
+    /// Weight of the teaches / competencies (Jaccard) component. Default 0.15.
     pub teaches_weight: f64,
 }
 

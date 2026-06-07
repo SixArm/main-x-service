@@ -1,4 +1,16 @@
-//! Search functionality using Tantivy
+//! Full-text search over worker records, backed by Tantivy.
+//!
+//! [`SearchEngine`](crate::search::SearchEngine) wraps a
+//! [`WorkerIndex`](crate::search::index::WorkerIndex) and exposes index/search
+//! operations used by the REST search endpoint and by the matching layer's
+//! candidate-blocking step. Indexed fields include the names, birth date,
+//! gender, primary-address components, and identifiers; see
+//! [`index`](crate::search::index) for the schema.
+//!
+//! Searches return worker-ID strings; the caller hydrates full records from
+//! the repository. The index is kept in sync with database writes by the
+//! handlers that call [`index_worker`](crate::search::SearchEngine::index_worker) and
+//! [`delete_worker`](crate::search::SearchEngine::delete_worker).
 
 use tantivy::{
     collector::TopDocs,
@@ -16,30 +28,49 @@ pub mod query;
 
 pub use index::{WorkerIndex, WorkerIndexSchema, IndexStats};
 
-/// Search engine for worker records
+/// Search engine for worker records.
+///
+/// A thin wrapper over [`WorkerIndex`] (the Tantivy index plus reader/writer
+/// handles) that translates [`Worker`] domain records into index documents
+/// and translates query hits back into worker-ID strings. The REST search
+/// endpoint and the matching layer's candidate-blocking step both call into
+/// this type. Construct one per index directory via [`SearchEngine::new`].
 pub struct SearchEngine {
+    /// The underlying Tantivy index, schema, reader, and writer factory.
     index: WorkerIndex,
 }
 
 impl SearchEngine {
-    /// Create a new search engine instance
+    /// Opens the Tantivy index at `index_path`, creating it (and the schema)
+    /// if the directory does not yet hold one. Returns an error if the index
+    /// cannot be created or opened.
     pub fn new<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let index = WorkerIndex::create_or_open(index_path)?;
         Ok(Self { index })
     }
 
-    /// Index a worker record
+    /// Adds a single `worker` to the index and commits immediately so the
+    /// document is durable.
+    ///
+    /// The worker is flattened into the index schema: family name, joined
+    /// given names, full name, birth date (as a string), lower-cased gender,
+    /// the primary address's postal code / city / state, a space-joined
+    /// `type:value` list of identifiers, worker type, and active flag. For
+    /// bulk loads prefer [`index_workers`](Self::index_workers), which commits
+    /// once for the whole batch.
     pub fn index_worker(&self, worker: &Worker) -> Result<()> {
+        // 50 MB writer heap; the writer is dropped at end of scope after commit.
         let mut writer = self.index.writer(50)?;
         let schema = self.index.schema();
 
-        // Build full name
+        // Build full name ("Given Family") for the free-text name field.
         let full_name = worker.full_name();
 
-        // Collect given names
+        // Join the given-name list into a single searchable field.
         let given_names = worker.name.given.join(" ");
 
-        // Collect identifiers
+        // Flatten identifiers to "TYPE:value" tokens so a search for either
+        // the type or the value matches.
         let identifiers: Vec<String> = worker
             .identifiers
             .iter()
@@ -47,7 +78,8 @@ impl SearchEngine {
             .collect();
         let identifiers_str = identifiers.join(" ");
 
-        // Get primary address components
+        // Only the first (primary) address is indexed; missing components
+        // become empty strings rather than absent fields.
         let (postal_code, city, state) = if let Some(addr) = worker.addresses.first() {
             (
                 addr.postal_code.clone().unwrap_or_default(),
@@ -58,7 +90,7 @@ impl SearchEngine {
             (String::new(), String::new(), String::new())
         };
 
-        // Create document
+        // Assemble the Tantivy document from the schema field handles.
         let doc = doc!(
             schema.id => worker.id.to_string(),
             schema.family_name => worker.name.family.clone(),
@@ -83,8 +115,12 @@ impl SearchEngine {
         Ok(())
     }
 
-    /// Bulk index multiple workers
+    /// Indexes a slice of workers in one writer session, committing only once
+    /// at the end. Preferred over repeated [`index_worker`](Self::index_worker)
+    /// calls for initial loads or re-indexing, as a single commit is far
+    /// cheaper than one per document.
     pub fn index_workers(&self, workers: &[Worker]) -> Result<()> {
+        // Larger 100 MB heap for batch throughput.
         let mut writer = self.index.writer(100)?;
         let schema = self.index.schema();
 
@@ -133,12 +169,18 @@ impl SearchEngine {
         Ok(())
     }
 
-    /// Search for workers by query string
+    /// Runs a full-text query over the name and identifier fields and returns
+    /// up to `limit` matching worker-ID strings, ranked by relevance.
+    ///
+    /// `query_str` uses Tantivy's [`QueryParser`] syntax (supports boolean
+    /// operators, field prefixes, etc.). The caller hydrates full [`Worker`]
+    /// records from the repository using the returned IDs. For typo-tolerant
+    /// lookups use [`fuzzy_search`](Self::fuzzy_search).
     pub fn search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
 
-        // Create query parser for name and identifier fields
+        // Search across the free-text name fields and the identifier tokens.
         let query_parser = QueryParser::for_index(
             self.index.index(),
             vec![
@@ -157,6 +199,7 @@ impl SearchEngine {
             .search(&query, &TopDocs::with_limit(limit))
             .map_err(|e| crate::Error::Search(format!("Search failed: {}", e)))?;
 
+        // Resolve each hit's stored `id` field into a worker-ID string.
         let mut worker_ids = Vec::new();
         for (_score, doc_address) in top_docs {
             let retrieved_doc: tantivy::TantivyDocument = searcher
@@ -173,12 +216,17 @@ impl SearchEngine {
         Ok(worker_ids)
     }
 
-    /// Search for workers with fuzzy matching
+    /// Performs a typo-tolerant search on the family name, returning up to
+    /// `limit` worker-ID strings.
+    ///
+    /// Uses a Tantivy [`FuzzyTermQuery`] with a Levenshtein edit distance of
+    /// `2` and prefix matching enabled, so "Smyth" matches "Smith". Useful
+    /// when the input may contain spelling errors.
     pub fn fuzzy_search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
 
-        // Build fuzzy query for family name
+        // Edit distance 2, prefix-enabled, against the family-name field.
         let term = Term::from_field_text(schema.family_name, query_str);
         let fuzzy_query = FuzzyTermQuery::new(term, 2, true);
 
@@ -186,6 +234,7 @@ impl SearchEngine {
             .search(&fuzzy_query, &TopDocs::with_limit(limit))
             .map_err(|e| crate::Error::Search(format!("Fuzzy search failed: {}", e)))?;
 
+        // Resolve each hit's stored `id` field into a worker-ID string.
         let mut worker_ids = Vec::new();
         for (_score, doc_address) in top_docs {
             let retrieved_doc: tantivy::TantivyDocument = searcher
@@ -202,7 +251,14 @@ impl SearchEngine {
         Ok(worker_ids)
     }
 
-    /// Search by name and birth year (for blocking in matching)
+    /// Blocking query for the matching layer: finds candidate workers by a
+    /// fuzzy family-name match, optionally boosted by birth year.
+    ///
+    /// The family name is matched with edit distance 2 (a `Must` clause); when
+    /// `birth_year` is supplied it is added as a `Should` clause so matching
+    /// years rank higher without excluding name-only matches. Returns up to
+    /// `limit` worker-ID strings — a reduced candidate set the matcher then
+    /// scores precisely.
     pub fn search_by_name_and_year(
         &self,
         family_name: &str,
@@ -212,11 +268,12 @@ impl SearchEngine {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
 
-        // Build fuzzy query for family name
+        // Required clause: fuzzy family-name match (edit distance 2).
         let name_term = Term::from_field_text(schema.family_name, family_name);
         let name_query: Box<dyn Query> = Box::new(FuzzyTermQuery::new(name_term, 2, true));
 
-        // If birth year provided, add it to the query
+        // When a birth year is given, OR it in as a `Should` clause so it
+        // boosts ranking but does not filter out name-only matches.
         let final_query: Box<dyn Query> = if let Some(year) = birth_year {
             let year_str = year.to_string();
             let year_query_parser = QueryParser::for_index(
@@ -230,6 +287,7 @@ impl SearchEngine {
                     (Occur::Should, year_query),
                 ]))
             } else {
+                // If the year fails to parse as a query, fall back to name only.
                 name_query
             }
         } else {
@@ -240,6 +298,7 @@ impl SearchEngine {
             .search(final_query.as_ref(), &TopDocs::with_limit(limit))
             .map_err(|e| crate::Error::Search(format!("Search failed: {}", e)))?;
 
+        // Resolve each hit's stored `id` field into a worker-ID string.
         let mut worker_ids = Vec::new();
         for (_score, doc_address) in top_docs {
             let retrieved_doc: tantivy::TantivyDocument = searcher
@@ -256,11 +315,14 @@ impl SearchEngine {
         Ok(worker_ids)
     }
 
-    /// Remove a worker from the index
+    /// Removes the worker whose `id` field equals `worker_id` from the index,
+    /// committing the deletion. Called when a record is soft-deleted or merged
+    /// away so it no longer appears in search results.
     pub fn delete_worker(&self, worker_id: &str) -> Result<()> {
         let mut writer = self.index.writer(50)?;
         let schema = self.index.schema();
 
+        // Delete by exact term on the unique `id` field.
         let term = Term::from_field_text(schema.id, worker_id);
         writer.delete_term(term);
 
@@ -270,17 +332,23 @@ impl SearchEngine {
         Ok(())
     }
 
-    /// Get index statistics
+    /// Returns index statistics (e.g. the live document count) from the
+    /// underlying [`WorkerIndex`].
     pub fn stats(&self) -> Result<IndexStats> {
         self.index.stats()
     }
 
-    /// Optimize the index
+    /// Merges the index segments to reclaim space and improve query speed.
+    /// Delegates to the underlying [`WorkerIndex`].
     pub fn optimize(&self) -> Result<()> {
         self.index.optimize()
     }
 
-    /// Manually reload the index reader (useful for tests to ensure documents are visible)
+    /// Forces the index reader to pick up the latest committed documents.
+    ///
+    /// Tantivy readers are eventually consistent, so a commit is not
+    /// immediately visible to searches. Tests call this after indexing to
+    /// guarantee the just-written documents are searchable.
     pub fn reload(&self) -> Result<()> {
         self.index.reload()
     }
@@ -294,6 +362,8 @@ mod tests {
     use tempfile::TempDir;
     use uuid::Uuid;
 
+    /// Builds a minimal active worker with the given name and optional birth
+    /// date; all other fields are empty/default for focused search tests.
     fn create_test_worker(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Worker {
         Worker {
             id: Uuid::new_v4(),
@@ -327,6 +397,7 @@ mod tests {
         }
     }
 
+    /// Indexing then searching a family name returns that worker's ID.
     #[test]
     fn test_index_and_search_worker() {
         let temp_dir = TempDir::new().unwrap();
@@ -341,6 +412,7 @@ mod tests {
         assert_eq!(results[0], worker.id.to_string());
     }
 
+    /// Fuzzy search tolerates a typo ("Smyth" finds "Smith").
     #[test]
     fn test_fuzzy_search() {
         let temp_dir = TempDir::new().unwrap();
@@ -356,6 +428,7 @@ mod tests {
         assert_eq!(results[0], worker.id.to_string());
     }
 
+    /// Bulk indexing three workers yields a document count of three.
     #[test]
     fn test_bulk_indexing() {
         let temp_dir = TempDir::new().unwrap();
@@ -374,6 +447,7 @@ mod tests {
         assert_eq!(stats.num_docs, 3);
     }
 
+    /// Deleting an indexed worker removes it from subsequent search results.
     #[test]
     fn test_delete_worker() {
         let temp_dir = TempDir::new().unwrap();
@@ -393,6 +467,7 @@ mod tests {
         assert_eq!(results.len(), 0);
     }
 
+    /// Name-plus-year blocking returns the matching worker's ID.
     #[test]
     fn test_search_by_name_and_year() {
         let temp_dir = TempDir::new().unwrap();

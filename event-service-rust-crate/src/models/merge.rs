@@ -1,4 +1,11 @@
-//! Record merge models
+//! Record merge models.
+//!
+//! When two events are confirmed duplicates, one survives (the *main*
+//! record) and the other is soft-deleted. A [`MergeRequest`] drives the
+//! operation, a [`MergeResponse`] reports the result, and a
+//! [`MergeRecord`] is persisted as an audit-able history entry holding a
+//! snapshot of the transferred data. See `agents/share/merge.md` for
+//! the workflow.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -24,11 +24,15 @@ pub use course_matcher as matcher_lib;
 /// Wraps `course_matcher::MatchingEngine` with the service's
 /// configured threshold.
 pub struct CourseMatcher {
+    /// The underlying canonical matching engine.
     engine: MatchingEngine,
+    /// The `is_match` cut-off score, mirrored from `MatchingConfig`.
     threshold: f64,
 }
 
 impl CourseMatcher {
+    /// Build a matcher from the service's [`MatchingConfig`], seeding the
+    /// underlying engine's threshold from `threshold_score`.
     pub fn new(config: MatchingConfig) -> Self {
         let mut cfg = MatchConfig::default();
         cfg.threshold = config.threshold_score;
@@ -38,6 +42,7 @@ impl CourseMatcher {
         }
     }
 
+    /// The configured `is_match` threshold score.
     pub fn threshold(&self) -> f64 {
         self.threshold
     }
@@ -63,6 +68,11 @@ impl CourseMatcher {
     }
 }
 
+/// Translate a `course_matcher::MatchResult` into the service-side
+/// [`MatchResult`], mapping the confidence enum and copying each
+/// per-component score across. `identifier_score` is left `None`
+/// because the matcher folds identifier matches into the deterministic
+/// short-circuit rather than a weighted component.
 fn from_matcher_result(r: course_matcher::MatchResult) -> MatchResult {
     MatchResult {
         score: r.score,
@@ -89,29 +99,48 @@ fn from_matcher_result(r: course_matcher::MatchResult) -> MatchResult {
 /// REST handlers can pass it straight through without translation.
 #[derive(Debug, Clone, Default)]
 pub struct MatchResult {
+    /// Overall match score in `[0.0, 1.0]`.
     pub score: f64,
+    /// Whether `score` met or exceeded the configured threshold.
     pub is_match: bool,
+    /// Coarse confidence band derived from `score`.
     pub confidence: MatchConfidence,
+    /// Per-component score breakdown.
     pub breakdown: MatchBreakdown,
 }
 
+/// Coarse confidence band for a [`MatchResult`], mirroring
+/// `course_matcher::Confidence`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MatchConfidence {
+    /// Strong match.
     High,
+    /// Plausible match warranting review.
     Medium,
+    /// Weak match. The default.
     #[default]
     Low,
 }
 
+/// Per-component scores behind an overall [`MatchResult`]. Each field is
+/// `None` when neither record supplied the corresponding data.
 #[derive(Debug, Clone, Default, Serialize, ToSchema)]
 pub struct MatchBreakdown {
+    /// Course-name similarity (Jaro-Winkler).
     pub name_score: Option<f64>,
+    /// Provider-scoped course-code similarity.
     pub course_code_score: Option<f64>,
+    /// Provider identity similarity.
     pub provider_score: Option<f64>,
+    /// Educational-level agreement.
     pub educational_level_score: Option<f64>,
+    /// Keyword-set Jaccard overlap.
     pub keywords_score: Option<f64>,
+    /// `teaches`-set Jaccard overlap.
     pub teaches_score: Option<f64>,
+    /// Identifier component; unused (folded into `deterministic_match`).
     pub identifier_score: Option<f64>,
+    /// Whether a deterministic identifier short-circuit fired.
     pub deterministic_match: bool,
 }
 
@@ -121,10 +150,12 @@ mod tests {
     use crate::config::MatchingConfig;
     use crate::models::{Course, CourseIdentifier, IdentifierType};
 
+    /// Test fixture: a matching config at the default 0.85 threshold.
     fn cfg() -> MatchingConfig {
         MatchingConfig { threshold_score: 0.85 }
     }
 
+    /// Two identical courses score near 1.0 and are flagged as a match.
     #[test]
     fn identical_records_score_one() {
         let m = CourseMatcher::new(cfg());
@@ -135,6 +166,7 @@ mod tests {
         assert!(r.is_match);
     }
 
+    /// A shared DOI short-circuits scoring to 1.0 even when titles differ.
     #[test]
     fn doi_short_circuits_to_one() {
         let m = CourseMatcher::new(cfg());
@@ -153,6 +185,7 @@ mod tests {
         assert!((r.score - 1.0).abs() < 1e-9);
     }
 
+    /// `find_matches` returns candidates ranked by descending score.
     #[test]
     fn find_matches_orders_by_score() {
         let m = CourseMatcher::new(cfg());

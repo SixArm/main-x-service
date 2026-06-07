@@ -1,3 +1,7 @@
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use event_matcher::{
     Address, Event, EventCategory, EventId, EventIdScheme, Location, MatchConfig, MatchingEngine,
 };

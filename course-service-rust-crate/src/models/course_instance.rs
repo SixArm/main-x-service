@@ -9,8 +9,15 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+/// A specific scheduled offering of a [`Course`](crate::models::course::Course).
+///
+/// Persisted in the `course_instances` table and surfaced under the
+/// `/api/courses/{id}/instances` sub-resource. Constructed from raw
+/// input without validation; `crate::validation::validate_instance`
+/// enforces FR-24 + FR-26..FR-28.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CourseInstance {
+    /// Server-generated UUID. Defaults to a fresh v4 on missing input.
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
     /// FK back to the owning `Course`.
@@ -53,37 +60,52 @@ pub struct CourseInstance {
     #[serde(default)]
     pub enrolled_count: Option<u32>,
 
-    /// Enrollment opens / closes — ISO 8601 in UTC.
+    /// Enrollment window opens — ISO 8601 in UTC. Validated to be ≤
+    /// [`enrollment_closes`](Self::enrollment_closes) (FR-27).
     #[serde(default)]
     pub enrollment_opens: Option<DateTime<Utc>>,
+    /// Enrollment window closes — ISO 8601 in UTC.
     #[serde(default)]
     pub enrollment_closes: Option<DateTime<Utc>>,
 
+    /// Created server-side on insert.
     #[serde(default = "Utc::now")]
     pub created_at: DateTime<Utc>,
+    /// Updated server-side on insert and update.
     #[serde(default = "Utc::now")]
     pub updated_at: DateTime<Utc>,
 }
 
-/// schema.org/CourseInstance.courseMode.
+/// schema.org/CourseInstance.courseMode — how the offering is delivered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CourseMode {
+    /// Delivered fully online.
     Online,
+    /// Delivered in person at a physical location.
     Onsite,
+    /// Mix of online and onsite delivery.
     Blended,
+    /// Learner-paced, no fixed schedule.
     SelfPaced,
 }
 
+/// Lifecycle state of a single [`CourseInstance`] offering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CourseInstanceStatus {
+    /// Planned but enrollment has not yet opened. The default state.
     #[default]
     Scheduled,
+    /// Currently accepting enrollments.
     EnrollmentOpen,
+    /// Enrollment window has closed; offering not yet started.
     EnrollmentClosed,
+    /// Offering is underway.
     InProgress,
+    /// Offering has finished.
     Completed,
+    /// Offering was cancelled.
     Cancelled,
 }
 
@@ -93,8 +115,11 @@ pub enum CourseInstanceStatus {
 /// offerings.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Schedule {
+    /// Window start. Validated to be ≤ [`end_date`](Self::end_date)
+    /// when both are present (FR-26).
     #[serde(default)]
     pub start_date: Option<DateTime<Utc>>,
+    /// Window end.
     #[serde(default)]
     pub end_date: Option<DateTime<Utc>>,
     /// IANA tz string (storage is UTC).
@@ -109,11 +134,16 @@ pub struct Schedule {
     pub sessions: Vec<Session>,
 }
 
+/// One explicit meeting time within a [`Schedule`], for offerings whose
+/// cadence isn't easily described by a `recurrence` rule.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Session {
+    /// When the session begins (UTC).
     pub start: DateTime<Utc>,
+    /// When the session ends (UTC); `None` if open-ended / unknown.
     #[serde(default)]
     pub end: Option<DateTime<Utc>>,
+    /// Optional human-readable label (e.g. "Week 1: Orientation").
     #[serde(default)]
     pub label: Option<String>,
 }

@@ -1,4 +1,12 @@
-//! Consent management models
+//! Consent management models (GDPR / privacy).
+//!
+//! A [`Consent`] record captures one grant of permission by a worker for a
+//! specific [`ConsentType`] (data processing, sharing, marketing, research,
+//! emergency access). Its [`ConsentStatus`] tracks the lifecycle —
+//! [`Active`](ConsentStatus::Active), [`Revoked`](ConsentStatus::Revoked), or
+//! [`Expired`](ConsentStatus::Expired) — and the dates record when each
+//! transition happened. The privacy layer (`crate::privacy`) consults these
+//! records before sharing or processing data.
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -63,7 +71,8 @@ pub struct Consent {
     /// How consent was obtained (e.g., "written", "electronic", "verbal")
     pub method: Option<String>,
 
-    /// Record timestamps
+    /// When this consent record was created.
     pub created_at: DateTime<Utc>,
+    /// When this consent record was last updated.
     pub updated_at: DateTime<Utc>,
 }

@@ -1,7 +1,17 @@
+//! Integration tests for the service-side probabilistic matcher
+//! ([`compute_match`]).
+//!
+//! These exercise the public scoring pipeline end to end against realistic
+//! book/software fixtures: exact duplicates, name typos, unrelated records,
+//! deterministic ISBN/DOI short-circuits, batch ranking, and `same_as`
+//! contribution.
+
 use thing_service::matching::scoring::{compute_match, MatchConfidence, MatchWeights};
 use thing_service::models::identifier::ThingIdentifier;
 use thing_service::models::thing::Thing;
 
+/// Build a book-shaped [`Thing`] from optional description / ISBN / url
+/// parts, for terse fixture construction in the tests below.
 fn book(name: &str, description: Option<&str>, isbn: Option<&str>, url: Option<&str>) -> Thing {
     let mut t = Thing::new(name);
     t.description = description.map(String::from);
@@ -12,6 +22,7 @@ fn book(name: &str, description: Option<&str>, isbn: Option<&str>, url: Option<&
     t
 }
 
+/// An exact clone scores Certain (near 1.0).
 #[test]
 fn test_exact_duplicate_detection() {
     let a = book(
@@ -26,6 +37,7 @@ fn test_exact_duplicate_detection() {
     assert_eq!(result.confidence, MatchConfidence::Certain);
 }
 
+/// A name typo with matching description still scores as a probable match.
 #[test]
 fn test_typo_in_name_still_matches() {
     let a = book("Pride and Prejudice", Some("A novel by Jane Austen"), None, None);
@@ -34,6 +46,7 @@ fn test_typo_in_name_still_matches() {
     assert!(result.score > 0.85, "Expected probable, got {}", result.score);
 }
 
+/// Two unrelated books score low and are not classified as a match.
 #[test]
 fn test_completely_different_things() {
     let a = book(
@@ -56,6 +69,7 @@ fn test_completely_different_things() {
     ));
 }
 
+/// Same name but diverging descriptions: name dominates, description scores lower.
 #[test]
 fn test_same_name_different_descriptions() {
     let a = book("Programming Manual", Some("Concise reference for new readers."), None, None);
@@ -78,6 +92,7 @@ fn test_same_name_different_descriptions() {
     );
 }
 
+/// A shared ISBN forces 1.0 even when names differ (translations).
 #[test]
 fn test_isbn_deterministic_overrides_name_mismatch() {
     let mut a = Thing::new("Pride and Prejudice");
@@ -89,6 +104,7 @@ fn test_isbn_deterministic_overrides_name_mismatch() {
     assert!(result.breakdown.deterministic_match);
 }
 
+/// A shared DOI forces 1.0 even when names differ (preprint vs final).
 #[test]
 fn test_doi_deterministic_overrides_name_mismatch() {
     let mut a = Thing::new("Original paper");
@@ -100,6 +116,7 @@ fn test_doi_deterministic_overrides_name_mismatch() {
     assert!(result.breakdown.deterministic_match);
 }
 
+/// With only names present, an exact name match scores very high.
 #[test]
 fn test_matching_with_name_only() {
     let a = Thing::new("The Linux Kernel");
@@ -108,6 +125,7 @@ fn test_matching_with_name_only() {
     assert!(result.score > 0.95, "Score: {}", result.score);
 }
 
+/// Ranking candidates by score puts the exact match first and orders the rest.
 #[test]
 fn test_batch_matching_multiple_candidates() {
     let target = book(
@@ -137,6 +155,7 @@ fn test_batch_matching_multiple_candidates() {
     assert!(results[1].score > results[2].score);
 }
 
+/// A shared `same_as` URL contributes a perfect same_as component score.
 #[test]
 fn test_same_as_url_contributes() {
     let mut a = Thing::new("Linux");

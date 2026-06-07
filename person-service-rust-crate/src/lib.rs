@@ -15,25 +15,49 @@
 //! - Record merging and deduplication
 //! - Distributed tracing and observability via OpenTelemetry
 
+// Always start with high quality coding conventions.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::clippy::pedantic)]
+
+// When we build for MUSL static, use faster memory allocator.
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 // Module declarations
+/// REST, FHIR R5, and gRPC API layers plus shared response envelopes.
 pub mod api;
+/// Configuration structs and environment/`.env` loading.
 pub mod config;
+/// PostgreSQL persistence: SeaORM entities, repositories, audit log.
 pub mod db;
+/// Crate-wide [`Error`] enum and [`Result`] alias.
 pub mod error;
+/// Probabilistic and deterministic person matching engines.
 pub mod matching;
+/// Prometheus metric definitions and the text-exposition surface.
 pub mod metrics;
+/// Domain models (Person, Identifier, Organization, Consent, …).
 pub mod models;
+/// OpenTelemetry/tracing initialization and custom metrics.
 pub mod observability;
+/// Data masking, GDPR export, and consent checking.
 pub mod privacy;
+/// Tantivy full-text search engine and index.
 pub mod search;
+/// Event streaming (PersonEvent, producers, consumers).
 pub mod streaming;
+/// Data-quality validation, normalization, and standardization.
 pub mod validation;
 
 // Re-exports
 pub use error::{Error, Result};
 
+/// Smoke tests for the crate's public surface.
 #[cfg(test)]
 mod tests {
+    /// Verify key public types/aliases are reachable from the crate root.
     #[test]
     fn test_module_imports() {
         // Verify key types are accessible

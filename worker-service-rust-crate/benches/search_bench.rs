@@ -1,4 +1,9 @@
-//! Benchmarks for worker search engine
+//! Criterion benchmarks for the Tantivy-backed search engine.
+//!
+//! Covers single and bulk indexing, several query shapes (exact, larger limit,
+//! fuzzy, name+year, no-results) over a 1000-worker index, and delete. Each
+//! engine is built in a [`TempDir`] so runs are isolated and leave no on-disk
+//! state. Run with `cargo bench`.
 
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
 use chrono::{NaiveDate, Utc};
@@ -8,6 +13,7 @@ use uuid::Uuid;
 use worker_service::models::*;
 use worker_service::search::SearchEngine;
 
+/// Builds a minimal indexable [`Worker`] fixture for the search benchmarks.
 fn create_test_worker(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Worker {
     let now = Utc::now();
     Worker {
@@ -52,6 +58,7 @@ const FAMILY_NAMES: &[&str] = &[
     "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson",
 ];
 
+/// Given-name pool for generating realistic test data.
 const GIVEN_NAMES: &[&str] = &[
     "James", "Robert", "John", "Michael", "David",
     "William", "Richard", "Joseph", "Thomas", "Charles",
@@ -59,6 +66,7 @@ const GIVEN_NAMES: &[&str] = &[
     "Elizabeth", "Susan", "Jessica", "Sarah", "Karen",
 ];
 
+/// Benchmarks indexing one worker into a fresh index.
 fn bench_index_single_worker(c: &mut Criterion) {
     let temp_dir = TempDir::new().unwrap();
     let engine = SearchEngine::new(temp_dir.path()).unwrap();
@@ -71,6 +79,7 @@ fn bench_index_single_worker(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks bulk-indexing 50 workers (fresh index per iteration via setup).
 fn bench_index_bulk_workers(c: &mut Criterion) {
     let workers_50: Vec<Worker> = (0..50)
         .map(|i| {
@@ -94,6 +103,8 @@ fn bench_index_bulk_workers(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks the main query shapes (exact, larger limit, fuzzy, name+year,
+/// no-results) against a pre-built 1000-worker index.
 fn bench_search_queries(c: &mut Criterion) {
     // Set up index with 1000 workers
     let temp_dir = TempDir::new().unwrap();
@@ -142,6 +153,7 @@ fn bench_search_queries(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks deleting a worker from the index (fresh index per iteration).
 fn bench_delete_worker(c: &mut Criterion) {
     c.bench_function("delete_and_reindex_worker", |b| {
         b.iter_with_setup(

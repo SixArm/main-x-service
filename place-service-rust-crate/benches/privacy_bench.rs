@@ -1,8 +1,14 @@
+//! Criterion benchmarks for the privacy layer.
+//!
+//! Measures `mask_place` (rich vs. minimal record) and `gdpr_export` (single
+//! record and a batch of 100), the latter dominated by Serde serialization.
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use place_service::models::geo::GeoCoordinates;
 use place_service::models::place::Place;
 use place_service::privacy::{gdpr_export, mask_place};
 
+/// Benchmark masking a record with phone, fax, and geo set.
 fn bench_mask_place(c: &mut Criterion) {
     let mut place = Place::new("Benchmark Place");
     place.telephone = Some("+1-555-867-5309".into());
@@ -14,6 +20,7 @@ fn bench_mask_place(c: &mut Criterion) {
     });
 }
 
+/// Benchmark masking a minimal record (no sensitive fields).
 fn bench_mask_place_minimal(c: &mut Criterion) {
     let place = Place::new("Minimal Place");
     c.bench_function("mask_place_minimal", |b| {
@@ -21,6 +28,7 @@ fn bench_mask_place_minimal(c: &mut Criterion) {
     });
 }
 
+/// Benchmark a single-record GDPR JSON export.
 fn bench_gdpr_export(c: &mut Criterion) {
     let mut place = Place::new("Export Place");
     place.telephone = Some("+1-555-867-5309".into());
@@ -32,6 +40,7 @@ fn bench_gdpr_export(c: &mut Criterion) {
     });
 }
 
+/// Benchmark GDPR-exporting a batch of 100 records.
 fn bench_gdpr_export_batch(c: &mut Criterion) {
     let places: Vec<Place> = (0..100)
         .map(|i| {

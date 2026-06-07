@@ -1,3 +1,7 @@
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use chrono::NaiveDate;
 use person_matcher::{Address, Gender, MatchConfig, MatchingEngine, Person};
 

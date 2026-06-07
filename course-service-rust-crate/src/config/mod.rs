@@ -8,51 +8,79 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Top-level service configuration, one field per concern. Built by
+/// [`Config::from_env`] (env → `.env` → [`Default`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+    /// HTTP / gRPC bind settings.
     pub server: ServerConfig,
+    /// PostgreSQL connection settings.
     pub database: DatabaseConfig,
+    /// Tantivy search-index settings.
     pub search: SearchConfig,
+    /// Matcher threshold settings.
     pub matching: MatchingConfig,
+    /// Tracing / OpenTelemetry settings.
     pub observability: ObservabilityConfig,
+    /// Event-streaming settings.
     pub streaming: StreamingConfig,
 }
 
+/// Network bind configuration for the HTTP and gRPC servers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
+    /// Bind address (e.g. `0.0.0.0`).
     pub host: String,
+    /// REST/HTTP listen port.
     pub port: u16,
+    /// gRPC listen port.
     pub grpc_port: u16,
 }
 
+/// PostgreSQL connection-pool configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
+    /// Connection URL (`postgres://…`).
     pub url: String,
+    /// Maximum pooled connections.
     pub max_connections: u32,
+    /// Minimum idle pooled connections.
     pub min_connections: u32,
 }
 
+/// Tantivy full-text index configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchConfig {
+    /// Filesystem path for the on-disk index.
     pub index_path: String,
+    /// Writer/reader cache budget in megabytes.
     pub cache_size_mb: usize,
 }
 
+/// Matcher tuning shared with [`crate::matching::CourseMatcher`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchingConfig {
+    /// `is_match` cut-off score in `[0.0, 1.0]`.
     pub threshold_score: f64,
 }
 
+/// Observability (tracing + OTLP export) configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservabilityConfig {
+    /// `service.name` resource attribute.
     pub service_name: String,
+    /// OTLP collector endpoint.
     pub otlp_endpoint: String,
+    /// `tracing-subscriber` env-filter directive.
     pub log_level: String,
 }
 
+/// Event-streaming publisher configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamingConfig {
+    /// Broker URL (used by the deferred Fluvio publisher).
     pub broker_url: String,
+    /// Topic to publish course events to.
     pub topic: String,
 }
 
@@ -137,6 +165,10 @@ impl Config {
     }
 }
 
+/// Parse environment variable `name` into `T`, returning `Ok(None)` when
+/// the variable is unset and `Err(Error::Config)` when it is set but
+/// fails to parse. Keeps `from_env` free of repeated parse-and-map
+/// boilerplate.
 fn parse_env<T: std::str::FromStr>(name: &str) -> crate::Result<Option<T>>
 where
     T::Err: std::fmt::Display,

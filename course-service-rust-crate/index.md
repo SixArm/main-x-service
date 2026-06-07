@@ -1,114 +1,145 @@
-# Course Service — index
+# Course Service
 
-Navigation aid + worked examples. The behavioural source of truth is
-[`spec.md`](spec.md); deep references live in [`AGENTS/`](AGENTS/).
+A registry of **course identities** based on
+[schema.org/Course](https://schema.org/Course). The Course Service is
+the abstract template (CS101 — Introduction to Computer Science);
+its `CourseInstance` sub-resource is the specific offering (CS101,
+Fall 2026, Prof. Smith, in-person). One course → many instances.
 
-## Top-level documents
+Sits between the [Thing Service](../thing-service-rust-crate/)
+(anything with an identity) and the
+[Event Service](../event-service-rust-crate/) (occurrences with
+locations and parties).
 
-| Document | Purpose |
-|---|---|
-| [spec.md](spec.md) | Single source of truth (§1–§18; live work queue in §13) |
-| [README.md](README.md) | User-facing intro, quick start, env vars |
-| [CLAUDE.md](CLAUDE.md) | Re-export of `AGENTS.md` for Claude Code session bootstrap |
-| [AGENTS.md](AGENTS.md) | Agent guide |
-| [CHANGELOG.md](CHANGELOG.md) | Keep-a-Changelog history |
+> **Status.** Production-ready MVP. FR-1..FR-9 (CRUD / search /
+> match / merge / dedup) + FR-10..FR-13 (instance sub-resource) +
+> FR-14..FR-18 (audit / streaming / privacy) are all wired. Only
+> JWT auth (T-15) remains, blocked on the family-wide auth rollout.
+> See [`spec.md §13`](spec.md#13-tasks) for the per-task ledger.
 
-## AGENTS/ (per-area detail)
+## Quick start
 
-| Document | Purpose |
-|---|---|
-| [AGENTS/index.md](AGENTS/index.md) | This directory's index |
-| [AGENTS/spec-driven-development.md](AGENTS/spec-driven-development.md) | SDD discipline |
-| [AGENTS/models.md](AGENTS/models.md) | Domain model reference |
-| [AGENTS/matching.md](AGENTS/matching.md) | Matching algorithm reference |
-| [AGENTS/restful.md](AGENTS/restful.md) | REST API + library API reference |
-| [AGENTS/testing.md](AGENTS/testing.md) | Testing strategy |
-
-## Worked examples
-
-### Create a course
+### Option 1: Podman compose (recommended)
 
 ```bash
-curl -X POST http://localhost:8084/api/courses \
-  -H "content-type: application/json" \
-  -d '{
-    "name": "Introduction to Computer Science",
-    "course_code": "CS101",
-    "number_of_credits": 4,
-    "educational_level": "Undergraduate",
-    "teaches": [
-      "computational thinking",
-      "abstraction",
-      "basic algorithms"
-    ],
-    "keywords": ["computer science", "programming", "algorithms"],
-    "available_language": ["en"],
-    "is_accessible_for_free": false
-  }'
+# From the repo root because the Dockerfile pulls in the sibling
+# course-matcher crate via the path dependency.
+cd course-service-rust-crate
+cp .env.example .env
+
+# Brings up postgres + course-service.
+podman compose up -d
+
+# Wait for healthy:
+podman compose logs -f course-service
+
+# Service on host port 8084 (avoids clashing with person-service on 8080).
+curl http://localhost:8084/api/health
 ```
 
-### Check for duplicates without writing
+### Option 2: native build
 
 ```bash
-curl -X POST http://localhost:8084/api/courses/check-duplicates \
-  -H "content-type: application/json" \
-  -d '{
-    "name": "Intro to CS",
-    "course_code": "CS101",
-    "provider_id": "00000000-0000-0000-0000-000000000001"
-  }'
+# Prerequisites: Rust 1.93+, PostgreSQL 17+, podman (optional).
+cp .env.example .env
+
+# Set up the database.
+podman run -d --name course-postgres -p 5434:5432 \
+  -e POSTGRES_DB=course \
+  -e POSTGRES_USER=course_user \
+  -e POSTGRES_PASSWORD=course_password \
+  postgres:17-alpine
+
+# Apply migrations (manual — auto-migrate is out of scope for MVP).
+for m in migrations/*/up.sql; do
+  podman exec -i course-postgres psql -U course_user -d course < "$m"
+done
+
+# Build and run.
+cargo run --release
 ```
 
-### Add an instance
+## API
+
+REST routes mount under `/api/courses/*` and `/api/courses/{id}/instances/*`.
+See [`AGENTS/restful.md`](AGENTS/restful.md) for the full list. All
+endpoints return the standard `{success, data, error}` envelope.
+
+Interactive OpenAPI 3 documentation ships with the binary:
+
+- Swagger UI: `http://localhost:8084/swagger-ui`
+- Raw spec: `http://localhost:8084/api-docs/openapi.json`
+
+The Event Service uses `/api/v1/`; Course does NOT — direct `/api`.
+
+## Configuration
+
+| Variable | Description | Default |
+|---|---|---|
+| `DATABASE_URL` | Postgres connection string | — |
+| `DATABASE_MAX_CONNECTIONS` | Pool max | `10` |
+| `DATABASE_MIN_CONNECTIONS` | Pool min | `2` |
+| `SERVER_HOST` | REST bind address | `0.0.0.0` |
+| `SERVER_PORT` | REST port | `8080` |
+| `SEARCH_INDEX_PATH` | Tantivy index directory | `./data/search_index` |
+| `MATCHING_THRESHOLD` | Probabilistic match cutoff | `0.85` |
+| `RUST_LOG` | tracing-subscriber filter | `info` |
+| `OTLP_ENDPOINT` | OpenTelemetry collector | `http://localhost:4317` |
+
+## Testing
 
 ```bash
-curl -X POST http://localhost:8084/api/courses/{course_id}/instances \
-  -H "content-type: application/json" \
-  -d '{
-    "course_id": "{course_id}",
-    "name": "CS101 — Fall 2026",
-    "course_mode": "blended",
-    "status": "scheduled",
-    "schedule": {
-      "start_date": "2026-09-01T09:00:00Z",
-      "end_date":   "2026-12-15T17:00:00Z",
-      "time_zone":  "America/Los_Angeles",
-      "recurrence": "FREQ=WEEKLY;BYDAY=TU,TH;BYHOUR=9"
-    },
-    "maximum_attendee_capacity": 200
-  }'
+# 35 unit tests (matcher facade, search index, validation, db
+# helpers, streaming, privacy, repository conversions).
+cargo test --lib
+
+# 14 bridge tests pinning the service ↔ canonical course-matcher
+# contract (identical clones, deterministic short-circuits, per-enum
+# routing, config presets).
+cargo test --test duplicate_detection
+
+# 12 DB-backed integration tests. Skipped by default — opt in with
+# `--ignored` after the Postgres bring-up below.
+DATABASE_URL=postgres://course_user:course_password@localhost:5434/course \
+  cargo test --test api_integration_test -- --ignored
+
+# Three criterion benches (matching, search, validation).
+cargo bench
 ```
 
-### Match a candidate
+See [`AGENTS/testing.md`](AGENTS/testing.md) for the layout and
+[`docker-compose.yml`](docker-compose.yml) for the dev Postgres
+bring-up the integration suite expects to be migrated against.
 
-```bash
-# Body is a `Course` shape (only `name` is required). The match
-# handler returns every blocked candidate sorted by descending
-# score; clients apply their own threshold downstream.
-curl -X POST http://localhost:8084/api/courses/match \
-  -H "content-type: application/json" \
-  -d '{
-    "name": "Intro Comp Sci",
-    "course_code": "CS101",
-    "educational_level": "Undergraduate"
-  }'
-```
+## Compliance
 
-### Merge confirmed duplicates
+- **GDPR**: right of access via `GET /api/courses/{id}/export`;
+  right to erasure via soft-delete + `/masked` view.
+- **FERPA**: masked view conceals instructor / student identifiers
+  on `CourseInstance` records; audit log preserves access trail.
 
-```bash
-curl -X POST http://localhost:8084/api/courses/merge \
-  -H "content-type: application/json" \
-  -d '{
-    "main_course_id":      "uuid-main",
-    "duplicate_course_id": "uuid-dup",
-    "merge_reason":        "Same course code, same provider, identical syllabus"
-  }'
-```
+## Status
 
-### Explore the full API
+- **Persistence**: SeaORM entities + transactional repository CRUD
+  (T-2 / T-3); CourseInstance sub-resource (T-8); merge bookkeeping.
+- **Search**: Tantivy `SearchEngine` with exact / fuzzy / blocking
+  queries; reader reload after every commit (T-4).
+- **Matching**: canonical [`course-matcher`](../course-matcher-rust-crate/)
+  driven through the service-side adapter (T-6); 14 bridge tests
+  pin the contract (T-11).
+- **Validation**: FR-21..FR-28 with nested-instance path prefixes
+  (T-5).
+- **REST**: FR-1..FR-9 + FR-14..FR-18 wired (T-7 / T-8 / T-9 / T-10);
+  OpenAPI via utoipa (T-14).
+- **Audit + streaming**: `AuditLogRepository` + in-memory
+  `EventPublisher` MVP (T-9). Fluvio adapter under feature flag
+  pending.
+- **Privacy**: `mask_course` + GDPR Article-15 export (T-10).
+- **Tests**: 35 unit + 14 bridge + 12 #[ignore]-tagged integration
+  (T-12) + 3 criterion benches (T-13).
+- **Auth**: JWT (T-15) blocked on the family-wide rollout.
 
-The binary serves an OpenAPI 3 document and Swagger UI:
+## License
 
-- Interactive: <http://localhost:8084/swagger-ui>
-- Raw JSON: <http://localhost:8084/api-docs/openapi.json>
+Dual-licensed under MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only
+OR GPL-3.0-only.

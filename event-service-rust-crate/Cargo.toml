@@ -77,6 +77,7 @@ event-matcher = "0.5.0"
 # Security
 argon2 = "0.5"
 jsonwebtoken = "9.3"
+mimalloc = "0.1.52"
 
 [dev-dependencies]
 # Testing

@@ -56,10 +56,11 @@ dotenvy = "0.15"
 
 # Sibling matcher crate (embedded via re-export so the service uses the
 # canonical algorithm rather than maintaining a fork).
-course-matcher = { path = "../course-matcher-rust-crate" }
+course-matcher = "0.2"
 
 # `dyn CourseRepository` needs object-safe async via async_trait.
 async-trait = "0.1"
+mimalloc = "0.1.52"
 
 [dev-dependencies]
 tokio-test = "0.4"

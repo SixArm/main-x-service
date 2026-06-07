@@ -1,4 +1,12 @@
-//! Repository pattern implementations for database operations
+//! Repository layer translating between domain [`Worker`]s and SeaORM rows.
+//!
+//! [`WorkerRepository`] is the async trait the API depends on;
+//! [`SeaOrmWorkerRepository`] is the PostgreSQL/SeaORM implementation. The
+//! implementation owns the mapping in both directions (`to_active_models` /
+//! `from_db_models`), runs multi-table writes in a transaction, and — when
+//! configured — publishes [`crate::streaming::WorkerEvent`]s and writes audit
+//! entries on every mutation. [`AuditContext`] carries the actor metadata
+//! recorded alongside those audit entries.
 
 use sea_orm::*;
 use sea_orm::sea_query::Expr;
@@ -9,15 +17,20 @@ use crate::models::{Worker, HumanName, Address, ContactPoint, Identifier, Worker
 use crate::Result;
 use super::models::*;
 
-/// Audit context for tracking user actions
+/// Actor metadata attached to audit-log entries for a mutation.
 #[derive(Debug, Clone)]
 pub struct AuditContext {
+    /// Acting user's identifier (defaults to `"system"`).
     pub user_id: Option<String>,
+    /// Originating client IP address, if known.
     pub ip_address: Option<String>,
+    /// Originating client user-agent string, if known.
     pub user_agent: Option<String>,
 }
 
 impl Default for AuditContext {
+    /// Returns a context attributed to the `"system"` user with no IP or
+    /// user-agent — used for internal/automated operations.
     fn default() -> Self {
         Self {
             user_id: Some("system".to_string()),
@@ -27,37 +40,46 @@ impl Default for AuditContext {
     }
 }
 
-/// Worker repository trait
+/// Persistence operations for worker records. Implementors must be `Send +
+/// Sync` so the repository can be shared across async tasks behind an `Arc`.
 #[async_trait::async_trait]
 pub trait WorkerRepository: Send + Sync {
-    /// Create a new worker
+    /// Persists a new worker (and its names/identifiers/addresses/contacts/
+    /// links), returning the stored record.
     async fn create(&self, worker: &Worker) -> Result<Worker>;
 
-    /// Get a worker by ID
+    /// Fetches a non-deleted worker by ID, or `None` if absent/soft-deleted.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Worker>>;
 
-    /// Update a worker
+    /// Replaces a worker and its associated rows, returning the new state.
     async fn update(&self, worker: &Worker) -> Result<Worker>;
 
-    /// Delete a worker (soft delete)
+    /// Soft-deletes a worker by stamping its `deleted_at` column.
     async fn delete(&self, id: &Uuid) -> Result<()>;
 
-    /// Search workers by name
+    /// Finds workers whose family name matches `query` (case-insensitive).
     async fn search(&self, query: &str) -> Result<Vec<Worker>>;
 
-    /// List all active workers (non-deleted)
+    /// Returns a page of active, non-deleted workers.
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Worker>>;
 }
 
-/// SeaORM-based worker repository implementation
+/// SeaORM/PostgreSQL implementation of [`WorkerRepository`].
+///
+/// Optionally wired with an event publisher and an audit-log repository via
+/// the `with_*` builder methods; when present, every mutation publishes an
+/// event and records an audit entry.
 pub struct SeaOrmWorkerRepository {
+    /// Pooled database connection.
     db: DatabaseConnection,
+    /// Optional event publisher; mutations emit events when set.
     event_publisher: Option<std::sync::Arc<dyn crate::streaming::EventProducer>>,
+    /// Optional audit repository; mutations log entries when set.
     audit_log: Option<std::sync::Arc<super::audit::AuditLogRepository>>,
 }
 
 impl SeaOrmWorkerRepository {
-    /// Create a new repository with the given database connection
+    /// Builds a repository over `db` with no event publisher or audit log.
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
             db,
@@ -66,7 +88,7 @@ impl SeaOrmWorkerRepository {
         }
     }
 
-    /// Set the event publisher for this repository
+    /// Builder method attaching an event publisher; returns `self` for chaining.
     pub fn with_event_publisher(
         mut self,
         publisher: std::sync::Arc<dyn crate::streaming::EventProducer>,
@@ -75,7 +97,7 @@ impl SeaOrmWorkerRepository {
         self
     }
 
-    /// Set the audit log repository
+    /// Builder method attaching an audit-log repository; returns `self` for chaining.
     pub fn with_audit_log(
         mut self,
         audit_log: std::sync::Arc<super::audit::AuditLogRepository>,
@@ -84,7 +106,8 @@ impl SeaOrmWorkerRepository {
         self
     }
 
-    /// Publish an event if publisher is configured
+    /// Publishes `event` if a publisher is configured; logs (but swallows) any
+    /// publish error so a streaming failure never aborts the database write.
     fn publish_event(&self, event: crate::streaming::WorkerEvent) {
         if let Some(ref publisher) = self.event_publisher {
             if let Err(e) = publisher.publish(event) {
@@ -93,7 +116,9 @@ impl SeaOrmWorkerRepository {
         }
     }
 
-    /// Log to audit trail if configured
+    /// Writes a `CREATE`/`UPDATE`/`DELETE` audit entry for a `Worker` if an
+    /// audit log is configured. Unknown actions are no-ops; errors are logged
+    /// but not propagated.
     async fn log_audit(
         &self,
         action: &str,
@@ -138,7 +163,11 @@ impl SeaOrmWorkerRepository {
         }
     }
 
-    /// Convert domain Worker model to SeaORM active models
+    /// Flattens a domain [`Worker`] into the set of SeaORM `ActiveModel`s for
+    /// each backing table (worker row plus name/identifier/address/contact/
+    /// link rows). The first name is marked primary; the first address and
+    /// contact are marked primary. Enum values are stored via their `Debug`
+    /// form, and fresh UUIDs/timestamps are assigned to child rows.
     fn to_active_models(&self, worker: &Worker) -> (
         workers::ActiveModel,
         Vec<worker_names::ActiveModel>,
@@ -250,7 +279,11 @@ impl SeaOrmWorkerRepository {
         (new_worker, names, identifiers, addresses, contacts, links)
     }
 
-    /// Convert database models to domain Worker model
+    /// Reassembles a domain [`Worker`] from its database rows, parsing the
+    /// string-stored enums (gender, worker type, name/identifier/contact/link
+    /// use types) back into their typed forms. Requires a primary name row;
+    /// returns a [`crate::Error::Validation`] if none is present. (Tax ID,
+    /// documents, and emergency contacts are not yet loaded from the DB.)
     fn from_db_models(
         &self,
         db_worker: workers::Model,
@@ -448,7 +481,9 @@ impl SeaOrmWorkerRepository {
         })
     }
 
-    /// Load all associated data for a worker
+    /// Fetches the child rows (names, identifiers, addresses, contacts, links)
+    /// belonging to `worker_id` in a fixed tuple order matching
+    /// [`from_db_models`](Self::from_db_models).
     async fn load_associations(&self, worker_id: &Uuid) -> Result<(
         Vec<worker_names::Model>,
         Vec<worker_identifiers::Model>,
@@ -485,9 +520,13 @@ impl SeaOrmWorkerRepository {
     }
 }
 
+// SeaORM implementation of the repository trait. Each mutation runs its
+// multi-table writes inside a transaction, then (best-effort) publishes an
+// event and records an audit entry after the commit.
 #[async_trait::async_trait]
 impl WorkerRepository for SeaOrmWorkerRepository {
     async fn create(&self, worker: &Worker) -> Result<Worker> {
+        // All inserts share one transaction so a partial worker is never left.
         let txn = self.db.begin().await?;
 
         let (new_worker, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
@@ -562,9 +601,11 @@ impl WorkerRepository for SeaOrmWorkerRepository {
     }
 
     async fn update(&self, worker: &Worker) -> Result<Worker> {
-        // Get old values for audit
+        // Capture the pre-update state for the audit diff.
         let old_worker = self.get_by_id(&worker.id).await?;
 
+        // Update is implemented as "update parent row + replace all child
+        // rows" within a single transaction.
         let txn = self.db.begin().await?;
 
         // Update worker
@@ -649,10 +690,10 @@ impl WorkerRepository for SeaOrmWorkerRepository {
     }
 
     async fn delete(&self, id: &Uuid) -> Result<()> {
-        // Get old values for audit
+        // Capture the pre-delete state for the audit record.
         let old_worker = self.get_by_id(id).await?;
 
-        // Soft delete
+        // Soft delete: stamp deleted_at/deleted_by rather than removing rows.
         let update_model = workers::ActiveModel {
             id: Set(*id),
             deleted_at: Set(Some(Utc::now())),
@@ -678,8 +719,10 @@ impl WorkerRepository for SeaOrmWorkerRepository {
     }
 
     async fn search(&self, query: &str) -> Result<Vec<Worker>> {
+        // Case-insensitive substring match on family name via SQL LIKE.
         let search_pattern = format!("%{}%", query.to_lowercase());
 
+        // First collect distinct matching worker IDs, then hydrate each.
         let worker_ids: Vec<Uuid> = worker_names::Entity::find()
             .filter(Expr::cust_with_values("LOWER(family) LIKE $1", [search_pattern]))
             .select_only()

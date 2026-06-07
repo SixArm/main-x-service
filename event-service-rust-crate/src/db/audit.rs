@@ -1,4 +1,10 @@
-//! Audit log repository for tracking changes
+//! Audit-log repository for the HIPAA-style change trail.
+//!
+//! [`AuditLogRepository`] appends immutable rows to the `audit_log`
+//! table — one per CREATE / UPDATE / DELETE — capturing the actor
+//! (`user_id`, `ip_address`, `user_agent`), the entity, and old/new
+//! JSON snapshots. Read-side queries fetch the trail per entity, per
+//! user, or system-wide, always newest-first.
 
 use sea_orm::*;
 use uuid::Uuid;
@@ -9,6 +15,7 @@ use super::models::audit_log;
 
 /// Audit log repository for recording changes
 pub struct AuditLogRepository {
+    /// The database connection/pool used for audit inserts and queries.
     db: DatabaseConnection,
 }
 

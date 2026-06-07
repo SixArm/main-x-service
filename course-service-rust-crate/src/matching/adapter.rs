@@ -26,6 +26,10 @@ use crate::models::{
     EducationalLevel as ServiceLevel, IdentifierType, LearningResourceType as ServiceLRT,
 };
 
+/// Project the rich service [`Course`](ServiceCourse) down to the slim
+/// `course_matcher::Course` the algorithm consumes. The provider FK
+/// (`Uuid`) is stringified so the matcher's
+/// `same provider_id + course_code` short-circuit can fire.
 pub fn to_matcher_course(c: &ServiceCourse) -> cm::Course {
     cm::Course {
         name: c.name.clone(),
@@ -43,6 +47,8 @@ pub fn to_matcher_course(c: &ServiceCourse) -> cm::Course {
     }
 }
 
+/// Map a service [`CourseIdentifier`](ServiceIdent) to the matcher's
+/// `CourseIdentifier` (scheme + value pair).
 fn ident_to_matcher(i: &ServiceIdent) -> cm::CourseIdentifier {
     cm::CourseIdentifier {
         scheme: scheme_to_matcher(&i.property_id),
@@ -50,6 +56,8 @@ fn ident_to_matcher(i: &ServiceIdent) -> cm::CourseIdentifier {
     }
 }
 
+/// Map the service [`IdentifierType`] enum one-to-one to the matcher's
+/// `IdentifierScheme`.
 fn scheme_to_matcher(t: &IdentifierType) -> cm::IdentifierScheme {
     match t {
         IdentifierType::LmsCourseId => cm::IdentifierScheme::LmsCourseId,
@@ -67,6 +75,8 @@ fn scheme_to_matcher(t: &IdentifierType) -> cm::IdentifierScheme {
     }
 }
 
+/// Map the service [`EducationalLevel`](ServiceLevel) enum one-to-one to
+/// the matcher's `EducationalLevel`.
 fn level_to_matcher(l: &ServiceLevel) -> cm::EducationalLevel {
     match l {
         ServiceLevel::Beginner => cm::EducationalLevel::Beginner,
@@ -85,6 +95,8 @@ fn level_to_matcher(l: &ServiceLevel) -> cm::EducationalLevel {
     }
 }
 
+/// Map the service [`LearningResourceType`](ServiceLRT) enum one-to-one
+/// to the matcher's `LearningResourceType`.
 fn lrt_to_matcher(l: &ServiceLRT) -> cm::LearningResourceType {
     match l {
         ServiceLRT::Lecture => cm::LearningResourceType::Lecture,
@@ -107,6 +119,7 @@ mod tests {
     use super::*;
     use uuid::Uuid;
 
+    /// A `Uuid` provider FK is stringified into the matcher's `provider_id`.
     #[test]
     fn provider_id_uuid_routes_to_matcher_string() {
         let mut c = ServiceCourse::new("Linear Algebra");
@@ -116,6 +129,7 @@ mod tests {
         assert_eq!(m.provider_id.as_deref(), Some(pid.to_string().as_str()));
     }
 
+    /// Identifier schemes (including `Custom`) map across one-to-one.
     #[test]
     fn identifier_scheme_routes_one_to_one() {
         let mut c = ServiceCourse::new("CS101");
@@ -141,6 +155,7 @@ mod tests {
         ));
     }
 
+    /// Educational level maps across one-to-one.
     #[test]
     fn educational_level_routes_one_to_one() {
         let mut c = ServiceCourse::new("Intro");

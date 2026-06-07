@@ -22,12 +22,18 @@ pub mod index;
 
 pub use index::{CourseIndex, CourseIndexSchema, IndexStats};
 
+/// High-level search facade over a [`CourseIndex`]. Owns the index and
+/// exposes the indexing + query operations the service needs.
 pub struct SearchEngine {
+    /// The underlying Tantivy index wrapper.
     index: CourseIndex,
+    /// Filesystem path the index lives at (for diagnostics / reopen).
     pub index_path: String,
 }
 
 impl SearchEngine {
+    /// Open or create the index under `path`, creating the directory if
+    /// it does not yet exist.
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let p = path.as_ref();
         std::fs::create_dir_all(p)
@@ -178,14 +184,18 @@ impl SearchEngine {
         Ok(())
     }
 
+    /// Document and segment counts for the live index.
     pub fn stats(&self) -> Result<IndexStats> {
         self.index.stats()
     }
 
+    /// Force the reader to observe the latest committed segments.
     pub fn reload(&self) -> Result<()> {
         self.index.reload()
     }
 
+    /// Run `query` and project the top `limit` hits down to their stored
+    /// `id` strings, dropping any document missing an `id`.
     fn collect_ids(
         &self,
         searcher: tantivy::Searcher,
@@ -211,6 +221,9 @@ impl SearchEngine {
     }
 }
 
+/// Split a query string into lowercase alphanumeric tokens, dropping
+/// empties. Underscores and punctuation act as separators (so
+/// `"CS101_intro"` yields `["cs101", "intro"]`).
 fn tokenise(s: &str) -> Vec<String> {
     s.split(|c: char| !c.is_alphanumeric())
         .filter(|s| !s.is_empty())
@@ -223,10 +236,12 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    /// Test fixture: a minimal course with the given name.
     fn course(name: &str) -> Course {
         Course::new(name)
     }
 
+    /// A course is indexed and found by an exact full-text query.
     #[test]
     fn index_and_exact_search() {
         let dir = TempDir::new().unwrap();
@@ -237,6 +252,7 @@ mod tests {
         assert_eq!(hits, vec![c.id.to_string()]);
     }
 
+    /// Fuzzy search finds a course despite a single-character typo.
     #[test]
     fn fuzzy_search_tolerates_typo() {
         let dir = TempDir::new().unwrap();
@@ -247,6 +263,7 @@ mod tests {
         assert_eq!(hits, vec![c.id.to_string()]);
     }
 
+    /// The blocking query returns only the course under the requested provider.
     #[test]
     fn blocking_query_filters_by_provider() {
         let dir = TempDir::new().unwrap();
@@ -268,6 +285,7 @@ mod tests {
         assert_eq!(hits, vec![a.id.to_string()]);
     }
 
+    /// Deleting a course removes it from the index document count.
     #[test]
     fn delete_removes_from_index() {
         let dir = TempDir::new().unwrap();
@@ -279,6 +297,7 @@ mod tests {
         assert_eq!(eng.stats().unwrap().num_docs, 0);
     }
 
+    /// `tokenise` splits on underscores/punctuation and drops blanks.
     #[test]
     fn tokenise_handles_underscores_and_punctuation() {
         assert_eq!(tokenise("CS101_intro"), vec!["cs101", "intro"]);

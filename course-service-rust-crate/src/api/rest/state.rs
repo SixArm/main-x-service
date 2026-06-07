@@ -12,18 +12,30 @@ use crate::matching::CourseMatcher;
 use crate::search::SearchEngine;
 use crate::streaming::{EventPublisher, InMemoryEventPublisher};
 
+/// Shared, cheaply-cloneable handle to every service the REST handlers
+/// need. Cloned per request by Axum; the inner services are `Arc`-shared.
 #[derive(Clone)]
 pub struct AppState {
+    /// Raw connection pool (for ad-hoc queries outside the repository).
     pub db: DatabaseConnection,
+    /// Course CRUD repository.
     pub course_repository: Arc<dyn CourseRepository>,
+    /// Audit-log repository.
     pub audit_log: Arc<AuditLogRepository>,
+    /// Event-stream publisher.
     pub event_publisher: Arc<dyn EventPublisher>,
+    /// Full-text search engine.
     pub search_engine: Arc<SearchEngine>,
+    /// Record matcher.
     pub matcher: Arc<CourseMatcher>,
+    /// Loaded service configuration.
     pub config: Arc<Config>,
 }
 
 impl AppState {
+    /// Assemble state from the externally-built services, constructing
+    /// the SeaORM repository, audit log, and in-memory event publisher
+    /// from the shared connection.
     pub fn new(
         db: DatabaseConnection,
         search_engine: SearchEngine,

@@ -1,4 +1,13 @@
-//! FHIR R5 API handlers
+//! FHIR R5 API handlers for the `Person` resource.
+//!
+//! Axum handlers backing the `/fhir/Person` endpoints (get/create/
+//! update/delete/search). Each handler shares the same [`AppState`](crate::api::rest::state::AppState) as
+//! the REST API and bridges the wire <-> domain boundary via
+//! [`to_fhir_person`](crate::api::fhir::to_fhir_person)/[`from_fhir_person`](crate::api::fhir::from_fhir_person) (in [`super`](crate::api::fhir)). Errors are
+//! reported as FHIR [`FhirOperationOutcome`](crate::api::fhir::FhirOperationOutcome) resources with appropriate
+//! HTTP status codes (404 not-found, 400 invalid, 500 database/search).
+//! Create/update also keep the Tantivy search index in sync, logging a
+//! warning (not failing the request) on index errors.
 
 use axum::{
     extract::{Path, Query, State},
@@ -12,7 +21,12 @@ use uuid::Uuid;
 use crate::api::rest::AppState;
 use super::{FhirPerson, FhirOperationOutcome, to_fhir_person, from_fhir_person};
 
-/// FHIR search parameters
+/// Query-string parameters for the FHIR `Person` search endpoint.
+///
+/// Mirrors the FHIR search-parameter names (renamed via serde, since
+/// `_count` and `birthdate` are not valid Rust identifiers). Only a
+/// subset is supported; see [`super::search_parameters`] for the
+/// reserved expansion point.
 #[derive(Debug, Deserialize)]
 pub struct FhirSearchParams {
     /// Person name (any part)
@@ -44,7 +58,11 @@ pub struct FhirSearchParams {
     pub count: Option<usize>,
 }
 
-/// Get FHIR Person by ID
+/// `GET /fhir/Person/{id}` — fetch a person and render it as FHIR.
+///
+/// Returns `200` with the FHIR Person JSON on success, `404` with a
+/// `not-found` OperationOutcome if no such person exists, or `500` with
+/// a `database-error` OperationOutcome on a repository failure.
 pub async fn get_fhir_person(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -65,7 +83,13 @@ pub async fn get_fhir_person(
     }
 }
 
-/// Create FHIR Person
+/// `POST /fhir/Person` — create a person from a FHIR Person payload.
+///
+/// Converts the FHIR resource to the domain model, assigns a fresh UUID
+/// if the payload omits one, persists it, and indexes it for search
+/// (a search-index failure is logged but does not fail the request).
+/// Returns `201` with the created FHIR Person, `400` for an invalid
+/// payload, or `500` on a database error.
 pub async fn create_fhir_person(
     State(state): State<AppState>,
     Json(fhir_person): Json<FhirPerson>,
@@ -102,7 +126,12 @@ pub async fn create_fhir_person(
     }
 }
 
-/// Update FHIR Person
+/// `PUT /fhir/Person/{id}` — replace a person from a FHIR payload.
+///
+/// The path `id` is authoritative and overrides any id in the body.
+/// Updates the database record and refreshes the search index (index
+/// failures are logged, not fatal). Returns `200` with the updated FHIR
+/// Person, `400` for an invalid payload, or `500` on a database error.
 pub async fn update_fhir_person(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -138,7 +167,11 @@ pub async fn update_fhir_person(
     }
 }
 
-/// Delete FHIR Person
+/// `DELETE /fhir/Person/{id}` — soft-delete a person.
+///
+/// Delegates to the repository's soft delete (the record is retained for
+/// audit). Returns `204 No Content` on success or `500` with a
+/// `database-error` OperationOutcome on failure.
 pub async fn delete_fhir_person(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -154,7 +187,14 @@ pub async fn delete_fhir_person(
     }
 }
 
-/// Search FHIR Persons
+/// `GET /fhir/Person?...` — search persons and return a FHIR Bundle.
+///
+/// Picks the first provided text criterion (`name`, then `family`, then
+/// `given`) as the search query and caps `_count` at 100 (default 10).
+/// Runs the Tantivy search, fetches each hit from the database, and
+/// wraps the results in a `searchset` Bundle. Index entries missing
+/// from the database are skipped with a warning. Returns `400` if no
+/// search parameter is supplied, or `500` on a search-engine error.
 pub async fn search_fhir_persons(
     State(state): State<AppState>,
     Query(params): Query<FhirSearchParams>,

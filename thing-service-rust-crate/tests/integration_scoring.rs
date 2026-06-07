@@ -1,3 +1,7 @@
+//! Integration tests for the matching components and the scoring engine:
+//! name / description / url / identifier / phonetic edge cases, custom
+//! weights, and confidence-band boundaries.
+
 use thing_service::matching::description::description_similarity;
 use thing_service::matching::identifier::{has_deterministic_match, identifier_similarity};
 use thing_service::matching::name::name_similarity;
@@ -9,12 +13,14 @@ use thing_service::models::thing::Thing;
 
 // -- Name matching edge cases --
 
+/// Accented vs unaccented names stay highly similar.
 #[test]
 fn test_name_similarity_unicode() {
     let score = name_similarity("Café Society", "Cafe Society");
     assert!(score > 0.8, "Unicode name similarity: {score}");
 }
 
+/// A long name compared to itself scores exactly 1.0.
 #[test]
 fn test_name_similarity_very_long_names() {
     let s = "The Very Long Name of an Incredibly Important Object With Many Words";
@@ -22,6 +28,7 @@ fn test_name_similarity_very_long_names() {
     assert!((score - 1.0).abs() < f64::EPSILON);
 }
 
+/// Single distinct characters score within `[0.0, 1.0)`.
 #[test]
 fn test_name_similarity_single_character() {
     let score = name_similarity("A", "B");
@@ -29,6 +36,7 @@ fn test_name_similarity_single_character() {
     assert!(score >= 0.0);
 }
 
+/// Reversed word order is similar but not identical.
 #[test]
 fn test_name_similarity_reversed_words() {
     let score = name_similarity("Prejudice and Pride", "Pride and Prejudice");
@@ -38,12 +46,14 @@ fn test_name_similarity_reversed_words() {
 
 // -- Description matching --
 
+/// Identical descriptions score 1.0.
 #[test]
 fn test_description_similarity_exact() {
     let s = description_similarity("Same description", "Same description");
     assert!((s - 1.0).abs() < f64::EPSILON);
 }
 
+/// Unrelated descriptions score low.
 #[test]
 fn test_description_similarity_different() {
     let s = description_similarity(
@@ -55,16 +65,19 @@ fn test_description_similarity_different() {
 
 // -- URL matching --
 
+/// Identical URLs score 1.0.
 #[test]
 fn test_url_similarity_identical() {
     assert_eq!(url_similarity("https://example.com", "https://example.com"), 1.0);
 }
 
+/// http vs https normalizes to a perfect URL match.
 #[test]
 fn test_url_similarity_scheme_insensitive() {
     assert_eq!(url_similarity("http://example.com", "https://example.com"), 1.0);
 }
 
+/// URL-list similarity returns the best-matching pair's score.
 #[test]
 fn test_url_list_best_match() {
     let a = vec!["https://example.com".to_string()];
@@ -77,6 +90,7 @@ fn test_url_list_best_match() {
 
 // -- Identifier matching edge cases --
 
+/// Identical identifier lists score 1.0.
 #[test]
 fn test_identifier_similarity_multiple_matches() {
     let a = vec![
@@ -88,6 +102,7 @@ fn test_identifier_similarity_multiple_matches() {
     assert!((score - 1.0).abs() < f64::EPSILON);
 }
 
+/// Different ISBN values score 0.0 on the identifier axis.
 #[test]
 fn test_identifier_no_match_different_values() {
     let a = vec![ThingIdentifier::isbn("9780141439518")];
@@ -95,6 +110,7 @@ fn test_identifier_no_match_different_values() {
     assert_eq!(identifier_similarity(&a, &b), 0.0);
 }
 
+/// A deterministic match is found even amid non-deterministic identifiers.
 #[test]
 fn test_deterministic_match_among_many_identifiers() {
     let a = vec![
@@ -111,6 +127,7 @@ fn test_deterministic_match_among_many_identifiers() {
 
 // -- Phonetic matching edge cases --
 
+/// Soundex is deterministic and always 4 characters.
 #[test]
 fn test_soundex_codes_consistency() {
     let code1 = soundex("Programming");
@@ -119,12 +136,14 @@ fn test_soundex_codes_consistency() {
     assert_eq!(code1.len(), 4);
 }
 
+/// All-numeric input yields the all-zero Soundex code.
 #[test]
 fn test_soundex_numeric_input() {
     let code = soundex("123");
     assert_eq!(code, "0000");
 }
 
+/// Common typo pairs share a Soundex code.
 #[test]
 fn test_soundex_match_similar_thing_names() {
     assert!(soundex_match("Steven", "Stevn"));
@@ -133,6 +152,7 @@ fn test_soundex_match_similar_thing_names() {
 
 // -- Scoring integration tests --
 
+/// Custom weights shift the score: name-heavy beats url-heavy when names match.
 #[test]
 fn test_match_with_custom_weights() {
     let mut a = Thing::new("Pride and Prejudice");
@@ -167,6 +187,7 @@ fn test_match_with_custom_weights() {
     );
 }
 
+/// Confidence bands map correctly at and just below each threshold.
 #[test]
 fn test_match_confidence_boundaries() {
     assert_eq!(MatchConfidence::from_score(0.95), MatchConfidence::Certain);
@@ -179,6 +200,7 @@ fn test_match_confidence_boundaries() {
     assert_eq!(MatchConfidence::from_score(1.0), MatchConfidence::Certain);
 }
 
+/// Every score stays within `[0.0, 1.0]` across name edge cases.
 #[test]
 fn test_match_score_always_in_range() {
     let things = [
@@ -202,6 +224,7 @@ fn test_match_score_always_in_range() {
     }
 }
 
+/// The phonetic bonus lifts a sub-Certain score for Soundex-matching names.
 #[test]
 fn test_match_phonetic_bonus_applied() {
     let a = Thing::new("Springfield");
@@ -211,6 +234,7 @@ fn test_match_phonetic_bonus_applied() {
     assert!(result.score > 0.85, "with phonetic bonus: {}", result.score);
 }
 
+/// No bonus is added when the base score is already at/above 0.95.
 #[test]
 fn test_match_no_phonetic_bonus_when_score_high() {
     let a = Thing::new("Pride and Prejudice");
@@ -220,6 +244,7 @@ fn test_match_no_phonetic_bonus_when_score_high() {
     assert!((result.score - 1.0).abs() < f64::EPSILON);
 }
 
+/// With all components populated, each axis reports its expected score.
 #[test]
 fn test_match_with_all_components() {
     let mut a = Thing::new("Pride and Prejudice");
@@ -241,6 +266,7 @@ fn test_match_with_all_components() {
     assert!((result.breakdown.same_as_score - 1.0).abs() < f64::EPSILON);
 }
 
+/// Batch scores rank exact above partial above unrelated candidates.
 #[test]
 fn test_batch_matching_sorted_by_relevance() {
     let target = Thing::new("Pride and Prejudice");

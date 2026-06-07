@@ -1,3 +1,7 @@
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use place_matcher::{
     Address, MatchConfig, MatchingEngine, Place, PlaceCategory, PlaceId, PlaceIdScheme,
 };
@@ -47,10 +51,7 @@ fn main() {
         .name("Wholly Different Name")
         .add_place_id(id)
         .build();
-    println!(
-        "Deterministic: {}",
-        engine.deterministic_match(&a, &b),
-    );
+    println!("Deterministic: {}", engine.deterministic_match(&a, &b),);
 
     // Example 4: deterministic match via identical name + postcode.
     println!("\nExample 4: Deterministic Match via Name + Postcode");

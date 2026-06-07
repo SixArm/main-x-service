@@ -1,4 +1,17 @@
-//! HL7 FHIR R5 API implementation
+//! HL7 FHIR R5 API: resource types, conversions, and endpoint handlers.
+//!
+//! Lets FHIR-aware clients (EHRs, integration engines) talk to the service in
+//! their native format. This module owns the bidirectional mapping between the
+//! internal [`Worker`] model and the wire-format [`FhirWorker`] resource
+//! ([`to_fhir_worker`] / [`from_fhir_worker`]); the resource structs live in
+//! [`resources`], `Bundle` handling in [`bundle`], search parameters in
+//! [`search_parameters`], and the Axum handlers in [`handlers`].
+//!
+//! The conversions are field-by-field and lossy in both directions — several
+//! internal fields have no FHIR slot here and several FHIR fields are not yet
+//! parsed back (marked `TODO` inline). No doctests: constructing a meaningful
+//! [`Worker`]/[`FhirWorker`] pair is verbose and the mapping is covered by the
+//! crate's tests.
 
 use crate::models::{Worker, Address, ContactPoint, Identifier};
 use crate::Result;
@@ -10,7 +23,13 @@ pub mod handlers;
 
 pub use resources::{FhirWorker, FhirOperationOutcome};
 
-/// Convert internal Worker model to FHIR Worker resource
+/// Maps an internal [`Worker`] to a FHIR R5 `Patient`-shaped [`FhirWorker`].
+///
+/// Copies identity, names (primary plus additional), telecom, gender, birth
+/// date, deceased state, addresses, marital status, multiple-birth flag,
+/// links, and managing organization, formatting enums as lowercase FHIR codes
+/// and building references as `Resource/{id}` strings. Fields the internal
+/// model does not carry (e.g. address `use`/`type`) are left `None`.
 pub fn to_fhir_worker(worker: &Worker) -> FhirWorker {
     use resources::*;
 
@@ -205,7 +224,14 @@ pub fn to_fhir_worker(worker: &Worker) -> FhirWorker {
     fhir_worker
 }
 
-/// Convert FHIR Worker resource to internal Worker model
+/// Maps a FHIR [`FhirWorker`] back to an internal [`Worker`].
+///
+/// Parses the id (generating a fresh UUID when absent), takes the first name
+/// entry (erroring if there is none), and decodes gender / birth date /
+/// deceased / identifiers / addresses / telecom from their FHIR codes.
+/// Returns [`crate::Error::Validation`] on an invalid UUID or a missing name.
+/// Several fields are not yet round-tripped (see the `TODO` markers) and are
+/// left at their defaults.
 pub fn from_fhir_worker(fhir_worker: &FhirWorker) -> Result<Worker> {
     use crate::models::{HumanName, NameUse, Gender, ContactPointSystem, ContactPointUse};
     use crate::api::fhir::resources::FhirDeceased;

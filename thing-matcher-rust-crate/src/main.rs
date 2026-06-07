@@ -1,3 +1,7 @@
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use thing_matcher::{Identifier, MatchConfig, MatchingEngine, Thing};
 
 fn main() {

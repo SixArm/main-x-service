@@ -9,6 +9,9 @@ use uuid::Uuid;
 use course_service::models::Course;
 use course_service::search::SearchEngine;
 
+/// Build a temp-dir-backed search engine pre-loaded with one probe
+/// course plus 100 decoys, returning the dir (kept alive), the engine,
+/// and the probe. The dir must outlive the engine, hence the tuple.
 fn populated_engine() -> (TempDir, SearchEngine, Course) {
     let dir = TempDir::new().expect("tempdir");
     let engine = SearchEngine::new(dir.path()).expect("engine");
@@ -31,6 +34,7 @@ fn populated_engine() -> (TempDir, SearchEngine, Course) {
     (dir, engine, probe)
 }
 
+/// Benchmark indexing a single course into a warm index.
 fn bench_index_single(c: &mut Criterion) {
     let (_dir, engine, _probe) = populated_engine();
     c.bench_function("search/index_course/single", |b| {
@@ -42,6 +46,7 @@ fn bench_index_single(c: &mut Criterion) {
     });
 }
 
+/// Benchmark an exact full-text search query.
 fn bench_search_exact(c: &mut Criterion) {
     let (_dir, engine, _probe) = populated_engine();
     c.bench_function("search/exact/computer_science", |b| {
@@ -51,6 +56,7 @@ fn bench_search_exact(c: &mut Criterion) {
     });
 }
 
+/// Benchmark a fuzzy search query against a typo.
 fn bench_search_fuzzy(c: &mut Criterion) {
     let (_dir, engine, _probe) = populated_engine();
     c.bench_function("search/fuzzy/typo", |b| {
@@ -60,6 +66,7 @@ fn bench_search_fuzzy(c: &mut Criterion) {
     });
 }
 
+/// Benchmark the duplicate-detector's name+provider blocking query.
 fn bench_blocker(c: &mut Criterion) {
     let (_dir, engine, probe) = populated_engine();
     c.bench_function("search/search_by_name_and_provider", |b| {

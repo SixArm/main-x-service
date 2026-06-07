@@ -1,10 +1,37 @@
-//! Identity document model
+//! Identity documents (passport, national ID, driver's license, …).
+//!
+//! An [`IdentityDocument`] records the document's [`DocumentType`], its number,
+//! and optional issuing/validity metadata. The matcher compares documents by
+//! *type plus number*, which gives a strong deterministic signal: a matching
+//! passport number, for example, is near-conclusive evidence that two records
+//! describe the same worker (see `crate::matching::algorithms`).
+//!
+//! # Examples
+//!
+//! ```
+//! use worker_service::models::{IdentityDocument, DocumentType};
+//!
+//! let doc = IdentityDocument {
+//!     document_type: DocumentType::Passport,
+//!     number: "X1234567".into(),
+//!     issuing_country: Some("GB".into()),
+//!     issuing_authority: None,
+//!     issue_date: None,
+//!     expiry_date: None,
+//!     verified: false,
+//! };
+//! assert_eq!(doc.document_type.to_string(), "PASSPORT");
+//! ```
 
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// Identity document types
+/// The kind of an [`IdentityDocument`].
+///
+/// Each variant serializes to a fixed SCREAMING_SNAKE_CASE token (e.g.
+/// `"PASSPORT"`, `"DRIVERS_LICENSE"`); unrecognized wire values deserialize to
+/// [`Other`](Self::Other) via `#[serde(other)]`.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
 pub enum DocumentType {
     /// Passport
@@ -36,6 +63,8 @@ pub enum DocumentType {
     Other,
 }
 
+/// Renders the SCREAMING_SNAKE_CASE wire token for each variant (e.g.
+/// `DocumentType::DriversLicense` → `"DRIVERS_LICENSE"`), matching its serde form.
 impl std::fmt::Display for DocumentType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -52,7 +81,11 @@ impl std::fmt::Display for DocumentType {
     }
 }
 
-/// An identity document associated with a worker
+/// An identity document associated with a worker.
+///
+/// The [`document_type`](Self::document_type) + [`number`](Self::number) pair
+/// is the matching key; the remaining fields are descriptive metadata that the
+/// validation layer can check (e.g. issue date must precede expiry date).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct IdentityDocument {
     /// Type of document
@@ -81,6 +114,7 @@ pub struct IdentityDocument {
 mod tests {
     use super::*;
 
+    /// Every [`DocumentType`] has a non-empty, correct `Display` rendering.
     #[test]
     fn test_document_type_variants() {
         let types = vec![
@@ -104,6 +138,7 @@ mod tests {
         assert_eq!(format!("{}", DocumentType::Other), "OTHER");
     }
 
+    /// An [`IdentityDocument`] survives a JSON round-trip with all fields intact.
     #[test]
     fn test_document_serialization() {
         let doc = IdentityDocument {

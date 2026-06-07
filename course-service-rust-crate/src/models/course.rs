@@ -4,6 +4,28 @@
 //! parent classes (`LearningResource`, `CreativeWork`, `Thing`). The
 //! `CourseInstance` collection on this struct is the canonical
 //! representation of `hasCourseInstance`.
+//!
+//! A [`Course`] is the abstract *template* ("CS101 — Intro to Computer
+//! Science"); each concrete offering ("CS101, Fall 2026, Prof. Smith")
+//! is a [`CourseInstance`]
+//! in the [`instances`](Course::instances) collection. The struct is a
+//! plain serde value object: construction never validates, so callers
+//! can deserialize raw input first and run `crate::validation` second.
+//!
+//! # Examples
+//!
+//! ```
+//! use course_service::models::course::{Course, CourseStatus};
+//!
+//! let mut c = Course::new("Introduction to Computer Science");
+//! c.course_code = Some("CS101".into());
+//! c.keywords = vec!["programming".into(), "algorithms".into()];
+//!
+//! assert_eq!(c.name, "Introduction to Computer Science");
+//! // A fresh course is active and Published by default.
+//! assert!(c.active);
+//! assert_eq!(c.status, CourseStatus::Published);
+//! ```
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -164,12 +186,35 @@ pub struct Course {
     pub updated_at: DateTime<Utc>,
 }
 
+/// serde `#[serde(default = ...)]` helper for the [`Course::active`]
+/// flag, which defaults to `true` (a freshly deserialized course is
+/// active unless the input explicitly says otherwise).
 fn default_true() -> bool {
     true
 }
 
 impl Course {
     /// Construct a minimal valid Course with just the required name.
+    ///
+    /// Generates a fresh v4 [`id`](Course::id), stamps
+    /// [`created_at`](Course::created_at) /
+    /// [`updated_at`](Course::updated_at) to the current instant, sets
+    /// [`active`](Course::active) to `true`, and leaves every optional
+    /// field empty / `None`. This is the canonical builder used by
+    /// tests and handlers; set further fields directly afterwards.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use course_service::models::course::Course;
+    ///
+    /// let c = Course::new("Linear Algebra");
+    /// assert_eq!(c.name, "Linear Algebra");
+    /// assert!(c.identifiers.is_empty());
+    /// assert!(c.deleted_at.is_none());
+    /// // created_at and updated_at are set to the same instant.
+    /// assert_eq!(c.created_at, c.updated_at);
+    /// ```
     pub fn new(name: impl Into<String>) -> Self {
         let now = Utc::now();
         Self {
@@ -237,37 +282,69 @@ pub enum CourseStatus {
 
 /// schema.org/educationalLevel — common buckets. `Custom` keeps the
 /// surface extensible without forking the enum.
+///
+/// Maps one-to-one onto `course_matcher::EducationalLevel` via
+/// `crate::matching::adapter`, so the level participates in the
+/// matcher's educational-level component score.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum EducationalLevel {
+    /// Entry level; no prior knowledge assumed.
     Beginner,
+    /// Some prior knowledge assumed.
     Intermediate,
+    /// Substantial prior knowledge assumed.
     Advanced,
+    /// Mastery level.
     Expert,
+    /// Primary / elementary schooling.
     PrimaryEducation,
+    /// Secondary / high-school schooling.
     SecondaryEducation,
+    /// Tertiary education, unspecified degree level.
     HigherEducation,
+    /// Bachelor-level study.
     Undergraduate,
+    /// Master-level study.
     Graduate,
+    /// Doctoral / post-master study.
     Postgraduate,
+    /// Trade / vocational training.
     Vocational,
+    /// Continuing professional development.
     ProfessionalDevelopment,
+    /// Any level not covered above, carried verbatim.
     Custom(String),
 }
 
 /// schema.org/learningResourceType — coarse buckets.
+///
+/// Maps one-to-one onto `course_matcher::LearningResourceType` via
+/// `crate::matching::adapter`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum LearningResourceType {
+    /// A lecture (instructor presents to learners).
     Lecture,
+    /// A guided, step-by-step tutorial.
     Tutorial,
+    /// A hands-on workshop.
     Workshop,
+    /// A graded or ungraded assignment.
     Assignment,
+    /// A reading (text resource).
     Reading,
+    /// A video resource.
     Video,
+    /// An audio resource.
     Audio,
+    /// An exam / assessment.
     Exam,
+    /// An interactive simulation.
     Simulation,
+    /// A project (often capstone / portfolio).
     Project,
+    /// A discussion / seminar.
     Discussion,
+    /// Any type not covered above, carried verbatim.
     Custom(String),
 }
 
@@ -283,13 +360,21 @@ pub enum InteractivityType {
     Mixed,
 }
 
-/// schema.org-style cross-references between Course records.
+/// schema.org-style cross-reference between two Course records.
+///
+/// Stored in its own `course_links` child table. The merge workflow
+/// adds a [`LinkType::Replaces`] link from the surviving course to the
+/// folded duplicate so the audit chain stays navigable.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CourseLink {
+    /// The id of the course on the other end of the relationship.
     pub other_course_id: Uuid,
+    /// How this course relates to [`other_course_id`](Self::other_course_id).
     pub link_type: LinkType,
 }
 
+/// The kind of relationship a [`CourseLink`] expresses, from the
+/// perspective of the course that owns the link.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum LinkType {

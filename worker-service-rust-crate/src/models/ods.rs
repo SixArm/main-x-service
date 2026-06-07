@@ -8,11 +8,13 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// ODS record status
+/// ODS record status. Serializes in snake_case.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OdsStatus {
+    /// The record / role / relationship is currently in effect.
     Active,
+    /// The record / role / relationship is no longer in effect.
     Inactive,
 }
 
@@ -49,8 +51,11 @@ pub enum PeriodType {
 /// A typed date period with optional start and end dates
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct DatePeriod {
+    /// Whether this is a legal or operational period.
     pub period_type: PeriodType,
+    /// Start of the period; `None` means open-ended in the past.
     pub start_date: Option<NaiveDate>,
+    /// End of the period; `None` means still ongoing.
     pub end_date: Option<NaiveDate>,
 }
 
@@ -130,6 +135,7 @@ pub struct OrganizationSuccession {
 mod tests {
     use super::*;
 
+    /// [`OdsStatus`] variants round-trip through JSON.
     #[test]
     fn test_ods_status_serialization() {
         let statuses = vec![OdsStatus::Active, OdsStatus::Inactive];
@@ -140,6 +146,7 @@ mod tests {
         }
     }
 
+    /// [`RecordClass`] variants round-trip through JSON.
     #[test]
     fn test_record_class_serialization() {
         let classes = vec![RecordClass::Organisation, RecordClass::Site];
@@ -150,6 +157,7 @@ mod tests {
         }
     }
 
+    /// [`PeriodType`] variants round-trip through JSON.
     #[test]
     fn test_period_type_serialization() {
         let types = vec![PeriodType::Legal, PeriodType::Operational];
@@ -160,6 +168,7 @@ mod tests {
         }
     }
 
+    /// A [`DatePeriod`] with an open end stores its fields verbatim.
     #[test]
     fn test_date_period_construction() {
         let period = DatePeriod {
@@ -171,6 +180,7 @@ mod tests {
         assert_eq!(period.period_type, PeriodType::Legal);
     }
 
+    /// An [`OrganizationRole`] preserves its primary flag and code.
     #[test]
     fn test_organization_role_construction() {
         let role = OrganizationRole {
@@ -189,6 +199,7 @@ mod tests {
         assert_eq!(role.role_code, "RO197");
     }
 
+    /// An [`OrganizationRelationship`] preserves its type code and target.
     #[test]
     fn test_organization_relationship_construction() {
         let rel = OrganizationRelationship {
@@ -204,6 +215,7 @@ mod tests {
         assert_eq!(rel.target_ods_code, "X26");
     }
 
+    /// An [`OrganizationSuccession`] preserves its succession type and flag.
     #[test]
     fn test_organization_succession_construction() {
         let succ = OrganizationSuccession {
@@ -218,6 +230,7 @@ mod tests {
         assert!(!succ.has_forward_succession);
     }
 
+    /// [`SuccessionType`] variants round-trip through JSON.
     #[test]
     fn test_succession_type_serialization() {
         let types = vec![SuccessionType::Predecessor, SuccessionType::Successor];
@@ -228,6 +241,7 @@ mod tests {
         }
     }
 
+    /// [`RecordUseType`] variants round-trip through JSON.
     #[test]
     fn test_record_use_type_serialization() {
         let types = vec![RecordUseType::Full, RecordUseType::RefOnly];

@@ -1,5 +1,6 @@
-//! Repository layer: converts between the domain [`Event`] and the
-//! SeaORM entities defined in [`crate::db::models`].
+//! Repository layer: converts between the domain
+//! [`Event`](crate::models::Event) and the SeaORM entities defined in
+//! [`crate::db::models`].
 
 use chrono::Utc;
 use sea_orm::sea_query::Expr;
@@ -15,15 +16,19 @@ use crate::Result;
 
 use super::models::*;
 
-/// Per-request audit context.
+/// Who/where/what context attached to each audited write.
 #[derive(Debug, Clone)]
 pub struct AuditContext {
+    /// Acting user id (defaults to `"system"`).
     pub user_id: Option<String>,
+    /// Originating IP address.
     pub ip_address: Option<String>,
+    /// Originating user-agent string.
     pub user_agent: Option<String>,
 }
 
 impl Default for AuditContext {
+    /// A `system`-attributed context with no IP / user-agent.
     fn default() -> Self {
         Self {
             user_id: Some("system".into()),
@@ -33,25 +38,37 @@ impl Default for AuditContext {
     }
 }
 
-/// CRUD + simple search for [`Event`].
+/// CRUD + simple search abstraction for [`Event`]. Object-safe (via
+/// `async_trait`) so it can be held as `Arc<dyn EventRepository>`.
 #[async_trait::async_trait]
 pub trait EventRepository: Send + Sync {
+    /// Insert a new event (and its child rows); returns the stored event.
     async fn create(&self, event: &Event) -> Result<Event>;
+    /// Fetch one non-deleted event by id, if it exists.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Event>>;
+    /// Replace an event and its child rows; returns the stored event.
     async fn update(&self, event: &Event) -> Result<Event>;
+    /// Soft-delete an event by id.
     async fn delete(&self, id: &Uuid) -> Result<()>;
+    /// Case-insensitive substring search over event names.
     async fn search(&self, query: &str) -> Result<Vec<Event>>;
+    /// List active events with `limit`/`offset` pagination.
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Event>>;
 }
 
-/// SeaORM-backed implementation.
+/// SeaORM-backed [`EventRepository`] with optional event publishing and
+/// audit logging.
 pub struct SeaOrmEventRepository {
+    /// The database connection/pool.
     db: DatabaseConnection,
+    /// Optional event-stream publisher for CRUD notifications.
     event_publisher: Option<std::sync::Arc<dyn crate::streaming::EventProducer>>,
+    /// Optional audit-log repository for write trails.
     audit_log: Option<std::sync::Arc<super::audit::AuditLogRepository>>,
 }
 
 impl SeaOrmEventRepository {
+    /// Construct a repository over `db` with no publisher or audit log.
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
             db,
@@ -60,6 +77,7 @@ impl SeaOrmEventRepository {
         }
     }
 
+    /// Builder: attach an event-stream publisher.
     pub fn with_event_publisher(
         mut self,
         publisher: std::sync::Arc<dyn crate::streaming::EventProducer>,
@@ -68,6 +86,7 @@ impl SeaOrmEventRepository {
         self
     }
 
+    /// Builder: attach an audit-log repository.
     pub fn with_audit_log(
         mut self,
         audit_log: std::sync::Arc<super::audit::AuditLogRepository>,
@@ -76,6 +95,8 @@ impl SeaOrmEventRepository {
         self
     }
 
+    /// Publish a streaming event if a publisher is attached, logging
+    /// (but swallowing) any publish error.
     fn publish_event(&self, event: crate::streaming::EventEvent) {
         if let Some(ref publisher) = self.event_publisher {
             if let Err(e) = publisher.publish(event) {
@@ -84,6 +105,11 @@ impl SeaOrmEventRepository {
         }
     }
 
+    /// Write one audit-log entry for `action` (`"CREATE"` / `"UPDATE"`
+    /// / `"DELETE"`) on the given entity, dispatching to the matching
+    /// [`AuditLogRepository`](super::audit::AuditLogRepository) method.
+    /// A no-op when no audit log is attached; any log error is traced
+    /// and swallowed so audit failures never abort the write.
     async fn log_audit(
         &self,
         action: &str,
@@ -145,16 +171,29 @@ impl SeaOrmEventRepository {
 // Conversions: domain Event ↔ SeaORM rows
 // ---------------------------------------------------------------------------
 
+/// One [`Event`] flattened into its parent row plus all child-table
+/// rows, ready to insert under a single transaction.
 struct ChildRows {
+    /// The parent `events` row.
     event_row: events::ActiveModel,
+    /// `event_identifiers` rows (one per external identifier).
     identifiers: Vec<event_identifiers::ActiveModel>,
+    /// `event_locations` rows (one per [`Location`] in order).
     locations: Vec<event_locations::ActiveModel>,
+    /// `event_parties` rows across all six role lists.
     parties: Vec<event_parties::ActiveModel>,
+    /// `event_offers` rows (one per [`Offer`] in order).
     offers: Vec<event_offers::ActiveModel>,
+    /// `event_links` rows (cross-event links).
     links: Vec<event_links::ActiveModel>,
+    /// `event_sub_events` rows (sub-event id references in order).
     sub_events: Vec<event_sub_events::ActiveModel>,
 }
 
+/// Flatten a domain [`Event`] into a [`ChildRows`] bundle of SeaORM
+/// `ActiveModel`s. Stamps `created_at`/`updated_at` to "now"; mints
+/// fresh `Uuid`s for child rows; serializes the JSONB array fields;
+/// and fans the six party role-lists out via [`push_party_rows`].
 fn to_rows(event: &Event) -> ChildRows {
     let now = Utc::now();
     let event_row = events::ActiveModel {
@@ -291,6 +330,9 @@ fn to_rows(event: &Event) -> ChildRows {
     }
 }
 
+/// Append one `event_parties` row per [`Party`] in `parties`, tagging
+/// each with `role` (e.g. `"organizer"`) and its 0-based `position`
+/// so insertion order can be restored on read.
 fn push_party_rows(
     rows: &mut Vec<event_parties::ActiveModel>,
     event_id: Uuid,
@@ -315,6 +357,11 @@ fn push_party_rows(
     }
 }
 
+/// Flatten one [`Location`] union variant into a single
+/// `event_locations` row. The `kind` column (`"place"` /
+/// `"postal_address"` / `"virtual"` / `"text"`) records which variant
+/// was stored so [`row_to_location`] can reconstruct it; columns not
+/// relevant to the variant are left `None`.
 fn location_to_row(
     event_id: Uuid,
     pos: i32,
@@ -379,6 +426,11 @@ fn location_to_row(
     row
 }
 
+/// Rebuild a domain [`Event`] from its parent row and the six child-row
+/// vectors. Child rows are sorted by their stored `position` to restore
+/// insertion order; JSONB arrays are deserialized; parties are bucketed
+/// back into the six role lists by their `role` column; and `about` /
+/// `works` are reset to empty (not yet persisted as child tables).
 fn from_rows(
     event_row: events::Model,
     identifiers: Vec<event_identifiers::Model>,
@@ -515,6 +567,10 @@ fn from_rows(
     }
 }
 
+/// Reconstruct a [`Location`] union variant from one `event_locations`
+/// row, dispatching on the `kind` column. Returns `None` for an
+/// unrecognized `kind` or a `text` row missing its value, so callers
+/// `filter_map` over the results.
 fn row_to_location(row: event_locations::Model) -> Option<Location> {
     match row.kind.as_str() {
         "place" => Some(Location::Place(Place {
@@ -535,6 +591,9 @@ fn row_to_location(row: event_locations::Model) -> Option<Location> {
     }
 }
 
+/// Assemble an [`Address`] from the address columns of an
+/// `event_locations` row, returning `None` when every address column
+/// is empty (so a bare place/virtual row doesn't yield a blank address).
 fn address_from_row(row: &event_locations::Model) -> Option<Address> {
     let any = row.line1.is_some()
         || row.line2.is_some()
@@ -556,6 +615,9 @@ fn address_from_row(row: &event_locations::Model) -> Option<Address> {
     })
 }
 
+/// Serialize a serde enum to its string column representation by
+/// round-tripping through [`serde_json`] and taking the JSON string
+/// body; non-string serializations collapse to `""`.
 fn enum_to_str<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_value(value)
         .ok()
@@ -563,18 +625,26 @@ fn enum_to_str<T: serde::Serialize>(value: &T) -> String {
         .unwrap_or_default()
 }
 
+/// Inverse of [`enum_to_str`]: deserialize a column string back into a
+/// serde enum, falling back to `default` on any unrecognized value.
 fn str_to_enum<T: serde::de::DeserializeOwned>(s: &str, default: T) -> T {
     serde_json::from_value::<T>(serde_json::Value::String(s.to_string())).unwrap_or(default)
 }
 
+/// Parse an `identifier_type` column string into an [`IdentifierType`],
+/// defaulting to [`IdentifierType::Other`] for unknown values.
 fn parse_identifier_type(s: &str) -> IdentifierType {
     str_to_enum(s, IdentifierType::Other)
 }
 
+/// Parse a `use_type` column string into an optional [`IdentifierUse`];
+/// `None` when the value is absent or unrecognized.
 fn parse_identifier_use(s: &str) -> Option<IdentifierUse> {
     serde_json::from_value(serde_json::Value::String(s.to_string())).ok()
 }
 
+/// Parse an `availability` column string into an optional
+/// [`OfferAvailability`]; `None` when absent or unrecognized.
 fn parse_offer_availability(s: &str) -> Option<OfferAvailability> {
     serde_json::from_value(serde_json::Value::String(s.to_string())).ok()
 }
@@ -584,6 +654,9 @@ fn parse_offer_availability(s: &str) -> Option<OfferAvailability> {
 // ---------------------------------------------------------------------------
 
 impl SeaOrmEventRepository {
+    /// Load all six child-row vectors for one event id in fixed order
+    /// (identifiers, locations, parties, offers, links, sub-events),
+    /// ready to feed into [`from_rows`].
     async fn load_children(
         &self,
         event_id: &Uuid,

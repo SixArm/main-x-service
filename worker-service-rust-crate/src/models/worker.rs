@@ -1,4 +1,35 @@
-//! Worker model definition
+//! The [`Worker`] aggregate — the central record of the worker-identity index.
+//!
+//! A [`Worker`] gathers everything the registry knows about one real-world
+//! worker: their [`HumanName`] (plus aliases), identifiers, contacts,
+//! addresses, identity documents, emergency contacts, and links to other
+//! worker records. Most fields are collections or `Option`s because the data
+//! is assembled incrementally from many source systems, and few sources
+//! supply every attribute.
+//!
+//! This file also defines the worker-specific helper types: [`HumanName`] and
+//! its [`NameUse`], the [`WorkerType`] classification, and the [`WorkerLink`]
+//! /[`LinkType`] pair used to express "this record replaces / refers to that
+//! one" relationships created during merges.
+//!
+//! # Examples
+//!
+//! ```
+//! use worker_service::models::{Worker, HumanName, Gender, WorkerType};
+//!
+//! let name = HumanName {
+//!     use_type: None,
+//!     family: "Okafor".into(),
+//!     given: vec!["Ada".into()],
+//!     prefix: vec!["Dr.".into()],
+//!     suffix: vec![],
+//! };
+//! let mut worker = Worker::new(name, Gender::Female);
+//! worker.worker_type = Some(WorkerType::Doctor);
+//!
+//! assert_eq!(worker.full_name(), "Ada Okafor");
+//! assert!(worker.active);
+//! ```
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -7,7 +38,12 @@ use utoipa::ToSchema;
 
 use super::{Address, ContactPoint, Gender, Identifier, IdentityDocument, EmergencyContact};
 
-/// Worker resource
+/// A worker identity record — the registry's central aggregate.
+///
+/// Created via [`Worker::new`], which assigns a fresh v4 [`Uuid`] and sets the
+/// creation/update timestamps. The remaining fields start empty/`None` and are
+/// populated as data arrives. Soft-delete is expressed through [`active`](Self::active)
+/// (set `false` rather than removing the row) so the audit trail stays intact.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Worker {
     /// Unique worker identifier
@@ -81,25 +117,44 @@ pub struct Worker {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Human name representation
+/// A structured human name, modeled on the FHIR `HumanName` datatype.
+///
+/// Splitting the name into [`family`](Self::family), [`given`](Self::given),
+/// [`prefix`](Self::prefix), and [`suffix`](Self::suffix) lets the matcher
+/// compare components independently (family-name similarity is weighted more
+/// heavily than given-name similarity — see `crate::matching::algorithms`).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct HumanName {
+    /// How this name is used (official, nickname, maiden, …); `None` if unspecified.
     pub use_type: Option<NameUse>,
+    /// Family / last / surname.
     pub family: String,
+    /// Ordered given / first / middle names.
     pub given: Vec<String>,
+    /// Honorific prefixes such as `Dr.` or `Mr.`.
     pub prefix: Vec<String>,
+    /// Generational or qualification suffixes such as `Jr.` or `III`.
     pub suffix: Vec<String>,
 }
 
+/// The role a [`HumanName`] plays, mirroring the FHIR `name-use` value set.
+/// Serializes in lowercase.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum NameUse {
+    /// The name normally used.
     Usual,
+    /// The name registered on official documents.
     Official,
+    /// A temporary name.
     Temp,
+    /// A nickname / preferred informal name.
     Nickname,
+    /// A name used to preserve anonymity.
     Anonymous,
+    /// A name no longer in use.
     Old,
+    /// A maiden (pre-marriage) name.
     Maiden,
 }
 
@@ -131,6 +186,8 @@ pub enum WorkerType {
     Other,
 }
 
+/// Renders the snake_case wire token for each variant (e.g. `WorkerType::Doctor`
+/// → `"doctor"`), matching its serde representation.
 impl std::fmt::Display for WorkerType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -147,13 +204,19 @@ impl std::fmt::Display for WorkerType {
     }
 }
 
-/// Worker link to another worker record
+/// A typed link from this worker record to another, used to record merges and
+/// cross-references (e.g. after a merge the duplicate gets a `ReplacedBy` link
+/// and the survivor gets a `Replaces` link).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct WorkerLink {
+    /// The [`Uuid`] of the linked worker record.
     pub other_worker_id: Uuid,
+    /// The semantics of the link (see [`LinkType`]).
     pub link_type: LinkType,
 }
 
+/// The semantics of a [`WorkerLink`], mirroring the FHIR `link-type` value
+/// set. Serializes in lowercase.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum LinkType {
@@ -168,7 +231,28 @@ pub enum LinkType {
 }
 
 impl Worker {
-    /// Create a new worker
+    /// Creates a new active worker with a fresh v4 [`Uuid`] and
+    /// `created_at`/`updated_at` set to the current time.
+    ///
+    /// All collection fields start empty and all optional fields start `None`;
+    /// populate them via field assignment after construction.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use worker_service::models::{Worker, HumanName, Gender};
+    ///
+    /// let name = HumanName {
+    ///     use_type: None,
+    ///     family: "Lee".into(),
+    ///     given: vec!["Min".into()],
+    ///     prefix: vec![],
+    ///     suffix: vec![],
+    /// };
+    /// let worker = Worker::new(name, Gender::Unknown);
+    /// assert!(worker.active);
+    /// assert!(worker.identifiers.is_empty());
+    /// ```
     pub fn new(name: HumanName, gender: Gender) -> Self {
         let now = Utc::now();
         Self {
@@ -197,17 +281,60 @@ impl Worker {
         }
     }
 
-    /// Get full name as a string
+    /// Returns the display name as `"<given...> <family>"`.
+    ///
+    /// The given names are space-joined in order, then the family name is
+    /// appended. With no given names the result has a leading space.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use worker_service::models::{Worker, HumanName, Gender};
+    ///
+    /// let name = HumanName {
+    ///     use_type: None,
+    ///     family: "Garcia".into(),
+    ///     given: vec!["Maria".into(), "Elena".into()],
+    ///     prefix: vec![],
+    ///     suffix: vec![],
+    /// };
+    /// let worker = Worker::new(name, Gender::Female);
+    /// assert_eq!(worker.full_name(), "Maria Elena Garcia");
+    /// ```
     pub fn full_name(&self) -> String {
         let given = self.name.given.join(" ");
         format!("{} {}", given, self.name.family)
     }
 
-    /// Get tax ID, falling back to TAX-type identifier if tax_id field is empty
+    /// Returns the worker's effective tax ID for matching purposes.
+    ///
+    /// Prefers the dedicated [`tax_id`](Self::tax_id) field; if that is `None`,
+    /// falls back to the value of the first identifier whose type is
+    /// [`IdentifierType::TAX`](super::IdentifierType::TAX). Returns `None` when
+    /// neither source carries a tax ID. The deterministic matcher uses this to
+    /// short-circuit on an exact tax-ID match.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use worker_service::models::{Worker, HumanName, Gender};
+    ///
+    /// let name = HumanName {
+    ///     use_type: None, family: "Roe".into(), given: vec!["Jo".into()],
+    ///     prefix: vec![], suffix: vec![],
+    /// };
+    /// let mut worker = Worker::new(name, Gender::Other);
+    /// assert_eq!(worker.effective_tax_id(), None);
+    ///
+    /// worker.tax_id = Some("123-45-6789".into());
+    /// assert_eq!(worker.effective_tax_id(), Some("123-45-6789"));
+    /// ```
     pub fn effective_tax_id(&self) -> Option<&str> {
+        // The dedicated field wins when present.
         if let Some(ref tid) = self.tax_id {
             return Some(tid.as_str());
         }
+        // Otherwise scan the identifier list for a TAX-typed entry.
         self.identifiers.iter()
             .find(|id| id.identifier_type == super::IdentifierType::TAX)
             .map(|id| id.value.as_str())
@@ -219,6 +346,7 @@ mod tests {
     use super::*;
     use crate::models::Gender;
 
+    /// `new` sets sensible defaults: active, not deceased, empty collections.
     #[test]
     fn test_worker_new_defaults() {
         let name = HumanName {
@@ -248,6 +376,7 @@ mod tests {
         assert!(worker.managing_organization.is_none());
     }
 
+    /// A worker survives a JSON serialize/deserialize round-trip unchanged.
     #[test]
     fn test_worker_serialization_roundtrip() {
         let name = HumanName {
@@ -271,6 +400,7 @@ mod tests {
         assert_eq!(deserialized.birth_date, worker.birth_date);
     }
 
+    /// `full_name` joins all given names before the family name.
     #[test]
     fn test_human_name_display() {
         let name = HumanName {
@@ -285,6 +415,7 @@ mod tests {
         assert_eq!(full, "Maria Elena Garcia");
     }
 
+    /// Every [`WorkerType`] variant round-trips through JSON.
     #[test]
     fn test_worker_type_variants() {
         let types = vec![
@@ -305,6 +436,7 @@ mod tests {
         }
     }
 
+    /// A worker's `worker_type` round-trips and its `Display` is correct.
     #[test]
     fn test_worker_with_worker_type() {
         let name = HumanName {
@@ -325,6 +457,7 @@ mod tests {
         assert_eq!(deser.worker_type, Some(WorkerType::Doctor));
     }
 
+    /// Every [`Gender`] variant round-trips through JSON.
     #[test]
     fn test_gender_variants() {
         // Test all gender variants serialize/deserialize correctly

@@ -1,8 +1,56 @@
+//! Privacy controls: field masking and GDPR data export for [`Place`] records.
+//!
+//! Two complementary operations:
+//!
+//! - [`mask_place`] returns a redacted *copy* suitable for low-trust views —
+//!   phone/fax numbers keep only their leading digits and geo coordinates are
+//!   rounded to ~1 km precision (two decimal places), so a place can be shown
+//!   without disclosing an exact contact number or pinpoint location.
+//! - [`gdpr_export`] serializes the *full* record to JSON for a data-subject
+//!   access request (right of access / portability).
+//!
+//! Masking never mutates the input; the original record is left intact.
+//!
+//! # Examples
+//!
+//! ```
+//! use place_service::models::place::Place;
+//! use place_service::models::geo::GeoCoordinates;
+//! use place_service::privacy::mask_place;
+//!
+//! let mut place = Place::new("Sensitive Place");
+//! place.telephone = Some("+1-555-867-5309".into());
+//! place.geo = Some(GeoCoordinates::new(40.78293456, -73.96543210));
+//!
+//! let masked = mask_place(&place);
+//! assert!(masked.telephone.unwrap().ends_with("****"));
+//! assert!((masked.geo.unwrap().latitude - 40.78).abs() < 0.01);
+//! ```
+
 use crate::models::place::Place;
 use serde_json::Value;
 
 /// Mask sensitive fields in a Place for privacy.
+///
+/// Returns a clone with telephone and fax masked (all but the last four
+/// characters) and geo coordinates rounded to two decimal places (~1 km). All
+/// other fields are copied verbatim; the input is not modified.
+///
+/// # Examples
+///
+/// ```
+/// use place_service::models::place::Place;
+/// use place_service::privacy::mask_place;
+///
+/// let mut place = Place::new("Test");
+/// place.telephone = Some("+1-555-867-5309".into());
+/// let masked = mask_place(&place);
+/// assert!(!masked.telephone.unwrap().contains("5309"));
+/// // The original is untouched.
+/// assert_eq!(place.telephone.as_deref(), Some("+1-555-867-5309"));
+/// ```
 pub fn mask_place(place: &Place) -> Place {
+    // Work on a clone so the caller's record is never mutated.
     let mut masked = place.clone();
 
     if let Some(tel) = &masked.telephone {
@@ -12,6 +60,7 @@ pub fn mask_place(place: &Place) -> Place {
         masked.fax_number = Some(mask_phone(fax));
     }
     if let Some(geo) = &mut masked.geo {
+        // Round to two decimals (~1 km) so the exact location is obscured.
         geo.latitude = (geo.latitude * 100.0).round() / 100.0;
         geo.longitude = (geo.longitude * 100.0).round() / 100.0;
     }
@@ -19,15 +68,37 @@ pub fn mask_place(place: &Place) -> Place {
     masked
 }
 
+/// Mask a phone/fax number, keeping all but the last four characters and
+/// replacing the tail with `"****"`.
+///
+/// Numbers of four characters or fewer are fully redacted to `"****"` so no
+/// digits leak from very short inputs.
 fn mask_phone(phone: &str) -> String {
+    // Too short to reveal any prefix without exposing most of the number.
     if phone.len() <= 4 {
         return "****".to_string();
     }
+    // `saturating_sub` is defensive; the length guard above already ensures
+    // a non-empty visible prefix.
     let visible = &phone[..phone.len().saturating_sub(4)];
     format!("{visible}****")
 }
 
 /// Export place data for GDPR compliance (all fields, JSON format).
+///
+/// Serializes the entire record via Serde. Falls back to JSON `null` if
+/// serialization somehow fails (it does not for the `Place` type).
+///
+/// # Examples
+///
+/// ```
+/// use place_service::models::place::Place;
+/// use place_service::privacy::gdpr_export;
+///
+/// let place = Place::new("Export Test");
+/// let export = gdpr_export(&place);
+/// assert_eq!(export["name"], "Export Test");
+/// ```
 pub fn gdpr_export(place: &Place) -> Value {
     serde_json::to_value(place).unwrap_or(Value::Null)
 }
@@ -37,6 +108,7 @@ mod tests {
     use super::*;
     use crate::models::geo::GeoCoordinates;
 
+    /// Telephone is masked, hiding the trailing digits.
     #[test]
     fn test_mask_telephone() {
         let mut place = Place::new("Test");
@@ -47,6 +119,7 @@ mod tests {
         assert!(!tel.contains("5309"));
     }
 
+    /// Fax number is masked like a telephone.
     #[test]
     fn test_mask_fax() {
         let mut place = Place::new("Test");
@@ -56,6 +129,7 @@ mod tests {
         assert!(fax.ends_with("****"));
     }
 
+    /// Geo coordinates are rounded to ~1 km precision.
     #[test]
     fn test_mask_geo_coordinates() {
         let mut place = Place::new("Test");
@@ -66,6 +140,7 @@ mod tests {
         assert!((geo.longitude - (-73.97)).abs() < 0.01);
     }
 
+    /// Non-sensitive fields like the name are preserved.
     #[test]
     fn test_mask_preserves_name() {
         let place = Place::new("Central Park");
@@ -73,6 +148,7 @@ mod tests {
         assert_eq!(masked.name, "Central Park");
     }
 
+    /// Masking a record with no sensitive fields leaves them absent.
     #[test]
     fn test_mask_no_sensitive_fields() {
         let place = Place::new("Test");
@@ -81,6 +157,7 @@ mod tests {
         assert!(masked.fax_number.is_none());
     }
 
+    /// A short phone (≤4 chars) is fully redacted to `****`.
     #[test]
     fn test_mask_short_phone() {
         let mut place = Place::new("Test");
@@ -89,6 +166,7 @@ mod tests {
         assert_eq!(masked.telephone.as_deref(), Some("****"));
     }
 
+    /// GDPR export includes user-supplied fields.
     #[test]
     fn test_gdpr_export() {
         let mut place = Place::new("Export Test");
@@ -98,6 +176,7 @@ mod tests {
         assert_eq!(export["description"], "A test place");
     }
 
+    /// GDPR export includes system fields (id, timestamps, soft-delete flag).
     #[test]
     fn test_gdpr_export_has_all_fields() {
         let place = Place::new("Full Export");

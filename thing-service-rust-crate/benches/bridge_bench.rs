@@ -20,10 +20,12 @@ use thing_service::models::{
 
 // -------- fixtures -----------------------------------------------------------
 
+/// A name-only fixture representing the cheapest possible record.
 fn minimal_thing() -> Thing {
     Thing::new("Test Thing")
 }
 
+/// A fully-populated fixture exercising every adapter projection path.
 fn rich_thing() -> Thing {
     let mut t = Thing::new("Pride and Prejudice");
     t.alternate_names = vec!["First Impressions".into()];
@@ -47,6 +49,7 @@ fn rich_thing() -> Thing {
     t
 }
 
+/// A matcher engine with the default configuration.
 fn engine() -> MatchingEngine {
     MatchingEngine::new(MatchConfig::default())
 }
@@ -55,6 +58,7 @@ fn engine() -> MatchingEngine {
 // Group 1: adapter projection cost (minimal vs rich record)
 // =============================================================================
 
+/// Benchmark the adapter projection alone for minimal and rich records.
 fn bench_adapter_only(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_adapter_only");
     let minimal = minimal_thing();
@@ -80,6 +84,7 @@ fn bench_adapter_only(c: &mut Criterion) {
 // Group 2: end-to-end bridge — adapter + engine
 // =============================================================================
 
+/// Benchmark the full adapter + engine bridge on clone matches.
 fn bench_end_to_end(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_end_to_end");
     let engine = engine();
@@ -114,6 +119,7 @@ fn bench_end_to_end(c: &mut Criterion) {
 // Group 3: one-vs-many — the realistic dedup-on-create path
 // =============================================================================
 
+/// Benchmark the one-vs-many dedup path across 10/50/100 candidates.
 fn bench_one_to_many(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_one_to_many");
     let engine = engine();

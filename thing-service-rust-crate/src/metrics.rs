@@ -1,9 +1,10 @@
 //! Prometheus metrics for the thing service.
 //!
-//! This module owns a process-wide [`Registry`] populated with a fixed set
-//! of counters and histograms. Application code increments the global
-//! [`METRICS`] via `crate::metrics::METRICS` (e.g.
-//! `METRICS.thing_created_total.inc()`). Call [`Metrics::render`] to
+//! This module owns a process-wide [`Registry`](prometheus::Registry)
+//! populated with a fixed set of counters and histograms. Application code
+//! increments the global [`METRICS`](crate::metrics::METRICS) via
+//! `crate::metrics::METRICS` (e.g. `METRICS.thing_created_total.inc()`). Call
+//! [`Metrics::render`](crate::metrics::Metrics::render) to
 //! produce the Prometheus text-exposition format string; the crate
 //! does not currently ship an HTTP server to serve it.
 //!
@@ -33,9 +34,13 @@ pub struct Metrics {
     /// service-specific metrics beyond this default set.
     pub registry: Registry,
 
+    /// Count of thing records created.
     pub thing_created_total: Counter,
+    /// Count of thing records updated.
     pub thing_updated_total: Counter,
+    /// Count of thing records deleted.
     pub thing_deleted_total: Counter,
+    /// Count of thing match operations performed.
     pub thing_matched_total: Counter,
 
     /// HTTP requests, labeled by method, path, and status code.

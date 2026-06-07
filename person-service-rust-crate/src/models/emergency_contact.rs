@@ -1,4 +1,28 @@
-//! Emergency contact model
+//! The [`EmergencyContact`] model — a next-of-kin / point-of-contact.
+//!
+//! Each person may carry zero or more emergency contacts. A contact
+//! reuses the shared [`crate::models::ContactPoint`] and
+//! [`crate::models::Address`] value objects for its telecom and postal
+//! details, and the `is_primary` flag marks the one to reach first.
+//!
+//! # Examples
+//!
+//! ```
+//! use person_service::models::{EmergencyContact, ContactPoint, ContactPointSystem};
+//!
+//! let contact = EmergencyContact {
+//!     name: "Jane Doe".to_string(),
+//!     relationship: "spouse".to_string(),
+//!     telecom: vec![ContactPoint {
+//!         system: ContactPointSystem::Phone,
+//!         value: "+15551234567".to_string(),
+//!         use_type: None,
+//!     }],
+//!     address: None,
+//!     is_primary: true,
+//! };
+//! assert!(contact.is_primary);
+//! ```
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -29,6 +53,7 @@ mod tests {
     use super::*;
     use crate::models::ContactPointSystem;
 
+    /// An `EmergencyContact` constructed inline exposes its fields as set.
     #[test]
     fn test_emergency_contact_creation() {
         let contact = EmergencyContact {
@@ -50,6 +75,8 @@ mod tests {
         assert!(contact.address.is_none());
     }
 
+    /// An `EmergencyContact` (including a nested address) survives a
+    /// JSON serialize → deserialize round-trip.
     #[test]
     fn test_emergency_contact_serialization() {
         let contact = EmergencyContact {

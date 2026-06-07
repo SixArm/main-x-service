@@ -1,3 +1,6 @@
+//! Criterion benchmarks for the matching hot path: name / url / Soundex
+//! component functions, a full `compute_match`, and a 100-candidate batch.
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use thing_service::matching::name::name_similarity;
 use thing_service::matching::phonetic::soundex;
@@ -6,6 +9,7 @@ use thing_service::matching::url::url_similarity;
 use thing_service::models::identifier::ThingIdentifier;
 use thing_service::models::thing::Thing;
 
+/// Benchmark `name_similarity` for exact, fuzzy, and different name pairs.
 fn bench_name_similarity(c: &mut Criterion) {
     c.bench_function("name_similarity_exact", |b| {
         b.iter(|| name_similarity(black_box("Pride and Prejudice"), black_box("Pride and Prejudice")))
@@ -18,6 +22,7 @@ fn bench_name_similarity(c: &mut Criterion) {
     });
 }
 
+/// Benchmark `url_similarity` for identical and different URLs.
 fn bench_url_similarity(c: &mut Criterion) {
     c.bench_function("url_similarity_identical", |bench| {
         bench.iter(|| {
@@ -37,6 +42,7 @@ fn bench_url_similarity(c: &mut Criterion) {
     });
 }
 
+/// Benchmark `soundex` on a short and a long word.
 fn bench_soundex(c: &mut Criterion) {
     c.bench_function("soundex_short", |b| {
         b.iter(|| soundex(black_box("Book")))
@@ -46,6 +52,7 @@ fn bench_soundex(c: &mut Criterion) {
     });
 }
 
+/// Benchmark a full `compute_match` over a multi-component record pair.
 fn bench_full_match(c: &mut Criterion) {
     let mut a = Thing::new("Pride and Prejudice");
     a.description = Some("A novel by Jane Austen.".into());
@@ -65,6 +72,7 @@ fn bench_full_match(c: &mut Criterion) {
     });
 }
 
+/// Benchmark matching one target against 100 candidates.
 fn bench_batch_matching(c: &mut Criterion) {
     let target = Thing::new("Target Thing");
     let candidates: Vec<Thing> = (0..100)

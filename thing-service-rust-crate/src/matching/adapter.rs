@@ -16,8 +16,9 @@
 //! matcher uses an opaque `(property_id: String, value: String)` shape and
 //! drops the metadata.
 //!
-//! [`to_matcher_thing`] performs the projection so callers can use the
-//! canonical algorithm without rewriting their domain model.
+//! [`to_matcher_thing`](crate::matching::adapter::to_matcher_thing) performs
+//! the projection so callers can use the canonical algorithm without
+//! rewriting their domain model.
 //!
 //! # Mapping
 //!
@@ -29,7 +30,7 @@
 //! | `disambiguating_description` | `disambiguating_description` |
 //! | `additional_type` (Option) | one entry in `additional_types` |
 //! | `url` | `url` |
-//! | `identifiers[]` | mapped via [`map_identifier_property`] |
+//! | `identifiers[]` | mapped via [`map_identifier_property`](crate::matching::adapter::map_identifier_property) |
 //! | `images[0]` | `image` (first only — matcher takes a single URL) |
 //! | `main_entity_of_page` | `main_entity_of_page` |
 //! | `owner` | `owner` |
@@ -123,6 +124,11 @@ pub fn to_matcher_thing(t: &Thing) -> MThing {
     b.build()
 }
 
+/// Project a single service
+/// [`ThingIdentifier`](crate::models::identifier::ThingIdentifier) onto the
+/// matcher's opaque
+/// `(property_id, value)` shape, dropping the `name`/`url` metadata. Returns
+/// `None` when the matcher rejects the pair (e.g. an empty value).
 fn thing_identifier_to_matcher(id: &ThingIdentifier) -> Option<MIdentifier> {
     MIdentifier::new(map_identifier_property(&id.property_id), id.value.trim())
 }
@@ -150,6 +156,8 @@ pub fn map_identifier_property(t: &IdentifierType) -> &str {
 mod tests {
     use super::*;
 
+    /// Core fields (name, alternate names, additional_type, ISBN) project
+    /// across with the expected matcher-side cardinality and tokens.
     #[test]
     fn round_trip_basic() {
         let mut svc = Thing::new("Pride and Prejudice");
@@ -168,6 +176,7 @@ mod tests {
         assert_eq!(m.identifiers[0].value, "9780141439518");
     }
 
+    /// The service's `images` vec collapses to the matcher's single `image`.
     #[test]
     fn images_collapse_to_first() {
         let mut svc = Thing::new("Thing");
@@ -176,6 +185,7 @@ mod tests {
         assert_eq!(m.image.as_deref(), Some("https://a.example/1.jpg"));
     }
 
+    /// A `Custom(label)` identifier passes its label through as property_id.
     #[test]
     fn custom_identifier_passes_through() {
         let mut svc = Thing::new("Thing");

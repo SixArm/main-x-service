@@ -20,14 +20,19 @@ use event_service::models::{
     PartyKind, Place,
 };
 
+/// A fixed top-of-hour UTC start for deterministic fixtures.
 fn start_at() -> DateTime<Utc> { Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap() }
 
 // -------- fixtures -----------------------------------------------------------
 
+/// A bare event with only the required name + start fields — the
+/// cheapest possible adapter input.
 fn minimal_event() -> Event {
     Event::new("Test Event", start_at())
 }
 
+/// A fully-populated conference (end date, location, organizer,
+/// identifier) — the realistic adapter input.
 fn rich_event() -> Event {
     let mut e = Event::new("Annual Conference", start_at());
     e.end_date = Some(start_at() + chrono::Duration::hours(8));
@@ -66,6 +71,7 @@ fn rich_event() -> Event {
     e
 }
 
+/// A matching engine with the default configuration.
 fn engine() -> MatchingEngine {
     MatchingEngine::new(MatchConfig::default())
 }
@@ -74,6 +80,8 @@ fn engine() -> MatchingEngine {
 // Group 1: adapter projection cost (minimal vs rich record)
 // =============================================================================
 
+/// Benchmark `to_matcher_event` projection alone, on minimal and rich
+/// records.
 fn bench_adapter_only(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_adapter_only");
     let minimal = minimal_event();
@@ -99,6 +107,8 @@ fn bench_adapter_only(c: &mut Criterion) {
 // Group 2: end-to-end bridge — adapter + engine
 // =============================================================================
 
+/// Benchmark the full bridge path: adapter projection of both sides
+/// plus the engine `match_events` call.
 fn bench_end_to_end(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_end_to_end");
     let engine = engine();
@@ -133,6 +143,8 @@ fn bench_end_to_end(c: &mut Criterion) {
 // Group 3: one-vs-many — the realistic dedup-on-create path
 // =============================================================================
 
+/// Benchmark scoring one query against 10 / 50 / 100 candidates — the
+/// realistic dedup-on-create fan-out.
 fn bench_one_to_many(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_one_to_many");
     let engine = engine();

@@ -1,3 +1,7 @@
+//! Integration tests for the domain models: [`Thing`] construction /
+//! serialization / soft-delete, [`ThingIdentifier`] round-trips, and the
+//! [`Consent`] lifecycle.
+
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 
@@ -7,6 +11,7 @@ use thing_service::models::thing::Thing;
 
 // -- Thing lifecycle tests --
 
+/// A fully-populated Thing survives a JSON round-trip with all fields intact.
 #[test]
 fn test_thing_full_construction_and_serialization() {
     let mut thing = Thing::new("Pride and Prejudice");
@@ -40,6 +45,7 @@ fn test_thing_full_construction_and_serialization() {
     assert_eq!(deserialized.id, thing.id);
 }
 
+/// Soft-delete sets the flag and a `deleted_at` at/after creation time.
 #[test]
 fn test_thing_soft_delete_timestamps() {
     let mut thing = Thing::new("Temporary Thing");
@@ -55,6 +61,7 @@ fn test_thing_soft_delete_timestamps() {
     assert!(thing.deleted_at.unwrap() >= created);
 }
 
+/// Distinct Things get distinct auto-generated IDs.
 #[test]
 fn test_thing_ids_are_unique() {
     let a = Thing::new("Thing A");
@@ -64,6 +71,7 @@ fn test_thing_ids_are_unique() {
 
 // -- Identifier integration tests --
 
+/// A mixed list of identifier types round-trips through JSON.
 #[test]
 fn test_multiple_identifier_types() {
     let ids = vec![
@@ -86,6 +94,7 @@ fn test_multiple_identifier_types() {
     );
 }
 
+/// An identifier's optional PropertyValue `name`/`url` survive serialization.
 #[test]
 fn test_identifier_with_property_value_fields() {
     let mut id = ThingIdentifier::isbn("9780141439518");
@@ -99,6 +108,7 @@ fn test_identifier_with_property_value_fields() {
 
 // -- Consent integration tests --
 
+/// A consent is active while granted, then inactive once revoked.
 #[test]
 fn test_consent_lifecycle() {
     let thing_id = Uuid::new_v4();
@@ -117,6 +127,7 @@ fn test_consent_lifecycle() {
     assert!(!consent.is_active());
 }
 
+/// Every ConsentType variant round-trips through JSON.
 #[test]
 fn test_consent_all_types_serialization() {
     let types = [

@@ -1,4 +1,9 @@
-//! Benchmarks for event matcher algorithms.
+//! Benchmarks for the service-side event matching algorithms.
+//!
+//! Each Criterion group exercises one component of the matcher hot path
+//! (name, time, location, party, identifier), plus the end-to-end
+//! probabilistic match against 50 candidates and the Soundex phonetic
+//! similarity used as a name-score floor. Run with `cargo bench`.
 
 use chrono::{DateTime, TimeZone, Utc};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
@@ -11,14 +16,18 @@ use event_service::matching::phonetic;
 use event_service::matching::{EventMatcher, ProbabilisticMatcher};
 use event_service::models::*;
 
+/// Build a top-of-hour UTC timestamp for deterministic benchmarks.
 fn dt(year: i32, month: u32, day: u32, hour: u32) -> DateTime<Utc> {
     Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).unwrap()
 }
 
+/// Build a minimal event with the given name and start.
 fn make_event(name: &str, start: DateTime<Utc>) -> Event {
     Event::new(name, start)
 }
 
+/// Benchmark title matching for an exact pair and a one-typo fuzzy
+/// pair.
 fn bench_name_matching(c: &mut Criterion) {
     c.bench_function("name_matching_exact", |b| {
         b.iter(|| {
@@ -38,6 +47,7 @@ fn bench_name_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark start-date proximity scoring for two close timestamps.
 fn bench_time_matching(c: &mut Criterion) {
     let a = dt(2026, 3, 1, 9);
     let b = dt(2026, 3, 1, 10);
@@ -46,6 +56,7 @@ fn bench_time_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark `Place ↔ Place` location matching on a cloned venue.
 fn bench_location_matching(c: &mut Criterion) {
     let p1 = Place {
         id: None,
@@ -71,6 +82,7 @@ fn bench_location_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark fuzzy organizer-name matching for two similar parties.
 fn bench_party_matching(c: &mut Criterion) {
     let a = Party {
         kind: PartyKind::Organization,
@@ -91,6 +103,8 @@ fn bench_party_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark identifier matching where the two values differ only in
+/// formatting (dashes / spaces / case).
 fn bench_identifier_matching(c: &mut Criterion) {
     let a = Identifier::new(IdentifierType::BookingNumber, "sys".into(), "ABC-1234".into());
     let b = Identifier::new(IdentifierType::BookingNumber, "sys".into(), "abc 1234".into());
@@ -99,6 +113,8 @@ fn bench_identifier_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmark the end-to-end probabilistic match of one query against
+/// 50 candidate events.
 fn bench_probabilistic_match(c: &mut Criterion) {
     let config = MatchingConfig {
         threshold_score: 0.7,
@@ -115,6 +131,8 @@ fn bench_probabilistic_match(c: &mut Criterion) {
     });
 }
 
+/// Benchmark Soundex-based phonetic similarity for two like-sounding
+/// names.
 fn bench_phonetic(c: &mut Criterion) {
     c.bench_function("phonetic_similarity", |b| {
         b.iter(|| {

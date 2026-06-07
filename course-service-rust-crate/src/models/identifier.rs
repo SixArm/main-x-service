@@ -9,9 +9,19 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// One external identifier attached to a `Course`, modelled on
+/// schema.org/PropertyValue.
+///
+/// A `Course` carries a `Vec<CourseIdentifier>`; each entry pairs a
+/// scheme ([`property_id`](Self::property_id)) with a scheme-specific
+/// [`value`](Self::value). Schemes flagged by
+/// [`IdentifierType::is_deterministic`] let the matcher short-circuit
+/// scoring to 1.0 on an exact value match.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CourseIdentifier {
+    /// The identifier scheme (DOI, LMS course-id, Wikidata, …).
     pub property_id: IdentifierType,
+    /// The scheme-specific identifier value (e.g. the DOI string).
     pub value: String,
     /// Optional human-readable label.
     #[serde(default)]
@@ -21,6 +31,11 @@ pub struct CourseIdentifier {
     pub url: Option<String>,
 }
 
+/// The scheme of a [`CourseIdentifier`].
+///
+/// `Custom` keeps the surface extensible without forking the enum for
+/// every niche registry. See [`is_deterministic`](Self::is_deterministic)
+/// for which schemes the matcher treats as globally unique.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum IdentifierType {
     /// LMS course-id (Canvas, Moodle, Blackboard, …).
@@ -50,10 +65,24 @@ pub enum IdentifierType {
 }
 
 impl IdentifierType {
-    /// Identifier schemes whose values are unique-by-construction
-    /// across providers. A match on these short-circuits scoring to
-    /// 1.0. Course code is NOT deterministic (CS101 exists at many
-    /// universities).
+    /// Whether this scheme's values are unique-by-construction across
+    /// providers. A match on a deterministic scheme short-circuits
+    /// scoring to 1.0. Course code is NOT deterministic (CS101 exists
+    /// at many universities).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use course_service::models::identifier::IdentifierType;
+    ///
+    /// // Globally-unique schemes short-circuit the matcher.
+    /// assert!(IdentifierType::Doi.is_deterministic());
+    /// assert!(IdentifierType::Wikidata.is_deterministic());
+    ///
+    /// // Provider-scoped codes do not.
+    /// assert!(!IdentifierType::CourseCode.is_deterministic());
+    /// assert!(!IdentifierType::LmsCourseId.is_deterministic());
+    /// ```
     pub fn is_deterministic(&self) -> bool {
         matches!(
             self,

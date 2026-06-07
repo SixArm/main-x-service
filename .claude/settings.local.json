@@ -64,7 +64,22 @@
       "Bash(git status *)",
       "Bash(git diff *)",
       "Bash(git push *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(cargo bench *)",
+      "Bash([ -f \"$dir/$file\" ])",
+      "Bash([ -d \"$dir/AGENTS\" ])",
+      "Bash(pnpm install *)",
+      "Bash(cargo doc *)",
+      "Bash(pnpm check *)",
+      "Bash(bin/test)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(./bin/test)",
+      "Bash(echo \"---EXIT:$?---\")",
+      "Bash(chmod +x bin/test-loco-project)",
+      "Bash([ -f \"$d/src/lib.rs\" ])",
+      "Bash(sort -t: -k1,1 -k2,2n)",
+      "Bash(echo \"===BINTEST_EXIT:$?===\")",
+      "Bash(grep *)"
     ]
   }
 }

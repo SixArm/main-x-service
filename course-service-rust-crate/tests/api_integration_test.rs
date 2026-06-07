@@ -23,6 +23,9 @@ use tower::ServiceExt;
 
 use course_service::models::Course;
 
+/// Drive one request through the router via `oneshot` and decode the
+/// response into `(status, json)`. An empty body decodes to `Value::Null`
+/// so 204 responses are handled cleanly.
 async fn send(app: &axum::Router, method: Method, uri: &str, body: Option<Value>) -> (StatusCode, Value) {
     let req_body = body
         .map(|v| Body::from(serde_json::to_vec(&v).unwrap()))
@@ -43,6 +46,7 @@ async fn send(app: &axum::Router, method: Method, uri: &str, body: Option<Value>
     (status, json)
 }
 
+/// Health probe returns `200` with the `healthy` envelope.
 #[tokio::test]
 #[ignore]
 async fn health_returns_ok() {
@@ -54,6 +58,7 @@ async fn health_returns_ok() {
     assert_eq!(body["data"]["service"], "course-service");
 }
 
+/// Full CRUD lifecycle: create → get → update → soft-delete → 404.
 #[tokio::test]
 #[ignore]
 async fn create_get_update_softdelete_lifecycle() {
@@ -90,6 +95,7 @@ async fn create_get_update_softdelete_lifecycle() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
+/// Invalid create body yields `422` with a field-scoped `details` array.
 #[tokio::test]
 #[ignore]
 async fn validation_failure_returns_422_with_details() {
@@ -114,6 +120,7 @@ async fn validation_failure_returns_422_with_details() {
     assert!(fields.iter().any(|f| f == "url"));
 }
 
+/// A freshly created course is discoverable via the search endpoint.
 #[tokio::test]
 #[ignore]
 async fn search_finds_created_record() {
@@ -136,6 +143,7 @@ async fn search_finds_created_record() {
     assert!(!items.is_empty(), "expected at least one hit for {token}");
 }
 
+/// The check-duplicates endpoint flags an identical-shape probe.
 #[tokio::test]
 #[ignore]
 async fn check_duplicates_flags_a_clone() {
@@ -155,6 +163,7 @@ async fn check_duplicates_flags_a_clone() {
     assert_eq!(hits[0]["course_id"], json!(created.id));
 }
 
+/// The match endpoint returns the existing record among ranked candidates.
 #[tokio::test]
 #[ignore]
 async fn match_endpoint_returns_ranked_candidates() {
@@ -174,6 +183,7 @@ async fn match_endpoint_returns_ranked_candidates() {
     assert!(arr.iter().any(|c| c["course_id"] == json!(created.id)));
 }
 
+/// Merge completes and soft-deletes the duplicate (subsequent GET → 404).
 #[tokio::test]
 #[ignore]
 async fn merge_folds_duplicate_into_main() {
@@ -204,6 +214,7 @@ async fn merge_folds_duplicate_into_main() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
+/// Batch dedup returns the full counter + review-items response shape.
 #[tokio::test]
 #[ignore]
 async fn batch_dedup_returns_response_shape() {
@@ -223,6 +234,7 @@ async fn batch_dedup_returns_response_shape() {
     assert!(data["review_items"].is_array());
 }
 
+/// CourseInstance sub-resource: create → list → soft-delete round trip.
 #[tokio::test]
 #[ignore]
 async fn instance_subresource_round_trips() {
@@ -272,6 +284,7 @@ async fn instance_subresource_round_trips() {
     assert_eq!(status, StatusCode::NO_CONTENT);
 }
 
+/// Create + update produce `CREATE` and `UPDATE` audit-log entries.
 #[tokio::test]
 #[ignore]
 async fn audit_log_records_create_then_update() {
@@ -303,6 +316,7 @@ async fn audit_log_records_create_then_update() {
     assert!(actions.contains(&"UPDATE"));
 }
 
+/// The masked view nulls out provider (and other sensitive) fields.
 #[tokio::test]
 #[ignore]
 async fn masked_view_clears_provider_and_instructors() {
@@ -323,6 +337,7 @@ async fn masked_view_clears_provider_and_instructors() {
     assert!(env["data"]["provider_id"].is_null());
 }
 
+/// The GDPR export wraps the record in the source/schema envelope.
 #[tokio::test]
 #[ignore]
 async fn gdpr_export_envelopes_the_record() {

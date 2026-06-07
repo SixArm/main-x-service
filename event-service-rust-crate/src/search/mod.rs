@@ -1,4 +1,17 @@
-//! Event search over a Tantivy index.
+//! Event full-text search over an embedded Tantivy index.
+//!
+//! [`SearchEngine`](crate::search::SearchEngine) is the high-level
+//! facade used by the API and matching layers. It wraps an
+//! [`EventIndex`](crate::search::index::EventIndex) (the low-level
+//! schema + reader/writer in [`index`](crate::search::index)) and offers
+//! free-text, fuzzy, date-range, and combined name+date queries plus
+//! indexing and deletion. Documents are flattened from the rich
+//! [`Event`](crate::models::Event) aggregate by the private `build_doc`
+//! helper; queries return matching event-id strings.
+//!
+//! Heavy I/O setup (a Tantivy index lives on disk) means the examples
+//! here are described in prose rather than as runnable doctests; see the
+//! `#[cfg(test)]` module for usage against a `tempfile::TempDir`.
 
 use std::path::Path;
 use tantivy::{
@@ -11,17 +24,21 @@ use tantivy::{
 use crate::models::{Event, Location, Party};
 use crate::Result;
 
+/// Low-level Tantivy index: schema, reader, writer, stats.
 pub mod index;
+/// Query-building helpers layered on the index.
 pub mod query;
 
 pub use index::{EventIndex, EventIndexSchema, IndexStats};
 
-/// High-level wrapper around the Tantivy index.
+/// High-level facade over the Tantivy [`EventIndex`].
 pub struct SearchEngine {
+    /// The underlying index (schema + reader/writer).
     index: EventIndex,
 }
 
 impl SearchEngine {
+    /// Open (or create) the index at `index_path` and wrap it.
     pub fn new<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         Ok(Self {
             index: EventIndex::create_or_open(index_path)?,
@@ -151,6 +168,7 @@ impl SearchEngine {
         Ok(extract_ids(&searcher, s.id, &top))
     }
 
+    /// Remove an event from the index by its id string.
     pub fn delete_event(&self, event_id: &str) -> Result<()> {
         let mut writer = self.index.writer(50)?;
         let s = self.index.schema();
@@ -162,14 +180,17 @@ impl SearchEngine {
         Ok(())
     }
 
+    /// Return index statistics (document count, …).
     pub fn stats(&self) -> Result<IndexStats> {
         self.index.stats()
     }
 
+    /// Merge index segments to reclaim space and speed up reads.
     pub fn optimize(&self) -> Result<()> {
         self.index.optimize()
     }
 
+    /// Reload the reader so recently committed writes become visible.
     pub fn reload(&self) -> Result<()> {
         self.index.reload()
     }
@@ -179,6 +200,9 @@ impl SearchEngine {
 // helpers
 // ---------------------------------------------------------------------------
 
+/// Flatten an [`Event`] aggregate into a Tantivy document, joining
+/// multi-valued fields into space-separated strings and summarizing
+/// locations/parties into searchable text fields.
 fn build_doc(event: &Event, s: &EventIndexSchema) -> tantivy::TantivyDocument {
     let alternate_names = event.alternate_names.join(" ");
     let keywords = event.keywords.join(" ");
@@ -222,6 +246,7 @@ fn build_doc(event: &Event, s: &EventIndexSchema) -> tantivy::TantivyDocument {
     )
 }
 
+/// Join all party names into one space-separated, searchable string.
 fn parties_names(parties: &[Party]) -> String {
     parties
         .iter()
@@ -230,6 +255,8 @@ fn parties_names(parties: &[Party]) -> String {
         .join(" ")
 }
 
+/// Collapse a `Vec<Location>` into four space-joined searchable strings:
+/// `(names, cities, countries, urls)`, dispatched per variant.
 fn summarize_locations(locs: &[Location]) -> (String, String, String, String) {
     let mut names = Vec::new();
     let mut cities = Vec::new();
@@ -284,6 +311,8 @@ fn serde_plain<T: serde::Serialize>(v: &T) -> String {
         .unwrap_or_default()
 }
 
+/// Pull the stored `id` string from each scored hit, skipping any
+/// document that fails to load or lacks the field.
 fn extract_ids(
     searcher: &tantivy::Searcher,
     id_field: tantivy::schema::Field,
@@ -311,10 +340,12 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use tempfile::TempDir;
 
+    /// Build a minimal event for indexing tests.
     fn evt(name: &str, when: chrono::DateTime<Utc>) -> Event {
         Event::new(name, when)
     }
 
+    /// An indexed event is found by a token from its name.
     #[test]
     fn index_and_search_event_by_name() {
         let tmp = TempDir::new().unwrap();
@@ -328,6 +359,7 @@ mod tests {
         assert_eq!(ids[0], event.id.to_string());
     }
 
+    /// Fuzzy search tolerates a one-character typo in the title.
     #[test]
     fn fuzzy_search_finds_typo() {
         let tmp = TempDir::new().unwrap();
@@ -341,6 +373,7 @@ mod tests {
         assert_eq!(ids[0], event.id.to_string());
     }
 
+    /// Free-text search matches against an indexed organizer name.
     #[test]
     fn search_finds_organizer_name() {
         let tmp = TempDir::new().unwrap();
@@ -361,6 +394,7 @@ mod tests {
         assert_eq!(ids.len(), 1);
     }
 
+    /// Deleting an event removes it from subsequent search results.
     #[test]
     fn delete_event_drops_from_index() {
         let tmp = TempDir::new().unwrap();
@@ -375,6 +409,7 @@ mod tests {
         assert_eq!(engine.search("Workshop", 10).unwrap().len(), 0);
     }
 
+    /// Bulk indexing commits all events in a single batch.
     #[test]
     fn bulk_index() {
         let tmp = TempDir::new().unwrap();

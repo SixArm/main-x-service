@@ -1,8 +1,9 @@
 //! Prometheus metrics for the event service.
 //!
-//! This module owns a process-wide [`Registry`] populated with a fixed set
-//! of counters and histograms. Application code increments the global
-//! [`METRICS`] via `crate::metrics::METRICS` (e.g.
+//! This module owns a process-wide [`Registry`](prometheus::Registry)
+//! populated with a fixed set of counters and histograms. Application
+//! code increments the global [`METRICS`](crate::metrics::METRICS) via
+//! `crate::metrics::METRICS` (e.g.
 //! `METRICS.event_created_total.inc()`). The REST API exposes the
 //! registry at `GET /metrics.prom` in Prometheus text-exposition format
 //! (see [`crate::api::rest::handlers::metrics_prom`]). Configure your
@@ -34,9 +35,13 @@ pub struct Metrics {
     /// service-specific metrics beyond this default set.
     pub registry: Registry,
 
+    /// Count of event records created.
     pub event_created_total: Counter,
+    /// Count of event records updated.
     pub event_updated_total: Counter,
+    /// Count of event records soft-deleted.
     pub event_deleted_total: Counter,
+    /// Count of match operations performed.
     pub event_matched_total: Counter,
 
     /// HTTP requests, labeled by method, path, and status code.
@@ -50,6 +55,8 @@ pub struct Metrics {
 }
 
 impl Metrics {
+    /// Construct a fresh registry, build every counter/histogram, and
+    /// register them. Called once via [`METRICS`]'s lazy initializer.
     fn new() -> Self {
         let registry = Registry::new();
 
@@ -176,6 +183,7 @@ pub const CONTENT_TYPE: &str = "text/plain; version=0.0.4; charset=utf-8";
 mod tests {
     use super::*;
 
+    /// The rendered exposition text includes the registered metrics.
     #[test]
     fn render_includes_default_counters() {
         METRICS.event_created_total.inc();

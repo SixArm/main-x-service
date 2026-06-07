@@ -1,7 +1,14 @@
+//! Integration tests for the privacy pipeline.
+//!
+//! These cover [`mask_place`] and [`gdpr_export`] end to end: masking before
+//! export, full data export, the non-mutating contract, and exporting a
+//! soft-deleted record.
+
 use place_service::models::geo::GeoCoordinates;
 use place_service::models::place::Place;
 use place_service::privacy::{gdpr_export, mask_place};
 
+/// Masking then exporting yields redacted contact fields in the JSON.
 #[test]
 fn test_mask_then_export_workflow() {
     let mut place = Place::new("Sensitive Place");
@@ -16,6 +23,7 @@ fn test_mask_then_export_workflow() {
     assert!(tel.ends_with("****"));
 }
 
+/// An unmasked GDPR export contains all the record's fields.
 #[test]
 fn test_gdpr_export_full_data() {
     let mut place = Place::new("GDPR Test");
@@ -31,6 +39,7 @@ fn test_gdpr_export_full_data() {
     assert!(export.get("updated_at").is_some());
 }
 
+/// Masking returns a copy and leaves the original record unchanged.
 #[test]
 fn test_mask_does_not_modify_original() {
     let mut place = Place::new("Original");
@@ -40,6 +49,7 @@ fn test_mask_does_not_modify_original() {
     assert_eq!(place.telephone.as_deref(), Some("+1-555-1234"));
 }
 
+/// A soft-deleted record still exports, with the deletion flag and timestamp.
 #[test]
 fn test_soft_delete_then_export() {
     let mut place = Place::new("Deleted Place");

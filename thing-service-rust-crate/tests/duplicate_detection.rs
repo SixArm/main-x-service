@@ -13,10 +13,12 @@ use thing_service::models::{
     thing::Thing,
 };
 
+/// A matcher engine configured with the default preset.
 fn engine() -> MatchingEngine {
     MatchingEngine::default_config()
 }
 
+/// A fully-populated canonical book fixture reused across the bridge tests.
 fn pride_and_prejudice() -> Thing {
     let mut t = Thing::new("Pride and Prejudice");
     t.alternate_names = vec!["First Impressions".into()];
@@ -35,6 +37,7 @@ fn pride_and_prejudice() -> Thing {
 // Identical / near-duplicate cases
 // =============================================================================
 
+/// Identical clones score ≥ 0.95 with High confidence and is_match true.
 #[test]
 fn identical_clones_score_near_one_high_confidence() {
     let a = pride_and_prejudice();
@@ -50,6 +53,7 @@ fn identical_clones_score_near_one_high_confidence() {
     assert!(result.is_match);
 }
 
+/// A name typo still scores ≥ 0.95 when a shared ISBN anchors the match.
 #[test]
 fn typo_in_name_still_matches_with_supporting_identifier() {
     let a = pride_and_prejudice();
@@ -70,6 +74,7 @@ fn typo_in_name_still_matches_with_supporting_identifier() {
 // Deterministic short-circuit — globally-unique identifiers
 // =============================================================================
 
+/// A shared ISBN triggers deterministic_match and a 1.0 identifiers score.
 #[test]
 fn shared_isbn_short_circuits_to_one() {
     // ISBN is one of the matcher's deterministic identifier schemes
@@ -95,6 +100,7 @@ fn shared_isbn_short_circuits_to_one() {
     );
 }
 
+/// A shared DOI triggers the deterministic short-circuit.
 #[test]
 fn shared_doi_short_circuits_to_one() {
     let mut a = Thing::new("Some Paper");
@@ -107,6 +113,7 @@ fn shared_doi_short_circuits_to_one() {
     assert!(engine().deterministic_match(&ma, &mb));
 }
 
+/// A shared UUID triggers the deterministic short-circuit.
 #[test]
 fn shared_uuid_short_circuits_to_one() {
     let mut a = Thing::new("Resource");
@@ -121,6 +128,7 @@ fn shared_uuid_short_circuits_to_one() {
     assert!(engine().deterministic_match(&to_matcher_thing(&a), &to_matcher_thing(&b)));
 }
 
+/// Different ISBNs (both populated) score 0 on the identifiers axis.
 #[test]
 fn different_isbns_do_not_short_circuit_even_with_same_name() {
     let mut a = Thing::new("Pride and Prejudice");
@@ -140,6 +148,8 @@ fn different_isbns_do_not_short_circuit_even_with_same_name() {
 // Non-deterministic identifiers (SKU / URI / Custom)
 // =============================================================================
 
+/// The deterministic/non-deterministic distinction is a service-side filter,
+/// not the matcher's permissive shared-identifier contract.
 #[test]
 fn non_deterministic_identifier_filter_is_service_side_concern() {
     // SKUs are vendor-scoped and not globally unique. The *matcher* treats
@@ -168,6 +178,7 @@ fn non_deterministic_identifier_filter_is_service_side_concern() {
     );
 }
 
+/// A Custom identifier's label passes through to the matcher verbatim.
 #[test]
 fn custom_identifier_property_id_passes_through_verbatim() {
     let mut a = Thing::new("Item");
@@ -186,6 +197,7 @@ fn custom_identifier_property_id_passes_through_verbatim() {
 // Same-as / URL cross-references
 // =============================================================================
 
+/// A shared `same_as` URL contributes positive same_as evidence.
 #[test]
 fn shared_same_as_url_drives_evidence() {
     let mut a = Thing::new("Linux kernel");
@@ -201,6 +213,7 @@ fn shared_same_as_url_drives_evidence() {
     assert!(result.is_match);
 }
 
+/// A shared canonical `url` scores 1.0 on the url axis.
 #[test]
 fn shared_canonical_url_contributes_positive_signal() {
     let mut a = Thing::new("The Rust Programming Language");
@@ -216,6 +229,7 @@ fn shared_canonical_url_contributes_positive_signal() {
 // Negative cases
 // =============================================================================
 
+/// Unrelated things score < 0.50 and are not flagged as a match.
 #[test]
 fn unrelated_things_score_low_and_do_not_match() {
     let a = pride_and_prejudice();
@@ -237,6 +251,7 @@ fn unrelated_things_score_low_and_do_not_match() {
 // Field-routing pinning
 // =============================================================================
 
+/// The service's singular `additional_type` routes into the matcher's vec.
 #[test]
 fn additional_type_singular_routes_to_additional_types_vec() {
     let mut a = Thing::new("Pride and Prejudice");
@@ -246,6 +261,7 @@ fn additional_type_singular_routes_to_additional_types_vec() {
     assert_eq!(m.additional_types[0], "https://schema.org/Book");
 }
 
+/// Only the first `images` entry becomes the matcher's single `image`.
 #[test]
 fn first_image_url_becomes_matcher_image() {
     let mut a = Thing::new("Item");
@@ -257,6 +273,7 @@ fn first_image_url_becomes_matcher_image() {
     assert_eq!(m.image.as_deref(), Some("https://example.com/a.jpg"));
 }
 
+/// An ISBN identifier maps to the canonical lowercase `isbn` property_id.
 #[test]
 fn isbn_property_id_lowercases_to_canonical_token() {
     let mut a = Thing::new("Book");
@@ -270,6 +287,7 @@ fn isbn_property_id_lowercases_to_canonical_token() {
 // Edge cases
 // =============================================================================
 
+/// Sparse/empty records score within range without panicking.
 #[test]
 fn sparse_records_do_not_panic() {
     let a = Thing::new("");

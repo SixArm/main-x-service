@@ -1,4 +1,10 @@
-//! Benchmarks for worker matcher algorithms
+//! Criterion benchmarks for the matching layer.
+//!
+//! Measures the per-component algorithms (name, DOB, gender, address,
+//! phonetic, tax id, document) in isolation and the end-to-end matchers at
+//! several candidate-list sizes (1/10/100/1000) to characterize how matching
+//! scales. Run with `cargo bench`. `black_box` prevents the optimizer from
+//! folding away the work being timed.
 
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
 use chrono::{NaiveDate, Utc};
@@ -14,6 +20,8 @@ use worker_service::matching::algorithms::{
 use worker_service::matching::phonetic;
 use worker_service::config::MatchingConfig;
 
+/// Builds a minimal [`Worker`] fixture (name + gender + optional DOB, all
+/// other fields empty) for the benchmarks.
 fn create_test_worker(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Worker {
     let now = Utc::now();
     Worker {
@@ -48,6 +56,8 @@ fn create_test_worker(family: &str, given: &str, birth_date: Option<NaiveDate>) 
     }
 }
 
+/// Like [`create_test_worker`] but with one address, to benchmark the address
+/// component of matching.
 fn create_test_worker_with_address(
     family: &str,
     given: &str,
@@ -69,6 +79,7 @@ fn create_test_worker_with_address(
     worker
 }
 
+/// Returns a fixed [`MatchingConfig`] so benchmark runs are comparable.
 fn create_matching_config() -> MatchingConfig {
     MatchingConfig {
         threshold_score: 0.7,
@@ -77,6 +88,7 @@ fn create_matching_config() -> MatchingConfig {
     }
 }
 
+/// Benchmarks name matching: fuzzy, exact, family-only, and given-name variants.
 fn bench_name_matching(c: &mut Criterion) {
     let name1 = HumanName {
         use_type: None,
@@ -121,6 +133,7 @@ fn bench_name_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks birth-date matching: exact, off-by-one typo, and missing.
 fn bench_dob_matching(c: &mut Criterion) {
     let dob1 = NaiveDate::from_ymd_opt(1980, 1, 15);
     let dob2 = NaiveDate::from_ymd_opt(1980, 1, 16);
@@ -144,6 +157,7 @@ fn bench_dob_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks gender matching for same and differing values.
 fn bench_gender_matching(c: &mut Criterion) {
     c.bench_function("gender_match_same", |b| {
         b.iter(|| {
@@ -158,6 +172,8 @@ fn bench_gender_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks address matching on two near-identical addresses (abbreviated
+/// vs spelled-out street).
 fn bench_address_matching(c: &mut Criterion) {
     let addr1 = Address {
         use_type: None,
@@ -187,6 +203,7 @@ fn bench_address_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks Soundex encoding (short/long) and phonetic comparison.
 fn bench_phonetic_matching(c: &mut Criterion) {
     c.bench_function("soundex_encode_short", |b| {
         b.iter(|| {
@@ -213,6 +230,8 @@ fn bench_phonetic_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks the full [`ProbabilisticMatcher`]: a single pair and
+/// `find_matches` over 10/100/1000 candidates, to measure scaling.
 fn bench_full_worker_matcher(c: &mut Criterion) {
     let config = create_matching_config();
     let matcher = ProbabilisticMatcher::new(config);
@@ -261,6 +280,7 @@ fn bench_full_worker_matcher(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks a single [`DeterministicMatcher`] pair comparison.
 fn bench_deterministic_matching(c: &mut Criterion) {
     let config = create_matching_config();
     let matcher = DeterministicMatcher::new(config);
@@ -276,6 +296,7 @@ fn bench_deterministic_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks tax-id matching for matching and missing tax ids.
 fn bench_tax_id_matching(c: &mut Criterion) {
     let mut p1 = create_test_worker("Smith", "John", None);
     p1.tax_id = Some("123-45-6789".to_string());
@@ -297,6 +318,7 @@ fn bench_tax_id_matching(c: &mut Criterion) {
     });
 }
 
+/// Benchmarks identity-document matching on a shared passport.
 fn bench_document_matching(c: &mut Criterion) {
     let doc1 = IdentityDocument {
         document_type: DocumentType::Passport,

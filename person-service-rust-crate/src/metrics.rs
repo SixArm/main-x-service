@@ -1,8 +1,8 @@
 //! Prometheus metrics for the person service.
 //!
-//! This module owns a process-wide [`Registry`] populated with a fixed set
+//! This module owns a process-wide [`Registry`](prometheus::Registry) populated with a fixed set
 //! of counters and histograms. Application code increments the global
-//! [`METRICS`] via `crate::metrics::METRICS` (e.g.
+//! [`METRICS`](crate::metrics::METRICS) via `crate::metrics::METRICS` (e.g.
 //! `METRICS.person_created_total.inc()`). The REST API exposes the
 //! registry at `GET /metrics.prom` in Prometheus text-exposition format
 //! (see [`crate::api::rest::handlers::metrics_prom`]). Configure your
@@ -34,9 +34,13 @@ pub struct Metrics {
     /// service-specific metrics beyond this default set.
     pub registry: Registry,
 
+    /// Count of person records created.
     pub person_created_total: Counter,
+    /// Count of person records updated.
     pub person_updated_total: Counter,
+    /// Count of person records soft-deleted.
     pub person_deleted_total: Counter,
+    /// Count of person match operations performed.
     pub person_matched_total: Counter,
 
     /// HTTP requests, labeled by method, path, and status code.
@@ -50,6 +54,9 @@ pub struct Metrics {
 }
 
 impl Metrics {
+    /// Construct the full metric set and register every collector into a
+    /// fresh [`Registry`]. Called once by [`METRICS`]; the `.expect`s are
+    /// infallible because all opts/collectors are statically valid.
     fn new() -> Self {
         let registry = Registry::new();
 
@@ -172,10 +179,13 @@ pub static METRICS: LazyLock<Metrics> = LazyLock::new(Metrics::new);
 /// HTTP responses serving [`Metrics::render`].
 pub const CONTENT_TYPE: &str = "text/plain; version=0.0.4; charset=utf-8";
 
+/// Tests for the Prometheus registry and text rendering.
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Incrementing a counter is reflected in the rendered exposition,
+    /// and default histograms appear even before being observed.
     #[test]
     fn render_includes_default_counters() {
         METRICS.person_created_total.inc();
