@@ -2,6 +2,51 @@
     import "../app.css";
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
+    import ThemePicker from "lily-design-system-svelte-theme-picker/ThemePicker.svelte";
+
+    const THEMES = [
+        "abyss",
+        "acid",
+        "aqua",
+        "autumn",
+        "black",
+        "bumblebee",
+        "business",
+        "caramellatte",
+        "cmyk",
+        "coffee",
+        "corporate",
+        "cupcake",
+        "cyberpunk",
+        "dark",
+        "dim",
+        "dracula",
+        "emerald",
+        "fantasy",
+        "forest",
+        "garden",
+        "halloween",
+        "lemonade",
+        "light",
+        "lofi",
+        "luxury",
+        "night",
+        "nord",
+        "pastel",
+        "retro",
+        "silk",
+        "sunset",
+        "synthwave",
+        "united-kingdom-national-health-service-england-for-patients",
+        "united-kingdom-national-health-service-england-for-practitioners",
+        "united-kingdom-national-health-service-scotland-for-patients",
+        "united-kingdom-national-health-service-scotland-for-practitioners",
+        "united-kingdom-national-health-service-wales-for-patients",
+        "united-kingdom-national-health-service-wales-for-practitioners",
+        "valentine",
+        "winter",
+        "wireframe"
+    ];
 
     // Lily headless example — uncomment after `pnpm install` resolves the
     // file: dependency to use Lily's accessibility-primitive Button:
@@ -35,6 +80,14 @@
                 {/each}
             </ul>
         </nav>
+        <div class="theme-section">
+            <ThemePicker
+                label="Theme"
+                themesUrl="/assets/themes/"
+                themes={THEMES}
+                storageKey="lily-theme"
+            />
+        </div>
     </aside>
     <main>
         {@render children()}
@@ -67,4 +120,30 @@
         font-weight: 600;
     }
     main { padding: 1.5rem; max-width: 1100px; width: 100%; }
+
+    .theme-section {
+        margin-top: 1.25rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--mxi-color-border);
+    }
+    .theme-section :global(.theme-picker) {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+    .theme-section :global(.theme-picker legend) {
+        font-size: 0.875rem;
+        color: var(--mxi-color-fg);
+        margin-bottom: 0.25rem;
+    }
+    .theme-section :global(.theme-picker label) {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: 0.875rem;
+        color: var(--mxi-color-fg);
+    }
 </style>
