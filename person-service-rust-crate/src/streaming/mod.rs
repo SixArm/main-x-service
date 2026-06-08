@@ -12,7 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 use crate::models::Person;
 use crate::Result;
@@ -37,21 +37,21 @@ pub enum PersonEvent {
         /// The newly created person record.
         person: Person,
         /// Wall-clock time of the operation.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// An existing person record was updated.
     Updated {
         /// The updated person record (post-update state).
         person: Person,
         /// Wall-clock time of the operation.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// A person record was (soft-) deleted; only its id is carried.
     Deleted {
         /// Id of the deleted person.
         person_id: Uuid,
         /// Wall-clock time of the operation.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// Two records were merged: `source_id` folded into `target_id`.
     Merged {
@@ -60,7 +60,7 @@ pub enum PersonEvent {
         /// Id of the surviving record.
         target_id: Uuid,
         /// Wall-clock time of the operation.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// A link was created from `person_id` to `linked_id`.
     Linked {
@@ -69,7 +69,7 @@ pub enum PersonEvent {
         /// Id of the linked person.
         linked_id: Uuid,
         /// Wall-clock time of the operation.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// A link from `person_id` to `unlinked_id` was removed.
     Unlinked {
@@ -78,13 +78,13 @@ pub enum PersonEvent {
         /// Id of the previously linked person.
         unlinked_id: Uuid,
         /// Wall-clock time of the operation.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
 }
 
 impl PersonEvent {
     /// Return the wall-clock timestamp common to every variant.
-    pub fn timestamp(&self) -> DateTime<Utc> {
+    pub fn timestamp(&self) -> Timestamp {
         match self {
             PersonEvent::Created { timestamp, .. } => *timestamp,
             PersonEvent::Updated { timestamp, .. } => *timestamp,

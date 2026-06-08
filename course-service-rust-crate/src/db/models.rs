@@ -23,20 +23,16 @@ pub mod providers {
         pub id: Uuid,
         /// Canonical name.
         pub name: String,
-        /// Alternate names (JSONB array).
-        pub alternate_names: Json,
         /// Website URL.
         pub url: Option<String>,
-        /// External authority URLs (JSONB array).
-        pub same_as: Json,
         /// Provider kind, stored as a string.
         pub kind: Option<String>,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
         /// Soft-delete timestamp, if deleted.
-        pub deleted_at: Option<DateTimeUtc>,
+        pub deleted_at: Option<TimeDateTimeWithTimeZone>,
     }
 
     /// Foreign-key relations from `providers`.
@@ -71,28 +67,16 @@ pub mod courses {
         pub id: Uuid,
         /// Course name.
         pub name: String,
-        /// Alternate names (JSONB array).
-        pub alternate_names: Json,
         /// Long description.
         pub description: Option<String>,
         /// Disambiguating one-liner.
         pub disambiguating_description: Option<String>,
         /// Canonical course URL.
         pub url: Option<String>,
-        /// Image URLs (JSONB array).
-        pub image: Json,
-        /// External authority URLs (JSONB array).
-        pub same_as: Json,
-        /// Keyword tags (JSONB array).
-        pub keywords: Json,
         /// schema.org/additionalType.
         pub additional_type: Option<String>,
-        /// schema.org/about subjects (JSONB array).
-        pub about: Json,
         /// Target audience.
         pub audience: Option<String>,
-        /// Languages of instruction (JSONB array).
-        pub in_language: Json,
         /// License URL/text.
         pub license: Option<String>,
         /// Typical learner age range.
@@ -103,34 +87,18 @@ pub mod courses {
         pub version: Option<String>,
         /// Whether the course is free to access.
         pub is_accessible_for_free: Option<bool>,
-        /// Competencies taught (JSONB array).
-        pub teaches: Json,
-        /// Competencies assessed (JSONB array).
-        pub assesses: Json,
-        /// Required prior competencies (JSONB array).
-        pub competency_required: Json,
-        /// Educational level enum (JSONB).
-        pub educational_level: Option<Json>,
+        /// Educational level enum (bare string).
+        pub educational_level: Option<String>,
         /// schema.org/educationalUse.
         pub educational_use: Option<String>,
-        /// Learning-resource-type enum (JSONB).
-        pub learning_resource_type: Option<Json>,
+        /// Learning-resource-type enum (bare string).
+        pub learning_resource_type: Option<String>,
         /// Interactivity-type enum (bare string).
         pub interactivity_type: Option<String>,
         /// Provider catalog code.
         pub course_code: Option<String>,
         /// Credit count (stored as `i32`).
         pub number_of_credits: Option<i32>,
-        /// Prerequisite descriptions (JSONB array).
-        pub course_prerequisites: Json,
-        /// Available languages (JSONB array).
-        pub available_language: Json,
-        /// Financial-aid eligibility notes (JSONB array).
-        pub financial_aid_eligible: Json,
-        /// Educational credential awarded (JSONB).
-        pub educational_credential_awarded: Option<Json>,
-        /// Occupational credential awarded (JSONB).
-        pub occupational_credential_awarded: Option<Json>,
         /// Historical enrollment count (stored as `i64`).
         pub total_historical_enrollment: Option<i64>,
         /// Lifecycle status (bare string).
@@ -140,11 +108,11 @@ pub mod courses {
         /// FK to the owning provider.
         pub provider_id: Option<Uuid>,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
         /// Soft-delete timestamp, if deleted.
-        pub deleted_at: Option<DateTimeUtc>,
+        pub deleted_at: Option<TimeDateTimeWithTimeZone>,
     }
 
     /// Foreign-key relations from `courses`.
@@ -200,16 +168,20 @@ pub mod course_identifiers {
         pub id: Uuid,
         /// FK to the owning course.
         pub course_id: Uuid,
-        /// Identifier scheme enum (JSONB).
-        pub property_id: Json,
+        /// Identifier scheme tag (or `Custom`).
+        pub property_id: String,
+        /// Free-text label for the `Custom` scheme.
+        pub custom_label: Option<String>,
         /// Scheme-specific value.
         pub value: String,
         /// Optional label.
         pub name: Option<String>,
         /// Optional authority URL.
         pub url: Option<String>,
+        /// Ordinal position within the list.
+        pub position: i32,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations from `course_identifiers`.
@@ -252,7 +224,7 @@ pub mod course_links {
         /// Link type (bare string).
         pub link_type: String,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations from `course_links`.
@@ -296,32 +268,32 @@ pub mod course_instances {
         pub course_mode: Option<String>,
         /// Lifecycle status (bare string).
         pub status: String,
-        /// Languages for this offering (JSONB array).
-        pub in_language: Json,
         /// Free-text location.
         pub location: Option<String>,
         /// External place-service location reference.
         pub location_id: Option<Uuid>,
-        /// Instructor person-service ids (JSONB array).
-        pub instructor_ids: Json,
-        /// Free-text instructor names (JSONB array).
-        pub instructor_names: Json,
         /// Maximum capacity (stored as `i32`).
         pub maximum_attendee_capacity: Option<i32>,
         /// Current enrollment (stored as `i32`).
         pub enrolled_count: Option<i32>,
         /// Enrollment window open time.
-        pub enrollment_opens: Option<DateTimeUtc>,
+        pub enrollment_opens: Option<TimeDateTimeWithTimeZone>,
         /// Enrollment window close time.
-        pub enrollment_closes: Option<DateTimeUtc>,
-        /// Schedule struct (JSONB).
-        pub schedule: Option<Json>,
+        pub enrollment_closes: Option<TimeDateTimeWithTimeZone>,
+        /// Schedule start (flattened from the Schedule struct).
+        pub schedule_start_date: Option<TimeDateTimeWithTimeZone>,
+        /// Schedule end (flattened).
+        pub schedule_end_date: Option<TimeDateTimeWithTimeZone>,
+        /// Schedule time zone (flattened).
+        pub schedule_time_zone: Option<String>,
+        /// Schedule recurrence rule (flattened).
+        pub schedule_recurrence: Option<String>,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
         /// Soft-delete timestamp, if deleted.
-        pub deleted_at: Option<DateTimeUtc>,
+        pub deleted_at: Option<TimeDateTimeWithTimeZone>,
     }
 
     /// Foreign-key relations from `course_instances`.
@@ -368,14 +340,10 @@ pub mod syllabus_sections {
         pub description: Option<String>,
         /// Ordering position (stored as `i32`).
         pub position: Option<i32>,
-        /// Competencies covered (JSONB array).
-        pub teaches: Json,
         /// ISO 8601 duration.
         pub time_required: Option<String>,
-        /// Resource URLs (JSONB array).
-        pub resources: Json,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations from `syllabus_sections`.
@@ -428,7 +396,7 @@ pub mod audit_log {
         /// Post-change snapshot (JSONB).
         pub new_values: Option<Json>,
         /// When the action occurred.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
     }
 
     /// No outbound relations from `audit_log`.
@@ -469,9 +437,9 @@ pub mod course_match_scores {
         /// Reviewer id, once reviewed.
         pub reviewed_by: Option<String>,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Review timestamp, if reviewed.
-        pub reviewed_at: Option<DateTimeUtc>,
+        pub reviewed_at: Option<TimeDateTimeWithTimeZone>,
     }
 
     /// No outbound relations from `course_match_scores`.
@@ -510,12 +478,234 @@ pub mod course_merge_records {
         /// Snapshot of transferred data (JSONB).
         pub transferred_data: Option<Json>,
         /// When the merge occurred.
-        pub merged_at: DateTimeUtc,
+        pub merged_at: TimeDateTimeWithTimeZone,
     }
 
     /// No outbound relations from `course_merge_records`.
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {}
 
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ───────────────────── course_text_values ─────────────────────
+
+/// Tagged table for the Course aggregate's parallel string-list properties.
+pub mod course_text_values {
+    use super::*;
+
+    /// One `(field, value)` row for a course string list.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "course_text_values")]
+    pub struct Model {
+        /// Primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// FK to the owning course.
+        pub course_id: Uuid,
+        /// Which list this value belongs to.
+        pub field: String,
+        /// The value.
+        pub value: String,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent course.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `courses`.
+        #[sea_orm(belongs_to = "super::courses::Entity", from = "Column::CourseId", to = "super::courses::Column::Id")]
+        Course,
+    }
+    impl Related<super::courses::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Course.def() }
+    }
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ───────────────────── course_credentials ─────────────────────
+
+/// Educational / occupational credential awarded by a course.
+pub mod course_credentials {
+    use super::*;
+
+    /// One credential row (`role` = educational|occupational).
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "course_credentials")]
+    pub struct Model {
+        /// Primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// FK to the owning course.
+        pub course_id: Uuid,
+        /// `educational` or `occupational`.
+        pub role: String,
+        /// Credential name.
+        pub name: String,
+        /// Credential category enum (bare string), if any.
+        pub category: Option<String>,
+        /// Educational level text, if any.
+        pub educational_level: Option<String>,
+        /// Recognizing body, if any.
+        pub recognized_by: Option<String>,
+        /// Credential URL, if any.
+        pub url: Option<String>,
+    }
+
+    /// `belongs_to` the parent course.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `courses`.
+        #[sea_orm(belongs_to = "super::courses::Entity", from = "Column::CourseId", to = "super::courses::Column::Id")]
+        Course,
+    }
+    impl Related<super::courses::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Course.def() }
+    }
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ───────────────────── course_instance_languages ─────────────────────
+
+/// Languages of instruction for a course instance.
+pub mod course_instance_languages {
+    use super::*;
+
+    /// One language row.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "course_instance_languages")]
+    pub struct Model {
+        /// Primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// FK to the owning instance.
+        pub instance_id: Uuid,
+        /// ISO 639-1 language code.
+        pub language: String,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent instance.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `course_instances`.
+        #[sea_orm(belongs_to = "super::course_instances::Entity", from = "Column::InstanceId", to = "super::course_instances::Column::Id")]
+        Instance,
+    }
+    impl Related<super::course_instances::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Instance.def() }
+    }
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ───────────────────── course_instance_instructors ─────────────────────
+
+/// Instructors (id and/or name) for a course instance.
+pub mod course_instance_instructors {
+    use super::*;
+
+    /// One instructor row.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "course_instance_instructors")]
+    pub struct Model {
+        /// Primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// FK to the owning instance.
+        pub instance_id: Uuid,
+        /// Person-service instructor id, if any.
+        pub instructor_id: Option<Uuid>,
+        /// Free-text instructor name, if any.
+        pub instructor_name: Option<String>,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent instance.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `course_instances`.
+        #[sea_orm(belongs_to = "super::course_instances::Entity", from = "Column::InstanceId", to = "super::course_instances::Column::Id")]
+        Instance,
+    }
+    impl Related<super::course_instances::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Instance.def() }
+    }
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ───────────────────── course_instance_sessions ─────────────────────
+
+/// Individual scheduled sessions for a course instance.
+pub mod course_instance_sessions {
+    use super::*;
+
+    /// One session row.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "course_instance_sessions")]
+    pub struct Model {
+        /// Primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// FK to the owning instance.
+        pub instance_id: Uuid,
+        /// Session start.
+        pub start_at: TimeDateTimeWithTimeZone,
+        /// Session end, if any.
+        pub end_at: Option<TimeDateTimeWithTimeZone>,
+        /// Session label, if any.
+        pub label: Option<String>,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent instance.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `course_instances`.
+        #[sea_orm(belongs_to = "super::course_instances::Entity", from = "Column::InstanceId", to = "super::course_instances::Column::Id")]
+        Instance,
+    }
+    impl Related<super::course_instances::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Instance.def() }
+    }
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ───────────────────── course_syllabus_text_values ─────────────────────
+
+/// Tagged table for syllabus-section `teaches` / `resource` lists.
+pub mod course_syllabus_text_values {
+    use super::*;
+
+    /// One `(field, value)` row for a syllabus section.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "course_syllabus_text_values")]
+    pub struct Model {
+        /// Primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// FK to the owning syllabus section.
+        pub section_id: Uuid,
+        /// `teaches` or `resource`.
+        pub field: String,
+        /// The value.
+        pub value: String,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent syllabus section.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `syllabus_sections`.
+        #[sea_orm(belongs_to = "super::syllabus_sections::Entity", from = "Column::SectionId", to = "super::syllabus_sections::Column::Id")]
+        Section,
+    }
+    impl Related<super::syllabus_sections::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Section.def() }
+    }
     impl ActiveModelBehavior for ActiveModel {}
 }

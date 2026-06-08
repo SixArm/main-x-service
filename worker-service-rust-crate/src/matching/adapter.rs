@@ -36,7 +36,6 @@
 //! `managing_organization`, `links`, `created_at`, `marital_status`, `photo`,
 //! `multiple_birth`) are dropped — they have no matcher counterpart.
 
-use chrono::Datelike;
 use worker_matcher::{
     Address as MAddress, Gender as MGender, PassportBook as MPassport, Worker as MWorker,
     WorkerBuilder as MBuilder,
@@ -236,7 +235,7 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
         return b.mx_curp(val);
     }
     if sys.contains("personnummer") {
-        return b.se_workernummer(val);
+        return b.se_personnummer(val);
     }
     if sys.contains("kvnr") {
         return b.de_kvnr(val);
@@ -292,7 +291,7 @@ fn build_passport(d: &IdentityDocument) -> Option<MPassport> {
 mod tests {
     use super::*;
     use crate::models::{HumanName, Worker};
-    use chrono::Utc;
+    use jiff::Timestamp;
     use uuid::Uuid;
 
     /// Builds a minimal service worker with the given family/given name.
@@ -312,7 +311,7 @@ mod tests {
             telecom: vec![],
             gender: Gender::Female,
             worker_type: None,
-            birth_date: chrono::NaiveDate::from_ymd_opt(1980, 5, 15),
+            birth_date: Some(jiff::civil::date(1980, 5, 15)),
             tax_id: None,
             documents: vec![],
             emergency_contacts: vec![],
@@ -324,8 +323,8 @@ mod tests {
             photo: vec![],
             managing_organization: None,
             links: vec![],
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         }
     }
 

@@ -100,7 +100,7 @@ pub fn has_active_consent(
     consents: &[crate::models::Consent],
     consent_type: crate::models::ConsentType,
 ) -> bool {
-    let today = chrono::Utc::now().date_naive();
+    let today = jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC).date();
 
     consents.iter().any(|c| {
         c.consent_type == consent_type
@@ -190,7 +190,7 @@ mod tests {
             Gender::Female,
         );
         worker.tax_id = Some("987-65-4321".into());
-        worker.birth_date = Some(chrono::NaiveDate::from_ymd_opt(1990, 5, 20).unwrap());
+        worker.birth_date = Some(jiff::civil::date(1990, 5, 20));
 
         let export = export_worker_data(&worker);
         assert!(export.is_object(), "Export should be a JSON object");
@@ -212,13 +212,13 @@ mod tests {
             worker_id: uuid::Uuid::new_v4(),
             consent_type: ConsentType::DataProcessing,
             status: ConsentStatus::Active,
-            granted_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-            expiry_date: Some(chrono::NaiveDate::from_ymd_opt(2099, 12, 31).unwrap()),
+            granted_date: jiff::civil::date(2024, 1, 1),
+            expiry_date: Some(jiff::civil::date(2099, 12, 31)),
             revoked_date: None,
             purpose: Some("General data processing".into()),
             method: Some("electronic".into()),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now(),
+            updated_at: jiff::Timestamp::now(),
         };
 
         assert!(has_active_consent(&[consent], ConsentType::DataProcessing));
@@ -234,13 +234,13 @@ mod tests {
             worker_id: uuid::Uuid::new_v4(),
             consent_type: ConsentType::Marketing,
             status: ConsentStatus::Active,
-            granted_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
-            expiry_date: Some(chrono::NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()), // expired
+            granted_date: jiff::civil::date(2020, 1, 1),
+            expiry_date: Some(jiff::civil::date(2021, 1, 1)), // expired
             revoked_date: None,
             purpose: None,
             method: None,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now(),
+            updated_at: jiff::Timestamp::now(),
         };
 
         assert!(!has_active_consent(&[expired_consent], ConsentType::Marketing),

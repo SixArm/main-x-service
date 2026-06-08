@@ -20,6 +20,8 @@ pub mod schema;
 pub mod models;
 /// Repository traits and their SeaORM implementations.
 pub mod repositories;
+/// jiff <-> time conversions at the persistence boundary.
+pub mod convert;
 /// Audit-log repository for the HIPAA-style trail.
 pub mod audit;
 

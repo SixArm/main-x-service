@@ -32,6 +32,9 @@
 //! ```
 
 use crate::models::identifier::{IdentifierType, ThingIdentifier};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
 use crate::models::thing::Thing;
 
 /// A single field-level validation failure.
@@ -39,7 +42,7 @@ use crate::models::thing::Thing;
 /// [`validate_thing`] returns a `Vec` of these; `field` names the offending
 /// field (with an index for list entries, e.g. `"same_as[0]"`) and `message`
 /// is a human-readable explanation suitable for an API error body.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct ValidationError {
     /// The offending field path (e.g. `"name"`, `"identifiers[2].value"`).
     pub field: String,

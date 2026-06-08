@@ -2,7 +2,7 @@
 //! `validate_course` pass on a fully-populated record (every
 //! FR-21..FR-28 branch exercised at least once).
 
-use chrono::Utc;
+use jiff::Timestamp;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use uuid::Uuid;
 
@@ -29,7 +29,7 @@ fn populated_course() -> Course {
         url: Some("https://doi.org/10.1234/intro-cs".into()),
     }];
     c.number_of_credits = Some(3);
-    let now = Utc::now();
+    let now = Timestamp::now();
     c.instances.push(CourseInstance {
         id: Uuid::new_v4(),
         course_id: c.id,
@@ -38,7 +38,7 @@ fn populated_course() -> Course {
         status: CourseInstanceStatus::Scheduled,
         schedule: Some(Schedule {
             start_date: Some(now),
-            end_date: Some(now + chrono::Duration::days(120)),
+            end_date: Some(now + jiff::SignedDuration::from_hours(24 * (120))),
             time_zone: Some("UTC".into()),
             recurrence: None,
             sessions: vec![],
@@ -51,7 +51,7 @@ fn populated_course() -> Course {
         maximum_attendee_capacity: Some(60),
         enrolled_count: Some(42),
         enrollment_opens: Some(now),
-        enrollment_closes: Some(now + chrono::Duration::days(30)),
+        enrollment_closes: Some(now + jiff::SignedDuration::from_hours(24 * (30))),
         created_at: now,
         updated_at: now,
     });

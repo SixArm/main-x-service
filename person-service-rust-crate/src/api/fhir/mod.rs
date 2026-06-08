@@ -41,7 +41,7 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
     // Meta
     fhir_person.meta = Some(FhirMeta {
         version_id: None,
-        last_updated: Some(person.updated_at.to_rfc3339()),
+        last_updated: Some(person.updated_at.to_string()),
     });
 
     // Identifiers
@@ -142,7 +142,7 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
     // Deceased
     if person.deceased {
         fhir_person.deceased = Some(if let Some(dt) = person.deceased_datetime {
-            FhirDeceased::DateTime(dt.to_rfc3339())
+            FhirDeceased::DateTime(dt.to_string())
         } else {
             FhirDeceased::Boolean(true)
         });
@@ -235,7 +235,7 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
     use crate::models::{HumanName, NameUse, Gender, ContactPointSystem, ContactPointUse};
     use crate::api::fhir::resources::FhirDeceased;
     use uuid::Uuid;
-    use chrono::Utc;
+    use jiff::Timestamp;
 
     // Parse ID
     let id = if let Some(ref id_str) = fhir_person.id {
@@ -285,15 +285,14 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
 
     // Parse birth date
     let birth_date = fhir_person.birth_date.as_ref().and_then(|d| {
-        chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok()
+        d.parse::<jiff::civil::Date>().ok()
     });
 
     // Parse deceased
     let (deceased, deceased_datetime) = match &fhir_person.deceased {
         Some(FhirDeceased::Boolean(b)) => (*b, None),
         Some(FhirDeceased::DateTime(dt)) => {
-            let parsed_dt = chrono::DateTime::parse_from_rfc3339(dt).ok()
-                .map(|d| d.with_timezone(&Utc));
+            let parsed_dt = dt.parse::<jiff::Timestamp>().ok();
             (true, parsed_dt)
         }
         None => (false, None),
@@ -389,7 +388,7 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
         photo: vec![],
         managing_organization: None, // TODO: Parse organization reference
         links: vec![],
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
+        created_at: Timestamp::now(),
+        updated_at: Timestamp::now(),
     })
 }

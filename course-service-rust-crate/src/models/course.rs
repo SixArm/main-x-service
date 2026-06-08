@@ -27,7 +27,7 @@
 //! assert_eq!(c.status, CourseStatus::Published);
 //! ```
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -176,14 +176,14 @@ pub struct Course {
 
     /// Soft-delete timestamp; `None` means active.
     #[serde(default)]
-    pub deleted_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<Timestamp>,
 
     /// Created server-side on insert.
-    #[serde(default = "Utc::now")]
-    pub created_at: DateTime<Utc>,
+    #[serde(default = "Timestamp::now")]
+    pub created_at: Timestamp,
     /// Updated server-side on insert and update.
-    #[serde(default = "Utc::now")]
-    pub updated_at: DateTime<Utc>,
+    #[serde(default = "Timestamp::now")]
+    pub updated_at: Timestamp,
 }
 
 /// serde `#[serde(default = ...)]` helper for the [`Course::active`]
@@ -216,7 +216,7 @@ impl Course {
     /// assert_eq!(c.created_at, c.updated_at);
     /// ```
     pub fn new(name: impl Into<String>) -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         Self {
             id: Uuid::new_v4(),
             name: name.into(),

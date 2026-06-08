@@ -18,7 +18,7 @@
 //! do not need to be pre-cleaned.
 
 use strsim::{jaro_winkler, normalized_levenshtein};
-use chrono::{NaiveDate, Datelike};
+use jiff::civil::Date;
 
 use crate::models::{HumanName, Address, Identifier, IdentityDocument};
 
@@ -216,8 +216,8 @@ pub mod dob_matching {
     /// same year/month). Both missing is treated as neutral (0.5); exactly one
     /// missing is no evidence (0.0).
     pub fn match_birth_dates(
-        dob1: Option<NaiveDate>,
-        dob2: Option<NaiveDate>,
+        dob1: Option<Date>,
+        dob2: Option<Date>,
     ) -> f64 {
         match (dob1, dob2) {
             (None, None) => 0.5, // Both missing - neutral
@@ -228,7 +228,7 @@ pub mod dob_matching {
                 }
 
                 // Allow for common data entry errors
-                let days_diff = (d1 - d2).num_days().abs();
+                let days_diff = (d1 - d2).get_days().abs();
 
                 // Same month and year, day off by 1-2 (typo)
                 if d1.year() == d2.year() && d1.month() == d2.month() {
@@ -713,7 +713,7 @@ mod tests {
     /// Identical birth dates score exactly 1.0.
     #[test]
     fn test_exact_dob_match() {
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let score = dob_matching::match_birth_dates(dob, dob);
         assert_eq!(score, 1.0);
     }
@@ -721,8 +721,8 @@ mod tests {
     /// A day off by one still scores high.
     #[test]
     fn test_dob_typo() {
-        let dob1 = NaiveDate::from_ymd_opt(1980, 1, 15);
-        let dob2 = NaiveDate::from_ymd_opt(1980, 1, 16); // Day off by 1
+        let dob1 = Some(jiff::civil::date(1980, 1, 15));
+        let dob2 = Some(jiff::civil::date(1980, 1, 16)); // Day off by 1
         let score = dob_matching::match_birth_dates(dob1, dob2);
         assert!(score > 0.90, "Minor DOB typo should score high, got {}", score);
     }
@@ -819,8 +819,8 @@ mod tests {
     /// Identical birth dates score exactly 1.0.
     #[test]
     fn test_dob_match_exact() {
-        let dob1 = NaiveDate::from_ymd_opt(1990, 6, 15);
-        let dob2 = NaiveDate::from_ymd_opt(1990, 6, 15);
+        let dob1 = Some(jiff::civil::date(1990, 6, 15));
+        let dob2 = Some(jiff::civil::date(1990, 6, 15));
         let score = dob_matching::match_birth_dates(dob1, dob2);
         assert_eq!(score, 1.0, "Exact DOB match should be 1.0");
     }
@@ -828,8 +828,8 @@ mod tests {
     /// Same month/day but year off by one still scores high.
     #[test]
     fn test_dob_match_off_by_one_year() {
-        let dob1 = NaiveDate::from_ymd_opt(1980, 3, 10);
-        let dob2 = NaiveDate::from_ymd_opt(1981, 3, 10);
+        let dob1 = Some(jiff::civil::date(1980, 3, 10));
+        let dob2 = Some(jiff::civil::date(1981, 3, 10));
         let score = dob_matching::match_birth_dates(dob1, dob2);
         assert!(score > 0.80, "Off-by-one year with same month/day should score high, got {}", score);
     }
@@ -837,7 +837,7 @@ mod tests {
     /// Both-None is neutral 0.5; exactly one None is 0.0.
     #[test]
     fn test_dob_match_none_values() {
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         assert_eq!(dob_matching::match_birth_dates(None, None), 0.5, "Both None should be neutral 0.5");
         assert_eq!(dob_matching::match_birth_dates(dob, None), 0.0, "One None should be 0.0");
         assert_eq!(dob_matching::match_birth_dates(None, dob), 0.0, "One None should be 0.0");

@@ -1,7 +1,6 @@
 //! Audit-log repository — writes to the `audit_log` table and reads
 //! back per-entity / recent histories.
 
-use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
     QueryOrder, QuerySelect,
@@ -38,7 +37,7 @@ pub struct AuditEntry {
     /// Post-change snapshot (absent for deletes).
     pub new_values: Option<JsonValue>,
     /// When the action occurred.
-    pub created_at: chrono::DateTime<Utc>,
+    pub created_at: jiff::Timestamp,
 }
 
 impl From<audit_log::Model> for AuditEntry {
@@ -54,7 +53,7 @@ impl From<audit_log::Model> for AuditEntry {
             user_agent: m.user_agent,
             old_values: m.old_values,
             new_values: m.new_values,
-            created_at: m.created_at,
+            created_at: super::convert::offset_to_ts(m.created_at),
         }
     }
 }
@@ -144,7 +143,7 @@ impl AuditLogRepository {
             user_agent: Set(ctx.user_agent.clone()),
             old_values: Set(old_values),
             new_values: Set(new_values),
-            created_at: Set(Utc::now()),
+            created_at: Set(time::OffsetDateTime::now_utc()),
         };
         row.insert(&self.db)
             .await

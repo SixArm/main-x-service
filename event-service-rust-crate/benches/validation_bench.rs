@@ -5,7 +5,6 @@
 //! boundary-normalization helpers (phone E.164, address
 //! standardization). Run with `cargo bench`.
 
-use chrono::{TimeZone, Utc};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use event_service::models::*;
@@ -13,7 +12,7 @@ use event_service::validation::{normalize_phone, standardize_address, validate_e
 
 /// Build a minimal event with the given name at a fixed start time.
 fn make_event(name: &str) -> Event {
-    Event::new(name, Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap())
+    Event::new(name, jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp())
 }
 
 /// Benchmark validating a minimal event (name + start only).

@@ -10,12 +10,96 @@
 
 use sea_orm::*;
 use sea_orm::sea_query::Expr;
-use chrono::Utc;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::models::{Worker, HumanName, Address, ContactPoint, Identifier, WorkerLink, WorkerType};
+use super::convert::{date_to_time, ts_to_offset, time_to_date, offset_to_ts};
+
+use crate::models::{
+    Address, ContactPoint, ContactPointSystem, DocumentType, EmergencyContact, HumanName,
+    Identifier, IdentityDocument, Worker, WorkerLink, WorkerType,
+};
 use crate::Result;
 use super::models::*;
+
+/// Serialize a fieldless enum to its canonical serde string tag.
+fn enum_to_tag<T: serde::Serialize>(value: &T) -> Option<String> {
+    serde_json::to_value(value).ok().and_then(|v| v.as_str().map(String::from))
+}
+
+/// Parse a stored string tag back into a fieldless enum, or `None`.
+fn tag_to_enum<T: serde::de::DeserializeOwned>(tag: &Option<String>) -> Option<T> {
+    let t = tag.as_ref()?;
+    serde_json::from_value(serde_json::Value::String(t.clone())).ok()
+}
+
+/// Insert the normalized document / emergency-contact (+ telecom) / photo
+/// child rows for `worker` on connection `conn`.
+async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    worker: &Worker,
+) -> Result<()> {
+    for (i, doc) in worker.documents.iter().enumerate() {
+        worker_documents::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            worker_id: Set(worker.id),
+            document_type: Set(enum_to_tag(&doc.document_type).unwrap_or_default()),
+            number: Set(doc.number.clone()),
+            issuing_country: Set(doc.issuing_country.clone()),
+            issuing_authority: Set(doc.issuing_authority.clone()),
+            issue_date: Set(doc.issue_date.map(date_to_time)),
+            expiry_date: Set(doc.expiry_date.map(date_to_time)),
+            verified: Set(doc.verified),
+            position: Set(i as i32),
+        }
+        .insert(conn)
+        .await?;
+    }
+    for (i, ec) in worker.emergency_contacts.iter().enumerate() {
+        let ec_id = Uuid::new_v4();
+        let addr = ec.address.as_ref();
+        worker_emergency_contacts::ActiveModel {
+            id: Set(ec_id),
+            worker_id: Set(worker.id),
+            name: Set(ec.name.clone()),
+            relationship: Set(ec.relationship.clone()),
+            is_primary: Set(ec.is_primary),
+            address_use_type: Set(addr.and_then(|a| a.use_type.as_ref().and_then(enum_to_tag))),
+            address_line1: Set(addr.and_then(|a| a.line1.clone())),
+            address_line2: Set(addr.and_then(|a| a.line2.clone())),
+            address_city: Set(addr.and_then(|a| a.city.clone())),
+            address_state: Set(addr.and_then(|a| a.state.clone())),
+            address_postal_code: Set(addr.and_then(|a| a.postal_code.clone())),
+            address_country: Set(addr.and_then(|a| a.country.clone())),
+            position: Set(i as i32),
+        }
+        .insert(conn)
+        .await?;
+        for (j, cp) in ec.telecom.iter().enumerate() {
+            worker_emergency_contact_telecom::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                emergency_contact_id: Set(ec_id),
+                system: Set(enum_to_tag(&cp.system).unwrap_or_default()),
+                value: Set(cp.value.clone()),
+                use_type: Set(cp.use_type.as_ref().and_then(enum_to_tag)),
+                position: Set(j as i32),
+            }
+            .insert(conn)
+            .await?;
+        }
+    }
+    for (i, url) in worker.photo.iter().enumerate() {
+        worker_photos::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            worker_id: Set(worker.id),
+            url: Set(url.clone()),
+            position: Set(i as i32),
+        }
+        .insert(conn)
+        .await?;
+    }
+    Ok(())
+}
 
 /// Actor metadata attached to audit-log entries for a mutation.
 #[derive(Debug, Clone)]
@@ -181,14 +265,15 @@ impl SeaOrmWorkerRepository {
             active: Set(worker.active),
             worker_type: Set(worker.worker_type.as_ref().map(|wt| wt.to_string())),
             gender: Set(format!("{:?}", worker.gender)),
-            birth_date: Set(worker.birth_date),
+            birth_date: Set(worker.birth_date.map(date_to_time)),
+            tax_id: Set(worker.tax_id.clone()),
             deceased: Set(worker.deceased),
-            deceased_datetime: Set(worker.deceased_datetime),
+            deceased_datetime: Set(worker.deceased_datetime.map(ts_to_offset)),
             marital_status: Set(worker.marital_status.clone()),
             multiple_birth: Set(worker.multiple_birth),
             managing_organization_id: Set(worker.managing_organization),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
             created_by: Set(None),
             updated_by: Set(None),
             deleted_at: Set(None),
@@ -205,8 +290,8 @@ impl SeaOrmWorkerRepository {
             prefix: Set(worker.name.prefix.clone()),
             suffix: Set(worker.name.suffix.clone()),
             is_primary: Set(true),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
         }];
 
         // Additional names
@@ -220,8 +305,8 @@ impl SeaOrmWorkerRepository {
                 prefix: Set(add_name.prefix.clone()),
                 suffix: Set(add_name.suffix.clone()),
                 is_primary: Set(false),
-                created_at: Set(Utc::now()),
-                updated_at: Set(Utc::now()),
+                created_at: Set(OffsetDateTime::now_utc()),
+                updated_at: Set(OffsetDateTime::now_utc()),
             });
         }
 
@@ -234,8 +319,8 @@ impl SeaOrmWorkerRepository {
             system: Set(id.system.clone()),
             value: Set(id.value.clone()),
             assigner: Set(id.assigner.clone()),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
         }).collect();
 
         // Addresses
@@ -250,8 +335,8 @@ impl SeaOrmWorkerRepository {
             postal_code: Set(addr.postal_code.clone()),
             country: Set(addr.country.clone()),
             is_primary: Set(idx == 0),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
         }).collect();
 
         // Contacts
@@ -262,8 +347,8 @@ impl SeaOrmWorkerRepository {
             value: Set(cp.value.clone()),
             use_type: Set(cp.use_type.as_ref().map(|u| format!("{:?}", u))),
             is_primary: Set(idx == 0),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
         }).collect();
 
         // Links
@@ -272,7 +357,7 @@ impl SeaOrmWorkerRepository {
             worker_id: Set(worker.id),
             other_worker_id: Set(link.other_worker_id),
             link_type: Set(format!("{:?}", link.link_type)),
-            created_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
             created_by: Set(None),
         }).collect();
 
@@ -464,20 +549,21 @@ impl SeaOrmWorkerRepository {
             telecom,
             gender,
             worker_type,
-            birth_date: db_worker.birth_date,
+            birth_date: db_worker.birth_date.map(time_to_date),
             deceased: db_worker.deceased,
-            deceased_datetime: db_worker.deceased_datetime,
+            deceased_datetime: db_worker.deceased_datetime.map(offset_to_ts),
             addresses,
             marital_status: db_worker.marital_status,
             multiple_birth: db_worker.multiple_birth,
-            tax_id: None, // TODO: Load from DB
-            documents: vec![], // TODO: Load from DB
-            emergency_contacts: vec![], // TODO: Load from DB
-            photo: vec![], // Not stored in DB yet
+            tax_id: db_worker.tax_id,
+            // Loaded separately from child tables by `load_extra_collections`.
+            documents: vec![],
+            emergency_contacts: vec![],
+            photo: vec![],
             managing_organization: db_worker.managing_organization_id,
             links,
-            created_at: db_worker.created_at,
-            updated_at: db_worker.updated_at,
+            created_at: offset_to_ts(db_worker.created_at),
+            updated_at: offset_to_ts(db_worker.updated_at),
         })
     }
 
@@ -517,6 +603,85 @@ impl SeaOrmWorkerRepository {
             .await?;
 
         Ok((db_names, db_identifiers, db_addresses, db_contacts, db_links))
+    }
+
+    /// Load the normalized document / emergency-contact / photo child rows
+    /// for `worker.id` and populate them onto `worker`.
+    async fn load_extra_collections(&self, worker: &mut Worker) -> Result<()> {
+        let id = worker.id;
+
+        let doc_rows = worker_documents::Entity::find()
+            .filter(worker_documents::Column::WorkerId.eq(id))
+            .order_by_asc(worker_documents::Column::Position)
+            .all(&self.db)
+            .await?;
+        worker.documents = doc_rows
+            .into_iter()
+            .map(|r| IdentityDocument {
+                document_type: tag_to_enum(&Some(r.document_type)).unwrap_or(DocumentType::Other),
+                number: r.number,
+                issuing_country: r.issuing_country,
+                issuing_authority: r.issuing_authority,
+                issue_date: r.issue_date.map(time_to_date),
+                expiry_date: r.expiry_date.map(time_to_date),
+                verified: r.verified,
+            })
+            .collect();
+
+        let ec_rows = worker_emergency_contacts::Entity::find()
+            .filter(worker_emergency_contacts::Column::WorkerId.eq(id))
+            .order_by_asc(worker_emergency_contacts::Column::Position)
+            .all(&self.db)
+            .await?;
+        let mut emergency_contacts = Vec::with_capacity(ec_rows.len());
+        for ec in ec_rows {
+            let tel_rows = worker_emergency_contact_telecom::Entity::find()
+                .filter(worker_emergency_contact_telecom::Column::EmergencyContactId.eq(ec.id))
+                .order_by_asc(worker_emergency_contact_telecom::Column::Position)
+                .all(&self.db)
+                .await?;
+            let telecom = tel_rows
+                .into_iter()
+                .map(|t| ContactPoint {
+                    system: tag_to_enum(&Some(t.system)).unwrap_or(ContactPointSystem::Other),
+                    value: t.value,
+                    use_type: tag_to_enum(&t.use_type),
+                })
+                .collect();
+            let has_address = ec.address_use_type.is_some()
+                || ec.address_line1.is_some()
+                || ec.address_line2.is_some()
+                || ec.address_city.is_some()
+                || ec.address_state.is_some()
+                || ec.address_postal_code.is_some()
+                || ec.address_country.is_some();
+            let address = has_address.then(|| Address {
+                use_type: tag_to_enum(&ec.address_use_type),
+                line1: ec.address_line1,
+                line2: ec.address_line2,
+                city: ec.address_city,
+                state: ec.address_state,
+                postal_code: ec.address_postal_code,
+                country: ec.address_country,
+            });
+            emergency_contacts.push(EmergencyContact {
+                name: ec.name,
+                relationship: ec.relationship,
+                telecom,
+                address,
+                is_primary: ec.is_primary,
+            });
+        }
+        worker.emergency_contacts = emergency_contacts;
+
+        let photo_rows = worker_photos::Entity::find()
+            .filter(worker_photos::Column::WorkerId.eq(id))
+            .order_by_asc(worker_photos::Column::Position)
+            .all(&self.db)
+            .await?;
+        worker.photo = photo_rows.into_iter().map(|r| r.url).collect();
+
+        Ok(())
     }
 }
 
@@ -560,18 +725,22 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             link.insert(&txn).await?;
         }
 
+        // Insert documents / emergency contacts / photos (normalized).
+        insert_extra_collections(&txn, worker).await?;
+
         txn.commit().await?;
 
         // Load associations
         let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
             self.load_associations(&db_worker.id).await?;
 
-        let result = self.from_db_models(db_worker, db_names, db_identifiers, db_addresses, db_contacts, db_links)?;
+        let mut result = self.from_db_models(db_worker, db_names, db_identifiers, db_addresses, db_contacts, db_links)?;
+        self.load_extra_collections(&mut result).await?;
 
         // Publish event
         self.publish_event(crate::streaming::WorkerEvent::Created {
             worker: result.clone(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         });
 
         // Log audit
@@ -596,8 +765,9 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
             self.load_associations(id).await?;
 
-        self.from_db_models(db_worker, db_names, db_identifiers, db_addresses, db_contacts, db_links)
-            .map(Some)
+        let mut worker = self.from_db_models(db_worker, db_names, db_identifiers, db_addresses, db_contacts, db_links)?;
+        self.load_extra_collections(&mut worker).await?;
+        Ok(Some(worker))
     }
 
     async fn update(&self, worker: &Worker) -> Result<Worker> {
@@ -614,13 +784,14 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             active: Set(worker.active),
             worker_type: Set(worker.worker_type.as_ref().map(|wt| wt.to_string())),
             gender: Set(format!("{:?}", worker.gender)),
-            birth_date: Set(worker.birth_date),
+            birth_date: Set(worker.birth_date.map(date_to_time)),
+            tax_id: Set(worker.tax_id.clone()),
             deceased: Set(worker.deceased),
-            deceased_datetime: Set(worker.deceased_datetime),
+            deceased_datetime: Set(worker.deceased_datetime.map(ts_to_offset)),
             marital_status: Set(worker.marital_status.clone()),
             multiple_birth: Set(worker.multiple_birth),
             managing_organization_id: Set(worker.managing_organization),
-            updated_at: Set(Utc::now()),
+            updated_at: Set(OffsetDateTime::now_utc()),
             updated_by: Set(None),
             ..Default::default()
         };
@@ -647,6 +818,17 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             .filter(worker_links::Column::WorkerId.eq(worker.id))
             .exec(&txn).await?;
 
+        // Deleting emergency contacts cascades to their telecom rows.
+        worker_emergency_contacts::Entity::delete_many()
+            .filter(worker_emergency_contacts::Column::WorkerId.eq(worker.id))
+            .exec(&txn).await?;
+        worker_documents::Entity::delete_many()
+            .filter(worker_documents::Column::WorkerId.eq(worker.id))
+            .exec(&txn).await?;
+        worker_photos::Entity::delete_many()
+            .filter(worker_photos::Column::WorkerId.eq(worker.id))
+            .exec(&txn).await?;
+
         // Re-insert associated data
         let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
             self.to_active_models(worker);
@@ -666,6 +848,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         for link in new_links {
             link.insert(&txn).await?;
         }
+        insert_extra_collections(&txn, worker).await?;
 
         txn.commit().await?;
 
@@ -676,7 +859,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // Publish event
         self.publish_event(crate::streaming::WorkerEvent::Updated {
             worker: result.clone(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         });
 
         // Log audit
@@ -696,7 +879,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // Soft delete: stamp deleted_at/deleted_by rather than removing rows.
         let update_model = workers::ActiveModel {
             id: Set(*id),
-            deleted_at: Set(Some(Utc::now())),
+            deleted_at: Set(Some(OffsetDateTime::now_utc())),
             deleted_by: Set(Some("system".to_string())),
             ..Default::default()
         };
@@ -705,7 +888,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // Publish event
         self.publish_event(crate::streaming::WorkerEvent::Deleted {
             worker_id: *id,
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         });
 
         // Log audit

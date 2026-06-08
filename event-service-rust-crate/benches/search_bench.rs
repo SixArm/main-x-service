@@ -4,7 +4,6 @@
 //! query latency over a 500-document seeded index. Run with
 //! `cargo bench`.
 
-use chrono::{TimeZone, Utc};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tempfile::TempDir;
 
@@ -28,8 +27,8 @@ const TITLES: &[&str] = &[
 
 /// Build an event with the given title at the given hour on a fixed
 /// date.
-fn make_event(title: &str, hour: u32) -> Event {
-    let when = Utc.with_ymd_and_hms(2026, 3, 1, hour, 0, 0).unwrap();
+fn make_event(title: &str, hour: i8) -> Event {
+    let when = jiff::civil::datetime(2026, 3, 1, hour, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
     Event::new(title, when)
 }
 
@@ -40,7 +39,7 @@ fn build_seeded_engine(n: usize) -> (TempDir, SearchEngine) {
     let tmp = TempDir::new().unwrap();
     let engine = SearchEngine::new(tmp.path()).unwrap();
     let events: Vec<Event> = (0..n)
-        .map(|i| make_event(TITLES[i % TITLES.len()], (9 + (i as u32 % 12)) % 24))
+        .map(|i| make_event(TITLES[i % TITLES.len()], (9 + (i as i8 % 12)) % 24))
         .collect();
     engine.index_events(&events).unwrap();
     engine.reload().unwrap();

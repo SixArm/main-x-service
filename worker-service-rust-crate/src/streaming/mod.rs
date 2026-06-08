@@ -15,7 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 use crate::models::Worker;
 use crate::Result;
@@ -37,21 +37,21 @@ pub enum WorkerEvent {
         /// The newly created worker record.
         worker: Worker,
         /// When the event occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// An existing worker was updated; carries the new record state.
     Updated {
         /// The updated worker record.
         worker: Worker,
         /// When the event occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// A worker was (soft) deleted; carries only the affected ID.
     Deleted {
         /// The ID of the deleted worker.
         worker_id: Uuid,
         /// When the event occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// Two workers were merged: `source_id` was merged into `target_id`.
     Merged {
@@ -60,7 +60,7 @@ pub enum WorkerEvent {
         /// The ID of the surviving worker (the main record).
         target_id: Uuid,
         /// When the event occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// A link was created from `worker_id` to `linked_id`.
     Linked {
@@ -69,7 +69,7 @@ pub enum WorkerEvent {
         /// The worker ID that was linked to.
         linked_id: Uuid,
         /// When the event occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// A link from `worker_id` to `unlinked_id` was removed.
     Unlinked {
@@ -78,13 +78,13 @@ pub enum WorkerEvent {
         /// The worker ID that was unlinked.
         unlinked_id: Uuid,
         /// When the event occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
 }
 
 impl WorkerEvent {
     /// Returns the event's timestamp regardless of variant.
-    pub fn timestamp(&self) -> DateTime<Utc> {
+    pub fn timestamp(&self) -> Timestamp {
         match self {
             WorkerEvent::Created { timestamp, .. } => *timestamp,
             WorkerEvent::Updated { timestamp, .. } => *timestamp,

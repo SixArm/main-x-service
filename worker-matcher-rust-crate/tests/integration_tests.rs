@@ -9,7 +9,7 @@
 //! All fixtures use synthetic, drama-reserved, or self-consistent NHS-format
 //! values; no real PII appears here.
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use worker_matcher::{
     Address, BloodType, Confidence, Gender, MatchConfig, MatchingEngine, NicknameTable, Normalizer,
     PassportBook, Worker, SimilarityAlgorithm, identifiers,
@@ -17,8 +17,8 @@ use worker_matcher::{
 
 // ---------- helpers ----------
 
-fn dob(y: i32, m: u32, d: u32) -> NaiveDate {
-    NaiveDate::from_ymd_opt(y, m, d).expect("valid date")
+fn dob(y: i16, m: i8, d: i8) -> Date {
+    jiff::civil::date(y, m, d)
 }
 
 /// A self-consistent NHS-format check-digit identifier used across fixtures.
@@ -3630,23 +3630,22 @@ fn test_passport_book_score_none_when_either_side_empty() {
 
 #[test]
 fn test_passport_book_dates_are_metadata_not_used_in_matching() {
-    use chrono::NaiveDate;
     // Same (country, number) but very different effective dates:
     // matching is unaffected.
     let p1 = Worker::builder()
         .add_passport_book(
             PassportBook::new("GB", "123456789")
                 .unwrap()
-                .with_issued(NaiveDate::from_ymd_opt(2010, 1, 1).unwrap())
-                .with_expires(NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()),
+                .with_issued(jiff::civil::date(2010, 1, 1))
+                .with_expires(jiff::civil::date(2020, 1, 1)),
         )
         .build();
     let p2 = Worker::builder()
         .add_passport_book(
             PassportBook::new("GB", "123456789")
                 .unwrap()
-                .with_issued(NaiveDate::from_ymd_opt(2024, 6, 1).unwrap())
-                .with_expires(NaiveDate::from_ymd_opt(2034, 6, 1).unwrap()),
+                .with_issued(jiff::civil::date(2024, 6, 1))
+                .with_expires(jiff::civil::date(2034, 6, 1)),
         )
         .build();
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
@@ -3654,14 +3653,13 @@ fn test_passport_book_dates_are_metadata_not_used_in_matching() {
 
 #[test]
 fn test_passport_book_serde_round_trip_with_worker() {
-    use chrono::NaiveDate;
     let p = Worker::builder()
         .given_name("X")
         .family_name("Y")
         .add_passport_book(
             PassportBook::new("GB", "123456789")
                 .unwrap()
-                .with_issued(NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()),
+                .with_issued(jiff::civil::date(2020, 1, 1)),
         )
         .add_passport_book(PassportBook::new("US", "AB1234567").unwrap())
         .build();

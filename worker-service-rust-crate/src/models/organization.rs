@@ -4,7 +4,7 @@
 //! ODS code, record class, assigning authority, roles, relationships,
 //! succession records, and geographic boundary data.
 
-use chrono::{DateTime, NaiveDate, Utc};
+use jiff::{Timestamp, civil::Date};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use utoipa::ToSchema;
@@ -75,7 +75,7 @@ pub struct Organization {
 
     /// Last change date from ODS
     #[serde(default)]
-    pub last_change_date: Option<NaiveDate>,
+    pub last_change_date: Option<Date>,
 
     /// Roles assigned to this organisation (primary + non-primary)
     #[serde(default)]
@@ -90,10 +90,10 @@ pub struct Organization {
     pub successions: Vec<OrganizationSuccession>,
 
     /// Created timestamp
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 
     /// Updated timestamp
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl Organization {
@@ -110,7 +110,7 @@ impl Organization {
     /// assert!(org.ods_code.is_none());
     /// ```
     pub fn new(name: String) -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         Self {
             id: Uuid::new_v4(),
             identifiers: Vec::new(),

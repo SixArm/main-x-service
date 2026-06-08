@@ -7,7 +7,7 @@
 //! organizer / performers list, identifier scheme mapping by system URI
 //! (Eventbrite, Meetup, Wikidata, Google Calendar, iCalendar).
 
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use jiff::Timestamp;
 
 use event_service::matching::adapter::to_matcher_event;
 use event_service::matching::matcher_lib::{Confidence, MatchingEngine};
@@ -20,12 +20,12 @@ use event_service::models::{
 // -------- builders -----------------------------------------------------------
 
 /// Build a fixed top-of-hour UTC timestamp for deterministic tests.
-fn start_at(year: i32, month: u32, day: u32, hour: u32) -> DateTime<Utc> {
-    Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).unwrap()
+fn start_at(year: i16, month: i8, day: i8, hour: i8) -> Timestamp {
+    jiff::civil::datetime(year, month, day, hour, 0, 0, 0).in_tz("UTC").unwrap().timestamp()
 }
 
 /// Build a scheduled conference-type event with the given name/start.
-fn event(name: &str, start: DateTime<Utc>) -> Event {
+fn event(name: &str, start: Timestamp) -> Event {
     let mut e = Event::new(name, start);
     e.event_type = EventType::Conference;
     e.event_status = EventStatus::Scheduled;
@@ -115,12 +115,12 @@ fn closer_start_dates_outscore_farther_start_dates_for_same_name() {
     let mut close_a = conference();
     let mut close_b = conference();
     close_a.start_date = start;
-    close_b.start_date = start + Duration::minutes(15); // 15 min drift
+    close_b.start_date = start + jiff::SignedDuration::from_mins(15); // 15 min drift
 
     let mut far_a = conference();
     let mut far_b = conference();
     far_a.start_date = start;
-    far_b.start_date = start + Duration::days(30); // 30 days off
+    far_b.start_date = start + jiff::SignedDuration::from_hours(24 * (30)); // 30 days off
 
     let close = engine().match_events(&to_matcher_event(&close_a), &to_matcher_event(&close_b));
     let far = engine().match_events(&to_matcher_event(&far_a), &to_matcher_event(&far_b));
@@ -402,7 +402,7 @@ fn event_status_scheduled_maps_to_matcher_event_scheduled() {
     assert_eq!(m.event_status, Some(MEventStatus::EventScheduled));
 }
 
-/// The domain `DateTime<Utc>` start date projects to an RFC 3339
+/// The domain `Timestamp` start date projects to an RFC 3339
 /// string on the matcher side.
 #[test]
 fn start_date_serialises_to_rfc3339() {

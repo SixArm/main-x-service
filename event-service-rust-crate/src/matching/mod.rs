@@ -219,7 +219,6 @@ impl EventMatcher for DeterministicMatcher {
 mod tests {
     use super::*;
     use crate::models::{Event, Identifier, IdentifierType};
-    use chrono::{TimeZone, Utc};
 
     /// A baseline matching config used by these tests.
     fn config() -> MatchingConfig {
@@ -238,11 +237,11 @@ mod tests {
             threshold_score: 0.20,
             ..config()
         });
-        let when = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap();
+        let when = jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
         let query = Event::new("Conference", when);
         let candidates = vec![
             Event::new("Conference", when),
-            Event::new("Totally Different Event", when + chrono::Duration::days(40)),
+            Event::new("Totally Different Event", when + jiff::SignedDuration::from_hours(24 * (40))),
         ];
         let matches = m.find_matches(&query, &candidates).unwrap();
         assert!(!matches.is_empty());
@@ -276,9 +275,9 @@ mod tests {
     #[test]
     fn identifier_short_circuits_match() {
         let m = ProbabilisticMatcher::new(config());
-        let when = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap();
+        let when = jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
         let mut a = Event::new("A", when);
-        let mut b = Event::new("Z", when + chrono::Duration::days(30));
+        let mut b = Event::new("Z", when + jiff::SignedDuration::from_hours(24 * (30)));
         let id = Identifier::new(IdentifierType::TicketNumber, "sys".into(), "T-1".into());
         a.identifiers.push(id.clone());
         b.identifiers.push(id);

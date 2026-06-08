@@ -6,15 +6,15 @@
 //! are pure, so these isolate CPU cost. Run with `cargo bench`.
 
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
-use chrono::{NaiveDate, Utc};
+use jiff::{Timestamp, civil::Date};
 use uuid::Uuid;
 
 use person_service::models::*;
 use person_service::validation::{validate_person, normalize_phone, standardize_address};
 
 /// Build a minimal [`Person`] for validation benchmarks.
-fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Person {
-    let now = Utc::now();
+fn create_test_person(family: &str, given: &str, birth_date: Option<Date>) -> Person {
+    let now = Timestamp::now();
     Person {
         id: Uuid::new_v4(),
         identifiers: vec![],
@@ -51,7 +51,7 @@ fn bench_validate_simple_person(c: &mut Criterion) {
     let person = create_test_person(
         "Smith",
         "John",
-        NaiveDate::from_ymd_opt(1980, 1, 15),
+        Some(jiff::civil::date(1980, 1, 15)),
     );
 
     c.bench_function("validate_simple_person", |b| {
@@ -67,7 +67,7 @@ fn bench_validate_complex_person(c: &mut Criterion) {
     let mut person = create_test_person(
         "Smith",
         "John",
-        NaiveDate::from_ymd_opt(1980, 1, 15),
+        Some(jiff::civil::date(1980, 1, 15)),
     );
 
     person.tax_id = Some("123-45-6789".to_string());
@@ -98,8 +98,8 @@ fn bench_validate_complex_person(c: &mut Criterion) {
         number: "X12345678".to_string(),
         issuing_country: Some("US".to_string()),
         issuing_authority: None,
-        issue_date: NaiveDate::from_ymd_opt(2020, 1, 1),
-        expiry_date: NaiveDate::from_ymd_opt(2030, 1, 1),
+        issue_date: Some(jiff::civil::date(2020, 1, 1)),
+        expiry_date: Some(jiff::civil::date(2030, 1, 1)),
         verified: false,
     });
 

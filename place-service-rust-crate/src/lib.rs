@@ -52,8 +52,16 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+pub mod api;
+pub mod config;
+pub mod db;
+pub mod error;
 pub mod matching;
 pub mod metrics;
 pub mod models;
 pub mod privacy;
+pub mod search;
+pub mod streaming;
 pub mod validation;
+
+pub use error::{Error, Result};

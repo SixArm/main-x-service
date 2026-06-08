@@ -69,7 +69,7 @@ pub fn validate_worker(worker: &Worker) -> Vec<ValidationError> {
 
     // Validate birth_date is not in the future
     if let Some(dob) = worker.birth_date {
-        if dob > chrono::Utc::now().date_naive() {
+        if dob > jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC).date() {
             errors.push(ValidationError {
                 field: "birth_date".into(),
                 message: "Birth date cannot be in the future".into(),
@@ -196,7 +196,7 @@ fn validate_document(doc: &IdentityDocument, prefix: &str) -> Vec<ValidationErro
 
     // Check expiry
     if let Some(expiry) = doc.expiry_date {
-        if expiry < chrono::Utc::now().date_naive() {
+        if expiry < jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC).date() {
             errors.push(ValidationError {
                 field: format!("{}.expiry_date", prefix),
                 message: "Document has expired".into(),
@@ -384,7 +384,7 @@ mod tests {
             Gender::Male,
         );
         // Set birth date to far in the future
-        worker.birth_date = Some(chrono::NaiveDate::from_ymd_opt(2099, 1, 1).unwrap());
+        worker.birth_date = Some(jiff::civil::date(2099, 1, 1));
         let errors = validate_worker(&worker);
         assert!(errors.iter().any(|e| e.field == "birth_date"), "Future birth date should produce validation error");
     }
@@ -470,7 +470,7 @@ mod tests {
             issuing_country: Some("US".into()),
             issuing_authority: None,
             issue_date: None,
-            expiry_date: Some(chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()),
+            expiry_date: Some(jiff::civil::date(2020, 1, 1)),
             verified: false,
         });
         let errors = validate_worker(&worker);

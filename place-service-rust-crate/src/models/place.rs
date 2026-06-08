@@ -18,8 +18,9 @@
 //! assert!(p.is_deleted);
 //! ```
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::address::PostalAddress;
@@ -51,7 +52,7 @@ use super::place_type::PlaceType;
 /// p.keywords = vec!["landmark".into(), "tourism".into()];
 /// assert_eq!(p.name, "Eiffel Tower");
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Place {
     /// Stable, system-generated UUID v4 primary key. Assigned once at
     /// construction and preserved across updates, merges, and serialization.
@@ -104,12 +105,12 @@ pub struct Place {
     pub is_deleted: bool,
     /// When the record was soft-deleted, if it has been. Paired with
     /// [`is_deleted`](Self::is_deleted).
-    pub deleted_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<Timestamp>,
     /// Creation timestamp, set once at construction.
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     /// Last-modification timestamp. Initialized equal to
     /// [`created_at`](Self::created_at).
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl Place {
@@ -128,7 +129,7 @@ impl Place {
     /// assert_eq!(p.created_at, p.updated_at);
     /// ```
     pub fn new(name: &str) -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         Self {
             id: Uuid::new_v4(),
             name: name.to_string(),
@@ -174,7 +175,7 @@ impl Place {
     /// ```
     pub fn soft_delete(&mut self) {
         self.is_deleted = true;
-        self.deleted_at = Some(Utc::now());
+        self.deleted_at = Some(Timestamp::now());
     }
 }
 

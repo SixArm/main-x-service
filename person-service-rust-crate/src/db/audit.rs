@@ -112,7 +112,7 @@ impl AuditLogRepository {
     ) -> Result<()> {
         let new_audit = audit_log::ActiveModel {
             id: Set(Uuid::new_v4()),
-            timestamp: Set(chrono::Utc::now()),
+            timestamp: Set(time::OffsetDateTime::now_utc()),
             user_id: Set(user_id),
             action: Set(action.to_string()),
             entity_type: Set(entity_type.to_string()),

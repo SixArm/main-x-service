@@ -225,7 +225,7 @@ impl PersonMatcher for DeterministicMatcher {
 mod tests {
     use super::*;
     use crate::models::{HumanName, Gender};
-    use chrono::NaiveDate;
+    use jiff::civil::Date;
 
     /// Build a default config with an 0.85 probable threshold.
     fn create_test_config() -> MatchingConfig {
@@ -237,7 +237,7 @@ mod tests {
     }
 
     /// Build a minimal male person with the given family/given name and DOB.
-    fn create_test_person(family: &str, given: &str, dob: Option<NaiveDate>) -> Person {
+    fn create_test_person(family: &str, given: &str, dob: Option<Date>) -> Person {
         Person {
             id: uuid::Uuid::new_v4(),
             identifiers: vec![],
@@ -264,8 +264,8 @@ mod tests {
             photo: vec![],
             managing_organization: None,
             links: vec![],
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now(),
+            updated_at: jiff::Timestamp::now(),
         }
     }
 
@@ -279,13 +279,13 @@ mod tests {
         };
         let matcher = ProbabilisticMatcher::new(config);
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let person = create_test_person("Smith", "John", dob);
 
         let candidates = vec![
             create_test_person("Smith", "John", dob), // Exact match
             create_test_person("Smyth", "John", dob), // Close match
-            create_test_person("Johnson", "Bob", NaiveDate::from_ymd_opt(1990, 5, 20)), // No match
+            create_test_person("Johnson", "Bob", Some(jiff::civil::date(1990, 5, 20))), // No match
         ];
 
         let matches = matcher.find_matches(&person, &candidates).unwrap();
@@ -305,7 +305,7 @@ mod tests {
         let config = create_test_config();
         let matcher = DeterministicMatcher::new(config);
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let person1 = create_test_person("Smith", "John", dob);
         let person2 = create_test_person("Smith", "John", dob);
 
@@ -343,7 +343,7 @@ mod tests {
         };
         let matcher = ProbabilisticMatcher::new(config);
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let person = create_test_person("Smith", "John", dob);
         let candidate = create_test_person("Smith", "John", dob);
 
@@ -363,11 +363,11 @@ mod tests {
         };
         let matcher = ProbabilisticMatcher::new(config);
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let person = create_test_person("Smith", "John", dob);
 
         let candidates = vec![
-            create_test_person("Johnson", "Bob", NaiveDate::from_ymd_opt(1995, 5, 20)), // Low match
+            create_test_person("Johnson", "Bob", Some(jiff::civil::date(1995, 5, 20))), // Low match
             create_test_person("Smith", "John", dob), // Exact match
             create_test_person("Smyth", "John", dob), // Close match
         ];
@@ -388,7 +388,7 @@ mod tests {
         let config = create_test_config();
         let matcher = ProbabilisticMatcher::new(config);
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let person = create_test_person("Smith", "John", dob);
 
         let matches = matcher.find_matches(&person, &[]).unwrap();

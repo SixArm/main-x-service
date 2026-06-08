@@ -26,13 +26,16 @@
 //! assert!(validate_place(&place).is_empty());
 //! ```
 
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
 use crate::models::place::Place;
 
 /// A single validation failure: which field failed and why.
 ///
 /// [`validate_place`] returns a `Vec<ValidationError>`; an empty vec means the
 /// record is valid.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct ValidationError {
     /// The offending field path (e.g. `"name"`, `"geo.latitude"`).
     pub field: String,

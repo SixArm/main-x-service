@@ -4,7 +4,7 @@
 //! mode (e.g. CS101 Fall 2026 with Prof. Smith). Multiple instances
 //! can share the same parent `Course`.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -63,17 +63,17 @@ pub struct CourseInstance {
     /// Enrollment window opens — ISO 8601 in UTC. Validated to be ≤
     /// [`enrollment_closes`](Self::enrollment_closes) (FR-27).
     #[serde(default)]
-    pub enrollment_opens: Option<DateTime<Utc>>,
+    pub enrollment_opens: Option<Timestamp>,
     /// Enrollment window closes — ISO 8601 in UTC.
     #[serde(default)]
-    pub enrollment_closes: Option<DateTime<Utc>>,
+    pub enrollment_closes: Option<Timestamp>,
 
     /// Created server-side on insert.
-    #[serde(default = "Utc::now")]
-    pub created_at: DateTime<Utc>,
+    #[serde(default = "Timestamp::now")]
+    pub created_at: Timestamp,
     /// Updated server-side on insert and update.
-    #[serde(default = "Utc::now")]
-    pub updated_at: DateTime<Utc>,
+    #[serde(default = "Timestamp::now")]
+    pub updated_at: Timestamp,
 }
 
 /// schema.org/CourseInstance.courseMode — how the offering is delivered.
@@ -118,10 +118,10 @@ pub struct Schedule {
     /// Window start. Validated to be ≤ [`end_date`](Self::end_date)
     /// when both are present (FR-26).
     #[serde(default)]
-    pub start_date: Option<DateTime<Utc>>,
+    pub start_date: Option<Timestamp>,
     /// Window end.
     #[serde(default)]
-    pub end_date: Option<DateTime<Utc>>,
+    pub end_date: Option<Timestamp>,
     /// IANA tz string (storage is UTC).
     #[serde(default)]
     pub time_zone: Option<String>,
@@ -139,10 +139,10 @@ pub struct Schedule {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Session {
     /// When the session begins (UTC).
-    pub start: DateTime<Utc>,
+    pub start: Timestamp,
     /// When the session ends (UTC); `None` if open-ended / unknown.
     #[serde(default)]
-    pub end: Option<DateTime<Utc>>,
+    pub end: Option<Timestamp>,
     /// Optional human-readable label (e.g. "Week 1: Orientation").
     #[serde(default)]
     pub label: Option<String>,

@@ -5,7 +5,7 @@
 //! probabilistic match against 50 candidates and the Soundex phonetic
 //! similarity used as a name-score floor. Run with `cargo bench`.
 
-use chrono::{DateTime, TimeZone, Utc};
+use jiff::Timestamp;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use event_service::config::MatchingConfig;
@@ -17,12 +17,12 @@ use event_service::matching::{EventMatcher, ProbabilisticMatcher};
 use event_service::models::*;
 
 /// Build a top-of-hour UTC timestamp for deterministic benchmarks.
-fn dt(year: i32, month: u32, day: u32, hour: u32) -> DateTime<Utc> {
-    Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).unwrap()
+fn dt(year: i16, month: i8, day: i8, hour: i8) -> Timestamp {
+    jiff::civil::datetime(year, month, day, hour, 0, 0, 0).in_tz("UTC").unwrap().timestamp()
 }
 
 /// Build a minimal event with the given name and start.
-fn make_event(name: &str, start: DateTime<Utc>) -> Event {
+fn make_event(name: &str, start: Timestamp) -> Event {
     Event::new(name, start)
 }
 
@@ -124,7 +124,7 @@ fn bench_probabilistic_match(c: &mut Criterion) {
     let matcher = ProbabilisticMatcher::new(config);
     let query = make_event("Concert", dt(2026, 3, 1, 9));
     let candidates: Vec<Event> = (0..50)
-        .map(|i| make_event(&format!("Concert {i}"), dt(2026, 3, 1, 9 + (i as u32 % 8))))
+        .map(|i| make_event(&format!("Concert {i}"), dt(2026, 3, 1, 9 + (i as i8 % 8))))
         .collect();
     c.bench_function("probabilistic_match_50_candidates", |c| {
         c.iter(|| black_box(matcher.find_matches(black_box(&query), black_box(&candidates)).unwrap()));

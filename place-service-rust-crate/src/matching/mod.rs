@@ -32,3 +32,55 @@ pub mod scoring;
 /// [`adapter::to_matcher_place`] to score two service `Place` records
 /// through the reference algorithm.
 pub use ::place_matcher as matcher_lib;
+
+use crate::config::MatchingConfig;
+use crate::models::place::Place;
+use scoring::{MatchConfidence, MatchResult, MatchWeights, compute_match};
+
+/// Service-tier matcher facade carried by the REST
+/// [`AppState`](crate::api::rest::AppState).
+///
+/// Wraps the native weighted [`compute_match`](scoring::compute_match)
+/// scorer with a configurable `is_match` threshold so handlers have one
+/// entry point for scoring and classification.
+pub struct PlaceMatcher {
+    /// Tunable weights for the component scores.
+    weights: MatchWeights,
+    /// `is_match` cut-off score in `[0.0, 1.0]`.
+    threshold: f64,
+}
+
+impl PlaceMatcher {
+    /// Build a matcher from the service [`MatchingConfig`].
+    pub fn new(config: MatchingConfig) -> Self {
+        Self {
+            weights: MatchWeights::default(),
+            threshold: config.threshold_score,
+        }
+    }
+
+    /// Score two places, returning the full [`MatchResult`](scoring::MatchResult).
+    pub fn score(&self, a: &Place, b: &Place) -> MatchResult {
+        compute_match(a, b, &self.weights)
+    }
+
+    /// Whether two places score at or above the configured threshold.
+    pub fn is_match(&self, a: &Place, b: &Place) -> bool {
+        self.score(a, b).score >= self.threshold
+    }
+
+    /// The configured `is_match` threshold.
+    pub fn threshold(&self) -> f64 {
+        self.threshold
+    }
+}
+
+/// Classify a confidence band into a stable string label for API responses.
+pub fn confidence_label(c: &MatchConfidence) -> &'static str {
+    match c {
+        MatchConfidence::Certain => "certain",
+        MatchConfidence::Probable => "probable",
+        MatchConfidence::Possible => "possible",
+        MatchConfidence::Unlikely => "unlikely",
+    }
+}

@@ -11,7 +11,6 @@
 //! column names are self-describing and map 1:1 to the SQL schema; the
 //! authoritative column reference is `AGENTS/models.md`.
 
-use chrono::NaiveDate;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -38,11 +37,13 @@ pub mod workers {
         /// Administrative gender code.
         pub gender: String,
         /// Date of birth.
-        pub birth_date: Option<NaiveDate>,
+        pub birth_date: Option<TimeDate>,
+        /// Tax identifier (CPF, SSN, TIN), if recorded.
+        pub tax_id: Option<String>,
         /// Whether the worker is deceased.
         pub deceased: bool,
         /// Date/time of death.
-        pub deceased_datetime: Option<DateTimeUtc>,
+        pub deceased_datetime: Option<TimeDateTimeWithTimeZone>,
         /// Marital status code.
         pub marital_status: Option<String>,
         /// Multiple-birth indicator.
@@ -50,15 +51,15 @@ pub mod workers {
         /// Managing organization foreign key.
         pub managing_organization_id: Option<Uuid>,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
         /// Actor who created the row.
         pub created_by: Option<String>,
         /// Actor who last updated the row.
         pub updated_by: Option<String>,
         /// Soft-delete timestamp.
-        pub deleted_at: Option<DateTimeUtc>,
+        pub deleted_at: Option<TimeDateTimeWithTimeZone>,
         /// Actor who soft-deleted the row.
         pub deleted_by: Option<String>,
     }
@@ -146,9 +147,9 @@ pub mod worker_names {
         /// Whether this is the primary name.
         pub is_primary: bool,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -199,9 +200,9 @@ pub mod worker_identifiers {
         /// Assigning authority.
         pub assigner: Option<String>,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -257,9 +258,9 @@ pub mod worker_addresses {
         /// Whether this is the primary address.
         pub is_primary: bool,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -307,9 +308,9 @@ pub mod worker_contacts {
         /// Whether this is the primary contact.
         pub is_primary: bool,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -354,7 +355,7 @@ pub mod worker_links {
         /// Link type code (Replaces, ReplacedBy, …).
         pub link_type: String,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Actor who created the link.
         pub created_by: Option<String>,
     }
@@ -407,7 +408,7 @@ pub mod organizations {
         /// Assigning authority.
         pub assigning_authority: Option<String>,
         /// Date of last ODS change.
-        pub last_change_date: Option<NaiveDate>,
+        pub last_change_date: Option<TimeDate>,
         /// Organization name.
         pub name: String,
         /// Alternative names.
@@ -417,15 +418,15 @@ pub mod organizations {
         /// Parent organization foreign key.
         pub part_of: Option<Uuid>,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
         /// Actor who created the row.
         pub created_by: Option<String>,
         /// Actor who last updated the row.
         pub updated_by: Option<String>,
         /// Soft-delete timestamp.
-        pub deleted_at: Option<DateTimeUtc>,
+        pub deleted_at: Option<TimeDateTimeWithTimeZone>,
         /// Actor who soft-deleted the row.
         pub deleted_by: Option<String>,
     }
@@ -515,9 +516,9 @@ pub mod organization_addresses {
         /// Whether this is the primary address.
         pub is_primary: bool,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -565,9 +566,9 @@ pub mod organization_contacts {
         /// Whether this is the primary contact.
         pub is_primary: bool,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -617,9 +618,9 @@ pub mod organization_identifiers {
         /// Assigning authority.
         pub assigner: Option<String>,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -680,7 +681,7 @@ pub mod worker_match_scores {
         #[sea_orm(column_type = "Decimal(Some((10, 6)))")]
         pub identifier_score: Option<bigdecimal::BigDecimal>,
         /// When the score was calculated.
-        pub calculated_at: DateTimeUtc,
+        pub calculated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -719,7 +720,7 @@ pub mod audit_log {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
         /// When the action occurred.
-        pub timestamp: DateTimeUtc,
+        pub timestamp: TimeDateTimeWithTimeZone,
         /// Acting user ID.
         pub user_id: Option<String>,
         /// Action performed (create, update, …).
@@ -774,9 +775,9 @@ pub mod organization_roles {
         /// Role status code.
         pub status: String,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -825,9 +826,9 @@ pub mod organization_role_periods {
         /// Period type code.
         pub period_type: String,
         /// Period start date.
-        pub start_date: Option<NaiveDate>,
+        pub start_date: Option<TimeDate>,
         /// Period end date.
-        pub end_date: Option<NaiveDate>,
+        pub end_date: Option<TimeDate>,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -880,9 +881,9 @@ pub mod organization_relationships {
         /// Target organization primary role ID.
         pub target_primary_role_id: Option<String>,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -931,9 +932,9 @@ pub mod organization_relationship_periods {
         /// Period type code.
         pub period_type: String,
         /// Period start date.
-        pub start_date: Option<NaiveDate>,
+        pub start_date: Option<TimeDate>,
         /// Period end date.
-        pub end_date: Option<NaiveDate>,
+        pub end_date: Option<TimeDate>,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -982,11 +983,11 @@ pub mod organization_successions {
         /// Counterpart organization primary role ID.
         pub target_primary_role_id: Option<String>,
         /// Legal start date of the succession.
-        pub legal_start_date: Option<NaiveDate>,
+        pub legal_start_date: Option<TimeDate>,
         /// Whether this is a forward succession.
         pub has_forward_succession: bool,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -1029,9 +1030,9 @@ pub mod organization_periods {
         /// Period type code.
         pub period_type: String,
         /// Period start date.
-        pub start_date: Option<NaiveDate>,
+        pub start_date: Option<TimeDate>,
         /// Period end date.
-        pub end_date: Option<NaiveDate>,
+        pub end_date: Option<TimeDate>,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -1092,7 +1093,7 @@ pub mod postcode_geography {
         /// Cancer alliance.
         pub cancer_alliance: Option<String>,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -1123,7 +1124,7 @@ pub mod ods_role_references {
         /// Whether this is a primary role type.
         pub is_primary_role_type: bool,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -1148,7 +1149,7 @@ pub mod ods_relationship_references {
         /// Human-readable relationship name.
         pub relationship_name: String,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -1173,7 +1174,7 @@ pub mod ods_record_class_references {
         /// Human-readable record-class name.
         pub name: String,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -1198,7 +1199,7 @@ pub mod ods_record_use_type_references {
         /// Human-readable record-use-type name.
         pub name: String,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -1225,7 +1226,7 @@ pub mod practitioner_role_references {
         /// Optional role category.
         pub role_category: Option<String>,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
@@ -1252,12 +1253,187 @@ pub mod geography_name_references {
         /// Geography type (Local Authority, ICB, …).
         pub geography_type: String,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {}
 
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ============================================================================
+// Worker Document Models
+// ============================================================================
+
+/// The `worker_documents` table: identity documents per worker.
+pub mod worker_documents {
+    use super::*;
+
+    /// An identity-document row.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "worker_documents")]
+    pub struct Model {
+        /// Application-assigned primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// Owning worker id (FK).
+        pub worker_id: Uuid,
+        /// Document type (serde tag, e.g. `Passport`).
+        pub document_type: String,
+        /// Document number.
+        pub number: String,
+        /// Issuing country, if recorded.
+        pub issuing_country: Option<String>,
+        /// Issuing authority, if recorded.
+        pub issuing_authority: Option<String>,
+        /// Issue date, if recorded.
+        pub issue_date: Option<TimeDate>,
+        /// Expiry date, if recorded.
+        pub expiry_date: Option<TimeDate>,
+        /// Whether the document has been verified.
+        pub verified: bool,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent worker.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `workers`.
+        #[sea_orm(belongs_to = "super::workers::Entity", from = "Column::WorkerId", to = "super::workers::Column::Id")]
+        Worker,
+    }
+    impl Related<super::workers::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Worker.def() }
+    }
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ============================================================================
+// Worker Emergency Contact Models
+// ============================================================================
+
+/// The `worker_emergency_contacts` table (address flattened; telecom in
+/// `worker_emergency_contact_telecom`).
+pub mod worker_emergency_contacts {
+    use super::*;
+
+    /// An emergency-contact row.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "worker_emergency_contacts")]
+    pub struct Model {
+        /// Application-assigned primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// Owning worker id (FK).
+        pub worker_id: Uuid,
+        /// Contact name.
+        pub name: String,
+        /// Relationship (spouse, parent, …).
+        pub relationship: String,
+        /// Whether this is the primary emergency contact.
+        pub is_primary: bool,
+        /// Flattened address use type.
+        pub address_use_type: Option<String>,
+        /// Flattened address line 1.
+        pub address_line1: Option<String>,
+        /// Flattened address line 2.
+        pub address_line2: Option<String>,
+        /// Flattened address city.
+        pub address_city: Option<String>,
+        /// Flattened address state.
+        pub address_state: Option<String>,
+        /// Flattened address postal code.
+        pub address_postal_code: Option<String>,
+        /// Flattened address country.
+        pub address_country: Option<String>,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent worker.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `workers`.
+        #[sea_orm(belongs_to = "super::workers::Entity", from = "Column::WorkerId", to = "super::workers::Column::Id")]
+        Worker,
+    }
+    impl Related<super::workers::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Worker.def() }
+    }
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// The `worker_emergency_contact_telecom` table.
+pub mod worker_emergency_contact_telecom {
+    use super::*;
+
+    /// A telecom row for one emergency contact.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "worker_emergency_contact_telecom")]
+    pub struct Model {
+        /// Application-assigned primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// Owning emergency-contact id (FK).
+        pub emergency_contact_id: Uuid,
+        /// Contact system (serde tag).
+        pub system: String,
+        /// Contact value.
+        pub value: String,
+        /// Contact use/type code, if recorded.
+        pub use_type: Option<String>,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent emergency contact.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `worker_emergency_contacts`.
+        #[sea_orm(belongs_to = "super::worker_emergency_contacts::Entity", from = "Column::EmergencyContactId", to = "super::worker_emergency_contacts::Column::Id")]
+        EmergencyContact,
+    }
+    impl Related<super::worker_emergency_contacts::Entity> for Entity {
+        fn to() -> RelationDef { Relation::EmergencyContact.def() }
+    }
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ============================================================================
+// Worker Photo Models
+// ============================================================================
+
+/// The `worker_photos` table: photo references per worker.
+pub mod worker_photos {
+    use super::*;
+
+    /// A photo-reference row.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "worker_photos")]
+    pub struct Model {
+        /// Application-assigned primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// Owning worker id (FK).
+        pub worker_id: Uuid,
+        /// The photo URL / reference.
+        pub url: String,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent worker.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `workers`.
+        #[sea_orm(belongs_to = "super::workers::Entity", from = "Column::WorkerId", to = "super::workers::Column::Id")]
+        Worker,
+    }
+    impl Related<super::workers::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Worker.def() }
+    }
     impl ActiveModelBehavior for ActiveModel {}
 }

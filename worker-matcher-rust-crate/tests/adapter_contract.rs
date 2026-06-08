@@ -10,7 +10,6 @@
 //! `united_kingdom_national_health_service_number`). The contract test
 //! pins the worker form so a rename in either direction trips CI.
 
-use chrono::NaiveDate;
 use worker_matcher::{
     Address, Confidence, Gender, MatchConfig, MatchingEngine, PassportBook, Worker, WorkerBuilder,
 };
@@ -21,8 +20,8 @@ use worker_matcher::{
 
 #[test]
 fn worker_builder_demographic_and_contact_surface() {
-    let dob = NaiveDate::from_ymd_opt(1970, 4, 1).unwrap();
-    let death = NaiveDate::from_ymd_opt(2060, 1, 1).unwrap();
+    let dob = jiff::civil::date(1970, 4, 1);
+    let death = jiff::civil::date(2060, 1, 1);
     let addr = Address::new().with_line1("1 Test St").with_city("Town");
 
     let w: Worker = Worker::builder()
@@ -104,8 +103,8 @@ fn worker_builder_passport_book_surface() {
 
     let pb = PassportBook::new("US", "X12345678")
         .expect("non-empty country + number must construct")
-        .with_issued(NaiveDate::from_ymd_opt(2020, 1, 1).unwrap())
-        .with_expires(NaiveDate::from_ymd_opt(2030, 1, 1).unwrap());
+        .with_issued(jiff::civil::date(2020, 1, 1))
+        .with_expires(jiff::civil::date(2030, 1, 1));
     assert_eq!(pb.country, "US");
     assert_eq!(pb.number, "X12345678");
 

@@ -50,6 +50,7 @@
 //! assert!(json.contains("\"kind\":\"virtual\""));
 //! ```
 
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -304,9 +305,9 @@ pub struct Offer {
     /// Stock / availability state of this offer.
     pub availability: Option<OfferAvailability>,
     /// When the offer becomes valid (sales open).
-    pub valid_from: Option<chrono::DateTime<chrono::Utc>>,
+    pub valid_from: Option<Timestamp>,
     /// When the offer expires (sales close); must be `>= valid_from`.
-    pub valid_through: Option<chrono::DateTime<chrono::Utc>>,
+    pub valid_through: Option<Timestamp>,
 }
 
 /// Availability state of an [`Offer`]. Mirrors

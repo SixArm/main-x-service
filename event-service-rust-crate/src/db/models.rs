@@ -37,31 +37,16 @@ pub mod events {
         pub disambiguating_description: Option<String>,
         /// Canonical URL.
         pub url: Option<String>,
-        /// JSONB array of alternate names.
-        #[sea_orm(column_type = "JsonBinary")]
-        pub alternate_names: Json,
-        /// JSONB array of image URLs.
-        #[sea_orm(column_type = "JsonBinary")]
-        pub image: Json,
-        /// JSONB array of `sameAs` identity URLs.
-        #[sea_orm(column_type = "JsonBinary")]
-        pub same_as: Json,
-        /// JSONB array of keywords/tags.
-        #[sea_orm(column_type = "JsonBinary")]
-        pub keywords: Json,
-        /// JSONB array of ISO 639-1 language codes.
-        #[sea_orm(column_type = "JsonBinary")]
-        pub in_language: Json,
         /// Event start instant (required).
-        pub start_date: DateTimeUtc,
+        pub start_date: TimeDateTimeWithTimeZone,
         /// Event end instant, if known.
-        pub end_date: Option<DateTimeUtc>,
+        pub end_date: Option<TimeDateTimeWithTimeZone>,
         /// Admission/door-open instant.
-        pub door_time: Option<DateTimeUtc>,
+        pub door_time: Option<TimeDateTimeWithTimeZone>,
         /// ISO 8601 duration string.
         pub duration: Option<String>,
         /// Original start instant before any reschedule.
-        pub previous_start_date: Option<DateTimeUtc>,
+        pub previous_start_date: Option<TimeDateTimeWithTimeZone>,
         /// IANA time-zone for display (storage is UTC).
         pub time_zone: Option<String>,
         /// All-day flag.
@@ -87,15 +72,15 @@ pub mod events {
         /// Parent event id (schema.org `superEvent`).
         pub super_event_id: Option<Uuid>,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
         /// User who created the row.
         pub created_by: Option<String>,
         /// User who last updated the row.
         pub updated_by: Option<String>,
         /// Soft-delete timestamp.
-        pub deleted_at: Option<DateTimeUtc>,
+        pub deleted_at: Option<TimeDateTimeWithTimeZone>,
         /// User who soft-deleted the row.
         pub deleted_by: Option<String>,
     }
@@ -185,9 +170,9 @@ pub mod event_identifiers {
         /// Optional assigning authority.
         pub assigner: Option<String>,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Relation back to the owning event.
@@ -261,9 +246,9 @@ pub mod event_locations {
         /// URL (for "place" or "virtual").
         pub url: Option<String>,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Relation back to the owning event.
@@ -321,9 +306,9 @@ pub mod event_parties {
         /// Optional URL.
         pub url: Option<String>,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Relation back to the owning event.
@@ -378,13 +363,13 @@ pub mod event_offers {
         /// Serialized `OfferAvailability`.
         pub availability: Option<String>,
         /// Offer validity start.
-        pub valid_from: Option<DateTimeUtc>,
+        pub valid_from: Option<TimeDateTimeWithTimeZone>,
         /// Offer validity end.
-        pub valid_through: Option<DateTimeUtc>,
+        pub valid_through: Option<TimeDateTimeWithTimeZone>,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Relation back to the owning event.
@@ -430,7 +415,7 @@ pub mod event_links {
         /// Serialized `LinkType` (Replaces / ReplacedBy / Refer / Seealso).
         pub link_type: String,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// User who created the link.
         pub created_by: Option<String>,
     }
@@ -479,7 +464,7 @@ pub mod event_sub_events {
         /// Ordering position within the sub-event list.
         pub position: i32,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
     }
 
     /// Relation back to the owning (parent) event.
@@ -529,15 +514,15 @@ pub mod organizations {
         /// Parent organization id (`partOf`).
         pub part_of: Option<Uuid>,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
         /// User who created the row.
         pub created_by: Option<String>,
         /// User who last updated the row.
         pub updated_by: Option<String>,
         /// Soft-delete timestamp.
-        pub deleted_at: Option<DateTimeUtc>,
+        pub deleted_at: Option<TimeDateTimeWithTimeZone>,
         /// User who soft-deleted the row.
         pub deleted_by: Option<String>,
     }
@@ -605,9 +590,9 @@ pub mod organization_addresses {
         /// Whether this is the primary address.
         pub is_primary: bool,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Relation back to the owning organization.
@@ -653,9 +638,9 @@ pub mod organization_contacts {
         /// Whether this is the primary contact.
         pub is_primary: bool,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Relation back to the owning organization.
@@ -703,9 +688,9 @@ pub mod organization_identifiers {
         /// Optional assigning authority.
         pub assigner: Option<String>,
         /// Row creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Row last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Relation back to the owning organization.
@@ -745,7 +730,7 @@ pub mod audit_log {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
         /// When the action occurred.
-        pub timestamp: DateTimeUtc,
+        pub timestamp: TimeDateTimeWithTimeZone,
         /// User who performed the action.
         pub user_id: Option<String>,
         /// Action name (create / update / delete / merge / …).
@@ -768,5 +753,42 @@ pub mod audit_log {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {}
 
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ───────────────────── event_text_values ─────────────────────
+
+/// Tagged table for the Event's parallel string-list properties
+/// (alternate_name | image | same_as | keyword | in_language).
+pub mod event_text_values {
+    use super::*;
+
+    /// One `(field, value)` row for an event string list.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "event_text_values")]
+    pub struct Model {
+        /// Primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// FK to the owning event.
+        pub event_id: Uuid,
+        /// Which list this value belongs to.
+        pub field: String,
+        /// The value.
+        pub value: String,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent event.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `events`.
+        #[sea_orm(belongs_to = "super::events::Entity", from = "Column::EventId", to = "super::events::Column::Id")]
+        Event,
+    }
+    impl Related<super::events::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Event.def() }
+    }
     impl ActiveModelBehavior for ActiveModel {}
 }

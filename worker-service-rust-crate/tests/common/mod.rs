@@ -48,7 +48,6 @@ pub async fn create_test_router() -> Router {
 /// (`TestWorker{suffix}_{micros}`) so tests sharing one database do not match
 /// each other's records during search/dedup assertions.
 pub fn unique_worker_name(suffix: &str) -> String {
-    use chrono::Utc;
-    let timestamp = Utc::now().timestamp_micros();
+    let timestamp = jiff::Timestamp::now().as_microsecond();
     format!("TestWorker{}_{}", suffix, timestamp)
 }

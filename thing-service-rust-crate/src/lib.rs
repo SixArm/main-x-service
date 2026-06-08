@@ -54,6 +54,14 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+/// REST API surface and shared response envelope.
+pub mod api;
+/// Service configuration loaded from the environment.
+pub mod config;
+/// PostgreSQL persistence: connection pool, repository, audit log.
+pub mod db;
+/// Crate-level error type and result alias.
+pub mod error;
 /// Matching engine: per-component similarity functions, the weighted
 /// scorer, and the adapter to the canonical `thing-matcher` crate.
 pub mod matching;
@@ -64,5 +72,11 @@ pub mod metrics;
 pub mod models;
 /// Privacy controls: per-field masking and GDPR export.
 pub mod privacy;
+/// Tantivy-backed full-text search engine.
+pub mod search;
+/// Event-streaming publisher for CRUD/merge operations.
+pub mod streaming;
 /// Data-quality validation and in-place normalization.
 pub mod validation;
+
+pub use error::{Error, Result};

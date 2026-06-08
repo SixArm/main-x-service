@@ -14,7 +14,7 @@
 //! against the service's domain model. If either side breaks the contract,
 //! a test here will fire.
 
-use chrono::{NaiveDate, Utc};
+use jiff::{Timestamp, civil::Date};
 use uuid::Uuid;
 
 use person_service::matching::adapter::to_matcher_person;
@@ -41,13 +41,13 @@ fn human_name(family: &str, given: &str) -> HumanName {
 fn person(family: &str, given: &str) -> Person {
     let mut p = Person::new(human_name(family, given), Gender::Female);
     p.id = Uuid::new_v4();
-    p.created_at = Utc::now();
+    p.created_at = Timestamp::now();
     p.updated_at = p.created_at;
     p
 }
 
 /// Build a [`person`] that also carries a birth date.
-fn person_with_dob(family: &str, given: &str, dob: NaiveDate) -> Person {
+fn person_with_dob(family: &str, given: &str, dob: Date) -> Person {
     let mut p = person(family, given);
     p.birth_date = Some(dob);
     p
@@ -110,7 +110,7 @@ fn engine() -> MatchingEngine {
 /// High confidence.
 #[test]
 fn identical_clones_score_near_one_high_confidence() {
-    let dob = NaiveDate::from_ymd_opt(1980, 5, 15).unwrap();
+    let dob = jiff::civil::date(1980, 5, 15);
     let a = person_with_dob("Williams", "Alice", dob);
     let b = a.clone();
 
@@ -125,7 +125,7 @@ fn identical_clones_score_near_one_high_confidence() {
 /// ≥ 0.85.
 #[test]
 fn typo_in_given_name_still_matches_fuzzy() {
-    let dob = NaiveDate::from_ymd_opt(1980, 5, 15).unwrap();
+    let dob = jiff::civil::date(1980, 5, 15);
     let alice = person_with_dob("Williams", "Alice", dob);
     let alyce = person_with_dob("Williams", "Alyce", dob); // single-letter Jaro-Winkler typo
 
@@ -143,8 +143,8 @@ fn typo_in_given_name_still_matches_fuzzy() {
 /// below the exact-DOB case.
 #[test]
 fn off_by_one_day_dob_softly_penalised_not_dropped() {
-    let alice_a = person_with_dob("Williams", "Alice", NaiveDate::from_ymd_opt(1980, 5, 15).unwrap());
-    let alice_b = person_with_dob("Williams", "Alice", NaiveDate::from_ymd_opt(1980, 5, 16).unwrap());
+    let alice_a = person_with_dob("Williams", "Alice", jiff::civil::date(1980, 5, 15));
+    let alice_b = person_with_dob("Williams", "Alice", jiff::civil::date(1980, 5, 16));
 
     let exact = engine().match_persons(
         &to_matcher_person(&alice_a),
@@ -196,7 +196,7 @@ fn shared_nhs_number_with_different_formatting_is_deterministic_match() {
 
     let result = engine().match_persons(&ma, &mb);
     assert_eq!(
-        result.breakdown.uk_nhs_number_score,
+        result.breakdown.united_kingdom_national_health_service_number_score,
         Some(1.0),
         "NHS number breakdown should score 1.0"
     );
@@ -265,12 +265,12 @@ fn completely_different_persons_score_low_and_do_not_match() {
     let a = person_with_dob(
         "Williams",
         "Alice",
-        NaiveDate::from_ymd_opt(1980, 5, 15).unwrap(),
+        jiff::civil::date(1980, 5, 15),
     );
     let b = person_with_dob(
         "Tanaka",
         "Hiroshi",
-        NaiveDate::from_ymd_opt(1953, 11, 2).unwrap(),
+        jiff::civil::date(1953, 11, 2),
     );
 
     let result = engine().match_persons(&to_matcher_person(&a), &to_matcher_person(&b));
@@ -290,8 +290,8 @@ fn completely_different_persons_score_low_and_do_not_match() {
 fn same_name_different_dob_and_no_shared_identifier_does_not_short_circuit() {
     // Common name like John Smith with no shared ID and different DOB must
     // not auto-match — false-positive prevention.
-    let a = person_with_dob("Smith", "John", NaiveDate::from_ymd_opt(1955, 1, 1).unwrap());
-    let b = person_with_dob("Smith", "John", NaiveDate::from_ymd_opt(1990, 12, 31).unwrap());
+    let a = person_with_dob("Smith", "John", jiff::civil::date(1955, 1, 1));
+    let b = person_with_dob("Smith", "John", jiff::civil::date(1990, 12, 31));
 
     let result = engine().match_persons(&to_matcher_person(&a), &to_matcher_person(&b));
 
@@ -439,7 +439,7 @@ fn strict_config_demands_more_evidence_than_lenient_for_same_pair() {
     let a = person_with_dob(
         "Garcia",
         "Maria",
-        NaiveDate::from_ymd_opt(1972, 3, 8).unwrap(),
+        jiff::civil::date(1972, 3, 8),
     );
     let mut b = a.clone();
     b.name.given[0] = "Mária".into(); // diacritic variation

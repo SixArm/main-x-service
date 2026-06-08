@@ -23,6 +23,7 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// A structured postal address (schema.org/PostalAddress).
 ///
@@ -30,7 +31,7 @@ use serde::{Deserialize, Serialize};
 /// (`address_locality`, `address_region`, `postal_code`) rather than the
 /// British vocabulary used by the `place-matcher` crate; the matching
 /// adapter renames them at the boundary.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct PostalAddress {
     /// Street address line, e.g. `"14 E 60th St"`.
     pub street_address: Option<String>,

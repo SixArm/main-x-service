@@ -2,7 +2,8 @@
 //! [`Event`](crate::models::Event) and the SeaORM entities defined in
 //! [`crate::db::models`].
 
-use chrono::Utc;
+use time::OffsetDateTime;
+use super::convert::{ts_to_offset, offset_to_ts};
 use sea_orm::sea_query::Expr;
 use sea_orm::*;
 use uuid::Uuid;
@@ -188,6 +189,8 @@ struct ChildRows {
     links: Vec<event_links::ActiveModel>,
     /// `event_sub_events` rows (sub-event id references in order).
     sub_events: Vec<event_sub_events::ActiveModel>,
+    /// `event_text_values` rows (alternate_name/image/same_as/keyword/in_language).
+    text_values: Vec<event_text_values::ActiveModel>,
 }
 
 /// Flatten a domain [`Event`] into a [`ChildRows`] bundle of SeaORM
@@ -195,7 +198,7 @@ struct ChildRows {
 /// fresh `Uuid`s for child rows; serializes the JSONB array fields;
 /// and fans the six party role-lists out via [`push_party_rows`].
 fn to_rows(event: &Event) -> ChildRows {
-    let now = Utc::now();
+    let now = OffsetDateTime::now_utc();
     let event_row = events::ActiveModel {
         id: Set(event.id),
         active: Set(event.active),
@@ -203,18 +206,11 @@ fn to_rows(event: &Event) -> ChildRows {
         description: Set(event.description.clone()),
         disambiguating_description: Set(event.disambiguating_description.clone()),
         url: Set(event.url.clone()),
-        alternate_names: Set(serde_json::to_value(&event.alternate_names)
-            .unwrap_or(serde_json::Value::Array(vec![]))),
-        image: Set(serde_json::to_value(&event.image).unwrap_or(serde_json::Value::Array(vec![]))),
-        same_as: Set(serde_json::to_value(&event.same_as).unwrap_or(serde_json::Value::Array(vec![]))),
-        keywords: Set(serde_json::to_value(&event.keywords).unwrap_or(serde_json::Value::Array(vec![]))),
-        in_language: Set(serde_json::to_value(&event.in_language)
-            .unwrap_or(serde_json::Value::Array(vec![]))),
-        start_date: Set(event.start_date),
-        end_date: Set(event.end_date),
-        door_time: Set(event.door_time),
+        start_date: Set(ts_to_offset(event.start_date)),
+        end_date: Set(event.end_date.map(ts_to_offset)),
+        door_time: Set(event.door_time.map(ts_to_offset)),
         duration: Set(event.duration.clone()),
-        previous_start_date: Set(event.previous_start_date),
+        previous_start_date: Set(event.previous_start_date.map(ts_to_offset)),
         time_zone: Set(event.time_zone.clone()),
         all_day: Set(event.all_day),
         event_status: Set(enum_to_str(&event.event_status)),
@@ -286,8 +282,8 @@ fn to_rows(event: &Event) -> ChildRows {
             price_currency: Set(o.price_currency.clone()),
             url: Set(o.url.clone()),
             availability: Set(o.availability.as_ref().map(enum_to_str)),
-            valid_from: Set(o.valid_from),
-            valid_through: Set(o.valid_through),
+            valid_from: Set(o.valid_from.map(ts_to_offset)),
+            valid_through: Set(o.valid_through.map(ts_to_offset)),
             created_at: Set(now),
             updated_at: Set(now),
         })
@@ -319,6 +315,26 @@ fn to_rows(event: &Event) -> ChildRows {
         })
         .collect();
 
+    // String-list properties → tagged `event_text_values` rows.
+    let mut text_values = Vec::new();
+    for (field, values) in [
+        ("alternate_name", &event.alternate_names),
+        ("image", &event.image),
+        ("same_as", &event.same_as),
+        ("keyword", &event.keywords),
+        ("in_language", &event.in_language),
+    ] {
+        for (pos, value) in values.iter().enumerate() {
+            text_values.push(event_text_values::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                event_id: Set(event.id),
+                field: Set(field.to_string()),
+                value: Set(value.clone()),
+                position: Set(pos as i32),
+            });
+        }
+    }
+
     ChildRows {
         event_row,
         identifiers,
@@ -327,6 +343,7 @@ fn to_rows(event: &Event) -> ChildRows {
         offers,
         links,
         sub_events,
+        text_values,
     }
 }
 
@@ -338,7 +355,7 @@ fn push_party_rows(
     event_id: Uuid,
     role: &str,
     parties: &[Party],
-    now: chrono::DateTime<Utc>,
+    now: OffsetDateTime,
 ) {
     for (pos, p) in parties.iter().enumerate() {
         rows.push(event_parties::ActiveModel {
@@ -366,7 +383,7 @@ fn location_to_row(
     event_id: Uuid,
     pos: i32,
     loc: &Location,
-    now: chrono::DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> event_locations::ActiveModel {
     let mut row = event_locations::ActiveModel {
         id: Set(Uuid::new_v4()),
@@ -439,14 +456,20 @@ fn from_rows(
     offers: Vec<event_offers::Model>,
     links: Vec<event_links::Model>,
     sub_events: Vec<event_sub_events::Model>,
+    text_values: Vec<event_text_values::Model>,
 ) -> Event {
-    let alternate_names: Vec<String> =
-        serde_json::from_value(event_row.alternate_names).unwrap_or_default();
-    let image: Vec<String> = serde_json::from_value(event_row.image).unwrap_or_default();
-    let same_as: Vec<String> = serde_json::from_value(event_row.same_as).unwrap_or_default();
-    let keywords: Vec<String> = serde_json::from_value(event_row.keywords).unwrap_or_default();
-    let in_language: Vec<String> =
-        serde_json::from_value(event_row.in_language).unwrap_or_default();
+    let text_of = |field: &str| -> Vec<String> {
+        text_values
+            .iter()
+            .filter(|r| r.field == field)
+            .map(|r| r.value.clone())
+            .collect()
+    };
+    let alternate_names = text_of("alternate_name");
+    let image = text_of("image");
+    let same_as = text_of("same_as");
+    let keywords = text_of("keyword");
+    let in_language = text_of("in_language");
 
     let event_status = str_to_enum(&event_row.event_status, EventStatus::Scheduled);
     let event_attendance_mode =
@@ -496,8 +519,8 @@ fn from_rows(
             price_currency: o.price_currency,
             url: o.url,
             availability: o.availability.as_deref().and_then(parse_offer_availability),
-            valid_from: o.valid_from,
-            valid_through: o.valid_through,
+            valid_from: o.valid_from.map(offset_to_ts),
+            valid_through: o.valid_through.map(offset_to_ts),
         })
         .collect();
 
@@ -528,11 +551,11 @@ fn from_rows(
         image,
         same_as,
         keywords,
-        start_date: event_row.start_date,
-        end_date: event_row.end_date,
-        door_time: event_row.door_time,
+        start_date: offset_to_ts(event_row.start_date),
+        end_date: event_row.end_date.map(offset_to_ts),
+        door_time: event_row.door_time.map(offset_to_ts),
         duration: event_row.duration,
-        previous_start_date: event_row.previous_start_date,
+        previous_start_date: event_row.previous_start_date.map(offset_to_ts),
         time_zone: event_row.time_zone,
         all_day: event_row.all_day,
         event_status,
@@ -562,8 +585,8 @@ fn from_rows(
         sub_events: sub_events_ids,
         offers,
         links,
-        created_at: event_row.created_at,
-        updated_at: event_row.updated_at,
+        created_at: offset_to_ts(event_row.created_at),
+        updated_at: offset_to_ts(event_row.updated_at),
     }
 }
 
@@ -667,6 +690,7 @@ impl SeaOrmEventRepository {
         Vec<event_offers::Model>,
         Vec<event_links::Model>,
         Vec<event_sub_events::Model>,
+        Vec<event_text_values::Model>,
     )> {
         let identifiers = event_identifiers::Entity::find()
             .filter(event_identifiers::Column::EventId.eq(*event_id))
@@ -692,7 +716,12 @@ impl SeaOrmEventRepository {
             .filter(event_sub_events::Column::EventId.eq(*event_id))
             .all(&self.db)
             .await?;
-        Ok((identifiers, locations, parties, offers, links, sub_events))
+        let text_values = event_text_values::Entity::find()
+            .filter(event_text_values::Column::EventId.eq(*event_id))
+            .order_by_asc(event_text_values::Column::Position)
+            .all(&self.db)
+            .await?;
+        Ok((identifiers, locations, parties, offers, links, sub_events, text_values))
     }
 }
 
@@ -721,16 +750,19 @@ impl EventRepository for SeaOrmEventRepository {
         for r in rows.sub_events {
             r.insert(&txn).await?;
         }
+        for r in rows.text_values {
+            r.insert(&txn).await?;
+        }
 
         txn.commit().await?;
 
-        let (identifiers, locations, parties, offers, links, sub_events) =
+        let (identifiers, locations, parties, offers, links, sub_events, text_values) =
             self.load_children(&inserted.id).await?;
-        let result = from_rows(inserted, identifiers, locations, parties, offers, links, sub_events);
+        let result = from_rows(inserted, identifiers, locations, parties, offers, links, sub_events, text_values);
 
         self.publish_event(crate::streaming::EventEvent::Created {
             event: result.clone(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         });
         if let Ok(json) = serde_json::to_value(&result) {
             self.log_audit("CREATE", result.id, None, Some(json), &AuditContext::default())
@@ -747,10 +779,10 @@ impl EventRepository for SeaOrmEventRepository {
         let Some(event_row) = event_row else {
             return Ok(None);
         };
-        let (identifiers, locations, parties, offers, links, sub_events) =
+        let (identifiers, locations, parties, offers, links, sub_events, text_values) =
             self.load_children(id).await?;
         Ok(Some(from_rows(
-            event_row, identifiers, locations, parties, offers, links, sub_events,
+            event_row, identifiers, locations, parties, offers, links, sub_events, text_values,
         )))
     }
 
@@ -763,7 +795,7 @@ impl EventRepository for SeaOrmEventRepository {
         let mut row = rows.event_row;
         row.created_at = NotSet;
         row.created_by = NotSet;
-        row.updated_at = Set(Utc::now());
+        row.updated_at = Set(OffsetDateTime::now_utc());
         row.update(&txn).await?;
 
         // Replace child rows wholesale.
@@ -791,6 +823,10 @@ impl EventRepository for SeaOrmEventRepository {
             .filter(event_sub_events::Column::EventId.eq(event.id))
             .exec(&txn)
             .await?;
+        event_text_values::Entity::delete_many()
+            .filter(event_text_values::Column::EventId.eq(event.id))
+            .exec(&txn)
+            .await?;
 
         for r in rows.identifiers {
             r.insert(&txn).await?;
@@ -810,6 +846,9 @@ impl EventRepository for SeaOrmEventRepository {
         for r in rows.sub_events {
             r.insert(&txn).await?;
         }
+        for r in rows.text_values {
+            r.insert(&txn).await?;
+        }
 
         txn.commit().await?;
 
@@ -820,7 +859,7 @@ impl EventRepository for SeaOrmEventRepository {
 
         self.publish_event(crate::streaming::EventEvent::Updated {
             event: result.clone(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         });
         if let (Some(old), Ok(new_json)) = (old, serde_json::to_value(&result)) {
             if let Ok(old_json) = serde_json::to_value(&old) {
@@ -841,14 +880,14 @@ impl EventRepository for SeaOrmEventRepository {
         let old = self.get_by_id(id).await?;
         let row = events::ActiveModel {
             id: Set(*id),
-            deleted_at: Set(Some(Utc::now())),
+            deleted_at: Set(Some(OffsetDateTime::now_utc())),
             deleted_by: Set(Some("system".into())),
             ..Default::default()
         };
         row.update(&self.db).await?;
         self.publish_event(crate::streaming::EventEvent::Deleted {
             event_id: *id,
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         });
         if let Some(old) = old {
             if let Ok(old_json) = serde_json::to_value(&old) {

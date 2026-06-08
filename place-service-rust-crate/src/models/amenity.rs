@@ -19,9 +19,10 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// A named amenity feature with an optional descriptive value.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct AmenityFeature {
     /// The feature's name, e.g. `"WiFi"` or `"Parking"`.
     pub name: String,

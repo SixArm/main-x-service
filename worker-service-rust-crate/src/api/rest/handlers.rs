@@ -21,7 +21,6 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use utoipa::ToSchema;
-use chrono::Datelike;
 
 use crate::models::Worker;
 use crate::api::ApiResponse;
@@ -501,7 +500,7 @@ pub async fn match_worker(
 ) -> impl IntoResponse {
     // Use search engine to get candidate workers (blocking)
     let family_name = &payload.worker.name.family;
-    let birth_year = payload.worker.birth_date.map(|d| d.year());
+    let birth_year = payload.worker.birth_date.map(|d| d.year() as i32);
 
     let candidate_ids = state.search_engine
         .search_by_name_and_year(family_name, birth_year, 100);
@@ -603,7 +602,7 @@ pub struct DuplicateCheckResponse {
 /// on any search/match error so a detection failure never blocks a create.
 async fn check_duplicates_internal(state: &AppState, worker: &Worker) -> Vec<MatchResponse> {
     let family_name = &worker.name.family;
-    let birth_year = worker.birth_date.map(|d| d.year());
+    let birth_year = worker.birth_date.map(|d| d.year() as i32);
 
     let candidate_ids = match state.search_engine.search_by_name_and_year(family_name, birth_year, 50) {
         Ok(ids) => ids,
@@ -815,7 +814,7 @@ pub async fn merge_workers(
     state.event_publisher.publish(crate::streaming::WorkerEvent::Merged {
         source_id: duplicate.id,
         target_id: merged.id,
-        timestamp: chrono::Utc::now(),
+        timestamp: jiff::Timestamp::now(),
     }).ok();
 
     // Create merge record
@@ -828,7 +827,7 @@ pub async fn merge_workers(
         merge_reason: req.merge_reason,
         match_score: None,
         transferred_data: Some(serde_json::Value::Object(transferred)),
-        merged_at: chrono::Utc::now(),
+        merged_at: jiff::Timestamp::now(),
     };
 
     let response = crate::models::MergeResponse {
@@ -930,7 +929,7 @@ pub async fn batch_deduplicate(
                 score_breakdown: serde_json::to_value(&m.breakdown).ok(),
                 status,
                 reviewed_by: None,
-                created_at: chrono::Utc::now(),
+                created_at: jiff::Timestamp::now(),
                 reviewed_at: None,
             });
         }

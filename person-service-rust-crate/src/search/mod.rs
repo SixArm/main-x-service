@@ -389,12 +389,12 @@ impl SearchEngine {
 mod tests {
     use super::*;
     use crate::models::{HumanName, Gender};
-    use chrono::{Utc, NaiveDate};
+    use jiff::civil::Date;
     use tempfile::TempDir;
     use uuid::Uuid;
 
     /// Build a minimal male person with the given name and birth date.
-    fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Person {
+    fn create_test_person(family: &str, given: &str, birth_date: Option<Date>) -> Person {
         Person {
             id: Uuid::new_v4(),
             identifiers: vec![],
@@ -421,8 +421,8 @@ mod tests {
             photo: vec![],
             managing_organization: None,
             links: vec![],
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
+            updated_at: jiff::Timestamp::now(),
         }
     }
 
@@ -502,7 +502,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let engine = SearchEngine::new(temp_dir.path()).unwrap();
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let person = create_test_person("Smith", "John", dob);
         engine.index_person(&person).unwrap();
         engine.reload().unwrap(); // Ensure reader sees new document

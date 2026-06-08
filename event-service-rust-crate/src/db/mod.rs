@@ -19,6 +19,8 @@ pub mod schema;
 pub mod models;
 /// Repository trait and SeaORM implementation.
 pub mod repositories;
+/// jiff <-> time conversions at the persistence boundary.
+pub mod convert;
 /// Audit-log repository.
 pub mod audit;
 

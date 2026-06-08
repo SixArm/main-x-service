@@ -9,7 +9,7 @@
 //! shrinks to a regression vector, copy that vector into a normal
 //! `#[test]` in `tests/integration_tests.rs` so it lives forever.
 
-use chrono::NaiveDate;
+use jiff::civil::{Date, date};
 use worker_matcher::{Confidence, Gender, MatchConfig, MatchingEngine, Normalizer, Worker};
 use proptest::prelude::*;
 
@@ -25,11 +25,11 @@ fn name_strategy() -> impl Strategy<Value = String> {
     })
 }
 
-/// A bounded date so we never trip `NaiveDate::from_ymd_opt` on
+/// A bounded date so we never trip date construction on
 /// implausible years.
-fn date_strategy() -> impl Strategy<Value = NaiveDate> {
-    (1900i32..=2100, 1u32..=12, 1u32..=28)
-        .prop_map(|(y, m, d)| NaiveDate::from_ymd_opt(y, m, d).expect("clamped to valid"))
+fn date_strategy() -> impl Strategy<Value = Date> {
+    (1900i16..=2100, 1i8..=12, 1i8..=28)
+        .prop_map(|(y, m, d)| date(y, m, d))
 }
 
 fn gender_strategy() -> impl Strategy<Value = Gender> {

@@ -1,0 +1,14 @@
+DROP TABLE IF EXISTS provider_text_values;
+ALTER TABLE providers ADD COLUMN alternate_names JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE providers ADD COLUMN same_as JSONB NOT NULL DEFAULT '[]'::jsonb;
+DROP TABLE IF EXISTS course_syllabus_text_values;
+DROP TABLE IF EXISTS course_instance_sessions;
+DROP TABLE IF EXISTS course_instance_instructors;
+DROP TABLE IF EXISTS course_instance_languages;
+DROP TABLE IF EXISTS course_credentials;
+DROP TABLE IF EXISTS course_text_values;
+ALTER TABLE syllabus_sections ADD COLUMN teaches JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE syllabus_sections ADD COLUMN resources JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE course_instances DROP COLUMN IF EXISTS schedule_recurrence, DROP COLUMN IF EXISTS schedule_time_zone, DROP COLUMN IF EXISTS schedule_end_date, DROP COLUMN IF EXISTS schedule_start_date, ADD COLUMN schedule JSONB, ADD COLUMN instructor_names JSONB NOT NULL DEFAULT '[]'::jsonb, ADD COLUMN instructor_ids JSONB NOT NULL DEFAULT '[]'::jsonb, ADD COLUMN in_language JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE course_identifiers DROP COLUMN IF EXISTS position, DROP COLUMN IF EXISTS custom_label, DROP COLUMN IF EXISTS property_id, ADD COLUMN property_id JSONB NOT NULL DEFAULT '""'::jsonb;
+ALTER TABLE courses DROP COLUMN IF EXISTS learning_resource_type, DROP COLUMN IF EXISTS educational_level;

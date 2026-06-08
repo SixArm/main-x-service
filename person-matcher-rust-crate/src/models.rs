@@ -16,13 +16,13 @@
 //!
 //! ```
 //! use person_matcher::{Gender, Person};
-//! use chrono::NaiveDate;
+//! use jiff::civil::Date;
 //!
 //! let p = Person::builder()
 //!     .united_kingdom_national_health_service_number("9434765919")
 //!     .given_name("Dafydd")
 //!     .family_name("Jones")
-//!     .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
+//!     .date_of_birth(jiff::civil::date(1980, 5, 15))
 //!     .gender(Gender::Male)
 //!     .build();
 //!
@@ -30,7 +30,7 @@
 //! assert_eq!(p.gender, Some(Gender::Male));
 //! ```
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 
 /// Gender/sex classification used to compare two [`Person`] records.
@@ -445,12 +445,12 @@ impl Default for Address {
 ///
 /// ```
 /// use person_matcher::PassportBook;
-/// use chrono::NaiveDate;
+/// use jiff::civil::Date;
 ///
 /// let book = PassportBook::new("gb", " 123 456 789 ")
 ///     .expect("valid book")
-///     .with_issued(NaiveDate::from_ymd_opt(2020, 1, 1).unwrap())
-///     .with_expires(NaiveDate::from_ymd_opt(2030, 1, 1).unwrap());
+///     .with_issued(jiff::civil::date(2020, 1, 1))
+///     .with_expires(jiff::civil::date(2030, 1, 1));
 ///
 /// assert_eq!(book.country, "GB");
 /// assert_eq!(book.number,  "123456789");
@@ -470,10 +470,10 @@ pub struct PassportBook {
     pub number: String,
     /// Optional issue date (not used in matching).
     #[serde(default)]
-    pub issued: Option<NaiveDate>,
+    pub issued: Option<Date>,
     /// Optional expiry date (not used in matching).
     #[serde(default)]
-    pub expires: Option<NaiveDate>,
+    pub expires: Option<Date>,
 }
 
 impl PassportBook {
@@ -522,12 +522,12 @@ impl PassportBook {
     ///
     /// ```
     /// use person_matcher::PassportBook;
-    /// use chrono::NaiveDate;
+    /// use jiff::civil::Date;
     /// let b = PassportBook::new("GB", "123456789").unwrap()
-    ///     .with_issued(NaiveDate::from_ymd_opt(2020, 1, 1).unwrap());
+    ///     .with_issued(jiff::civil::date(2020, 1, 1));
     /// assert!(b.issued.is_some());
     /// ```
-    pub fn with_issued(mut self, date: NaiveDate) -> Self {
+    pub fn with_issued(mut self, date: Date) -> Self {
         self.issued = Some(date);
         self
     }
@@ -537,12 +537,12 @@ impl PassportBook {
     ///
     /// ```
     /// use person_matcher::PassportBook;
-    /// use chrono::NaiveDate;
+    /// use jiff::civil::Date;
     /// let b = PassportBook::new("GB", "123456789").unwrap()
-    ///     .with_expires(NaiveDate::from_ymd_opt(2030, 1, 1).unwrap());
+    ///     .with_expires(jiff::civil::date(2030, 1, 1));
     /// assert!(b.expires.is_some());
     /// ```
-    pub fn with_expires(mut self, date: NaiveDate) -> Self {
+    pub fn with_expires(mut self, date: Date) -> Self {
         self.expires = Some(date);
         self
     }
@@ -562,12 +562,12 @@ impl PassportBook {
 ///
 /// ```
 /// use person_matcher::{Gender, Person};
-/// use chrono::NaiveDate;
+/// use jiff::civil::Date;
 ///
 /// let p = Person::builder()
 ///     .given_name("Siân")
 ///     .family_name("Evans")
-///     .date_of_birth(NaiveDate::from_ymd_opt(1990, 3, 10).unwrap())
+///     .date_of_birth(jiff::civil::date(1990, 3, 10))
 ///     .gender(Gender::Female)
 ///     .build();
 ///
@@ -844,14 +844,14 @@ pub struct Person {
     pub family_name: Option<String>,
 
     /// Date of birth. Compared by exact equality.
-    pub date_of_birth: Option<NaiveDate>,
+    pub date_of_birth: Option<Date>,
 
     /// Date of death (FHIR `Patient.deceasedDateTime`). Compared using
     /// the same DOB transposition heuristic as
     /// [`Person::date_of_birth`] — DD/MM ↔ MM/DD data-entry bugs are
     /// just as common in death records as in birth records.
     #[serde(default)]
-    pub death_date: Option<NaiveDate>,
+    pub death_date: Option<Date>,
 
     /// Administrative gender. See [`Gender`].
     pub gender: Option<Gender>,
@@ -1044,13 +1044,13 @@ impl Person {
 ///
 /// ```
 /// use person_matcher::{Gender, Person, PersonBuilder};
-/// use chrono::NaiveDate;
+/// use jiff::civil::Date;
 ///
 /// let p: Person = PersonBuilder::default()
 ///     .united_kingdom_national_health_service_number("9434765919")
 ///     .given_name(String::from("Owen"))   // owned String
 ///     .family_name("Williams")            // &str
-///     .date_of_birth(NaiveDate::from_ymd_opt(1972, 11, 4).unwrap())
+///     .date_of_birth(jiff::civil::date(1972, 11, 4))
 ///     .gender(Gender::Male)
 ///     .build();
 ///
@@ -1103,8 +1103,8 @@ pub struct PersonBuilder {
     given_name: Option<String>,
     middle_name: Option<String>,
     family_name: Option<String>,
-    date_of_birth: Option<NaiveDate>,
-    death_date: Option<NaiveDate>,
+    date_of_birth: Option<Date>,
+    death_date: Option<Date>,
     gender: Option<Gender>,
     blood_type: Option<BloodType>,
     multiple_birth: Option<u8>,
@@ -1540,12 +1540,12 @@ impl PersonBuilder {
     ///
     /// ```
     /// # use person_matcher::Person;
-    /// use chrono::NaiveDate;
-    /// let dob = NaiveDate::from_ymd_opt(1990, 1, 1).unwrap();
+    /// use jiff::civil::Date;
+    /// let dob = jiff::civil::date(1990, 1, 1);
     /// let p = Person::builder().date_of_birth(dob).build();
     /// assert_eq!(p.date_of_birth, Some(dob));
     /// ```
-    pub fn date_of_birth(mut self, value: NaiveDate) -> Self {
+    pub fn date_of_birth(mut self, value: Date) -> Self {
         self.date_of_birth = Some(value);
         self
     }
@@ -1554,12 +1554,12 @@ impl PersonBuilder {
     ///
     /// ```
     /// # use person_matcher::Person;
-    /// use chrono::NaiveDate;
-    /// let dod = NaiveDate::from_ymd_opt(2024, 6, 30).unwrap();
+    /// use jiff::civil::Date;
+    /// let dod = jiff::civil::date(2024, 6, 30);
     /// let p = Person::builder().death_date(dod).build();
     /// assert_eq!(p.death_date, Some(dod));
     /// ```
-    pub fn death_date(mut self, value: NaiveDate) -> Self {
+    pub fn death_date(mut self, value: Date) -> Self {
         self.death_date = Some(value);
         self
     }
@@ -1963,7 +1963,7 @@ mod tests {
             .united_kingdom_national_health_service_number("9434765919")
             .given_name("Carys")
             .family_name("Pritchard")
-            .date_of_birth(chrono::NaiveDate::from_ymd_opt(1990, 6, 1).unwrap())
+            .date_of_birth(jiff::civil::date(1990, 6, 1))
             .gender(Gender::Female)
             .build();
         let json = serde_json::to_string(&p).expect("serialise");
@@ -2122,8 +2122,8 @@ mod tests {
     fn passport_book_with_dates_sets_metadata() {
         let b = PassportBook::new("GB", "123")
             .unwrap()
-            .with_issued(chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap())
-            .with_expires(chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap());
+            .with_issued(jiff::civil::date(2020, 1, 1))
+            .with_expires(jiff::civil::date(2030, 1, 1));
         assert!(b.issued.is_some());
         assert!(b.expires.is_some());
     }
@@ -2132,7 +2132,7 @@ mod tests {
     fn passport_book_round_trips_through_serde() {
         let b = PassportBook::new("US", "AB1234567")
             .unwrap()
-            .with_issued(chrono::NaiveDate::from_ymd_opt(2024, 6, 1).unwrap());
+            .with_issued(jiff::civil::date(2024, 6, 1));
         let json = serde_json::to_string(&b).unwrap();
         let back: PassportBook = serde_json::from_str(&json).unwrap();
         assert_eq!(b, back);

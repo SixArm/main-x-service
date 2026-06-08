@@ -16,9 +16,10 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// A day of the week (Monday through Sunday).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
 pub enum DayOfWeek {
     /// Monday.
     Monday,
@@ -37,7 +38,7 @@ pub enum DayOfWeek {
 }
 
 /// One day's opening window: the day plus open and close times.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct OpeningHoursSpecification {
     /// The day this window applies to.
     pub day_of_week: DayOfWeek,

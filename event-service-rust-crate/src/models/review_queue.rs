@@ -7,7 +7,7 @@
 //! ([`ReviewStatus`]). The default thresholds are supplied by the
 //! private `default_*` helpers below.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use utoipa::ToSchema;
@@ -57,10 +57,10 @@ pub struct ReviewQueueItem {
     pub reviewed_by: Option<String>,
 
     /// When this item was created
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 
     /// When this item was last reviewed
-    pub reviewed_at: Option<DateTime<Utc>>,
+    pub reviewed_at: Option<Timestamp>,
 }
 
 /// Request to run batch deduplication

@@ -44,7 +44,6 @@
 //! | `identifiers[]` with `IdentifierType` + `system` URI | country-specific slot via `route_identifier` |
 //! | `documents[]` of type `Passport` | `passport_books` (one per passport) |
 
-use chrono::Datelike;
 use person_matcher::{
     Address as MAddress, Gender as MGender, PassportBook as MPassport, Person as MPerson,
     PersonBuilder as MBuilder,
@@ -213,7 +212,7 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
 
     // System-URI fast paths (most specific first).
     if sys.contains("nhs.uk") || sys.contains("uk-nhs") || sys.contains("nhs-number") {
-        return b.uk_nhs_number(val);
+        return b.united_kingdom_national_health_service_number(val);
     }
     if sys.contains("us-ssn") || sys.contains("ssa.gov") {
         return b.us_ssn(val);
@@ -284,7 +283,7 @@ fn build_passport(d: &IdentityDocument) -> Option<MPassport> {
 mod tests {
     use super::*;
     use crate::models::{HumanName, Identifier, IdentifierType, Person};
-    use chrono::Utc;
+    use jiff::Timestamp;
     use uuid::Uuid;
 
     fn svc_person(family: &str, given: &str) -> Person {
@@ -302,7 +301,7 @@ mod tests {
             additional_names: vec![],
             telecom: vec![],
             gender: Gender::Female,
-            birth_date: chrono::NaiveDate::from_ymd_opt(1980, 5, 15),
+            birth_date: Some(jiff::civil::date(1980, 5, 15)),
             tax_id: None,
             documents: vec![],
             emergency_contacts: vec![],
@@ -314,8 +313,8 @@ mod tests {
             photo: vec![],
             managing_organization: None,
             links: vec![],
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         }
     }
 
@@ -327,7 +326,7 @@ mod tests {
         assert_eq!(m.given_name.as_deref(), Some("Alice"));
         assert_eq!(
             m.date_of_birth,
-            chrono::NaiveDate::from_ymd_opt(1980, 5, 15)
+            Some(jiff::civil::date(1980, 5, 15))
         );
     }
 
@@ -341,7 +340,7 @@ mod tests {
         ));
         let m = to_matcher_person(&svc);
         assert_eq!(
-            m.uk_nhs_number.as_deref(),
+            m.united_kingdom_national_health_service_number.as_deref(),
             Some("943 476 5919")
         );
     }

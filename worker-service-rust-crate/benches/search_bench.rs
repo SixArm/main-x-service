@@ -6,7 +6,7 @@
 //! state. Run with `cargo bench`.
 
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
-use chrono::{NaiveDate, Utc};
+use jiff::{Timestamp, civil::Date};
 use tempfile::TempDir;
 use uuid::Uuid;
 
@@ -14,8 +14,8 @@ use worker_service::models::*;
 use worker_service::search::SearchEngine;
 
 /// Builds a minimal indexable [`Worker`] fixture for the search benchmarks.
-fn create_test_worker(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Worker {
-    let now = Utc::now();
+fn create_test_worker(family: &str, given: &str, birth_date: Option<Date>) -> Worker {
+    let now = Timestamp::now();
     Worker {
         id: Uuid::new_v4(),
         identifiers: vec![],
@@ -70,7 +70,7 @@ const GIVEN_NAMES: &[&str] = &[
 fn bench_index_single_worker(c: &mut Criterion) {
     let temp_dir = TempDir::new().unwrap();
     let engine = SearchEngine::new(temp_dir.path()).unwrap();
-    let worker = create_test_worker("Smith", "John", NaiveDate::from_ymd_opt(1980, 1, 15));
+    let worker = create_test_worker("Smith", "John", Some(jiff::civil::date(1980, 1, 15)));
 
     c.bench_function("index_single_worker", |b| {
         b.iter(|| {
@@ -114,7 +114,7 @@ fn bench_search_queries(c: &mut Criterion) {
         .map(|i| {
             let family = FAMILY_NAMES[i % FAMILY_NAMES.len()];
             let given = GIVEN_NAMES[i % GIVEN_NAMES.len()];
-            let dob = NaiveDate::from_ymd_opt(1950 + (i as i32 % 50), 1 + (i as u32 % 12), 1 + (i as u32 % 28));
+            let dob = Some(jiff::civil::date(1950 + (i as i16 % 50), 1 + (i as i8 % 12), 1 + (i as i8 % 28)));
             create_test_worker(family, given, dob)
         })
         .collect();

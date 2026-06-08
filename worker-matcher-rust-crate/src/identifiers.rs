@@ -1790,7 +1790,7 @@ pub fn parse_cn_rrn(s: &str) -> Option<String> {
     let yyyy: i32 = cleaned[6..10].parse().ok()?;
     let mm: u32 = cleaned[10..12].parse().ok()?;
     let dd: u32 = cleaned[12..14].parse().ok()?;
-    chrono::NaiveDate::from_ymd_opt(yyyy, mm, dd)?;
+    jiff::civil::Date::new(yyyy as i16, mm as i8, dd as i8).ok()?;
     const WEIGHTS: [u32; 17] = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
     const CHECK: [u8; 11] = [
         b'1', b'0', b'X', b'9', b'8', b'7', b'6', b'5', b'4', b'3', b'2',
@@ -1964,7 +1964,7 @@ pub fn parse_mx_curp(s: &str) -> Option<String> {
     let mm: u32 = cleaned[6..8].parse().ok()?;
     let dd: u32 = cleaned[8..10].parse().ok()?;
     let yyyy = if yy <= 29 { 2000 + yy } else { 1900 + yy };
-    chrono::NaiveDate::from_ymd_opt(yyyy, mm, dd)?;
+    jiff::civil::Date::new(yyyy as i16, mm as i8, dd as i8).ok()?;
     let value = |c: char| -> Option<u32> {
         Some(match c {
             '0'..='9' => (c as u32) - ('0' as u32),
@@ -2091,7 +2091,7 @@ pub fn parse_za_id(s: &str) -> Option<String> {
     let mm: u32 = digits[2..4].parse().ok()?;
     let dd: u32 = digits[4..6].parse().ok()?;
     let yyyy = if yy <= 29 { 2000 + yy } else { 1900 + yy };
-    chrono::NaiveDate::from_ymd_opt(yyyy, mm, dd)?;
+    jiff::civil::Date::new(yyyy as i16, mm as i8, dd as i8).ok()?;
     let bytes = digits.as_bytes();
     let mut sum: u32 = 0;
     // Standard Luhn: process right-to-left, double every second digit

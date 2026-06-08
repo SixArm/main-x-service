@@ -358,13 +358,13 @@ impl SearchEngine {
 mod tests {
     use super::*;
     use crate::models::{HumanName, Gender};
-    use chrono::{Utc, NaiveDate};
+    use jiff::{Timestamp, civil::Date};
     use tempfile::TempDir;
     use uuid::Uuid;
 
     /// Builds a minimal active worker with the given name and optional birth
     /// date; all other fields are empty/default for focused search tests.
-    fn create_test_worker(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Worker {
+    fn create_test_worker(family: &str, given: &str, birth_date: Option<Date>) -> Worker {
         Worker {
             id: Uuid::new_v4(),
             identifiers: vec![],
@@ -392,8 +392,8 @@ mod tests {
             photo: vec![],
             managing_organization: None,
             links: vec![],
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         }
     }
 
@@ -473,7 +473,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let engine = SearchEngine::new(temp_dir.path()).unwrap();
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let worker = create_test_worker("Smith", "John", dob);
         engine.index_worker(&worker).unwrap();
         engine.reload().unwrap(); // Ensure reader sees new document

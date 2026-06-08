@@ -24,7 +24,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # Database (PostgreSQL ORM)
-sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid", "with-json"] }
+sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json"] }
 sea-orm-migration = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
 
@@ -39,7 +39,7 @@ tonic = { version = "0.12", features = ["transport", "codegen", "prost"] }
 prost = "0.13"
 
 # OpenAPI Documentation
-utoipa = { version = "5.4", features = ["axum_extras", "chrono", "uuid"] }
+utoipa = { version = "5.4", features = ["axum_extras", "jiff_0_2", "uuid"] }
 utoipa-swagger-ui = { version = "8.1", features = ["axum"] }
 openapiv3 = "2.2"
 
@@ -57,7 +57,8 @@ tracing-opentelemetry = "0.28"
 
 # Utilities
 uuid = { version = "1.19", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
+jiff = { version = "0.2", features = ["serde"] }
+time = "0.3"
 thiserror = "2.0"
 anyhow = "1.0"
 validator = { version = "0.19", features = ["derive"] }

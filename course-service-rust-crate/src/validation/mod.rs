@@ -220,7 +220,7 @@ fn is_plausible_bcp47(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{Duration, Utc};
+    use jiff::Timestamp;
 
     use crate::models::{CourseIdentifier, IdentifierType, Schedule};
 
@@ -321,11 +321,11 @@ mod tests {
             enrolled_count: None,
             enrollment_opens: None,
             enrollment_closes: None,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         };
-        let start = Utc::now();
-        let end = start - Duration::days(7);
+        let start = Timestamp::now();
+        let end = start - jiff::SignedDuration::from_hours(24 * (7));
         inst.schedule = Some(Schedule {
             start_date: Some(start),
             end_date: Some(end),
@@ -354,10 +354,10 @@ mod tests {
             instructor_names: vec![],
             maximum_attendee_capacity: None,
             enrolled_count: None,
-            enrollment_opens: Some(Utc::now()),
-            enrollment_closes: Some(Utc::now() - Duration::days(1)),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            enrollment_opens: Some(Timestamp::now()),
+            enrollment_closes: Some(Timestamp::now() - jiff::SignedDuration::from_hours(24 * (1))),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         };
         let errs = validate_instance(&inst);
         assert!(errs.iter().any(|e| e.field == "enrollment_closes"));
@@ -382,8 +382,8 @@ mod tests {
             enrolled_count: Some(31),
             enrollment_opens: None,
             enrollment_closes: None,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         };
         let errs = validate_instance(&inst);
         assert!(errs.iter().any(|e| e.field == "maximum_attendee_capacity"));
@@ -409,8 +409,8 @@ mod tests {
             enrolled_count: Some(20),
             enrollment_opens: None,
             enrollment_closes: None,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         });
         let errs = validate_course(&c);
         assert!(errs.iter().any(|e| e.field == "instances[0].maximum_attendee_capacity"));

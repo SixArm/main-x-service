@@ -24,6 +24,7 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// A geographic point in the [WGS 84](https://en.wikipedia.org/wiki/World_Geodetic_System)
 /// reference system, modeled on [schema.org/GeoCoordinates](https://schema.org/GeoCoordinates).
@@ -47,7 +48,7 @@ use serde::{Deserialize, Serialize};
 /// };
 /// assert_eq!(everest.elevation, Some(8848.86));
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct GeoCoordinates {
     /// Latitude in decimal degrees. Positive is north of the equator,
     /// negative is south. Expected range: `-90.0..=90.0`.

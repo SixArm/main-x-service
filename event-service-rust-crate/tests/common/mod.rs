@@ -38,7 +38,6 @@ pub async fn create_test_router() -> Router {
 
 /// Unique title suffix to avoid clashes across parallel tests.
 pub fn unique_event_name(suffix: &str) -> String {
-    use chrono::Utc;
-    let ts = Utc::now().timestamp_micros();
+    let ts = jiff::Timestamp::now().as_microsecond();
     format!("TestEvent_{suffix}_{ts}")
 }

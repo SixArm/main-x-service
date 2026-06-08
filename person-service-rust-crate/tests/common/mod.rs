@@ -38,7 +38,6 @@ pub async fn create_test_router() -> Router {
 
 /// Create a unique test person name to avoid conflicts
 pub fn unique_person_name(suffix: &str) -> String {
-    use chrono::Utc;
-    let timestamp = Utc::now().timestamp_micros();
+    let timestamp = jiff::Timestamp::now().as_microsecond();
     format!("TestPerson{}_{}", suffix, timestamp)
 }

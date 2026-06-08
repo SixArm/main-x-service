@@ -20,13 +20,14 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// The namespace / scheme an identifier value belongs to.
 ///
 /// Derives `Eq` and `Hash` so identifiers can key maps/sets. The
 /// [`Custom`](Self::Custom) variant names any scheme outside the fixed list
 /// (e.g. an IATA airport code).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq, Hash)]
 pub enum IdentifierType {
     /// GS1 Global Location Number (13 digits). Deterministic match signal.
     GlobalLocationNumber,
@@ -43,7 +44,7 @@ pub enum IdentifierType {
 }
 
 /// An external identifier: a scheme plus its value.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct PlaceIdentifier {
     /// Which namespace the [`value`](Self::value) belongs to.
     pub identifier_type: IdentifierType,

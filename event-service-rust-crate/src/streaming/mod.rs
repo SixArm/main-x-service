@@ -13,7 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 use crate::models::Event;
 use crate::Result;
@@ -32,21 +32,21 @@ pub enum EventEvent {
         /// The newly created event.
         event: Event,
         /// When the change occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// An event record was updated.
     Updated {
         /// The updated event.
         event: Event,
         /// When the change occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// An event record was (soft) deleted.
     Deleted {
         /// Id of the deleted event.
         event_id: Uuid,
         /// When the change occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// Two records were merged.
     Merged {
@@ -55,7 +55,7 @@ pub enum EventEvent {
         /// Id of the surviving target event.
         target_id: Uuid,
         /// When the change occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// A link was created between two events.
     Linked {
@@ -64,7 +64,7 @@ pub enum EventEvent {
         /// Id of the newly linked event.
         linked_id: Uuid,
         /// When the change occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
     /// A link between two events was removed.
     Unlinked {
@@ -73,13 +73,13 @@ pub enum EventEvent {
         /// Id of the unlinked event.
         unlinked_id: Uuid,
         /// When the change occurred.
-        timestamp: DateTime<Utc>,
+        timestamp: Timestamp,
     },
 }
 
 impl EventEvent {
     /// Return the timestamp carried by any variant.
-    pub fn timestamp(&self) -> DateTime<Utc> {
+    pub fn timestamp(&self) -> Timestamp {
         match self {
             EventEvent::Created { timestamp, .. } => *timestamp,
             EventEvent::Updated { timestamp, .. } => *timestamp,

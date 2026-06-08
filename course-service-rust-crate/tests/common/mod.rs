@@ -13,7 +13,6 @@
 use std::sync::OnceLock;
 
 use axum::Router;
-use chrono::Utc;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
@@ -64,7 +63,7 @@ pub async fn create_test_router() -> Router {
 /// Generate a per-test unique course name so concurrent tests don't
 /// step on each other inside the shared Postgres instance.
 pub fn unique_name(suffix: &str) -> String {
-    let ts = Utc::now().timestamp_micros();
+    let ts = jiff::Timestamp::now().as_microsecond();
     format!("Integration {suffix} {ts}")
 }
 

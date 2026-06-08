@@ -7,7 +7,7 @@
 //! snapshot of the transferred data. See `agents/share/merge.md` for
 //! the workflow.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use utoipa::ToSchema;
@@ -50,7 +50,7 @@ pub struct MergeRecord {
     pub transferred_data: Option<serde_json::Value>,
 
     /// When the merge was performed
-    pub merged_at: DateTime<Utc>,
+    pub merged_at: Timestamp,
 }
 
 /// Request to merge two event records

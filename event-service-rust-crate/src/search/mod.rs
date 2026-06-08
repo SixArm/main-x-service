@@ -216,10 +216,10 @@ fn build_doc(event: &Event, s: &EventIndexSchema) -> tantivy::TantivyDocument {
     let (loc_name, loc_city, loc_country, loc_url) = summarize_locations(&event.location);
     let organizer_name = parties_names(&event.organizers);
     let performer_name = parties_names(&event.performers);
-    let start_date = event.start_date.format("%Y-%m-%d").to_string();
+    let start_date = event.start_date.strftime("%Y-%m-%d").to_string();
     let end_date = event
         .end_date
-        .map(|d| d.format("%Y-%m-%d").to_string())
+        .map(|d| d.strftime("%Y-%m-%d").to_string())
         .unwrap_or_default();
     let description = event.description.clone().unwrap_or_default();
 
@@ -337,11 +337,11 @@ fn extract_ids(
 mod tests {
     use super::*;
     use crate::models::{Event, EventType, Party, PartyKind};
-    use chrono::{TimeZone, Utc};
+    use jiff::Timestamp;
     use tempfile::TempDir;
 
     /// Build a minimal event for indexing tests.
-    fn evt(name: &str, when: chrono::DateTime<Utc>) -> Event {
+    fn evt(name: &str, when: Timestamp) -> Event {
         Event::new(name, when)
     }
 
@@ -350,7 +350,7 @@ mod tests {
     fn index_and_search_event_by_name() {
         let tmp = TempDir::new().unwrap();
         let engine = SearchEngine::new(tmp.path()).unwrap();
-        let when = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap();
+        let when = jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
         let event = evt("Annual Conference", when);
         engine.index_event(&event).unwrap();
         engine.reload().unwrap();
@@ -364,7 +364,7 @@ mod tests {
     fn fuzzy_search_finds_typo() {
         let tmp = TempDir::new().unwrap();
         let engine = SearchEngine::new(tmp.path()).unwrap();
-        let when = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap();
+        let when = jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
         let event = evt("Hackathon", when);
         engine.index_event(&event).unwrap();
         engine.reload().unwrap();
@@ -378,7 +378,7 @@ mod tests {
     fn search_finds_organizer_name() {
         let tmp = TempDir::new().unwrap();
         let engine = SearchEngine::new(tmp.path()).unwrap();
-        let when = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap();
+        let when = jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
         let mut event = evt("Talk", when);
         event.event_type = EventType::Conference;
         event.organizers.push(Party {
@@ -399,7 +399,7 @@ mod tests {
     fn delete_event_drops_from_index() {
         let tmp = TempDir::new().unwrap();
         let engine = SearchEngine::new(tmp.path()).unwrap();
-        let when = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap();
+        let when = jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
         let event = evt("Workshop", when);
         engine.index_event(&event).unwrap();
         engine.reload().unwrap();
@@ -414,7 +414,7 @@ mod tests {
     fn bulk_index() {
         let tmp = TempDir::new().unwrap();
         let engine = SearchEngine::new(tmp.path()).unwrap();
-        let when = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap();
+        let when = jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
         let events = vec![
             evt("One", when),
             evt("Two", when),

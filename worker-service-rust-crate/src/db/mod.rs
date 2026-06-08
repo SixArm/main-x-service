@@ -17,6 +17,8 @@ use crate::Result;
 pub mod schema;
 pub mod models;
 pub mod repositories;
+/// jiff <-> time conversions at the persistence boundary.
+pub mod convert;
 pub mod audit;
 
 pub use repositories::{WorkerRepository, SeaOrmWorkerRepository, AuditContext};

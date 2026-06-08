@@ -17,7 +17,6 @@
 //! [`organization_contacts`](crate::db::models::organization_contacts), [`organization_identifiers`](crate::db::models::organization_identifiers),
 //! [`person_match_scores`](crate::db::models::person_match_scores), and [`audit_log`](crate::db::models::audit_log).
 
-use chrono::NaiveDate;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -42,11 +41,13 @@ pub mod persons {
         /// Gender code (lowercased FHIR value).
         pub gender: String,
         /// Date of birth, if known.
-        pub birth_date: Option<NaiveDate>,
+        pub birth_date: Option<TimeDate>,
+        /// Tax identifier (CPF, SSN, TIN), if recorded.
+        pub tax_id: Option<String>,
         /// Whether the person is deceased.
         pub deceased: bool,
         /// Date/time of death, if known.
-        pub deceased_datetime: Option<DateTimeUtc>,
+        pub deceased_datetime: Option<TimeDateTimeWithTimeZone>,
         /// Marital-status code, if recorded.
         pub marital_status: Option<String>,
         /// Multiple-birth indicator, if recorded.
@@ -54,15 +55,15 @@ pub mod persons {
         /// Managing organization id (nullable FK).
         pub managing_organization_id: Option<Uuid>,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
         /// User who created the record.
         pub created_by: Option<String>,
         /// User who last updated the record.
         pub updated_by: Option<String>,
         /// Soft-delete timestamp (set when deleted).
-        pub deleted_at: Option<DateTimeUtc>,
+        pub deleted_at: Option<TimeDateTimeWithTimeZone>,
         /// User who soft-deleted the record.
         pub deleted_by: Option<String>,
     }
@@ -150,9 +151,9 @@ pub mod person_names {
         /// Whether this is the person's primary name.
         pub is_primary: bool,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relation back to the owning person.
@@ -202,9 +203,9 @@ pub mod person_identifiers {
         /// Assigning authority, if recorded.
         pub assigner: Option<String>,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relation back to the owning person.
@@ -260,9 +261,9 @@ pub mod person_addresses {
         /// Whether this is the person's primary address.
         pub is_primary: bool,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relation back to the owning person.
@@ -310,9 +311,9 @@ pub mod person_contacts {
         /// Whether this is the person's primary contact.
         pub is_primary: bool,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relation back to the owning person.
@@ -357,7 +358,7 @@ pub mod person_links {
         /// Link type (Replaces, Refer, Seealso, …).
         pub link_type: String,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// User who created the link.
         pub created_by: Option<String>,
     }
@@ -407,15 +408,15 @@ pub mod organizations {
         /// Parent organization id (self-referential FK).
         pub part_of: Option<Uuid>,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
         /// User who created the record.
         pub created_by: Option<String>,
         /// User who last updated the record.
         pub updated_by: Option<String>,
         /// Soft-delete timestamp (set when deleted).
-        pub deleted_at: Option<DateTimeUtc>,
+        pub deleted_at: Option<TimeDateTimeWithTimeZone>,
         /// User who soft-deleted the record.
         pub deleted_by: Option<String>,
     }
@@ -481,9 +482,9 @@ pub mod organization_addresses {
         /// Whether this is the organization's primary address.
         pub is_primary: bool,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relation back to the owning organization.
@@ -531,9 +532,9 @@ pub mod organization_contacts {
         /// Whether this is the organization's primary contact.
         pub is_primary: bool,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relation back to the owning organization.
@@ -583,9 +584,9 @@ pub mod organization_identifiers {
         /// Assigning authority, if recorded.
         pub assigner: Option<String>,
         /// Creation timestamp.
-        pub created_at: DateTimeUtc,
+        pub created_at: TimeDateTimeWithTimeZone,
         /// Last-update timestamp.
-        pub updated_at: DateTimeUtc,
+        pub updated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relation back to the owning organization.
@@ -646,7 +647,7 @@ pub mod person_match_scores {
         #[sea_orm(column_type = "Decimal(Some((10, 6)))")]
         pub identifier_score: Option<bigdecimal::BigDecimal>,
         /// When the score was computed.
-        pub calculated_at: DateTimeUtc,
+        pub calculated_at: TimeDateTimeWithTimeZone,
     }
 
     /// Foreign-key relation back to the owning person.
@@ -685,7 +686,7 @@ pub mod audit_log {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
         /// When the audited action occurred.
-        pub timestamp: DateTimeUtc,
+        pub timestamp: TimeDateTimeWithTimeZone,
         /// Acting user id, if known.
         pub user_id: Option<String>,
         /// Action performed (create, update, delete, …).
@@ -709,5 +710,181 @@ pub mod audit_log {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {}
 
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ============================================================================
+// Person Document Models
+// ============================================================================
+
+/// The `person_documents` table: identity documents per person.
+pub mod person_documents {
+    use super::*;
+
+    /// An identity-document row (passport, driver's license, …).
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "person_documents")]
+    pub struct Model {
+        /// Application-assigned primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// Owning person id (FK).
+        pub person_id: Uuid,
+        /// Document type (PASCALCASE debug form, e.g. `Passport`).
+        pub document_type: String,
+        /// Document number.
+        pub number: String,
+        /// Issuing country, if recorded.
+        pub issuing_country: Option<String>,
+        /// Issuing authority, if recorded.
+        pub issuing_authority: Option<String>,
+        /// Issue date, if recorded.
+        pub issue_date: Option<TimeDate>,
+        /// Expiry date, if recorded.
+        pub expiry_date: Option<TimeDate>,
+        /// Whether the document has been verified.
+        pub verified: bool,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent person.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `persons`.
+        #[sea_orm(belongs_to = "super::persons::Entity", from = "Column::PersonId", to = "super::persons::Column::Id")]
+        Person,
+    }
+    impl Related<super::persons::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Person.def() }
+    }
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ============================================================================
+// Person Emergency Contact Models
+// ============================================================================
+
+/// The `person_emergency_contacts` table: emergency contacts per person
+/// (address flattened; telecom lives in `person_emergency_contact_telecom`).
+pub mod person_emergency_contacts {
+    use super::*;
+
+    /// An emergency-contact row.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "person_emergency_contacts")]
+    pub struct Model {
+        /// Application-assigned primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// Owning person id (FK).
+        pub person_id: Uuid,
+        /// Contact name.
+        pub name: String,
+        /// Relationship (spouse, parent, …).
+        pub relationship: String,
+        /// Whether this is the primary emergency contact.
+        pub is_primary: bool,
+        /// Flattened address use type.
+        pub address_use_type: Option<String>,
+        /// Flattened address line 1.
+        pub address_line1: Option<String>,
+        /// Flattened address line 2.
+        pub address_line2: Option<String>,
+        /// Flattened address city.
+        pub address_city: Option<String>,
+        /// Flattened address state.
+        pub address_state: Option<String>,
+        /// Flattened address postal code.
+        pub address_postal_code: Option<String>,
+        /// Flattened address country.
+        pub address_country: Option<String>,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent person.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `persons`.
+        #[sea_orm(belongs_to = "super::persons::Entity", from = "Column::PersonId", to = "super::persons::Column::Id")]
+        Person,
+    }
+    impl Related<super::persons::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Person.def() }
+    }
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// The `person_emergency_contact_telecom` table: contact points per
+/// emergency contact.
+pub mod person_emergency_contact_telecom {
+    use super::*;
+
+    /// A telecom row for one emergency contact.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "person_emergency_contact_telecom")]
+    pub struct Model {
+        /// Application-assigned primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// Owning emergency-contact id (FK).
+        pub emergency_contact_id: Uuid,
+        /// Contact system (PascalCase debug form).
+        pub system: String,
+        /// Contact value.
+        pub value: String,
+        /// Contact use/type code, if recorded.
+        pub use_type: Option<String>,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent emergency contact.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `person_emergency_contacts`.
+        #[sea_orm(belongs_to = "super::person_emergency_contacts::Entity", from = "Column::EmergencyContactId", to = "super::person_emergency_contacts::Column::Id")]
+        EmergencyContact,
+    }
+    impl Related<super::person_emergency_contacts::Entity> for Entity {
+        fn to() -> RelationDef { Relation::EmergencyContact.def() }
+    }
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// ============================================================================
+// Person Photo Models
+// ============================================================================
+
+/// The `person_photos` table: photo references per person.
+pub mod person_photos {
+    use super::*;
+
+    /// A photo-reference row.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "person_photos")]
+    pub struct Model {
+        /// Application-assigned primary key.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// Owning person id (FK).
+        pub person_id: Uuid,
+        /// The photo URL / reference.
+        pub url: String,
+        /// Ordinal position within the list.
+        pub position: i32,
+    }
+
+    /// `belongs_to` the parent person.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        /// FK to `persons`.
+        #[sea_orm(belongs_to = "super::persons::Entity", from = "Column::PersonId", to = "super::persons::Column::Id")]
+        Person,
+    }
+    impl Related<super::persons::Entity> for Entity {
+        fn to() -> RelationDef { Relation::Person.def() }
+    }
     impl ActiveModelBehavior for ActiveModel {}
 }

@@ -14,7 +14,7 @@
 //! assert_eq!(format!("{}", DocumentType::Passport), "PASSPORT");
 //! ```
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -86,10 +86,10 @@ pub struct IdentityDocument {
     pub issuing_authority: Option<String>,
 
     /// Date the document was issued
-    pub issue_date: Option<NaiveDate>,
+    pub issue_date: Option<Date>,
 
     /// Date the document expires
-    pub expiry_date: Option<NaiveDate>,
+    pub expiry_date: Option<Date>,
 
     /// Whether the document has been verified
     pub verified: bool,
@@ -133,8 +133,8 @@ mod tests {
             number: "AB1234567".into(),
             issuing_country: Some("US".into()),
             issuing_authority: Some("State Dept".into()),
-            issue_date: Some(NaiveDate::from_ymd_opt(2020, 1, 15).unwrap()),
-            expiry_date: Some(NaiveDate::from_ymd_opt(2030, 1, 15).unwrap()),
+            issue_date: Some(jiff::civil::date(2020, 1, 15)),
+            expiry_date: Some(jiff::civil::date(2030, 1, 15)),
             verified: true,
         };
 

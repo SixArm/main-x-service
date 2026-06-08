@@ -18,18 +18,18 @@
 //!
 //! ```
 //! use worker_matcher::{MatchingEngine, Worker};
-//! use chrono::NaiveDate;
+//! use jiff::civil::Date;
 //!
 //! let a = Worker::builder()
 //!     .given_name("John")
 //!     .family_name("Smith")
-//!     .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
+//!     .date_of_birth(jiff::civil::date(1980, 5, 15))
 //!     .build();
 //!
 //! let b = Worker::builder()
 //!     .given_name("Jon")          // typo
 //!     .family_name("Smith")
-//!     .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
+//!     .date_of_birth(jiff::civil::date(1980, 5, 15))
 //!     .build();
 //!
 //! let engine = MatchingEngine::default_config();
@@ -42,7 +42,7 @@ use crate::models::{Address, PassportBook, Worker};
 use crate::nicknames::NicknameTable;
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
-use chrono::{Datelike, NaiveDate};
+use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 
 /// Tunable configuration for the matching engine.
@@ -818,12 +818,12 @@ impl MatchingEngine {
     ///
     /// ```
     /// use worker_matcher::{MatchingEngine, Worker};
-    /// use chrono::NaiveDate;
+    /// use jiff::civil::Date;
     ///
     /// let p = Worker::builder()
     ///     .given_name("Carys")
     ///     .family_name("Pritchard")
-    ///     .date_of_birth(NaiveDate::from_ymd_opt(1985, 1, 1).unwrap())
+    ///     .date_of_birth(jiff::civil::date(1985, 1, 1))
     ///     .build();
     ///
     /// let result = MatchingEngine::default_config().match_workers(&p, &p);
@@ -1927,7 +1927,7 @@ fn score_passport_books(a: &[PassportBook], b: &[PassportBook]) -> Option<f64> {
     Some(f64::from(passport_books_share_pair(a, b)))
 }
 
-/// Score a pair of `NaiveDate` values for the date-of-birth component.
+/// Score a pair of `Date` values for the date-of-birth component.
 ///
 /// - `1.0` when the dates are exactly equal.
 /// - `0.5` when **swapping the day and month on one side** yields the
@@ -1937,7 +1937,7 @@ fn score_passport_books(a: &[PassportBook], b: &[PassportBook]) -> Option<f64> {
 /// - `0.0` otherwise.
 ///
 /// The transposition path is conservative by design: it requires the
-/// years to match, and it relies on `NaiveDate::from_ymd_opt` to validate
+/// years to match, and it relies on `Date::from_ymd_opt` to validate
 /// the swapped form (so it cannot fire on a day greater than 12, on a
 /// month longer than the original day's day-count, or across years).
 /// Compare two named-place [`Address`] values (typically `city` and
@@ -1969,12 +1969,12 @@ fn score_named_place(a: &Address, b: &Address) -> Option<f64> {
     }
 }
 
-fn score_dob_pair(dob1: NaiveDate, dob2: NaiveDate) -> f64 {
+fn score_dob_pair(dob1: Date, dob2: Date) -> f64 {
     if dob1 == dob2 {
         return 1.0;
     }
     if dob1.year() == dob2.year()
-        && let Some(swapped) = NaiveDate::from_ymd_opt(dob1.year(), dob1.day(), dob1.month())
+        && let Ok(swapped) = Date::new(dob1.year(), dob1.day(), dob1.month())
         && swapped == dob2
     {
         return 0.5;
@@ -1986,10 +1986,9 @@ fn score_dob_pair(dob1: NaiveDate, dob2: NaiveDate) -> f64 {
 mod tests {
     use super::*;
     use crate::models::Gender;
-    use chrono::NaiveDate;
 
-    fn dob(y: i32, m: u32, d: u32) -> NaiveDate {
-        NaiveDate::from_ymd_opt(y, m, d).expect("valid date")
+    fn dob(y: i16, m: i8, d: i8) -> Date {
+        jiff::civil::date(y, m, d)
     }
 
     // ---------- MatchConfig presets ----------
@@ -2541,7 +2540,7 @@ mod tests {
     #[test]
     fn dob_pair_swap_skipped_when_day_exceeds_12() {
         // 1995-01-25: the swap target (1995, month=25, day=1) is not a
-        // valid calendar date, so `NaiveDate::from_ymd_opt` returns None
+        // valid calendar date, so `Date::from_ymd_opt` returns None
         // and the heuristic does not fire. Compared against any other
         // valid date — including the same month with a different day —
         // the score must be 0.0.
@@ -2565,7 +2564,7 @@ mod tests {
 
     #[test]
     fn dob_pair_invalid_swap_target_does_not_panic() {
-        // 2003-02-30 is never constructed (chrono rejects it), so the
+        // 2003-02-30 is never constructed (jiff rejects it), so the
         // helper only ever receives valid dates. But test a near-edge:
         // swap of Feb 29 (leap) vs swap target.
         assert_eq!(score_dob_pair(dob(2000, 2, 29), dob(2000, 2, 29)), 1.0);

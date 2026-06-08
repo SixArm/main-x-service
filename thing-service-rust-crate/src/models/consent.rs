@@ -13,7 +13,7 @@
 //! # Examples
 //!
 //! ```
-//! use chrono::Utc;
+//! use jiff::Timestamp;
 //! use uuid::Uuid;
 //! use thing_service::models::consent::{Consent, ConsentStatus, ConsentType};
 //!
@@ -22,13 +22,13 @@
 //!     thing_id: Uuid::new_v4(),
 //!     consent_type: ConsentType::DataProcessing,
 //!     status: ConsentStatus::Active,
-//!     granted_at: Utc::now(),
+//!     granted_at: Timestamp::now(),
 //!     expires_at: None, // never expires
 //! };
 //! assert!(consent.is_active());
 //! ```
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -62,7 +62,7 @@ pub enum ConsentStatus {
 /// # Examples
 ///
 /// ```
-/// use chrono::{Duration, Utc};
+/// use jiff::Timestamp;
 /// use uuid::Uuid;
 /// use thing_service::models::consent::{Consent, ConsentStatus, ConsentType};
 ///
@@ -72,8 +72,8 @@ pub enum ConsentStatus {
 ///     thing_id: Uuid::new_v4(),
 ///     consent_type: ConsentType::Marketing,
 ///     status: ConsentStatus::Revoked,
-///     granted_at: Utc::now(),
-///     expires_at: Some(Utc::now() + Duration::days(30)),
+///     granted_at: Timestamp::now(),
+///     expires_at: Some(Timestamp::now() + jiff::SignedDuration::from_hours(24 * (30))),
 /// };
 /// assert!(!consent.is_active());
 /// ```
@@ -88,9 +88,9 @@ pub struct Consent {
     /// The grant's lifecycle state.
     pub status: ConsentStatus,
     /// When the grant was given.
-    pub granted_at: DateTime<Utc>,
+    pub granted_at: Timestamp,
     /// When the grant lapses, or `None` for an open-ended grant.
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
 }
 
 impl Consent {
@@ -104,7 +104,7 @@ impl Consent {
     /// # Examples
     ///
     /// ```
-    /// use chrono::{Duration, Utc};
+    /// use jiff::Timestamp;
     /// use uuid::Uuid;
     /// use thing_service::models::consent::{Consent, ConsentStatus, ConsentType};
     ///
@@ -113,8 +113,8 @@ impl Consent {
     ///     thing_id: Uuid::new_v4(),
     ///     consent_type: ConsentType::Research,
     ///     status: ConsentStatus::Active,
-    ///     granted_at: Utc::now() - Duration::days(2),
-    ///     expires_at: Some(Utc::now() - Duration::days(1)), // already lapsed
+    ///     granted_at: Timestamp::now() - jiff::SignedDuration::from_hours(24 * (2)),
+    ///     expires_at: Some(Timestamp::now() - jiff::SignedDuration::from_hours(24 * (1))), // already lapsed
     /// };
     /// assert!(!expired.is_active());
     /// ```
@@ -125,7 +125,7 @@ impl Consent {
         }
         // Status is Active; honour the expiry date if one is set.
         if let Some(expires) = self.expires_at {
-            return Utc::now() < expires;
+            return Timestamp::now() < expires;
         }
         // Active with no expiry: in force indefinitely.
         true
@@ -135,7 +135,6 @@ impl Consent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Duration;
 
     /// An Active grant with no expiry is active.
     #[test]
@@ -145,7 +144,7 @@ mod tests {
             thing_id: Uuid::new_v4(),
             consent_type: ConsentType::DataProcessing,
             status: ConsentStatus::Active,
-            granted_at: Utc::now(),
+            granted_at: Timestamp::now(),
             expires_at: None,
         };
         assert!(consent.is_active());
@@ -159,7 +158,7 @@ mod tests {
             thing_id: Uuid::new_v4(),
             consent_type: ConsentType::Marketing,
             status: ConsentStatus::Revoked,
-            granted_at: Utc::now(),
+            granted_at: Timestamp::now(),
             expires_at: None,
         };
         assert!(!consent.is_active());
@@ -173,8 +172,8 @@ mod tests {
             thing_id: Uuid::new_v4(),
             consent_type: ConsentType::DataSharing,
             status: ConsentStatus::Active,
-            granted_at: Utc::now() - Duration::days(365),
-            expires_at: Some(Utc::now() - Duration::days(1)),
+            granted_at: Timestamp::now() - jiff::SignedDuration::from_hours(24 * (365)),
+            expires_at: Some(Timestamp::now() - jiff::SignedDuration::from_hours(24 * (1))),
         };
         assert!(!consent.is_active());
     }
@@ -187,8 +186,8 @@ mod tests {
             thing_id: Uuid::new_v4(),
             consent_type: ConsentType::Research,
             status: ConsentStatus::Active,
-            granted_at: Utc::now(),
-            expires_at: Some(Utc::now() + Duration::days(365)),
+            granted_at: Timestamp::now(),
+            expires_at: Some(Timestamp::now() + jiff::SignedDuration::from_hours(24 * (365))),
         };
         assert!(consent.is_active());
     }

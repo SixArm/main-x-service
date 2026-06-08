@@ -16,13 +16,14 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// The kind of place, modeled on schema.org/Place subtypes.
 ///
 /// Derives `Eq` and `Hash` so place types can be used as map/set keys. The
 /// [`Other`](Self::Other) variant carries a free-form label for categories
 /// outside the fixed list.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq, Hash)]
 pub enum PlaceType {
     /// A commercial establishment (shop, office, …).
     LocalBusiness,

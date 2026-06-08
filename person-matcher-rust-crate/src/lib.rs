@@ -34,19 +34,19 @@
 //!
 //! ```
 //! use person_matcher::{Gender, MatchingEngine, MatchConfig, Person};
-//! use chrono::NaiveDate;
+//! use jiff::civil::Date;
 //!
 //! let alice = Person::builder()
 //!     .given_name("Alice")
 //!     .family_name("Williams")
-//!     .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
+//!     .date_of_birth(jiff::civil::date(1980, 5, 15))
 //!     .gender(Gender::Female)
 //!     .build();
 //!
 //! let alyce = Person::builder()
 //!     .given_name("Alyce")   // alternate spelling
 //!     .family_name("Williams")
-//!     .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
+//!     .date_of_birth(jiff::civil::date(1980, 5, 15))
 //!     .gender(Gender::Female)
 //!     .build();
 //!
@@ -79,12 +79,12 @@
 //!
 //! ```
 //! use person_matcher::{MatchingEngine, Person};
-//! use chrono::NaiveDate;
+//! use jiff::civil::Date;
 //!
 //! let p1 = Person::builder()
 //!     .given_name("John")
 //!     .family_name("Smith")
-//!     .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
+//!     .date_of_birth(jiff::civil::date(1980, 5, 15))
 //!     .build();
 //! let p2 = p1.clone();
 //!

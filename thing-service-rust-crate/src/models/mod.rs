@@ -24,4 +24,6 @@ pub mod consent;
 /// shape.
 pub mod identifier;
 /// The core [`Thing`](crate::models::thing::Thing) entity.
+/// Merge request/response/record types.
+pub mod merge;
 pub mod thing;

@@ -23,6 +23,7 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Canonical identifier scheme. Mirrors the values commonly found in
 /// the `propertyID` attribute of a schema.org
@@ -32,7 +33,7 @@ use serde::{Deserialize, Serialize};
 /// "deterministic" for matching purposes; [`Sku`](Self::Sku),
 /// [`Uri`](Self::Uri), and [`Custom`](Self::Custom) are not. See
 /// [`ThingIdentifier::is_deterministic`].
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq, Hash)]
 pub enum IdentifierType {
     /// Digital Object Identifier (`10.<registrant>/<suffix>`).
     Doi,
@@ -73,7 +74,7 @@ pub enum IdentifierType {
 /// id.name = Some("Nature article".into());
 /// assert_eq!(id.property_id, IdentifierType::Doi);
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
 pub struct ThingIdentifier {
     /// The identifier scheme — schema.org `propertyID`.
     pub property_id: IdentifierType,

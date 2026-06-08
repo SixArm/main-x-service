@@ -21,7 +21,7 @@
 //! assert_eq!(match_titles("", "Concert"), 0.0);
 //! ```
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use strsim::{jaro_winkler, normalized_levenshtein};
 
 use crate::models::{Address, Identifier, Location, Party, Reference};
@@ -99,8 +99,8 @@ pub mod time_matching {
     ///
     /// Exact match = 1.0; within 5 min ≈ 0.99; within 1 h ≈ 0.95;
     /// within 1 day ≈ 0.80; within 1 week ≈ 0.40; further → 0.0.
-    pub fn match_start_dates(a: DateTime<Utc>, b: DateTime<Utc>) -> f64 {
-        let secs_diff = (a - b).num_seconds().unsigned_abs() as f64;
+    pub fn match_start_dates(a: Timestamp, b: Timestamp) -> f64 {
+        let secs_diff = a.duration_since(b).as_secs().unsigned_abs() as f64;
         // Exponential decay; half-life ≈ 1 hour.
         let half_life_secs: f64 = 3600.0;
         let score = (-secs_diff / half_life_secs).exp2().max(0.0);
@@ -110,7 +110,7 @@ pub mod time_matching {
     /// Score end-date proximity. Handles unknown end dates as
     /// neutral (0.5) when both are missing, or 0.0 when only one is
     /// missing.
-    pub fn match_end_dates(a: Option<DateTime<Utc>>, b: Option<DateTime<Utc>>) -> f64 {
+    pub fn match_end_dates(a: Option<Timestamp>, b: Option<Timestamp>) -> f64 {
         match (a, b) {
             (None, None) => 0.5,
             (None, Some(_)) | (Some(_), None) => 0.0,
@@ -122,10 +122,10 @@ pub mod time_matching {
     /// Returns the Jaccard ratio: |intersection| / |union|.
     /// If either end is open-ended, fall back to `match_start_dates`.
     pub fn match_window_overlap(
-        a_start: DateTime<Utc>,
-        a_end: Option<DateTime<Utc>>,
-        b_start: DateTime<Utc>,
-        b_end: Option<DateTime<Utc>>,
+        a_start: Timestamp,
+        a_end: Option<Timestamp>,
+        b_start: Timestamp,
+        b_end: Option<Timestamp>,
     ) -> f64 {
         let (Some(ae), Some(be)) = (a_end, b_end) else {
             return match_start_dates(a_start, b_start);
@@ -135,10 +135,10 @@ pub mod time_matching {
         if inter_end <= inter_start {
             return 0.0;
         }
-        let inter = (inter_end - inter_start).num_seconds() as f64;
+        let inter = inter_end.duration_since(inter_start).as_secs() as f64;
         let union_start = a_start.min(b_start);
         let union_end = ae.max(be);
-        let union = (union_end - union_start).num_seconds() as f64;
+        let union = union_end.duration_since(union_start).as_secs() as f64;
         if union <= 0.0 {
             return 0.0;
         }
@@ -444,11 +444,10 @@ pub mod reference_matching {
 mod tests {
     use super::*;
     use crate::models::{Address, Place};
-    use chrono::TimeZone;
 
     /// Build a fixed UTC timestamp for deterministic time tests.
-    fn dt(y: i32, mo: u32, d: u32, h: u32) -> DateTime<Utc> {
-        Utc.with_ymd_and_hms(y, mo, d, h, 0, 0).unwrap()
+    fn dt(y: i16, mo: i8, d: i8, h: i8) -> Timestamp {
+        jiff::civil::datetime(y, mo, d, h, 0, 0, 0).in_tz("UTC").unwrap().timestamp()
     }
 
     /// Identical titles score ~1.0.

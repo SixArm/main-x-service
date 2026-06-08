@@ -23,8 +23,9 @@
 //! assert!(!book.is_deleted);
 //! ```
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::identifier::ThingIdentifier;
@@ -50,7 +51,7 @@ use super::identifier::ThingIdentifier;
 /// t.identifiers = vec![ThingIdentifier::isbn("9781718500457")];
 /// assert_eq!(t.identifiers.len(), 1);
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Thing {
     /// Stable system identifier, auto-generated as a UUID v4 by
     /// [`Thing::new`]. Distinct from any external [`identifiers`](Self::identifiers).
@@ -103,12 +104,12 @@ pub struct Thing {
     /// hides them while preserving the audit trail. See [`Thing::soft_delete`].
     pub is_deleted: bool,
     /// Timestamp the record was soft-deleted, or `None` if still active.
-    pub deleted_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<Timestamp>,
     /// Creation timestamp, set once by [`Thing::new`].
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     /// Last-update timestamp. Equal to [`created_at`](Self::created_at) on a
     /// freshly constructed record.
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl Thing {
@@ -130,7 +131,7 @@ impl Thing {
     /// assert!(!t.is_deleted);
     /// ```
     pub fn new(name: &str) -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         Self {
             id: Uuid::new_v4(),
             name: name.to_string(),
@@ -172,7 +173,7 @@ impl Thing {
     /// ```
     pub fn soft_delete(&mut self) {
         self.is_deleted = true;
-        self.deleted_at = Some(Utc::now());
+        self.deleted_at = Some(Timestamp::now());
     }
 }
 

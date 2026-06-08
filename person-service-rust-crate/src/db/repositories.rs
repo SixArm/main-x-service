@@ -12,12 +12,98 @@
 
 use sea_orm::*;
 use sea_orm::sea_query::Expr;
-use chrono::Utc;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::models::{Person, HumanName, Address, ContactPoint, Identifier, PersonLink};
+use super::convert::{date_to_time, ts_to_offset, time_to_date, offset_to_ts};
+
+use crate::models::{
+    Address, ContactPoint, ContactPointSystem, DocumentType, EmergencyContact, HumanName,
+    Identifier, IdentityDocument, Person, PersonLink,
+};
 use crate::Result;
 use super::models::*;
+
+/// Serialize a fieldless enum to its canonical serde string tag (used for
+/// the document/telecom/address enum columns).
+fn enum_to_tag<T: serde::Serialize>(value: &T) -> Option<String> {
+    serde_json::to_value(value).ok().and_then(|v| v.as_str().map(String::from))
+}
+
+/// Parse a stored string tag back into a fieldless enum, or `None` if it is
+/// absent or unrecognized.
+fn tag_to_enum<T: serde::de::DeserializeOwned>(tag: &Option<String>) -> Option<T> {
+    let t = tag.as_ref()?;
+    serde_json::from_value(serde_json::Value::String(t.clone())).ok()
+}
+
+/// Insert the normalized document / emergency-contact (+ telecom) / photo
+/// child rows for `person` on connection `conn`.
+async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    person: &Person,
+) -> Result<()> {
+    for (i, doc) in person.documents.iter().enumerate() {
+        person_documents::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            person_id: Set(person.id),
+            document_type: Set(enum_to_tag(&doc.document_type).unwrap_or_default()),
+            number: Set(doc.number.clone()),
+            issuing_country: Set(doc.issuing_country.clone()),
+            issuing_authority: Set(doc.issuing_authority.clone()),
+            issue_date: Set(doc.issue_date.map(date_to_time)),
+            expiry_date: Set(doc.expiry_date.map(date_to_time)),
+            verified: Set(doc.verified),
+            position: Set(i as i32),
+        }
+        .insert(conn)
+        .await?;
+    }
+    for (i, ec) in person.emergency_contacts.iter().enumerate() {
+        let ec_id = Uuid::new_v4();
+        let addr = ec.address.as_ref();
+        person_emergency_contacts::ActiveModel {
+            id: Set(ec_id),
+            person_id: Set(person.id),
+            name: Set(ec.name.clone()),
+            relationship: Set(ec.relationship.clone()),
+            is_primary: Set(ec.is_primary),
+            address_use_type: Set(addr.and_then(|a| a.use_type.as_ref().and_then(enum_to_tag))),
+            address_line1: Set(addr.and_then(|a| a.line1.clone())),
+            address_line2: Set(addr.and_then(|a| a.line2.clone())),
+            address_city: Set(addr.and_then(|a| a.city.clone())),
+            address_state: Set(addr.and_then(|a| a.state.clone())),
+            address_postal_code: Set(addr.and_then(|a| a.postal_code.clone())),
+            address_country: Set(addr.and_then(|a| a.country.clone())),
+            position: Set(i as i32),
+        }
+        .insert(conn)
+        .await?;
+        for (j, cp) in ec.telecom.iter().enumerate() {
+            person_emergency_contact_telecom::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                emergency_contact_id: Set(ec_id),
+                system: Set(enum_to_tag(&cp.system).unwrap_or_default()),
+                value: Set(cp.value.clone()),
+                use_type: Set(cp.use_type.as_ref().and_then(enum_to_tag)),
+                position: Set(j as i32),
+            }
+            .insert(conn)
+            .await?;
+        }
+    }
+    for (i, url) in person.photo.iter().enumerate() {
+        person_photos::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            person_id: Set(person.id),
+            url: Set(url.clone()),
+            position: Set(i as i32),
+        }
+        .insert(conn)
+        .await?;
+    }
+    Ok(())
+}
 
 /// Request provenance attached to audit-log writes.
 ///
@@ -188,14 +274,15 @@ impl SeaOrmPersonRepository {
             // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
             // Gender's serde rename_all="lowercase" produces the same shape.
             gender: Set(format!("{:?}", person.gender).to_lowercase()),
-            birth_date: Set(person.birth_date),
+            birth_date: Set(person.birth_date.map(date_to_time)),
+            tax_id: Set(person.tax_id.clone()),
             deceased: Set(person.deceased),
-            deceased_datetime: Set(person.deceased_datetime),
+            deceased_datetime: Set(person.deceased_datetime.map(ts_to_offset)),
             marital_status: Set(person.marital_status.clone()),
             multiple_birth: Set(person.multiple_birth),
             managing_organization_id: Set(person.managing_organization),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
             created_by: Set(None),
             updated_by: Set(None),
             deleted_at: Set(None),
@@ -212,8 +299,8 @@ impl SeaOrmPersonRepository {
             prefix: Set(person.name.prefix.clone()),
             suffix: Set(person.name.suffix.clone()),
             is_primary: Set(true),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
         }];
 
         // Additional names
@@ -227,8 +314,8 @@ impl SeaOrmPersonRepository {
                 prefix: Set(add_name.prefix.clone()),
                 suffix: Set(add_name.suffix.clone()),
                 is_primary: Set(false),
-                created_at: Set(Utc::now()),
-                updated_at: Set(Utc::now()),
+                created_at: Set(OffsetDateTime::now_utc()),
+                updated_at: Set(OffsetDateTime::now_utc()),
             });
         }
 
@@ -241,8 +328,8 @@ impl SeaOrmPersonRepository {
             system: Set(id.system.clone()),
             value: Set(id.value.clone()),
             assigner: Set(id.assigner.clone()),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
         }).collect();
 
         // Addresses
@@ -257,8 +344,8 @@ impl SeaOrmPersonRepository {
             postal_code: Set(addr.postal_code.clone()),
             country: Set(addr.country.clone()),
             is_primary: Set(idx == 0),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
         }).collect();
 
         // Contacts
@@ -269,8 +356,8 @@ impl SeaOrmPersonRepository {
             value: Set(cp.value.clone()),
             use_type: Set(cp.use_type.as_ref().map(|u| format!("{:?}", u))),
             is_primary: Set(idx == 0),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
         }).collect();
 
         // Links
@@ -279,7 +366,7 @@ impl SeaOrmPersonRepository {
             person_id: Set(person.id),
             other_person_id: Set(link.other_person_id),
             link_type: Set(format!("{:?}", link.link_type)),
-            created_at: Set(Utc::now()),
+            created_at: Set(OffsetDateTime::now_utc()),
             created_by: Set(None),
         }).collect();
 
@@ -459,20 +546,21 @@ impl SeaOrmPersonRepository {
             additional_names,
             telecom,
             gender,
-            birth_date: db_person.birth_date,
+            birth_date: db_person.birth_date.map(time_to_date),
             deceased: db_person.deceased,
-            deceased_datetime: db_person.deceased_datetime,
+            deceased_datetime: db_person.deceased_datetime.map(offset_to_ts),
             addresses,
             marital_status: db_person.marital_status,
             multiple_birth: db_person.multiple_birth,
-            tax_id: None, // TODO: Load from DB
-            documents: vec![], // TODO: Load from DB
-            emergency_contacts: vec![], // TODO: Load from DB
-            photo: vec![], // Not stored in DB yet
+            tax_id: db_person.tax_id,
+            // Loaded separately from child tables by `load_extra_collections`.
+            documents: vec![],
+            emergency_contacts: vec![],
+            photo: vec![],
             managing_organization: db_person.managing_organization_id,
             links,
-            created_at: db_person.created_at,
-            updated_at: db_person.updated_at,
+            created_at: offset_to_ts(db_person.created_at),
+            updated_at: offset_to_ts(db_person.updated_at),
         })
     }
 
@@ -511,6 +599,85 @@ impl SeaOrmPersonRepository {
             .await?;
 
         Ok((db_names, db_identifiers, db_addresses, db_contacts, db_links))
+    }
+
+    /// Load the normalized document / emergency-contact / photo child rows
+    /// for `person.id` and populate them onto `person`.
+    async fn load_extra_collections(&self, person: &mut Person) -> Result<()> {
+        let id = person.id;
+
+        let doc_rows = person_documents::Entity::find()
+            .filter(person_documents::Column::PersonId.eq(id))
+            .order_by_asc(person_documents::Column::Position)
+            .all(&self.db)
+            .await?;
+        person.documents = doc_rows
+            .into_iter()
+            .map(|r| IdentityDocument {
+                document_type: tag_to_enum(&Some(r.document_type)).unwrap_or(DocumentType::Other),
+                number: r.number,
+                issuing_country: r.issuing_country,
+                issuing_authority: r.issuing_authority,
+                issue_date: r.issue_date.map(time_to_date),
+                expiry_date: r.expiry_date.map(time_to_date),
+                verified: r.verified,
+            })
+            .collect();
+
+        let ec_rows = person_emergency_contacts::Entity::find()
+            .filter(person_emergency_contacts::Column::PersonId.eq(id))
+            .order_by_asc(person_emergency_contacts::Column::Position)
+            .all(&self.db)
+            .await?;
+        let mut emergency_contacts = Vec::with_capacity(ec_rows.len());
+        for ec in ec_rows {
+            let tel_rows = person_emergency_contact_telecom::Entity::find()
+                .filter(person_emergency_contact_telecom::Column::EmergencyContactId.eq(ec.id))
+                .order_by_asc(person_emergency_contact_telecom::Column::Position)
+                .all(&self.db)
+                .await?;
+            let telecom = tel_rows
+                .into_iter()
+                .map(|t| ContactPoint {
+                    system: tag_to_enum(&Some(t.system)).unwrap_or(ContactPointSystem::Other),
+                    value: t.value,
+                    use_type: tag_to_enum(&t.use_type),
+                })
+                .collect();
+            let has_address = ec.address_use_type.is_some()
+                || ec.address_line1.is_some()
+                || ec.address_line2.is_some()
+                || ec.address_city.is_some()
+                || ec.address_state.is_some()
+                || ec.address_postal_code.is_some()
+                || ec.address_country.is_some();
+            let address = has_address.then(|| Address {
+                use_type: tag_to_enum(&ec.address_use_type),
+                line1: ec.address_line1,
+                line2: ec.address_line2,
+                city: ec.address_city,
+                state: ec.address_state,
+                postal_code: ec.address_postal_code,
+                country: ec.address_country,
+            });
+            emergency_contacts.push(EmergencyContact {
+                name: ec.name,
+                relationship: ec.relationship,
+                telecom,
+                address,
+                is_primary: ec.is_primary,
+            });
+        }
+        person.emergency_contacts = emergency_contacts;
+
+        let photo_rows = person_photos::Entity::find()
+            .filter(person_photos::Column::PersonId.eq(id))
+            .order_by_asc(person_photos::Column::Position)
+            .all(&self.db)
+            .await?;
+        person.photo = photo_rows.into_iter().map(|r| r.url).collect();
+
+        Ok(())
     }
 }
 
@@ -552,18 +719,22 @@ impl PersonRepository for SeaOrmPersonRepository {
             link.insert(&txn).await?;
         }
 
+        // Insert documents / emergency contacts / photos (normalized).
+        insert_extra_collections(&txn, person).await?;
+
         txn.commit().await?;
 
         // Load associations
         let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
             self.load_associations(&db_person.id).await?;
 
-        let result = self.from_db_models(db_person, db_names, db_identifiers, db_addresses, db_contacts, db_links)?;
+        let mut result = self.from_db_models(db_person, db_names, db_identifiers, db_addresses, db_contacts, db_links)?;
+        self.load_extra_collections(&mut result).await?;
 
         // Publish event
         self.publish_event(crate::streaming::PersonEvent::Created {
             person: result.clone(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         });
 
         // Log audit
@@ -589,8 +760,9 @@ impl PersonRepository for SeaOrmPersonRepository {
         let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
             self.load_associations(id).await?;
 
-        self.from_db_models(db_person, db_names, db_identifiers, db_addresses, db_contacts, db_links)
-            .map(Some)
+        let mut person = self.from_db_models(db_person, db_names, db_identifiers, db_addresses, db_contacts, db_links)?;
+        self.load_extra_collections(&mut person).await?;
+        Ok(Some(person))
     }
 
     /// Update the parent row, then delete-and-reinsert all child rows in
@@ -609,13 +781,14 @@ impl PersonRepository for SeaOrmPersonRepository {
             // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
             // Gender's serde rename_all="lowercase" produces the same shape.
             gender: Set(format!("{:?}", person.gender).to_lowercase()),
-            birth_date: Set(person.birth_date),
+            birth_date: Set(person.birth_date.map(date_to_time)),
+            tax_id: Set(person.tax_id.clone()),
             deceased: Set(person.deceased),
-            deceased_datetime: Set(person.deceased_datetime),
+            deceased_datetime: Set(person.deceased_datetime.map(ts_to_offset)),
             marital_status: Set(person.marital_status.clone()),
             multiple_birth: Set(person.multiple_birth),
             managing_organization_id: Set(person.managing_organization),
-            updated_at: Set(Utc::now()),
+            updated_at: Set(OffsetDateTime::now_utc()),
             updated_by: Set(None),
             ..Default::default()
         };
@@ -642,6 +815,17 @@ impl PersonRepository for SeaOrmPersonRepository {
             .filter(person_links::Column::PersonId.eq(person.id))
             .exec(&txn).await?;
 
+        // Deleting emergency contacts cascades to their telecom rows.
+        person_emergency_contacts::Entity::delete_many()
+            .filter(person_emergency_contacts::Column::PersonId.eq(person.id))
+            .exec(&txn).await?;
+        person_documents::Entity::delete_many()
+            .filter(person_documents::Column::PersonId.eq(person.id))
+            .exec(&txn).await?;
+        person_photos::Entity::delete_many()
+            .filter(person_photos::Column::PersonId.eq(person.id))
+            .exec(&txn).await?;
+
         // Re-insert associated data
         let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
             self.to_active_models(person);
@@ -661,6 +845,7 @@ impl PersonRepository for SeaOrmPersonRepository {
         for link in new_links {
             link.insert(&txn).await?;
         }
+        insert_extra_collections(&txn, person).await?;
 
         txn.commit().await?;
 
@@ -671,7 +856,7 @@ impl PersonRepository for SeaOrmPersonRepository {
         // Publish event
         self.publish_event(crate::streaming::PersonEvent::Updated {
             person: result.clone(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         });
 
         // Log audit
@@ -693,7 +878,7 @@ impl PersonRepository for SeaOrmPersonRepository {
         // Soft delete
         let update_model = persons::ActiveModel {
             id: Set(*id),
-            deleted_at: Set(Some(Utc::now())),
+            deleted_at: Set(Some(OffsetDateTime::now_utc())),
             deleted_by: Set(Some("system".to_string())),
             ..Default::default()
         };
@@ -702,7 +887,7 @@ impl PersonRepository for SeaOrmPersonRepository {
         // Publish event
         self.publish_event(crate::streaming::PersonEvent::Deleted {
             person_id: *id,
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         });
 
         // Log audit

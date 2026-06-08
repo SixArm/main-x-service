@@ -5,15 +5,15 @@
 //! standardization (full and minimal). Run with `cargo bench`.
 
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
-use chrono::{NaiveDate, Utc};
+use jiff::{Timestamp, civil::Date};
 use uuid::Uuid;
 
 use worker_service::models::*;
 use worker_service::validation::{validate_worker, normalize_phone, standardize_address};
 
 /// Builds a minimal [`Worker`] fixture; the more complex benches extend it.
-fn create_test_worker(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Worker {
-    let now = Utc::now();
+fn create_test_worker(family: &str, given: &str, birth_date: Option<Date>) -> Worker {
+    let now = Timestamp::now();
     Worker {
         id: Uuid::new_v4(),
         identifiers: vec![],
@@ -51,7 +51,7 @@ fn bench_validate_simple_worker(c: &mut Criterion) {
     let worker = create_test_worker(
         "Smith",
         "John",
-        NaiveDate::from_ymd_opt(1980, 1, 15),
+        Some(jiff::civil::date(1980, 1, 15)),
     );
 
     c.bench_function("validate_simple_worker", |b| {
@@ -67,7 +67,7 @@ fn bench_validate_complex_worker(c: &mut Criterion) {
     let mut worker = create_test_worker(
         "Smith",
         "John",
-        NaiveDate::from_ymd_opt(1980, 1, 15),
+        Some(jiff::civil::date(1980, 1, 15)),
     );
 
     worker.tax_id = Some("123-45-6789".to_string());
@@ -98,8 +98,8 @@ fn bench_validate_complex_worker(c: &mut Criterion) {
         number: "X12345678".to_string(),
         issuing_country: Some("US".to_string()),
         issuing_authority: None,
-        issue_date: NaiveDate::from_ymd_opt(2020, 1, 1),
-        expiry_date: NaiveDate::from_ymd_opt(2030, 1, 1),
+        issue_date: Some(jiff::civil::date(2020, 1, 1)),
+        expiry_date: Some(jiff::civil::date(2030, 1, 1)),
         verified: false,
     });
 

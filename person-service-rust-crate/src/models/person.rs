@@ -27,7 +27,7 @@
 //! assert!(person.active);
 //! ```
 
-use chrono::{DateTime, NaiveDate, Utc};
+use jiff::{Timestamp, civil::Date};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use utoipa::ToSchema;
@@ -72,7 +72,7 @@ pub struct Person {
 
     /// Birth date
     #[serde(default)]
-    pub birth_date: Option<NaiveDate>,
+    pub birth_date: Option<Date>,
 
     /// Tax ID number (CPF, SSN, TIN, etc.)
     #[serde(default)]
@@ -92,7 +92,7 @@ pub struct Person {
 
     /// Deceased date/time
     #[serde(default)]
-    pub deceased_datetime: Option<DateTime<Utc>>,
+    pub deceased_datetime: Option<Timestamp>,
 
     /// Addresses
     #[serde(default)]
@@ -119,12 +119,12 @@ pub struct Person {
     pub links: Vec<PersonLink>,
 
     /// Created timestamp — set server-side on create.
-    #[serde(default = "Utc::now")]
-    pub created_at: DateTime<Utc>,
+    #[serde(default = "Timestamp::now")]
+    pub created_at: Timestamp,
 
     /// Updated timestamp — set server-side on create and on update.
-    #[serde(default = "Utc::now")]
-    pub updated_at: DateTime<Utc>,
+    #[serde(default = "Timestamp::now")]
+    pub updated_at: Timestamp,
 }
 
 /// serde default for [`Person::active`] — new records are active.
@@ -226,7 +226,7 @@ impl Person {
     /// assert!(person.identifiers.is_empty());
     /// ```
     pub fn new(name: HumanName, gender: Gender) -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         Self {
             id: Uuid::new_v4(),
             identifiers: Vec::new(),
@@ -341,7 +341,7 @@ mod tests {
             suffix: vec!["Jr.".into()],
         };
         let mut person = Person::new(name, Gender::Male);
-        person.birth_date = Some(chrono::NaiveDate::from_ymd_opt(1985, 3, 20).unwrap());
+        person.birth_date = Some(jiff::civil::date(1985, 3, 20));
         person.tax_id = Some("123-45-6789".into());
 
         let json = serde_json::to_string(&person).expect("Serialization should succeed");

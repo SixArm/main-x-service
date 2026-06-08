@@ -369,12 +369,12 @@ pub async fn search_events(
                 }
             }
             if let Some(from) = params.date_from.as_deref() {
-                if event.start_date.format("%Y-%m-%d").to_string().as_str() < from {
+                if event.start_date.strftime("%Y-%m-%d").to_string().as_str() < from {
                     continue;
                 }
             }
             if let Some(to) = params.date_to.as_deref() {
-                if event.start_date.format("%Y-%m-%d").to_string().as_str() > to {
+                if event.start_date.strftime("%Y-%m-%d").to_string().as_str() > to {
                     continue;
                 }
             }
@@ -520,7 +520,7 @@ async fn check_duplicates_internal(state: &AppState, event: &Event) -> Vec<Match
 /// events with a similar name on the same `start_date` day, hydrate
 /// them from the repository, and exclude the probe event's own id.
 async fn blocking_candidates(state: &AppState, event: &Event) -> Vec<Event> {
-    let date = event.start_date.format("%Y-%m-%d").to_string();
+    let date = event.start_date.strftime("%Y-%m-%d").to_string();
     let candidate_ids = state
         .search_engine
         .search_by_name_and_date(&event.name, Some(&date), 100)
@@ -747,7 +747,7 @@ pub async fn merge_events(
         .publish(crate::streaming::EventEvent::Merged {
             source_id: duplicate.id,
             target_id: merged.id,
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         })
         .ok();
 
@@ -760,7 +760,7 @@ pub async fn merge_events(
         merge_reason: req.merge_reason,
         match_score: None,
         transferred_data: Some(serde_json::Value::Object(transferred)),
-        merged_at: chrono::Utc::now(),
+        merged_at: jiff::Timestamp::now(),
     };
 
     let response = crate::models::MergeResponse {
@@ -855,7 +855,7 @@ pub async fn batch_deduplicate(
                 score_breakdown: serde_json::to_value(&m.breakdown).ok(),
                 status,
                 reviewed_by: None,
-                created_at: chrono::Utc::now(),
+                created_at: jiff::Timestamp::now(),
                 reviewed_at: None,
             });
         }

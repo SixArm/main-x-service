@@ -2,7 +2,7 @@
 //! serialization / soft-delete, [`ThingIdentifier`] round-trips, and the
 //! [`Consent`] lifecycle.
 
-use chrono::{Duration, Utc};
+use jiff::Timestamp;
 use uuid::Uuid;
 
 use thing_service::models::consent::{Consent, ConsentStatus, ConsentType};
@@ -118,8 +118,8 @@ fn test_consent_lifecycle() {
         thing_id,
         consent_type: ConsentType::DataProcessing,
         status: ConsentStatus::Active,
-        granted_at: Utc::now(),
-        expires_at: Some(Utc::now() + Duration::days(365)),
+        granted_at: Timestamp::now(),
+        expires_at: Some(Timestamp::now() + jiff::SignedDuration::from_hours(24 * (365))),
     };
     assert!(consent.is_active());
 

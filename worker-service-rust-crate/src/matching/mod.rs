@@ -272,7 +272,7 @@ impl WorkerMatcher for DeterministicMatcher {
 mod tests {
     use super::*;
     use crate::models::{HumanName, Gender};
-    use chrono::NaiveDate;
+    use jiff::civil::Date;
 
     /// Builds a baseline matching config with the default 0.85 threshold.
     fn create_test_config() -> MatchingConfig {
@@ -284,7 +284,7 @@ mod tests {
     }
 
     /// Builds a minimal male [`Worker`] with the given name parts and DOB.
-    fn create_test_worker(family: &str, given: &str, dob: Option<NaiveDate>) -> Worker {
+    fn create_test_worker(family: &str, given: &str, dob: Option<Date>) -> Worker {
         Worker {
             id: uuid::Uuid::new_v4(),
             identifiers: vec![],
@@ -312,8 +312,8 @@ mod tests {
             photo: vec![],
             managing_organization: None,
             links: vec![],
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now(),
+            updated_at: jiff::Timestamp::now(),
         }
     }
 
@@ -327,13 +327,13 @@ mod tests {
         };
         let matcher = ProbabilisticMatcher::new(config);
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let worker = create_test_worker("Smith", "John", dob);
 
         let candidates = vec![
             create_test_worker("Smith", "John", dob), // Exact match
             create_test_worker("Smyth", "John", dob), // Close match
-            create_test_worker("Johnson", "Bob", NaiveDate::from_ymd_opt(1990, 5, 20)), // No match
+            create_test_worker("Johnson", "Bob", Some(jiff::civil::date(1990, 5, 20))), // No match
         ];
 
         let matches = matcher.find_matches(&worker, &candidates).unwrap();
@@ -353,7 +353,7 @@ mod tests {
         let config = create_test_config();
         let matcher = DeterministicMatcher::new(config);
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let worker1 = create_test_worker("Smith", "John", dob);
         let worker2 = create_test_worker("Smith", "John", dob);
 
@@ -391,7 +391,7 @@ mod tests {
         };
         let matcher = ProbabilisticMatcher::new(config);
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let worker = create_test_worker("Smith", "John", dob);
         let candidate = create_test_worker("Smith", "John", dob);
 
@@ -411,11 +411,11 @@ mod tests {
         };
         let matcher = ProbabilisticMatcher::new(config);
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let worker = create_test_worker("Smith", "John", dob);
 
         let candidates = vec![
-            create_test_worker("Johnson", "Bob", NaiveDate::from_ymd_opt(1995, 5, 20)), // Low match
+            create_test_worker("Johnson", "Bob", Some(jiff::civil::date(1995, 5, 20))), // Low match
             create_test_worker("Smith", "John", dob), // Exact match
             create_test_worker("Smyth", "John", dob), // Close match
         ];
@@ -436,7 +436,7 @@ mod tests {
         let config = create_test_config();
         let matcher = ProbabilisticMatcher::new(config);
 
-        let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+        let dob = Some(jiff::civil::date(1980, 1, 15));
         let worker = create_test_worker("Smith", "John", dob);
 
         let matches = matcher.find_matches(&worker, &[]).unwrap();

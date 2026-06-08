@@ -295,7 +295,6 @@ impl MatchQuality {
 mod tests {
     use super::*;
     use crate::models::{Event, EventType, Identifier, IdentifierType};
-    use chrono::{TimeZone, Utc};
 
     /// A baseline matching config used by these tests.
     fn config() -> MatchingConfig {
@@ -307,8 +306,8 @@ mod tests {
     }
 
     /// Build a conference event with the given name on a fixed date.
-    fn event(name: &str, hour: u32) -> Event {
-        let mut e = Event::new(name, Utc.with_ymd_and_hms(2026, 3, 1, hour, 0, 0).unwrap());
+    fn event(name: &str, hour: i8) -> Event {
+        let mut e = Event::new(name, jiff::civil::datetime(2026, 3, 1, hour, 0, 0, 0).in_tz("UTC").unwrap().timestamp());
         e.event_type = EventType::Conference;
         e
     }

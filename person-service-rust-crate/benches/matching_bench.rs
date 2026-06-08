@@ -6,7 +6,7 @@
 //! scaling across 10/100/1000 candidates. Run with `cargo bench`.
 
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
-use chrono::{NaiveDate, Utc};
+use jiff::{Timestamp, civil::Date};
 use uuid::Uuid;
 
 use person_service::models::*;
@@ -20,8 +20,8 @@ use person_service::matching::phonetic;
 use person_service::config::MatchingConfig;
 
 /// Build a minimal [`Person`] with the given family/given names and DOB.
-fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Person {
-    let now = Utc::now();
+fn create_test_person(family: &str, given: &str, birth_date: Option<Date>) -> Person {
+    let now = Timestamp::now();
     Person {
         id: Uuid::new_v4(),
         identifiers: vec![],
@@ -57,7 +57,7 @@ fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) 
 fn create_test_person_with_address(
     family: &str,
     given: &str,
-    birth_date: Option<NaiveDate>,
+    birth_date: Option<Date>,
     city: &str,
     state: &str,
     postal_code: &str,
@@ -131,8 +131,8 @@ fn bench_name_matching(c: &mut Criterion) {
 
 /// Benchmark birth-date matching (exact, off-by-one, missing).
 fn bench_dob_matching(c: &mut Criterion) {
-    let dob1 = NaiveDate::from_ymd_opt(1980, 1, 15);
-    let dob2 = NaiveDate::from_ymd_opt(1980, 1, 16);
+    let dob1 = Some(jiff::civil::date(1980, 1, 15));
+    let dob2 = Some(jiff::civil::date(1980, 1, 16));
 
     c.bench_function("dob_match_exact", |b| {
         b.iter(|| {
@@ -231,7 +231,7 @@ fn bench_full_person_matcher(c: &mut Criterion) {
     let config = create_matching_config();
     let matcher = ProbabilisticMatcher::new(config);
 
-    let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+    let dob = Some(jiff::civil::date(1980, 1, 15));
     let person = create_test_person_with_address(
         "Smith", "John", dob,
         "Springfield", "IL", "62701",
@@ -280,7 +280,7 @@ fn bench_deterministic_matching(c: &mut Criterion) {
     let config = create_matching_config();
     let matcher = DeterministicMatcher::new(config);
 
-    let dob = NaiveDate::from_ymd_opt(1980, 1, 15);
+    let dob = Some(jiff::civil::date(1980, 1, 15));
     let person = create_test_person("Smith", "John", dob);
     let candidate = create_test_person("Smith", "John", dob);
 

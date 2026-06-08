@@ -2,7 +2,7 @@
 //! library's `Event` matching input.
 //!
 //! The service's `Event` is schema.org/Event-aligned and uses typed
-//! `DateTime<Utc>` for all time fields, `Vec<Location>` (a tagged union of
+//! `Timestamp` for all time fields, `Vec<Location>` (a tagged union of
 //! `Place` / `PostalAddress` / `Virtual` / `Text`), `Vec<Party>` for
 //! organizers/performers/attendees, and `Vec<Identifier>` with an enumerated
 //! `IdentifierType`. The matcher's `Event` accepts ISO 8601 *strings* for
@@ -92,16 +92,16 @@ pub fn to_matcher_event(e: &Event) -> MEvent {
         b = b.typical_age_range(age);
     }
 
-    // Times: DateTime<Utc> → RFC 3339.
-    b = b.start_date(e.start_date.to_rfc3339());
+    // Times: Timestamp → RFC 3339.
+    b = b.start_date(e.start_date.to_string());
     if let Some(t) = e.end_date {
-        b = b.end_date(t.to_rfc3339());
+        b = b.end_date(t.to_string());
     }
     if let Some(t) = e.door_time {
-        b = b.door_time(t.to_rfc3339());
+        b = b.door_time(t.to_string());
     }
     if let Some(t) = e.previous_start_date {
-        b = b.previous_start_date(t.to_rfc3339());
+        b = b.previous_start_date(t.to_string());
     }
 
     b = b.event_status(map_status(e.event_status));
@@ -390,11 +390,10 @@ mod tests {
         identifier::Identifier, Event, EventStatus, Location, Party, PartyKind, Place,
         VirtualLocation,
     };
-    use chrono::{TimeZone, Utc};
 
     /// Build a minimal service `Event` with a fixed start date for tests.
     fn svc_event(name: &str) -> Event {
-        Event::new(name, Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap())
+        Event::new(name, jiff::civil::datetime(2026, 6, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp())
     }
 
     /// Name, category, status, and start date survive the projection.
