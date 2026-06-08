@@ -1,7 +1,7 @@
 ### Technology stack for Rust Loco
 
 | Component            | Technology                                        | Purpose                                     |
-| -------------------- | ------------------------------------------------- | ------------------------------------------- | ---------------- |
+| -------------------- | ------------------------------------------------- | ------------------------------------------- |
 | **Language**         | Rust 1.95+ 2024 Edition                           | Systems programming, performance, safety    |
 | **Async Runtime**    | Tokio                                             | Asynchronous I/O and concurrency            |
 | **HTTP**             | tower-http                                        | HTTP layer, CORS, compression               |
@@ -20,9 +20,10 @@
 | **Containerization** | Podman                                            | Deployment OpenContainer packaging          |
 | **gRPC**             | Tonic                                             | High-performance RPC framework              |
 | **Protocols**        | Prost                                             | Protocol buffers                            |
-| **Utilities**        | chrono, dotenvy                                   | timestamps, env config                      |
+| **Environment**      | dotenvy                                           | Config env var                              |
+| **Timestamps**       | jiff                                              | Dates, times, durations                     |
 | **Error Handling**   | thiserror, anyhow                                 | Typed and contextual error handling         |
-| **Security**         | argon2                                            |                                             | Password hashing |
+| **Security**         | argon2                                            | Password hashing                            |
 | **Authentication**   | jsonwebtoken                                      | JWT authentication                          |
 | **Testing**          | assertables, tokio-test                           | Unit testing, integration                   |
 | **Mock Testing**     | mockall, tempfile                                 | Mock testing                                |
@@ -38,6 +39,8 @@ Constraints:
 - Tokio NOT async_std
 - MiMalloc NOT jemalloc
 - PostgreSQL NOT SQLite
+- jiff NOT chrono
+- sea-orm feature "with-jiff" NOT "with-chrono"
 
 ## Configurations
 
