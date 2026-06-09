@@ -47,4 +47,4 @@ If a CHANGELOG entry doesn't have a corresponding spec edit, one of them is wron
 - Patch-bump dependencies regularly; document in CHANGELOG under "Dependencies".
 - Minor/major dependency bumps that change public behaviour require a behaviour-change note even if our crate's surface is unchanged.
 - Run `cargo audit` before every release. Zero findings is the bar. Pin or yank if a transitive dep is flagged.
-- Current direct dependencies (0.3.0): `chrono ^0.4`, `serde ^1.0`, `serde_json ^1.0`, `unicode-normalization ^0.1`, `strsim ^0.11`, `thiserror ^2.0`, `soundex ^0.2`, `united-kingdom-national-health-service-number ^1.0` (aliased upstream `nhs-number ^1.0`). No `tokio`, `async-std`, or other runtimes.
+- Current direct dependencies (0.6.0): `jiff ^0.2`, `serde ^1.0`, `serde_json ^1.0`, `unicode-normalization ^0.1`, `strsim ^0.11`, `thiserror ^2.0`, `soundex ^0.2`, `united-kingdom-national-health-service-number ^1.0` (aliased upstream `nhs-number ^1.0`). No `tokio`, `async-std`, or other runtimes.

@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > See also: [index.md](./index.md) (documentation map), [spec.md](./spec.md) (authoritative behaviour — each entry below corresponds to a section / FR / task in the spec), [README.md](./README.md) (user-facing overview).
 
-## [Unreleased] → 0.5.0
+## [Unreleased] → 0.6.0
+
+### Changed — version-aligned with the matcher-family `chrono` elimination
+
+- Bumped to 0.6.0. `event-matcher` carries no date dependency and
+  `chrono` is not in the manifest. No functional change.
 
 ### Added — adapter-contract test (CI guardrail for the public API)
 

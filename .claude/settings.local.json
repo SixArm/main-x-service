@@ -109,7 +109,10 @@
       "Bash(sed -i '' 's/make_event\\(TITLES\\\\[i % TITLES.len\\(\\)\\\\], \\(9 + \\(i as u32 % 12\\)\\) % 24\\)/make_event\\(TITLES[i % TITLES.len\\(\\)], \\(9 + \\(i as i8 % 12\\)\\) % 24\\)/' benches/search_bench.rs)",
       "Bash(sed -i '' 's/dt\\(2026, 3, 1, 9 + \\(i as u32 % 8\\)\\)/dt\\(2026, 3, 1, 9 + \\(i as i8 % 8\\)\\)/' benches/matching_bench.rs)",
       "Bash(perl -0pi -e 's/            documents: Set\\\\\\(json_or_empty_array\\\\\\(&worker\\\\.documents\\\\\\)\\\\\\),\\\\n            emergency_contacts: Set\\\\\\(json_or_empty_array\\\\\\(&worker\\\\.emergency_contacts\\\\\\)\\\\\\),\\\\n            photo: Set\\\\\\(json_or_empty_array\\\\\\(&worker\\\\.photo\\\\\\)\\\\\\),\\\\n//g' src/db/repositories.rs)",
-      "Bash(perl -0pi -e 's/            documents: serde_json::from_value\\\\\\(db_worker\\\\.documents\\\\\\)\\\\.unwrap_or_default\\\\\\(\\\\\\),\\\\n            emergency_contacts: serde_json::from_value\\\\\\(db_worker\\\\.emergency_contacts\\\\\\)\\\\.unwrap_or_default\\\\\\(\\\\\\),\\\\n            photo: serde_json::from_value\\\\\\(db_worker\\\\.photo\\\\\\)\\\\.unwrap_or_default\\\\\\(\\\\\\),/            \\\\/\\\\/ Loaded separately from child tables by `load_extra_collections`.\\\\n            documents: vec![],\\\\n            emergency_contacts: vec![],\\\\n            photo: vec![],/' src/db/repositories.rs)"
+      "Bash(perl -0pi -e 's/            documents: serde_json::from_value\\\\\\(db_worker\\\\.documents\\\\\\)\\\\.unwrap_or_default\\\\\\(\\\\\\),\\\\n            emergency_contacts: serde_json::from_value\\\\\\(db_worker\\\\.emergency_contacts\\\\\\)\\\\.unwrap_or_default\\\\\\(\\\\\\),\\\\n            photo: serde_json::from_value\\\\\\(db_worker\\\\.photo\\\\\\)\\\\.unwrap_or_default\\\\\\(\\\\\\),/            \\\\/\\\\/ Loaded separately from child tables by `load_extra_collections`.\\\\n            documents: vec![],\\\\n            emergency_contacts: vec![],\\\\n            photo: vec![],/' src/db/repositories.rs)",
+      "Bash(cargo tree *)",
+      "Bash(grep -rn chrono __TRACKED_VAR__/src)",
+      "Bash(grep -rln jiff __TRACKED_VAR__/src)"
     ]
   }
 }

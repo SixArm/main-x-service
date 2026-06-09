@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > See also: [index.md](./index.md) (documentation map), [spec.md](./spec.md) (authoritative behaviour — each entry below corresponds to a section / FR / task in the spec), [README.md](./README.md) (user-facing overview).
 
-## [Unreleased] → 0.4.0
+## [Unreleased] → 0.6.0
+
+### Changed — `chrono` eliminated
+
+- Bumped to 0.6.0. `chrono` (an unused manifest dependency flagged for
+  removal) is gone; `thing-matcher` carries no date dependency. See the
+  Dependencies note below. No functional change.
 
 ### Added — adapter-contract test (CI guardrail for the public API)
 
@@ -81,8 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MatchingError` is unchanged in shape (`#[non_exhaustive]`, single variant `MissingField`) but is now returned only by `Place::validate` against the new `name` requirement.
 
 ### Dependencies
-- Dropped: `nhs-number` (no per-scheme identifier parsers remain).
-- Retained: `chrono`, `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`. `chrono` is no longer used by the library surface and is a candidate for removal in a follow-up; it stays in the manifest for now to keep this release scoped to documentation.
+- Dropped: `nhs-number` (no per-scheme identifier parsers remain) and `chrono` (never used by the library surface; the crate has no date dependency).
+- Retained: `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`.
 
 ## [Unreleased]
 

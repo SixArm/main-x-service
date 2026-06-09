@@ -182,5 +182,5 @@ entries (Unreleased + the most recent released version) remain in
 
 ### Dependencies
 - Dropped: `nhs-number` (no per-scheme identifier parsers remain).
-- Retained: `chrono`, `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`. `chrono` is no longer used by the library surface and is a candidate for removal in a follow-up; it stays in the manifest for now to keep this release scoped to documentation.
+- Retained: `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`.
 

@@ -7,9 +7,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 > See also: [spec.md](./spec.md) — single source of truth (numbered §1–§25; live work queue in §23); [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
 
-## [Unreleased]
+## [Unreleased] → 0.4.0
 
-Nothing yet.
+### Changed
+
+- Bumped to 0.4.0, version-aligned with the matcher-family release that
+  eliminated `chrono`. `course-matcher` carries no date dependency
+  (never used `chrono`), so this is a no-functional-change release.
 
 ## [0.2.0] — 2026-06-05
 

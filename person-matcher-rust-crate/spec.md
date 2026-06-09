@@ -191,7 +191,7 @@ Every field is `Option<f64>`: `None` = not scored; `Some(v)` ∈ `[0.0, 1.0]`. O
 
 ### 9.2 Dependency Graph
 
-`matcher → normalizer / scorer / models / identifiers / error`; `identifiers → united-kingdom-national-health-service-number`; `models → serde / chrono`; `scorer → strsim`; `normalizer → unicode-normalization / soundex`; `error → thiserror`. No cycles. `lib.rs` only re-exports.
+`matcher → normalizer / scorer / models / identifiers / error`; `identifiers → united-kingdom-national-health-service-number`; `models → serde / jiff`; `scorer → strsim`; `normalizer → unicode-normalization / soundex`; `error → thiserror`. No cycles. `lib.rs` only re-exports.
 
 ### 9.3 Layering Rules
 
@@ -279,7 +279,7 @@ Invariants: normalisers SHOULD be idempotent; identifier parsers are scheme-loca
 
 ## 16. Serialization Contract
 
-All public types in §11 except `MatchingEngine` MUST be `Serialize + Deserialize`. JSON is the reference format (`serde_json` hard dep). Optional fields round-trip `null` ⇄ `None`; dates serialise as ISO-8601 via `chrono`'s `serde` feature. `MatchConfig` carries `#[serde(default)]` so partial JSON deserialises with remaining fields from `MatchConfig::default()`. `SimilarityAlgorithm` serialises as the bare variant name (`"JaroWinkler"` / `"Levenshtein"` / `"Exact"` / `"Combined"`). `NicknameTable` serialises as `{ "classes": [["michael", "mike", "mickey"], …] }` (entries pre-normalised at insertion → byte-stable round-trip).
+All public types in §11 except `MatchingEngine` MUST be `Serialize + Deserialize`. JSON is the reference format (`serde_json` hard dep). Optional fields round-trip `null` ⇄ `None`; dates serialise as ISO-8601 via `jiff`'s `serde` feature. `MatchConfig` carries `#[serde(default)]` so partial JSON deserialises with remaining fields from `MatchConfig::default()`. `SimilarityAlgorithm` serialises as the bare variant name (`"JaroWinkler"` / `"Levenshtein"` / `"Exact"` / `"Combined"`). `NicknameTable` serialises as `{ "classes": [["michael", "mike", "mickey"], …] }` (entries pre-normalised at insertion → byte-stable round-trip).
 
 ---
 
@@ -289,7 +289,7 @@ All public types in §11 except `MatchingEngine` MUST be `Serialize + Deserializ
 - **Explainability** — every score carries a per-field `MatchBreakdown`.
 - **Performance** — `< 50 µs` per `match_persons` on a 2024-era Mac; verified by `benches/match_pair.rs` (criterion, T-5; single-pair fuzzy match ≈ 4 µs).
 - **Maintainability** — no single file > 500 lines (`matcher.rs` exempt pending refactor).
-- **Portability** — pure Rust, no C deps beyond `chrono` / `strsim` defaults.
+- **Portability** — pure Rust, no C deps beyond `jiff` / `strsim` defaults.
 - **Auditability** — all score combinations documented in §12.
 
 ---

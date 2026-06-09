@@ -1,6 +1,6 @@
 [package]
 name = "course-service"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Course Service — a course-administration microservice modelled on schema.org/Course; interoperates with the course-matcher crate"
@@ -57,7 +57,7 @@ dotenvy = "0.15"
 
 # Sibling matcher crate (embedded via re-export so the service uses the
 # canonical algorithm rather than maintaining a fork).
-course-matcher = "0.2"
+course-matcher = "0.4"
 
 # `dyn CourseRepository` needs object-safe async via async_trait.
 async-trait = "0.1"

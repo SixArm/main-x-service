@@ -50,21 +50,21 @@ worker-matcher = "0.1.0"
 
 ```rust
 use worker_matcher::{Worker, MatchingEngine, MatchConfig};
-use chrono::NaiveDate;
+use jiff::civil::date;
 
 fn main() {
     // Create two worker records
     let worker1 = Worker::builder()
         .given_name("John")
         .family_name("Smith")
-        .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
+        .date_of_birth(date(1980, 5, 15))
         .nhs_number("1234567890")
         .build();
 
     let worker2 = Worker::builder()
         .given_name("Jon")  // Typo
         .family_name("Smith")
-        .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
+        .date_of_birth(date(1980, 5, 15))
         .nhs_number("1234567890")
         .build();
 
@@ -298,7 +298,7 @@ Supported countries: UK, France, Spain, Ireland, UK Northern Ireland (via GB dia
 Passport book numbers don't fit the per-scheme `Option<String>` national-identifier pattern: a worker may hold passports from several countries, each book has its own number, and book numbers change with each renewal. The crate models this directly with a `Vec<PassportBook>` on `Worker`:
 
 ```rust
-use chrono::NaiveDate;
+use jiff::civil::date;
 use worker_matcher::{MatchingEngine, PassportBook, Worker};
 
 let alice = Worker::builder()
@@ -307,8 +307,8 @@ let alice = Worker::builder()
     // Current UK passport
     .add_passport_book(
         PassportBook::new("GB", "123456789").unwrap()
-            .with_issued(NaiveDate::from_ymd_opt(2024, 6, 1).unwrap())
-            .with_expires(NaiveDate::from_ymd_opt(2034, 6, 1).unwrap()),
+            .with_issued(date(2024, 6, 1))
+            .with_expires(date(2034, 6, 1)),
     )
     // Dual citizen: also carries a US passport
     .add_passport_book(PassportBook::new("US", "AB1234567").unwrap())

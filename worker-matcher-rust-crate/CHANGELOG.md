@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — date handling on `jiff`, `chrono` eliminated (0.6.0)
+
+- Bumped to 0.6.0. The crate's date handling is fully on `jiff`
+  (`jiff::civil::Date`); `chrono` is no longer a dependency and every
+  doc reference (`spec.md`, `index.md`, `IMPLEMENTATION_SUMMARY.md`,
+  `AGENTS/release.md`, `AGENTS/roadmap-research.md`) now points to
+  `jiff`. Date fields serialise as ISO-8601 via `jiff`'s `serde`
+  feature, matching the prior wire format.
+
 ### Added — adapter-contract test (CI guardrail for the public API)
 
 - New `tests/adapter_contract.rs` (13 tests). Pins every public

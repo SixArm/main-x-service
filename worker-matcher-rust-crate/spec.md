@@ -182,7 +182,7 @@ Full per-file detail in [`AGENTS/architecture.md`](AGENTS/architecture.md).
 
 ### 9.2 Dependency Graph
 
-`matcher` → `normalizer`, `scorer`, `models`, `identifiers`, `error`. `identifiers` → `nhs-number`. `models` → `serde`, `chrono`. `scorer` → `strsim`. `normalizer` → `unicode-normalization`, `soundex`. `error` → `thiserror`. No cycles; `lib.rs` only re-exports.
+`matcher` → `normalizer`, `scorer`, `models`, `identifiers`, `error`. `identifiers` → `nhs-number`. `models` → `serde`, `jiff`. `scorer` → `strsim`. `normalizer` → `unicode-normalization`, `soundex`. `error` → `thiserror`. No cycles; `lib.rs` only re-exports.
 
 ### 9.3 Layering Rules
 
@@ -273,13 +273,13 @@ Design axiom (per §5): most accuracy gains come from data standardisation. Two 
 
 ## 16. Serialization Contract
 
-All public types in §11 except `MatchingEngine` MUST be `Serialize + Deserialize`. JSON is the reference format; `serde_json` is a hard dependency. Optional fields round-trip `null` ⇄ `None`. Dates serialise as ISO-8601 strings via `chrono`'s default `serde` feature. `MatchConfig` carries `#[serde(default)]` on the struct so partial JSON merges over `MatchConfig::default()`. `SimilarityAlgorithm` serialises as the bare variant name. `NicknameTable` serialises as `{ "classes": [["michael", "mike", "mickey"], …] }`; entries are pre-normalised at insertion time so the round-trip is byte-stable.
+All public types in §11 except `MatchingEngine` MUST be `Serialize + Deserialize`. JSON is the reference format; `serde_json` is a hard dependency. Optional fields round-trip `null` ⇄ `None`. Dates serialise as ISO-8601 strings via `jiff`'s `serde` feature. `MatchConfig` carries `#[serde(default)]` on the struct so partial JSON merges over `MatchConfig::default()`. `SimilarityAlgorithm` serialises as the bare variant name. `NicknameTable` serialises as `{ "classes": [["michael", "mike", "mickey"], …] }`; entries are pre-normalised at insertion time so the round-trip is byte-stable.
 
 ---
 
 ## 17. Quality Attributes
 
-Correctness (behaviour matches §12; verified by §18 tests). Explainability (per-field `MatchBreakdown` on every call). Performance (`< 50 µs` per `match_workers` on 2024-era Mac; verified by `benches/match_pair.rs` — single-pair fuzzy ~4 µs). Maintainability (no single file > 500 lines, `matcher.rs` exempt pending refactor). Portability (pure Rust, no C deps beyond `chrono` / `strsim` defaults; `cargo build` on Linux + macOS). Auditability (all score combinations documented in §12).
+Correctness (behaviour matches §12; verified by §18 tests). Explainability (per-field `MatchBreakdown` on every call). Performance (`< 50 µs` per `match_workers` on 2024-era Mac; verified by `benches/match_pair.rs` — single-pair fuzzy ~4 µs). Maintainability (no single file > 500 lines, `matcher.rs` exempt pending refactor). Portability (pure Rust, no C deps beyond `jiff` / `strsim` defaults; `cargo build` on Linux + macOS). Auditability (all score combinations documented in §12).
 
 ---
 

@@ -73,7 +73,7 @@ fuzzy-matcher = "0.3"
 prometheus = "0.13"
 
 # Sibling matcher crate (canonical reference algorithm; reached via adapter)
-person-matcher = { path = "../person-matcher-rust-crate" }
+person-matcher = "0.5.0"
 
 # Security
 argon2 = "0.5"
