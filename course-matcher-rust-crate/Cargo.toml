@@ -1,6 +1,6 @@
 [package]
 name = "course-matcher"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Course matcher — pairwise course-record matching with weighted fuzzy + deterministic strategies, modelled on schema.org/Course"
