@@ -18,7 +18,7 @@ use crate::config::MatchConfig;
 use crate::course::{Course, CourseIdentifier, EducationalLevel};
 use crate::normalize;
 use crate::phonetic;
-use crate::scoring::{weighted_average, Confidence, MatchBreakdown, MatchResult};
+use crate::scoring::{Confidence, MatchBreakdown, MatchResult, weighted_average};
 
 /// Soundex bonus applied to `name_score` when the two name codes
 /// match and the underlying Jaro-Winkler hasn't already cleared the
@@ -35,21 +35,49 @@ pub struct MatchingEngine {
 
 impl MatchingEngine {
     /// Build a matcher with the given configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use course_matcher::{MatchConfig, MatchingEngine};
+    ///
+    /// let engine = MatchingEngine::new(MatchConfig::strict());
+    /// assert_eq!(engine.config().threshold, 0.95);
+    /// ```
+    #[must_use]
     pub fn new(config: MatchConfig) -> Self {
         Self { config }
     }
 
     /// Build with `MatchConfig::default()`. Convenience for the common path.
+    #[must_use]
     pub fn default_config() -> Self {
         Self::new(MatchConfig::default())
     }
 
     /// Borrow the engine's configuration.
+    #[must_use]
     pub fn config(&self) -> &MatchConfig {
         &self.config
     }
 
     /// Score two courses. Always returns a result (never errs).
+    ///
+    /// Runs the deterministic short-circuit first; on a miss it falls
+    /// back to the renormalised probabilistic weighted average.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use course_matcher::{Course, MatchingEngine};
+    ///
+    /// let engine = MatchingEngine::default_config();
+    /// let a = Course::new("Introduction to Computer Science");
+    /// let b = Course::new("Intro to Computer Science");
+    /// let result = engine.match_courses(&a, &b);
+    /// assert!((0.0..=1.0).contains(&result.score));
+    /// ```
+    #[must_use]
     pub fn match_courses(&self, a: &Course, b: &Course) -> MatchResult {
         // ── Deterministic short-circuit ──────────────────────────
         if deterministic_match(a, b) {
@@ -76,7 +104,10 @@ impl MatchingEngine {
             (name_score, self.config.name_weight),
             (course_code_score, self.config.course_code_weight),
             (provider_score, self.config.provider_weight),
-            (educational_level_score, self.config.educational_level_weight),
+            (
+                educational_level_score,
+                self.config.educational_level_weight,
+            ),
             (keywords_score, self.config.keywords_weight),
             (teaches_score, self.config.teaches_weight),
         ]);
@@ -107,6 +138,7 @@ impl MatchingEngine {
     /// Use [`MatchingEngine::rank`] when you want the results sorted
     /// by descending score, or [`MatchingEngine::find_matches`] when
     /// you also want the filter applied.
+    #[must_use]
     pub fn match_one_to_many(&self, query: &Course, candidates: &[Course]) -> Vec<MatchResult> {
         candidates
             .iter()
@@ -115,7 +147,10 @@ impl MatchingEngine {
     }
 
     /// One-to-many: score `query` against each `candidate`, return
-    /// `(index, result)` sorted by score descending.
+    /// `(index, result)` sorted by score descending. The original
+    /// candidate index is preserved in the tuple so callers can map
+    /// back to their input slice after sorting.
+    #[must_use]
     pub fn rank(&self, query: &Course, candidates: &[Course]) -> Vec<(usize, MatchResult)> {
         let mut ranked: Vec<(usize, MatchResult)> = candidates
             .iter()
@@ -132,6 +167,7 @@ impl MatchingEngine {
 
     /// Convenience filter: rank then drop everything below
     /// `MatchConfig::threshold`.
+    #[must_use]
     pub fn find_matches(&self, query: &Course, candidates: &[Course]) -> Vec<(usize, MatchResult)> {
         self.rank(query, candidates)
             .into_iter()
@@ -165,10 +201,11 @@ fn deterministic_match(a: &Course, b: &Course) -> bool {
         b.provider_id.as_deref(),
         a.course_code.as_deref(),
         b.course_code.as_deref(),
-    ) {
-        if !ap.is_empty() && ap == bp && normalize::course_code(ac) == normalize::course_code(bc) {
-            return true;
-        }
+    ) && !ap.is_empty()
+        && ap == bp
+        && normalize::course_code(ac) == normalize::course_code(bc)
+    {
+        return true;
     }
 
     // R-2 — any same_as URL overlaps (case-folded host+path).
@@ -235,10 +272,10 @@ fn course_code_score(a: &Course, b: &Course) -> Option<f64> {
 }
 
 fn provider_score(a: &Course, b: &Course) -> Option<f64> {
-    if let (Some(ap), Some(bp)) = (a.provider_id.as_deref(), b.provider_id.as_deref()) {
-        if !ap.is_empty() {
-            return Some(if ap == bp { 1.0 } else { 0.0 });
-        }
+    if let (Some(ap), Some(bp)) = (a.provider_id.as_deref(), b.provider_id.as_deref())
+        && !ap.is_empty()
+    {
+        return Some(if ap == bp { 1.0 } else { 0.0 });
     }
     match (a.provider_name.as_deref(), b.provider_name.as_deref()) {
         (Some(an), Some(bn)) if !an.is_empty() && !bn.is_empty() => {
@@ -249,9 +286,8 @@ fn provider_score(a: &Course, b: &Course) -> Option<f64> {
 }
 
 fn educational_level_score(a: &Course, b: &Course) -> Option<f64> {
-    let (al, bl) = match (&a.educational_level, &b.educational_level) {
-        (Some(al), Some(bl)) => (al, bl),
-        _ => return None,
+    let (Some(al), Some(bl)) = (&a.educational_level, &b.educational_level) else {
+        return None;
     };
     Some(if al == bl {
         1.0
@@ -263,23 +299,26 @@ fn educational_level_score(a: &Course, b: &Course) -> Option<f64> {
 }
 
 fn educational_level_one_off(a: &EducationalLevel, b: &EducationalLevel) -> bool {
-    use EducationalLevel::*;
-    // Skill ladder.
-    let skill = [Beginner, Intermediate, Advanced, Expert];
-    if let (Some(ai), Some(bi)) = (skill.iter().position(|x| x == a), skill.iter().position(|x| x == b)) {
-        return (ai as i32 - bi as i32).abs() == 1;
-    }
-    // School ladder.
-    let school = [PrimaryEducation, SecondaryEducation, HigherEducation];
-    if let (Some(ai), Some(bi)) = (school.iter().position(|x| x == a), school.iter().position(|x| x == b)) {
-        return (ai as i32 - bi as i32).abs() == 1;
-    }
-    // Degree ladder.
-    let degree = [Undergraduate, Graduate, Postgraduate];
-    if let (Some(ai), Some(bi)) = (degree.iter().position(|x| x == a), degree.iter().position(|x| x == b)) {
-        return (ai as i32 - bi as i32).abs() == 1;
-    }
-    false
+    use EducationalLevel::{
+        Advanced, Beginner, Expert, Graduate, HigherEducation, Intermediate, Postgraduate,
+        PrimaryEducation, SecondaryEducation, Undergraduate,
+    };
+    // Each ladder lists adjacent levels; a pair is "one off" when both
+    // sit on the same ladder exactly one rung apart.
+    let ladders: [&[EducationalLevel]; 3] = [
+        &[Beginner, Intermediate, Advanced, Expert],
+        &[PrimaryEducation, SecondaryEducation, HigherEducation],
+        &[Undergraduate, Graduate, Postgraduate],
+    ];
+    ladders.iter().any(|ladder| {
+        match (
+            ladder.iter().position(|x| x == a),
+            ladder.iter().position(|x| x == b),
+        ) {
+            (Some(ai), Some(bi)) => ai.abs_diff(bi) == 1,
+            _ => false,
+        }
+    })
 }
 
 fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
@@ -299,6 +338,8 @@ fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
     if union == 0 {
         Some(0.0)
     } else {
+        // Set sizes are small bounded counts; the cast to f64 is exact.
+        #[allow(clippy::cast_precision_loss)]
         Some(inter as f64 / union as f64)
     }
 }
@@ -316,7 +357,10 @@ mod tests {
     use crate::course::IdentifierScheme;
 
     fn ident(scheme: IdentifierScheme, value: &str) -> crate::CourseIdentifier {
-        crate::CourseIdentifier { scheme, value: value.into() }
+        crate::CourseIdentifier {
+            scheme,
+            value: value.into(),
+        }
     }
 
     #[test]
@@ -334,10 +378,12 @@ mod tests {
         let engine = MatchingEngine::default_config();
         let mut a = Course::new("A");
         let mut b = Course::new("Completely different");
-        a.identifiers.push(ident(IdentifierScheme::Doi, "10.1234/abc"));
-        b.identifiers.push(ident(IdentifierScheme::Doi, "10.1234/abc"));
+        a.identifiers
+            .push(ident(IdentifierScheme::Doi, "10.1234/abc"));
+        b.identifiers
+            .push(ident(IdentifierScheme::Doi, "10.1234/abc"));
         let r = engine.match_courses(&a, &b);
-        assert_eq!(r.score, 1.0);
+        assert!((r.score - 1.0).abs() < 1e-9);
         assert!(r.breakdown.deterministic_match);
     }
 
@@ -351,7 +397,7 @@ mod tests {
         a.course_code = Some("cs101".into());
         b.course_code = Some("CS 101".into());
         let r = engine.match_courses(&a, &b);
-        assert_eq!(r.score, 1.0);
+        assert!((r.score - 1.0).abs() < 1e-9);
     }
 
     #[test]
@@ -401,7 +447,10 @@ mod tests {
         let b = Course::new("Smith");
         let with = name_score(&a, &b);
         let base = strsim::jaro_winkler("jones", "smith");
-        assert!((with - base).abs() < 1e-9, "expected base {base}, got {with}");
+        assert!(
+            (with - base).abs() < 1e-9,
+            "expected base {base}, got {with}"
+        );
     }
 
     #[test]
@@ -448,5 +497,282 @@ mod tests {
         ];
         let ranked = engine.rank(&query, &cands);
         assert_eq!(ranked[0].0, 2); // exact match wins
+    }
+
+    // ─── Deterministic short-circuits ────────────────────────────
+
+    #[test]
+    fn same_as_url_overlap_short_circuits() {
+        // R-2: a shared same_as URL pins the score to 1.0 even when
+        // names are unrelated. Case + surrounding whitespace fold away.
+        let engine = MatchingEngine::default_config();
+        let mut a = Course::new("Alpha");
+        let mut b = Course::new("Omega");
+        a.same_as = vec!["https://www.Wikidata.org/wiki/Q42".into()];
+        b.same_as = vec!["  https://www.wikidata.org/wiki/Q42  ".into()];
+        let r = engine.match_courses(&a, &b);
+        assert!((r.score - 1.0).abs() < 1e-9);
+        assert!(r.breakdown.deterministic_match);
+        assert_eq!(r.confidence, Confidence::High);
+    }
+
+    #[test]
+    fn non_deterministic_scheme_does_not_short_circuit() {
+        // A shared CourseCode *identifier* is provider-scoped and must
+        // NOT pin to 1.0 — CS101 is not globally unique.
+        let engine = MatchingEngine::default_config();
+        let mut a = Course::new("History of Rome");
+        let mut b = Course::new("Organic Chemistry");
+        a.identifiers
+            .push(ident(IdentifierScheme::CourseCode, "CS101"));
+        b.identifiers
+            .push(ident(IdentifierScheme::CourseCode, "CS101"));
+        let r = engine.match_courses(&a, &b);
+        // A provider-scoped identifier never pins the score to 1.0, and
+        // these unrelated names fall well short of the match threshold.
+        assert!(!r.breakdown.deterministic_match);
+        assert!(!r.is_match, "should not be a match, got {}", r.score);
+    }
+
+    #[test]
+    fn deterministic_scheme_must_match_value_to_short_circuit() {
+        // Same scheme, different value → no short-circuit.
+        let engine = MatchingEngine::default_config();
+        let mut a = Course::new("X");
+        let mut b = Course::new("X");
+        a.identifiers.push(ident(IdentifierScheme::Doi, "10.1/aaa"));
+        b.identifiers.push(ident(IdentifierScheme::Doi, "10.1/bbb"));
+        let r = engine.match_courses(&a, &b);
+        assert!(!r.breakdown.deterministic_match);
+    }
+
+    #[test]
+    fn deterministic_match_ignores_empty_identifier_values() {
+        // Two empty DOI values must not be treated as "equal" and
+        // short-circuit.
+        let mut a = Course::new("A");
+        let mut b = Course::new("B");
+        a.identifiers.push(ident(IdentifierScheme::Doi, "   "));
+        b.identifiers.push(ident(IdentifierScheme::Doi, ""));
+        assert!(!deterministic_match(&a, &b));
+    }
+
+    #[test]
+    fn r1_needs_both_provider_and_course_code() {
+        // Same course_code but no provider_id → R-1 does not fire.
+        let mut a = Course::new("A");
+        let mut b = Course::new("B");
+        a.course_code = Some("CS101".into());
+        b.course_code = Some("cs 101".into());
+        assert!(!deterministic_match(&a, &b));
+        // Add a shared provider → now it fires.
+        a.provider_id = Some("prov-1".into());
+        b.provider_id = Some("prov-1".into());
+        assert!(deterministic_match(&a, &b));
+    }
+
+    // ─── Component functions ─────────────────────────────────────
+
+    #[test]
+    fn course_code_skipped_across_different_providers() {
+        let mut a = Course::new("A");
+        let mut b = Course::new("B");
+        a.provider_id = Some("prov-1".into());
+        b.provider_id = Some("prov-2".into());
+        a.course_code = Some("CS101".into());
+        b.course_code = Some("CS101".into());
+        // Different providers → the component is skipped entirely.
+        assert_eq!(course_code_score(&a, &b), None);
+    }
+
+    #[test]
+    fn course_code_zero_when_same_provider_codes_differ() {
+        let mut a = Course::new("A");
+        let mut b = Course::new("B");
+        a.provider_id = Some("prov-1".into());
+        b.provider_id = Some("prov-1".into());
+        a.course_code = Some("CS101".into());
+        b.course_code = Some("MATH220".into());
+        assert_eq!(course_code_score(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn course_code_none_when_one_side_missing() {
+        let mut a = Course::new("A");
+        let b = Course::new("B");
+        a.course_code = Some("CS101".into());
+        assert_eq!(course_code_score(&a, &b), None);
+    }
+
+    #[test]
+    fn provider_score_exact_id() {
+        let mut a = Course::new("A");
+        let mut b = Course::new("B");
+        a.provider_id = Some("ror-1".into());
+        b.provider_id = Some("ror-1".into());
+        assert_eq!(provider_score(&a, &b), Some(1.0));
+        b.provider_id = Some("ror-2".into());
+        assert_eq!(provider_score(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn provider_score_falls_back_to_name_when_no_id() {
+        let mut a = Course::new("A");
+        let mut b = Course::new("B");
+        a.provider_name = Some("Stanford University".into());
+        b.provider_name = Some("stanford university".into());
+        // Case-folded identical names → Jaro-Winkler 1.0.
+        assert_eq!(provider_score(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn provider_score_none_when_no_provider_info() {
+        let a = Course::new("A");
+        let b = Course::new("B");
+        assert_eq!(provider_score(&a, &b), None);
+    }
+
+    #[test]
+    fn educational_level_exact_one_off_and_unrelated() {
+        use EducationalLevel::{Advanced, Beginner, Expert, Intermediate, Undergraduate};
+        let mut a = Course::new("A");
+        let mut b = Course::new("B");
+
+        a.educational_level = Some(Beginner);
+        b.educational_level = Some(Beginner);
+        assert_eq!(educational_level_score(&a, &b), Some(1.0));
+
+        b.educational_level = Some(Intermediate); // one rung up the skill ladder
+        assert_eq!(educational_level_score(&a, &b), Some(0.5));
+
+        b.educational_level = Some(Advanced); // two rungs apart
+        assert_eq!(educational_level_score(&a, &b), Some(0.0));
+
+        // Different ladders never count as "one off".
+        a.educational_level = Some(Expert);
+        b.educational_level = Some(Undergraduate);
+        assert_eq!(educational_level_score(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn educational_level_none_when_either_side_unset() {
+        let mut a = Course::new("A");
+        let b = Course::new("B");
+        a.educational_level = Some(EducationalLevel::Graduate);
+        assert_eq!(educational_level_score(&a, &b), None);
+    }
+
+    #[test]
+    fn jaccard_exact_fraction() {
+        let a = vec!["alpha".to_string(), "beta".to_string()];
+        let b = vec!["beta".to_string(), "gamma".to_string()];
+        // intersection {beta}=1, union {alpha,beta,gamma}=3 → 1/3.
+        let got = set_jaccard(&a, &b).expect("some");
+        assert!((got - 1.0 / 3.0).abs() < 1e-9, "got {got}");
+    }
+
+    #[test]
+    fn jaccard_skipped_when_both_empty() {
+        assert_eq!(set_jaccard(&[], &[]), None);
+    }
+
+    #[test]
+    fn jaccard_zero_when_only_one_side_has_items() {
+        let a = vec!["alpha".to_string()];
+        assert_eq!(set_jaccard(&a, &[]), Some(0.0));
+        assert_eq!(set_jaccard(&[], &a), Some(0.0));
+    }
+
+    #[test]
+    fn jaccard_is_case_and_whitespace_insensitive() {
+        let a = vec![" Alpha ".to_string(), "BETA".to_string()];
+        let b = vec!["alpha".to_string(), "beta".to_string()];
+        assert_eq!(set_jaccard(&a, &b), Some(1.0));
+    }
+
+    // ─── Name scoring ────────────────────────────────────────────
+
+    #[test]
+    fn name_score_considers_alternate_names() {
+        // Primary names disagree, but an alternate on `a` matches `b`.
+        let mut a = Course::new("Intro to Programming");
+        a.alternate_names = vec!["Data Structures".into()];
+        let b = Course::new("Data Structures");
+        let with_alt = name_score(&a, &b);
+        let without_alt = name_score(&Course::new("Intro to Programming"), &b);
+        assert!(
+            with_alt > without_alt,
+            "alternate name should raise the score: {with_alt} vs {without_alt}"
+        );
+        assert!(with_alt >= 0.99);
+    }
+
+    #[test]
+    fn name_score_handles_diacritics() {
+        // Identical diacritic strings must round-trip to a perfect score.
+        let a = Course::new("Élève Café Über");
+        let b = Course::new("Élève Café Über");
+        assert!((name_score(&a, &b) - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn empty_names_do_not_panic() {
+        let engine = MatchingEngine::default_config();
+        let a = Course::new("");
+        let b = Course::new("");
+        let r = engine.match_courses(&a, &b);
+        assert!((0.0..=1.0).contains(&r.score));
+    }
+
+    // ─── Renormalisation & engine surface ────────────────────────
+
+    #[test]
+    fn renormalisation_ignores_absent_components() {
+        // Only name + provider_id present on both sides; both identical.
+        // The score must renormalise to 1.0, not be diluted by the
+        // absent components' weights.
+        let engine = MatchingEngine::default_config();
+        let mut a = Course::new("Quantum Mechanics");
+        let mut b = Course::new("Quantum Mechanics");
+        a.provider_id = Some("prov-9".into());
+        b.provider_id = Some("prov-9".into());
+        let r = engine.match_courses(&a, &b);
+        assert!(r.score >= 0.99, "expected ~1.0, got {}", r.score);
+        assert!(r.breakdown.name_score.is_some());
+        assert_eq!(r.breakdown.provider_score, Some(1.0));
+        // Absent components stay None in the breakdown.
+        assert!(r.breakdown.educational_level_score.is_none());
+        assert!(r.breakdown.keywords_score.is_none());
+    }
+
+    #[test]
+    fn find_matches_filters_below_threshold() {
+        let engine = MatchingEngine::default_config();
+        let query = Course::new("Organic Chemistry");
+        let cands = vec![
+            Course::new("Organic Chemistry"), // exact → passes
+            Course::new("Medieval Poetry"),   // unrelated → filtered
+        ];
+        let matches = engine.find_matches(&query, &cands);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].0, 0);
+        assert!(matches[0].1.is_match);
+    }
+
+    #[test]
+    fn strict_config_rejects_a_merely_probable_match() {
+        // A pair that clears the default 0.85 threshold but not 0.95.
+        let lenient = MatchingEngine::new(MatchConfig::default());
+        let strict = MatchingEngine::new(MatchConfig::strict());
+        let a = Course::new("Introduction to Computer Science");
+        let b = Course::new("Introduction to Computer Sciences");
+        let rl = lenient.match_courses(&a, &b);
+        let rs = strict.match_courses(&a, &b);
+        // Same score, different is_match because the threshold moved.
+        assert!((rl.score - rs.score).abs() < 1e-9);
+        if rl.score >= 0.85 && rl.score < 0.95 {
+            assert!(rl.is_match);
+            assert!(!rs.is_match);
+        }
     }
 }

@@ -13,5 +13,5 @@ pub enum Error {
     Normalization(String),
 }
 
-/// Convenience alias for results returning a crate [`Error`].
+/// Convenience alias for results returning a crate [`enum@Error`].
 pub type Result<T> = std::result::Result<T, Error>;

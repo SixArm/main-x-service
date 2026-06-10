@@ -16,10 +16,11 @@
 
 /// Encode `s` into a 4-character Soundex code. Returns `None` for
 /// inputs with no ASCII-alphabetic characters.
+#[must_use]
 pub fn soundex(s: &str) -> Option<String> {
     let mut chars = s
         .chars()
-        .filter(|c| c.is_ascii_alphabetic())
+        .filter(char::is_ascii_alphabetic)
         .map(|c| c.to_ascii_uppercase());
     let first = chars.next()?;
     let mut code = String::with_capacity(4);
@@ -61,6 +62,7 @@ fn digit(c: char) -> char {
 }
 
 /// True when both inputs produce the same Soundex code.
+#[must_use]
 pub fn same(a: &str, b: &str) -> bool {
     match (soundex(a), soundex(b)) {
         (Some(x), Some(y)) => x == y,
@@ -103,5 +105,40 @@ mod tests {
         assert!(same("Robert", "Rupert"));
         assert!(!same("Smith", "Jones"));
         assert!(!same("Catherine", "Katheryn"));
+    }
+
+    #[test]
+    fn code_is_always_four_chars_for_alphabetic_input() {
+        for s in ["a", "Lee", "Washington", "Supercalifragilistic"] {
+            let code = soundex(s).expect("alphabetic input encodes");
+            assert_eq!(code.len(), 4, "{s:?} → {code}");
+        }
+    }
+
+    #[test]
+    fn ignores_non_alphabetic_characters() {
+        // Digits / punctuation are skipped; the leading letter is the
+        // first ASCII-alphabetic char.
+        assert_eq!(soundex("S-m-i-t-h").as_deref(), soundex("Smith").as_deref());
+        assert_eq!(soundex("123Smith!").as_deref(), Some("S530"));
+    }
+
+    #[test]
+    fn case_insensitive() {
+        assert_eq!(soundex("SMITH").as_deref(), soundex("smith").as_deref());
+    }
+
+    #[test]
+    fn same_is_false_when_either_side_has_no_letters() {
+        assert!(!same("Smith", ""));
+        assert!(!same("", "Smith"));
+        assert!(!same("123", "456"));
+    }
+
+    #[test]
+    fn adjacent_same_group_consonants_collapse() {
+        // c, k, s all map to digit 2, so the "cks" run collapses to a
+        // single 2: Jackson → J250.
+        assert_eq!(soundex("Jackson").as_deref(), Some("J250"));
     }
 }

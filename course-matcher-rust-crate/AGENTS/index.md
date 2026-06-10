@@ -9,7 +9,7 @@
 
 See also:
 
-- [`../spec.md`](../spec.md) — single source of truth
+- [`../spec.md`](../spec/index.md) — single source of truth
 - [`../AGENTS.md`](../AGENTS.md) — agent guide
 - [`../README.md`](../README.md) / [`../CLAUDE.md`](../CLAUDE.md) — user intro
 - [`../index.md`](../index.md) — worked examples

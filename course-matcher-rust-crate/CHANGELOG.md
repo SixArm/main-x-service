@@ -5,15 +5,70 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-> See also: [spec.md](./spec.md) — single source of truth (numbered §1–§25; live work queue in §23); [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
+> See also: [spec.md](./spec/index.md) — single source of truth (numbered §1–§25; live work queue in §23); [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
 
-## [Unreleased] → 0.4.0
+## [Unreleased]
+
+### Added
+
+- **Expanded test coverage** (72 embedded unit tests, up from 21,
+  plus a new 15-test integration suite). Filled the
+  previously-undocumented gaps: `src/course.rs` now pins
+  `Course::new` defaults, `IdentifierScheme::is_deterministic` for
+  every variant, and serde round-trips; `src/config.rs` pins the
+  default weights summing to 1.0 and the `strict`/`lenient` presets
+  changing only the threshold. Added edge cases across `matcher`
+  (R-2 `same_as` overlap, provider-scoped schemes not short-circuiting,
+  cross-provider course-code skipped, provider-name fallback,
+  educational-level ladder, Jaccard skip/zero, diacritic round-trip,
+  `find_matches` filtering, strict-vs-lenient), `scoring`,
+  `normalize`, and `phonetic`. New integration suite
+  [`tests/public_api.rs`](./tests/public_api.rs) drives the
+  re-exported surface end-to-end (deterministic rules, confidence
+  bands, renormalisation, rank/find_matches).
+- **Demo binary** ([`src/main.rs`](./src/main.rs)). A runnable
+  `cargo run` walkthrough of the public API — deterministic course-code
+  and DOI short-circuits, fuzzy name + keyword overlap, the Soundex
+  bonus, educational-level adjacency, strict-vs-lenient thresholds, and
+  one-to-many ranking. Harmonises with the sibling matcher crates,
+  each of which already ships a demo binary, and is the consumer of the
+  musl-gated `mimalloc` allocator. Not part of the SemVer surface.
+- `#[must_use]` on the pure constructors, accessors, and scoring
+  functions across the public surface (`Course::new`,
+  `IdentifierScheme::is_deterministic`, `MatchConfig::{strict,lenient}`,
+  the `MatchingEngine` query methods, `Confidence::classify`,
+  `normalize::*`, `phonetic::*`, `scoring::weighted_average`).
+- Worked rustdoc `# Examples` on the primary public API
+  (`Course::new`, `IdentifierScheme::is_deterministic`,
+  `MatchConfig::{strict,lenient}`, `MatchingEngine::{new,match_courses}`,
+  `Confidence::classify`), exercised as doctests.
 
 ### Changed
 
-- Bumped to 0.4.0, version-aligned with the matcher-family release that
-  eliminated `chrono`. `course-matcher` carries no date dependency
-  (never used `chrono`), so this is a no-functional-change release.
+- Cleaned up `clippy::pedantic` lints (let-chains, `let…else`,
+  `usize` cast avoidance via `abs_diff`, explicit-import over
+  glob) with no change to matching behaviour.
+- **Spec/code drift fixed.** `spec.md §9` now documents the Soundex
+  phonetic bonus (T-6) that the code and `AGENTS/matching-algorithm.md`
+  already described; §2.1 lists `match_one_to_many`; §4 notes the demo
+  binary and that `mimalloc` is demo-only.
+- Removed the duplicate `serde_json` `[dev-dependencies]` entry (it is
+  already a normal dependency; siblings list it once).
+
+## [0.6.1] — 2026-06-10
+
+### Changed
+
+- **Edition 2024.** Crate now builds on the Rust 2024 edition (enables
+  let-chains used in the matcher).
+- **`mimalloc` relocated.** The musl-gated global allocator was removed
+  from `lib.rs`; the library now sets no global allocator. The
+  allocator lives only in the demo binary, matching the family layout.
+- **Family version alignment.** Versions 0.3.0–0.6.0 were coordinated
+  family-wide bumps (no course-matcher behavioural change). 0.4.0
+  tracked the matcher-family release that eliminated `chrono`;
+  `course-matcher` never carried a date dependency, so that bump was a
+  no-op here. Now aligned at 0.6.1 with the sibling matcher crates.
 
 ## [0.2.0] — 2026-06-05
 

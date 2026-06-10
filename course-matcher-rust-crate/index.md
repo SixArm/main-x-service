@@ -57,7 +57,7 @@ Default weights:
 Match `is_match` threshold: 0.85. Confidence bands: ≥0.95 High,
 ≥0.70 Medium, otherwise Low.
 
-Full derivation: [`spec.md`](spec.md) +
+Full derivation: [`spec.md`](spec/index.md) +
 [`AGENTS/matching-algorithm.md`](AGENTS/matching-algorithm.md).
 
 ## Public surface
@@ -77,6 +77,7 @@ use course_matcher::{
 - `unicode-normalization` for NFKC normalisation.
 - `serde` / `serde_json` for round-trip.
 - `thiserror` for the error enum.
+- `mimalloc` — demo binary only, under a `musl` target gate.
 
 No `axum`, no `tokio`, no `tantivy`. Embedding services (e.g.
 [`course-service`](../course-service-rust-crate/)) bring those
@@ -86,12 +87,17 @@ themselves and adapt their richer Course shape down to ours.
 
 ```bash
 cargo test --lib       # 21 unit tests (encoder + scoring + normalisation + bonus)
+cargo run              # demo binary — worked examples through the public API
 cargo doc --open       # rustdoc
 
 # Benches live in the embedding service crate so they exercise the
 # adapter + facade path that production calls:
 cd ../course-service-rust-crate && cargo bench
 ```
+
+The demo binary ([`src/main.rs`](src/main.rs)) is illustrative only and
+not part of the SemVer surface. It is the sole consumer of the
+musl-gated `mimalloc` allocator; the library sets no global allocator.
 
 ## License
 

@@ -50,7 +50,19 @@ pub struct Course {
 }
 
 impl Course {
-    /// Construct a Course with just the required name.
+    /// Construct a `Course` with just the required name; every other
+    /// field defaults to empty / `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use course_matcher::Course;
+    ///
+    /// let course = Course::new("Introduction to Computer Science");
+    /// assert_eq!(course.name, "Introduction to Computer Science");
+    /// assert!(course.identifiers.is_empty());
+    /// ```
+    #[must_use]
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -90,7 +102,7 @@ pub enum IdentifierScheme {
     /// MOOC / online-learning platform slug. Provider-scoped.
     /// Example: `coursera:learn-to-program`, `edx:MITx/6.00.1x`.
     PlatformSlug,
-    /// Open Education Resource identifier (OERCommons, MERLOT, …).
+    /// Open Education Resource identifier (`OERCommons`, MERLOT, …).
     /// **Deterministic.** Example: `oercommons:60132`.
     Oer,
     /// Digital Object Identifier. **Deterministic.**
@@ -122,6 +134,16 @@ pub enum IdentifierScheme {
 impl IdentifierScheme {
     /// Schemes whose values are unique by construction across
     /// providers. A match on these pins the final score to `1.0`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use course_matcher::IdentifierScheme;
+    ///
+    /// assert!(IdentifierScheme::Doi.is_deterministic());
+    /// assert!(!IdentifierScheme::CourseCode.is_deterministic());
+    /// ```
+    #[must_use]
     pub fn is_deterministic(&self) -> bool {
         matches!(
             self,
@@ -193,4 +215,118 @@ pub enum LearningResourceType {
     Discussion,
     /// Free-form custom type with a caller-supplied label.
     Custom(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_sets_name_and_defaults_everything_else() {
+        let c = Course::new("Introduction to Computer Science");
+        assert_eq!(c.name, "Introduction to Computer Science");
+        assert!(c.alternate_names.is_empty());
+        assert!(c.course_code.is_none());
+        assert!(c.provider_id.is_none());
+        assert!(c.provider_name.is_none());
+        assert!(c.educational_level.is_none());
+        assert!(c.learning_resource_type.is_none());
+        assert!(c.keywords.is_empty());
+        assert!(c.teaches.is_empty());
+        assert!(c.identifiers.is_empty());
+        assert!(c.same_as.is_empty());
+        assert!(c.in_language.is_empty());
+    }
+
+    #[test]
+    fn default_course_has_empty_name() {
+        let c = Course::default();
+        assert_eq!(c.name, "");
+        assert!(c.identifiers.is_empty());
+    }
+
+    #[test]
+    fn deterministic_schemes_are_exactly_the_globally_unique_ones() {
+        // The six deterministic schemes (per spec §15) short-circuit to 1.0.
+        for scheme in [
+            IdentifierScheme::Doi,
+            IdentifierScheme::Wikidata,
+            IdentifierScheme::Lom,
+            IdentifierScheme::Oer,
+            IdentifierScheme::Uri,
+            IdentifierScheme::Uuid,
+        ] {
+            assert!(
+                scheme.is_deterministic(),
+                "{scheme:?} should be deterministic"
+            );
+        }
+        // The provider-scoped schemes must NOT short-circuit — CS101
+        // exists at every university.
+        for scheme in [
+            IdentifierScheme::LmsCourseId,
+            IdentifierScheme::CourseCode,
+            IdentifierScheme::PlatformSlug,
+            IdentifierScheme::Isced,
+            IdentifierScheme::Ror,
+            IdentifierScheme::Custom("KhanCourse".into()),
+        ] {
+            assert!(
+                !scheme.is_deterministic(),
+                "{scheme:?} must not be deterministic"
+            );
+        }
+    }
+
+    #[test]
+    fn course_serde_round_trips() {
+        let mut c = Course::new("Café Programming Élève");
+        c.alternate_names = vec!["Programmation".into()];
+        c.course_code = Some("CS101".into());
+        c.provider_id = Some("ror-021nxhr62".into());
+        c.educational_level = Some(EducationalLevel::Undergraduate);
+        c.learning_resource_type = Some(LearningResourceType::Lecture);
+        c.keywords = vec!["programming".into()];
+        c.teaches = vec!["recursion".into()];
+        c.identifiers = vec![CourseIdentifier {
+            scheme: IdentifierScheme::Doi,
+            value: "10.1234/abc".into(),
+        }];
+        c.same_as = vec!["https://www.wikidata.org/wiki/Q123".into()];
+        c.in_language = vec!["en".into()];
+
+        let json = serde_json::to_string(&c).expect("serialize");
+        let back: Course = serde_json::from_str(&json).expect("deserialize");
+
+        assert_eq!(back.name, c.name);
+        assert_eq!(back.alternate_names, c.alternate_names);
+        assert_eq!(back.course_code, c.course_code);
+        assert_eq!(back.provider_id, c.provider_id);
+        assert_eq!(back.educational_level, c.educational_level);
+        assert_eq!(back.learning_resource_type, c.learning_resource_type);
+        assert_eq!(back.keywords, c.keywords);
+        assert_eq!(back.teaches, c.teaches);
+        assert_eq!(back.same_as, c.same_as);
+        assert_eq!(back.in_language, c.in_language);
+        assert_eq!(back.identifiers.len(), 1);
+        assert_eq!(back.identifiers[0].scheme, IdentifierScheme::Doi);
+        assert_eq!(back.identifiers[0].value, "10.1234/abc");
+    }
+
+    #[test]
+    fn custom_scheme_round_trips_its_label() {
+        let scheme = IdentifierScheme::Custom("KhanCourse".into());
+        let json = serde_json::to_string(&scheme).expect("serialize");
+        let back: IdentifierScheme = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, scheme);
+    }
+
+    #[test]
+    fn course_deserialises_from_name_only_json() {
+        // Every non-name field is #[serde(default)] — a bare name must parse.
+        let c: Course = serde_json::from_str(r#"{"name":"Lone Course"}"#).expect("deserialize");
+        assert_eq!(c.name, "Lone Course");
+        assert!(c.keywords.is_empty());
+        assert!(c.identifiers.is_empty());
+    }
 }

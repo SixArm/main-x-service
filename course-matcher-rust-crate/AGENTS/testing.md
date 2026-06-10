@@ -5,16 +5,30 @@
 Embedded in `#[cfg(test)] mod tests` blocks in each source file.
 Run with `cargo test --lib`.
 
-### Coverage targets (21 tests today)
+### Coverage targets (72 tests today)
 
 | Module | What's covered |
 |---|---|
-| `course` | Default construction, serde round-trip, `IdentifierScheme::is_deterministic` for every variant. |
-| `config` | Default weights sum to 1.0; `strict()` / `lenient()` thresholds. |
-| `normalize` | `fold`, `course_code`, `fold_set` — pin each rule. |
-| `scoring` | `weighted_average` ignores `None`; `Confidence::classify` boundaries. |
-| `phonetic` | Russell-style examples (`Smith` → `S530`, `Robert` → `R163`); empty input returns `None`; short-code zero-padding; `same()` helper matches phonetic pairs while respecting the initial-letter contract. |
-| `matcher` | Identical → 1.0; DOI short-circuit; same-provider course-code short-circuit; same_as overlap; unrelated → low; rank ordering; `match_one_to_many` preserves input order + handles empty input; Soundex bonus fires on homophones, doesn't fire on unrelated names, capped at `0.95`. |
+| `course` | `Course::new` defaults + `Course::default`; `IdentifierScheme::is_deterministic` for every variant (six deterministic, six provider-scoped); serde round-trip of a fully-populated `Course`, the `Custom` scheme label, and name-only JSON via `#[serde(default)]`. |
+| `config` | Default weights sum to 1.0; default threshold + every weight pinned; `strict()` / `lenient()` change only the threshold; config serde round-trip. |
+| `normalize` | `fold`, `course_code`, `fold_set` — each rule plus empty/whitespace, diacritic preservation, and NFKC compatibility folding. |
+| `scoring` | `weighted_average` ignores `None` + renormalises + all-`None` → 0.0; `Confidence::classify` boundaries (inclusive lower bounds) + extremes + default. |
+| `phonetic` | Russell-style examples (`Smith` → `S530`, `Robert` → `R163`); empty input returns `None`; short-code zero-padding; case-insensitivity; non-alphabetic stripping; same-group collapse; `same()` helper matches phonetic pairs while respecting the initial-letter contract and is false when either side has no letters. |
+| `matcher` | Identical → 1.0; R-0 DOI short-circuit; R-1 same-provider course-code; R-2 `same_as` overlap; non-deterministic scheme + differing/empty values do NOT short-circuit; component functions (`course_code_score` skipped across providers / zero on mismatch / `None` when missing; `provider_score` exact-id + name fallback + `None`; `educational_level_score` exact/one-off/unrelated/`None`; `set_jaccard` exact fraction / both-empty `None` / one-side `0.0` / case-insensitive); name scoring uses alternate names, round-trips diacritics, empty names don't panic; renormalisation ignores absent components; `find_matches` filters below threshold; strict config rejects a merely-probable match; rank ordering; `match_one_to_many` preserves input order + handles empty input; Soundex bonus fires on homophones, doesn't fire on unrelated names, capped at `0.95`. |
+
+### Integration tests
+
+[`tests/public_api.rs`](../tests/public_api.rs) drives the public
+re-exported surface only (everything reachable via
+`use course_matcher::…`). Run with `cargo test --test public_api`.
+It is the in-crate contract test for the public API — a rename of any
+re-export breaks it. Coverage: the worked example (R-1), R-0 for every
+deterministic scheme, provider-scoped schemes NOT short-circuiting,
+R-2 `same_as` overlap, renormalisation, confidence bands,
+strict/lenient threshold effects on `is_match`, the one-to-many surface
+(`match_one_to_many` / `rank` / `find_matches`, including empty input),
+and `MatchResult` JSON serialisation. (The service-side bridge test —
+see below — remains the cross-crate contract test through the adapter.)
 
 ### Pattern
 

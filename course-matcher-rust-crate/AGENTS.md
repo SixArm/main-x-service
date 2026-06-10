@@ -9,7 +9,7 @@ at the keyboard.
 > documentation index — start there if you don't know what to read
 > first.
 >
-> If you only read one file, read [`spec.md`](./spec.md). It is the
+> If you only read one file, read [`spec.md`](./spec/index.md). It is the
 > living, authoritative specification of the crate. This guide tells
 > you **how to work**; the spec tells you **what to build**.
 
@@ -20,10 +20,11 @@ at the keyboard.
 | Question | Answer |
 |---|---|
 | What does the crate do? | Pairwise course-record matching (deterministic + probabilistic) per [schema.org/Course](https://schema.org/Course), modelling only the properties that carry identity signal. |
-| Where is the canonical spec? | [`spec.md`](./spec.md) — §1–§25 (matcher-crate shape). |
+| Where is the canonical spec? | [`spec.md`](./spec/index.md) — §1–§25 (matcher-crate shape). |
 | Where does new behaviour get specified? | In `spec.md` first, then code. |
 | What is the build command? | `cargo build` |
 | What is the test command? | `cargo test` |
+| What is the run command? | `cargo run` — demo binary (`src/main.rs`), illustrative only, not part of the SemVer surface. |
 | What is the lint command? | `cargo clippy --all-targets -- -D warnings` |
 | What is the format command? | `cargo fmt` |
 | Where do public types live? | `src/lib.rs` re-exports; defined under `src/{course,matcher,scoring,normalize,phonetic,config,error}.rs`. |
@@ -36,7 +37,7 @@ at the keyboard.
 ## Golden rules
 
 1. **Spec-first.** If you change observable behaviour, update
-   [`spec.md`](./spec.md) in the same change. If the spec is silent,
+   [`spec.md`](./spec/index.md) in the same change. If the spec is silent,
    propose a spec update before writing code.
 2. **Pure library.** No IO, no logging, no global state inside `src/`
    (excluding `src/main.rs` if present, which is a demo binary).
@@ -58,7 +59,7 @@ at the keyboard.
 
 ## Workflow for any change
 
-1. **Read** [`spec.md`](./spec.md). Locate the section(s) affected.
+1. **Read** [`spec.md`](./spec/index.md). Locate the section(s) affected.
 2. **Decide** whether your change is editorial (docs / format only) or
    behavioural (touches what the library does).
 3. **For behavioural changes:**
@@ -150,6 +151,7 @@ that matches your task before editing:
 ├── spec.md                   ← LIVING SPECIFICATION (read this)
 └── src/
     ├── lib.rs                ← public re-exports
+    ├── main.rs               ← demo binary (cargo run; not SemVer surface)
     ├── course.rs             ← domain types
     ├── matcher.rs            ← MatchingEngine, per-component fns
     ├── scoring.rs            ← MatchResult, MatchBreakdown, Confidence

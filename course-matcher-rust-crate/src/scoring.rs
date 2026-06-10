@@ -41,6 +41,17 @@ pub enum Confidence {
 impl Confidence {
     /// Classify a score into a coarse band. Mirrors the service-side
     /// `MatchQuality` for cross-crate consistency.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use course_matcher::Confidence;
+    ///
+    /// assert_eq!(Confidence::classify(0.99), Confidence::High);
+    /// assert_eq!(Confidence::classify(0.80), Confidence::Medium);
+    /// assert_eq!(Confidence::classify(0.40), Confidence::Low);
+    /// ```
+    #[must_use]
     pub fn classify(score: f64) -> Self {
         if score >= 0.95 {
             Confidence::High
@@ -72,8 +83,11 @@ pub struct MatchBreakdown {
     pub deterministic_match: bool,
 }
 
-/// Compute a renormalised weighted average over Some components only.
-/// `Skipped` (None) components don't pull the score down.
+/// Compute a renormalised weighted average over `Some` components only.
+/// Skipped (`None`) components don't pull the score down: the divisor is
+/// the sum of the weights that actually contributed. Returns `0.0` when
+/// no component is present.
+#[must_use]
 pub fn weighted_average(components: &[(Option<f64>, f64)]) -> f64 {
     let mut weighted_sum = 0.0_f64;
     let mut weight_sum = 0.0_f64;
@@ -83,7 +97,11 @@ pub fn weighted_average(components: &[(Option<f64>, f64)]) -> f64 {
             weight_sum += weight;
         }
     }
-    if weight_sum > 0.0 { weighted_sum / weight_sum } else { 0.0 }
+    if weight_sum > 0.0 {
+        weighted_sum / weight_sum
+    } else {
+        0.0
+    }
 }
 
 #[cfg(test)]
@@ -103,7 +121,7 @@ mod tests {
 
     #[test]
     fn weighted_average_empty_is_zero() {
-        assert_eq!(weighted_average(&[]), 0.0);
+        assert!(weighted_average(&[]).abs() < 1e-9);
     }
 
     #[test]
@@ -111,5 +129,49 @@ mod tests {
         assert_eq!(Confidence::classify(0.99), Confidence::High);
         assert_eq!(Confidence::classify(0.85), Confidence::Medium);
         assert_eq!(Confidence::classify(0.50), Confidence::Low);
+    }
+
+    #[test]
+    fn confidence_boundaries_are_inclusive_lower_bounds() {
+        // Exactly on a boundary classifies into the higher band.
+        assert_eq!(Confidence::classify(0.95), Confidence::High);
+        assert_eq!(Confidence::classify(0.70), Confidence::Medium);
+        // Just below flips to the lower band.
+        assert_eq!(Confidence::classify(0.949_999), Confidence::Medium);
+        assert_eq!(Confidence::classify(0.699_999), Confidence::Low);
+    }
+
+    #[test]
+    fn confidence_extremes() {
+        assert_eq!(Confidence::classify(0.0), Confidence::Low);
+        assert_eq!(Confidence::classify(1.0), Confidence::High);
+    }
+
+    #[test]
+    fn weighted_average_renormalises_over_present_weights() {
+        // name 1.0 @ 0.35 and provider 0.0 @ 0.15; others absent.
+        // (1.0*0.35 + 0.0*0.15) / (0.35+0.15) = 0.7.
+        let score = weighted_average(&[(Some(1.0), 0.35), (Some(0.0), 0.15), (None, 0.10)]);
+        assert!((score - 0.7).abs() < 1e-9, "got {score}");
+    }
+
+    #[test]
+    fn weighted_average_all_none_is_zero() {
+        let score = weighted_average(&[(None, 0.35), (None, 0.15)]);
+        assert!(score.abs() < 1e-9);
+    }
+
+    #[test]
+    fn default_match_result_is_low_non_match() {
+        let r = MatchResult::default();
+        assert!(r.score.abs() < 1e-9);
+        assert!(!r.is_match);
+        assert_eq!(r.confidence, Confidence::Low);
+        assert!(!r.breakdown.deterministic_match);
+    }
+
+    #[test]
+    fn confidence_default_is_low() {
+        assert_eq!(Confidence::default(), Confidence::Low);
     }
 }
