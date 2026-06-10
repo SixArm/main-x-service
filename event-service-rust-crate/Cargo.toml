@@ -73,7 +73,7 @@ fuzzy-matcher = "0.3"
 prometheus = "0.13"
 
 # Sibling matcher crate
-event-matcher = "0.5.0"
+event-matcher = "0.6.1"
 
 # Security
 argon2 = "0.5"

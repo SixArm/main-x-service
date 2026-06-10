@@ -1,6 +1,6 @@
 [package]
 name = "event-matcher"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Deterministic and probabilistic matching of schema.org/Event records (ISO 8601 date-times, external event IDs, locations, categories) with explainable per-field score breakdowns."

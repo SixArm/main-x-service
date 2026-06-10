@@ -3,6 +3,12 @@
 //! `Config::from_env` → `db::create_connection` → `SearchEngine` →
 //! matcher → `AppState` → `api::rest::serve`. Migrations are NOT auto-run.
 
+// Always start with high quality coding conventions.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+
+// When we build for MUSL static, use faster memory allocator.
 #[cfg(target_env = "musl")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -36,7 +42,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new(&config.observability.log_level))
         .unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::fmt().with_env_filter(filter).compact().init();
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .compact()
+        .init();
 
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
@@ -50,7 +59,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("database connected");
 
     let search_engine = SearchEngine::new(&config.search.index_path)?;
-    tracing::info!(path = config.search.index_path.as_str(), "search index ready");
+    tracing::info!(
+        path = config.search.index_path.as_str(),
+        "search index ready"
+    );
 
     let matcher = PlaceMatcher::new(config.matching.clone());
     let state = AppState::new(db, search_engine, matcher, config);

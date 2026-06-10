@@ -132,16 +132,6 @@
 //! - [`AGENTS/matching-algorithm.md`](https://github.com/sixarm/person-matcher/blob/main/AGENTS/matching-algorithm.md) — practitioner's view of the algorithm.
 //! - [`AGENTS/normalization.md`](https://github.com/sixarm/person-matcher/blob/main/AGENTS/normalization.md) — text normalisation rules.
 
-// Always start with high quality coding conventions.
-#![forbid(unsafe_code)]
-#![deny(missing_docs)]
-#![warn(clippy::clippy::pedantic)]
-
-// When we build for MUSL static, use faster memory allocator.
-#[cfg(target_env = "musl")]
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 pub mod error;
 pub mod identifiers;
 pub mod matcher;

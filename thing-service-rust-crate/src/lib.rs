@@ -44,16 +44,6 @@
 //! assert!(result.score > 0.85);
 //! ```
 
-// Always start with high quality coding conventions.
-#![forbid(unsafe_code)]
-#![deny(missing_docs)]
-#![warn(clippy::clippy::pedantic)]
-
-// When we build for MUSL static, use faster memory allocator.
-#[cfg(target_env = "musl")]
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 /// REST API surface and shared response envelope.
 pub mod api;
 /// Service configuration loaded from the environment.

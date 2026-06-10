@@ -32,9 +32,9 @@ test_loco_project() {
     # dir="$1"
     ai_exists_or_err "$1"
     echo "$1"
-    for file in "$1/src/lib.rs"; do
+    for file in "$1/src/main.rs"; do
         file_exists_or_err "$file"
-        grep_exists_or_err "#!\[warn(clippy::clippy::pedantic)\]" "$file"
+        grep_exists_or_err "#!\[warn(clippy::pedantic)\]" "$file"
         grep_exists_or_err "#!\[forbid(unsafe_code)\]" "$file"
         grep_exists_or_err "#!\[deny(missing_docs)\]" "$file"
         grep_exists_or_err "#\[cfg(target_env = \"musl\")\]" "$file"

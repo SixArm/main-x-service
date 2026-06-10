@@ -1,6 +1,6 @@
 [package]
 name = "thing-matcher"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Deterministic and probabilistic matching of schema.org Thing records (name, alternateName, description, identifier, url, sameAs, additionalType) with explainable per-field score breakdowns."

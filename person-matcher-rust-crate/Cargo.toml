@@ -1,6 +1,6 @@
 [package]
 name = "person-matcher"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Person matcher for healthcare information exchange: deterministic and probabilistic matching with multinational national identifiers (UK United Kingdom National Health Service Number / FR NIR / ES TSI / IE IHI / UK NI H&C / US SSN), E.164 phone normalisation, address parsing, nickname dictionary, email scoring, and explainable per-field breakdowns."

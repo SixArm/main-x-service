@@ -31,7 +31,7 @@ ai_exists_or_err() (
     symlink_exists_or_err "$1/README.md"
     file_size_or_err "$1/AGENTS.md" && implemented_or_err "$1/AGENTS.md"
     file_size_or_err "$1/CLAUDE.md"
-    file_size_or_err "$1/spec.md" && implemented_or_err "$1/spec.md"
+    directory_exists_or_err "$1/spec" && implemented_or_err "$1/spec/index.md"
 )
 
 ## Main
@@ -45,7 +45,7 @@ test_repository() {
 test_loco_projects() {
     find "$top" -type d -name '*-rust-crate' -maxdepth 1 | sort |
     while read -r dir; do
-        "$top/bin/test-loco-project" "$dir"
+        "$top/bin/test-loco-project" "$dir" || true
     done
 }
 

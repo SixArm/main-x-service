@@ -12,12 +12,12 @@
 //! or by psql-piping the `up.sql` files in numbered order. See
 //! [`README.md`](../../README.md) for the bring-up sequence.
 
-/// Process-wide allocator override for MUSL static builds.
-///
-/// MUSL's default allocator is slow under multi-threaded load; swapping
-/// in MiMalloc materially improves throughput for release containers.
-/// Gated on `target_env = "musl"` so glibc/macOS builds keep the system
-/// allocator.
+// Always start with high quality coding conventions.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+
+// When we build for MUSL static, use faster memory allocator.
 #[cfg(target_env = "musl")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;

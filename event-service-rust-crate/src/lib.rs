@@ -42,16 +42,6 @@
 //! assert!(event.active);
 //! ```
 
-// Always start with high quality coding conventions.
-#![forbid(unsafe_code)]
-#![deny(missing_docs)]
-#![warn(clippy::clippy::pedantic)]
-
-// When we build for MUSL static, use faster memory allocator.
-#[cfg(target_env = "musl")]
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 // Module declarations.
 /// HTTP / RPC surface: REST (Axum), FHIR stubs, gRPC stub.
 pub mod api;

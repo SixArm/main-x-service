@@ -57,7 +57,7 @@ dotenvy = "0.15"
 
 # Sibling matcher crate (embedded via re-export so the service uses the
 # canonical algorithm rather than maintaining a fork).
-course-matcher = "0.4"
+course-matcher = "0.6.1"
 
 # `dyn CourseRepository` needs object-safe async via async_trait.
 async-trait = "0.1"
