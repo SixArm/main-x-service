@@ -13,11 +13,11 @@ artefact**. Code conforms to the spec; not the other way around.
 
 Per-crate `spec.md`:
 
-- [person-service/spec.md](../../person-service-rust-crate/spec.md)
-- [event-service/spec.md](../../event-service-rust-crate/spec.md)
-- [worker-service/spec.md](../../worker-service-rust-crate/spec.md)
-- [place-service/spec.md](../../place-service-rust-crate/spec.md)
-- [thing-service/spec.md](../../thing-service-rust-crate/spec.md)
+- [person-service/spec.md](../../person-service-rust-crate/spec/index.md)
+- [event-service/spec.md](../../event-service-rust-crate/spec/index.md)
+- [worker-service/spec.md](../../worker-service-rust-crate/spec/index.md)
+- [place-service/spec.md](../../place-service-rust-crate/spec/index.md)
+- [thing-service/spec.md](../../thing-service-rust-crate/spec/index.md)
 
 ## Overview
 

@@ -44,7 +44,7 @@ pub type Result<T> = std::result::Result<T, MatchingError>;
 /// `lenient`) are infallible.
 ///
 /// The enum is `#[non_exhaustive]` so future fallible code paths can add
-/// variants without breaking SemVer for downstream pattern-matches.
+/// variants without breaking `SemVer` for downstream pattern-matches.
 ///
 /// ```
 /// use place_matcher::MatchingError;
@@ -73,6 +73,8 @@ mod tests {
 
     #[test]
     fn result_alias_resolves() {
+        // The wrap is the point: this exercises the `Result` type alias.
+        #[allow(clippy::unnecessary_wraps)]
         fn make() -> Result<i32> {
             Ok(42)
         }

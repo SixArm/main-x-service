@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Bridge-path benchmarks: service-side `Event` → `to_matcher_event` →
 //! `event_matcher::MatchingEngine::match_events`.
 //!

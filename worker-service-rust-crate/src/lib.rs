@@ -51,6 +51,11 @@
 //! assert!(worker.active);
 //! ```
 
+// Always start with high quality coding conventions.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+
 // Module declarations.
 //
 // Every top-level module is `pub` so the crate doubles as a reusable library:

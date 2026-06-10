@@ -102,6 +102,7 @@ impl NicknameTable {
     /// assert!(!t.are_equivalent("Mike", "Michael"));
     /// assert!(t.are_equivalent("Mike", "Mike"));
     /// ```
+    #[must_use]
     pub fn empty() -> Self {
         Self {
             classes: Vec::new(),
@@ -123,6 +124,7 @@ impl NicknameTable {
     /// let t = NicknameTable::empty().with_class(["Robert", "Bob", "Rob"]);
     /// assert!(t.are_equivalent("BOB", "robert"));
     /// ```
+    #[must_use]
     pub fn with_class<I, S>(mut self, names: I) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -155,6 +157,7 @@ impl NicknameTable {
     /// assert!(!t.are_equivalent("Mike", "Robert"));
     /// assert!(t.are_equivalent("",       ""));         // trivially equal
     /// ```
+    #[must_use]
     pub fn are_equivalent(&self, a: &str, b: &str) -> bool {
         let na = Normalizer::normalize_name(a);
         let nb = Normalizer::normalize_name(b);
@@ -174,6 +177,7 @@ impl NicknameTable {
     /// assert!(NicknameTable::empty().is_empty());
     /// assert!(!NicknameTable::english().is_empty());
     /// ```
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.classes.is_empty()
     }
@@ -186,6 +190,7 @@ impl NicknameTable {
     /// let t = NicknameTable::empty().with_class(["A", "B"]);
     /// assert_eq!(t.len(), 1);
     /// ```
+    #[must_use]
     pub fn len(&self) -> usize {
         self.classes.len()
     }
@@ -207,6 +212,7 @@ impl NicknameTable {
     /// assert!(t.are_equivalent("Steve",     "Steven"));
     /// assert!(t.are_equivalent("Steve",     "Stephen"));
     /// ```
+    #[must_use]
     pub fn english() -> Self {
         let pairs: &[&[&str]] = &[
             &["michael", "mike", "mick", "mickey"],

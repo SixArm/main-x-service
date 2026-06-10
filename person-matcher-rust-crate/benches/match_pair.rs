@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the `person-matcher` crate.
 //!
 //! Run with `cargo bench`. The harness covers the hot paths a downstream
@@ -5,8 +7,8 @@
 //! deterministic matching, and the batch ranking entry point. Numbers
 //! are reported in absolute time per call.
 
-use jiff::civil::Date;
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use jiff::civil::Date;
 use person_matcher::{
     Address, Gender, MatchConfig, MatchingEngine, NicknameTable, Person, SimilarityAlgorithm,
 };

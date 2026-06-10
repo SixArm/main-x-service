@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for the privacy workflow ([`mask_thing`] /
 //! [`gdpr_export`]): masking sensitive fields, full GDPR export, and the
 //! immutability of the original record.

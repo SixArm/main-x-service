@@ -23,7 +23,14 @@
       "Bash(grep *)",
       "Bash(cargo bench *)",
       "Bash(chmod +x /Users/jph/git/worker-matcher/worker-matcher-rust-crate/scripts/spec-drift-check.sh)",
-      "Bash(bash *)"
+      "Bash(bash *)",
+      "Bash(python3 -c ' *)",
+      "Bash(cat)",
+      "Bash(python3 /tmp/add_must_use.py)",
+      "Bash(python3 /tmp/all_lints.py)",
+      "Bash(awk -F: '$1>900 && $1<1690')",
+      "Bash(python3 /tmp/floc.py)",
+      "Bash(python3 /tmp/ploc.py)"
     ],
     "deny": [],
     "ask": []

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the validation layer.
 //!
 //! Measures `validate_place` on a minimal and a fully-populated record (so the

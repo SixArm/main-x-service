@@ -4,7 +4,7 @@ All notable changes to this crate are documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
-[`index.md`](./index.md), [`spec.md`](./spec.md), [`README.md`](./README.md).
+[`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
 

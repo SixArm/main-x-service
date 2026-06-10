@@ -1,3 +1,13 @@
+//! # Event matcher demo binary
+//!
+//! A runnable demonstration of the `event-matcher` library. It builds a
+//! handful of [`Event`] records and prints the deterministic and
+//! probabilistic match results for each pair, illustrating perfect
+//! matches, near matches, and non-matches.
+//!
+//! Run it with `cargo run`. For the library API, see the
+//! [`event_matcher`] crate documentation.
+
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]

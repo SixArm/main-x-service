@@ -14,7 +14,7 @@ Detailed reference documentation for the Course Service crate.
 
 ## See also
 
-- [`../spec.md`](../spec.md) — single source of truth for this crate
+- [`../spec.md`](../spec/index.md) — single source of truth for this crate
 - [`../AGENTS.md`](../AGENTS.md) — agent-facing entry point
 - [`../README.md`](../README.md) / [`../CLAUDE.md`](../CLAUDE.md) — user-facing intro
 - [`../index.md`](../index.md) — navigation aid + worked examples

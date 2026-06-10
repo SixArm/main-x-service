@@ -539,7 +539,7 @@ This project was developed in 15 comprehensive phases:
 9. **Phase 14**: Core Library & Tests (104 unit tests, 14 integration tests, 12 benchmarks)
 10. **Phase 15**: Update & Expand Tests (171 tests + 16 benchmarks, comprehensive edge case coverage)
 
-See [spec.md §13](spec.md#13-tasks) for the live task queue and [spec.md §14](spec.md#14-implementation-status) for implementation status.
+See [spec.md §13](spec/13-tasks.md) for the live task queue and [spec.md §14](spec/14-implementation-status.md) for implementation status.
 
 ## Contributing
 

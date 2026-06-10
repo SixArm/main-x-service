@@ -1,6 +1,6 @@
 # Release — Agent Guide
 
-See [`../spec.md`](../spec.md) §19 for the formal procedure.
+See [`../spec.md`](../spec/index.md) §19 for the formal procedure.
 
 ## Versioning
 

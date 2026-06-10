@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! REST API integration tests. Requires a running PostgreSQL
 //! reachable via `DATABASE_URL`.
 //!

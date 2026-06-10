@@ -13,11 +13,6 @@ ISSN, GTIN, SKU, MPN, SerialNumber, URI, UUID, or `Custom(String)`.
 The first seven are globally unique and short-circuit matching to
 `1.0` on exact match.
 
-> **Status.** Behavioural MVP. Models / matching / validation /
-> privacy / matcher-bridge are in tree; REST handlers, persistence,
-> search index, and Docker bring-up are tracked in
-> [`spec.md §13`](spec.md#13-tasks).
-
 ## Quick start
 
 Prerequisites: Rust 1.93+ (2024 edition), PostgreSQL 18+.
@@ -86,14 +81,14 @@ curl -X POST http://localhost:8080/api/things/match \
 Configuration is loaded from `config/{development,test,production}.yaml`
 (Loco convention). Environment-overridable variables:
 
-| Variable | Description | Default |
-|---|---|---|
-| `PORT` | REST bind port | `8080` |
-| `DATABASE_URL` | Postgres connection string | per config file |
-| `SEARCH_INDEX_PATH` | Tantivy index directory | `./data/search_index` |
-| `MATCHING_THRESHOLD` | Probabilistic match cutoff | `0.85` |
-| `RUST_LOG` | tracing-subscriber filter | `info` |
-| `OTLP_ENDPOINT` | OpenTelemetry collector | `http://localhost:4317` |
+| Variable             | Description                | Default                 |
+| -------------------- | -------------------------- | ----------------------- |
+| `PORT`               | REST bind port             | `8080`                  |
+| `DATABASE_URL`       | Postgres connection string | per config file         |
+| `SEARCH_INDEX_PATH`  | Tantivy index directory    | `./data/search_index`   |
+| `MATCHING_THRESHOLD` | Probabilistic match cutoff | `0.85`                  |
+| `RUST_LOG`           | tracing-subscriber filter  | `info`                  |
+| `OTLP_ENDPOINT`      | OpenTelemetry collector    | `http://localhost:4317` |
 
 ## Testing
 
@@ -117,13 +112,13 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the layout.
 
 ## Matching at a glance
 
-| Component | Weight | Algorithm |
-|---|---:|---|
-| Name | 0.40 | Jaro-Winkler + Soundex phonetic bonus |
-| Identifier | 0.30 | `(property_id, value)` exact, best pair |
-| Description | 0.10 | Jaro-Winkler (case-insensitive) |
-| URL | 0.10 | Scheme/case-normalized host + path |
-| Same-as | 0.10 | Best pair across `same_as` URL lists |
+| Component   | Weight | Algorithm                               |
+| ----------- | -----: | --------------------------------------- |
+| Name        |   0.40 | Jaro-Winkler + Soundex phonetic bonus   |
+| Identifier  |   0.30 | `(property_id, value)` exact, best pair |
+| Description |   0.10 | Jaro-Winkler (case-insensitive)         |
+| URL         |   0.10 | Scheme/case-normalized host + path      |
+| Same-as     |   0.10 | Best pair across `same_as` URL lists    |
 
 Deterministic short-circuit: any matched DOI / ISBN / ISSN / GTIN /
 MPN / SerialNumber / UUID → 1.0. (SKU / URI / Custom are evidence,

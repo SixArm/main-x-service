@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Bridge test — pins the contract between the service's domain
 //! `Course` and the canonical `course-matcher` algorithm.
 //!

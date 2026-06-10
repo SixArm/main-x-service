@@ -1,6 +1,6 @@
 # Architecture — Agent Guide
 
-This guide complements [`../spec.md`](../spec.md) §9 and §10. Read both before making structural changes.
+This guide complements [`../spec.md`](../spec/index.md) §9 and §10. Read both before making structural changes.
 
 ## Layering
 
@@ -54,7 +54,7 @@ If you genuinely need a new module:
 
 1. Add `pub mod foo;` in `lib.rs`.
 2. Decide its layer (data / utility / orchestration).
-3. Update [`../spec.md`](../spec.md) §9.1 and §9.2 (module layout and dependency graph) **before** writing code.
+3. Update [`../spec.md`](../spec/index.md) §9.1 and §9.2 (module layout and dependency graph) **before** writing code.
 4. If it exposes public types, add an entry in §11 (public API).
 
 ## Avoid These Shapes

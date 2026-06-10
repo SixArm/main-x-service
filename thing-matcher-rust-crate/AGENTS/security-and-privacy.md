@@ -1,6 +1,6 @@
 # Security and privacy — agent guide
 
-See [`../spec.md`](../spec.md) §8 for the formal determinism and safety guarantees.
+See [`../spec.md`](../spec/index.md) §8 for the formal determinism and safety guarantees.
 
 ## Scope
 

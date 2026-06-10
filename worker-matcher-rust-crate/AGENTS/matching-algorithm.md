@@ -1,6 +1,6 @@
 # Matching Algorithm — Agent Guide
 
-The authoritative description lives in [`../spec.md`](../spec.md) §12 and §13. This guide is the practitioner's view.
+The authoritative description lives in [`../spec.md`](../spec/index.md) §12 and §13. This guide is the practitioner's view.
 
 ## Strategies and Surface
 

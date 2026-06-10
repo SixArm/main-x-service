@@ -1,4 +1,10 @@
+#![warn(clippy::pedantic)]
+
 //! Basic usage example for worker matcher
+
+// Demo code: a single linear walkthrough; the late `use` keeps the
+// identifier-parsing snippet self-contained next to where it is shown.
+#![allow(clippy::too_many_lines, clippy::items_after_statements)]
 
 use worker_matcher::{
     Address, BloodType, Gender, MatchConfig, MatchingEngine, NicknameTable, Normalizer,
@@ -78,15 +84,12 @@ fn main() {
 
     // Demonstrate deterministic matching
     let is_deterministic = engine.deterministic_match(&worker1, &worker2);
-    println!(
-        "Deterministic Match (NHS number exact): {}",
-        is_deterministic
-    );
+    println!("Deterministic Match (NHS number exact): {is_deterministic}");
 
     // Show JSON serialization
     println!("\n=== JSON Export ===");
     let json = serde_json::to_string_pretty(&result).unwrap();
-    println!("{}", json);
+    println!("{json}");
 
     // International phone-number normalisation (E.164).
     println!("\n=== International Phone Numbers (E.164) ===");
@@ -479,7 +482,7 @@ fn main() {
             "UK CHI" => identifiers::parse_uk_chi_number(raw),
             _ => unreachable!(),
         };
-        println!("  {label:<18} {raw:<24} -> {parsed:?} (expected {canonical:?})",);
+        println!("  {label:<18} {raw:<24} -> {parsed:?} (expected {canonical:?})");
     }
 
     // Seven next-batch national identifiers (T-17.1).
@@ -503,7 +506,7 @@ fn main() {
             "ZA ID" => identifiers::parse_za_id(raw),
             _ => unreachable!(),
         };
-        println!("  {label:<14} {raw:<24} -> {parsed:?} (expected {canonical:?})",);
+        println!("  {label:<14} {raw:<24} -> {parsed:?} (expected {canonical:?})");
     }
 
     // Sophisticated address parsing.

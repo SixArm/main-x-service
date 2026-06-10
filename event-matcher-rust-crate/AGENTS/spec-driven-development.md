@@ -1,6 +1,6 @@
 # Spec-driven development — agent guide
 
-This crate practises **spec-driven development**: the specification ([`../spec.md`](../spec.md)) is the canonical artefact. Code conforms to the spec, not the other way around.
+This crate practises **spec-driven development**: the specification ([`../spec.md`](../spec/index.md)) is the canonical artefact. Code conforms to the spec, not the other way around.
 
 ## What that means in practice
 

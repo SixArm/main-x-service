@@ -1,3 +1,9 @@
+//! Demo binary for the `place-matcher` crate.
+//!
+//! Runs a handful of example place comparisons at the default, strict, and
+//! lenient thresholds and prints the resulting scores. See the library crate
+//! and `spec.md` for the matching semantics.
+
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -57,7 +63,7 @@ fn main() {
         .name("Wholly Different Name")
         .add_place_id(id)
         .build();
-    println!("Deterministic: {}", engine.deterministic_match(&a, &b),);
+    println!("Deterministic: {}", engine.deterministic_match(&a, &b));
 
     // Example 4: deterministic match via identical name + postcode.
     println!("\nExample 4: Deterministic Match via Name + Postcode");

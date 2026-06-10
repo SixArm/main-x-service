@@ -188,6 +188,7 @@ impl MatchConfig {
     /// assert!((c.match_threshold - 0.95).abs() < 1e-9);
     /// assert!(c.strict_mode);
     /// ```
+    #[must_use]
     pub fn strict() -> Self {
         Self {
             match_threshold: 0.95,
@@ -207,6 +208,7 @@ impl MatchConfig {
     /// assert!((c.match_threshold - 0.65).abs() < 1e-9);
     /// assert!(c.use_phonetic_matching);
     /// ```
+    #[must_use]
     pub fn lenient() -> Self {
         Self {
             match_threshold: 0.65,
@@ -254,6 +256,7 @@ impl Confidence {
     /// assert_eq!(Confidence::from_score(-0.5),     Confidence::Low);
     /// assert_eq!(Confidence::from_score(2.0),      Confidence::High);
     /// ```
+    #[must_use]
     pub fn from_score(score: f64) -> Self {
         if score >= 0.90 {
             Confidence::High
@@ -360,11 +363,13 @@ pub struct MatchingEngine {
 
 impl MatchingEngine {
     /// Construct an engine with the given configuration.
+    #[must_use]
     pub fn new(config: MatchConfig) -> Self {
         Self { config }
     }
 
     /// Construct an engine with [`MatchConfig::default`].
+    #[must_use]
     pub fn default_config() -> Self {
         Self::new(MatchConfig::default())
     }
@@ -386,6 +391,7 @@ impl MatchingEngine {
     /// assert!(result.is_match);
     /// assert!(result.score > 0.99);
     /// ```
+    #[must_use]
     pub fn match_events(&self, event1: &Event, event2: &Event) -> MatchResult {
         let breakdown = self.calculate_breakdown(event1, event2);
         let score = self.calculate_weighted_score(&breakdown);
@@ -422,6 +428,7 @@ impl MatchingEngine {
     /// assert!(results[0].is_match);
     /// assert!(!results[1].is_match);
     /// ```
+    #[must_use]
     pub fn match_one_to_many(&self, query: &Event, candidates: &[Event]) -> Vec<MatchResult> {
         candidates
             .iter()
@@ -432,6 +439,7 @@ impl MatchingEngine {
     /// Score and rank: return `(original_index, MatchResult)` tuples
     /// sorted by descending score. Ties are broken by ascending original
     /// index, so the result is deterministic.
+    #[must_use]
     pub fn rank_one_to_many(
         &self,
         query: &Event,
@@ -468,6 +476,7 @@ impl MatchingEngine {
     /// let b = Event::builder().name("RC '24").add_event_id(id).build();
     /// assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     /// ```
+    #[must_use]
     pub fn deterministic_match(&self, event1: &Event, event2: &Event) -> bool {
         if shares_event_id(event1, event2) {
             return true;
@@ -479,7 +488,7 @@ impl MatchingEngine {
         MatchBreakdown {
             name_score: self.score_name(event1, event2),
             name_phonetic_score: if self.config.use_phonetic_matching {
-                self.score_phonetic_names(event1, event2)
+                Self::score_phonetic_names(event1, event2)
             } else {
                 None
             },
@@ -489,8 +498,8 @@ impl MatchingEngine {
             category_score: score_category(event1, event2),
             country_code_score: score_country_code(event1, event2),
             event_ids_score: score_event_ids(event1, event2),
-            organizer_score: self.score_organizer(event1, event2),
-            performers_score: self.score_performers(event1, event2),
+            organizer_score: Self::score_organizer(event1, event2),
+            performers_score: Self::score_performers(event1, event2),
             url_score: score_url(event1, event2),
         }
     }
@@ -511,7 +520,10 @@ impl MatchingEngine {
         accumulate(breakdown.end_date_score, self.config.end_date_weight);
         accumulate(breakdown.location_score, self.config.location_weight);
         accumulate(breakdown.category_score, self.config.category_weight);
-        accumulate(breakdown.country_code_score, self.config.country_code_weight);
+        accumulate(
+            breakdown.country_code_score,
+            self.config.country_code_weight,
+        );
         accumulate(breakdown.event_ids_score, self.config.event_ids_weight);
         accumulate(breakdown.organizer_score, self.config.organizer_weight);
         accumulate(breakdown.performers_score, self.config.performers_weight);
@@ -561,7 +573,7 @@ impl MatchingEngine {
         }
     }
 
-    fn score_phonetic_names(&self, e1: &Event, e2: &Event) -> Option<f64> {
+    fn score_phonetic_names(e1: &Event, e2: &Event) -> Option<f64> {
         let names1 = collect_names(e1);
         let names2 = collect_names(e2);
         if names1.is_empty() || names2.is_empty() {
@@ -586,6 +598,10 @@ impl MatchingEngine {
         Some(best)
     }
 
+    // A signed second-delta between two event timestamps. The magnitude is
+    // tiny relative to f64's 52-bit mantissa, so the lossy i64->f64 cast is
+    // harmless here.
+    #[allow(clippy::cast_precision_loss)]
     fn score_start_date(&self, e1: &Event, e2: &Event) -> Option<f64> {
         let d = Scorer::seconds_between(e1.start_date.as_deref()?, e2.start_date.as_deref()?)?;
         Some(Scorer::start_date_score(
@@ -594,6 +610,7 @@ impl MatchingEngine {
         ))
     }
 
+    #[allow(clippy::cast_precision_loss)]
     fn score_end_date(&self, e1: &Event, e2: &Event) -> Option<f64> {
         let d = Scorer::seconds_between(e1.end_date.as_deref()?, e2.end_date.as_deref()?)?;
         Some(Scorer::start_date_score(
@@ -626,7 +643,8 @@ impl MatchingEngine {
             )
         {
             let d = Scorer::haversine_metres(la1, lo1, la2, lo2);
-            weighted_sum += Scorer::coordinates_score(d, self.config.coordinates_scale_metres) * 0.5;
+            weighted_sum +=
+                Scorer::coordinates_score(d, self.config.coordinates_scale_metres) * 0.5;
             total_weight += 0.5;
         }
 
@@ -654,7 +672,7 @@ impl MatchingEngine {
         }
     }
 
-    fn score_organizer(&self, e1: &Event, e2: &Event) -> Option<f64> {
+    fn score_organizer(e1: &Event, e2: &Event) -> Option<f64> {
         let o1 = e1.organizer.as_deref()?;
         let o2 = e2.organizer.as_deref()?;
         let n1 = Normalizer::normalize_name(o1);
@@ -662,7 +680,7 @@ impl MatchingEngine {
         Some(Scorer::combined_similarity(&n1, &n2))
     }
 
-    fn score_performers(&self, e1: &Event, e2: &Event) -> Option<f64> {
+    fn score_performers(e1: &Event, e2: &Event) -> Option<f64> {
         if e1.performers.is_empty() || e2.performers.is_empty() {
             return None;
         }
@@ -750,16 +768,14 @@ fn score_url(e1: &Event, e2: &Event) -> Option<f64> {
 }
 
 fn name_and_start_date_match(e1: &Event, e2: &Event) -> bool {
-    let (n1, n2) = match (&e1.name, &e2.name) {
-        (Some(a), Some(b)) => (a, b),
-        _ => return false,
+    let (Some(n1), Some(n2)) = (&e1.name, &e2.name) else {
+        return false;
     };
     if Normalizer::normalize_name(n1) != Normalizer::normalize_name(n2) {
         return false;
     }
-    let (sd1, sd2) = match (&e1.start_date, &e2.start_date) {
-        (Some(a), Some(b)) => (a, b),
-        _ => return false,
+    let (Some(sd1), Some(sd2)) = (&e1.start_date, &e2.start_date) else {
+        return false;
     };
     match (
         Normalizer::parse_iso8601_unix_seconds(sd1),
@@ -815,6 +831,9 @@ fn compare_addresses(addr1: &Address, addr2: &Address) -> f64 {
 }
 
 #[cfg(test)]
+// Some assertions check exact sentinel scores (`0.0` / `1.0`), where exact
+// float comparison is the intended behaviour.
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
     use crate::models::{EventCategory, EventId, EventIdScheme};
@@ -972,8 +991,14 @@ mod tests {
             .category(EventCategory::ComedyEvent)
             .build();
         let engine = MatchingEngine::default_config();
-        assert_eq!(engine.match_events(&a, &b).breakdown.category_score, Some(1.0));
-        assert_eq!(engine.match_events(&a, &c).breakdown.category_score, Some(0.0));
+        assert_eq!(
+            engine.match_events(&a, &b).breakdown.category_score,
+            Some(1.0)
+        );
+        assert_eq!(
+            engine.match_events(&a, &c).breakdown.category_score,
+            Some(0.0)
+        );
     }
 
     #[test]
@@ -1058,8 +1083,14 @@ mod tests {
     #[test]
     fn deterministic_via_shared_event_id() {
         let id = EventId::new(EventIdScheme::Eventbrite, "12345").unwrap();
-        let a = Event::builder().name("RustConf 2024").add_event_id(id.clone()).build();
-        let b = Event::builder().name("Wholly Different").add_event_id(id).build();
+        let a = Event::builder()
+            .name("RustConf 2024")
+            .add_event_id(id.clone())
+            .build();
+        let b = Event::builder()
+            .name("Wholly Different")
+            .add_event_id(id)
+            .build();
         assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
@@ -1193,7 +1224,10 @@ mod tests {
 
     #[test]
     fn organizer_match_after_normalisation() {
-        let a = Event::builder().name("X").organizer("Rust Foundation").build();
+        let a = Event::builder()
+            .name("X")
+            .organizer("Rust Foundation")
+            .build();
         let b = Event::builder()
             .name("X")
             .organizer("rust foundation")
@@ -1220,7 +1254,10 @@ mod tests {
 
     #[test]
     fn url_match_is_exact_after_trim() {
-        let a = Event::builder().name("X").url("https://rustconf.com").build();
+        let a = Event::builder()
+            .name("X")
+            .url("https://rustconf.com")
+            .build();
         let b = Event::builder()
             .name("X")
             .url("  https://rustconf.com  ")

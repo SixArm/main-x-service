@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for the validation + normalization pipeline.
 //!
 //! These exercise [`validate_place`] and [`normalize_place`] together against

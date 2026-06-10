@@ -1,6 +1,6 @@
 # Testing — agent guide
 
-See [`../spec.md`](../spec.md) for the authoritative behavioural contract. This guide is the practitioner's view of how the crate is tested.
+See [`../spec.md`](../spec/index.md) for the authoritative behavioural contract. This guide is the practitioner's view of how the crate is tested.
 
 ## Test pyramid
 

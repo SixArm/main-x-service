@@ -1,6 +1,6 @@
 # Testing strategy
 
-Three layers, mapped to spec [§11 Testing Strategy](../spec.md#11-testing-strategy).
+Three layers, mapped to spec [§11 Testing Strategy](../spec/11-testing-strategy.md).
 
 | Layer | Tool | Runs against | Purpose |
 |---|---|---|---|

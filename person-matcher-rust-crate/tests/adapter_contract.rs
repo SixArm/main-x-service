@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Adapter contract test for the `person-matcher` public API.
 //!
 //! This test pins the exact public surface that downstream `person-service`
@@ -68,7 +70,7 @@ fn person_builder_demographic_and_contact_surface() {
 }
 
 /// Pins every national-identifier builder slot the adapter routes to.
-/// The list MUST stay stable across SemVer minor releases.
+/// The list MUST stay stable across `SemVer` minor releases.
 #[test]
 fn person_builder_national_identifier_surface() {
     // We don't care about the parsed value here — the point is the method
@@ -189,7 +191,9 @@ fn matching_engine_match_persons_returns_match_result() {
     let _ = result.breakdown.address_score;
     let _ = result.breakdown.phone_score;
     let _ = result.breakdown.email_score;
-    let _ = result.breakdown.united_kingdom_national_health_service_number_score;
+    let _ = result
+        .breakdown
+        .united_kingdom_national_health_service_number_score;
     let _ = result.breakdown.us_ssn_score;
     let _ = result.breakdown.passport_book_score;
 }
@@ -255,8 +259,7 @@ fn match_result_round_trips_through_json() {
     let b = a.clone();
     let result = MatchingEngine::default_config().match_persons(&a, &b);
     let json = serde_json::to_string(&result).expect("serialize");
-    let back: person_matcher::MatchResult =
-        serde_json::from_str(&json).expect("deserialize");
+    let back: person_matcher::MatchResult = serde_json::from_str(&json).expect("deserialize");
     assert!((result.score - back.score).abs() < 1e-12);
     assert_eq!(result.is_match, back.is_match);
     assert_eq!(result.confidence, back.confidence);

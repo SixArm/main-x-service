@@ -448,7 +448,7 @@ This project was developed in 14 comprehensive phases:
 8. **Phase 13**: Advanced MPI Features (duplicate detection, merging, deduplication, validation, privacy, emergency contacts, identity documents, phonetic matching)
 9. **Phase 14**: Compilation Fixes, Test Expansion & Documentation Update (99 unit tests, 3 benchmark suites, comprehensive AGENTS docs)
 
-See [spec.md §13](spec.md#13-tasks) for the live task queue and [spec.md §14](spec.md#14-implementation-status) for implementation status.
+See [spec.md §13](spec/13-tasks.md) for the live task queue and [spec.md §14](spec/14-implementation-status.md) for implementation status.
 
 ## Contributing
 

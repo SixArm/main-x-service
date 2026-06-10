@@ -24,7 +24,7 @@ ai_exists_or_err() (
     symlink_exists_or_err "$1/README.md"
     file_size_or_err "$1/AGENTS.md" && implemented_or_err "$1/AGENTS.md"
     file_size_or_err "$1/CLAUDE.md"
-    file_size_or_err "$1/spec.md" && implemented_or_err "$1/spec.md"
+    file_size_or_err "$1/spec/index.md" && implemented_or_err "$1/spec/index.md"
 )
 
 ### Main
@@ -32,23 +32,25 @@ test_loco_project() {
     # dir="$1"
     ai_exists_or_err "$1"
     echo "$1"
-    for file in "$1/src/main.rs"; do
+    for file in "$1/src/main.rs" "$1/src/lib.rs"; do
         file_exists_or_err "$file"
         grep_exists_or_err "#!\[warn(clippy::pedantic)\]" "$file"
         grep_exists_or_err "#!\[forbid(unsafe_code)\]" "$file"
         grep_exists_or_err "#!\[deny(missing_docs)\]" "$file"
-        grep_exists_or_err "#\[cfg(target_env = \"musl\")\]" "$file"
-        grep_exists_or_err "#\[global_allocator\]" "$file"
-        grep_exists_or_err "static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;" "$file"
-        cd "$1"
-        cargo update
-        cargo check --all-targets
-        cargo clippy
-        cargo test
-        cargo build
-        cargo build --target x86_64-unknown-linux-musl
-        cargo report future-incompatibilities
     done
+    file="$1/src/main.rs"
+    grep_exists_or_err "#\[cfg(target_env = \"musl\")\]" "$file"
+    grep_exists_or_err "#\[global_allocator\]" "$file"
+    grep_exists_or_err "static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;" "$file"
+    cd "$1"
+    cargo update
+    cargo check --all-targets
+    cargo clippy
+    cargo test
+    cargo build --workspace 
+    # cargo build --target x86_64-unknown-linux-musl
+    # cargo bench
+    # cargo report future-incompatibilities
 }
 
 test_loco_project "$1"

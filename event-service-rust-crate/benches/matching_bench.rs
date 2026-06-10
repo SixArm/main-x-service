@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Benchmarks for the service-side event matching algorithms.
 //!
 //! Each Criterion group exercises one component of the matcher hot path

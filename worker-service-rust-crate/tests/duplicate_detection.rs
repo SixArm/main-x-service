@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! End-to-end duplicate-detection integration tests for the
 //! worker-service ↔ worker-matcher bridge.
 //!

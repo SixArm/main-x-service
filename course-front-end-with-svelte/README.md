@@ -120,5 +120,5 @@ See the commented example in `src/routes/+layout.svelte`. The MVP currently uses
 MVP wired against the now-real Course Service surface. Routes for
 list / new / detail / edit / delete / match / merge / audit are
 live; instance and syllabus-section edit UI are the remaining
-gaps tracked in [`spec.md §13`](spec.md#13-tasks). 9 vitest + 5
+gaps tracked in [`spec.md §13`](spec/13-tasks.md). 9 vitest + 5
 Playwright smoke tests.

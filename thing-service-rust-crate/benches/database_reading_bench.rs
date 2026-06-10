@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks approximating read-side cost: single and batch
 //! `Thing` construction (a proxy for row hydration).
 

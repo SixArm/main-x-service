@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for person matcher.
 //!
 //! These exercise the **public API** as a downstream user would — building
@@ -43,7 +45,9 @@ fn test_perfect_match_all_fields() {
     address.postcode = Some("CF10 1AA".into());
 
     let person1 = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
         .given_name("John")
         .middle_name("David")
         .family_name("Smith")
@@ -57,7 +61,12 @@ fn test_perfect_match_all_fields() {
     let result = MatchingEngine::default_config().match_persons(&person1, &person2);
     assert!(result.is_match);
     assert!(result.score > 0.95);
-    assert_eq!(result.breakdown.united_kingdom_national_health_service_number_score, Some(1.0));
+    assert_eq!(
+        result
+            .breakdown
+            .united_kingdom_national_health_service_number_score,
+        Some(1.0)
+    );
     assert!(result.breakdown.given_name_score.unwrap() > 0.99);
     assert!(result.breakdown.family_name_score.unwrap() > 0.99);
     assert_eq!(result.breakdown.date_of_birth_score, Some(1.0));
@@ -82,20 +91,28 @@ fn test_identical_minimal_record_scores_one() {
 #[test]
 fn test_united_kingdom_national_health_service_number_mismatch_does_not_immediately_disqualify() {
     let p1 = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
         .given_name("John")
         .family_name("Smith")
         .date_of_birth(dob(1980, 5, 15))
         .build();
     let p2 = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_B)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_B,
+        )
         .given_name("John")
         .family_name("Smith")
         .date_of_birth(dob(1980, 5, 15))
         .build();
 
     let r = MatchingEngine::default_config().match_persons(&p1, &p2);
-    assert_eq!(r.breakdown.united_kingdom_national_health_service_number_score, Some(0.0));
+    assert_eq!(
+        r.breakdown
+            .united_kingdom_national_health_service_number_score,
+        Some(0.0)
+    );
     // Demographics still align, so the score sits in the middle range.
     assert!(r.score > 0.5);
     assert!(r.score < 0.9);
@@ -118,7 +135,9 @@ fn test_unparseable_united_kingdom_national_health_service_numbers_score_none_no
 
     let r = MatchingEngine::default_config().match_persons(&p1, &p2);
     assert_eq!(
-        r.breakdown.united_kingdom_national_health_service_number_score, None,
+        r.breakdown
+            .united_kingdom_national_health_service_number_score,
+        None,
         "unparseable United Kingdom National Health Service Numbers must not contribute a 0.0 penalty"
     );
     assert!(r.is_match, "demographics fully align");
@@ -129,7 +148,9 @@ fn test_one_sided_united_kingdom_national_health_service_number_scores_none() {
     // Asymmetric United Kingdom National Health Service Number data: scorer
     // should skip the field rather than penalise.
     let p1 = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
         .given_name("Ada")
         .family_name("Lovelace")
         .build();
@@ -138,13 +159,24 @@ fn test_one_sided_united_kingdom_national_health_service_number_scores_none() {
         .family_name("Lovelace")
         .build();
     let r = MatchingEngine::default_config().match_persons(&p1, &p2);
-    assert_eq!(r.breakdown.united_kingdom_national_health_service_number_score, None);
+    assert_eq!(
+        r.breakdown
+            .united_kingdom_national_health_service_number_score,
+        None
+    );
 }
 
 #[test]
-fn test_united_kingdom_national_health_service_number_whitespace_variants_match_deterministically() {
-    let a = Person::builder().united_kingdom_national_health_service_number("943 476 5919").build();
-    let b = Person::builder().united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A).build();
+fn test_united_kingdom_national_health_service_number_whitespace_variants_match_deterministically()
+{
+    let a = Person::builder()
+        .united_kingdom_national_health_service_number("943 476 5919")
+        .build();
+    let b = Person::builder()
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
+        .build();
     assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
 }
 
@@ -616,7 +648,9 @@ fn test_deterministic_united_kingdom_national_health_service_number_match_overri
         .family_name("Brown")
         .build();
     let p2 = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
         .given_name("Bob") // different name
         .family_name("Brown")
         .build();
@@ -721,7 +755,9 @@ fn test_strict_mode_accepts_deterministic_match() {
     // Same person on both sides — deterministic match holds AND the
     // score is above the strict threshold. Strict mode accepts.
     let p = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
         .given_name("John")
         .family_name("Smith")
         .date_of_birth(dob(1980, 5, 15))
@@ -977,14 +1013,18 @@ fn test_missing_fields_calc_uses_only_available() {
 #[test]
 fn test_completely_different_persons() {
     let p1 = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
         .given_name("Alice")
         .family_name("Anderson")
         .date_of_birth(dob(1990, 1, 1))
         .gender(Gender::Female)
         .build();
     let p2 = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_B)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_B,
+        )
         .given_name("Zachary")
         .family_name("Zimmerman")
         .date_of_birth(dob(2000, 12, 31))
@@ -993,7 +1033,11 @@ fn test_completely_different_persons() {
     let r = MatchingEngine::default_config().match_persons(&p1, &p2);
     assert!(!r.is_match);
     assert!(r.score < 0.3);
-    assert_eq!(r.breakdown.united_kingdom_national_health_service_number_score, Some(0.0));
+    assert_eq!(
+        r.breakdown
+            .united_kingdom_national_health_service_number_score,
+        Some(0.0)
+    );
     assert_eq!(r.breakdown.date_of_birth_score, Some(0.0));
     assert_eq!(r.breakdown.gender_score, Some(0.0));
 }
@@ -1060,7 +1104,9 @@ fn test_validation_accepts_minimum_fields() {
     );
     assert!(
         Person::builder()
-            .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+            .united_kingdom_national_health_service_number(
+                UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A
+            )
             .build()
             .validate()
             .is_ok()
@@ -1075,7 +1121,9 @@ fn test_validation_accepts_minimum_fields() {
 #[test]
 fn test_person_serialization_round_trip() {
     let p = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
         .given_name("Test")
         .family_name("Person")
         .date_of_birth(dob(1990, 1, 1))
@@ -1098,8 +1146,10 @@ fn test_match_result_serialization_round_trip() {
     assert_eq!(r.score, back.score);
     assert_eq!(r.is_match, back.is_match);
     assert_eq!(
-        r.breakdown.united_kingdom_national_health_service_number_score,
-        back.breakdown.united_kingdom_national_health_service_number_score
+        r.breakdown
+            .united_kingdom_national_health_service_number_score,
+        back.breakdown
+            .united_kingdom_national_health_service_number_score
     );
 }
 
@@ -1176,9 +1226,15 @@ fn test_score_is_in_unit_interval() {
             .family_name("BB")
             .date_of_birth(dob(2000, 1, 1))
             .build(),
-        Person::builder().united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A).build(),
         Person::builder()
-            .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_B)
+            .united_kingdom_national_health_service_number(
+                UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+            )
+            .build(),
+        Person::builder()
+            .united_kingdom_national_health_service_number(
+                UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_B,
+            )
             .given_name("X")
             .build(),
         Person::builder().build(),
@@ -1357,8 +1413,14 @@ fn test_uk_hc_number_does_not_cross_match_with_united_kingdom_national_health_se
     // Health Service Number and the
     // other as an H&C Number — different registries, no deterministic
     // match by identifier alone.
-    let p1 = Person::builder().united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A).build();
-    let p2 = Person::builder().uk_hc_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A).build();
+    let p1 = Person::builder()
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
+        .build();
+    let p2 = Person::builder()
+        .uk_hc_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+        .build();
     assert!(!MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
@@ -1700,7 +1762,9 @@ fn test_uk_chi_number_does_not_cross_match_united_kingdom_national_health_servic
     // Health Service Number on the
     // other does not deterministically match.
     let p1 = Person::builder().uk_chi_number(CHI_A_UK).build();
-    let p2 = Person::builder().united_kingdom_national_health_service_number(CHI_A_UK).build();
+    let p2 = Person::builder()
+        .united_kingdom_national_health_service_number(CHI_A_UK)
+        .build();
     assert!(!MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
@@ -1719,7 +1783,9 @@ fn test_uk_chi_number_does_not_cross_match_uk_hc_number() {
 #[test]
 fn test_breakdown_carries_independent_score_per_scheme() {
     let p1 = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
         .fr_nir(NIR_A_FR)
         .es_tsi(TSI_A_ES)
         .ie_ihi(IHI_A_IE)
@@ -1736,7 +1802,11 @@ fn test_breakdown_carries_independent_score_per_scheme() {
         .build();
     let p2 = p1.clone();
     let r = MatchingEngine::default_config().match_persons(&p1, &p2);
-    assert_eq!(r.breakdown.united_kingdom_national_health_service_number_score, Some(1.0));
+    assert_eq!(
+        r.breakdown
+            .united_kingdom_national_health_service_number_score,
+        Some(1.0)
+    );
     assert_eq!(r.breakdown.fr_nir_score, Some(1.0));
     assert_eq!(r.breakdown.es_tsi_score, Some(1.0));
     assert_eq!(r.breakdown.ie_ihi_score, Some(1.0));
@@ -2769,13 +2839,23 @@ fn test_batch_match_one_to_many_filtered_for_is_match() {
     // returns everything and lets the consumer decide.
     let engine = MatchingEngine::default_config();
     let query = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
         .given_name("John")
         .family_name("Smith")
         .build();
     let candidates = vec![
-        Person::builder().united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A).build(),
-        Person::builder().united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_B).build(),
+        Person::builder()
+            .united_kingdom_national_health_service_number(
+                UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+            )
+            .build(),
+        Person::builder()
+            .united_kingdom_national_health_service_number(
+                UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_B,
+            )
+            .build(),
         query.clone(),
     ];
     let results = engine.match_one_to_many(&query, &candidates);
@@ -3515,11 +3595,14 @@ fn test_country_passport_validators_compose_with_passport_book() {
 }
 
 #[test]
-fn test_uk_chi_does_not_cross_match_uk_nino_or_united_kingdom_national_health_service_number_or_uk_hc() {
+fn test_uk_chi_does_not_cross_match_uk_nino_or_united_kingdom_national_health_service_number_or_uk_hc()
+ {
     // Three UK scheme-local identifiers must never cross-match. Use
     // the same characters where possible to make the test sharper.
     let chi = Person::builder().uk_chi_number("0101701233").build();
-    let uknhsn = Person::builder().united_kingdom_national_health_service_number("0101701233").build();
+    let uknhsn = Person::builder()
+        .united_kingdom_national_health_service_number("0101701233")
+        .build();
     let hc = Person::builder().uk_hc_number("0101701233").build();
     let engine = MatchingEngine::default_config();
     assert!(!engine.deterministic_match(&chi, &uknhsn));
@@ -4130,7 +4213,9 @@ fn test_multiple_birth_legacy_payload_deserialises_to_none() {
 #[test]
 fn test_serialization_round_trip_carries_all_identifiers() {
     let p = Person::builder()
-        .united_kingdom_national_health_service_number(UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A)
+        .united_kingdom_national_health_service_number(
+            UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_A,
+        )
         .fr_nir(NIR_A_FR)
         .es_tsi(TSI_A_ES)
         .ie_ihi(IHI_A_IE)

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the privacy layer.
 //!
 //! Measures `mask_place` (rich vs. minimal record) and `gdpr_export` (single

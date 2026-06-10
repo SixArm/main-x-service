@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for the REST API endpoints.
 //!
 //! These tests build a real [`Router`](axum::Router) via

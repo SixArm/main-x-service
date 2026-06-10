@@ -435,6 +435,7 @@ impl MatchConfig {
     /// assert!((c.match_threshold - 0.95).abs() < 1e-9);
     /// assert!(c.strict_mode);
     /// ```
+    #[must_use]
     pub fn strict() -> Self {
         Self {
             match_threshold: 0.95,
@@ -454,6 +455,7 @@ impl MatchConfig {
     /// assert!((c.match_threshold - 0.75).abs() < 1e-9);
     /// assert!(c.use_phonetic_matching);
     /// ```
+    #[must_use]
     pub fn lenient() -> Self {
         Self {
             match_threshold: 0.75,
@@ -521,6 +523,7 @@ impl Confidence {
     /// assert_eq!(Confidence::from_score(-0.5),     Confidence::Low);
     /// assert_eq!(Confidence::from_score(2.0),      Confidence::High);
     /// ```
+    #[must_use]
     pub fn from_score(score: f64) -> Self {
         if score >= 0.90 {
             Confidence::High
@@ -788,6 +791,8 @@ pub struct MatchBreakdown {
 /// # let _ = (engine_a, engine_b);
 /// ```
 pub struct MatchingEngine {
+    /// Tunable weights, thresholds, and algorithm selections applied to
+    /// every comparison this engine performs.
     config: MatchConfig,
 }
 
@@ -799,6 +804,7 @@ impl MatchingEngine {
     /// let engine = MatchingEngine::new(MatchConfig::lenient());
     /// # let _ = engine;
     /// ```
+    #[must_use]
     pub fn new(config: MatchConfig) -> Self {
         Self { config }
     }
@@ -810,6 +816,7 @@ impl MatchingEngine {
     /// let engine = MatchingEngine::default_config();
     /// # let _ = engine;
     /// ```
+    #[must_use]
     pub fn default_config() -> Self {
         Self::new(MatchConfig::default())
     }
@@ -833,6 +840,7 @@ impl MatchingEngine {
     /// assert!(result.is_match);
     /// assert!(result.score > 0.99);
     /// ```
+    #[must_use]
     pub fn match_persons(&self, person1: &Person, person2: &Person) -> MatchResult {
         let breakdown = self.calculate_breakdown(person1, person2);
         let score = self.calculate_weighted_score(&breakdown);
@@ -905,6 +913,7 @@ impl MatchingEngine {
     /// let r = MatchingEngine::default_config().match_one_to_many(&q, &[]);
     /// assert!(r.is_empty());
     /// ```
+    #[must_use]
     pub fn match_one_to_many(&self, query: &Person, candidates: &[Person]) -> Vec<MatchResult> {
         candidates
             .iter()
@@ -941,6 +950,7 @@ impl MatchingEngine {
     /// assert!(ranked[0].1.score >= ranked[1].1.score);
     /// assert!(ranked[1].1.score >= ranked[2].1.score);
     /// ```
+    #[must_use]
     pub fn rank_one_to_many(
         &self,
         query: &Person,
@@ -1200,6 +1210,11 @@ impl MatchingEngine {
         name_match && dob_match && gender_match
     }
 
+    /// Compute the full per-field [`MatchBreakdown`] for two persons.
+    ///
+    /// Every scorable field is compared independently. A field absent or
+    /// unparseable on either side yields `None` for that component rather
+    /// than `0.0`, so missing data never penalises the pair.
     fn calculate_breakdown(&self, person1: &Person, person2: &Person) -> MatchBreakdown {
         MatchBreakdown {
             united_kingdom_national_health_service_number_score: identifier_score(
@@ -1388,13 +1403,24 @@ impl MatchingEngine {
         }
     }
 
+    /// Collapse a [`MatchBreakdown`] into a single score in `[0.0, 1.0]`.
+    ///
+    /// Each present component contributes `score × weight`; the result is
+    /// the weight-renormalised average over only the components that fired,
+    /// so absent fields neither raise nor lower the outcome. Returns `0.0`
+    /// when no component was scorable.
     fn calculate_weighted_score(&self, breakdown: &MatchBreakdown) -> f64 {
         let mut total_weight = 0.0;
         let mut weighted_sum = 0.0;
 
         if let Some(score) = breakdown.united_kingdom_national_health_service_number_score {
-            weighted_sum += score * self.config.united_kingdom_national_health_service_number_weight;
-            total_weight += self.config.united_kingdom_national_health_service_number_weight;
+            weighted_sum += score
+                * self
+                    .config
+                    .united_kingdom_national_health_service_number_weight;
+            total_weight += self
+                .config
+                .united_kingdom_national_health_service_number_weight;
         }
         if let Some(score) = breakdown.fr_nir_score {
             weighted_sum += score * self.config.fr_nir_weight;
@@ -1628,6 +1654,10 @@ impl MatchingEngine {
         }
     }
 
+    /// Score the given-name pair, blending in 5% of a middle-name
+    /// similarity when both persons carry a middle name (spec FR-49 / §12.2).
+    ///
+    /// Returns `None` unless both persons have a given name.
     fn score_given_name(&self, person1: &Person, person2: &Person) -> Option<f64> {
         let (g1, g2) = match (&person1.given_name, &person2.given_name) {
             (Some(a), Some(b)) => (a.as_str(), b.as_str()),
@@ -1650,6 +1680,8 @@ impl MatchingEngine {
         Some(blended)
     }
 
+    /// Score the family-name pair via [`Self::score_name`], or `None` if
+    /// either side is missing.
     fn score_family_name(&self, person1: &Person, person2: &Person) -> Option<f64> {
         match (&person1.family_name, &person2.family_name) {
             (Some(name1), Some(name2)) => Some(self.score_name(name1, name2)),
@@ -1657,6 +1689,11 @@ impl MatchingEngine {
         }
     }
 
+    /// Normalise and compare two name strings under the configured
+    /// similarity algorithm, then apply the nickname-table boost.
+    ///
+    /// The boost lifts the score to at least `0.9` when both normalised
+    /// forms share a nickname equivalence class; it never lowers a score.
     fn score_name(&self, name1: &str, name2: &str) -> f64 {
         let norm1 = Normalizer::normalize_name(name1);
         let norm2 = Normalizer::normalize_name(name2);
@@ -1680,6 +1717,8 @@ impl MatchingEngine {
         }
     }
 
+    /// Score the date-of-birth pair via [`score_dob_pair`], or `None` if
+    /// either side is missing.
     fn score_date_of_birth(&self, person1: &Person, person2: &Person) -> Option<f64> {
         match (person1.date_of_birth, person2.date_of_birth) {
             (Some(dob1), Some(dob2)) => Some(score_dob_pair(dob1, dob2)),
@@ -1687,6 +1726,8 @@ impl MatchingEngine {
         }
     }
 
+    /// Score gender as `1.0` for an exact match and `0.0` otherwise, or
+    /// `None` if either side is missing.
     fn score_gender(&self, person1: &Person, person2: &Person) -> Option<f64> {
         match (person1.gender, person2.gender) {
             (Some(g1), Some(g2)) => Some(if g1 == g2 { 1.0 } else { 0.0 }),
@@ -1694,6 +1735,8 @@ impl MatchingEngine {
         }
     }
 
+    /// Score blood type as `1.0` for an exact match and `0.0` otherwise,
+    /// or `None` if either side is missing.
     fn score_blood_type(&self, person1: &Person, person2: &Person) -> Option<f64> {
         match (person1.blood_type, person2.blood_type) {
             (Some(b1), Some(b2)) => Some(if b1 == b2 { 1.0 } else { 0.0 }),
@@ -1701,6 +1744,8 @@ impl MatchingEngine {
         }
     }
 
+    /// Score the multiple-birth ordinal as `1.0` for an exact match and
+    /// `0.0` otherwise, or `None` if either side is missing.
     fn score_multiple_birth(&self, person1: &Person, person2: &Person) -> Option<f64> {
         match (person1.multiple_birth, person2.multiple_birth) {
             (Some(m1), Some(m2)) => Some(f64::from(m1 == m2)),
@@ -1708,6 +1753,11 @@ impl MatchingEngine {
         }
     }
 
+    /// Score address similarity, taking the best score across the cartesian
+    /// product of each person's current plus historical addresses, so a
+    /// prior address can still match after a move (spec §12.4 / FR-48).
+    ///
+    /// Returns `None` when either person has no address on record.
     fn score_address(&self, person1: &Person, person2: &Person) -> Option<f64> {
         // Consider the current address plus any historical addresses
         // recorded on each person. The reported `address_score` is the
@@ -1770,6 +1820,12 @@ impl MatchingEngine {
         Some(score_dob_pair(person1.death_date?, person2.death_date?))
     }
 
+    /// Compare two single [`Address`] values into a sub-score in `[0.0, 1.0]`.
+    ///
+    /// Postcode (weight `0.5`), city (`0.3`), and line 1 (`0.2`) each
+    /// contribute when present on both sides; the result is the
+    /// weight-renormalised average, defaulting to `0.5` when nothing
+    /// overlaps (spec §12.3, resolves OQ-4).
     fn compare_addresses(&self, addr1: &Address, addr2: &Address) -> f64 {
         // Each sub-component contributes its own raw score in `[0.0, 1.0]`
         // and a weight. The final sub-score is the weight-renormalised
@@ -1818,6 +1874,12 @@ impl MatchingEngine {
         }
     }
 
+    /// Score two phone numbers, preferring an E.164-normalised comparison
+    /// and falling back to national-significant digits when either side
+    /// cannot be parsed to E.164.
+    ///
+    /// Each person's landline is tried before their mobile. Returns `None`
+    /// when neither person has any number.
     fn score_phone(&self, person1: &Person, person2: &Person) -> Option<f64> {
         let phone1 = person1.phone.as_ref().or(person1.mobile.as_ref())?;
         let phone2 = person2.phone.as_ref().or(person2.mobile.as_ref())?;
@@ -1840,6 +1902,9 @@ impl MatchingEngine {
         Some(f64::from(norm1 == norm2))
     }
 
+    /// Score two email addresses for exact equality after canonicalisation
+    /// (lower-casing, plus optional Gmail dot-folding). Returns `None` when
+    /// either address is missing or fails to canonicalise.
     fn score_email(&self, person1: &Person, person2: &Person) -> Option<f64> {
         let email1 = person1.email.as_ref()?;
         let email2 = person2.email.as_ref()?;
@@ -1849,6 +1914,10 @@ impl MatchingEngine {
         Some(f64::from(canonical1 == canonical2))
     }
 
+    /// Score the phonetic agreement of given and family names, averaging a
+    /// `1.0`/`0.0` match on each Soundex-coded component.
+    ///
+    /// Returns `None` unless both persons have given and family names.
     fn score_phonetic_names(&self, person1: &Person, person2: &Person) -> Option<f64> {
         let p1_given_name = person1.given_name.as_ref()?;
         let p1_given_name_phonetic = Normalizer::phonetic_code(p1_given_name);
@@ -1862,13 +1931,14 @@ impl MatchingEngine {
 
         let given_name_match = f64::from(p1_given_name_phonetic == p2_given_name_phonetic);
         let family_name_match = f64::from(p1_family_name_phonetic == p2_family_name_phonetic);
-        Some((given_name_match + family_name_match) / 2.0)
+        Some(f64::midpoint(given_name_match, family_name_match))
     }
 }
 
 /// Return `true` iff both raw identifier strings parse via `parser` to the
 /// same canonical form. Both `None` or a parse failure on either side
 /// yields `false` — this helper backs deterministic identifier matching.
+#[allow(clippy::ref_option)] // called on `&person.field` across ~40 schemes
 fn identifier_equal<F>(a: &Option<String>, b: &Option<String>, parser: F) -> bool
 where
     F: Fn(&str) -> Option<String>,
@@ -1885,6 +1955,7 @@ where
 /// Return `Some(1.0)` if both inputs parse and are equal, `Some(0.0)` if
 /// both parse but differ, or `None` if either input is absent or fails to
 /// parse — mirroring the existing per-field scoring contract.
+#[allow(clippy::ref_option)] // called on `&person.field` across ~40 schemes
 fn identifier_score<F>(a: &Option<String>, b: &Option<String>, parser: F) -> Option<f64>
 where
     F: Fn(&str) -> Option<String>,
@@ -1974,6 +2045,11 @@ fn score_named_place(a: &Address, b: &Address) -> Option<f64> {
     }
 }
 
+/// Score a pair of dates: `1.0` when equal, `0.5` when they differ only by
+/// a day/month transposition within the same year, `0.0` otherwise.
+///
+/// The transposition allowance absorbs a common data-entry error and is
+/// shared by date-of-birth and date-of-death scoring.
 fn score_dob_pair(dob1: Date, dob2: Date) -> f64 {
     if dob1 == dob2 {
         return 1.0;
@@ -1989,6 +2065,7 @@ fn score_dob_pair(dob1: Date, dob2: Date) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::float_cmp)] // scores are exact constants in assertions
     use super::*;
     use crate::models::Gender;
 
@@ -2022,7 +2099,12 @@ mod tests {
         let json = serde_json::to_string(&cfg).expect("serialise");
         let back: MatchConfig = serde_json::from_str(&json).expect("deserialise");
         assert!((cfg.match_threshold - back.match_threshold).abs() < 1e-12);
-        assert!((cfg.united_kingdom_national_health_service_number_weight - back.united_kingdom_national_health_service_number_weight).abs() < 1e-12);
+        assert!(
+            (cfg.united_kingdom_national_health_service_number_weight
+                - back.united_kingdom_national_health_service_number_weight)
+                .abs()
+                < 1e-12
+        );
         assert_eq!(cfg.use_phonetic_matching, back.use_phonetic_matching);
         assert!(matches!(back.name_algorithm, SimilarityAlgorithm::Combined));
         assert_eq!(cfg.strict_mode, back.strict_mode);
@@ -2164,7 +2246,9 @@ mod tests {
             .build();
         let r = MatchingEngine::default_config().match_persons(&a, &b);
         assert_eq!(
-            r.breakdown.united_kingdom_national_health_service_number_score, None,
+            r.breakdown
+                .united_kingdom_national_health_service_number_score,
+            None,
             "unparseable United Kingdom National Health Service Numbers should not produce a 0.0 penalty"
         );
         assert!(r.is_match, "should still match on demographics");

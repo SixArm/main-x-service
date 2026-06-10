@@ -4,8 +4,8 @@ Sibling to [`course-service-rust-crate/`](../course-service-rust-crate/). The Ru
 
 ## Single source of truth
 
-- The service's [`spec.md`](../course-service-rust-crate/spec.md) and [`AGENTS/`](../course-service-rust-crate/AGENTS/) describe the API contract. If a field disappears from `Course` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
-- This project has its own [`spec.md`](spec.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
+- The service's [`spec.md`](../course-service-rust-crate/spec/index.md) and [`AGENTS/`](../course-service-rust-crate/AGENTS/) describe the API contract. If a field disappears from `Course` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
+- This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
 
 ## Three-part change rule
 

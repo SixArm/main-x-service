@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! End-to-end tests for the REST API, driving the real Axum router via
 //! `tower`'s `oneshot` against the JSON HTTP surface.
 //!

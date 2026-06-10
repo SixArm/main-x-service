@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Matching micro-benchmarks. Establishes a per-pair scoring
 //! baseline for the canonical `course-matcher` algorithm driven
 //! through the service's `CourseMatcher` facade + adapter.

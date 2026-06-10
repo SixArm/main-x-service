@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Search micro-benchmarks. Establishes baselines for indexing one
 //! course, exact search, fuzzy search, and the duplicate-detector
 //! blocking query against a populated 100-course index.

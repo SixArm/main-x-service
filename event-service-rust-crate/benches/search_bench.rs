@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Benchmarks for the Tantivy-backed event search engine.
 //!
 //! Measures single-event indexing throughput and full-text / fuzzy

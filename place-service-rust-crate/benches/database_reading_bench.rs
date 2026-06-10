@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks proxying database-read deserialization cost.
 //!
 //! Without a live database, these measure the in-memory cost of constructing

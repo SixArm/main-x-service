@@ -1,7 +1,7 @@
 # AGENTS — Event Service
 
 How to work in this crate. The canonical artefact is
-[`spec.md`](spec.md). When in doubt, the spec wins. See
+[`spec.md`](spec/index.md). When in doubt, the spec wins. See
 [`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md)
 for the discipline this crate practises.
 

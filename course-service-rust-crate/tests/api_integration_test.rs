@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! End-to-end integration tests over the full REST surface.
 //!
 //! All tests are marked `#[ignore]` so they are not part of the

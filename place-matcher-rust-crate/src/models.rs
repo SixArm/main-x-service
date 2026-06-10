@@ -6,7 +6,7 @@
 //! text transformations that the matcher applies to these fields.
 //!
 //! All public types here are `Serialize + Deserialize` so they round-trip
-//! through JSON, MessagePack, or any other `serde` format.
+//! through JSON, `MessagePack`, or any other `serde` format.
 //!
 //! ## Building a place
 //!
@@ -91,6 +91,7 @@ impl Address {
     /// assert!(a.line1.is_none());
     /// assert!(a.postcode.is_none());
     /// ```
+    #[must_use]
     pub fn new() -> Self {
         Self {
             line1: None,
@@ -109,24 +110,28 @@ impl Address {
     /// let a = Address::new().with_line1("10 Downing Street");
     /// assert_eq!(a.line1.as_deref(), Some("10 Downing Street"));
     /// ```
+    #[must_use]
     pub fn with_line1(mut self, value: impl Into<String>) -> Self {
         self.line1 = Some(value.into());
         self
     }
 
     /// Fluent setter for `line2`.
+    #[must_use]
     pub fn with_line2(mut self, value: impl Into<String>) -> Self {
         self.line2 = Some(value.into());
         self
     }
 
     /// Fluent setter for `city`.
+    #[must_use]
     pub fn with_city(mut self, value: impl Into<String>) -> Self {
         self.city = Some(value.into());
         self
     }
 
     /// Fluent setter for `county`.
+    #[must_use]
     pub fn with_county(mut self, value: impl Into<String>) -> Self {
         self.county = Some(value.into());
         self
@@ -139,12 +144,14 @@ impl Address {
     /// let a = Address::new().with_postcode("CF10 1AA");
     /// assert_eq!(a.postcode.as_deref(), Some("CF10 1AA"));
     /// ```
+    #[must_use]
     pub fn with_postcode(mut self, value: impl Into<String>) -> Self {
         self.postcode = Some(value.into());
         self
     }
 
     /// Fluent setter for `country`.
+    #[must_use]
     pub fn with_country(mut self, value: impl Into<String>) -> Self {
         self.country = Some(value.into());
         self
@@ -166,7 +173,7 @@ impl Default for Address {
 /// string is structurally equal (`PartialEq`).
 ///
 /// The enum is `#[non_exhaustive]` so future variants can be added without
-/// breaking SemVer for downstream pattern matches.
+/// breaking `SemVer` for downstream pattern matches.
 ///
 /// # Example
 ///
@@ -265,7 +272,7 @@ pub enum PlaceCategory {
 /// their string values happen to coincide — see [`PlaceId`].
 ///
 /// The enum is `#[non_exhaustive]` so future variants can be added without
-/// breaking SemVer for downstream pattern matches.
+/// breaking `SemVer` for downstream pattern matches.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum PlaceIdScheme {
@@ -277,7 +284,7 @@ pub enum PlaceIdScheme {
     OsmWay,
     /// OpenStreetMap relation — a multi-feature aggregate.
     OsmRelation,
-    /// GeoNames numeric identifier (`geonameid`).
+    /// `GeoNames` numeric identifier (`geonameid`).
     GeoNames,
     /// Wikidata QID (e.g. `Q243`).
     Wikidata,
@@ -469,17 +476,21 @@ impl Place {
     ///
     /// assert_eq!(p.name.as_deref(), Some("Big Ben"));
     /// ```
+    #[must_use]
     pub fn builder() -> PlaceBuilder {
         PlaceBuilder::default()
     }
 
     /// Validate that the place carries a primary name.
     ///
-    /// Returns `Ok(())` if `name` is set. Otherwise returns
-    /// [`crate::MatchingError::MissingField`].
+    /// Returns `Ok(())` if `name` is set.
     ///
     /// This is **not** invoked automatically by the matcher — call it at the
     /// system boundary when you ingest data, not on every comparison.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::MatchingError::MissingField`] when `name` is absent.
     ///
     /// # Example
     ///
@@ -548,6 +559,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().name("Eiffel Tower").build();
     /// assert_eq!(p.name.as_deref(), Some("Eiffel Tower"));
     /// ```
+    #[must_use]
     pub fn name<S: Into<String>>(mut self, value: S) -> Self {
         self.name = Some(value.into());
         self
@@ -562,6 +574,7 @@ impl PlaceBuilder {
     ///     .build();
     /// assert_eq!(p.alternate_names.len(), 2);
     /// ```
+    #[must_use]
     pub fn alternate_names(mut self, value: Vec<String>) -> Self {
         self.alternate_names = value;
         self
@@ -577,6 +590,7 @@ impl PlaceBuilder {
     ///     .build();
     /// assert_eq!(p.alternate_names.len(), 2);
     /// ```
+    #[must_use]
     pub fn add_alternate_name<S: Into<String>>(mut self, value: S) -> Self {
         self.alternate_names.push(value.into());
         self
@@ -589,6 +603,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().latitude(48.858_222).build();
     /// assert_eq!(p.latitude, Some(48.858_222));
     /// ```
+    #[must_use]
     pub fn latitude(mut self, value: f64) -> Self {
         self.latitude = Some(value);
         self
@@ -601,6 +616,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().longitude(2.294_500).build();
     /// assert_eq!(p.longitude, Some(2.294_500));
     /// ```
+    #[must_use]
     pub fn longitude(mut self, value: f64) -> Self {
         self.longitude = Some(value);
         self
@@ -613,6 +629,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().category(PlaceCategory::Museum).build();
     /// assert_eq!(p.category, Some(PlaceCategory::Museum));
     /// ```
+    #[must_use]
     pub fn category(mut self, value: PlaceCategory) -> Self {
         self.category = Some(value);
         self
@@ -626,6 +643,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().place_ids(vec![id.clone()]).build();
     /// assert_eq!(p.place_ids, vec![id]);
     /// ```
+    #[must_use]
     pub fn place_ids(mut self, value: Vec<PlaceId>) -> Self {
         self.place_ids = value;
         self
@@ -640,6 +658,7 @@ impl PlaceBuilder {
     ///     .build();
     /// assert_eq!(p.place_ids.len(), 1);
     /// ```
+    #[must_use]
     pub fn add_place_id(mut self, value: PlaceId) -> Self {
         self.place_ids.push(value);
         self
@@ -654,6 +673,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().address(a).build();
     /// assert_eq!(p.address.unwrap().postcode.as_deref(), Some("CF10 1AA"));
     /// ```
+    #[must_use]
     pub fn address(mut self, value: Address) -> Self {
         self.address = Some(value);
         self
@@ -666,6 +686,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().phone("029 2034 5678").build();
     /// assert_eq!(p.phone.as_deref(), Some("029 2034 5678"));
     /// ```
+    #[must_use]
     pub fn phone<S: Into<String>>(mut self, value: S) -> Self {
         self.phone = Some(value.into());
         self
@@ -678,6 +699,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().email("info@example.org").build();
     /// assert_eq!(p.email.as_deref(), Some("info@example.org"));
     /// ```
+    #[must_use]
     pub fn email<S: Into<String>>(mut self, value: S) -> Self {
         self.email = Some(value.into());
         self
@@ -690,6 +712,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().local_id("REF-12345").build();
     /// assert_eq!(p.local_id.as_deref(), Some("REF-12345"));
     /// ```
+    #[must_use]
     pub fn local_id<S: Into<String>>(mut self, value: S) -> Self {
         self.local_id = Some(value.into());
         self
@@ -702,6 +725,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().altitude_as_metre(120.5).build();
     /// assert_eq!(p.altitude_as_metre, Some(120.5));
     /// ```
+    #[must_use]
     pub fn altitude_as_metre(mut self, value: f64) -> Self {
         self.altitude_as_metre = Some(value);
         self
@@ -714,6 +738,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().elevation_as_metre(-430.0).build();
     /// assert_eq!(p.elevation_as_metre, Some(-430.0));
     /// ```
+    #[must_use]
     pub fn elevation_as_metre(mut self, value: f64) -> Self {
         self.elevation_as_metre = Some(value);
         self
@@ -726,6 +751,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().area_as_metre_2(10_000.0).build();
     /// assert_eq!(p.area_as_metre_2, Some(10_000.0));
     /// ```
+    #[must_use]
     pub fn area_as_metre_2(mut self, value: f64) -> Self {
         self.area_as_metre_2 = Some(value);
         self
@@ -738,6 +764,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().country_code_as_iso_3166_1_alpha_2("GB").build();
     /// assert_eq!(p.country_code_as_iso_3166_1_alpha_2.as_deref(), Some("GB"));
     /// ```
+    #[must_use]
     pub fn country_code_as_iso_3166_1_alpha_2<S: Into<String>>(mut self, value: S) -> Self {
         self.country_code_as_iso_3166_1_alpha_2 = Some(value.into());
         self
@@ -750,6 +777,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().maximum_capacity_count(82_500).build();
     /// assert_eq!(p.maximum_capacity_count, Some(82_500));
     /// ```
+    #[must_use]
     pub fn maximum_capacity_count(mut self, value: u32) -> Self {
         self.maximum_capacity_count = Some(value);
         self
@@ -762,6 +790,7 @@ impl PlaceBuilder {
     /// let p = Place::builder().name("Big Ben").build();
     /// assert!(p.latitude.is_none());
     /// ```
+    #[must_use]
     pub fn build(self) -> Place {
         Place {
             name: self.name,
@@ -861,10 +890,7 @@ mod tests {
         assert_eq!(p.altitude_as_metre, Some(48.0));
         assert_eq!(p.elevation_as_metre, Some(45.5));
         assert_eq!(p.area_as_metre_2, Some(40_000.0));
-        assert_eq!(
-            p.country_code_as_iso_3166_1_alpha_2.as_deref(),
-            Some("GB"),
-        );
+        assert_eq!(p.country_code_as_iso_3166_1_alpha_2.as_deref(), Some("GB"),);
         assert_eq!(p.maximum_capacity_count, Some(90_000));
     }
 
@@ -880,7 +906,13 @@ mod tests {
 
     #[test]
     fn place_validate_requires_a_name() {
-        assert!(Place::builder().name("Eiffel Tower").build().validate().is_ok());
+        assert!(
+            Place::builder()
+                .name("Eiffel Tower")
+                .build()
+                .validate()
+                .is_ok()
+        );
         let err = Place::builder()
             .build()
             .validate()

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Bridge-path benchmarks: service-side `Worker` → `to_matcher_worker` →
 //! `worker_matcher::MatchingEngine::match_workers`.
 //!

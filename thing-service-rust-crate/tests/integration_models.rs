@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for the domain models: [`Thing`] construction /
 //! serialization / soft-delete, [`ThingIdentifier`] round-trips, and the
 //! [`Consent`] lifecycle.

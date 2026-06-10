@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the `place-matcher` crate.
 //!
 //! Run with `cargo bench`. The harness covers the hot paths a downstream

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Example showing custom matching configuration.
 //!
 //! Walks the same pair of places through several tunings of
@@ -90,8 +92,14 @@ fn main() {
     let lenient = MatchingEngine::new(MatchConfig::lenient());
     let rs = strict.match_places(&p1, &p2);
     let rl = lenient.match_places(&p1, &p2);
-    println!("Strict preset:  score {:.3}  is_match {}", rs.score, rs.is_match);
-    println!("Lenient preset: score {:.3}  is_match {}", rl.score, rl.is_match);
+    println!(
+        "Strict preset:  score {:.3}  is_match {}",
+        rs.score, rs.is_match
+    );
+    println!(
+        "Lenient preset: score {:.3}  is_match {}",
+        rl.score, rl.is_match
+    );
     println!();
 
     // Exact-name algorithm: tiny name differences become a hard fail.

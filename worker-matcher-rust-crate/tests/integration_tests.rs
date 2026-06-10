@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for worker matcher.
 //!
 //! These exercise the **public API** as a downstream user would — building
@@ -9,10 +11,15 @@
 //! All fixtures use synthetic, drama-reserved, or self-consistent NHS-format
 //! values; no real PII appears here.
 
+// Test code: exact-score `==` comparisons are valid (the engine is
+// deterministic), `worker1`/`worker2`-style names are intentionally parallel,
+// and end-to-end scenario tests are long by nature.
+#![allow(clippy::float_cmp, clippy::similar_names, clippy::too_many_lines)]
+
 use jiff::civil::Date;
 use worker_matcher::{
     Address, BloodType, Confidence, Gender, MatchConfig, MatchingEngine, NicknameTable, Normalizer,
-    PassportBook, Worker, SimilarityAlgorithm, identifiers,
+    PassportBook, SimilarityAlgorithm, Worker, identifiers,
 };
 
 // ---------- helpers ----------

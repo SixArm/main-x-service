@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for boundary conditions and cross-module workflows.
 //!
 //! These pin validation boundaries (coordinate limits, GLN length, URL

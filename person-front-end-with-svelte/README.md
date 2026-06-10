@@ -163,4 +163,4 @@ See the commented example in `src/routes/+layout.svelte`. The MVP currently uses
 
 ## Status
 
-MVP scaffold. See [`spec.md`](spec.md) for the canonical work queue (§13 Tasks).
+MVP scaffold. See [`spec.md`](spec/index.md) for the canonical work queue (§13 Tasks).

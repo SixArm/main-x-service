@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the matching layer.
 //!
 //! Covers the individual scoring components (name Jaro-Winkler, geo Haversine

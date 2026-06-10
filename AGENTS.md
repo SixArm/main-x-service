@@ -13,12 +13,12 @@ per-crate `AGENTS/spec-driven-development.md` files for the discipline.
 
 | Crate | Entity | Spec | Index |
 |---|---|---|---|
-| [Person Service](person-service-rust-crate/) | Person (general) | [spec](person-service-rust-crate/spec.md) | [index](person-service-rust-crate/index.md) |
-| [Worker Service](worker-service-rust-crate/) | Worker (workforce / professional) | [spec](worker-service-rust-crate/spec.md) | [index](worker-service-rust-crate/index.md) |
-| [Place Service](place-service-rust-crate/) | Place (schema.org/Place) | [spec](place-service-rust-crate/spec.md) | [index](place-service-rust-crate/index.md) |
-| [Thing Service](thing-service-rust-crate/) | Thing (schema.org/Thing — generic) | [spec](thing-service-rust-crate/spec.md) | [index](thing-service-rust-crate/index.md) |
-| [Event Service](event-service-rust-crate/) | Event (schema.org/Event — time-bounded) | [spec](event-service-rust-crate/spec.md) | [index](event-service-rust-crate/index.md) |
-| [Course Service](course-service-rust-crate/) | Course (schema.org/Course) — template + `CourseInstance` sub-resource | [spec](course-service-rust-crate/spec.md) | [index](course-service-rust-crate/index.md) |
+| [Person Service](person-service-rust-crate/) | Person (general) | [spec](person-service-rust-crate/spec/index.md) | [index](person-service-rust-crate/index.md) |
+| [Worker Service](worker-service-rust-crate/) | Worker (workforce / professional) | [spec](worker-service-rust-crate/spec/index.md) | [index](worker-service-rust-crate/index.md) |
+| [Place Service](place-service-rust-crate/) | Place (schema.org/Place) | [spec](place-service-rust-crate/spec/index.md) | [index](place-service-rust-crate/index.md) |
+| [Thing Service](thing-service-rust-crate/) | Thing (schema.org/Thing — generic) | [spec](thing-service-rust-crate/spec/index.md) | [index](thing-service-rust-crate/index.md) |
+| [Event Service](event-service-rust-crate/) | Event (schema.org/Event — time-bounded) | [spec](event-service-rust-crate/spec/index.md) | [index](event-service-rust-crate/index.md) |
+| [Course Service](course-service-rust-crate/) | Course (schema.org/Course) — template + `CourseInstance` sub-resource | [spec](course-service-rust-crate/spec/index.md) | [index](course-service-rust-crate/index.md) |
 
 ### Matcher crates
 
@@ -30,12 +30,12 @@ the corresponding service crate's matching layer.
 
 | Crate | Entity | Spec | Index |
 |---|---|---|---|
-| [Person Matcher](person-matcher-rust-crate/) | Person | [spec](person-matcher-rust-crate/spec.md) | [index](person-matcher-rust-crate/index.md) |
-| [Worker Matcher](worker-matcher-rust-crate/) | Worker | [spec](worker-matcher-rust-crate/spec.md) | [index](worker-matcher-rust-crate/index.md) |
-| [Place Matcher](place-matcher-rust-crate/) | Place | [spec](place-matcher-rust-crate/spec.md) | [index](place-matcher-rust-crate/index.md) |
-| [Thing Matcher](thing-matcher-rust-crate/) | Thing | [spec](thing-matcher-rust-crate/spec.md) | [index](thing-matcher-rust-crate/index.md) |
-| [Event Matcher](event-matcher-rust-crate/) | Event | [spec](event-matcher-rust-crate/spec.md) | [index](event-matcher-rust-crate/index.md) |
-| [Course Matcher](course-matcher-rust-crate/) | Course | [spec](course-matcher-rust-crate/spec.md) | [index](course-matcher-rust-crate/index.md) |
+| [Person Matcher](person-matcher-rust-crate/) | Person | [spec](person-matcher-rust-crate/spec/index.md) | [index](person-matcher-rust-crate/index.md) |
+| [Worker Matcher](worker-matcher-rust-crate/) | Worker | [spec](worker-matcher-rust-crate/spec/index.md) | [index](worker-matcher-rust-crate/index.md) |
+| [Place Matcher](place-matcher-rust-crate/) | Place | [spec](place-matcher-rust-crate/spec/index.md) | [index](place-matcher-rust-crate/index.md) |
+| [Thing Matcher](thing-matcher-rust-crate/) | Thing | [spec](thing-matcher-rust-crate/spec/index.md) | [index](thing-matcher-rust-crate/index.md) |
+| [Event Matcher](event-matcher-rust-crate/) | Event | [spec](event-matcher-rust-crate/spec/index.md) | [index](event-matcher-rust-crate/index.md) |
+| [Course Matcher](course-matcher-rust-crate/) | Course | [spec](course-matcher-rust-crate/spec/index.md) | [index](course-matcher-rust-crate/index.md) |
 
 ### Front-end projects
 
@@ -48,12 +48,12 @@ accepted (see `feedback_front_end_drift` memory) — no shared package.
 
 | Project | Consumes | Spec | Changelog |
 |---|---|---|---|
-| [person-front-end-with-svelte](person-front-end-with-svelte/) | [person-service](person-service-rust-crate/) | [spec](person-front-end-with-svelte/spec.md) | [CHANGELOG](person-front-end-with-svelte/CHANGELOG.md) |
-| [worker-front-end-with-svelte](worker-front-end-with-svelte/) | [worker-service](worker-service-rust-crate/) | [spec](worker-front-end-with-svelte/spec.md) | [CHANGELOG](worker-front-end-with-svelte/CHANGELOG.md) |
-| [place-front-end-with-svelte](place-front-end-with-svelte/) | [place-service](place-service-rust-crate/) | [spec](place-front-end-with-svelte/spec.md) | [CHANGELOG](place-front-end-with-svelte/CHANGELOG.md) |
-| [thing-front-end-with-svelte](thing-front-end-with-svelte/) | [thing-service](thing-service-rust-crate/) | [spec](thing-front-end-with-svelte/spec.md) | [CHANGELOG](thing-front-end-with-svelte/CHANGELOG.md) |
-| [event-front-end-with-svelte](event-front-end-with-svelte/) | [event-service](event-service-rust-crate/) | [spec](event-front-end-with-svelte/spec.md) | [CHANGELOG](event-front-end-with-svelte/CHANGELOG.md) |
-| [course-front-end-with-svelte](course-front-end-with-svelte/) | [course-service](course-service-rust-crate/) | [spec](course-front-end-with-svelte/spec.md) | [CHANGELOG](course-front-end-with-svelte/CHANGELOG.md) |
+| [person-front-end-with-svelte](person-front-end-with-svelte/) | [person-service](person-service-rust-crate/) | [spec](person-front-end-with-svelte/spec/index.md) | [CHANGELOG](person-front-end-with-svelte/CHANGELOG.md) |
+| [worker-front-end-with-svelte](worker-front-end-with-svelte/) | [worker-service](worker-service-rust-crate/) | [spec](worker-front-end-with-svelte/spec/index.md) | [CHANGELOG](worker-front-end-with-svelte/CHANGELOG.md) |
+| [place-front-end-with-svelte](place-front-end-with-svelte/) | [place-service](place-service-rust-crate/) | [spec](place-front-end-with-svelte/spec/index.md) | [CHANGELOG](place-front-end-with-svelte/CHANGELOG.md) |
+| [thing-front-end-with-svelte](thing-front-end-with-svelte/) | [thing-service](thing-service-rust-crate/) | [spec](thing-front-end-with-svelte/spec/index.md) | [CHANGELOG](thing-front-end-with-svelte/CHANGELOG.md) |
+| [event-front-end-with-svelte](event-front-end-with-svelte/) | [event-service](event-service-rust-crate/) | [spec](event-front-end-with-svelte/spec/index.md) | [CHANGELOG](event-front-end-with-svelte/CHANGELOG.md) |
+| [course-front-end-with-svelte](course-front-end-with-svelte/) | [course-service](course-service-rust-crate/) | [spec](course-front-end-with-svelte/spec/index.md) | [CHANGELOG](course-front-end-with-svelte/CHANGELOG.md) |
 
 ## Shared reference docs
 

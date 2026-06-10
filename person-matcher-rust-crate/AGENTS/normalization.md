@@ -1,6 +1,6 @@
 # Normalization — Agent Guide
 
-See [`../spec.md`](../spec.md) §14 for the formal rules. This guide is the operational view.
+See [`../spec.md`](../spec/index.md) §14 for the formal rules. This guide is the operational view.
 
 ## Why Normalise At All?
 
@@ -100,7 +100,7 @@ This means cross-country deployments should set `phone_default_country` to the p
 
 1. Add the new public method on `Normalizer` in `src/normalizer.rs`.
 2. Add unit tests covering: empty input, all-whitespace input, a realistic happy-path input, and a diacritic case if the field can contain Unicode names.
-3. Update [`../spec.md`](../spec.md) §14 with the algorithm steps and a table of examples.
+3. Update [`../spec.md`](../spec/index.md) §14 with the algorithm steps and a table of examples.
 4. If a scoring path uses the new normaliser, document it in spec §12.2.
 
 ## Pitfalls

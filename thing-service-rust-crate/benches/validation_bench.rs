@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for validation and normalization: a minimal record,
 //! a fully-populated record, and in-place normalization.
 

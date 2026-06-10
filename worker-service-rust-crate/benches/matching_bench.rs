@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the matching layer.
 //!
 //! Measures the per-component algorithms (name, DOB, gender, address,

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Adapter contract test for the `worker-matcher` public API.
 //!
 //! Pins the public surface that downstream `worker-service` depends on via

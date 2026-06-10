@@ -6,7 +6,7 @@
 //! text transformations that the matcher applies to these fields.
 //!
 //! All public types here are `Serialize + Deserialize` so they round-trip
-//! through JSON, MessagePack, or any other `serde` format.
+//! through JSON, `MessagePack`, or any other `serde` format.
 //!
 //! ## Schema.org alignment
 //!
@@ -230,6 +230,10 @@ impl Thing {
     /// This is **not** invoked automatically by the matcher — call it at
     /// the system boundary when you ingest data, not on every
     /// comparison.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::MatchingError::MissingField`] when `name` is absent.
     ///
     /// # Example
     ///
@@ -481,18 +485,43 @@ impl ThingBuilder {
     }
 
     /// Replace the entire `subjectOf` list.
+    ///
+    /// ```
+    /// # use thing_matcher::Thing;
+    /// let t = Thing::builder()
+    ///     .subject_of(vec!["https://en.wikipedia.org/wiki/Eiffel_Tower".into()])
+    ///     .build();
+    /// assert_eq!(t.subject_of.len(), 1);
+    /// ```
     pub fn subject_of(mut self, value: Vec<String>) -> Self {
         self.subject_of = value;
         self
     }
 
     /// Append a single `subjectOf` URL.
+    ///
+    /// ```
+    /// # use thing_matcher::Thing;
+    /// let t = Thing::builder()
+    ///     .add_subject_of("https://en.wikipedia.org/wiki/Eiffel_Tower")
+    ///     .build();
+    /// assert_eq!(t.subject_of.len(), 1);
+    /// ```
     pub fn add_subject_of<S: Into<String>>(mut self, value: S) -> Self {
         self.subject_of.push(value.into());
         self
     }
 
     /// Set the owner (person or organisation, as a string).
+    ///
+    /// The crate does not model `Person` / `Organization` separately; the
+    /// owner is stored as an opaque name or URL string.
+    ///
+    /// ```
+    /// # use thing_matcher::Thing;
+    /// let t = Thing::builder().owner("City of Paris").build();
+    /// assert_eq!(t.owner.as_deref(), Some("City of Paris"));
+    /// ```
     pub fn owner<S: Into<String>>(mut self, value: S) -> Self {
         self.owner = Some(value.into());
         self

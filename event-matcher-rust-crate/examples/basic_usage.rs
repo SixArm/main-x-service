@@ -1,8 +1,8 @@
+#![warn(clippy::pedantic)]
+
 //! Basic usage example for Event matcher.
 
-use event_matcher::{
-    Event, EventCategory, EventId, EventIdScheme, Location, MatchingEngine,
-};
+use event_matcher::{Event, EventCategory, EventId, EventIdScheme, Location, MatchingEngine};
 
 fn main() {
     println!("=== Basic Event matcher Example ===\n");
@@ -30,7 +30,10 @@ fn main() {
     let result = engine.match_events(&p1, &p2);
 
     println!("Overall Score: {:.2}%", result.score * 100.0);
-    println!("Is Match:      {}", if result.is_match { "YES" } else { "NO" });
+    println!(
+        "Is Match:      {}",
+        if result.is_match { "YES" } else { "NO" }
+    );
     println!("Confidence:    {:?}", result.confidence);
     println!();
 
@@ -119,7 +122,10 @@ fn main() {
         .name("RustConf 2024")
         .add_event_id(id.clone())
         .build();
-    let d2 = Event::builder().name("Anything Else").add_event_id(id).build();
+    let d2 = Event::builder()
+        .name("Anything Else")
+        .add_event_id(id)
+        .build();
     println!("Deterministic: {}", engine.deterministic_match(&d1, &d2));
 
     // Deterministic match via identical name + start_date (even with

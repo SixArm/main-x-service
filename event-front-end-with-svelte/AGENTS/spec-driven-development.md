@@ -1,7 +1,7 @@
 # Spec-Driven Development — Agent Guide
 
 This project practises **spec-driven development**: the specification
-([`../spec.md`](../spec.md)) is the canonical artefact for this
+([`../spec.md`](../spec/index.md)) is the canonical artefact for this
 front-end. Code conforms to the spec; not the other way around.
 
 ## What that means in practice
@@ -21,10 +21,10 @@ This is a thin presentation layer over a system of record. There are
 **two** specs in play:
 
 1. **Service spec** —
-   [`../../event-service-rust-crate/spec.md`](../../event-service-rust-crate/spec.md)
+   [`../../event-service-rust-crate/spec.md`](../../event-service-rust-crate/spec/index.md)
    — describes the API contract. If `Event` loses a field server-side,
    fix `src/lib/api/types.ts` here; do not let the front-end drift.
-2. **Front-end spec** — [`../spec.md`](../spec.md) — describes
+2. **Front-end spec** — [`../spec.md`](../spec/index.md) — describes
    front-end-specific decisions: routes, components, design system,
    build pipeline, testing layers.
 

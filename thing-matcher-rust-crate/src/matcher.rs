@@ -542,22 +542,22 @@ impl MatchingEngine {
         MatchBreakdown {
             name_score: self.score_name(thing1, thing2),
             name_phonetic_score: if self.config.use_phonetic_matching {
-                self.score_phonetic_names(thing1, thing2)
+                score_phonetic_names(thing1, thing2)
             } else {
                 None
             },
-            description_score: score_text(&thing1.description, &thing2.description),
+            description_score: score_text(thing1.description.as_ref(), thing2.description.as_ref()),
             disambiguating_description_score: score_text(
-                &thing1.disambiguating_description,
-                &thing2.disambiguating_description,
+                thing1.disambiguating_description.as_ref(),
+                thing2.disambiguating_description.as_ref(),
             ),
             identifiers_score: score_identifiers(thing1, thing2),
-            url_score: score_url(&thing1.url, &thing2.url),
+            url_score: score_url(thing1.url.as_ref(), thing2.url.as_ref()),
             same_as_score: score_url_set(&thing1.same_as, &thing2.same_as),
-            image_score: score_url(&thing1.image, &thing2.image),
+            image_score: score_url(thing1.image.as_ref(), thing2.image.as_ref()),
             main_entity_of_page_score: score_url(
-                &thing1.main_entity_of_page,
-                &thing2.main_entity_of_page,
+                thing1.main_entity_of_page.as_ref(),
+                thing2.main_entity_of_page.as_ref(),
             ),
             additional_types_score: score_url_set(
                 &thing1.additional_types,
@@ -639,31 +639,6 @@ impl MatchingEngine {
             SimilarityAlgorithm::Combined => Scorer::combined_similarity(&norm1, &norm2),
         }
     }
-
-    fn score_phonetic_names(&self, thing1: &Thing, thing2: &Thing) -> Option<f64> {
-        let names1 = collect_names(thing1);
-        let names2 = collect_names(thing2);
-        if names1.is_empty() || names2.is_empty() {
-            return None;
-        }
-        let codes1: Vec<String> = names1
-            .iter()
-            .map(|n| Normalizer::phonetic_code(n))
-            .collect();
-        let codes2: Vec<String> = names2
-            .iter()
-            .map(|n| Normalizer::phonetic_code(n))
-            .collect();
-        let mut best = 0.0_f64;
-        for c1 in &codes1 {
-            for c2 in &codes2 {
-                if !c1.is_empty() && c1 == c2 {
-                    best = 1.0;
-                }
-            }
-        }
-        Some(best)
-    }
 }
 
 // ---- Free helpers ------------------------------------------------------
@@ -679,23 +654,46 @@ fn collect_names(thing: &Thing) -> Vec<&String> {
         .collect()
 }
 
+/// Maximum Soundex match (`1.0` / `0.0`) across the cartesian product of
+/// both things' names. `None` when either side has no usable names.
+fn score_phonetic_names(thing1: &Thing, thing2: &Thing) -> Option<f64> {
+    let names1 = collect_names(thing1);
+    let names2 = collect_names(thing2);
+    if names1.is_empty() || names2.is_empty() {
+        return None;
+    }
+    let codes1: Vec<String> = names1
+        .iter()
+        .map(|n| Normalizer::phonetic_code(n))
+        .collect();
+    let codes2: Vec<String> = names2
+        .iter()
+        .map(|n| Normalizer::phonetic_code(n))
+        .collect();
+    let mut best = 0.0_f64;
+    for c1 in &codes1 {
+        for c2 in &codes2 {
+            if !c1.is_empty() && c1 == c2 {
+                best = 1.0;
+            }
+        }
+    }
+    Some(best)
+}
+
 /// `Combined` similarity over a pair of optional free-form text fields.
 /// Returns `None` if either side is absent.
-fn score_text(a: &Option<String>, b: &Option<String>) -> Option<f64> {
-    let a = a.as_ref()?;
-    let b = b.as_ref()?;
-    let na = Normalizer::normalize_text(a);
-    let nb = Normalizer::normalize_text(b);
+fn score_text(a: Option<&String>, b: Option<&String>) -> Option<f64> {
+    let na = Normalizer::normalize_text(a?);
+    let nb = Normalizer::normalize_text(b?);
     Some(Scorer::combined_similarity(&na, &nb))
 }
 
 /// Exact match over a pair of optional URL fields, compared after URL
 /// normalisation. Returns `None` if either side is absent.
-fn score_url(a: &Option<String>, b: &Option<String>) -> Option<f64> {
-    let a = a.as_ref()?;
-    let b = b.as_ref()?;
-    let na = Normalizer::normalize_url(a);
-    let nb = Normalizer::normalize_url(b);
+fn score_url(a: Option<&String>, b: Option<&String>) -> Option<f64> {
+    let na = Normalizer::normalize_url(a?);
+    let nb = Normalizer::normalize_url(b?);
     Some(Scorer::exact_match(&na, &nb))
 }
 

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks approximating name search: scoring a query against
 //! 100 records, for exact and fuzzy queries.
 

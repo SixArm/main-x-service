@@ -46,7 +46,7 @@ pub type Result<T> = std::result::Result<T, MatchingError>;
 /// ([`crate::MatchConfig::default`], `strict`, `lenient`) are infallible.
 ///
 /// The enum is `#[non_exhaustive]` so future fallible code paths can add
-/// variants without breaking SemVer for downstream pattern-matches.
+/// variants without breaking `SemVer` for downstream pattern-matches.
 ///
 /// ```
 /// use worker_matcher::MatchingError;
@@ -75,6 +75,9 @@ mod tests {
 
     #[test]
     fn result_alias_resolves() {
+        // The `Result` wrapper is the point of this test — it exercises the
+        // crate's `Result<T>` type alias, so the always-`Ok` return is intended.
+        #[allow(clippy::unnecessary_wraps)]
         fn make() -> Result<i32> {
             Ok(42)
         }

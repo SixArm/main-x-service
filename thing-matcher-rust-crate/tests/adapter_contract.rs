@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Adapter contract test for the `thing-matcher` public API.
 //!
 //! Pins the public surface that downstream `thing-service` depends on via
@@ -91,7 +93,10 @@ fn matching_engine_match_things_returns_match_result() {
 #[test]
 fn matching_engine_deterministic_match_returns_bool() {
     let id = Identifier::new("isbn", "9780141439518").unwrap();
-    let a = Thing::builder().name("A").add_identifier(id.clone()).build();
+    let a = Thing::builder()
+        .name("A")
+        .add_identifier(id.clone())
+        .build();
     let b = Thing::builder().name("B").add_identifier(id).build();
     let res: bool = MatchingEngine::default_config().deterministic_match(&a, &b);
     assert!(res, "shared identifier must trigger deterministic match");

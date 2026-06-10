@@ -103,6 +103,21 @@
 //! - **No panics** in library code paths; every fallible input returns
 //!   `None` from a scorer or a [`MatchingError`].
 
+// Always start with high quality coding conventions.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+// Every method here is a pure computation or an owned-`self` builder step, so
+// annotating each one with `#[must_use]` adds noise without catching real bugs.
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::return_self_not_must_use)]
+// Scores are deterministic sentinel values (exactly `0.0` / `1.0`), so the
+// tests compare them with `assert_eq!` on purpose.
+#![allow(clippy::float_cmp)]
+// The similarity math casts small, bounded counts (string lengths, set sizes)
+// to `f64`; the values never approach the 52-bit mantissa limit.
+#![allow(clippy::cast_precision_loss)]
+
 pub mod error;
 pub mod matcher;
 pub mod models;

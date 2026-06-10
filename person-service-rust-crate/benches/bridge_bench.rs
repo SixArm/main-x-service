@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Bridge-path benchmarks: service-side `Person` → `to_matcher_person` →
 //! `person_matcher::MatchingEngine::match_persons`.
 //!

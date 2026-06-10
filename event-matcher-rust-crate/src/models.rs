@@ -12,7 +12,7 @@
 //! be loaded with a thin field-by-field mapping.
 //!
 //! All public types here are `Serialize + Deserialize` so they round-trip
-//! through JSON, MessagePack, or any other `serde` format.
+//! through JSON, `MessagePack`, or any other `serde` format.
 //!
 //! ## Building an event
 //!
@@ -97,6 +97,7 @@ impl Address {
     /// assert!(a.line1.is_none());
     /// assert!(a.postcode.is_none());
     /// ```
+    #[must_use]
     pub fn new() -> Self {
         Self {
             line1: None,
@@ -109,36 +110,42 @@ impl Address {
     }
 
     /// Fluent setter for `line1`.
+    #[must_use]
     pub fn with_line1(mut self, value: impl Into<String>) -> Self {
         self.line1 = Some(value.into());
         self
     }
 
     /// Fluent setter for `line2`.
+    #[must_use]
     pub fn with_line2(mut self, value: impl Into<String>) -> Self {
         self.line2 = Some(value.into());
         self
     }
 
     /// Fluent setter for `city`.
+    #[must_use]
     pub fn with_city(mut self, value: impl Into<String>) -> Self {
         self.city = Some(value.into());
         self
     }
 
     /// Fluent setter for `county`.
+    #[must_use]
     pub fn with_county(mut self, value: impl Into<String>) -> Self {
         self.county = Some(value.into());
         self
     }
 
     /// Fluent setter for `postcode`.
+    #[must_use]
     pub fn with_postcode(mut self, value: impl Into<String>) -> Self {
         self.postcode = Some(value.into());
         self
     }
 
     /// Fluent setter for `country`.
+    #[must_use]
     pub fn with_country(mut self, value: impl Into<String>) -> Self {
         self.country = Some(value.into());
         self
@@ -203,6 +210,7 @@ pub struct Location {
 
 impl Location {
     /// Construct an empty location with every field set to `None`.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             venue_name: None,
@@ -214,30 +222,35 @@ impl Location {
     }
 
     /// Fluent setter for `venue_name`.
+    #[must_use]
     pub fn with_venue_name(mut self, value: impl Into<String>) -> Self {
         self.venue_name = Some(value.into());
         self
     }
 
     /// Fluent setter for `address`.
+    #[must_use]
     pub fn with_address(mut self, value: Address) -> Self {
         self.address = Some(value);
         self
     }
 
     /// Fluent setter for `latitude`.
+    #[must_use]
     pub fn with_latitude(mut self, value: f64) -> Self {
         self.latitude = Some(value);
         self
     }
 
     /// Fluent setter for `longitude`.
+    #[must_use]
     pub fn with_longitude(mut self, value: f64) -> Self {
         self.longitude = Some(value);
         self
     }
 
     /// Fluent setter for `virtual_url`.
+    #[must_use]
     pub fn with_virtual_url(mut self, value: impl Into<String>) -> Self {
         self.virtual_url = Some(value.into());
         self
@@ -259,7 +272,7 @@ impl Default for Location {
 /// structurally equal (`PartialEq`).
 ///
 /// The enum is `#[non_exhaustive]` so future variants can be added without
-/// breaking SemVer for downstream pattern matches.
+/// breaking `SemVer` for downstream pattern matches.
 ///
 /// # Example
 ///
@@ -334,7 +347,7 @@ pub enum EventCategory {
 /// <https://schema.org/EventStatusType>.
 ///
 /// The enum is `#[non_exhaustive]` so future variants can be added without
-/// breaking SemVer for downstream pattern matches.
+/// breaking `SemVer` for downstream pattern matches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum EventStatus {
@@ -355,7 +368,7 @@ pub enum EventStatus {
 /// Defined at <https://schema.org/EventAttendanceModeEnumeration>.
 ///
 /// The enum is `#[non_exhaustive]` so future variants can be added without
-/// breaking SemVer for downstream pattern matches.
+/// breaking `SemVer` for downstream pattern matches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum EventAttendanceMode {
@@ -373,7 +386,7 @@ pub enum EventAttendanceMode {
 /// their string values happen to coincide — see [`EventId`].
 ///
 /// The enum is `#[non_exhaustive]` so future variants can be added without
-/// breaking SemVer for downstream pattern matches.
+/// breaking `SemVer` for downstream pattern matches.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum EventIdScheme {
@@ -630,17 +643,21 @@ impl Event {
     ///
     /// assert_eq!(e.name.as_deref(), Some("RustConf 2024"));
     /// ```
+    #[must_use]
     pub fn builder() -> EventBuilder {
         EventBuilder::default()
     }
 
     /// Validate that the event carries a primary name.
     ///
-    /// Returns `Ok(())` if `name` is set. Otherwise returns
-    /// [`crate::MatchingError::MissingField`].
+    /// Returns `Ok(())` if `name` is set.
     ///
     /// This is **not** invoked automatically by the matcher — call it at the
     /// system boundary when you ingest data, not on every comparison.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::MatchingError::MissingField`] if `name` is `None`.
     ///
     /// # Example
     ///
@@ -712,180 +729,210 @@ pub struct EventBuilder {
 
 impl EventBuilder {
     /// Set the primary canonical name.
+    #[must_use]
     pub fn name<S: Into<String>>(mut self, value: S) -> Self {
         self.name = Some(value.into());
         self
     }
 
     /// Replace the entire list of alternate names.
+    #[must_use]
     pub fn alternate_names(mut self, value: Vec<String>) -> Self {
         self.alternate_names = value;
         self
     }
 
     /// Append a single alternate name.
+    #[must_use]
     pub fn add_alternate_name<S: Into<String>>(mut self, value: S) -> Self {
         self.alternate_names.push(value.into());
         self
     }
 
     /// Set the free-text description.
+    #[must_use]
     pub fn description<S: Into<String>>(mut self, value: S) -> Self {
         self.description = Some(value.into());
         self
     }
 
     /// Set the canonical URL.
+    #[must_use]
     pub fn url<S: Into<String>>(mut self, value: S) -> Self {
         self.url = Some(value.into());
         self
     }
 
     /// Replace the entire list of external event IDs.
+    #[must_use]
     pub fn event_ids(mut self, value: Vec<EventId>) -> Self {
         self.event_ids = value;
         self
     }
 
     /// Append a single external event ID.
+    #[must_use]
     pub fn add_event_id(mut self, value: EventId) -> Self {
         self.event_ids.push(value);
         self
     }
 
     /// Set the local identifier.
+    #[must_use]
     pub fn local_id<S: Into<String>>(mut self, value: S) -> Self {
         self.local_id = Some(value.into());
         self
     }
 
     /// Set the event's category.
+    #[must_use]
     pub fn category(mut self, value: EventCategory) -> Self {
         self.category = Some(value);
         self
     }
 
     /// Replace the entire list of keywords.
+    #[must_use]
     pub fn keywords(mut self, value: Vec<String>) -> Self {
         self.keywords = value;
         self
     }
 
     /// Append a single keyword.
+    #[must_use]
     pub fn add_keyword<S: Into<String>>(mut self, value: S) -> Self {
         self.keywords.push(value.into());
         self
     }
 
     /// Set the BCP-47 language tag.
+    #[must_use]
     pub fn in_language<S: Into<String>>(mut self, value: S) -> Self {
         self.in_language = Some(value.into());
         self
     }
 
     /// Set the typical-age-range string.
+    #[must_use]
     pub fn typical_age_range<S: Into<String>>(mut self, value: S) -> Self {
         self.typical_age_range = Some(value.into());
         self
     }
 
     /// Set the start date or date-time in ISO 8601 form.
+    #[must_use]
     pub fn start_date<S: Into<String>>(mut self, value: S) -> Self {
         self.start_date = Some(value.into());
         self
     }
 
     /// Set the end date or date-time in ISO 8601 form.
+    #[must_use]
     pub fn end_date<S: Into<String>>(mut self, value: S) -> Self {
         self.end_date = Some(value.into());
         self
     }
 
     /// Set the door-opening time in ISO 8601 form.
+    #[must_use]
     pub fn door_time<S: Into<String>>(mut self, value: S) -> Self {
         self.door_time = Some(value.into());
         self
     }
 
     /// Set the previous-start-date for rescheduled events.
+    #[must_use]
     pub fn previous_start_date<S: Into<String>>(mut self, value: S) -> Self {
         self.previous_start_date = Some(value.into());
         self
     }
 
     /// Set the event lifecycle status.
+    #[must_use]
     pub fn event_status(mut self, value: EventStatus) -> Self {
         self.event_status = Some(value);
         self
     }
 
     /// Set the attendance mode (offline / online / mixed).
+    #[must_use]
     pub fn event_attendance_mode(mut self, value: EventAttendanceMode) -> Self {
         self.event_attendance_mode = Some(value);
         self
     }
 
     /// Set the event's location.
+    #[must_use]
     pub fn location(mut self, value: Location) -> Self {
         self.location = Some(value);
         self
     }
 
     /// Set the country code in ISO 3166-1 alpha-2 form.
+    #[must_use]
     pub fn country_code_as_iso_3166_1_alpha_2<S: Into<String>>(mut self, value: S) -> Self {
         self.country_code_as_iso_3166_1_alpha_2 = Some(value.into());
         self
     }
 
     /// Set the organiser name.
+    #[must_use]
     pub fn organizer<S: Into<String>>(mut self, value: S) -> Self {
         self.organizer = Some(value.into());
         self
     }
 
     /// Replace the entire list of performer names.
+    #[must_use]
     pub fn performers(mut self, value: Vec<String>) -> Self {
         self.performers = value;
         self
     }
 
     /// Append a single performer name.
+    #[must_use]
     pub fn add_performer<S: Into<String>>(mut self, value: S) -> Self {
         self.performers.push(value.into());
         self
     }
 
     /// Set the total expected attendee capacity.
+    #[must_use]
     pub fn maximum_attendee_capacity(mut self, value: u32) -> Self {
         self.maximum_attendee_capacity = Some(value);
         self
     }
 
     /// Set the offline-attendance capacity.
+    #[must_use]
     pub fn maximum_physical_attendee_capacity(mut self, value: u32) -> Self {
         self.maximum_physical_attendee_capacity = Some(value);
         self
     }
 
     /// Set the online-attendance capacity.
+    #[must_use]
     pub fn maximum_virtual_attendee_capacity(mut self, value: u32) -> Self {
         self.maximum_virtual_attendee_capacity = Some(value);
         self
     }
 
     /// Set the "free to attend" flag.
+    #[must_use]
     pub fn is_accessible_for_free(mut self, value: bool) -> Self {
         self.is_accessible_for_free = Some(value);
         self
     }
 
     /// Set the parent event identifier.
+    #[must_use]
     pub fn super_event_id<S: Into<String>>(mut self, value: S) -> Self {
         self.super_event_id = Some(value.into());
         self
     }
 
     /// Consume the builder and produce the [`Event`].
+    #[must_use]
     pub fn build(self) -> Event {
         Event {
             name: self.name,

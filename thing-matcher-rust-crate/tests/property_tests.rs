@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Property-based tests.
 //!
 //! Each property generates many random inputs via `proptest` and checks an

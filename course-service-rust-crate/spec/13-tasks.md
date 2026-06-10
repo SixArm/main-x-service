@@ -1,0 +1,18 @@
+## 13. Tasks
+
+- [x] T-1: Scaffold skeleton (Cargo.toml, src/, migrations, Dockerfile, docker-compose, spec, AGENTS docs).
+- [x] T-2: SeaORM entity modules in `db/models.rs` matching the migration schema.
+- [x] T-3: `SeaOrmCourseRepository` CRUD + soft-delete (courses + identifiers + links round-trip; transactional). Audit-log writes landed with T-9.
+- [x] T-4: Tantivy `SearchEngine::index_course` + `search` + `fuzzy_search` + `search_by_name_and_provider` + `delete_course` (reader-reload after every commit).
+- [x] T-5: Validation module enforcing FR-21..FR-28 (`src/validation/`; nested-instance errors carry path prefixes).
+- [x] T-6: Adapter `matching::adapter::to_matcher_course` + `CourseMatcher` drives `course_matcher::MatchingEngine` (1:1 enum routing for `IdentifierScheme` / `EducationalLevel` / `LearningResourceType`).
+- [x] T-7: REST handlers — FR-1..FR-9 all wired (create with duplicate detection, get, update, soft-delete, search, match-against-existing, check-duplicates, merge, batch dedup with auto-merge above `auto_merge_threshold` + review queue items returned in response).
+- [x] T-8: Instance sub-resource handlers FR-10..FR-13 — `CourseRepository::{list,get,create,update,soft_delete}_instance` + four handlers under `/api/courses/{id}/instances`. FR-10 ordering done in-memory after JSONB hydration.
+- [x] T-9: Audit handlers + event-stream publisher — `AuditLogRepository` writes `audit_log` rows on create/update/delete (Course + CourseInstance); `InMemoryEventPublisher` (`Arc<dyn EventPublisher>` on AppState) emits `CourseEvent` per FR-18. `GET /api/courses/{id}/audit` and `GET /api/audit/recent` wired. Fluvio adapter under feature flag still pending.
+- [x] T-10: Privacy module — `mask_course` (clears `provider_id`, instance `instructor_ids`, masks `instructor_names`) + `export_course` (GDPR Article-15 envelope). `GET /api/courses/{id}/masked` (FR-16) + `GET /api/courses/{id}/export` (FR-15) wired.
+- [x] T-11: Bridge test pinning matcher contract + per-field routing (`tests/duplicate_detection.rs`, 14 tests covering identical / typo / deterministic short-circuits / negatives / routing / config presets).
+- [x] T-12: Integration test — `tests/api_integration_test.rs` (12 `#[ignore]`-tagged tokio tests covering health, lifecycle, validation/422, search, check-duplicates, match, merge, batch dedup, instance sub-resource round-trip, audit log, masked view, GDPR export). `tests/common/mod.rs` builds the full router against env-configured Postgres + a process-shared Tantivy temp dir. Run with `cargo test --test api_integration_test -- --ignored`.
+- [x] T-13: Criterion benchmark suite — `benches/matching_bench.rs` (pair scoring + deterministic short-circuit + rank-of-100), `benches/search_bench.rs` (index + exact + fuzzy + blocking query on a 100-row index), `benches/validation_bench.rs` (populated-record pass).
+- [x] T-14: OpenAPI schema via utoipa derive annotations. Every wired handler carries `#[utoipa::path]`; every public domain type derives `ToSchema`; `SearchQuery` + `AuditQuery` derive `IntoParams`. `ApiDoc` aggregator + Swagger UI at `/swagger-ui`, raw spec at `/api-docs/openapi.json`.
+- [ ] T-15: Authentication middleware (JWT) — coordinated with the family-wide auth rollout.
+

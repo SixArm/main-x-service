@@ -1,6 +1,6 @@
 # Matching algorithm — agent guide
 
-The authoritative description lives in [`../spec.md`](../spec.md) §5–§7. This guide is the practitioner's view, with diagrams and worked examples drawn from `spec.md` §11.
+The authoritative description lives in [`../spec.md`](../spec/index.md) §5–§7. This guide is the practitioner's view, with diagrams and worked examples drawn from `spec.md` §11.
 
 ## Strategies and surface
 
@@ -186,4 +186,4 @@ The names share a prefix but the identifiers are scheme-local and the values dif
 
 ## Open algorithm questions
 
-See [`../spec.md`](../spec.md) §10 for the live list (OQ-A through OQ-D). When you have an opinion, propose a resolution in `spec.md` as a PR, not as a unilateral code change.
+See [`../spec.md`](../spec/index.md) §10 for the live list (OQ-A through OQ-D). When you have an opinion, propose a resolution in `spec.md` as a PR, not as a unilateral code change.

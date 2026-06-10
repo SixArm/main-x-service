@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for the domain models.
 //!
 //! These exercise the public model types end to end — construction, Serde

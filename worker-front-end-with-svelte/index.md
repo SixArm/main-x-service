@@ -1,13 +1,13 @@
 # worker-front-end-with-svelte — index
 
 Navigation aid + worked flow examples. The behavioural source of truth
-is [`spec.md`](spec.md); deep references live in [`AGENTS/`](AGENTS/).
+is [`spec.md`](spec/index.md); deep references live in [`AGENTS/`](AGENTS/).
 
 ## Top-level documents
 
 | Document | Purpose |
 |---|---|
-| [spec.md](spec.md) | Single source of truth (§1–§18; live work queue in §13) |
+| [spec.md](spec/index.md) | Single source of truth (§1–§18; live work queue in §13) |
 | [README.md](README.md) | User-facing intro, routes, env vars |
 | [CLAUDE.md](CLAUDE.md) | `@AGENTS.md` re-export for Claude Code session bootstrap |
 | [AGENTS.md](AGENTS.md) | Agent guide (ground rules, drift policy, tech-stack rules) |
@@ -23,7 +23,7 @@ is [`spec.md`](spec.md); deep references live in [`AGENTS/`](AGENTS/).
 
 ## Sibling service
 
-- [`../worker-service-rust-crate/`](../worker-service-rust-crate/) — the system of record this UI calls. Its [`spec.md`](../worker-service-rust-crate/spec.md) and [`AGENTS/restful.md`](../worker-service-rust-crate/AGENTS/restful.md) are the API contract.
+- [`../worker-service-rust-crate/`](../worker-service-rust-crate/) — the system of record this UI calls. Its [`spec.md`](../worker-service-rust-crate/spec/index.md) and [`AGENTS/restful.md`](../worker-service-rust-crate/AGENTS/restful.md) are the API contract.
 
 ## Route map
 

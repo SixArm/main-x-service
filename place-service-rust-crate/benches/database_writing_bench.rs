@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks proxying the database-write preparation cost.
 //!
 //! Without a live database, these measure the boundary work that precedes an

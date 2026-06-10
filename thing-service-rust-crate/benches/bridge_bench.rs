@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Bridge-path benchmarks: service-side `Thing` → `to_matcher_thing` →
 //! `thing_matcher::MatchingEngine::match_things`.
 //!

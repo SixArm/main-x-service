@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Basic usage example for person matcher
 
 use person_matcher::{
@@ -46,8 +48,14 @@ fn main() {
     println!("Detailed Breakdown:");
     println!("------------------");
 
-    if let Some(score) = result.breakdown.united_kingdom_national_health_service_number_score {
-        println!("UK United Kingdom National Health Service Number: {:.0}%", score * 100.0);
+    if let Some(score) = result
+        .breakdown
+        .united_kingdom_national_health_service_number_score
+    {
+        println!(
+            "UK United Kingdom National Health Service Number: {:.0}%",
+            score * 100.0
+        );
     }
 
     if let Some(score) = result.breakdown.given_name_score {
@@ -79,14 +87,13 @@ fn main() {
     // Demonstrate deterministic matching
     let is_deterministic = engine.deterministic_match(&person1, &person2);
     println!(
-        "Deterministic Match (United Kingdom National Health Service Number exact): {}",
-        is_deterministic
+        "Deterministic Match (United Kingdom National Health Service Number exact): {is_deterministic}"
     );
 
     // Show JSON serialization
     println!("\n=== JSON Export ===");
     let json = serde_json::to_string_pretty(&result).unwrap();
-    println!("{}", json);
+    println!("{json}");
 
     // International phone-number normalisation (E.164).
     println!("\n=== International Phone Numbers (E.164) ===");
@@ -479,7 +486,7 @@ fn main() {
             "UK CHI" => identifiers::parse_uk_chi_number(raw),
             _ => unreachable!(),
         };
-        println!("  {label:<18} {raw:<24} -> {parsed:?} (expected {canonical:?})",);
+        println!("  {label:<18} {raw:<24} -> {parsed:?} (expected {canonical:?})");
     }
 
     // Seven next-batch national identifiers (T-17.1).
@@ -503,7 +510,7 @@ fn main() {
             "ZA ID" => identifiers::parse_za_id(raw),
             _ => unreachable!(),
         };
-        println!("  {label:<14} {raw:<24} -> {parsed:?} (expected {canonical:?})",);
+        println!("  {label:<14} {raw:<24} -> {parsed:?} (expected {canonical:?})");
     }
 
     // Sophisticated address parsing.

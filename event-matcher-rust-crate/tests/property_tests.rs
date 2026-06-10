@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Property-based tests.
 //!
 //! Each property generates many random inputs via `proptest` and checks an
@@ -5,9 +7,7 @@
 //! the failure modes that example-based tests miss: weird Unicode in
 //! names, edge-case dates, sparse / dense `Event` records.
 
-use event_matcher::{
-    Confidence, Event, EventCategory, MatchConfig, MatchingEngine, Normalizer,
-};
+use event_matcher::{Confidence, Event, EventCategory, MatchConfig, MatchingEngine, Normalizer};
 use proptest::prelude::*;
 
 // ---------- Strategies ----------
@@ -32,9 +32,7 @@ fn iso8601_datetime_strategy() -> impl Strategy<Value = String> {
         0u32..=59,
         0u32..=59,
     )
-        .prop_map(|(y, m, d, h, mi, s)| {
-            format!("{y:04}-{m:02}-{d:02}T{h:02}:{mi:02}:{s:02}Z")
-        })
+        .prop_map(|(y, m, d, h, mi, s)| format!("{y:04}-{m:02}-{d:02}T{h:02}:{mi:02}:{s:02}Z"))
 }
 
 /// A reasonable category for proptest.

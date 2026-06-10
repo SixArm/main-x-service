@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for the matching pipeline.
 //!
 //! These drive [`compute_match`] against whole-record fixtures to exercise

@@ -15,6 +15,11 @@
 //! - Record merging and deduplication
 //! - Distributed tracing and observability via OpenTelemetry
 
+// Always start with high quality coding conventions.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+
 // Module declarations
 /// REST, FHIR R5, and gRPC API layers plus shared response envelopes.
 pub mod api;

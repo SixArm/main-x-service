@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Example showing custom matching configuration
 
 use person_matcher::{
@@ -194,5 +196,7 @@ fn main() {
     println!("United Kingdom National Health Service Number-Focused Config:");
     println!("  Score: {:.2}%", uknhsn_result.score * 100.0);
     println!("  Match: {}", uknhsn_result.is_match);
-    println!("  Note: No United Kingdom National Health Service Numbers provided, so match relies on names/DOB");
+    println!(
+        "  Note: No United Kingdom National Health Service Numbers provided, so match relies on names/DOB"
+    );
 }

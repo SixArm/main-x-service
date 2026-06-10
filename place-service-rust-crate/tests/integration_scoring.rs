@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for the scoring components and the combined scorer.
 //!
 //! These cover edge cases across each matching component (name, address, geo,

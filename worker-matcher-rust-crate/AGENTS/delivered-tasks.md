@@ -1,6 +1,6 @@
 # Delivered Tasks Archive
 
-This file archives the delivered (`[x]` / "✅ Delivered") tasks that were previously inlined in `spec.md §23`. The spec retains the still-open queue (`[ ]` / `[~]`) plus a pointer here. See [`spec.md`](../spec.md) §23 for the live work queue.
+This file archives the delivered (`[x]` / "✅ Delivered") tasks that were previously inlined in `spec.md §23`. The spec retains the still-open queue (`[ ]` / `[~]`) plus a pointer here. See [`spec.md`](../spec/index.md) §23 for the live work queue.
 
 Status legend: `[x]` done.
 

@@ -1,3 +1,9 @@
+//! # Worker matcher demo
+//!
+//! Command-line demonstration of the [`worker_matcher`] crate. Runs a handful
+//! of illustrative worker-record comparisons and prints the deterministic and
+//! probabilistic results. See the library crate for the matching API.
+
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -10,6 +16,9 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use worker_matcher::{Address, Gender, MatchConfig, MatchingEngine, Worker};
 
+// A flat sequence of illustrative demo scenarios; length is inherent to a
+// walkthrough binary, not a sign of tangled logic.
+#[allow(clippy::too_many_lines)]
 fn main() {
     println!("Worker matcher");
     println!("================\n");

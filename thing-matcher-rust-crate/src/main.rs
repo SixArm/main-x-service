@@ -1,3 +1,11 @@
+//! Demo binary for the `thing-matcher` crate.
+//!
+//! Runs a handful of worked examples — probabilistic matches, deterministic
+//! matches via shared identifier / `sameAs` / `url`, an identifier veto, and
+//! a strict-vs-lenient comparison — printing each score and verdict to
+//! stdout. It exists to smoke-test the public API; the library itself does
+//! no IO. Run it with `cargo run`.
+
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]

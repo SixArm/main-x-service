@@ -13,7 +13,7 @@ Detailed reference documentation for the Event Service front-end.
 
 | Document | Description |
 |---|---|
-| [../spec.md](../spec.md) | Single source of truth (§1–§18; live tasks in §13) |
+| [../spec.md](../spec/index.md) | Single source of truth (§1–§18; live tasks in §13) |
 | [../AGENTS.md](../AGENTS.md) | Agent guide — ground rules, drift policy, tech-stack rules |
 | [../README.md](../README.md) | User-facing intro |
 | [../CHANGELOG.md](../CHANGELOG.md) | Keep-a-Changelog history |
@@ -23,7 +23,7 @@ Detailed reference documentation for the Event Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../event-service-rust-crate/spec.md](../../event-service-rust-crate/spec.md) | Service spec — system of record |
+| [../../event-service-rust-crate/spec.md](../../event-service-rust-crate/spec/index.md) | Service spec — system of record |
 | [../../event-service-rust-crate/AGENTS/restful.md](../../event-service-rust-crate/AGENTS/restful.md) | REST API surface |
 | [../../event-service-rust-crate/AGENTS/models.md](../../event-service-rust-crate/AGENTS/models.md) | Wire-format domain types |
 | [../../event-service-rust-crate/AGENTS/matching.md](../../event-service-rust-crate/AGENTS/matching.md) | Matching algorithm reference |

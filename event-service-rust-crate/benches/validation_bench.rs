@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Benchmarks for event validation and normalization.
 //!
 //! Measures the cost of validating a minimal vs. a richly-populated

@@ -1,4 +1,4 @@
-# Worker Service (MPI)
+# Worker Service
 
 A high-performance, enterprise-grade Worker Service system built with Rust.
 
@@ -227,22 +227,22 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 
 ## Technology Stack
 
-| Component                       | Technology                           | Purpose                                  |
-| ------------------------------- | ------------------------------------ | ---------------------------------------- |
-| **Language**                    | Rust 1.93+ 2024 Edition              | Systems programming, performance, safety |
-| **Async Runtime**               | Tokio                                | Asynchronous I/O and concurrency         |
-| **Web Framework**               | Axum                                 | HTTP server and routing                  |
-| **Web Framework**               | Loco                                 | HTTP server and routing                  |
-| **Database**                    | PostgreSQL 18+                       | Data persistence                         |
-| **ORM**                         | SeaORM                               | Async database object-relational mapper  |
-| **Search Engine**               | Tantivy                              | Full-text search indexing                |
-| **Event Streaming**             | In-Memory (extendable to Kafka/NATS) | Event publishing                         |
-| **API Docs**                    | Utoipa                               | OpenAPI 3.0 specification                |
-| **Serialization**               | Serde                                | JSON serialization/deserialization       |
-| **Logging**                     | Tracing                              | Structured logging                       |
-| **Observability**               | OpenTelemetry                        | Structured observability                 |
-| **String Matching**             | strsim, fuzzy-matcher                | Jaro-Winkler, Levenshtein                |
-| **Containerization**            | Docker                               | Deployment packaging                     |
+| Component            | Technology                           | Purpose                                  |
+| -------------------- | ------------------------------------ | ---------------------------------------- |
+| **Language**         | Rust 1.93+ 2024 Edition              | Systems programming, performance, safety |
+| **Async Runtime**    | Tokio                                | Asynchronous I/O and concurrency         |
+| **Web Framework**    | Axum                                 | HTTP server and routing                  |
+| **Web Framework**    | Loco                                 | HTTP server and routing                  |
+| **Database**         | PostgreSQL 18+                       | Data persistence                         |
+| **ORM**              | SeaORM                               | Async database object-relational mapper  |
+| **Search Engine**    | Tantivy                              | Full-text search indexing                |
+| **Event Streaming**  | In-Memory (extendable to Kafka/NATS) | Event publishing                         |
+| **API Docs**         | Utoipa                               | OpenAPI 3.0 specification                |
+| **Serialization**    | Serde                                | JSON serialization/deserialization       |
+| **Logging**          | Tracing                              | Structured logging                       |
+| **Observability**    | OpenTelemetry                        | Structured observability                 |
+| **String Matching**  | strsim, fuzzy-matcher                | Jaro-Winkler, Levenshtein                |
+| **Containerization** | Docker                               | Deployment packaging                     |
 
 ## Architecture
 

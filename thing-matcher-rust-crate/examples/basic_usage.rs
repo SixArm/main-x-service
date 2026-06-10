@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Basic usage example for thing matcher.
 
 use thing_matcher::{Identifier, MatchingEngine, Thing};

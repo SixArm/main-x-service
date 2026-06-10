@@ -4,7 +4,7 @@
 **Developer**: Claude (Anthropic)
 **Maintainer**: Joel Parker Henderson
 
-> **Historical snapshot.** This document captures the initial implementation and is **superseded by [spec.md](./spec.md)** as the authoritative behaviour reference. It is retained for context only. For an up-to-date map of the docs, see [index.md](./index.md).
+> **Historical snapshot.** This document captures the initial implementation and is **superseded by [spec.md](./spec/index.md)** as the authoritative behaviour reference. It is retained for context only. For an up-to-date map of the docs, see [index.md](./index.md).
 
 ## Overview
 

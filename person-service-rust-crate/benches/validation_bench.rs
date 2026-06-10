@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for validation and normalization.
 //!
 //! Covers [`validate_person`] on simple/complex/invalid records,

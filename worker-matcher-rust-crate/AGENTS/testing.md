@@ -1,6 +1,6 @@
 # Testing — Agent Guide
 
-Complements [`../spec.md`](../spec.md) §18.
+Complements [`../spec.md`](../spec/index.md) §18.
 
 ## Test Pyramid
 
@@ -15,7 +15,7 @@ Run everything: `cargo test`. Run a single test: `cargo test test_fuzzy_name_mat
 
 ## Required Scenarios
 
-The list in [`../spec.md`](../spec.md) §18.2 is the spec — each scenario MUST have at least one test. When you add a feature that affects matching, add a scenario to that list.
+The list in [`../spec.md`](../spec/index.md) §18.2 is the spec — each scenario MUST have at least one test. When you add a feature that affects matching, add a scenario to that list.
 
 ## Naming Conventions
 

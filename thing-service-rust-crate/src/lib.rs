@@ -44,6 +44,11 @@
 //! assert!(result.score > 0.85);
 //! ```
 
+// Always start with high quality coding conventions.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+
 /// REST API surface and shared response envelope.
 pub mod api;
 /// Service configuration loaded from the environment.

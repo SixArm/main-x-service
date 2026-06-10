@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the validation / normalization layer.
 //!
 //! Times worker validation across simple, fully-populated, and invalid

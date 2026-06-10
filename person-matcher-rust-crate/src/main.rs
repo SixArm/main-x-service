@@ -1,7 +1,15 @@
+//! Person matcher demo binary.
+//!
+//! Smoke-tests the `person_matcher` library by running a handful of
+//! illustrative matches against the public API. This is not part of the
+//! library's `SemVer` surface; see `lib.rs` for the supported types.
+
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![warn(clippy::pedantic)]
+// The demo `main` is one long sequence of illustrative examples by design.
+#![allow(clippy::too_many_lines)]
 
 // When we build for MUSL static, use faster memory allocator.
 #[cfg(target_env = "musl")]

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks approximating write-side cost: the create-time
 //! validate and normalize steps that run before a row is persisted.
 

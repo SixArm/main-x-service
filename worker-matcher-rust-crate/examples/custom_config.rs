@@ -1,7 +1,12 @@
+#![warn(clippy::pedantic)]
+
 //! Example showing custom matching configuration
 
+// Demo code: a single linear walkthrough, long by nature.
+#![allow(clippy::too_many_lines)]
+
 use worker_matcher::{
-    Gender, MatchConfig, MatchingEngine, NicknameTable, Worker, SimilarityAlgorithm,
+    Gender, MatchConfig, MatchingEngine, NicknameTable, SimilarityAlgorithm, Worker,
 };
 
 fn main() {

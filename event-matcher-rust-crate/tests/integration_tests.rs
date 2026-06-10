@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for Event matcher.
 //!
 //! These exercise the **public API** as a downstream user would — building
@@ -68,7 +70,10 @@ fn test_name_match_picks_best_across_alternates() {
         .build();
     let r = MatchingEngine::default_config().match_events(&p1, &p2);
     let s = r.breakdown.name_score.expect("scored");
-    assert!(s > 0.99, "expected best-of cartesian product to pick exact, got {s}");
+    assert!(
+        s > 0.99,
+        "expected best-of cartesian product to pick exact, got {s}"
+    );
 }
 
 #[test]
@@ -173,8 +178,14 @@ fn test_category_mismatch_other_strings_scores_zero() {
 #[test]
 fn test_event_id_shared_scores_one_and_is_deterministic_match() {
     let id = EventId::new(EventIdScheme::Eventbrite, "12345").unwrap();
-    let p1 = Event::builder().name("RustConf").add_event_id(id.clone()).build();
-    let p2 = Event::builder().name("Wholly Different").add_event_id(id).build();
+    let p1 = Event::builder()
+        .name("RustConf")
+        .add_event_id(id.clone())
+        .build();
+    let p2 = Event::builder()
+        .name("Wholly Different")
+        .add_event_id(id)
+        .build();
     let engine = MatchingEngine::default_config();
     let r = engine.match_events(&p1, &p2);
     assert_eq!(r.breakdown.event_ids_score, Some(1.0));
@@ -226,7 +237,10 @@ fn test_location_score_none_when_one_side_has_no_location() {
 
 #[test]
 fn test_organizer_match_after_normalisation() {
-    let a = Event::builder().name("X").organizer("Rust Foundation").build();
+    let a = Event::builder()
+        .name("X")
+        .organizer("Rust Foundation")
+        .build();
     let b = Event::builder()
         .name("X")
         .organizer("RUST  Foundation")
@@ -253,7 +267,10 @@ fn test_performers_match_picks_best_across_cartesian_product() {
 
 #[test]
 fn test_url_match_is_exact_after_trim() {
-    let a = Event::builder().name("X").url("https://rustconf.com").build();
+    let a = Event::builder()
+        .name("X")
+        .url("https://rustconf.com")
+        .build();
     let b = Event::builder()
         .name("X")
         .url("  https://rustconf.com  ")

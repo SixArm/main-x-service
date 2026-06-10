@@ -206,7 +206,7 @@ Contributions welcome. Before opening a PR:
 - `cargo clippy --all-targets -- -D warnings`
 - `cargo test`
 
-See [`AGENTS.md`](./AGENTS.md) for the working guide and [`spec.md`](./spec.md) for the authoritative behaviour spec.
+See [`AGENTS.md`](./AGENTS.md) for the working guide and [`spec.md`](./spec/index.md) for the authoritative behaviour spec.
 
 ## Contact
 

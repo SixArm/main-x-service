@@ -433,6 +433,7 @@ impl MatchConfig {
     /// assert!((c.match_threshold - 0.95).abs() < 1e-9);
     /// assert!(c.strict_mode);
     /// ```
+    #[must_use]
     pub fn strict() -> Self {
         Self {
             match_threshold: 0.95,
@@ -452,6 +453,7 @@ impl MatchConfig {
     /// assert!((c.match_threshold - 0.75).abs() < 1e-9);
     /// assert!(c.use_phonetic_matching);
     /// ```
+    #[must_use]
     pub fn lenient() -> Self {
         Self {
             match_threshold: 0.75,
@@ -519,6 +521,7 @@ impl Confidence {
     /// assert_eq!(Confidence::from_score(-0.5),     Confidence::Low);
     /// assert_eq!(Confidence::from_score(2.0),      Confidence::High);
     /// ```
+    #[must_use]
     pub fn from_score(score: f64) -> Self {
         if score >= 0.90 {
             Confidence::High
@@ -788,6 +791,11 @@ pub struct MatchingEngine {
     config: MatchConfig,
 }
 
+// The per-field `score_*` methods share a uniform `&self` signature so the
+// scoring pipeline can dispatch them consistently and so any of them can read
+// `self.config` as the matching rules evolve. A few currently ignore `self`;
+// keeping the signature uniform is deliberate, so `unused_self` is allowed here.
+#[allow(clippy::unused_self)]
 impl MatchingEngine {
     /// Construct an engine with the given configuration.
     ///
@@ -796,6 +804,7 @@ impl MatchingEngine {
     /// let engine = MatchingEngine::new(MatchConfig::lenient());
     /// # let _ = engine;
     /// ```
+    #[must_use]
     pub fn new(config: MatchConfig) -> Self {
         Self { config }
     }
@@ -807,6 +816,7 @@ impl MatchingEngine {
     /// let engine = MatchingEngine::default_config();
     /// # let _ = engine;
     /// ```
+    #[must_use]
     pub fn default_config() -> Self {
         Self::new(MatchConfig::default())
     }
@@ -830,6 +840,7 @@ impl MatchingEngine {
     /// assert!(result.is_match);
     /// assert!(result.score > 0.99);
     /// ```
+    #[must_use]
     pub fn match_workers(&self, worker1: &Worker, worker2: &Worker) -> MatchResult {
         let breakdown = self.calculate_breakdown(worker1, worker2);
         let score = self.calculate_weighted_score(&breakdown);
@@ -902,6 +913,7 @@ impl MatchingEngine {
     /// let r = MatchingEngine::default_config().match_one_to_many(&q, &[]);
     /// assert!(r.is_empty());
     /// ```
+    #[must_use]
     pub fn match_one_to_many(&self, query: &Worker, candidates: &[Worker]) -> Vec<MatchResult> {
         candidates
             .iter()
@@ -938,6 +950,7 @@ impl MatchingEngine {
     /// assert!(ranked[0].1.score >= ranked[1].1.score);
     /// assert!(ranked[1].1.score >= ranked[2].1.score);
     /// ```
+    #[must_use]
     pub fn rank_one_to_many(
         &self,
         query: &Worker,
@@ -991,6 +1004,10 @@ impl MatchingEngine {
     /// let b = Worker::builder().uk_nhs_number("9434765919").build();
     /// assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     /// ```
+    // Long by nature: one explicit short-circuit per supported identifier
+    // scheme. The list is flat and linear; splitting it would scatter the
+    // scheme enumeration and reduce auditability.
+    #[allow(clippy::too_many_lines)]
     pub fn deterministic_match(&self, worker1: &Worker, worker2: &Worker) -> bool {
         if identifier_equal(
             &worker1.uk_nhs_number,
@@ -1195,6 +1212,9 @@ impl MatchingEngine {
         name_match && dob_match && gender_match
     }
 
+    // Long by nature: one explicit per-field score assignment. Splitting it
+    // would scatter the field enumeration and reduce auditability.
+    #[allow(clippy::too_many_lines)]
     fn calculate_breakdown(&self, worker1: &Worker, worker2: &Worker) -> MatchBreakdown {
         MatchBreakdown {
             uk_nhs_number_score: identifier_score(
@@ -1383,6 +1403,9 @@ impl MatchingEngine {
         }
     }
 
+    // Long by nature: one explicit weight application per scored field.
+    // Splitting it would scatter the per-field weighting and reduce auditability.
+    #[allow(clippy::too_many_lines)]
     fn calculate_weighted_score(&self, breakdown: &MatchBreakdown) -> f64 {
         let mut total_weight = 0.0;
         let mut weighted_sum = 0.0;
@@ -1857,13 +1880,16 @@ impl MatchingEngine {
 
         let given_name_match = f64::from(p1_given_name_phonetic == p2_given_name_phonetic);
         let family_name_match = f64::from(p1_family_name_phonetic == p2_family_name_phonetic);
-        Some((given_name_match + family_name_match) / 2.0)
+        Some(f64::midpoint(given_name_match, family_name_match))
     }
 }
 
 /// Return `true` iff both raw identifier strings parse via `parser` to the
 /// same canonical form. Both `None` or a parse failure on either side
 /// yields `false` — this helper backs deterministic identifier matching.
+// Takes `&Option<String>` so the ~40 per-scheme call sites can pass a worker
+// field directly without an `.as_ref()` dance; the reference is internal only.
+#[allow(clippy::ref_option)]
 fn identifier_equal<F>(a: &Option<String>, b: &Option<String>, parser: F) -> bool
 where
     F: Fn(&str) -> Option<String>,
@@ -1880,6 +1906,9 @@ where
 /// Return `Some(1.0)` if both inputs parse and are equal, `Some(0.0)` if
 /// both parse but differ, or `None` if either input is absent or fails to
 /// parse — mirroring the existing per-field scoring contract.
+// Takes `&Option<String>` so the ~40 per-scheme call sites can pass a worker
+// field directly without an `.as_ref()` dance; the reference is internal only.
+#[allow(clippy::ref_option)]
 fn identifier_score<F>(a: &Option<String>, b: &Option<String>, parser: F) -> Option<f64>
 where
     F: Fn(&str) -> Option<String>,
@@ -1969,6 +1998,11 @@ fn score_named_place(a: &Address, b: &Address) -> Option<f64> {
     }
 }
 
+/// Score a pair of dates of birth.
+///
+/// Returns `1.0` for an exact match, `0.5` when the day and month are
+/// transposed within the same year (a common data-entry error), and `0.0`
+/// otherwise.
 fn score_dob_pair(dob1: Date, dob2: Date) -> f64 {
     if dob1 == dob2 {
         return 1.0;
@@ -1984,6 +2018,9 @@ fn score_dob_pair(dob1: Date, dob2: Date) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    // The engine is deterministic and returns exact constants (0.0, 0.5, 1.0)
+    // for the cases asserted here, so comparing the results with `==` is correct.
+    #![allow(clippy::float_cmp)]
     use super::*;
     use crate::models::Gender;
 

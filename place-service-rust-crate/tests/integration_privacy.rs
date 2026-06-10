@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for the privacy pipeline.
 //!
 //! These cover [`mask_place`] and [`gdpr_export`] end to end: masking before

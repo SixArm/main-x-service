@@ -185,6 +185,7 @@ impl MatchConfig {
     /// assert!((c.match_threshold - 0.95).abs() < 1e-9);
     /// assert!(c.strict_mode);
     /// ```
+    #[must_use]
     pub fn strict() -> Self {
         Self {
             match_threshold: 0.95,
@@ -204,6 +205,7 @@ impl MatchConfig {
     /// assert!((c.match_threshold - 0.65).abs() < 1e-9);
     /// assert!(c.use_phonetic_matching);
     /// ```
+    #[must_use]
     pub fn lenient() -> Self {
         Self {
             match_threshold: 0.65,
@@ -271,6 +273,7 @@ impl Confidence {
     /// assert_eq!(Confidence::from_score(-0.5),     Confidence::Low);
     /// assert_eq!(Confidence::from_score(2.0),      Confidence::High);
     /// ```
+    #[must_use]
     pub fn from_score(score: f64) -> Self {
         if score >= 0.90 {
             Confidence::High
@@ -398,6 +401,7 @@ impl MatchingEngine {
     /// let engine = MatchingEngine::new(MatchConfig::lenient());
     /// # let _ = engine;
     /// ```
+    #[must_use]
     pub fn new(config: MatchConfig) -> Self {
         Self { config }
     }
@@ -409,6 +413,7 @@ impl MatchingEngine {
     /// let engine = MatchingEngine::default_config();
     /// # let _ = engine;
     /// ```
+    #[must_use]
     pub fn default_config() -> Self {
         Self::new(MatchConfig::default())
     }
@@ -431,6 +436,7 @@ impl MatchingEngine {
     /// assert!(result.is_match);
     /// assert!(result.score > 0.99);
     /// ```
+    #[must_use]
     pub fn match_places(&self, place1: &Place, place2: &Place) -> MatchResult {
         let breakdown = self.calculate_breakdown(place1, place2);
         let score = self.calculate_weighted_score(&breakdown);
@@ -484,6 +490,7 @@ impl MatchingEngine {
     /// let r = MatchingEngine::default_config().match_one_to_many(&q, &[]);
     /// assert!(r.is_empty());
     /// ```
+    #[must_use]
     pub fn match_one_to_many(&self, query: &Place, candidates: &[Place]) -> Vec<MatchResult> {
         candidates
             .iter()
@@ -513,6 +520,7 @@ impl MatchingEngine {
     /// assert!(ranked[0].1.score >= ranked[1].1.score);
     /// assert!(ranked[1].1.score >= ranked[2].1.score);
     /// ```
+    #[must_use]
     pub fn rank_one_to_many(
         &self,
         query: &Place,
@@ -549,6 +557,7 @@ impl MatchingEngine {
     /// let b = Place::builder().name("Tour Eiffel").add_place_id(id).build();
     /// assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     /// ```
+    #[must_use]
     pub fn deterministic_match(&self, place1: &Place, place2: &Place) -> bool {
         if shares_place_id(place1, place2) {
             return true;
@@ -560,12 +569,12 @@ impl MatchingEngine {
         MatchBreakdown {
             name_score: self.score_name(place1, place2),
             name_phonetic_score: if self.config.use_phonetic_matching {
-                self.score_phonetic_names(place1, place2)
+                Self::score_phonetic_names(place1, place2)
             } else {
                 None
             },
             coordinates_score: self.score_coordinates(place1, place2),
-            address_score: self.score_address(place1, place2),
+            address_score: Self::score_address(place1, place2),
             category_score: score_category(place1, place2),
             country_code_score: score_country_code(place1, place2),
             place_ids_score: score_place_ids(place1, place2),
@@ -655,7 +664,7 @@ impl MatchingEngine {
         }
     }
 
-    fn score_phonetic_names(&self, place1: &Place, place2: &Place) -> Option<f64> {
+    fn score_phonetic_names(place1: &Place, place2: &Place) -> Option<f64> {
         let names1 = collect_names(place1);
         let names2 = collect_names(place2);
         if names1.is_empty() || names2.is_empty() {
@@ -690,14 +699,14 @@ impl MatchingEngine {
         ))
     }
 
-    fn score_address(&self, place1: &Place, place2: &Place) -> Option<f64> {
+    fn score_address(place1: &Place, place2: &Place) -> Option<f64> {
         match (place1.address.as_ref(), place2.address.as_ref()) {
-            (Some(a1), Some(a2)) => Some(self.compare_addresses(a1, a2)),
+            (Some(a1), Some(a2)) => Some(Self::compare_addresses(a1, a2)),
             _ => None,
         }
     }
 
-    fn compare_addresses(&self, addr1: &Address, addr2: &Address) -> f64 {
+    fn compare_addresses(addr1: &Address, addr2: &Address) -> f64 {
         // Each sub-component contributes its own raw score in `[0.0, 1.0]`
         // and a weight. The final sub-score is the weight-renormalised
         // average — `(score x weight) / weight` summed across the
@@ -838,25 +847,26 @@ fn score_place_ids(p1: &Place, p2: &Place) -> Option<f64> {
 }
 
 fn name_and_postcode_match(p1: &Place, p2: &Place) -> bool {
-    let (n1, n2) = match (&p1.name, &p2.name) {
-        (Some(a), Some(b)) => (a, b),
-        _ => return false,
+    let (Some(n1), Some(n2)) = (&p1.name, &p2.name) else {
+        return false;
     };
     if Normalizer::normalize_name(n1) != Normalizer::normalize_name(n2) {
         return false;
     }
-    let (pc1, pc2) = match (
+    let (Some(pc1), Some(pc2)) = (
         p1.address.as_ref().and_then(|a| a.postcode.as_ref()),
         p2.address.as_ref().and_then(|a| a.postcode.as_ref()),
-    ) {
-        (Some(a), Some(b)) => (a, b),
-        _ => return false,
+    ) else {
+        return false;
     };
     Normalizer::normalize_postcode(pc1) == Normalizer::normalize_postcode(pc2)
 }
 
 #[cfg(test)]
 mod tests {
+    // Tests assert exact scores against representable constants (0.0, 1.0, …).
+    #![allow(clippy::float_cmp)]
+
     use super::*;
     use crate::models::{PlaceCategory, PlaceId, PlaceIdScheme};
 
@@ -930,7 +940,10 @@ mod tests {
             .build();
         let r = MatchingEngine::default_config().match_places(&p1, &p2);
         let s = r.breakdown.name_score.expect("scored");
-        assert!(s > 0.99, "best-of cartesian product should pick exact match: {s}");
+        assert!(
+            s > 0.99,
+            "best-of cartesian product should pick exact match: {s}"
+        );
     }
 
     #[test]
@@ -962,23 +975,43 @@ mod tests {
 
     #[test]
     fn coordinates_score_present_when_both_sides_have_coords() {
-        let a = Place::builder().name("X").latitude(0.0).longitude(0.0).build();
-        let b = Place::builder().name("X").latitude(0.0).longitude(0.0).build();
+        let a = Place::builder()
+            .name("X")
+            .latitude(0.0)
+            .longitude(0.0)
+            .build();
+        let b = Place::builder()
+            .name("X")
+            .latitude(0.0)
+            .longitude(0.0)
+            .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
         assert!((r.breakdown.coordinates_score.unwrap() - 1.0).abs() < 1e-9);
     }
 
     #[test]
     fn coordinates_score_none_when_out_of_range() {
-        let a = Place::builder().name("X").latitude(91.0).longitude(0.0).build();
-        let b = Place::builder().name("X").latitude(0.0).longitude(0.0).build();
+        let a = Place::builder()
+            .name("X")
+            .latitude(91.0)
+            .longitude(0.0)
+            .build();
+        let b = Place::builder()
+            .name("X")
+            .latitude(0.0)
+            .longitude(0.0)
+            .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
         assert!(r.breakdown.coordinates_score.is_none());
     }
 
     #[test]
     fn coordinates_score_none_when_one_side_missing() {
-        let a = Place::builder().name("X").latitude(48.0).longitude(2.0).build();
+        let a = Place::builder()
+            .name("X")
+            .latitude(48.0)
+            .longitude(2.0)
+            .build();
         let b = Place::builder().name("X").build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
         assert!(r.breakdown.coordinates_score.is_none());
@@ -991,7 +1024,11 @@ mod tests {
             .latitude(f64::NAN)
             .longitude(0.0)
             .build();
-        let b = Place::builder().name("X").latitude(0.0).longitude(0.0).build();
+        let b = Place::builder()
+            .name("X")
+            .latitude(0.0)
+            .longitude(0.0)
+            .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
         assert!(r.breakdown.coordinates_score.is_none());
     }
@@ -1013,8 +1050,14 @@ mod tests {
             .category(PlaceCategory::Cafe)
             .build();
         let engine = MatchingEngine::default_config();
-        assert_eq!(engine.match_places(&a, &b).breakdown.category_score, Some(1.0));
-        assert_eq!(engine.match_places(&a, &c).breakdown.category_score, Some(0.0));
+        assert_eq!(
+            engine.match_places(&a, &b).breakdown.category_score,
+            Some(1.0)
+        );
+        assert_eq!(
+            engine.match_places(&a, &c).breakdown.category_score,
+            Some(0.0)
+        );
     }
 
     #[test]
@@ -1113,8 +1156,14 @@ mod tests {
     #[test]
     fn deterministic_via_shared_place_id() {
         let id = PlaceId::new(PlaceIdScheme::Wikidata, "Q243").unwrap();
-        let a = Place::builder().name("Eiffel Tower").add_place_id(id.clone()).build();
-        let b = Place::builder().name("Wholly Different").add_place_id(id).build();
+        let a = Place::builder()
+            .name("Eiffel Tower")
+            .add_place_id(id.clone())
+            .build();
+        let b = Place::builder()
+            .name("Wholly Different")
+            .add_place_id(id)
+            .build();
         assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
@@ -1220,8 +1269,7 @@ mod tests {
     fn address_with_no_subfields_is_neutral_half() {
         let a = Address::new();
         let b = Address::new();
-        let engine = MatchingEngine::default_config();
-        let score = engine.compare_addresses(&a, &b);
+        let score = MatchingEngine::compare_addresses(&a, &b);
         assert!((score - 0.5).abs() < 1e-9, "got {score}");
     }
 
@@ -1229,7 +1277,7 @@ mod tests {
     fn address_postcode_match_dominates() {
         let a = Address::new().with_postcode("CF10 1AA");
         let b = Address::new().with_postcode("CF10 1AA");
-        let s = MatchingEngine::default_config().compare_addresses(&a, &b);
+        let s = MatchingEngine::compare_addresses(&a, &b);
         assert!((s - 1.0).abs() < 1e-9);
     }
 

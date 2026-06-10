@@ -1,6 +1,6 @@
 # Roadmap research spike outcomes
 
-This file archives the research-spike outcomes that were previously inlined in `spec.md §21.4`. Each entry remains reference-grade documentation of a closed decision, sourced verbatim. The spec keeps a one-line pointer to this file. See [`spec.md`](../spec.md) §21 for the live roadmap.
+This file archives the research-spike outcomes that were previously inlined in `spec.md §21.4`. Each entry remains reference-grade documentation of a closed decision, sourced verbatim. The spec keeps a one-line pointer to this file. See [`spec.md`](../spec/index.md) §21 for the live roadmap.
 
 ### 21.4 Research Spike Outcomes
 

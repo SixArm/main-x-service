@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the Tantivy-backed search engine.
 //!
 //! Covers single and bulk indexing, several query shapes (exact, larger limit,

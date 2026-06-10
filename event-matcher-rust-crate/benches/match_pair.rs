@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the `event-matcher` crate.
 //!
 //! Run with `cargo bench`. The harness covers the hot paths a downstream
@@ -75,7 +77,12 @@ fn build_unrelated() -> Event {
 
 fn make_candidate(idx: usize) -> Event {
     let cities = ["London", "Cardiff", "Edinburgh", "Belfast", "Manchester"];
-    let names = ["Open Mic Night", "Conference Day", "Comedy Hour", "Book Club"];
+    let names = [
+        "Open Mic Night",
+        "Conference Day",
+        "Comedy Hour",
+        "Book Club",
+    ];
     let day = (idx % 28) + 1;
     Event::builder()
         .name(names[idx % names.len()])

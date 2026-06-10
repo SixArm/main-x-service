@@ -4,8 +4,8 @@ Sibling to [`event-service-rust-crate/`](../event-service-rust-crate/). The Rust
 
 ## Single source of truth
 
-- The service's [`spec.md`](../event-service-rust-crate/spec.md) and [`AGENTS/`](../event-service-rust-crate/AGENTS/) describe the API contract. If a field disappears from `Event` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
-- This project has its own [`spec.md`](spec.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
+- The service's [`spec.md`](../event-service-rust-crate/spec/index.md) and [`AGENTS/`](../event-service-rust-crate/AGENTS/) describe the API contract. If a field disappears from `Event` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
+- This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
 
 ## Three-part change rule
 

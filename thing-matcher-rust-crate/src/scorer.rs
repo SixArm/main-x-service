@@ -169,8 +169,8 @@ impl Scorer {
         if a.is_empty() || b.is_empty() {
             return 0.0;
         }
-        let a_set: std::collections::BTreeSet<&str> = a.iter().map(|s| s.as_ref()).collect();
-        let b_set: std::collections::BTreeSet<&str> = b.iter().map(|s| s.as_ref()).collect();
+        let a_set: std::collections::BTreeSet<&str> = a.iter().map(AsRef::as_ref).collect();
+        let b_set: std::collections::BTreeSet<&str> = b.iter().map(AsRef::as_ref).collect();
         let intersection = a_set.intersection(&b_set).count();
         let union = a_set.union(&b_set).count();
         if union == 0 {

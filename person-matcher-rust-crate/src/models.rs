@@ -6,7 +6,7 @@
 //! text transformations that the matcher applies to these fields.
 //!
 //! All public types here are `Serialize + Deserialize` so they round-trip
-//! through JSON, MessagePack, or any other `serde` format.
+//! through JSON, `MessagePack`, or any other `serde` format.
 //!
 //! ## Building a person
 //!
@@ -76,7 +76,7 @@ pub enum Gender {
     Unknown,
 }
 
-/// ABO + RhD blood type used as supporting evidence in person matcher.
+/// ABO + `RhD` blood type used as supporting evidence in person matcher.
 ///
 /// Blood type is a **weak positive** signal and a **strong negative**
 /// signal:
@@ -160,6 +160,7 @@ impl BloodType {
     /// assert_eq!(BloodType::APositive.as_str(),  "A+");
     /// assert_eq!(BloodType::ABNegative.as_str(), "AB-");
     /// ```
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             BloodType::APositive => "A+",
@@ -192,6 +193,7 @@ impl BloodType {
     /// assert_eq!(BloodType::parse("ab+"),        Some(BloodType::ABPositive));
     /// assert_eq!(BloodType::parse("Bombay"),     None); // rare phenotype, not supported
     /// ```
+    #[must_use]
     pub fn parse(s: &str) -> Option<BloodType> {
         let upper: String = s
             .trim()
@@ -339,6 +341,7 @@ impl Address {
     /// assert!(a.line1.is_none());
     /// assert!(a.postcode.is_none());
     /// ```
+    #[must_use]
     pub fn new() -> Self {
         Self {
             line1: None,
@@ -527,6 +530,7 @@ impl PassportBook {
     ///     .with_issued(jiff::civil::date(2020, 1, 1));
     /// assert!(b.issued.is_some());
     /// ```
+    #[must_use]
     pub fn with_issued(mut self, date: Date) -> Self {
         self.issued = Some(date);
         self
@@ -542,6 +546,7 @@ impl PassportBook {
     ///     .with_expires(jiff::civil::date(2030, 1, 1));
     /// assert!(b.expires.is_some());
     /// ```
+    #[must_use]
     pub fn with_expires(mut self, date: Date) -> Self {
         self.expires = Some(date);
         self
@@ -947,6 +952,7 @@ impl Person {
     ///
     /// assert_eq!(p.family_name.as_deref(), Some("Smith"));
     /// ```
+    #[must_use]
     pub fn builder() -> PersonBuilder {
         PersonBuilder::default()
     }
@@ -960,6 +966,11 @@ impl Person {
     ///
     /// This is **not** invoked automatically by the matcher — call it at the
     /// system boundary when you ingest data, not on every comparison.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::MatchingError::MissingField`] when the person carries
+    /// neither a name nor any national identifier.
     ///
     /// # Example
     ///
@@ -1058,64 +1069,123 @@ impl Person {
 /// ```
 #[derive(Default)]
 pub struct PersonBuilder {
+    /// Staged [`Person::united_kingdom_national_health_service_number`].
     united_kingdom_national_health_service_number: Option<String>,
+    /// Staged [`Person::fr_nir`].
     fr_nir: Option<String>,
+    /// Staged [`Person::es_tsi`].
     es_tsi: Option<String>,
+    /// Staged [`Person::ie_ihi`].
     ie_ihi: Option<String>,
+    /// Staged [`Person::uk_hc_number`].
     uk_hc_number: Option<String>,
+    /// Staged [`Person::us_ssn`].
     us_ssn: Option<String>,
+    /// Staged [`Person::au_ihi`].
     au_ihi: Option<String>,
+    /// Staged [`Person::de_kvnr`].
     de_kvnr: Option<String>,
+    /// Staged [`Person::it_cf`].
     it_cf: Option<String>,
+    /// Staged [`Person::nl_bsn`].
     nl_bsn: Option<String>,
+    /// Staged [`Person::se_personnummer`].
     se_personnummer: Option<String>,
+    /// Staged [`Person::uk_chi_number`].
     uk_chi_number: Option<String>,
+    /// Staged [`Person::be_nn`].
     be_nn: Option<String>,
+    /// Staged [`Person::bg_egn`].
     bg_egn: Option<String>,
+    /// Staged [`Person::cz_rc`].
     cz_rc: Option<String>,
+    /// Staged [`Person::dk_cpr`].
     dk_cpr: Option<String>,
+    /// Staged [`Person::ee_ik`].
     ee_ik: Option<String>,
+    /// Staged [`Person::es_dni`].
     es_dni: Option<String>,
+    /// Staged [`Person::fi_hetu`].
     fi_hetu: Option<String>,
+    /// Staged [`Person::hr_oib`].
     hr_oib: Option<String>,
+    /// Staged [`Person::is_kt`].
     is_kt: Option<String>,
+    /// Staged [`Person::lt_ak`].
     lt_ak: Option<String>,
+    /// Staged [`Person::lv_pk`].
     lv_pk: Option<String>,
+    /// Staged [`Person::mt_id`].
     mt_id: Option<String>,
+    /// Staged [`Person::no_fnr`].
     no_fnr: Option<String>,
+    /// Staged [`Person::pl_pesel`].
     pl_pesel: Option<String>,
+    /// Staged [`Person::ro_cnp`].
     ro_cnp: Option<String>,
+    /// Staged [`Person::si_emso`].
     si_emso: Option<String>,
+    /// Staged [`Person::sk_rc`].
     sk_rc: Option<String>,
+    /// Staged [`Person::uk_nino`].
     uk_nino: Option<String>,
+    /// Staged [`Person::gr_dss`].
     gr_dss: Option<String>,
+    /// Staged [`Person::li_id`].
     li_id: Option<String>,
+    /// Staged [`Person::nl_id`].
     nl_id: Option<String>,
+    /// Staged [`Person::pl_nip`].
     pl_nip: Option<String>,
+    /// Staged [`Person::pt_nif`].
     pt_nif: Option<String>,
+    /// Staged [`Person::br_cpf`].
     br_cpf: Option<String>,
+    /// Staged [`Person::cn_rrn`].
     cn_rrn: Option<String>,
+    /// Staged [`Person::in_aadhaar`].
     in_aadhaar: Option<String>,
+    /// Staged [`Person::jp_my_number`].
     jp_my_number: Option<String>,
+    /// Staged [`Person::mx_curp`].
     mx_curp: Option<String>,
+    /// Staged [`Person::nz_nhi`].
     nz_nhi: Option<String>,
+    /// Staged [`Person::za_id`].
     za_id: Option<String>,
+    /// Staged [`Person::given_name`].
     given_name: Option<String>,
+    /// Staged [`Person::middle_name`].
     middle_name: Option<String>,
+    /// Staged [`Person::family_name`].
     family_name: Option<String>,
+    /// Staged [`Person::date_of_birth`].
     date_of_birth: Option<Date>,
+    /// Staged [`Person::death_date`].
     death_date: Option<Date>,
+    /// Staged [`Person::gender`].
     gender: Option<Gender>,
+    /// Staged [`Person::blood_type`].
     blood_type: Option<BloodType>,
+    /// Staged [`Person::multiple_birth`].
     multiple_birth: Option<u8>,
+    /// Staged [`Person::address`].
     address: Option<Address>,
+    /// Staged [`Person::birth_place`].
     birth_place: Option<Address>,
+    /// Staged [`Person::death_place`].
     death_place: Option<Address>,
+    /// Staged [`Person::previous_addresses`].
     previous_addresses: Vec<Address>,
+    /// Staged [`Person::passport_books`].
     passport_books: Vec<PassportBook>,
+    /// Staged [`Person::phone`].
     phone: Option<String>,
+    /// Staged [`Person::mobile`].
     mobile: Option<String>,
+    /// Staged [`Person::email`].
     email: Option<String>,
+    /// Staged [`Person::local_id`].
     local_id: Option<String>,
 }
 
@@ -1133,7 +1203,10 @@ impl PersonBuilder {
     /// let p = Person::builder().united_kingdom_national_health_service_number("943 476 5919").build();
     /// assert_eq!(p.united_kingdom_national_health_service_number.as_deref(), Some("943 476 5919"));
     /// ```
-    pub fn united_kingdom_national_health_service_number<S: Into<String>>(mut self, value: S) -> Self {
+    pub fn united_kingdom_national_health_service_number<S: Into<String>>(
+        mut self,
+        value: S,
+    ) -> Self {
         self.united_kingdom_national_health_service_number = Some(value.into());
         self
     }
@@ -1545,6 +1618,7 @@ impl PersonBuilder {
     /// let p = Person::builder().date_of_birth(dob).build();
     /// assert_eq!(p.date_of_birth, Some(dob));
     /// ```
+    #[must_use]
     pub fn date_of_birth(mut self, value: Date) -> Self {
         self.date_of_birth = Some(value);
         self
@@ -1559,6 +1633,7 @@ impl PersonBuilder {
     /// let p = Person::builder().death_date(dod).build();
     /// assert_eq!(p.death_date, Some(dod));
     /// ```
+    #[must_use]
     pub fn death_date(mut self, value: Date) -> Self {
         self.death_date = Some(value);
         self
@@ -1571,6 +1646,7 @@ impl PersonBuilder {
     /// let p = Person::builder().gender(Gender::Female).build();
     /// assert_eq!(p.gender, Some(Gender::Female));
     /// ```
+    #[must_use]
     pub fn gender(mut self, value: Gender) -> Self {
         self.gender = Some(value);
         self
@@ -1583,6 +1659,7 @@ impl PersonBuilder {
     /// let p = Person::builder().blood_type(BloodType::OPositive).build();
     /// assert_eq!(p.blood_type, Some(BloodType::OPositive));
     /// ```
+    #[must_use]
     pub fn blood_type(mut self, value: BloodType) -> Self {
         self.blood_type = Some(value);
         self
@@ -1601,6 +1678,7 @@ impl PersonBuilder {
     /// let p = Person::builder().multiple_birth(1).build();
     /// assert_eq!(p.multiple_birth, Some(1));
     /// ```
+    #[must_use]
     pub fn multiple_birth(mut self, value: u8) -> Self {
         self.multiple_birth = Some(value);
         self
@@ -1615,6 +1693,7 @@ impl PersonBuilder {
     /// let p = Person::builder().address(a).build();
     /// assert_eq!(p.address.unwrap().postcode.as_deref(), Some("CF10 1AA"));
     /// ```
+    #[must_use]
     pub fn address(mut self, value: Address) -> Self {
         self.address = Some(value);
         self
@@ -1632,6 +1711,7 @@ impl PersonBuilder {
     ///     .build();
     /// assert_eq!(p.birth_place.as_ref().unwrap().city.as_deref(), Some("Cardiff"));
     /// ```
+    #[must_use]
     pub fn birth_place(mut self, value: Address) -> Self {
         self.birth_place = Some(value);
         self
@@ -1650,6 +1730,7 @@ impl PersonBuilder {
     ///     .build();
     /// assert_eq!(p.death_place.as_ref().unwrap().city.as_deref(), Some("Glasgow"));
     /// ```
+    #[must_use]
     pub fn death_place(mut self, value: Address) -> Self {
         self.death_place = Some(value);
         self
@@ -1665,6 +1746,7 @@ impl PersonBuilder {
     ///     .build();
     /// assert_eq!(p.previous_addresses.len(), 2);
     /// ```
+    #[must_use]
     pub fn previous_addresses(mut self, value: Vec<Address>) -> Self {
         self.previous_addresses = value;
         self
@@ -1682,6 +1764,7 @@ impl PersonBuilder {
     ///     .build();
     /// assert_eq!(p.passport_books.len(), 2);
     /// ```
+    #[must_use]
     pub fn add_passport_book(mut self, book: PassportBook) -> Self {
         self.passport_books.push(book);
         self
@@ -1695,6 +1778,7 @@ impl PersonBuilder {
     /// let p = Person::builder().passport_books(books).build();
     /// assert_eq!(p.passport_books.len(), 1);
     /// ```
+    #[must_use]
     pub fn passport_books(mut self, value: Vec<PassportBook>) -> Self {
         self.passport_books = value;
         self
@@ -1755,9 +1839,11 @@ impl PersonBuilder {
     /// let p = Person::builder().given_name("Eira").build();
     /// assert!(p.family_name.is_none());
     /// ```
+    #[must_use]
     pub fn build(self) -> Person {
         Person {
-            united_kingdom_national_health_service_number: self.united_kingdom_national_health_service_number,
+            united_kingdom_national_health_service_number: self
+                .united_kingdom_national_health_service_number,
             fr_nir: self.fr_nir,
             es_tsi: self.es_tsi,
             ie_ihi: self.ie_ihi,
@@ -1909,7 +1995,10 @@ mod tests {
             .se_personnummer("4603243850")
             .uk_chi_number("0101701233")
             .build();
-        assert_eq!(p.united_kingdom_national_health_service_number.as_deref(), Some("9434765919"));
+        assert_eq!(
+            p.united_kingdom_national_health_service_number.as_deref(),
+            Some("9434765919")
+        );
         assert_eq!(p.fr_nir.as_deref(), Some("180127512345642"));
         assert_eq!(p.es_tsi.as_deref(), Some("ABCD123456XY1234"));
         assert_eq!(p.ie_ihi.as_deref(), Some("1234567"));

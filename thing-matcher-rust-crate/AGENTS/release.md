@@ -1,6 +1,6 @@
 # Release — agent guide
 
-See [`../spec.md`](../spec.md) §9 for the formal versioning policy.
+See [`../spec.md`](../spec/index.md) §9 for the formal versioning policy.
 
 ## Versioning
 

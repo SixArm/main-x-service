@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Property-based tests.
 //!
 //! Each property generates many random inputs via `proptest` and checks an
@@ -5,9 +7,7 @@
 //! the failure modes that example-based tests miss: weird Unicode in
 //! names, edge-case coordinates, sparse / dense `Place` records.
 
-use place_matcher::{
-    Confidence, MatchConfig, MatchingEngine, Normalizer, Place, PlaceCategory,
-};
+use place_matcher::{Confidence, MatchConfig, MatchingEngine, Normalizer, Place, PlaceCategory};
 use proptest::prelude::*;
 
 // ---------- Strategies ----------

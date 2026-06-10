@@ -4,7 +4,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 > **Navigating the docs:** [`index.md`](./index.md) is the top-level documentation index — start there if you don't know what to read first.
 >
-> If you only read one file, read [`spec.md`](./spec.md). It is the living, authoritative specification of the crate. This guide tells you **how to work**; the spec tells you **what to build**.
+> If you only read one file, read [`spec.md`](./spec/index.md). It is the living, authoritative specification of the crate. This guide tells you **how to work**; the spec tells you **what to build**.
 
 ---
 
@@ -13,7 +13,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 | Question | Answer |
 |---|---|
 | What does the crate do? | Pairwise matching of geographic-place records (landmarks, natural features, chain branches, administrative areas), deterministic and probabilistic, for de-duplication and record linkage. |
-| Where is the canonical spec? | [`spec.md`](./spec.md). |
+| Where is the canonical spec? | [`spec.md`](./spec/index.md). |
 | Where does new behaviour get specified? | In `spec.md` first, then code. See [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md). |
 | Build command | `cargo build` |
 | Test command | `cargo test` (unit + integration + property + doctest) |
@@ -21,17 +21,17 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 | Format command | `cargo fmt` |
 | Where do public types live? | `src/lib.rs` re-exports; defined under `src/{models,matcher,scorer,normalizer,error}.rs`. |
 | Where are demo runs? | `cargo run` and `cargo run --example basic_usage` and `cargo run --example custom_config`. |
-| What's the deterministic-match rule? | Any shared `(scheme, value)` pair across `place_ids`, OR identical normalised `name` plus identical normalised `address.postcode`. See [`spec.md` §5.1](./spec.md). |
-| What's the probabilistic-match pipeline? | Weighted, weight-renormalised sum across name / coordinates / address / category / country_code / place_ids / phone / email; missing fields skip. Optional Soundex bonus when phonetic gating clears. See [`spec.md` §5.2, §6](./spec.md). |
-| Default match threshold | `0.80`. Strict: `0.95`. Lenient: `0.65`. See [`spec.md` §7](./spec.md). |
-| Default coordinates scale | `50.0` metres. Gaussian decay `exp(-(d/s)^2)`. See [`spec.md` §6.3](./spec.md). |
-| `#[non_exhaustive]` items | `Place`, `Address`, `PlaceCategory`, `PlaceIdScheme`, `MatchingError`. Construct via builders / `new`. See [`spec.md` §9.1](./spec.md). |
+| What's the deterministic-match rule? | Any shared `(scheme, value)` pair across `place_ids`, OR identical normalised `name` plus identical normalised `address.postcode`. See [`spec.md` §5.1](./spec/index.md). |
+| What's the probabilistic-match pipeline? | Weighted, weight-renormalised sum across name / coordinates / address / category / country_code / place_ids / phone / email; missing fields skip. Optional Soundex bonus when phonetic gating clears. See [`spec.md` §5.2, §6](./spec/index.md). |
+| Default match threshold | `0.80`. Strict: `0.95`. Lenient: `0.65`. See [`spec.md` §7](./spec/index.md). |
+| Default coordinates scale | `50.0` metres. Gaussian decay `exp(-(d/s)^2)`. See [`spec.md` §6.3](./spec/index.md). |
+| `#[non_exhaustive]` items | `Place`, `Address`, `PlaceCategory`, `PlaceIdScheme`, `MatchingError`. Construct via builders / `new`. See [`spec.md` §9.1](./spec/index.md). |
 
 ---
 
 ## Golden rules
 
-1. **Spec-first.** If you change observable behaviour, update [`spec.md`](./spec.md) in the same change. If the spec is silent, propose a spec update before writing code. (`spec.md` §9.3, [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md))
+1. **Spec-first.** If you change observable behaviour, update [`spec.md`](./spec/index.md) in the same change. If the spec is silent, propose a spec update before writing code. (`spec.md` §9.3, [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md))
 2. **Pure library.** No IO, no logging, no global state inside `src/` (excluding `src/main.rs`, which is a demo binary). (`spec.md` §8)
 3. **No `unsafe`.** Enforced by `#![forbid(unsafe_code)]` in `lib.rs`. Do not remove the attribute.
 4. **Deterministic.** No clocks, no RNGs, no environment variables. Same inputs => same outputs, byte-for-byte. (`spec.md` §8)
@@ -45,7 +45,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 ## Workflow for any change
 
-1. **Read** [`spec.md`](./spec.md). Locate the section(s) affected.
+1. **Read** [`spec.md`](./spec/index.md). Locate the section(s) affected.
 2. **Decide** whether your change is editorial (docs / formatting only) or behavioural (touches what the library does).
 3. **For behavioural changes:**
    - Update `spec.md` first (or alongside) with the new wording.

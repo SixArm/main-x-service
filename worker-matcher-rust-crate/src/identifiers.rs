@@ -114,6 +114,21 @@
 //! assert_eq!(identifiers::parse_uk_nhs_number("not-a-number"), None);
 //! ```
 
+// Every numeric cast in this module operates on values that have already
+// been validated as single decimal digits (`0..=9`), small fixed-width
+// checksum weights, or string lengths bounded by an explicit length check.
+// The results are provably within range of the target type, so the cast
+// truncation / wrap / sign-loss pedantic lints do not indicate real risk.
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss
+)]
+// Several parsers declare a `const` lookup table (checksum weights, valid
+// letters) immediately above the statement that uses it. Keeping the table
+// adjacent to its use aids readability of the checksum logic.
+#![allow(clippy::items_after_statements)]
+
 use nhs_number::NHSNumber;
 use std::str::FromStr;
 
@@ -137,6 +152,7 @@ use std::str::FromStr;
 /// assert_eq!(parse_uk_nhs_number("ABCDEFGHIJ"),   None);
 /// assert_eq!(parse_uk_nhs_number("123"),          None);
 /// ```
+#[must_use]
 pub fn parse_uk_nhs_number(s: &str) -> Option<String> {
     let parsed = NHSNumber::from_str(s).ok()?;
     let mut canonical = String::with_capacity(10);
@@ -202,6 +218,7 @@ pub fn parse_uk_nhs_number(s: &str) -> Option<String> {
 /// assert_eq!(parse_fr_nir("12345"),           None);  // wrong length
 /// assert_eq!(parse_fr_nir(""),                None);
 /// ```
+#[must_use]
 pub fn parse_fr_nir(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
@@ -281,6 +298,7 @@ pub fn parse_fr_nir(s: &str) -> Option<String> {
 /// assert_eq!(parse_es_tsi("ABCDEF123456XY12345678"), None);  // 22 chars
 /// assert_eq!(parse_es_tsi("ABC@123!XYZ"),            None);  // bad chars
 /// ```
+#[must_use]
 pub fn parse_es_tsi(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
@@ -328,8 +346,9 @@ pub fn parse_es_tsi(s: &str) -> Option<String> {
 /// assert_eq!(parse_ie_ihi("12345678"),   None);   // too long
 /// assert_eq!(parse_ie_ihi("ABCDEFG"),    None);   // not digits
 /// ```
+#[must_use]
 pub fn parse_ie_ihi(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() == 7 {
         Some(digits)
     } else {
@@ -362,6 +381,7 @@ pub fn parse_ie_ihi(s: &str) -> Option<String> {
 /// assert_eq!(parse_uk_hc_number("943 476 5919"), Some("9434765919".to_string()));
 /// assert_eq!(parse_uk_hc_number("not-a-number"), None);
 /// ```
+#[must_use]
 pub fn parse_uk_hc_number(s: &str) -> Option<String> {
     parse_uk_nhs_number(s)
 }
@@ -419,8 +439,9 @@ pub fn parse_uk_hc_number(s: &str) -> Option<String> {
 /// assert_eq!(parse_us_ssn("ABCDEFGHI"),   None); // not digits
 /// assert_eq!(parse_us_ssn(""),            None);
 /// ```
+#[must_use]
 pub fn parse_us_ssn(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 9 {
         return None;
     }
@@ -478,6 +499,7 @@ pub fn parse_us_ssn(s: &str) -> Option<String> {
 /// assert_eq!(parse_de_kvnr("A12345"),     None);
 /// assert_eq!(parse_de_kvnr(""),           None);
 /// ```
+#[must_use]
 pub fn parse_de_kvnr(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
@@ -493,7 +515,7 @@ pub fn parse_de_kvnr(s: &str) -> Option<String> {
         return None;
     }
     let digit_chars: Vec<char> = chars.collect();
-    if !digit_chars.iter().all(|c| c.is_ascii_digit()) {
+    if !digit_chars.iter().all(char::is_ascii_digit) {
         return None;
     }
     let letter_ord = (first as u32) - ('A' as u32) + 1;
@@ -636,6 +658,7 @@ fn cf_even_value(c: char) -> Option<u32> {
 /// assert_eq!(parse_it_cf("RSSMRA85T10A562!"), None);
 /// assert_eq!(parse_it_cf(""),                  None);
 /// ```
+#[must_use]
 pub fn parse_it_cf(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
@@ -701,8 +724,9 @@ pub fn parse_it_cf(s: &str) -> Option<String> {
 /// assert_eq!(parse_nl_bsn("000000000"), None);
 /// assert_eq!(parse_nl_bsn(""),          None);
 /// ```
+#[must_use]
 pub fn parse_nl_bsn(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 9 {
         return None;
     }
@@ -773,8 +797,9 @@ pub fn parse_nl_bsn(s: &str) -> Option<String> {
 /// assert_eq!(parse_se_personnummer("ABCDEFGHIJ"),  None);
 /// assert_eq!(parse_se_personnummer(""),            None);
 /// ```
+#[must_use]
 pub fn parse_se_personnummer(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     let luhn_digits: &str = match digits.len() {
         10 => &digits,
         12 => &digits[2..],
@@ -828,8 +853,9 @@ pub fn parse_se_personnummer(s: &str) -> Option<String> {
 /// assert_eq!(parse_au_ihi("ABCDEFGHIJKLMNOP"), None);
 /// assert_eq!(parse_au_ihi(""),                 None);
 /// ```
+#[must_use]
 pub fn parse_au_ihi(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 16 {
         return None;
     }
@@ -891,15 +917,13 @@ pub fn parse_au_ihi(s: &str) -> Option<String> {
 /// assert_eq!(parse_uk_chi_number("ABCDEFGHIJ"), None);
 /// assert_eq!(parse_uk_chi_number(""),           None);
 /// ```
+#[must_use]
 pub fn parse_uk_chi_number(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 10 {
         return None;
     }
-    let chars: Vec<u32> = digits
-        .chars()
-        .map(|c| c.to_digit(10).expect("filtered to digits"))
-        .collect();
+    let chars: Vec<u32> = digits.bytes().map(|b| u32::from(b - b'0')).collect();
     let weights = [10u32, 9, 8, 7, 6, 5, 4, 3, 2];
     let sum: u32 = chars
         .iter()
@@ -940,8 +964,9 @@ pub fn parse_uk_chi_number(s: &str) -> Option<String> {
 /// assert_eq!(parse_be_nn("80010100100"), None);   // wrong check
 /// assert_eq!(parse_be_nn("12345"), None);         // wrong length
 /// ```
+#[must_use]
 pub fn parse_be_nn(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 11 {
         return None;
     }
@@ -968,8 +993,9 @@ pub fn parse_be_nn(s: &str) -> Option<String> {
 /// assert_eq!(parse_bg_egn("8001010014"), None);
 /// assert_eq!(parse_bg_egn(""), None);
 /// ```
+#[must_use]
 pub fn parse_bg_egn(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 10 {
         return None;
     }
@@ -999,8 +1025,9 @@ pub fn parse_bg_egn(s: &str) -> Option<String> {
 /// assert_eq!(parse_cz_rc("800115001"), Some("800115001".to_string())); // 9-digit pre-1954
 /// assert_eq!(parse_cz_rc("8001150015"), None);
 /// ```
+#[must_use]
 pub fn parse_cz_rc(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     match digits.len() {
         9 => Some(digits),
         10 => {
@@ -1031,8 +1058,9 @@ pub fn parse_cz_rc(s: &str) -> Option<String> {
 /// assert_eq!(parse_dk_cpr("150180-1234"), Some("1501801234".to_string()));
 /// assert_eq!(parse_dk_cpr("12345"), None);
 /// ```
+#[must_use]
 pub fn parse_dk_cpr(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() == 10 {
         Some(digits)
     } else {
@@ -1071,8 +1099,9 @@ fn baltic_cascade_check(digits: &str) -> Option<u32> {
 /// assert_eq!(parse_ee_ik("48001150011"), Some("48001150011".to_string()));
 /// assert_eq!(parse_ee_ik("48001150012"), None);
 /// ```
+#[must_use]
 pub fn parse_ee_ik(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 11 {
         return None;
     }
@@ -1096,10 +1125,11 @@ pub fn parse_ee_ik(s: &str) -> Option<String> {
 /// assert_eq!(parse_es_dni("12345678-Z"), Some("12345678Z".to_string()));
 /// assert_eq!(parse_es_dni("12345678A"), None);  // wrong letter
 /// ```
+#[must_use]
 pub fn parse_es_dni(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .collect::<String>()
         .to_uppercase();
     if cleaned.is_empty() {
@@ -1138,6 +1168,7 @@ pub fn parse_es_dni(s: &str) -> Option<String> {
 /// assert_eq!(parse_fi_hetu("150180-999B"), Some("150180-999B".to_string()));
 /// assert_eq!(parse_fi_hetu("150180-999C"), None);
 /// ```
+#[must_use]
 pub fn parse_fi_hetu(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
@@ -1164,7 +1195,7 @@ pub fn parse_fi_hetu(s: &str) -> Option<String> {
     ) {
         return None;
     }
-    let n: u64 = format!("{}{}", date, serial).parse().ok()?;
+    let n: u64 = format!("{date}{serial}").parse().ok()?;
     const TABLE: &[u8; 31] = b"0123456789ABCDEFHJKLMNPRSTUVWXY";
     let expected = TABLE[(n % 31) as usize] as char;
     if check == expected {
@@ -1183,8 +1214,9 @@ pub fn parse_fi_hetu(s: &str) -> Option<String> {
 /// assert_eq!(parse_hr_oib("12345678903"), Some("12345678903".to_string()));
 /// assert_eq!(parse_hr_oib("12345678901"), None);
 /// ```
+#[must_use]
 pub fn parse_hr_oib(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 11 {
         return None;
     }
@@ -1215,8 +1247,9 @@ pub fn parse_hr_oib(s: &str) -> Option<String> {
 /// assert_eq!(parse_is_kt("1501802529"), Some("1501802529".to_string()));
 /// assert_eq!(parse_is_kt("1501802539"), None);  // wrong check digit
 /// ```
+#[must_use]
 pub fn parse_is_kt(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 10 {
         return None;
     }
@@ -1246,8 +1279,9 @@ pub fn parse_is_kt(s: &str) -> Option<String> {
 /// assert_eq!(parse_lt_ak("48001150011"), Some("48001150011".to_string()));
 /// assert_eq!(parse_lt_ak("48001150012"), None);
 /// ```
+#[must_use]
 pub fn parse_lt_ak(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 11 {
         return None;
     }
@@ -1269,8 +1303,9 @@ pub fn parse_lt_ak(s: &str) -> Option<String> {
 /// assert_eq!(parse_lv_pk("15018010007"), Some("15018010007".to_string()));
 /// assert_eq!(parse_lv_pk("15018010008"), None);
 /// ```
+#[must_use]
 pub fn parse_lv_pk(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 11 {
         return None;
     }
@@ -1298,10 +1333,11 @@ pub fn parse_lv_pk(s: &str) -> Option<String> {
 /// assert_eq!(parse_mt_id("1234567M"), Some("1234567M".to_string()));
 /// assert_eq!(parse_mt_id("1234567X"), None);  // X not in valid letter set
 /// ```
+#[must_use]
 pub fn parse_mt_id(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .collect::<String>()
         .to_uppercase();
     if cleaned.len() != 8 {
@@ -1328,8 +1364,9 @@ pub fn parse_mt_id(s: &str) -> Option<String> {
 /// assert_eq!(parse_no_fnr("15018012399"), Some("15018012399".to_string()));
 /// assert_eq!(parse_no_fnr("15018012390"), None);
 /// ```
+#[must_use]
 pub fn parse_no_fnr(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 11 {
         return None;
     }
@@ -1376,8 +1413,9 @@ pub fn parse_no_fnr(s: &str) -> Option<String> {
 /// assert_eq!(parse_pl_pesel("80011500014"), Some("80011500014".to_string()));
 /// assert_eq!(parse_pl_pesel("80011500015"), None);
 /// ```
+#[must_use]
 pub fn parse_pl_pesel(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 11 {
         return None;
     }
@@ -1405,8 +1443,9 @@ pub fn parse_pl_pesel(s: &str) -> Option<String> {
 /// assert_eq!(parse_ro_cnp("1800115400012"), Some("1800115400012".to_string()));
 /// assert_eq!(parse_ro_cnp("1800115400015"), None);
 /// ```
+#[must_use]
 pub fn parse_ro_cnp(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 13 {
         return None;
     }
@@ -1435,8 +1474,9 @@ pub fn parse_ro_cnp(s: &str) -> Option<String> {
 /// assert_eq!(parse_si_emso("1501980500015"), Some("1501980500015".to_string()));
 /// assert_eq!(parse_si_emso("1501980500014"), None);
 /// ```
+#[must_use]
 pub fn parse_si_emso(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 13 {
         return None;
     }
@@ -1464,6 +1504,7 @@ pub fn parse_si_emso(s: &str) -> Option<String> {
 /// assert_eq!(parse_sk_rc("8051150019"), Some("8051150019".to_string()));
 /// assert_eq!(parse_sk_rc("8051150010"), None);
 /// ```
+#[must_use]
 pub fn parse_sk_rc(s: &str) -> Option<String> {
     parse_cz_rc(s)
 }
@@ -1483,10 +1524,11 @@ pub fn parse_sk_rc(s: &str) -> Option<String> {
 /// assert_eq!(parse_uk_nino("DA123456A"), None);  // banned first letter
 /// assert_eq!(parse_uk_nino("ABCDEFGHI"), None);
 /// ```
+#[must_use]
 pub fn parse_uk_nino(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .collect::<String>()
         .to_uppercase();
     if cleaned.len() != 9 {
@@ -1536,8 +1578,9 @@ pub fn parse_uk_nino(s: &str) -> Option<String> {
 /// assert_eq!(parse_gr_dss("12345"), None);
 /// assert_eq!(parse_gr_dss("ABCDEFGHIJ"), None);
 /// ```
+#[must_use]
 pub fn parse_gr_dss(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() == 10 {
         Some(digits)
     } else {
@@ -1561,10 +1604,11 @@ pub fn parse_gr_dss(s: &str) -> Option<String> {
 /// assert_eq!(parse_li_id("12 34 56 78"), None);  // missing letters
 /// assert_eq!(parse_li_id(""), None);
 /// ```
+#[must_use]
 pub fn parse_li_id(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .collect::<String>()
         .to_uppercase();
     if !(10..=11).contains(&cleaned.len()) {
@@ -1574,7 +1618,7 @@ pub fn parse_li_id(s: &str) -> Option<String> {
     if !chars[0].is_ascii_alphabetic() || !chars[1].is_ascii_alphabetic() {
         return None;
     }
-    if !chars[2..].iter().all(|c| c.is_ascii_digit()) {
+    if !chars[2..].iter().all(char::is_ascii_digit) {
         return None;
     }
     Some(cleaned)
@@ -1595,10 +1639,11 @@ pub fn parse_li_id(s: &str) -> Option<String> {
 /// assert_eq!(parse_nl_id("AB12345AB"), None);   // last must be digit
 /// assert_eq!(parse_nl_id("12345AB67"), None);   // leading must be letters
 /// ```
+#[must_use]
 pub fn parse_nl_id(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .collect::<String>()
         .to_uppercase();
     if cleaned.len() != 9 {
@@ -1635,8 +1680,9 @@ pub fn parse_nl_id(s: &str) -> Option<String> {
 /// assert_eq!(parse_pl_nip("1234567803"), None);    // wrong check
 /// assert_eq!(parse_pl_nip("1234567890"), None);    // r = 10 — invalid by spec
 /// ```
+#[must_use]
 pub fn parse_pl_nip(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 10 {
         return None;
     }
@@ -1668,8 +1714,9 @@ pub fn parse_pl_nip(s: &str) -> Option<String> {
 /// assert_eq!(parse_pt_nif("123 456 789"), Some("123456789".to_string()));
 /// assert_eq!(parse_pt_nif("123456780"), None);
 /// ```
+#[must_use]
 pub fn parse_pt_nif(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 9 {
         return None;
     }
@@ -1710,8 +1757,9 @@ pub fn parse_pt_nif(s: &str) -> Option<String> {
 /// assert_eq!(parse_br_cpf("11111111111"),    None);             // all-equal sentinel
 /// assert_eq!(parse_br_cpf("1234567890"),     None);             // too short
 /// ```
+#[must_use]
 pub fn parse_br_cpf(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 11 {
         return None;
     }
@@ -1719,7 +1767,7 @@ pub fn parse_br_cpf(s: &str) -> Option<String> {
     if bytes.iter().all(|&b| b == bytes[0]) {
         return None;
     }
-    let d = |i: usize| (bytes[i] - b'0') as u32;
+    let d = |i: usize| u32::from(bytes[i] - b'0');
     let mut sum1: u32 = 0;
     for i in 0..9 {
         sum1 += d(i) * (10 - i as u32);
@@ -1769,10 +1817,11 @@ pub fn parse_br_cpf(s: &str) -> Option<String> {
 /// assert_eq!(parse_cn_rrn("110105194912310020"), None);          // wrong check
 /// assert_eq!(parse_cn_rrn("11010519491231"),     None);          // too short
 /// ```
+#[must_use]
 pub fn parse_cn_rrn(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .map(|c| c.to_ascii_uppercase())
         .collect();
     if cleaned.len() != 18 {
@@ -1825,6 +1874,7 @@ pub fn parse_cn_rrn(s: &str) -> Option<String> {
 /// assert_eq!(parse_in_aadhaar("222222222222"),   None);  // all-equal sentinel
 /// assert_eq!(parse_in_aadhaar("034123412346"),   None);  // reserved prefix
 /// ```
+#[must_use]
 pub fn parse_in_aadhaar(s: &str) -> Option<String> {
     const VERHOEFF_D: [[u8; 10]; 10] = [
         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -1848,7 +1898,7 @@ pub fn parse_in_aadhaar(s: &str) -> Option<String> {
         [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
         [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
     ];
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 12 {
         return None;
     }
@@ -1882,8 +1932,9 @@ pub fn parse_in_aadhaar(s: &str) -> Option<String> {
 /// assert_eq!(parse_jp_my_number("123456789010"),   None);  // wrong check
 /// assert_eq!(parse_jp_my_number("12345678901"),    None);  // too short
 /// ```
+#[must_use]
 pub fn parse_jp_my_number(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 12 {
         return None;
     }
@@ -1931,6 +1982,7 @@ pub fn parse_jp_my_number(s: &str) -> Option<String> {
 /// assert_eq!(parse_mx_curp("HEGG561327MVZRRL04"), None);   // invalid month
 /// assert_eq!(parse_mx_curp("HEGG560427"),         None);   // too short
 /// ```
+#[must_use]
 pub fn parse_mx_curp(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
@@ -1945,7 +1997,7 @@ pub fn parse_mx_curp(s: &str) -> Option<String> {
     if !chars[..4].iter().copied().all(is_letter_or_n_tilde) {
         return None;
     }
-    if !chars[4..10].iter().all(|c| c.is_ascii_digit()) {
+    if !chars[4..10].iter().all(char::is_ascii_digit) {
         return None;
     }
     if chars[10] != 'H' && chars[10] != 'M' {
@@ -2012,10 +2064,11 @@ pub fn parse_mx_curp(s: &str) -> Option<String> {
 /// assert_eq!(parse_nz_nhi("ZAI0083"), None);          // I excluded
 /// assert_eq!(parse_nz_nhi("ZAA008"),  None);          // too short
 /// ```
+#[must_use]
 pub fn parse_nz_nhi(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .map(|c| c.to_ascii_uppercase())
         .collect();
     if cleaned.len() != 7 {
@@ -2082,8 +2135,9 @@ pub fn parse_nz_nhi(s: &str) -> Option<String> {
 /// assert_eq!(parse_za_id("8013015009087"),   None);  // invalid month
 /// assert_eq!(parse_za_id("80010150090"),     None);  // too short
 /// ```
+#[must_use]
 pub fn parse_za_id(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 13 {
         return None;
     }
@@ -2137,16 +2191,18 @@ pub fn parse_za_id(s: &str) -> Option<String> {
 /// assert_eq!(parse_cy_passport("A123456"),   None);
 /// assert_eq!(parse_cy_passport("E12345"),    None);  // too short
 /// ```
+#[must_use]
 pub fn parse_cy_passport(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .collect::<String>()
         .to_uppercase();
     let chars: Vec<char> = cleaned.chars().collect();
     match (chars.first(), chars.len()) {
-        (Some('E'), 7) if chars[1..].iter().all(|c| c.is_ascii_digit()) => Some(cleaned),
-        (Some('K'), 9) if chars[1..].iter().all(|c| c.is_ascii_digit()) => Some(cleaned),
+        (Some('E'), 7) | (Some('K'), 9) if chars[1..].iter().all(char::is_ascii_digit) => {
+            Some(cleaned)
+        }
         _ => None,
     }
 }
@@ -2162,8 +2218,9 @@ pub fn parse_cy_passport(s: &str) -> Option<String> {
 /// assert_eq!(parse_cz_passport("123-456-78"), Some("12345678".to_string()));
 /// assert_eq!(parse_cz_passport("123"), None);  // too short
 /// ```
+#[must_use]
 pub fn parse_cz_passport(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if (8..=12).contains(&digits.len()) {
         Some(digits)
     } else {
@@ -2179,10 +2236,11 @@ pub fn parse_cz_passport(s: &str) -> Option<String> {
 /// assert_eq!(parse_li_passport("r00536"), Some("R00536".to_string()));
 /// assert_eq!(parse_li_passport("123456"), None);
 /// ```
+#[must_use]
 pub fn parse_li_passport(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .collect::<String>()
         .to_uppercase();
     if cleaned.len() != 6 {
@@ -2192,7 +2250,7 @@ pub fn parse_li_passport(s: &str) -> Option<String> {
     if !chars[0].is_ascii_alphabetic() {
         return None;
     }
-    if !chars[1..].iter().all(|c| c.is_ascii_digit()) {
+    if !chars[1..].iter().all(char::is_ascii_digit) {
         return None;
     }
     Some(cleaned)
@@ -2206,8 +2264,9 @@ pub fn parse_li_passport(s: &str) -> Option<String> {
 /// assert_eq!(parse_lt_passport("12345678"), Some("12345678".to_string()));
 /// assert_eq!(parse_lt_passport("1234567"), None);
 /// ```
+#[must_use]
 pub fn parse_lt_passport(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() == 8 {
         Some(digits)
     } else {
@@ -2222,8 +2281,9 @@ pub fn parse_lt_passport(s: &str) -> Option<String> {
 /// assert_eq!(parse_mt_passport("1234567"), Some("1234567".to_string()));
 /// assert_eq!(parse_mt_passport("123"), None);
 /// ```
+#[must_use]
 pub fn parse_mt_passport(s: &str) -> Option<String> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() == 7 {
         Some(digits)
     } else {
@@ -2239,6 +2299,7 @@ pub fn parse_mt_passport(s: &str) -> Option<String> {
 /// assert_eq!(parse_nl_passport("AB1234567"), Some("AB1234567".to_string()));
 /// assert_eq!(parse_nl_passport("AO1234567"), None);  // O is banned
 /// ```
+#[must_use]
 pub fn parse_nl_passport(s: &str) -> Option<String> {
     parse_nl_id(s)
 }
@@ -2250,10 +2311,11 @@ pub fn parse_nl_passport(s: &str) -> Option<String> {
 /// assert_eq!(parse_pt_passport("A123456"), Some("A123456".to_string()));
 /// assert_eq!(parse_pt_passport("AA12345"), None);
 /// ```
+#[must_use]
 pub fn parse_pt_passport(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .collect::<String>()
         .to_uppercase();
     if cleaned.len() != 7 {
@@ -2263,7 +2325,7 @@ pub fn parse_pt_passport(s: &str) -> Option<String> {
     if !chars[0].is_ascii_alphabetic() {
         return None;
     }
-    if !chars[1..].iter().all(|c| c.is_ascii_digit()) {
+    if !chars[1..].iter().all(char::is_ascii_digit) {
         return None;
     }
     Some(cleaned)
@@ -2276,20 +2338,21 @@ pub fn parse_pt_passport(s: &str) -> Option<String> {
 /// assert_eq!(parse_ro_passport("AB123456"), Some("AB123456".to_string()));
 /// assert_eq!(parse_ro_passport("A1234567"), None);
 /// ```
+#[must_use]
 pub fn parse_ro_passport(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .collect::<String>()
         .to_uppercase();
     if cleaned.len() != 8 {
         return None;
     }
     let chars: Vec<char> = cleaned.chars().collect();
-    if !chars[..2].iter().all(|c| c.is_ascii_alphabetic()) {
+    if !chars[..2].iter().all(char::is_ascii_alphabetic) {
         return None;
     }
-    if !chars[2..].iter().all(|c| c.is_ascii_digit()) {
+    if !chars[2..].iter().all(char::is_ascii_digit) {
         return None;
     }
     Some(cleaned)
@@ -2302,20 +2365,21 @@ pub fn parse_ro_passport(s: &str) -> Option<String> {
 /// assert_eq!(parse_sk_passport("AB1234567"), Some("AB1234567".to_string()));
 /// assert_eq!(parse_sk_passport("AB12345"), None);
 /// ```
+#[must_use]
 pub fn parse_sk_passport(s: &str) -> Option<String> {
     let cleaned: String = s
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .collect::<String>()
         .to_uppercase();
     if cleaned.len() != 9 {
         return None;
     }
     let chars: Vec<char> = cleaned.chars().collect();
-    if !chars[..2].iter().all(|c| c.is_ascii_alphabetic()) {
+    if !chars[..2].iter().all(char::is_ascii_alphabetic) {
         return None;
     }
-    if !chars[2..].iter().all(|c| c.is_ascii_digit()) {
+    if !chars[2..].iter().all(char::is_ascii_digit) {
         return None;
     }
     Some(cleaned)

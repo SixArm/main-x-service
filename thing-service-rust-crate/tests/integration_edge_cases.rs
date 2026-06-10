@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration edge-case tests spanning validation, normalization, privacy,
 //! and combined create → validate → normalize → match / mask / export
 //! workflows.

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the matching hot path: name / url / Soundex
 //! component functions, a full `compute_match`, and a 100-candidate batch.
 

@@ -6,7 +6,7 @@
 //! text transformations that the matcher applies to these fields.
 //!
 //! All public types here are `Serialize + Deserialize` so they round-trip
-//! through JSON, MessagePack, or any other `serde` format.
+//! through JSON, `MessagePack`, or any other `serde` format.
 //!
 //! ## Building a worker
 //!
@@ -76,7 +76,7 @@ pub enum Gender {
     Unknown,
 }
 
-/// ABO + RhD blood type used as supporting evidence in worker matcher.
+/// ABO + `RhD` blood type used as supporting evidence in worker matcher.
 ///
 /// Blood type is a **weak positive** signal and a **strong negative**
 /// signal:
@@ -160,6 +160,7 @@ impl BloodType {
     /// assert_eq!(BloodType::APositive.as_str(),  "A+");
     /// assert_eq!(BloodType::ABNegative.as_str(), "AB-");
     /// ```
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             BloodType::APositive => "A+",
@@ -192,6 +193,7 @@ impl BloodType {
     /// assert_eq!(BloodType::parse("ab+"),        Some(BloodType::ABPositive));
     /// assert_eq!(BloodType::parse("Bombay"),     None); // rare phenotype, not supported
     /// ```
+    #[must_use]
     pub fn parse(s: &str) -> Option<BloodType> {
         let upper: String = s
             .trim()
@@ -339,6 +341,7 @@ impl Address {
     /// assert!(a.line1.is_none());
     /// assert!(a.postcode.is_none());
     /// ```
+    #[must_use]
     pub fn new() -> Self {
         Self {
             line1: None,
@@ -357,24 +360,28 @@ impl Address {
     /// let a = Address::new().with_line1("10 Downing Street");
     /// assert_eq!(a.line1.as_deref(), Some("10 Downing Street"));
     /// ```
+    #[must_use]
     pub fn with_line1(mut self, value: impl Into<String>) -> Self {
         self.line1 = Some(value.into());
         self
     }
 
     /// Fluent setter for `line2`.
+    #[must_use]
     pub fn with_line2(mut self, value: impl Into<String>) -> Self {
         self.line2 = Some(value.into());
         self
     }
 
     /// Fluent setter for `city`.
+    #[must_use]
     pub fn with_city(mut self, value: impl Into<String>) -> Self {
         self.city = Some(value.into());
         self
     }
 
     /// Fluent setter for `county`.
+    #[must_use]
     pub fn with_county(mut self, value: impl Into<String>) -> Self {
         self.county = Some(value.into());
         self
@@ -387,12 +394,14 @@ impl Address {
     /// let a = Address::new().with_postcode("CF10 1AA");
     /// assert_eq!(a.postcode.as_deref(), Some("CF10 1AA"));
     /// ```
+    #[must_use]
     pub fn with_postcode(mut self, value: impl Into<String>) -> Self {
         self.postcode = Some(value.into());
         self
     }
 
     /// Fluent setter for `country`.
+    #[must_use]
     pub fn with_country(mut self, value: impl Into<String>) -> Self {
         self.country = Some(value.into());
         self
@@ -527,6 +536,7 @@ impl PassportBook {
     ///     .with_issued(jiff::civil::date(2020, 1, 1));
     /// assert!(b.issued.is_some());
     /// ```
+    #[must_use]
     pub fn with_issued(mut self, date: Date) -> Self {
         self.issued = Some(date);
         self
@@ -542,6 +552,7 @@ impl PassportBook {
     ///     .with_expires(jiff::civil::date(2030, 1, 1));
     /// assert!(b.expires.is_some());
     /// ```
+    #[must_use]
     pub fn with_expires(mut self, date: Date) -> Self {
         self.expires = Some(date);
         self
@@ -947,6 +958,7 @@ impl Worker {
     ///
     /// assert_eq!(p.family_name.as_deref(), Some("Smith"));
     /// ```
+    #[must_use]
     pub fn builder() -> WorkerBuilder {
         WorkerBuilder::default()
     }
@@ -960,6 +972,11 @@ impl Worker {
     ///
     /// This is **not** invoked automatically by the matcher — call it at the
     /// system boundary when you ingest data, not on every comparison.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::MatchingError::MissingField`] when the worker carries
+    /// neither a name nor any national identifier.
     ///
     /// # Example
     ///
@@ -1131,6 +1148,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().uk_nhs_number("943 476 5919").build();
     /// assert_eq!(p.uk_nhs_number.as_deref(), Some("943 476 5919"));
     /// ```
+    #[must_use]
     pub fn uk_nhs_number<S: Into<String>>(mut self, value: S) -> Self {
         self.uk_nhs_number = Some(value.into());
         self
@@ -1146,6 +1164,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().fr_nir("180127512345642").build();
     /// assert_eq!(p.fr_nir.as_deref(), Some("180127512345642"));
     /// ```
+    #[must_use]
     pub fn fr_nir<S: Into<String>>(mut self, value: S) -> Self {
         self.fr_nir = Some(value.into());
         self
@@ -1162,6 +1181,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().es_tsi("ABCD123456XY1234").build();
     /// assert_eq!(p.es_tsi.as_deref(), Some("ABCD123456XY1234"));
     /// ```
+    #[must_use]
     pub fn es_tsi<S: Into<String>>(mut self, value: S) -> Self {
         self.es_tsi = Some(value.into());
         self
@@ -1177,6 +1197,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().ie_ihi("1234567").build();
     /// assert_eq!(p.ie_ihi.as_deref(), Some("1234567"));
     /// ```
+    #[must_use]
     pub fn ie_ihi<S: Into<String>>(mut self, value: S) -> Self {
         self.ie_ihi = Some(value.into());
         self
@@ -1193,6 +1214,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().uk_hc_number("9434765919").build();
     /// assert_eq!(p.uk_hc_number.as_deref(), Some("9434765919"));
     /// ```
+    #[must_use]
     pub fn uk_hc_number<S: Into<String>>(mut self, value: S) -> Self {
         self.uk_hc_number = Some(value.into());
         self
@@ -1211,6 +1233,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().us_ssn("123-45-6789").build();
     /// assert_eq!(p.us_ssn.as_deref(), Some("123-45-6789"));
     /// ```
+    #[must_use]
     pub fn us_ssn<S: Into<String>>(mut self, value: S) -> Self {
         self.us_ssn = Some(value.into());
         self
@@ -1227,6 +1250,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().au_ihi("8003601234567894").build();
     /// assert_eq!(p.au_ihi.as_deref(), Some("8003601234567894"));
     /// ```
+    #[must_use]
     pub fn au_ihi<S: Into<String>>(mut self, value: S) -> Self {
         self.au_ihi = Some(value.into());
         self
@@ -1243,6 +1267,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().de_kvnr("A123456780").build();
     /// assert_eq!(p.de_kvnr.as_deref(), Some("A123456780"));
     /// ```
+    #[must_use]
     pub fn de_kvnr<S: Into<String>>(mut self, value: S) -> Self {
         self.de_kvnr = Some(value.into());
         self
@@ -1259,6 +1284,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().it_cf("RSSMRA85T10A562S").build();
     /// assert_eq!(p.it_cf.as_deref(), Some("RSSMRA85T10A562S"));
     /// ```
+    #[must_use]
     pub fn it_cf<S: Into<String>>(mut self, value: S) -> Self {
         self.it_cf = Some(value.into());
         self
@@ -1275,6 +1301,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().nl_bsn("111222333").build();
     /// assert_eq!(p.nl_bsn.as_deref(), Some("111222333"));
     /// ```
+    #[must_use]
     pub fn nl_bsn<S: Into<String>>(mut self, value: S) -> Self {
         self.nl_bsn = Some(value.into());
         self
@@ -1291,6 +1318,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().se_personnummer("19460324-3850").build();
     /// assert_eq!(p.se_personnummer.as_deref(), Some("19460324-3850"));
     /// ```
+    #[must_use]
     pub fn se_personnummer<S: Into<String>>(mut self, value: S) -> Self {
         self.se_personnummer = Some(value.into());
         self
@@ -1308,186 +1336,217 @@ impl WorkerBuilder {
     /// let p = Worker::builder().uk_chi_number("0101701233").build();
     /// assert_eq!(p.uk_chi_number.as_deref(), Some("0101701233"));
     /// ```
+    #[must_use]
     pub fn uk_chi_number<S: Into<String>>(mut self, value: S) -> Self {
         self.uk_chi_number = Some(value.into());
         self
     }
 
     /// Set the Belgium National Number (*Rijksregisternummer*). 11 digits, Mod-97.
+    #[must_use]
     pub fn be_nn<S: Into<String>>(mut self, value: S) -> Self {
         self.be_nn = Some(value.into());
         self
     }
 
     /// Set the Bulgaria EGN (*Edinen grazhdanski nomer*). 10 digits, weighted Mod-11.
+    #[must_use]
     pub fn bg_egn<S: Into<String>>(mut self, value: S) -> Self {
         self.bg_egn = Some(value.into());
         self
     }
 
     /// Set the Czech Republic *Rodné číslo*. 9 or 10 digits.
+    #[must_use]
     pub fn cz_rc<S: Into<String>>(mut self, value: S) -> Self {
         self.cz_rc = Some(value.into());
         self
     }
 
     /// Set the Denmark CPR (*Centrale Personregister*). 10 digits.
+    #[must_use]
     pub fn dk_cpr<S: Into<String>>(mut self, value: S) -> Self {
         self.dk_cpr = Some(value.into());
         self
     }
 
     /// Set the Estonia *Isikukood* (Personal Identification Code). 11 digits.
+    #[must_use]
     pub fn ee_ik<S: Into<String>>(mut self, value: S) -> Self {
         self.ee_ik = Some(value.into());
         self
     }
 
     /// Set the Spain DNI / NIE. 8 digits + Mod-23 letter.
+    #[must_use]
     pub fn es_dni<S: Into<String>>(mut self, value: S) -> Self {
         self.es_dni = Some(value.into());
         self
     }
 
     /// Set the Finland HETU (*Henkilötunnus*). 11 chars with century sign.
+    #[must_use]
     pub fn fi_hetu<S: Into<String>>(mut self, value: S) -> Self {
         self.fi_hetu = Some(value.into());
         self
     }
 
     /// Set the Croatia OIB (*Osobni identifikacijski broj*). 11 digits.
+    #[must_use]
     pub fn hr_oib<S: Into<String>>(mut self, value: S) -> Self {
         self.hr_oib = Some(value.into());
         self
     }
 
     /// Set the Iceland *Kennitala*. 10 digits.
+    #[must_use]
     pub fn is_kt<S: Into<String>>(mut self, value: S) -> Self {
         self.is_kt = Some(value.into());
         self
     }
 
     /// Set the Lithuania *Asmens kodas*. 11 digits.
+    #[must_use]
     pub fn lt_ak<S: Into<String>>(mut self, value: S) -> Self {
         self.lt_ak = Some(value.into());
         self
     }
 
     /// Set the Latvia *Personas kods*. 11 digits.
+    #[must_use]
     pub fn lv_pk<S: Into<String>>(mut self, value: S) -> Self {
         self.lv_pk = Some(value.into());
         self
     }
 
     /// Set the Malta National ID. 7 digits + letter.
+    #[must_use]
     pub fn mt_id<S: Into<String>>(mut self, value: S) -> Self {
         self.mt_id = Some(value.into());
         self
     }
 
     /// Set the Norway *Fødselsnummer*. 11 digits, dual Mod-11.
+    #[must_use]
     pub fn no_fnr<S: Into<String>>(mut self, value: S) -> Self {
         self.no_fnr = Some(value.into());
         self
     }
 
     /// Set the Poland PESEL. 11 digits, weighted Mod-10.
+    #[must_use]
     pub fn pl_pesel<S: Into<String>>(mut self, value: S) -> Self {
         self.pl_pesel = Some(value.into());
         self
     }
 
     /// Set the Romania CNP (*Cod Numeric Personal*). 13 digits.
+    #[must_use]
     pub fn ro_cnp<S: Into<String>>(mut self, value: S) -> Self {
         self.ro_cnp = Some(value.into());
         self
     }
 
     /// Set the Slovenia EMŠO (*Enotna Matična Številka Občana*). 13 digits.
+    #[must_use]
     pub fn si_emso<S: Into<String>>(mut self, value: S) -> Self {
         self.si_emso = Some(value.into());
         self
     }
 
     /// Set the Slovakia *Rodné číslo*. 9 or 10 digits.
+    #[must_use]
     pub fn sk_rc<S: Into<String>>(mut self, value: S) -> Self {
         self.sk_rc = Some(value.into());
         self
     }
 
     /// Set the United Kingdom National Insurance Number (NINO).
+    #[must_use]
     pub fn uk_nino<S: Into<String>>(mut self, value: S) -> Self {
         self.uk_nino = Some(value.into());
         self
     }
 
     /// Set the Greece DSS investor share code. 10 digits.
+    #[must_use]
     pub fn gr_dss<S: Into<String>>(mut self, value: S) -> Self {
         self.gr_dss = Some(value.into());
         self
     }
 
     /// Set the Liechtenstein National Identity Card Number. 2 letters + 8 digits.
+    #[must_use]
     pub fn li_id<S: Into<String>>(mut self, value: S) -> Self {
         self.li_id = Some(value.into());
         self
     }
 
     /// Set the Netherlands National Identity Card Number. 9 chars per spec.
+    #[must_use]
     pub fn nl_id<S: Into<String>>(mut self, value: S) -> Self {
         self.nl_id = Some(value.into());
         self
     }
 
     /// Set the Poland NIP (*Numer Identyfikacji Podatkowej*). 10 digits, weighted Mod-11.
+    #[must_use]
     pub fn pl_nip<S: Into<String>>(mut self, value: S) -> Self {
         self.pl_nip = Some(value.into());
         self
     }
 
     /// Set the Portugal NIF (*Número de Identificação Fiscal*). 9 digits, weighted Mod-11.
+    #[must_use]
     pub fn pt_nif<S: Into<String>>(mut self, value: S) -> Self {
         self.pt_nif = Some(value.into());
         self
     }
 
     /// Set the Brazil CPF (*Cadastro de Pessoas Físicas*). 11 digits, two Mod-11 check digits.
+    #[must_use]
     pub fn br_cpf<S: Into<String>>(mut self, value: S) -> Self {
         self.br_cpf = Some(value.into());
         self
     }
 
     /// Set the China Resident Identity Card number (*居民身份证*). 18 chars, weighted Mod-11 + date substring.
+    #[must_use]
     pub fn cn_rrn<S: Into<String>>(mut self, value: S) -> Self {
         self.cn_rrn = Some(value.into());
         self
     }
 
     /// Set the India Aadhaar number. 12 digits, Verhoeff check digit.
+    #[must_use]
     pub fn in_aadhaar<S: Into<String>>(mut self, value: S) -> Self {
         self.in_aadhaar = Some(value.into());
         self
     }
 
     /// Set the Japan My Number (*個人番号*). 12 digits, weighted Mod-11 check digit.
+    #[must_use]
     pub fn jp_my_number<S: Into<String>>(mut self, value: S) -> Self {
         self.jp_my_number = Some(value.into());
         self
     }
 
     /// Set the Mexico CURP. 18 alphanumeric chars, structural + Mod-10 check digit.
+    #[must_use]
     pub fn mx_curp<S: Into<String>>(mut self, value: S) -> Self {
         self.mx_curp = Some(value.into());
         self
     }
 
     /// Set the New Zealand NHI Number. Original 7-char format (3 letters + 4 digits).
+    #[must_use]
     pub fn nz_nhi<S: Into<String>>(mut self, value: S) -> Self {
         self.nz_nhi = Some(value.into());
         self
     }
 
     /// Set the South Africa ID Number. 13 digits, Luhn + date substring.
+    #[must_use]
     pub fn za_id<S: Into<String>>(mut self, value: S) -> Self {
         self.za_id = Some(value.into());
         self
@@ -1500,6 +1559,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().given_name("Carys").build();
     /// assert_eq!(p.given_name.as_deref(), Some("Carys"));
     /// ```
+    #[must_use]
     pub fn given_name<S: Into<String>>(mut self, value: S) -> Self {
         self.given_name = Some(value.into());
         self
@@ -1515,6 +1575,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().middle_name("Eleri").build();
     /// assert_eq!(p.middle_name.as_deref(), Some("Eleri"));
     /// ```
+    #[must_use]
     pub fn middle_name<S: Into<String>>(mut self, value: S) -> Self {
         self.middle_name = Some(value.into());
         self
@@ -1527,6 +1588,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().family_name("Pritchard").build();
     /// assert_eq!(p.family_name.as_deref(), Some("Pritchard"));
     /// ```
+    #[must_use]
     pub fn family_name<S: Into<String>>(mut self, value: S) -> Self {
         self.family_name = Some(value.into());
         self
@@ -1541,6 +1603,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().date_of_birth(dob).build();
     /// assert_eq!(p.date_of_birth, Some(dob));
     /// ```
+    #[must_use]
     pub fn date_of_birth(mut self, value: Date) -> Self {
         self.date_of_birth = Some(value);
         self
@@ -1555,6 +1618,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().death_date(dod).build();
     /// assert_eq!(p.death_date, Some(dod));
     /// ```
+    #[must_use]
     pub fn death_date(mut self, value: Date) -> Self {
         self.death_date = Some(value);
         self
@@ -1567,6 +1631,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().gender(Gender::Female).build();
     /// assert_eq!(p.gender, Some(Gender::Female));
     /// ```
+    #[must_use]
     pub fn gender(mut self, value: Gender) -> Self {
         self.gender = Some(value);
         self
@@ -1579,6 +1644,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().blood_type(BloodType::OPositive).build();
     /// assert_eq!(p.blood_type, Some(BloodType::OPositive));
     /// ```
+    #[must_use]
     pub fn blood_type(mut self, value: BloodType) -> Self {
         self.blood_type = Some(value);
         self
@@ -1597,6 +1663,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().multiple_birth(1).build();
     /// assert_eq!(p.multiple_birth, Some(1));
     /// ```
+    #[must_use]
     pub fn multiple_birth(mut self, value: u8) -> Self {
         self.multiple_birth = Some(value);
         self
@@ -1611,6 +1678,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().address(a).build();
     /// assert_eq!(p.address.unwrap().postcode.as_deref(), Some("CF10 1AA"));
     /// ```
+    #[must_use]
     pub fn address(mut self, value: Address) -> Self {
         self.address = Some(value);
         self
@@ -1628,6 +1696,7 @@ impl WorkerBuilder {
     ///     .build();
     /// assert_eq!(p.birth_place.as_ref().unwrap().city.as_deref(), Some("Cardiff"));
     /// ```
+    #[must_use]
     pub fn birth_place(mut self, value: Address) -> Self {
         self.birth_place = Some(value);
         self
@@ -1646,6 +1715,7 @@ impl WorkerBuilder {
     ///     .build();
     /// assert_eq!(p.death_place.as_ref().unwrap().city.as_deref(), Some("Glasgow"));
     /// ```
+    #[must_use]
     pub fn death_place(mut self, value: Address) -> Self {
         self.death_place = Some(value);
         self
@@ -1661,6 +1731,7 @@ impl WorkerBuilder {
     ///     .build();
     /// assert_eq!(p.previous_addresses.len(), 2);
     /// ```
+    #[must_use]
     pub fn previous_addresses(mut self, value: Vec<Address>) -> Self {
         self.previous_addresses = value;
         self
@@ -1678,6 +1749,7 @@ impl WorkerBuilder {
     ///     .build();
     /// assert_eq!(p.passport_books.len(), 2);
     /// ```
+    #[must_use]
     pub fn add_passport_book(mut self, book: PassportBook) -> Self {
         self.passport_books.push(book);
         self
@@ -1691,6 +1763,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().passport_books(books).build();
     /// assert_eq!(p.passport_books.len(), 1);
     /// ```
+    #[must_use]
     pub fn passport_books(mut self, value: Vec<PassportBook>) -> Self {
         self.passport_books = value;
         self
@@ -1703,6 +1776,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().phone("029 2034 5678").build();
     /// assert_eq!(p.phone.as_deref(), Some("029 2034 5678"));
     /// ```
+    #[must_use]
     pub fn phone<S: Into<String>>(mut self, value: S) -> Self {
         self.phone = Some(value.into());
         self
@@ -1715,6 +1789,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().mobile("07700 900123").build();
     /// assert_eq!(p.mobile.as_deref(), Some("07700 900123"));
     /// ```
+    #[must_use]
     pub fn mobile<S: Into<String>>(mut self, value: S) -> Self {
         self.mobile = Some(value.into());
         self
@@ -1727,6 +1802,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().email("alice@example.org").build();
     /// assert_eq!(p.email.as_deref(), Some("alice@example.org"));
     /// ```
+    #[must_use]
     pub fn email<S: Into<String>>(mut self, value: S) -> Self {
         self.email = Some(value.into());
         self
@@ -1739,6 +1815,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().local_id("MRN-12345").build();
     /// assert_eq!(p.local_id.as_deref(), Some("MRN-12345"));
     /// ```
+    #[must_use]
     pub fn local_id<S: Into<String>>(mut self, value: S) -> Self {
         self.local_id = Some(value.into());
         self
@@ -1751,6 +1828,7 @@ impl WorkerBuilder {
     /// let p = Worker::builder().given_name("Eira").build();
     /// assert!(p.family_name.is_none());
     /// ```
+    #[must_use]
     pub fn build(self) -> Worker {
         Worker {
             uk_nhs_number: self.uk_nhs_number,

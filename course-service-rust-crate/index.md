@@ -1,5 +1,7 @@
 # Course Service
 
+A high-performance, enterprise-grade Course Service system built with Rust.
+
 A registry of **course identities** based on
 [schema.org/Course](https://schema.org/Course). The Course Service is
 the abstract template (CS101 — Introduction to Computer Science);
@@ -15,7 +17,7 @@ locations and parties).
 > match / merge / dedup) + FR-10..FR-13 (instance sub-resource) +
 > FR-14..FR-18 (audit / streaming / privacy) are all wired. Only
 > JWT auth (T-15) remains, blocked on the family-wide auth rollout.
-> See [`spec.md §13`](spec.md#13-tasks) for the per-task ledger.
+> See [`spec.md §13`](spec/13-tasks.md) for the per-task ledger.
 
 ## Quick start
 
@@ -74,17 +76,17 @@ The Event Service uses `/api/v1/`; Course does NOT — direct `/api`.
 
 ## Configuration
 
-| Variable | Description | Default |
-|---|---|---|
-| `DATABASE_URL` | Postgres connection string | — |
-| `DATABASE_MAX_CONNECTIONS` | Pool max | `10` |
-| `DATABASE_MIN_CONNECTIONS` | Pool min | `2` |
-| `SERVER_HOST` | REST bind address | `0.0.0.0` |
-| `SERVER_PORT` | REST port | `8080` |
-| `SEARCH_INDEX_PATH` | Tantivy index directory | `./data/search_index` |
-| `MATCHING_THRESHOLD` | Probabilistic match cutoff | `0.85` |
-| `RUST_LOG` | tracing-subscriber filter | `info` |
-| `OTLP_ENDPOINT` | OpenTelemetry collector | `http://localhost:4317` |
+| Variable                   | Description                | Default                 |
+| -------------------------- | -------------------------- | ----------------------- |
+| `DATABASE_URL`             | Postgres connection string | —                       |
+| `DATABASE_MAX_CONNECTIONS` | Pool max                   | `10`                    |
+| `DATABASE_MIN_CONNECTIONS` | Pool min                   | `2`                     |
+| `SERVER_HOST`              | REST bind address          | `0.0.0.0`               |
+| `SERVER_PORT`              | REST port                  | `8080`                  |
+| `SEARCH_INDEX_PATH`        | Tantivy index directory    | `./data/search_index`   |
+| `MATCHING_THRESHOLD`       | Probabilistic match cutoff | `0.85`                  |
+| `RUST_LOG`                 | tracing-subscriber filter  | `info`                  |
+| `OTLP_ENDPOINT`            | OpenTelemetry collector    | `http://localhost:4317` |
 
 ## Testing
 

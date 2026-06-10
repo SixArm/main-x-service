@@ -1,8 +1,8 @@
+#![warn(clippy::pedantic)]
+
 //! Basic usage example for place matcher.
 
-use place_matcher::{
-    Address, MatchingEngine, Place, PlaceCategory, PlaceId, PlaceIdScheme,
-};
+use place_matcher::{Address, MatchingEngine, Place, PlaceCategory, PlaceId, PlaceIdScheme};
 
 fn main() {
     println!("=== Basic Place matcher Example ===\n");
@@ -116,8 +116,14 @@ fn main() {
     // Deterministic match via shared Wikidata ID.
     println!("\n=== Deterministic Match via Place ID ===");
     let id = PlaceId::new(PlaceIdScheme::Wikidata, "Q243").unwrap();
-    let d1 = Place::builder().name("Eiffel Tower").add_place_id(id.clone()).build();
-    let d2 = Place::builder().name("Anything Else").add_place_id(id).build();
+    let d1 = Place::builder()
+        .name("Eiffel Tower")
+        .add_place_id(id.clone())
+        .build();
+    let d2 = Place::builder()
+        .name("Anything Else")
+        .add_place_id(id)
+        .build();
     println!("Deterministic: {}", engine.deterministic_match(&d1, &d2));
 
     // Deterministic match via identical name + postcode.

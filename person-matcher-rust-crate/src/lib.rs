@@ -132,6 +132,34 @@
 //! - [`AGENTS/matching-algorithm.md`](https://github.com/sixarm/person-matcher/blob/main/AGENTS/matching-algorithm.md) — practitioner's view of the algorithm.
 //! - [`AGENTS/normalization.md`](https://github.com/sixarm/person-matcher/blob/main/AGENTS/normalization.md) — text normalisation rules.
 
+// Always start with high quality coding conventions.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+// Pedantic sub-lints that are intentional design choices here, not defects:
+#![allow(
+    // Builder and parser methods deliberately omit `#[must_use]`; annotating
+    // every one is noise on an already-large public surface.
+    clippy::must_use_candidate,
+    clippy::return_self_not_must_use,
+    // The per-field `score_*` methods form one consistent method API on the
+    // engine even where an individual scorer needs no `&self` state.
+    clippy::unused_self,
+    // Identity field names are inherently paired (`person1`/`person2`,
+    // `norm1`/`norm2`); the similarity is meaningful, not accidental.
+    clippy::similar_names,
+    // National-identifier parsers are flat match ladders that read best whole.
+    clippy::too_many_lines,
+    // Parser lookup tables are defined next to their single use site on purpose.
+    clippy::items_after_statements,
+    // Calendar/index arithmetic over small, bounded integers (month/day, digit
+    // weights); the casts are in-range by construction.
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+
 pub mod error;
 pub mod identifiers;
 pub mod matcher;

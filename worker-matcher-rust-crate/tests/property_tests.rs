@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Property-based tests (spec §18.4, task T-6).
 //!
 //! Each property generates many random inputs via `proptest` and checks an
@@ -10,8 +12,8 @@
 //! `#[test]` in `tests/integration_tests.rs` so it lives forever.
 
 use jiff::civil::{Date, date};
-use worker_matcher::{Confidence, Gender, MatchConfig, MatchingEngine, Normalizer, Worker};
 use proptest::prelude::*;
+use worker_matcher::{Confidence, Gender, MatchConfig, MatchingEngine, Normalizer, Worker};
 
 // ---------- Strategies ----------
 
@@ -28,8 +30,7 @@ fn name_strategy() -> impl Strategy<Value = String> {
 /// A bounded date so we never trip date construction on
 /// implausible years.
 fn date_strategy() -> impl Strategy<Value = Date> {
-    (1900i16..=2100, 1i8..=12, 1i8..=28)
-        .prop_map(|(y, m, d)| date(y, m, d))
+    (1900i16..=2100, 1i8..=12, 1i8..=28).prop_map(|(y, m, d)| date(y, m, d))
 }
 
 fn gender_strategy() -> impl Strategy<Value = Gender> {

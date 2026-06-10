@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for place matcher.
 //!
 //! These exercise the **public API** as a downstream user would — building
@@ -62,7 +64,10 @@ fn test_name_match_picks_best_across_alternates() {
         .build();
     let r = MatchingEngine::default_config().match_places(&p1, &p2);
     let s = r.breakdown.name_score.expect("scored");
-    assert!(s > 0.99, "expected best-of cartesian product to pick exact, got {s}");
+    assert!(
+        s > 0.99,
+        "expected best-of cartesian product to pick exact, got {s}"
+    );
 }
 
 #[test]
@@ -79,7 +84,11 @@ fn test_name_match_returns_none_if_either_side_empty() {
 
 #[test]
 fn test_coordinates_score_identical_points() {
-    let p1 = Place::builder().name("X").latitude(48.85).longitude(2.29).build();
+    let p1 = Place::builder()
+        .name("X")
+        .latitude(48.85)
+        .longitude(2.29)
+        .build();
     let p2 = p1.clone();
     let r = MatchingEngine::default_config().match_places(&p1, &p2);
     assert!((r.breakdown.coordinates_score.unwrap() - 1.0).abs() < 1e-9);
@@ -87,16 +96,32 @@ fn test_coordinates_score_identical_points() {
 
 #[test]
 fn test_coordinates_score_far_apart_decays_to_zero() {
-    let p1 = Place::builder().name("X").latitude(0.0).longitude(0.0).build();
-    let p2 = Place::builder().name("X").latitude(0.0).longitude(10.0).build();
+    let p1 = Place::builder()
+        .name("X")
+        .latitude(0.0)
+        .longitude(0.0)
+        .build();
+    let p2 = Place::builder()
+        .name("X")
+        .latitude(0.0)
+        .longitude(10.0)
+        .build();
     let r = MatchingEngine::default_config().match_places(&p1, &p2);
     assert!(r.breakdown.coordinates_score.unwrap() < 1e-3);
 }
 
 #[test]
 fn test_coordinates_score_none_when_out_of_range() {
-    let p1 = Place::builder().name("X").latitude(200.0).longitude(0.0).build();
-    let p2 = Place::builder().name("X").latitude(0.0).longitude(0.0).build();
+    let p1 = Place::builder()
+        .name("X")
+        .latitude(200.0)
+        .longitude(0.0)
+        .build();
+    let p2 = Place::builder()
+        .name("X")
+        .latitude(0.0)
+        .longitude(0.0)
+        .build();
     let r = MatchingEngine::default_config().match_places(&p1, &p2);
     assert!(r.breakdown.coordinates_score.is_none());
 }
@@ -107,8 +132,14 @@ fn test_coordinates_score_none_when_out_of_range() {
 
 #[test]
 fn test_category_match_equal_scores_one() {
-    let p1 = Place::builder().name("X").category(PlaceCategory::Hotel).build();
-    let p2 = Place::builder().name("X").category(PlaceCategory::Hotel).build();
+    let p1 = Place::builder()
+        .name("X")
+        .category(PlaceCategory::Hotel)
+        .build();
+    let p2 = Place::builder()
+        .name("X")
+        .category(PlaceCategory::Hotel)
+        .build();
     let r = MatchingEngine::default_config().match_places(&p1, &p2);
     assert_eq!(r.breakdown.category_score, Some(1.0));
 }
@@ -152,8 +183,14 @@ fn test_country_code_case_insensitive_match() {
 #[test]
 fn test_place_ids_shared_returns_one() {
     let id = PlaceId::new(PlaceIdScheme::Wikidata, "Q243").unwrap();
-    let a = Place::builder().name("Eiffel Tower").add_place_id(id.clone()).build();
-    let b = Place::builder().name("Tour Eiffel").add_place_id(id).build();
+    let a = Place::builder()
+        .name("Eiffel Tower")
+        .add_place_id(id.clone())
+        .build();
+    let b = Place::builder()
+        .name("Tour Eiffel")
+        .add_place_id(id)
+        .build();
     let r = MatchingEngine::default_config().match_places(&a, &b);
     assert_eq!(r.breakdown.place_ids_score, Some(1.0));
 }
@@ -234,28 +271,16 @@ fn test_address_postcode_match_dominates() {
 
 #[test]
 fn test_phone_normalisation_match() {
-    let p1 = Place::builder()
-        .name("X")
-        .phone("+44 7700 900123")
-        .build();
-    let p2 = Place::builder()
-        .name("X")
-        .phone("07700 900123")
-        .build();
+    let p1 = Place::builder().name("X").phone("+44 7700 900123").build();
+    let p2 = Place::builder().name("X").phone("07700 900123").build();
     let r = MatchingEngine::default_config().match_places(&p1, &p2);
     assert_eq!(r.breakdown.phone_score, Some(1.0));
 }
 
 #[test]
 fn test_email_match_after_normalisation() {
-    let p1 = Place::builder()
-        .name("X")
-        .email("Info@Example.ORG")
-        .build();
-    let p2 = Place::builder()
-        .name("X")
-        .email("info@example.org")
-        .build();
+    let p1 = Place::builder().name("X").email("Info@Example.ORG").build();
+    let p2 = Place::builder().name("X").email("info@example.org").build();
     let r = MatchingEngine::default_config().match_places(&p1, &p2);
     assert_eq!(r.breakdown.email_score, Some(1.0));
 }

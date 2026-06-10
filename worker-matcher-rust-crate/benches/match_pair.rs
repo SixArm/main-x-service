@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the `worker-matcher` crate.
 //!
 //! Run with `cargo bench`. The harness covers the hot paths a downstream
@@ -5,10 +7,14 @@
 //! deterministic matching, and the batch ranking entry point. Numbers
 //! are reported in absolute time per call.
 
-use jiff::civil::Date;
+// Bench code: `worker1`/`worker2`-style names are intentionally parallel, and
+// the loop-counter cast operates on small, bounded benchmark sizes.
+#![allow(clippy::similar_names, clippy::cast_possible_truncation)]
+
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use jiff::civil::Date;
 use worker_matcher::{
-    Address, Gender, MatchConfig, MatchingEngine, NicknameTable, Worker, SimilarityAlgorithm,
+    Address, Gender, MatchConfig, MatchingEngine, NicknameTable, SimilarityAlgorithm, Worker,
 };
 
 fn dob(y: i16, m: i8, d: i8) -> Date {

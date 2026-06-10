@@ -73,6 +73,7 @@ impl Scorer {
     /// assert_eq!(Scorer::jaro_winkler_similarity("", ""), 1.0);
     /// assert_eq!(Scorer::jaro_winkler_similarity("smith", ""), 0.0);
     /// ```
+    #[must_use]
     pub fn jaro_winkler_similarity(s1: &str, s2: &str) -> f64 {
         if s1.is_empty() && s2.is_empty() {
             return 1.0;
@@ -102,6 +103,10 @@ impl Scorer {
     /// assert!(Scorer::levenshtein_similarity("abc", "xyz") < 0.5);
     /// assert_eq!(Scorer::levenshtein_similarity("", ""), 1.0);
     /// ```
+    #[must_use]
+    // `distance` and `max_len` are string-length counts, far below f64's
+    // 52-bit mantissa limit, so the usize->f64 casts are effectively exact.
+    #[allow(clippy::cast_precision_loss)]
     pub fn levenshtein_similarity(s1: &str, s2: &str) -> f64 {
         if s1.is_empty() && s2.is_empty() {
             return 1.0;
@@ -128,6 +133,7 @@ impl Scorer {
     /// assert_eq!(Scorer::exact_match("Test", "test"), 0.0);  // case-sensitive
     /// assert_eq!(Scorer::exact_match("a", "b"),       0.0);
     /// ```
+    #[must_use]
     pub fn exact_match(s1: &str, s2: &str) -> f64 {
         if s1 == s2 { 1.0 } else { 0.0 }
     }
@@ -146,6 +152,7 @@ impl Scorer {
     /// let s = Scorer::combined_similarity("Stephen", "Steven");
     /// assert!(s > 0.80, "combined score for Stephen/Steven was {s}");
     /// ```
+    #[must_use]
     pub fn combined_similarity(s1: &str, s2: &str) -> f64 {
         let jw = Self::jaro_winkler_similarity(s1, s2);
         let lev = Self::levenshtein_similarity(s1, s2);
@@ -177,6 +184,7 @@ impl Scorer {
     /// let km = d / 1000.0;
     /// assert!(km > 330.0 && km < 355.0, "London-Paris km was {km}");
     /// ```
+    #[must_use]
     pub fn haversine_metres(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
         const EARTH_RADIUS_M: f64 = 6_371_000.0;
         let to_rad = |d: f64| d.to_radians();
@@ -184,8 +192,8 @@ impl Scorer {
         let phi2 = to_rad(lat2);
         let dphi = to_rad(lat2 - lat1);
         let dlambda = to_rad(lon2 - lon1);
-        let a = (dphi / 2.0).sin().powi(2)
-            + phi1.cos() * phi2.cos() * (dlambda / 2.0).sin().powi(2);
+        let a =
+            (dphi / 2.0).sin().powi(2) + phi1.cos() * phi2.cos() * (dlambda / 2.0).sin().powi(2);
         let c = 2.0 * a.sqrt().clamp(0.0, 1.0).asin();
         EARTH_RADIUS_M * c
     }
@@ -215,6 +223,7 @@ impl Scorer {
     /// let far = Scorer::coordinates_score(3.0 * scale, scale);
     /// assert!(far < 1e-3, "got {far}");
     /// ```
+    #[must_use]
     pub fn coordinates_score(distance_metres: f64, scale_metres: f64) -> f64 {
         gaussian_decay(distance_metres, scale_metres)
     }
@@ -253,6 +262,7 @@ impl Scorer {
     ///
     /// assert!(Scorer::seconds_between("not-a-date", "2024-06-26").is_none());
     /// ```
+    #[must_use]
     pub fn seconds_between(t1: &str, t2: &str) -> Option<i64> {
         let s1 = Normalizer::parse_iso8601_unix_seconds(t1)?;
         let s2 = Normalizer::parse_iso8601_unix_seconds(t2)?;
@@ -286,6 +296,7 @@ impl Scorer {
     /// let far = Scorer::start_date_score(3.0 * scale_seconds, scale_seconds);
     /// assert!(far < 1e-3, "got {far}");
     /// ```
+    #[must_use]
     pub fn start_date_score(difference_seconds: f64, scale_seconds: f64) -> f64 {
         gaussian_decay(difference_seconds, scale_seconds)
     }
@@ -316,6 +327,7 @@ impl Scorer {
     /// assert_eq!(Scorer::optional_field_score(&a,    &none, SimilarityAlgorithm::Exact), 0.0);
     /// assert_eq!(Scorer::optional_field_score(&a,    &b,    SimilarityAlgorithm::Exact), 1.0);
     /// ```
+    #[must_use]
     pub fn optional_field_score(
         field1: &Option<String>,
         field2: &Option<String>,
@@ -367,6 +379,9 @@ pub enum SimilarityAlgorithm {
 }
 
 #[cfg(test)]
+// Scorers return exact `0.0` / `1.0` sentinels at their boundaries; these
+// tests assert those literal values, where exact comparison is correct.
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 

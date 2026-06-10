@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the privacy operations: masking (rich and
 //! minimal records) and GDPR export (single and 100-record batch).
 

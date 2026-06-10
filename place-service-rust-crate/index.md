@@ -1,19 +1,12 @@
 # Place Service
 
+A high-performance, enterprise-grade Place Service system built with Rust.
+
 A registry of **place identities** based on
 [schema.org/Place](https://schema.org/Place). The Place Service is
 the canonical store for geographic places — sites, branches, civic
 structures, landforms, administrative areas, business locations —
 anything modelled by schema.org/Place.
-
-Pairs with the sibling [Thing Service](../thing-service-rust-crate/)
-(anything with an identity) and [Event Service](../event-service-rust-crate/)
-(occurrences with locations and parties).
-
-> **Status.** Behavioural MVP. Models / matching / validation /
-> privacy / matcher-bridge are in tree; REST handlers, persistence,
-> search index, and Docker bring-up are tracked in
-> [`spec.md §13`](spec.md#13-tasks).
 
 ## Quick start
 
@@ -73,14 +66,14 @@ curl "http://localhost:8080/api/places/search?lat=40.78&lon=-73.96&radius_km=2"
 Configuration is loaded from `config/{development,test,production}.yaml`
 (Loco convention). Environment-overridable variables:
 
-| Variable | Description | Default |
-|---|---|---|
-| `PORT` | REST bind port | `8080` |
-| `DATABASE_URL` | Postgres connection string | per config file |
-| `SEARCH_INDEX_PATH` | Tantivy index directory | `./data/search_index` |
-| `MATCHING_THRESHOLD` | Probabilistic match cutoff | `0.85` |
-| `RUST_LOG` | tracing-subscriber filter | `info` |
-| `OTLP_ENDPOINT` | OpenTelemetry collector | `http://localhost:4317` |
+| Variable             | Description                | Default                 |
+| -------------------- | -------------------------- | ----------------------- |
+| `PORT`               | REST bind port             | `8080`                  |
+| `DATABASE_URL`       | Postgres connection string | per config file         |
+| `SEARCH_INDEX_PATH`  | Tantivy index directory    | `./data/search_index`   |
+| `MATCHING_THRESHOLD` | Probabilistic match cutoff | `0.85`                  |
+| `RUST_LOG`           | tracing-subscriber filter  | `info`                  |
+| `OTLP_ENDPOINT`      | OpenTelemetry collector    | `http://localhost:4317` |
 
 ## Testing
 
@@ -104,13 +97,13 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the layout.
 
 ## Matching at a glance
 
-| Component | Weight | Algorithm |
-|---|---:|---|
-| Name | 0.35 | Jaro-Winkler + Soundex phonetic bonus |
-| Geo coordinates | 0.25 | Haversine distance, sigmoid decay |
-| Address | 0.20 | Weighted postal / locality / street / region / country |
-| Place type | 0.10 | Exact enum match |
-| Identifier | 0.10 | Type + value exact |
+| Component       | Weight | Algorithm                                              |
+| --------------- | -----: | ------------------------------------------------------ |
+| Name            |   0.35 | Jaro-Winkler + Soundex phonetic bonus                  |
+| Geo coordinates |   0.25 | Haversine distance, sigmoid decay                      |
+| Address         |   0.20 | Weighted postal / locality / street / region / country |
+| Place type      |   0.10 | Exact enum match                                       |
+| Identifier      |   0.10 | Type + value exact                                     |
 
 Deterministic short-circuit: exact GLN match → 1.0.
 

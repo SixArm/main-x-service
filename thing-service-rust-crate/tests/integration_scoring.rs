@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for the matching components and the scoring engine:
 //! name / description / url / identifier / phonetic edge cases, custom
 //! weights, and confidence-band boundaries.

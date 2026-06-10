@@ -26,7 +26,7 @@
 ## Error Handling
 
 - Library code returns `crate::Result<T>` (alias for `Result<T, MatchingError>`).
-- New error variants go in `src/error.rs`. Update [`../spec.md`](../spec.md) §15 in the same change.
+- New error variants go in `src/error.rs`. Update [`../spec.md`](../spec/index.md) §15 in the same change.
 - Do not `unwrap()` `NHSNumber::from_str`. If parsing fails, return `None` from a scorer — never a 0.0 score with a discarded error.
 
 ## Doc Comments
@@ -64,5 +64,5 @@ See [`testing.md`](./testing.md).
 
 ## Dependencies
 
-- New runtime dependencies require a justification in the PR description and a note in [`../spec.md`](../spec.md) §22 risks if they expand the trust boundary.
+- New runtime dependencies require a justification in the PR description and a note in [`../spec.md`](../spec/index.md) §22 risks if they expand the trust boundary.
 - Dev-only dependencies (e.g. `proptest`, `criterion`) are lower-risk but should still be deliberate.

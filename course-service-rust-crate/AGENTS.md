@@ -1,7 +1,7 @@
 # AGENTS — Course Service
 
 How to work in this crate. The canonical artefact is
-[`spec.md`](spec.md). When in doubt, the spec wins. See
+[`spec.md`](spec/index.md). When in doubt, the spec wins. See
 [`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md)
 for the discipline this crate practises.
 
@@ -38,7 +38,7 @@ Shared reference docs live at the project root under
 
 | Concern | Location |
 |---|---|
-| Behavioural truth | [`spec.md`](spec.md) (§1–§18; live work queue in §13) |
+| Behavioural truth | [`spec.md`](spec/index.md) (§1–§18; live work queue in §13) |
 | Domain models | `src/models/` |
 | REST handlers | `src/api/rest/handlers.rs` |
 | Database access | `src/db/` |

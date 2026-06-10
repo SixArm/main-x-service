@@ -42,6 +42,11 @@
 //! assert!(result.score > 0.8);
 //! ```
 
+// Always start with high quality coding conventions.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+
 pub mod api;
 pub mod config;
 pub mod db;

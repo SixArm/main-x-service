@@ -42,6 +42,11 @@
 //! assert!(event.active);
 //! ```
 
+// Always start with high quality coding conventions.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+
 // Module declarations.
 /// HTTP / RPC surface: REST (Axum), FHIR stubs, gRPC stub.
 pub mod api;

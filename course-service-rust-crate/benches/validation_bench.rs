@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Validation micro-benchmarks. Establishes a baseline for one
 //! `validate_course` pass on a fully-populated record (every
 //! FR-21..FR-28 branch exercised at least once).

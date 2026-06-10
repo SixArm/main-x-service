@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-> See also: [spec.md](./spec.md) — single source of truth (numbered §1–§18; live work queue in §13); [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
+> See also: [spec.md](./spec/index.md) — single source of truth (numbered §1–§18; live work queue in §13); [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
 
 ## [Unreleased]
 
@@ -32,7 +32,7 @@ Initial scaffold for the Worker Service front-end. Copy-adapted from `person-fro
 
 ### Cross-references
 
-- Service spec: [`../worker-service-rust-crate/spec.md`](../worker-service-rust-crate/spec.md).
+- Service spec: [`../worker-service-rust-crate/spec.md`](../worker-service-rust-crate/spec/index.md).
 - Service REST contract: [`../worker-service-rust-crate/AGENTS/restful.md`](../worker-service-rust-crate/AGENTS/restful.md).
 - Service model types: [`../worker-service-rust-crate/AGENTS/models.md`](../worker-service-rust-crate/AGENTS/models.md).
 - Service matching reference: [`../worker-service-rust-crate/AGENTS/matching.md`](../worker-service-rust-crate/AGENTS/matching.md).

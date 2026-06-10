@@ -1,6 +1,6 @@
 # Contributing
 
-> Before opening an issue or PR, skim [index.md](./index.md) for the doc map, then [AGENTS.md](./AGENTS.md) for the working rules and [spec.md](./spec.md) for the authoritative behaviour (any code change that alters behaviour must update `spec.md` in the same PR).
+> Before opening an issue or PR, skim [index.md](./index.md) for the doc map, then [AGENTS.md](./AGENTS.md) for the working rules and [spec.md](./spec/index.md) for the authoritative behaviour (any code change that alters behaviour must update `spec.md` in the same PR).
 
 We welcome people contributing. We welcome feedback, suggestions, ideas, and help.
 

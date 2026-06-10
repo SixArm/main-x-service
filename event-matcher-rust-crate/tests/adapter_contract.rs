@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Adapter contract test for the `event-matcher` public API.
 //!
 //! Pins the public surface that downstream `event-service` depends on via
@@ -14,7 +16,9 @@ use event_matcher::{
 
 #[test]
 fn event_builder_full_surface() {
-    let loc = Location::new().with_venue_name("Greek Theatre").with_latitude(37.873);
+    let loc = Location::new()
+        .with_venue_name("Greek Theatre")
+        .with_latitude(37.873);
     let eid = EventId::new(EventIdScheme::Eventbrite, "123456789").unwrap();
 
     let e: Event = Event::builder()

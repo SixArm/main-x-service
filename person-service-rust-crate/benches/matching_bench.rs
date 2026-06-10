@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the person matching engine.
 //!
 //! Covers the per-field algorithms (name, DOB, gender, address,

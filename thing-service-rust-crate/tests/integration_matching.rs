@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for the service-side probabilistic matcher
 //! ([`compute_match`]).
 //!

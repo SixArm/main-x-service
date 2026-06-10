@@ -46,7 +46,7 @@ pub type Result<T> = std::result::Result<T, MatchingError>;
 /// ([`crate::MatchConfig::default`], `strict`, `lenient`) are infallible.
 ///
 /// The enum is `#[non_exhaustive]` so future fallible code paths can add
-/// variants without breaking SemVer for downstream pattern-matches.
+/// variants without breaking `SemVer` for downstream pattern-matches.
 ///
 /// ```
 /// use person_matcher::MatchingError;
@@ -65,12 +65,16 @@ pub enum MatchingError {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unnecessary_wraps)] // demonstrates the `Result` alias
     use super::*;
 
     #[test]
     fn missing_field_display() {
         let e = MatchingError::MissingField("united_kingdom_national_health_service_number".into());
-        assert_eq!(e.to_string(), "Missing required field: united_kingdom_national_health_service_number");
+        assert_eq!(
+            e.to_string(),
+            "Missing required field: united_kingdom_national_health_service_number"
+        );
     }
 
     #[test]

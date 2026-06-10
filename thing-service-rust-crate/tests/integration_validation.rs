@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for the validation + normalization workflow
 //! ([`validate_thing`] / [`normalize_thing`]) at the create/update boundary.
 

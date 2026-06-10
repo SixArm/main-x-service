@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Example showing custom matching configuration.
 //!
 //! Walks the same pair of things through several tunings of

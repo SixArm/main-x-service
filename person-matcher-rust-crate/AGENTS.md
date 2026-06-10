@@ -4,7 +4,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 > **Navigating the docs:** [`index.md`](./index.md) is the top-level documentation index — start there if you don't know what to read first.
 >
-> If you only read one file, read [`spec.md`](./spec.md). It is the living, authoritative specification of the crate. This guide tells you **how to work**; the spec tells you **what to build**.
+> If you only read one file, read [`spec.md`](./spec/index.md). It is the living, authoritative specification of the crate. This guide tells you **how to work**; the spec tells you **what to build**.
 
 ---
 
@@ -13,7 +13,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 | Question | Answer |
 |---|---|
 | What does the crate do? | Pairwise person-record matching (deterministic + probabilistic) for identity exchange. |
-| Where is the canonical spec? | [`spec.md`](./spec.md). |
+| Where is the canonical spec? | [`spec.md`](./spec/index.md). |
 | Where does new behaviour get specified? | In `spec.md` first, then code. |
 | What is the build command? | `cargo build` |
 | What is the test command? | `cargo test` |
@@ -29,7 +29,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 ## Golden Rules
 
-1. **Spec-first.** If you change observable behaviour, update [`spec.md`](./spec.md) in the same change. If the spec is silent, propose a spec update before writing code.
+1. **Spec-first.** If you change observable behaviour, update [`spec.md`](./spec/index.md) in the same change. If the spec is silent, propose a spec update before writing code.
 2. **Pure library.** No IO, no logging, no global state inside `src/` (excluding `src/main.rs`, which is a demo binary).
 3. **No `unsafe`.** This is an identity-adjacent library. `unsafe` is forbidden.
 4. **Deterministic.** No clocks, no RNGs, no environment variables. Same inputs ⇒ same outputs, byte-for-byte.
@@ -43,7 +43,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 ## Workflow for Any Change
 
-1. **Read** [`spec.md`](./spec.md). Locate the section(s) affected.
+1. **Read** [`spec.md`](./spec/index.md). Locate the section(s) affected.
 2. **Decide** whether your change is editorial (docs/format only) or behavioural (touches what the library does).
 3. **For behavioural changes:**
    - Update `spec.md` first (or alongside) with the new wording.

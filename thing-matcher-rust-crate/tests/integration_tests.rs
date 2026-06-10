@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for thing matcher.
 //!
 //! These exercise the **public API** as a downstream user would — building

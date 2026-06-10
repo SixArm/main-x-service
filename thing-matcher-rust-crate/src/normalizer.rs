@@ -256,7 +256,7 @@ impl Normalizer {
         }
         // The `soundex` crate's `american_soundex` is infallible for any
         // ASCII input. Strip non-ASCII bytes before handing it over.
-        let ascii: String = normalised.chars().filter(|c| c.is_ascii()).collect();
+        let ascii: String = normalised.chars().filter(char::is_ascii).collect();
         if ascii.is_empty() {
             return String::new();
         }

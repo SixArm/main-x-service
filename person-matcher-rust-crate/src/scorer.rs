@@ -61,6 +61,7 @@ impl Scorer {
     /// assert_eq!(Scorer::jaro_winkler_similarity("", ""), 1.0);
     /// assert_eq!(Scorer::jaro_winkler_similarity("smith", ""), 0.0);
     /// ```
+    #[must_use]
     pub fn jaro_winkler_similarity(s1: &str, s2: &str) -> f64 {
         if s1.is_empty() && s2.is_empty() {
             return 1.0;
@@ -90,6 +91,7 @@ impl Scorer {
     /// assert!(Scorer::levenshtein_similarity("abc", "xyz") < 0.5);
     /// assert_eq!(Scorer::levenshtein_similarity("", ""), 1.0);
     /// ```
+    #[must_use]
     pub fn levenshtein_similarity(s1: &str, s2: &str) -> f64 {
         if s1.is_empty() && s2.is_empty() {
             return 1.0;
@@ -116,6 +118,7 @@ impl Scorer {
     /// assert_eq!(Scorer::exact_match("Test", "test"), 0.0);  // case-sensitive
     /// assert_eq!(Scorer::exact_match("a", "b"),       0.0);
     /// ```
+    #[must_use]
     pub fn exact_match(s1: &str, s2: &str) -> f64 {
         if s1 == s2 { 1.0 } else { 0.0 }
     }
@@ -134,6 +137,7 @@ impl Scorer {
     /// let s = Scorer::combined_similarity("Stephen", "Steven");
     /// assert!(s > 0.80, "combined score for Stephen/Steven was {s}");
     /// ```
+    #[must_use]
     pub fn combined_similarity(s1: &str, s2: &str) -> f64 {
         let jw = Self::jaro_winkler_similarity(s1, s2);
         let lev = Self::levenshtein_similarity(s1, s2);
@@ -166,6 +170,7 @@ impl Scorer {
     /// assert_eq!(Scorer::optional_field_score(&a,    &none, SimilarityAlgorithm::Exact), 0.0);
     /// assert_eq!(Scorer::optional_field_score(&a,    &b,    SimilarityAlgorithm::Exact), 1.0);
     /// ```
+    #[must_use]
     pub fn optional_field_score(
         field1: &Option<String>,
         field2: &Option<String>,
@@ -209,6 +214,7 @@ pub enum SimilarityAlgorithm {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::float_cmp)] // scores are exact constants in assertions
     use super::*;
 
     // ---------- jaro_winkler ----------

@@ -124,6 +124,7 @@ impl Normalizer {
     /// let twice = Normalizer::normalize_name(&once);
     /// assert_eq!(once, twice);
     /// ```
+    #[must_use]
     pub fn normalize_name(name: &str) -> String {
         name.nfkd()
             .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
@@ -166,6 +167,7 @@ impl Normalizer {
     /// let twice = Normalizer::normalize_postcode(&once);
     /// assert_eq!(once, twice);
     /// ```
+    #[must_use]
     pub fn normalize_postcode(postcode: &str) -> String {
         postcode
             .chars()
@@ -214,8 +216,9 @@ impl Normalizer {
     /// let twice = Normalizer::normalize_phone(&once);
     /// assert_eq!(once, twice);
     /// ```
+    #[must_use]
     pub fn normalize_phone(phone: &str) -> String {
-        let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+        let digits: String = phone.chars().filter(char::is_ascii_digit).collect();
 
         if digits.starts_with("0044") && digits.len() > 4 {
             return digits[4..].to_string();
@@ -331,9 +334,10 @@ impl Normalizer {
     /// let twice = Normalizer::normalize_phone_e164(&once, Some("GB")).unwrap();
     /// assert_eq!(once, twice);
     /// ```
+    #[must_use]
     pub fn normalize_phone_e164(phone: &str, default_country: Option<&str>) -> Option<String> {
         let has_plus = phone.chars().any(|c| c == '+');
-        let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+        let digits: String = phone.chars().filter(char::is_ascii_digit).collect();
         if digits.is_empty() {
             return None;
         }
@@ -451,6 +455,7 @@ impl Normalizer {
     ///     "10 downing street",
     /// );
     /// ```
+    #[must_use]
     pub fn normalize_address_line(line: &str) -> String {
         Self::normalize_name(&Self::expand_street_abbreviations(line))
     }
@@ -512,6 +517,7 @@ impl Normalizer {
     /// assert_eq!(p.unit, None);
     /// assert_eq!(p.street, "buckingham palace");
     /// ```
+    #[must_use]
     pub fn parse_address_line(line: &str) -> ParsedAddressLine {
         let trimmed = line.trim();
         let (unit, after_unit) = extract_unit_prefix(trimmed);
@@ -564,6 +570,7 @@ impl Normalizer {
     /// assert_eq!(Normalizer::phonetic_code(""),       "");
     /// assert_eq!(Normalizer::phonetic_code("   "),    "");
     /// ```
+    #[must_use]
     pub fn phonetic_code(name: &str) -> String {
         let normalized = Self::normalize_name(name);
         if normalized.is_empty() {
@@ -644,6 +651,7 @@ impl Normalizer {
     /// let twice = Normalizer::normalize_email(&once, false).unwrap();
     /// assert_eq!(once, twice);
     /// ```
+    #[must_use]
     pub fn normalize_email(email: &str, gmail_dot_folding: bool) -> Option<String> {
         let trimmed = email.trim().to_lowercase();
         if trimmed.is_empty() {
@@ -840,7 +848,7 @@ fn extract_house_number(s: &str) -> (Option<String>, &str) {
         && c1.is_ascii_alphabetic()
     {
         let next = chars.next();
-        if next.is_none() || next.is_some_and(|c2| !c2.is_ascii_alphanumeric()) {
+        if next.is_none_or(|c2| !c2.is_ascii_alphanumeric()) {
             end += c1.len_utf8();
         }
     }

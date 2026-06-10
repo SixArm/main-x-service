@@ -120,6 +120,7 @@ impl Normalizer {
     /// let twice = Normalizer::normalize_name(&once);
     /// assert_eq!(once, twice);
     /// ```
+    #[must_use]
     pub fn normalize_name(name: &str) -> String {
         name.nfkd()
             .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
@@ -162,6 +163,7 @@ impl Normalizer {
     /// let twice = Normalizer::normalize_postcode(&once);
     /// assert_eq!(once, twice);
     /// ```
+    #[must_use]
     pub fn normalize_postcode(postcode: &str) -> String {
         postcode
             .chars()
@@ -210,8 +212,9 @@ impl Normalizer {
     /// let twice = Normalizer::normalize_phone(&once);
     /// assert_eq!(once, twice);
     /// ```
+    #[must_use]
     pub fn normalize_phone(phone: &str) -> String {
-        let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+        let digits: String = phone.chars().filter(char::is_ascii_digit).collect();
 
         if digits.starts_with("0044") && digits.len() > 4 {
             return digits[4..].to_string();
@@ -327,9 +330,10 @@ impl Normalizer {
     /// let twice = Normalizer::normalize_phone_e164(&once, Some("GB")).unwrap();
     /// assert_eq!(once, twice);
     /// ```
+    #[must_use]
     pub fn normalize_phone_e164(phone: &str, default_country: Option<&str>) -> Option<String> {
         let has_plus = phone.chars().any(|c| c == '+');
-        let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+        let digits: String = phone.chars().filter(char::is_ascii_digit).collect();
         if digits.is_empty() {
             return None;
         }
@@ -447,6 +451,7 @@ impl Normalizer {
     ///     "10 downing street",
     /// );
     /// ```
+    #[must_use]
     pub fn normalize_address_line(line: &str) -> String {
         Self::normalize_name(&Self::expand_street_abbreviations(line))
     }
@@ -508,6 +513,7 @@ impl Normalizer {
     /// assert_eq!(p.unit, None);
     /// assert_eq!(p.street, "buckingham palace");
     /// ```
+    #[must_use]
     pub fn parse_address_line(line: &str) -> ParsedAddressLine {
         let trimmed = line.trim();
         let (unit, after_unit) = extract_unit_prefix(trimmed);
@@ -560,6 +566,7 @@ impl Normalizer {
     /// assert_eq!(Normalizer::phonetic_code(""),       "");
     /// assert_eq!(Normalizer::phonetic_code("   "),    "");
     /// ```
+    #[must_use]
     pub fn phonetic_code(name: &str) -> String {
         let normalized = Self::normalize_name(name);
         if normalized.is_empty() {
@@ -640,6 +647,7 @@ impl Normalizer {
     /// let twice = Normalizer::normalize_email(&once, false).unwrap();
     /// assert_eq!(once, twice);
     /// ```
+    #[must_use]
     pub fn normalize_email(email: &str, gmail_dot_folding: bool) -> Option<String> {
         let trimmed = email.trim().to_lowercase();
         if trimmed.is_empty() {
@@ -713,6 +721,7 @@ impl Normalizer {
     /// assert!(Normalizer::parse_iso8601_unix_seconds("2024-13-01").is_none());
     /// assert!(Normalizer::parse_iso8601_unix_seconds("2024-02-30").is_none());
     /// ```
+    #[must_use]
     pub fn parse_iso8601_unix_seconds(input: &str) -> Option<i64> {
         let s = input.trim();
         if s.len() < 10 {
@@ -772,15 +781,15 @@ fn days_in_month(year: i64, month: u32) -> u32 {
     }
 }
 
-/// Hinnant's days_from_civil — number of days from `1970-01-01` to the
+/// Hinnant's `days_from_civil` — number of days from `1970-01-01` to the
 /// given Gregorian date. Negative for earlier dates. Total over all
 /// `(y, m, d)` triples that satisfy the per-month range check.
 fn days_from_civil(year: i64, month: u32, day: u32) -> i64 {
     let y = if month <= 2 { year - 1 } else { year };
     let era = if y >= 0 { y } else { y - 399 } / 400;
     let yoe = y - era * 400; // [0, 399]
-    let m = month as i64;
-    let d = day as i64;
+    let m = i64::from(month);
+    let d = i64::from(day);
     let mp = if m > 2 { m - 3 } else { m + 9 };
     let doy = (153 * mp + 2) / 5 + d - 1; // [0, 365]
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy; // [0, 146096]
@@ -811,7 +820,7 @@ fn parse_time_and_offset(rest: &str) -> Option<(u32, u32, u32, i64)> {
     if rest.as_bytes().get(idx) == Some(&b'.') {
         idx += 1;
         let frac_start = idx;
-        while rest.as_bytes().get(idx).is_some_and(|b| b.is_ascii_digit()) {
+        while rest.as_bytes().get(idx).is_some_and(u8::is_ascii_digit) {
             idx += 1;
         }
         if idx == frac_start {
@@ -822,11 +831,11 @@ fn parse_time_and_offset(rest: &str) -> Option<(u32, u32, u32, i64)> {
     // Optional timezone designator: `Z`, `±HH:MM`, or `±HHMM`.
     let tz_offset_seconds = match rest.as_bytes().get(idx).copied() {
         None => 0,
-        Some(b'Z') | Some(b'z') => {
+        Some(b'Z' | b'z') => {
             idx += 1;
             0
         }
-        Some(b'+') | Some(b'-') => {
+        Some(b'+' | b'-') => {
             let sign = if rest.as_bytes()[idx] == b'+' { 1 } else { -1 };
             idx += 1;
             let oh: i64 = rest.get(idx..idx + 2)?.parse().ok()?;
@@ -1024,7 +1033,7 @@ fn extract_house_number(s: &str) -> (Option<String>, &str) {
         && c1.is_ascii_alphabetic()
     {
         let next = chars.next();
-        if next.is_none() || next.is_some_and(|c2| !c2.is_ascii_alphanumeric()) {
+        if next.is_none_or(|c2| !c2.is_ascii_alphanumeric()) {
             end += c1.len_utf8();
         }
     }

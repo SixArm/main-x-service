@@ -13,7 +13,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 | Question | Answer |
 |---|---|
 | What does the crate do? | Pairwise matching of event records (festivals, conferences, concerts, sports fixtures, screenings, hackathons, meetups), modelled on [schema.org/Event](https://schema.org/Event), deterministic and probabilistic, for de-duplication and record linkage. |
-| Where is the spec? | [`spec.md`](./spec.md) (0.4.x place spec; cross-reference with `src/` and `README.md` for 0.5.0 event surface). |
+| Where is the spec? | [`spec.md`](./spec/index.md) (0.4.x place spec; cross-reference with `src/` and `README.md` for 0.5.0 event surface). |
 | Where does new behaviour get specified? | In `spec.md` and `CHANGELOG.md` in the same PR as the code change. See [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md). |
 | Build command | `cargo build` |
 | Test command | `cargo test` (unit + integration + property + doctest) |
@@ -32,7 +32,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 ## Golden rules
 
-1. **Spec-first.** If you change observable behaviour, update [`spec.md`](./spec.md) in the same change. If the spec is silent, propose a spec update before writing code. (`spec.md` §9.3, [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md))
+1. **Spec-first.** If you change observable behaviour, update [`spec.md`](./spec/index.md) in the same change. If the spec is silent, propose a spec update before writing code. (`spec.md` §9.3, [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md))
 2. **Pure library.** No IO, no logging, no global state inside `src/` (excluding `src/main.rs`, which is a demo binary). (`spec.md` §8)
 3. **No `unsafe`.** Enforced by `#![forbid(unsafe_code)]` in `lib.rs`. Do not remove the attribute.
 4. **Deterministic.** No clocks, no RNGs, no environment variables. Same inputs => same outputs, byte-for-byte. (`spec.md` §8)
@@ -46,7 +46,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 ## Workflow for any change
 
-1. **Read** [`spec.md`](./spec.md). Locate the section(s) affected.
+1. **Read** [`spec.md`](./spec/index.md). Locate the section(s) affected.
 2. **Decide** whether your change is editorial (docs / formatting only) or behavioural (touches what the library does).
 3. **For behavioural changes:**
    - Update `spec.md` first (or alongside) with the new wording.

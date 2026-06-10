@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks for the Tantivy-backed search engine.
 //!
 //! Measures single and bulk indexing, the main query paths (exact,

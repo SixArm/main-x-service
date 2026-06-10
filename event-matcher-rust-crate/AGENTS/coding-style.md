@@ -1,6 +1,6 @@
 # Coding style — agent guide
 
-Read alongside [`../spec.md`](../spec.md) §8 (determinism and safety) and §9 (public API contract).
+Read alongside [`../spec.md`](../spec/index.md) §8 (determinism and safety) and §9 (public API contract).
 
 ## Formatting and linting
 
@@ -28,7 +28,7 @@ Read alongside [`../spec.md`](../spec.md) §8 (determinism and safety) and §9 (
 ## Error handling
 
 - Library code returns `crate::Result<T>` (alias for `Result<T, MatchingError>`).
-- New error variants go in `src/error.rs`. Update [`../spec.md`](../spec.md) §3.9 (error model) in the same change.
+- New error variants go in `src/error.rs`. Update [`../spec.md`](../spec/index.md) §3.9 (error model) in the same change.
 - Parsers and constructors that can reject input return `Option<T>` (e.g. `PlaceId::new`, `Normalizer::normalize_email`, `Normalizer::normalize_phone_e164`); the matcher itself is infallible — invalid coordinates, malformed phones, or absent fields degrade to `None` in the breakdown rather than an error (`spec.md` §5.4).
 
 ## Doc comments
@@ -67,6 +67,6 @@ See [`testing.md`](./testing.md).
 
 ## Dependencies
 
-- New runtime dependencies require a justification in the PR description and a note in [`../spec.md`](../spec.md) if they expand the trust boundary.
+- New runtime dependencies require a justification in the PR description and a note in [`../spec.md`](../spec/index.md) if they expand the trust boundary.
 - Current direct runtime dependencies: `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`. No `tokio`, `async-std`, or other runtimes.
 - Dev-only dependencies (e.g. `proptest`, `criterion`) are lower-risk but should still be deliberate.

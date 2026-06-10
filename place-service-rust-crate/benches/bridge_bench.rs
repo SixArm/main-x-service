@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Bridge-path benchmarks: service-side `Place` → `to_matcher_place` →
 //! `place_matcher::MatchingEngine::match_places`.
 //!

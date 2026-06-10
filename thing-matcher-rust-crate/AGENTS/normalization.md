@@ -1,6 +1,6 @@
 # Normalisation — agent guide
 
-See [`../spec.md`](../spec.md) §4 for the formal rules. This guide is the operational view, with extra examples per rule.
+See [`../spec.md`](../spec/index.md) §4 for the formal rules. This guide is the operational view, with extra examples per rule.
 
 ## Why normalise at all?
 
@@ -89,7 +89,7 @@ The name is first run through `normalize_name`, so `"Robért"` and `"Robert"` pr
 
 1. Add the new public method on `Normalizer` in `src/normalizer.rs`.
 2. Add unit tests covering: empty input, all-whitespace input, a realistic happy-path input, and a diacritic case if the field can contain Unicode names.
-3. Update [`../spec.md`](../spec.md) §4 with the algorithm steps and a table of examples.
+3. Update [`../spec.md`](../spec/index.md) §4 with the algorithm steps and a table of examples.
 4. If a scoring path uses the new normaliser, document it in `spec.md` §6.
 
 ## Pitfalls

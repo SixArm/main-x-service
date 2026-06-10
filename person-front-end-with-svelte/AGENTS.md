@@ -4,8 +4,8 @@ Sibling to [`person-service-rust-crate/`](../person-service-rust-crate/). The Ru
 
 ## Single source of truth
 
-- The service's [`spec.md`](../person-service-rust-crate/spec.md) and [`AGENTS/`](../person-service-rust-crate/AGENTS/) describe the API contract. If a field disappears from `Person` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
-- This project has its own [`spec.md`](spec.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
+- The service's [`spec.md`](../person-service-rust-crate/spec/index.md) and [`AGENTS/`](../person-service-rust-crate/AGENTS/) describe the API contract. If a field disappears from `Person` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
+- This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
 
 ## Three-part change rule
 

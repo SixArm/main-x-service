@@ -1,6 +1,6 @@
 # Architecture — agent guide
 
-The authoritative description of the crate's data model, scoring pipeline, and safety guarantees lives in [`../spec.md`](../spec.md) §3 and §5. This guide is the practitioner's view of the module layout and the layering rules.
+The authoritative description of the crate's data model, scoring pipeline, and safety guarantees lives in [`../spec.md`](../spec/index.md) §3 and §5. This guide is the practitioner's view of the module layout and the layering rules.
 
 ## Module layout
 
@@ -91,7 +91,7 @@ If you genuinely need a new module:
 
 1. Add `pub mod foo;` in `lib.rs`.
 2. Decide its layer (data / utility / orchestration).
-3. Update [`../spec.md`](../spec.md) (module layout and dependency graph) **before** writing code.
+3. Update [`../spec.md`](../spec/index.md) (module layout and dependency graph) **before** writing code.
 4. If it exposes public types, add re-exports in `lib.rs` and document the new public surface in the spec.
 
 ## Avoid these shapes

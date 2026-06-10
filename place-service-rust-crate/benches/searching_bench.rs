@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Criterion benchmarks approximating name-based search.
 //!
 //! Models a linear scan that scores a query against 100 candidate names via

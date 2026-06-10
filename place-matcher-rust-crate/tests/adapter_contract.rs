@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Adapter contract test for the `place-matcher` public API.
 //!
 //! Pins the public surface that downstream `place-service` depends on via
