@@ -264,6 +264,48 @@ impl Model {
             .generate_token(expiration, self.pid.to_string(), Map::new())
             .map_err(ModelError::from)
     }
+
+    /// Creates a passwordless user for the magic-link flow. The
+    /// `password` column is `NOT NULL`, so we store the hash of an
+    /// unguessable random value that no login path will ever check.
+    ///
+    /// # Errors
+    ///
+    /// When the email already exists or the insert fails.
+    pub async fn create_passwordless(
+        db: &DatabaseConnection,
+        email: &str,
+        name: &str,
+    ) -> ModelResult<Self> {
+        let txn = db.begin().await?;
+
+        if users::Entity::find()
+            .filter(
+                model::query::condition()
+                    .eq(users::Column::Email, email)
+                    .build(),
+            )
+            .one(&txn)
+            .await?
+            .is_some()
+        {
+            return Err(ModelError::EntityAlreadyExists {});
+        }
+
+        let unusable = hash::hash_password(&Uuid::new_v4().to_string())
+            .map_err(|e| ModelError::Any(e.into()))?;
+        let user = users::ActiveModel {
+            email: ActiveValue::set(email.to_string()),
+            password: ActiveValue::set(unusable),
+            name: ActiveValue::set(name.to_string()),
+            ..Default::default()
+        }
+        .insert(&txn)
+        .await?;
+
+        txn.commit().await?;
+        Ok(user)
+    }
 }
 
 impl ActiveModel {

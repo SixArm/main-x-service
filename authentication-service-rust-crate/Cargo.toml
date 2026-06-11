@@ -35,6 +35,13 @@ chrono = { version = "0.4" }
 validator = { version = "0.20" }
 uuid = { version = "1.6", features = ["v4"] }
 include_dir = { version = "0.7" }
+# RS256 JWT signing + JWKS publication. As the central auth provider,
+# other services verify tokens offline against the public keys exposed
+# at /.well-known/jwks.json — no shared secret, no introspection hop.
+jsonwebtoken = { version = "9" }
+rsa = { version = "0.9", features = ["pem"] }
+base64 = { version = "0.22" }
+sha2 = { version = "0.10" }
 
 [[bin]]
 name = "authentication_service-cli"
