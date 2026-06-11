@@ -51,6 +51,8 @@
 
 /// REST API surface and shared response envelope.
 pub mod api;
+/// Loco application hooks (boot, routes, migrations).
+pub mod app;
 /// Service configuration loaded from the environment.
 pub mod config;
 /// PostgreSQL persistence: connection pool, repository, audit log.

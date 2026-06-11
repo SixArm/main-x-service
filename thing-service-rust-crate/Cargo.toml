@@ -9,12 +9,16 @@ repository = "https://github.com/sixarm/main-x-service/thing-service-rust-crate"
 keywords = ["thing-matcher", "microservice"]
 categories = ["database"]
 
+[[bin]]
+name = "thing-service"
+path = "src/bin/main.rs"
+
 [dependencies]
 # Async Runtime
 tokio = { version = "1.49", features = ["full"] }
 
-# Web Framework & HTTP
-axum = { version = "0.7", features = ["macros", "multipart", "ws"] }
+# Web Framework & HTTP (axum 0.8 to match loco 0.16)
+axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
 hyper = { version = "1.8", features = ["full"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
@@ -29,7 +33,8 @@ sea-orm-migration = { version = "1.1", features = ["sqlx-postgres", "runtime-tok
 bigdecimal = { version = "0.4", features = ["serde"] }
 
 # Web Framework (Loco conventions; web/template tier removed)
-loco-rs = { version = "0.14", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
+loco-rs = { version = "0.16.3", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
+migration = { path = "migration" }
 
 # Search Engine
 tantivy = "0.22"
@@ -40,7 +45,7 @@ prost = "0.13"
 
 # OpenAPI Documentation
 utoipa = { version = "5.4", features = ["axum_extras", "jiff_0_2", "uuid"] }
-utoipa-swagger-ui = { version = "8.1", features = ["axum"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
 openapiv3 = "2.2"
 
 # Data Streaming

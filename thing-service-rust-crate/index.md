@@ -20,14 +20,13 @@ Prerequisites: Rust 1.93+ (2024 edition), PostgreSQL 18+.
 ```bash
 cd thing-service-rust-crate
 
-# Configure (Loco-style YAML in config/, env via PORT / DATABASE_URL):
-cp config/development.yaml.example config/development.yaml || true
+# Build and run (loco.rs): point DATABASE_URL at the database, then
+# start. Migrations run automatically in development (auto_migrate).
+export DATABASE_URL=postgres://localhost/thing_service_development
+cargo loco start            # or: cargo run -- start
 
-# Build and run.
-cargo run --release
-
-# Service binds on port 8080 by default:
-curl http://localhost:8080/api/health
+# Service binds on the configured port (config/development.yaml):
+curl http://localhost:5150/api/health
 ```
 
 ## API
