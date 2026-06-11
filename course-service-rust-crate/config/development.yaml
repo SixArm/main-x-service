@@ -1,0 +1,39 @@
+logger:
+  enable: true
+  pretty_backtrace: true
+  level: debug
+  format: compact
+
+server:
+  port: 8084
+  binding: localhost
+  host: http://localhost
+  middlewares:
+
+workers:
+  mode: BackgroundQueue
+
+# Postgres-backed background jobs (repo convention — NOT Redis).
+queue:
+  kind: Postgres
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/course_service_development") }}
+  dangerously_flush: false
+
+database:
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/course_service_development") }}
+  enable_logging: false
+  connect_timeout: {{ get_env(name="DB_CONNECT_TIMEOUT", default="500") }}
+  idle_timeout: {{ get_env(name="DB_IDLE_TIMEOUT", default="500") }}
+  min_connections: {{ get_env(name="DB_MIN_CONNECTIONS", default="1") }}
+  max_connections: {{ get_env(name="DB_MAX_CONNECTIONS", default="10") }}
+  auto_migrate: true
+  dangerously_truncate: false
+  dangerously_recreate: false
+
+# auth_jwt is compiled in but course-service does not issue tokens —
+# authentication is centralized in the authentication-service. This
+# block only satisfies loco's config schema.
+auth:
+  jwt:
+    secret: PLEASE_CHANGE_ME_DEVELOPMENT_ONLY
+    expiration: 604800

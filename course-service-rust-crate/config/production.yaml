@@ -1,0 +1,39 @@
+logger:
+  enable: true
+  pretty_backtrace: false
+  level: info
+  format: json
+
+server:
+  port: {{ get_env(name="PORT", default="8084") }}
+  binding: 0.0.0.0
+  host: {{ get_env(name="HOST", default="http://localhost") }}
+  middlewares:
+    compression:
+      enable: true
+    etag:
+      enable: true
+
+workers:
+  mode: BackgroundQueue
+
+queue:
+  kind: Postgres
+  uri: {{ get_env(name="DATABASE_URL") }}
+  dangerously_flush: false
+
+database:
+  uri: {{ get_env(name="DATABASE_URL") }}
+  enable_logging: false
+  connect_timeout: {{ get_env(name="DB_CONNECT_TIMEOUT", default="500") }}
+  idle_timeout: {{ get_env(name="DB_IDLE_TIMEOUT", default="500") }}
+  min_connections: {{ get_env(name="DB_MIN_CONNECTIONS", default="1") }}
+  max_connections: {{ get_env(name="DB_MAX_CONNECTIONS", default="20") }}
+  auto_migrate: false
+  dangerously_truncate: false
+  dangerously_recreate: false
+
+auth:
+  jwt:
+    secret: {{ get_env(name="JWT_SECRET", default="unused-course-service-does-not-issue-tokens") }}
+    expiration: 604800

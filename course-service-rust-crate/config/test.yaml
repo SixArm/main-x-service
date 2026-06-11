@@ -1,0 +1,34 @@
+logger:
+  enable: false
+  level: error
+  format: compact
+
+server:
+  port: 8084
+  binding: localhost
+  host: http://localhost
+  middlewares:
+
+workers:
+  mode: ForegroundBlocking
+
+queue:
+  kind: Postgres
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/course_service_test") }}
+  dangerously_flush: true
+
+database:
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/course_service_test") }}
+  enable_logging: false
+  connect_timeout: 500
+  idle_timeout: 500
+  min_connections: 1
+  max_connections: 5
+  auto_migrate: true
+  dangerously_truncate: true
+  dangerously_recreate: false
+
+auth:
+  jwt:
+    secret: PLEASE_CHANGE_ME_TEST_ONLY
+    expiration: 604800

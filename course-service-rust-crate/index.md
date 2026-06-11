@@ -52,13 +52,13 @@ podman run -d --name course-postgres -p 5434:5432 \
   -e POSTGRES_PASSWORD=course_password \
   postgres:17-alpine
 
-# Apply migrations (manual — auto-migrate is out of scope for MVP).
-for m in migrations/*/up.sql; do
-  podman exec -i course-postgres psql -U course_user -d course < "$m"
-done
+# Build and run (loco.rs): point DATABASE_URL at the database, then
+# start. Migrations run automatically in development (config auto_migrate).
+export DATABASE_URL=postgres://course_user:course_password@localhost:5434/course
+cargo loco start            # or: cargo run -- start
 
-# Build and run.
-cargo run --release
+# Migrations can also be run explicitly:
+cargo loco db migrate
 ```
 
 ## API

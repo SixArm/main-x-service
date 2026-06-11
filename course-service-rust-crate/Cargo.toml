@@ -15,14 +15,19 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "course-service"
-path = "src/main.rs"
+path = "src/bin/main.rs"
 
 [dependencies]
 # Async runtime
 tokio = { version = "1.49", features = ["full"] }
 
-# Web framework
-axum = { version = "0.7", features = ["macros"] }
+# Loco framework (backend-only; the service boots through loco's
+# Hooks/AppContext/CLI and mounts its REST router via after_routes).
+loco-rs = { version = "0.16", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
+migration = { path = "migration" }
+
+# Web framework (axum 0.8 to match loco 0.16)
+axum = { version = "0.8", features = ["macros"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
 
@@ -38,7 +43,7 @@ tantivy = "0.22"
 
 # OpenAPI documentation
 utoipa = { version = "5.4", features = ["axum_extras", "jiff_0_2", "uuid"] }
-utoipa-swagger-ui = { version = "8.1", features = ["axum"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
 # Common types
 jiff = { version = "0.2", features = ["serde"] }
