@@ -169,14 +169,12 @@ cd event-service-rust-crate
 # Set up database
 createdb mpi
 cp .env.example .env
-# Edit .env and set DATABASE_URL
+# Set DATABASE_URL (loco reads it via config/development.yaml)
+export DATABASE_URL=postgres://localhost/event_service_development
 
-# Run migrations
-sea-orm-cli migrate up
-
-# Build and run
-cargo build --release
-cargo run --release
+# Build and run (loco.rs). Migrations run automatically in development
+# (auto_migrate); or run them explicitly with `cargo loco db migrate`.
+cargo loco start            # or: cargo run -- start
 ```
 
 ## Docker Deployment

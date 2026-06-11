@@ -50,6 +50,8 @@
 // Module declarations.
 /// HTTP / RPC surface: REST (Axum), FHIR stubs, gRPC stub.
 pub mod api;
+/// Loco application hooks (boot, routes, migrations).
+pub mod app;
 /// Runtime configuration (server, database, search, matching).
 pub mod config;
 /// PostgreSQL persistence (SeaORM entities, repositories, audit log).
