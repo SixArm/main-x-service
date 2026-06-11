@@ -23,6 +23,8 @@
 // Module declarations
 /// REST, FHIR R5, and gRPC API layers plus shared response envelopes.
 pub mod api;
+/// Loco application hooks (boot, routes, migrations).
+pub mod app;
 /// Configuration structs and environment/`.env` loading.
 pub mod config;
 /// PostgreSQL persistence: SeaORM entities, repositories, audit log.

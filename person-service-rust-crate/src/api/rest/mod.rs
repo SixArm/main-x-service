@@ -25,8 +25,6 @@ pub mod state;
 
 pub use state::AppState;
 
-use crate::Result;
-
 /// The OpenAPI 3 document: endpoint paths, schemas, and tags.
 #[derive(OpenApi)]
 #[openapi(
@@ -119,9 +117,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/health", get(handlers::health_check))
         // Person CRUD
         .route("/persons", post(handlers::create_person))
-        .route("/persons/:id", get(handlers::get_person))
-        .route("/persons/:id", put(handlers::update_person))
-        .route("/persons/:id", delete(handlers::delete_person))
+        .route("/persons/{id}", get(handlers::get_person))
+        .route("/persons/{id}", put(handlers::update_person))
+        .route("/persons/{id}", delete(handlers::delete_person))
         // Search
         .route("/persons/search", get(handlers::search_persons))
         // Matching
@@ -131,10 +129,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/persons/merge", post(handlers::merge_persons))
         .route("/persons/deduplicate", post(handlers::batch_deduplicate))
         // Privacy
-        .route("/persons/:id/export", get(handlers::export_person_data))
-        .route("/persons/:id/masked", get(handlers::get_person_masked))
+        .route("/persons/{id}/export", get(handlers::export_person_data))
+        .route("/persons/{id}/masked", get(handlers::get_person_masked))
         // Audit
-        .route("/persons/:id/audit", get(handlers::get_person_audit_logs))
+        .route("/persons/{id}/audit", get(handlers::get_person_audit_logs))
         .route("/audit/recent", get(handlers::get_recent_audit_logs))
         .route("/audit/user", get(handlers::get_user_audit_logs))
         .with_state(state);
@@ -147,25 +145,4 @@ pub fn create_router(state: AppState) -> Router {
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
-}
-
-/// Bind the configured host/port and run the REST server to completion.
-///
-/// Returns [`crate::Error::Api`] if the listener cannot bind or the
-/// server exits with an error.
-pub async fn serve(state: AppState) -> Result<()> {
-    let app = create_router(state.clone());
-    let addr = format!("{}:{}", state.config.server.host, state.config.server.port);
-    let listener = tokio::net::TcpListener::bind(&addr)
-        .await
-        .map_err(|e| crate::Error::Api(e.to_string()))?;
-
-    tracing::info!("REST API server listening on {}", addr);
-    tracing::info!("Swagger UI available at http://{}/swagger-ui", addr);
-
-    axum::serve(listener, app)
-        .await
-        .map_err(|e| crate::Error::Api(e.to_string()))?;
-
-    Ok(())
 }

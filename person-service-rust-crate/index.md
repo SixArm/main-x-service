@@ -171,12 +171,10 @@ createdb mpi
 cp .env.example .env
 # Edit .env and set DATABASE_URL
 
-# Run migrations
-sea-orm-cli migrate up
-
-# Build and run
-cargo build --release
-cargo run --release
+# Build and run (loco.rs). Migrations run automatically in development
+# (auto_migrate); or run them explicitly with `cargo loco db migrate`.
+export DATABASE_URL=postgres://localhost/person_service_development
+cargo loco start            # or: cargo run -- start
 ```
 
 ## Docker Deployment
