@@ -16,8 +16,6 @@ pub mod state;
 
 pub use state::AppState;
 
-use crate::Result;
-
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -87,14 +85,14 @@ pub fn create_router(state: AppState) -> Router {
         .route("/places/merge", post(handlers::merge_places))
         .route("/places/deduplicate", post(handlers::deduplicate))
         .route(
-            "/places/:id",
+            "/places/{id}",
             get(handlers::get_place)
                 .put(handlers::update_place)
                 .delete(handlers::delete_place),
         )
-        .route("/places/:id/export", get(handlers::export_place_data))
-        .route("/places/:id/masked", get(handlers::masked_place))
-        .route("/places/:id/audit", get(handlers::audit_for_place))
+        .route("/places/{id}/export", get(handlers::export_place_data))
+        .route("/places/{id}/masked", get(handlers::masked_place))
+        .route("/places/{id}/audit", get(handlers::audit_for_place))
         .route("/audit/recent", get(handlers::audit_recent))
         .with_state(state);
 
@@ -102,20 +100,4 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api", api_routes)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
-}
-
-/// Start the REST API server.
-pub async fn serve(state: AppState) -> Result<()> {
-    let app = create_router(state.clone());
-    let addr = format!("{}:{}", state.config.server.host, state.config.server.port);
-    let listener = tokio::net::TcpListener::bind(&addr)
-        .await
-        .map_err(|e| crate::Error::Api(e.to_string()))?;
-
-    tracing::info!("REST API server listening on {}", addr);
-
-    axum::serve(listener, app)
-        .await
-        .map_err(|e| crate::Error::Api(e.to_string()))?;
-    Ok(())
 }
