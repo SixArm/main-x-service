@@ -37,6 +37,7 @@ the corresponding service crate's matching layer.
 | [Thing Matcher](thing-matcher-rust-crate/) | Thing | [spec](thing-matcher-rust-crate/spec/index.md) | [index](thing-matcher-rust-crate/index.md) |
 | [Event Matcher](event-matcher-rust-crate/) | Event | [spec](event-matcher-rust-crate/spec/index.md) | [index](event-matcher-rust-crate/index.md) |
 | [Course Matcher](course-matcher-rust-crate/) | Course | [spec](course-matcher-rust-crate/spec/index.md) | [index](course-matcher-rust-crate/index.md) |
+| [Organization Matcher](organization-matcher-rust-crate/) | Organization (schema.org/Organization) | [spec](organization-matcher-rust-crate/spec/index.md) | [index](organization-matcher-rust-crate/index.md) |
 
 ### Front-end projects
 
