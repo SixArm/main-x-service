@@ -1,0 +1,113 @@
+# AGENTS.md — Authentication Service
+
+Entry point for AI coding agents (and humans) working in the
+`authentication-service` crate — the **central single sign-on provider**
+for the Main X Index family.
+
+> If you read one file, read [`spec/index.md`](./spec/index.md): the
+> living specification. This guide tells you **how to work**; the spec
+> tells you **what to build**.
+
+---
+
+## What this crate is
+
+A **loco.rs** service that authenticates users via **passwordless email
+magic links** and issues **RS256 JWT** access tokens. Every other Main X
+service verifies those tokens **offline** against the public keys at
+`/.well-known/jwks.json` — no shared secret, no per-request
+introspection.
+
+It is also the family's **reference loco.rs application**: the existing
+service crates only *declare* `loco-rs` but actually run hand-rolled
+Axum. They will be converted to real loco using this crate as the
+template (see root `AGENTS.md`).
+
+| Question | Answer |
+|---|---|
+| Framework | loco.rs 0.16 (real `Hooks`/`AppContext` boot, loco controllers, loco config, `sea-orm-migration`). |
+| Auth model | Passwordless magic link. No passwords are ever checked. |
+| Tokens | RS256 JWT; public keys published as JWKS for offline verification. |
+| Build | `cargo build` |
+| Test | `cargo test --lib` (DB-free unit tests); full request tests need Postgres. |
+| Lint | `cargo clippy --bins` |
+| Run | `cargo loco start` (needs Postgres; see README). |
+
+---
+
+## API surface
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| POST | `/api/auth/signup` | — | Create a passwordless account, issue a magic link. |
+| POST | `/api/auth/magic-link` | — | Request a magic link for an existing account (sign in). |
+| GET | `/api/auth/magic-link/{token}` | — | Consume the link → RS256 access token + session. |
+| GET | `/api/auth/me` | Bearer | Current user. |
+| POST | `/api/auth/signout` | Bearer | Revoke the current session. |
+| GET | `/.well-known/jwks.json` | — | Public keys for offline token verification. |
+
+To avoid account enumeration, `signup` and `magic-link` always return
+`200` regardless of whether the email exists.
+
+---
+
+## Golden rules
+
+1. **Loco-idiomatic.** New endpoints are loco controllers registered in
+   `app.rs`; new tables are `sea-orm-migration` migrations registered in
+   `migration/src/lib.rs` with a matching entity under
+   `src/models/_entities/`.
+2. **RS256 only.** Token signing/verification lives in `src/auth`. Do
+   not reintroduce loco's symmetric HS256 helper for access tokens; peer
+   services rely on the JWKS.
+3. **No password flow.** This is passwordless. The `users.password`
+   column exists only to satisfy `NOT NULL`; it holds an unusable random
+   hash (`create_passwordless`).
+4. **Don't leak account existence.** Keep the always-`200` responses on
+   the unauthenticated endpoints.
+5. **Dev has no SMTP.** Magic links are logged to the tracing console in
+   development (mailer disabled). Production supplies SMTP via config.
+6. **Keys come from the edges.** Private/public PEM load from env in
+   production (`JWT_PRIVATE_KEY_FILE` / `JWT_PUBLIC_KEY_FILE` or the
+   `*_PEM` inline variants); the committed `config/keys/*_dev.pem` are
+   **dev only**.
+
+---
+
+## Layout
+
+```
+src/
+├── app.rs                 loco Hooks: routes, workers, truncate, seed
+├── bin/main.rs            loco CLI entrypoint
+├── auth/mod.rs            RS256 signing + verification + JWKS + bearer extractor
+├── controllers/
+│   ├── auth.rs            signup / magic-link / verify / me / signout
+│   └── jwks.rs            /.well-known/jwks.json
+├── models/
+│   ├── users.rs           magic-link user model (+ create_passwordless)
+│   ├── sessions.rs        session issue/revoke (jid = jwt jti)
+│   └── _entities/         generated SeaORM entities
+├── mailers/auth.rs        magic-link mailer (prod)
+└── views/auth.rs          LoginResponse / CurrentResponse
+migration/src/             m20220101_000001_users, m20220101_000002_sessions
+config/                    development/production/test yaml + dev RSA keys
+```
+
+## Configuration (env)
+
+| Var | Default | Purpose |
+|---|---|---|
+| `JWT_PRIVATE_KEY_FILE` | `config/keys/jwt_private_dev.pem` | RSA private signing key (PEM). |
+| `JWT_PUBLIC_KEY_FILE` | `config/keys/jwt_public_dev.pem` | RSA public verification key (PEM). |
+| `JWT_PRIVATE_KEY_PEM` / `JWT_PUBLIC_KEY_PEM` | — | Inline PEM (takes precedence over the file vars). |
+| `JWT_ISSUER` | `authentication-service` | `iss` claim. |
+| `JWT_AUDIENCE` | `main-x-service` | `aud` claim. |
+| `JWT_EXPIRATION` | `3600` | Access-token lifetime (seconds). |
+| `FRONTEND_URL` | `http://localhost:5173` | Base for the magic link in emails/logs. |
+| `DATABASE_URL` | loco config default | Postgres connection. |
+
+## When you are unsure
+
+The spec wins. If the spec is silent, propose an update in
+[`spec/index.md`](./spec/index.md) rather than guessing.

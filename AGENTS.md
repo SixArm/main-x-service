@@ -19,6 +19,7 @@ per-crate `AGENTS/spec-driven-development.md` files for the discipline.
 | [Thing Service](thing-service-rust-crate/) | Thing (schema.org/Thing — generic) | [spec](thing-service-rust-crate/spec/index.md) | [index](thing-service-rust-crate/index.md) |
 | [Event Service](event-service-rust-crate/) | Event (schema.org/Event — time-bounded) | [spec](event-service-rust-crate/spec/index.md) | [index](event-service-rust-crate/index.md) |
 | [Course Service](course-service-rust-crate/) | Course (schema.org/Course) — template + `CourseInstance` sub-resource | [spec](course-service-rust-crate/spec/index.md) | [index](course-service-rust-crate/index.md) |
+| [Authentication Service](authentication-service-rust-crate/) | User (central single sign-on provider) — passwordless magic-link, RS256 JWT + JWKS. **First real loco.rs crate**; reference for converting the others. | [spec](authentication-service-rust-crate/spec/index.md) | [index](authentication-service-rust-crate/index.md) |
 
 ### Matcher crates
 
@@ -54,6 +55,7 @@ accepted (see `feedback_front_end_drift` memory) — no shared package.
 | [thing-front-end-with-svelte](thing-front-end-with-svelte/) | [thing-service](thing-service-rust-crate/) | [spec](thing-front-end-with-svelte/spec/index.md) | [CHANGELOG](thing-front-end-with-svelte/CHANGELOG.md) |
 | [event-front-end-with-svelte](event-front-end-with-svelte/) | [event-service](event-service-rust-crate/) | [spec](event-front-end-with-svelte/spec/index.md) | [CHANGELOG](event-front-end-with-svelte/CHANGELOG.md) |
 | [course-front-end-with-svelte](course-front-end-with-svelte/) | [course-service](course-service-rust-crate/) | [spec](course-front-end-with-svelte/spec/index.md) | [CHANGELOG](course-front-end-with-svelte/CHANGELOG.md) |
+| [authentication-front-end-with-svelte](authentication-front-end-with-svelte/) | [authentication-service](authentication-service-rust-crate/) | [spec](authentication-front-end-with-svelte/spec/index.md) | [CHANGELOG](authentication-front-end-with-svelte/CHANGELOG.md) |
 
 ## Shared reference docs
 

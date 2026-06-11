@@ -12,6 +12,7 @@ The **Main X Index** family of crates implements a federated identity index — 
 | [thing-service](../../thing-service-rust-crate) | Thing | Generic thing / asset registry (schema.org/Thing) |
 | [event-service](../../event-service-rust-crate) | Event | Time-bounded event registry (schema.org/Event) |
 | [course-service](../../course-service-rust-crate) | Course | Course-identity registry (schema.org/Course) — template + `CourseInstance` sub-resource for specific offerings |
+| [authentication-service](../../authentication-service-rust-crate) | User | Central single sign-on provider — passwordless email magic-link auth, RS256 JWT issuance, JWKS for offline verification by peers. The first real loco.rs crate and the reference for converting the others. |
 
 ### Matcher crates
 
@@ -47,6 +48,7 @@ shape as the service crates.
 | [thing-front-end-with-svelte](../../thing-front-end-with-svelte) | thing-service | Operator UI for Thing CRUD / search / match / merge / audit (PropertyValue identifiers — DOI / ISBN / GTIN / …) |
 | [event-front-end-with-svelte](../../event-front-end-with-svelte) | event-service | Operator UI for Event CRUD / search / match / merge / audit (time window + Location union + Party / Offer) — calls under `/api/v1/` |
 | [course-front-end-with-svelte](../../course-front-end-with-svelte) | course-service | Operator UI for Course CRUD / search / match / merge / audit (schema.org/Course: course code, educational level, keywords, teaches, syllabus sections, instances sub-resource) |
+| [authentication-front-end-with-svelte](../../authentication-front-end-with-svelte) | authentication-service | Operator UI for passwordless magic-link sign up / sign in / sign out (no data grid; deliberately dependency-light) |
 
 Per-project decision (2026-06-02): drift between front-ends is accepted; there is no shared `mxi-svelte-core` package. Copy-adapt from a sibling when scaffolding a new front-end.
 
