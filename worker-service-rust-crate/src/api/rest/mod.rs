@@ -20,8 +20,6 @@ pub mod state;
 
 pub use state::AppState;
 
-use crate::Result;
-
 /// utoipa OpenAPI document: aggregates every handler path and schema into the
 /// spec served at `/api-docs/openapi.json` and rendered by the Swagger UI.
 #[derive(OpenApi)]
@@ -112,9 +110,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/health", get(handlers::health_check))
         // Worker CRUD
         .route("/workers", post(handlers::create_worker))
-        .route("/workers/:id", get(handlers::get_worker))
-        .route("/workers/:id", put(handlers::update_worker))
-        .route("/workers/:id", delete(handlers::delete_worker))
+        .route("/workers/{id}", get(handlers::get_worker))
+        .route("/workers/{id}", put(handlers::update_worker))
+        .route("/workers/{id}", delete(handlers::delete_worker))
         // Search
         .route("/workers/search", get(handlers::search_workers))
         // Matching
@@ -124,10 +122,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/workers/merge", post(handlers::merge_workers))
         .route("/workers/deduplicate", post(handlers::batch_deduplicate))
         // Privacy
-        .route("/workers/:id/export", get(handlers::export_worker_data))
-        .route("/workers/:id/masked", get(handlers::get_worker_masked))
+        .route("/workers/{id}/export", get(handlers::export_worker_data))
+        .route("/workers/{id}/masked", get(handlers::get_worker_masked))
         // Audit
-        .route("/workers/:id/audit", get(handlers::get_worker_audit_logs))
+        .route("/workers/{id}/audit", get(handlers::get_worker_audit_logs))
         .route("/audit/recent", get(handlers::get_recent_audit_logs))
         .route("/audit/user", get(handlers::get_user_audit_logs))
         .with_state(state);
@@ -137,24 +135,4 @@ pub fn create_router(state: AppState) -> Router {
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
-}
-
-/// Builds the router and serves it on `config.server.host:port`, logging the
-/// bind address and Swagger UI URL. Returns a [`crate::Error::Api`] if binding
-/// or serving fails.
-pub async fn serve(state: AppState) -> Result<()> {
-    let app = create_router(state.clone());
-    let addr = format!("{}:{}", state.config.server.host, state.config.server.port);
-    let listener = tokio::net::TcpListener::bind(&addr)
-        .await
-        .map_err(|e| crate::Error::Api(e.to_string()))?;
-
-    tracing::info!("REST API server listening on {}", addr);
-    tracing::info!("Swagger UI available at http://{}/swagger-ui", addr);
-
-    axum::serve(listener, app)
-        .await
-        .map_err(|e| crate::Error::Api(e.to_string()))?;
-
-    Ok(())
 }
