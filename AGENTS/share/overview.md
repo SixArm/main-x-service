@@ -13,6 +13,7 @@ The **Main X Index** family of crates implements a federated identity index — 
 | [event-service](../../event-service-rust-crate) | Event | Time-bounded event registry (schema.org/Event) |
 | [course-service](../../course-service-rust-crate) | Course | Course-identity registry (schema.org/Course) — template + `CourseInstance` sub-resource for specific offerings |
 | [authentication-service](../../authentication-service-rust-crate) | User | Central single sign-on provider — passwordless email magic-link auth, RS256 JWT issuance, JWKS for offline verification by peers. The first real loco.rs crate and the reference for converting the others. |
+| [care-pathway-service](../../care-pathway-service-rust-crate) | Care pathway | loco.rs registry for clinical care pathways — CRUD + matching (embeds care-pathway-matcher; API DTO is the matcher's CarePathway type). MVP; search/streaming/audit deferred. |
 
 ### Matcher crates
 

@@ -20,6 +20,7 @@ per-crate `AGENTS/spec-driven-development.md` files for the discipline.
 | [Event Service](event-service-rust-crate/) | Event (schema.org/Event — time-bounded) | [spec](event-service-rust-crate/spec/index.md) | [index](event-service-rust-crate/index.md) |
 | [Course Service](course-service-rust-crate/) | Course (schema.org/Course) — template + `CourseInstance` sub-resource | [spec](course-service-rust-crate/spec/index.md) | [index](course-service-rust-crate/index.md) |
 | [Authentication Service](authentication-service-rust-crate/) | User (central single sign-on provider) — passwordless magic-link, RS256 JWT + JWKS. **First real loco.rs crate**; reference for converting the others. | [spec](authentication-service-rust-crate/spec/index.md) | [index](authentication-service-rust-crate/index.md) |
+| [Care Pathway Service](care-pathway-service-rust-crate/) | Care pathway (clinical pathway) — loco.rs CRUD + matching, embeds care-pathway-matcher (MVP) | [spec](care-pathway-service-rust-crate/spec/index.md) | [index](care-pathway-service-rust-crate/index.md) |
 
 ### Matcher crates
 
