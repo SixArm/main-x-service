@@ -1,0 +1,202 @@
+//! Integration tests driving the public re-exported surface only —
+//! everything reachable via `use organization_matcher::…`. A rename of
+//! any re-export breaks it.
+
+use organization_matcher::{
+    Confidence, IdentifierScheme, MatchConfig, MatchingEngine, OrgIdentifier, Organization,
+    PostalAddress,
+};
+
+fn ident(scheme: IdentifierScheme, value: &str) -> OrgIdentifier {
+    OrgIdentifier {
+        scheme,
+        value: value.into(),
+    }
+}
+
+// ─── Deterministic short-circuits ────────────────────────────────────
+
+#[test]
+fn r0_fires_for_every_deterministic_scheme() {
+    let engine = MatchingEngine::default_config();
+    for scheme in [
+        IdentifierScheme::Lei,
+        IdentifierScheme::Duns,
+        IdentifierScheme::Iso6523,
+        IdentifierScheme::Gln,
+        IdentifierScheme::Wikidata,
+        IdentifierScheme::Ror,
+        IdentifierScheme::Isni,
+        IdentifierScheme::Vat,
+    ] {
+        let mut a = Organization::new("Left");
+        let mut b = Organization::new("Right");
+        a.identifiers
+            .push(ident(scheme.clone(), "shared-value-123"));
+        b.identifiers
+            .push(ident(scheme.clone(), "shared-value-123"));
+        let r = engine.match_organizations(&a, &b);
+        assert!(
+            r.breakdown.deterministic_match,
+            "{scheme:?} should short-circuit"
+        );
+        assert_eq!(r.score, 1.0);
+        assert_eq!(r.confidence, Confidence::High);
+    }
+}
+
+#[test]
+fn classification_and_custom_schemes_do_not_short_circuit() {
+    let engine = MatchingEngine::default_config();
+    for scheme in [
+        IdentifierScheme::Naics,
+        IdentifierScheme::IsicV4,
+        IdentifierScheme::Sic,
+        IdentifierScheme::TaxId, // scoped, needs jurisdiction
+        IdentifierScheme::Custom("Crunchbase".into()),
+    ] {
+        let mut a = Organization::new("Alpha Holdings");
+        let mut b = Organization::new("Beta Ventures");
+        a.identifiers.push(ident(scheme.clone(), "shared-123"));
+        b.identifiers.push(ident(scheme.clone(), "shared-123"));
+        let r = engine.match_organizations(&a, &b);
+        assert!(
+            !r.breakdown.deterministic_match,
+            "{scheme:?} must not short-circuit"
+        );
+    }
+}
+
+#[test]
+fn tax_id_short_circuits_within_jurisdiction() {
+    let engine = MatchingEngine::default_config();
+    let mut a = Organization::new("Initech");
+    let mut b = Organization::new("Initech Limited");
+    a.jurisdiction = Some("GB".into());
+    b.jurisdiction = Some("GB".into());
+    a.identifiers.push(ident(IdentifierScheme::TaxId, "GB123"));
+    b.identifiers.push(ident(IdentifierScheme::TaxId, "GB123"));
+    let r = engine.match_organizations(&a, &b);
+    assert_eq!(r.score, 1.0);
+    assert!(r.breakdown.deterministic_match);
+}
+
+#[test]
+fn same_as_url_overlap_short_circuits() {
+    let engine = MatchingEngine::default_config();
+    let mut a = Organization::new("Anything");
+    let mut b = Organization::new("Anything Else");
+    a.same_as = vec!["https://ror.org/02nr0ka47".into()];
+    b.same_as = vec!["https://ror.org/02nr0ka47".into()];
+    let r = engine.match_organizations(&a, &b);
+    assert_eq!(r.score, 1.0);
+    assert!(r.breakdown.deterministic_match);
+}
+
+// ─── Probabilistic path ──────────────────────────────────────────────
+
+#[test]
+fn legal_suffix_variants_are_high_confidence() {
+    let engine = MatchingEngine::default_config();
+    let a = Organization::new("Acme, Inc.");
+    let b = Organization::new("ACME Corporation");
+    let r = engine.match_organizations(&a, &b);
+    assert!(r.score >= 0.95, "got {}", r.score);
+    assert_eq!(r.confidence, Confidence::High);
+    assert!(r.is_match);
+}
+
+#[test]
+fn renormalisation_over_present_components() {
+    // name + url + jurisdiction present; all agree → ~1.0, not diluted
+    // by the absent address/founding/keywords weights.
+    let engine = MatchingEngine::default_config();
+    let mut a = Organization::new("Wonka Industries");
+    let mut b = Organization::new("Wonka Industries");
+    a.url = Some("https://www.wonka.com".into());
+    b.url = Some("http://wonka.com/about".into());
+    a.jurisdiction = Some("US".into());
+    b.jurisdiction = Some("US".into());
+    let r = engine.match_organizations(&a, &b);
+    assert!(r.score >= 0.99, "got {}", r.score);
+    assert!(r.breakdown.name_score.is_some());
+    assert_eq!(r.breakdown.url_score, Some(1.0));
+    assert_eq!(r.breakdown.jurisdiction_score, Some(1.0));
+    assert!(r.breakdown.address_score.is_none());
+    assert!(r.breakdown.keywords_score.is_none());
+}
+
+#[test]
+fn unrelated_orgs_are_low_confidence_non_matches() {
+    let engine = MatchingEngine::default_config();
+    let a = Organization::new("Acme Corporation");
+    let b = Organization::new("Stark Industries");
+    let r = engine.match_organizations(&a, &b);
+    assert!(!r.is_match);
+    assert_eq!(r.confidence, Confidence::Low);
+    assert!(!r.breakdown.deterministic_match);
+}
+
+#[test]
+fn address_and_domain_corroborate_a_name_match() {
+    let engine = MatchingEngine::default_config();
+    let mut a = Organization::new("Wonka Industries");
+    let mut b = Organization::new("Wonka Industries GmbH");
+    let addr = |city: &str| PostalAddress {
+        locality: Some(city.into()),
+        country: Some("DE".into()),
+        ..Default::default()
+    };
+    a.address = Some(addr("Munich"));
+    b.address = Some(addr("munich"));
+    a.url = Some("https://wonka.com".into());
+    b.url = Some("https://www.wonka.com".into());
+    let r = engine.match_organizations(&a, &b);
+    assert!(r.is_match, "got {}", r.score);
+}
+
+// ─── Threshold presets + one-to-many ─────────────────────────────────
+
+#[test]
+fn strict_and_lenient_change_is_match_not_score() {
+    let a = Organization::new("Acme Corporation");
+    let b = Organization::new("Acme Corporated Holdings");
+    let default = MatchingEngine::new(MatchConfig::default()).match_organizations(&a, &b);
+    let strict = MatchingEngine::new(MatchConfig::strict()).match_organizations(&a, &b);
+    let lenient = MatchingEngine::new(MatchConfig::lenient()).match_organizations(&a, &b);
+    assert!((default.score - strict.score).abs() < 1e-9);
+    assert!((default.score - lenient.score).abs() < 1e-9);
+    if strict.is_match {
+        assert!(default.is_match && lenient.is_match);
+    }
+}
+
+#[test]
+fn one_to_many_surface() {
+    let engine = MatchingEngine::default_config();
+    let query = Organization::new("Acme Corporation");
+    let cands = vec![
+        Organization::new("Stark Industries"),
+        Organization::new("Acme Corporation"),
+    ];
+    let out = engine.match_one_to_many(&query, &cands);
+    assert_eq!(out.len(), 2);
+    assert!(out[1].score > out[0].score);
+
+    let ranked = engine.rank(&query, &cands);
+    assert_eq!(ranked[0].0, 1);
+
+    assert!(engine.match_one_to_many(&query, &[]).is_empty());
+    assert!(engine.find_matches(&query, &[]).is_empty());
+}
+
+#[test]
+fn match_result_serialises_to_json() {
+    let engine = MatchingEngine::default_config();
+    let a = Organization::new("Acme Corporation");
+    let b = Organization::new("Acme Corp");
+    let r = engine.match_organizations(&a, &b);
+    let json = serde_json::to_string(&r).expect("serialize");
+    assert!(json.contains("score"));
+    assert!(json.contains("breakdown"));
+}

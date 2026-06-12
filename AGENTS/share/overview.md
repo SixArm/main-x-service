@@ -13,6 +13,7 @@ The **Main X Index** family of crates implements a federated identity index — 
 | [event-service](../../event-service-rust-crate) | Event | Time-bounded event registry (schema.org/Event) |
 | [course-service](../../course-service-rust-crate) | Course | Course-identity registry (schema.org/Course) — template + `CourseInstance` sub-resource for specific offerings |
 | [authentication-service](../../authentication-service-rust-crate) | User | Central single sign-on provider — passwordless email magic-link auth, RS256 JWT issuance, JWKS for offline verification by peers. The first real loco.rs crate and the reference for converting the others. |
+| [organization-service](../../organization-service-rust-crate) | Organization | loco.rs registry for schema.org/Organization — CRUD + matching (embeds organization-matcher; API DTO is the matcher's Organization type). MVP; search/streaming/audit/privacy deferred. |
 
 ### Matcher crates
 
@@ -31,6 +32,7 @@ specifications, …) tailored to library-style work.
 | [thing-matcher](../../thing-matcher-rust-crate) | Thing | Generic thing / asset matching |
 | [event-matcher](../../event-matcher-rust-crate) | Event | Time-bounded event matching with window-overlap |
 | [course-matcher](../../course-matcher-rust-crate) | Course | Course matching — name (Jaro-Winkler), provider-scoped course code, educational level, keywords / teaches Jaccard, deterministic short-circuits on DOI / Wikidata / OER / LOM / URI / UUID |
+| [organization-matcher](../../organization-matcher-rust-crate) | Organization | Organization matching — legal-suffix-aware name, postal address, url/domain, jurisdiction, founding date, keywords; deterministic short-circuits on LEI / DUNS / ISO 6523 / GLN / Wikidata / ROR / ISNI / VAT, same-jurisdiction tax id, sameAs URL |
 
 ### Front-end projects
 
@@ -49,6 +51,7 @@ shape as the service crates.
 | [event-front-end-with-svelte](../../event-front-end-with-svelte) | event-service | Operator UI for Event CRUD / search / match / merge / audit (time window + Location union + Party / Offer) — calls under `/api/v1/` |
 | [course-front-end-with-svelte](../../course-front-end-with-svelte) | course-service | Operator UI for Course CRUD / search / match / merge / audit (schema.org/Course: course code, educational level, keywords, teaches, syllabus sections, instances sub-resource) |
 | [authentication-front-end-with-svelte](../../authentication-front-end-with-svelte) | authentication-service | Operator UI for passwordless magic-link sign up / sign in / sign out (no data grid; deliberately dependency-light) |
+| [organization-front-end-with-svelte](../../organization-front-end-with-svelte) | organization-service | Operator UI for Organization CRUD + duplicate-check (schema.org/Organization: identifiers, address, jurisdiction; dependency-light, no data grid) |
 
 Per-project decision (2026-06-02): drift between front-ends is accepted; there is no shared `mxi-svelte-core` package. Copy-adapt from a sibling when scaffolding a new front-end.
 
