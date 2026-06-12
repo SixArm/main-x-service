@@ -31,6 +31,7 @@ specifications, …) tailored to library-style work.
 | [thing-matcher](../../thing-matcher-rust-crate) | Thing | Generic thing / asset matching |
 | [event-matcher](../../event-matcher-rust-crate) | Event | Time-bounded event matching with window-overlap |
 | [course-matcher](../../course-matcher-rust-crate) | Course | Course matching — name (Jaro-Winkler), provider-scoped course code, educational level, keywords / teaches Jaccard, deterministic short-circuits on DOI / Wikidata / OER / LOM / URI / UUID |
+| [care-pathway-matcher](../../care-pathway-matcher-rust-crate) | Care pathway | Clinical care-pathway matching — name (Jaro-Winkler), target condition codes (ICD/SNOMED Jaccard), provider-scoped pathway code, care setting, interventions / keywords Jaccard; deterministic short-circuits on DOI / Wikidata / guideline-id / URI / UUID, same-provider pathway code, sameAs URL |
 
 ### Front-end projects
 

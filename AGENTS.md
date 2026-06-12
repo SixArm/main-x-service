@@ -37,6 +37,7 @@ the corresponding service crate's matching layer.
 | [Thing Matcher](thing-matcher-rust-crate/) | Thing | [spec](thing-matcher-rust-crate/spec/index.md) | [index](thing-matcher-rust-crate/index.md) |
 | [Event Matcher](event-matcher-rust-crate/) | Event | [spec](event-matcher-rust-crate/spec/index.md) | [index](event-matcher-rust-crate/index.md) |
 | [Course Matcher](course-matcher-rust-crate/) | Course | [spec](course-matcher-rust-crate/spec/index.md) | [index](course-matcher-rust-crate/index.md) |
+| [Care Pathway Matcher](care-pathway-matcher-rust-crate/) | Care pathway (clinical pathway) | [spec](care-pathway-matcher-rust-crate/spec/index.md) | [index](care-pathway-matcher-rust-crate/index.md) |
 
 ### Front-end projects
 
