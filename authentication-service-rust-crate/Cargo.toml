@@ -3,9 +3,9 @@
 [package]
 name = "authentication-service"
 version = "0.1.0"
-edition = "2021"
-publish = false
-default-run = "authentication_service-cli"
+edition = "2024"
+publish = true
+default-run = "authentication-service-cli"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -44,7 +44,7 @@ base64 = { version = "0.22" }
 sha2 = { version = "0.10" }
 
 [[bin]]
-name = "authentication_service-cli"
+name = "authentication-service-cli"
 path = "src/bin/main.rs"
 required-features = []
 
