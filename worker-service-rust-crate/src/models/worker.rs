@@ -33,10 +33,10 @@
 
 use jiff::{Timestamp, civil::Date};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
-use super::{Address, ContactPoint, Gender, Identifier, IdentityDocument, EmergencyContact};
+use super::{Address, ContactPoint, EmergencyContact, Gender, Identifier, IdentityDocument};
 
 /// A worker identity record — the registry's central aggregate.
 ///
@@ -335,7 +335,8 @@ impl Worker {
             return Some(tid.as_str());
         }
         // Otherwise scan the identifier list for a TAX-typed entry.
-        self.identifiers.iter()
+        self.identifiers
+            .iter()
             .find(|id| id.identifier_type == super::IdentifierType::TAX)
             .map(|id| id.value.as_str())
     }
@@ -391,7 +392,8 @@ mod tests {
         worker.tax_id = Some("123-45-6789".into());
 
         let json = serde_json::to_string(&worker).expect("Serialization should succeed");
-        let deserialized: Worker = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let deserialized: Worker =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
 
         assert_eq!(deserialized.name.family, "Smith");
         assert_eq!(deserialized.name.given.len(), 2);
@@ -431,7 +433,8 @@ mod tests {
         ];
         for wt in types {
             let json = serde_json::to_string(&wt).expect("WorkerType serialization");
-            let deser: WorkerType = serde_json::from_str(&json).expect("WorkerType deserialization");
+            let deser: WorkerType =
+                serde_json::from_str(&json).expect("WorkerType deserialization");
             assert_eq!(deser, wt);
         }
     }

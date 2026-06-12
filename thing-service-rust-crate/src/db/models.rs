@@ -67,16 +67,24 @@ pub mod things {
     }
 
     impl Related<super::thing_alternate_names::Entity> for Entity {
-        fn to() -> RelationDef { Relation::AlternateNames.def() }
+        fn to() -> RelationDef {
+            Relation::AlternateNames.def()
+        }
     }
     impl Related<super::thing_identifiers::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Identifiers.def() }
+        fn to() -> RelationDef {
+            Relation::Identifiers.def()
+        }
     }
     impl Related<super::thing_images::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Images.def() }
+        fn to() -> RelationDef {
+            Relation::Images.def()
+        }
     }
     impl Related<super::thing_same_as::Entity> for Entity {
-        fn to() -> RelationDef { Relation::SameAs.def() }
+        fn to() -> RelationDef {
+            Relation::SameAs.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -105,11 +113,17 @@ pub mod thing_alternate_names {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `things`.
-        #[sea_orm(belongs_to = "super::things::Entity", from = "Column::ThingId", to = "super::things::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::things::Entity",
+            from = "Column::ThingId",
+            to = "super::things::Column::Id"
+        )]
         Thing,
     }
     impl Related<super::things::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Thing.def() }
+        fn to() -> RelationDef {
+            Relation::Thing.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -145,11 +159,17 @@ pub mod thing_identifiers {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `things`.
-        #[sea_orm(belongs_to = "super::things::Entity", from = "Column::ThingId", to = "super::things::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::things::Entity",
+            from = "Column::ThingId",
+            to = "super::things::Column::Id"
+        )]
         Thing,
     }
     impl Related<super::things::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Thing.def() }
+        fn to() -> RelationDef {
+            Relation::Thing.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -177,11 +197,17 @@ pub mod thing_images {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `things`.
-        #[sea_orm(belongs_to = "super::things::Entity", from = "Column::ThingId", to = "super::things::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::things::Entity",
+            from = "Column::ThingId",
+            to = "super::things::Column::Id"
+        )]
         Thing,
     }
     impl Related<super::things::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Thing.def() }
+        fn to() -> RelationDef {
+            Relation::Thing.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -209,11 +235,17 @@ pub mod thing_same_as {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `things`.
-        #[sea_orm(belongs_to = "super::things::Entity", from = "Column::ThingId", to = "super::things::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::things::Entity",
+            from = "Column::ThingId",
+            to = "super::things::Column::Id"
+        )]
         Thing,
     }
     impl Related<super::things::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Thing.def() }
+        fn to() -> RelationDef {
+            Relation::Thing.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }

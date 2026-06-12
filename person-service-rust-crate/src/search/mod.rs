@@ -15,23 +15,23 @@
 //! on-disk index directory (typically a `tempfile::tempdir()` in tests);
 //! see the module test suite for end-to-end usage.
 
+use std::path::Path;
 use tantivy::{
     collector::TopDocs,
     doc,
-    query::{Query, QueryParser, FuzzyTermQuery, BooleanQuery, Occur},
+    query::{BooleanQuery, FuzzyTermQuery, Occur, Query, QueryParser},
     schema::{Term, Value},
 };
-use std::path::Path;
 
-use crate::models::Person;
 use crate::Result;
+use crate::models::Person;
 
 /// Tantivy index wrapper: schema, reader/writer, and stats.
 pub mod index;
 /// Query-building helpers for the search engine.
 pub mod query;
 
-pub use index::{PersonIndex, PersonIndexSchema, IndexStats};
+pub use index::{IndexStats, PersonIndex, PersonIndexSchema};
 
 /// Full-text search engine over indexed [`Person`] records.
 ///
@@ -95,10 +95,12 @@ impl SearchEngine {
             schema.active => if person.active { "true" } else { "false" },
         );
 
-        writer.add_document(doc)
+        writer
+            .add_document(doc)
             .map_err(|e| crate::Error::Search(format!("Failed to add document: {}", e)))?;
 
-        writer.commit()
+        writer
+            .commit()
             .map_err(|e| crate::Error::Search(format!("Failed to commit: {}", e)))?;
 
         // Force reader to pick up the new segment so a search issued
@@ -150,11 +152,13 @@ impl SearchEngine {
                 schema.active => if person.active { "true" } else { "false" },
             );
 
-            writer.add_document(doc)
+            writer
+                .add_document(doc)
                 .map_err(|e| crate::Error::Search(format!("Failed to add document: {}", e)))?;
         }
 
-        writer.commit()
+        writer
+            .commit()
             .map_err(|e| crate::Error::Search(format!("Failed to commit: {}", e)))?;
 
         self.index.reload()?;
@@ -313,10 +317,8 @@ impl SearchEngine {
         // If birth year provided, add it to the query
         let final_query: Box<dyn Query> = if let Some(year) = birth_year {
             let year_str = year.to_string();
-            let year_query_parser = QueryParser::for_index(
-                self.index.index(),
-                vec![schema.birth_date],
-            );
+            let year_query_parser =
+                QueryParser::for_index(self.index.index(), vec![schema.birth_date]);
 
             if let Ok(year_query) = year_query_parser.parse_query(&year_str) {
                 Box::new(BooleanQuery::new(vec![
@@ -359,7 +361,8 @@ impl SearchEngine {
         let term = Term::from_field_text(schema.id, person_id);
         writer.delete_term(term);
 
-        writer.commit()
+        writer
+            .commit()
             .map_err(|e| crate::Error::Search(format!("Failed to commit deletion: {}", e)))?;
 
         self.index.reload()?;
@@ -388,7 +391,7 @@ impl SearchEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{HumanName, Gender};
+    use crate::models::{Gender, HumanName};
     use jiff::civil::Date;
     use tempfile::TempDir;
     use uuid::Uuid;
@@ -507,7 +510,9 @@ mod tests {
         engine.index_person(&person).unwrap();
         engine.reload().unwrap(); // Ensure reader sees new document
 
-        let results = engine.search_by_name_and_year("Smith", Some(1980), 10).unwrap();
+        let results = engine
+            .search_by_name_and_year("Smith", Some(1980), 10)
+            .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0], person.id.to_string());
     }

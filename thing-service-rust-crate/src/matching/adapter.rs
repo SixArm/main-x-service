@@ -61,7 +61,12 @@ pub fn to_matcher_thing(t: &Thing) -> MThing {
         b = b.add_alternate_name(alt);
     }
 
-    if let Some(d) = t.description.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(d) = t
+        .description
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         b = b.description(d);
     }
     if let Some(d) = t
@@ -93,10 +98,20 @@ pub fn to_matcher_thing(t: &Thing) -> MThing {
     }
 
     // additional_type / subject_of: matcher takes Vec; service holds Option.
-    if let Some(at) = t.additional_type.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(at) = t
+        .additional_type
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         b = b.add_additional_type(at);
     }
-    if let Some(so) = t.subject_of.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(so) = t
+        .subject_of
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         b = b.add_subject_of(so);
     }
 
@@ -180,7 +195,10 @@ mod tests {
     #[test]
     fn images_collapse_to_first() {
         let mut svc = Thing::new("Thing");
-        svc.images = vec!["https://a.example/1.jpg".into(), "https://b.example/2.jpg".into()];
+        svc.images = vec![
+            "https://a.example/1.jpg".into(),
+            "https://b.example/2.jpg".into(),
+        ];
         let m = to_matcher_thing(&svc);
         assert_eq!(m.image.as_deref(), Some("https://a.example/1.jpg"));
     }

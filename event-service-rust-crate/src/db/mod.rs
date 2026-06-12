@@ -10,22 +10,22 @@
 
 use sea_orm::{Database, DatabaseConnection};
 
-use crate::config::DatabaseConfig;
 use crate::Result;
+use crate::config::DatabaseConfig;
 
-/// Schema/table definitions.
-pub mod schema;
+/// Audit-log repository.
+pub mod audit;
+/// jiff <-> time conversions at the persistence boundary.
+pub mod convert;
 /// SeaORM entity models.
 pub mod models;
 /// Repository trait and SeaORM implementation.
 pub mod repositories;
-/// jiff <-> time conversions at the persistence boundary.
-pub mod convert;
-/// Audit-log repository.
-pub mod audit;
+/// Schema/table definitions.
+pub mod schema;
 
-pub use repositories::{EventRepository, SeaOrmEventRepository, AuditContext};
 pub use audit::AuditLogRepository;
+pub use repositories::{AuditContext, EventRepository, SeaOrmEventRepository};
 
 /// Open a pooled SeaORM connection using the configured URL and pool
 /// bounds; pool failures surface as [`Error::Pool`](crate::Error::Pool).

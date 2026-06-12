@@ -10,16 +10,16 @@
 //! warning (not failing the request) on index errors.
 
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
     response::IntoResponse,
 };
 use serde::Deserialize;
 use uuid::Uuid;
 
+use super::{FhirOperationOutcome, FhirPerson, from_fhir_person, to_fhir_person};
 use crate::api::rest::AppState;
-use super::{FhirPerson, FhirOperationOutcome, to_fhir_person, from_fhir_person};
 
 /// Query-string parameters for the FHIR `Person` search endpoint.
 ///
@@ -70,15 +70,24 @@ pub async fn get_fhir_person(
     match state.person_repository.get_by_id(&id).await {
         Ok(Some(person)) => {
             let fhir_person = to_fhir_person(&person);
-            (StatusCode::OK, Json(serde_json::to_value(fhir_person).unwrap()))
+            (
+                StatusCode::OK,
+                Json(serde_json::to_value(fhir_person).unwrap()),
+            )
         }
         Ok(None) => {
             let outcome = FhirOperationOutcome::not_found("Person", &id.to_string());
-            (StatusCode::NOT_FOUND, Json(serde_json::to_value(outcome).unwrap()))
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::to_value(outcome).unwrap()),
+            )
         }
         Err(e) => {
             let outcome = FhirOperationOutcome::error("database-error", &e.to_string());
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::to_value(outcome).unwrap()))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::to_value(outcome).unwrap()),
+            )
         }
     }
 }
@@ -111,17 +120,26 @@ pub async fn create_fhir_person(
                     }
 
                     let fhir_response = to_fhir_person(&created_person);
-                    (StatusCode::CREATED, Json(serde_json::to_value(fhir_response).unwrap()))
+                    (
+                        StatusCode::CREATED,
+                        Json(serde_json::to_value(fhir_response).unwrap()),
+                    )
                 }
                 Err(e) => {
                     let outcome = FhirOperationOutcome::error("database-error", &e.to_string());
-                    (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::to_value(outcome).unwrap()))
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::to_value(outcome).unwrap()),
+                    )
                 }
             }
         }
         Err(e) => {
             let outcome = FhirOperationOutcome::invalid(&e.to_string());
-            (StatusCode::BAD_REQUEST, Json(serde_json::to_value(outcome).unwrap()))
+            (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::to_value(outcome).unwrap()),
+            )
         }
     }
 }
@@ -152,17 +170,26 @@ pub async fn update_fhir_person(
                     }
 
                     let fhir_response = to_fhir_person(&updated_person);
-                    (StatusCode::OK, Json(serde_json::to_value(fhir_response).unwrap()))
+                    (
+                        StatusCode::OK,
+                        Json(serde_json::to_value(fhir_response).unwrap()),
+                    )
                 }
                 Err(e) => {
                     let outcome = FhirOperationOutcome::error("database-error", &e.to_string());
-                    (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::to_value(outcome).unwrap()))
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::to_value(outcome).unwrap()),
+                    )
                 }
             }
         }
         Err(e) => {
             let outcome = FhirOperationOutcome::invalid(&e.to_string());
-            (StatusCode::BAD_REQUEST, Json(serde_json::to_value(outcome).unwrap()))
+            (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::to_value(outcome).unwrap()),
+            )
         }
     }
 }
@@ -177,12 +204,13 @@ pub async fn delete_fhir_person(
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
     match state.person_repository.delete(&id).await {
-        Ok(()) => {
-            (StatusCode::NO_CONTENT, Json(serde_json::json!({})))
-        }
+        Ok(()) => (StatusCode::NO_CONTENT, Json(serde_json::json!({}))),
         Err(e) => {
             let outcome = FhirOperationOutcome::error("database-error", &e.to_string());
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::to_value(outcome).unwrap()))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::to_value(outcome).unwrap()),
+            )
         }
     }
 }
@@ -209,7 +237,10 @@ pub async fn search_fhir_persons(
     } else {
         // No search criteria provided
         let outcome = FhirOperationOutcome::invalid("At least one search parameter is required");
-        return (StatusCode::BAD_REQUEST, Json(serde_json::to_value(outcome).unwrap()));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::to_value(outcome).unwrap()),
+        );
     };
 
     let limit = params.count.unwrap_or(10).min(100);
@@ -238,7 +269,10 @@ pub async fn search_fhir_persons(
                         }));
                     }
                     Ok(None) => {
-                        tracing::warn!("Person {} found in search index but not in database", person_id);
+                        tracing::warn!(
+                            "Person {} found in search index but not in database",
+                            person_id
+                        );
                     }
                     Err(e) => {
                         tracing::error!("Failed to fetch person {}: {}", person_id, e);
@@ -256,7 +290,10 @@ pub async fn search_fhir_persons(
         }
         Err(e) => {
             let outcome = FhirOperationOutcome::error("search-error", &e.to_string());
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::to_value(outcome).unwrap()))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::to_value(outcome).unwrap()),
+            )
         }
     }
 }

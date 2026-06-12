@@ -6,13 +6,13 @@
 //! trait-object fields ([`WorkerRepository`], [`EventProducer`],
 //! [`WorkerMatcher`]) keep handlers decoupled from concrete implementations.
 
-use std::sync::Arc;
 use sea_orm::DatabaseConnection;
+use std::sync::Arc;
 
-use crate::search::SearchEngine;
-use crate::matching::{ProbabilisticMatcher, WorkerMatcher};
 use crate::config::Config;
-use crate::db::{WorkerRepository, SeaOrmWorkerRepository, AuditLogRepository};
+use crate::db::{AuditLogRepository, SeaOrmWorkerRepository, WorkerRepository};
+use crate::matching::{ProbabilisticMatcher, WorkerMatcher};
+use crate::search::SearchEngine;
 use crate::streaming::{EventProducer, InMemoryEventPublisher};
 
 /// Shared application state
@@ -65,7 +65,7 @@ impl AppState {
         let worker_repository = Arc::new(
             SeaOrmWorkerRepository::new(db.clone())
                 .with_event_publisher(event_publisher.clone())
-                .with_audit_log(audit_log.clone())
+                .with_audit_log(audit_log.clone()),
         ) as Arc<dyn WorkerRepository>;
 
         let worker_matcher = Arc::new(matcher) as Arc<dyn WorkerMatcher>;
@@ -79,5 +79,16 @@ impl AppState {
             matcher: worker_matcher,
             config: Arc::new(config),
         }
+    }
+}
+
+/// Bridge so the existing `State<AppState>` handlers run as native loco
+/// controllers: extracts the cheaply-cloneable `AppState` from the
+/// `AppContext` shared store (populated once at boot in `after_routes`).
+impl axum::extract::FromRef<loco_rs::app::AppContext> for AppState {
+    fn from_ref(ctx: &loco_rs::app::AppContext) -> Self {
+        ctx.shared_store
+            .get::<AppState>()
+            .expect("AppState must be inserted into the shared store at boot")
     }
 }

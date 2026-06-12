@@ -246,7 +246,10 @@ mod tests {
         assert_eq!(deserialized.name, "Test Thing");
         assert_eq!(deserialized.description.as_deref(), Some("A test"));
         assert_eq!(deserialized.alternate_names.len(), 2);
-        assert_eq!(deserialized.additional_type.as_deref(), Some("https://schema.org/Book"));
+        assert_eq!(
+            deserialized.additional_type.as_deref(),
+            Some("https://schema.org/Book")
+        );
         assert_eq!(deserialized.id, thing.id);
     }
 

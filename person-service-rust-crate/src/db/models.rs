@@ -100,22 +100,34 @@ pub mod persons {
     }
 
     impl Related<super::person_names::Entity> for Entity {
-        fn to() -> RelationDef { Relation::PersonNames.def() }
+        fn to() -> RelationDef {
+            Relation::PersonNames.def()
+        }
     }
     impl Related<super::person_identifiers::Entity> for Entity {
-        fn to() -> RelationDef { Relation::PersonIdentifiers.def() }
+        fn to() -> RelationDef {
+            Relation::PersonIdentifiers.def()
+        }
     }
     impl Related<super::person_addresses::Entity> for Entity {
-        fn to() -> RelationDef { Relation::PersonAddresses.def() }
+        fn to() -> RelationDef {
+            Relation::PersonAddresses.def()
+        }
     }
     impl Related<super::person_contacts::Entity> for Entity {
-        fn to() -> RelationDef { Relation::PersonContacts.def() }
+        fn to() -> RelationDef {
+            Relation::PersonContacts.def()
+        }
     }
     impl Related<super::person_links::Entity> for Entity {
-        fn to() -> RelationDef { Relation::PersonLinks.def() }
+        fn to() -> RelationDef {
+            Relation::PersonLinks.def()
+        }
     }
     impl Related<super::organizations::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Organization.def() }
+        fn to() -> RelationDef {
+            Relation::Organization.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -169,7 +181,9 @@ pub mod person_names {
     }
 
     impl Related<super::persons::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Person.def() }
+        fn to() -> RelationDef {
+            Relation::Person.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -221,7 +235,9 @@ pub mod person_identifiers {
     }
 
     impl Related<super::persons::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Person.def() }
+        fn to() -> RelationDef {
+            Relation::Person.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -279,7 +295,9 @@ pub mod person_addresses {
     }
 
     impl Related<super::persons::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Person.def() }
+        fn to() -> RelationDef {
+            Relation::Person.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -329,7 +347,9 @@ pub mod person_contacts {
     }
 
     impl Related<super::persons::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Person.def() }
+        fn to() -> RelationDef {
+            Relation::Person.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -376,7 +396,9 @@ pub mod person_links {
     }
 
     impl Related<super::persons::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Person.def() }
+        fn to() -> RelationDef {
+            Relation::Person.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -436,13 +458,19 @@ pub mod organizations {
     }
 
     impl Related<super::organization_addresses::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Addresses.def() }
+        fn to() -> RelationDef {
+            Relation::Addresses.def()
+        }
     }
     impl Related<super::organization_contacts::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Contacts.def() }
+        fn to() -> RelationDef {
+            Relation::Contacts.def()
+        }
     }
     impl Related<super::organization_identifiers::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Identifiers.def() }
+        fn to() -> RelationDef {
+            Relation::Identifiers.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -500,7 +528,9 @@ pub mod organization_addresses {
     }
 
     impl Related<super::organizations::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Organization.def() }
+        fn to() -> RelationDef {
+            Relation::Organization.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -550,7 +580,9 @@ pub mod organization_contacts {
     }
 
     impl Related<super::organizations::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Organization.def() }
+        fn to() -> RelationDef {
+            Relation::Organization.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -602,7 +634,9 @@ pub mod organization_identifiers {
     }
 
     impl Related<super::organizations::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Organization.def() }
+        fn to() -> RelationDef {
+            Relation::Organization.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -663,7 +697,9 @@ pub mod person_match_scores {
     }
 
     impl Related<super::persons::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Person.def() }
+        fn to() -> RelationDef {
+            Relation::Person.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -752,11 +788,17 @@ pub mod person_documents {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `persons`.
-        #[sea_orm(belongs_to = "super::persons::Entity", from = "Column::PersonId", to = "super::persons::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::persons::Entity",
+            from = "Column::PersonId",
+            to = "super::persons::Column::Id"
+        )]
         Person,
     }
     impl Related<super::persons::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Person.def() }
+        fn to() -> RelationDef {
+            Relation::Person.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -807,11 +849,17 @@ pub mod person_emergency_contacts {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `persons`.
-        #[sea_orm(belongs_to = "super::persons::Entity", from = "Column::PersonId", to = "super::persons::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::persons::Entity",
+            from = "Column::PersonId",
+            to = "super::persons::Column::Id"
+        )]
         Person,
     }
     impl Related<super::persons::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Person.def() }
+        fn to() -> RelationDef {
+            Relation::Person.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -844,11 +892,17 @@ pub mod person_emergency_contact_telecom {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `person_emergency_contacts`.
-        #[sea_orm(belongs_to = "super::person_emergency_contacts::Entity", from = "Column::EmergencyContactId", to = "super::person_emergency_contacts::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::person_emergency_contacts::Entity",
+            from = "Column::EmergencyContactId",
+            to = "super::person_emergency_contacts::Column::Id"
+        )]
         EmergencyContact,
     }
     impl Related<super::person_emergency_contacts::Entity> for Entity {
-        fn to() -> RelationDef { Relation::EmergencyContact.def() }
+        fn to() -> RelationDef {
+            Relation::EmergencyContact.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -880,11 +934,17 @@ pub mod person_photos {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `persons`.
-        #[sea_orm(belongs_to = "super::persons::Entity", from = "Column::PersonId", to = "super::persons::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::persons::Entity",
+            from = "Column::PersonId",
+            to = "super::persons::Column::Id"
+        )]
         Person,
     }
     impl Related<super::persons::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Person.def() }
+        fn to() -> RelationDef {
+            Relation::Person.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }

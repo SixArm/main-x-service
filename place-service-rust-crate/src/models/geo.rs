@@ -124,8 +124,7 @@ impl GeoCoordinates {
         let dlon = (other.longitude - self.longitude).to_radians();
 
         // `a` is the square of half the chord length between the points.
-        let a = (dlat / 2.0).sin().powi(2)
-            + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
+        let a = (dlat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
         // `c` is the angular distance in radians. Using asin(sqrt(a)) (the
         // half-angle form) is numerically stable for the small distances
         // that dominate place matching.
@@ -175,7 +174,10 @@ mod tests {
         let nyc = GeoCoordinates::new(40.7128, -74.0060);
         let lax = GeoCoordinates::new(33.9425, -118.4081);
         let dist_km = nyc.distance_to(&lax) / 1000.0;
-        assert!((dist_km - 3944.0).abs() < 50.0, "NYC-LAX distance: {dist_km} km");
+        assert!(
+            (dist_km - 3944.0).abs() < 50.0,
+            "NYC-LAX distance: {dist_km} km"
+        );
     }
 
     /// Sub-kilometer accuracy: 0.01° of latitude is ~1.11 km.

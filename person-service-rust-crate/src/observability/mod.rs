@@ -8,12 +8,12 @@
 //! stubbed (`todo!`) pending the OTLP pipeline. Submodules: [`traces`](crate::observability::traces)
 //! and [`metrics`](crate::observability::metrics).
 
-use opentelemetry::{global, KeyValue};
+use opentelemetry::{KeyValue, global};
 use opentelemetry_sdk::Resource;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::config::ObservabilityConfig;
 use crate::Result;
+use crate::config::ObservabilityConfig;
 
 /// Metrics instrument definitions (reserved).
 pub mod metrics;
@@ -42,8 +42,8 @@ pub fn init_telemetry(config: &ObservabilityConfig) -> Result<()> {
     //     .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
     // Set up tracing subscriber
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(&config.log_level));
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level));
 
     tracing_subscriber::registry()
         .with(env_filter)

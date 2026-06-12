@@ -11,10 +11,10 @@
 //! appropriate [`StatusCode`](axum::http::StatusCode).
 
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -71,7 +71,10 @@ pub async fn health_check() -> impl IntoResponse {
 )]
 pub async fn metrics_prom() -> impl IntoResponse {
     (
-        [(axum::http::header::CONTENT_TYPE, crate::metrics::CONTENT_TYPE)],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            crate::metrics::CONTENT_TYPE,
+        )],
         crate::metrics::METRICS.render(),
     )
 }
@@ -115,7 +118,8 @@ pub async fn create_event(
             .map(|e| format!("{}: {}", e.field, e.message))
             .collect::<Vec<_>>()
             .join("; ");
-        let err = ApiResponse::<Event>::error("VALIDATION_ERROR", format!("Validation failed: {msg}"));
+        let err =
+            ApiResponse::<Event>::error("VALIDATION_ERROR", format!("Validation failed: {msg}"));
         return (StatusCode::UNPROCESSABLE_ENTITY, Json(err));
     }
 
@@ -213,7 +217,8 @@ pub async fn update_event(
             .map(|e| format!("{}: {}", e.field, e.message))
             .collect::<Vec<_>>()
             .join("; ");
-        let err = ApiResponse::<Event>::error("VALIDATION_ERROR", format!("Validation failed: {msg}"));
+        let err =
+            ApiResponse::<Event>::error("VALIDATION_ERROR", format!("Validation failed: {msg}"));
         return (StatusCode::UNPROCESSABLE_ENTITY, Json(err));
     }
     payload.id = id;
@@ -345,7 +350,8 @@ pub async fn search_events(
     let ids = match event_ids {
         Ok(ids) => ids,
         Err(e) => {
-            let err = ApiResponse::<SearchResponse>::error("SEARCH_ERROR", format!("Search failed: {e}"));
+            let err =
+                ApiResponse::<SearchResponse>::error("SEARCH_ERROR", format!("Search failed: {e}"));
             return (StatusCode::INTERNAL_SERVER_ERROR, Json(err));
         }
     };
@@ -463,8 +469,10 @@ pub async fn match_event(
     let match_results = match state.matcher.find_matches(&payload.event, &candidates) {
         Ok(r) => r,
         Err(e) => {
-            let err =
-                ApiResponse::<MatchResultsResponse>::error("MATCH_ERROR", format!("Matching failed: {e}"));
+            let err = ApiResponse::<MatchResultsResponse>::error(
+                "MATCH_ERROR",
+                format!("Matching failed: {e}"),
+            );
             return (StatusCode::INTERNAL_SERVER_ERROR, Json(err));
         }
     };
@@ -628,7 +636,11 @@ pub async fn merge_events(
         }
     };
 
-    let duplicate = match state.event_repository.get_by_id(&req.duplicate_event_id).await {
+    let duplicate = match state
+        .event_repository
+        .get_by_id(&req.duplicate_event_id)
+        .await
+    {
         Ok(Some(p)) => p,
         Ok(None) => {
             return (
@@ -794,10 +806,12 @@ pub async fn batch_deduplicate(
         Err(e) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<crate::models::BatchDeduplicationResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to list events: {e}"),
-                )),
+                Json(
+                    ApiResponse::<crate::models::BatchDeduplicationResponse>::error(
+                        "DATABASE_ERROR",
+                        format!("Failed to list events: {e}"),
+                    ),
+                ),
             );
         }
     };
@@ -996,10 +1010,12 @@ pub async fn get_event_audit_logs(
         Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve audit logs: {e}"),
-            )),
+            Json(
+                ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to retrieve audit logs: {e}"),
+                ),
+            ),
         ),
     }
 }
@@ -1022,10 +1038,12 @@ pub async fn get_recent_audit_logs(
         Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve audit logs: {e}"),
-            )),
+            Json(
+                ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to retrieve audit logs: {e}"),
+                ),
+            ),
         ),
     }
 }
@@ -1062,10 +1080,12 @@ pub async fn get_user_audit_logs(
         Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve audit logs: {e}"),
-            )),
+            Json(
+                ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to retrieve audit logs: {e}"),
+                ),
+            ),
         ),
     }
 }

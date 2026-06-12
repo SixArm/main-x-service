@@ -7,11 +7,11 @@
 //! and is the type application code normally uses; this module owns the
 //! lower-level Tantivy plumbing.
 
-use tantivy::{
-    schema::{Schema, Field, STORED, TEXT, STRING, FAST},
-    Index, IndexWriter, IndexReader, ReloadPolicy,
-};
 use std::path::Path;
+use tantivy::{
+    Index, IndexReader, IndexWriter, ReloadPolicy,
+    schema::{FAST, Field, STORED, STRING, Schema, TEXT},
+};
 
 use crate::Result;
 
@@ -212,7 +212,8 @@ impl WorkerIndex {
     /// Forces the reader to reload so the latest committed documents become
     /// visible immediately, rather than after the on-commit delay.
     pub fn reload(&self) -> Result<()> {
-        self.reader.reload()
+        self.reader
+            .reload()
             .map_err(|e| crate::Error::Search(format!("Failed to reload reader: {}", e)))
     }
 
@@ -348,7 +349,11 @@ mod tests {
         let term = Term::from_field_text(schema.family_name, "jonson"); // typo
         let query = FuzzyTermQuery::new(term, 1, true);
         let top_docs = searcher.search(&query, &TopDocs::with_limit(10)).unwrap();
-        assert_eq!(top_docs.len(), 1, "Fuzzy search should find 'johnson' with typo 'jonson'");
+        assert_eq!(
+            top_docs.len(),
+            1,
+            "Fuzzy search should find 'johnson' with typo 'jonson'"
+        );
     }
 
     /// Deleting by the `id` term drops the document count back to zero.
@@ -386,7 +391,11 @@ mod tests {
         }
 
         worker_index.reload().unwrap();
-        assert_eq!(worker_index.stats().unwrap().num_docs, 0, "Document should be deleted");
+        assert_eq!(
+            worker_index.stats().unwrap().num_docs,
+            0,
+            "Document should be deleted"
+        );
     }
 
     /// Searching an empty index returns no hits.
@@ -394,7 +403,7 @@ mod tests {
     fn test_search_no_results() {
         use tantivy::collector::TopDocs;
         use tantivy::query::TermQuery;
-        use tantivy::schema::{Term, IndexRecordOption};
+        use tantivy::schema::{IndexRecordOption, Term};
 
         let temp_dir = TempDir::new().unwrap();
         let worker_index = WorkerIndex::create(temp_dir.path()).unwrap();
@@ -405,7 +414,11 @@ mod tests {
         let term = Term::from_field_text(schema.family_name, "nonexistent");
         let query = TermQuery::new(term, IndexRecordOption::Basic);
         let top_docs = searcher.search(&query, &TopDocs::with_limit(10)).unwrap();
-        assert_eq!(top_docs.len(), 0, "Search on empty index should return 0 results");
+        assert_eq!(
+            top_docs.len(),
+            0,
+            "Search on empty index should return 0 results"
+        );
     }
 
     /// An AND of name + exact birth date selects one of two same-name workers.
@@ -413,7 +426,7 @@ mod tests {
     fn test_search_by_name_and_year_filter() {
         use tantivy::collector::TopDocs;
         use tantivy::query::{BooleanQuery, TermQuery};
-        use tantivy::schema::{Term, IndexRecordOption};
+        use tantivy::schema::{IndexRecordOption, Term};
 
         let temp_dir = TempDir::new().unwrap();
         let worker_index = WorkerIndex::create(temp_dir.path()).unwrap();
@@ -446,6 +459,10 @@ mod tests {
             Box::new(TermQuery::new(dob_term, IndexRecordOption::Basic)),
         ]);
         let top_docs = searcher.search(&query, &TopDocs::with_limit(10)).unwrap();
-        assert_eq!(top_docs.len(), 1, "Should find exactly 1 worker with matching name+DOB");
+        assert_eq!(
+            top_docs.len(),
+            1,
+            "Should find exactly 1 worker with matching name+DOB"
+        );
     }
 }

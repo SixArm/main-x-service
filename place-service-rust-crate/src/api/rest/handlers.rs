@@ -125,7 +125,10 @@ pub async fn create_place(
             }
             (StatusCode::CREATED, Json(ApiResponse::success(stored)))
         }
-        Err(e) => (status_for(&e), Json(ApiResponse::error("error", e.to_string()))),
+        Err(e) => (
+            status_for(&e),
+            Json(ApiResponse::error("error", e.to_string())),
+        ),
     }
 }
 
@@ -133,10 +136,7 @@ pub async fn create_place(
 #[utoipa::path(get, path = "/api/places/{id}", tag = "places",
     params(("id" = Uuid, Path, description = "Place id")),
     responses((status = 200, body = Place), (status = 404, description = "Not found")))]
-pub async fn get_place(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+pub async fn get_place(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
     match state.place_repository.get_by_id(&id).await {
         Ok(Some(p)) => (StatusCode::OK, Json(ApiResponse::success(p))),
         Ok(None) => fail(&crate::Error::NotFound),
@@ -209,7 +209,11 @@ pub async fn delete_place(
             let _ = state.search_engine.delete_place(&id.to_string());
             let _ = state
                 .event_publisher
-                .publish(PlaceEvent::new(EventKind::PlaceDeleted, id, serde_json::json!({})))
+                .publish(PlaceEvent::new(
+                    EventKind::PlaceDeleted,
+                    id,
+                    serde_json::json!({}),
+                ))
                 .await;
             if let Some(old) = old {
                 if let Ok(v) = serde_json::to_value(&old) {
@@ -277,7 +281,10 @@ pub async fn search_places(
         }
     }
     let total = results.len();
-    (StatusCode::OK, Json(ApiResponse::success(SearchResponse { results, total })))
+    (
+        StatusCode::OK,
+        Json(ApiResponse::success(SearchResponse { results, total })),
+    )
 }
 
 /// A scored candidate place returned by match / duplicate endpoints.
@@ -300,7 +307,9 @@ async fn find_candidates(state: &AppState, place: &Place) -> Vec<ScoredCandidate
         .unwrap_or_default();
     let mut out = Vec::new();
     for id in ids {
-        let Ok(uuid) = Uuid::parse_str(&id) else { continue };
+        let Ok(uuid) = Uuid::parse_str(&id) else {
+            continue;
+        };
         if uuid == place.id {
             continue;
         }
@@ -313,7 +322,11 @@ async fn find_candidates(state: &AppState, place: &Place) -> Vec<ScoredCandidate
             });
         }
     }
-    out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     out
 }
 
@@ -351,7 +364,10 @@ pub async fn check_duplicates(
     let duplicates_found = candidates.iter().any(|c| c.score >= threshold);
     (
         StatusCode::OK,
-        Json(ApiResponse::success(DuplicateCheckResponse { duplicates_found, candidates })),
+        Json(ApiResponse::success(DuplicateCheckResponse {
+            duplicates_found,
+            candidates,
+        })),
     )
 }
 
@@ -365,18 +381,45 @@ pub async fn merge_places(
 ) -> impl IntoResponse {
     let main = match state.place_repository.get_by_id(&req.main_place_id).await {
         Ok(Some(p)) => p,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(ApiResponse::error("not_found", "main place not found"))),
-        Err(e) => return (status_for(&e), Json(ApiResponse::error("error", e.to_string()))),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::error("not_found", "main place not found")),
+            );
+        }
+        Err(e) => {
+            return (
+                status_for(&e),
+                Json(ApiResponse::error("error", e.to_string())),
+            );
+        }
     };
-    let dup = match state.place_repository.get_by_id(&req.duplicate_place_id).await {
+    let dup = match state
+        .place_repository
+        .get_by_id(&req.duplicate_place_id)
+        .await
+    {
         Ok(Some(p)) => p,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(ApiResponse::error("not_found", "duplicate place not found"))),
-        Err(e) => return (status_for(&e), Json(ApiResponse::error("error", e.to_string()))),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::error("not_found", "duplicate place not found")),
+            );
+        }
+        Err(e) => {
+            return (
+                status_for(&e),
+                Json(ApiResponse::error("error", e.to_string())),
+            );
+        }
     };
 
     let transferred = serde_json::to_value(&dup).ok();
     if let Err(e) = state.place_repository.soft_delete(&dup.id).await {
-        return (status_for(&e), Json(ApiResponse::error("error", e.to_string())));
+        return (
+            status_for(&e),
+            Json(ApiResponse::error("error", e.to_string())),
+        );
     }
     let _ = state.search_engine.delete_place(&dup.id.to_string());
 
@@ -390,7 +433,12 @@ pub async fn merge_places(
     };
     let record = match state.place_repository.record_merge(&record).await {
         Ok(r) => r,
-        Err(e) => return (status_for(&e), Json(ApiResponse::error("error", e.to_string()))),
+        Err(e) => {
+            return (
+                status_for(&e),
+                Json(ApiResponse::error("error", e.to_string())),
+            );
+        }
     };
     let _ = state
         .event_publisher
@@ -403,7 +451,10 @@ pub async fn merge_places(
 
     (
         StatusCode::OK,
-        Json(ApiResponse::success(MergeResponse { merge_record: record, main_place: main })),
+        Json(ApiResponse::success(MergeResponse {
+            merge_record: record,
+            main_place: main,
+        })),
     )
 }
 
@@ -437,7 +488,11 @@ pub async fn deduplicate(
 ) -> impl IntoResponse {
     let limit = req.max_candidates.unwrap_or(100);
     let threshold = req.threshold.unwrap_or_else(|| state.matcher.threshold());
-    let places = state.place_repository.list(limit, 0).await.unwrap_or_default();
+    let places = state
+        .place_repository
+        .list(limit, 0)
+        .await
+        .unwrap_or_default();
     let mut duplicates_found = 0usize;
     for i in 0..places.len() {
         for j in (i + 1)..places.len() {
@@ -465,8 +520,14 @@ pub async fn export_place_data(
 ) -> impl IntoResponse {
     match state.place_repository.get_by_id(&id).await {
         Ok(Some(p)) => (StatusCode::OK, Json(ApiResponse::success(gdpr_export(&p)))),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(ApiResponse::error("not_found", "place not found"))),
-        Err(e) => (status_for(&e), Json(ApiResponse::error("error", e.to_string()))),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse::error("not_found", "place not found")),
+        ),
+        Err(e) => (
+            status_for(&e),
+            Json(ApiResponse::error("error", e.to_string())),
+        ),
     }
 }
 

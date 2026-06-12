@@ -9,12 +9,12 @@
 //! scaffolded but not yet wired up — the runtime Prometheus metrics actually
 //! served live in [`crate::metrics`].
 
-use opentelemetry::{global, KeyValue};
+use opentelemetry::{KeyValue, global};
 use opentelemetry_sdk::Resource;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::config::ObservabilityConfig;
 use crate::Result;
+use crate::config::ObservabilityConfig;
 
 pub mod metrics;
 pub mod traces;
@@ -40,8 +40,8 @@ pub fn init_telemetry(config: &ObservabilityConfig) -> Result<()> {
     //     .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
     // Prefer RUST_LOG; fall back to the configured default level.
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(&config.log_level));
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level));
 
     tracing_subscriber::registry()
         .with(env_filter)

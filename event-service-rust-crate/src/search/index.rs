@@ -8,8 +8,8 @@
 
 use std::path::Path;
 use tantivy::{
-    schema::{Field, Schema, FAST, STORED, STRING, TEXT},
     Index, IndexReader, IndexWriter, ReloadPolicy,
+    schema::{FAST, Field, STORED, STRING, Schema, TEXT},
 };
 
 use crate::Result;
@@ -245,7 +245,13 @@ mod tests {
     #[test]
     fn schema_has_event_fields() {
         let s = EventIndexSchema::new();
-        let _ = (s.name, s.start_date, s.event_status, s.event_type, s.organizer_name);
+        let _ = (
+            s.name,
+            s.start_date,
+            s.event_status,
+            s.event_type,
+            s.organizer_name,
+        );
     }
 
     /// Calling `create_or_open` twice on the same path is safe.

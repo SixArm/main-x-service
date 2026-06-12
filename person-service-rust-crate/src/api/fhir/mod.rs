@@ -9,19 +9,19 @@
 //! lossy where the domain model has no equivalent field (noted by inline
 //! `TODO`s).
 
-use crate::models::{Person, Address, ContactPoint, Identifier};
 use crate::Result;
+use crate::models::{Address, ContactPoint, Identifier, Person};
 
-/// FHIR resource type definitions (Person, Identifier, …).
-pub mod resources;
 /// FHIR Bundle (search-set) construction.
 pub mod bundle;
-/// FHIR search-parameter parsing.
-pub mod search_parameters;
 /// FHIR endpoint handlers.
 pub mod handlers;
+/// FHIR resource type definitions (Person, Identifier, …).
+pub mod resources;
+/// FHIR search-parameter parsing.
+pub mod search_parameters;
 
-pub use resources::{FhirPerson, FhirOperationOutcome};
+pub use resources::{FhirOperationOutcome, FhirPerson};
 
 /// Map an internal [`Person`] to its FHIR R5 [`FhirPerson`] form.
 ///
@@ -51,7 +51,10 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
                 .identifiers
                 .iter()
                 .map(|id| FhirIdentifier {
-                    use_: id.use_type.as_ref().map(|u| format!("{:?}", u).to_lowercase()),
+                    use_: id
+                        .use_type
+                        .as_ref()
+                        .map(|u| format!("{:?}", u).to_lowercase()),
                     type_: Some(FhirCodeableConcept {
                         coding: Some(vec![FhirCoding {
                             system: Some(id.system.clone()),
@@ -73,7 +76,11 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
 
     // Name
     let mut names = vec![FhirHumanName {
-        use_: person.name.use_type.as_ref().map(|u| format!("{:?}", u).to_lowercase()),
+        use_: person
+            .name
+            .use_type
+            .as_ref()
+            .map(|u| format!("{:?}", u).to_lowercase()),
         text: Some(person.full_name()),
         family: Some(person.name.family.clone()),
         given: if person.name.given.is_empty() {
@@ -96,7 +103,10 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
     // Additional names
     for add_name in &person.additional_names {
         names.push(FhirHumanName {
-            use_: add_name.use_type.as_ref().map(|u| format!("{:?}", u).to_lowercase()),
+            use_: add_name
+                .use_type
+                .as_ref()
+                .map(|u| format!("{:?}", u).to_lowercase()),
             text: Some(format!("{} {}", add_name.given.join(" "), add_name.family)),
             family: Some(add_name.family.clone()),
             given: if add_name.given.is_empty() {
@@ -127,7 +137,10 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
                 .map(|cp| FhirContactPoint {
                     system: Some(format!("{:?}", cp.system).to_lowercase()),
                     value: Some(cp.value.clone()),
-                    use_: cp.use_type.as_ref().map(|u| format!("{:?}", u).to_lowercase()),
+                    use_: cp
+                        .use_type
+                        .as_ref()
+                        .map(|u| format!("{:?}", u).to_lowercase()),
                 })
                 .collect(),
         );
@@ -164,9 +177,9 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
                     }
 
                     FhirAddress {
-                        use_: None, // Not stored in our model
+                        use_: None,  // Not stored in our model
                         type_: None, // Not stored in our model
-                        text: None, // Not stored in our model
+                        text: None,  // Not stored in our model
                         line: if lines.is_empty() { None } else { Some(lines) },
                         city: addr.city.clone(),
                         state: addr.state.clone(),
@@ -232,14 +245,15 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
 /// org reference) are left at defaults. Returns
 /// [`crate::Error::Validation`] on an invalid UUID or a missing name.
 pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
-    use crate::models::{HumanName, NameUse, Gender, ContactPointSystem, ContactPointUse};
     use crate::api::fhir::resources::FhirDeceased;
-    use uuid::Uuid;
+    use crate::models::{ContactPointSystem, ContactPointUse, Gender, HumanName, NameUse};
     use jiff::Timestamp;
+    use uuid::Uuid;
 
     // Parse ID
     let id = if let Some(ref id_str) = fhir_person.id {
-        Uuid::parse_str(id_str).map_err(|e| crate::Error::Validation(format!("Invalid UUID: {}", e)))?
+        Uuid::parse_str(id_str)
+            .map_err(|e| crate::Error::Validation(format!("Invalid UUID: {}", e)))?
     } else {
         Uuid::new_v4()
     };
@@ -264,10 +278,14 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
                 suffix: first_name.suffix.clone().unwrap_or_default(),
             }
         } else {
-            return Err(crate::Error::Validation("Person must have at least one name".to_string()));
+            return Err(crate::Error::Validation(
+                "Person must have at least one name".to_string(),
+            ));
         }
     } else {
-        return Err(crate::Error::Validation("Person must have at least one name".to_string()));
+        return Err(crate::Error::Validation(
+            "Person must have at least one name".to_string(),
+        ));
     };
 
     // Parse gender
@@ -284,9 +302,10 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
     };
 
     // Parse birth date
-    let birth_date = fhir_person.birth_date.as_ref().and_then(|d| {
-        d.parse::<jiff::civil::Date>().ok()
-    });
+    let birth_date = fhir_person
+        .birth_date
+        .as_ref()
+        .and_then(|d| d.parse::<jiff::civil::Date>().ok());
 
     // Parse deceased
     let (deceased, deceased_datetime) = match &fhir_person.deceased {
@@ -315,7 +334,8 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
 
     // Parse addresses
     let addresses = if let Some(ref addrs) = fhir_person.address {
-        addrs.iter()
+        addrs
+            .iter()
             .map(|faddr| {
                 let lines = faddr.line.clone().unwrap_or_default();
                 Address {

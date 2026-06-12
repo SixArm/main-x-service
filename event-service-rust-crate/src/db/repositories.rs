@@ -2,18 +2,18 @@
 //! [`Event`](crate::models::Event) and the SeaORM entities defined in
 //! [`crate::db::models`].
 
-use time::OffsetDateTime;
-use super::convert::{ts_to_offset, offset_to_ts};
+use super::convert::{offset_to_ts, ts_to_offset};
 use sea_orm::sea_query::Expr;
 use sea_orm::*;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
+use crate::Result;
 use crate::models::{
     Address, Event, EventAttendanceMode, EventLink, EventStatus, EventType, Identifier,
-    IdentifierType, IdentifierUse, LinkType, Location, Offer, OfferAvailability, Party,
-    PartyKind, Place, VirtualLocation,
+    IdentifierType, IdentifierUse, LinkType, Location, Offer, OfferAvailability, Party, PartyKind,
+    Place, VirtualLocation,
 };
-use crate::Result;
 
 use super::models::*;
 
@@ -264,7 +264,13 @@ fn to_rows(event: &Event) -> ChildRows {
     push_party_rows(&mut parties, event.id, "attendee", &event.attendees, now);
     push_party_rows(&mut parties, event.id, "sponsor", &event.sponsors, now);
     push_party_rows(&mut parties, event.id, "funder", &event.funders, now);
-    push_party_rows(&mut parties, event.id, "contributor", &event.contributors, now);
+    push_party_rows(
+        &mut parties,
+        event.id,
+        "contributor",
+        &event.contributors,
+        now,
+    );
 
     let offers = event
         .offers
@@ -472,8 +478,10 @@ fn from_rows(
     let in_language = text_of("in_language");
 
     let event_status = str_to_enum(&event_row.event_status, EventStatus::Scheduled);
-    let event_attendance_mode =
-        str_to_enum(&event_row.event_attendance_mode, EventAttendanceMode::Offline);
+    let event_attendance_mode = str_to_enum(
+        &event_row.event_attendance_mode,
+        EventAttendanceMode::Offline,
+    );
     let event_type = str_to_enum(&event_row.event_type, EventType::Generic);
 
     let identifiers = identifiers
@@ -489,9 +497,13 @@ fn from_rows(
 
     let mut sorted_locations = locations;
     sorted_locations.sort_by_key(|l| l.position);
-    let location = sorted_locations.into_iter().filter_map(row_to_location).collect();
+    let location = sorted_locations
+        .into_iter()
+        .filter_map(row_to_location)
+        .collect();
 
-    let mut by_role: std::collections::HashMap<String, Vec<Party>> = std::collections::HashMap::new();
+    let mut by_role: std::collections::HashMap<String, Vec<Party>> =
+        std::collections::HashMap::new();
     let mut parties_sorted = parties;
     parties_sorted.sort_by_key(|p| p.position);
     for p in parties_sorted {
@@ -721,7 +733,15 @@ impl SeaOrmEventRepository {
             .order_by_asc(event_text_values::Column::Position)
             .all(&self.db)
             .await?;
-        Ok((identifiers, locations, parties, offers, links, sub_events, text_values))
+        Ok((
+            identifiers,
+            locations,
+            parties,
+            offers,
+            links,
+            sub_events,
+            text_values,
+        ))
     }
 }
 
@@ -758,15 +778,30 @@ impl EventRepository for SeaOrmEventRepository {
 
         let (identifiers, locations, parties, offers, links, sub_events, text_values) =
             self.load_children(&inserted.id).await?;
-        let result = from_rows(inserted, identifiers, locations, parties, offers, links, sub_events, text_values);
+        let result = from_rows(
+            inserted,
+            identifiers,
+            locations,
+            parties,
+            offers,
+            links,
+            sub_events,
+            text_values,
+        );
 
         self.publish_event(crate::streaming::EventEvent::Created {
             event: result.clone(),
             timestamp: jiff::Timestamp::now(),
         });
         if let Ok(json) = serde_json::to_value(&result) {
-            self.log_audit("CREATE", result.id, None, Some(json), &AuditContext::default())
-                .await;
+            self.log_audit(
+                "CREATE",
+                result.id,
+                None,
+                Some(json),
+                &AuditContext::default(),
+            )
+            .await;
         }
         Ok(result)
     }
@@ -782,7 +817,14 @@ impl EventRepository for SeaOrmEventRepository {
         let (identifiers, locations, parties, offers, links, sub_events, text_values) =
             self.load_children(id).await?;
         Ok(Some(from_rows(
-            event_row, identifiers, locations, parties, offers, links, sub_events, text_values,
+            event_row,
+            identifiers,
+            locations,
+            parties,
+            offers,
+            links,
+            sub_events,
+            text_values,
         )))
     }
 
@@ -891,8 +933,14 @@ impl EventRepository for SeaOrmEventRepository {
         });
         if let Some(old) = old {
             if let Ok(old_json) = serde_json::to_value(&old) {
-                self.log_audit("DELETE", *id, Some(old_json), None, &AuditContext::default())
-                    .await;
+                self.log_audit(
+                    "DELETE",
+                    *id,
+                    Some(old_json),
+                    None,
+                    &AuditContext::default(),
+                )
+                .await;
             }
         }
         Ok(())

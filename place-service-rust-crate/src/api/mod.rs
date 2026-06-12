@@ -21,14 +21,22 @@ pub struct ApiResponse<T> {
 impl<T> ApiResponse<T> {
     /// Build a successful envelope wrapping `data`.
     pub fn success(data: T) -> Self {
-        Self { success: true, data: Some(data), error: None }
+        Self {
+            success: true,
+            data: Some(data),
+            error: None,
+        }
     }
     /// Build a failure envelope from a code + message (no details).
     pub fn error(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             success: false,
             data: None,
-            error: Some(ApiError { code: code.into(), message: message.into(), details: None }),
+            error: Some(ApiError {
+                code: code.into(),
+                message: message.into(),
+                details: None,
+            }),
         }
     }
     /// Build a failure envelope with a serialisable `details` payload.
@@ -41,7 +49,11 @@ impl<T> ApiResponse<T> {
         Self {
             success: false,
             data: None,
-            error: Some(ApiError { code: code.into(), message: message.into(), details }),
+            error: Some(ApiError {
+                code: code.into(),
+                message: message.into(),
+                details,
+            }),
         }
     }
 }

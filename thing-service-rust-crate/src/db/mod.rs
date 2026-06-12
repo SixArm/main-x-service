@@ -171,7 +171,9 @@ impl ThingRepository for SeaOrmThingRepository {
         delete_collections(&txn, thing.id).await?;
         insert_collections(&txn, thing).await?;
         txn.commit().await.map_err(map_db)?;
-        self.get_by_id(&thing.id).await?.ok_or(crate::Error::NotFound)
+        self.get_by_id(&thing.id)
+            .await?
+            .ok_or(crate::Error::NotFound)
     }
 
     async fn soft_delete(&self, id: &Uuid) -> Result<()> {

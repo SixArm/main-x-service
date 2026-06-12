@@ -324,10 +324,7 @@ mod tests {
         let m = to_matcher_person(&svc);
         assert_eq!(m.family_name.as_deref(), Some("Williams"));
         assert_eq!(m.given_name.as_deref(), Some("Alice"));
-        assert_eq!(
-            m.date_of_birth,
-            Some(jiff::civil::date(1980, 5, 15))
-        );
+        assert_eq!(m.date_of_birth, Some(jiff::civil::date(1980, 5, 15)));
     }
 
     #[test]

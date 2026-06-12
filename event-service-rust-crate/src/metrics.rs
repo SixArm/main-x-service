@@ -189,6 +189,9 @@ mod tests {
         METRICS.event_created_total.inc();
         let body = METRICS.render();
         assert!(body.contains("event_created_total"), "got: {body}");
-        assert!(body.contains("http_request_duration_seconds"), "got: {body}");
+        assert!(
+            body.contains("http_request_duration_seconds"),
+            "got: {body}"
+        );
     }
 }

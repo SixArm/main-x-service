@@ -39,7 +39,14 @@ impl ThingIndexSchema {
         let description = b.add_text_field("description", TEXT | STORED);
         let identifiers = b.add_text_field("identifiers", TEXT | STORED);
         let schema = b.build();
-        Self { schema, id, name, alternate_names, description, identifiers }
+        Self {
+            schema,
+            id,
+            name,
+            alternate_names,
+            description,
+            identifiers,
+        }
     }
 }
 
@@ -70,7 +77,11 @@ impl ThingIndex {
             .reload_policy(ReloadPolicy::OnCommitWithDelay)
             .try_into()
             .map_err(|e| crate::Error::Search(format!("create reader: {e}")))?;
-        Ok(Self { index, schema, reader })
+        Ok(Self {
+            index,
+            schema,
+            reader,
+        })
     }
 
     /// Open an existing index previously created at `path`.
@@ -83,7 +94,11 @@ impl ThingIndex {
             .reload_policy(ReloadPolicy::OnCommitWithDelay)
             .try_into()
             .map_err(|e| crate::Error::Search(format!("create reader: {e}")))?;
-        Ok(Self { index, schema, reader })
+        Ok(Self {
+            index,
+            schema,
+            reader,
+        })
     }
 
     /// Open the index if a `meta.json` already exists, otherwise create.
@@ -104,11 +119,17 @@ impl ThingIndex {
     }
 
     /// Borrow the underlying Tantivy index (for query-parser setup).
-    pub fn index(&self) -> &Index { &self.index }
+    pub fn index(&self) -> &Index {
+        &self.index
+    }
     /// Borrow the schema + field handles.
-    pub fn schema(&self) -> &ThingIndexSchema { &self.schema }
+    pub fn schema(&self) -> &ThingIndexSchema {
+        &self.schema
+    }
     /// Borrow the live reader.
-    pub fn reader(&self) -> &IndexReader { &self.reader }
+    pub fn reader(&self) -> &IndexReader {
+        &self.reader
+    }
 
     /// Force the reader to pick up the latest committed segments.
     pub fn reload(&self) -> Result<()> {

@@ -8,18 +8,18 @@
 //! attributes feed [`ApiDoc`](crate::api::rest::ApiDoc) for OpenAPI/Swagger.
 
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
-use crate::models::Person;
-use crate::api::ApiResponse;
 use super::state::AppState;
+use crate::api::ApiResponse;
+use crate::models::Person;
 
 /// Body returned by the health-check endpoint.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -64,7 +64,10 @@ pub async fn health_check() -> impl IntoResponse {
 )]
 pub async fn metrics_prom() -> impl IntoResponse {
     (
-        [(axum::http::header::CONTENT_TYPE, crate::metrics::CONTENT_TYPE)],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            crate::metrics::CONTENT_TYPE,
+        )],
         crate::metrics::METRICS.render(),
     )
 }
@@ -102,10 +105,14 @@ pub async fn create_person(
     if !validation_errors.is_empty() {
         let error = ApiResponse::<Person>::error(
             "VALIDATION_ERROR",
-            format!("Validation failed: {}", validation_errors.iter()
-                .map(|e| format!("{}: {}", e.field, e.message))
-                .collect::<Vec<_>>()
-                .join("; "))
+            format!(
+                "Validation failed: {}",
+                validation_errors
+                    .iter()
+                    .map(|e| format!("{}: {}", e.field, e.message))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ),
         );
         return (StatusCode::UNPROCESSABLE_ENTITY, Json(error));
     }
@@ -125,7 +132,7 @@ pub async fn create_person(
         let details = serde_json::to_value(&dup_response).ok();
         let mut error = ApiResponse::<Person>::error(
             "DUPLICATE_DETECTED",
-            "Potential duplicate persons found. Review matches before proceeding."
+            "Potential duplicate persons found. Review matches before proceeding.",
         );
         if let Some(ref mut err) = error.error {
             err.details = details;
@@ -146,7 +153,7 @@ pub async fn create_person(
         Err(e) => {
             let error = ApiResponse::<Person>::error(
                 "DATABASE_ERROR",
-                format!("Failed to create person: {}", e)
+                format!("Failed to create person: {}", e),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -167,25 +174,20 @@ pub async fn create_person(
         (status = 500, description = "Internal server error")
     )
 )]
-pub async fn get_person(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+pub async fn get_person(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
     match state.person_repository.get_by_id(&id).await {
-        Ok(Some(person)) => {
-            (StatusCode::OK, Json(ApiResponse::success(person)))
-        }
+        Ok(Some(person)) => (StatusCode::OK, Json(ApiResponse::success(person))),
         Ok(None) => {
             let error = ApiResponse::<Person>::error(
                 "NOT_FOUND",
-                format!("Person with id '{}' not found", id)
+                format!("Person with id '{}' not found", id),
             );
             (StatusCode::NOT_FOUND, Json(error))
         }
         Err(e) => {
             let error = ApiResponse::<Person>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve person: {}", e)
+                format!("Failed to retrieve person: {}", e),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -217,10 +219,14 @@ pub async fn update_person(
     if !validation_errors.is_empty() {
         let error = ApiResponse::<Person>::error(
             "VALIDATION_ERROR",
-            format!("Validation failed: {}", validation_errors.iter()
-                .map(|e| format!("{}: {}", e.field, e.message))
-                .collect::<Vec<_>>()
-                .join("; "))
+            format!(
+                "Validation failed: {}",
+                validation_errors
+                    .iter()
+                    .map(|e| format!("{}: {}", e.field, e.message))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ),
         );
         return (StatusCode::UNPROCESSABLE_ENTITY, Json(error));
     }
@@ -240,7 +246,7 @@ pub async fn update_person(
         Err(e) => {
             let error = ApiResponse::<Person>::error(
                 "DATABASE_ERROR",
-                format!("Failed to update person: {}", e)
+                format!("Failed to update person: {}", e),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -276,7 +282,7 @@ pub async fn delete_person(
         Err(e) => {
             let error = ApiResponse::<()>::error(
                 "DATABASE_ERROR",
-                format!("Failed to delete person: {}", e)
+                format!("Failed to delete person: {}", e),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -360,10 +366,7 @@ pub async fn search_persons(
     match person_ids {
         Ok(ids) => {
             // Apply offset and limit
-            let paginated_ids: Vec<_> = ids.into_iter()
-                .skip(params.offset)
-                .take(limit)
-                .collect();
+            let paginated_ids: Vec<_> = ids.into_iter().skip(params.offset).take(limit).collect();
 
             // Fetch full person records from database
             let mut persons = Vec::new();
@@ -385,7 +388,10 @@ pub async fn search_persons(
                         }
                     }
                     Ok(None) => {
-                        tracing::warn!("Person {} found in search index but not in database", person_id);
+                        tracing::warn!(
+                            "Person {} found in search index but not in database",
+                            person_id
+                        );
                     }
                     Err(e) => {
                         tracing::error!("Failed to fetch person {}: {}", person_id, e);
@@ -405,7 +411,7 @@ pub async fn search_persons(
         Err(e) => {
             let error = ApiResponse::<SearchResponse>::error(
                 "SEARCH_ERROR",
-                format!("Search failed: {}", e)
+                format!("Search failed: {}", e),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -476,7 +482,8 @@ pub async fn match_person(
     let family_name = &payload.person.name.family;
     let birth_year = payload.person.birth_date.map(|d| d.year() as i32);
 
-    let candidate_ids = state.search_engine
+    let candidate_ids = state
+        .search_engine
         .search_by_name_and_year(family_name, birth_year, 100);
 
     match candidate_ids {
@@ -495,7 +502,10 @@ pub async fn match_person(
                 match state.person_repository.get_by_id(&person_id).await {
                     Ok(Some(person)) => candidates.push(person),
                     Ok(None) => {
-                        tracing::warn!("Person {} found in search index but not in database", person_id);
+                        tracing::warn!(
+                            "Person {} found in search index but not in database",
+                            person_id
+                        );
                     }
                     Err(e) => {
                         tracing::error!("Failed to fetch person {}: {}", person_id, e);
@@ -509,7 +519,7 @@ pub async fn match_person(
                 Err(e) => {
                     let error = ApiResponse::<MatchResultsResponse>::error(
                         "MATCH_ERROR",
-                        format!("Matching failed: {}", e)
+                        format!("Matching failed: {}", e),
                     );
                     return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
                 }
@@ -517,7 +527,8 @@ pub async fn match_person(
 
             // Filter by threshold if provided
             let threshold = payload.threshold.unwrap_or(0.5);
-            let matches: Vec<MatchResponse> = match_results.into_iter()
+            let matches: Vec<MatchResponse> = match_results
+                .into_iter()
                 .filter(|m| m.score >= threshold)
                 .take(payload.limit)
                 .map(|m| {
@@ -550,7 +561,7 @@ pub async fn match_person(
         Err(e) => {
             let error = ApiResponse::<MatchResultsResponse>::error(
                 "MATCH_ERROR",
-                format!("Matching failed: {}", e)
+                format!("Matching failed: {}", e),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -579,10 +590,14 @@ async fn check_duplicates_internal(state: &AppState, person: &Person) -> Vec<Mat
     let family_name = &person.name.family;
     let birth_year = person.birth_date.map(|d| d.year() as i32);
 
-    let candidate_ids = match state.search_engine.search_by_name_and_year(family_name, birth_year, 50) {
-        Ok(ids) => ids,
-        Err(_) => return Vec::new(),
-    };
+    let candidate_ids =
+        match state
+            .search_engine
+            .search_by_name_and_year(family_name, birth_year, 50)
+        {
+            Ok(ids) => ids,
+            Err(_) => return Vec::new(),
+        };
 
     let mut candidates = Vec::new();
     for id_str in candidate_ids {
@@ -602,13 +617,18 @@ async fn check_duplicates_internal(state: &AppState, person: &Person) -> Vec<Mat
     };
 
     // Return matches above the auto-review threshold (0.7)
-    match_results.into_iter()
+    match_results
+        .into_iter()
         .filter(|m| m.score >= 0.7)
         .take(10)
         .map(|m| {
-            let quality = if m.score >= 0.95 { "certain" }
-                else if m.score >= 0.7 { "probable" }
-                else { "possible" };
+            let quality = if m.score >= 0.95 {
+                "certain"
+            } else if m.score >= 0.7 {
+                "probable"
+            } else {
+                "possible"
+            };
 
             MatchResponse {
                 person: m.person.clone(),
@@ -674,28 +694,48 @@ pub async fn merge_persons(
     let main = match state.person_repository.get_by_id(&req.main_person_id).await {
         Ok(Some(p)) => p,
         Ok(None) => {
-            return (StatusCode::NOT_FOUND, Json(ApiResponse::<crate::models::MergeResponse>::error(
-                "NOT_FOUND", format!("Main person {} not found", req.main_person_id)
-            )));
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::<crate::models::MergeResponse>::error(
+                    "NOT_FOUND",
+                    format!("Main person {} not found", req.main_person_id),
+                )),
+            );
         }
         Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiResponse::<crate::models::MergeResponse>::error(
-                "DATABASE_ERROR", format!("Failed to fetch main person: {}", e)
-            )));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<crate::models::MergeResponse>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to fetch main person: {}", e),
+                )),
+            );
         }
     };
 
-    let duplicate = match state.person_repository.get_by_id(&req.duplicate_person_id).await {
+    let duplicate = match state
+        .person_repository
+        .get_by_id(&req.duplicate_person_id)
+        .await
+    {
         Ok(Some(p)) => p,
         Ok(None) => {
-            return (StatusCode::NOT_FOUND, Json(ApiResponse::<crate::models::MergeResponse>::error(
-                "NOT_FOUND", format!("Duplicate person {} not found", req.duplicate_person_id)
-            )));
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::<crate::models::MergeResponse>::error(
+                    "NOT_FOUND",
+                    format!("Duplicate person {} not found", req.duplicate_person_id),
+                )),
+            );
         }
         Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiResponse::<crate::models::MergeResponse>::error(
-                "DATABASE_ERROR", format!("Failed to fetch duplicate person: {}", e)
-            )));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<crate::models::MergeResponse>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to fetch duplicate person: {}", e),
+                )),
+            );
         }
     };
 
@@ -705,9 +745,12 @@ pub async fn merge_persons(
 
     // Transfer identifiers not already present
     for id in &duplicate.identifiers {
-        if !merged.identifiers.iter().any(|existing| existing.value == id.value && existing.identifier_type == id.identifier_type) {
+        if !merged.identifiers.iter().any(|existing| {
+            existing.value == id.value && existing.identifier_type == id.identifier_type
+        }) {
             merged.identifiers.push(id.clone());
-            transferred.entry("identifiers".to_string())
+            transferred
+                .entry("identifiers".to_string())
                 .or_insert_with(|| serde_json::Value::Array(vec![]))
                 .as_array_mut()
                 .unwrap()
@@ -731,21 +774,31 @@ pub async fn merge_persons(
 
     // Transfer contacts
     for cp in &duplicate.telecom {
-        if !merged.telecom.iter().any(|existing| existing.value == cp.value) {
+        if !merged
+            .telecom
+            .iter()
+            .any(|existing| existing.value == cp.value)
+        {
             merged.telecom.push(cp.clone());
         }
     }
 
     // Transfer documents
     for doc in &duplicate.documents {
-        if !merged.documents.iter().any(|existing| existing.number == doc.number && existing.document_type == doc.document_type) {
+        if !merged.documents.iter().any(|existing| {
+            existing.number == doc.number && existing.document_type == doc.document_type
+        }) {
             merged.documents.push(doc.clone());
         }
     }
 
     // Transfer emergency contacts
     for ec in &duplicate.emergency_contacts {
-        if !merged.emergency_contacts.iter().any(|existing| existing.name == ec.name) {
+        if !merged
+            .emergency_contacts
+            .iter()
+            .any(|existing| existing.name == ec.name)
+        {
             merged.emergency_contacts.push(ec.clone());
         }
     }
@@ -753,7 +806,10 @@ pub async fn merge_persons(
     // Transfer tax_id if main doesn't have one
     if merged.tax_id.is_none() && duplicate.tax_id.is_some() {
         merged.tax_id = duplicate.tax_id.clone();
-        transferred.insert("tax_id".into(), serde_json::to_value(&duplicate.tax_id).unwrap_or_default());
+        transferred.insert(
+            "tax_id".into(),
+            serde_json::to_value(&duplicate.tax_id).unwrap_or_default(),
+        );
     }
 
     // Add a link from main → replaces duplicate
@@ -764,9 +820,13 @@ pub async fn merge_persons(
 
     // Update main person
     if let Err(e) = state.person_repository.update(&merged).await {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiResponse::<crate::models::MergeResponse>::error(
-            "DATABASE_ERROR", format!("Failed to update main person: {}", e)
-        )));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<crate::models::MergeResponse>::error(
+                "DATABASE_ERROR",
+                format!("Failed to update main person: {}", e),
+            )),
+        );
     }
 
     // Soft-delete the duplicate
@@ -785,11 +845,14 @@ pub async fn merge_persons(
     }
 
     // Publish merge event
-    state.event_publisher.publish(crate::streaming::PersonEvent::Merged {
-        source_id: duplicate.id,
-        target_id: merged.id,
-        timestamp: jiff::Timestamp::now(),
-    }).ok();
+    state
+        .event_publisher
+        .publish(crate::streaming::PersonEvent::Merged {
+            source_id: duplicate.id,
+            target_id: merged.id,
+            timestamp: jiff::Timestamp::now(),
+        })
+        .ok();
 
     // Create merge record
     let merge_record = crate::models::MergeRecord {
@@ -840,9 +903,15 @@ pub async fn batch_deduplicate(
     let persons = match state.person_repository.list_active(1000, 0).await {
         Ok(p) => p,
         Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiResponse::<crate::models::BatchDeduplicationResponse>::error(
-                "DATABASE_ERROR", format!("Failed to list persons: {}", e)
-            )));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(
+                    ApiResponse::<crate::models::BatchDeduplicationResponse>::error(
+                        "DATABASE_ERROR",
+                        format!("Failed to list persons: {}", e),
+                    ),
+                ),
+            );
         }
     };
 
@@ -853,7 +922,8 @@ pub async fn batch_deduplicate(
 
     for (i, person) in persons.iter().enumerate() {
         // Compare with subsequent persons to avoid duplicate pairs
-        let candidates: Vec<_> = persons[i+1..].iter()
+        let candidates: Vec<_> = persons[i + 1..]
+            .iter()
             .take(req.max_candidates)
             .cloned()
             .collect();
@@ -883,9 +953,13 @@ pub async fn batch_deduplicate(
                 continue;
             }
 
-            let quality = if m.score >= 0.95 { "certain" }
-                else if m.score >= 0.7 { "probable" }
-                else { "possible" };
+            let quality = if m.score >= 0.95 {
+                "certain"
+            } else if m.score >= 0.7 {
+                "probable"
+            } else {
+                "possible"
+            };
 
             let status = if m.score >= req.auto_merge_threshold {
                 auto_merged += 1;
@@ -910,7 +984,10 @@ pub async fn batch_deduplicate(
         }
     }
 
-    let queued = review_items.iter().filter(|r| r.status == crate::models::ReviewStatus::Pending).count();
+    let queued = review_items
+        .iter()
+        .filter(|r| r.status == crate::models::ReviewStatus::Pending)
+        .count();
 
     let response = crate::models::BatchDeduplicationResponse {
         persons_scanned,
@@ -951,14 +1028,14 @@ pub async fn export_person_data(
         Ok(None) => {
             let error = ApiResponse::<serde_json::Value>::error(
                 "NOT_FOUND",
-                format!("Person with id '{}' not found", id)
+                format!("Person with id '{}' not found", id),
             );
             (StatusCode::NOT_FOUND, Json(error))
         }
         Err(e) => {
             let error = ApiResponse::<serde_json::Value>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve person: {}", e)
+                format!("Failed to retrieve person: {}", e),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -991,14 +1068,14 @@ pub async fn get_person_masked(
         Ok(None) => {
             let error = ApiResponse::<Person>::error(
                 "NOT_FOUND",
-                format!("Person with id '{}' not found", id)
+                format!("Person with id '{}' not found", id),
             );
             (StatusCode::NOT_FOUND, Json(error))
         }
         Err(e) => {
             let error = ApiResponse::<Person>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve person: {}", e)
+                format!("Failed to retrieve person: {}", e),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -1041,12 +1118,16 @@ pub async fn get_person_audit_logs(
 ) -> impl IntoResponse {
     let limit = params.limit.min(500);
 
-    match state.audit_log.get_logs_for_entity("Person", id, limit as u64).await {
+    match state
+        .audit_log
+        .get_logs_for_entity("Person", id, limit as u64)
+        .await
+    {
         Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
         Err(e) => {
             let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve audit logs: {}", e)
+                format!("Failed to retrieve audit logs: {}", e),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -1075,7 +1156,7 @@ pub async fn get_recent_audit_logs(
         Err(e) => {
             let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve audit logs: {}", e)
+                format!("Failed to retrieve audit logs: {}", e),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -1110,12 +1191,16 @@ pub async fn get_user_audit_logs(
 ) -> impl IntoResponse {
     let limit = params.limit.min(500);
 
-    match state.audit_log.get_logs_by_user(&params.user_id, limit as u64).await {
+    match state
+        .audit_log
+        .get_logs_by_user(&params.user_id, limit as u64)
+        .await
+    {
         Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
         Err(e) => {
             let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve audit logs: {}", e)
+                format!("Failed to retrieve audit logs: {}", e),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }

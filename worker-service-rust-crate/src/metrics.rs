@@ -190,6 +190,9 @@ mod tests {
         METRICS.worker_created_total.inc();
         let body = METRICS.render();
         assert!(body.contains("worker_created_total"), "got: {body}");
-        assert!(body.contains("http_request_duration_seconds"), "got: {body}");
+        assert!(
+            body.contains("http_request_duration_seconds"),
+            "got: {body}"
+        );
     }
 }

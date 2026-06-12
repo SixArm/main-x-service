@@ -16,7 +16,7 @@
 //! assert_eq!(normalize_phone("(555) 123-4567", "1"), "+15551234567");
 //! ```
 
-use crate::models::{Worker, Address, ContactPoint, ContactPointSystem, IdentityDocument};
+use crate::models::{Address, ContactPoint, ContactPointSystem, IdentityDocument, Worker};
 
 /// A single validation failure: the dotted `field` path that failed and a
 /// human-readable `message`. Serializable so it can be returned in API errors.
@@ -69,7 +69,11 @@ pub fn validate_worker(worker: &Worker) -> Vec<ValidationError> {
 
     // Validate birth_date is not in the future
     if let Some(dob) = worker.birth_date {
-        if dob > jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC).date() {
+        if dob
+            > jiff::Timestamp::now()
+                .to_zoned(jiff::tz::TimeZone::UTC)
+                .date()
+        {
             errors.push(ValidationError {
                 field: "birth_date".into(),
                 message: "Birth date cannot be in the future".into(),
@@ -168,7 +172,10 @@ fn validate_address(addr: &Address, prefix: &str) -> Vec<ValidationError> {
 
     // At minimum, a country or postal code should be present
     let has_location = addr.city.as_ref().is_some_and(|s| !s.trim().is_empty())
-        || addr.postal_code.as_ref().is_some_and(|s| !s.trim().is_empty())
+        || addr
+            .postal_code
+            .as_ref()
+            .is_some_and(|s| !s.trim().is_empty())
         || addr.country.as_ref().is_some_and(|s| !s.trim().is_empty());
 
     if !has_location {
@@ -196,7 +203,11 @@ fn validate_document(doc: &IdentityDocument, prefix: &str) -> Vec<ValidationErro
 
     // Check expiry
     if let Some(expiry) = doc.expiry_date {
-        if expiry < jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC).date() {
+        if expiry
+            < jiff::Timestamp::now()
+                .to_zoned(jiff::tz::TimeZone::UTC)
+                .date()
+        {
             errors.push(ValidationError {
                 field: format!("{}.expiry_date", prefix),
                 message: "Document has expired".into(),
@@ -333,7 +344,13 @@ mod tests {
     #[test]
     fn test_validate_missing_family_name() {
         let worker = Worker::new(
-            HumanName { use_type: None, family: "".into(), given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Male,
         );
         let errors = validate_worker(&worker);
@@ -344,7 +361,13 @@ mod tests {
     #[test]
     fn test_validate_valid_worker() {
         let worker = Worker::new(
-            HumanName { use_type: None, family: "Smith".into(), given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Male,
         );
         let errors = validate_worker(&worker);
@@ -380,20 +403,35 @@ mod tests {
     #[test]
     fn test_validate_future_birth_date() {
         let mut worker = Worker::new(
-            HumanName { use_type: None, family: "Smith".into(), given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Male,
         );
         // Set birth date to far in the future
         worker.birth_date = Some(jiff::civil::date(2099, 1, 1));
         let errors = validate_worker(&worker);
-        assert!(errors.iter().any(|e| e.field == "birth_date"), "Future birth date should produce validation error");
+        assert!(
+            errors.iter().any(|e| e.field == "birth_date"),
+            "Future birth date should produce validation error"
+        );
     }
 
     /// A malformed email value produces a telecom error.
     #[test]
     fn test_validate_invalid_email() {
         let mut worker = Worker::new(
-            HumanName { use_type: None, family: "Smith".into(), given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Male,
         );
         worker.telecom.push(ContactPoint {
@@ -402,15 +440,25 @@ mod tests {
             use_type: None,
         });
         let errors = validate_worker(&worker);
-        assert!(errors.iter().any(|e| e.field.contains("telecom") && e.message.contains("email")),
-            "Invalid email should produce validation error");
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.contains("telecom") && e.message.contains("email")),
+            "Invalid email should produce validation error"
+        );
     }
 
     /// A too-short phone number produces a telecom error.
     #[test]
     fn test_validate_invalid_phone() {
         let mut worker = Worker::new(
-            HumanName { use_type: None, family: "Smith".into(), given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Male,
         );
         worker.telecom.push(ContactPoint {
@@ -419,28 +467,47 @@ mod tests {
             use_type: None,
         });
         let errors = validate_worker(&worker);
-        assert!(errors.iter().any(|e| e.field.contains("telecom") && e.message.contains("7 digits")),
-            "Short phone number should produce validation error");
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.contains("telecom") && e.message.contains("7 digits")),
+            "Short phone number should produce validation error"
+        );
     }
 
     /// A tax ID with no alphanumerics produces a `tax_id` error.
     #[test]
     fn test_validate_tax_id_format() {
         let mut worker = Worker::new(
-            HumanName { use_type: None, family: "Smith".into(), given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Male,
         );
         worker.tax_id = Some("---".into()); // No alphanumeric chars
         let errors = validate_worker(&worker);
-        assert!(errors.iter().any(|e| e.field == "tax_id"), "Tax ID with no alphanumeric chars should fail");
+        assert!(
+            errors.iter().any(|e| e.field == "tax_id"),
+            "Tax ID with no alphanumeric chars should fail"
+        );
     }
 
     /// A document with an empty number produces a `number` error.
     #[test]
     fn test_validate_document_missing_number() {
-        use crate::models::{IdentityDocument, DocumentType};
+        use crate::models::{DocumentType, IdentityDocument};
         let mut worker = Worker::new(
-            HumanName { use_type: None, family: "Smith".into(), given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Male,
         );
         worker.documents.push(IdentityDocument {
@@ -453,15 +520,24 @@ mod tests {
             verified: false,
         });
         let errors = validate_worker(&worker);
-        assert!(errors.iter().any(|e| e.field.contains("number")), "Empty document number should fail");
+        assert!(
+            errors.iter().any(|e| e.field.contains("number")),
+            "Empty document number should fail"
+        );
     }
 
     /// A past expiry date produces an "expired" error.
     #[test]
     fn test_validate_document_expired() {
-        use crate::models::{IdentityDocument, DocumentType};
+        use crate::models::{DocumentType, IdentityDocument};
         let mut worker = Worker::new(
-            HumanName { use_type: None, family: "Smith".into(), given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Male,
         );
         worker.documents.push(IdentityDocument {
@@ -474,7 +550,10 @@ mod tests {
             verified: false,
         });
         let errors = validate_worker(&worker);
-        assert!(errors.iter().any(|e| e.message.contains("expired")), "Expired document should produce error");
+        assert!(
+            errors.iter().any(|e| e.message.contains("expired")),
+            "Expired document should produce error"
+        );
     }
 
     /// An emergency contact with a blank name produces an error.
@@ -482,7 +561,13 @@ mod tests {
     fn test_validate_emergency_contact_missing_name() {
         use crate::models::EmergencyContact;
         let mut worker = Worker::new(
-            HumanName { use_type: None, family: "Smith".into(), given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Male,
         );
         worker.emergency_contacts.push(EmergencyContact {
@@ -493,15 +578,25 @@ mod tests {
             is_primary: true,
         });
         let errors = validate_worker(&worker);
-        assert!(errors.iter().any(|e| e.field.contains("emergency_contacts") && e.message.contains("name")),
-            "Missing emergency contact name should produce error");
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.contains("emergency_contacts") && e.message.contains("name")),
+            "Missing emergency contact name should produce error"
+        );
     }
 
     /// A street-only address with no city/postal/country produces an error.
     #[test]
     fn test_validate_address_incomplete() {
         let mut worker = Worker::new(
-            HumanName { use_type: None, family: "Smith".into(), given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Male,
         );
         worker.addresses.push(Address {
@@ -514,8 +609,12 @@ mod tests {
             country: None,
         });
         let errors = validate_worker(&worker);
-        assert!(errors.iter().any(|e| e.field.contains("addresses") && e.message.contains("city")),
-            "Address without city/postal/country should produce error");
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.contains("addresses") && e.message.contains("city")),
+            "Address without city/postal/country should produce error"
+        );
     }
 
     /// An international number already carrying its country code normalizes cleanly.
@@ -530,8 +629,14 @@ mod tests {
     fn test_normalize_phone_with_extensions() {
         // Extensions should be stripped (only digits kept)
         let result = normalize_phone("555-123-4567 ext. 100", "1");
-        assert!(result.starts_with('+'), "Normalized phone should start with +");
-        assert!(result.chars().skip(1).all(|c| c.is_ascii_digit()), "Should contain only digits after +");
+        assert!(
+            result.starts_with('+'),
+            "Normalized phone should start with +"
+        );
+        assert!(
+            result.chars().skip(1).all(|c| c.is_ascii_digit()),
+            "Should contain only digits after +"
+        );
     }
 
     /// Street abbreviations expand (Ave. -> Avenue) during standardization.
@@ -547,7 +652,11 @@ mod tests {
             country: Some("us".into()),
         };
         let std = standardize_address(&addr);
-        assert!(std.line1.as_ref().unwrap().contains("Avenue"), "Ave. should expand to Avenue, got {:?}", std.line1);
+        assert!(
+            std.line1.as_ref().unwrap().contains("Avenue"),
+            "Ave. should expand to Avenue, got {:?}",
+            std.line1
+        );
     }
 
     /// City is title-cased while state and country are upper-cased.

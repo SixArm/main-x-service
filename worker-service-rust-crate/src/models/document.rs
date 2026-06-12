@@ -130,11 +130,17 @@ mod tests {
         ];
         for dt in &types {
             let display = format!("{}", dt);
-            assert!(!display.is_empty(), "DocumentType Display should not be empty");
+            assert!(
+                !display.is_empty(),
+                "DocumentType Display should not be empty"
+            );
         }
         // Check specific display values
         assert_eq!(format!("{}", DocumentType::Passport), "PASSPORT");
-        assert_eq!(format!("{}", DocumentType::DriversLicense), "DRIVERS_LICENSE");
+        assert_eq!(
+            format!("{}", DocumentType::DriversLicense),
+            "DRIVERS_LICENSE"
+        );
         assert_eq!(format!("{}", DocumentType::Other), "OTHER");
     }
 
@@ -152,7 +158,8 @@ mod tests {
         };
 
         let json = serde_json::to_string(&doc).expect("Serialization should succeed");
-        let deser: IdentityDocument = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let deser: IdentityDocument =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
 
         assert_eq!(deser.document_type, DocumentType::Passport);
         assert_eq!(deser.number, "AB1234567");

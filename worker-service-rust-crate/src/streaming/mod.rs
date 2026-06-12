@@ -13,15 +13,15 @@
 //! Events are serde-tagged on `event_type`, so the JSON wire form carries a
 //! discriminator field naming the variant.
 
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use jiff::Timestamp;
 
-use crate::models::Worker;
 use crate::Result;
+use crate::models::Worker;
 
-pub mod producer;
 pub mod consumer;
+pub mod producer;
 
 /// A lifecycle event emitted when a worker record changes.
 ///

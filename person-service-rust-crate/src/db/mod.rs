@@ -11,22 +11,22 @@
 
 use sea_orm::{Database, DatabaseConnection};
 
-use crate::config::DatabaseConfig;
 use crate::Result;
+use crate::config::DatabaseConfig;
 
-/// Table/column schema definitions.
-pub mod schema;
+/// Audit-log repository for the HIPAA-style trail.
+pub mod audit;
+/// jiff <-> time conversions at the persistence boundary.
+pub mod convert;
 /// SeaORM entity (ActiveModel/Model) definitions.
 pub mod models;
 /// Repository traits and their SeaORM implementations.
 pub mod repositories;
-/// jiff <-> time conversions at the persistence boundary.
-pub mod convert;
-/// Audit-log repository for the HIPAA-style trail.
-pub mod audit;
+/// Table/column schema definitions.
+pub mod schema;
 
-pub use repositories::{PersonRepository, SeaOrmPersonRepository, AuditContext};
 pub use audit::AuditLogRepository;
+pub use repositories::{AuditContext, PersonRepository, SeaOrmPersonRepository};
 
 /// Open a pooled PostgreSQL connection from the given configuration.
 ///

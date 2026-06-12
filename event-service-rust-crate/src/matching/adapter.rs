@@ -30,8 +30,8 @@ use event_matcher::{
 };
 
 use crate::models::{
-    identifier::{Identifier, IdentifierType},
     Address as SAddress, Event, EventAttendanceMode, EventStatus, EventType, Location, Party,
+    identifier::{Identifier, IdentifierType},
 };
 
 /// Convert a service [`Event`] into an `event_matcher::Event` ready for
@@ -54,7 +54,12 @@ pub fn to_matcher_event(e: &Event) -> MEvent {
         b = b.alternate_names(alts);
     }
 
-    if let Some(d) = e.description.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(d) = e
+        .description
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         b = b.description(d);
     }
     if let Some(u) = e.url.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
@@ -88,7 +93,12 @@ pub fn to_matcher_event(e: &Event) -> MEvent {
         }
     }
 
-    if let Some(age) = e.typical_age_range.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(age) = e
+        .typical_age_range
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         b = b.typical_age_range(age);
     }
 
@@ -327,7 +337,10 @@ fn map_service_address(a: &SAddress) -> Option<MAddress> {
 /// Returns `None` when the value is empty (matcher `EventId::new`
 /// rejects blank values).
 fn identifier_to_event_id(id: &Identifier) -> Option<MEventId> {
-    MEventId::new(map_identifier_scheme(&id.identifier_type, &id.system), id.value.trim())
+    MEventId::new(
+        map_identifier_scheme(&id.identifier_type, &id.system),
+        id.value.trim(),
+    )
 }
 
 /// Map the service's `IdentifierType` + `system` URI to a matcher
@@ -387,13 +400,19 @@ pub fn map_identifier_scheme(t: &IdentifierType, system: &str) -> MScheme {
 mod tests {
     use super::*;
     use crate::models::{
-        identifier::Identifier, Event, EventStatus, Location, Party, PartyKind, Place,
-        VirtualLocation,
+        Event, EventStatus, Location, Party, PartyKind, Place, VirtualLocation,
+        identifier::Identifier,
     };
 
     /// Build a minimal service `Event` with a fixed start date for tests.
     fn svc_event(name: &str) -> Event {
-        Event::new(name, jiff::civil::datetime(2026, 6, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp())
+        Event::new(
+            name,
+            jiff::civil::datetime(2026, 6, 1, 9, 0, 0, 0)
+                .in_tz("UTC")
+                .unwrap()
+                .timestamp(),
+        )
     }
 
     /// Name, category, status, and start date survive the projection.

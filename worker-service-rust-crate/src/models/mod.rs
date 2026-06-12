@@ -57,35 +57,37 @@ use serde::{Deserialize, Serialize};
 
 // Submodules: one file per cluster of related model types.
 
-pub mod worker;
-pub mod organization;
-pub mod identifier;
+pub mod codesystem;
+pub mod consent;
 pub mod document;
 pub mod emergency_contact;
-pub mod merge;
-pub mod review_queue;
-pub mod consent;
-pub mod ods;
 pub mod geography;
-pub mod codesystem;
+pub mod identifier;
+pub mod merge;
+pub mod ods;
+pub mod organization;
+pub mod review_queue;
+pub mod worker;
 
-pub use worker::{Worker, HumanName, NameUse, WorkerLink, LinkType, WorkerType};
-pub use organization::Organization;
-pub use identifier::{Identifier, IdentifierType, IdentifierUse};
-pub use ods::{
-    OdsStatus, RecordClass, RecordUseType, PeriodType, DatePeriod,
-    OrganizationRole, OrganizationRelationship, OrganizationSuccession, SuccessionType,
-};
-pub use geography::PostcodeGeography;
 pub use codesystem::{
-    OdsRoleReference, OdsRelationshipReference, OdsRecordClassReference,
-    OdsRecordUseTypeReference, PractitionerRoleReference, GeographyNameReference,
+    GeographyNameReference, OdsRecordClassReference, OdsRecordUseTypeReference,
+    OdsRelationshipReference, OdsRoleReference, PractitionerRoleReference,
 };
-pub use document::{IdentityDocument, DocumentType};
+pub use consent::{Consent, ConsentStatus, ConsentType};
+pub use document::{DocumentType, IdentityDocument};
 pub use emergency_contact::EmergencyContact;
+pub use geography::PostcodeGeography;
+pub use identifier::{Identifier, IdentifierType, IdentifierUse};
 pub use merge::{MergeRecord, MergeRequest, MergeResponse, MergeStatus};
-pub use review_queue::{ReviewQueueItem, ReviewStatus, BatchDeduplicationRequest, BatchDeduplicationResponse};
-pub use consent::{Consent, ConsentType, ConsentStatus};
+pub use ods::{
+    DatePeriod, OdsStatus, OrganizationRelationship, OrganizationRole, OrganizationSuccession,
+    PeriodType, RecordClass, RecordUseType, SuccessionType,
+};
+pub use organization::Organization;
+pub use review_queue::{
+    BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewQueueItem, ReviewStatus,
+};
+pub use worker::{HumanName, LinkType, NameUse, Worker, WorkerLink, WorkerType};
 
 /// Administrative gender, modeled on the HL7 FHIR
 /// [`AdministrativeGender`](https://www.hl7.org/fhir/valueset-administrative-gender.html)

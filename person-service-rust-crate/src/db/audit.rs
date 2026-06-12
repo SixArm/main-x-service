@@ -7,11 +7,11 @@
 //! the audit REST endpoints (per-entity, recent, per-user history).
 
 use sea_orm::*;
-use uuid::Uuid;
 use serde_json::Value as JsonValue;
+use uuid::Uuid;
 
-use crate::Result;
 use super::models::audit_log;
+use crate::Result;
 
 /// Reads and writes the `audit_log` table.
 ///
@@ -47,7 +47,8 @@ impl AuditLogRepository {
             user_id,
             ip_address,
             user_agent,
-        ).await
+        )
+        .await
     }
 
     /// Record an `UPDATE`: stores both the prior and new JSON snapshots.
@@ -70,7 +71,8 @@ impl AuditLogRepository {
             user_id,
             ip_address,
             user_agent,
-        ).await
+        )
+        .await
     }
 
     /// Record a `DELETE`: stores the prior snapshot, with no new values.
@@ -92,7 +94,8 @@ impl AuditLogRepository {
             user_id,
             ip_address,
             user_agent,
-        ).await
+        )
+        .await
     }
 
     /// Insert one audit row. Shared backend for the typed `log_*` helpers.

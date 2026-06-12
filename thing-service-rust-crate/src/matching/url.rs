@@ -125,25 +125,37 @@ mod tests {
     /// Byte-identical URLs score 1.0.
     #[test]
     fn test_identical() {
-        assert_eq!(url_similarity("https://example.com", "https://example.com"), 1.0);
+        assert_eq!(
+            url_similarity("https://example.com", "https://example.com"),
+            1.0
+        );
     }
 
     /// `http` vs `https` normalizes to the same URL.
     #[test]
     fn test_scheme_insensitive() {
-        assert_eq!(url_similarity("http://example.com", "https://example.com"), 1.0);
+        assert_eq!(
+            url_similarity("http://example.com", "https://example.com"),
+            1.0
+        );
     }
 
     /// A trailing slash is stripped during normalization.
     #[test]
     fn test_trailing_slash_normalized() {
-        assert_eq!(url_similarity("https://example.com/", "https://example.com"), 1.0);
+        assert_eq!(
+            url_similarity("https://example.com/", "https://example.com"),
+            1.0
+        );
     }
 
     /// Host case is folded away.
     #[test]
     fn test_case_insensitive() {
-        assert_eq!(url_similarity("https://EXAMPLE.com", "https://example.com"), 1.0);
+        assert_eq!(
+            url_similarity("https://EXAMPLE.com", "https://example.com"),
+            1.0
+        );
     }
 
     /// Same host with different paths scores 0.75.

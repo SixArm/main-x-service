@@ -90,7 +90,13 @@ impl SearchEngine {
         let s = self.index.schema();
         let parser = QueryParser::for_index(
             self.index.index(),
-            vec![s.name, s.alternate_name, s.keywords, s.locality, s.identifiers],
+            vec![
+                s.name,
+                s.alternate_name,
+                s.keywords,
+                s.locality,
+                s.identifiers,
+            ],
         );
         let query = parser
             .parse_query(query_str)
@@ -130,8 +136,11 @@ impl SearchEngine {
         let sub: Vec<(Occur, Box<dyn Query>)> = tokens
             .iter()
             .map(|t| {
-                let q: Box<dyn Query> =
-                    Box::new(FuzzyTermQuery::new(Term::from_field_text(s.name, t), 2, true));
+                let q: Box<dyn Query> = Box::new(FuzzyTermQuery::new(
+                    Term::from_field_text(s.name, t),
+                    2,
+                    true,
+                ));
                 (Occur::Should, q)
             })
             .collect();

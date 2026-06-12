@@ -107,7 +107,10 @@ impl SeaOrmPlaceRepository {
             .map_err(map_db)?;
         let amenity_features = am_rows
             .into_iter()
-            .map(|r| AmenityFeature { name: r.name, value: r.value })
+            .map(|r| AmenityFeature {
+                name: r.name,
+                value: r.value,
+            })
             .collect();
 
         let oh_rows = place_opening_hours::Entity::find()
@@ -206,7 +209,9 @@ impl PlaceRepository for SeaOrmPlaceRepository {
         delete_collections(&txn, place.id).await?;
         insert_collections(&txn, place).await?;
         txn.commit().await.map_err(map_db)?;
-        self.get_by_id(&place.id).await?.ok_or(crate::Error::NotFound)
+        self.get_by_id(&place.id)
+            .await?
+            .ok_or(crate::Error::NotFound)
     }
 
     async fn soft_delete(&self, id: &Uuid) -> Result<()> {
@@ -278,10 +283,22 @@ fn to_active(place: &Place) -> places::ActiveModel {
         description: Set(place.description.clone()),
         place_type: Set(place_type),
         place_type_custom: Set(place_type_custom),
-        address_street_address: Set(place.address.as_ref().and_then(|a| a.street_address.clone())),
-        address_locality: Set(place.address.as_ref().and_then(|a| a.address_locality.clone())),
-        address_region: Set(place.address.as_ref().and_then(|a| a.address_region.clone())),
-        address_country: Set(place.address.as_ref().and_then(|a| a.address_country.clone())),
+        address_street_address: Set(place
+            .address
+            .as_ref()
+            .and_then(|a| a.street_address.clone())),
+        address_locality: Set(place
+            .address
+            .as_ref()
+            .and_then(|a| a.address_locality.clone())),
+        address_region: Set(place
+            .address
+            .as_ref()
+            .and_then(|a| a.address_region.clone())),
+        address_country: Set(place
+            .address
+            .as_ref()
+            .and_then(|a| a.address_country.clone())),
         address_postal_code: Set(place.address.as_ref().and_then(|a| a.postal_code.clone())),
         geo_latitude: Set(place.geo.as_ref().map(|g| g.latitude)),
         geo_longitude: Set(place.geo.as_ref().map(|g| g.longitude)),

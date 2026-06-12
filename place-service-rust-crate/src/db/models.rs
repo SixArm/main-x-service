@@ -94,16 +94,24 @@ pub mod places {
     }
 
     impl Related<super::place_keywords::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Keywords.def() }
+        fn to() -> RelationDef {
+            Relation::Keywords.def()
+        }
     }
     impl Related<super::place_identifiers::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Identifiers.def() }
+        fn to() -> RelationDef {
+            Relation::Identifiers.def()
+        }
     }
     impl Related<super::place_amenity_features::Entity> for Entity {
-        fn to() -> RelationDef { Relation::AmenityFeatures.def() }
+        fn to() -> RelationDef {
+            Relation::AmenityFeatures.def()
+        }
     }
     impl Related<super::place_opening_hours::Entity> for Entity {
-        fn to() -> RelationDef { Relation::OpeningHours.def() }
+        fn to() -> RelationDef {
+            Relation::OpeningHours.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -132,11 +140,17 @@ pub mod place_keywords {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `places`.
-        #[sea_orm(belongs_to = "super::places::Entity", from = "Column::PlaceId", to = "super::places::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::places::Entity",
+            from = "Column::PlaceId",
+            to = "super::places::Column::Id"
+        )]
         Place,
     }
     impl Related<super::places::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Place.def() }
+        fn to() -> RelationDef {
+            Relation::Place.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -168,11 +182,17 @@ pub mod place_identifiers {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `places`.
-        #[sea_orm(belongs_to = "super::places::Entity", from = "Column::PlaceId", to = "super::places::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::places::Entity",
+            from = "Column::PlaceId",
+            to = "super::places::Column::Id"
+        )]
         Place,
     }
     impl Related<super::places::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Place.def() }
+        fn to() -> RelationDef {
+            Relation::Place.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -202,11 +222,17 @@ pub mod place_amenity_features {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `places`.
-        #[sea_orm(belongs_to = "super::places::Entity", from = "Column::PlaceId", to = "super::places::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::places::Entity",
+            from = "Column::PlaceId",
+            to = "super::places::Column::Id"
+        )]
         Place,
     }
     impl Related<super::places::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Place.def() }
+        fn to() -> RelationDef {
+            Relation::Place.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -238,11 +264,17 @@ pub mod place_opening_hours {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `places`.
-        #[sea_orm(belongs_to = "super::places::Entity", from = "Column::PlaceId", to = "super::places::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::places::Entity",
+            from = "Column::PlaceId",
+            to = "super::places::Column::Id"
+        )]
         Place,
     }
     impl Related<super::places::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Place.def() }
+        fn to() -> RelationDef {
+            Relation::Place.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }

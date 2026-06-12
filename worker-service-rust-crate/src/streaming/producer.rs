@@ -5,9 +5,9 @@
 //! [`FluvioProducer`] is the production transport placeholder. Both implement
 //! the [`EventProducer`] trait from the parent module.
 
-use std::sync::{Arc, Mutex};
 use super::{EventProducer, WorkerEvent};
 use crate::Result;
+use std::sync::{Arc, Mutex};
 
 /// An [`EventProducer`] that records events in an in-memory buffer.
 ///

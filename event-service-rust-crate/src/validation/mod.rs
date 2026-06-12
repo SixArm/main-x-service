@@ -89,9 +89,10 @@ pub fn validate_event(event: &Event) -> Vec<ValidationError> {
             }
         }
         EventAttendanceMode::Mixed => {
-            let has_physical = event.location.iter().any(|loc| {
-                matches!(loc, Location::Place(_) | Location::PostalAddress(_))
-            });
+            let has_physical = event
+                .location
+                .iter()
+                .any(|loc| matches!(loc, Location::Place(_) | Location::PostalAddress(_)));
             let has_virtual = event
                 .location
                 .iter()
@@ -149,7 +150,10 @@ pub fn validate_event(event: &Event) -> Vec<ValidationError> {
         match loc {
             Location::Place(place) => {
                 if place.name.trim().is_empty() {
-                    errors.push(ValidationError::new(format!("{prefix}.name"), "Place name is required"));
+                    errors.push(ValidationError::new(
+                        format!("{prefix}.name"),
+                        "Place name is required",
+                    ));
                 }
                 if let Some(lat) = place.latitude {
                     if !(-90.0..=90.0).contains(&lat) {
@@ -243,7 +247,10 @@ pub fn validate_event(event: &Event) -> Vec<ValidationError> {
 fn validate_address(addr: &Address, prefix: &str) -> Vec<ValidationError> {
     let mut errors = Vec::new();
     let has_location = addr.city.as_ref().is_some_and(|s| !s.trim().is_empty())
-        || addr.postal_code.as_ref().is_some_and(|s| !s.trim().is_empty())
+        || addr
+            .postal_code
+            .as_ref()
+            .is_some_and(|s| !s.trim().is_empty())
         || addr.country.as_ref().is_some_and(|s| !s.trim().is_empty());
     if !has_location {
         errors.push(ValidationError::new(
@@ -438,7 +445,10 @@ mod tests {
 
     /// A fixed start instant for building test events.
     fn start() -> Timestamp {
-        jiff::civil::datetime(2026, 3, 1, 12, 0, 0, 0).in_tz("UTC").unwrap().timestamp()
+        jiff::civil::datetime(2026, 3, 1, 12, 0, 0, 0)
+            .in_tz("UTC")
+            .unwrap()
+            .timestamp()
     }
 
     /// A minimal valid event produces no validation errors.
@@ -483,9 +493,11 @@ mod tests {
         event.maximum_physical_attendee_capacity = Some(80);
         event.maximum_virtual_attendee_capacity = Some(50);
         let errors = validate_event(&event);
-        assert!(errors
-            .iter()
-            .any(|e| e.field == "maximum_attendee_capacity"));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "maximum_attendee_capacity")
+        );
     }
 
     /// An online event with no virtual location yields a `location` error.

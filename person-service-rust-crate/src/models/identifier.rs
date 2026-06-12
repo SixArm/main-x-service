@@ -116,11 +116,7 @@ impl Identifier {
     /// );
     /// assert_eq!(id.value, "1234567890");
     /// ```
-    pub fn new(
-        identifier_type: IdentifierType,
-        system: String,
-        value: String,
-    ) -> Self {
+    pub fn new(identifier_type: IdentifierType, system: String, value: String) -> Self {
         Self {
             use_type: None,
             identifier_type,

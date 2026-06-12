@@ -7,11 +7,11 @@
 //! user, or system-wide, always newest-first.
 
 use sea_orm::*;
-use uuid::Uuid;
 use serde_json::Value as JsonValue;
+use uuid::Uuid;
 
-use crate::Result;
 use super::models::audit_log;
+use crate::Result;
 
 /// Audit log repository for recording changes
 pub struct AuditLogRepository {
@@ -44,7 +44,8 @@ impl AuditLogRepository {
             user_id,
             ip_address,
             user_agent,
-        ).await
+        )
+        .await
     }
 
     /// Log an update action
@@ -67,7 +68,8 @@ impl AuditLogRepository {
             user_id,
             ip_address,
             user_agent,
-        ).await
+        )
+        .await
     }
 
     /// Log a delete action
@@ -89,7 +91,8 @@ impl AuditLogRepository {
             user_id,
             ip_address,
             user_agent,
-        ).await
+        )
+        .await
     }
 
     /// Log a generic action

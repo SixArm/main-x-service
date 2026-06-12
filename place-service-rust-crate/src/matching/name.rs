@@ -106,7 +106,9 @@ mod tests {
     fn test_jaro_winkler_prefix_bonus() {
         let score_prefix = name_similarity("Central Park", "Central Gardens");
         let score_no_prefix = name_similarity("Park Central", "Gardens Central");
-        assert!(score_prefix > score_no_prefix,
-            "prefix: {score_prefix}, no_prefix: {score_no_prefix}");
+        assert!(
+            score_prefix > score_no_prefix,
+            "prefix: {score_prefix}, no_prefix: {score_no_prefix}"
+        );
     }
 }

@@ -8,7 +8,7 @@
 
 use axum::{
     Router,
-    routing::{get, post, put, delete},
+    routing::{delete, get, post, put},
 };
 use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
@@ -118,7 +118,10 @@ pub fn create_router(state: AppState) -> Router {
         // Matching
         .route("/workers/match", post(handlers::match_worker))
         // Duplicate detection & deduplication
-        .route("/workers/check-duplicates", post(handlers::check_duplicates))
+        .route(
+            "/workers/check-duplicates",
+            post(handlers::check_duplicates),
+        )
         .route("/workers/merge", post(handlers::merge_workers))
         .route("/workers/deduplicate", post(handlers::batch_deduplicate))
         // Privacy
@@ -135,4 +138,43 @@ pub fn create_router(state: AppState) -> Router {
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
+}
+
+/// Native loco controller routes (idiomatic path): the `/api/v1` surface
+/// as a loco `Routes`; handlers extract `AppState` from the `AppContext`
+/// shared store via `FromRef`. `create_router` is retained for the
+/// integration tests. The root `/metrics.prom` route is [`metrics_routes`].
+#[must_use]
+pub fn workers_routes() -> loco_rs::controller::Routes {
+    use loco_rs::prelude::{Routes, get, post};
+    Routes::new()
+        .prefix("/api/v1")
+        .add("/health", get(handlers::health_check))
+        .add("/workers", post(handlers::create_worker))
+        .add(
+            "/workers/{id}",
+            get(handlers::get_worker)
+                .put(handlers::update_worker)
+                .delete(handlers::delete_worker),
+        )
+        .add("/workers/search", get(handlers::search_workers))
+        .add("/workers/match", post(handlers::match_worker))
+        .add(
+            "/workers/check-duplicates",
+            post(handlers::check_duplicates),
+        )
+        .add("/workers/merge", post(handlers::merge_workers))
+        .add("/workers/deduplicate", post(handlers::batch_deduplicate))
+        .add("/workers/{id}/export", get(handlers::export_worker_data))
+        .add("/workers/{id}/masked", get(handlers::get_worker_masked))
+        .add("/workers/{id}/audit", get(handlers::get_worker_audit_logs))
+        .add("/audit/recent", get(handlers::get_recent_audit_logs))
+        .add("/audit/user", get(handlers::get_user_audit_logs))
+}
+
+/// Root-level Prometheus scrape route (`GET /metrics.prom`).
+#[must_use]
+pub fn metrics_routes() -> loco_rs::controller::Routes {
+    use loco_rs::prelude::{Routes, get};
+    Routes::new().add("/metrics.prom", get(handlers::metrics_prom))
 }

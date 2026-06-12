@@ -96,12 +96,16 @@ mod tests {
         };
 
         let json = serde_json::to_string(&contact).expect("Serialization should succeed");
-        let deser: EmergencyContact = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let deser: EmergencyContact =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
 
         assert_eq!(deser.name, "Bob Smith");
         assert_eq!(deser.relationship, "parent");
         assert!(!deser.is_primary);
         assert!(deser.address.is_some());
-        assert_eq!(deser.address.as_ref().unwrap().city.as_deref(), Some("Anytown"));
+        assert_eq!(
+            deser.address.as_ref().unwrap().city.as_deref(),
+            Some("Anytown")
+        );
     }
 }

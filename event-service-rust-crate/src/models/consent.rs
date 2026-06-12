@@ -9,8 +9,8 @@
 
 use jiff::{Timestamp, civil::Date};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 /// Type of consent
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]

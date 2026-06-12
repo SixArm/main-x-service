@@ -35,31 +35,33 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Central person identity record and its name/link helper types.
-pub mod person;
-/// Healthcare / managing organization record.
-pub mod organization;
-/// External identifiers (MRN, SSN, passport, tax, …).
-pub mod identifier;
+/// GDPR-style consent records and their type / status enums.
+pub mod consent;
 /// Identity documents (passport, driver's license, …).
 pub mod document;
 /// Emergency-contact records attached to a person.
 pub mod emergency_contact;
+/// External identifiers (MRN, SSN, passport, tax, …).
+pub mod identifier;
 /// Merge request / response / history types for deduplication.
 pub mod merge;
+/// Healthcare / managing organization record.
+pub mod organization;
+/// Central person identity record and its name/link helper types.
+pub mod person;
 /// Deduplication review-queue items and batch-scan request/response.
 pub mod review_queue;
-/// GDPR-style consent records and their type / status enums.
-pub mod consent;
 
-pub use person::{Person, HumanName, NameUse, PersonLink, LinkType};
-pub use organization::Organization;
-pub use identifier::{Identifier, IdentifierType, IdentifierUse};
-pub use document::{IdentityDocument, DocumentType};
+pub use consent::{Consent, ConsentStatus, ConsentType};
+pub use document::{DocumentType, IdentityDocument};
 pub use emergency_contact::EmergencyContact;
+pub use identifier::{Identifier, IdentifierType, IdentifierUse};
 pub use merge::{MergeRecord, MergeRequest, MergeResponse, MergeStatus};
-pub use review_queue::{ReviewQueueItem, ReviewStatus, BatchDeduplicationRequest, BatchDeduplicationResponse};
-pub use consent::{Consent, ConsentType, ConsentStatus};
+pub use organization::Organization;
+pub use person::{HumanName, LinkType, NameUse, Person, PersonLink};
+pub use review_queue::{
+    BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewQueueItem, ReviewStatus,
+};
 
 /// Administrative gender, modeled on the HL7 FHIR `AdministrativeGender`
 /// value set.

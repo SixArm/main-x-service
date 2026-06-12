@@ -14,14 +14,13 @@
 //! Both produce a [`MatchResult`] carrying the score and a full
 //! [`MatchScoreBreakdown`]; [`MatchQuality`] buckets a score for display.
 
-use crate::models::Worker;
-use crate::config::MatchingConfig;
-use super::{MatchResult, MatchScoreBreakdown};
 use super::algorithms::{
-    name_matching, dob_matching, gender_matching,
-    address_matching, identifier_matching,
-    tax_id_matching, document_matching,
+    address_matching, dob_matching, document_matching, gender_matching, identifier_matching,
+    name_matching, tax_id_matching,
 };
+use super::{MatchResult, MatchScoreBreakdown};
+use crate::config::MatchingConfig;
+use crate::models::Worker;
 
 /// Weighted, fuzzy ("probabilistic") scoring strategy.
 ///
@@ -46,40 +45,25 @@ impl ProbabilisticScorer {
     /// match to 0.98; otherwise the result is the weighted sum (name 0.30,
     /// birth date 0.25, gender/address/identifier/tax-ID 0.10 each, document
     /// 0.05).
-    pub fn calculate_score(
-        &self,
-        worker: &Worker,
-        candidate: &Worker,
-    ) -> MatchResult {
+    pub fn calculate_score(&self, worker: &Worker, candidate: &Worker) -> MatchResult {
         // Calculate individual component scores
         let name_score = name_matching::match_names(&worker.name, &candidate.name);
 
-        let birth_date_score = dob_matching::match_birth_dates(
-            worker.birth_date,
-            candidate.birth_date,
-        );
+        let birth_date_score =
+            dob_matching::match_birth_dates(worker.birth_date, candidate.birth_date);
 
-        let gender_score = gender_matching::match_gender(
-            worker.gender,
-            candidate.gender,
-        );
+        let gender_score = gender_matching::match_gender(worker.gender, candidate.gender);
 
-        let address_score = address_matching::match_addresses(
-            &worker.addresses,
-            &candidate.addresses,
-        );
+        let address_score =
+            address_matching::match_addresses(&worker.addresses, &candidate.addresses);
 
-        let identifier_score = identifier_matching::match_identifiers(
-            &worker.identifiers,
-            &candidate.identifiers,
-        );
+        let identifier_score =
+            identifier_matching::match_identifiers(&worker.identifiers, &candidate.identifiers);
 
         let tax_id_score = tax_id_matching::match_tax_ids(worker, candidate);
 
-        let document_score = document_matching::match_documents(
-            &worker.documents,
-            &candidate.documents,
-        );
+        let document_score =
+            document_matching::match_documents(&worker.documents, &candidate.documents);
 
         // Tax ID exact match is a strong deterministic signal — short-circuit
         if tax_id_score >= 1.0 {
@@ -87,8 +71,13 @@ impl ProbabilisticScorer {
                 worker: candidate.clone(),
                 score: 1.0,
                 breakdown: MatchScoreBreakdown {
-                    name_score, birth_date_score, gender_score,
-                    address_score, identifier_score, tax_id_score, document_score,
+                    name_score,
+                    birth_date_score,
+                    gender_score,
+                    address_score,
+                    identifier_score,
+                    tax_id_score,
+                    document_score,
                 },
             };
         }
@@ -99,8 +88,13 @@ impl ProbabilisticScorer {
                 worker: candidate.clone(),
                 score: 0.98,
                 breakdown: MatchScoreBreakdown {
-                    name_score, birth_date_score, gender_score,
-                    address_score, identifier_score, tax_id_score, document_score,
+                    name_score,
+                    birth_date_score,
+                    gender_score,
+                    address_score,
+                    identifier_score,
+                    tax_id_score,
+                    document_score,
                 },
             };
         }
@@ -188,11 +182,7 @@ impl DeterministicScorer {
     /// earns one point out of three available, and — when both records have
     /// addresses — a strong address match (≥0.80) earns a fourth point. The
     /// returned score is earned/available.
-    pub fn calculate_score(
-        &self,
-        worker: &Worker,
-        candidate: &Worker,
-    ) -> MatchResult {
+    pub fn calculate_score(&self, worker: &Worker, candidate: &Worker) -> MatchResult {
         let mut total_score = 0.0;
         let mut points_available = 0.0;
 
@@ -203,59 +193,61 @@ impl DeterministicScorer {
                 worker: candidate.clone(),
                 score: 1.0,
                 breakdown: MatchScoreBreakdown {
-                    name_score: 0.0, birth_date_score: 0.0, gender_score: 0.0,
-                    address_score: 0.0, identifier_score: 0.0,
-                    tax_id_score, document_score: 0.0,
+                    name_score: 0.0,
+                    birth_date_score: 0.0,
+                    gender_score: 0.0,
+                    address_score: 0.0,
+                    identifier_score: 0.0,
+                    tax_id_score,
+                    document_score: 0.0,
                 },
             };
         }
 
         // Rule 1: Exact identifier match = definite match
-        let identifier_score = identifier_matching::match_identifiers(
-            &worker.identifiers,
-            &candidate.identifiers,
-        );
+        let identifier_score =
+            identifier_matching::match_identifiers(&worker.identifiers, &candidate.identifiers);
 
         if identifier_score >= 0.98 {
             return MatchResult {
                 worker: candidate.clone(),
                 score: 1.0,
                 breakdown: MatchScoreBreakdown {
-                    name_score: 0.0, birth_date_score: 0.0, gender_score: 0.0,
-                    address_score: 0.0, identifier_score,
-                    tax_id_score, document_score: 0.0,
+                    name_score: 0.0,
+                    birth_date_score: 0.0,
+                    gender_score: 0.0,
+                    address_score: 0.0,
+                    identifier_score,
+                    tax_id_score,
+                    document_score: 0.0,
                 },
             };
         }
 
         // Rule 1b: Document number exact match = definite match
-        let document_score = document_matching::match_documents(
-            &worker.documents,
-            &candidate.documents,
-        );
+        let document_score =
+            document_matching::match_documents(&worker.documents, &candidate.documents);
 
         if document_score >= 1.0 {
             return MatchResult {
                 worker: candidate.clone(),
                 score: 1.0,
                 breakdown: MatchScoreBreakdown {
-                    name_score: 0.0, birth_date_score: 0.0, gender_score: 0.0,
-                    address_score: 0.0, identifier_score,
-                    tax_id_score, document_score,
+                    name_score: 0.0,
+                    birth_date_score: 0.0,
+                    gender_score: 0.0,
+                    address_score: 0.0,
+                    identifier_score,
+                    tax_id_score,
+                    document_score,
                 },
             };
         }
 
         // Rule 2: Name + DOB + Gender must all match
         let name_score = name_matching::match_names(&worker.name, &candidate.name);
-        let dob_score = dob_matching::match_birth_dates(
-            worker.birth_date,
-            candidate.birth_date,
-        );
-        let gender_score = gender_matching::match_gender(
-            worker.gender,
-            candidate.gender,
-        );
+        let dob_score = dob_matching::match_birth_dates(worker.birth_date, candidate.birth_date);
+        let gender_score = gender_matching::match_gender(worker.gender, candidate.gender);
 
         points_available += 3.0;
 
@@ -272,10 +264,8 @@ impl DeterministicScorer {
         }
 
         // Rule 3: Address is optional but adds confidence
-        let address_score = address_matching::match_addresses(
-            &worker.addresses,
-            &candidate.addresses,
-        );
+        let address_score =
+            address_matching::match_addresses(&worker.addresses, &candidate.addresses);
 
         if !worker.addresses.is_empty() && !candidate.addresses.is_empty() {
             points_available += 1.0;
@@ -350,7 +340,7 @@ impl MatchQuality {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{HumanName, Gender};
+    use crate::models::{Gender, HumanName};
     use jiff::civil::Date;
 
     /// Builds a matching config with a 0.85 threshold for the tests.
@@ -410,7 +400,11 @@ mod tests {
 
         // With NAME (0.30) + DOB (0.25) + GENDER (0.10) = 0.65
         // No address, identifiers, tax_id, or documents, so those contribute 0
-        assert!(result.score >= 0.60, "Exact match on name/dob/gender should score >= 0.60, got {}", result.score);
+        assert!(
+            result.score >= 0.60,
+            "Exact match on name/dob/gender should score >= 0.60, got {}",
+            result.score
+        );
         assert!(!scorer.is_match(result.score)); // 0.65 < threshold of 0.85
         assert_eq!(scorer.classify_match(result.score), MatchQuality::Possible);
     }
@@ -429,7 +423,11 @@ mod tests {
 
         let result = scorer.calculate_score(&worker1, &worker2);
 
-        assert!(result.score > 0.60, "Fuzzy match should score > 0.60, got {}", result.score);
+        assert!(
+            result.score > 0.60,
+            "Fuzzy match should score > 0.60, got {}",
+            result.score
+        );
         assert!(result.score < 0.80);
     }
 
@@ -447,7 +445,11 @@ mod tests {
 
         let result = scorer.calculate_score(&worker1, &worker2);
 
-        assert!(result.score < 0.50, "Non-match should score < 0.50, got {}", result.score);
+        assert!(
+            result.score < 0.50,
+            "Non-match should score < 0.50, got {}",
+            result.score
+        );
         assert!(!scorer.is_match(result.score));
     }
 
@@ -463,24 +465,35 @@ mod tests {
 
         let result = scorer.calculate_score(&worker1, &worker2);
 
-        assert!(result.score >= 0.75, "Exact match should meet deterministic threshold");
+        assert!(
+            result.score >= 0.75,
+            "Exact match should meet deterministic threshold"
+        );
         assert!(scorer.is_match(result.score));
     }
 
     /// Representative scores map to the expected quality buckets.
     #[test]
     fn test_match_quality_classification() {
-        assert_eq!(ProbabilisticScorer::new(create_test_config())
-            .classify_match(0.98), MatchQuality::Definite);
+        assert_eq!(
+            ProbabilisticScorer::new(create_test_config()).classify_match(0.98),
+            MatchQuality::Definite
+        );
 
-        assert_eq!(ProbabilisticScorer::new(create_test_config())
-            .classify_match(0.87), MatchQuality::Probable);
+        assert_eq!(
+            ProbabilisticScorer::new(create_test_config()).classify_match(0.87),
+            MatchQuality::Probable
+        );
 
-        assert_eq!(ProbabilisticScorer::new(create_test_config())
-            .classify_match(0.60), MatchQuality::Possible);
+        assert_eq!(
+            ProbabilisticScorer::new(create_test_config()).classify_match(0.60),
+            MatchQuality::Possible
+        );
 
-        assert_eq!(ProbabilisticScorer::new(create_test_config())
-            .classify_match(0.30), MatchQuality::Unlikely);
+        assert_eq!(
+            ProbabilisticScorer::new(create_test_config()).classify_match(0.30),
+            MatchQuality::Unlikely
+        );
     }
 
     /// Name, DOB, gender, address, and identifier all matching scores high.
@@ -512,7 +525,11 @@ mod tests {
         worker2.identifiers = vec![id];
 
         let result = scorer.calculate_score(&worker1, &worker2);
-        assert!(result.score > 0.80, "All fields matching should score very high, got {}", result.score);
+        assert!(
+            result.score > 0.80,
+            "All fields matching should score very high, got {}",
+            result.score
+        );
     }
 
     /// Divergent name, DOB, and gender score very low.
@@ -527,7 +544,11 @@ mod tests {
         worker2.gender = Gender::Female;
 
         let result = scorer.calculate_score(&worker1, &worker2);
-        assert!(result.score < 0.30, "No matching fields should score very low, got {}", result.score);
+        assert!(
+            result.score < 0.30,
+            "No matching fields should score very low, got {}",
+            result.score
+        );
         assert!(!scorer.is_match(result.score));
     }
 
@@ -542,8 +563,16 @@ mod tests {
         let worker2 = create_test_worker("Smith", Some(jiff::civil::date(1990, 6, 20)));
 
         let result = scorer.calculate_score(&worker1, &worker2);
-        assert!(result.score > 0.30, "Name match alone should contribute some score, got {}", result.score);
-        assert!(result.score < 0.80, "Only name match should not score too high, got {}", result.score);
+        assert!(
+            result.score > 0.30,
+            "Name match alone should contribute some score, got {}",
+            result.score
+        );
+        assert!(
+            result.score < 0.80,
+            "Only name match should not score too high, got {}",
+            result.score
+        );
     }
 
     /// A shared tax ID forces a 1.0 score even when names/DOBs differ.
@@ -558,7 +587,10 @@ mod tests {
         worker2.tax_id = Some("123-45-6789".into());
 
         let result = scorer.calculate_score(&worker1, &worker2);
-        assert_eq!(result.score, 1.0, "Tax ID match should short-circuit to 1.0");
+        assert_eq!(
+            result.score, 1.0,
+            "Tax ID match should short-circuit to 1.0"
+        );
         assert_eq!(result.breakdown.tax_id_score, 1.0);
     }
 
@@ -575,7 +607,10 @@ mod tests {
         worker2.identifiers = vec![id];
 
         let result = scorer.calculate_score(&worker1, &worker2);
-        assert_eq!(result.score, 1.0, "Exact identifier match should short-circuit to 1.0");
+        assert_eq!(
+            result.score, 1.0,
+            "Exact identifier match should short-circuit to 1.0"
+        );
     }
 
     /// The Definite/Probable boundary sits exactly at 0.95.
@@ -595,8 +630,14 @@ mod tests {
             fuzzy_match_score: 0.8,
         };
         let scorer = ProbabilisticScorer::new(config);
-        assert!(scorer.is_match(0.70), "Score at threshold should be a match");
-        assert!(!scorer.is_match(0.69), "Score below threshold should not be a match");
+        assert!(
+            scorer.is_match(0.70),
+            "Score at threshold should be a match"
+        );
+        assert!(
+            !scorer.is_match(0.69),
+            "Score below threshold should not be a match"
+        );
         assert_eq!(scorer.classify_match(0.70), MatchQuality::Probable);
     }
 }

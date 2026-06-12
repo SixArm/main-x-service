@@ -11,18 +11,18 @@
 
 use sea_orm::{Database, DatabaseConnection};
 
-use crate::config::DatabaseConfig;
 use crate::Result;
+use crate::config::DatabaseConfig;
 
-pub mod schema;
-pub mod models;
-pub mod repositories;
+pub mod audit;
 /// jiff <-> time conversions at the persistence boundary.
 pub mod convert;
-pub mod audit;
+pub mod models;
+pub mod repositories;
+pub mod schema;
 
-pub use repositories::{WorkerRepository, SeaOrmWorkerRepository, AuditContext};
 pub use audit::AuditLogRepository;
+pub use repositories::{AuditContext, SeaOrmWorkerRepository, WorkerRepository};
 
 /// Opens a pooled PostgreSQL connection using the URL and pool bounds from
 /// `config`. Maps connection failures to [`crate::Error::Pool`].

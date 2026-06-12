@@ -220,7 +220,10 @@ mod tests {
         };
         let mut place = Place::new("Central Park");
         place.address = Some(addr);
-        assert_eq!(place.address.as_ref().unwrap().address_locality.as_deref(), Some("New York"));
+        assert_eq!(
+            place.address.as_ref().unwrap().address_locality.as_deref(),
+            Some("New York")
+        );
     }
 
     /// Coordinates can be attached and read back at full precision.

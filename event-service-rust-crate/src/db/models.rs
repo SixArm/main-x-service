@@ -784,11 +784,17 @@ pub mod event_text_values {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `events`.
-        #[sea_orm(belongs_to = "super::events::Entity", from = "Column::EventId", to = "super::events::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::events::Entity",
+            from = "Column::EventId",
+            to = "super::events::Column::Id"
+        )]
         Event,
     }
     impl Related<super::events::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Event.def() }
+        fn to() -> RelationDef {
+            Relation::Event.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }

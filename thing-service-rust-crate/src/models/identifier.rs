@@ -110,23 +110,41 @@ impl ThingIdentifier {
     }
 
     /// Constructs a [`Doi`](IdentifierType::Doi) identifier.
-    pub fn doi(value: &str) -> Self { Self::new(IdentifierType::Doi, value) }
+    pub fn doi(value: &str) -> Self {
+        Self::new(IdentifierType::Doi, value)
+    }
     /// Constructs an [`Isbn`](IdentifierType::Isbn) identifier.
-    pub fn isbn(value: &str) -> Self { Self::new(IdentifierType::Isbn, value) }
+    pub fn isbn(value: &str) -> Self {
+        Self::new(IdentifierType::Isbn, value)
+    }
     /// Constructs an [`Issn`](IdentifierType::Issn) identifier.
-    pub fn issn(value: &str) -> Self { Self::new(IdentifierType::Issn, value) }
+    pub fn issn(value: &str) -> Self {
+        Self::new(IdentifierType::Issn, value)
+    }
     /// Constructs a [`Gtin`](IdentifierType::Gtin) identifier.
-    pub fn gtin(value: &str) -> Self { Self::new(IdentifierType::Gtin, value) }
+    pub fn gtin(value: &str) -> Self {
+        Self::new(IdentifierType::Gtin, value)
+    }
     /// Constructs a [`Sku`](IdentifierType::Sku) identifier.
-    pub fn sku(value: &str) -> Self { Self::new(IdentifierType::Sku, value) }
+    pub fn sku(value: &str) -> Self {
+        Self::new(IdentifierType::Sku, value)
+    }
     /// Constructs an [`Mpn`](IdentifierType::Mpn) identifier.
-    pub fn mpn(value: &str) -> Self { Self::new(IdentifierType::Mpn, value) }
+    pub fn mpn(value: &str) -> Self {
+        Self::new(IdentifierType::Mpn, value)
+    }
     /// Constructs a [`SerialNumber`](IdentifierType::SerialNumber) identifier.
-    pub fn serial_number(value: &str) -> Self { Self::new(IdentifierType::SerialNumber, value) }
+    pub fn serial_number(value: &str) -> Self {
+        Self::new(IdentifierType::SerialNumber, value)
+    }
     /// Constructs a [`Uri`](IdentifierType::Uri) identifier.
-    pub fn uri(value: &str) -> Self { Self::new(IdentifierType::Uri, value) }
+    pub fn uri(value: &str) -> Self {
+        Self::new(IdentifierType::Uri, value)
+    }
     /// Constructs a [`Uuid`](IdentifierType::Uuid) identifier.
-    pub fn uuid(value: &str) -> Self { Self::new(IdentifierType::Uuid, value) }
+    pub fn uuid(value: &str) -> Self {
+        Self::new(IdentifierType::Uuid, value)
+    }
 
     /// Returns `true` if this identifier's scheme is globally unique by
     /// construction (DOI, ISBN, ISSN, GTIN, MPN, serial number, or UUID).
@@ -164,10 +182,22 @@ mod tests {
     /// Each per-scheme helper sets the matching `property_id`.
     #[test]
     fn test_identifier_constructors() {
-        assert_eq!(ThingIdentifier::isbn("9780141439518").property_id, IdentifierType::Isbn);
-        assert_eq!(ThingIdentifier::doi("10.1000/xyz123").property_id, IdentifierType::Doi);
-        assert_eq!(ThingIdentifier::gtin("00012345600012").property_id, IdentifierType::Gtin);
-        assert_eq!(ThingIdentifier::sku("WIDGET-42").property_id, IdentifierType::Sku);
+        assert_eq!(
+            ThingIdentifier::isbn("9780141439518").property_id,
+            IdentifierType::Isbn
+        );
+        assert_eq!(
+            ThingIdentifier::doi("10.1000/xyz123").property_id,
+            IdentifierType::Doi
+        );
+        assert_eq!(
+            ThingIdentifier::gtin("00012345600012").property_id,
+            IdentifierType::Gtin
+        );
+        assert_eq!(
+            ThingIdentifier::sku("WIDGET-42").property_id,
+            IdentifierType::Sku
+        );
     }
 
     /// The `Custom` variant carries its label and stores the value.
@@ -185,7 +215,10 @@ mod tests {
         assert!(ThingIdentifier::serial_number("SN-001").is_deterministic());
         assert!(!ThingIdentifier::sku("WIDGET-42").is_deterministic());
         assert!(!ThingIdentifier::uri("urn:example:1").is_deterministic());
-        assert!(!ThingIdentifier::new(IdentifierType::Custom("Internal".into()), "X").is_deterministic());
+        assert!(
+            !ThingIdentifier::new(IdentifierType::Custom("Internal".into()), "X")
+                .is_deterministic()
+        );
     }
 
     /// An identifier survives a JSON serialization round-trip.
@@ -206,6 +239,9 @@ mod tests {
         let json = serde_json::to_string(&id).unwrap();
         let deserialized: ThingIdentifier = serde_json::from_str(&json).unwrap();
         assert_eq!(id, deserialized);
-        assert_eq!(deserialized.url.as_deref().unwrap(), "https://www.worldcat.org/isbn/9780141439518");
+        assert_eq!(
+            deserialized.url.as_deref().unwrap(),
+            "https://www.worldcat.org/isbn/9780141439518"
+        );
     }
 }

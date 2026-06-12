@@ -125,7 +125,10 @@ mod tests {
             ThingIdentifier::isbn("9780141439518"),
             ThingIdentifier::new(IdentifierType::Custom("OpenLibrary".into()), "OL1394865W"),
         ];
-        let b = vec![ThingIdentifier::new(IdentifierType::Custom("OpenLibrary".into()), "OL1394865W")];
+        let b = vec![ThingIdentifier::new(
+            IdentifierType::Custom("OpenLibrary".into()),
+            "OL1394865W",
+        )];
         assert!((identifier_similarity(&a, &b) - 1.0).abs() < f64::EPSILON);
     }
 
@@ -157,8 +160,14 @@ mod tests {
     /// A shared Custom identifier does NOT short-circuit.
     #[test]
     fn test_has_deterministic_match_custom_excluded() {
-        let a = vec![ThingIdentifier::new(IdentifierType::Custom("Internal".into()), "X1")];
-        let b = vec![ThingIdentifier::new(IdentifierType::Custom("Internal".into()), "X1")];
+        let a = vec![ThingIdentifier::new(
+            IdentifierType::Custom("Internal".into()),
+            "X1",
+        )];
+        let b = vec![ThingIdentifier::new(
+            IdentifierType::Custom("Internal".into()),
+            "X1",
+        )];
         assert!(!has_deterministic_match(&a, &b));
     }
 

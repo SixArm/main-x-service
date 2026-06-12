@@ -10,17 +10,17 @@
 //! payloads serialize via Serde with an internally-tagged `event_type`
 //! discriminator, so the wire form is self-describing JSON.
 
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use jiff::Timestamp;
 
-use crate::models::Person;
 use crate::Result;
+use crate::models::Person;
 
-/// In-process and (future) Fluvio event publishers.
-pub mod producer;
 /// Event consumer interface (stub) for reading the stream.
 pub mod consumer;
+/// In-process and (future) Fluvio event publishers.
+pub mod producer;
 
 /// A domain event describing one mutation to a person record.
 ///

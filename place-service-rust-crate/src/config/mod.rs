@@ -98,7 +98,9 @@ impl Default for Config {
                 index_path: "./data/search_index".to_string(),
                 cache_size_mb: 512,
             },
-            matching: MatchingConfig { threshold_score: 0.7 },
+            matching: MatchingConfig {
+                threshold_score: 0.7,
+            },
             observability: ObservabilityConfig {
                 service_name: "place-service".to_string(),
                 otlp_endpoint: "http://localhost:4317".to_string(),

@@ -6,14 +6,14 @@
 
 use jiff::{Timestamp, civil::Date};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
-use super::{Address, ContactPoint, Identifier};
 use super::ods::{
-    OdsStatus, RecordClass, RecordUseType, OrganizationRole,
-    OrganizationRelationship, OrganizationSuccession, DatePeriod, SuccessionType,
+    DatePeriod, OdsStatus, OrganizationRelationship, OrganizationRole, OrganizationSuccession,
+    RecordClass, RecordUseType, SuccessionType,
 };
+use super::{Address, ContactPoint, Identifier};
 
 /// Organization (hospital, trust, GP practice, ICB, site, etc.)
 ///
@@ -147,13 +147,17 @@ impl Organization {
     /// Returns only the relationships whose status is
     /// [`OdsStatus::Active`], filtering out inactive/historical ones.
     pub fn active_relationships(&self) -> Vec<&OrganizationRelationship> {
-        self.relationships.iter().filter(|r| r.status == OdsStatus::Active).collect()
+        self.relationships
+            .iter()
+            .filter(|r| r.status == OdsStatus::Active)
+            .collect()
     }
 
     /// Returns succession records pointing to *predecessor* organisations
     /// (those this organisation absorbed or replaced).
     pub fn predecessors(&self) -> Vec<&OrganizationSuccession> {
-        self.successions.iter()
+        self.successions
+            .iter()
             .filter(|s| s.succession_type == SuccessionType::Predecessor)
             .collect()
     }
@@ -161,7 +165,8 @@ impl Organization {
     /// Returns succession records pointing to *successor* organisations
     /// (those that took over from this one).
     pub fn successors(&self) -> Vec<&OrganizationSuccession> {
-        self.successions.iter()
+        self.successions
+            .iter()
             .filter(|s| s.succession_type == SuccessionType::Successor)
             .collect()
     }

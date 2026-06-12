@@ -16,9 +16,9 @@
 //! to score two service [`Event`](crate::models::Event)s through the
 //! reference implementation.
 
+use crate::Result;
 use crate::config::MatchingConfig;
 use crate::models::Event;
-use crate::Result;
 
 /// Bridge to the canonical `event-matcher` crate ([`to_matcher_event`](adapter::to_matcher_event)).
 pub mod adapter;
@@ -168,7 +168,11 @@ impl EventMatcher for ProbabilisticMatcher {
             .collect();
         // Best matches first; NaN scores are treated as equal so the
         // sort never panics.
-        out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        out.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         Ok(out)
     }
 
@@ -206,7 +210,11 @@ impl EventMatcher for DeterministicMatcher {
             .map(|c| self.scorer.calculate_score(event, c))
             .filter(|r| self.is_match(r.score))
             .collect();
-        out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        out.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         Ok(out)
     }
 
@@ -237,11 +245,17 @@ mod tests {
             threshold_score: 0.20,
             ..config()
         });
-        let when = jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
+        let when = jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0)
+            .in_tz("UTC")
+            .unwrap()
+            .timestamp();
         let query = Event::new("Conference", when);
         let candidates = vec![
             Event::new("Conference", when),
-            Event::new("Totally Different Event", when + jiff::SignedDuration::from_hours(24 * (40))),
+            Event::new(
+                "Totally Different Event",
+                when + jiff::SignedDuration::from_hours(24 * (40)),
+            ),
         ];
         let matches = m.find_matches(&query, &candidates).unwrap();
         assert!(!matches.is_empty());
@@ -275,7 +289,10 @@ mod tests {
     #[test]
     fn identifier_short_circuits_match() {
         let m = ProbabilisticMatcher::new(config());
-        let when = jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
+        let when = jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0)
+            .in_tz("UTC")
+            .unwrap()
+            .timestamp();
         let mut a = Event::new("A", when);
         let mut b = Event::new("Z", when + jiff::SignedDuration::from_hours(24 * (30)));
         let id = Identifier::new(IdentifierType::TicketNumber, "sys".into(), "T-1".into());

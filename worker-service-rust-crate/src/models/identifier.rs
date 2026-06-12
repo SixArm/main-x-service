@@ -122,11 +122,7 @@ impl Identifier {
     /// assert_eq!(id.identifier_type, IdentifierType::NPI);
     /// assert!(id.use_type.is_none());
     /// ```
-    pub fn new(
-        identifier_type: IdentifierType,
-        system: String,
-        value: String,
-    ) -> Self {
+    pub fn new(identifier_type: IdentifierType, system: String, value: String) -> Self {
         Self {
             use_type: None,
             identifier_type,

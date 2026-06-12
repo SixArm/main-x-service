@@ -359,7 +359,10 @@ mod tests {
 
     /// A fixed timestamp used across the tests for reproducibility.
     fn jan_2026() -> Timestamp {
-        jiff::civil::datetime(2026, 1, 15, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp()
+        jiff::civil::datetime(2026, 1, 15, 9, 0, 0, 0)
+            .in_tz("UTC")
+            .unwrap()
+            .timestamp()
     }
 
     /// `new` leaves all collections empty and applies enum defaults.

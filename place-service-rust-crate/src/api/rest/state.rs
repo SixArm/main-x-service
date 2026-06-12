@@ -55,3 +55,14 @@ impl AppState {
         }
     }
 }
+
+/// Bridge so the existing `State<AppState>` handlers run as native loco
+/// controllers: extracts the cheaply-cloneable `AppState` from the
+/// `AppContext` shared store (populated once at boot in `after_routes`).
+impl axum::extract::FromRef<loco_rs::app::AppContext> for AppState {
+    fn from_ref(ctx: &loco_rs::app::AppContext) -> Self {
+        ctx.shared_store
+            .get::<AppState>()
+            .expect("AppState must be inserted into the shared store at boot")
+    }
+}

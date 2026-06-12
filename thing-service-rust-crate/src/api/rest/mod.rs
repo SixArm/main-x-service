@@ -92,3 +92,31 @@ pub fn create_router(state: AppState) -> Router {
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
 }
+
+/// Native loco controller routes (idiomatic path). Mirrors
+/// [`create_router`]'s `/api` surface as a loco `Routes`; handlers
+/// extract `AppState` from the `AppContext` shared store via `FromRef`.
+/// `create_router` is retained for the integration tests.
+#[must_use]
+pub fn things_routes() -> loco_rs::controller::Routes {
+    use loco_rs::prelude::{Routes, get, post};
+    Routes::new()
+        .prefix("/api")
+        .add("/health", get(handlers::health))
+        .add("/things", post(handlers::create_thing))
+        .add("/things/search", get(handlers::search_things))
+        .add("/things/match", post(handlers::match_thing))
+        .add("/things/check-duplicates", post(handlers::check_duplicates))
+        .add("/things/merge", post(handlers::merge_things))
+        .add("/things/deduplicate", post(handlers::deduplicate))
+        .add(
+            "/things/{id}",
+            get(handlers::get_thing)
+                .put(handlers::update_thing)
+                .delete(handlers::delete_thing),
+        )
+        .add("/things/{id}/export", get(handlers::export_thing_data))
+        .add("/things/{id}/masked", get(handlers::masked_thing))
+        .add("/things/{id}/audit", get(handlers::audit_for_thing))
+        .add("/audit/recent", get(handlers::audit_recent))
+}

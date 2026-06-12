@@ -27,12 +27,12 @@
 //! assert_eq!(r.confidence, MatchConfidence::Certain);
 //! ```
 
-use crate::models::place::Place;
-use super::name::name_similarity;
 use super::address::address_similarity;
 use super::geo::geo_similarity;
-use super::identifier::{identifier_similarity, has_gln_match};
+use super::identifier::{has_gln_match, identifier_similarity};
+use super::name::name_similarity;
 use super::phonetic::soundex_match;
+use crate::models::place::Place;
 
 /// Relative importance of each match component.
 ///
@@ -128,10 +128,15 @@ impl MatchConfidence {
     /// assert_eq!(MatchConfidence::from_score(0.50), MatchConfidence::Unlikely);
     /// ```
     pub fn from_score(score: f64) -> Self {
-        if score >= 0.95 { Self::Certain }
-        else if score >= 0.80 { Self::Probable }
-        else if score >= 0.60 { Self::Possible }
-        else { Self::Unlikely }
+        if score >= 0.95 {
+            Self::Certain
+        } else if score >= 0.80 {
+            Self::Probable
+        } else if score >= 0.60 {
+            Self::Possible
+        } else {
+            Self::Unlikely
+        }
     }
 }
 
@@ -189,7 +194,13 @@ pub fn compute_match(a: &Place, b: &Place, weights: &MatchWeights) -> MatchResul
     };
 
     let place_type_score = match (&a.place_type, &b.place_type) {
-        (Some(ta), Some(tb)) => if ta == tb { 1.0 } else { 0.0 },
+        (Some(ta), Some(tb)) => {
+            if ta == tb {
+                1.0
+            } else {
+                0.0
+            }
+        }
         _ => 0.0,
     };
 
@@ -220,7 +231,11 @@ pub fn compute_match(a: &Place, b: &Place, weights: &MatchWeights) -> MatchResul
         weight_sum += weights.identifier;
     }
 
-    let score = if weight_sum > 0.0 { total / weight_sum } else { 0.0 };
+    let score = if weight_sum > 0.0 {
+        total / weight_sum
+    } else {
+        0.0
+    };
 
     // Phonetic bonus: +5% if names sound alike but scored below 0.95
     let score = if phonetic && score < 0.95 {

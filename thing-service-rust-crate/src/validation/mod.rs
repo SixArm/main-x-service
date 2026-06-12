@@ -63,7 +63,11 @@ pub fn validate_thing(thing: &Thing) -> Vec<ValidationError> {
 
     check_optional_http_url(&thing.url, "url", &mut errors);
     check_optional_http_url(&thing.additional_type, "additional_type", &mut errors);
-    check_optional_http_url(&thing.main_entity_of_page, "main_entity_of_page", &mut errors);
+    check_optional_http_url(
+        &thing.main_entity_of_page,
+        "main_entity_of_page",
+        &mut errors,
+    );
     check_optional_http_url(&thing.subject_of, "subject_of", &mut errors);
 
     for (i, img) in thing.images.iter().enumerate() {
@@ -179,7 +183,8 @@ fn normalize_url(s: &str) -> String {
 fn dedupe(iter: impl Iterator<Item = String>) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
     // `insert` returns false for an already-seen value, filtering duplicates.
-    iter.filter(|s| !s.is_empty() && seen.insert(s.clone())).collect()
+    iter.filter(|s| !s.is_empty() && seen.insert(s.clone()))
+        .collect()
 }
 
 /// Dispatch per-scheme format validation. Deterministic schemes with a
@@ -234,7 +239,10 @@ fn validate_isbn(v: &str) -> Result<(), String> {
 /// Validate an ISSN: exactly 8 characters after stripping dashes/whitespace,
 /// the last of which may be the check character `X`.
 fn validate_issn(v: &str) -> Result<(), String> {
-    let s: String = v.chars().filter(|c| !c.is_whitespace() && *c != '-').collect();
+    let s: String = v
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '-')
+        .collect();
     if s.len() != 8 {
         return Err(format!("ISSN must be 8 digits, got {}", s.len()));
     }
@@ -421,7 +429,9 @@ mod tests {
     #[test]
     fn test_valid_uuid() {
         let mut thing = Thing::new("X");
-        thing.identifiers = vec![ThingIdentifier::uuid("550e8400-e29b-41d4-a716-446655440000")];
+        thing.identifiers = vec![ThingIdentifier::uuid(
+            "550e8400-e29b-41d4-a716-446655440000",
+        )];
         assert!(validate_thing(&thing).is_empty());
     }
 
@@ -498,6 +508,9 @@ mod tests {
         let mut thing = Thing::new("X");
         thing.alternate_names = vec!["A".into(), "A".into(), "B".into()];
         normalize_thing(&mut thing);
-        assert_eq!(thing.alternate_names, vec!["A".to_string(), "B".to_string()]);
+        assert_eq!(
+            thing.alternate_names,
+            vec!["A".to_string(), "B".to_string()]
+        );
     }
 }

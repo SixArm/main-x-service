@@ -7,9 +7,9 @@
 //! envelope every REST handler returns,
 //! giving clients a uniform `{ success, data, error }` shape.
 
-pub mod rest;
-pub mod grpc;
 pub mod fhir;
+pub mod grpc;
+pub mod rest;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

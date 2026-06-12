@@ -2,7 +2,7 @@
 //! `OperationOutcome`-shaped JSON body explaining that the
 //! mapping isn't decided yet. See `mod.rs` for the rationale.
 
-use axum::{http::StatusCode, response::IntoResponse, Json};
+use axum::{Json, http::StatusCode, response::IntoResponse};
 use serde_json::json;
 
 /// Build a `501 Not Implemented` response with a FHIR

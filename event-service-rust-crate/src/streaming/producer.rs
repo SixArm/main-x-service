@@ -5,9 +5,9 @@
 //! [`FluvioProducer`](crate::streaming::producer::FluvioProducer) is the
 //! production placeholder backed by Fluvio.
 
-use std::sync::{Arc, Mutex};
-use super::{EventProducer, EventEvent};
+use super::{EventEvent, EventProducer};
 use crate::Result;
+use std::sync::{Arc, Mutex};
 
 /// In-memory event publisher for development and testing. In production,
 /// replace with a durable backend (Fluvio / Kafka / NATS). The buffer is

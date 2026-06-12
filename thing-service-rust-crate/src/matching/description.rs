@@ -51,7 +51,11 @@ mod tests {
     /// Identical descriptions score 1.0.
     #[test]
     fn test_exact() {
-        assert!((description_similarity("A novel by Jane Austen", "A novel by Jane Austen") - 1.0).abs() < f64::EPSILON);
+        assert!(
+            (description_similarity("A novel by Jane Austen", "A novel by Jane Austen") - 1.0)
+                .abs()
+                < f64::EPSILON
+        );
     }
 
     /// Case is folded away before comparison.
@@ -71,7 +75,10 @@ mod tests {
     /// Unrelated descriptions score low.
     #[test]
     fn test_different() {
-        let s = description_similarity("A novel by Jane Austen", "Standard library for asynchronous Rust");
+        let s = description_similarity(
+            "A novel by Jane Austen",
+            "Standard library for asynchronous Rust",
+        );
         assert!(s < 0.6, "{s}");
     }
 

@@ -6,8 +6,8 @@
 //! sketches the intended Tonic wiring. Callers should use the REST API
 //! ([`crate::api::rest`]) until this is implemented.
 
-use crate::config::ServerConfig;
 use crate::Result;
+use crate::config::ServerConfig;
 
 /// Generated Protobuf types (reserved).
 ///

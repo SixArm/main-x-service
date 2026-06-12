@@ -54,7 +54,12 @@ use crate::models::{
 pub fn to_matcher_place(p: &Place) -> MPlace {
     let mut b = MPlace::builder().name(p.name.trim());
 
-    if let Some(alt) = p.alternate_name.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(alt) = p
+        .alternate_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         b = b.add_alternate_name(alt);
     }
 
@@ -83,7 +88,12 @@ pub fn to_matcher_place(p: &Place) -> MPlace {
         }
     }
 
-    if let Some(t) = p.telephone.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(t) = p
+        .telephone
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         b = b.phone(t);
     }
 
@@ -109,7 +119,9 @@ pub fn to_matcher_place(p: &Place) -> MPlace {
     }
 
     for id in &p.identifiers {
-        if let Some(pid) = MPlaceId::new(map_identifier_scheme(&id.identifier_type), id.value.trim()) {
+        if let Some(pid) =
+            MPlaceId::new(map_identifier_scheme(&id.identifier_type), id.value.trim())
+        {
             b = b.add_place_id(pid);
         }
     }

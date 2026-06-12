@@ -6,8 +6,8 @@
 //! the Prost-generated message and service code once the `.proto`
 //! schema is added.
 
-use crate::config::ServerConfig;
 use crate::Result;
+use crate::config::ServerConfig;
 
 /// Prost-generated protocol-buffer types and service stubs (empty
 /// until the `.proto` schema is wired in via `tonic::include_proto!`).

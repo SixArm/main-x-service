@@ -45,12 +45,10 @@ pub fn mask_person(person: &Person) -> Person {
     // Mask SSN and other sensitive identifiers
     for id in &mut masked.identifiers {
         match id.identifier_type {
-            crate::models::IdentifierType::SSN
-            | crate::models::IdentifierType::TAX => {
+            crate::models::IdentifierType::SSN | crate::models::IdentifierType::TAX => {
                 id.value = mask_value(&id.value, 4);
             }
-            crate::models::IdentifierType::PPN
-            | crate::models::IdentifierType::DL => {
+            crate::models::IdentifierType::PPN | crate::models::IdentifierType::DL => {
                 id.value = mask_value(&id.value, 4);
             }
             _ => {}
@@ -107,7 +105,9 @@ pub fn has_active_consent(
     consents: &[crate::models::Consent],
     consent_type: crate::models::ConsentType,
 ) -> bool {
-    let today = jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC).date();
+    let today = jiff::Timestamp::now()
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .date();
 
     consents.iter().any(|c| {
         c.consent_type == consent_type
@@ -142,11 +142,19 @@ mod tests {
         use crate::models::*;
 
         let mut person = Person::new(
-            HumanName { use_type: None, family: "Smith".into(), given: vec!["John".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Male,
         );
         person.tax_id = Some("123-45-6789".into());
-        person.identifiers.push(Identifier::ssn("123-45-6789".into()));
+        person
+            .identifiers
+            .push(Identifier::ssn("123-45-6789".into()));
 
         let masked = mask_person(&person);
         assert_eq!(masked.tax_id.as_deref(), Some("***-**-6789"));
@@ -160,7 +168,11 @@ mod tests {
     fn test_mask_email() {
         // mask_value on an email-like string
         let masked = mask_value("john.doe@example.com", 4);
-        assert!(masked.ends_with(".com"), "Should keep last 4 chars visible, got {}", masked);
+        assert!(
+            masked.ends_with(".com"),
+            "Should keep last 4 chars visible, got {}",
+            masked
+        );
         assert!(masked.contains('*'), "Should contain masked characters");
     }
 
@@ -168,7 +180,11 @@ mod tests {
     #[test]
     fn test_mask_phone() {
         let masked = mask_value("+1-555-123-4567", 4);
-        assert!(masked.ends_with("4567"), "Last 4 digits should be visible, got {}", masked);
+        assert!(
+            masked.ends_with("4567"),
+            "Last 4 digits should be visible, got {}",
+            masked
+        );
     }
 
     /// An SSN masks to `***-**-6789`.
@@ -193,7 +209,13 @@ mod tests {
         use crate::models::*;
 
         let mut person = Person::new(
-            HumanName { use_type: None, family: "Doe".into(), given: vec!["Jane".into()], prefix: vec![], suffix: vec![] },
+            HumanName {
+                use_type: None,
+                family: "Doe".into(),
+                given: vec!["Jane".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
             Gender::Female,
         );
         person.tax_id = Some("987-65-4321".into());
@@ -205,14 +227,17 @@ mod tests {
         assert!(obj.contains_key("name"), "Export should contain name");
         assert!(obj.contains_key("gender"), "Export should contain gender");
         assert!(obj.contains_key("tax_id"), "Export should contain tax_id");
-        assert!(obj.contains_key("birth_date"), "Export should contain birth_date");
+        assert!(
+            obj.contains_key("birth_date"),
+            "Export should contain birth_date"
+        );
         assert!(obj.contains_key("id"), "Export should contain id");
     }
 
     /// An active, unexpired consent is detected.
     #[test]
     fn test_consent_active_check() {
-        use crate::models::{Consent, ConsentType, ConsentStatus};
+        use crate::models::{Consent, ConsentStatus, ConsentType};
 
         let consent = Consent {
             id: uuid::Uuid::new_v4(),
@@ -234,7 +259,7 @@ mod tests {
     /// A past-expiry consent is not considered active.
     #[test]
     fn test_consent_expired_check() {
-        use crate::models::{Consent, ConsentType, ConsentStatus};
+        use crate::models::{Consent, ConsentStatus, ConsentType};
 
         let expired_consent = Consent {
             id: uuid::Uuid::new_v4(),
@@ -250,7 +275,9 @@ mod tests {
             updated_at: jiff::Timestamp::now(),
         };
 
-        assert!(!has_active_consent(&[expired_consent], ConsentType::Marketing),
-            "Expired consent should not be considered active");
+        assert!(
+            !has_active_consent(&[expired_consent], ConsentType::Marketing),
+            "Expired consent should not be considered active"
+        );
     }
 }

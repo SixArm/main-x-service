@@ -79,9 +79,7 @@ impl ProbabilisticScorer {
         // Short-circuit: exact match on a strong identifier type
         // (booking / ticket / confirmation / encounter / transaction
         // ID) is enough on its own.
-        if identifier >= 1.0
-            && shares_strong_identifier_type(event, candidate)
-        {
+        if identifier >= 1.0 && shares_strong_identifier_type(event, candidate) {
             return MatchResult {
                 event: candidate.clone(),
                 score: 1.0,
@@ -307,7 +305,13 @@ mod tests {
 
     /// Build a conference event with the given name on a fixed date.
     fn event(name: &str, hour: i8) -> Event {
-        let mut e = Event::new(name, jiff::civil::datetime(2026, 3, 1, hour, 0, 0, 0).in_tz("UTC").unwrap().timestamp());
+        let mut e = Event::new(
+            name,
+            jiff::civil::datetime(2026, 3, 1, hour, 0, 0, 0)
+                .in_tz("UTC")
+                .unwrap()
+                .timestamp(),
+        );
         e.event_type = EventType::Conference;
         e
     }

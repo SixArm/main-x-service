@@ -61,7 +61,9 @@ pub fn has_active_consent(
     consents: &[crate::models::Consent],
     consent_type: crate::models::ConsentType,
 ) -> bool {
-    let today = jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC).date();
+    let today = jiff::Timestamp::now()
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .date();
     consents.iter().any(|c| {
         c.consent_type == consent_type
             && c.status == crate::models::ConsentStatus::Active
@@ -92,7 +94,13 @@ mod tests {
     /// `mask_event` masks identifier values (potential access tokens).
     #[test]
     fn mask_event_masks_identifiers() {
-        let mut event = Event::new("Concert", jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp());
+        let mut event = Event::new(
+            "Concert",
+            jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0)
+                .in_tz("UTC")
+                .unwrap()
+                .timestamp(),
+        );
         event.identifiers.push(Identifier::new(
             IdentifierType::TicketNumber,
             "sys".into(),
@@ -106,7 +114,13 @@ mod tests {
     /// `mask_event` masks party emails, strips external IDs, keeps names.
     #[test]
     fn mask_event_masks_party_emails() {
-        let mut event = Event::new("X", jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp());
+        let mut event = Event::new(
+            "X",
+            jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0)
+                .in_tz("UTC")
+                .unwrap()
+                .timestamp(),
+        );
         event.attendees.push(Party {
             kind: PartyKind::Person,
             id: Some(uuid::Uuid::new_v4()),
@@ -115,7 +129,13 @@ mod tests {
             url: None,
         });
         let masked = mask_event(&event);
-        assert!(masked.attendees[0].email.as_ref().unwrap().ends_with("test"));
+        assert!(
+            masked.attendees[0]
+                .email
+                .as_ref()
+                .unwrap()
+                .ends_with("test")
+        );
         assert!(masked.attendees[0].email.as_ref().unwrap().contains('*'));
         // External ID should be stripped from the masked view.
         assert!(masked.attendees[0].id.is_none());
@@ -126,7 +146,13 @@ mod tests {
     /// The GDPR export includes the core stored fields.
     #[test]
     fn export_includes_all_fields() {
-        let event = Event::new("X", jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp());
+        let event = Event::new(
+            "X",
+            jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0)
+                .in_tz("UTC")
+                .unwrap()
+                .timestamp(),
+        );
         let exported = export_event_data(&event);
         let obj = exported.as_object().unwrap();
         assert!(obj.contains_key("name"));

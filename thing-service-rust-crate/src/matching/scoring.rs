@@ -244,7 +244,11 @@ pub fn compute_match(a: &Thing, b: &Thing, weights: &MatchWeights) -> MatchResul
 
     // Normalize by the summed weight of the participating components. The
     // guard handles a pathological all-zero weight set (score 0.0).
-    let score = if weight_sum > 0.0 { total / weight_sum } else { 0.0 };
+    let score = if weight_sum > 0.0 {
+        total / weight_sum
+    } else {
+        0.0
+    };
     // Step 4: phonetic bonus. A shared Soundex code nudges sub-Certain
     // scores up by 0.05 (capped at 1.0), rewarding spelling variants the
     // Jaro-Winkler name score may have under-counted.

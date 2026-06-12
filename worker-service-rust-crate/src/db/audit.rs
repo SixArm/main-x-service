@@ -7,11 +7,11 @@
 //! endpoints.
 
 use sea_orm::*;
-use uuid::Uuid;
 use serde_json::Value as JsonValue;
+use uuid::Uuid;
 
-use crate::Result;
 use super::models::audit_log;
+use crate::Result;
 
 /// Repository that writes and queries entries in the `audit_log` table.
 pub struct AuditLogRepository {
@@ -44,7 +44,8 @@ impl AuditLogRepository {
             user_id,
             ip_address,
             user_agent,
-        ).await
+        )
+        .await
     }
 
     /// Records an `UPDATE` action, storing both `old_values` and `new_values`.
@@ -67,7 +68,8 @@ impl AuditLogRepository {
             user_id,
             ip_address,
             user_agent,
-        ).await
+        )
+        .await
     }
 
     /// Records a `DELETE` action, storing `old_values` (no new state).
@@ -89,7 +91,8 @@ impl AuditLogRepository {
             user_id,
             ip_address,
             user_agent,
-        ).await
+        )
+        .await
     }
 
     /// Inserts one audit row. Shared implementation behind the typed

@@ -447,7 +447,10 @@ mod tests {
 
     /// Build a fixed UTC timestamp for deterministic time tests.
     fn dt(y: i16, mo: i8, d: i8, h: i8) -> Timestamp {
-        jiff::civil::datetime(y, mo, d, h, 0, 0, 0).in_tz("UTC").unwrap().timestamp()
+        jiff::civil::datetime(y, mo, d, h, 0, 0, 0)
+            .in_tz("UTC")
+            .unwrap()
+            .timestamp()
     }
 
     /// Identical titles score ~1.0.
@@ -573,10 +576,7 @@ mod tests {
             name: Some("y".into()),
             url: "https://x.test".into(),
         };
-        let s = location_matching::match_location(
-            &Location::Virtual(v1),
-            &Location::Virtual(v2),
-        );
+        let s = location_matching::match_location(&Location::Virtual(v1), &Location::Virtual(v2));
         assert_eq!(s, 1.0);
     }
 
@@ -627,8 +627,16 @@ mod tests {
     #[test]
     fn identifier_exact_match() {
         use crate::models::{Identifier, IdentifierType};
-        let a = Identifier::new(IdentifierType::BookingNumber, "sys".into(), "ABC-123".into());
-        let b = Identifier::new(IdentifierType::BookingNumber, "sys".into(), "ABC-123".into());
+        let a = Identifier::new(
+            IdentifierType::BookingNumber,
+            "sys".into(),
+            "ABC-123".into(),
+        );
+        let b = Identifier::new(
+            IdentifierType::BookingNumber,
+            "sys".into(),
+            "ABC-123".into(),
+        );
         assert_eq!(identifier_matching::match_identifier(&a, &b), 1.0);
     }
 
@@ -636,8 +644,16 @@ mod tests {
     #[test]
     fn identifier_formatting_difference() {
         use crate::models::{Identifier, IdentifierType};
-        let a = Identifier::new(IdentifierType::BookingNumber, "sys".into(), "ABC-123".into());
-        let b = Identifier::new(IdentifierType::BookingNumber, "sys".into(), "abc 123".into());
+        let a = Identifier::new(
+            IdentifierType::BookingNumber,
+            "sys".into(),
+            "ABC-123".into(),
+        );
+        let b = Identifier::new(
+            IdentifierType::BookingNumber,
+            "sys".into(),
+            "abc 123".into(),
+        );
         let s = identifier_matching::match_identifier(&a, &b);
         assert!(s > 0.97 && s < 1.0, "got {s}");
     }

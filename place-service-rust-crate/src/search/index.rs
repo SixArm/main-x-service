@@ -45,7 +45,16 @@ impl PlaceIndexSchema {
         let identifiers = b.add_text_field("identifiers", TEXT | STORED);
         let gln = b.add_text_field("gln", STRING | STORED);
         let schema = b.build();
-        Self { schema, id, name, alternate_name, keywords, locality, identifiers, gln }
+        Self {
+            schema,
+            id,
+            name,
+            alternate_name,
+            keywords,
+            locality,
+            identifiers,
+            gln,
+        }
     }
 }
 
@@ -76,7 +85,11 @@ impl PlaceIndex {
             .reload_policy(ReloadPolicy::OnCommitWithDelay)
             .try_into()
             .map_err(|e| crate::Error::Search(format!("create reader: {e}")))?;
-        Ok(Self { index, schema, reader })
+        Ok(Self {
+            index,
+            schema,
+            reader,
+        })
     }
 
     /// Open an existing index previously created at `path`.
@@ -89,7 +102,11 @@ impl PlaceIndex {
             .reload_policy(ReloadPolicy::OnCommitWithDelay)
             .try_into()
             .map_err(|e| crate::Error::Search(format!("create reader: {e}")))?;
-        Ok(Self { index, schema, reader })
+        Ok(Self {
+            index,
+            schema,
+            reader,
+        })
     }
 
     /// Open the index if a `meta.json` already exists, otherwise create.
@@ -110,11 +127,17 @@ impl PlaceIndex {
     }
 
     /// Borrow the underlying Tantivy index (for query-parser setup).
-    pub fn index(&self) -> &Index { &self.index }
+    pub fn index(&self) -> &Index {
+        &self.index
+    }
     /// Borrow the schema + field handles.
-    pub fn schema(&self) -> &PlaceIndexSchema { &self.schema }
+    pub fn schema(&self) -> &PlaceIndexSchema {
+        &self.schema
+    }
     /// Borrow the live reader.
-    pub fn reader(&self) -> &IndexReader { &self.reader }
+    pub fn reader(&self) -> &IndexReader {
+        &self.reader
+    }
 
     /// Force the reader to pick up the latest committed segments.
     pub fn reload(&self) -> Result<()> {

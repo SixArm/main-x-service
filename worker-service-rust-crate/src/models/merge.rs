@@ -15,8 +15,8 @@
 
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 /// Status of a merge operation
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]

@@ -120,7 +120,10 @@ pub async fn create_thing(
             }
             (StatusCode::CREATED, Json(ApiResponse::success(stored)))
         }
-        Err(e) => (status_for(&e), Json(ApiResponse::error("error", e.to_string()))),
+        Err(e) => (
+            status_for(&e),
+            Json(ApiResponse::error("error", e.to_string())),
+        ),
     }
 }
 
@@ -128,10 +131,7 @@ pub async fn create_thing(
 #[utoipa::path(get, path = "/api/things/{id}", tag = "things",
     params(("id" = Uuid, Path, description = "Thing id")),
     responses((status = 200, body = Thing), (status = 404, description = "Not found")))]
-pub async fn get_thing(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+pub async fn get_thing(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
     match state.thing_repository.get_by_id(&id).await {
         Ok(Some(t)) => (StatusCode::OK, Json(ApiResponse::success(t))),
         Ok(None) => fail(&crate::Error::NotFound),
@@ -204,7 +204,11 @@ pub async fn delete_thing(
             let _ = state.search_engine.delete_thing(&id.to_string());
             let _ = state
                 .event_publisher
-                .publish(ThingEvent::new(EventKind::ThingDeleted, id, serde_json::json!({})))
+                .publish(ThingEvent::new(
+                    EventKind::ThingDeleted,
+                    id,
+                    serde_json::json!({}),
+                ))
                 .await;
             if let Some(old) = old {
                 if let Ok(v) = serde_json::to_value(&old) {
@@ -272,7 +276,10 @@ pub async fn search_things(
         }
     }
     let total = results.len();
-    (StatusCode::OK, Json(ApiResponse::success(SearchResponse { results, total })))
+    (
+        StatusCode::OK,
+        Json(ApiResponse::success(SearchResponse { results, total })),
+    )
 }
 
 /// A scored candidate thing returned by match / duplicate endpoints.
@@ -294,7 +301,9 @@ async fn find_candidates(state: &AppState, thing: &Thing) -> Vec<ScoredCandidate
         .unwrap_or_default();
     let mut out = Vec::new();
     for id in ids {
-        let Ok(uuid) = Uuid::parse_str(&id) else { continue };
+        let Ok(uuid) = Uuid::parse_str(&id) else {
+            continue;
+        };
         if uuid == thing.id {
             continue;
         }
@@ -307,7 +316,11 @@ async fn find_candidates(state: &AppState, thing: &Thing) -> Vec<ScoredCandidate
             });
         }
     }
-    out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     out
 }
 
@@ -345,7 +358,10 @@ pub async fn check_duplicates(
     let duplicates_found = candidates.iter().any(|c| c.score >= threshold);
     (
         StatusCode::OK,
-        Json(ApiResponse::success(DuplicateCheckResponse { duplicates_found, candidates })),
+        Json(ApiResponse::success(DuplicateCheckResponse {
+            duplicates_found,
+            candidates,
+        })),
     )
 }
 
@@ -359,18 +375,45 @@ pub async fn merge_things(
 ) -> impl IntoResponse {
     let main = match state.thing_repository.get_by_id(&req.main_thing_id).await {
         Ok(Some(t)) => t,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(ApiResponse::error("not_found", "main thing not found"))),
-        Err(e) => return (status_for(&e), Json(ApiResponse::error("error", e.to_string()))),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::error("not_found", "main thing not found")),
+            );
+        }
+        Err(e) => {
+            return (
+                status_for(&e),
+                Json(ApiResponse::error("error", e.to_string())),
+            );
+        }
     };
-    let dup = match state.thing_repository.get_by_id(&req.duplicate_thing_id).await {
+    let dup = match state
+        .thing_repository
+        .get_by_id(&req.duplicate_thing_id)
+        .await
+    {
         Ok(Some(t)) => t,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(ApiResponse::error("not_found", "duplicate thing not found"))),
-        Err(e) => return (status_for(&e), Json(ApiResponse::error("error", e.to_string()))),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::error("not_found", "duplicate thing not found")),
+            );
+        }
+        Err(e) => {
+            return (
+                status_for(&e),
+                Json(ApiResponse::error("error", e.to_string())),
+            );
+        }
     };
 
     let transferred = serde_json::to_value(&dup).ok();
     if let Err(e) = state.thing_repository.soft_delete(&dup.id).await {
-        return (status_for(&e), Json(ApiResponse::error("error", e.to_string())));
+        return (
+            status_for(&e),
+            Json(ApiResponse::error("error", e.to_string())),
+        );
     }
     let _ = state.search_engine.delete_thing(&dup.id.to_string());
 
@@ -384,7 +427,12 @@ pub async fn merge_things(
     };
     let record = match state.thing_repository.record_merge(&record).await {
         Ok(r) => r,
-        Err(e) => return (status_for(&e), Json(ApiResponse::error("error", e.to_string()))),
+        Err(e) => {
+            return (
+                status_for(&e),
+                Json(ApiResponse::error("error", e.to_string())),
+            );
+        }
     };
     let _ = state
         .event_publisher
@@ -397,7 +445,10 @@ pub async fn merge_things(
 
     (
         StatusCode::OK,
-        Json(ApiResponse::success(MergeResponse { merge_record: record, main_thing: main })),
+        Json(ApiResponse::success(MergeResponse {
+            merge_record: record,
+            main_thing: main,
+        })),
     )
 }
 
@@ -431,7 +482,11 @@ pub async fn deduplicate(
 ) -> impl IntoResponse {
     let limit = req.max_candidates.unwrap_or(100);
     let threshold = req.threshold.unwrap_or_else(|| state.matcher.threshold());
-    let things = state.thing_repository.list(limit, 0).await.unwrap_or_default();
+    let things = state
+        .thing_repository
+        .list(limit, 0)
+        .await
+        .unwrap_or_default();
     let mut duplicates_found = 0usize;
     for i in 0..things.len() {
         for j in (i + 1)..things.len() {
@@ -459,8 +514,14 @@ pub async fn export_thing_data(
 ) -> impl IntoResponse {
     match state.thing_repository.get_by_id(&id).await {
         Ok(Some(t)) => (StatusCode::OK, Json(ApiResponse::success(gdpr_export(&t)))),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(ApiResponse::error("not_found", "thing not found"))),
-        Err(e) => (status_for(&e), Json(ApiResponse::error("error", e.to_string()))),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse::error("not_found", "thing not found")),
+        ),
+        Err(e) => (
+            status_for(&e),
+            Json(ApiResponse::error("error", e.to_string())),
+        ),
     }
 }
 

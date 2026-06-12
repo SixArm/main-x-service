@@ -5,9 +5,9 @@
 //! [`FluvioProducer`](crate::streaming::producer::FluvioProducer) is the production transport stub. Both implement
 //! the [`EventProducer`](crate::streaming::EventProducer) trait from the parent module.
 
-use std::sync::{Arc, Mutex};
 use super::{EventProducer, PersonEvent};
 use crate::Result;
+use std::sync::{Arc, Mutex};
 
 /// An [`EventProducer`] that records events in memory.
 ///

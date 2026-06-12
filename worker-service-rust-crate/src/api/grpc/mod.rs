@@ -4,8 +4,8 @@
 //! placeholder: [`serve`] is a no-op and [`proto`] will hold the
 //! Tonic/prost-generated types once the `.proto` is compiled in.
 
-use crate::config::ServerConfig;
 use crate::Result;
+use crate::config::ServerConfig;
 
 /// Generated Protocol Buffers code (Tonic/prost) will live here.
 pub mod proto {

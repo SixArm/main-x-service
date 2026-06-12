@@ -20,12 +20,12 @@
 //! assert_eq!(err.error.unwrap().code, "NOT_FOUND");
 //! ```
 
-/// REST API (Axum): router, handlers, routes, shared state.
-pub mod rest;
-/// gRPC API (Tonic) — currently a stub.
-pub mod grpc;
 /// FHIR R5 API — currently a stub returning `OperationOutcome`.
 pub mod fhir;
+/// gRPC API (Tonic) — currently a stub.
+pub mod grpc;
+/// REST API (Axum): router, handlers, routes, shared state.
+pub mod rest;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

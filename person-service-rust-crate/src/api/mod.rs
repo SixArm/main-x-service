@@ -8,12 +8,12 @@
 //! (the primary HTTP API + Swagger), [`fhir`](crate::api::fhir) (HL7 FHIR R5 Person), and
 //! [`grpc`](crate::api::grpc) (Tonic stub).
 
-/// REST API: router, handlers, state, and OpenAPI/Swagger.
-pub mod rest;
-/// gRPC API (Tonic) — stub.
-pub mod grpc;
 /// HL7 FHIR R5 API for the Person resource.
 pub mod fhir;
+/// gRPC API (Tonic) — stub.
+pub mod grpc;
+/// REST API: router, handlers, state, and OpenAPI/Swagger.
+pub mod rest;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

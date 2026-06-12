@@ -11,17 +11,17 @@
 //! intended to be Fluvio in production but is abstracted behind the
 //! traits.
 
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use jiff::Timestamp;
 
-use crate::models::Event;
 use crate::Result;
+use crate::models::Event;
 
-/// Producer implementations (in-memory publisher).
-pub mod producer;
 /// Consumer implementations (stub).
 pub mod consumer;
+/// Producer implementations (in-memory publisher).
+pub mod producer;
 
 /// A streamed domain event describing one change to an event record.
 #[derive(Debug, Clone, Serialize, Deserialize)]

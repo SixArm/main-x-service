@@ -86,7 +86,10 @@ pub fn validate_place(place: &Place) -> Vec<ValidationError> {
         if geo.longitude < -180.0 || geo.longitude > 180.0 {
             errors.push(ValidationError {
                 field: "geo.longitude".into(),
-                message: format!("Longitude must be between -180 and 180, got {}", geo.longitude),
+                message: format!(
+                    "Longitude must be between -180 and 180, got {}",
+                    geo.longitude
+                ),
             });
         }
     }
@@ -103,7 +106,8 @@ pub fn validate_place(place: &Place) -> Vec<ValidationError> {
 
     // URL must carry an http(s) scheme; we do not parse the full URL.
     if let Some(url) = &place.url
-        && !url.starts_with("http://") && !url.starts_with("https://")
+        && !url.starts_with("http://")
+        && !url.starts_with("https://")
     {
         errors.push(ValidationError {
             field: "url".into(),
@@ -113,7 +117,8 @@ pub fn validate_place(place: &Place) -> Vec<ValidationError> {
 
     // Telephone, when non-empty, must use the international `+` prefix.
     if let Some(tel) = &place.telephone
-        && !tel.is_empty() && !tel.starts_with('+')
+        && !tel.is_empty()
+        && !tel.starts_with('+')
     {
         errors.push(ValidationError {
             field: "telephone".into(),
@@ -124,7 +129,10 @@ pub fn validate_place(place: &Place) -> Vec<ValidationError> {
     // A present address needs at least one locating field; a lone street line
     // is not enough to place it.
     if let Some(addr) = &place.address {
-        let has_locality = addr.address_locality.as_ref().is_some_and(|s| !s.is_empty());
+        let has_locality = addr
+            .address_locality
+            .as_ref()
+            .is_some_and(|s| !s.is_empty());
         let has_postal = addr.postal_code.as_ref().is_some_and(|s| !s.is_empty());
         let has_country = addr.address_country.as_ref().is_some_and(|s| !s.is_empty());
         if !has_locality && !has_postal && !has_country {
