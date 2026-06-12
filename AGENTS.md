@@ -21,6 +21,7 @@ per-crate `AGENTS/spec-driven-development.md` files for the discipline.
 | [Course Service](course-service-rust-crate/) | Course (schema.org/Course) — template + `CourseInstance` sub-resource | [spec](course-service-rust-crate/spec/index.md) | [index](course-service-rust-crate/index.md) |
 | [Authentication Service](authentication-service-rust-crate/) | User (central single sign-on provider) — passwordless magic-link, RS256 JWT + JWKS. **First real loco.rs crate**; reference for converting the others. | [spec](authentication-service-rust-crate/spec/index.md) | [index](authentication-service-rust-crate/index.md) |
 | [Organization Service](organization-service-rust-crate/) | Organization (schema.org/Organization) — loco.rs CRUD + matching, embeds organization-matcher (MVP) | [spec](organization-service-rust-crate/spec/index.md) | [index](organization-service-rust-crate/index.md) |
+| [Care Pathway Service](care-pathway-service-rust-crate/) | Care pathway (clinical pathway) — loco.rs CRUD + matching, embeds care-pathway-matcher (MVP) | [spec](care-pathway-service-rust-crate/spec/index.md) | [index](care-pathway-service-rust-crate/index.md) |
 
 ### Matcher crates
 
@@ -39,6 +40,7 @@ the corresponding service crate's matching layer.
 | [Event Matcher](event-matcher-rust-crate/) | Event | [spec](event-matcher-rust-crate/spec/index.md) | [index](event-matcher-rust-crate/index.md) |
 | [Course Matcher](course-matcher-rust-crate/) | Course | [spec](course-matcher-rust-crate/spec/index.md) | [index](course-matcher-rust-crate/index.md) |
 | [Organization Matcher](organization-matcher-rust-crate/) | Organization (schema.org/Organization) | [spec](organization-matcher-rust-crate/spec/index.md) | [index](organization-matcher-rust-crate/index.md) |
+| [Care Pathway Matcher](care-pathway-matcher-rust-crate/) | Care pathway (clinical pathway) | [spec](care-pathway-matcher-rust-crate/spec/index.md) | [index](care-pathway-matcher-rust-crate/index.md) |
 
 ### Front-end projects
 
@@ -59,6 +61,7 @@ accepted (see `feedback_front_end_drift` memory) — no shared package.
 | [course-front-end-with-svelte](course-front-end-with-svelte/) | [course-service](course-service-rust-crate/) | [spec](course-front-end-with-svelte/spec/index.md) | [CHANGELOG](course-front-end-with-svelte/CHANGELOG.md) |
 | [authentication-front-end-with-svelte](authentication-front-end-with-svelte/) | [authentication-service](authentication-service-rust-crate/) | [spec](authentication-front-end-with-svelte/spec/index.md) | [CHANGELOG](authentication-front-end-with-svelte/CHANGELOG.md) |
 | [organization-front-end-with-svelte](organization-front-end-with-svelte/) | [organization-service](organization-service-rust-crate/) | [spec](organization-front-end-with-svelte/spec/index.md) | [CHANGELOG](organization-front-end-with-svelte/CHANGELOG.md) |
+| [care-pathway-front-end-with-svelte](care-pathway-front-end-with-svelte/) | [care-pathway-service](care-pathway-service-rust-crate/) | [spec](care-pathway-front-end-with-svelte/spec/index.md) | [CHANGELOG](care-pathway-front-end-with-svelte/CHANGELOG.md) |
 
 ## Shared reference docs
 
