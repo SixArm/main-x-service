@@ -3,6 +3,8 @@
 
 use loco_rs::prelude::*;
 use organization_matcher::Organization as MatchOrg;
+use sea_orm::sea_query::extension::postgres::PgExpr;
+use sea_orm::sea_query::Expr;
 use sea_orm::{QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -53,6 +55,23 @@ impl Model {
             .one(db)
             .await?;
         org.ok_or_else(|| ModelError::EntityNotFound)
+    }
+
+    /// Case-insensitive substring search on the denormalised `name`,
+    /// over active rows. (Postgres `ILIKE '%q%'`.)
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn search(db: &DatabaseConnection, q: &str, limit: u64) -> ModelResult<Vec<Self>> {
+        let rows = organizations::Entity::find()
+            .filter(organizations::Column::DeletedAt.is_null())
+            .filter(Expr::col(organizations::Column::Name).ilike(format!("%{q}%")))
+            .order_by_desc(organizations::Column::Id)
+            .limit(limit)
+            .all(db)
+            .await?;
+        Ok(rows)
     }
 
     /// List active organizations (most-recent first), capped at `limit`.

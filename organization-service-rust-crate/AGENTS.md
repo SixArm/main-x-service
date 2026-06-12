@@ -27,19 +27,24 @@ there is no separate model or adapter to drift.
 |---|---|---|
 | POST | `/api/organizations` | Create (body: `Organization`) → `{pid, name}` |
 | GET | `/api/organizations` | List active (capped 100) |
+| GET | `/api/organizations/search?q=` | Case-insensitive name search |
 | GET | `/api/organizations/{pid}` | Fetch the stored `Organization` |
 | PUT | `/api/organizations/{pid}` | Replace payload |
 | DELETE | `/api/organizations/{pid}` | Soft-delete |
 | POST | `/api/organizations/match` | Rank a `{query, candidates}` set (no persistence) |
 | POST | `/api/organizations/check-duplicates` | Match a query against stored orgs |
+| GET | `/api/organizations/audit/recent` · `/{pid}/audit` | Audit trail |
+| GET | `/api/organizations/events/recent` | In-memory event stream |
+| GET | `/swagger-ui` · `/api-docs/openapi.json` | API docs |
 
 Plus loco's default `/_health`, `/_ping`.
 
-## MVP scope
+## Scope
 
-This is a focused first cut: **CRUD + matching**. Deferred to follow-up
-(see spec §13): Tantivy full-text search, event streaming, audit log,
-per-field privacy/GDPR export, richer validation, OpenAPI/Swagger.
+CRUD + matching + **name search** + **audit log** + **event streaming**
++ **OpenAPI/Swagger** are wired. Still deferred (spec §13): Tantivy
+full-text (this uses Postgres `ILIKE`), per-field privacy/GDPR export,
+record merge, richer validation, request-level tests.
 
 ## Golden rules
 

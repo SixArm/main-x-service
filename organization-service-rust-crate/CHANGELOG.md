@@ -11,6 +11,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Audit log + event streaming.** `audit_logs` table records every
+  create/update/delete (with a JSONB snapshot); a process-global
+  in-memory event stream publishes Created/Updated/Deleted events.
+  Endpoints: `GET /api/organizations/audit/recent`, `/{pid}/audit`,
+  `/events/recent`.
+- **Name search.** `GET /api/organizations/search?q=` — case-insensitive
+  Postgres `ILIKE` on the denormalised name (Tantivy full-text remains a
+  §13 follow-up).
+- **OpenAPI + Swagger UI.** Hand-authored OpenAPI 3 spec at
+  `/api-docs/openapi.json` (accurately typed `Organization` schema, since
+  the matcher crate is `utoipa`-free) and a Swagger UI page at
+  `/swagger-ui`.
+
 - **Inaugural scaffold (v0.1.0).** loco.rs organization-identity
   registry (schema.org/Organization).
   - Generated via `loco new` (loco-rs 0.16) and stripped of the auth

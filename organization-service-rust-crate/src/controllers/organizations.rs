@@ -146,6 +146,26 @@ async fn check_duplicates(
     format::json(hits)
 }
 
+#[derive(Debug, Deserialize)]
+struct SearchParams {
+    q: Option<String>,
+}
+
+/// Case-insensitive name search: `GET /api/organizations/search?q=acme`.
+#[debug_handler]
+async fn search(
+    axum::extract::Query(params): axum::extract::Query<SearchParams>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let q = params.q.unwrap_or_default();
+    if q.trim().is_empty() {
+        return bad_request("query parameter `q` is required");
+    }
+    let rows = OrgModel::search(&ctx.db, q.trim(), 50).await?;
+    let refs: Vec<OrgRef> = rows.iter().map(OrgRef::of).collect();
+    format::json(refs)
+}
+
 /// Recent audit-log entries across all organizations.
 #[debug_handler]
 async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
@@ -174,6 +194,7 @@ pub fn routes() -> Routes {
         .prefix("/api/organizations")
         .add("/", post(create))
         .add("/", get(list))
+        .add("/search", get(search))
         .add("/match", post(match_against))
         .add("/check-duplicates", post(check_duplicates))
         .add("/audit/recent", get(recent_audit))

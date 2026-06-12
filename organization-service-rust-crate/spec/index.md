@@ -85,11 +85,12 @@ personal data — honour GDPR when the privacy layer lands (§13).
 
 ## 13. Tasks (live work queue)
 
-- [ ] Tantivy full-text search + fuzzy/blocking.
-- [ ] Event streaming + audit log on CRUD.
+- [x] Event streaming + audit log on CRUD.
+- [x] Name search (Postgres `ILIKE`) + OpenAPI/Swagger.
+- [ ] Tantivy full-text search + fuzzy/blocking (replacing the `ILIKE`
+      search).
 - [ ] Per-field masking + GDPR export endpoint.
 - [ ] Record merge with link tracking.
-- [ ] OpenAPI/Swagger via utoipa.
 - [ ] Richer validation (identifier formats, URL, country codes).
 - [ ] Request-level integration tests (Postgres).
 - [ ] JWT verification middleware consuming the auth-service JWKS.
@@ -97,8 +98,9 @@ personal data — honour GDPR when the privacy layer lands (§13).
 ## 14. Implementation status
 
 Done: loco boot; organizations table + migration; CRUD; `/match` and
-`/check-duplicates` embedding organization-matcher; DB-free tests; green
-build + clippy.
+`/check-duplicates` embedding organization-matcher; audit log; in-memory
+event streaming; name search (`ILIKE`); OpenAPI 3 + Swagger UI; DB-free
+tests; green build + clippy.
 
 ## 15. Roadmap
 
