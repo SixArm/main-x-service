@@ -58,6 +58,7 @@ accepted (see `feedback_front_end_drift` memory) — no shared package.
 | [event-front-end-with-svelte](event-front-end-with-svelte/) | [event-service](event-service-rust-crate/) | [spec](event-front-end-with-svelte/spec/index.md) | [CHANGELOG](event-front-end-with-svelte/CHANGELOG.md) |
 | [course-front-end-with-svelte](course-front-end-with-svelte/) | [course-service](course-service-rust-crate/) | [spec](course-front-end-with-svelte/spec/index.md) | [CHANGELOG](course-front-end-with-svelte/CHANGELOG.md) |
 | [authentication-front-end-with-svelte](authentication-front-end-with-svelte/) | [authentication-service](authentication-service-rust-crate/) | [spec](authentication-front-end-with-svelte/spec/index.md) | [CHANGELOG](authentication-front-end-with-svelte/CHANGELOG.md) |
+| [organization-front-end-with-svelte](organization-front-end-with-svelte/) | [organization-service](organization-service-rust-crate/) | [spec](organization-front-end-with-svelte/spec/index.md) | [CHANGELOG](organization-front-end-with-svelte/CHANGELOG.md) |
 
 ## Shared reference docs
 
