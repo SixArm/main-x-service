@@ -44,7 +44,9 @@ pub mod providers {
     }
 
     impl Related<super::courses::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Courses.def() }
+        fn to() -> RelationDef {
+            Relation::Courses.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -137,16 +139,24 @@ pub mod courses {
     }
 
     impl Related<super::course_identifiers::Entity> for Entity {
-        fn to() -> RelationDef { Relation::CourseIdentifiers.def() }
+        fn to() -> RelationDef {
+            Relation::CourseIdentifiers.def()
+        }
     }
     impl Related<super::course_instances::Entity> for Entity {
-        fn to() -> RelationDef { Relation::CourseInstances.def() }
+        fn to() -> RelationDef {
+            Relation::CourseInstances.def()
+        }
     }
     impl Related<super::syllabus_sections::Entity> for Entity {
-        fn to() -> RelationDef { Relation::SyllabusSections.def() }
+        fn to() -> RelationDef {
+            Relation::SyllabusSections.def()
+        }
     }
     impl Related<super::providers::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Provider.def() }
+        fn to() -> RelationDef {
+            Relation::Provider.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -197,7 +207,9 @@ pub mod course_identifiers {
     }
 
     impl Related<super::courses::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Course.def() }
+        fn to() -> RelationDef {
+            Relation::Course.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -240,7 +252,9 @@ pub mod course_links {
     }
 
     impl Related<super::courses::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Course.def() }
+        fn to() -> RelationDef {
+            Relation::Course.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -309,7 +323,9 @@ pub mod course_instances {
     }
 
     impl Related<super::courses::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Course.def() }
+        fn to() -> RelationDef {
+            Relation::Course.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -359,7 +375,9 @@ pub mod syllabus_sections {
     }
 
     impl Related<super::courses::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Course.def() }
+        fn to() -> RelationDef {
+            Relation::Course.def()
+        }
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -515,11 +533,17 @@ pub mod course_text_values {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `courses`.
-        #[sea_orm(belongs_to = "super::courses::Entity", from = "Column::CourseId", to = "super::courses::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::courses::Entity",
+            from = "Column::CourseId",
+            to = "super::courses::Column::Id"
+        )]
         Course,
     }
     impl Related<super::courses::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Course.def() }
+        fn to() -> RelationDef {
+            Relation::Course.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -557,11 +581,17 @@ pub mod course_credentials {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `courses`.
-        #[sea_orm(belongs_to = "super::courses::Entity", from = "Column::CourseId", to = "super::courses::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::courses::Entity",
+            from = "Column::CourseId",
+            to = "super::courses::Column::Id"
+        )]
         Course,
     }
     impl Related<super::courses::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Course.def() }
+        fn to() -> RelationDef {
+            Relation::Course.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -591,11 +621,17 @@ pub mod course_instance_languages {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `course_instances`.
-        #[sea_orm(belongs_to = "super::course_instances::Entity", from = "Column::InstanceId", to = "super::course_instances::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::course_instances::Entity",
+            from = "Column::InstanceId",
+            to = "super::course_instances::Column::Id"
+        )]
         Instance,
     }
     impl Related<super::course_instances::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Instance.def() }
+        fn to() -> RelationDef {
+            Relation::Instance.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -627,11 +663,17 @@ pub mod course_instance_instructors {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `course_instances`.
-        #[sea_orm(belongs_to = "super::course_instances::Entity", from = "Column::InstanceId", to = "super::course_instances::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::course_instances::Entity",
+            from = "Column::InstanceId",
+            to = "super::course_instances::Column::Id"
+        )]
         Instance,
     }
     impl Related<super::course_instances::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Instance.def() }
+        fn to() -> RelationDef {
+            Relation::Instance.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -665,11 +707,17 @@ pub mod course_instance_sessions {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `course_instances`.
-        #[sea_orm(belongs_to = "super::course_instances::Entity", from = "Column::InstanceId", to = "super::course_instances::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::course_instances::Entity",
+            from = "Column::InstanceId",
+            to = "super::course_instances::Column::Id"
+        )]
         Instance,
     }
     impl Related<super::course_instances::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Instance.def() }
+        fn to() -> RelationDef {
+            Relation::Instance.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -701,11 +749,17 @@ pub mod course_syllabus_text_values {
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// FK to `syllabus_sections`.
-        #[sea_orm(belongs_to = "super::syllabus_sections::Entity", from = "Column::SectionId", to = "super::syllabus_sections::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::syllabus_sections::Entity",
+            from = "Column::SectionId",
+            to = "super::syllabus_sections::Column::Id"
+        )]
         Section,
     }
     impl Related<super::syllabus_sections::Entity> for Entity {
-        fn to() -> RelationDef { Relation::Section.def() }
+        fn to() -> RelationDef {
+            Relation::Section.def()
+        }
     }
     impl ActiveModelBehavior for ActiveModel {}
 }

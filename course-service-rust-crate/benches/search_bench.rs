@@ -53,7 +53,11 @@ fn bench_search_exact(c: &mut Criterion) {
     let (_dir, engine, _probe) = populated_engine();
     c.bench_function("search/exact/computer_science", |b| {
         b.iter(|| {
-            black_box(engine.search(black_box("Computer Science"), 10).expect("search"));
+            black_box(
+                engine
+                    .search(black_box("Computer Science"), 10)
+                    .expect("search"),
+            );
         });
     });
 }
@@ -63,7 +67,11 @@ fn bench_search_fuzzy(c: &mut Criterion) {
     let (_dir, engine, _probe) = populated_engine();
     c.bench_function("search/fuzzy/typo", |b| {
         b.iter(|| {
-            black_box(engine.fuzzy_search(black_box("Computre"), 10).expect("fuzzy"));
+            black_box(
+                engine
+                    .fuzzy_search(black_box("Computre"), 10)
+                    .expect("fuzzy"),
+            );
         });
     });
 }

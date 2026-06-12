@@ -89,7 +89,15 @@ impl AuditLogRepository {
         new_values: JsonValue,
         ctx: &AuditContext,
     ) -> Result<()> {
-        self.log_action("CREATE", entity_type, entity_id, None, Some(new_values), ctx).await
+        self.log_action(
+            "CREATE",
+            entity_type,
+            entity_id,
+            None,
+            Some(new_values),
+            ctx,
+        )
+        .await
     }
 
     /// Record an `UPDATE` with both pre- and post-change values.
@@ -120,7 +128,15 @@ impl AuditLogRepository {
         old_values: JsonValue,
         ctx: &AuditContext,
     ) -> Result<()> {
-        self.log_action("DELETE", entity_type, entity_id, Some(old_values), None, ctx).await
+        self.log_action(
+            "DELETE",
+            entity_type,
+            entity_id,
+            Some(old_values),
+            None,
+            ctx,
+        )
+        .await
     }
 
     /// Shared insert path for all three log_* convenience methods.

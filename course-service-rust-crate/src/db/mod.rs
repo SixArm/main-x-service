@@ -8,13 +8,13 @@
 //! they ship with T-8.
 
 mod convert;
-use convert::{ts_to_offset, offset_to_ts};
-use time::OffsetDateTime;
+use convert::{offset_to_ts, ts_to_offset};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, Database, DatabaseConnection, EntityTrait,
     QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::Result;
@@ -29,9 +29,9 @@ pub mod audit;
 pub mod models;
 
 use models::{
-    course_credentials, course_identifiers, course_instance_instructors,
-    course_instance_languages, course_instance_sessions, course_instances, course_links,
-    course_merge_records, course_text_values, courses,
+    course_credentials, course_identifiers, course_instance_instructors, course_instance_languages,
+    course_instance_sessions, course_instances, course_links, course_merge_records,
+    course_text_values, courses,
 };
 
 /// Open a connection pool from a `DatabaseConfig`.
@@ -75,11 +75,7 @@ pub trait CourseRepository: Send + Sync {
     /// Update an existing instance.
     async fn update_instance(&self, instance: &CourseInstance) -> Result<CourseInstance>;
     /// Soft-delete one instance scoped to its parent course.
-    async fn soft_delete_instance(
-        &self,
-        course_id: &Uuid,
-        instance_id: &Uuid,
-    ) -> Result<()>;
+    async fn soft_delete_instance(&self, course_id: &Uuid, instance_id: &Uuid) -> Result<()>;
 
     /// Merge bookkeeping (T-7b / FR-8). Inserts a row into
     /// `course_merge_records` describing the fold of `duplicate` into
@@ -129,7 +125,13 @@ impl CourseRepository for SeaOrmCourseRepository {
         let identifiers = load_identifiers(&self.db, *id).await?;
         let links = load_links(&self.db, *id).await?;
         let (text_values, credentials) = load_course_collections(&self.db, *id).await?;
-        Ok(Some(hydrate_course(row, identifiers, links, &text_values, &credentials)?))
+        Ok(Some(hydrate_course(
+            row,
+            identifiers,
+            links,
+            &text_values,
+            &credentials,
+        )?))
     }
 
     async fn update(&self, course: &Course) -> Result<Course> {
@@ -192,7 +194,13 @@ impl CourseRepository for SeaOrmCourseRepository {
             let identifiers = load_identifiers(&self.db, id).await?;
             let links = load_links(&self.db, id).await?;
             let (text_values, credentials) = load_course_collections(&self.db, id).await?;
-            out.push(hydrate_course(row, identifiers, links, &text_values, &credentials)?);
+            out.push(hydrate_course(
+                row,
+                identifiers,
+                links,
+                &text_values,
+                &credentials,
+            )?);
         }
         Ok(out)
     }
@@ -235,7 +243,10 @@ impl CourseRepository for SeaOrmCourseRepository {
 
     async fn create_instance(&self, instance: &CourseInstance) -> Result<CourseInstance> {
         let txn = self.db.begin().await.map_err(map_db)?;
-        to_instance_active(instance, false)?.insert(&txn).await.map_err(map_db)?;
+        to_instance_active(instance, false)?
+            .insert(&txn)
+            .await
+            .map_err(map_db)?;
         insert_instance_collections(&txn, instance).await?;
         txn.commit().await.map_err(map_db)?;
         self.get_instance(&instance.course_id, &instance.id)
@@ -249,12 +260,17 @@ impl CourseRepository for SeaOrmCourseRepository {
             .one(&self.db)
             .await
             .map_err(map_db)?;
-        let Some(row) = exists else { return Err(crate::Error::NotFound) };
+        let Some(row) = exists else {
+            return Err(crate::Error::NotFound);
+        };
         if row.deleted_at.is_some() {
             return Err(crate::Error::NotFound);
         }
         let txn = self.db.begin().await.map_err(map_db)?;
-        to_instance_active(instance, true)?.update(&txn).await.map_err(map_db)?;
+        to_instance_active(instance, true)?
+            .update(&txn)
+            .await
+            .map_err(map_db)?;
         delete_instance_collections(&txn, instance.id).await?;
         insert_instance_collections(&txn, instance).await?;
         txn.commit().await.map_err(map_db)?;
@@ -263,11 +279,7 @@ impl CourseRepository for SeaOrmCourseRepository {
             .ok_or(crate::Error::NotFound)
     }
 
-    async fn soft_delete_instance(
-        &self,
-        course_id: &Uuid,
-        instance_id: &Uuid,
-    ) -> Result<()> {
+    async fn soft_delete_instance(&self, course_id: &Uuid, instance_id: &Uuid) -> Result<()> {
         let row = course_instances::Entity::find_by_id(*instance_id)
             .filter(course_instances::Column::CourseId.eq(*course_id))
             .one(&self.db)
@@ -326,7 +338,11 @@ fn to_course_active(course: &Course, is_update: bool) -> Result<courses::ActiveM
         time_required: Set(course.time_required.clone()),
         version: Set(course.version.clone()),
         is_accessible_for_free: Set(course.is_accessible_for_free),
-        educational_level: Set(course.educational_level.as_ref().map(enum_to_string).transpose()?),
+        educational_level: Set(course
+            .educational_level
+            .as_ref()
+            .map(enum_to_string)
+            .transpose()?),
         educational_use: Set(course.educational_use.clone()),
         learning_resource_type: Set(course
             .learning_resource_type
@@ -345,7 +361,11 @@ fn to_course_active(course: &Course, is_update: bool) -> Result<courses::ActiveM
         active: Set(course.active),
         provider_id: Set(course.provider_id),
         created_at: Set(ts_to_offset(course.created_at)),
-        updated_at: Set(if is_update { now } else { ts_to_offset(course.updated_at) }),
+        updated_at: Set(if is_update {
+            now
+        } else {
+            ts_to_offset(course.updated_at)
+        }),
         deleted_at: Set(course.deleted_at.map(ts_to_offset)),
     })
 }
@@ -442,7 +462,10 @@ async fn delete_course_collections<C: sea_orm::ConnectionTrait>(
 async fn load_course_collections(
     db: &DatabaseConnection,
     course_id: Uuid,
-) -> Result<(Vec<course_text_values::Model>, Vec<course_credentials::Model>)> {
+) -> Result<(
+    Vec<course_text_values::Model>,
+    Vec<course_credentials::Model>,
+)> {
     let text_values = course_text_values::Entity::find()
         .filter(course_text_values::Column::CourseId.eq(course_id))
         .order_by_asc(course_text_values::Column::Position)
@@ -581,7 +604,11 @@ fn to_instance_active(
         schedule_time_zone: Set(sched.and_then(|s| s.time_zone.clone())),
         schedule_recurrence: Set(sched.and_then(|s| s.recurrence.clone())),
         created_at: Set(ts_to_offset(i.created_at)),
-        updated_at: Set(if is_update { now } else { ts_to_offset(i.updated_at) }),
+        updated_at: Set(if is_update {
+            now
+        } else {
+            ts_to_offset(i.updated_at)
+        }),
         deleted_at: Set(None),
     })
 }

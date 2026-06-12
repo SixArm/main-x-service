@@ -4,8 +4,8 @@
 //! `validate_course` pass on a fully-populated record (every
 //! FR-21..FR-28 branch exercised at least once).
 
-use jiff::Timestamp;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use jiff::Timestamp;
 use uuid::Uuid;
 
 use course_service::models::{

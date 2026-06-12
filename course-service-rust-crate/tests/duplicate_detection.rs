@@ -59,7 +59,11 @@ fn identical_clones_score_high_and_classify_as_match() {
 
     let r = engine().match_courses(&to_matcher_course(&a), &to_matcher_course(&b));
 
-    assert!(r.score >= 0.95, "identical clones should score ≥ 0.95, got {}", r.score);
+    assert!(
+        r.score >= 0.95,
+        "identical clones should score ≥ 0.95, got {}",
+        r.score
+    );
     assert_eq!(r.confidence, Confidence::High);
     assert!(r.is_match);
 }
@@ -72,7 +76,11 @@ fn name_typo_still_classifies_via_jaro_winkler() {
 
     let r = engine().match_courses(&to_matcher_course(&a), &to_matcher_course(&b));
 
-    assert!(r.score >= 0.85, "near-clone should classify ≥ 0.85, got {}", r.score);
+    assert!(
+        r.score >= 0.85,
+        "near-clone should classify ≥ 0.85, got {}",
+        r.score
+    );
     assert!(r.is_match);
 }
 
@@ -150,7 +158,10 @@ fn lms_course_id_does_not_short_circuit() {
 
     let r = engine().match_courses(&to_matcher_course(&a), &to_matcher_course(&b));
     assert!(!r.breakdown.deterministic_match);
-    assert!(!r.is_match, "unrelated titles must not match on a non-deterministic scheme alone");
+    assert!(
+        !r.is_match,
+        "unrelated titles must not match on a non-deterministic scheme alone"
+    );
 }
 
 // =============================================================================
@@ -269,7 +280,10 @@ fn strict_preset_raises_threshold() {
     let r_default = default.match_courses(&ma, &mb);
     let r_strict = strict.match_courses(&ma, &mb);
     if !r_default.is_match {
-        assert!(!r_strict.is_match, "strict must be a subset of default matches");
+        assert!(
+            !r_strict.is_match,
+            "strict must be a subset of default matches"
+        );
     }
     // Scores must be identical — only the threshold changes.
     assert!((r_default.score - r_strict.score).abs() < 1e-9);

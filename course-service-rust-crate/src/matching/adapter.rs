@@ -22,8 +22,8 @@
 use course_matcher as cm;
 
 use crate::models::{
-    Course as ServiceCourse, CourseIdentifier as ServiceIdent,
-    EducationalLevel as ServiceLevel, IdentifierType, LearningResourceType as ServiceLRT,
+    Course as ServiceCourse, CourseIdentifier as ServiceIdent, EducationalLevel as ServiceLevel,
+    IdentifierType, LearningResourceType as ServiceLRT,
 };
 
 /// Project the rich service [`Course`](ServiceCourse) down to the slim

@@ -37,7 +37,10 @@ pub struct ValidationError {
 impl ValidationError {
     /// Construct a field-scoped error from any string-like inputs.
     fn new(field: impl Into<String>, message: impl Into<String>) -> Self {
-        Self { field: field.into(), message: message.into() }
+        Self {
+            field: field.into(),
+            message: message.into(),
+        }
     }
 }
 
@@ -58,7 +61,10 @@ pub fn validate_course(c: &Course) -> Vec<ValidationError> {
 
     // FR-21
     if c.name.trim().is_empty() {
-        errs.push(ValidationError::new("name", "name is required and must be non-empty"));
+        errs.push(ValidationError::new(
+            "name",
+            "name is required and must be non-empty",
+        ));
     }
 
     // FR-22
@@ -103,7 +109,10 @@ pub fn validate_course(c: &Course) -> Vec<ValidationError> {
     // FR-25
     if let Some(url) = c.url.as_deref() {
         if !is_http_url(url) {
-            errs.push(ValidationError::new("url", "url must start with http:// or https://"));
+            errs.push(ValidationError::new(
+                "url",
+                "url must start with http:// or https://",
+            ));
         }
     }
     for (i, u) in c.image.iter().enumerate() {
@@ -296,7 +305,9 @@ mod tests {
         c.in_language = vec!["E".into(), "english".into(), "-en".into()];
         let errs = validate_course(&c);
         assert_eq!(
-            errs.iter().filter(|e| e.field.starts_with("in_language")).count(),
+            errs.iter()
+                .filter(|e| e.field.starts_with("in_language"))
+                .count(),
             2,
             "expected 2 in_language errors (single-char and leading-hyphen), got {errs:?}"
         );
@@ -413,6 +424,9 @@ mod tests {
             updated_at: Timestamp::now(),
         });
         let errs = validate_course(&c);
-        assert!(errs.iter().any(|e| e.field == "instances[0].maximum_attendee_capacity"));
+        assert!(
+            errs.iter()
+                .any(|e| e.field == "instances[0].maximum_attendee_capacity")
+        );
     }
 }

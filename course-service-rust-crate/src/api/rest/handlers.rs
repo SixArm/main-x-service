@@ -191,7 +191,14 @@ pub async fn create_course(
     if let Err(e) = state.search_engine.index_course(&created) {
         tracing::warn!("indexing course after create failed: {e}");
     }
-    record_create(&state, "Course", created.id, &created, EventKind::CourseCreated).await;
+    record_create(
+        &state,
+        "Course",
+        created.id,
+        &created,
+        EventKind::CourseCreated,
+    )
+    .await;
     (StatusCode::CREATED, Json(ApiResponse::success(created))).into_response()
 }
 
@@ -209,10 +216,7 @@ pub async fn create_course(
     ),
     tag = "courses",
 )]
-pub async fn get_course(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+pub async fn get_course(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
     let mut course = match state.course_repository.get_by_id(&id).await {
         Ok(Some(c)) => c,
         Ok(None) => return not_found_response("Course not found"),
@@ -252,12 +256,7 @@ pub async fn update_course(
     // Snapshot the existing row so the audit entry can carry old/new
     // values. Failure to read the prior state is non-fatal — the
     // update itself is the source of truth.
-    let prior = state
-        .course_repository
-        .get_by_id(&id)
-        .await
-        .ok()
-        .flatten();
+    let prior = state.course_repository.get_by_id(&id).await.ok().flatten();
     let updated = match state.course_repository.update(&course).await {
         Ok(c) => c,
         Err(crate::Error::NotFound) => return not_found_response("Course not found"),
@@ -295,18 +294,20 @@ pub async fn delete_course(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let prior = state
-        .course_repository
-        .get_by_id(&id)
-        .await
-        .ok()
-        .flatten();
+    let prior = state.course_repository.get_by_id(&id).await.ok().flatten();
     match state.course_repository.soft_delete(&id).await {
         Ok(()) => {
             if let Err(e) = state.search_engine.delete_course(&id.to_string()) {
                 tracing::warn!("removing course segment after soft-delete failed: {e}");
             }
-            record_delete(&state, "Course", id, prior.as_ref(), EventKind::CourseDeleted).await;
+            record_delete(
+                &state,
+                "Course",
+                id,
+                prior.as_ref(),
+                EventKind::CourseDeleted,
+            )
+            .await;
             StatusCode::NO_CONTENT.into_response()
         }
         Err(crate::Error::NotFound) => not_found_response("Course not found"),
@@ -329,10 +330,13 @@ pub async fn search_courses(
     let query = q.q.unwrap_or_default();
     let ids: Vec<String> = if query.trim().is_empty() {
         match state.course_repository.list(q.limit, q.offset).await {
-            Ok(rows) => return Json(ApiResponse::success(SearchResponse {
-                total: rows.len(),
-                items: rows,
-            })).into_response(),
+            Ok(rows) => {
+                return Json(ApiResponse::success(SearchResponse {
+                    total: rows.len(),
+                    items: rows,
+                }))
+                .into_response();
+            }
             Err(e) => return error_response(e),
         }
     } else if q.fuzzy {
@@ -349,7 +353,9 @@ pub async fn search_courses(
 
     let mut items = Vec::with_capacity(ids.len());
     for sid in ids {
-        let Ok(uuid) = Uuid::parse_str(&sid) else { continue };
+        let Ok(uuid) = Uuid::parse_str(&sid) else {
+            continue;
+        };
         match state.course_repository.get_by_id(&uuid).await {
             Ok(Some(c)) => items.push(c),
             Ok(None) => {} // stale index entry
@@ -583,7 +589,9 @@ async fn find_probable_duplicates(
 
     let mut candidates: Vec<Course> = Vec::with_capacity(ids.len());
     for sid in ids {
-        let Ok(uuid) = Uuid::parse_str(&sid) else { continue };
+        let Ok(uuid) = Uuid::parse_str(&sid) else {
+            continue;
+        };
         if Some(uuid) == Some(probe.id) && probe.id != Uuid::nil() {
             continue;
         }
@@ -608,7 +616,11 @@ async fn find_probable_duplicates(
         })
         .filter(|r| r.is_match)
         .collect();
-    scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     Ok(scored)
 }
 
@@ -697,7 +709,11 @@ pub async fn merge_courses(
         Ok(None) => return not_found_response("main course not found"),
         Err(e) => return error_response(e),
     };
-    let duplicate = match state.course_repository.get_by_id(&req.duplicate_course_id).await {
+    let duplicate = match state
+        .course_repository
+        .get_by_id(&req.duplicate_course_id)
+        .await
+    {
         Ok(Some(c)) => c,
         Ok(None) => return not_found_response("duplicate course not found"),
         Err(e) => return error_response(e),
@@ -784,24 +800,27 @@ pub async fn merge_courses(
 /// collections; dedupe identifiers by `(scheme, value)`; preserve the
 /// duplicate's primary name as a `[former]` alternate on main; do not
 /// touch the parent's status / version / lifecycle scalars.
-fn fold_duplicate_into_main(
-    main: &Course,
-    duplicate: &Course,
-) -> (Course, serde_json::Value) {
+fn fold_duplicate_into_main(main: &Course, duplicate: &Course) -> (Course, serde_json::Value) {
     let mut merged = main.clone();
 
     // Alternate names — record the duplicate's primary name explicitly
     // ("former") so reverse-lookup queries can still find it.
     let former = format!("[former] {}", duplicate.name);
     merge_unique(&mut merged.alternate_names, std::iter::once(former.clone()));
-    merge_unique(&mut merged.alternate_names, duplicate.alternate_names.iter().cloned());
+    merge_unique(
+        &mut merged.alternate_names,
+        duplicate.alternate_names.iter().cloned(),
+    );
 
     // Free-text / URL collections — union.
     merge_unique(&mut merged.image, duplicate.image.iter().cloned());
     merge_unique(&mut merged.same_as, duplicate.same_as.iter().cloned());
     merge_unique(&mut merged.keywords, duplicate.keywords.iter().cloned());
     merge_unique(&mut merged.about, duplicate.about.iter().cloned());
-    merge_unique(&mut merged.in_language, duplicate.in_language.iter().cloned());
+    merge_unique(
+        &mut merged.in_language,
+        duplicate.in_language.iter().cloned(),
+    );
     merge_unique(&mut merged.teaches, duplicate.teaches.iter().cloned());
     merge_unique(&mut merged.assesses, duplicate.assesses.iter().cloned());
     merge_unique(
@@ -883,7 +902,9 @@ async fn score_all_blocked_candidates(
 
     let mut candidates: Vec<Course> = Vec::with_capacity(ids.len());
     for sid in ids {
-        let Ok(uuid) = Uuid::parse_str(&sid) else { continue };
+        let Ok(uuid) = Uuid::parse_str(&sid) else {
+            continue;
+        };
         if Some(uuid) == Some(probe.id) && probe.id != Uuid::nil() {
             continue;
         }
@@ -907,7 +928,11 @@ async fn score_all_blocked_candidates(
             }
         })
         .collect();
-    scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     Ok(scored)
 }
 
@@ -989,7 +1014,9 @@ async fn run_batch_dedup(
             )?;
 
             for sid in candidate_ids {
-                let Ok(cid) = Uuid::parse_str(&sid) else { continue };
+                let Ok(cid) = Uuid::parse_str(&sid) else {
+                    continue;
+                };
                 if cid == probe.id || soft_deleted.contains(&cid) {
                     continue;
                 }
@@ -1146,7 +1173,9 @@ pub async fn export_course_data(
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
     match state.course_repository.get_by_id(&id).await {
-        Ok(Some(c)) => Json(ApiResponse::success(crate::privacy::export_course(&c))).into_response(),
+        Ok(Some(c)) => {
+            Json(ApiResponse::success(crate::privacy::export_course(&c))).into_response()
+        }
         Ok(None) => not_found_response("Course not found"),
         Err(e) => error_response(e),
     }
@@ -1216,7 +1245,12 @@ async fn record_create(
     let new_json = serde_json::to_value(new_value).unwrap_or(serde_json::Value::Null);
     if let Err(e) = state
         .audit_log
-        .log_create(entity_type, entity_id, new_json.clone(), &AuditContext::default())
+        .log_create(
+            entity_type,
+            entity_id,
+            new_json.clone(),
+            &AuditContext::default(),
+        )
         .await
     {
         tracing::warn!("audit_log.log_create failed: {e}");
@@ -1276,7 +1310,12 @@ async fn record_delete(
         .unwrap_or(serde_json::Value::Null);
     if let Err(e) = state
         .audit_log
-        .log_delete(entity_type, entity_id, old_json.clone(), &AuditContext::default())
+        .log_delete(
+            entity_type,
+            entity_id,
+            old_json.clone(),
+            &AuditContext::default(),
+        )
         .await
     {
         tracing::warn!("audit_log.log_delete failed: {e}");
@@ -1294,7 +1333,12 @@ async fn record_instance_create(state: &AppState, course_id: Uuid, instance: &Co
     let payload = serde_json::to_value(instance).unwrap_or(serde_json::Value::Null);
     if let Err(e) = state
         .audit_log
-        .log_create("CourseInstance", course_id, payload.clone(), &AuditContext::default())
+        .log_create(
+            "CourseInstance",
+            course_id,
+            payload.clone(),
+            &AuditContext::default(),
+        )
         .await
     {
         tracing::warn!("audit_log.log_create (instance) failed: {e}");
@@ -1359,7 +1403,12 @@ async fn record_instance_delete(
         .unwrap_or(serde_json::Value::Null);
     if let Err(e) = state
         .audit_log
-        .log_delete("CourseInstance", course_id, payload.clone(), &AuditContext::default())
+        .log_delete(
+            "CourseInstance",
+            course_id,
+            payload.clone(),
+            &AuditContext::default(),
+        )
         .await
     {
         tracing::warn!("audit_log.log_delete (instance) failed: {e}");
@@ -1420,17 +1469,19 @@ mod tests {
         dup.keywords = vec!["programming".into(), "algorithms".into()];
         dup.same_as = vec!["https://wikidata.org/wiki/Q1".into()];
         dup.identifiers = vec![
-            ident(IdentifierType::Doi, "10.1234/abc"),         // already on main
-            ident(IdentifierType::Wikidata, "Q12345"),         // new
+            ident(IdentifierType::Doi, "10.1234/abc"), // already on main
+            ident(IdentifierType::Wikidata, "Q12345"), // new
         ];
 
         let (merged, transferred) = fold_duplicate_into_main(&main, &dup);
 
         // alternate_names captures the former primary name.
-        assert!(merged
-            .alternate_names
-            .iter()
-            .any(|n| n.starts_with("[former]")));
+        assert!(
+            merged
+                .alternate_names
+                .iter()
+                .any(|n| n.starts_with("[former]"))
+        );
         // free-text union — no duplicates.
         assert_eq!(merged.keywords.len(), 2);
         assert_eq!(merged.same_as.len(), 1);

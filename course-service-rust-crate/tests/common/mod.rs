@@ -38,15 +38,13 @@ pub async fn create_test_app_state() -> AppState {
     let mut config = Config::from_env().expect("load test config from env");
     config.search.index_path = index_dir().path().to_string_lossy().into_owned();
 
-    let db = create_connection(&config.database)
-        .await
-        .expect(
-            "Postgres connection failed — set DATABASE_URL to a running, migrated DB before \
+    let db = create_connection(&config.database).await.expect(
+        "Postgres connection failed — set DATABASE_URL to a running, migrated DB before \
              running integration tests",
-        );
+    );
 
-    let search_engine = SearchEngine::new(&config.search.index_path)
-        .expect("create Tantivy search engine");
+    let search_engine =
+        SearchEngine::new(&config.search.index_path).expect("create Tantivy search engine");
 
     let matcher = CourseMatcher::new(config.matching.clone());
 

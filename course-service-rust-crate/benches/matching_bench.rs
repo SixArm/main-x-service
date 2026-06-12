@@ -15,7 +15,9 @@ use course_service::models::{
 
 /// Matcher config used by every benchmark (threshold 0.85).
 fn cfg() -> MatchingConfig {
-    MatchingConfig { threshold_score: 0.85 }
+    MatchingConfig {
+        threshold_score: 0.85,
+    }
 }
 
 /// Build a richly populated course (every weighted component present) so
@@ -97,5 +99,10 @@ fn bench_rank_100(c: &mut Criterion) {
     });
 }
 
-criterion_group!(matching, bench_match_pair, bench_match_deterministic, bench_rank_100);
+criterion_group!(
+    matching,
+    bench_match_pair,
+    bench_match_deterministic,
+    bench_rank_100
+);
 criterion_main!(matching);

@@ -28,7 +28,12 @@ use course_service::models::Course;
 /// Drive one request through the router via `oneshot` and decode the
 /// response into `(status, json)`. An empty body decodes to `Value::Null`
 /// so 204 responses are handled cleanly.
-async fn send(app: &axum::Router, method: Method, uri: &str, body: Option<Value>) -> (StatusCode, Value) {
+async fn send(
+    app: &axum::Router,
+    method: Method,
+    uri: &str,
+    body: Option<Value>,
+) -> (StatusCode, Value) {
     let req_body = body
         .map(|v| Body::from(serde_json::to_vec(&v).unwrap()))
         .unwrap_or(Body::empty());
@@ -39,7 +44,9 @@ async fn send(app: &axum::Router, method: Method, uri: &str, body: Option<Value>
     let req = builder.body(req_body).unwrap();
     let resp = app.clone().oneshot(req).await.unwrap();
     let status = resp.status();
-    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let json = if bytes.is_empty() {
         Value::Null
     } else {
@@ -71,7 +78,10 @@ async fn create_get_update_softdelete_lifecycle() {
     let (status, env) = send(&app, Method::POST, "/api/courses", Some(body.clone())).await;
     assert_eq!(status, StatusCode::CREATED, "body: {env}");
     let created: Course = serde_json::from_value(env["data"].clone()).unwrap();
-    assert_ne!(created.id.to_string(), "00000000-0000-0000-0000-000000000000");
+    assert_ne!(
+        created.id.to_string(),
+        "00000000-0000-0000-0000-000000000000"
+    );
     let id = created.id;
 
     // Get
@@ -84,7 +94,13 @@ async fn create_get_update_softdelete_lifecycle() {
     // Update — change course_code
     let mut updated_body: Value = serde_json::to_value(&created).unwrap();
     updated_body["course_code"] = json!("EDIT202");
-    let (status, env) = send(&app, Method::PUT, &format!("/api/courses/{id}"), Some(updated_body)).await;
+    let (status, env) = send(
+        &app,
+        Method::PUT,
+        &format!("/api/courses/{id}"),
+        Some(updated_body),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(env["data"]["course_code"], "EDIT202");
 
@@ -111,7 +127,10 @@ async fn validation_failure_returns_422_with_details() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(env["success"], json!(false));
     let details = &env["error"]["details"];
-    assert!(details.is_array(), "details should be an array, got {details}");
+    assert!(
+        details.is_array(),
+        "details should be an array, got {details}"
+    );
     let fields: Vec<String> = details
         .as_array()
         .unwrap()
@@ -133,10 +152,7 @@ async fn search_finds_created_record() {
     assert_eq!(status, StatusCode::CREATED);
 
     // Pull out the unique "Integration Search <ts>" token for the query.
-    let token = suffix
-        .split_whitespace()
-        .last()
-        .expect("timestamp token");
+    let token = suffix.split_whitespace().last().expect("timestamp token");
 
     let uri = format!("/api/courses/search?q={token}");
     let (status, env) = send(&app, Method::GET, &uri, None).await;
@@ -158,7 +174,13 @@ async fn check_duplicates_flags_a_clone() {
     // Probe with an identical-shape body but a fresh id.
     let mut probe: Value = serde_json::to_value(&created).unwrap();
     probe["id"] = json!("00000000-0000-0000-0000-000000000000");
-    let (status, env) = send(&app, Method::POST, "/api/courses/check-duplicates", Some(probe)).await;
+    let (status, env) = send(
+        &app,
+        Method::POST,
+        "/api/courses/check-duplicates",
+        Some(probe),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let hits = env["data"].as_array().expect("array of ScoredCandidate");
     assert!(!hits.is_empty(), "expected duplicate detection to fire");
@@ -207,8 +229,14 @@ async fn merge_folds_duplicate_into_main() {
     });
     let (status, env) = send(&app, Method::POST, "/api/courses/merge", Some(req)).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(env["data"]["merge_record"]["main_course_id"], json!(main_id));
-    assert_eq!(env["data"]["merge_record"]["duplicate_course_id"], json!(dup_id));
+    assert_eq!(
+        env["data"]["merge_record"]["main_course_id"],
+        json!(main_id)
+    );
+    assert_eq!(
+        env["data"]["merge_record"]["duplicate_course_id"],
+        json!(dup_id)
+    );
     assert_eq!(env["data"]["merge_record"]["status"], "Completed");
 
     // Duplicate is soft-deleted → 404.
@@ -299,7 +327,13 @@ async fn audit_log_records_create_then_update() {
     // Update so we have two entries
     let mut update_body = env["data"].clone();
     update_body["course_code"] = json!("AUDIT99");
-    let (_, _) = send(&app, Method::PUT, &format!("/api/courses/{course_id}"), Some(update_body)).await;
+    let (_, _) = send(
+        &app,
+        Method::PUT,
+        &format!("/api/courses/{course_id}"),
+        Some(update_body),
+    )
+    .await;
 
     let (status, env) = send(
         &app,

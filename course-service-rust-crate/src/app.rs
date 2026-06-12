@@ -10,28 +10,32 @@
 use async_trait::async_trait;
 use axum::Router as AxumRouter;
 use loco_rs::{
+    Result,
     app::{AppContext, Hooks},
     bgworker::Queue,
-    boot::{create_app, BootResult, StartMode},
+    boot::{BootResult, StartMode, create_app},
     config::Config as LocoConfig,
     controller::AppRoutes,
     environment::Environment,
     task::Tasks,
-    Result,
 };
 use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{create_router, AppState},
+    api::rest::{ApiDoc, AppState, courses_routes},
     config::Config,
     matching::CourseMatcher,
     search::SearchEngine,
 };
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 /// The loco application. Owns the boot lifecycle, config, migrations,
-/// and the background queue; the REST surface is merged in via
-/// [`App::after_routes`].
+/// and the background queue. The REST surface is registered as native
+/// loco controllers in [`App::routes`]; `AppState` (search engine,
+/// matcher, repositories, config) is built once and placed in the
+/// `AppContext` shared store in [`App::after_routes`].
 pub struct App;
 
 #[async_trait]
@@ -59,20 +63,25 @@ impl Hooks for App {
     }
 
     fn routes(_ctx: &AppContext) -> AppRoutes {
-        // loco's default routes (/_health, /_ping); the domain REST
-        // surface is merged on in `after_routes`.
-        AppRoutes::with_default_routes()
+        AppRoutes::with_default_routes() // loco /_health, /_ping
+            .add_route(courses_routes())
     }
 
     async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
-        // Domain config (search index path, matching threshold, …) still
-        // comes from the environment; the database pool comes from loco.
+        // Build the boot-time singletons (search engine, matcher, repos,
+        // domain config) once and place them in the shared store, where
+        // the controllers retrieve them via `FromRef<AppContext>`.
         let config = Config::from_env().map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let search_engine = SearchEngine::new(&config.search.index_path)
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let matcher = CourseMatcher::new(config.matching.clone());
         let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
-        Ok(router.merge(create_router(state)))
+        ctx.shared_store.insert(state);
+        // Swagger UI + permissive CORS layered on top of the controllers.
+        let router = router
+            .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+            .layer(tower_http::cors::CorsLayer::permissive());
+        Ok(router)
     }
 
     async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {

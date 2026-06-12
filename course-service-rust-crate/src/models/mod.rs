@@ -14,11 +14,16 @@ pub mod organization;
 pub mod review_queue;
 pub mod syllabus;
 
-pub use course::{Course, CourseStatus, EducationalLevel, InteractivityType, LearningResourceType, LinkType, CourseLink};
-pub use course_instance::{CourseInstance, CourseMode, CourseInstanceStatus, Schedule};
-pub use credential::{EducationalCredential, CredentialCategory};
+pub use course::{
+    Course, CourseLink, CourseStatus, EducationalLevel, InteractivityType, LearningResourceType,
+    LinkType,
+};
+pub use course_instance::{CourseInstance, CourseInstanceStatus, CourseMode, Schedule};
+pub use credential::{CredentialCategory, EducationalCredential};
 pub use identifier::{CourseIdentifier, IdentifierType};
 pub use merge::{MergeRecord, MergeRequest, MergeResponse, MergeStatus};
 pub use organization::{Provider, ProviderKind};
-pub use review_queue::{BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewQueueItem, ReviewStatus};
+pub use review_queue::{
+    BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewQueueItem, ReviewStatus,
+};
 pub use syllabus::Syllabus;

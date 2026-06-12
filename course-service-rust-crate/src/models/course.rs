@@ -43,7 +43,6 @@ pub struct Course {
     pub id: Uuid,
 
     // ─── Thing properties ─────────────────────────────────────────
-
     /// Required title (schema.org/name).
     pub name: String,
     /// Aliases (schema.org/alternateName).
@@ -78,7 +77,6 @@ pub struct Course {
     pub active: bool,
 
     // ─── CreativeWork properties ──────────────────────────────────
-
     /// schema.org/about — subjects covered.
     #[serde(default)]
     pub about: Vec<String>,
@@ -105,7 +103,6 @@ pub struct Course {
     pub is_accessible_for_free: Option<bool>,
 
     // ─── LearningResource properties ──────────────────────────────
-
     /// schema.org/teaches — competencies taught.
     #[serde(default)]
     pub teaches: Vec<String>,
@@ -129,7 +126,6 @@ pub struct Course {
     pub interactivity_type: Option<InteractivityType>,
 
     // ─── Course-specific properties ───────────────────────────────
-
     /// Provider's identifier (e.g. "CS101"). schema.org/courseCode.
     #[serde(default)]
     pub course_code: Option<String>,
@@ -162,7 +158,6 @@ pub struct Course {
     pub instances: Vec<CourseInstance>,
 
     // ─── Lifecycle ────────────────────────────────────────────────
-
     /// Course lifecycle state (Draft / Published / Archived / Retired).
     #[serde(default)]
     pub status: CourseStatus,

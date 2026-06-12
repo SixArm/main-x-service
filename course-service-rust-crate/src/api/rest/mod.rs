@@ -149,3 +149,48 @@ pub fn create_router(state: AppState) -> Router {
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
 }
+
+/// Native loco controller routes (idiomatic path). Mirrors
+/// [`create_router`]'s `/api` surface, but as a loco `Routes` whose
+/// handlers extract `AppState` from the `AppContext` shared store via
+/// `FromRef`. Registered in `App::routes`; `create_router` is retained
+/// for the `tower::oneshot`-based integration tests.
+#[must_use]
+pub fn courses_routes() -> loco_rs::controller::Routes {
+    use loco_rs::prelude::{Routes, get, post};
+    Routes::new()
+        .prefix("/api")
+        .add("/health", get(handlers::health))
+        .add(
+            "/courses",
+            get(handlers::not_implemented).post(handlers::create_course),
+        )
+        .add("/courses/search", get(handlers::search_courses))
+        .add("/courses/match", post(handlers::match_course))
+        .add(
+            "/courses/check-duplicates",
+            post(handlers::check_duplicates),
+        )
+        .add("/courses/merge", post(handlers::merge_courses))
+        .add("/courses/deduplicate", post(handlers::deduplicate))
+        .add(
+            "/courses/{id}",
+            get(handlers::get_course)
+                .put(handlers::update_course)
+                .delete(handlers::delete_course),
+        )
+        .add(
+            "/courses/{id}/instances",
+            get(handlers::list_instances).post(handlers::create_instance),
+        )
+        .add(
+            "/courses/{id}/instances/{instance_id}",
+            get(handlers::get_instance)
+                .put(handlers::update_instance_handler)
+                .delete(handlers::delete_instance),
+        )
+        .add("/courses/{id}/export", get(handlers::export_course_data))
+        .add("/courses/{id}/masked", get(handlers::masked_course))
+        .add("/courses/{id}/audit", get(handlers::audit_for_course))
+        .add("/audit/recent", get(handlers::audit_recent))
+}

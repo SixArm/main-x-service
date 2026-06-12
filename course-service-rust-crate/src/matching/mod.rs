@@ -152,7 +152,9 @@ mod tests {
 
     /// Test fixture: a matching config at the default 0.85 threshold.
     fn cfg() -> MatchingConfig {
-        MatchingConfig { threshold_score: 0.85 }
+        MatchingConfig {
+            threshold_score: 0.85,
+        }
     }
 
     /// Two identical courses score near 1.0 and are flagged as a match.

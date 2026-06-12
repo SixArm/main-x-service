@@ -5,9 +5,7 @@ use std::sync::Arc;
 use sea_orm::DatabaseConnection;
 
 use crate::config::Config;
-use crate::db::{
-    CourseRepository, SeaOrmCourseRepository, audit::AuditLogRepository,
-};
+use crate::db::{CourseRepository, SeaOrmCourseRepository, audit::AuditLogRepository};
 use crate::matching::CourseMatcher;
 use crate::search::SearchEngine;
 use crate::streaming::{EventPublisher, InMemoryEventPublisher};
@@ -55,5 +53,17 @@ impl AppState {
             matcher: Arc::new(matcher),
             config: Arc::new(config),
         }
+    }
+}
+
+/// Bridge so the existing `State<AppState>` handlers can run as native
+/// loco controllers: loco's router state is [`AppContext`], and this
+/// extracts the (cheaply-cloneable) `AppState` from the context's shared
+/// store, which is populated once at boot in `App::after_routes`.
+impl axum::extract::FromRef<loco_rs::app::AppContext> for AppState {
+    fn from_ref(ctx: &loco_rs::app::AppContext) -> Self {
+        ctx.shared_store
+            .get::<AppState>()
+            .expect("AppState must be inserted into the shared store at boot")
     }
 }
