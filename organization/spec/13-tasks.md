@@ -111,9 +111,15 @@ oversized tasks (`T-2a`, `T-2b`).
   - **Acceptance:** events survive a process restart; two replicas
     see one stream.
 - [ ] **T-11 — Front-end catch-up: search box, audit views, tests.**
-  - [ ] Search box over `/search`; audit view over the audit
-    endpoints; vitest + Playwright (queued in the front-end's §13).
-  - **Acceptance:** front-end spec §13 boxes ticked.
+  - [x] vitest + Playwright. **Done (2026-06-13):** `tests/unit/`
+    (16 — `ApiClient` + `OrganizationRepository`, incl. a
+    `check-duplicates` path regression) and `tests/e2e/smoke.spec.ts`
+    (4 routes, API stubbed, runs on `vite preview`). Also fixed two
+    scaffold copy artifacts (`client.ts` "Authentication Service"
+    header, `app.html` "Course Service" description).
+  - [ ] Search box over `/search`; audit view over the audit endpoints.
+  - **Acceptance:** front-end spec §13 boxes ticked. *(tests ticked;
+    search-box / audit-view UI remain.)*
 - [x] **T-12 — Remove loco scaffolding leftovers (service).** *(done
   2026-06-13)*
   - [x] Deleted `src/workers/` (the `DownloadWorker` TODO stub and its

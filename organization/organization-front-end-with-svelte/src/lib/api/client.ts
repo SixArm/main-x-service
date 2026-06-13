@@ -1,9 +1,9 @@
-// Lean fetch wrapper for the Authentication Service.
+// Lean fetch wrapper for the Organization Service.
 //
-// The auth service is a loco.rs app: handlers return RAW JSON (no
+// The service is a loco.rs app: handlers return RAW JSON (no
 // {success,data,error} envelope), so this client returns the parsed
 // body directly and throws ApiError on non-2xx. A bearer token can be
-// supplied per request for the protected /me and /signout endpoints.
+// supplied per request for endpoints protected by JWT verification.
 
 export interface ClientOptions {
     baseUrl: string;

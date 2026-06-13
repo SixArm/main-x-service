@@ -51,6 +51,6 @@ Open gaps drive tasks in §13 (entity-level) or the subproject queues.
 | `ILIKE`-only search (no Tantivy / fuzzy / phonetic) | T-8 |
 | JWT verification exists (`/whoami` + audit/merge `actor`) but is not yet *enforced* on every `/api/*` route, and the JWKS is injected via env rather than fetched from the auth service | T-9 follow-up |
 | In-memory event stream (not durable, not HA-safe) | T-10 |
-| Front-end lacks search box, audit views, tests | T-11 |
+| Front-end has vitest + Playwright tests now, but still lacks a search box and audit views | T-11 follow-up |
 | Matcher spec is one file (its own §23 queues the split) | matcher §23 |
 | Matcher `telephone` / `email` carried but unscored | matcher §23 |

@@ -75,8 +75,15 @@ None client-side beyond in-memory route state.
 
 ## 11. Testing strategy
 
-`pnpm run check` (svelte-check strict, 0/0). Unit/e2e tests are a
-follow-up (§13).
+`pnpm run check` (svelte-check strict, 0/0). **vitest** unit tests
+(`tests/unit/`) cover the `ApiClient` (verb/body/headers/bearer-token/
+error-classification/empty-body) and `OrganizationRepository` (every
+method's path + verb, incl. a regression pinning `check-duplicates`).
+**Playwright** smoke tests (`tests/e2e/`) load the four routes (`/`,
+`/new`, `/[pid]`, `/[pid]/edit`) with the API stubbed via
+`page.route`, asserting each renders; they run against the production
+build (`vite preview`) to avoid the `vite dev` cold-start module race.
+Run: `pnpm test` (vitest) and `pnpm test:e2e` (Playwright).
 
 ## 12. Compliance
 
@@ -85,8 +92,10 @@ controls when they land.
 
 ## 13. Tasks (live work queue)
 
-- [ ] vitest unit tests for `ApiClient` + `OrganizationRepository`.
-- [ ] playwright smoke for the four routes.
+- [x] vitest unit tests for `ApiClient` + `OrganizationRepository`
+  (`tests/unit/`, 16 tests).
+- [x] playwright smoke for the four routes (`tests/e2e/smoke.spec.ts`,
+  4 tests, API stubbed, runs against `vite preview`).
 - [ ] Identifier `Custom(label)` editing in the form.
 - [ ] Search box once the service ships search.
 - [ ] Bearer token wiring once the service enforces auth.
