@@ -102,13 +102,41 @@ confirms it. Split larger tasks (`T-5a`, `T-5b`).
     `sessions`.
   - **Acceptance:** documented endpoints or runbook; erasure removes
     or anonymises the email.
-- [ ] **T-10 — Authentication event audit trail.**
-  - [ ] `audit_log`-style records (or event streaming) for sign-in
-    attempts, redemptions, and signouts, aligned with
+- [x] **T-10 — Authentication event audit trail.** *(2026-06-13)*
+  - [x] Durable `auth_events` table (migration
+    `m20220101_000003_auth_events`): `(id, event, email, user_pid,
+    detail, created_at)`, aligned with
     [`agents/share/auditability.md`](../../agents/share/auditability.md).
-  - **Acceptance:** a redeemed magic link produces a queryable audit
-    record with user, timestamp, and outcome.
-- [ ] **T-11 — Front-end test suite.**
-  - [ ] Vitest unit tests (`ApiClient`, `AuthRepository`); playwright
-    smoke for the four routes. (Mirrors front-end spec §13.)
-  - **Acceptance:** `pnpm run test` and `pnpm run test:e2e` pass in CI.
+    SeaORM entity (`models/_entities/auth_events.rs`) + model
+    (`models/auth_events.rs`) with best-effort `record` /
+    `record_best_effort` (never fails the request) and `recent`.
+  - [x] Wired into signup, magic-link request (records the
+    `rate_limited` / `unknown_email` / `issued` outcome without leaking
+    which to the caller), redeem (`ok` vs `invalid_or_expired`), and
+    signout. Anti-enumeration preserved: the audit row distinguishes
+    outcomes, the HTTP response does not. No tokens or secrets stored.
+  - [x] Read endpoint `GET /api/auth/audit/recent` (newest 100), left
+    unauthenticated to mirror care-pathway's `/audit/recent` (noted in
+    spec §12; bearer-gating tracked with T-9). OpenAPI documents the
+    endpoint + the `AuthEvent` schema.
+  - **Acceptance met:** un-gated unit tests (`normalise_email`; OpenAPI
+    `documents_the_audit_endpoint_and_schema`); a DB-gated request test
+    (`auth_events_are_recorded_and_queryable`) asserts a signup and an
+    unknown-email magic-link request write the expected `auth_events`
+    rows and that `/audit/recent` returns them. Documented in spec
+    §6/§9/§10/§12.
+- [x] **T-11 — Front-end test suite.** *(2026-06-13)*
+  - [x] Vitest unit tests (`tests/unit/client.test.ts` +
+    `tests/unit/auth.test.ts`, 16): `ApiClient` request shaping +
+    bearer-token attachment + `ApiError` classification + raw-JSON /
+    empty-body / non-JSON handling; `AuthRepository` exact path/verb/body
+    for signup / magic-link request / verify (URL-encoded token) / me /
+    signout. (Mirrors front-end spec §11/§13.)
+  - [x] Playwright smoke (`tests/e2e/smoke.spec.ts`, 7) stubbing the auth
+    API via `page.route` and loading sign-up / sign-in / verify /
+    signed-in + signed-out home; `playwright.config.ts` runs against
+    `vite preview` (build+preview, port 4173) per the care-pathway
+    pattern. Also fixed a scaffold artifact (`src/app.html` meta
+    description named the Course Service).
+  - **Acceptance met:** `pnpm test` (16) and `pnpm test:e2e` (7) pass;
+    `pnpm run check` 0/0; authored files prettier-clean.

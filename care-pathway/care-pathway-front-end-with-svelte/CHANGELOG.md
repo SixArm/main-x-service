@@ -11,6 +11,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Merge-duplicate action.** The detail page (`/[pid]`) now offers a
+  "Merge into this record" action on each potential-duplicate row (the
+  detail record is the survivor/main; the row's pid is the duplicate).
+  A two-step inline confirm calls a new
+  `CarePathwayRepository.merge(mainPid, duplicatePid, reason?)` →
+  `POST /api/care-pathways/merge` with body `{main_pid, duplicate_pid,
+  reason?}` (pids in the body, not the URL), returning the new
+  `MergeResult` (`{main_pid, duplicate_pid, main}`). On success the page
+  adopts the returned survivor record, re-runs check-duplicates, and
+  shows a success message; equal pids are guarded client-side and
+  `404`/other errors surface via the existing error banner. vitest adds
+  2 unit tests (body shape + reason-omitted); Playwright adds 1 smoke
+  test (check-duplicates → confirm merge → success state, asserting the
+  merge endpoint fired).
 - **List search box.** The list page (`/`) gains a name-search box
   (search-on-submit + **Clear**). A non-blank query calls
   `GET /api/care-pathways/search?q=` (URL-encoded) via a new

@@ -202,6 +202,17 @@ an audit trail of issuance and revocation.
       `src/controllers/docs.rs` at `/api-docs/openapi.json` +
       `/swagger-ui`; documents all six endpoints + schemas + bearer
       scheme; un-gated `spec()` tests. *(2026-06-13; entity spec T-8.)*
+- [x] Authentication event audit trail (`auth_events` table, migration
+      `m20220101_000003_auth_events`): durable rows
+      `(id, event, email, user_pid, detail, created_at)` for signup /
+      magic-link request / redeem / signout, written best-effort
+      (`models/auth_events.rs`, never fails the request, never stores a
+      token). Anti-enumeration preserved (the row distinguishes
+      `unknown_email` / `rate_limited`, the 200 response does not).
+      Queryable at `GET /api/auth/audit/recent`; OpenAPI documents the
+      endpoint + `AuthEvent` schema. Un-gated unit tests + a DB-gated
+      request test (`auth_events_are_recorded_and_queryable`).
+      *(2026-06-13; entity spec T-10.)*
 - [ ] Key rotation: support multiple JWKS entries (`kid` already
       stamped) and a grace window.
 - [ ] Optional Mailpit docker-compose service for realistic dev email.
@@ -214,7 +225,8 @@ green `cargo build`, clippy clean, DB-free unit tests passing;
 magic-link request tests (Postgres-gated); peer-service verifier crate
 (`../authentication-verifier-rust-crate/`) with a DB-free cross-crate
 contract test; per-email rate limiting on magic-link issuance (`429`);
-hand-written OpenAPI 3 + Swagger UI.
+hand-written OpenAPI 3 + Swagger UI; durable `auth_events` audit trail
+(`GET /api/auth/audit/recent`).
 
 ## 15. Roadmap
 

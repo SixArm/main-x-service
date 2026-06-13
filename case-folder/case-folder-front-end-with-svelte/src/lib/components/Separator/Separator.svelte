@@ -25,7 +25,8 @@
     //   - None — the <hr> element is not focusable and does not receive keyboard input.
     //
     // Accessibility:
-    //   - role="separator" explicitly identifies the element as a section divider
+    //   - <hr> carries the implicit ARIA role "separator" — no explicit role is set,
+    //     which would be redundant
     //   - aria-label provides optional descriptive context for screen readers
     //
     // Internationalization:
@@ -54,7 +55,6 @@
 <!-- Separator.svelte -->
 <hr
     class={`separator ${className}`}
-    role="separator"
     aria-label={label}
     {...restProps}
 />

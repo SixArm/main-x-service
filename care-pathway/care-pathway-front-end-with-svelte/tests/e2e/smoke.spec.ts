@@ -5,6 +5,7 @@ import { test, expect, type Page } from "@playwright/test";
 // request and a failing assertion, without needing the Rust service.
 
 const PID = "11111111-1111-4111-8111-111111111111";
+const DUP_PID = "22222222-2222-4222-8222-222222222222";
 
 const PATHWAY = {
   name: "Acute Stroke Care Pathway",
@@ -54,6 +55,49 @@ async function stubApi(page: Page) {
     }
     return route.fulfill({ status: 404, json: { error: "unhandled in stub" } });
   });
+}
+
+/**
+ * Stub for the merge flow: check-duplicates returns one duplicate row,
+ * and POST /merge returns the survivor. `state.merged` records the call
+ * so the test can assert the endpoint fired.
+ */
+async function stubMergeApi(page: Page) {
+  const state = { merged: false };
+  await page.route("**/api/care-pathways**", async (route) => {
+    const req = route.request();
+    const url = new URL(req.url());
+    const method = req.method();
+    const path = url.pathname;
+
+    if (path === "/api/care-pathways/merge" && method === "POST") {
+      state.merged = true;
+      return route.fulfill({
+        json: { main_pid: PID, duplicate_pid: DUP_PID, main: PATHWAY },
+      });
+    }
+    if (path.endsWith("/check-duplicates")) {
+      // After a merge the duplicate is gone, so return an empty list.
+      return route.fulfill({
+        json: state.merged
+          ? []
+          : [
+              {
+                pid: DUP_PID,
+                name: "Stroke Pathway (dup)",
+                score: 0.97,
+                confidence: "Certain",
+                is_match: true,
+              },
+            ],
+      });
+    }
+    if (path === `/api/care-pathways/${PID}` && method === "GET") {
+      return route.fulfill({ json: PATHWAY });
+    }
+    return route.fulfill({ status: 404, json: { error: "unhandled in stub" } });
+  });
+  return state;
 }
 
 test.beforeEach(async ({ page }) => {
@@ -106,4 +150,25 @@ test("edit page renders the edit form", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Edit care pathway" }),
   ).toBeVisible();
+});
+
+test("merge action folds a duplicate into the survivor", async ({ page }) => {
+  // Later route registration wins over the beforeEach stub.
+  const state = await stubMergeApi(page);
+  await page.goto(`/${PID}`, { waitUntil: "networkidle" });
+
+  // Surface the potential duplicate.
+  await page.getByRole("button", { name: "Check duplicates" }).click();
+  await expect(page.getByText("Stroke Pathway (dup)")).toBeVisible();
+
+  // Arm the inline confirm, then confirm the merge.
+  await page.getByRole("button", { name: "Merge into this record" }).click();
+  await page.getByRole("button", { name: "Confirm merge" }).click();
+
+  // Success message shows and the merge endpoint was hit.
+  await expect(page.getByText(/Merged .* into this record/)).toBeVisible();
+  expect(state.merged).toBe(true);
+
+  // The refreshed duplicates list no longer offers a merge.
+  await expect(page.getByText("None above the match threshold.")).toBeVisible();
 });

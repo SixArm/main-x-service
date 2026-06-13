@@ -86,10 +86,21 @@ persistence in the front-end.
 
 ## 11. Testing strategy
 
-- **Unit (vitest):** `ApiClient` request shaping + error mapping;
-  `AuthRepository` path construction.
-- **E2E (playwright):** route shells render; the verify route handles a
-  missing/invalid token. (To be added — §13.)
+- **Unit (vitest, `tests/unit/`):** `ApiClient` request shaping (URL
+  join, JSON body + content-type, per-request bearer token for `/me` +
+  `/signout`, empty-body → `undefined`) and error mapping (`ApiError`
+  message extraction, `isUnauthorized` / `isBadRequest`, non-JSON
+  fallback) — `client.test.ts`; `AuthRepository` path + verb + body
+  construction for signup / magic-link request / verify (URL-encoded
+  token) / `me` / signout — `auth.test.ts`. 16 tests.
+- **E2E (playwright, `tests/e2e/smoke.spec.ts`):** the auth API is
+  stubbed via `page.route`, so a broken endpoint contract surfaces as a
+  failing assertion without a running service. Smoke-loads sign-up,
+  sign-in (incl. submit → "link sent"), verify (token → redirect to the
+  signed-in dashboard; missing token → error), and home in both
+  signed-in (session seeded into `localStorage`) and signed-out states.
+  7 tests. `playwright.config.ts` runs against `vite preview` (build +
+  preview on port 4173) to avoid the `vite dev` cold-start module race.
 
 ## 12. Compliance
 
@@ -99,8 +110,14 @@ out and on `401`.
 
 ## 13. Tasks (live work queue)
 
-- [ ] Add vitest unit tests for `ApiClient` and `AuthRepository`.
-- [ ] Add a playwright smoke test for the four routes.
+- [x] Add vitest unit tests for `ApiClient` and `AuthRepository`
+      (`tests/unit/client.test.ts` + `tests/unit/auth.test.ts`, 16
+      tests). *(2026-06-13; entity spec T-11.)*
+- [x] Add a playwright smoke test for the routes
+      (`tests/e2e/smoke.spec.ts`, 7 tests; `playwright.config.ts` via
+      `vite preview`). Also fixed the scaffold artifact in
+      `src/app.html` (meta description named the Course Service).
+      *(2026-06-13; entity spec T-11.)*
 - [ ] Consider an in-memory token option (vs. `localStorage`) for stricter
       XSS posture.
 
@@ -108,7 +125,8 @@ out and on `401`.
 
 Done: all four routes, lean client, repository, runes session, SPA
 config. `pnpm run check` clean (0 errors/0 warnings); production build
-succeeds.
+succeeds. Test suites added: vitest unit (16) + playwright smoke (7),
+both green.
 
 ## 15. Roadmap
 

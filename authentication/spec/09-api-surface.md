@@ -15,7 +15,13 @@ Source:
 | GET | `/api/auth/magic-link/{token}` | — | Redeem link → RS256 access token + session |
 | GET | `/api/auth/me` | Bearer | Current user; rejects revoked sessions |
 | POST | `/api/auth/signout` | Bearer | Revoke the current session |
+| GET | `/api/auth/audit/recent` | — | Recent authentication audit events (`AuthEvent[]`, newest 100) |
 | GET | `/.well-known/jwks.json` | — | Public keys for offline verification |
+
+`/api/auth/audit/recent` returns the durable `auth_events` audit trail
+(T-10; see §10 + §12). It is currently unauthenticated, mirroring the
+sibling care-pathway service's `/audit/recent`; rows carry no tokens or
+secrets.
 
 Plus loco's default routes (`AppRoutes::with_default_routes()` in
 [`src/app.rs`](../authentication-service-rust-crate/src/app.rs)),

@@ -48,6 +48,21 @@ Each requirement names its owning subproject. Endpoint detail:
   tokens until `exp` — the documented tradeoff of offline
   verification, bounded by the short TTL (NFR-4).
 
+### 6.4a Audit trail (service)
+
+- **FR-8a — Auth-event audit (T-10).** Every authentication endpoint
+  writes a best-effort `auth_events` row — `signup`,
+  `magic_link_requested`, `magic_link_redeemed`, `signout` — capturing
+  the event, the normalised email and/or subject pid when known, and an
+  outcome `detail` (`rate_limited` / `unknown_email` /
+  `invalid_or_expired` / `issued` / `created` / `existing` / `ok` /
+  `rejected`). Writes never fail the request and never store a token or
+  secret. The row may distinguish outcomes the response deliberately
+  hides — the anti-enumeration shape (FR-1/FR-2) holds at the wire.
+- **FR-8b — Audit query.** `GET /api/auth/audit/recent` returns the
+  newest 100 `auth_events` (`AuthEvent[]`). Unauthenticated for now,
+  mirroring the family `/audit/recent` pattern (§9, §12).
+
 ### 6.5 Verifier library (verifier)
 
 - **FR-9 — Construction.** `Verifier::from_jwks_value(&jwks, issuer,

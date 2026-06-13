@@ -4,8 +4,9 @@
 
 Migrations (`sea-orm-migration`, registered in
 [`src/migration/mod.rs`](../authentication-service-rust-crate/src/migration/mod.rs)):
-`m20220101_000001_users`, `m20220101_000002_sessions`. `auto_migrate`
-is on in development, off in production.
+`m20220101_000001_users`, `m20220101_000002_sessions`,
+`m20220101_000003_auth_events`. `auto_migrate` is on in development,
+off in production.
 
 **`users`** (from
 [`m20220101_000001_users.rs`](../authentication-service-rust-crate/src/migration/m20220101_000001_users.rs)):
@@ -35,6 +36,23 @@ is on in development, off in production.
 | `expires_at` | timestamptz | = token `exp` |
 | `revoked_at` | timestamptz, nullable | Set on signout |
 | `user_agent` | string, nullable | Issuance context |
+
+**`auth_events`** (from
+[`m20220101_000003_auth_events.rs`](../authentication-service-rust-crate/src/migration/m20220101_000003_auth_events.rs)) —
+the durable authentication audit trail (T-10, §12):
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | pk auto | Monotonic; newest = largest |
+| `event` | string | `signup` / `magic_link_requested` / `magic_link_redeemed` / `signout` (`me` reserved) |
+| `email` | string, nullable | Normalised (trimmed, lowercased) subject email where applicable |
+| `user_pid` | uuid, nullable | Subject pid when known |
+| `detail` | string, nullable | Outcome marker (`rate_limited` / `unknown_email` / `invalid_or_expired` / `issued` / `created` / `existing` / `ok` / `rejected`) — never a token or secret |
+| `created_at` | timestamptz | Event time |
+
+Writes are best-effort and never fail the request; the row may
+distinguish outcomes the HTTP response deliberately hides
+(anti-enumeration).
 
 The Postgres-backed loco worker queue (`bg_pg`) shares the same
 database — family convention, no external broker.

@@ -296,6 +296,79 @@ async fn magic_link_issuance_is_rate_limited() {
     .await;
 }
 
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn auth_events_are_recorded_and_queryable() {
+    use authentication_service::{models::auth_events::Model as AuthEvent, rate_limit};
+
+    request::<App, _, _>(|request, ctx| async move {
+        rate_limit::reset();
+
+        // A signup writes a `signup` audit row (created/existing).
+        let signup_email = "audit-signup@example.com";
+        let signup = request
+            .post("/api/auth/signup")
+            .json(&serde_json::json!({ "email": signup_email, "name": "Audit" }))
+            .await;
+        assert_eq!(signup.status_code(), 200);
+
+        // A magic-link request for an unknown email writes a
+        // `magic_link_requested` row with the `unknown_email` outcome —
+        // even though the HTTP response is the same 200 as a known one.
+        let unknown_email = "audit-unknown@example.com";
+        let magic = request
+            .post("/api/auth/magic-link")
+            .json(&serde_json::json!({ "email": unknown_email }))
+            .await;
+        assert_eq!(magic.status_code(), 200);
+
+        // The model sees both rows.
+        let rows = AuthEvent::recent(&ctx.db, 100)
+            .await
+            .expect("recent auth events should query");
+        assert!(
+            rows.iter()
+                .any(|r| r.event == "signup" && r.email.as_deref() == Some(signup_email)),
+            "expected a signup auth event for {signup_email}; got {rows:?}"
+        );
+        assert!(
+            rows.iter().any(|r| r.event == "magic_link_requested"
+                && r.email.as_deref() == Some(unknown_email)
+                && r.detail.as_deref() == Some("unknown_email")),
+            "expected an unknown_email magic_link_requested event; got {rows:?}"
+        );
+        // No row ever carries a token or secret column.
+        assert!(
+            !rows.iter().any(|r| r
+                .detail
+                .as_deref()
+                .is_some_and(|d| d.contains("token") && d.len() > 32)),
+            "audit detail must not leak token-like material"
+        );
+
+        // The read endpoint surfaces them, newest first.
+        let recent = request.get("/api/auth/audit/recent").await;
+        assert_eq!(recent.status_code(), 200, "/audit/recent should be public");
+        let body: serde_json::Value = serde_json::from_str(&recent.text()).unwrap();
+        let events = body.as_array().expect("audit/recent returns an array");
+        assert!(
+            events
+                .iter()
+                .any(|e| e["event"] == "signup" && e["email"] == signup_email),
+            "audit/recent should include the signup event"
+        );
+        assert!(
+            events.iter().any(|e| e["event"] == "magic_link_requested"
+                && e["detail"] == "unknown_email"),
+            "audit/recent should include the unknown_email magic-link event"
+        );
+
+        rate_limit::reset();
+    })
+    .await;
+}
+
 // ---------------------------------------------------------------------------
 // DB-free contract assertions (always run).
 // ---------------------------------------------------------------------------
@@ -305,7 +378,14 @@ fn route_table_covers_the_magic_link_surface() {
     let routes = authentication_service::controllers::auth::routes();
     assert_eq!(routes.prefix.as_deref(), Some("/api/auth"));
     let uris: Vec<&str> = routes.handlers.iter().map(|h| h.uri.as_str()).collect();
-    for expected in ["/signup", "/magic-link", "/magic-link/{token}", "/me", "/signout"] {
+    for expected in [
+        "/signup",
+        "/magic-link",
+        "/magic-link/{token}",
+        "/me",
+        "/signout",
+        "/audit/recent",
+    ] {
         assert!(uris.contains(&expected), "missing route {expected}; have {uris:?}");
     }
 

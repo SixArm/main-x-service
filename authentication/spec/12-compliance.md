@@ -15,17 +15,34 @@ healthcare contexts add
 
 ### Audit of authentication events
 
-The `sessions` table is the issuance/revocation trail: every token
-issuance writes `(jid, user_pid, expires_at, user_agent)`; every
-signout stamps `revoked_at`; `email_verified_at` records first
-verification. Magic-link issuance is traced (structured tracing with
-the email field).
+Two complementary trails:
 
-**Gap:** unlike the sibling services there is no `audit_log` table and
-no event streaming (`*Created` / `*Updated` events) for account
-lifecycle and sign-in attempts — a governmental audit trail (who
-attempted sign-in, from where, outcome) needs this (§13 T-10,
+1. **`sessions`** is the issuance/revocation trail: every token issuance
+   writes `(jid, user_pid, expires_at, user_agent)`; every signout
+   stamps `revoked_at`; `email_verified_at` records first verification.
+2. **`auth_events`** (T-10, done) is the durable security/compliance
+   audit trail of authentication *events*. Each row is
+   `(id, event, email, user_pid, detail, created_at)`. Events:
+   `signup`, `magic_link_requested`, `magic_link_redeemed`, `signout`
+   (and `me` is reserved). `detail` is an outcome marker
+   (`rate_limited` / `unknown_email` / `invalid_or_expired` / `issued` /
+   `created` / `existing` / `ok` / `rejected`). Writes are **best-effort**
+   (`Model::record_best_effort` logs on failure but never fails the
+   request). The audit row may distinguish outcomes for security review,
+   but the HTTP response does **not** — the anti-enumeration contract
+   holds at the wire (e.g. an `unknown_email` magic-link request is
+   audited as such yet still returns the same `200`). **No tokens or
+   secrets are ever stored** (only event names, normalised emails,
+   subject pids, and outcome markers).
+
+The trail is queryable at `GET /api/auth/audit/recent` (newest 100,
+`AuthEvent[]`). It mirrors the family `/audit/recent` pattern (see
 [`agents/share/auditability.md`](../../agents/share/auditability.md)).
+The endpoint is currently **unauthenticated** (consistent with the
+sibling care-pathway service's `/audit/recent`); gating it behind the
+bearer `AuthUser` extractor is a candidate follow-up tracked with the
+GDPR work (§13 T-9). Magic-link issuance also remains traced
+(structured tracing with the email field).
 
 ### Token handling rules
 

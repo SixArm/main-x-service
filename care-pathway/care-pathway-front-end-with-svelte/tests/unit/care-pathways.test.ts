@@ -94,4 +94,22 @@ describe("CarePathwayRepository", () => {
       "http://svc.test/api/care-pathways/check-duplicates",
     );
   });
+
+  it("merge() POSTs main/duplicate/reason in the body (pids not in the URL)", async () => {
+    const { repo, calls } = spyClient();
+    await repo.merge("m1", "d1", "reason");
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.url).toBe("http://svc.test/api/care-pathways/merge");
+    expect(calls[0]?.init.body).toBe(
+      JSON.stringify({ main_pid: "m1", duplicate_pid: "d1", reason: "reason" }),
+    );
+  });
+
+  it("merge() omits reason when not supplied", async () => {
+    const { repo, calls } = spyClient();
+    await repo.merge("m1", "d1");
+    expect(calls[0]?.init.body).toBe(
+      JSON.stringify({ main_pid: "m1", duplicate_pid: "d1" }),
+    );
+  });
 });

@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { ApiError, toFolder, toMove, toStats } from './client';
+import {
+    ApiError,
+    toBuilding,
+    toCabinet,
+    toFolder,
+    toMove,
+    toPatient,
+    toRoom,
+    toStats,
+    toWorker
+} from './client';
 
 describe('snake → camel mappers', () => {
     it('maps a folder, including volume fields', () => {
@@ -44,6 +54,106 @@ describe('snake → camel mappers', () => {
         expect(move.folderId).toBe('f1');
         expect(move.toCabinetLabel).toBe('Cabinet A1');
         expect(move.workerRole).toBe('administrator');
+    });
+
+    it('maps a patient, including count and source provenance', () => {
+        const patient = toPatient({
+            id: 'p1',
+            nhs_number: '943 476 5919',
+            name: 'Alice Johnson',
+            date_of_birth: '1980-04-12',
+            folder_count: 3,
+            source: 'patient-service'
+        });
+        expect(patient.id).toBe('p1');
+        expect(patient.nhsNumber).toBe('943 476 5919');
+        expect(patient.dateOfBirth).toBe('1980-04-12');
+        expect(patient.folderCount).toBe(3);
+        expect(patient.source).toBe('patient-service');
+    });
+
+    it('maps a patient with a null date of birth', () => {
+        const patient = toPatient({
+            id: 'p2',
+            nhs_number: '987 654 3210',
+            name: 'Bob Smith',
+            date_of_birth: null,
+            folder_count: 0,
+            source: 'snapshot'
+        });
+        expect(patient.dateOfBirth).toBeNull();
+        expect(patient.folderCount).toBe(0);
+    });
+
+    it('maps a building, dropping place hierarchy fields', () => {
+        const building = toBuilding({
+            id: 'b1',
+            name: 'Main Hospital',
+            place_type: 'Hospital',
+            place_kind: 'building',
+            description: 'Acute site',
+            contained_in_place: null,
+            container_path: 'Main Hospital',
+            capacity: null,
+            source: 'place-service'
+        });
+        expect(building).toEqual({
+            id: 'b1',
+            name: 'Main Hospital',
+            description: 'Acute site'
+        });
+    });
+
+    it('maps a room, carrying the parent building id', () => {
+        const room = toRoom({
+            id: 'r1',
+            name: 'Records Room',
+            place_type: 'RecordsRoom',
+            place_kind: 'room',
+            description: null,
+            contained_in_place: 'b1',
+            container_path: 'Main Hospital — Records Room',
+            capacity: null,
+            source: 'place-service'
+        });
+        expect(room.id).toBe('r1');
+        expect(room.name).toBe('Records Room');
+        expect(room.buildingId).toBe('b1');
+        expect(room.description).toBeNull();
+    });
+
+    it('maps a cabinet, including capacity, count and container path', () => {
+        const cabinet = toCabinet({
+            id: 'c1',
+            name: 'Cabinet A1',
+            place_type: 'FileCabinet',
+            place_kind: 'cabinet',
+            description: null,
+            contained_in_place: 'r1',
+            container_path: 'Main Hospital — Records Room — Cabinet A1',
+            capacity: 100,
+            source: 'place-service',
+            folder_count: 7
+        });
+        expect(cabinet.id).toBe('c1');
+        expect(cabinet.label).toBe('Cabinet A1');
+        expect(cabinet.roomId).toBe('r1');
+        expect(cabinet.capacity).toBe(100);
+        expect(cabinet.folderCount).toBe(7);
+        expect(cabinet.containerPath).toContain('Cabinet A1');
+    });
+
+    it('maps a worker with and without a role', () => {
+        expect(toWorker({ id: 'w1', name: 'Mira', role: 'administrator' })).toEqual({
+            id: 'w1',
+            name: 'Mira',
+            role: 'administrator'
+        });
+        expect(toWorker({ id: 'w2', name: 'Sam', role: null })).toEqual({
+            id: 'w2',
+            name: 'Sam',
+            role: null
+        });
     });
 
     it('maps stats', () => {

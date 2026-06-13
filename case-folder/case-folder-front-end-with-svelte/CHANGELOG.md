@@ -10,6 +10,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **ST-13 complete — mapper unit coverage.** `client.test.ts` now exercises
+  every exported snake→camel mapper (`toPatient`, `toFolder`, `toMove`,
+  `toBuilding`, `toRoom`, `toCabinet`, `toWorker`, `toStats`) plus `ApiError`;
+  vitest unit count is now 24 (was 18).
+- **A11y fix.** Removed the redundant `role="separator"` from
+  `Separator.svelte` — an `<hr>` already carries the implicit `separator`
+  role. `pnpm run check` is now 0 errors / 0 warnings.
+
 ### Added
 
 - **Inaugural scaffold (v0.1.0).** SvelteKit 2 / Svelte 5 (runes)
@@ -34,7 +44,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - **Theming & locale**: `nhs` / `nhs-high-contrast` themes and `en` / `cy`
     / `gd` locales via the Lily theme/locale pickers, persisted to
     `localStorage`.
-  - **Tests**: 18 Vitest unit tests + a 14-file Playwright e2e suite
+  - **Tests**: Vitest unit tests + a 14-file Playwright e2e suite
     (smoke, dashboard, folders, patients, places, move, history, errors,
     volumes, clickthrough, auth, a11y, ifit, wiring) — boots the dev
     server and runs against the API in stub mode.

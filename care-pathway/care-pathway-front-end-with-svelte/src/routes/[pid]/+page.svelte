@@ -13,6 +13,9 @@
     let error = $state<string | null>(null);
     let duplicates = $state<ScoredRef[] | null>(null);
     let checking = $state(false);
+    let merging = $state<string | null>(null);
+    let confirming = $state<string | null>(null);
+    let mergeMessage = $state<string | null>(null);
 
     onMount(async () => {
         try {
@@ -32,6 +35,8 @@
     async function handleCheckDuplicates() {
         if (!pathway) return;
         checking = true;
+        mergeMessage = null;
+        confirming = null;
         try {
             const hits = await repo.checkDuplicates(pathway);
             duplicates = hits.filter((h) => h.pid !== pid);
@@ -39,6 +44,34 @@
             error = err instanceof Error ? err.message : "Check failed";
         } finally {
             checking = false;
+        }
+    }
+
+    /// This detail record is the survivor (main); the row's pid is the
+    /// duplicate to fold in. Two-step: arm `confirming`, then merge.
+    async function handleMerge(duplicatePid: string) {
+        // Guard: equal pids would 422; should never happen here.
+        if (duplicatePid === pid) {
+            error = "Cannot merge a record into itself.";
+            confirming = null;
+            return;
+        }
+        merging = duplicatePid;
+        error = null;
+        mergeMessage = null;
+        try {
+            const result = await repo.merge(pid, duplicatePid);
+            // The survivor's data may have changed: use the returned
+            // record, then re-fetch the duplicates list.
+            pathway = result.main;
+            mergeMessage = `Merged ${duplicatePid} into this record.`;
+            confirming = null;
+            const hits = await repo.checkDuplicates(result.main);
+            duplicates = hits.filter((h) => h.pid !== pid);
+        } catch (err) {
+            error = err instanceof Error ? err.message : "Merge failed";
+        } finally {
+            merging = null;
         }
     }
 </script>
@@ -92,6 +125,10 @@
         <button onclick={handleDelete}>Delete</button>
     </div>
 
+    {#if mergeMessage}
+        <p class="banner" role="status">{mergeMessage}</p>
+    {/if}
+
     {#if duplicates}
         <h2>Potential duplicates</h2>
         {#if duplicates.length === 0}
@@ -102,6 +139,28 @@
                     <li class="surface row">
                         <a href={`/${dup.pid}`}>{dup.name}</a>
                         <span>{dup.score.toFixed(3)} · {dup.confidence}</span>
+                        {#if confirming === dup.pid}
+                            <span>Merge into this record?</span>
+                            <button
+                                class="button"
+                                onclick={() => handleMerge(dup.pid)}
+                                disabled={merging === dup.pid}
+                            >
+                                {merging === dup.pid ? "Merging…" : "Confirm merge"}
+                            </button>
+                            <button onclick={() => (confirming = null)} disabled={merging === dup.pid}>
+                                Cancel
+                            </button>
+                        {:else}
+                            <button
+                                onclick={() => {
+                                    confirming = dup.pid;
+                                }}
+                                disabled={merging !== null}
+                            >
+                                Merge into this record
+                            </button>
+                        {/if}
                     </li>
                 {/each}
             </ul>

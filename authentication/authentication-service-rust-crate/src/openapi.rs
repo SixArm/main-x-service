@@ -83,6 +83,16 @@ pub fn spec() -> Value {
                     }
                 }
             },
+            "/api/auth/audit/recent": {
+                "get": {
+                    "tags": ["audit"],
+                    "summary": "Recent authentication events (audit trail)",
+                    "description": "Newest-first authentication audit events (signup, magic-link request/redeem, signout), capped at 100. Rows carry the event name, normalised email, subject pid, and an outcome marker — never tokens or secrets. Currently unauthenticated (mirrors the family /audit/recent pattern); may be gated behind a bearer token in a future task.",
+                    "responses": {
+                        "200": { "description": "Recent auth events", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AuthEvent" } } } } }
+                    }
+                }
+            },
             "/.well-known/jwks.json": {
                 "get": {
                     "tags": ["jwks"],
@@ -135,6 +145,16 @@ pub fn spec() -> Value {
                     "e": { "type": "string", "description": "RSA exponent (base64url)." } } },
                 "Jwks": { "type": "object", "required": ["keys"], "properties": {
                     "keys": { "type": "array", "items": { "$ref": "#/components/schemas/Jwk" } } } },
+                "AuthEvent": { "type": "object",
+                    "description": "One authentication audit-trail row. Never carries tokens or secrets.",
+                    "required": ["id", "event", "created_at", "updated_at"], "properties": {
+                    "id": { "type": "integer", "format": "int32", "description": "Row id (monotonic; newest = largest)." },
+                    "event": { "type": "string", "description": "signup / magic_link_requested / magic_link_redeemed / signout / me." },
+                    "email": { "type": "string", "format": "email", "nullable": true, "description": "Normalised subject email where applicable." },
+                    "user_pid": { "type": "string", "format": "uuid", "nullable": true, "description": "Subject user pid when known." },
+                    "detail": { "type": "string", "nullable": true, "description": "Outcome marker, e.g. rate_limited / unknown_email / invalid_or_expired / issued / ok." },
+                    "created_at": { "type": "string", "format": "date-time" },
+                    "updated_at": { "type": "string", "format": "date-time" } } },
                 "Error": { "type": "object", "properties": {
                     "error": { "type": "string", "description": "Machine-readable error code, e.g. rate_limited." },
                     "description": { "type": "string" } } }
@@ -165,7 +185,27 @@ mod tests {
         assert!(paths["/api/auth/magic-link/{token}"]["get"].is_object());
         assert!(paths["/api/auth/me"]["get"].is_object());
         assert!(paths["/api/auth/signout"]["post"].is_object());
+        assert!(paths["/api/auth/audit/recent"]["get"].is_object());
         assert!(paths["/.well-known/jwks.json"]["get"].is_object());
+    }
+
+    #[test]
+    fn documents_the_audit_endpoint_and_schema() {
+        let s = spec();
+        // The endpoint returns an array of AuthEvent.
+        let resp = &s["paths"]["/api/auth/audit/recent"]["get"]["responses"]["200"];
+        assert_eq!(
+            resp["content"]["application/json"]["schema"]["items"]["$ref"],
+            "#/components/schemas/AuthEvent"
+        );
+        // The schema is present and must not advertise a token field.
+        let schema = &s["components"]["schemas"]["AuthEvent"];
+        assert!(schema["properties"]["event"].is_object());
+        assert!(schema["properties"]["detail"].is_object());
+        assert!(
+            schema["properties"]["token"].is_null(),
+            "auth audit rows must not expose tokens"
+        );
     }
 
     #[test]
@@ -203,6 +243,7 @@ mod tests {
             "Claims",
             "Jwks",
             "Jwk",
+            "AuthEvent",
         ] {
             assert!(schemas[name].is_object(), "missing schema {name}");
         }

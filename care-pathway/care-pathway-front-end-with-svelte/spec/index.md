@@ -14,8 +14,9 @@ service.
 ## 2. Scope
 
 In scope: the four routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`), the
-API client, the care-pathway form, and a name-search box on the list.
-Out of scope: fuzzy/full-text search UI, audit views, auth.
+API client, the care-pathway form, a name-search box on the list, and a
+merge-duplicate action on the detail page. Out of scope: fuzzy/full-text
+search UI, audit views, auth.
 
 ## 3. Stakeholders and users
 
@@ -50,6 +51,13 @@ Clinical informaticians and pathway authors.
 5. Delete (`DELETE`, soft), redirect to the list.
 6. Check-duplicates posts the current record and lists matches (name,
    score, confidence), excluding the record itself.
+7. Merge: each duplicate row offers "Merge into this record" (the detail
+   record is the survivor/main; the row's pid is the duplicate). A
+   two-step inline confirm calls `POST /api/care-pathways/merge` with
+   `{main_pid, duplicate_pid}`. On success it adopts the returned
+   survivor record, re-runs check-duplicates, and shows a success
+   message. Equal pids are guarded client-side (the service `422`s);
+   `404`/other errors surface via the error banner.
 
 ## 7. Non-functional requirements
 
@@ -73,6 +81,7 @@ editable rows).
 | `/[pid]` load | `GET /api/care-pathways/{pid}` |
 | `/[pid]` delete | `DELETE /api/care-pathways/{pid}` |
 | `/[pid]` duplicates | `POST /api/care-pathways/check-duplicates` |
+| `/[pid]` merge | `POST /api/care-pathways/merge` (`{main_pid, duplicate_pid, reason?}`) |
 | `/[pid]/edit` | `PUT /api/care-pathways/{pid}` |
 
 ## 10. Persistence
@@ -85,12 +94,16 @@ None client-side beyond in-memory route state.
 (`tests/unit/`) cover the `ApiClient` (verb/body/headers/bearer-token/
 error-classification/empty-body) and `CarePathwayRepository` (every
 method's path + verb, incl. a regression pinning `check-duplicates`,
-and `search()` pinning the `/search?q=` path with URL-encoding).
-**Playwright** smoke tests (`tests/e2e/`) load the four routes (`/`,
-`/new`, `/[pid]`, `/[pid]/edit`) with the API stubbed via
-`page.route`, asserting each renders; one test exercises the list
-search box (matching query keeps the row, non-matching shows the
-empty-result message). They run against the production
+`search()` pinning the `/search?q=` path with URL-encoding, and
+`merge()` pinning `POST /merge` with the `{main_pid, duplicate_pid,
+reason?}` body — pids in the body, not the URL). **Playwright** smoke
+tests (`tests/e2e/`) load the four routes (`/`, `/new`, `/[pid]`,
+`/[pid]/edit`) with the API stubbed via `page.route`, asserting each
+renders; one test exercises the list search box (matching query keeps
+the row, non-matching shows the empty-result message); one test drives
+the detail-page merge action (check-duplicates → confirm merge →
+success message, asserting the merge endpoint fired). They run against
+the production
 build (`vite preview`) to avoid the `vite dev` cold-start module race.
 Run: `pnpm test` (vitest) and `pnpm test:e2e` (Playwright).
 
@@ -105,6 +118,11 @@ for any access/audit requirements.
   (`tests/unit/`, 16 tests).
 - [x] playwright smoke for the four routes (`tests/e2e/smoke.spec.ts`,
   4 tests, API stubbed, runs against `vite preview`).
+- [x] Merge-duplicate action on the detail page — each duplicate row
+  offers "Merge into this record" (two-step inline confirm) calling
+  `POST /api/care-pathways/merge`; adopts the returned survivor and
+  re-checks. `repository.merge()` added; vitest (2) + Playwright (1)
+  cover it.
 - [ ] `Custom(label)` editing for code systems / settings / schemes.
 - [x] Search box once the service ships search — list page calls
   `GET /api/care-pathways/search?q=` (search-on-submit + Clear);
@@ -113,9 +131,10 @@ for any access/audit requirements.
 
 ## 14. Implementation status
 
-Done: all four routes; lean client; repository (incl. `search()`); list
-search box; form (incl. condition codes + identifiers editors); SPA
-config. `pnpm run check` clean; production build succeeds.
+Done: all four routes; lean client; repository (incl. `search()` and
+`merge()`); list search box; detail-page merge-duplicate action; form
+(incl. condition codes + identifiers editors); SPA config. `pnpm run
+check` clean; production build succeeds.
 
 ## 15. Roadmap
 

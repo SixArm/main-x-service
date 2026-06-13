@@ -50,8 +50,9 @@
   mappers (P1) — NFR-6
 - [x] **T-13** Automated axe accessibility scans (`tests/e2e/a11y.spec.ts`,
   9 routes, fails on serious/critical) (P1) — NFR-5
-- [x] **T-14** vitest unit tests (`npm run test:unit`, 11 tests) + ESLint
-  flat config (`npm run lint`, clean) for the Svelte client (P1)
+- [x] **T-14** vitest unit tests (`npm run test:unit`, 24 tests — `nhs.ts`
+  + all exported `client.ts` mappers + components) + ESLint flat config
+  (`npm run lint`, clean) for the Svelte client (P1)
 
 ## Production gates (blocked on deployment decisions)
 

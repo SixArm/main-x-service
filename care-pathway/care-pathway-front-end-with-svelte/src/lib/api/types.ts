@@ -93,3 +93,11 @@ export interface ScoredRef {
     confidence: string;
     is_match: boolean;
 }
+
+/// Result of merging a duplicate into a survivor (`POST /merge`).
+/// `main` is the survivor's refreshed `CarePathway`.
+export interface MergeResult {
+    main_pid: string;
+    duplicate_pid: string;
+    main: CarePathway;
+}

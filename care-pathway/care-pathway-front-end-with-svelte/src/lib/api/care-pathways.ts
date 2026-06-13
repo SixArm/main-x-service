@@ -2,7 +2,7 @@
 
 import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
-import type { CarePathway, PathwayRef, ScoredRef } from "./types";
+import type { CarePathway, MergeResult, PathwayRef, ScoredRef } from "./types";
 
 export class CarePathwayRepository {
     constructor(private readonly http: ApiClient) {}
@@ -43,5 +43,19 @@ export class CarePathwayRepository {
     /// Match a query against the stored care pathways.
     checkDuplicates(query: CarePathway): Promise<ScoredRef[]> {
         return this.http.post<ScoredRef[]>("/api/care-pathways/check-duplicates", { body: query });
+    }
+
+    /// Merge a duplicate into a survivor. Both pids travel in the body;
+    /// returns the survivor's refreshed record. `422` for equal pids,
+    /// `404` for an unknown pid.
+    merge(mainPid: string, duplicatePid: string, reason?: string): Promise<MergeResult> {
+        const body: { main_pid: string; duplicate_pid: string; reason?: string } = {
+            main_pid: mainPid,
+            duplicate_pid: duplicatePid,
+        };
+        if (reason !== undefined) {
+            body.reason = reason;
+        }
+        return this.http.post<MergeResult>("/api/care-pathways/merge", { body });
     }
 }

@@ -31,7 +31,7 @@ src/
 │   ├── api/
 │   │   ├── client.ts             lean fetch wrapper (+ ApiError)
 │   │   ├── types.ts              CarePathway + ConditionCode + CareSetting + IdentifierScheme + PathwayRef + ScoredRef
-│   │   └── care-pathways.ts      CarePathwayRepository (CRUD + checkDuplicates)
+│   │   └── care-pathways.ts      CarePathwayRepository (CRUD + checkDuplicates + merge)
 │   └── components/CarePathwayForm.svelte
 └── routes/
     ├── +layout.svelte / +layout.ts   nav + SPA toggle
@@ -51,6 +51,7 @@ src/
 | Edit | `PUT /api/care-pathways/{pid}` |
 | Delete | `DELETE /api/care-pathways/{pid}` |
 | Check duplicates | `POST /api/care-pathways/check-duplicates` |
+| Merge duplicate | `POST /api/care-pathways/merge` |
 
 ## Commands
 

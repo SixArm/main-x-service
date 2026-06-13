@@ -16,7 +16,7 @@ use std::path::Path;
 #[allow(unused_imports)]
 use crate::{
     controllers,
-    models::_entities::{sessions, users},
+    models::_entities::{auth_events, sessions, users},
     tasks,
     workers::downloader::DownloadWorker,
 };
@@ -68,6 +68,7 @@ impl Hooks for App {
         // tasks-inject (do not remove)
     }
     async fn truncate(ctx: &AppContext) -> Result<()> {
+        truncate_table(&ctx.db, auth_events::Entity).await?;
         truncate_table(&ctx.db, sessions::Entity).await?;
         truncate_table(&ctx.db, users::Entity).await?;
         Ok(())

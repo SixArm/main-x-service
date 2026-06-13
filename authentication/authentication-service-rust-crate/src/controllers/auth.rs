@@ -6,6 +6,14 @@
 //! 3. `GET  /api/auth/magic-link/{token}`          — consume the link → RS256 access token + session.
 //! 4. `GET  /api/auth/me`                          — current user (bearer token required).
 //! 5. `POST /api/auth/signout`                     — revoke the current session (bearer token required).
+//! 6. `GET  /api/auth/audit/recent`                — recent authentication events (audit trail).
+//!
+//! Every endpoint writes a best-effort [`AuthEvent`] row (signup,
+//! magic-link request/redeem, signout) for the security + compliance
+//! audit trail. The audit row may distinguish outcomes (e.g.
+//! `rate_limited` / `unknown_email` / `existing`) for review, but the
+//! HTTP response never does — the anti-enumeration contract holds at the
+//! wire. No tokens or secrets are ever stored.
 //!
 //! Tokens are RS256 and verifiable offline by peer services via the
 //! JWKS at `/.well-known/jwks.json`. In development the magic link is
@@ -19,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     auth::AuthUser,
     mailers::auth::AuthMailer,
-    models::{sessions, users},
+    models::{auth_events::Model as AuthEvent, sessions, users},
     rate_limit,
     views::auth::{CurrentResponse, LoginResponse},
 };
@@ -87,6 +95,14 @@ async fn signup(State(ctx): State<AppContext>, Json(params): Json<SignupParams>)
     // Throttle per email before any work, so abuse cannot email-bomb a
     // victim or probe for accounts. Over the limit → 429, no token issued.
     if rate_limit::check(&params.email).is_err() {
+        AuthEvent::record_best_effort(
+            &ctx.db,
+            "signup",
+            Some(&params.email),
+            None,
+            Some("rate_limited"),
+        )
+        .await;
         return Err(rate_limited());
     }
 
@@ -96,21 +112,50 @@ async fn signup(State(ctx): State<AppContext>, Json(params): Json<SignupParams>)
         .filter(|n| n.chars().count() >= 2)
         .unwrap_or_else(|| default_name(&params.email));
 
-    let user = match users::Model::create_passwordless(&ctx.db, &params.email, &name).await {
-        Ok(user) => user,
-        Err(ModelError::EntityAlreadyExists) => {
-            match users::Model::find_by_email(&ctx.db, &params.email).await {
-                Ok(user) => user,
-                Err(_) => return format::empty_json(),
+    let (user, existing) =
+        match users::Model::create_passwordless(&ctx.db, &params.email, &name).await {
+            Ok(user) => (user, false),
+            Err(ModelError::EntityAlreadyExists) => {
+                if let Ok(user) = users::Model::find_by_email(&ctx.db, &params.email).await {
+                    (user, true)
+                } else {
+                    AuthEvent::record_best_effort(
+                        &ctx.db,
+                        "signup",
+                        Some(&params.email),
+                        None,
+                        Some("rejected"),
+                    )
+                    .await;
+                    return format::empty_json();
+                }
             }
-        }
-        Err(err) => {
-            tracing::info!(error = %err, email = %params.email, "signup rejected");
-            return format::empty_json();
-        }
-    };
+            Err(err) => {
+                tracing::info!(error = %err, email = %params.email, "signup rejected");
+                AuthEvent::record_best_effort(
+                    &ctx.db,
+                    "signup",
+                    Some(&params.email),
+                    None,
+                    Some("rejected"),
+                )
+                .await;
+                return format::empty_json();
+            }
+        };
 
     let user = user.into_active_model().create_magic_link(&ctx.db).await?;
+    // The audit row distinguishes a fresh account from an existing one
+    // for security review, but the 200 response above does not — the
+    // anti-enumeration contract holds at the wire.
+    AuthEvent::record_best_effort(
+        &ctx.db,
+        "signup",
+        Some(&user.email),
+        Some(user.pid),
+        Some(if existing { "existing" } else { "created" }),
+    )
+    .await;
     deliver_magic_link(&ctx, &user).await;
     format::empty_json()
 }
@@ -124,14 +169,40 @@ async fn request_magic_link(
 ) -> Result<Response> {
     // Throttle per email before any lookup (see `signup`).
     if rate_limit::check(&params.email).is_err() {
+        AuthEvent::record_best_effort(
+            &ctx.db,
+            "magic_link_requested",
+            Some(&params.email),
+            None,
+            Some("rate_limited"),
+        )
+        .await;
         return Err(rate_limited());
     }
 
     let Ok(user) = users::Model::find_by_email(&ctx.db, &params.email).await else {
         tracing::debug!(email = %params.email, "magic link requested for unknown email");
+        // Audited as unknown_email for security review; the 200 response
+        // is identical to the known-account path (anti-enumeration).
+        AuthEvent::record_best_effort(
+            &ctx.db,
+            "magic_link_requested",
+            Some(&params.email),
+            None,
+            Some("unknown_email"),
+        )
+        .await;
         return format::empty_json();
     };
     let user = user.into_active_model().create_magic_link(&ctx.db).await?;
+    AuthEvent::record_best_effort(
+        &ctx.db,
+        "magic_link_requested",
+        Some(&user.email),
+        Some(user.pid),
+        Some("issued"),
+    )
+    .await;
     deliver_magic_link(&ctx, &user).await;
     format::empty_json()
 }
@@ -141,6 +212,16 @@ async fn request_magic_link(
 #[debug_handler]
 async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
     let Ok(user) = users::Model::find_by_magic_token(&ctx.db, &token).await else {
+        // Unknown / expired / already-consumed token — all map to the
+        // same 401. We never log the token itself.
+        AuthEvent::record_best_effort(
+            &ctx.db,
+            "magic_link_redeemed",
+            None,
+            None,
+            Some("invalid_or_expired"),
+        )
+        .await;
         return unauthorized("invalid or expired magic link");
     };
 
@@ -160,6 +241,14 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
         .fixed_offset();
     sessions::Model::issue(&ctx.db, &jti, user.pid, expires_at, None).await?;
 
+    AuthEvent::record_best_effort(
+        &ctx.db,
+        "magic_link_redeemed",
+        Some(&user.email),
+        Some(user.pid),
+        Some("ok"),
+    )
+    .await;
     format::json(LoginResponse::new(&user, &access_token))
 }
 
@@ -186,7 +275,29 @@ async fn signout(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Respon
     if let Ok(session) = sessions::Model::find_by_jid(&ctx.db, &claims.jti).await {
         session.into_active_model().revoke(&ctx.db).await?;
     }
+    AuthEvent::record_best_effort(
+        &ctx.db,
+        "signout",
+        Some(&claims.email),
+        uuid::Uuid::parse_str(&claims.sub).ok(),
+        None,
+    )
+    .await;
     format::empty_json()
+}
+
+/// Recent authentication events, newest first. The response shape is
+/// documented in the `OpenAPI` document (the `AuthEvent` schema).
+///
+/// Left **open** (no bearer) for now to mirror how care-pathway exposes
+/// `/audit/recent`; the rows carry no tokens or secrets, only event
+/// names, normalised emails, subject pids, and outcome markers. A future
+/// task (entity spec T-9 / GDPR) may gate it behind the bearer
+/// `AuthUser` extractor — see service spec §12.
+#[debug_handler]
+async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
+    let rows = AuthEvent::recent(&ctx.db, 100).await?;
+    format::json(rows)
 }
 
 /// Routes for the passwordless magic-link auth surface, mounted under
@@ -199,4 +310,5 @@ pub fn routes() -> Routes {
         .add("/magic-link/{token}", get(verify))
         .add("/me", get(me))
         .add("/signout", post(signout))
+        .add("/audit/recent", get(recent_audit))
 }

@@ -25,7 +25,12 @@
 
 ## Active / next
 
-- [ ] **ST-13** vitest unit tests for `nhs.ts` + `client.ts` mappers (P1) — UR-4, UR-6
+- [x] **ST-13** vitest unit tests for `nhs.ts` + `client.ts` mappers (P1) — UR-4, UR-6.
+  `nhs.test.ts` covers normalise/format/Modulus-11; `client.test.ts` covers
+  every exported mapper (`toPatient`, `toFolder`, `toMove`, `toBuilding`,
+  `toRoom`, `toCabinet`, `toWorker`, `toStats`) + `ApiError`. Also removed a
+  redundant `role="separator"` on `Separator.svelte` (`<hr>` carries the
+  implicit role), so `pnpm run check` is back to 0 errors / 0 warnings.
 - [ ] **ST-14** ESLint + svelte-eslint (P1)
 - [ ] **ST-15** `@axe-core/playwright` scans in CI (P1) — UR-9
 - [ ] **ST-16** Codegen client types from API OpenAPI/JSON Schema (P1) — UR-6

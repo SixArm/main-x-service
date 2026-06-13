@@ -5,6 +5,7 @@
 //! hand-annotating fields that codegen would overwrite.
 #![allow(missing_docs)]
 
+pub mod auth_events;
 pub mod prelude;
 pub mod sessions;
 pub mod users;
