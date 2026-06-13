@@ -10,7 +10,8 @@ impl ActiveModelBehavior for super::_entities::audit_logs::ActiveModel {}
 
 impl Model {
     /// Record one audit entry. Best-effort — callers log but don't fail
-    /// the request if auditing errors.
+    /// the request if auditing errors. `actor` is the caller's `sub`
+    /// (user `pid`) when a verified token was presented, else `None`.
     ///
     /// # Errors
     ///
@@ -19,12 +20,13 @@ impl Model {
         db: &DatabaseConnection,
         entity_pid: Uuid,
         action: &str,
+        actor: Option<&str>,
         snapshot: Option<serde_json::Value>,
     ) -> ModelResult<Self> {
         let entry = audit_logs::ActiveModel {
             entity_pid: ActiveValue::set(entity_pid),
             action: ActiveValue::set(action.to_string()),
-            actor: ActiveValue::set(None),
+            actor: ActiveValue::set(actor.map(ToString::to_string)),
             snapshot: ActiveValue::set(snapshot),
             ..Default::default()
         }

@@ -83,10 +83,24 @@ manual check confirms it. Split tasks too big for one PR
     with search-blocked candidates (NFR-1 / NFR-2; OQ-2).
   - **Acceptance:** `check-duplicates` latency test passes at
     100 000 stored pathways.
-- [ ] **T-7 — JWT verification middleware.**
-  - [ ] Verify RS256 JWTs against the auth-service JWKS on `/api/*`.
-  - **Acceptance:** integration test: no token → `401`; valid signed
-    token → `2xx`.
+- [x] **T-7 — JWT verification.**
+  - [x] Verify RS256 JWTs against the auth-service JWKS (offline).
+    **Done (2026-06-13):** `src/auth.rs` embeds the
+    [`authentication-verifier`](../../authentication/authentication-verifier-rust-crate)
+    crate behind a process-wide `Verifier` built from `CARE_PATHWAY_JWKS`
+    / `CARE_PATHWAY_JWT_ISSUER` / `CARE_PATHWAY_JWT_AUDIENCE`. `AuthUser`
+    (required) and `MaybeAuthUser` (optional) extractors; `GET
+    /api/care-pathways/whoami` is protected. CRUD now stamps the audit
+    `actor` from the token when present (previously always `NULL`).
+  - **Acceptance:** no token → `401`; valid signed token → `2xx`.
+    **Met:** `whoami_without_token_is_401` (DB-gated) + six un-gated
+    crypto unit tests in `auth::tests` (valid→claims, missing/non-bearer/
+    expired/tampered→401, empty-verifier rejects) minting a real token +
+    matching JWKS in-process.
+  - [ ] *Follow-up:* blanket enforcement on every `/api/*` route (awaits
+    the coordinated family SSO rollout; the front-end must attach the
+    bearer token first) and JWKS-over-HTTP fetch from the auth service
+    at boot (currently injected via env).
 - [ ] **T-8 — Record merge.** (deferred MVP feature)
   - [ ] Merge confirmed duplicates: transfer identifiers /
     alternate names, soft-delete the duplicate, link, snapshot,

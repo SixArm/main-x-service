@@ -56,6 +56,17 @@ pub fn spec() -> Value {
                         "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ScoredRef" } } } } } }
                 }
             },
+            "/api/care-pathways/whoami": {
+                "get": {
+                    "tags": ["auth"],
+                    "summary": "Echo the verified claims of the bearer token",
+                    "security": [{ "bearer": [] }],
+                    "responses": {
+                        "200": { "description": "Verified token claims" },
+                        "401": { "description": "Missing or invalid bearer token" }
+                    }
+                }
+            },
             "/api/care-pathways/audit/recent": {
                 "get": { "tags": ["audit"], "summary": "Recent audit-log entries across all pathways", "responses": { "200": { "description": "Audit entries" } } }
             },
@@ -77,6 +88,10 @@ pub fn spec() -> Value {
             }
         },
         "components": {
+            "securitySchemes": {
+                "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT",
+                    "description": "RS256 access token from the authentication-service, verified offline against its JWKS." }
+            },
             "schemas": {
                 "PathwayRef": { "type": "object", "required": ["pid", "name"], "properties": {
                     "pid": { "type": "string", "format": "uuid" }, "name": { "type": "string" } } },
@@ -146,5 +161,15 @@ mod tests {
         assert!(paths["/api/care-pathways/audit/recent"]["get"].is_object());
         assert!(paths["/api/care-pathways/events/recent"]["get"].is_object());
         assert!(paths["/api/care-pathways/{pid}/audit"]["get"].is_object());
+    }
+
+    #[test]
+    fn spec_documents_whoami_with_bearer_security() {
+        let s = spec();
+        assert!(s["paths"]["/api/care-pathways/whoami"]["get"]["security"][0]["bearer"].is_array());
+        assert_eq!(
+            s["components"]["securitySchemes"]["bearer"]["scheme"],
+            "bearer"
+        );
     }
 }

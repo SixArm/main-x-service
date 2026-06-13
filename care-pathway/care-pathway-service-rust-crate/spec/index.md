@@ -57,7 +57,9 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    query; `GET /api/care-pathways/events/recent` — in-memory event
    stream. Each CRUD action writes an `audit_logs` row and publishes a
    `created`/`updated`/`deleted` event.
-9. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3
+9. `GET /api/care-pathways/whoami` — echo verified bearer-token claims
+   (`401` without a valid token); proves offline RS256 verification.
+10. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3
    document and a Swagger UI page rendering it.
 
 ## 7. Non-functional requirements
@@ -91,12 +93,15 @@ PostgreSQL via SeaORM + `sea-orm-migration`. Migrations
 
 DB-free tests: `tests/matching.rs` (matcher embedding + JSON
 round-trip), the `src/validation.rs` unit tests (ICD-10 / ICD-11 /
-SNOMED-Verhoeff format checks), and controller validation unit tests
-(blank-name and malformed-code → `422` pins). Request-level tests
-(`tests/requests/care_pathways.rs`, loco testing harness) cover all
-seven endpoints plus the malformed-code `422` but require Postgres, so
-they are `#[ignore]`-gated — run with `cargo test -- --ignored` and a
-`DATABASE_URL`.
+SNOMED-Verhoeff format checks), the `src/auth.rs` unit tests (mint a
+real RS256 token + matching JWKS in-process, then assert valid → claims
+and missing / non-bearer / expired / tampered / empty-verifier → `401`),
+and controller validation unit tests (blank-name and malformed-code →
+`422` pins). Request-level tests (`tests/requests/care_pathways.rs`,
+loco testing harness) cover the CRUD + match endpoints, the audit/event
+trail, `whoami` (no token → `401`), and OpenAPI/Swagger but require
+Postgres, so they are `#[ignore]`-gated — run with
+`cargo test -- --ignored` and a `DATABASE_URL`.
 
 ## 12. Compliance
 
@@ -125,7 +130,12 @@ access controls added later.
 - [x] Request-level integration tests (Postgres) — landed
   `#[ignore]`-gated (entity spec §13 T-4); wiring a DB-backed run
   into CI remains.
-- [ ] JWT verification middleware consuming the auth-service JWKS.
+- [x] JWT verification consuming the auth-service JWKS — `src/auth.rs`
+  embeds `authentication-verifier`; offline RS256 verification via a
+  process-wide `Verifier` (env-configured JWKS/issuer/audience);
+  `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit
+  `actor` stamped from the token. Blanket `/api/*` enforcement +
+  JWKS-over-HTTP fetch are follow-ups.
 
 ## 14. Implementation status
 
@@ -134,9 +144,10 @@ validation on create/update (blank `name` + ICD-10 / ICD-11 / SNOMED CT
 `condition_codes` format checks, all problems reported together);
 `/match` and `/check-duplicates` embedding care-pathway-matcher;
 audit log + in-memory event streaming on every CRUD (`/audit/recent`,
-`/{pid}/audit`, `/events/recent`); OpenAPI 3 doc + Swagger UI
-(`/api-docs/openapi.json`, `/swagger-ui`); DB-free tests + gated
-request-level tests; green build + clippy.
+`/{pid}/audit`, `/events/recent`); offline RS256 JWT verification
+(`AuthUser`/`MaybeAuthUser`, `/whoami`, audit `actor` from the token);
+OpenAPI 3 doc + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`);
+DB-free tests + gated request-level tests; green build + clippy.
 
 ## 15. Roadmap
 

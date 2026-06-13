@@ -259,6 +259,9 @@ async fn crud_writes_audit_log_and_events() {
         assert!(actions.contains(&"created"));
         assert!(actions.contains(&"updated"));
         assert!(actions.contains(&"deleted"));
+        // No bearer token was sent, so the actor is recorded as null
+        // (populated once JWT auth is enforced — T-7).
+        assert!(rows.iter().all(|r| r["actor"].is_null()));
 
         // System-wide recent-audit endpoint returns entries too.
         let recent_audit: Value = request.get("/api/care-pathways/audit/recent").await.json();
@@ -280,6 +283,20 @@ async fn crud_writes_audit_log_and_events() {
         assert!(kinds.contains(&"created"));
         assert!(kinds.contains(&"updated"));
         assert!(kinds.contains(&"deleted"));
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn whoami_without_token_is_401() {
+    // No JWKS is configured in tests, and no bearer header is sent, so the
+    // protected endpoint must reject. The token-accepted path is pinned
+    // un-gated by `auth::tests::valid_token_yields_claims`.
+    request::<App, _, _>(|request, _ctx| async move {
+        let response = request.get("/api/care-pathways/whoami").await;
+        assert_eq!(response.status_code(), 401, "whoami needs a bearer token");
     })
     .await;
 }

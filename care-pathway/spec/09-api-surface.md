@@ -14,6 +14,7 @@ Endpoint detail: [`AGENTS/restful.md`](../AGENTS/restful.md); source:
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete | empty JSON |
 | POST | `/api/care-pathways/match` | Rank `{query, candidates}` (no persistence) | `[(index, MatchResult)]` |
 | POST | `/api/care-pathways/check-duplicates` | Match a query against stored pathways | `[{pid, name, score, confidence, is_match}]` sorted by score |
+| GET | `/api/care-pathways/whoami` | Echo verified bearer-token claims; `401` without a valid token | `Claims` |
 | GET | `/api/care-pathways/audit/recent` | Recent audit-log entries (all pathways), newest first, cap 100 | `[AuditLog]` |
 | GET | `/api/care-pathways/{pid}/audit` | Audit trail for one pathway, newest first | `[AuditLog]` |
 | GET | `/api/care-pathways/events/recent` | Recent CRUD events from the in-memory stream | `[PathwayEvent]` |
@@ -26,6 +27,12 @@ Every create / update / delete writes a best-effort `audit_logs` row
 (action + JSON snapshot, durable in Postgres) and publishes a
 `PathwayEvent` (`created`/`updated`/`deleted`) to the in-memory event
 stream. A durable broker is roadmap (§15).
+
+Bearer-token verification (RS256 against the auth-service JWKS, offline)
+is available via the `AuthUser` extractor; `whoami` is protected by it,
+and create/update/delete stamp the audit `actor` from the token when
+one is present (`MaybeAuthUser`). Blanket `/api/*` enforcement and
+JWKS-over-HTTP fetch are follow-ups (§13 T-7).
 
 Conventions: **raw loco JSON** (no `{success, data, error}` envelope
 — this is the loco-era convention, unlike the pre-loco person

@@ -32,6 +32,17 @@ Base URL in development: `http://localhost:5150`.
 | POST | `/api/care-pathways/match` | `{query, candidates}` | ranked `[(index, MatchResult)]` |
 | POST | `/api/care-pathways/check-duplicates` | `CarePathway` | `[{pid, name, score, confidence, is_match}]`, score-descending |
 
+### Authentication
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/api/care-pathways/whoami` | verified bearer-token `Claims`; `401` without a valid token |
+
+RS256 tokens are verified offline against the auth-service JWKS via the
+embedded `authentication-verifier` (`src/auth.rs`). The `AuthUser`
+extractor requires a token; `MaybeAuthUser` is optional and feeds the
+audit `actor`. Blanket `/api/*` enforcement + JWKS-fetch are follow-ups.
+
 ### Audit & events
 
 | Method | Path | Returns |

@@ -222,6 +222,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "authentication-verifier"
+version = "0.1.0"
+dependencies = [
+ "jsonwebtoken",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "auto-future"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -573,20 +583,25 @@ name = "care-pathway-service"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "authentication-verifier",
  "axum",
+ "base64",
  "care-pathway-matcher",
  "chrono",
  "include_dir",
  "insta",
+ "jsonwebtoken",
  "loco-rs",
  "migration",
  "mimalloc",
  "regex",
+ "rsa",
  "rstest",
  "sea-orm",
  "serde",
  "serde_json",
  "serial_test",
+ "sha2",
  "tokio",
  "tracing",
  "tracing-subscriber",

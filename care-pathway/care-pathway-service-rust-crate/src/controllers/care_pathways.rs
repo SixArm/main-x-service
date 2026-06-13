@@ -11,6 +11,7 @@ use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::auth::{AuthUser, MaybeAuthUser};
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::care_pathways::Model as PathwayModel;
 use crate::streaming::{self, EventKind};
@@ -86,23 +87,33 @@ struct ScoredRef {
 #[debug_handler]
 async fn create(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Json(pathway): Json<CarePathway>,
 ) -> Result<Response> {
     validate(&pathway)?;
     let model = PathwayModel::create(&ctx.db, &pathway).await?;
-    audit(&ctx, model.pid, "created", Some(model.data.clone())).await;
+    audit(
+        &ctx,
+        model.pid,
+        "created",
+        caller.actor(),
+        Some(model.data.clone()),
+    )
+    .await;
     streaming::publish(EventKind::Created, &model.pid.to_string(), &model.name);
     format::json(PathwayRef::of(&model))
 }
 
 /// Best-effort audit write: log on failure but never fail the request.
+/// `actor` is the verified caller `sub` when a token was presented.
 async fn audit(
     ctx: &AppContext,
     entity_pid: uuid::Uuid,
     action: &str,
+    actor: Option<&str>,
     snapshot: Option<serde_json::Value>,
 ) {
-    if let Err(err) = AuditModel::record(&ctx.db, entity_pid, action, snapshot).await {
+    if let Err(err) = AuditModel::record(&ctx.db, entity_pid, action, actor, snapshot).await {
         tracing::warn!(error = %err, action, "failed to write audit log");
     }
 }
@@ -119,6 +130,7 @@ async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Resu
 async fn update(
     Path(pid): Path<String>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Json(pathway): Json<CarePathway>,
 ) -> Result<Response> {
     validate(&pathway)?;
@@ -127,18 +139,29 @@ async fn update(
         .into_active_model()
         .update_data(&ctx.db, &pathway)
         .await?;
-    audit(&ctx, updated.pid, "updated", Some(updated.data.clone())).await;
+    audit(
+        &ctx,
+        updated.pid,
+        "updated",
+        caller.actor(),
+        Some(updated.data.clone()),
+    )
+    .await;
     streaming::publish(EventKind::Updated, &updated.pid.to_string(), &updated.name);
     format::json(PathwayRef::of(&updated))
 }
 
 /// Soft-delete a care pathway.
 #[debug_handler]
-async fn remove(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+async fn remove(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
     let model = PathwayModel::find_by_pid(&ctx.db, &pid).await?;
     let (entity_pid, name) = (model.pid, model.name.clone());
     model.into_active_model().soft_delete(&ctx.db).await?;
-    audit(&ctx, entity_pid, "deleted", None).await;
+    audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
     streaming::publish(EventKind::Deleted, &entity_pid.to_string(), &name);
     format::empty_json()
 }
@@ -219,6 +242,14 @@ async fn recent_events() -> Result<Response> {
     format::json(streaming::recent(100))
 }
 
+/// Echo the verified claims of the bearer token — `401` when the token is
+/// missing or fails verification. Proves peer JWT verification against
+/// the auth-service JWKS end to end (spec §13 T-7).
+#[debug_handler]
+async fn whoami(AuthUser(claims): AuthUser) -> Result<Response> {
+    format::json(claims)
+}
+
 /// Build the `/api/care-pathways` route table (CRUD + match +
 /// check-duplicates + audit / event endpoints).
 pub fn routes() -> Routes {
@@ -228,6 +259,7 @@ pub fn routes() -> Routes {
         .add("/", get(list))
         .add("/match", post(match_against))
         .add("/check-duplicates", post(check_duplicates))
+        .add("/whoami", get(whoami))
         .add("/audit/recent", get(recent_audit))
         .add("/events/recent", get(recent_events))
         .add("/{pid}", get(get_one))
