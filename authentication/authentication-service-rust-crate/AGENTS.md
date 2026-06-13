@@ -58,7 +58,7 @@ To avoid account enumeration, `signup` and `magic-link` always return
 
 1. **Loco-idiomatic.** New endpoints are loco controllers registered in
    `app.rs`; new tables are `sea-orm-migration` migrations registered in
-   `migration/src/lib.rs` with a matching entity under
+   `src/migration/mod.rs` with a matching entity under
    `src/models/_entities/`.
 2. **RS256 only.** Token signing/verification lives in `src/auth`. Do
    not reintroduce loco's symmetric HS256 helper for access tokens; peer
@@ -92,8 +92,8 @@ src/
 │   ├── sessions.rs        session issue/revoke (jid = jwt jti)
 │   └── _entities/         generated SeaORM entities
 ├── mailers/auth.rs        magic-link mailer (prod)
+├── migration/             in-crate migrator: m20220101_000001_users, m20220101_000002_sessions
 └── views/auth.rs          LoginResponse / CurrentResponse
-migration/src/             m20220101_000001_users, m20220101_000002_sessions
 config/                    development/production/test yaml + dev RSA keys
 ```
 
