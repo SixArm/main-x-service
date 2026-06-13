@@ -101,12 +101,24 @@ manual check confirms it. Split tasks too big for one PR
     the coordinated family SSO rollout; the front-end must attach the
     bearer token first) and JWKS-over-HTTP fetch from the auth service
     at boot (currently injected via env).
-- [ ] **T-8 — Record merge.** (deferred MVP feature)
-  - [ ] Merge confirmed duplicates: transfer identifiers /
-    alternate names, soft-delete the duplicate, link, snapshot,
-    `Merged` event; front-end merge action from the duplicates list.
+- [x] **T-8 — Record merge.**
+  - [x] Merge confirmed duplicates: union list fields, keep the
+    duplicate's title as an `alternate_names` entry, soft-delete the
+    duplicate, write a `merge_records` history row (snapshot of the
+    transferred payload), and publish a `Merged` event (+ `Deleted`
+    for the duplicate). **Done (2026-06-13):** pure `src/merge.rs`
+    (`merge_pathways`) + `POST /api/care-pathways/merge` and
+    `GET /api/care-pathways/merges/recent`; migration
+    `m20220101_000003_merge_records` + `models/merge_records.rs`. Equal
+    pids → `422`, unknown pid → `404`. The audit `actor` and merge
+    `actor` are stamped from the bearer token (T-7) when present.
   - **Acceptance:** integration test merges two stored pathways and
     verifies survivor contents + soft-deleted duplicate.
+    **Met (DB-gated):** `merge_folds_duplicate_into_survivor`,
+    `merge_with_equal_pids_is_422`, `merge_unknown_pid_is_404`; the
+    merge algorithm is pinned un-gated by five `merge::tests` cases.
+  - [ ] *Follow-up:* a front-end merge action from the duplicates list
+    (T-5 territory).
 - [x] **T-9 — OpenAPI / Swagger + richer validation.**
   - [x] OpenAPI 3 schema + Swagger UI. **Done (2026-06-13):**
     hand-written `src/openapi.rs` (the matcher's `CarePathway` shape is

@@ -14,7 +14,7 @@ The **Main X Index** family of crates implements a federated identity index — 
 | [course-service](../../course/course-service-rust-crate) | Course | Course-identity registry (schema.org/Course) — template + `CourseInstance` sub-resource for specific offerings |
 | [authentication-service](../../authentication/authentication-service-rust-crate) | User | Central single sign-on provider — passwordless email magic-link auth, RS256 JWT issuance, JWKS for offline verification by peers. The first real loco.rs crate and the reference for converting the others. |
 | [organization-service](../../organization/organization-service-rust-crate) | Organization | loco.rs registry for schema.org/Organization — CRUD + matching (embeds organization-matcher; API DTO is the matcher's Organization type). MVP; search/streaming/audit/privacy deferred. |
-| [care-pathway-service](../../care-pathway/care-pathway-service-rust-crate) | Care pathway | loco.rs registry for clinical care pathways — CRUD + matching (embeds care-pathway-matcher; API DTO is the matcher's CarePathway type) + condition-code validation + OpenAPI/Swagger + audit log + in-memory event streaming + offline RS256 JWT verification. Deferred: full-text search, durable event bus, privacy, merge, blanket JWT enforcement. |
+| [care-pathway-service](../../care-pathway/care-pathway-service-rust-crate) | Care pathway | loco.rs registry for clinical care pathways — CRUD + matching (embeds care-pathway-matcher; API DTO is the matcher's CarePathway type) + condition-code validation + OpenAPI/Swagger + audit log + in-memory event streaming + offline RS256 JWT verification + record merge. Deferred: full-text search, durable event bus, privacy, front-end merge action, blanket JWT enforcement. |
 
 ### Matcher crates
 

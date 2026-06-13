@@ -31,6 +31,8 @@ adapter to drift.
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete |
 | POST | `/api/care-pathways/match` | Rank a `{query, candidates}` set |
 | POST | `/api/care-pathways/check-duplicates` | Match a query against stored pathways |
+| POST | `/api/care-pathways/merge` | Merge a duplicate into a survivor (`422` equal pids, `404` unknown) |
+| GET | `/api/care-pathways/merges/recent` | Merge-history records |
 | GET | `/api/care-pathways/whoami` | Verified bearer-token claims (`401` without one) |
 | GET | `/api/care-pathways/audit/recent` · `/{pid}/audit` | Audit-log query |
 | GET | `/api/care-pathways/events/recent` | In-memory event stream |
@@ -44,11 +46,12 @@ Plus loco's default `/_health`, `/_ping`. Every CRUD action writes an
 CRUD + matching, with `condition_codes` format validation (ICD-10 /
 ICD-11 / SNOMED CT SCTID Verhoeff; `src/validation.rs`), OpenAPI 3 +
 Swagger UI (`src/openapi.rs`, `controllers/docs.rs`), an audit log +
-in-memory event stream on every CRUD (`models/audit_logs.rs`,
-`src/streaming.rs`), and offline RS256 JWT verification (`src/auth.rs`,
+in-memory event stream on every CRUD/merge (`models/audit_logs.rs`,
+`src/streaming.rs`), record merge (`src/merge.rs` + `models/merge_records.rs`,
+`POST /merge`), and offline RS256 JWT verification (`src/auth.rs`,
 embeds `authentication-verifier`; `/whoami` + audit `actor`). Deferred
-(spec §13): Tantivy search, durable event bus, privacy, record merge,
-blanket `/api/*` JWT enforcement + JWKS-fetch, terminology-server
+(spec §13): Tantivy search, durable event bus, privacy, front-end merge
+action, blanket `/api/*` JWT enforcement + JWKS-fetch, terminology-server
 code-existence checks.
 
 ## Golden rules
@@ -66,16 +69,18 @@ code-existence checks.
 src/
 ├── app.rs                 loco Hooks (routes, truncate)
 ├── bin/main.rs            loco CLI entrypoint
-├── controllers/care_pathways.rs   CRUD + match + check-duplicates + audit/events + whoami
+├── controllers/care_pathways.rs   CRUD + match + check-duplicates + merge + audit/events + whoami
 ├── controllers/docs.rs    OpenAPI JSON + Swagger UI
 ├── auth.rs                RS256 JWT verification (AuthUser/MaybeAuthUser) via authentication-verifier
+├── merge.rs               pure record-merge logic (merge_pathways)
 ├── openapi.rs             hand-written OpenAPI 3 document
-├── streaming.rs           in-memory CRUD event stream (PathwayEvent)
+├── streaming.rs           in-memory CRUD/merge event stream (PathwayEvent)
 ├── validation.rs          name + condition-code (ICD/SNOMED) checks → 422
 ├── models/
 │   ├── care_pathways.rs   CRUD helpers over the stored payload
 │   ├── audit_logs.rs      audit-trail record/query helpers
-│   └── _entities/{care_pathways,audit_logs}.rs  SeaORM entities
-migration/src/            m20220101_000001_care_pathways, …_000002_audit_logs
+│   ├── merge_records.rs   merge-history record/query helpers
+│   └── _entities/{care_pathways,audit_logs,merge_records}.rs  SeaORM entities
+migration/src/            …_000001_care_pathways, …_000002_audit_logs, …_000003_merge_records
 config/                   development/production/test yaml
 ```

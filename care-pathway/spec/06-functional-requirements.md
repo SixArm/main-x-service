@@ -62,6 +62,14 @@ Algorithm reference:
   stored pathways and returns hits above threshold as
   `{pid, name, score, confidence, is_match}`, sorted by score
   descending.
+- **FR-10a** Record merge (service): `POST /api/care-pathways/merge`
+  folds a confirmed-duplicate pathway into a surviving one — union the
+  list fields, keep the duplicate's title as an `alternate_names`
+  entry, soft-delete the duplicate, write a `merge_records` history row
+  (with a snapshot of the transferred payload), and publish a `Merged`
+  event. Equal `main_pid`/`duplicate_pid` → `422`; unknown pid →
+  `404`. `GET /api/care-pathways/merges/recent` lists the history. Merge
+  logic lives in [`crate::merge`](../care-pathway-service-rust-crate/src/merge.rs).
 
 ### 6.3 Operator UI — front-end
 

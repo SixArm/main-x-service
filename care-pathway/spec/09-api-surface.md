@@ -14,6 +14,8 @@ Endpoint detail: [`AGENTS/restful.md`](../AGENTS/restful.md); source:
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete | empty JSON |
 | POST | `/api/care-pathways/match` | Rank `{query, candidates}` (no persistence) | `[(index, MatchResult)]` |
 | POST | `/api/care-pathways/check-duplicates` | Match a query against stored pathways | `[{pid, name, score, confidence, is_match}]` sorted by score |
+| POST | `/api/care-pathways/merge` | Merge a duplicate into a survivor (`{main_pid, duplicate_pid, reason?}`); equal pids → `422`, unknown → `404` | `{main_pid, duplicate_pid, main: CarePathway}` |
+| GET | `/api/care-pathways/merges/recent` | Recent merge-history records, newest first | `[MergeRecord]` |
 | GET | `/api/care-pathways/whoami` | Echo verified bearer-token claims; `401` without a valid token | `Claims` |
 | GET | `/api/care-pathways/audit/recent` | Recent audit-log entries (all pathways), newest first, cap 100 | `[AuditLog]` |
 | GET | `/api/care-pathways/{pid}/audit` | Audit trail for one pathway, newest first | `[AuditLog]` |
@@ -23,10 +25,12 @@ Endpoint detail: [`AGENTS/restful.md`](../AGENTS/restful.md); source:
 
 Plus loco's built-in `/_health` and `/_ping`.
 
-Every create / update / delete writes a best-effort `audit_logs` row
-(action + JSON snapshot, durable in Postgres) and publishes a
-`PathwayEvent` (`created`/`updated`/`deleted`) to the in-memory event
-stream. A durable broker is roadmap (§15).
+Every create / update / delete / merge writes a best-effort `audit_logs`
+row (action + JSON snapshot, durable in Postgres) and publishes a
+`PathwayEvent` (`created`/`updated`/`deleted`/`merged`) to the in-memory
+event stream. Merge additionally writes a `merge_records` history row
+with a snapshot of the transferred (duplicate) payload. A durable broker
+is roadmap (§15).
 
 Bearer-token verification (RS256 against the auth-service JWKS, offline)
 is available via the `AuthUser` extractor; `whoami` is protected by it,

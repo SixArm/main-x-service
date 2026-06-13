@@ -19,6 +19,7 @@ Aspirational items live in §15, not here.
 | service | API docs | OpenAPI 3 (`src/openapi.rs`, hand-written) + Swagger UI at `/api-docs/openapi.json` · `/swagger-ui` (`controllers/docs.rs`) |
 | service | Matching endpoints | `/match` (rank explicit candidates), `/check-duplicates` (scan ≤ 1 000 stored rows, ranked hits) |
 | service | Audit + streaming | `audit_logs` table + best-effort row per CRUD (action + snapshot + `actor`); in-memory `PathwayEvent` stream (cap 1 000); read at `/audit/recent`, `/{pid}/audit`, `/events/recent` |
+| service | Record merge | `POST /merge` folds a duplicate into a survivor (union fields, former-title alias, soft-delete, `merge_records` history, `Merged` event); pure `src/merge.rs`; `/merges/recent` history |
 | service | JWT verification | Offline RS256 verification against the auth-service JWKS (`src/auth.rs`, embeds `authentication-verifier`); `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit `actor` stamped from the token |
 | service | Tests | DB-free `tests/matching.rs` (matcher embedding + JSON round-trip) + controller validation unit tests (422 pin); request-level loco tests `tests/requests/care_pathways.rs` (`#[ignore]`-gated on Postgres); green build + clippy |
 | front-end | Routes | `/`, `/new`, `/[pid]` (detail + delete + check-duplicates), `/[pid]/edit` |
@@ -38,7 +39,7 @@ Open gaps drive tasks in §13. Live gap list:
 | No front-end unit / e2e tests | T-5 |
 | No full-text search; `check-duplicates` full scan capped at 1 000 rows | T-6 |
 | JWT verification exists (extractor + `/whoami` + audit `actor`) but is not yet *enforced* on every `/api/*` route, and the JWKS is injected via env rather than fetched from the auth service | T-7 follow-up |
-| No merge workflow | T-8 |
+| Record merge has no front-end action yet (backend `POST /merge` is done) | T-8 follow-up / T-5 |
 | No terminology-server check that codes exist in a published release (formats are validated; existence is not) | T-9 follow-up |
 | No privacy controls (none required while no restricted fields exist — §12.3) | (re-assess; no task) |
 | No localization of the operator UI | (roadmap §15; no task yet) |

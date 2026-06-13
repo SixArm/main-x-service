@@ -31,6 +31,8 @@ Base URL in development: `http://localhost:5150`.
 |---|---|---|---|
 | POST | `/api/care-pathways/match` | `{query, candidates}` | ranked `[(index, MatchResult)]` |
 | POST | `/api/care-pathways/check-duplicates` | `CarePathway` | `[{pid, name, score, confidence, is_match}]`, score-descending |
+| POST | `/api/care-pathways/merge` | `{main_pid, duplicate_pid, reason?}` | `{main_pid, duplicate_pid, main}`; `422` equal pids, `404` unknown |
+| GET | `/api/care-pathways/merges/recent` | — | recent `merge_records` (history + transferred snapshot) |
 
 ### Authentication
 

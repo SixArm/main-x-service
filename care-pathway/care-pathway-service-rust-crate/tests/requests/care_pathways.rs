@@ -227,6 +227,119 @@ async fn can_check_duplicates_against_stored_pathways() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn merge_folds_duplicate_into_survivor() {
+    request::<App, _, _>(|request, _ctx| async move {
+        // Main: stroke pathway with one ICD-10 code.
+        let main: Value = request
+            .post("/api/care-pathways")
+            .json(&stroke_pathway())
+            .await
+            .json();
+        let main_pid = main["pid"].as_str().expect("main pid").to_string();
+
+        // Duplicate: different title + an extra keyword and code.
+        let dup: Value = request
+            .post("/api/care-pathways")
+            .json(&json!({
+                "name": "Cerebrovascular Accident Pathway",
+                "keywords": ["acute"],
+                "condition_codes": [{"system": "Snomed", "code": "422504002"}]
+            }))
+            .await
+            .json();
+        let dup_pid = dup["pid"].as_str().expect("dup pid").to_string();
+
+        // Merge the duplicate into main.
+        let response = request
+            .post("/api/care-pathways/merge")
+            .json(&json!({"main_pid": main_pid, "duplicate_pid": dup_pid, "reason": "confirmed"}))
+            .await;
+        assert_eq!(response.status_code(), 200, "merge should succeed");
+        let body: Value = response.json();
+        let merged = &body["main"];
+        assert_eq!(merged["name"], "Acute Stroke Care Pathway");
+        // The duplicate's title is now an alternate name; its data unioned in.
+        let alts = merged["alternate_names"].as_array().expect("alt names");
+        assert!(alts.iter().any(|n| n == "Cerebrovascular Accident Pathway"));
+        assert_eq!(merged["condition_codes"].as_array().unwrap().len(), 2);
+        assert!(merged["keywords"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|k| k == "acute"));
+
+        // The duplicate is gone (soft-deleted).
+        let response = request.get(&format!("/api/care-pathways/{dup_pid}")).await;
+        assert_eq!(
+            response.status_code(),
+            404,
+            "duplicate should be soft-deleted"
+        );
+
+        // A merge-history record exists.
+        let merges: Value = request.get("/api/care-pathways/merges/recent").await.json();
+        let rows = merges.as_array().expect("merge rows");
+        assert!(rows
+            .iter()
+            .any(|r| r["duplicate_pid"].as_str() == Some(dup_pid.as_str())));
+
+        // A Merged event was published for the survivor.
+        let events: Value = request.get("/api/care-pathways/events/recent").await.json();
+        assert!(events
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["kind"] == "merged" && e["pid"] == main_pid));
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn merge_with_equal_pids_is_422() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let created: Value = request
+            .post("/api/care-pathways")
+            .json(&stroke_pathway())
+            .await
+            .json();
+        let pid = created["pid"].as_str().expect("pid").to_string();
+        let response = request
+            .post("/api/care-pathways/merge")
+            .json(&json!({"main_pid": pid, "duplicate_pid": pid}))
+            .await;
+        assert_eq!(response.status_code(), 422, "self-merge must be rejected");
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn merge_unknown_pid_is_404() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let created: Value = request
+            .post("/api/care-pathways")
+            .json(&stroke_pathway())
+            .await
+            .json();
+        let pid = created["pid"].as_str().expect("pid").to_string();
+        let response = request
+            .post("/api/care-pathways/merge")
+            .json(&json!({
+                "main_pid": pid,
+                "duplicate_pid": "00000000-0000-4000-8000-000000000000"
+            }))
+            .await;
+        assert_eq!(response.status_code(), 404, "unknown duplicate is 404");
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn crud_writes_audit_log_and_events() {
     request::<App, _, _>(|request, _ctx| async move {
         // Create → update → delete one pathway.

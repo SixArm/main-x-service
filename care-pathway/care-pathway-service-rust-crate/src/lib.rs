@@ -25,6 +25,7 @@ pub mod auth;
 pub mod controllers;
 pub mod data;
 pub mod initializers;
+pub mod merge;
 pub mod models;
 pub mod openapi;
 pub mod streaming;

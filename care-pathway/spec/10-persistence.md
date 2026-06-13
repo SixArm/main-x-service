@@ -30,6 +30,19 @@ The `audit_logs` table, created by migration
 | `actor` | `StringNull` | User / system id — `NULL` until JWT auth (T-7) |
 | `snapshot` | `JsonBinaryNull` | The record's `data` at the time of the action |
 
+The `merge_records` table, created by migration
+[`m20220101_000003_merge_records`](../care-pathway-service-rust-crate/migration/src/m20220101_000003_merge_records.rs)
+— one row per record-merge (T-8):
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `PkAuto` | Internal row id |
+| `main_pid` | `Uuid` | The surviving pathway |
+| `duplicate_pid` | `Uuid` | The merged-away (now soft-deleted) pathway |
+| `reason` | `StringNull` | Optional operator-supplied reason |
+| `actor` | `StringNull` | Caller `sub` from the bearer token, else `NULL` |
+| `transferred` | `JsonBinaryNull` | Snapshot of the duplicate's payload at merge time |
+
 ### 10.2 JSONB rationale
 
 The payload is stored verbatim so that the matcher type remains the

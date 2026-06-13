@@ -12,8 +12,10 @@ use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::{AuthUser, MaybeAuthUser};
+use crate::merge::merge_pathways;
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::care_pathways::Model as PathwayModel;
+use crate::models::merge_records::Model as MergeRecordModel;
 use crate::streaming::{self, EventKind};
 
 /// Maximum number of stored pathways scanned in-memory by
@@ -72,6 +74,17 @@ impl PathwayRef {
 struct MatchRequest {
     query: CarePathway,
     candidates: Vec<CarePathway>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MergeRequest {
+    /// The surviving pathway's public id.
+    main_pid: String,
+    /// The duplicate to merge in and soft-delete.
+    duplicate_pid: String,
+    /// Optional operator-supplied reason, recorded in the merge history.
+    #[serde(default)]
+    reason: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -219,6 +232,73 @@ async fn check_duplicates(
     format::json(hits)
 }
 
+/// Merge a confirmed-duplicate pathway into a surviving (main) pathway:
+/// union the duplicate's data into main, keep the duplicate's title as an
+/// alternate name, soft-delete the duplicate, record the merge history,
+/// and publish a `Merged` event (plus a `Deleted` for the duplicate).
+#[debug_handler]
+async fn merge(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Json(req): Json<MergeRequest>,
+) -> Result<Response> {
+    if req.main_pid == req.duplicate_pid {
+        return Err(Error::CustomError(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ErrorDetail::new("validation", "main_pid and duplicate_pid must differ"),
+        ));
+    }
+    let main = PathwayModel::find_by_pid(&ctx.db, &req.main_pid).await?;
+    let duplicate = PathwayModel::find_by_pid(&ctx.db, &req.duplicate_pid).await?;
+
+    let outcome = merge_pathways(&main.to_pathway()?, &duplicate.to_pathway()?);
+
+    // Update the survivor, then retire the duplicate.
+    let merged = main
+        .into_active_model()
+        .update_data(&ctx.db, &outcome.merged)
+        .await?;
+    let (dup_pid, dup_name) = (duplicate.pid, duplicate.name.clone());
+    duplicate.into_active_model().soft_delete(&ctx.db).await?;
+
+    if let Err(err) = MergeRecordModel::record(
+        &ctx.db,
+        merged.pid,
+        dup_pid,
+        req.reason.as_deref(),
+        caller.actor(),
+        Some(outcome.transferred),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write merge record");
+    }
+    audit(
+        &ctx,
+        merged.pid,
+        "merged",
+        caller.actor(),
+        Some(merged.data.clone()),
+    )
+    .await;
+    audit(&ctx, dup_pid, "merged_into", caller.actor(), None).await;
+    streaming::publish(EventKind::Merged, &merged.pid.to_string(), &merged.name);
+    streaming::publish(EventKind::Deleted, &dup_pid.to_string(), &dup_name);
+
+    format::json(serde_json::json!({
+        "main_pid": merged.pid.to_string(),
+        "duplicate_pid": dup_pid.to_string(),
+        "main": merged.to_pathway()?,
+    }))
+}
+
+/// Recent merge-history records, newest first.
+#[debug_handler]
+async fn recent_merges(State(ctx): State<AppContext>) -> Result<Response> {
+    let rows = MergeRecordModel::recent(&ctx.db, 100).await?;
+    format::json(rows)
+}
+
 /// Recent audit-log entries across all care pathways.
 #[debug_handler]
 async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
@@ -259,6 +339,8 @@ pub fn routes() -> Routes {
         .add("/", get(list))
         .add("/match", post(match_against))
         .add("/check-duplicates", post(check_duplicates))
+        .add("/merge", post(merge))
+        .add("/merges/recent", get(recent_merges))
         .add("/whoami", get(whoami))
         .add("/audit/recent", get(recent_audit))
         .add("/events/recent", get(recent_events))

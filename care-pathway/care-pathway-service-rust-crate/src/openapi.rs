@@ -56,6 +56,21 @@ pub fn spec() -> Value {
                         "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ScoredRef" } } } } } }
                 }
             },
+            "/api/care-pathways/merge": {
+                "post": {
+                    "tags": ["matching"],
+                    "summary": "Merge a confirmed duplicate into a surviving pathway",
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MergeRequest" } } } },
+                    "responses": {
+                        "200": { "description": "The survivor's merged payload + the merged pids" },
+                        "404": { "description": "main_pid or duplicate_pid not found" },
+                        "422": { "description": "main_pid and duplicate_pid are equal" }
+                    }
+                }
+            },
+            "/api/care-pathways/merges/recent": {
+                "get": { "tags": ["matching"], "summary": "Recent merge-history records", "responses": { "200": { "description": "Merge records" } } }
+            },
             "/api/care-pathways/whoami": {
                 "get": {
                     "tags": ["auth"],
@@ -102,6 +117,10 @@ pub fn spec() -> Value {
                 "MatchRequest": { "type": "object", "required": ["query", "candidates"], "properties": {
                     "query": { "$ref": "#/components/schemas/CarePathway" },
                     "candidates": { "type": "array", "items": { "$ref": "#/components/schemas/CarePathway" } } } },
+                "MergeRequest": { "type": "object", "required": ["main_pid", "duplicate_pid"], "properties": {
+                    "main_pid": { "type": "string", "format": "uuid" },
+                    "duplicate_pid": { "type": "string", "format": "uuid" },
+                    "reason": { "type": "string", "nullable": true } } },
                 "ConditionCode": { "type": "object", "required": ["system", "code"], "properties": {
                     "system": { "description": "Icd10 | Icd11 | Snomed | {Custom: string}" },
                     "code": { "type": "string", "description": "Format-validated by system: ICD-10 (e.g. I63.9), ICD-11 stem (e.g. 1A00), SNOMED CT SCTID (6-18 digits, Verhoeff check digit); Custom must be non-blank." } } },
@@ -161,6 +180,14 @@ mod tests {
         assert!(paths["/api/care-pathways/audit/recent"]["get"].is_object());
         assert!(paths["/api/care-pathways/events/recent"]["get"].is_object());
         assert!(paths["/api/care-pathways/{pid}/audit"]["get"].is_object());
+    }
+
+    #[test]
+    fn spec_documents_merge_endpoints() {
+        let s = spec();
+        assert!(s["paths"]["/api/care-pathways/merge"]["post"].is_object());
+        assert!(s["paths"]["/api/care-pathways/merges/recent"]["get"].is_object());
+        assert!(s["components"]["schemas"]["MergeRequest"]["properties"]["main_pid"].is_object());
     }
 
     #[test]

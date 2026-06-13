@@ -20,7 +20,7 @@ use std::path::Path;
 #[allow(unused_imports)]
 use crate::{
     controllers,
-    models::_entities::{audit_logs, care_pathways},
+    models::_entities::{audit_logs, care_pathways, merge_records},
     tasks,
     workers::downloader::DownloadWorker,
 };
@@ -74,6 +74,7 @@ impl Hooks for App {
         // tasks-inject (do not remove)
     }
     async fn truncate(ctx: &AppContext) -> Result<()> {
+        truncate_table(&ctx.db, merge_records::Entity).await?;
         truncate_table(&ctx.db, audit_logs::Entity).await?;
         truncate_table(&ctx.db, care_pathways::Entity).await?;
         Ok(())

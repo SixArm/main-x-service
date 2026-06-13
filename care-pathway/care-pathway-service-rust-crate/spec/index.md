@@ -53,13 +53,17 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    candidates}` set (no persistence).
 7. `POST /api/care-pathways/check-duplicates` — match a query against
    stored pathways; return those above threshold, ranked.
-8. `GET /api/care-pathways/audit/recent` + `/{pid}/audit` — audit-log
+8. `POST /api/care-pathways/merge` — fold a duplicate into a survivor
+   (union fields, former-title alias, soft-delete the duplicate,
+   `merge_records` history, `Merged` event); `422` equal pids, `404`
+   unknown. `GET /api/care-pathways/merges/recent` — merge history.
+9. `GET /api/care-pathways/audit/recent` + `/{pid}/audit` — audit-log
    query; `GET /api/care-pathways/events/recent` — in-memory event
-   stream. Each CRUD action writes an `audit_logs` row and publishes a
-   `created`/`updated`/`deleted` event.
-9. `GET /api/care-pathways/whoami` — echo verified bearer-token claims
+   stream. Each create/update/delete/merge writes an `audit_logs` row
+   and publishes a `created`/`updated`/`deleted`/`merged` event.
+10. `GET /api/care-pathways/whoami` — echo verified bearer-token claims
    (`401` without a valid token); proves offline RS256 verification.
-10. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3
+11. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3
    document and a Swagger UI page rendering it.
 
 ## 7. Non-functional requirements
@@ -85,8 +89,9 @@ problem reported in one body); `400` for a malformed body.
 ## 10. Persistence
 
 PostgreSQL via SeaORM + `sea-orm-migration`. Migrations
-`m20220101_000001_care_pathways` (the `care_pathways` table) and
-`m20220101_000002_audit_logs` (the CRUD `audit_logs` trail).
+`m20220101_000001_care_pathways` (the `care_pathways` table),
+`m20220101_000002_audit_logs` (the CRUD `audit_logs` trail), and
+`m20220101_000003_merge_records` (record-merge history).
 `auto_migrate` on in development.
 
 ## 11. Testing strategy
@@ -96,8 +101,9 @@ round-trip), the `src/validation.rs` unit tests (ICD-10 / ICD-11 /
 SNOMED-Verhoeff format checks), the `src/auth.rs` unit tests (mint a
 real RS256 token + matching JWKS in-process, then assert valid → claims
 and missing / non-bearer / expired / tampered / empty-verifier → `401`),
-and controller validation unit tests (blank-name and malformed-code →
-`422` pins). Request-level tests (`tests/requests/care_pathways.rs`,
+the `src/merge.rs` unit tests (former-title alias, scalar fallback, list
+union, transferred snapshot), and controller validation unit tests
+(blank-name and malformed-code → `422` pins). Request-level tests (`tests/requests/care_pathways.rs`,
 loco testing harness) cover the CRUD + match endpoints, the audit/event
 trail, `whoami` (no token → `401`), and OpenAPI/Swagger but require
 Postgres, so they are `#[ignore]`-gated — run with
@@ -118,7 +124,10 @@ access controls added later.
   `/audit/recent`, `/{pid}/audit`, `/events/recent`. Durable broker +
   `actor` (needs auth) remain roadmap.
 - [ ] Privacy controls if any restricted fields appear.
-- [ ] Record merge with link tracking.
+- [x] Record merge — `POST /merge` folds a duplicate into a survivor
+  (union fields, former-title alias, soft-delete, `merge_records`
+  history + snapshot, `Merged` event); pure `src/merge.rs`;
+  `/merges/recent`. Front-end merge action is a follow-up.
 - [x] OpenAPI/Swagger — hand-written `src/openapi.rs` (matcher DTO is
   dependency-light, so no utoipa, matching the organization service)
   served at `/api-docs/openapi.json` + `/swagger-ui` by
@@ -142,12 +151,13 @@ access controls added later.
 Done: loco boot; care_pathways table + migration; CRUD with `422`
 validation on create/update (blank `name` + ICD-10 / ICD-11 / SNOMED CT
 `condition_codes` format checks, all problems reported together);
-`/match` and `/check-duplicates` embedding care-pathway-matcher;
-audit log + in-memory event streaming on every CRUD (`/audit/recent`,
-`/{pid}/audit`, `/events/recent`); offline RS256 JWT verification
-(`AuthUser`/`MaybeAuthUser`, `/whoami`, audit `actor` from the token);
-OpenAPI 3 doc + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`);
-DB-free tests + gated request-level tests; green build + clippy.
+`/match`, `/check-duplicates`, and `/merge` (record merge + history)
+embedding care-pathway-matcher; audit log + in-memory event streaming on
+every CRUD/merge (`/audit/recent`, `/{pid}/audit`, `/events/recent`,
+`/merges/recent`); offline RS256 JWT verification (`AuthUser`/
+`MaybeAuthUser`, `/whoami`, audit `actor` from the token); OpenAPI 3 doc
++ Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`); DB-free tests +
+gated request-level tests; green build + clippy.
 
 ## 15. Roadmap
 
