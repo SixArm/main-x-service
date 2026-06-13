@@ -1,0 +1,61 @@
+# Loco — development environment.
+# Any value can be overridden with the matching environment variable.
+
+logger:
+  enable: true
+  pretty_backtrace: true
+  level: debug
+  format: compact
+
+server:
+  port: {{ get_env(name="PORT", default="5150") }}
+  binding: {{ get_env(name="BINDING", default="localhost") }}
+  host: http://localhost
+  middlewares:
+    static:
+      enable: false
+    # Permissive CORS so the SvelteKit dev server on :5173 can call
+    # the API on :5150. Tighten or disable for production deployments
+    # served from the same origin.
+    cors:
+      enable: true
+      allow_origins:
+        - "*"
+      allow_methods:
+        - "*"
+      allow_headers:
+        - "*"
+
+# PostgreSQL — set DATABASE_URL to override.
+database:
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://postgres:postgres@localhost:5432/case_folder_development") }}
+  enable_logging: false
+  connect_timeout: 500
+  idle_timeout: 500
+  min_connections: 1
+  max_connections: 10
+  auto_migrate: true
+  dangerously_truncate: false
+  dangerously_recreate: false
+
+workers:
+  mode: BackgroundAsync
+
+# Email magic-link authentication (stateless signed tokens).
+# See spec/auth.md. Identity comes from the allowlist below.
+settings:
+  auth:
+    secret: {{ get_env(name="AUTH_SECRET", default="dev-secret-not-for-production-change-me") }}
+    magic_link_ttl_seconds: 600
+    session_ttl_seconds: 86400
+    require_session: true
+    expose_magic_link: true
+    cookie_secure: false
+    frontend_url: {{ get_env(name="FRONTEND_URL", default="http://localhost:5173") }}
+    allowlist:
+      - email: records@example.nhs.uk
+        name: Records Office
+        role: administrator
+      - email: alice@example.nhs.uk
+        name: Alice Johnson
+        role: nurse

@@ -1,0 +1,41 @@
+logger:
+  enable: true
+  pretty_backtrace: false
+  level: info
+  format: json
+
+server:
+  port: {{ get_env(name="PORT", default="5150") }}
+  binding: {{ get_env(name="BINDING", default="0.0.0.0") }}
+  host: {{ get_env(name="HOST", default="http://localhost") }}
+  middlewares:
+    static:
+      enable: false
+
+database:
+  uri: {{ get_env(name="DATABASE_URL") }}
+  enable_logging: false
+  connect_timeout: 1000
+  idle_timeout: 1000
+  min_connections: 2
+  max_connections: 25
+  auto_migrate: false
+  dangerously_truncate: false
+  dangerously_recreate: false
+
+workers:
+  mode: BackgroundAsync
+
+# Email magic-link authentication. AUTH_SECRET MUST be set (no default).
+# Replace the allowlist with CIS2 / OIDC before any live use — see
+# spec/regulatory.md. expose_magic_link MUST stay false in production.
+settings:
+  auth:
+    secret: {{ get_env(name="AUTH_SECRET", default="") }}
+    magic_link_ttl_seconds: 600
+    session_ttl_seconds: 86400
+    require_session: true
+    expose_magic_link: false
+    cookie_secure: true
+    frontend_url: {{ get_env(name="FRONTEND_URL", default="http://localhost") }}
+    allowlist: []

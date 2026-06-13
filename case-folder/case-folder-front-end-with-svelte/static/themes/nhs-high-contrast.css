@@ -1,0 +1,36 @@
+/*
+ * NHS high-contrast theme — pure black/white for low-vision users.
+ *
+ * Scoped to :root[data-theme="nhs-high-contrast"].
+ */
+
+:root[data-theme="nhs-high-contrast"] {
+    --nhs-dark-blue: #000000;
+    --nhs-blue: #000000;
+    --nhs-bright-blue: #000000;
+    --nhs-light-blue: #000000;
+    --nhs-aqua-blue: #000000;
+
+    --nhs-black: #000000;
+    --nhs-dark-grey: #000000;
+    --nhs-mid-grey: #000000;
+    --nhs-pale-grey: #ffffff;
+    --nhs-white: #ffffff;
+
+    --nhs-dark-green: #000000;
+    --nhs-green: #000000;
+    --nhs-light-green: #000000;
+    --nhs-aqua-green: #000000;
+
+    --nhs-purple: #000000;
+    --nhs-dark-pink: #000000;
+    --nhs-pink: #000000;
+    --nhs-dark-red: #000000;
+    --nhs-red: #000000;
+    --nhs-orange: #000000;
+    --nhs-warm-yellow: #ffff00;
+    --nhs-yellow: #ffff00;
+
+    --nhs-focus-color: #ffff00;
+    --nhs-focus-text-color: #000000;
+}
