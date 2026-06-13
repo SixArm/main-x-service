@@ -15,7 +15,7 @@ use std::path::Path;
 
 use crate::{
     controllers,
-    models::_entities::{audit_logs, organizations},
+    models::_entities::{audit_logs, merge_records, organizations},
 };
 
 /// The loco application type. Carries no state; it exists to implement
@@ -66,6 +66,7 @@ impl Hooks for App {
         // tasks-inject (do not remove)
     }
     async fn truncate(ctx: &AppContext) -> Result<()> {
+        truncate_table(&ctx.db, merge_records::Entity).await?;
         truncate_table(&ctx.db, audit_logs::Entity).await?;
         truncate_table(&ctx.db, organizations::Entity).await?;
         Ok(())

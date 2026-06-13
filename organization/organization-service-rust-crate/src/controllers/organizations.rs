@@ -11,7 +11,9 @@ use loco_rs::prelude::*;
 use organization_matcher::{MatchConfig, MatchingEngine, Organization};
 use serde::{Deserialize, Serialize};
 
+use crate::merge::merge_orgs;
 use crate::models::audit_logs::Model as AuditModel;
+use crate::models::merge_records::Model as MergeRecordModel;
 use crate::models::organizations::Model as OrgModel;
 use crate::streaming::{self, EventKind};
 
@@ -34,6 +36,17 @@ impl OrgRef {
 struct MatchRequest {
     query: Organization,
     candidates: Vec<Organization>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MergeRequest {
+    /// The surviving organization's public id.
+    main_pid: String,
+    /// The duplicate to merge in and soft-delete.
+    duplicate_pid: String,
+    /// Optional operator-supplied reason, recorded in the merge history.
+    #[serde(default)]
+    reason: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -222,6 +235,65 @@ async fn search(
     format::json(refs)
 }
 
+/// Merge a confirmed-duplicate organization into a surviving (main)
+/// organization: union the duplicate's data into main, keep the
+/// duplicate's name as an alternate name, soft-delete the duplicate,
+/// record the merge history, and publish a `Merged` event (plus a
+/// `Deleted` for the duplicate).
+#[debug_handler]
+async fn merge(State(ctx): State<AppContext>, Json(req): Json<MergeRequest>) -> Result<Response> {
+    if req.main_pid == req.duplicate_pid {
+        return Err(Error::CustomError(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ErrorDetail::new("validation", "main_pid and duplicate_pid must differ"),
+        ));
+    }
+    let main = OrgModel::find_by_pid(&ctx.db, &req.main_pid)
+        .await
+        .map_err(http_err)?;
+    let duplicate = OrgModel::find_by_pid(&ctx.db, &req.duplicate_pid)
+        .await
+        .map_err(http_err)?;
+
+    let outcome = merge_orgs(&main.to_org()?, &duplicate.to_org()?);
+
+    let merged = main
+        .into_active_model()
+        .update_data(&ctx.db, &outcome.merged)
+        .await?;
+    let (dup_pid, dup_name) = (duplicate.pid, duplicate.name.clone());
+    duplicate.into_active_model().soft_delete(&ctx.db).await?;
+
+    if let Err(err) = MergeRecordModel::record(
+        &ctx.db,
+        merged.pid,
+        dup_pid,
+        req.reason.as_deref(),
+        Some(outcome.transferred),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write merge record");
+    }
+    audit(&ctx, merged.pid, "merged", Some(merged.data.clone())).await;
+    audit(&ctx, dup_pid, "merged_into", None).await;
+    streaming::publish(EventKind::Merged, &merged.pid.to_string(), &merged.name);
+    streaming::publish(EventKind::Deleted, &dup_pid.to_string(), &dup_name);
+
+    format::json(serde_json::json!({
+        "main_pid": merged.pid.to_string(),
+        "duplicate_pid": dup_pid.to_string(),
+        "main": merged.to_org()?,
+    }))
+}
+
+/// Recent merge-history records, newest first.
+#[debug_handler]
+async fn recent_merges(State(ctx): State<AppContext>) -> Result<Response> {
+    let rows = MergeRecordModel::recent(&ctx.db, 100).await?;
+    format::json(rows)
+}
+
 /// Recent audit-log entries across all organizations.
 #[debug_handler]
 async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
@@ -255,6 +327,8 @@ pub fn routes() -> Routes {
         .add("/search", get(search))
         .add("/match", post(match_against))
         .add("/check-duplicates", post(check_duplicates))
+        .add("/merge", post(merge))
+        .add("/merges/recent", get(recent_merges))
         .add("/audit/recent", get(recent_audit))
         .add("/events/recent", get(recent_events))
         .add("/{pid}", get(get_one))

@@ -21,6 +21,8 @@ pub enum EventKind {
     Updated,
     /// A record was soft-deleted.
     Deleted,
+    /// A duplicate was merged into this (surviving) record.
+    Merged,
 }
 
 /// A published organization event.

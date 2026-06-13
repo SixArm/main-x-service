@@ -171,3 +171,115 @@ async fn can_check_duplicates() {
     })
     .await;
 }
+
+/// Merge folds a duplicate into a survivor: list fields union, the
+/// duplicate's name becomes an alternate name, the duplicate is
+/// soft-deleted, and a merge-history row + `merged` event are written.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn merge_folds_duplicate_into_survivor() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let main: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&acme())
+            .await
+            .json();
+        let main_pid = main["pid"].as_str().expect("main pid").to_string();
+
+        let dup: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&json!({
+                "name": "Acme Incorporated",
+                "keywords": ["hardware"],
+                "identifiers": [{"scheme": "Duns", "value": "150483782"}]
+            }))
+            .await
+            .json();
+        let dup_pid = dup["pid"].as_str().expect("dup pid").to_string();
+
+        let response = request
+            .post("/api/organizations/merge")
+            .json(&json!({"main_pid": main_pid, "duplicate_pid": dup_pid, "reason": "confirmed"}))
+            .await;
+        assert_eq!(response.status_code(), 200, "merge should succeed");
+        let merged = response.json::<serde_json::Value>()["main"].clone();
+        assert_eq!(merged["name"], "Acme, Inc.");
+        let alts = merged["alternate_names"].as_array().expect("alt names");
+        assert!(alts.iter().any(|n| n == "Acme Incorporated"));
+        assert!(merged["keywords"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|k| k == "hardware"));
+        assert_eq!(merged["identifiers"].as_array().unwrap().len(), 1);
+
+        // Duplicate is soft-deleted.
+        let gone = request.get(&format!("/api/organizations/{dup_pid}")).await;
+        assert_eq!(gone.status_code(), 404, "duplicate should be soft-deleted");
+
+        // Merge-history row exists.
+        let merges: serde_json::Value =
+            request.get("/api/organizations/merges/recent").await.json();
+        assert!(merges
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["duplicate_pid"].as_str() == Some(dup_pid.as_str())));
+
+        // Merged event published for the survivor.
+        let events: serde_json::Value =
+            request.get("/api/organizations/events/recent").await.json();
+        assert!(events
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["kind"] == "merged" && e["pid"] == main_pid));
+    })
+    .await;
+}
+
+/// Self-merge (equal pids) is rejected with `422`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn merge_with_equal_pids_is_422() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let created: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&acme())
+            .await
+            .json();
+        let pid = created["pid"].as_str().expect("pid").to_string();
+        let response = request
+            .post("/api/organizations/merge")
+            .json(&json!({"main_pid": pid, "duplicate_pid": pid}))
+            .await;
+        assert_eq!(response.status_code(), 422, "self-merge must be rejected");
+    })
+    .await;
+}
+
+/// Merging an unknown duplicate is a `404`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn merge_unknown_pid_is_404() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let created: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&acme())
+            .await
+            .json();
+        let pid = created["pid"].as_str().expect("pid").to_string();
+        let response = request
+            .post("/api/organizations/merge")
+            .json(&json!({
+                "main_pid": pid,
+                "duplicate_pid": "00000000-0000-4000-8000-000000000000"
+            }))
+            .await;
+        assert_eq!(response.status_code(), 404, "unknown duplicate is 404");
+    })
+    .await;
+}

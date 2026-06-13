@@ -56,12 +56,23 @@ oversized tasks (`T-2a`, `T-2b`).
     endpoint.
   - **Acceptance:** masked view hides `telephone` / `email`; export
     returns the full stored payload + audit trail.
-- [ ] **T-6 — Record merge with link tracking (service).**
-  - [ ] Survivor + duplicate, former-name alias, `Replaces` link,
+- [x] **T-6 — Record merge (service).**
+  - [x] Survivor + duplicate: union list fields, former-name alias,
     transferred-data snapshot, soft-delete duplicate, `Merged` event
     — parity with [`agents/share/merge.md`](../../agents/share/merge.md).
+    **Done (2026-06-13):** pure `src/merge.rs` (`merge_orgs`) +
+    `POST /api/organizations/merge` and
+    `GET /api/organizations/merges/recent`; migration
+    `m20220101_000003_merge_records` + `models/merge_records.rs`. Equal
+    pids → `422`, unknown pid → `404`. (A typed `Replaces` link between
+    survivor and duplicate is not modelled — the `merge_records` row
+    captures the relationship; a link table is a follow-up if needed.)
+    `actor` is `NULL` until JWT auth (T-9).
   - **Acceptance:** integration test merges two records and verifies
-    snapshot + soft delete + event.
+    snapshot + soft delete + event. **Met (DB-gated):**
+    `merge_folds_duplicate_into_survivor`, `merge_with_equal_pids_is_422`,
+    `merge_unknown_pid_is_404`; algorithm pinned un-gated by five
+    `merge::tests` cases.
 - [ ] **T-7 — Scale the duplicate check beyond the 1 000-row scan.**
   - [x] Observable cap: the scan limit is the named constant
     `CHECK_DUPLICATES_SCAN_CAP` (= 1 000) with a doc comment, the

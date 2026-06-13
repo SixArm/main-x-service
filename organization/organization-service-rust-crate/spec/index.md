@@ -100,7 +100,9 @@ personal data — honour GDPR when the privacy layer lands (§13).
 - [ ] Tantivy full-text search + fuzzy/blocking (replacing the `ILIKE`
       search).
 - [ ] Per-field masking + GDPR export endpoint.
-- [ ] Record merge with link tracking.
+- [x] Record merge — `POST /merge` folds a duplicate into a survivor
+  (union fields, former-name alias, soft-delete, `merge_records` history
+  + snapshot, `Merged` event); pure `src/merge.rs`; `/merges/recent`.
 - [ ] Richer validation (identifier formats, URL, country codes).
 - [x] Request-level integration tests (Postgres; `#[ignore]`-gated).
 - [ ] JWT verification middleware consuming the auth-service JWKS.
@@ -110,9 +112,10 @@ personal data — honour GDPR when the privacy layer lands (§13).
 Done: loco boot; organizations table + migration; CRUD (blank name →
 `422`, unknown pid → `404`); `/match` and `/check-duplicates` embedding
 organization-matcher; audit log; in-memory event streaming; name search
-(`ILIKE`); OpenAPI 3 + Swagger UI; DB-free tests; request-level test
-suite (Postgres, `#[ignore]`-gated); loco scaffolding leftovers removed
-(no workers/tasks/data stubs); green build + clippy.
+(`ILIKE`); record merge (`/merge` + `merge_records` history); OpenAPI 3 +
+Swagger UI; DB-free tests; request-level test suite (Postgres,
+`#[ignore]`-gated); loco scaffolding leftovers removed (no
+workers/tasks/data stubs); green build + clippy.
 
 ## 15. Roadmap
 

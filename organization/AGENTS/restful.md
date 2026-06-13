@@ -43,6 +43,8 @@ Default base URL: `http://localhost:5150` (loco default port).
 |---|---|---|
 | POST | `/api/organizations/match` | `{query, candidates}` → ranked `[(index, MatchResult)]`; pure scoring, no persistence |
 | POST | `/api/organizations/check-duplicates` | `Organization` → `[{pid, name, score, confidence, is_match}]` score-desc (scans ≤ 1 000 stored rows) |
+| POST | `/api/organizations/merge` | `{main_pid, duplicate_pid, reason?}` → `{main_pid, duplicate_pid, main}`; `422` equal pids, `404` unknown |
+| GET | `/api/organizations/merges/recent` | merge-history rows (transferred snapshot) |
 
 ### Audit & events
 

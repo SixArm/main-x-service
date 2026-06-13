@@ -33,6 +33,8 @@ there is no separate model or adapter to drift.
 | DELETE | `/api/organizations/{pid}` | Soft-delete |
 | POST | `/api/organizations/match` | Rank a `{query, candidates}` set (no persistence) |
 | POST | `/api/organizations/check-duplicates` | Match a query against stored orgs |
+| POST | `/api/organizations/merge` | Merge a duplicate into a survivor (`422` equal pids, `404` unknown) |
+| GET | `/api/organizations/merges/recent` | Merge-history records |
 | GET | `/api/organizations/audit/recent` · `/{pid}/audit` | Audit trail |
 | GET | `/api/organizations/events/recent` | In-memory event stream |
 | GET | `/swagger-ui` · `/api-docs/openapi.json` | API docs |
@@ -41,12 +43,12 @@ Plus loco's default `/_health`, `/_ping`.
 
 ## Scope
 
-CRUD + matching + **name search** + **audit log** + **event streaming**
-+ **OpenAPI/Swagger** + **request-level tests** (Postgres,
-`#[ignore]`-gated) are wired. The wire format is snake_case
+CRUD + matching + **name search** + **record merge** + **audit log** +
+**event streaming** + **OpenAPI/Swagger** + **request-level tests**
+(Postgres, `#[ignore]`-gated) are wired. The wire format is snake_case
 (`legal_name`, `same_as`, …) and validation failures return `422`.
 Still deferred (spec §13): Tantivy full-text (this uses Postgres
-`ILIKE`), per-field privacy/GDPR export, record merge, richer
+`ILIKE`), per-field privacy/GDPR export, JWT verification, richer
 validation.
 
 ## Golden rules

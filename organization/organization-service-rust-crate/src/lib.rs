@@ -23,6 +23,8 @@ pub mod app;
 pub mod controllers;
 /// Loco initializers (currently empty; reserved for app-startup wiring).
 pub mod initializers;
+/// Pure record-merge logic (fold a duplicate into a survivor).
+pub mod merge;
 /// `SeaORM` entities plus the CRUD/audit helpers layered over them.
 pub mod models;
 /// Hand-written OpenAPI 3 document served at `/api-docs/openapi.json`.

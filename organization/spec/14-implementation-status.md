@@ -23,8 +23,9 @@
 | Name search | `GET /search?q=` — Postgres `ILIKE`, capped 50 *(recent)* |
 | Audit log | Best-effort row per CRUD with JSONB snapshot; recent + per-record queries *(recent)* |
 | Event streaming | In-memory ring buffer (capacity 1 000) + `/events/recent` *(recent)* |
+| Record merge | `POST /merge` folds a duplicate into a survivor (union fields, former-name alias, soft-delete, `merge_records` history + snapshot, `Merged` event); pure `src/merge.rs`; `/merges/recent` *(recent)* |
 | OpenAPI / Swagger | Hand-written OpenAPI 3 at `/api-docs/openapi.json` + `/swagger-ui` *(recent)* |
-| Tests | DB-free `tests/matching.rs` + unit tests (validation `422` pin); request-level suite `tests/requests/organizations.rs` (Postgres, `#[ignore]`-gated, 6 tests); green build + clippy |
+| Tests | DB-free `tests/matching.rs` + unit tests (validation `422` pin, 5 `merge` cases); request-level suite `tests/requests/organizations.rs` (Postgres, `#[ignore]`-gated, 9 tests); green build + clippy |
 | Hygiene | loco scaffolding leftovers removed (no `workers/` / `data/` / `tasks/` stubs) *(recent)* |
 
 **organization-front-end-with-svelte** (MVP):

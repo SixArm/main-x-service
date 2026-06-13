@@ -3,6 +3,7 @@
 pub use sea_orm_migration::prelude::*;
 mod m20220101_000001_organizations;
 mod m20220101_000002_audit_logs;
+mod m20220101_000003_merge_records;
 
 pub struct Migrator;
 
@@ -12,6 +13,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20220101_000001_organizations::Migration),
             Box::new(m20220101_000002_audit_logs::Migration),
+            Box::new(m20220101_000003_merge_records::Migration),
             // inject-above (do not remove this comment)
         ]
     }

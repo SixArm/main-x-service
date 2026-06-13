@@ -65,6 +65,21 @@ pub fn spec() -> Value {
                         "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ScoredRef" } } } } } }
                 }
             },
+            "/api/organizations/merge": {
+                "post": {
+                    "tags": ["matching"],
+                    "summary": "Merge a confirmed duplicate into a surviving organization",
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MergeRequest" } } } },
+                    "responses": {
+                        "200": { "description": "The survivor's merged payload + the merged pids" },
+                        "404": { "description": "main_pid or duplicate_pid not found" },
+                        "422": { "description": "main_pid and duplicate_pid are equal" }
+                    }
+                }
+            },
+            "/api/organizations/merges/recent": {
+                "get": { "tags": ["matching"], "summary": "Recent merge-history records", "responses": { "200": { "description": "Merge records" } } }
+            },
             "/api/organizations/audit/recent": {
                 "get": { "tags": ["audit"], "summary": "Recent audit-log entries", "responses": { "200": { "description": "Audit entries" } } }
             },
@@ -93,6 +108,10 @@ pub fn spec() -> Value {
                     "pid": { "type": "string" }, "name": { "type": "string" },
                     "score": { "type": "number", "format": "double" }, "confidence": { "type": "string" },
                     "is_match": { "type": "boolean" } } },
+                "MergeRequest": { "type": "object", "required": ["main_pid", "duplicate_pid"], "properties": {
+                    "main_pid": { "type": "string", "format": "uuid" },
+                    "duplicate_pid": { "type": "string", "format": "uuid" },
+                    "reason": { "type": "string", "nullable": true } } },
                 "MatchRequest": { "type": "object", "required": ["query", "candidates"], "properties": {
                     "query": { "$ref": "#/components/schemas/Organization" },
                     "candidates": { "type": "array", "items": { "$ref": "#/components/schemas/Organization" } } } },
@@ -133,5 +152,13 @@ mod tests {
         assert_eq!(s["openapi"], "3.0.3");
         assert!(s["paths"]["/api/organizations"]["post"].is_object());
         assert!(s["components"]["schemas"]["Organization"]["properties"]["name"].is_object());
+    }
+
+    #[test]
+    fn spec_documents_merge_endpoints() {
+        let s = spec();
+        assert!(s["paths"]["/api/organizations/merge"]["post"].is_object());
+        assert!(s["paths"]["/api/organizations/merges/recent"]["get"].is_object());
+        assert!(s["components"]["schemas"]["MergeRequest"]["properties"]["main_pid"].is_object());
     }
 }
