@@ -78,6 +78,14 @@ PascalCase strings; `Custom` as `{"Custom":"label"}`.
 loco-idiomatic; Postgres persistence; deterministic matching via the
 embedded library; soft-delete with audit-friendly timestamps.
 
+**Configuration (environment).** JWKS / verification:
+`CASE_JWKS` (the auth-service JWKS JSON; absent ⇒ empty key set, all
+tokens rejected), `CASE_JWT_ISSUER` (default `authentication-service`),
+`CASE_JWT_AUDIENCE` (default `main-x-service`). Access control:
+`CASE_REQUIRE_AUTH` — blanket-enforcement flag, parsed leniently
+(`1`/`true`/`yes`/`on`, case-insensitive ⇒ on; unset/blank/other ⇒ off),
+**off by default** (see §9). Plus loco's own `DATABASE_URL` etc.
+
 ## 8. Architecture
 
 loco `App` (`src/app.rs`) registers the cases controller. One `cases`
@@ -92,6 +100,20 @@ failure (blank `title`, malformed `opened_date`, blank identifier value,
 or blank `subjects` / `keywords` entry — family convention, via
 `Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY, …)`, with every
 problem reported in one body); `400` for a malformed body.
+
+**Authentication / blanket enforcement.** Offline RS256 JWT verification
+(`src/auth.rs`, embedding `authentication-verifier`) underpins the
+`AuthUser` / `MaybeAuthUser` extractors. When `CASE_REQUIRE_AUTH` is on,
+an Axum `from_fn` middleware wired in `App::after_routes` (delegating to
+the pure `auth::enforce(require_auth, path, headers, verifier)`) rejects
+every non-public request lacking a valid bearer token with `401`;
+`/_health`, `/_ping`, `/api-docs/openapi.json` and `/swagger-ui*` stay
+public. The flag is read once per process and the layer is always wired,
+so it is a near-noop when off. Enforcement is **off by default**;
+because case data is personal data, this blanket gate is the
+access-control boundary in front of the case API once activated (an
+operations decision taken with the family SSO rollout). The contract is
+the family-wide [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md).
 
 ## 10. Persistence
 
@@ -108,7 +130,10 @@ round-trip), the `src/validation.rs` unit tests (title, `opened_date`
 formats, blank identifier / subject / keyword), the `src/auth.rs` unit
 tests (mint a real RS256 token + matching JWKS in-process, then assert
 valid → claims and missing / non-bearer / expired / tampered /
-empty-verifier → `401`), the `src/merge.rs` unit tests (former-title
+empty-verifier → `401`; plus the blanket-enforcement decision —
+`parse_bool` truthy/falsey cases and `enforce` off-no-token → `Ok`,
+on-public → `Ok`, on-protected-no-token / expired / tampered → `401`,
+on-protected-valid → `Ok`), the `src/merge.rs` unit tests (former-title
 alias, scalar fallback, list union, transferred snapshot), the
 `escape_like` unit test (search wildcard neutralisation), the
 `src/openapi.rs` unit tests (well-formed doc; core + merge + whoami +
@@ -116,9 +141,11 @@ search endpoints), the `src/streaming.rs` unit test (publish/read-back),
 and controller validation unit tests (blank-title and malformed-date →
 `422` pins). Request-level tests (`tests/requests/cases.rs`, loco testing
 harness) cover the CRUD + match endpoints, the audit/event trail,
-`whoami` (no token → `401`), and OpenAPI/Swagger but require Postgres, so
-they are `#[ignore]`-gated — run with `cargo test -- --ignored` and a
-`DATABASE_URL`.
+`whoami` (no token → `401`), blanket enforcement (with
+`CASE_REQUIRE_AUTH=1` set in-test: un-authed `GET /api/cases` → `401`,
+public `GET /api-docs/openapi.json` → `200`; `#[serial]`), and
+OpenAPI/Swagger but require Postgres, so they are `#[ignore]`-gated —
+run with `cargo test -- --ignored` and a `DATABASE_URL`.
 
 ## 12. Compliance
 
@@ -154,8 +181,15 @@ added later. Subjects are stored as opaque identifiers, not embedded PII.
   embeds `authentication-verifier`; offline RS256 verification via a
   process-wide `Verifier` (env-configured `CASE_JWKS` / `CASE_JWT_ISSUER`
   / `CASE_JWT_AUDIENCE`); `AuthUser`/`MaybeAuthUser` extractors;
-  `/whoami` protected; audit `actor` stamped from the token. Blanket
-  `/api/*` enforcement + JWKS-over-HTTP fetch are follow-ups.
+  `/whoami` protected; audit `actor` stamped from the token.
+  - [x] Blanket `/api/*` enforcement — `CASE_REQUIRE_AUTH` flag +
+    `auth::enforce` middleware wired in `App::after_routes` (off by
+    default; public paths exempt; un-gated `enforce`/`parse_bool` unit
+    tests + DB-gated request test). Family contract
+    [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md).
+    Case data is personal data, so this is the access-control gate.
+  - [ ] JWKS-over-HTTP fetch (instead of env injection) remains a
+    follow-up, as does activating the flag (operations decision).
 
 ## 14. Implementation status
 

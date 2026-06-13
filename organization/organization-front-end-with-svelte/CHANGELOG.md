@@ -11,6 +11,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Bearer-token session.** New reactive token store
+  `src/lib/auth.svelte.ts` (`setToken`/`clearToken`/`token`), hydrated
+  from the family-shared `localStorage["mxi_access_token"]` key and
+  guarded for SSR/preview. `ApiClient` now attaches `Authorization:
+  Bearer <token>` from the store on every request when signed in and
+  omits it otherwise (an explicit per-request `token` still overrides;
+  pass `null` to suppress). A minimal session affordance in the layout
+  sidebar lets an operator paste/clear the token ("Use token" /
+  "Sign out"). The token is obtained out-of-band from the central
+  authentication-service; full magic-link redirect is a follow-up.
+  vitest covers store round-trip + store-driven / override / cleared
+  header attachment. Implements `agents/share/jwt-enforcement.md`
+  (service enforcement stays off by default).
 - **Test suites (T-11).** vitest unit tests (`tests/unit/`, 16) for the
   `ApiClient` and `OrganizationRepository` — verb/path/body/bearer-token,
   error classification, and a regression pinning the `check-duplicates`

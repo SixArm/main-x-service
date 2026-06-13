@@ -9,6 +9,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Session bearer-token attachment** (family contract
+  [`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md)).
+  - New reactive session store `src/lib/auth.svelte.ts` (`token` /
+    `setToken` / `clearToken`), hydrated from the family-shared
+    `localStorage["mxi_access_token"]` and guarded for SSR / `vite
+    preview` / vitest where `localStorage` is absent.
+  - `ApiClient` now reads the session token by default and attaches
+    `Authorization: Bearer <token>` on every request when present; a
+    per-call `token` (string or `null`) still overrides, and a
+    `tokenSource` seam keeps it unit-testable.
+  - Minimal session affordance in the layout sidebar: paste / clear the
+    token (issued by the central authentication-service magic-link flow),
+    so operator traffic passes the service's blanket JWT enforcement
+    (`CASE_REQUIRE_AUTH`) once activated.
+  - Tests: vitest `auth.test.ts` (no-token default, round-trip, guarded
+    write-through under the shared key) + new `ApiClient` cases
+    (store-default header, per-call `null` override). Playwright smoke
+    suite stays green.
+
 ### Added (scaffold)
 
 - **Inaugural scaffold (v0.1.0).** SvelteKit 2 / Svelte 5 (runes) SPA

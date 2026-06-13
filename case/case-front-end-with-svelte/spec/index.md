@@ -46,6 +46,15 @@ Caseworkers and case administrators across governmental agencies.
 5. Delete (`DELETE`, soft), redirect to the list.
 6. Check-duplicates posts the current record and lists matches (title,
    score, confidence), excluding the record itself.
+7. Session affordance: the layout sidebar lets an operator paste / clear
+   a bearer **access token**, stored in the shared session store. While a
+   token is set, the API client attaches `Authorization: Bearer <token>`
+   to every request, so operator traffic passes the service's blanket JWT
+   enforcement (`CASE_REQUIRE_AUTH`) once activated. The token is issued
+   out-of-band by the central **authentication-service** (passwordless
+   magic-link); full redirect wiring is a follow-up. The token lives under
+   the family-shared `localStorage` key `mxi_access_token` (see the
+   family contract `agents/share/jwt-enforcement.md`).
 
 ## 7. Non-functional requirements
 
@@ -57,7 +66,12 @@ dependency-light (no data grid / design system).
 `ApiClient` (lean, raw-JSON, get/post/put/delete) → `CaseRepository`
 → routes. `CaseForm` builds a `Case` from the inputs (comma lists
 split, blanks nulled, case type / status / priority / identifier
-schemes from `ALL_*` dropdowns, identifiers as editable rows).
+schemes from `ALL_*` dropdowns, identifiers as editable rows). The
+reactive session store `src/lib/auth.svelte.ts` (`token` / `setToken` /
+`clearToken`, hydrated from `localStorage["mxi_access_token"]`, guarded
+for SSR / preview / vitest where `localStorage` is absent) is the default
+token source for `ApiClient`, which attaches the bearer header per request
+when a token is present; a per-call `token` (string or `null`) overrides.
 
 ## 9. API consumption
 
@@ -77,9 +91,13 @@ None client-side beyond in-memory route state.
 ## 11. Testing strategy
 
 `pnpm run check` (svelte-check strict, 0/0). **vitest** unit tests
-(`tests/unit/`) cover the `ApiClient` (verb/body/headers/bearer-token/
-error-classification/empty-body) and `CaseRepository` (every method's
-path + verb, incl. a regression pinning `check-duplicates`).
+(`tests/unit/`) cover the `ApiClient` (verb/body/headers, per-call and
+session-store bearer-token attachment, per-call `null` override,
+error-classification/empty-body), the session store
+(`auth.test.ts`: no-token default, `setToken`/`clearToken` round-trip,
+guarded localStorage write-through under the shared key), and
+`CaseRepository` (every method's path + verb, incl. a regression pinning
+`check-duplicates`).
 **Playwright** smoke tests (`tests/e2e/`) load the four routes (`/`,
 `/new`, `/[pid]`, `/[pid]/edit`) with the API stubbed via
 `page.route`, asserting each renders; they run against the production

@@ -114,10 +114,11 @@ mod tests {
         let dup = Case::new("HB appeal — J. Smith");
         let out = merge_cases(&main, &dup);
         assert_eq!(out.merged.title, "Housing benefit appeal");
-        assert!(out
-            .merged
-            .alternate_titles
-            .contains(&"HB appeal — J. Smith".to_string()));
+        assert!(
+            out.merged
+                .alternate_titles
+                .contains(&"HB appeal — J. Smith".to_string())
+        );
     }
 
     #[test]

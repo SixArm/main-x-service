@@ -7,6 +7,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
+## [Unreleased]
+
+### Added
+
+- **Blanket JWT enforcement** (family contract
+  [`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md)),
+  **off by default**. A new env flag `CASE_REQUIRE_AUTH`
+  (`1`/`true`/`yes`/`on` ⇒ on; unset/blank/other ⇒ off) gates an Axum
+  `from_fn` middleware wired in `App::after_routes`: when on, every
+  non-public request without a valid bearer token is rejected with `401`;
+  `/_health`, `/_ping`, `/api-docs/openapi.json` and `/swagger-ui*` stay
+  public. The flag is read once per process. Case data is personal data,
+  so this gate is the access-control boundary in front of the case API.
+  New `src/auth.rs` surface: pure `parse_bool`, `require_auth`,
+  `is_public_path`, and a unit-testable `enforce(require_auth, path,
+  headers, verifier)`. Un-gated unit tests pin the decision (off/no-token,
+  on/public, on/protected/no-token, on/valid, on/expired, on/tampered,
+  plus `parse_bool`); a DB-gated `#[serial]` request test asserts un-authed
+  `GET /api/cases` ⇒ `401` while `GET /api-docs/openapi.json` ⇒ `200`.
+  Activation (setting the flag) and JWKS-over-HTTP fetch remain
+  operational follow-ups.
+
 ## [0.1.0] - 2026-06-13
 
 Inaugural release. A loco.rs governmental **case** registry, copy-adapted

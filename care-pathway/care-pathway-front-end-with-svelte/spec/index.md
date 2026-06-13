@@ -71,6 +71,18 @@ Clinical informaticians and pathway authors.
    renders the rows newest-first (action, actor or "—" when null,
    timestamp). Loading, empty, and error states are shown; the panel
    does not auto-load on mount.
+9. Session / bearer auth: the layout sidebar carries a minimal session
+   affordance — paste an access token to sign in, or sign out to clear
+   it. The token is held in a reactive store (`$lib/auth.svelte`) under
+   the family-shared `localStorage` key `mxi_access_token` (guarded for
+   SSR / `vite preview`), obtained out-of-band from the central
+   authentication-service (passwordless magic-link). The `ApiClient`
+   attaches `Authorization: Bearer <token>` to every request when the
+   store holds one, omitting it otherwise; a per-call token overrides the
+   store. This lets operator traffic through once the service turns on
+   blanket JWT enforcement (`CARE_PATHWAY_REQUIRE_AUTH`, off by default —
+   family contract `agents/share/jwt-enforcement.md`). Full magic-link
+   redirect wiring is a follow-up.
 
 ## 7. Non-functional requirements
 
@@ -80,9 +92,11 @@ dependency-light (no data grid / design system).
 ## 8. Architecture
 
 `ApiClient` (lean, raw-JSON, get/post/put/delete) → `CarePathwayRepository`
-→ routes. `CarePathwayForm` builds a `CarePathway` from the inputs
-(comma lists split, blanks nulled, condition codes and identifiers as
-editable rows).
+→ routes. The `ApiClient` reads the reactive auth store
+(`$lib/auth.svelte`) on each request and attaches `Authorization: Bearer
+<token>` when a token is present. `CarePathwayForm` builds a `CarePathway`
+from the inputs (comma lists split, blanks nulled, condition codes and
+identifiers as editable rows).
 
 ## 9. API consumption
 
@@ -107,7 +121,11 @@ None client-side beyond in-memory route state.
 
 `pnpm run check` (svelte-check strict, 0/0). **vitest** unit tests
 (`tests/unit/`) cover the `ApiClient` (verb/body/headers/bearer-token/
-error-classification/empty-body) and `CarePathwayRepository` (every
+error-classification/empty-body), the **auth token store**
+(`tests/unit/auth.test.ts`: `setToken`/`clearToken` round-trip; the
+client attaches `Authorization: Bearer` when the store holds a token and
+omits it when empty; a per-call token/`null` overrides the store), and
+`CarePathwayRepository` (every
 method's path + verb, incl. a regression pinning `check-duplicates`,
 `search()` pinning the `/search?q=` path with URL-encoding, and
 `merge()` pinning `POST /merge` with the `{main_pid, duplicate_pid,
@@ -134,7 +152,7 @@ for any access/audit requirements.
 ## 13. Tasks (live work queue)
 
 - [x] vitest unit tests for `ApiClient` + `CarePathwayRepository`
-  (`tests/unit/`, 16 tests).
+  + auth token store (`tests/unit/`, 29 tests).
 - [x] playwright smoke for the four routes (`tests/e2e/smoke.spec.ts`,
   4 tests, API stubbed, runs against `vite preview`).
 - [x] Merge-duplicate action on the detail page — each duplicate row
@@ -156,21 +174,32 @@ for any access/audit requirements.
 - [x] Search box once the service ships search — list page calls
   `GET /api/care-pathways/search?q=` (search-on-submit + Clear);
   `repository.search()` added; vitest (2) + Playwright (1) cover it.
-- [ ] Bearer token wiring once the service enforces auth.
+- [x] Bearer token wiring (blanket-enforcement front-end half) —
+  reactive token store `$lib/auth.svelte` (hydrated from
+  `localStorage["mxi_access_token"]`, SSR-guarded; `setToken`/`clearToken`/
+  `token`), `ApiClient` attaches `Authorization: Bearer <token>` from the
+  store by default (per-call override preserved), and a minimal session
+  affordance in the layout (paste/clear token). vitest (6) cover the store
+  + client attachment; Playwright smoke stays green. Family contract:
+  `agents/share/jwt-enforcement.md`. Full magic-link redirect is a
+  follow-up.
 
 ## 14. Implementation status
 
 Done: all four routes; lean client; repository (incl. `search()`,
 `merge()`, `audit()`, and `recentEvents()`); list search box;
 list-page recent-activity (event-stream) view; detail-page
-merge-duplicate action; detail-page audit-trail view; form (incl.
+merge-duplicate action; detail-page audit-trail view; auth token store
+(`$lib/auth.svelte`) + client bearer-attachment + layout session
+affordance; form (incl.
 condition codes + identifiers editors); SPA config. `pnpm run check`
 clean; production build succeeds.
 
 ## 15. Roadmap
 
 v0.1 (here): CRUD + duplicate-check UI. v0.2: tests + search box.
-v0.3: audit-trail view (done) + recent-activity view (done) + auth token.
+v0.3: audit-trail view (done) + recent-activity view (done) + auth token
+(done; magic-link redirect deferred).
 
 ## 16. Open questions
 

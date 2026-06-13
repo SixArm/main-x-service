@@ -17,7 +17,7 @@
 
 use case_service::app::App;
 use loco_rs::testing::prelude::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use serial_test::serial;
 
 /// A minimal valid case payload (the body *is* `case_matcher::Case`; all
@@ -284,11 +284,13 @@ async fn merge_folds_duplicate_into_survivor() {
         let alts = merged["alternate_titles"].as_array().expect("alt titles");
         assert!(alts.iter().any(|n| n == "HB appeal — John Smith"));
         assert_eq!(merged["identifiers"].as_array().unwrap().len(), 2);
-        assert!(merged["keywords"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|k| k == "appeal"));
+        assert!(
+            merged["keywords"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|k| k == "appeal")
+        );
 
         // The duplicate is gone (soft-deleted).
         let response = request.get(&format!("/api/cases/{dup_pid}")).await;
@@ -301,17 +303,20 @@ async fn merge_folds_duplicate_into_survivor() {
         // A merge-history record exists.
         let merges: Value = request.get("/api/cases/merges/recent").await.json();
         let rows = merges.as_array().expect("merge rows");
-        assert!(rows
-            .iter()
-            .any(|r| r["duplicate_pid"].as_str() == Some(dup_pid.as_str())));
+        assert!(
+            rows.iter()
+                .any(|r| r["duplicate_pid"].as_str() == Some(dup_pid.as_str()))
+        );
 
         // A Merged event was published for the survivor.
         let events: Value = request.get("/api/cases/events/recent").await.json();
-        assert!(events
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|e| e["kind"] == "merged" && e["pid"] == main_pid));
+        assert!(
+            events
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|e| e["kind"] == "merged" && e["pid"] == main_pid)
+        );
     })
     .await;
 }
@@ -397,10 +402,12 @@ async fn crud_writes_audit_log_and_events() {
 
         // System-wide recent-audit endpoint returns entries too.
         let recent_audit: Value = request.get("/api/cases/audit/recent").await.json();
-        assert!(!recent_audit
-            .as_array()
-            .expect("recent audit array")
-            .is_empty());
+        assert!(
+            !recent_audit
+                .as_array()
+                .expect("recent audit array")
+                .is_empty()
+        );
 
         // The in-memory event stream carries the three events for this pid.
         let events: Value = request.get("/api/cases/events/recent").await.json();
@@ -457,4 +464,37 @@ async fn swagger_ui_is_served() {
         assert!(response.text().contains("/api-docs/openapi.json"));
     })
     .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn blanket_enforcement_gates_api_but_not_public_paths() {
+    // With `CASE_REQUIRE_AUTH` on and no JWKS configured, an un-authed
+    // `/api/*` request must 401, while the public OpenAPI doc still serves.
+    // `require_auth()` is read once via a `OnceLock`, so set the env before
+    // the app boots; `#[serial]` keeps this isolated from other tests.
+    // SAFETY: single-threaded under `#[serial]`; no concurrent env access.
+    unsafe {
+        std::env::set_var("CASE_REQUIRE_AUTH", "1");
+    }
+    request::<App, _, _>(|request, _ctx| async move {
+        let gated = request.get("/api/cases").await;
+        assert_eq!(
+            gated.status_code(),
+            401,
+            "un-authed /api/cases should 401 when enforcement is on"
+        );
+
+        let doc = request.get("/api-docs/openapi.json").await;
+        assert_eq!(
+            doc.status_code(),
+            200,
+            "openapi.json stays public under enforcement"
+        );
+    })
+    .await;
+    unsafe {
+        std::env::remove_var("CASE_REQUIRE_AUTH");
+    }
 }

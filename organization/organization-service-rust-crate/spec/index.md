@@ -57,6 +57,15 @@ The API DTO is `organization_matcher::Organization`: `name`,
 loco-idiomatic; Postgres persistence; deterministic matching via the
 embedded library; soft-delete with audit-friendly timestamps.
 
+### Configuration environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ORGANIZATION_JWKS` | empty key set | JWKS document for offline token verification (`src/auth.rs`). |
+| `ORGANIZATION_JWT_ISSUER` | `authentication-service` | Expected `iss`. |
+| `ORGANIZATION_JWT_AUDIENCE` | `main-x-service` | Expected `aud`. |
+| `ORGANIZATION_REQUIRE_AUTH` | unset ⇒ **off** | Blanket `/api/*` JWT enforcement. Lenient bool: `1`/`true`/`yes`/`on` ⇒ on; else off. See `agents/share/jwt-enforcement.md`. |
+
 ## 8. Architecture
 
 loco `App` (`src/app.rs`) registers the organizations controller. One
@@ -71,6 +80,15 @@ Unprocessable Entity` for validation failures (blank `name` on create
 or replace — family convention); `400` for malformed requests (blank
 search `q`, invalid audit pid).
 
+**Auth.** `GET /api/organizations/whoami` always requires a valid bearer
+token (the `AuthUser` extractor; `401` otherwise); other handlers take
+`MaybeAuthUser` to stamp the audit/merge `actor` when a token is present.
+When `ORGANIZATION_REQUIRE_AUTH` is on (see §7), an `axum` middleware
+layer (`App::after_routes` → `auth::enforce`) requires a valid bearer
+token on **every** route except the public health/ping + OpenAPI/Swagger
+paths, returning `401` otherwise. The flag is read per request and is
+**off by default**, so default behaviour is unchanged.
+
 ## 10. Persistence
 
 PostgreSQL via SeaORM + `sea-orm-migration`. Migration
@@ -80,13 +98,18 @@ PostgreSQL via SeaORM + `sea-orm-migration`. Migration
 
 DB-free tests: `tests/matching.rs` (matcher embedding + JSON
 round-trip) and unit tests in `src/` (validation → `422` pin, OpenAPI
-shape, streaming). Request-level tests
-(`tests/requests/organizations.rs`): boot the real app via loco's
-`testing` harness and cover create round-trip, blank-name `422`
-(create + update), unknown-pid `404`, search, and check-duplicates;
-they require Postgres (`config/test.yaml`) and are `#[ignore]`d so
-the default `cargo test` stays green — run with `cargo test --
---ignored`.
+shape, streaming, and `auth::tests` — `bearer_claims` plus the pure
+`enforce`/`parse_bool` decision: off+no-token ⇒ ok, on+public ⇒ ok,
+on+protected without/expired/tampered ⇒ `401`, on+protected+valid ⇒
+ok). Request-level tests (`tests/requests/organizations.rs`): boot the
+real app via loco's `testing` harness and cover create round-trip,
+blank-name `422` (create + update), unknown-pid `404`, search,
+check-duplicates, merge, `whoami` `401`, and the blanket-enforcement
+gate (with `ORGANIZATION_REQUIRE_AUTH=1` set in-test, un-authed `GET
+/api/organizations` ⇒ `401` while `GET /api-docs/openapi.json` ⇒
+`200`; `#[serial]` for env-var ordering). These require Postgres
+(`config/test.yaml`) and are `#[ignore]`d so the default `cargo test`
+stays green — run with `cargo test -- --ignored`.
 
 ## 12. Compliance
 
@@ -109,8 +132,16 @@ personal data — honour GDPR when the privacy layer lands (§13).
   embeds `authentication-verifier`; offline RS256 verification via a
   process-wide `Verifier` (env-configured JWKS/issuer/audience);
   `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit +
-  merge `actor` from the token. Blanket `/api/*` enforcement +
-  JWKS-fetch are follow-ups.
+  merge `actor` from the token.
+  - [x] Blanket `/api/*` enforcement — `auth::enforce` (pure, unit-tested)
+    wired as an `axum::middleware::from_fn` layer in `App::after_routes`,
+    gated by `ORGANIZATION_REQUIRE_AUTH` (lenient bool, **default off**).
+    Public paths (`/_health`, `/_ping`, `/api-docs/openapi.json`,
+    `/swagger-ui*`) stay open; everything else needs a valid bearer token
+    when the flag is on. Off by default keeps current behaviour and the
+    existing DB-gated tests green. Family contract:
+    `agents/share/jwt-enforcement.md`.
+  - [ ] JWKS-over-HTTP fetch at boot (vs env injection) — follow-up.
 
 ## 14. Implementation status
 

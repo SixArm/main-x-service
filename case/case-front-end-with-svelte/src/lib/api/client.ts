@@ -2,12 +2,22 @@
 //
 // The service is a loco.rs app: handlers return RAW JSON (no
 // {success,data,error} envelope), so this client returns the parsed
-// body directly and throws ApiError on non-2xx. A bearer token can be
-// supplied per request for endpoints protected by JWT verification.
+// body directly and throws ApiError on non-2xx.
+//
+// Auth: by default the client reads the operator's bearer token from the
+// shared session store (`$lib/auth.svelte`) on each request and attaches
+// it as `Authorization: Bearer <token>`, so it travels automatically once
+// the operator authenticates the SPA. A per-call `token` overrides the
+// store: pass a string to force a token, or `null` to omit the header.
+// The store getter is injectable for tests.
+
+import { token as sessionToken } from "$lib/auth.svelte";
 
 export interface ClientOptions {
     baseUrl: string;
     fetch?: typeof fetch;
+    /** Override the default session-token source (testing/seam). */
+    tokenSource?: () => string | null;
 }
 
 export interface RequestOptions {
@@ -39,10 +49,12 @@ export class ApiError extends Error {
 export class ApiClient {
     private readonly baseUrl: string;
     private readonly fetchFn: typeof fetch;
+    private readonly tokenSource: () => string | null;
 
     constructor(options: ClientOptions) {
         this.baseUrl = options.baseUrl.replace(/\/+$/, "");
         this.fetchFn = options.fetch ?? globalThis.fetch.bind(globalThis);
+        this.tokenSource = options.tokenSource ?? sessionToken;
     }
 
     get<T>(path: string, opts?: RequestOptions): Promise<T> {
@@ -64,8 +76,11 @@ export class ApiClient {
             accept: "application/json",
             ...opts.headers,
         };
-        if (opts.token) {
-            headers.authorization = `Bearer ${opts.token}`;
+        // A per-call `token` (string or explicit `null`) overrides the
+        // session store; `undefined` falls back to the store.
+        const token = opts.token !== undefined ? opts.token : this.tokenSource();
+        if (token) {
+            headers.authorization = `Bearer ${token}`;
         }
 
         const init: RequestInit = { method, headers, signal: opts.signal };

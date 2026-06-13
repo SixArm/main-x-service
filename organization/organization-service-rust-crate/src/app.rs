@@ -1,4 +1,10 @@
 use async_trait::async_trait;
+use axum::{
+    extract::Request,
+    middleware::Next,
+    response::{IntoResponse, Response},
+    Router as AxumRouter,
+};
 use loco_rs::{
     app::{AppContext, Hooks, Initializer},
     bgworker::Queue,
@@ -14,9 +20,21 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    controllers,
+    auth, controllers,
     models::_entities::{audit_logs, merge_records, organizations},
 };
+
+/// Blanket JWT-enforcement middleware. Reads the flag and verifier per
+/// request (both are cached `OnceLock`s), so the layer is wired
+/// unconditionally and is a near-noop when `ORGANIZATION_REQUIRE_AUTH`
+/// is off. See [`auth::enforce`] for the pure decision.
+async fn require_auth_mw(req: Request, next: Next) -> Response {
+    let path = req.uri().path().to_string();
+    match auth::enforce(auth::require_auth(), &path, req.headers(), auth::verifier()) {
+        Ok(()) => next.run(req).await,
+        Err((status, msg)) => (status, msg).into_response(),
+    }
+}
 
 /// The loco application type. Carries no state; it exists to implement
 /// [`Hooks`], which loco's CLI drives to boot the service, register
@@ -55,6 +73,13 @@ impl Hooks for App {
             .add_route(controllers::organizations::routes())
             .add_route(controllers::docs::routes())
     }
+    async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
+        // Blanket JWT enforcement, gated by `ORGANIZATION_REQUIRE_AUTH`
+        // (off by default). The layer is added unconditionally; the flag
+        // is read per request inside the middleware.
+        Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
+    }
+
     async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {
         // No background workers (the loco scaffold's DownloadWorker stub
         // was removed; see entity spec §13 T-12).

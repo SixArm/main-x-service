@@ -42,6 +42,20 @@ shape, serialized snake_case (`name`, `legal_name`, `alternate_names`,
 resolved). The form edits these; `check-duplicates` posts the current
 record and lists stored matches with their scores.
 
+## Session / authentication
+
+The sidebar has a small **Session** panel. Paste an access token there
+and the client attaches `Authorization: Bearer <token>` to every API
+request; "Sign out" clears it. The token is stored under the
+family-shared `localStorage["mxi_access_token"]` key and obtained
+**out-of-band** from the central
+[authentication-service](../../authentication/authentication-service-rust-crate)
+(passwordless magic-link → access token) — in-app magic-link redirect is
+a follow-up. The organization service only *requires* a token when it is
+started with `ORGANIZATION_REQUIRE_AUTH` enabled (off by default), so the
+SPA works without a token until that flag is set. See the family contract
+in [`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md).
+
 ## Testing
 
 ```bash

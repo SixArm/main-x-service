@@ -92,6 +92,18 @@ coding system, an `identifiers` entry malformed for its scheme, or an
 `Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY, …)`, with every
 problem reported in one body); `400` for a malformed body.
 
+**Auth.** Every route may carry `Authorization: Bearer <jwt>` (offline
+RS256 verification against the auth-service JWKS); handlers take
+`MaybeAuthUser` to stamp the audit `actor`. Blanket `/api/*` enforcement
+is wired (an `after_routes` middleware calling `auth::enforce`) but
+**off by default** — gated by `CARE_PATHWAY_REQUIRE_AUTH`
+(`1`/`true`/`yes`/`on` ⇒ on). When on, any `/api/*` route without a valid
+token is `401`; the public paths `/_health`, `/_ping`,
+`/api-docs/openapi.json`, `/swagger-ui*` stay open. JWKS/issuer/audience
+come from `CARE_PATHWAY_JWKS` / `CARE_PATHWAY_JWT_ISSUER` /
+`CARE_PATHWAY_JWT_AUDIENCE`. See the family contract
+`agents/share/jwt-enforcement.md`.
+
 ## 10. Persistence
 
 PostgreSQL via SeaORM + `sea-orm-migration`. Migrations
@@ -107,13 +119,18 @@ round-trip), the `src/validation.rs` unit tests (ICD-10 / ICD-11 /
 SNOMED-Verhoeff code formats, UUID / DOI identifier shapes, and BCP-47
 `in_language` syntax), the `src/auth.rs` unit tests (mint a
 real RS256 token + matching JWKS in-process, then assert valid → claims
-and missing / non-bearer / expired / tampered / empty-verifier → `401`),
+and missing / non-bearer / expired / tampered / empty-verifier → `401`;
+plus `parse_bool` cases and `enforce` — off+no-token → `Ok`, on+public →
+`Ok`, on+protected+{no/valid/expired/tampered} token → `401`/`Ok`),
 the `src/merge.rs` unit tests (former-title alias, scalar fallback, list
 union, transferred snapshot), the `escape_like` unit test (search
 wildcard neutralisation), and controller validation unit tests
 (blank-name and malformed-code → `422` pins). Request-level tests (`tests/requests/care_pathways.rs`,
 loco testing harness) cover the CRUD + match endpoints, the audit/event
-trail, `whoami` (no token → `401`), and OpenAPI/Swagger but require
+trail, `whoami` (no token → `401`), blanket enforcement (with
+`CARE_PATHWAY_REQUIRE_AUTH=1` set in-test: un-authed `GET
+/api/care-pathways` → `401`, public `GET /api-docs/openapi.json` →
+`200`; `#[serial]`), and OpenAPI/Swagger but require
 Postgres, so they are `#[ignore]`-gated — run with
 `cargo test -- --ignored` and a `DATABASE_URL`.
 
@@ -156,8 +173,17 @@ access controls added later.
   embeds `authentication-verifier`; offline RS256 verification via a
   process-wide `Verifier` (env-configured JWKS/issuer/audience);
   `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit
-  `actor` stamped from the token. Blanket `/api/*` enforcement +
-  JWKS-over-HTTP fetch are follow-ups.
+  `actor` stamped from the token.
+  - [x] Blanket `/api/*` enforcement — pure `auth::enforce(require_auth,
+    path, headers, verifier)` + an `axum::middleware::from_fn` layer in
+    `app.rs after_routes`, wired unconditionally and gated per-request by
+    `CARE_PATHWAY_REQUIRE_AUTH` (`auth::require_auth`, off by default;
+    `1`/`true`/`yes`/`on` ⇒ on). Public paths (`/_health`, `/_ping`,
+    `/api-docs/openapi.json`, `/swagger-ui*`) stay open. Family contract:
+    `agents/share/jwt-enforcement.md`. Activation is an operations
+    decision once the SSO token flow is live.
+  - [ ] JWKS-over-HTTP fetch from the auth service at boot (still
+    env-injected today).
 
 ## 14. Implementation status
 
@@ -171,7 +197,9 @@ embedding care-pathway-matcher; audit log + in-memory event streaming on
 every CRUD/merge (`/audit/recent`, `/{pid}/audit`, `/events/recent`,
 `/merges/recent`); offline RS256 JWT verification (`AuthUser`/
 `MaybeAuthUser`, `/whoami`, audit `actor` from the token); OpenAPI 3 doc
-+ Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`); DB-free tests +
++ Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`); blanket `/api/*`
+JWT enforcement middleware (`auth::enforce` + `after_routes` layer,
+off by default via `CARE_PATHWAY_REQUIRE_AUTH`); DB-free tests +
 gated request-level tests; green build + clippy.
 
 ## 15. Roadmap

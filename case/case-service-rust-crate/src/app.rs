@@ -3,27 +3,46 @@
 //! lifecycle for `case-service`.
 
 use async_trait::async_trait;
+use axum::{
+    Router as AxumRouter,
+    extract::Request,
+    middleware::Next,
+    response::{IntoResponse, Response},
+};
 use loco_rs::{
+    Result,
     app::{AppContext, Hooks, Initializer},
     bgworker::{BackgroundWorker, Queue},
-    boot::{create_app, BootResult, StartMode},
+    boot::{BootResult, StartMode, create_app},
     config::Config,
     controller::AppRoutes,
     db::truncate_table,
     environment::Environment,
     task::Tasks,
-    Result,
 };
 use migration::Migrator;
 use std::path::Path;
 
 #[allow(unused_imports)]
 use crate::{
-    controllers,
+    auth, controllers,
     models::_entities::{audit_logs, cases, merge_records},
     tasks,
     workers::downloader::DownloadWorker,
 };
+
+/// Blanket JWT-enforcement middleware. Reads the `CASE_REQUIRE_AUTH` flag
+/// per request via [`auth::require_auth`] and delegates the decision to
+/// the pure [`auth::enforce`]: public paths and the disabled flag pass
+/// through; otherwise a valid bearer token is required or the request is
+/// rejected with `401`. Off by default (see `auth.rs`).
+async fn require_auth_mw(req: Request, next: Next) -> Response {
+    let path = req.uri().path().to_string();
+    match auth::enforce(auth::require_auth(), &path, req.headers(), auth::verifier()) {
+        Ok(()) => next.run(req).await,
+        Err((status, msg)) => (status, msg).into_response(),
+    }
+}
 
 /// The loco.rs application hooks for `case-service`.
 ///
@@ -63,6 +82,13 @@ impl Hooks for App {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::cases::routes())
             .add_route(controllers::docs::routes())
+    }
+
+    async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
+        // Blanket JWT enforcement layer. Added unconditionally; the
+        // `CASE_REQUIRE_AUTH` flag is read per request and the layer is a
+        // near-noop when the flag is off (the default).
+        Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
     }
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue.register(DownloadWorker::build(ctx)).await?;

@@ -5,7 +5,7 @@
 //! schema is authored here by hand rather than derived — which also keeps
 //! the doc accurate to the wire format.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// The full `OpenAPI` document, served at `/api-docs/openapi.json`.
 // One contiguous `json!` literal: splitting it into helpers would

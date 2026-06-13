@@ -60,5 +60,6 @@ Per-crate `spec.md`:
 | [postgresql.md](postgresql.md)                                   | PostgreSQL database, extensions                        |
 | [privacy.md](privacy.md)                                         | Data masking, GDPR, consent                            |
 | [restful.md](restful.md)                                         | RESTful API guidance                                   |
+| [jwt-enforcement.md](jwt-enforcement.md)                         | Blanket `/api/*` JWT enforcement (coordinated)         |
 | [rust-loco-stack.md](rust-loco-stack.md)                         | Stack for Rust, Loco (database, search, …)             |
 | [loco.md](loco.md)                                               | Loco framework (backend-only conventions)              |

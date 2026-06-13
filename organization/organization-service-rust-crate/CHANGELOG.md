@@ -11,6 +11,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Blanket `/api/*` JWT enforcement (default-off).** A new
+  `ORGANIZATION_REQUIRE_AUTH` env flag (lenient bool — `1`/`true`/`yes`/
+  `on`) gates an `axum::middleware::from_fn` layer wired in
+  `App::after_routes`. When on, every route except the public health/ping
+  + OpenAPI/Swagger paths requires a valid bearer token (`401`
+  otherwise); when off (the default) behaviour is unchanged. The decision
+  is the pure, unit-tested `auth::enforce` (plus `auth::require_auth`,
+  `auth::parse_bool`, `is_public_path`). New `auth::tests` cover the
+  matrix; a `#[serial]`/`#[ignore]` request test pins un-authed `GET
+  /api/organizations` ⇒ `401` with the public OpenAPI doc still `200`.
+  Implements the family contract in `agents/share/jwt-enforcement.md`.
 - **Request-level integration tests.** `tests/requests/organizations.rs`
   (loco testing harness + `serial_test`): create round-trip
   (snake_case wire), blank-name `422` on create + update, unknown-pid

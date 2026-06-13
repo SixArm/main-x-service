@@ -28,12 +28,12 @@ pub fn problems(case: &Case) -> Vec<String> {
     if case.title.trim().is_empty() {
         out.push("title is required".to_string());
     }
-    if let Some(date) = &case.opened_date {
-        if !is_valid_iso_date(date.trim()) {
-            out.push(format!(
-                "opened_date: {date:?} is not a valid ISO-8601 date"
-            ));
-        }
+    if let Some(date) = &case.opened_date
+        && !is_valid_iso_date(date.trim())
+    {
+        out.push(format!(
+            "opened_date: {date:?} is not a valid ISO-8601 date"
+        ));
     }
     for (i, ident) in case.identifiers.iter().enumerate() {
         if ident.value.trim().is_empty() {

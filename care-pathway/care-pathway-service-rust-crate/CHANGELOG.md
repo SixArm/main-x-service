@@ -9,6 +9,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Blanket `/api/*` JWT enforcement (off by default).** A pure
+  `auth::enforce(require_auth, path, headers, verifier)` decision plus an
+  `axum::middleware::from_fn` layer wired unconditionally in `app.rs`
+  `after_routes`. Gated per-request by `CARE_PATHWAY_REQUIRE_AUTH`
+  (`auth::require_auth`, `OnceLock<bool>`; `1`/`true`/`yes`/`on` ⇒ on,
+  anything else incl. unset ⇒ off). When on, every `/api/*` route needs a
+  valid bearer token (`401` otherwise); the public paths `/_health`,
+  `/_ping`, `/api-docs/openapi.json`, `/swagger-ui*` stay open. Default-off
+  keeps existing behaviour and the DB-gated request suite green until an
+  operator opts in. Un-gated `auth::tests` cover `parse_bool` and
+  `enforce` (off/public/protected × no/valid/expired/tampered token); a
+  `#[serial]` `#[ignore]` request test asserts `401` on `GET
+  /api/care-pathways` and `200` on `GET /api-docs/openapi.json` with the
+  flag set. Family contract: `agents/share/jwt-enforcement.md`.
+
 ### Changed
 
 - **Validation failures now return `422 Unprocessable Entity`**

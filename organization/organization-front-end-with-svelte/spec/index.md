@@ -45,6 +45,18 @@ Operators curating the organization registry.
 5. Delete (`DELETE`, soft), redirect to the list.
 6. Check-duplicates posts the current record and lists matches (name,
    score, confidence), excluding the record itself.
+7. **Session / bearer token.** A reactive token store
+   (`src/lib/auth.svelte.ts`) holds an access token hydrated from
+   `localStorage["mxi_access_token"]` (the family-shared key; guarded for
+   SSR/preview). The `ApiClient` attaches `Authorization: Bearer <token>`
+   on every request when the store holds one, and omits it otherwise; a
+   per-request `token` overrides the store. The layout has a minimal
+   session affordance (paste/clear the token, "Sign out"). The token is
+   obtained out-of-band from the central authentication-service
+   (passwordless magic-link → access token); full redirect wiring is a
+   follow-up. Service-side enforcement (`ORGANIZATION_REQUIRE_AUTH`) is
+   off by default, so an absent token keeps current behaviour. See
+   `agents/share/jwt-enforcement.md`.
 
 ## 7. Non-functional requirements
 
@@ -76,9 +88,12 @@ None client-side beyond in-memory route state.
 ## 11. Testing strategy
 
 `pnpm run check` (svelte-check strict, 0/0). **vitest** unit tests
-(`tests/unit/`) cover the `ApiClient` (verb/body/headers/bearer-token/
-error-classification/empty-body) and `OrganizationRepository` (every
-method's path + verb, incl. a regression pinning `check-duplicates`).
+(`tests/unit/`) cover the `ApiClient` (verb/body/headers/bearer-token —
+explicit token, store-driven attach, clear, and explicit-`null`
+override / error-classification / empty-body), the `auth` token store
+(`setToken`/`clearToken` round-trip, trim/blank handling), and
+`OrganizationRepository` (every method's path + verb, incl. a regression
+pinning `check-duplicates`).
 **Playwright** smoke tests (`tests/e2e/`) load the four routes (`/`,
 `/new`, `/[pid]`, `/[pid]/edit`) with the API stubbed via
 `page.route`, asserting each renders; they run against the production
@@ -92,13 +107,18 @@ controls when they land.
 
 ## 13. Tasks (live work queue)
 
-- [x] vitest unit tests for `ApiClient` + `OrganizationRepository`
-  (`tests/unit/`, 16 tests).
+- [x] vitest unit tests for `ApiClient` + `OrganizationRepository` +
+  `auth` store (`tests/unit/`, 23 tests).
 - [x] playwright smoke for the four routes (`tests/e2e/smoke.spec.ts`,
   4 tests, API stubbed, runs against `vite preview`).
 - [ ] Identifier `Custom(label)` editing in the form.
 - [ ] Search box once the service ships search.
-- [ ] Bearer token wiring once the service enforces auth.
+- [x] Bearer token wiring — `auth.svelte.ts` token store
+  (`localStorage["mxi_access_token"]`) + `ApiClient` auto-attach +
+  layout session affordance, per `agents/share/jwt-enforcement.md`.
+  Service enforcement is off by default.
+- [ ] Magic-link redirect to the authentication front-end (obtain the
+  token in-app rather than paste).
 
 ## 14. Implementation status
 

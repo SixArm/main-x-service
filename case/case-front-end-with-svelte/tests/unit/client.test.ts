@@ -60,16 +60,46 @@ describe("ApiClient", () => {
     );
   });
 
-  it("attaches a bearer token when supplied", async () => {
+  it("attaches a bearer token when supplied per call", async () => {
     const f = fakeFetch(200, {});
     await client(f).get("/api/cases/whoami", { token: "tok-123" });
     const headers = f.calls[0]?.init.headers as Record<string, string>;
     expect(headers.authorization).toBe("Bearer tok-123");
   });
 
-  it("omits the authorization header when no token is given", async () => {
+  it("omits the authorization header when no token is available", async () => {
     const f = fakeFetch(200, {});
-    await client(f).get("/api/cases");
+    // No per-call token and the (default-empty) session source -> no header.
+    const c = new ApiClient({
+      baseUrl: "http://svc.test",
+      fetch: f.fn,
+      tokenSource: () => null,
+    });
+    await c.get("/api/cases");
+    const headers = f.calls[0]?.init.headers as Record<string, string>;
+    expect(headers.authorization).toBeUndefined();
+  });
+
+  it("attaches the session-store token by default when one is set", async () => {
+    const f = fakeFetch(200, {});
+    const c = new ApiClient({
+      baseUrl: "http://svc.test",
+      fetch: f.fn,
+      tokenSource: () => "store-tok",
+    });
+    await c.get("/api/cases");
+    const headers = f.calls[0]?.init.headers as Record<string, string>;
+    expect(headers.authorization).toBe("Bearer store-tok");
+  });
+
+  it("a per-call null token overrides a set session token (omits header)", async () => {
+    const f = fakeFetch(200, {});
+    const c = new ApiClient({
+      baseUrl: "http://svc.test",
+      fetch: f.fn,
+      tokenSource: () => "store-tok",
+    });
+    await c.get("/api/cases", { token: null });
     const headers = f.calls[0]?.init.headers as Record<string, string>;
     expect(headers.authorization).toBeUndefined();
   });

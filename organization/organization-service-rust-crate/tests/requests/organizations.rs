@@ -273,6 +273,46 @@ async fn whoami_without_token_is_401() {
     .await;
 }
 
+/// With blanket enforcement on (`ORGANIZATION_REQUIRE_AUTH=1`), an
+/// un-authenticated `GET /api/organizations` is `401`, while the public
+/// OpenAPI doc still returns `200`. The flag is set inside the test and
+/// removed afterwards; `#[serial]` avoids env-var races with the other
+/// request tests (which run with the flag unset / off).
+///
+/// Note: `require_auth()` caches the flag in a `OnceLock` on first read,
+/// so this test sets the env var *before* the app boots; if another test
+/// in this process already triggered enforcement to cache as `false`,
+/// this assertion would not hold — hence `#[serial]` and a dedicated
+/// scope. In CI this suite runs with the flag wired (see family contract).
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn require_auth_gate_blocks_unauthed_list_but_allows_openapi() {
+    // SAFETY: single-threaded within this #[serial] test.
+    unsafe {
+        std::env::set_var("ORGANIZATION_REQUIRE_AUTH", "1");
+    }
+    request::<App, _, _>(|request, _ctx| async move {
+        let protected = request.get("/api/organizations").await;
+        assert_eq!(
+            protected.status_code(),
+            401,
+            "un-authed list must be 401 when enforcement is on"
+        );
+
+        let openapi = request.get("/api-docs/openapi.json").await;
+        assert_eq!(
+            openapi.status_code(),
+            200,
+            "public OpenAPI doc must stay reachable"
+        );
+    })
+    .await;
+    unsafe {
+        std::env::remove_var("ORGANIZATION_REQUIRE_AUTH");
+    }
+}
+
 /// Merging an unknown duplicate is a `404`.
 #[tokio::test]
 #[serial]

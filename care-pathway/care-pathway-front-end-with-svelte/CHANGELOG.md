@@ -11,6 +11,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Bearer-token auth (front-end half of blanket JWT enforcement).** A
+  new reactive token store `src/lib/auth.svelte.ts` holds the access
+  token, hydrated from the family-shared `localStorage` key
+  `mxi_access_token` (guarded for SSR / `vite preview`), exposing
+  `setToken` / `clearToken` / `token`. `ApiClient` now reads this store on
+  every request and attaches `Authorization: Bearer <token>` when present
+  (a per-call `token` — string or `null` — still overrides). The layout
+  sidebar gains a minimal session affordance to paste/clear the token; the
+  token is obtained out-of-band from the central authentication-service
+  (passwordless magic-link). This lets operator traffic through once the
+  service turns on blanket enforcement (`CARE_PATHWAY_REQUIRE_AUTH`, off
+  by default). vitest adds 6 tests (`tests/unit/auth.test.ts`: store
+  round-trip + client attachment/omission/override); Playwright smoke
+  stays green. Family contract: `agents/share/jwt-enforcement.md`. Full
+  magic-link redirect wiring is a follow-up.
+
 - **Recent-activity view.** The list page (`/`) gains a "Show recent
   activity" toggle that lazy-loads `GET /api/care-pathways/events/recent`
   on first open (it does not auto-load on mount) via a new

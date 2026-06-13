@@ -2,8 +2,16 @@
 //
 // The service is a loco.rs app: handlers return RAW JSON (no
 // {success,data,error} envelope), so this client returns the parsed
-// body directly and throws ApiError on non-2xx. A bearer token can be
-// supplied per request for endpoints protected by JWT verification.
+// body directly and throws ApiError on non-2xx.
+//
+// Bearer token: by default the client reads the current token from the
+// shared `auth` store (hydrated from localStorage["mxi_access_token"])
+// and attaches `Authorization: Bearer <token>` when one is present,
+// omitting the header otherwise. A per-request `token` overrides the
+// store (pass `null`/`""` to force no header). See `auth.svelte.ts` and
+// `agents/share/jwt-enforcement.md`.
+
+import { auth } from "$lib/auth.svelte";
 
 export interface ClientOptions {
     baseUrl: string;
@@ -12,6 +20,8 @@ export interface ClientOptions {
 
 export interface RequestOptions {
     body?: unknown;
+    /** Override the stored token. Omit to use the `auth` store; pass
+     * `null`/`""` to suppress the header for this request. */
     token?: string | null;
     headers?: Record<string, string>;
     signal?: AbortSignal;
@@ -64,8 +74,11 @@ export class ApiClient {
             accept: "application/json",
             ...opts.headers,
         };
-        if (opts.token) {
-            headers.authorization = `Bearer ${opts.token}`;
+        // Explicit `token` (including `null`/`""`) overrides the store;
+        // otherwise fall back to the shared session token.
+        const token = "token" in opts ? opts.token : auth.token;
+        if (token) {
+            headers.authorization = `Bearer ${token}`;
         }
 
         const init: RequestInit = { method, headers, signal: opts.signal };

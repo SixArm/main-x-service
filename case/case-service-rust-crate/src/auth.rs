@@ -24,11 +24,20 @@
 //! Fetching the JWKS over HTTP from the auth service at boot (instead of
 //! injecting it via env) is a follow-up — see spec §13 T-7.
 //!
-//! Blanket enforcement on `/api/*` is **not** wired yet: like the
-//! person service, the extractor is available for opt-in protection and
+//! ## Blanket enforcement
+//!
+//! When `CASE_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
+//! case-insensitive), the [`enforce`] decision — wired as an Axum
+//! middleware layer in [`crate::app`] — rejects every non-public request
+//! that lacks a valid bearer token with `401`. Health/ping and the
+//! `OpenAPI` doc + Swagger UI stay public (see [`is_public_path`]).
+//! Case data is personal data, so this blanket gate is the access-control
+//! boundary in front of every case route. Enforcement is **off by
+//! default**: an unset/blank/falsey flag leaves behaviour exactly as
+//! before — the extractor stays available for opt-in protection and
 //! actor capture, and `GET /api/cases/whoami` proves end-to-end
-//! verification. Requiring a token on every route awaits the coordinated
-//! SSO rollout across the family.
+//! verification. Activation is an operations decision taken once the SSO
+//! token flow is live across the family.
 
 use std::sync::{Arc, OnceLock};
 
@@ -49,6 +58,57 @@ const DEFAULT_AUDIENCE: &str = "main-x-service";
 pub fn verifier() -> &'static Arc<Verifier> {
     static VERIFIER: OnceLock<Arc<Verifier>> = OnceLock::new();
     VERIFIER.get_or_init(|| Arc::new(build_from_env()))
+}
+
+/// Parse a boolean-ish env value leniently: `1`/`true`/`yes`/`on`
+/// (case-insensitive, trimmed) ⇒ `true`; everything else (incl. blank)
+/// ⇒ `false`.
+#[must_use]
+pub fn parse_bool(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
+/// Whether blanket `/api/*` enforcement is on, read once from
+/// `CASE_REQUIRE_AUTH` (see [`parse_bool`]). Off by default. Mirrors
+/// [`verifier`]: a process-wide `OnceLock` so the env is read a single
+/// time.
+#[must_use]
+pub fn require_auth() -> bool {
+    static REQUIRE_AUTH: OnceLock<bool> = OnceLock::new();
+    *REQUIRE_AUTH.get_or_init(|| std::env::var("CASE_REQUIRE_AUTH").is_ok_and(|v| parse_bool(&v)))
+}
+
+/// Paths that stay public even when enforcement is on: health/ping and
+/// the `OpenAPI` doc + Swagger UI. Everything else (the `/api/` surface)
+/// requires a valid bearer token.
+fn is_public_path(path: &str) -> bool {
+    path == "/_health"
+        || path == "/_ping"
+        || path == "/api-docs/openapi.json"
+        || path.starts_with("/swagger-ui")
+}
+
+/// The blanket-enforcement decision. `Ok(())` ⇒ let the request through;
+/// `Err((401, msg))` ⇒ reject. Pure: caller passes the flag, path, headers
+/// and verifier, so it is fully unit-testable.
+///
+/// # Errors
+///
+/// `401` when `require_auth` is set, the path is not public, and the
+/// request carries no valid bearer token.
+pub fn enforce(
+    require_auth: bool,
+    path: &str,
+    headers: &HeaderMap,
+    verifier: &Verifier,
+) -> Result<(), (StatusCode, String)> {
+    if !require_auth || is_public_path(path) {
+        return Ok(());
+    }
+    bearer_claims(headers, verifier).map(|_| ())
 }
 
 fn env_or(name: &str, default: &str) -> String {
@@ -148,7 +208,7 @@ impl<S: Send + Sync> FromRequestParts<S> for MaybeAuthUser {
 mod tests {
     use super::*;
     use base64::Engine;
-    use jsonwebtoken::{encode, EncodingKey, Header};
+    use jsonwebtoken::{EncodingKey, Header, encode};
     use rsa::pkcs8::DecodePrivateKey;
     use rsa::traits::PublicKeyParts;
 
@@ -299,5 +359,77 @@ cg5Tq5R846wbNyxrso8C988=
             bearer_claims(&bearer(&token), &verifier).unwrap_err().0,
             StatusCode::UNAUTHORIZED
         );
+    }
+
+    #[test]
+    fn parse_bool_truthy_and_falsey() {
+        for t in ["1", "true", "TRUE", "Yes", "on", " on ", "On"] {
+            assert!(parse_bool(t), "{t:?} should be true");
+        }
+        for f in ["", "  ", "0", "false", "no", "off", "junk", "2"] {
+            assert!(!parse_bool(f), "{f:?} should be false");
+        }
+    }
+
+    #[test]
+    fn enforce_off_without_token_is_ok() {
+        let (jwks, _) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        // Flag off ⇒ allowed regardless of path/headers.
+        assert!(enforce(false, "/api/cases", &HeaderMap::new(), &verifier).is_ok());
+    }
+
+    #[test]
+    fn enforce_on_public_path_is_ok() {
+        let (jwks, _) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        for path in [
+            "/_health",
+            "/_ping",
+            "/api-docs/openapi.json",
+            "/swagger-ui",
+            "/swagger-ui/index.html",
+        ] {
+            assert!(
+                enforce(true, path, &HeaderMap::new(), &verifier).is_ok(),
+                "{path} should stay public"
+            );
+        }
+    }
+
+    #[test]
+    fn enforce_on_protected_without_token_is_401() {
+        let (jwks, _) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        let err = enforce(true, "/api/cases", &HeaderMap::new(), &verifier).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn enforce_on_protected_with_valid_token_is_ok() {
+        let (jwks, kid) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        let token = sign(&kid, 10_000_000_000);
+        assert!(enforce(true, "/api/cases", &bearer(&token), &verifier).is_ok());
+    }
+
+    #[test]
+    fn enforce_on_protected_with_expired_token_is_401() {
+        let (jwks, kid) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        let token = sign(&kid, -60);
+        let err = enforce(true, "/api/cases", &bearer(&token), &verifier).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn enforce_on_protected_with_tampered_token_is_401() {
+        let (jwks, kid) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        let mut token = sign(&kid, 10_000_000_000);
+        let last = token.pop().unwrap();
+        token.push(if last == 'a' { 'b' } else { 'a' });
+        let err = enforce(true, "/api/cases", &bearer(&token), &verifier).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
     }
 }

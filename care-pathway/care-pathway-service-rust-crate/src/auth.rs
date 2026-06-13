@@ -24,11 +24,19 @@
 //! Fetching the JWKS over HTTP from the auth service at boot (instead of
 //! injecting it via env) is a follow-up — see spec §13 T-7.
 //!
-//! Blanket enforcement on `/api/*` is **not** wired yet: like the
-//! person service, the extractor is available for opt-in protection and
-//! actor capture, and `GET /api/care-pathways/whoami` proves end-to-end
-//! verification. Requiring a token on every route awaits the coordinated
-//! SSO rollout across the family.
+//! ## Blanket enforcement
+//!
+//! Mandatory bearer-token auth on every `/api/*` route is wired via the
+//! [`enforce`] decision function and an `axum::middleware::from_fn` layer
+//! in `app.rs`. It is **off by default** and gated by the
+//! `CARE_PATHWAY_REQUIRE_AUTH` env var ([`require_auth`]): `1`/`true`/
+//! `yes`/`on` (case-insensitive) ⇒ enabled; anything else ⇒ disabled.
+//! When off, behaviour is exactly as before (the extractor is available
+//! for opt-in protection and actor capture, and
+//! `GET /api/care-pathways/whoami` proves end-to-end verification).
+//! Activation is an operations decision once the SSO token flow is live;
+//! see the family contract in `agents/share/jwt-enforcement.md` and spec
+//! §13 T-7.
 
 use std::sync::{Arc, OnceLock};
 
@@ -75,6 +83,56 @@ fn build_from_env() -> Verifier {
 fn empty_verifier(issuer: &str, audience: &str) -> Verifier {
     let empty = serde_json::json!({ "keys": [] });
     Verifier::from_jwks_value(&empty, issuer, audience).expect("empty jwks always builds")
+}
+
+/// Parse a boolean-ish env value leniently: `1`/`true`/`yes`/`on`
+/// (case-insensitive, trimmed) ⇒ `true`; anything else ⇒ `false`.
+#[must_use]
+pub fn parse_bool(raw: &str) -> bool {
+    matches!(
+        raw.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
+/// Whether blanket `/api/*` JWT enforcement is on, read once from
+/// `CARE_PATHWAY_REQUIRE_AUTH` (see [`parse_bool`]). Off by default —
+/// unset/blank ⇒ `false`. Mirrors [`verifier`] with a `OnceLock`.
+#[must_use]
+pub fn require_auth() -> bool {
+    static REQUIRE_AUTH: OnceLock<bool> = OnceLock::new();
+    *REQUIRE_AUTH
+        .get_or_init(|| std::env::var("CARE_PATHWAY_REQUIRE_AUTH").is_ok_and(|v| parse_bool(&v)))
+}
+
+/// Paths that stay public even when enforcement is on: health/ping and
+/// the `OpenAPI` doc + Swagger UI. Everything else under `/api` requires a
+/// valid bearer token.
+fn is_public_path(path: &str) -> bool {
+    path == "/_health"
+        || path == "/_ping"
+        || path == "/api-docs/openapi.json"
+        || path.starts_with("/swagger-ui")
+}
+
+/// The blanket-enforcement decision. `Ok(())` ⇒ let the request through;
+/// `Err((401, msg))` ⇒ reject. Pure: caller passes the flag, path,
+/// headers and verifier, so it is fully unit-testable.
+///
+/// # Errors
+///
+/// `401` when enforcement is on, the path is not public, and the request
+/// carries no valid bearer token (see [`bearer_claims`]).
+pub fn enforce(
+    require_auth: bool,
+    path: &str,
+    headers: &HeaderMap,
+    verifier: &Verifier,
+) -> Result<(), (StatusCode, String)> {
+    if !require_auth || is_public_path(path) {
+        return Ok(());
+    }
+    bearer_claims(headers, verifier).map(|_| ())
 }
 
 /// Extract and verify the bearer token from request headers. Pure (the
@@ -297,6 +355,87 @@ cg5Tq5R846wbNyxrso8C988=
         let token = sign(&kid, 10_000_000_000);
         assert_eq!(
             bearer_claims(&bearer(&token), &verifier).unwrap_err().0,
+            StatusCode::UNAUTHORIZED
+        );
+    }
+
+    #[test]
+    fn parse_bool_truthy_and_falsy() {
+        for t in ["1", "true", "TRUE", "yes", "Yes", "on", "ON", " true "] {
+            assert!(parse_bool(t), "{t:?} should parse true");
+        }
+        for f in ["", "0", "false", "no", "off", "junk", "  "] {
+            assert!(!parse_bool(f), "{f:?} should parse false");
+        }
+    }
+
+    #[test]
+    fn enforce_off_allows_without_token() {
+        let (jwks, _) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        // Enforcement off: even a protected path with no token is allowed.
+        assert!(enforce(false, "/api/care-pathways", &HeaderMap::new(), &verifier).is_ok());
+    }
+
+    #[test]
+    fn enforce_on_allows_public_paths() {
+        let (jwks, _) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        let h = HeaderMap::new();
+        for p in [
+            "/_health",
+            "/_ping",
+            "/api-docs/openapi.json",
+            "/swagger-ui",
+            "/swagger-ui/index.html",
+        ] {
+            assert!(
+                enforce(true, p, &h, &verifier).is_ok(),
+                "{p} should be public"
+            );
+        }
+    }
+
+    #[test]
+    fn enforce_on_protected_without_token_is_401() {
+        let (jwks, _) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        let err = enforce(true, "/api/care-pathways", &HeaderMap::new(), &verifier).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn enforce_on_protected_with_valid_token_is_ok() {
+        let (jwks, kid) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        let token = sign(&kid, 10_000_000_000);
+        assert!(enforce(true, "/api/care-pathways", &bearer(&token), &verifier).is_ok());
+    }
+
+    #[test]
+    fn enforce_on_protected_with_expired_token_is_401() {
+        let (jwks, kid) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        let token = sign(&kid, -60);
+        assert_eq!(
+            enforce(true, "/api/care-pathways", &bearer(&token), &verifier)
+                .unwrap_err()
+                .0,
+            StatusCode::UNAUTHORIZED
+        );
+    }
+
+    #[test]
+    fn enforce_on_protected_with_tampered_token_is_401() {
+        let (jwks, kid) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        let mut token = sign(&kid, 10_000_000_000);
+        let last = token.pop().unwrap();
+        token.push(if last == 'a' { 'b' } else { 'a' });
+        assert_eq!(
+            enforce(true, "/api/care-pathways", &bearer(&token), &verifier)
+                .unwrap_err()
+                .0,
             StatusCode::UNAUTHORIZED
         );
     }
