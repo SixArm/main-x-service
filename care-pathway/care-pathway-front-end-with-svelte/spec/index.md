@@ -14,8 +14,8 @@ service.
 ## 2. Scope
 
 In scope: the four routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`), the
-API client, and the care-pathway form. Out of scope: full-text search
-UI, audit views, auth.
+API client, the care-pathway form, and a name-search box on the list.
+Out of scope: fuzzy/full-text search UI, audit views, auth.
 
 ## 3. Stakeholders and users
 
@@ -39,6 +39,10 @@ Clinical informaticians and pathway authors.
 ## 6. Functional requirements
 
 1. List active care pathways (`GET /api/care-pathways`).
+   - Search box (search-on-submit): a non-blank query calls
+     `GET /api/care-pathways/search?q=` (URL-encoded) and renders the
+     filtered results; **Clear** (or an empty query) restores the full
+     list. Loading and empty-result states are shown.
 2. Create (`POST`), redirect to the new detail page.
 3. Detail: render the stored `CarePathway`; offer edit, delete, and
    check-duplicates.
@@ -63,7 +67,8 @@ editable rows).
 
 | Route / action | Endpoint |
 |---|---|
-| `/` | `GET /api/care-pathways` |
+| `/` list | `GET /api/care-pathways` |
+| `/` search | `GET /api/care-pathways/search?q=` |
 | `/new` | `POST /api/care-pathways` |
 | `/[pid]` load | `GET /api/care-pathways/{pid}` |
 | `/[pid]` delete | `DELETE /api/care-pathways/{pid}` |
@@ -79,10 +84,13 @@ None client-side beyond in-memory route state.
 `pnpm run check` (svelte-check strict, 0/0). **vitest** unit tests
 (`tests/unit/`) cover the `ApiClient` (verb/body/headers/bearer-token/
 error-classification/empty-body) and `CarePathwayRepository` (every
-method's path + verb, incl. a regression pinning `check-duplicates`).
+method's path + verb, incl. a regression pinning `check-duplicates`,
+and `search()` pinning the `/search?q=` path with URL-encoding).
 **Playwright** smoke tests (`tests/e2e/`) load the four routes (`/`,
 `/new`, `/[pid]`, `/[pid]/edit`) with the API stubbed via
-`page.route`, asserting each renders; they run against the production
+`page.route`, asserting each renders; one test exercises the list
+search box (matching query keeps the row, non-matching shows the
+empty-result message). They run against the production
 build (`vite preview`) to avoid the `vite dev` cold-start module race.
 Run: `pnpm test` (vitest) and `pnpm test:e2e` (Playwright).
 
@@ -98,14 +106,16 @@ for any access/audit requirements.
 - [x] playwright smoke for the four routes (`tests/e2e/smoke.spec.ts`,
   4 tests, API stubbed, runs against `vite preview`).
 - [ ] `Custom(label)` editing for code systems / settings / schemes.
-- [ ] Search box once the service ships search.
+- [x] Search box once the service ships search — list page calls
+  `GET /api/care-pathways/search?q=` (search-on-submit + Clear);
+  `repository.search()` added; vitest (2) + Playwright (1) cover it.
 - [ ] Bearer token wiring once the service enforces auth.
 
 ## 14. Implementation status
 
-Done: all four routes; lean client; repository; form (incl. condition
-codes + identifiers editors); SPA config. `pnpm run check` clean;
-production build succeeds.
+Done: all four routes; lean client; repository (incl. `search()`); list
+search box; form (incl. condition codes + identifiers editors); SPA
+config. `pnpm run check` clean; production build succeeds.
 
 ## 15. Roadmap
 

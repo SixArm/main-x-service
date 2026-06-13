@@ -1,0 +1,210 @@
+//! Hand-written `OpenAPI` 3 description of the authentication REST API.
+//!
+//! The family authors `OpenAPI` documents by hand (no `utoipa`), which
+//! keeps the schema accurate to the wire format and the crate
+//! dependency-light. This document covers the passwordless magic-link
+//! surface (FR-1…FR-8): signup, magic-link issuance, redemption, `me`,
+//! signout, and the public JWKS. The bearer `securityScheme` describes the
+//! RS256 access token that `me` and `signout` require.
+
+use serde_json::{Value, json};
+
+/// The full `OpenAPI` document, served at `/api-docs/openapi.json`.
+// One contiguous `json!` literal: splitting it into helpers would scatter
+// the document and hurt readability, so the length is allowed.
+#[allow(clippy::too_many_lines)]
+#[must_use]
+pub fn spec() -> Value {
+    json!({
+        "openapi": "3.0.3",
+        "info": {
+            "title": "Authentication Service API",
+            "version": env!("CARGO_PKG_VERSION"),
+            "description": "Central single sign-on provider for the Main X Index family. Passwordless email magic-link authentication; issues RS256 JWT access tokens verifiable offline against the JWKS at /.well-known/jwks.json. The unauthenticated issuance endpoints (signup, magic-link) always return 200 to avoid account enumeration, and are rate-limited per email (429 when exceeded). me and signout require a bearer token."
+        },
+        "paths": {
+            "/api/auth/signup": {
+                "post": {
+                    "tags": ["auth"],
+                    "summary": "Create a passwordless account and issue a magic link",
+                    "description": "Always returns 200 regardless of whether the email already exists (anti-enumeration). Rate-limited per email; over the limit returns 429 without issuing a token or sending mail.",
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SignupParams" } } } },
+                    "responses": {
+                        "200": { "description": "Magic link issued (or silently ignored to avoid enumeration)" },
+                        "429": { "description": "Too many issuance requests for this email; try again later", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+                    }
+                }
+            },
+            "/api/auth/magic-link": {
+                "post": {
+                    "tags": ["auth"],
+                    "summary": "Request a magic link for an existing account (sign in)",
+                    "description": "Always returns 200, even for unknown emails (anti-enumeration). Rate-limited per email; over the limit returns 429 without issuing a token or sending mail.",
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MagicLinkParams" } } } },
+                    "responses": {
+                        "200": { "description": "Magic link issued (or silently ignored for unknown emails)" },
+                        "429": { "description": "Too many issuance requests for this email; try again later", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+                    }
+                }
+            },
+            "/api/auth/magic-link/{token}": {
+                "get": {
+                    "tags": ["auth"],
+                    "summary": "Consume a magic link → RS256 access token + session",
+                    "description": "Validates the unexpired, single-use token, marks the email verified, issues an RS256 access token, and records a revocable session.",
+                    "parameters": [{ "name": "token", "in": "path", "required": true, "schema": { "type": "string" }, "description": "The opaque magic-link token." }],
+                    "responses": {
+                        "200": { "description": "Access token + user", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginResponse" } } } },
+                        "401": { "description": "Invalid, expired, or already-consumed magic link" }
+                    }
+                }
+            },
+            "/api/auth/me": {
+                "get": {
+                    "tags": ["auth"],
+                    "summary": "Current authenticated user",
+                    "description": "Returns the current user. Honors local revocation: a signed-out session is rejected even though the JWT signature is still valid.",
+                    "security": [{ "bearer": [] }],
+                    "responses": {
+                        "200": { "description": "Current user", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrentResponse" } } } },
+                        "401": { "description": "Missing/invalid bearer token, or the session was signed out" }
+                    }
+                }
+            },
+            "/api/auth/signout": {
+                "post": {
+                    "tags": ["auth"],
+                    "summary": "Revoke the current session",
+                    "description": "Marks the bearer token's session revoked. Peer services that cached the token keep honoring it until expiry (offline JWKS verification); TTLs are kept short to bound this window.",
+                    "security": [{ "bearer": [] }],
+                    "responses": {
+                        "200": { "description": "Session revoked" },
+                        "401": { "description": "Missing or invalid bearer token" }
+                    }
+                }
+            },
+            "/.well-known/jwks.json": {
+                "get": {
+                    "tags": ["jwks"],
+                    "summary": "Public keys for offline token verification",
+                    "description": "The JSON Web Key Set peer services fetch once to verify RS256 tokens locally — no shared secret, no introspection round-trip.",
+                    "responses": {
+                        "200": { "description": "JWKS document", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Jwks" } } } }
+                    }
+                }
+            }
+        },
+        "components": {
+            "securitySchemes": {
+                "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT",
+                    "description": "RS256 access token issued by this service, verified offline against its JWKS." }
+            },
+            "schemas": {
+                "SignupParams": { "type": "object", "required": ["email"], "properties": {
+                    "email": { "type": "string", "format": "email", "description": "Email to register and the magic-link recipient." },
+                    "name": { "type": "string", "nullable": true, "description": "Optional display name; defaults from the email local-part." } } },
+                "MagicLinkParams": { "type": "object", "required": ["email"], "properties": {
+                    "email": { "type": "string", "format": "email", "description": "Email of the existing account to sign in." } } },
+                "LoginResponse": { "type": "object", "required": ["token", "pid", "name", "email", "is_verified"], "properties": {
+                    "token": { "type": "string", "description": "RS256 access token (bearer)." },
+                    "pid": { "type": "string", "format": "uuid", "description": "User public id." },
+                    "name": { "type": "string" },
+                    "email": { "type": "string", "format": "email" },
+                    "is_verified": { "type": "boolean", "description": "Whether the email has been verified." } } },
+                "CurrentResponse": { "type": "object", "required": ["pid", "name", "email"], "properties": {
+                    "pid": { "type": "string", "format": "uuid" },
+                    "name": { "type": "string" },
+                    "email": { "type": "string", "format": "email" } } },
+                "Claims": { "type": "object",
+                    "description": "Decoded RS256 JWT payload. sub carries the user pid; jti also indexes the revocable sessions row.",
+                    "required": ["sub", "email", "name", "iss", "aud", "exp", "iat", "jti"], "properties": {
+                    "sub": { "type": "string", "format": "uuid", "description": "Subject — the user pid." },
+                    "email": { "type": "string", "format": "email" },
+                    "name": { "type": "string" },
+                    "iss": { "type": "string", "description": "Issuer (default authentication-service)." },
+                    "aud": { "type": "string", "description": "Audience (default main-x-service)." },
+                    "exp": { "type": "integer", "format": "int64", "description": "Expiry (unix seconds)." },
+                    "iat": { "type": "integer", "format": "int64", "description": "Issued-at (unix seconds)." },
+                    "jti": { "type": "string", "format": "uuid", "description": "JWT id; also sessions.jid for revocation." } } },
+                "Jwk": { "type": "object", "required": ["kty", "use", "alg", "kid", "n", "e"], "properties": {
+                    "kty": { "type": "string", "example": "RSA" },
+                    "use": { "type": "string", "example": "sig" },
+                    "alg": { "type": "string", "example": "RS256" },
+                    "kid": { "type": "string", "description": "base64url(SHA-256(public modulus))." },
+                    "n": { "type": "string", "description": "RSA modulus (base64url)." },
+                    "e": { "type": "string", "description": "RSA exponent (base64url)." } } },
+                "Jwks": { "type": "object", "required": ["keys"], "properties": {
+                    "keys": { "type": "array", "items": { "$ref": "#/components/schemas/Jwk" } } } },
+                "Error": { "type": "object", "properties": {
+                    "error": { "type": "string", "description": "Machine-readable error code, e.g. rate_limited." },
+                    "description": { "type": "string" } } }
+            }
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spec_is_wellformed() {
+        let s = spec();
+        assert_eq!(s["openapi"], "3.0.3");
+        assert!(s["info"]["title"].is_string());
+        assert!(s["paths"].is_object());
+        assert!(s["components"]["schemas"]["LoginResponse"]["properties"]["token"].is_object());
+    }
+
+    #[test]
+    fn spec_documents_every_auth_endpoint() {
+        let s = spec();
+        let paths = &s["paths"];
+        assert!(paths["/api/auth/signup"]["post"].is_object());
+        assert!(paths["/api/auth/magic-link"]["post"].is_object());
+        assert!(paths["/api/auth/magic-link/{token}"]["get"].is_object());
+        assert!(paths["/api/auth/me"]["get"].is_object());
+        assert!(paths["/api/auth/signout"]["post"].is_object());
+        assert!(paths["/.well-known/jwks.json"]["get"].is_object());
+    }
+
+    #[test]
+    fn issuance_endpoints_document_the_429_rate_limit() {
+        let s = spec();
+        assert!(s["paths"]["/api/auth/signup"]["post"]["responses"]["429"].is_object());
+        assert!(s["paths"]["/api/auth/magic-link"]["post"]["responses"]["429"].is_object());
+    }
+
+    #[test]
+    fn bearer_security_scheme_is_present_and_applied() {
+        let s = spec();
+        assert_eq!(
+            s["components"]["securitySchemes"]["bearer"]["scheme"],
+            "bearer"
+        );
+        assert_eq!(
+            s["components"]["securitySchemes"]["bearer"]["bearerFormat"],
+            "JWT"
+        );
+        // The two protected endpoints require it.
+        assert!(s["paths"]["/api/auth/me"]["get"]["security"][0]["bearer"].is_array());
+        assert!(s["paths"]["/api/auth/signout"]["post"]["security"][0]["bearer"].is_array());
+    }
+
+    #[test]
+    fn documents_the_core_schemas() {
+        let s = spec();
+        let schemas = &s["components"]["schemas"];
+        for name in [
+            "SignupParams",
+            "MagicLinkParams",
+            "LoginResponse",
+            "CurrentResponse",
+            "Claims",
+            "Jwks",
+            "Jwk",
+        ] {
+            assert!(schemas[name].is_object(), "missing schema {name}");
+        }
+    }
+}

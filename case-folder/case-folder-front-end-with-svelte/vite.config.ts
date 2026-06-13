@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 const lilyHelpers = resolve(
     fileURLToPath(new URL('.', import.meta.url)),
-    '../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers'
+    '../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers'
 );
 
 // Proxy the API to the Loco app so the browser sees a single origin and

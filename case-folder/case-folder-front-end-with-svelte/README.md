@@ -50,6 +50,18 @@ room.
   `POST /api/moves` on submit.
 - **Audit history** (`/history`) — searchable global log from
   `GET /api/moves?q=...`.
+- **Volumes** (`/volumes`, `/volumes/{id}`, `/volumes/new`) — movable
+  bundles of a patient's folders: create, assign/remove folders, and
+  move a whole volume at once via `GET/POST/PATCH /api/volumes...`.
+- **Workers** (`/workers`, `/workers/{id}`) — workforce register from
+  `GET /api/workers`, with per-worker move attributions.
+- **Scan** (`/scan`) — find a folder by NHS Number and jump to a move.
+- **Reports** (`/reports`) and **Alerts** (`/alerts`) — KPIs / cabinet
+  utilisation and cross-building geofence alerts (`GET /api/alerts`).
+- **Sign in** (`/login`, `/auth/callback`) — magic-link auth UI against
+  `POST /api/auth/request` + `/api/auth/verify`; the session is a
+  first-party HttpOnly cookie (the dev server proxies `/api` so it is
+  same-origin).
 
 ## Stack
 
@@ -141,7 +153,9 @@ tests/e2e/
 ├── global-setup.ts              # pings /healthz + verifies seed state
 ├── helpers/{nhs,seed,forms,unique}.ts
 └── *.spec.ts                    # smoke, dashboard, folders, patients,
-                                 #   places, move, history, errors
+                                 #   places, move, history, errors, volumes,
+                                 #   workers (clickthrough), auth, a11y,
+                                 #   ifit, wiring
 static/
 └── themes/
     ├── nhs.css                  # :root[data-theme="nhs"] colour tokens
@@ -179,7 +193,20 @@ src/
     ├── cabinets/
     │   ├── +page.{ts,svelte}
     │   └── new/+page.{ts,svelte}
+    ├── rooms/[id]/+page.{ts,svelte}
+    ├── volumes/
+    │   ├── +page.{ts,svelte}
+    │   ├── new/+page.{ts,svelte}
+    │   └── [id]/+page.{ts,svelte}
+    ├── workers/
+    │   ├── +page.{ts,svelte}
+    │   └── [id]/+page.{ts,svelte}
     ├── move/+page.{ts,svelte}
+    ├── scan/+page.svelte
+    ├── reports/+page.{ts,svelte}
+    ├── alerts/+page.{ts,svelte}
+    ├── login/+page.svelte
+    ├── auth/callback/+page.{ts,svelte}
     └── history/+page.{ts,svelte}
 ```
 

@@ -14,6 +14,8 @@ paper case-note folders across NHS hospital cabinets.
 - **[AGENTS.md](AGENTS.md)** — working agreements for collaborators
   (human and AI): repo orientation, response style, CI gates, how to
   add an endpoint.
+- **[CHANGELOG.md](CHANGELOG.md)** — notable changes, Keep a Changelog
+  format.
 
 ## By role
 
@@ -80,8 +82,8 @@ so the audit trail keeps working when upstreams are down.
 ## Sibling projects
 
 - **[`../case-folder-front-end-with-svelte`](../case-folder-front-end-with-svelte)**
-  — same domain, Svelte + TypeScript front-end. Maintains its own
-  back-end shim today; could become a client of this API in the
-  future.
+  — same domain, Svelte + TypeScript front-end. A **client of this
+  API**: every page round-trips through `/api/*`, and its Playwright
+  e2e suite runs against this service in stub mode.
 - The five upstream Main-X-Services live under
   `~/git/sixarm/main-x-service/`.

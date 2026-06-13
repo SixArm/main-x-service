@@ -69,6 +69,23 @@ describe("CarePathwayRepository", () => {
     expect(calls[0]?.url).toBe("http://svc.test/api/care-pathways/p1");
   });
 
+  it("search() GETs the search endpoint with q", async () => {
+    const { repo, calls } = spyClient();
+    await repo.search("stroke");
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/care-pathways/search?q=stroke",
+    );
+  });
+
+  it("search() URL-encodes q (spaces and reserved chars)", async () => {
+    const { repo, calls } = spyClient();
+    await repo.search("a b");
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/care-pathways/search?q=a%20b",
+    );
+  });
+
   it("checkDuplicates() POSTs to the right endpoint (regression: not /duplicates)", async () => {
     const { repo, calls } = spyClient();
     await repo.checkDuplicates(pathway);

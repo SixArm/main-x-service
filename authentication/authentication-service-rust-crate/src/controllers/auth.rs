@@ -11,6 +11,8 @@
 //! JWKS at `/.well-known/jwks.json`. In development the magic link is
 //! written to the tracing log (no SMTP required).
 
+use axum::http::StatusCode;
+use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -18,8 +20,21 @@ use crate::{
     auth::AuthUser,
     mailers::auth::AuthMailer,
     models::{sessions, users},
+    rate_limit,
     views::auth::{CurrentResponse, LoginResponse},
 };
+
+/// Map an exceeded magic-link issuance quota to an HTTP `429`. Returning
+/// this *before* any account lookup or token issuance keeps abuse cheap to
+/// reject and preserves the always-`200` anti-enumeration shape on the
+/// success path (the `429` is keyed on request volume, not account
+/// existence).
+fn rate_limited() -> Error {
+    Error::CustomError(
+        StatusCode::TOO_MANY_REQUESTS,
+        ErrorDetail::new("rate_limited", "too many requests; try again later"),
+    )
+}
 
 /// Request body for `POST /api/auth/signup`.
 #[derive(Debug, Deserialize, Serialize)]
@@ -69,6 +84,12 @@ async fn deliver_magic_link(ctx: &AppContext, user: &users::Model) {
 /// still receives a fresh link and the response is always 200.
 #[debug_handler]
 async fn signup(State(ctx): State<AppContext>, Json(params): Json<SignupParams>) -> Result<Response> {
+    // Throttle per email before any work, so abuse cannot email-bomb a
+    // victim or probe for accounts. Over the limit → 429, no token issued.
+    if rate_limit::check(&params.email).is_err() {
+        return Err(rate_limited());
+    }
+
     let name = params
         .name
         .clone()
@@ -101,6 +122,11 @@ async fn request_magic_link(
     State(ctx): State<AppContext>,
     Json(params): Json<MagicLinkParams>,
 ) -> Result<Response> {
+    // Throttle per email before any lookup (see `signup`).
+    if rate_limit::check(&params.email).is_err() {
+        return Err(rate_limited());
+    }
+
     let Ok(user) = users::Model::find_by_email(&ctx.db, &params.email).await else {
         tracing::debug!(email = %params.email, "magic link requested for unknown email");
         return format::empty_json();

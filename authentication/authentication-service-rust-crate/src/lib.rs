@@ -29,6 +29,10 @@ pub mod mailers;
 pub mod migration;
 /// Domain models and generated `SeaORM` entities.
 pub mod models;
+/// Hand-written `OpenAPI` 3 document for the auth API.
+pub mod openapi;
+/// In-memory per-email rate limiter for magic-link issuance.
+pub mod rate_limit;
 /// Loco CLI tasks.
 pub mod tasks;
 /// HTTP response view types.

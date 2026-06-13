@@ -38,6 +38,15 @@ specifications, …) tailored to library-style work.
 | [care-pathway-matcher](../../care-pathway/care-pathway-matcher-rust-crate) | Care pathway | Clinical care-pathway matching — name (Jaro-Winkler), target condition codes (ICD/SNOMED Jaccard), provider-scoped pathway code, care setting, interventions / keywords Jaccard; deterministic short-circuits on DOI / Wikidata / guideline-id / URI / UUID, same-provider pathway code, sameAs URL |
 | [case-matcher](../../case/case-matcher-rust-crate) | Case | Governmental case matching — title (Jaro-Winkler + Soundex), subjects / keywords Jaccard, agency-scoped case number, case type / status; deterministic short-circuits on Docket / external-case-id / URI / UUID, same-agency case number, sameAs URL |
 
+### Library crates
+
+Peer-side support libraries — not services, not matchers. Dependency-light
+and published to crates.io for downstream consumers.
+
+| Crate | Entity | Purpose |
+|-------|--------|---------|
+| [authentication-verifier](../../authentication/authentication-verifier-rust-crate) | User | Peer-side **offline RS256 JWT verification** for the [authentication-service](../../authentication/authentication-service-rust-crate). Fetches/holds the service's JWKS (`Verifier::from_jwks_value` / `from_jwks_url` behind the `fetch` feature), mirrors the `Claims` shape, and verifies `kid` / `iss` / `aud` / `exp` with no shared secret and no introspection hop. Published to crates.io as `authentication-verifier` (0.1); embedded by the sibling services' `src/auth.rs`. |
+
 ### Front-end projects
 
 Operator-facing web UIs — one independent SvelteKit SPA per entity,

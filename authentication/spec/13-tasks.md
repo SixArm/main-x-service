@@ -17,17 +17,20 @@ confirms it. Split larger tasks (`T-5a`, `T-5b`).
   - **Acceptance met:** `cargo package --list --allow-dirty` succeeds
     in `authentication-verifier-rust-crate` and lists `README.md` and
     `CHANGELOG.md`.
-- [ ] **T-2 — Register the verifier in the family indexes.**
-  - [ ] Add `authentication-verifier-rust-crate` to the root
-    `AGENTS.md` subproject tables and `agents/share/overview.md`
-    (today neither mentions it). *(Root docs are outside this
-    entity's write scope — pending a root-level pass.)*
+- [x] **T-2 — Register the verifier in the family indexes.** *(2026-06-13)*
+  - [x] Add `authentication-verifier-rust-crate` to the root
+    `AGENTS.md` subproject tables and `agents/share/overview.md`. Both
+    now carry a new **Library crates** section listing the verifier as
+    a peer-side offline RS256 JWT-verification library published to
+    crates.io as `authentication-verifier` (0.1).
   - [x] Tick the service spec §13 item "a reusable verifier
     crate/snippet for peer services" — the crate now exists.
     *(2026-06-13: ticked with a pointer; service README/AGENTS also
     point peers at the verifier.)*
-  - **Acceptance:** root docs list the crate; service spec §13 is
-    consistent with reality (second half met).
+  - **Acceptance met:** root `AGENTS.md` + `agents/share/overview.md`
+    list the crate (Library crates section); the verifier's own
+    `index.md`/`README.md` cross-reference the service; service spec
+    §13 is consistent with reality.
 - [x] **T-3 — Rework service request tests for the magic-link surface.**
   *(2026-06-13)*
   - [x] Replace the generated password-flow tests in
@@ -54,21 +57,46 @@ confirms it. Split larger tasks (`T-5a`, `T-5b`).
   - [ ] Verifier: document (or implement) refetch-on-`UnknownKid`.
   - **Acceptance:** tokens signed with the previous key verify during
     the grace window; after it, they are rejected.
-- [ ] **T-6 — Rate limiting / abuse resistance for magic-link issuance.**
-  - [ ] Per-email and per-IP issuance limits; backoff on repeated
-    requests.
-  - **Acceptance:** integration test shows the N+1th request inside
-    the window is throttled while the always-`200` anti-enumeration
-    shape is preserved.
+- [x] **T-6 — Rate limiting / abuse resistance for magic-link issuance.**
+  *(2026-06-13)*
+  - [x] Per-email issuance limit with a monotonic-clock sliding window
+    (`src/rate_limit.rs`): at most `MAX_REQUESTS` = 5 issuance requests
+    per `WINDOW` = 5 minutes, keyed by a normalised (trimmed,
+    lowercased) email. `Instant`-based (no wall-clock / env coupling);
+    a `check_at(key, now)` core makes it deterministically testable and
+    a `reset()` helper clears the process-wide store between tests.
+  - [x] Wired into `POST /api/auth/signup` + `POST /api/auth/magic-link`
+    *before* any account lookup or token issuance: over the limit
+    returns `429` (`Error::CustomError(TOO_MANY_REQUESTS,
+    ErrorDetail::new("rate_limited", …))`) with no mail sent; the
+    success path keeps the always-`200` anti-enumeration shape because
+    the `429` is keyed on request volume, not account existence.
+  - **Acceptance met:** un-gated unit tests (8) prove allow-up-to-N /
+    reject-N+1 / window-reset / sliding-window / per-key isolation /
+    normalised-key sharing / non-consuming rejection; a DB-gated request
+    test (`magic_link_issuance_is_rate_limited`) asserts the
+    `(MAX_REQUESTS+1)`th magic-link POST for one email returns `429`
+    after `MAX_REQUESTS` `200`s. Documented in service spec §6/§7.
 - [ ] **T-7 — Localise user-facing emails and UI.**
   - [ ] Mailer templates (`magic_link`, `welcome`) and front-end
     strings per [`agents/share/locales.md`](../../agents/share/locales.md).
   - **Acceptance:** a locale switch produces a translated magic-link
     email and UI.
-- [ ] **T-8 — OpenAPI documentation for the service API.**
-  - [ ] Document FR-1…FR-8 endpoints (sibling services ship Swagger).
-  - **Acceptance:** an OpenAPI 3.0 document describing all six
-    endpoints is served or committed.
+- [x] **T-8 — OpenAPI documentation for the service API.** *(2026-06-13)*
+  - [x] Hand-written OpenAPI 3.0.3 document (`src/openapi.rs`, no
+    `utoipa`, mirroring the care-pathway/case pattern) served by a docs
+    controller (`src/controllers/docs.rs`) at
+    `GET /api-docs/openapi.json` + `GET /swagger-ui` (CDN assets),
+    registered in `app.rs`. Documents all six endpoints (signup,
+    magic-link request, magic-link redeem, me, signout, JWKS) with the
+    `SignupParams` / `MagicLinkParams` / `LoginResponse` /
+    `CurrentResponse` / `Claims` / `Jwks` / `Jwk` schemas, the `429`
+    rate-limit responses, and a bearer `securityScheme` applied to `me`
+    + `signout`.
+  - **Acceptance met:** the OpenAPI document is served at
+    `/api-docs/openapi.json`; un-gated `spec()` unit tests (5) assert it
+    is well-formed, documents every endpoint, carries the bearer scheme,
+    and exposes the core schemas. Documented in service spec §9.
 - [ ] **T-9 — GDPR subject-rights workflow for accounts.**
   - [ ] Export (Art. 15) and erasure (Art. 17) paths for `users` +
     `sessions`.

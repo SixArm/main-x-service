@@ -44,6 +44,15 @@ the corresponding service crate's matching layer.
 | [Care Pathway Matcher](care-pathway/care-pathway-matcher-rust-crate/) | Care pathway (clinical pathway) | [spec](care-pathway/care-pathway-matcher-rust-crate/spec/index.md) | [index](care-pathway/care-pathway-matcher-rust-crate/index.md) |
 | [Case Matcher](case/case-matcher-rust-crate/) | Case (governmental case) — title (Jaro-Winkler), subjects/keywords Jaccard, agency-scoped case number, type/status; deterministic short-circuits on Docket / external case id / URI / UUID, same-agency case number, sameAs URL | [spec](case/case-matcher-rust-crate/spec/index.md) | [index](case/case-matcher-rust-crate/index.md) |
 
+### Library crates
+
+Peer-side support libraries (not services, not matchers). Dependency-light
+and published to crates.io for downstream consumers.
+
+| Crate | Entity | Spec | Index |
+|---|---|---|---|
+| [Authentication Verifier](authentication/authentication-verifier-rust-crate/) | User — peer-side **offline RS256 JWT verification** for the [Authentication Service](authentication/authentication-service-rust-crate/); fetches/holds the service's JWKS, mirrors the `Claims` shape, verifies `kid`/`iss`/`aud`/`exp`. Published to crates.io as `authentication-verifier` (0.1). | [spec](authentication/authentication-verifier-rust-crate/spec/index.md) | [index](authentication/authentication-verifier-rust-crate/index.md) |
+
 ### Front-end projects
 
 SvelteKit front-ends sit alongside their service crates. Each is an

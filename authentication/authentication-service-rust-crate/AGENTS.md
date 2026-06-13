@@ -48,9 +48,15 @@ template (see root `AGENTS.md`).
 | GET | `/api/auth/me` | Bearer | Current user. |
 | POST | `/api/auth/signout` | Bearer | Revoke the current session. |
 | GET | `/.well-known/jwks.json` | — | Public keys for offline token verification. |
+| GET | `/api-docs/openapi.json` | — | Hand-written OpenAPI 3 document. |
+| GET | `/swagger-ui` | — | Swagger UI page (CDN assets) rendering the doc. |
 
 To avoid account enumeration, `signup` and `magic-link` always return
-`200` regardless of whether the email exists.
+`200` regardless of whether the email exists. They are also
+**rate-limited per email** (`src/rate_limit.rs`: `MAX_REQUESTS` = 5 per
+`WINDOW` = 5 min, monotonic-clock sliding window); over the cap they
+return `429` and issue no token / send no mail, without leaking account
+existence.
 
 ---
 
@@ -85,8 +91,11 @@ src/
 ├── bin/main.rs            loco CLI entrypoint
 ├── auth/mod.rs            RS256 signing + verification + JWKS + bearer extractor
 ├── controllers/
-│   ├── auth.rs            signup / magic-link / verify / me / signout
+│   ├── auth.rs            signup / magic-link / verify / me / signout (issuance rate-limited)
+│   ├── docs.rs            /api-docs/openapi.json + /swagger-ui
 │   └── jwks.rs            /.well-known/jwks.json
+├── openapi.rs            hand-written OpenAPI 3 document
+├── rate_limit.rs         per-email sliding-window magic-link issuance limiter
 ├── models/
 │   ├── users.rs           magic-link user model (+ create_passwordless)
 │   ├── sessions.rs        session issue/revoke (jid = jwt jti)

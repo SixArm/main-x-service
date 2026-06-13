@@ -27,6 +27,13 @@ async function stubApi(page: Page) {
     const method = req.method();
     const path = url.pathname;
 
+    if (path === "/api/care-pathways/search" && method === "GET") {
+      const q = (url.searchParams.get("q") ?? "").toLowerCase();
+      const hit = PATHWAY.name.toLowerCase().includes(q);
+      return route.fulfill({
+        json: hit ? [{ pid: PID, name: PATHWAY.name }] : [],
+      });
+    }
     if (path === "/api/care-pathways" && method === "GET") {
       return route.fulfill({ json: [{ pid: PID, name: PATHWAY.name }] });
     }
@@ -59,6 +66,25 @@ test("list page renders the seeded pathway", async ({ page }) => {
     page.getByRole("heading", { name: "Care pathways" }),
   ).toBeVisible();
   await expect(page.getByText("Acute Stroke Care Pathway")).toBeVisible();
+});
+
+test("search box filters the list via the search endpoint", async ({
+  page,
+}) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+  const box = page.getByRole("searchbox", {
+    name: "Search care pathways by name",
+  });
+
+  // A matching query keeps the seeded pathway.
+  await box.fill("stroke");
+  await page.getByRole("button", { name: "Search" }).click();
+  await expect(page.getByText("Acute Stroke Care Pathway")).toBeVisible();
+
+  // A non-matching query yields the empty-result message.
+  await box.fill("nomatch");
+  await page.getByRole("button", { name: "Search" }).click();
+  await expect(page.getByText(/No care pathways match/)).toBeVisible();
 });
 
 test("new page shows the create form", async ({ page }) => {

@@ -72,6 +72,20 @@ organization/tenant modelling, account self-service beyond sign-in.
 Magic links expire after 5 minutes (`MAGIC_LINK_EXPIRATION_MIN`) and are
 single-use (cleared on consumption).
 
+7. **Rate-limited issuance.** The two issuance endpoints (signup,
+   magic-link) are throttled per normalised (trimmed, lowercased) email:
+   at most `MAX_REQUESTS` (5) requests per `WINDOW` (5 minutes). Over the
+   limit the endpoint returns `429 Too Many Requests`
+   (`{"error":"rate_limited",…}`) and issues no token / sends no mail.
+   The limiter keys on request *volume*, not account existence, so the
+   always-`200` anti-enumeration shape of the success path is preserved.
+   The window is measured with a monotonic `Instant` clock (no wall-clock
+   / env coupling); `src/rate_limit.rs` is pure and unit-testable via a
+   clock-injecting `check_at(key, now)` and a `reset()` test helper.
+
+8. `GET /api-docs/openapi.json` + `GET /swagger-ui` — the hand-written
+   OpenAPI 3 document and a Swagger UI page.
+
 ## 7. Non-functional requirements
 
 - **RS256, not HS256.** No shared secret; peer services verify offline.
@@ -80,6 +94,11 @@ single-use (cleared on consumption).
 - **No SMTP in dev**: links are logged to the tracing console.
 - **Deterministic keys**: a stable committed dev keypair so the JWKS is
   stable across restarts in development.
+- **Abuse resistance**: per-email sliding-window rate limiting on
+  magic-link issuance (`MAX_REQUESTS` = 5 per `WINDOW` = 5 min) bounds
+  email-bombing and account-probing without breaking anti-enumeration.
+  In-memory, process-wide (single-instance MVP); a shared store
+  (Redis/DB) would be needed for horizontal scaling.
 
 ## 8. Architecture
 
@@ -93,7 +112,20 @@ verification approach.
 ## 9. API surface
 
 See §6. Responses are raw loco JSON (no envelope). Errors use loco's
-standard error responses (`401` unauthorized, `400` bad request).
+standard error responses (`401` unauthorized, `400` bad request, `429`
+too many requests on throttled issuance).
+
+The API is described by a hand-written **OpenAPI 3.0.3** document
+(`src/openapi.rs`; the family authors these by hand rather than via
+`utoipa`). It is served by the docs controller
+(`src/controllers/docs.rs`) at `GET /api-docs/openapi.json`, with a
+Swagger UI page at `GET /swagger-ui` (CDN assets). The document covers
+all six endpoints plus the `SignupParams` / `MagicLinkParams` /
+`LoginResponse` / `CurrentResponse` / `Claims` / `Jwks` / `Jwk` schemas,
+the `429` rate-limit responses, and a bearer `securityScheme` applied to
+the `me` + `signout` endpoints. Un-gated `spec()` unit tests pin its
+well-formedness, the documented paths, the bearer scheme, and the
+schemas.
 
 ## 10. Persistence
 
@@ -111,6 +143,16 @@ on in development, off in production.
   Postgres instance (standard loco) and are `#[ignore]`d so plain
   `cargo test` stays green; run them with `cargo test -- --ignored`.
   DB-free route-table and params-contract assertions always run.
+- **Rate-limit unit tests (DB-free):** `src/rate_limit.rs` — allow up to
+  `MAX_REQUESTS`, reject the next, window reset, sliding-window single-slot
+  release, per-key isolation, normalised-key sharing, non-consuming
+  rejection (clock injected via `check_at`, serialised over the shared
+  store). The DB-gated `magic_link_issuance_is_rate_limited` request test
+  asserts the `(MAX_REQUESTS+1)`th magic-link POST returns `429`.
+- **OpenAPI unit tests (DB-free):** `src/openapi.rs` `spec()` — well-formed,
+  documents every endpoint, the bearer scheme is present + applied, core
+  schemas exist. The docs route table is asserted in
+  `tests/requests/auth.rs`.
 - **Cross-crate contract test (DB-free):** `tests/sign_verify_contract.rs`
   pins the convention shared with
   [`authentication-verifier`](../../authentication-verifier-rust-crate/index.md):
@@ -150,6 +192,16 @@ an audit trail of issuance and revocation.
       carries the same three lints with `deny(missing_docs)` satisfied
       across the whole crate (generated `_entities` are `allow`ed at the
       module). Clippy is warning-free. *(2026-06-13)*
+- [x] Rate-limit magic-link issuance (`src/rate_limit.rs`): per-email
+      sliding window (`MAX_REQUESTS` = 5 / `WINDOW` = 5 min), monotonic
+      `Instant` clock, wired into signup + magic-link → `429` over the
+      cap with the always-`200` anti-enumeration shape preserved.
+      Un-gated unit tests + a DB-gated request test. *(2026-06-13;
+      entity spec T-6.)*
+- [x] OpenAPI 3 + Swagger UI: hand-written `src/openapi.rs` served by
+      `src/controllers/docs.rs` at `/api-docs/openapi.json` +
+      `/swagger-ui`; documents all six endpoints + schemas + bearer
+      scheme; un-gated `spec()` tests. *(2026-06-13; entity spec T-8.)*
 - [ ] Key rotation: support multiple JWKS entries (`kid` already
       stamped) and a grace window.
 - [ ] Optional Mailpit docker-compose service for realistic dev email.
@@ -161,7 +213,8 @@ JWKS endpoint; sessions + signout; console magic links; Postgres queue;
 green `cargo build`, clippy clean, DB-free unit tests passing;
 magic-link request tests (Postgres-gated); peer-service verifier crate
 (`../authentication-verifier-rust-crate/`) with a DB-free cross-crate
-contract test.
+contract test; per-email rate limiting on magic-link issuance (`429`);
+hand-written OpenAPI 3 + Swagger UI.
 
 ## 15. Roadmap
 

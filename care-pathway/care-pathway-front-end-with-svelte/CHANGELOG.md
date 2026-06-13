@@ -11,6 +11,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **List search box.** The list page (`/`) gains a name-search box
+  (search-on-submit + **Clear**). A non-blank query calls
+  `GET /api/care-pathways/search?q=` (URL-encoded) via a new
+  `CarePathwayRepository.search(q)`; an empty query or **Clear**
+  restores the full `list()`. Loading and empty-result states handled.
+  vitest adds 2 unit tests (path + URL-encoding); Playwright adds 1
+  smoke test (matching keeps the row, non-matching shows the empty
+  message). Closes the spec §13 "search box" task.
 - **Test suites (T-5).** vitest unit tests (`tests/unit/`, 16) for the
   `ApiClient` and `CarePathwayRepository` — verb/path/body/bearer-token,
   error classification, and a regression pinning the `check-duplicates`

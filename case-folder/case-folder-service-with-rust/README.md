@@ -131,6 +131,21 @@ back to placeholder UUIDs so the rest of the demo still works.
 | GET    | `/api/workers?q=`                 | List/search workers                                      |
 | GET    | `/api/moves?q=`                   | Global move audit log (free-text filter)                 |
 | POST   | `/api/moves`                      | Record a move (writes Event Service + Thing Service)     |
+| GET    | `/api/moves/{id}`                 | Show a single move                                       |
+| GET    | `/api/volumes?q=`                 | List volumes (movable bundles of a patient's folders)    |
+| POST   | `/api/volumes`                    | Create a volume for a patient                            |
+| GET    | `/api/volumes/{id}`               | Show a volume + its member folders                       |
+| PATCH  | `/api/volumes/{id}`               | Rename a volume                                          |
+| POST   | `/api/volumes/{id}/folders`       | Assign a folder to the volume                            |
+| DELETE | `/api/volumes/{id}/folders/{fid}` | Remove a folder from the volume                          |
+| POST   | `/api/volumes/{id}/move`          | Move the whole volume (relocates every member folder)    |
+| GET    | `/api/alerts`                     | Cross-building/geofence move alerts                      |
+| GET    | `/api/workers/{id}`               | Show a single worker                                     |
+| GET    | `/api/places/{id}/history`        | Cabinet presence-interval history                        |
+| POST   | `/api/auth/request`               | Request an email magic link                              |
+| POST   | `/api/auth/verify`                | Verify a magic-link token → session cookie               |
+| GET    | `/api/auth/me`                    | Current session identity (always requires a session)     |
+| POST   | `/api/auth/logout`                | Clear the session cookie                                 |
 
 All `POST` endpoints accept `application/json` request bodies and
 return the created resource at `201 Created` with a `Location` header.
@@ -148,7 +163,7 @@ cargo run -- task seed         # populate demo records across all services
 
 # Tests (use stub clients — no real services needed)
 DATABASE_URL=postgres://postgres@localhost:5432/case_folder_test \
-  cargo test                   # 6 unit (nhs) + 29 request tests
+  cargo test                   # 6 unit (nhs) + 49 request tests
 ```
 
 The request tests need a Postgres database (`case_folder_test`
@@ -182,16 +197,22 @@ case-folder-service-with-rust/
     ├── controllers/
     │   ├── mod.rs
     │   ├── healthz.rs              ← GET /healthz
+    │   ├── auth.rs                 ← /api/auth/{request,verify,me,logout}
     │   ├── stats.rs                ← GET /api/stats + latest_move_per_folder helper
     │   ├── folders.rs              ← /api/folders[/{id}[/history]]
-    │   ├── moves.rs                ← /api/moves
+    │   ├── moves.rs                ← /api/moves[/{id}]
+    │   ├── volumes.rs              ← /api/volumes[/{id}[/folders|/move]]
+    │   ├── alerts.rs               ← GET /api/alerts (geofence/cross-building)
     │   ├── patients.rs             ← /api/patients[/{nhs}]
-    │   ├── places.rs               ← /api/places[/{id}]
-    │   └── workers.rs              ← /api/workers
+    │   ├── places.rs               ← /api/places[/{id}[/history]]
+    │   └── workers.rs              ← /api/workers[/{id}]
     ├── responses/
     │   └── mod.rs                  ← serializable wire structs + error helpers
+    ├── auth/                       ← magic-link tokens, session guard, mailer
     ├── initializers/
     │   ├── mod.rs
+    │   ├── auth.rs                 ← loads auth settings + session layer
+    │   ├── bootstrap_stubs.rs      ← USE_UPSTREAM_STUBS=1 in-process stub mode
     │   ├── main_patient_service_client.rs
     │   ├── main_place_service_client.rs
     │   ├── main_worker_service_client.rs

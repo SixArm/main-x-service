@@ -12,6 +12,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Rate-limited magic-link issuance** (`src/rate_limit.rs`): a per-email
+  (normalised: trimmed + lowercased) monotonic-clock sliding-window
+  limiter — at most `MAX_REQUESTS` (5) requests per `WINDOW` (5 min).
+  Wired into `POST /api/auth/signup` + `POST /api/auth/magic-link` before
+  any account lookup; over the cap returns `429 Too Many Requests`
+  (`{"error":"rate_limited",…}`) and issues no token / sends no mail,
+  while keeping the always-`200` anti-enumeration shape. Un-gated unit
+  tests (clock-injectable `check_at`, `reset()` helper) plus a DB-gated
+  request test. *(entity spec T-6)*
+- **OpenAPI 3 + Swagger UI**: hand-written `src/openapi.rs` (OpenAPI
+  3.0.3, no `utoipa`) served by `src/controllers/docs.rs` at
+  `GET /api-docs/openapi.json` + `GET /swagger-ui`. Documents all six
+  endpoints, the request/response + `Claims`/`Jwks` schemas, the `429`
+  rate-limit responses, and a bearer `securityScheme` on `me`/`signout`.
+  Un-gated `spec()` unit tests. *(entity spec T-8)*
 - **Cross-crate sign→verify contract test**
   (`tests/sign_verify_contract.rs`): signs with this crate's `auth`
   module and verifies through the sibling

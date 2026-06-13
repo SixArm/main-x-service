@@ -15,6 +15,13 @@ export class CarePathwayRepository {
         return this.http.get<PathwayRef[]>("/api/care-pathways");
     }
 
+    /// Case-insensitive name search (`ILIKE`, cap 50). `q` is URL-encoded.
+    search(q: string): Promise<PathwayRef[]> {
+        return this.http.get<PathwayRef[]>(
+            `/api/care-pathways/search?q=${encodeURIComponent(q)}`,
+        );
+    }
+
     get(pid: string): Promise<CarePathway> {
         return this.http.get<CarePathway>(`/api/care-pathways/${encodeURIComponent(pid)}`);
     }

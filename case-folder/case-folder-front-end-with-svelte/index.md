@@ -15,6 +15,8 @@ tracks paper case-note folders across NHS hospital cabinets.
 - **[AGENTS.md](AGENTS.md)** — working agreements for collaborators
   (human and AI): repo orientation, working rules, how-to-add-an-endpoint
   recipe, CI gate.
+- **[CHANGELOG.md](CHANGELOG.md)** — notable changes, Keep a Changelog
+  format.
 
 ## By role
 

@@ -258,6 +258,44 @@ async fn jwks_endpoint_publishes_the_signing_key() {
     .await;
 }
 
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn magic_link_issuance_is_rate_limited() {
+    use authentication_service::rate_limit;
+
+    request::<App, _, _>(|request, _ctx| async move {
+        // The limiter store is process-wide; start from a clean slate so
+        // the per-email window is deterministic for this email.
+        rate_limit::reset();
+
+        let email = "rate-limit@example.com";
+        let payload = serde_json::json!({ "email": email });
+
+        // The first MAX_REQUESTS are accepted with the always-200
+        // anti-enumeration shape, even though the email is unknown.
+        for i in 0..rate_limit::MAX_REQUESTS {
+            let response = request.post("/api/auth/magic-link").json(&payload).await;
+            assert_eq!(
+                response.status_code(),
+                200,
+                "request {i} (within the quota) must stay 200"
+            );
+        }
+
+        // The N+1th request inside the window is throttled with 429.
+        let throttled = request.post("/api/auth/magic-link").json(&payload).await;
+        assert_eq!(
+            throttled.status_code(),
+            429,
+            "the (MAX_REQUESTS+1)th request must be rate-limited"
+        );
+
+        rate_limit::reset();
+    })
+    .await;
+}
+
 // ---------------------------------------------------------------------------
 // DB-free contract assertions (always run).
 // ---------------------------------------------------------------------------
@@ -274,6 +312,18 @@ fn route_table_covers_the_magic_link_surface() {
     let jwks = authentication_service::controllers::jwks::routes();
     assert_eq!(jwks.prefix.as_deref(), Some("/.well-known"));
     assert!(jwks.handlers.iter().any(|h| h.uri == "/jwks.json"));
+}
+
+#[test]
+fn route_table_covers_the_api_docs_surface() {
+    let docs = authentication_service::controllers::docs::routes();
+    let uris: Vec<&str> = docs.handlers.iter().map(|h| h.uri.as_str()).collect();
+    for expected in ["/api-docs/openapi.json", "/swagger-ui"] {
+        assert!(
+            uris.contains(&expected),
+            "missing docs route {expected}; have {uris:?}"
+        );
+    }
 }
 
 #[test]
