@@ -32,6 +32,13 @@ Base URL in development: `http://localhost:5150`.
 | POST | `/api/care-pathways/match` | `{query, candidates}` | ranked `[(index, MatchResult)]` |
 | POST | `/api/care-pathways/check-duplicates` | `CarePathway` | `[{pid, name, score, confidence, is_match}]`, score-descending |
 
+### API documentation
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/api-docs/openapi.json` | hand-written OpenAPI 3 document |
+| GET | `/swagger-ui` | Swagger UI page (CDN assets) rendering the spec |
+
 ## HTTP status codes
 
 | Code | Meaning |

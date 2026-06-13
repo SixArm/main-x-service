@@ -15,6 +15,8 @@ Aspirational items live in §15, not here.
 | service | loco.rs chassis | loco 0.16, Axum 0.8, SeaORM 1.1; `cargo loco start`; config yamls; port 5150 |
 | service | Persistence | `care_pathways` table (pid, name, JSONB `data`, active, `deleted_at`); migration; auto-migrate in dev |
 | service | CRUD | Create / list (cap 100) / read / replace / soft-delete; `404` unknown pid; blank-name rejection (`422`, create + update) |
+| service | Validation | `condition_codes` format-checked per `system` — ICD-10, ICD-11, SNOMED CT (SCTID Verhoeff); all problems reported in one `422` (`src/validation.rs`) |
+| service | API docs | OpenAPI 3 (`src/openapi.rs`, hand-written) + Swagger UI at `/api-docs/openapi.json` · `/swagger-ui` (`controllers/docs.rs`) |
 | service | Matching endpoints | `/match` (rank explicit candidates), `/check-duplicates` (scan ≤ 1 000 stored rows, ranked hits) |
 | service | Tests | DB-free `tests/matching.rs` (matcher embedding + JSON round-trip) + controller validation unit tests (422 pin); request-level loco tests `tests/requests/care_pathways.rs` (`#[ignore]`-gated on Postgres); green build + clippy |
 | front-end | Routes | `/`, `/new`, `/[pid]` (detail + delete + check-duplicates), `/[pid]/edit` |
@@ -35,6 +37,6 @@ Open gaps drive tasks in §13. Live gap list:
 | No full-text search; `check-duplicates` full scan capped at 1 000 rows | T-6 |
 | No authentication on `/api/*` | T-7 |
 | No merge workflow | T-8 |
-| No OpenAPI/Swagger; no ICD/SNOMED format validation | T-9 |
+| No terminology-server check that codes exist in a published release (formats are validated; existence is not) | T-9 follow-up |
 | No privacy controls (none required while no restricted fields exist — §12.3) | (re-assess; no task) |
 | No localization of the operator UI | (roadmap §15; no task yet) |

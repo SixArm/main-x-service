@@ -53,6 +53,8 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    candidates}` set (no persistence).
 7. `POST /api/care-pathways/check-duplicates` — match a query against
    stored pathways; return those above threshold, ranked.
+8. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3
+   document and a Swagger UI page rendering it.
 
 ## 7. Non-functional requirements
 
@@ -102,7 +104,10 @@ access controls added later.
 - [ ] Event streaming + audit log on CRUD.
 - [ ] Privacy controls if any restricted fields appear.
 - [ ] Record merge with link tracking.
-- [ ] OpenAPI/Swagger via utoipa.
+- [x] OpenAPI/Swagger — hand-written `src/openapi.rs` (matcher DTO is
+  dependency-light, so no utoipa, matching the organization service)
+  served at `/api-docs/openapi.json` + `/swagger-ui` by
+  `controllers/docs.rs`.
 - [x] Richer validation (ICD/SNOMED code formats) — `src/validation.rs`
   format-checks `condition_codes` per `system` (ICD-10, ICD-11, SNOMED
   CT SCTID Verhoeff); `422` with all problems. Terminology-server
@@ -117,8 +122,9 @@ access controls added later.
 Done: loco boot; care_pathways table + migration; CRUD with `422`
 validation on create/update (blank `name` + ICD-10 / ICD-11 / SNOMED CT
 `condition_codes` format checks, all problems reported together);
-`/match` and `/check-duplicates` embedding care-pathway-matcher; DB-free
-tests + gated request-level tests; green build + clippy.
+`/match` and `/check-duplicates` embedding care-pathway-matcher;
+OpenAPI 3 doc + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`);
+DB-free tests + gated request-level tests; green build + clippy.
 
 ## 15. Roadmap
 

@@ -79,8 +79,17 @@ manual check confirms it. Split tasks too big for one PR
     `Merged` event; front-end merge action from the duplicates list.
   - **Acceptance:** integration test merges two stored pathways and
     verifies survivor contents + soft-deleted duplicate.
-- [ ] **T-9 — OpenAPI / Swagger + richer validation.** (partly done)
-  - [ ] utoipa schema + Swagger UI.
+- [x] **T-9 — OpenAPI / Swagger + richer validation.**
+  - [x] OpenAPI 3 schema + Swagger UI. **Done (2026-06-13):**
+    hand-written `src/openapi.rs` (the matcher's `CarePathway` shape is
+    the API DTO and is dependency-light, so the schema is authored by
+    hand rather than utoipa-derived — same approach as the
+    organization service) served by `src/controllers/docs.rs` at
+    `GET /api-docs/openapi.json` + `GET /swagger-ui`, registered in
+    `app.rs`. Pinned un-gated by `openapi::spec` unit tests
+    (`spec_is_wellformed`, `spec_documents_all_seven_endpoints`) and
+    (DB-gated) by request tests `openapi_json_is_served` /
+    `swagger_ui_is_served`.
   - [x] ICD-10 / ICD-11 / SNOMED CT code-format validation on
     `condition_codes` (`422` on failure). **Done (2026-06-13):**
     `src/validation.rs` format-checks each `condition_codes` entry

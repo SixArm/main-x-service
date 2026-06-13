@@ -14,6 +14,8 @@ Endpoint detail: [`AGENTS/restful.md`](../AGENTS/restful.md); source:
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete | empty JSON |
 | POST | `/api/care-pathways/match` | Rank `{query, candidates}` (no persistence) | `[(index, MatchResult)]` |
 | POST | `/api/care-pathways/check-duplicates` | Match a query against stored pathways | `[{pid, name, score, confidence, is_match}]` sorted by score |
+| GET | `/api-docs/openapi.json` | OpenAPI 3 document for the API | `OpenAPI` JSON |
+| GET | `/swagger-ui` | Swagger UI rendering the spec (CDN assets) | HTML |
 
 Plus loco's built-in `/_health` and `/_ping`.
 

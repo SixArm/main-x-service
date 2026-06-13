@@ -37,5 +37,6 @@ and accept. Ordered roughly by intent.
   replication, JSONB GIN / side-table indexing for condition codes
   (OQ-3), OTLP observability pipeline, Prometheus metrics, backup /
   DR runbooks, container hardening.
-- **OpenAPI + gRPC.** utoipa/Swagger for the REST surface (T-9);
-  Tonic stub once a high-throughput consumer exists.
+- **gRPC.** Tonic stub once a high-throughput consumer exists. (The
+  OpenAPI 3 doc + Swagger UI for the REST surface shipped under T-9 —
+  hand-written `src/openapi.rs`, not utoipa-derived.)

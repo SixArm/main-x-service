@@ -223,3 +223,29 @@ async fn can_check_duplicates_against_stored_pathways() {
     })
     .await;
 }
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn openapi_json_is_served() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let response = request.get("/api-docs/openapi.json").await;
+        assert_eq!(response.status_code(), 200, "openapi.json should be served");
+        let body: Value = response.json();
+        assert_eq!(body["openapi"], "3.0.3");
+        assert!(body["paths"]["/api/care-pathways"]["post"].is_object());
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn swagger_ui_is_served() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let response = request.get("/swagger-ui").await;
+        assert_eq!(response.status_code(), 200, "swagger-ui should be served");
+        assert!(response.text().contains("/api-docs/openapi.json"));
+    })
+    .await;
+}

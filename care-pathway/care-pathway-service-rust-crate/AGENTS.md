@@ -31,15 +31,17 @@ adapter to drift.
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete |
 | POST | `/api/care-pathways/match` | Rank a `{query, candidates}` set |
 | POST | `/api/care-pathways/check-duplicates` | Match a query against stored pathways |
+| GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 
 Plus loco's default `/_health`, `/_ping`.
 
 ## MVP scope
 
 CRUD + matching, with `condition_codes` format validation (ICD-10 /
-ICD-11 / SNOMED CT SCTID Verhoeff; `src/validation.rs`). Deferred
-(spec §13): Tantivy search, streaming, audit, privacy, OpenAPI,
-terminology-server code-existence checks.
+ICD-11 / SNOMED CT SCTID Verhoeff; `src/validation.rs`) and OpenAPI 3 +
+Swagger UI (`src/openapi.rs`, `controllers/docs.rs`). Deferred
+(spec §13): Tantivy search, streaming, audit, privacy, record merge,
+JWT, terminology-server code-existence checks.
 
 ## Golden rules
 
@@ -57,6 +59,8 @@ src/
 ├── app.rs                 loco Hooks (routes, truncate)
 ├── bin/main.rs            loco CLI entrypoint
 ├── controllers/care_pathways.rs   CRUD + match + check-duplicates
+├── controllers/docs.rs    OpenAPI JSON + Swagger UI
+├── openapi.rs             hand-written OpenAPI 3 document
 ├── validation.rs          name + condition-code (ICD/SNOMED) checks → 422
 ├── models/
 │   ├── care_pathways.rs   CRUD helpers over the stored payload
