@@ -32,6 +32,20 @@ pnpm dev                 # http://localhost:5173
 | Var | Default | Purpose |
 |---|---|---|
 | `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Case service REST base URL. |
+| `VITE_AUTH_FRONTEND_URL` | `http://localhost:5173` | Central authentication front-end (SSO sign-in) base URL. "Sign in" redirects to `${VITE_AUTH_FRONTEND_URL}/signin?return_to=…`; the auth front-end hands the access token back via the URL fragment. |
+
+## Sign in (SSO)
+
+The operator clicks **Sign in** in the sidebar and is sent to the central
+authentication front-end (`VITE_AUTH_FRONTEND_URL`). After the
+passwordless magic-link, the auth front-end redirects back to this app
+with the access token in the URL fragment
+(`…#access_token=<jwt>`); the app captures it on load, stores it under the
+family-shared `localStorage["mxi_access_token"]`, and strips the fragment
+from the address bar. The `ApiClient` then attaches it as
+`Authorization: Bearer <token>` on every request. A manual token-paste
+field is kept for development. See
+[`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md).
 
 ## How it works
 

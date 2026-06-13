@@ -1,22 +1,36 @@
 <script lang="ts">
     import "../app.css";
+    import { onMount } from "svelte";
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
-    import { token, setToken, clearToken } from "$lib/auth.svelte";
+    import { token, setToken, clearToken, captureFromLocation } from "$lib/auth.svelte";
+    import { signInUrl } from "$lib/config";
 
     let { children }: { children: Snippet } = $props();
+
+    // Capture a returning SSO handoff (`…#access_token=<jwt>`) before any
+    // route makes an API call, then strip the fragment. See
+    // `agents/share/jwt-enforcement.md`.
+    onMount(() => {
+        captureFromLocation();
+    });
 
     const navItems = [
         { href: "/", label: "Care pathways" },
         { href: "/new", label: "New care pathway" },
     ];
 
-    // Minimal session affordance: paste/clear the access token. The token
-    // is obtained out-of-band from the central authentication-service
-    // (passwordless magic-link); full redirect wiring is a follow-up. It
-    // is attached as `Authorization: Bearer <token>` to every API request
-    // (see `$lib/auth.svelte` + `$lib/api/client`).
+    // Session affordance. Primary path: "Sign in" redirects to the
+    // central authentication front-end, which hands the access token back
+    // via the URL fragment (captured above). The manual paste field is
+    // kept as a dev convenience. The stored token is attached as
+    // `Authorization: Bearer <token>` to every API request (see
+    // `$lib/auth.svelte` + `$lib/api/client`).
     let draft = $state("");
+
+    function signIn(): void {
+        window.location.href = signInUrl();
+    }
 
     function applyToken(): void {
         const trimmed = draft.trim();
@@ -48,18 +62,22 @@
                 <div class="session-status" data-testid="session-status">Signed in</div>
                 <button type="button" onclick={signOut}>Sign out</button>
             {:else}
-                <input
-                    type="password"
-                    placeholder="Paste access token"
-                    aria-label="Access token"
-                    bind:value={draft}
-                />
-                <button type="button" onclick={applyToken} disabled={draft.trim().length === 0}>
-                    Use token
-                </button>
-                <p class="session-hint">
-                    Token comes from the authentication-service (magic-link sign-in).
-                </p>
+                <button type="button" class="signin" onclick={signIn}>Sign in</button>
+                <details class="paste">
+                    <summary>Paste a token</summary>
+                    <input
+                        type="password"
+                        placeholder="Paste access token"
+                        aria-label="Access token"
+                        bind:value={draft}
+                    />
+                    <button type="button" onclick={applyToken} disabled={draft.trim().length === 0}>
+                        Use token
+                    </button>
+                    <p class="session-hint">
+                        Token comes from the authentication-service (magic-link sign-in).
+                    </p>
+                </details>
             {/if}
         </div>
     </aside>
@@ -131,6 +149,22 @@
     .session button:disabled {
         cursor: not-allowed;
         opacity: 0.6;
+    }
+    .session button.signin {
+        background: var(--mxi-accent, #356);
+        color: #fff;
+        border: none;
+        font-weight: 600;
+    }
+    .session .paste {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+    .session .paste summary {
+        cursor: pointer;
+        font-size: 0.8rem;
+        color: var(--mxi-muted, #666);
     }
     .session-hint {
         margin: 0;

@@ -46,15 +46,27 @@ Caseworkers and case administrators across governmental agencies.
 5. Delete (`DELETE`, soft), redirect to the list.
 6. Check-duplicates posts the current record and lists matches (title,
    score, confidence), excluding the record itself.
-7. Session affordance: the layout sidebar lets an operator paste / clear
-   a bearer **access token**, stored in the shared session store. While a
-   token is set, the API client attaches `Authorization: Bearer <token>`
-   to every request, so operator traffic passes the service's blanket JWT
-   enforcement (`CASE_REQUIRE_AUTH`) once activated. The token is issued
-   out-of-band by the central **authentication-service** (passwordless
-   magic-link); full redirect wiring is a follow-up. The token lives under
-   the family-shared `localStorage` key `mxi_access_token` (see the
-   family contract `agents/share/jwt-enforcement.md`).
+7. Session affordance: the layout sidebar offers a primary **Sign in**
+   link and, once signed in, **Sign out**; a manual token-paste field is
+   kept for development. While a token is set, the API client attaches
+   `Authorization: Bearer <token>` to every request, so operator traffic
+   passes the service's blanket JWT enforcement (`CASE_REQUIRE_AUTH`) once
+   activated. The token lives under the family-shared `localStorage` key
+   `mxi_access_token`.
+8. SSO token handoff (consumer side; see the family contract
+   `agents/share/jwt-enforcement.md`, "Token acquisition handoff"):
+   **Sign in** redirects to the central **authentication-service**
+   front-end at `${AUTH_FRONTEND_URL}/signin?return_to=<this app's
+   absolute URL>` (`AUTH_FRONTEND_URL` from `VITE_AUTH_FRONTEND_URL`,
+   default `http://localhost:5173`; built by `signInUrl()` in
+   `src/lib/config.ts`). After the passwordless magic-link, the auth
+   front-end redirects back with the access token in the URL fragment
+   (`…#access_token=<jwt>`). On load the layout calls
+   `captureFromLocation()` (in `onMount`, before any API call), which
+   reads `window.location.hash`, stores any token, and strips the
+   fragment via `history.replaceState` so the bearer credential never
+   lingers in the address bar / history. The pure parser
+   `captureTokenFromHash(hash)` underlies it.
 
 ## 7. Non-functional requirements
 
@@ -95,7 +107,11 @@ None client-side beyond in-memory route state.
 session-store bearer-token attachment, per-call `null` override,
 error-classification/empty-body), the session store
 (`auth.test.ts`: no-token default, `setToken`/`clearToken` round-trip,
-guarded localStorage write-through under the shared key), and
+guarded localStorage write-through under the shared key, and
+`captureTokenFromHash` — well-formed extract, multi-param, no leading
+`#`, URL-decode, empty/`#`, no-token, garbage → `null`), the sign-in URL
+builder (`config.test.ts`: `signInUrl` encoded `return_to`, base path,
+trailing-slash safety), and
 `CaseRepository` (every method's path + verb, incl. a regression pinning
 `check-duplicates`).
 **Playwright** smoke tests (`tests/e2e/`) load the four routes (`/`,
@@ -115,6 +131,10 @@ access/audit requirements.
   (`tests/unit/`, 16 tests).
 - [x] playwright smoke for the four routes (`tests/e2e/smoke.spec.ts`,
   4 tests, API stubbed, runs against `vite preview`).
+- [x] Cross-origin SSO token handoff (consumer side): capture token from
+  the URL fragment + strip it; `signInUrl` builder + sidebar **Sign in**
+  redirect (`captureTokenFromHash` / `captureFromLocation` /
+  `signInUrl`; `auth.test.ts` + `config.test.ts`).
 - [ ] `Custom(label)` editing for case type / status / schemes.
 - [ ] Search box once the service ships search.
 - [ ] Bearer token wiring once the service enforces auth.

@@ -1,23 +1,35 @@
 <script lang="ts">
     import "../app.css";
+    import { onMount } from "svelte";
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
-    import { auth } from "$lib/auth.svelte";
+    import { auth, captureFromLocation } from "$lib/auth.svelte";
+    import { signInUrl } from "$lib/config";
 
     let { children }: { children: Snippet } = $props();
+
+    // Capture a returning SSO handoff (`…#access_token=<jwt>`) before any
+    // route makes an API call, then strip the fragment. See
+    // `agents/share/jwt-enforcement.md`.
+    onMount(() => {
+        captureFromLocation();
+    });
 
     const navItems = [
         { href: "/", label: "Organizations" },
         { href: "/new", label: "New organization" },
     ];
 
-    // Minimal session affordance. The access token is obtained
-    // out-of-band from the central authentication-service (passwordless
-    // magic-link); paste it here and it is attached to every API request
-    // (see auth.svelte.ts). Full magic-link redirect wiring is a
-    // follow-up; service-side enforcement is off by default.
+    // Session affordance. Primary path: "Sign in" redirects to the
+    // central authentication front-end, which hands the access token
+    // back via the URL fragment (captured above). The manual paste field
+    // is kept as a dev convenience. Service-side enforcement is off by
+    // default.
     let draft = $state("");
 
+    function signIn() {
+        window.location.href = signInUrl();
+    }
     function saveToken() {
         auth.setToken(draft);
         draft = "";
@@ -44,17 +56,21 @@
                 <p class="session-status">Signed in (token attached)</p>
                 <button type="button" onclick={signOut}>Sign out</button>
             {:else}
-                <label class="session-label" for="session-token">Access token</label>
-                <input
-                    id="session-token"
-                    type="password"
-                    placeholder="Paste bearer token"
-                    bind:value={draft}
-                    autocomplete="off"
-                />
-                <button type="button" onclick={saveToken} disabled={draft.trim().length === 0}>
-                    Use token
-                </button>
+                <button type="button" class="signin" onclick={signIn}>Sign in</button>
+                <details class="paste">
+                    <summary>Paste a token</summary>
+                    <label class="session-label" for="session-token">Access token</label>
+                    <input
+                        id="session-token"
+                        type="password"
+                        placeholder="Paste bearer token"
+                        bind:value={draft}
+                        autocomplete="off"
+                    />
+                    <button type="button" onclick={saveToken} disabled={draft.trim().length === 0}>
+                        Use token
+                    </button>
+                </details>
             {/if}
         </section>
     </aside>
@@ -127,5 +143,21 @@
     .session button:disabled {
         cursor: not-allowed;
         opacity: 0.5;
+    }
+    .session button.signin {
+        background: var(--mxi-accent, #356);
+        color: #fff;
+        border: none;
+        font-weight: 600;
+    }
+    .session .paste summary {
+        cursor: pointer;
+        color: var(--mxi-muted, #555);
+        margin-top: 0.2rem;
+    }
+    .session .paste {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
     }
 </style>

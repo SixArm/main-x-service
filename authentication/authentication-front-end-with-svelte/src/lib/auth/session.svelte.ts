@@ -9,6 +9,12 @@ import type { CurrentUser, LoginResponse } from "$lib/api/types";
 const TOKEN_KEY = "mxi.auth.token";
 const USER_KEY = "mxi.auth.user";
 
+/// Shared federation key. The issued access token is mirrored here (in
+/// addition to the `mxi.auth.*` bookkeeping above) so a same-origin
+/// sibling operator SPA can read the bearer credential with no handoff.
+/// This is the key documented in the family JWT-enforcement contract.
+export const FEDERATION_TOKEN_KEY = "mxi_access_token";
+
 function readUser(): CurrentUser | null {
     if (!browser) return null;
     const raw = localStorage.getItem(USER_KEY);
@@ -41,6 +47,7 @@ export const session = {
         if (browser) {
             localStorage.setItem(TOKEN_KEY, token);
             localStorage.setItem(USER_KEY, JSON.stringify(user));
+            localStorage.setItem(FEDERATION_TOKEN_KEY, token);
         }
     },
 
@@ -57,6 +64,7 @@ export const session = {
         if (browser) {
             localStorage.removeItem(TOKEN_KEY);
             localStorage.removeItem(USER_KEY);
+            localStorage.removeItem(FEDERATION_TOKEN_KEY);
         }
     },
 };

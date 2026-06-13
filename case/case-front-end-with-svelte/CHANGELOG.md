@@ -11,6 +11,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Cross-origin SSO token handoff (consumer side)** (family contract
+  [`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md),
+  "Token acquisition handoff").
+  - `src/lib/auth.svelte.ts` gains `captureTokenFromHash(hash)` — a pure
+    parser pulling `access_token` out of a `#…access_token=<jwt>…` URL
+    fragment (with/without leading `#`, URL-decoded, `null` otherwise) —
+    and a browser-only `captureFromLocation()` that reads
+    `window.location.hash`, stores any token, then strips the fragment
+    via `history.replaceState` so the bearer credential never lingers in
+    the address bar / history.
+  - The layout runs `captureFromLocation()` once in `onMount` before any
+    route makes an API call.
+  - `src/lib/config.ts` gains `AUTH_FRONTEND_URL` (from
+    `VITE_AUTH_FRONTEND_URL`, default `http://localhost:5173`) and
+    `signInUrl(origin?, basePath?)`, building
+    `${AUTH_FRONTEND_URL}/signin?return_to=<encoded origin + base>`
+    (trailing slash trimmed; origin / base injectable for tests).
+  - Layout sidebar now shows a primary **Sign in** link (redirects to the
+    auth front-end) when signed out; the manual paste field is demoted to
+    a dev-only `<details>`. **Sign out** unchanged.
+  - Tests: `auth.test.ts` adds the `captureTokenFromHash` cases
+    (well-formed, multi-param, no leading `#`, URL-decode, empty/`#`,
+    no-token, garbage → `null`); new `config.test.ts` covers `signInUrl`
+    (encoded `return_to`, base path, trailing-slash safety). vitest 31
+    green; Playwright smoke suite stays green.
+
 - **Session bearer-token attachment** (family contract
   [`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md)).
   - New reactive session store `src/lib/auth.svelte.ts` (`token` /

@@ -1,8 +1,24 @@
 <script lang="ts">
+    import { onMount } from "svelte";
+    import { page } from "$app/state";
     import { AuthRepository } from "$lib/api/auth";
+    import { RETURN_TO_ALLOWLIST } from "$lib/config";
+    import { parseAllowlist, persistReturnTo } from "$lib/auth/return-to";
     import { i18n, t } from "$lib/i18n.svelte";
 
     const repo = AuthRepository.withFetch();
+
+    // Park an allowlisted `?return_to=` across the magic-link email
+    // round-trip; `/verify` reads it back. The emailed link does not
+    // carry it, so we persist it client-side here. Not allowlisted ⇒
+    // ignored (never persisted, never handed the token later).
+    onMount(() => {
+        persistReturnTo(
+            page.url,
+            parseAllowlist(RETURN_TO_ALLOWLIST),
+            window.location.origin,
+        );
+    });
 
     let email = $state("");
     let submitting = $state(false);

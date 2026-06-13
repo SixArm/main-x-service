@@ -98,6 +98,32 @@ test("verify route consumes the token and lands on the signed-in dashboard", asy
   await expect(page.getByRole("main").getByText(EMAIL)).toBeVisible();
 });
 
+test("verify hands the token to an allowlisted return_to via the URL fragment", async ({
+  page,
+}) => {
+  // Self-origin is always allowed (empty allowlist ⇒ same-origin only),
+  // so we can exercise the cross-origin handoff decision without build
+  // env config: park a same-origin return_to, then verify.
+  await page.addInitScript(() => {
+    sessionStorage.setItem("mxi_return_to", location.origin + "/signin");
+  });
+  await page.goto("/verify?token=magic-123", { waitUntil: "networkidle" });
+  // The page redirects to return_to with the token in the URL fragment.
+  await expect(page).toHaveURL(/\/signin#access_token=test-access-token/);
+});
+
+test("verify ignores a non-allowlisted return_to and never appends the token", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem("mxi_return_to", "https://evil.example.com/grab");
+  });
+  await page.goto("/verify?token=magic-123", { waitUntil: "networkidle" });
+  // Falls through to home; the token is not handed off.
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
+});
+
 test("verify route reports an error when the token is missing", async ({
   page,
 }) => {

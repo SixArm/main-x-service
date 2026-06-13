@@ -50,13 +50,23 @@ Operators curating the organization registry.
    `localStorage["mxi_access_token"]` (the family-shared key; guarded for
    SSR/preview). The `ApiClient` attaches `Authorization: Bearer <token>`
    on every request when the store holds one, and omits it otherwise; a
-   per-request `token` overrides the store. The layout has a minimal
-   session affordance (paste/clear the token, "Sign out"). The token is
-   obtained out-of-band from the central authentication-service
-   (passwordless magic-link → access token); full redirect wiring is a
-   follow-up. Service-side enforcement (`ORGANIZATION_REQUIRE_AUTH`) is
-   off by default, so an absent token keeps current behaviour. See
-   `agents/share/jwt-enforcement.md`.
+   per-request `token` overrides the store. Service-side enforcement
+   (`ORGANIZATION_REQUIRE_AUTH`) is off by default, so an absent token
+   keeps current behaviour. See `agents/share/jwt-enforcement.md`.
+8. **Cross-origin SSO handoff (token acquisition).** When signed out the
+   layout shows a primary **Sign in** action that navigates to
+   `signInUrl()` =
+   `${VITE_AUTH_FRONTEND_URL}/signin?return_to=<encoded origin+base>`
+   (`src/lib/config.ts`). The authentication front-end runs the
+   passwordless magic-link, then (if our origin is on its allowlist)
+   redirects back to `return_to#access_token=<jwt>`. On app load the
+   layout's `onMount` calls `captureFromLocation()` **before any API
+   call**: `captureTokenFromHash(window.location.hash)` pulls the token
+   out of the fragment, `setToken` stores it, and `history.replaceState`
+   strips the fragment from the address bar. The token rides the URL
+   fragment (never the query) so it is not sent to servers / logged. A
+   manual paste field (under a "Paste a token" disclosure) is kept as a
+   dev convenience. Guarded for SSR/preview (no `window`).
 
 ## 7. Non-functional requirements
 
@@ -91,7 +101,11 @@ None client-side beyond in-memory route state.
 (`tests/unit/`) cover the `ApiClient` (verb/body/headers/bearer-token —
 explicit token, store-driven attach, clear, and explicit-`null`
 override / error-classification / empty-body), the `auth` token store
-(`setToken`/`clearToken` round-trip, trim/blank handling), and
+(`setToken`/`clearToken` round-trip, trim/blank handling) and its SSO
+handoff parser `captureTokenFromHash` (extracts the token from a
+well-formed fragment, URL-decodes, returns `null` for
+empty/garbage/no-token/blank), the `signInUrl` builder (encoded
+`return_to` of origin + base, trailing-slash safe), and
 `OrganizationRepository` (every method's path + verb, incl. a regression
 pinning `check-duplicates`).
 **Playwright** smoke tests (`tests/e2e/`) load the four routes (`/`,
@@ -117,8 +131,11 @@ controls when they land.
   (`localStorage["mxi_access_token"]`) + `ApiClient` auto-attach +
   layout session affordance, per `agents/share/jwt-enforcement.md`.
   Service enforcement is off by default.
-- [ ] Magic-link redirect to the authentication front-end (obtain the
-  token in-app rather than paste).
+- [x] Cross-origin SSO handoff — `signInUrl()` redirect to the
+  authentication front-end + `captureFromLocation()` / `captureTokenFromHash`
+  capture the token from `…#access_token=<jwt>` on load and strip the
+  fragment (`VITE_AUTH_FRONTEND_URL`), per
+  `agents/share/jwt-enforcement.md`. Manual paste kept as a dev fallback.
 
 ## 14. Implementation status
 

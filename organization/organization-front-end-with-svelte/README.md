@@ -32,6 +32,7 @@ pnpm dev                 # http://localhost:5173
 | Var | Default | Purpose |
 |---|---|---|
 | `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Organization service REST base URL. |
+| `VITE_AUTH_FRONTEND_URL` | `http://localhost:5173` | Central authentication front-end base URL for the SSO sign-in handoff. |
 
 ## How it works
 
@@ -44,17 +45,22 @@ record and lists stored matches with their scores.
 
 ## Session / authentication
 
-The sidebar has a small **Session** panel. Paste an access token there
-and the client attaches `Authorization: Bearer <token>` to every API
-request; "Sign out" clears it. The token is stored under the
-family-shared `localStorage["mxi_access_token"]` key and obtained
-**out-of-band** from the central
+The sidebar has a small **Session** panel. When signed out it shows a
+**Sign in** button that sends you to the central authentication
+front-end (`${VITE_AUTH_FRONTEND_URL}/signin?return_to=…`). After the
+passwordless magic-link, the auth front-end redirects back with the
+access token in the URL fragment (`…#access_token=<jwt>`); the SPA
+captures it on load, stores it, and strips the fragment from the address
+bar. The client then attaches `Authorization: Bearer <token>` to every
+API request; "Sign out" clears it. A "Paste a token" disclosure remains
+for dev. The token lives under the family-shared
+`localStorage["mxi_access_token"]` key; the auth provider is the central
 [authentication-service](../../authentication/authentication-service-rust-crate)
-(passwordless magic-link → access token) — in-app magic-link redirect is
-a follow-up. The organization service only *requires* a token when it is
-started with `ORGANIZATION_REQUIRE_AUTH` enabled (off by default), so the
-SPA works without a token until that flag is set. See the family contract
-in [`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md).
+(passwordless magic-link → access token). The organization service only
+*requires* a token when started with `ORGANIZATION_REQUIRE_AUTH` enabled
+(off by default), so the SPA works without a token until that flag is
+set. See the family contract in
+[`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md).
 
 ## Testing
 

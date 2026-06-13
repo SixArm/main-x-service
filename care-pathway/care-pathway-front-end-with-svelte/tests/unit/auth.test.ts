@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ApiClient } from "$lib/api/client";
-import { token, setToken, clearToken } from "$lib/auth.svelte";
+import {
+  token,
+  setToken,
+  clearToken,
+  captureTokenFromHash,
+} from "$lib/auth.svelte";
 
 /** A fake `fetch` that records the last call and returns an empty 200. */
 function fakeFetch() {
@@ -67,5 +72,44 @@ describe("ApiClient reads the auth store by default", () => {
     await client(f).get("/api/care-pathways", { token: null });
     const headers = f.calls[0]?.init.headers as Record<string, string>;
     expect(headers.authorization).toBeUndefined();
+  });
+});
+
+describe("captureTokenFromHash", () => {
+  it("extracts the token from a well-formed fragment", () => {
+    expect(captureTokenFromHash("#access_token=abc.def.ghi")).toBe(
+      "abc.def.ghi",
+    );
+  });
+
+  it("extracts when access_token is one of several fragment params", () => {
+    expect(
+      captureTokenFromHash("#token_type=Bearer&access_token=jjj&state=x"),
+    ).toBe("jjj");
+  });
+
+  it("accepts a fragment without a leading '#'", () => {
+    expect(captureTokenFromHash("access_token=plain")).toBe("plain");
+  });
+
+  it("URL-decodes the token value", () => {
+    // A JWT never contains '+' or '/', but the decode path must round-trip
+    // a percent-encoded value handed back by the auth front-end.
+    expect(captureTokenFromHash("#access_token=a%2Bb%2Fc%3D")).toBe("a+b/c=");
+  });
+
+  it("returns null for an empty hash", () => {
+    expect(captureTokenFromHash("")).toBeNull();
+    expect(captureTokenFromHash("#")).toBeNull();
+  });
+
+  it("returns null when there is no access_token", () => {
+    expect(captureTokenFromHash("#state=x&token_type=Bearer")).toBeNull();
+  });
+
+  it("returns null for garbage and for a blank access_token", () => {
+    expect(captureTokenFromHash("#not-a-query-string")).toBeNull();
+    expect(captureTokenFromHash("#access_token=")).toBeNull();
+    expect(captureTokenFromHash("#access_token=%20%20")).toBeNull();
   });
 });

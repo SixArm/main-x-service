@@ -11,6 +11,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Cross-origin SSO token handoff (consumer side).** The operator now
+  obtains a token from the central authentication front-end instead of
+  pasting it. `signInUrl()` (`src/lib/config.ts`, new
+  `VITE_AUTH_FRONTEND_URL`) builds
+  `${VITE_AUTH_FRONTEND_URL}/signin?return_to=<encoded origin+base>`; the
+  layout shows a primary **Sign in** button when signed out. On app load
+  the layout's `onMount` runs `captureFromLocation()` (new in
+  `auth.svelte.ts`) before any API call: `captureTokenFromHash` parses
+  `…#access_token=<jwt>` out of the URL fragment (URL-decoded), `setToken`
+  stores it, and `history.replaceState` strips the fragment. The manual
+  paste field is kept (behind a "Paste a token" disclosure) as a dev
+  fallback. vitest covers `captureTokenFromHash` (extract / decode /
+  null cases) and `signInUrl` (encoded `return_to`, trailing-slash
+  safe). Implements the "Token acquisition handoff" section of
+  `agents/share/jwt-enforcement.md`.
 - **Bearer-token session.** New reactive token store
   `src/lib/auth.svelte.ts` (`setToken`/`clearToken`/`token`), hydrated
   from the family-shared `localStorage["mxi_access_token"]` key and
@@ -57,3 +72,5 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Configuration
 
 - `PUBLIC_API_BASE_URL` (default `http://localhost:5150`).
+- `VITE_AUTH_FRONTEND_URL` (default `http://localhost:5173`) — base URL of
+  the central authentication front-end for the SSO sign-in handoff.

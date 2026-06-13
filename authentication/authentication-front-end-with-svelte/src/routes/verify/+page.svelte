@@ -3,6 +3,13 @@
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
     import { AuthRepository } from "$lib/api/auth";
+    import { RETURN_TO_ALLOWLIST } from "$lib/config";
+    import {
+        clearReturnTo,
+        nextDestination,
+        parseAllowlist,
+        readReturnTo,
+    } from "$lib/auth/return-to";
     import { session } from "$lib/auth/session.svelte";
     import { t } from "$lib/i18n.svelte";
 
@@ -21,7 +28,24 @@
         try {
             const login = await repo.verify(token);
             session.start(login);
-            await goto("/");
+            // Cross-origin SSO handoff: if an allowlisted `return_to` was
+            // parked on /signin or /signup, redirect there with the token
+            // in the URL fragment; else go home. `nextDestination` is the
+            // pure decision (unit-tested); we only navigate here.
+            const dest = nextDestination(
+                readReturnTo(),
+                login.token,
+                parseAllowlist(RETURN_TO_ALLOWLIST),
+                window.location.origin,
+            );
+            clearReturnTo();
+            if (dest.kind === "external") {
+                // Cross-origin: must be a full navigation, not SvelteKit
+                // `goto` (which is same-origin client-side routing).
+                window.location.assign(dest.url);
+            } else {
+                await goto("/");
+            }
         } catch (err) {
             status = "error";
             error = err instanceof Error ? err.message : t("verify.error.invalid");

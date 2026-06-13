@@ -71,18 +71,27 @@ Clinical informaticians and pathway authors.
    renders the rows newest-first (action, actor or "—" when null,
    timestamp). Loading, empty, and error states are shown; the panel
    does not auto-load on mount.
-9. Session / bearer auth: the layout sidebar carries a minimal session
-   affordance — paste an access token to sign in, or sign out to clear
-   it. The token is held in a reactive store (`$lib/auth.svelte`) under
-   the family-shared `localStorage` key `mxi_access_token` (guarded for
-   SSR / `vite preview`), obtained out-of-band from the central
-   authentication-service (passwordless magic-link). The `ApiClient`
-   attaches `Authorization: Bearer <token>` to every request when the
-   store holds one, omitting it otherwise; a per-call token overrides the
-   store. This lets operator traffic through once the service turns on
-   blanket JWT enforcement (`CARE_PATHWAY_REQUIRE_AUTH`, off by default —
-   family contract `agents/share/jwt-enforcement.md`). Full magic-link
-   redirect wiring is a follow-up.
+9. Session / bearer auth: the layout sidebar carries a session
+   affordance. The primary path is **Sign in**, which redirects to the
+   central authentication front-end
+   (`${VITE_AUTH_FRONTEND_URL}/signin?return_to=<origin + base>`); after
+   the passwordless magic-link the auth front-end hands the access token
+   back via the URL fragment (`…#access_token=<jwt>`, only when this
+   origin is on its allowlist). On app load the layout `onMount` calls
+   `captureFromLocation()` **before** any API call: it reads
+   `window.location.hash`, stores any `access_token`, and strips the
+   fragment via `history.replaceState`. A manual paste field remains
+   (behind a disclosure) as a dev convenience; **Sign out** clears the
+   token. The token is held in a reactive store (`$lib/auth.svelte`)
+   under the family-shared `localStorage` key `mxi_access_token` (guarded
+   for SSR / `vite preview`). The `ApiClient` attaches `Authorization:
+   Bearer <token>` to every request when the store holds one, omitting it
+   otherwise; a per-call token overrides the store. This lets operator
+   traffic through once the service turns on blanket JWT enforcement
+   (`CARE_PATHWAY_REQUIRE_AUTH`, off by default — family contract
+   `agents/share/jwt-enforcement.md`). The auth front-end URL is
+   configured with `VITE_AUTH_FRONTEND_URL` (default
+   `http://localhost:5173`).
 
 ## 7. Non-functional requirements
 
@@ -124,7 +133,12 @@ None client-side beyond in-memory route state.
 error-classification/empty-body), the **auth token store**
 (`tests/unit/auth.test.ts`: `setToken`/`clearToken` round-trip; the
 client attaches `Authorization: Bearer` when the store holds a token and
-omits it when empty; a per-call token/`null` overrides the store), and
+omits it when empty; a per-call token/`null` overrides the store; and
+`captureTokenFromHash` — well-formed extract, multi-param fragment, no
+leading `#`, URL-decode, empty/`#`, no-token, and garbage/blank → null),
+the **SSO sign-in URL builder** (`tests/unit/config.test.ts`: `signInUrl`
+encodes `return_to`, includes the SvelteKit base path, and trims a
+trailing slash so there is no `//signin`), and
 `CarePathwayRepository` (every
 method's path + verb, incl. a regression pinning `check-duplicates`,
 `search()` pinning the `/search?q=` path with URL-encoding, and
@@ -178,11 +192,17 @@ for any access/audit requirements.
   reactive token store `$lib/auth.svelte` (hydrated from
   `localStorage["mxi_access_token"]`, SSR-guarded; `setToken`/`clearToken`/
   `token`), `ApiClient` attaches `Authorization: Bearer <token>` from the
-  store by default (per-call override preserved), and a minimal session
+  store by default (per-call override preserved), and a session
   affordance in the layout (paste/clear token). vitest (6) cover the store
   + client attachment; Playwright smoke stays green. Family contract:
-  `agents/share/jwt-enforcement.md`. Full magic-link redirect is a
-  follow-up.
+  `agents/share/jwt-enforcement.md`.
+- [x] Cross-origin SSO token handoff (consumer side) — `captureTokenFromHash`
+  + browser-only `captureFromLocation()` (run in layout `onMount` before
+  any API call: store the fragment `access_token`, then
+  `history.replaceState` to strip it); `VITE_AUTH_FRONTEND_URL` config +
+  `signInUrl()` builder; layout leads with **Sign in** (paste kept behind
+  a disclosure for dev). vitest (10) cover `captureTokenFromHash` (7) and
+  `signInUrl` (3). Family contract: `agents/share/jwt-enforcement.md`.
 
 ## 14. Implementation status
 
@@ -191,7 +211,8 @@ Done: all four routes; lean client; repository (incl. `search()`,
 list-page recent-activity (event-stream) view; detail-page
 merge-duplicate action; detail-page audit-trail view; auth token store
 (`$lib/auth.svelte`) + client bearer-attachment + layout session
-affordance; form (incl.
+affordance with cross-origin SSO sign-in (fragment capture + strip,
+`signInUrl` redirect); form (incl.
 condition codes + identifiers editors); SPA config. `pnpm run check`
 clean; production build succeeds.
 
@@ -199,7 +220,7 @@ clean; production build succeeds.
 
 v0.1 (here): CRUD + duplicate-check UI. v0.2: tests + search box.
 v0.3: audit-trail view (done) + recent-activity view (done) + auth token
-(done; magic-link redirect deferred).
+(done) + cross-origin SSO sign-in handoff (done).
 
 ## 16. Open questions
 

@@ -32,6 +32,7 @@ pnpm dev                 # http://localhost:5173
 | Var | Default | Purpose |
 |---|---|---|
 | `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Care pathway service REST base URL. |
+| `VITE_AUTH_FRONTEND_URL` | `http://localhost:5173` | Central authentication front-end base URL. "Sign in" redirects to `${VITE_AUTH_FRONTEND_URL}/signin?return_to=…`; the access token is handed back via the URL fragment (cross-origin SSO; see `agents/share/jwt-enforcement.md`). |
 
 ## How it works
 

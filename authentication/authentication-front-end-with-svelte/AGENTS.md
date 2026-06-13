@@ -34,12 +34,14 @@ credential.
 ```
 src/
 ├── lib/
-│   ├── config.ts                 PUBLIC_API_BASE_URL (default :5150)
+│   ├── config.ts                 PUBLIC_API_BASE_URL (:5150) + VITE_RETURN_TO_ALLOWLIST
 │   ├── api/
 │   │   ├── client.ts             lean fetch wrapper (+ bearer, ApiError)
 │   │   ├── types.ts              LoginResponse / CurrentUser (mirror the service views)
 │   │   └── auth.ts               AuthRepository (signup/magic-link/verify/me/signout)
-│   └── auth/session.svelte.ts    token + profile, persisted to localStorage (runes)
+│   └── auth/
+│       ├── session.svelte.ts     token + profile, persisted to localStorage (runes); mirrors token to mxi_access_token
+│       └── return-to.ts          cross-origin SSO handoff: return_to allowlist + pure redirect decision
 └── routes/
     ├── +layout.svelte            nav + signed-in badge
     ├── +layout.ts                SPA toggle

@@ -12,6 +12,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Cross-origin SSO token handoff (issuer side).** This front-end is now
+  the issuer in the first-party, OAuth-implicit-shaped token handoff (see
+  `AGENTS/share/jwt-enforcement.md`).
+  - **Federation key.** `session.start()` mirrors the issued access token
+    to the shared `localStorage["mxi_access_token"]` key (in addition to
+    the back-compat `mxi.auth.token` / `mxi.auth.user`); `clear()` removes
+    it. Key name exported as `FEDERATION_TOKEN_KEY`.
+  - **`return_to` allowlist (`src/lib/auth/return-to.ts`).** Pure helpers
+    `isAllowedReturnTo(returnTo, allowlist, selfOrigin)` (absolute http(s)
+    + origin exactly in allowlist or equal to self — rejects
+    `javascript:` / `data:` / relative / cross-origin / garbage),
+    `parseAllowlist(env)`, `nextDestination(returnTo, token, …)` (the pure
+    redirect decision: `{kind:"external",url}` with the token in the URL
+    fragment, or `{kind:"home"}`), plus `sessionStorage` persist / read /
+    clear. The allowlist is the control that stops token exfiltration via
+    a crafted `return_to`.
+  - **Round-trip.** `/signin` + `/signup` park an allowlisted
+    `?return_to=` in `sessionStorage["mxi_return_to"]` (the emailed link
+    carries no `return_to`); `/verify` consumes it after a successful
+    sign-in and redirects to `return_to#access_token=<jwt>` via
+    `window.location.assign` (cross-origin, not SvelteKit `goto`).
+  - Tests: `tests/unit/return-to.test.ts` (24) + `tests/unit/session.test.ts`
+    (3); 2 new playwright handoff cases (allowlisted → fragment redirect;
+    non-allowlisted → home, no token). Vitest 25 → 52; playwright 7 → 9.
+    `pnpm run check` clean.
+
 - **Inaugural scaffold (v0.1.0).** SvelteKit 2 / Svelte 5 (runes) SPA
   for the Authentication Service.
   - Routes: `/` (account + sign out), `/signup`, `/signin`, and
@@ -48,3 +74,6 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Configuration
 
 - `PUBLIC_API_BASE_URL` (default `http://localhost:5150`).
+- `VITE_RETURN_TO_ALLOWLIST` (default empty ⇒ same-origin only):
+  comma-separated operator-app origins the SSO handoff may redirect the
+  access token to.

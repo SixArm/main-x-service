@@ -124,10 +124,54 @@ it:
 localStorage key: "mxi_access_token"
 ```
 
-Full magic-link wiring (redirect to the authentication front-end and back)
-is a follow-up; for now the token store reads/writes this key, and a
-minimal session affordance lets an operator set/clear it. Document the key
-here so every front-end agrees.
+The token is obtained from the authentication front-end via the handoff
+protocol below; the store reads/writes this key, and a minimal session
+affordance lets an operator sign in / sign out (or paste a token).
+
+### Token acquisition handoff (cross-origin SSO)
+
+Each operator SPA is its own deployment, so `localStorage` is **not**
+shared across origins — the token must be handed across explicitly. The
+flow is OAuth-implicit-shaped (first-party federation), with a strict
+allowlist so the bearer credential can never be redirected to an
+untrusted site:
+
+```
+operator SPA (no token)
+   │  user clicks "Sign in"
+   ▼
+<AUTH_FRONTEND>/signin?return_to=<absolute operator-app URL>
+   │  passwordless magic-link → /verify?token=…&return_to=…
+   ▼
+authentication front-end verifies, issues the RS256 access token, then:
+   • origin(return_to) ∈ allowlist  → redirect to  return_to#access_token=<jwt>
+   • otherwise                      → ignore return_to, go to "/" (NO token appended)
+   ▼
+operator SPA loads, reads access_token from location.hash,
+stores it under "mxi_access_token", then history.replaceState to strip it.
+```
+
+Rules:
+
+- **Fragment, not query.** The token rides in the URL `#fragment`, which
+  browsers do not send to servers (no access-log / Referer leak). The
+  receiving SPA strips it with `history.replaceState` immediately.
+- **Allowlist is mandatory.** The authentication front-end validates
+  `origin(return_to)` against `VITE_RETURN_TO_ALLOWLIST` (comma-separated
+  origins, exact `scheme://host[:port]` match). Unset/empty ⇒ same-origin
+  only; a non-matching `return_to` is dropped silently and the token is
+  **never** appended. This is the control that stops token exfiltration
+  via a crafted `return_to`.
+- **Federation key.** The authentication front-end writes the issued token
+  to the shared `mxi_access_token` key (in addition to any of its own
+  session bookkeeping), so a same-origin sibling needs no handoff.
+- **Operator config.** Each operator SPA knows the auth front-end URL via
+  `VITE_AUTH_FRONTEND_URL`; the "Sign in" affordance builds
+  `${VITE_AUTH_FRONTEND_URL}/signin?return_to=${encodeURIComponent(location.origin + base)}`.
+- **Hardening follow-up.** Implicit-style fragment delivery is acceptable
+  for a first-party MVP with short token TTLs + the allowlist; OAuth
+  auth-code + PKCE is the documented next step if these apps ever face
+  third-party clients.
 
 ### Token store + client
 

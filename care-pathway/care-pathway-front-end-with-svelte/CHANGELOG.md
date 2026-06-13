@@ -11,6 +11,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Cross-origin SSO token handoff (consumer side).** The session
+  affordance now leads with **Sign in**, which redirects to the central
+  authentication front-end
+  (`${VITE_AUTH_FRONTEND_URL}/signin?return_to=<origin + base>`); after
+  the magic-link, the auth front-end hands the access token back via the
+  URL fragment (`…#access_token=<jwt>`, allowlist-gated). `auth.svelte.ts`
+  gains a pure `captureTokenFromHash(hash)` (URL-decoded `access_token`,
+  else `null`) and a browser-only `captureFromLocation()` that stores the
+  token and strips the fragment with `history.replaceState`; the layout
+  `onMount` runs it before any API call. The manual paste field is kept
+  behind a disclosure as a dev convenience. New config:
+  `VITE_AUTH_FRONTEND_URL` (default `http://localhost:5173`) + a
+  `signInUrl(origin?, basePath?)` builder (encoded `return_to`, base-path
+  aware, trailing-slash safe). vitest adds 10 tests (`auth.test.ts`: 7 ×
+  `captureTokenFromHash`; new `config.test.ts`: 3 × `signInUrl`);
+  `pnpm run check` 0/0 and Playwright smoke stay green. Family contract:
+  `agents/share/jwt-enforcement.md`.
+
 - **Bearer-token auth (front-end half of blanket JWT enforcement).** A
   new reactive token store `src/lib/auth.svelte.ts` holds the access
   token, hydrated from the family-shared `localStorage` key
