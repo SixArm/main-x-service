@@ -87,11 +87,22 @@ oversized tasks (`T-2a`, `T-2b`).
   - [ ] Family-standard fuzzy + phonetic search; keep `/search`
     stable. (Also queued in the service crate's §13.)
   - **Acceptance:** fuzzy query (`"Acmee"`) finds `"Acme, Inc."`.
-- [ ] **T-9 — JWT verification end to end.**
-  - [ ] Service middleware consuming the auth-service JWKS; populate
-    audit `actor` from the token subject; front-end bearer wiring.
-  - **Acceptance:** unauthenticated POST → `401`; audit rows carry
-    the actor.
+- [x] **T-9 — JWT verification (service).**
+  - [x] Offline RS256 verification consuming the auth-service JWKS;
+    populate audit `actor` (and merge `actor`) from the token subject.
+    **Done (2026-06-13):** `src/auth.rs` embeds the
+    [`authentication-verifier`](../../authentication/authentication-verifier-rust-crate)
+    crate behind a process-wide `Verifier` built from `ORGANIZATION_JWKS`
+    / `ORGANIZATION_JWT_ISSUER` / `ORGANIZATION_JWT_AUDIENCE`. `AuthUser`
+    (required) + `MaybeAuthUser` (optional) extractors; `GET
+    /api/organizations/whoami` is protected; create/update/delete/merge
+    stamp the audit + merge `actor` from the token when present.
+  - **Acceptance:** unauthenticated `whoami` → `401`; audit rows carry
+    the actor when a token is sent. **Met:** `whoami_without_token_is_401`
+    (DB-gated) + six un-gated crypto unit tests in `auth::tests`.
+  - [ ] *Follow-up:* blanket `/api/*` enforcement (awaits the
+    coordinated family SSO rollout + front-end bearer wiring) and
+    JWKS-over-HTTP fetch (currently injected via env).
 - [ ] **T-10 — Durable event bus.**
   - [ ] Replace the in-memory ring buffer behind the same publish
     call (the buffer is the documented swap point in

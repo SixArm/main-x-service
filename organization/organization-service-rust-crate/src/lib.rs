@@ -19,6 +19,8 @@
 
 /// Loco application hooks: route registration, boot, and test truncation.
 pub mod app;
+/// Bearer-token (RS256 JWT) verification extractors for the REST surface.
+pub mod auth;
 /// REST controllers: organization CRUD, matching, audit, and the docs endpoints.
 pub mod controllers;
 /// Loco initializers (currently empty; reserved for app-startup wiring).

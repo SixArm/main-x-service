@@ -80,6 +80,17 @@ pub fn spec() -> Value {
             "/api/organizations/merges/recent": {
                 "get": { "tags": ["matching"], "summary": "Recent merge-history records", "responses": { "200": { "description": "Merge records" } } }
             },
+            "/api/organizations/whoami": {
+                "get": {
+                    "tags": ["auth"],
+                    "summary": "Echo the verified claims of the bearer token",
+                    "security": [{ "bearer": [] }],
+                    "responses": {
+                        "200": { "description": "Verified token claims" },
+                        "401": { "description": "Missing or invalid bearer token" }
+                    }
+                }
+            },
             "/api/organizations/audit/recent": {
                 "get": { "tags": ["audit"], "summary": "Recent audit-log entries", "responses": { "200": { "description": "Audit entries" } } }
             },
@@ -101,6 +112,10 @@ pub fn spec() -> Value {
             }
         },
         "components": {
+            "securitySchemes": {
+                "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT",
+                    "description": "RS256 access token from the authentication-service, verified offline against its JWKS." }
+            },
             "schemas": {
                 "OrgRef": { "type": "object", "required": ["pid", "name"], "properties": {
                     "pid": { "type": "string", "format": "uuid" }, "name": { "type": "string" } } },
@@ -160,5 +175,15 @@ mod tests {
         assert!(s["paths"]["/api/organizations/merge"]["post"].is_object());
         assert!(s["paths"]["/api/organizations/merges/recent"]["get"].is_object());
         assert!(s["components"]["schemas"]["MergeRequest"]["properties"]["main_pid"].is_object());
+    }
+
+    #[test]
+    fn spec_documents_whoami_with_bearer_security() {
+        let s = spec();
+        assert!(s["paths"]["/api/organizations/whoami"]["get"]["security"][0]["bearer"].is_array());
+        assert_eq!(
+            s["components"]["securitySchemes"]["bearer"]["scheme"],
+            "bearer"
+        );
     }
 }

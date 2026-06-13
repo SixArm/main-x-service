@@ -11,6 +11,7 @@ use loco_rs::prelude::*;
 use organization_matcher::{MatchConfig, MatchingEngine, Organization};
 use serde::{Deserialize, Serialize};
 
+use crate::auth::{AuthUser, MaybeAuthUser};
 use crate::merge::merge_orgs;
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::merge_records::Model as MergeRecordModel;
@@ -88,10 +89,21 @@ fn http_err(err: ModelError) -> Error {
 
 /// Create an organization.
 #[debug_handler]
-async fn create(State(ctx): State<AppContext>, Json(org): Json<Organization>) -> Result<Response> {
+async fn create(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Json(org): Json<Organization>,
+) -> Result<Response> {
     validate(&org)?;
     let model = OrgModel::create(&ctx.db, &org).await?;
-    audit(&ctx, model.pid, "created", Some(model.data.clone())).await;
+    audit(
+        &ctx,
+        model.pid,
+        "created",
+        caller.actor(),
+        Some(model.data.clone()),
+    )
+    .await;
     streaming::publish(EventKind::Created, &model.pid.to_string(), &model.name);
     format::json(OrgRef::of(&model))
 }
@@ -111,6 +123,7 @@ async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Resu
 async fn update(
     Path(pid): Path<String>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Json(org): Json<Organization>,
 ) -> Result<Response> {
     validate(&org)?;
@@ -118,32 +131,45 @@ async fn update(
         .await
         .map_err(http_err)?;
     let updated = model.into_active_model().update_data(&ctx.db, &org).await?;
-    audit(&ctx, updated.pid, "updated", Some(updated.data.clone())).await;
+    audit(
+        &ctx,
+        updated.pid,
+        "updated",
+        caller.actor(),
+        Some(updated.data.clone()),
+    )
+    .await;
     streaming::publish(EventKind::Updated, &updated.pid.to_string(), &updated.name);
     format::json(OrgRef::of(&updated))
 }
 
 /// Soft-delete an organization.
 #[debug_handler]
-async fn remove(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+async fn remove(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
     let model = OrgModel::find_by_pid(&ctx.db, &pid)
         .await
         .map_err(http_err)?;
     let (entity_pid, name) = (model.pid, model.name.clone());
     model.into_active_model().soft_delete(&ctx.db).await?;
-    audit(&ctx, entity_pid, "deleted", None).await;
+    audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
     streaming::publish(EventKind::Deleted, &entity_pid.to_string(), &name);
     format::empty_json()
 }
 
 /// Best-effort audit write: log on failure but never fail the request.
+/// `actor` is the verified caller `sub` when a token was presented.
 async fn audit(
     ctx: &AppContext,
     entity_pid: uuid::Uuid,
     action: &str,
+    actor: Option<&str>,
     snapshot: Option<serde_json::Value>,
 ) {
-    if let Err(err) = AuditModel::record(&ctx.db, entity_pid, action, snapshot).await {
+    if let Err(err) = AuditModel::record(&ctx.db, entity_pid, action, actor, snapshot).await {
         tracing::warn!(error = %err, action, "failed to write audit log");
     }
 }
@@ -241,7 +267,11 @@ async fn search(
 /// record the merge history, and publish a `Merged` event (plus a
 /// `Deleted` for the duplicate).
 #[debug_handler]
-async fn merge(State(ctx): State<AppContext>, Json(req): Json<MergeRequest>) -> Result<Response> {
+async fn merge(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Json(req): Json<MergeRequest>,
+) -> Result<Response> {
     if req.main_pid == req.duplicate_pid {
         return Err(Error::CustomError(
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -269,14 +299,22 @@ async fn merge(State(ctx): State<AppContext>, Json(req): Json<MergeRequest>) -> 
         merged.pid,
         dup_pid,
         req.reason.as_deref(),
+        caller.actor(),
         Some(outcome.transferred),
     )
     .await
     {
         tracing::warn!(error = %err, "failed to write merge record");
     }
-    audit(&ctx, merged.pid, "merged", Some(merged.data.clone())).await;
-    audit(&ctx, dup_pid, "merged_into", None).await;
+    audit(
+        &ctx,
+        merged.pid,
+        "merged",
+        caller.actor(),
+        Some(merged.data.clone()),
+    )
+    .await;
+    audit(&ctx, dup_pid, "merged_into", caller.actor(), None).await;
     streaming::publish(EventKind::Merged, &merged.pid.to_string(), &merged.name);
     streaming::publish(EventKind::Deleted, &dup_pid.to_string(), &dup_name);
 
@@ -292,6 +330,14 @@ async fn merge(State(ctx): State<AppContext>, Json(req): Json<MergeRequest>) -> 
 async fn recent_merges(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = MergeRecordModel::recent(&ctx.db, 100).await?;
     format::json(rows)
+}
+
+/// Echo the verified claims of the bearer token — `401` when the token is
+/// missing or fails verification. Proves peer JWT verification against
+/// the auth-service JWKS end to end (spec §13 T-9).
+#[debug_handler]
+async fn whoami(AuthUser(claims): AuthUser) -> Result<Response> {
+    format::json(claims)
 }
 
 /// Recent audit-log entries across all organizations.
@@ -329,6 +375,7 @@ pub fn routes() -> Routes {
         .add("/check-duplicates", post(check_duplicates))
         .add("/merge", post(merge))
         .add("/merges/recent", get(recent_merges))
+        .add("/whoami", get(whoami))
         .add("/audit/recent", get(recent_audit))
         .add("/events/recent", get(recent_events))
         .add("/{pid}", get(get_one))

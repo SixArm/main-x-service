@@ -42,6 +42,9 @@ mimalloc = "0.1.52"
 # Canonical matching algorithm — embedded and used directly as the API DTO.
 organization-matcher = { path = "../organization-matcher-rust-crate" }
 
+# Offline RS256 JWT verification against the authentication-service JWKS.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
+
 [[bin]]
 name = "organization-service"
 path = "src/bin/main.rs"
@@ -52,3 +55,9 @@ loco-rs = { workspace = true, features = ["testing"] }
 serial_test = { version = "3.5.0" }
 rstest = { version = "0.25" }
 insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }
+# Mint RS256 tokens + a matching JWKS in-process so the JWT extractor's
+# happy path is verified un-gated (no auth-service / network dependency).
+jsonwebtoken = { version = "9" }
+rsa = { version = "0.9", features = ["pem"] }
+sha2 = { version = "0.10" }
+base64 = { version = "0.22" }

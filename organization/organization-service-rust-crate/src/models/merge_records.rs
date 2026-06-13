@@ -10,7 +10,8 @@ impl ActiveModelBehavior for super::_entities::merge_records::ActiveModel {}
 
 impl Model {
     /// Record one merge. `transferred` is a snapshot of the merged-away
-    /// duplicate's payload. `actor` is `None` until JWT auth lands.
+    /// duplicate's payload. `actor` is the caller's `sub` when a verified
+    /// token was presented, else `None`.
     ///
     /// # Errors
     ///
@@ -20,13 +21,14 @@ impl Model {
         main_pid: Uuid,
         duplicate_pid: Uuid,
         reason: Option<&str>,
+        actor: Option<&str>,
         transferred: Option<serde_json::Value>,
     ) -> ModelResult<Self> {
         let entry = merge_records::ActiveModel {
             main_pid: ActiveValue::set(main_pid),
             duplicate_pid: ActiveValue::set(duplicate_pid),
             reason: ActiveValue::set(reason.map(ToString::to_string)),
-            actor: ActiveValue::set(None),
+            actor: ActiveValue::set(actor.map(ToString::to_string)),
             transferred: ActiveValue::set(transferred),
             ..Default::default()
         }

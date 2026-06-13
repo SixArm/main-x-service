@@ -260,6 +260,19 @@ async fn merge_with_equal_pids_is_422() {
     .await;
 }
 
+/// The JWT-protected `whoami` rejects a request without a bearer token.
+/// The token-accepted path is pinned un-gated by `auth::tests`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn whoami_without_token_is_401() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let response = request.get("/api/organizations/whoami").await;
+        assert_eq!(response.status_code(), 401, "whoami needs a bearer token");
+    })
+    .await;
+}
+
 /// Merging an unknown duplicate is a `404`.
 #[tokio::test]
 #[serial]

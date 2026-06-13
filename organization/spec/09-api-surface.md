@@ -20,6 +20,7 @@ machine-readable form at `/api-docs/openapi.json`
 | POST | `/api/organizations/check-duplicates` | `Organization` | `[{pid, name, score, confidence, is_match}]` | Stored matches above threshold, score-desc |
 | POST | `/api/organizations/merge` | `{main_pid, duplicate_pid, reason?}` | `{main_pid, duplicate_pid, main}` | Fold a duplicate into a survivor; `422` equal pids, `404` unknown |
 | GET | `/api/organizations/merges/recent` | — | `[merge row]` | Merge history (incl. transferred snapshot) |
+| GET | `/api/organizations/whoami` | — | `Claims` | Verified bearer-token claims; `401` without a valid token |
 | GET | `/api/organizations/audit/recent` | — | `[audit row]` | Newest 100 system-wide |
 | GET | `/api/organizations/{pid}/audit` | — | `[audit row]` | Per-record trail; `400` invalid pid |
 | GET | `/api/organizations/events/recent` | — | `[OrgEvent]` | Newest 100 from the in-memory stream |
