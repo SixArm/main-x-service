@@ -60,8 +60,33 @@ Each requirement names its owning subproject. Endpoint detail:
   secret. The row may distinguish outcomes the response deliberately
   hides — the anti-enumeration shape (FR-1/FR-2) holds at the wire.
 - **FR-8b — Audit query.** `GET /api/auth/audit/recent` returns the
-  newest 100 `auth_events` (`AuthEvent[]`). Unauthenticated for now,
-  mirroring the family `/audit/recent` pattern (§9, §12).
+  newest 100 `auth_events` (`AuthEvent[]`). Deliberately unauthenticated
+  (operator-facing system feed), mirroring the family `/audit/recent`
+  pattern (§9, §12); the per-subject right-of-access view is FR-8e.
+
+### 6.4b GDPR subject rights (service)
+
+- **FR-8c — Right of access (Art. 15).** `GET /api/auth/account/export`
+  (bearer) returns a JSON document of everything the service holds about
+  the authenticated subject: their `users` row (`pid`, `email`, `name`,
+  `email_verified_at`, timestamps), their `sessions`
+  (jid, issuance/expiry/revocation, user_agent), and their `auth_events`
+  audit trail (matched by pid *or* email). It excludes the password
+  hash, api key, and any token / key material. A GDPR-erased account is
+  treated as gone (`401`).
+- **FR-8d — Right to erasure (Art. 17).** `DELETE /api/auth/account`
+  (bearer) **soft-deletes + anonymises**: stamps `users.deleted_at`,
+  replaces `email` with a `pid`-keyed unroutable tombstone
+  (`deleted+<pid>@invalid`, keeps `UNIQUE(email)`) and `name` with
+  `"deleted user"`, clears magic-link material, revokes all the
+  subject's sessions, and records an `account_erased` audit row. The row
+  survives so referential history + the audit trail keep integrity.
+  Post-erasure the bearer token still verifies cryptographically until
+  `exp`, but `/me` and the export return `401`. Idempotent.
+- **FR-8e — Per-subject audit.** `GET /api/auth/account/audit` (bearer)
+  returns only the authenticated subject's own `auth_events` rows
+  (matched by pid or email), newest first — the right-of-access
+  counterpart to the open system-wide FR-8b.
 
 ### 6.5 Verifier library (verifier)
 

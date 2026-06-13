@@ -112,4 +112,19 @@ describe("CarePathwayRepository", () => {
       JSON.stringify({ main_pid: "m1", duplicate_pid: "d1" }),
     );
   });
+
+  it("audit() GETs the per-pathway audit endpoint", async () => {
+    const { repo, calls } = spyClient();
+    await repo.audit("p1");
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/care-pathways/p1/audit");
+  });
+
+  it("audit() URL-encodes the pid", async () => {
+    const { repo, calls } = spyClient();
+    await repo.audit("a b");
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/care-pathways/a%20b/audit",
+    );
+  });
 });

@@ -97,11 +97,43 @@ confirms it. Split larger tasks (`T-5a`, `T-5b`).
     `/api-docs/openapi.json`; un-gated `spec()` unit tests (5) assert it
     is well-formed, documents every endpoint, carries the bearer scheme,
     and exposes the core schemas. Documented in service spec §9.
-- [ ] **T-9 — GDPR subject-rights workflow for accounts.**
-  - [ ] Export (Art. 15) and erasure (Art. 17) paths for `users` +
-    `sessions`.
-  - **Acceptance:** documented endpoints or runbook; erasure removes
-    or anonymises the email.
+- [x] **T-9 — GDPR subject-rights workflow for accounts.** *(2026-06-13)*
+  - [x] **Right of access (Art. 15) — account export.**
+    `GET /api/auth/account/export` (bearer) returns a JSON document of
+    everything the service holds about the authenticated subject: their
+    `users` row (`pid`, `email`, `name`, `email_verified_at`,
+    timestamps), their `sessions` (jid, issuance/expiry/revocation,
+    user_agent), and their `auth_events` audit trail (matched by pid
+    *or* email). Excludes the password hash, api key, and any token /
+    key material (`models/users::find_active_by_pid`,
+    `sessions::find_all_by_user_pid`, `auth_events::for_subject`;
+    `views/auth::AccountExport`).
+  - [x] **Right to erasure (Art. 17) — account deletion.**
+    `DELETE /api/auth/account` (bearer): **soft-delete + anonymise** —
+    new `users.deleted_at` column (migration
+    `m20220101_000004_users_deleted_at`), `email`→`deleted+<pid>@invalid`
+    tombstone (keeps `UNIQUE(email)`, RFC 2606 unroutable),
+    `name`→`"deleted user"`, magic-link material cleared; **all sessions
+    revoked**; an `account_erased` `auth_events` row written. The row
+    survives so referential history + the audit trail keep integrity.
+    Post-erasure the bearer token still verifies cryptographically until
+    `exp`, but `/me` and the export treat the subject as gone (`401`,
+    via `find_active_by_pid`). Idempotent.
+  - [x] **Per-subject audit (T-10 follow-up).** Decision: leave the
+    system-wide `GET /api/auth/audit/recent` **open** (family convention,
+    mirrors care-pathway; rows carry no secrets) and add a bearer-gated
+    per-subject `GET /api/auth/account/audit` returning only the caller's
+    own events. So a subject's export + own audit are reachable **only**
+    by that subject; the operator-facing system feed stays open.
+  - **Acceptance met:** un-gated unit tests — anonymisation/tombstone
+    transform (`models/users` tests, 3), export-document assembly +
+    secret-exclusion (`views/auth` tests, 2), OpenAPI `spec()` for the
+    new paths/schemas/bearer (`openapi.rs` tests, 3). DB-gated request
+    tests (`tests/requests/auth.rs`): export returns the caller's data,
+    erasure soft-deletes + anonymises + revokes sessions + writes the
+    audit row, post-erasure `/me` + export are `401`, unauthenticated
+    export/audit/delete are `401`. OpenAPI updated; spec §6/§9/§12/§14 +
+    AGENTS updated. `cargo test` green (un-gated), clippy clean.
 - [x] **T-10 — Authentication event audit trail.** *(2026-06-13)*
   - [x] Durable `auth_events` table (migration
     `m20220101_000003_auth_events`): `(id, event, email, user_pid,

@@ -6,7 +6,10 @@
 //! 3. `GET  /api/auth/magic-link/{token}`          — consume the link → RS256 access token + session.
 //! 4. `GET  /api/auth/me`                          — current user (bearer token required).
 //! 5. `POST /api/auth/signout`                     — revoke the current session (bearer token required).
-//! 6. `GET  /api/auth/audit/recent`                — recent authentication events (audit trail).
+//! 6. `GET  /api/auth/audit/recent`                — recent authentication events (system-wide audit trail).
+//! 7. `GET  /api/auth/account/export`              — GDPR right of access: the subject's own data (bearer).
+//! 8. `GET  /api/auth/account/audit`               — GDPR right of access: the subject's own audit trail (bearer).
+//! 9. `DELETE /api/auth/account`                   — GDPR right to erasure: soft-delete + anonymise (bearer).
 //!
 //! Every endpoint writes a best-effort [`AuthEvent`] row (signup,
 //! magic-link request/redeem, signout) for the security + compliance
@@ -29,7 +32,7 @@ use crate::{
     mailers::auth::AuthMailer,
     models::{auth_events::Model as AuthEvent, sessions, users},
     rate_limit,
-    views::auth::{CurrentResponse, LoginResponse},
+    views::auth::{AccountAuditExport, AccountExport, CurrentResponse, LoginResponse},
 };
 
 /// Map an exceeded magic-link issuance quota to an HTTP `429`. Returning
@@ -254,6 +257,8 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
 
 /// Current authenticated user. Honors local revocation: a signed-out
 /// session is rejected even though its JWT signature is still valid.
+/// Honors GDPR erasure: a deleted account is treated as gone — its
+/// still-valid bearer token returns `401`, not the tombstoned record.
 #[debug_handler]
 async fn me(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
     let AuthUser(claims) = auth;
@@ -262,7 +267,12 @@ async fn me(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
     {
         return unauthorized("session signed out");
     }
-    let user = users::Model::find_by_pid(&ctx.db, &claims.sub).await?;
+    let Ok(user) = users::Model::find_active_by_pid(&ctx.db, &claims.sub).await else {
+        // No live user for this pid (never existed, or GDPR-erased). The
+        // token may still verify cryptographically until expiry; we
+        // refuse to serve a deleted subject's record.
+        return unauthorized("account not found");
+    };
     format::json(CurrentResponse::new(&user))
 }
 
@@ -286,22 +296,100 @@ async fn signout(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Respon
     format::empty_json()
 }
 
-/// Recent authentication events, newest first. The response shape is
-/// documented in the `OpenAPI` document (the `AuthEvent` schema).
+/// Recent **system-wide** authentication events, newest first. The
+/// response shape is documented in the `OpenAPI` document (the
+/// `AuthEvent` schema).
 ///
-/// Left **open** (no bearer) for now to mirror how care-pathway exposes
-/// `/audit/recent`; the rows carry no tokens or secrets, only event
-/// names, normalised emails, subject pids, and outcome markers. A future
-/// task (entity spec T-9 / GDPR) may gate it behind the bearer
-/// `AuthUser` extractor — see service spec §12.
+/// Left **open** (no bearer), mirroring how the sibling care-pathway
+/// service exposes `/audit/recent`: the rows carry no tokens or secrets,
+/// only event names, normalised emails, subject pids, and outcome
+/// markers. The GDPR right-of-access requirement (T-9) is satisfied
+/// instead by the bearer-gated per-subject `GET /api/auth/account/audit`
+/// — a subject's *own* audit trail is reachable only by that subject —
+/// so this system-wide view can stay open for operators. See service
+/// spec §12 for the recorded decision.
 #[debug_handler]
 async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = AuthEvent::recent(&ctx.db, 100).await?;
     format::json(rows)
 }
 
+/// Resolve the live, non-erased user for an authenticated request, or a
+/// `401`. A token can outlive its account (erasure is irreversible but
+/// the token verifies until `exp`); the account routes must refuse a
+/// deleted subject rather than operate on a tombstone.
+async fn require_active_user(
+    ctx: &AppContext,
+    claims: &crate::auth::Claims,
+) -> Result<users::Model> {
+    users::Model::find_active_by_pid(&ctx.db, &claims.sub)
+        .await
+        .map_err(|_| Error::Unauthorized("account not found".to_string()))
+}
+
+/// GDPR Art. 15 (right of access). Returns a JSON document of everything
+/// the service holds about the authenticated subject: their `users` row,
+/// their `sessions` (issuance/expiry/revocation timestamps + user agent,
+/// never a token), and their `auth_events` audit trail (matched by pid
+/// *or* email). No tokens, key material, password hash, or api key are
+/// ever included. A GDPR-erased account is treated as gone (`401`).
+#[debug_handler]
+async fn export_account(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
+    let AuthUser(claims) = auth;
+    let user = require_active_user(&ctx, &claims).await?;
+    let sessions = sessions::Model::find_all_by_user_pid(&ctx.db, user.pid).await?;
+    let events = AuthEvent::for_subject(&ctx.db, user.pid, &user.email).await?;
+    format::json(AccountExport::new(&user, &sessions, &events))
+}
+
+/// GDPR Art. 15 (right of access), per-subject audit trail. Returns only
+/// the authenticated subject's own `auth_events` rows (matched by pid or
+/// email), newest first — the bearer-gated counterpart to the open,
+/// system-wide `GET /api/auth/audit/recent`.
+#[debug_handler]
+async fn account_audit(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
+    let AuthUser(claims) = auth;
+    let user = require_active_user(&ctx, &claims).await?;
+    let events = AuthEvent::for_subject(&ctx.db, user.pid, &user.email).await?;
+    let rows: Vec<AccountAuditExport> = events.iter().map(AccountAuditExport::new).collect();
+    format::json(rows)
+}
+
+/// GDPR Art. 17 (right to erasure). Soft-deletes + anonymises the
+/// account: stamps `users.deleted_at`, replaces `email`/`name` with a
+/// tombstone (so referential history and the audit trail keep their
+/// integrity), revokes all of the subject's sessions, and records an
+/// `account_erased` audit row. After erasure the bearer token still
+/// verifies cryptographically until `exp`, but `/me` and the export
+/// treat the subject as gone (`401`). Idempotent: erasing an
+/// already-erased account is a no-op `200`.
+#[debug_handler]
+async fn delete_account(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
+    let AuthUser(claims) = auth;
+    let user = require_active_user(&ctx, &claims).await?;
+
+    let pid = user.pid;
+    let email = user.email.clone();
+    // Revoke every live session first so a concurrent request cannot use
+    // a session that outlives the anonymisation.
+    sessions::Model::revoke_all_for_user(&ctx.db, pid).await?;
+    user.into_active_model().erase(&ctx.db).await?;
+    AuthEvent::record_best_effort(
+        &ctx.db,
+        "account_erased",
+        Some(&email),
+        Some(pid),
+        Some("ok"),
+    )
+    .await;
+
+    format::empty_json()
+}
+
 /// Routes for the passwordless magic-link auth surface, mounted under
-/// `/api/auth`: signup, magic-link request, redeem, me, signout.
+/// `/api/auth`: signup, magic-link request, redeem, me, signout, the
+/// system-wide audit feed, and the bearer-gated GDPR account routes
+/// (export / per-subject audit / erasure).
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/auth")
@@ -311,4 +399,7 @@ pub fn routes() -> Routes {
         .add("/me", get(me))
         .add("/signout", post(signout))
         .add("/audit/recent", get(recent_audit))
+        .add("/account/export", get(export_account))
+        .add("/account/audit", get(account_audit))
+        .add("/account", delete(delete_account))
 }

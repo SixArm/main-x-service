@@ -11,6 +11,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Audit-trail view.** The detail page (`/[pid]`) gains a "Show audit
+  trail" toggle that lazy-loads `GET /api/care-pathways/{pid}/audit` on
+  first open (it does not auto-load on mount) via a new
+  `CarePathwayRepository.audit(pid)` → returning an `AuditEntry[]`
+  (`{action, actor, snapshot?, created_at?}`, mirroring the service's
+  `audit_logs` model). Rows render newest-first with the action, the
+  actor (or "—" when `null`), and the timestamp; loading, empty, and
+  error states are handled. vitest adds 2 unit tests (path + pid
+  URL-encoding); Playwright adds 1 smoke test (toggle → rows render with
+  action + "—" actor).
 - **Merge-duplicate action.** The detail page (`/[pid]`) now offers a
   "Merge into this record" action on each potential-duplicate row (the
   detail record is the survivor/main; the row's pid is the duplicate).

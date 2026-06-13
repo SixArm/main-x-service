@@ -12,6 +12,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **GDPR subject-rights workflow** (entity spec T-9). Three bearer-gated
+  account endpoints on the `auth` controller:
+  - `GET /api/auth/account/export` — **right of access** (Art. 15):
+    a JSON document of everything the service holds about the
+    authenticated subject — their `users` row, their `sessions`
+    (issuance/expiry/revocation + user agent), and their `auth_events`
+    audit trail (matched by pid *or* email). Excludes the password hash,
+    api key, and any token / key material (`views/auth::AccountExport`).
+  - `DELETE /api/auth/account` — **right to erasure** (Art. 17):
+    soft-delete + anonymise. New `users.deleted_at` column (migration
+    `m20220101_000004_users_deleted_at`); `email`→`deleted+<pid>@invalid`
+    tombstone (keeps `UNIQUE(email)`, RFC 2606 unroutable),
+    `name`→`"deleted user"`; **all** the subject's sessions revoked; an
+    `account_erased` audit row written. The row survives so referential
+    history + the audit trail keep integrity. Post-erasure `/me` and the
+    export treat the subject as gone (`401` via
+    `users::find_active_by_pid`), though the issued bearer token still
+    verifies cryptographically until `exp`. Idempotent.
+  - `GET /api/auth/account/audit` — the subject's own audit trail
+    (bearer-gated, per-subject counterpart to the open system-wide
+    `/api/auth/audit/recent`, which stays open by decision — see spec
+    §12). OpenAPI documents all three endpoints + the `AccountExport` /
+    `AccountUserExport` / `AccountSessionExport` / `AccountAuditExport`
+    schemas + bearer security. Un-gated unit tests (tombstone transform,
+    export assembly + secret-exclusion, OpenAPI `spec()`) plus DB-gated
+    request tests (export, erasure, post-erasure `401`, unauthenticated
+    `401`).
 - **Rate-limited magic-link issuance** (`src/rate_limit.rs`): a per-email
   (normalised: trimmed + lowercased) monotonic-clock sliding-window
   limiter — at most `MAX_REQUESTS` (5) requests per `WINDOW` (5 min).

@@ -49,11 +49,17 @@ organization/tenant modelling, account self-service beyond sign-in.
 ## 5. Domain model
 
 - **users** — `id`, `pid` (UUID), `email` (unique), `name`,
-  `email_verified_at`, magic-link columns, audit timestamps. `password`
-  exists only to satisfy `NOT NULL` and holds an unusable random hash.
+  `email_verified_at`, magic-link columns, `deleted_at`, audit
+  timestamps. `password` exists only to satisfy `NOT NULL` and holds an
+  unusable random hash. `deleted_at` (GDPR Art. 17) soft-deletes the
+  account: when set, the `email`/`name` are anonymised to a tombstone
+  and every read path treats the user as gone.
 - **sessions** — `jid` (unique, = token `jti`), `user_pid`,
   `expires_at`, `revoked_at`, `user_agent`. One row per issued token;
   the unit of revocation.
+- **auth_events** — `id`, `event`, `email`, `user_pid`, `detail`,
+  timestamps. The durable authentication audit trail (T-10). Never
+  stores tokens or secrets.
 
 ## 6. Functional requirements
 
@@ -85,6 +91,21 @@ single-use (cleared on consumption).
 
 8. `GET /api-docs/openapi.json` + `GET /swagger-ui` — the hand-written
    OpenAPI 3 document and a Swagger UI page.
+
+9. **GDPR subject rights (account).**
+   - `GET /api/auth/account/export` (bearer) — **right of access**
+     (Art. 15): a JSON document of everything the service holds about
+     the authenticated subject — their `users` row, their `sessions`,
+     and their `auth_events` audit trail. No tokens, key material,
+     password hash, or api key.
+   - `GET /api/auth/account/audit` (bearer) — the subject's own audit
+     trail (per-subject counterpart to the open `/audit/recent`).
+   - `DELETE /api/auth/account` (bearer) — **right to erasure**
+     (Art. 17): soft-delete + anonymise the `users` row (stamp
+     `deleted_at`, tombstone `email`/`name`), revoke all the subject's
+     sessions, and record an `account_erased` audit row. After erasure
+     the bearer token still verifies cryptographically until expiry, but
+     `/me` and the export treat the subject as gone (`401`). Idempotent.
 
 ## 7. Non-functional requirements
 
@@ -120,18 +141,22 @@ The API is described by a hand-written **OpenAPI 3.0.3** document
 `utoipa`). It is served by the docs controller
 (`src/controllers/docs.rs`) at `GET /api-docs/openapi.json`, with a
 Swagger UI page at `GET /swagger-ui` (CDN assets). The document covers
-all six endpoints plus the `SignupParams` / `MagicLinkParams` /
-`LoginResponse` / `CurrentResponse` / `Claims` / `Jwks` / `Jwk` schemas,
-the `429` rate-limit responses, and a bearer `securityScheme` applied to
-the `me` + `signout` endpoints. Un-gated `spec()` unit tests pin its
-well-formedness, the documented paths, the bearer scheme, and the
-schemas.
+every endpoint plus the `SignupParams` / `MagicLinkParams` /
+`LoginResponse` / `CurrentResponse` / `Claims` / `Jwks` / `Jwk` /
+`AuthEvent` / `AccountExport` (+ `AccountUserExport` /
+`AccountSessionExport` / `AccountAuditExport`) schemas, the `429`
+rate-limit responses, and a bearer `securityScheme` applied to the `me`
++ `signout` + `account/export` + `account/audit` + `account` (DELETE)
+endpoints. Un-gated `spec()` unit tests pin its well-formedness, the
+documented paths, the bearer scheme, and the schemas.
 
 ## 10. Persistence
 
 PostgreSQL via SeaORM + `sea-orm-migration`. Migrations:
-`m20220101_000001_users`, `m20220101_000002_sessions`. `auto_migrate` is
-on in development, off in production.
+`m20220101_000001_users`, `m20220101_000002_sessions`,
+`m20220101_000003_auth_events`, `m20220101_000004_users_deleted_at` (the
+GDPR-erasure soft-delete column). `auto_migrate` is on in development,
+off in production.
 
 ## 11. Testing strategy
 
@@ -150,9 +175,19 @@ on in development, off in production.
   store). The DB-gated `magic_link_issuance_is_rate_limited` request test
   asserts the `(MAX_REQUESTS+1)`th magic-link POST returns `429`.
 - **OpenAPI unit tests (DB-free):** `src/openapi.rs` `spec()` — well-formed,
-  documents every endpoint, the bearer scheme is present + applied, core
-  schemas exist. The docs route table is asserted in
-  `tests/requests/auth.rs`.
+  documents every endpoint, the bearer scheme is present + applied (incl.
+  the GDPR account endpoints), core schemas exist, and the account export
+  schema advertises no credential/secret fields. The docs route table is
+  asserted in `tests/requests/auth.rs`.
+- **GDPR unit tests (DB-free):** `src/models/users.rs` — the
+  `tombstone_email` transform is pid-keyed, unroutable, irreversible;
+  `src/views/auth.rs` — `AccountExport::new` assembles user + sessions +
+  audit rows from in-memory models and serialises **no** password hash /
+  api key / token. DB-gated request tests (`tests/requests/auth.rs`,
+  `#[ignore]`d): export returns the caller's data; erasure soft-deletes +
+  anonymises + revokes sessions + writes the `account_erased` row;
+  post-erasure `/me` + export are `401`; unauthenticated
+  export/audit/delete are `401`.
 - **Cross-crate contract test (DB-free):** `tests/sign_verify_contract.rs`
   pins the convention shared with
   [`authentication-verifier`](../../authentication-verifier-rust-crate/index.md):
@@ -165,7 +200,31 @@ on in development, off in production.
 
 Email is personal data: minimise, never log tokens alongside avoidable
 PII in production, and honour the family's GDPR posture. Sessions give
-an audit trail of issuance and revocation.
+an audit trail of issuance and revocation; `auth_events` is the durable
+authentication audit trail.
+
+**GDPR subject rights (T-9).**
+- *Right of access (Art. 15)* — `GET /api/auth/account/export` (bearer)
+  returns the subject's `users` row + `sessions` + `auth_events`. No
+  tokens, key material, password hash, or api key are exported.
+- *Right to erasure (Art. 17)* — `DELETE /api/auth/account` (bearer)
+  **soft-deletes + anonymises**: stamp `users.deleted_at`, replace
+  `email` with a `pid`-keyed unroutable tombstone
+  (`deleted+<pid>@invalid`) and `name` with `"deleted user"`, revoke all
+  the subject's sessions, and record an `account_erased` audit row. The
+  row survives so referential history and the audit trail keep their
+  integrity (erasure is anonymisation, not deletion). Every read path
+  (`/me`, export) treats a `deleted_at` user as gone (`401`), even while
+  the already-issued bearer token verifies cryptographically until `exp`
+  (bounded by the short TTL).
+
+**Audit gating decision.** The system-wide
+`GET /api/auth/audit/recent` is left **unauthenticated** (family
+convention; mirrors the sibling care-pathway `/audit/recent`; rows carry
+no tokens or secrets). The GDPR right-of-access requirement is met
+instead by the bearer-gated per-subject `GET /api/auth/account/audit`,
+so a subject's own audit trail (and export) is reachable **only** by
+that subject, while the operator-facing system feed stays open.
 
 ## 13. Tasks (live work queue)
 
@@ -213,6 +272,21 @@ an audit trail of issuance and revocation.
       endpoint + `AuthEvent` schema. Un-gated unit tests + a DB-gated
       request test (`auth_events_are_recorded_and_queryable`).
       *(2026-06-13; entity spec T-10.)*
+- [x] GDPR subject-rights workflow (`account` controller surface):
+      **right of access** `GET /api/auth/account/export` (bearer) — the
+      subject's `users` row + `sessions` + `auth_events` (no tokens / key
+      material / password hash / api key; `views/auth::AccountExport`);
+      **right to erasure** `DELETE /api/auth/account` (bearer) —
+      soft-delete + anonymise (`users.deleted_at`, migration
+      `m20220101_000004_users_deleted_at`; email→`deleted+<pid>@invalid`,
+      name→`"deleted user"`), revoke all sessions, write an
+      `account_erased` audit row; `/me` + export then `401` for the
+      erased subject (`users::find_active_by_pid`). Per-subject
+      `GET /api/auth/account/audit` (bearer) added; system-wide
+      `/audit/recent` left open by decision (§12). Un-gated unit tests +
+      DB-gated request tests; OpenAPI documents the three endpoints +
+      `AccountExport`/`AccountSessionExport`/`AccountAuditExport`
+      schemas. *(2026-06-13; entity spec T-9.)*
 - [ ] Key rotation: support multiple JWKS entries (`kid` already
       stamped) and a grace window.
 - [ ] Optional Mailpit docker-compose service for realistic dev email.
@@ -226,7 +300,10 @@ magic-link request tests (Postgres-gated); peer-service verifier crate
 (`../authentication-verifier-rust-crate/`) with a DB-free cross-crate
 contract test; per-email rate limiting on magic-link issuance (`429`);
 hand-written OpenAPI 3 + Swagger UI; durable `auth_events` audit trail
-(`GET /api/auth/audit/recent`).
+(`GET /api/auth/audit/recent`); GDPR subject-rights workflow
+(`GET /api/auth/account/export`, `GET /api/auth/account/audit`,
+`DELETE /api/auth/account` — right of access + soft-delete/anonymise
+erasure, `users.deleted_at`).
 
 ## 15. Roadmap
 

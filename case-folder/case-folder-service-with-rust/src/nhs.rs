@@ -84,12 +84,41 @@ mod tests {
 
     #[test]
     fn rejects_bad_check_digit() {
-        assert!(!is_valid_nhs_number("943 476 5918"));
+        // Each computes a valid check digit that does not equal the tenth digit.
+        // See spec/nhs-number.md worked examples.
+        assert!(!is_valid_nhs_number("943 476 5918")); // computed 9, tenth 8
+        assert!(!is_valid_nhs_number("614 309 0431")); // computed 2, tenth 1
+    }
+
+    #[test]
+    fn rejects_check_digit_of_ten() {
+        // Weighted sum 254, 254 mod 11 = 1, check = 10 -> invalid by rule,
+        // regardless of the tenth digit. Exercises the `10 => return false`
+        // branch. See spec/nhs-number.md.
+        assert!(!is_valid_nhs_number("999 000 0140"));
+        // The same nine-digit prefix is invalid whatever the tenth digit is.
+        for tenth in '0'..='9' {
+            let candidate = format!("99900001{tenth}");
+            assert!(
+                !is_valid_nhs_number(&candidate),
+                "{candidate} has check digit 10 and must be invalid"
+            );
+        }
     }
 
     #[test]
     fn rejects_wrong_length() {
         assert!(!is_valid_nhs_number("123"));
         assert!(!is_valid_nhs_number("12345678901"));
+        assert!(!is_valid_nhs_number(""));
+    }
+
+    #[test]
+    fn accepts_grouped_and_bare_forms_identically() {
+        assert_eq!(
+            is_valid_nhs_number("943 476 5919"),
+            is_valid_nhs_number("9434765919")
+        );
+        assert!(is_valid_nhs_number("943-476-5919"));
     }
 }

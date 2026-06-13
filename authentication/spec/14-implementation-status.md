@@ -17,6 +17,7 @@
 | Verifier doc set (T-1) | verifier | README, CHANGELOG, spec §1–§18, AGENTS.md/CLAUDE.md/index.md; `cargo package --list` green |
 | Magic-link request tests (T-3) | service | Signup / magic-link / redeem (single-use, anti-enumeration) / me / signout / JWKS; Postgres-backed tests `#[ignore]`d, DB-free assertions un-gated |
 | Cross-crate contract test (T-4) | service + verifier | `tests/sign_verify_contract.rs` — service signs, verifier verifies; claims round-trip; `kid` thumbprint pinned; DB-free |
+| GDPR subject rights (T-9) | service | Right of access `GET /api/auth/account/export` + per-subject `GET /api/auth/account/audit` (bearer); right to erasure `DELETE /api/auth/account` — soft-delete + anonymise (`users.deleted_at`, migration `m20220101_000004`), revoke sessions, `account_erased` audit; `/me` + export `401` post-erasure; un-gated unit + DB-gated request tests; OpenAPI updated |
 
 ### 14.2 Open gaps
 
@@ -29,7 +30,6 @@ Open gaps drive tasks in §13. Live gap list:
 | No rate limiting on magic-link issuance | T-6 |
 | Emails / UI English-only | T-7 |
 | No OpenAPI / Swagger for the service | T-8 |
-| No GDPR export / erasure workflow for accounts | T-9 |
 | No audit log or event streaming for auth events (sessions table only) | T-10 |
 | No front-end unit / e2e tests | T-11 |
 | Refresh tokens, revocation propagation, audience model | §16 open questions |

@@ -10,6 +10,7 @@ pub use sea_orm_migration::prelude::*;
 mod m20220101_000001_users;
 mod m20220101_000002_sessions;
 mod m20220101_000003_auth_events;
+mod m20220101_000004_users_deleted_at;
 
 /// loco/`SeaORM` migrator that runs every migration in order.
 pub struct Migrator;
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000001_users::Migration),
             Box::new(m20220101_000002_sessions::Migration),
             Box::new(m20220101_000003_auth_events::Migration),
+            Box::new(m20220101_000004_users_deleted_at::Migration),
             // inject-above (do not remove this comment)
         ]
     }

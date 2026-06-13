@@ -24,6 +24,10 @@ pub struct Model {
     pub email_verified_at: Option<DateTimeWithTimeZone>,
     pub magic_link_token: Option<String>,
     pub magic_link_expiration: Option<DateTimeWithTimeZone>,
+    /// Set by GDPR Art. 17 erasure: when present the account is
+    /// soft-deleted (and its `email`/`name` anonymised to a tombstone),
+    /// and every read path must treat the user as gone.
+    pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

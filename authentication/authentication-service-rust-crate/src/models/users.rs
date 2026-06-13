@@ -12,6 +12,18 @@ pub const MAGIC_LINK_LENGTH: i8 = 32;
 /// Magic-link validity window, in minutes.
 pub const MAGIC_LINK_EXPIRATION_MIN: i8 = 5;
 
+/// Tombstone email written by GDPR erasure, keyed by the user `pid` so
+/// the `UNIQUE(email)` constraint still holds across many erased rows
+/// while the original address is gone. Shape: `deleted+<pid>@invalid`
+/// (`.invalid` is RFC 2606 reserved — it can never route).
+#[must_use]
+pub fn tombstone_email(pid: &Uuid) -> String {
+    format!("deleted+{pid}@invalid")
+}
+
+/// Display name written by GDPR erasure in place of the real name.
+pub const TOMBSTONE_NAME: &str = "deleted user";
+
 /// Password-login params (loco scaffold; unused in the passwordless flow).
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginParams {
@@ -197,6 +209,29 @@ impl Model {
             .one(db)
             .await?;
         user.ok_or_else(|| ModelError::EntityNotFound)
+    }
+
+    /// Finds a *non-erased* user by `pid`. A GDPR-erased account
+    /// (`deleted_at` set) is treated as gone: the read paths (`/me`,
+    /// account export) use this so a still-cryptographically-valid
+    /// bearer token cannot reach a deleted user's data.
+    ///
+    /// # Errors
+    ///
+    /// [`ModelError::EntityNotFound`] when no live user matches, plus
+    /// the usual parse / DB errors.
+    pub async fn find_active_by_pid(db: &DatabaseConnection, pid: &str) -> ModelResult<Self> {
+        let user = Self::find_by_pid(db, pid).await?;
+        if user.deleted_at.is_some() {
+            return Err(ModelError::EntityNotFound);
+        }
+        Ok(user)
+    }
+
+    /// True when this account has been GDPR-erased (soft-deleted).
+    #[must_use]
+    pub fn is_deleted(&self) -> bool {
+        self.deleted_at.is_some()
     }
 
     /// finds a user by the provided api key
@@ -420,5 +455,65 @@ impl ActiveModel {
         self.magic_link_token = ActiveValue::set(None);
         self.magic_link_expiration = ActiveValue::set(None);
         self.update(db).await.map_err(ModelError::from)
+    }
+
+    /// GDPR Art. 17 erasure. **Soft-delete + anonymise**: stamp
+    /// `deleted_at`, replace `email` with a `pid`-keyed tombstone (so the
+    /// `UNIQUE(email)` constraint still holds and the original address is
+    /// gone), replace `name` with [`TOMBSTONE_NAME`], and clear any live
+    /// magic-link material. The row survives so the `auth_events` audit
+    /// trail and any referential history keep their integrity; every read
+    /// path treats a `deleted_at` user as gone
+    /// ([`Model::find_active_by_pid`]). Session revocation and the audit
+    /// row are written by the caller (the controller), which also owns
+    /// the transaction boundary.
+    ///
+    /// # Errors
+    /// - Returns an error if the database update fails.
+    pub async fn erase(mut self, db: &DatabaseConnection) -> ModelResult<Model> {
+        let pid = self.pid.as_ref();
+        self.email = ActiveValue::set(tombstone_email(pid));
+        self.name = ActiveValue::set(TOMBSTONE_NAME.to_string());
+        self.magic_link_token = ActiveValue::set(None);
+        self.magic_link_expiration = ActiveValue::set(None);
+        self.deleted_at = ActiveValue::set(Some(Local::now().into()));
+        self.update(db).await.map_err(ModelError::from)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TOMBSTONE_NAME, tombstone_email};
+    use uuid::Uuid;
+
+    #[test]
+    fn tombstone_email_is_pid_keyed_and_unroutable() {
+        let pid = Uuid::parse_str("00000000-0000-0000-0000-0000000000ab").unwrap();
+        let email = tombstone_email(&pid);
+        // Carries the pid (keeps UNIQUE(email) across many erased rows)
+        // and ends in the RFC 2606 reserved, never-routable `.invalid`.
+        assert_eq!(
+            email,
+            "deleted+00000000-0000-0000-0000-0000000000ab@invalid"
+        );
+        assert!(email.ends_with("@invalid"));
+        assert!(email.contains(&pid.to_string()));
+    }
+
+    #[test]
+    fn tombstone_email_differs_per_pid() {
+        let a = tombstone_email(&Uuid::new_v4());
+        let b = tombstone_email(&Uuid::new_v4());
+        assert_ne!(a, b, "distinct pids must yield distinct tombstone emails");
+    }
+
+    #[test]
+    fn tombstone_email_carries_no_original_address() {
+        // The transform is pid-only: it cannot reconstruct the original
+        // address, so erasure is irreversible from the stored value.
+        let pid = Uuid::new_v4();
+        let email = tombstone_email(&pid);
+        assert!(!email.contains("@example.com"));
+        assert_eq!(TOMBSTONE_NAME, "deleted user");
     }
 }

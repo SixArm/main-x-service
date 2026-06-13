@@ -10,6 +10,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **LT-6 / T-15 — Modulus-11 hardening.** `src/nhs.rs` now has 8 lib tests
+  (was 6). Added explicit coverage for the `check == 10 → invalid` branch
+  (`999 000 0140`), the documented invalid number `614 309 0431`,
+  grouped/bare-form parity, and the empty-input case. No behaviour change;
+  the validator was already correct — this closes a coverage gap on a
+  documented core invariant (`spec/nhs-number.md`).
+
 ### Added
 
 - **Inaugural scaffold (v0.1.0).** Loco / Axum / SeaORM **JSON API** for

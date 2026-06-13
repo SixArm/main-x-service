@@ -2,6 +2,7 @@
 
 use chrono::offset::Local;
 use loco_rs::prelude::*;
+use sea_orm::QueryOrder;
 use uuid::Uuid;
 
 pub use super::_entities::sessions::{self, ActiveModel, Entity, Model};
@@ -49,6 +50,52 @@ impl Model {
             .one(db)
             .await?;
         session.ok_or_else(|| ModelError::EntityNotFound)
+    }
+
+    /// All sessions for a user, newest first. Used by the GDPR account
+    /// export (right of access) — issuance/expiry/revocation timestamps
+    /// and the captured `user_agent`, never any token or secret.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn find_all_by_user_pid(
+        db: &DatabaseConnection,
+        user_pid: Uuid,
+    ) -> ModelResult<Vec<Self>> {
+        let rows = sessions::Entity::find()
+            .filter(
+                model::query::condition()
+                    .eq(sessions::Column::UserPid, user_pid)
+                    .build(),
+            )
+            .order_by_desc(sessions::Column::Id)
+            .all(db)
+            .await?;
+        Ok(rows)
+    }
+
+    /// Revoke every still-active session for a user (GDPR erasure stamps
+    /// `revoked_at` on each). Already-revoked sessions are left as-is so
+    /// their original revocation timestamp survives. Returns the number
+    /// of sessions newly revoked.
+    ///
+    /// # Errors
+    ///
+    /// When a query or update fails.
+    pub async fn revoke_all_for_user(
+        db: &DatabaseConnection,
+        user_pid: Uuid,
+    ) -> ModelResult<usize> {
+        let sessions = Self::find_all_by_user_pid(db, user_pid).await?;
+        let mut revoked = 0;
+        for session in sessions {
+            if session.is_active() {
+                session.into_active_model().revoke(db).await?;
+                revoked += 1;
+            }
+        }
+        Ok(revoked)
     }
 
     /// True when the session exists and has not been revoked.

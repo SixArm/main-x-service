@@ -29,9 +29,14 @@ validation; either grouped or bare form is accepted in path/query params.
 | `943 476 5919` | 9434765919 | 299          | 2          | 9     | ✓      |
 | `987 654 3210` | 9876543210 | 330          | 0          | 0     | ✓      |
 | `999 999 9999` | 9999999999 | 486          | 2          | 9     | ✓      |
-| `943 476 5918` | 9434765918 | —            | —          | ≠8    | ✗      |
-| `614 309 0431` | 6143090431 | 185          | 9          | 2     | ✗      |
-| `013 628 2963` | 0136282963 | —            | 1          | 10    | ✗      |
+| `943 476 5918` | 9434765918 | 299          | 2          | 9≠8   | ✗      |
+| `614 309 0431` | 6143090431 | 185          | 9          | 2≠1   | ✗      |
+| `999 000 0140` | 9990000140 | 254          | 1          | 10    | ✗      |
+
+The last row is the **`check == 10`** case: a weighted sum of `254`
+gives `254 mod 11 = 1`, so `check = 11 − 1 = 10`. By rule 5 the number
+is invalid regardless of the tenth digit — no valid NHS Number ever has
+a check digit of 10.
 
 ## Helper contract
 

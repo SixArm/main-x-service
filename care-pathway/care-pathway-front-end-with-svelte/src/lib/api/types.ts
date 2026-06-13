@@ -101,3 +101,15 @@ export interface MergeResult {
     duplicate_pid: string;
     main: CarePathway;
 }
+
+/// One audit-log row from `GET /api/care-pathways/{pid}/audit`.
+/// Mirrors the service's `audit_logs` SeaORM model (serialized field
+/// names): `action` (created/updated/deleted/merged), nullable `actor`
+/// (the caller's user pid when a verified token was presented, else
+/// `null`), an optional JSON `snapshot`, and the `created_at` timestamp.
+export interface AuditEntry {
+    action: string;
+    actor: string | null;
+    snapshot?: unknown;
+    created_at?: string;
+}

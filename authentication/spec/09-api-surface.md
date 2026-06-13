@@ -16,12 +16,18 @@ Source:
 | GET | `/api/auth/me` | Bearer | Current user; rejects revoked sessions |
 | POST | `/api/auth/signout` | Bearer | Revoke the current session |
 | GET | `/api/auth/audit/recent` | — | Recent authentication audit events (`AuthEvent[]`, newest 100) |
+| GET | `/api/auth/account/export` | Bearer | GDPR right of access: the subject's `users` + `sessions` + `auth_events` (`AccountExport`) |
+| GET | `/api/auth/account/audit` | Bearer | GDPR right of access: the subject's own audit trail (`AccountAuditExport[]`) |
+| DELETE | `/api/auth/account` | Bearer | GDPR right to erasure: soft-delete + anonymise + revoke sessions + audit |
 | GET | `/.well-known/jwks.json` | — | Public keys for offline verification |
 
 `/api/auth/audit/recent` returns the durable `auth_events` audit trail
-(T-10; see §10 + §12). It is currently unauthenticated, mirroring the
-sibling care-pathway service's `/audit/recent`; rows carry no tokens or
-secrets.
+(T-10; see §10 + §12). It is deliberately unauthenticated (operator
+system feed), mirroring the sibling care-pathway service's
+`/audit/recent`; rows carry no tokens or secrets. The GDPR right of
+access (T-9) is served instead by the bearer-gated, per-subject
+`/api/auth/account/audit` + `/api/auth/account/export`, so a subject's
+own data is reachable only by that subject.
 
 Plus loco's default routes (`AppRoutes::with_default_routes()` in
 [`src/app.rs`](../authentication-service-rust-crate/src/app.rs)),

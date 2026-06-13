@@ -2,7 +2,7 @@
 
 import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
-import type { CarePathway, MergeResult, PathwayRef, ScoredRef } from "./types";
+import type { AuditEntry, CarePathway, MergeResult, PathwayRef, ScoredRef } from "./types";
 
 export class CarePathwayRepository {
     constructor(private readonly http: ApiClient) {}
@@ -57,5 +57,13 @@ export class CarePathwayRepository {
             body.reason = reason;
         }
         return this.http.post<MergeResult>("/api/care-pathways/merge", { body });
+    }
+
+    /// Audit trail for one care pathway, most-recent first. `pid` is
+    /// URL-encoded.
+    audit(pid: string): Promise<AuditEntry[]> {
+        return this.http.get<AuditEntry[]>(
+            `/api/care-pathways/${encodeURIComponent(pid)}/audit`,
+        );
     }
 }

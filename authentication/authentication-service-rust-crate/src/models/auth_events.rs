@@ -10,7 +10,7 @@
 //! account existence (anti-enumeration is preserved at the wire).
 
 use loco_rs::prelude::*;
-use sea_orm::{QueryOrder, QuerySelect};
+use sea_orm::{ColumnTrait, Condition, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
 pub use super::_entities::auth_events::{self, ActiveModel, Entity, Model};
@@ -62,6 +62,32 @@ impl Model {
         if let Err(err) = Self::record(db, event, email, user_pid, detail).await {
             tracing::warn!(error = %err, event, "failed to write auth event");
         }
+    }
+
+    /// All audit rows for one subject, newest first. A subject is matched
+    /// by `user_pid` **or** by their normalised `email` — the early
+    /// events of a flow (e.g. a `signup` before the pid is known, or an
+    /// `unknown_email` probe) carry only the email, while later ones
+    /// carry the pid, so the GDPR right-of-access export must union both.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn for_subject(
+        db: &DatabaseConnection,
+        user_pid: Uuid,
+        email: &str,
+    ) -> ModelResult<Vec<Self>> {
+        let rows = auth_events::Entity::find()
+            .filter(
+                Condition::any()
+                    .add(auth_events::Column::UserPid.eq(user_pid))
+                    .add(auth_events::Column::Email.eq(normalise_email(email))),
+            )
+            .order_by_desc(auth_events::Column::Id)
+            .all(db)
+            .await?;
+        Ok(rows)
     }
 
     /// Most-recent authentication events, newest first, capped at `limit`.

@@ -31,6 +31,11 @@
   `toRoom`, `toCabinet`, `toWorker`, `toStats`) + `ApiError`. Also removed a
   redundant `role="separator"` on `Separator.svelte` (`<hr>` carries the
   implicit role), so `pnpm run check` is back to 0 errors / 0 warnings.
+- [x] **ST-13b** Modulus-11 hardening (root **T-15**). `nhs.test.ts` adds the
+  `check === 10 → invalid` branch (`999 000 0140`), the documented invalid
+  number `614 309 0431`, leading-zero normalisation, empty input, and
+  grouped/bare parity; `nhs.ts` reorders the `check === 10` guard to mirror
+  the Rust edition (no behaviour change). vitest unit count 24→26.
 - [ ] **ST-14** ESLint + svelte-eslint (P1)
 - [ ] **ST-15** `@axe-core/playwright` scans in CI (P1) — UR-9
 - [ ] **ST-16** Codegen client types from API OpenAPI/JSON Schema (P1) — UR-6

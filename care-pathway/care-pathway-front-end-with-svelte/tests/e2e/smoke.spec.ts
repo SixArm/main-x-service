@@ -44,6 +44,22 @@ async function stubApi(page: Page) {
     if (path.endsWith("/check-duplicates")) {
       return route.fulfill({ json: [] });
     }
+    if (path === `/api/care-pathways/${PID}/audit` && method === "GET") {
+      return route.fulfill({
+        json: [
+          {
+            action: "updated",
+            actor: null,
+            created_at: "2026-06-13T10:00:00Z",
+          },
+          {
+            action: "created",
+            actor: null,
+            created_at: "2026-06-13T09:00:00Z",
+          },
+        ],
+      });
+    }
     if (path === `/api/care-pathways/${PID}` && method === "GET") {
       return route.fulfill({ json: PATHWAY });
     }
@@ -150,6 +166,21 @@ test("edit page renders the edit form", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Edit care pathway" }),
   ).toBeVisible();
+});
+
+test("audit trail toggle loads and renders the trail", async ({ page }) => {
+  await page.goto(`/${PID}`, { waitUntil: "networkidle" });
+
+  // The panel is collapsed by default; open it to lazy-load the trail.
+  await page.getByRole("button", { name: "Show audit trail" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Audit trail" }),
+  ).toBeVisible();
+
+  // Newest-first: both rows render with the action and "—" for a null actor.
+  await expect(page.getByText("updated")).toBeVisible();
+  await expect(page.getByText("created")).toBeVisible();
+  await expect(page.getByText("—").first()).toBeVisible();
 });
 
 test("merge action folds a duplicate into the survivor", async ({ page }) => {

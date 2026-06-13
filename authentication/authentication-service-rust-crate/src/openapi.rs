@@ -86,10 +86,46 @@ pub fn spec() -> Value {
             "/api/auth/audit/recent": {
                 "get": {
                     "tags": ["audit"],
-                    "summary": "Recent authentication events (audit trail)",
-                    "description": "Newest-first authentication audit events (signup, magic-link request/redeem, signout), capped at 100. Rows carry the event name, normalised email, subject pid, and an outcome marker — never tokens or secrets. Currently unauthenticated (mirrors the family /audit/recent pattern); may be gated behind a bearer token in a future task.",
+                    "summary": "Recent authentication events (system-wide audit trail)",
+                    "description": "Newest-first authentication audit events (signup, magic-link request/redeem, signout, account_erased), capped at 100. Rows carry the event name, normalised email, subject pid, and an outcome marker — never tokens or secrets. Deliberately unauthenticated (mirrors the family /audit/recent pattern); the GDPR right-of-access requirement is met by the bearer-gated per-subject /api/auth/account/audit instead.",
                     "responses": {
                         "200": { "description": "Recent auth events", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AuthEvent" } } } } }
+                    }
+                }
+            },
+            "/api/auth/account/export": {
+                "get": {
+                    "tags": ["account"],
+                    "summary": "GDPR right of access — export the subject's account data",
+                    "description": "Returns everything the service holds about the authenticated subject: their users row, their sessions (issuance/expiry/revocation timestamps + user agent), and their auth_events audit trail. Never includes tokens, key material, the password hash, or the api key. A GDPR-erased account is treated as gone (401).",
+                    "security": [{ "bearer": [] }],
+                    "responses": {
+                        "200": { "description": "Account export", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountExport" } } } },
+                        "401": { "description": "Missing/invalid bearer token, or the account has been erased" }
+                    }
+                }
+            },
+            "/api/auth/account/audit": {
+                "get": {
+                    "tags": ["account"],
+                    "summary": "GDPR right of access — the subject's own audit trail",
+                    "description": "Returns only the authenticated subject's own auth_events rows (matched by pid or email), newest first — the bearer-gated, per-subject counterpart to the open system-wide /api/auth/audit/recent.",
+                    "security": [{ "bearer": [] }],
+                    "responses": {
+                        "200": { "description": "The subject's audit events", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AccountAuditExport" } } } } },
+                        "401": { "description": "Missing/invalid bearer token, or the account has been erased" }
+                    }
+                }
+            },
+            "/api/auth/account": {
+                "delete": {
+                    "tags": ["account"],
+                    "summary": "GDPR right to erasure — delete the subject's account",
+                    "description": "Soft-deletes + anonymises the account: stamps users.deleted_at, replaces email/name with a tombstone (so referential history and the audit trail keep their integrity), revokes all of the subject's sessions, and records an account_erased audit row. After erasure the bearer token still verifies cryptographically until exp, but /me and the export treat the subject as gone (401). Idempotent.",
+                    "security": [{ "bearer": [] }],
+                    "responses": {
+                        "200": { "description": "Account erased (soft-delete + anonymise)" },
+                        "401": { "description": "Missing/invalid bearer token, or the account is already erased" }
                     }
                 }
             },
@@ -155,6 +191,37 @@ pub fn spec() -> Value {
                     "detail": { "type": "string", "nullable": true, "description": "Outcome marker, e.g. rate_limited / unknown_email / invalid_or_expired / issued / ok." },
                     "created_at": { "type": "string", "format": "date-time" },
                     "updated_at": { "type": "string", "format": "date-time" } } },
+                "AccountUserExport": { "type": "object",
+                    "description": "The users row as exported for GDPR right of access. Excludes the password hash, api key, and live magic-link material (secrets/credentials, not subject data).",
+                    "required": ["pid", "email", "name", "created_at", "updated_at"], "properties": {
+                    "pid": { "type": "string", "format": "uuid" },
+                    "email": { "type": "string", "format": "email" },
+                    "name": { "type": "string" },
+                    "email_verified_at": { "type": "string", "format": "date-time", "nullable": true },
+                    "created_at": { "type": "string", "format": "date-time" },
+                    "updated_at": { "type": "string", "format": "date-time" } } },
+                "AccountSessionExport": { "type": "object",
+                    "description": "One session row exported for GDPR right of access. jid is the JWT jti (an opaque id, not a credential); no token is ever included.",
+                    "required": ["jid", "issued_at", "expires_at"], "properties": {
+                    "jid": { "type": "string", "description": "JWT id (jti) — an opaque identifier, not a credential." },
+                    "issued_at": { "type": "string", "format": "date-time" },
+                    "expires_at": { "type": "string", "format": "date-time" },
+                    "revoked_at": { "type": "string", "format": "date-time", "nullable": true },
+                    "user_agent": { "type": "string", "nullable": true } } },
+                "AccountAuditExport": { "type": "object",
+                    "description": "One audit-trail row exported for GDPR right of access. Never carries a token or secret.",
+                    "required": ["event", "created_at"], "properties": {
+                    "event": { "type": "string", "description": "signup / magic_link_requested / magic_link_redeemed / signout / account_erased." },
+                    "email": { "type": "string", "format": "email", "nullable": true },
+                    "user_pid": { "type": "string", "format": "uuid", "nullable": true },
+                    "detail": { "type": "string", "nullable": true },
+                    "created_at": { "type": "string", "format": "date-time" } } },
+                "AccountExport": { "type": "object",
+                    "description": "GDPR Art. 15 (right of access) export: everything the service holds about the authenticated subject. No tokens, key material, password hash, or api key.",
+                    "required": ["user", "sessions", "auth_events"], "properties": {
+                    "user": { "$ref": "#/components/schemas/AccountUserExport" },
+                    "sessions": { "type": "array", "items": { "$ref": "#/components/schemas/AccountSessionExport" } },
+                    "auth_events": { "type": "array", "items": { "$ref": "#/components/schemas/AccountAuditExport" } } } },
                 "Error": { "type": "object", "properties": {
                     "error": { "type": "string", "description": "Machine-readable error code, e.g. rate_limited." },
                     "description": { "type": "string" } } }
@@ -186,7 +253,48 @@ mod tests {
         assert!(paths["/api/auth/me"]["get"].is_object());
         assert!(paths["/api/auth/signout"]["post"].is_object());
         assert!(paths["/api/auth/audit/recent"]["get"].is_object());
+        assert!(paths["/api/auth/account/export"]["get"].is_object());
+        assert!(paths["/api/auth/account/audit"]["get"].is_object());
+        assert!(paths["/api/auth/account"]["delete"].is_object());
         assert!(paths["/.well-known/jwks.json"]["get"].is_object());
+    }
+
+    #[test]
+    fn documents_the_gdpr_account_endpoints_as_bearer_gated() {
+        let s = spec();
+        let p = &s["paths"];
+        // Export returns an AccountExport and requires the bearer token.
+        assert_eq!(
+            p["/api/auth/account/export"]["get"]["responses"]["200"]["content"]["application/json"]
+                ["schema"]["$ref"],
+            "#/components/schemas/AccountExport"
+        );
+        assert!(p["/api/auth/account/export"]["get"]["security"][0]["bearer"].is_array());
+        // The per-subject audit + erasure are bearer-gated too.
+        assert!(p["/api/auth/account/audit"]["get"]["security"][0]["bearer"].is_array());
+        assert!(p["/api/auth/account"]["delete"]["security"][0]["bearer"].is_array());
+        // Each documents the 401 for missing/erased.
+        assert!(p["/api/auth/account/export"]["get"]["responses"]["401"].is_object());
+        assert!(p["/api/auth/account"]["delete"]["responses"]["401"].is_object());
+    }
+
+    #[test]
+    fn account_export_schema_excludes_secrets() {
+        let s = spec();
+        let schemas = &s["components"]["schemas"];
+        let user = &schemas["AccountUserExport"]["properties"];
+        // The export must not advertise credential/secret fields.
+        for forbidden in ["password", "api_key", "magic_link_token"] {
+            assert!(
+                user[forbidden].is_null(),
+                "AccountUserExport must not expose {forbidden}"
+            );
+        }
+        // The composite export references the three parts.
+        let export = &schemas["AccountExport"]["properties"];
+        assert!(export["user"]["$ref"].is_string());
+        assert!(export["sessions"]["items"]["$ref"].is_string());
+        assert!(export["auth_events"]["items"]["$ref"].is_string());
     }
 
     #[test]
@@ -244,6 +352,10 @@ mod tests {
             "Jwks",
             "Jwk",
             "AuthEvent",
+            "AccountUserExport",
+            "AccountSessionExport",
+            "AccountAuditExport",
+            "AccountExport",
         ] {
             assert!(schemas[name].is_object(), "missing schema {name}");
         }

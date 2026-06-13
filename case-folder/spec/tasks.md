@@ -50,9 +50,17 @@
   mappers (P1) — NFR-6
 - [x] **T-13** Automated axe accessibility scans (`tests/e2e/a11y.spec.ts`,
   9 routes, fails on serious/critical) (P1) — NFR-5
-- [x] **T-14** vitest unit tests (`npm run test:unit`, 24 tests — `nhs.ts`
+- [x] **T-14** vitest unit tests (`npm run test:unit`, 26 tests — `nhs.ts`
   + all exported `client.ts` mappers + components) + ESLint flat config
   (`npm run lint`, clean) for the Svelte client (P1)
+- [x] **T-15** Harden the Modulus-11 core invariant on both editions
+  (D-6) — NFR-1. Fixed two factual errors in
+  [nhs-number.md](nhs-number.md)'s worked-example table (the `013 628 2963`
+  row mis-stated its `Sum mod 11`/`Check` columns); added a genuine
+  `check == 10 → invalid` example (`999 000 0140`); both editions now test
+  that branch plus grouped/bare-form parity and the documented invalid
+  numbers. Rust `nhs.rs` 6→8 lib tests; Svelte `nhs.test.ts` adds 4
+  assertions.
 
 ## Production gates (blocked on deployment decisions)
 

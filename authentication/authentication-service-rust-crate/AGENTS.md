@@ -45,8 +45,12 @@ template (see root `AGENTS.md`).
 | POST | `/api/auth/signup` | — | Create a passwordless account, issue a magic link. |
 | POST | `/api/auth/magic-link` | — | Request a magic link for an existing account (sign in). |
 | GET | `/api/auth/magic-link/{token}` | — | Consume the link → RS256 access token + session. |
-| GET | `/api/auth/me` | Bearer | Current user. |
+| GET | `/api/auth/me` | Bearer | Current user (rejects revoked + GDPR-erased accounts). |
 | POST | `/api/auth/signout` | Bearer | Revoke the current session. |
+| GET | `/api/auth/audit/recent` | — | System-wide authentication audit trail (newest 100). |
+| GET | `/api/auth/account/export` | Bearer | GDPR right of access: the subject's data (`users` + `sessions` + `auth_events`). |
+| GET | `/api/auth/account/audit` | Bearer | GDPR right of access: the subject's own audit trail. |
+| DELETE | `/api/auth/account` | Bearer | GDPR right to erasure: soft-delete + anonymise + revoke sessions + audit. |
 | GET | `/.well-known/jwks.json` | — | Public keys for offline token verification. |
 | GET | `/api-docs/openapi.json` | — | Hand-written OpenAPI 3 document. |
 | GET | `/swagger-ui` | — | Swagger UI page (CDN assets) rendering the doc. |
@@ -91,17 +95,17 @@ src/
 ├── bin/main.rs            loco CLI entrypoint
 ├── auth/mod.rs            RS256 signing + verification + JWKS + bearer extractor
 ├── controllers/
-│   ├── auth.rs            signup / magic-link / verify / me / signout (issuance rate-limited)
+│   ├── auth.rs            signup / magic-link / verify / me / signout / audit + GDPR account export/audit/erasure
 │   ├── docs.rs            /api-docs/openapi.json + /swagger-ui
 │   └── jwks.rs            /.well-known/jwks.json
 ├── openapi.rs            hand-written OpenAPI 3 document
 ├── rate_limit.rs         per-email sliding-window magic-link issuance limiter
 ├── models/
-│   ├── users.rs           magic-link user model (+ create_passwordless)
-│   ├── sessions.rs        session issue/revoke (jid = jwt jti)
+│   ├── users.rs           magic-link user model (+ create_passwordless, GDPR erase + find_active_by_pid)
+│   ├── sessions.rs        session issue/revoke (jid = jwt jti); revoke_all_for_user for erasure
 │   └── _entities/         generated SeaORM entities
 ├── mailers/auth.rs        magic-link mailer (prod)
-├── migration/             in-crate migrator: m20220101_000001_users, m20220101_000002_sessions
+├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at
 └── views/auth.rs          LoginResponse / CurrentResponse
 config/                    development/production/test yaml + dev RSA keys
 ```

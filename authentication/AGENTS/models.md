@@ -26,11 +26,15 @@ entity in `src/models/_entities/users.rs`, migration
 | email_verified_at | Option\<DateTime\> | Set on first magic-link redemption |
 | magic_link_token | Option\<String\> | Live link token — 32 random chars (`MAGIC_LINK_LENGTH`) |
 | magic_link_expiration | Option\<DateTime\> | Now + 5 min (`MAGIC_LINK_EXPIRATION_MIN`) |
+| deleted_at | Option\<DateTime\> | GDPR Art. 17 soft-delete (migration `m20220101_000004_users_deleted_at`); when set the account is anonymised + treated as gone |
 
 **Key methods:** `create_passwordless(db, email, name)`,
-`find_by_email`, `find_by_pid`, `find_by_magic_token` (enforces
+`find_by_email`, `find_by_pid`, `find_active_by_pid` (excludes
+GDPR-erased accounts), `is_deleted()`, `find_by_magic_token` (enforces
 expiry), `ActiveModel::create_magic_link`,
-`ActiveModel::clear_magic_link`, `ActiveModel::verified`.
+`ActiveModel::clear_magic_link`, `ActiveModel::verified`,
+`ActiveModel::erase` (GDPR soft-delete + anonymise). The pure
+`tombstone_email(pid)` + `TOMBSTONE_NAME` shape the anonymised values.
 
 ## Session
 
@@ -51,7 +55,8 @@ migration
 | user_agent | Option\<String\> | Issuance context |
 
 **Key methods:** `issue(db, jid, user_pid, expires_at, user_agent)`,
-`find_by_jid`, `is_active()` (= `revoked_at.is_none()`),
+`find_by_jid`, `find_all_by_user_pid` (export), `is_active()` (=
+`revoked_at.is_none()`), `revoke_all_for_user` (GDPR erasure),
 `ActiveModel::revoke`.
 
 ## Claims (cross-crate contract)

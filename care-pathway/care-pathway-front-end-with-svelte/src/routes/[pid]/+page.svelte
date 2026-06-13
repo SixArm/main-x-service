@@ -3,7 +3,7 @@
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
     import { CarePathwayRepository } from "$lib/api/care-pathways";
-    import type { CarePathway, ScoredRef } from "$lib/api/types";
+    import type { AuditEntry, CarePathway, ScoredRef } from "$lib/api/types";
 
     const repo = CarePathwayRepository.withFetch();
     const pid = page.params.pid ?? "";
@@ -16,6 +16,13 @@
     let merging = $state<string | null>(null);
     let confirming = $state<string | null>(null);
     let mergeMessage = $state<string | null>(null);
+
+    // Audit trail: lazy-loaded behind a toggle so the detail page stays
+    // lean on first paint.
+    let showAudit = $state(false);
+    let audit = $state<AuditEntry[] | null>(null);
+    let auditLoading = $state(false);
+    let auditError = $state<string | null>(null);
 
     onMount(async () => {
         try {
@@ -72,6 +79,26 @@
             error = err instanceof Error ? err.message : "Merge failed";
         } finally {
             merging = null;
+        }
+    }
+
+    /// Toggle the audit panel; lazy-load the trail on first open.
+    async function toggleAudit() {
+        showAudit = !showAudit;
+        if (!showAudit || audit !== null || auditLoading) return;
+        auditLoading = true;
+        auditError = null;
+        try {
+            const rows = await repo.audit(pid);
+            // Defensive newest-first sort by created_at (the service
+            // already orders this way; tolerate missing timestamps).
+            audit = [...rows].sort((a, b) =>
+                (b.created_at ?? "").localeCompare(a.created_at ?? ""),
+            );
+        } catch (err) {
+            auditError = err instanceof Error ? err.message : "Audit load failed";
+        } finally {
+            auditLoading = false;
         }
     }
 </script>
@@ -164,6 +191,33 @@
                     </li>
                 {/each}
             </ul>
+        {/if}
+    {/if}
+
+    <div class="row" style="margin-top:1rem">
+        <button class="button" onclick={toggleAudit}>
+            {showAudit ? "Hide audit trail" : "Show audit trail"}
+        </button>
+    </div>
+
+    {#if showAudit}
+        <h2>Audit trail</h2>
+        {#if auditLoading}
+            <p>Loading audit trail…</p>
+        {:else if auditError}
+            <p class="banner" role="alert">{auditError}</p>
+        {:else if audit && audit.length > 0}
+            <ul class="stack">
+                {#each audit as entry, i (i)}
+                    <li class="surface row">
+                        <strong>{entry.action}</strong>
+                        <span>{entry.actor ?? "—"}</span>
+                        {#if entry.created_at}<span>{entry.created_at}</span>{/if}
+                    </li>
+                {/each}
+            </ul>
+        {:else}
+            <p>No audit entries.</p>
         {/if}
     {/if}
 {/if}

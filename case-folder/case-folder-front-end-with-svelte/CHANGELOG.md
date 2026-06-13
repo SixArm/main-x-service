@@ -12,6 +12,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **T-15 — Modulus-11 hardening.** `nhs.test.ts` now covers the genuine
+  `check === 10 → invalid` branch (`999 000 0140`, asserted across all ten
+  trailing digits), the documented invalid number `614 309 0431`, leading-zero
+  normalisation, the empty-input case, and grouped/bare-form parity. Fixed a
+  wrong comment that mis-described why `013 628 2963` is invalid (it fails on
+  a check-digit mismatch, not because the check computes to 10). Reordered the
+  `check === 10` guard in `nhs.ts` ahead of the check-digit computation to
+  mirror the Rust edition; behaviour is unchanged. vitest unit count is now 26
+  (was 24).
 - **ST-13 complete — mapper unit coverage.** `client.test.ts` now exercises
   every exported snake→camel mapper (`toPatient`, `toFolder`, `toMove`,
   `toBuilding`, `toRoom`, `toCabinet`, `toWorker`, `toStats`) plus `ApiError`;

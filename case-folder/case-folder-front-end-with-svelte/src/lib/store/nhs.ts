@@ -28,7 +28,8 @@ export function isValidNhsNumber(raw: string): boolean {
     }
     const remainder = total % 11;
     const check = 11 - remainder;
-    const checkDigit = check === 11 ? 0 : check;
+    // check === 10 → invalid by rule; check === 11 → check digit is 0.
     if (check === 10) return false;
+    const checkDigit = check === 11 ? 0 : check;
     return checkDigit === Number(digits[9]);
 }

@@ -369,6 +369,138 @@ async fn auth_events_are_recorded_and_queryable() {
     .await;
 }
 
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn account_export_returns_the_callers_data() {
+    // GDPR Art. 15 (right of access): the export gathers the subject's
+    // users row, sessions, and auth_events.
+    request::<App, _, _>(|request, ctx| async move {
+        let logged_in = prepare_data::init_user_login(&request, &ctx).await;
+        let (auth_key, auth_value) = prepare_data::auth_header(&logged_in.token);
+
+        let response = request
+            .get("/api/auth/account/export")
+            .add_header(auth_key, auth_value)
+            .await;
+        assert_eq!(response.status_code(), 200, "export should succeed with a bearer token");
+
+        let body: serde_json::Value = serde_json::from_str(&response.text()).unwrap();
+        assert_eq!(body["user"]["pid"], logged_in.user.pid.to_string());
+        assert_eq!(body["user"]["email"], logged_in.user.email);
+        // At least the redemption session is present.
+        assert!(
+            body["sessions"].as_array().is_some_and(|s| !s.is_empty()),
+            "export should include the subject's sessions"
+        );
+        // The audit trail (signup + redeem) is present.
+        assert!(
+            body["auth_events"].as_array().is_some_and(|e| !e.is_empty()),
+            "export should include the subject's auth events"
+        );
+        // No credentials/secrets ever appear.
+        let raw = response.text();
+        assert!(!raw.contains("password"), "export must not expose the password");
+        assert!(!raw.contains("api_key"), "export must not expose the api key");
+        assert!(!raw.contains("\"token\""), "export must not expose any token");
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn account_export_and_delete_require_a_bearer_token() {
+    request::<App, _, _>(|request, _ctx| async move {
+        assert_eq!(
+            request.get("/api/auth/account/export").await.status_code(),
+            401,
+            "export requires a bearer token"
+        );
+        assert_eq!(
+            request.get("/api/auth/account/audit").await.status_code(),
+            401,
+            "per-subject audit requires a bearer token"
+        );
+        assert_eq!(
+            request.delete("/api/auth/account").await.status_code(),
+            401,
+            "erasure requires a bearer token"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn account_erasure_soft_deletes_anonymises_revokes_and_audits() {
+    // GDPR Art. 17 (right to erasure): soft-delete + anonymise + revoke
+    // sessions + audit; after erasure /me and export are gone.
+    use authentication_service::models::{auth_events::Model as AuthEvent, sessions, users};
+
+    request::<App, _, _>(|request, ctx| async move {
+        let logged_in = prepare_data::init_user_login(&request, &ctx).await;
+        let pid = logged_in.user.pid;
+        let original_email = logged_in.user.email.clone();
+        let (auth_key, auth_value) = prepare_data::auth_header(&logged_in.token);
+
+        let erase = request
+            .delete("/api/auth/account")
+            .add_header(auth_key.clone(), auth_value.clone())
+            .await;
+        assert_eq!(erase.status_code(), 200, "erasure should succeed");
+
+        // The row survives but is soft-deleted + anonymised.
+        let erased = users::Model::find_by_pid(&ctx.db, &pid.to_string())
+            .await
+            .expect("the row must survive erasure for audit integrity");
+        assert!(erased.deleted_at.is_some(), "deleted_at must be stamped");
+        assert_ne!(erased.email, original_email, "email must be anonymised");
+        assert!(erased.email.ends_with("@invalid"), "email must be tombstoned");
+        assert_eq!(erased.name, "deleted user", "name must be tombstoned");
+        // The original email no longer resolves.
+        assert!(
+            users::Model::find_by_email(&ctx.db, &original_email)
+                .await
+                .is_err(),
+            "the original email must no longer resolve to the account"
+        );
+
+        // All sessions are revoked.
+        let sessions = sessions::Model::find_all_by_user_pid(&ctx.db, pid)
+            .await
+            .expect("sessions should query");
+        assert!(
+            sessions.iter().all(|s| !s.is_active()),
+            "every session must be revoked after erasure"
+        );
+
+        // An account_erased audit row was written.
+        let events = AuthEvent::for_subject(&ctx.db, pid, &original_email)
+            .await
+            .expect("subject audit should query");
+        assert!(
+            events.iter().any(|e| e.event == "account_erased"),
+            "an account_erased audit row must be recorded; got {events:?}"
+        );
+
+        // Post-erasure: /me and export treat the subject as gone (401),
+        // even though the bearer token still verifies cryptographically.
+        let me = request
+            .get("/api/auth/me")
+            .add_header(auth_key.clone(), auth_value.clone())
+            .await;
+        assert_eq!(me.status_code(), 401, "/me must reject an erased account");
+        let export = request
+            .get("/api/auth/account/export")
+            .add_header(auth_key, auth_value)
+            .await;
+        assert_eq!(export.status_code(), 401, "export must reject an erased account");
+    })
+    .await;
+}
+
 // ---------------------------------------------------------------------------
 // DB-free contract assertions (always run).
 // ---------------------------------------------------------------------------
@@ -385,6 +517,9 @@ fn route_table_covers_the_magic_link_surface() {
         "/me",
         "/signout",
         "/audit/recent",
+        "/account/export",
+        "/account/audit",
+        "/account",
     ] {
         assert!(uris.contains(&expected), "missing route {expected}; have {uris:?}");
     }

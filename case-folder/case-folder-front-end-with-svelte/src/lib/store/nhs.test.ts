@@ -6,6 +6,9 @@ describe('normaliseNhsNumber', () => {
         expect(normaliseNhsNumber('943 476 5919')).toBe('9434765919');
         expect(normaliseNhsNumber('943-476-5919')).toBe('9434765919');
     });
+    it('preserves a leading zero', () => {
+        expect(normaliseNhsNumber('013 628 2963')).toBe('0136282963');
+    });
 });
 
 describe('formatNhsNumber', () => {
@@ -26,13 +29,26 @@ describe('isValidNhsNumber (Modulus 11)', () => {
         expect(isValidNhsNumber('999 999 9999')).toBe(true);
     });
     it('rejects a bad check digit', () => {
-        expect(isValidNhsNumber('943 476 5918')).toBe(false);
+        // Computed check digit differs from the tenth digit.
+        expect(isValidNhsNumber('943 476 5918')).toBe(false); // computed 9, tenth 8
+        expect(isValidNhsNumber('614 309 0431')).toBe(false); // computed 2, tenth 1
+        // 0136282963: weighted sum 174 → mod 11 = 9 → check 2 ≠ tenth digit 3.
+        expect(isValidNhsNumber('013 628 2963')).toBe(false);
     });
     it('rejects the wrong length', () => {
         expect(isValidNhsNumber('943 476 591')).toBe(false);
+        expect(isValidNhsNumber('')).toBe(false);
     });
     it('rejects a number whose check digit computes to 10', () => {
-        // 0136282963 → weighted sum mod 11 = 1 → check 10 → invalid.
-        expect(isValidNhsNumber('013 628 2963')).toBe(false);
+        // 9990000140: weighted sum 254 → mod 11 = 1 → check 10 → invalid
+        // by rule, whatever the tenth digit is. Exercises the check === 10
+        // branch. See spec/nhs-number.md.
+        for (let tenth = 0; tenth <= 9; tenth++) {
+            expect(isValidNhsNumber(`99900001${tenth}`)).toBe(false);
+        }
+    });
+    it('treats grouped and bare forms identically', () => {
+        expect(isValidNhsNumber('943 476 5919')).toBe(isValidNhsNumber('9434765919'));
+        expect(isValidNhsNumber('943-476-5919')).toBe(true);
     });
 });
