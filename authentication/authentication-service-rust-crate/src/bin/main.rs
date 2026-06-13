@@ -11,8 +11,8 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use authentication_service::app::App;
+use authentication_service::migration::Migrator;
 use loco_rs::cli;
-use migration::Migrator;
 
 #[tokio::main]
 async fn main() -> loco_rs::Result<()> {

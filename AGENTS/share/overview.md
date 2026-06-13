@@ -15,6 +15,7 @@ The **Main X Index** family of crates implements a federated identity index — 
 | [authentication-service](../../authentication/authentication-service-rust-crate) | User | Central single sign-on provider — passwordless email magic-link auth, RS256 JWT issuance, JWKS for offline verification by peers. The first real loco.rs crate and the reference for converting the others. |
 | [organization-service](../../organization/organization-service-rust-crate) | Organization | loco.rs registry for schema.org/Organization — CRUD + matching (embeds organization-matcher; API DTO is the matcher's Organization type) + name search + audit log + event streaming + OpenAPI/Swagger + record merge + offline RS256 JWT verification. Deferred: Tantivy full-text, privacy, blanket JWT enforcement. |
 | [care-pathway-service](../../care-pathway/care-pathway-service-rust-crate) | Care pathway | loco.rs registry for clinical care pathways — CRUD + ILIKE name search + matching (embeds care-pathway-matcher; API DTO is the matcher's CarePathway type) + condition-code validation + OpenAPI/Swagger + audit log + in-memory event streaming + offline RS256 JWT verification + record merge. Deferred: Tantivy full-text search, durable event bus, privacy, front-end merge action, blanket JWT enforcement. |
+| [case-service](../../case/case-service-rust-crate) | Case | loco.rs registry for governmental cases (case tracking — benefits, legal, social-services, complaints, appeals, investigations) — CRUD + ILIKE title search + matching (embeds case-matcher; API DTO is the matcher's Case type) + validation + OpenAPI/Swagger + audit log + in-memory event streaming + offline RS256 JWT verification + record merge. Case data is personal data; deferred: per-field privacy masking + GDPR export, Tantivy full-text, durable event bus, blanket JWT enforcement. |
 
 ### Matcher crates
 
@@ -35,6 +36,7 @@ specifications, …) tailored to library-style work.
 | [course-matcher](../../course/course-matcher-rust-crate) | Course | Course matching — name (Jaro-Winkler), provider-scoped course code, educational level, keywords / teaches Jaccard, deterministic short-circuits on DOI / Wikidata / OER / LOM / URI / UUID |
 | [organization-matcher](../../organization/organization-matcher-rust-crate) | Organization | Organization matching — legal-suffix-aware name, postal address, url/domain, jurisdiction, founding date, keywords; deterministic short-circuits on LEI / DUNS / ISO 6523 / GLN / Wikidata / ROR / ISNI / VAT, same-jurisdiction tax id, sameAs URL |
 | [care-pathway-matcher](../../care-pathway/care-pathway-matcher-rust-crate) | Care pathway | Clinical care-pathway matching — name (Jaro-Winkler), target condition codes (ICD/SNOMED Jaccard), provider-scoped pathway code, care setting, interventions / keywords Jaccard; deterministic short-circuits on DOI / Wikidata / guideline-id / URI / UUID, same-provider pathway code, sameAs URL |
+| [case-matcher](../../case/case-matcher-rust-crate) | Case | Governmental case matching — title (Jaro-Winkler + Soundex), subjects / keywords Jaccard, agency-scoped case number, case type / status; deterministic short-circuits on Docket / external-case-id / URI / UUID, same-agency case number, sameAs URL |
 
 ### Front-end projects
 
@@ -55,6 +57,7 @@ shape as the service crates.
 | [authentication-front-end-with-svelte](../../authentication/authentication-front-end-with-svelte) | authentication-service | Operator UI for passwordless magic-link sign up / sign in / sign out (no data grid; deliberately dependency-light) |
 | [organization-front-end-with-svelte](../../organization/organization-front-end-with-svelte) | organization-service | Operator UI for Organization CRUD + duplicate-check (schema.org/Organization: identifiers, address, jurisdiction; dependency-light, no data grid) |
 | [care-pathway-front-end-with-svelte](../../care-pathway/care-pathway-front-end-with-svelte) | care-pathway-service | Operator UI for clinical care-pathway CRUD + duplicate-check (condition codes, care setting, interventions; dependency-light, no data grid) |
+| [case-front-end-with-svelte](../../case/case-front-end-with-svelte) | case-service | Operator UI for governmental case CRUD + duplicate-check (title, agency, case number, type/status/priority, subjects, identifiers; dependency-light, no data grid; vitest + Playwright tests) |
 
 Per-project decision (2026-06-02): drift between front-ends is accepted; there is no shared `mxi-svelte-core` package. Copy-adapt from a sibling when scaffolding a new front-end.
 

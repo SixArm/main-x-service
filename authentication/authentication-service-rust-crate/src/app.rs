@@ -10,7 +10,7 @@ use loco_rs::{
     task::Tasks,
     Result,
 };
-use migration::Migrator;
+use crate::migration::Migrator;
 use std::path::Path;
 
 #[allow(unused_imports)]

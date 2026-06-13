@@ -25,6 +25,8 @@ pub mod data;
 pub mod initializers;
 /// Mailers (magic-link / welcome emails).
 pub mod mailers;
+/// Database migrations (`SeaORM` / loco migrator).
+pub mod migration;
 /// Domain models and generated `SeaORM` entities.
 pub mod models;
 /// Loco CLI tasks.

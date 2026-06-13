@@ -22,6 +22,7 @@ per-crate `AGENTS/spec-driven-development.md` files for the discipline.
 | [Authentication Service](authentication/authentication-service-rust-crate/) | User (central single sign-on provider) — passwordless magic-link, RS256 JWT + JWKS. **First real loco.rs crate**; reference for converting the others. | [spec](authentication/authentication-service-rust-crate/spec/index.md) | [index](authentication/authentication-service-rust-crate/index.md) |
 | [Organization Service](organization/organization-service-rust-crate/) | Organization (schema.org/Organization) — loco.rs CRUD + matching (embeds organization-matcher) + name search + audit log + event streaming + OpenAPI/Swagger + record merge + JWT verification | [spec](organization/organization-service-rust-crate/spec/index.md) | [index](organization/organization-service-rust-crate/index.md) |
 | [Care Pathway Service](care-pathway/care-pathway-service-rust-crate/) | Care pathway (clinical pathway) — loco.rs CRUD + name search + matching (embeds care-pathway-matcher) + condition-code validation + OpenAPI/Swagger + audit log + event streaming + JWT verification + record merge | [spec](care-pathway/care-pathway-service-rust-crate/spec/index.md) | [index](care-pathway/care-pathway-service-rust-crate/index.md) |
+| [Case Service](case/case-service-rust-crate/) | Case (governmental case management / case tracking) — loco.rs CRUD + title search + matching (embeds case-matcher) + validation + OpenAPI/Swagger + audit log + event streaming + JWT verification + record merge | [spec](case/case-service-rust-crate/spec/index.md) | [index](case/case-service-rust-crate/index.md) |
 
 ### Matcher crates
 
@@ -41,6 +42,7 @@ the corresponding service crate's matching layer.
 | [Course Matcher](course/course-matcher-rust-crate/) | Course | [spec](course/course-matcher-rust-crate/spec/index.md) | [index](course/course-matcher-rust-crate/index.md) |
 | [Organization Matcher](organization/organization-matcher-rust-crate/) | Organization (schema.org/Organization) | [spec](organization/organization-matcher-rust-crate/spec/index.md) | [index](organization/organization-matcher-rust-crate/index.md) |
 | [Care Pathway Matcher](care-pathway/care-pathway-matcher-rust-crate/) | Care pathway (clinical pathway) | [spec](care-pathway/care-pathway-matcher-rust-crate/spec/index.md) | [index](care-pathway/care-pathway-matcher-rust-crate/index.md) |
+| [Case Matcher](case/case-matcher-rust-crate/) | Case (governmental case) — title (Jaro-Winkler), subjects/keywords Jaccard, agency-scoped case number, type/status; deterministic short-circuits on Docket / external case id / URI / UUID, same-agency case number, sameAs URL | [spec](case/case-matcher-rust-crate/spec/index.md) | [index](case/case-matcher-rust-crate/index.md) |
 
 ### Front-end projects
 
@@ -62,6 +64,7 @@ accepted (see `feedback_front_end_drift` memory) — no shared package.
 | [authentication-front-end-with-svelte](authentication/authentication-front-end-with-svelte/) | [authentication-service](authentication/authentication-service-rust-crate/) | [spec](authentication/authentication-front-end-with-svelte/spec/index.md) | [CHANGELOG](authentication/authentication-front-end-with-svelte/CHANGELOG.md) |
 | [organization-front-end-with-svelte](organization/organization-front-end-with-svelte/) | [organization-service](organization/organization-service-rust-crate/) | [spec](organization/organization-front-end-with-svelte/spec/index.md) | [CHANGELOG](organization/organization-front-end-with-svelte/CHANGELOG.md) |
 | [care-pathway-front-end-with-svelte](care-pathway/care-pathway-front-end-with-svelte/) | [care-pathway-service](care-pathway/care-pathway-service-rust-crate/) | [spec](care-pathway/care-pathway-front-end-with-svelte/spec/index.md) | [CHANGELOG](care-pathway/care-pathway-front-end-with-svelte/CHANGELOG.md) |
+| [case-front-end-with-svelte](case/case-front-end-with-svelte/) | [case-service](case/case-service-rust-crate/) | [spec](case/case-front-end-with-svelte/spec/index.md) | [CHANGELOG](case/case-front-end-with-svelte/CHANGELOG.md) |
 
 ## Shared reference docs
 
