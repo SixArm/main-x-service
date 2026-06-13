@@ -1,0 +1,37 @@
+/*
+ * NHS theme — default colour tokens.
+ *
+ * Scoped to :root[data-theme="nhs"] so multiple themes can coexist
+ * and ThemePicker can swap by mutating data-theme.
+ */
+
+:root[data-theme="nhs"] {
+    --nhs-dark-blue: #003087;
+    --nhs-blue: #005eb8;
+    --nhs-bright-blue: #0072ce;
+    --nhs-light-blue: #41b6e6;
+    --nhs-aqua-blue: #00a9ce;
+
+    --nhs-black: #231f20;
+    --nhs-dark-grey: #425563;
+    --nhs-mid-grey: #5d6b75;
+    --nhs-pale-grey: #e8edee;
+    --nhs-white: #ffffff;
+
+    --nhs-dark-green: #006747;
+    --nhs-green: #009639;
+    --nhs-light-green: #78be20;
+    --nhs-aqua-green: #00a499;
+
+    --nhs-purple: #330072;
+    --nhs-dark-pink: #7c2855;
+    --nhs-pink: #ae2573;
+    --nhs-dark-red: #8a1538;
+    --nhs-red: #da291c;
+    --nhs-orange: #ed8b00;
+    --nhs-warm-yellow: #ffb81c;
+    --nhs-yellow: #fae100;
+
+    --nhs-focus-color: #ffeb3b;
+    --nhs-focus-text-color: #231f20;
+}

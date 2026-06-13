@@ -1,0 +1,9 @@
+node_modules
+.svelte-kit
+build
+test-results
+tests/e2e/.auth
+.DS_Store
+.env
+.env.*
+!.env.example

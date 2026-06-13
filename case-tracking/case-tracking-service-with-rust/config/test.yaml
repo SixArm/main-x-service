@@ -1,0 +1,44 @@
+logger:
+  enable: false
+  pretty_backtrace: false
+  level: warn
+  format: compact
+
+server:
+  port: 5151
+  binding: localhost
+  host: http://localhost
+  middlewares:
+    static:
+      enable: false
+
+database:
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://postgres:postgres@localhost:5432/case_tracking_test") }}
+  enable_logging: false
+  connect_timeout: 500
+  idle_timeout: 500
+  min_connections: 1
+  max_connections: 5
+  auto_migrate: true
+  dangerously_truncate: true
+  dangerously_recreate: false
+
+workers:
+  mode: BackgroundAsync
+
+# Auth is in pass-through mode for the domain request-tests
+# (require_session: false). Auth itself is covered by tests/requests/auth.rs
+# and by /api/auth/me (which always requires a session).
+settings:
+  auth:
+    secret: test-secret-fixed-for-deterministic-tokens
+    magic_link_ttl_seconds: 600
+    session_ttl_seconds: 86400
+    require_session: false
+    expose_magic_link: true
+    cookie_secure: false
+    frontend_url: http://localhost:5173
+    allowlist:
+      - email: tester@example.nhs.uk
+        name: Test User
+        role: administrator
