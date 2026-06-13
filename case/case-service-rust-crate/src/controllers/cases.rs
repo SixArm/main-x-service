@@ -119,7 +119,12 @@ async fn create(
         Some(model.data.clone()),
     )
     .await;
-    streaming::publish(EventKind::Created, &model.pid.to_string(), &model.title);
+    streaming::publish_with_actor(
+        EventKind::Created,
+        &model.pid.to_string(),
+        &model.title,
+        caller.actor(),
+    );
     format::json(CaseRef::of(&model))
 }
 
@@ -166,7 +171,12 @@ async fn update(
         Some(updated.data.clone()),
     )
     .await;
-    streaming::publish(EventKind::Updated, &updated.pid.to_string(), &updated.title);
+    streaming::publish_with_actor(
+        EventKind::Updated,
+        &updated.pid.to_string(),
+        &updated.title,
+        caller.actor(),
+    );
     format::json(CaseRef::of(&updated))
 }
 
@@ -181,7 +191,12 @@ async fn remove(
     let (entity_pid, title) = (model.pid, model.title.clone());
     model.into_active_model().soft_delete(&ctx.db).await?;
     audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
-    streaming::publish(EventKind::Deleted, &entity_pid.to_string(), &title);
+    streaming::publish_with_actor(
+        EventKind::Deleted,
+        &entity_pid.to_string(),
+        &title,
+        caller.actor(),
+    );
     format::empty_json()
 }
 
@@ -305,8 +320,18 @@ async fn merge(
     )
     .await;
     audit(&ctx, dup_pid, "merged_into", caller.actor(), None).await;
-    streaming::publish(EventKind::Merged, &merged.pid.to_string(), &merged.title);
-    streaming::publish(EventKind::Deleted, &dup_pid.to_string(), &dup_title);
+    streaming::publish_with_actor(
+        EventKind::Merged,
+        &merged.pid.to_string(),
+        &merged.title,
+        caller.actor(),
+    );
+    streaming::publish_with_actor(
+        EventKind::Deleted,
+        &dup_pid.to_string(),
+        &dup_title,
+        caller.actor(),
+    );
 
     format::json(serde_json::json!({
         "main_pid": merged.pid.to_string(),

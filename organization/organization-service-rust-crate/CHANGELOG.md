@@ -11,6 +11,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Durable event bus — Phase 1 (in-memory envelope + `EventPublisher`
+  seam).** `src/streaming.rs` now carries the canonical versioned
+  `Envelope` (`event_id` UUID dedup key, `schema_version` = 1,
+  `entity` = `"organization"`, `kind`, `pid`, `seq`, `actor`, `name`),
+  an `EventPublisher` trait, and an `InMemoryPublisher` ring buffer
+  (process-wide `OnceLock`) implementing it — replacing the flat
+  `OrgEvent` free-function buffer. `occurred_at`/`data` are deferred to
+  the outbox stage (Phase 2; no new dependency added — the project
+  mandates `jiff`, not the already-present `chrono`). CRUD/merge call
+  sites now stamp the bearer `actor` via `publish_with_actor`
+  (`publish` kept as a `None`-actor shim). Pure refactor: behaviour is
+  identical and the `GET /api/organizations/events/recent` wire shape is
+  **frozen** — it returns the flat `EventView { kind, pid, name, seq }`
+  projection of the envelope, byte-identical to before (front-end safe).
+  Phases 2–3 (transactional outbox + Fluvio relay) remain infra-gated
+  roadmap per [`agents/share/event-bus.md`](../../agents/share/event-bus.md).
 - **Blanket `/api/*` JWT enforcement (default-off).** A new
   `ORGANIZATION_REQUIRE_AUTH` env flag (lenient bool — `1`/`true`/`yes`/
   `on`) gates an `axum::middleware::from_fn` layer wired in

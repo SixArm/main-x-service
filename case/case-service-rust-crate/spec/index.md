@@ -160,10 +160,16 @@ added later. Subjects are stored as opaque identifiers, not embedded PII.
   fuzzy search over the JSONB payload remains deferred.
 - [x] Event streaming + audit log on CRUD — `audit_logs` table +
   best-effort row per create/update/delete (`models/audit_logs.rs`);
-  in-memory `CaseEvent` stream (`streaming.rs`); read at `/audit/recent`,
-  `/{pid}/audit`, `/events/recent`. The durable broker is designed in
-  [`agents/share/event-bus.md`](../../../agents/share/event-bus.md)
-  (transactional outbox → Fluvio) and remains roadmap.
+  in-memory event stream (`streaming.rs`); read at `/audit/recent`,
+  `/{pid}/audit`, `/events/recent`. **Durable event bus Phase 1
+  implemented** (in-memory canonical `Envelope` + `EventPublisher` seam
+  per [`agents/share/event-bus.md`](../../../agents/share/event-bus.md)
+  §4–§5): the publish path builds a versioned `Envelope` (`event_id`,
+  `schema_version` 1, `entity` `"case"`, `kind`, `pid`, `seq`, `actor`,
+  `name`) behind an `EventPublisher` trait with an `InMemoryPublisher`
+  ring buffer; `/events/recent` returns the flat `EventView` projection
+  (`{kind, pid, name, seq}`). Phases 2–3 (transactional outbox → Fluvio)
+  remain infra-gated roadmap.
 - [ ] Privacy controls if any restricted fields appear.
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-title alias, soft-delete, `merge_records`

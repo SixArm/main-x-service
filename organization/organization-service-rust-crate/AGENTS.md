@@ -37,7 +37,7 @@ there is no separate model or adapter to drift.
 | GET | `/api/organizations/merges/recent` | Merge-history records |
 | GET | `/api/organizations/whoami` | Verified bearer-token claims (`401` without one) |
 | GET | `/api/organizations/audit/recent` · `/{pid}/audit` | Audit trail |
-| GET | `/api/organizations/events/recent` | In-memory event stream |
+| GET | `/api/organizations/events/recent` | In-memory event stream (frozen `EventView {kind,pid,name,seq}` projection of the canonical `Envelope`) |
 | GET | `/swagger-ui` · `/api-docs/openapi.json` | API docs |
 
 Plus loco's default `/_health`, `/_ping`.

@@ -11,6 +11,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Durable event bus — Phase 1 (in-memory envelope + `EventPublisher`
+  seam).** `src/streaming.rs` now carries the canonical, versioned
+  `Envelope` (`event_id` UUID dedup key, `schema_version` 1, `entity`
+  `"care_pathway"`, `kind`, `pid`, `seq`, `actor`, `name`) and the
+  `EventPublisher` trait, with an `InMemoryPublisher` ring buffer wired as
+  the process-wide global — a pure refactor of the previous free
+  functions. `occurred_at` / `data` are deferred to the outbox stage
+  (Phase 2) per `agents/share/event-bus.md`; no new dependency added.
+  `GET /api/care-pathways/events/recent` returns the frozen `EventView`
+  projection (`{kind, pid, name, seq}`), **byte-identical** to the
+  previous wire shape (the front-end recent-activity view depends on it).
+  Added `publish_with_actor(kind, pid, name, actor)`; the CRUD/merge
+  controller call sites now stamp the `actor` from the bearer token (the
+  bare `publish` back-compat surface stays, actor `None`). Phases 2–3
+  (transactional outbox → Fluvio) remain infra-gated roadmap. Un-gated
+  tests: envelope Serde round-trip + `schema_version == 1`, `EventView`
+  projects exactly `{kind, pid, name, seq}`, `InMemoryPublisher`
+  publish→recent, `actor` populated/`None`, `seq` monotonic.
+
 - **Blanket `/api/*` JWT enforcement (off by default).** A pure
   `auth::enforce(require_auth, path, headers, verifier)` decision plus an
   `axum::middleware::from_fn` layer wired unconditionally in `app.rs`

@@ -50,10 +50,16 @@ keywords; `src/validation.rs`), OpenAPI 3 + Swagger UI (`src/openapi.rs`,
 CRUD/merge (`models/audit_logs.rs`, `src/streaming.rs`), record merge
 (`src/merge.rs` + `models/merge_records.rs`, `POST /merge`), and offline
 RS256 JWT verification (`src/auth.rs`, embeds `authentication-verifier`;
-`/whoami` + audit `actor`). Deferred (spec §13): Tantivy full-text/fuzzy
-search (title search via `ILIKE` is done), search-blocked dedup
-candidates, durable event bus, privacy, front-end merge action, blanket
-`/api/*` JWT enforcement + JWKS-fetch.
+`/whoami` + audit `actor`). The event stream is **durable-bus Phase 1**:
+`src/streaming.rs` publishes a canonical versioned `Envelope` behind an
+`EventPublisher` trait (in-memory `InMemoryPublisher`), and
+`/events/recent` returns the flat `EventView { kind, pid, name, seq }`
+projection unchanged (see
+[`agents/share/event-bus.md`](../../agents/share/event-bus.md) §4–§5).
+Deferred (spec §13): Tantivy full-text/fuzzy search (title search via
+`ILIKE` is done), search-blocked dedup candidates, durable event bus
+Phases 2–3 (transactional outbox → Fluvio), privacy, front-end merge
+action, blanket `/api/*` JWT enforcement + JWKS-fetch.
 
 ## Golden rules
 
@@ -75,7 +81,7 @@ src/
 ├── auth.rs                RS256 JWT verification (AuthUser/MaybeAuthUser) via authentication-verifier
 ├── merge.rs               pure record-merge logic (merge_cases)
 ├── openapi.rs             hand-written OpenAPI 3 document
-├── streaming.rs           in-memory CRUD/merge event stream (CaseEvent)
+├── streaming.rs           durable-bus Phase 1: Envelope + EventPublisher seam (in-memory)
 ├── validation.rs          title + opened_date + identifier/subject/keyword checks → 422
 ├── models/
 │   ├── cases.rs           CRUD helpers over the stored payload

@@ -147,11 +147,18 @@ access controls added later.
   fuzzy search over the JSONB payload remains deferred.
 - [x] Event streaming + audit log on CRUD — `audit_logs` table +
   best-effort row per create/update/delete (`models/audit_logs.rs`);
-  in-memory `PathwayEvent` stream (`streaming.rs`); read at
-  `/audit/recent`, `/{pid}/audit`, `/events/recent`. The durable broker
-  is designed in
-  [`agents/share/event-bus.md`](../../../agents/share/event-bus.md)
-  (transactional outbox → Fluvio) and remains roadmap; `actor` is wired.
+  in-memory event stream (`streaming.rs`); read at
+  `/audit/recent`, `/{pid}/audit`, `/events/recent`. **Phase 1** of the
+  durable event bus is implemented: the canonical versioned `Envelope`
+  (`event_id`, `schema_version` 1, `entity`, `kind`, `pid`, `seq`,
+  `actor`, `name`) plus the `EventPublisher` trait seam with an
+  `InMemoryPublisher` ring buffer; `/events/recent` returns the frozen
+  `EventView` projection (`{kind, pid, name, seq}`), byte-identical to the
+  previous wire shape. `occurred_at` / `data` are deferred to the outbox
+  stage (Phase 2) per the design. Phases 2–3 (transactional outbox →
+  Fluvio) remain infra-gated roadmap, designed in
+  [`agents/share/event-bus.md`](../../../agents/share/event-bus.md);
+  `actor` is wired through `publish_with_actor`.
 - [ ] Privacy controls if any restricted fields appear.
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-title alias, soft-delete, `merge_records`
@@ -197,7 +204,9 @@ validation on create/update (blank `name`; ICD-10 / ICD-11 / SNOMED CT
 (record merge + history)
 embedding care-pathway-matcher; audit log + in-memory event streaming on
 every CRUD/merge (`/audit/recent`, `/{pid}/audit`, `/events/recent`,
-`/merges/recent`); offline RS256 JWT verification (`AuthUser`/
+`/merges/recent`) — Phase 1 of the durable event bus (canonical
+`Envelope` + `EventPublisher` seam + `InMemoryPublisher`; frozen
+`EventView` projection on `/events/recent`); offline RS256 JWT verification (`AuthUser`/
 `MaybeAuthUser`, `/whoami`, audit `actor` from the token); OpenAPI 3 doc
 + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`); blanket `/api/*`
 JWT enforcement middleware (`auth::enforce` + `after_routes` layer,

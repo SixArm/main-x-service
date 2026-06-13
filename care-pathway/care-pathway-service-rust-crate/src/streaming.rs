@@ -1,15 +1,34 @@
-//! Minimal in-memory event stream.
+//! Minimal in-memory event stream — Phase 1 of the durable event bus.
 //!
-//! Every CRUD action publishes a typed [`PathwayEvent`] to a process-wide
-//! ring buffer. This is the MVP of the family's event-streaming layer
-//! (siblings swap in Kafka/NATS/Fluvio behind the same publish call).
-//! In loco there is no per-request shared state for this, so the buffer
-//! is a `OnceLock`-initialised global.
+//! Every CRUD action publishes a canonical [`Envelope`] to a process-wide
+//! ring buffer behind the [`EventPublisher`] seam. This is Phase 1 of the
+//! family's durable event-bus design: the versioned envelope plus the
+//! publisher trait, with an [`InMemoryPublisher`] wired exactly as the
+//! previous free functions behaved. Phases 2–3 (transactional outbox +
+//! Fluvio sink) remain infra-gated roadmap — see
+//! [`agents/share/event-bus.md`](../../../../agents/share/event-bus.md).
+//!
+//! `occurred_at` and `data` are deliberately **omitted** in Phase 1: the
+//! design (§4) places them at the outbox stage (Phase 2), and adding a
+//! timestamp would mean threading a non-trivial type through the in-memory
+//! path. They arrive with `OutboxPublisher`.
+//!
+//! The operator endpoint `GET /api/care-pathways/events/recent` returns an
+//! [`EventView`] projection (`{kind, pid, name, seq}`) whose JSON is frozen
+//! and byte-identical to the previous `PathwayEvent` wire shape.
 
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+/// Current envelope schema version. Bumped only on a breaking change to
+/// the [`Envelope`] shape; additive fields do not bump it.
+pub const SCHEMA_VERSION: u32 = 1;
+
+/// The `snake_case` entity name carried by every envelope from this service.
+pub const ENTITY: &str = "care_pathway";
 
 /// The kind of change that occurred.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -25,9 +44,37 @@ pub enum EventKind {
     Merged,
 }
 
-/// A published care-pathway event.
+/// The canonical, versioned event envelope (design §4).
+///
+/// One shape for every entity and transport. Phase 1 omits `occurred_at`
+/// and `data`; those arrive at the outbox stage (Phase 2).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PathwayEvent {
+pub struct Envelope {
+    /// Idempotency / dedup key for consumers (UUID v4).
+    pub event_id: Uuid,
+    /// Envelope schema version (currently [`SCHEMA_VERSION`]).
+    pub schema_version: u32,
+    /// The `snake_case` entity name, e.g. `"care_pathway"`.
+    pub entity: &'static str,
+    /// The kind of change.
+    pub kind: EventKind,
+    /// The care pathway's public id.
+    pub pid: String,
+    /// Monotonic sequence number (per process).
+    pub seq: u64,
+    /// The user pid from the bearer token, when known.
+    pub actor: Option<String>,
+    /// The care pathway's name at the time of the event.
+    pub name: String,
+}
+
+/// Operator-facing projection of an [`Envelope`] (design §4).
+///
+/// Serializes to the **frozen** `/events/recent` wire shape — exactly the
+/// keys `kind`, `pid`, `name`, `seq`, byte-identical to the previous
+/// `PathwayEvent`. The front-end recent-activity view depends on this.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EventView {
     /// The kind of change.
     pub kind: EventKind,
     /// The care pathway's public id.
@@ -38,11 +85,74 @@ pub struct PathwayEvent {
     pub seq: u64,
 }
 
+impl From<&Envelope> for EventView {
+    fn from(env: &Envelope) -> Self {
+        Self {
+            kind: env.kind,
+            pid: env.pid.clone(),
+            name: env.name.clone(),
+            seq: env.seq,
+        }
+    }
+}
+
+/// The publisher seam (design §5).
+///
+/// In Phase 1 the only implementation is [`InMemoryPublisher`]; Phase 2
+/// adds `OutboxPublisher` (in-transaction `event_outbox` insert) behind
+/// the same trait. The publish path never silently drops on the durable
+/// implementation.
+pub trait EventPublisher: Send + Sync {
+    /// Publish an event to the stream.
+    fn publish(&self, env: Envelope);
+    /// Recent events for the operator endpoint, newest last, capped at
+    /// `limit` (projection of §4).
+    fn recent(&self, limit: usize) -> Vec<EventView>;
+}
+
 const CAPACITY: usize = 1000;
 
-fn buffer() -> &'static Mutex<VecDeque<PathwayEvent>> {
-    static BUF: OnceLock<Mutex<VecDeque<PathwayEvent>>> = OnceLock::new();
-    BUF.get_or_init(|| Mutex::new(VecDeque::with_capacity(CAPACITY)))
+/// Today's ring buffer behind the [`EventPublisher`] seam. Default for
+/// tests and single-node dev; keeps `cargo test` DB-free.
+#[derive(Debug, Default)]
+pub struct InMemoryPublisher {
+    buffer: Mutex<VecDeque<Envelope>>,
+}
+
+impl InMemoryPublisher {
+    /// Construct an empty in-memory publisher.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            buffer: Mutex::new(VecDeque::with_capacity(CAPACITY)),
+        }
+    }
+}
+
+impl EventPublisher for InMemoryPublisher {
+    /// Push to the ring buffer. Never fails; if the lock is poisoned the
+    /// event is dropped (the audit log is the durable record).
+    fn publish(&self, env: Envelope) {
+        if let Ok(mut buf) = self.buffer.lock() {
+            if buf.len() == CAPACITY {
+                buf.pop_front();
+            }
+            buf.push_back(env);
+        }
+    }
+
+    fn recent(&self, limit: usize) -> Vec<EventView> {
+        self.buffer.lock().map_or_else(
+            |_| Vec::new(),
+            |buf| buf.iter().rev().take(limit).rev().map(Into::into).collect(),
+        )
+    }
+}
+
+/// The process-wide publisher global.
+fn publisher() -> &'static InMemoryPublisher {
+    static PUBLISHER: OnceLock<InMemoryPublisher> = OnceLock::new();
+    PUBLISHER.get_or_init(InMemoryPublisher::new)
 }
 
 fn next_seq() -> u64 {
@@ -51,36 +161,48 @@ fn next_seq() -> u64 {
     SEQ.fetch_add(1, Ordering::Relaxed)
 }
 
-/// Publish an event to the in-memory stream. Never fails; if the lock is
-/// poisoned the event is dropped (the audit log is the durable record).
-pub fn publish(kind: EventKind, pid: &str, name: &str) {
-    let event = PathwayEvent {
+/// Build a canonical [`Envelope`] for a change, allocating the next
+/// per-process sequence number.
+fn envelope(kind: EventKind, pid: &str, name: &str, actor: Option<&str>) -> Envelope {
+    Envelope {
+        event_id: Uuid::new_v4(),
+        schema_version: SCHEMA_VERSION,
+        entity: ENTITY,
         kind,
         pid: pid.to_string(),
-        name: name.to_string(),
         seq: next_seq(),
-    };
-    if let Ok(mut buf) = buffer().lock() {
-        if buf.len() == CAPACITY {
-            buf.pop_front();
-        }
-        buf.push_back(event);
+        actor: actor.map(ToString::to_string),
+        name: name.to_string(),
     }
 }
 
-/// The most recent events (newest last), capped at `limit`.
+/// Publish an event to the in-memory stream (actor unknown).
+///
+/// Back-compatible call surface; equivalent to
+/// [`publish_with_actor`] with `actor == None`.
+pub fn publish(kind: EventKind, pid: &str, name: &str) {
+    publish_with_actor(kind, pid, name, None);
+}
+
+/// Publish an event to the in-memory stream, stamping the bearer-token
+/// `actor` when the caller is known. Never fails.
+pub fn publish_with_actor(kind: EventKind, pid: &str, name: &str, actor: Option<&str>) {
+    publisher().publish(envelope(kind, pid, name, actor));
+}
+
+/// The most recent events (newest last), capped at `limit`. Returns the
+/// frozen [`EventView`] projection consumed by `/events/recent`.
 #[must_use]
-pub fn recent(limit: usize) -> Vec<PathwayEvent> {
-    buffer().lock().map_or_else(
-        |_| Vec::new(),
-        |buf| buf.iter().rev().take(limit).rev().cloned().collect(),
-    )
+pub fn recent(limit: usize) -> Vec<EventView> {
+    publisher().recent(limit)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// The `InMemoryPublisher` round-trips a published envelope to its
+    /// projection (retargets the previous `publish_and_read_back`).
     #[test]
     fn publish_and_read_back() {
         publish(EventKind::Created, "pid-1", "Acute Stroke Care Pathway");
@@ -91,6 +213,81 @@ mod tests {
         assert_eq!(last.kind, EventKind::Updated);
         assert_eq!(last.name, "Acute Stroke Pathway");
         // Sequence numbers are monotonic.
+        assert!(events.windows(2).all(|w| w[0].seq < w[1].seq));
+    }
+
+    /// A fresh `InMemoryPublisher` (not the global) publishes and reads
+    /// back its own buffer, independent of process-wide state.
+    #[test]
+    fn in_memory_publisher_is_self_contained() {
+        let pub_ = InMemoryPublisher::new();
+        assert!(pub_.recent(10).is_empty());
+        pub_.publish(envelope(EventKind::Created, "p", "Name", None));
+        let got = pub_.recent(10);
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].pid, "p");
+        assert_eq!(got[0].name, "Name");
+    }
+
+    /// The envelope round-trips through Serde and carries `schema_version` 1.
+    ///
+    /// `entity` is `&'static str`, so deserialization borrows from a
+    /// `'static` JSON buffer (the in-memory transport never deserializes
+    /// envelopes; this only guards the wire shape).
+    #[test]
+    fn envelope_serde_round_trip() {
+        let env = envelope(EventKind::Merged, "pid-x", "Stroke", Some("user-7"));
+        let json: &'static str = Box::leak(serde_json::to_string(&env).unwrap().into_boxed_str());
+        let back: Envelope = serde_json::from_str(json).unwrap();
+        assert_eq!(back.schema_version, SCHEMA_VERSION);
+        assert_eq!(back.schema_version, 1);
+        assert_eq!(back.entity, ENTITY);
+        assert_eq!(back.kind, EventKind::Merged);
+        assert_eq!(back.pid, "pid-x");
+        assert_eq!(back.name, "Stroke");
+        assert_eq!(back.actor.as_deref(), Some("user-7"));
+        assert_eq!(back.event_id, env.event_id);
+    }
+
+    /// The `EventView` projection serializes to EXACTLY the frozen
+    /// `/events/recent` keys: `kind`, `pid`, `name`, `seq` — and nothing
+    /// else. The front-end recent-activity view depends on this shape.
+    #[test]
+    fn event_view_has_exactly_the_frozen_keys() {
+        let env = envelope(EventKind::Created, "pid-1", "Acute Stroke", Some("user-1"));
+        let view = EventView::from(&env);
+        let value = serde_json::to_value(&view).unwrap();
+        let obj = value.as_object().unwrap();
+        let mut keys: Vec<&str> = obj.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["kind", "name", "pid", "seq"]);
+        // Frozen lowercase kind rendering.
+        assert_eq!(obj["kind"], serde_json::json!("created"));
+        assert_eq!(obj["pid"], serde_json::json!("pid-1"));
+        assert_eq!(obj["name"], serde_json::json!("Acute Stroke"));
+        // The actor is intentionally NOT projected to the operator view.
+        assert!(!obj.contains_key("actor"));
+    }
+
+    /// `actor` is populated when supplied and `None` via the bare
+    /// `publish` surface.
+    #[test]
+    fn actor_is_populated_or_none() {
+        let with = envelope(EventKind::Updated, "p", "n", Some("user-9"));
+        assert_eq!(with.actor.as_deref(), Some("user-9"));
+        let without = envelope(EventKind::Updated, "p", "n", None);
+        assert_eq!(without.actor, None);
+    }
+
+    /// Sequence numbers are monotonic across publishes on one publisher.
+    #[test]
+    fn seq_is_monotonic() {
+        let pub_ = InMemoryPublisher::new();
+        for i in 0..5 {
+            pub_.publish(envelope(EventKind::Created, &format!("p{i}"), "n", None));
+        }
+        let events = pub_.recent(10);
+        assert_eq!(events.len(), 5);
         assert!(events.windows(2).all(|w| w[0].seq < w[1].seq));
     }
 }

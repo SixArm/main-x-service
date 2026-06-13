@@ -118,10 +118,19 @@ personal data — honour GDPR when the privacy layer lands (§13).
 
 ## 13. Tasks (live work queue)
 
-- [x] Event streaming + audit log on CRUD. (In-memory `OrgEvent` stream;
-  the durable broker is designed in
-  [`agents/share/event-bus.md`](../../../agents/share/event-bus.md) —
-  transactional outbox → Fluvio — and remains roadmap.)
+- [x] Event streaming + audit log on CRUD. **Phase 1 (in-memory
+  envelope + `EventPublisher` seam) implemented** per
+  [`agents/share/event-bus.md`](../../../agents/share/event-bus.md):
+  `src/streaming.rs` carries the canonical versioned `Envelope`
+  (`event_id`, `schema_version` = 1, `entity`, `kind`, `pid`, `seq`,
+  `actor`, `name`; `occurred_at`/`data` deferred to the outbox stage),
+  an `EventPublisher` trait, and an `InMemoryPublisher` ring buffer
+  (process-wide `OnceLock`). The operator endpoint
+  `/api/organizations/events/recent` returns the frozen flat
+  `EventView { kind, pid, name, seq }` projection (wire shape unchanged
+  — front-end safe). CRUD/merge call sites stamp the bearer `actor`.
+  Phases 2–3 (transactional outbox + Fluvio relay) remain infra-gated
+  roadmap.
 - [x] Name search (Postgres `ILIKE`) + OpenAPI/Swagger.
 - [ ] Tantivy full-text search + fuzzy/blocking (replacing the `ILIKE`
       search).
@@ -150,8 +159,10 @@ personal data — honour GDPR when the privacy layer lands (§13).
 
 Done: loco boot; organizations table + migration; CRUD (blank name →
 `422`, unknown pid → `404`); `/match` and `/check-duplicates` embedding
-organization-matcher; audit log; in-memory event streaming; name search
-(`ILIKE`); record merge (`/merge` + `merge_records` history); offline
+organization-matcher; audit log; in-memory event streaming (Phase 1:
+canonical `Envelope` + `EventPublisher` seam, `EventView` projection
+frozen for `/events/recent`); name search (`ILIKE`); record merge
+(`/merge` + `merge_records` history); offline
 RS256 JWT verification (`AuthUser`/`MaybeAuthUser`, `/whoami`, audit +
 merge `actor` from the token); OpenAPI 3 + Swagger UI; DB-free tests;
 request-level test suite (Postgres, `#[ignore]`-gated); loco scaffolding

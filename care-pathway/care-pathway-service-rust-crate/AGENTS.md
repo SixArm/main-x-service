@@ -54,7 +54,9 @@ in-memory event stream on every CRUD/merge (`models/audit_logs.rs`,
 `POST /merge`), and offline RS256 JWT verification (`src/auth.rs`,
 embeds `authentication-verifier`; `/whoami` + audit `actor`). Deferred
 (spec §13): Tantivy full-text/fuzzy search (name search via `ILIKE` is
-done), search-blocked dedup candidates, durable event bus, privacy,
+done), search-blocked dedup candidates, durable event bus Phases 2–3
+(outbox + Fluvio; Phase 1 in-memory envelope + `EventPublisher` seam is
+done — see `agents/share/event-bus.md`), privacy,
 front-end merge
 action, blanket `/api/*` JWT enforcement + JWKS-fetch, terminology-server
 code-existence checks.
@@ -79,7 +81,9 @@ src/
 ├── auth.rs                RS256 JWT verification (AuthUser/MaybeAuthUser) via authentication-verifier
 ├── merge.rs               pure record-merge logic (merge_pathways)
 ├── openapi.rs             hand-written OpenAPI 3 document
-├── streaming.rs           in-memory CRUD/merge event stream (PathwayEvent)
+├── streaming.rs           CRUD/merge event stream — Phase 1 durable-bus
+│                          envelope (Envelope) + EventPublisher seam +
+│                          InMemoryPublisher; frozen EventView projection
 ├── validation.rs          name + condition-code (ICD/SNOMED) checks → 422
 ├── models/
 │   ├── care_pathways.rs   CRUD helpers over the stored payload

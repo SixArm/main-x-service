@@ -11,6 +11,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Durable event bus — Phase 1** (canonical envelope + publisher seam,
+  per [`agents/share/event-bus.md`](../../agents/share/event-bus.md)
+  §4–§5). `src/streaming.rs` now models a versioned `Envelope`
+  (`event_id: Uuid` dedup key, `schema_version` const `1`, `entity`
+  `"case"`, `kind`, `pid`, `seq`, `actor: Option<String>`, `name`) and a
+  flat `EventView { kind, pid, name, seq }` projection, with
+  `From<&Envelope>`. The free functions are now a thin
+  `EventPublisher` trait (`publish` / `recent`) with an
+  `InMemoryPublisher` ring buffer as the process-wide global. A new
+  `publish_with_actor(kind, pid, name, actor)` records the verified
+  caller `sub`; the CRUD/merge handlers pass the `actor` they already
+  extract from `MaybeAuthUser`. `occurred_at` and the full-record `data`
+  snapshot are deferred to the Phase 2 outbox (no new dependency added).
+  Pure refactor: behaviour identical and the `GET /api/cases/events/recent`
+  wire shape (`{kind, pid, name, seq}`) is unchanged. Un-gated unit tests
+  cover envelope serde round-trip + `schema_version == 1`, the projection's
+  exact keys, `InMemoryPublisher` publish→recent, actor populated/None,
+  and seq monotonicity. Phases 2–3 (transactional outbox → Fluvio) remain
+  infra-gated roadmap.
 - **Blanket JWT enforcement** (family contract
   [`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md)),
   **off by default**. A new env flag `CASE_REQUIRE_AUTH`
