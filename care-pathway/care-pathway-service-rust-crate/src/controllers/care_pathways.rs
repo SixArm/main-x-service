@@ -77,6 +77,11 @@ struct MatchRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct SearchParams {
+    q: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 struct MergeRequest {
     /// The surviving pathway's public id.
     main_pid: String,
@@ -183,6 +188,23 @@ async fn remove(
 #[debug_handler]
 async fn list(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = PathwayModel::list(&ctx.db, 100).await?;
+    let refs: Vec<PathwayRef> = rows.iter().map(PathwayRef::of).collect();
+    format::json(refs)
+}
+
+/// Case-insensitive name search: `GET /api/care-pathways/search?q=stroke`.
+/// Pragmatic Postgres `ILIKE` over the denormalised `name` (cap 50);
+/// full-text / fuzzy search is deferred (spec §13 T-6).
+#[debug_handler]
+async fn search(
+    axum::extract::Query(params): axum::extract::Query<SearchParams>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let q = params.q.unwrap_or_default();
+    if q.trim().is_empty() {
+        return bad_request("query parameter `q` is required");
+    }
+    let rows = PathwayModel::search(&ctx.db, q.trim(), 50).await?;
     let refs: Vec<PathwayRef> = rows.iter().map(PathwayRef::of).collect();
     format::json(refs)
 }
@@ -337,6 +359,7 @@ pub fn routes() -> Routes {
         .prefix("/api/care-pathways")
         .add("/", post(create))
         .add("/", get(list))
+        .add("/search", get(search))
         .add("/match", post(match_against))
         .add("/check-duplicates", post(check_duplicates))
         .add("/merge", post(merge))

@@ -26,6 +26,7 @@ adapter to drift.
 |---|---|---|
 | POST | `/api/care-pathways` | Create (body: `CarePathway`; blank `name` → `422`) → `{pid, name}` |
 | GET | `/api/care-pathways` | List active (capped 100) |
+| GET | `/api/care-pathways/search?q=` | Case-insensitive name search (`ILIKE`, cap 50) |
 | GET | `/api/care-pathways/{pid}` | Fetch the stored `CarePathway` |
 | PUT | `/api/care-pathways/{pid}` | Replace payload |
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete |
@@ -43,14 +44,17 @@ Plus loco's default `/_health`, `/_ping`. Every CRUD action writes an
 
 ## MVP scope
 
-CRUD + matching, with `condition_codes` format validation (ICD-10 /
-ICD-11 / SNOMED CT SCTID Verhoeff; `src/validation.rs`), OpenAPI 3 +
+CRUD + `ILIKE` name search + matching, with `condition_codes` format
+validation (ICD-10 / ICD-11 / SNOMED CT SCTID Verhoeff;
+`src/validation.rs`), OpenAPI 3 +
 Swagger UI (`src/openapi.rs`, `controllers/docs.rs`), an audit log +
 in-memory event stream on every CRUD/merge (`models/audit_logs.rs`,
 `src/streaming.rs`), record merge (`src/merge.rs` + `models/merge_records.rs`,
 `POST /merge`), and offline RS256 JWT verification (`src/auth.rs`,
 embeds `authentication-verifier`; `/whoami` + audit `actor`). Deferred
-(spec §13): Tantivy search, durable event bus, privacy, front-end merge
+(spec §13): Tantivy full-text/fuzzy search (name search via `ILIKE` is
+done), search-blocked dedup candidates, durable event bus, privacy,
+front-end merge
 action, blanket `/api/*` JWT enforcement + JWKS-fetch, terminology-server
 code-existence checks.
 

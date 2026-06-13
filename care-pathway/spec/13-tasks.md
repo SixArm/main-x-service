@@ -70,8 +70,16 @@ manual check confirms it. Split tasks too big for one PR
   - [ ] Playwright smoke over `/`, `/new`, `/[pid]`, `/[pid]/edit`.
   - **Acceptance:** both suites run in CI and fail on a broken
     endpoint contract.
-- [ ] **T-6 — Search + candidate blocking.** (deferred MVP feature)
-  - [ ] Tantivy full-text search endpoint + front-end search box.
+- [ ] **T-6 — Search + candidate blocking.** (partly done)
+  - [x] Name search endpoint. **Done (2026-06-13):**
+    `GET /api/care-pathways/search?q=` — pragmatic Postgres `ILIKE`
+    substring match on the denormalised `name` (cap 50; `%`/`_`/`\`
+    escaped so the query matches literally), mirroring the organization
+    service. `PathwayModel::search` + the `search` handler; blank `q`
+    → `400`. Pinned by `can_search_pathways_by_name` (DB-gated) and the
+    un-gated `escape_like_neutralises_wildcards` unit test.
+  - [ ] Tantivy full-text / fuzzy search over the JSONB payload +
+    front-end search box.
   - [x] Make the `check-duplicates` in-memory scan cap a named,
     documented const with a WARN on hit (interim safety, ahead of
     the redesign). **Done (2026-06-13):** `CHECK_DUPLICATES_SCAN_CAP`

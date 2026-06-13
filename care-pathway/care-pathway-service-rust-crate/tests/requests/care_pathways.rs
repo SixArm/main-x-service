@@ -165,6 +165,33 @@ async fn can_list_care_pathways() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn can_search_pathways_by_name() {
+    request::<App, _, _>(|request, _ctx| async move {
+        for name in ["Acute Stroke Care Pathway", "Sepsis Care Pathway"] {
+            let response = request
+                .post("/api/care-pathways")
+                .json(&json!({"name": name}))
+                .await;
+            assert_eq!(response.status_code(), 200);
+        }
+        // Case-insensitive substring match on `name`.
+        let response = request.get("/api/care-pathways/search?q=stroke").await;
+        assert_eq!(response.status_code(), 200, "search should succeed");
+        let body: Value = response.json();
+        let rows = body.as_array().expect("search returns an array");
+        assert_eq!(rows.len(), 1, "only the stroke pathway matches");
+        assert_eq!(rows[0]["name"], "Acute Stroke Care Pathway");
+
+        // A blank query is a 400.
+        let response = request.get("/api/care-pathways/search?q=").await;
+        assert_eq!(response.status_code(), 400, "blank q is rejected");
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn can_match_query_against_candidates() {
     request::<App, _, _>(|request, _ctx| async move {
         let response = request

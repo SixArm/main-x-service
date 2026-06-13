@@ -45,6 +45,8 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    problem, all reported together — also enforced on update. Rules in
    [`src/validation.rs`](../src/validation.rs).
 2. `GET /api/care-pathways` — list active (cap 100), `{pid, name}`.
+   `GET /api/care-pathways/search?q=` — case-insensitive name search
+   (Postgres `ILIKE`, cap 50; blank `q` → `400`).
 3. `GET /api/care-pathways/{pid}` — return the stored `CarePathway`.
 4. `PUT /api/care-pathways/{pid}` — replace the payload (`422` if
    `name` is blank or a `condition_codes` entry is malformed).
@@ -102,7 +104,8 @@ SNOMED-Verhoeff format checks), the `src/auth.rs` unit tests (mint a
 real RS256 token + matching JWKS in-process, then assert valid → claims
 and missing / non-bearer / expired / tampered / empty-verifier → `401`),
 the `src/merge.rs` unit tests (former-title alias, scalar fallback, list
-union, transferred snapshot), and controller validation unit tests
+union, transferred snapshot), the `escape_like` unit test (search
+wildcard neutralisation), and controller validation unit tests
 (blank-name and malformed-code → `422` pins). Request-level tests (`tests/requests/care_pathways.rs`,
 loco testing harness) cover the CRUD + match endpoints, the audit/event
 trail, `whoami` (no token → `401`), and OpenAPI/Swagger but require
@@ -117,7 +120,9 @@ access controls added later.
 
 ## 13. Tasks (live work queue)
 
-- [ ] Tantivy full-text search.
+- [x] Name search — `GET /search?q=` Postgres `ILIKE` on the
+  denormalised `name` (cap 50, wildcards escaped). Tantivy full-text /
+  fuzzy search over the JSONB payload remains deferred.
 - [x] Event streaming + audit log on CRUD — `audit_logs` table +
   best-effort row per create/update/delete (`models/audit_logs.rs`);
   in-memory `PathwayEvent` stream (`streaming.rs`); read at
@@ -151,7 +156,8 @@ access controls added later.
 Done: loco boot; care_pathways table + migration; CRUD with `422`
 validation on create/update (blank `name` + ICD-10 / ICD-11 / SNOMED CT
 `condition_codes` format checks, all problems reported together);
-`/match`, `/check-duplicates`, and `/merge` (record merge + history)
+`ILIKE` name search; `/match`, `/check-duplicates`, and `/merge`
+(record merge + history)
 embedding care-pathway-matcher; audit log + in-memory event streaming on
 every CRUD/merge (`/audit/recent`, `/{pid}/audit`, `/events/recent`,
 `/merges/recent`); offline RS256 JWT verification (`AuthUser`/

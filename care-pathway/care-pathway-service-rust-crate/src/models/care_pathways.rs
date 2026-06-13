@@ -3,6 +3,8 @@
 
 use care_pathway_matcher::CarePathway as MatchPathway;
 use loco_rs::prelude::*;
+use sea_orm::sea_query::extension::postgres::PgExpr;
+use sea_orm::sea_query::Expr;
 use sea_orm::{QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -69,6 +71,34 @@ impl Model {
             .await?;
         Ok(rows)
     }
+
+    /// Case-insensitive substring search on the denormalised `name`, over
+    /// active rows (Postgres `ILIKE '%q%'`). This is the pragmatic name
+    /// search; full-text / fuzzy search over the JSONB payload via Tantivy
+    /// is deferred (spec §13 T-6). `q` is matched literally — `%` and `_`
+    /// in the query are escaped so they are not treated as wildcards.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn search(db: &DatabaseConnection, q: &str, limit: u64) -> ModelResult<Vec<Self>> {
+        let pattern = format!("%{}%", escape_like(q));
+        let rows = care_pathways::Entity::find()
+            .filter(care_pathways::Column::DeletedAt.is_null())
+            .filter(Expr::col(care_pathways::Column::Name).ilike(pattern))
+            .order_by_desc(care_pathways::Column::Id)
+            .limit(limit)
+            .all(db)
+            .await?;
+        Ok(rows)
+    }
+}
+
+/// Escape `LIKE`/`ILIKE` wildcards so a user query matches literally.
+fn escape_like(q: &str) -> String {
+    q.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
 }
 
 impl ActiveModel {
@@ -97,5 +127,19 @@ impl ActiveModel {
         self.active = ActiveValue::set(false);
         self.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
         self.update(db).await.map_err(ModelError::from)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::escape_like;
+
+    #[test]
+    fn escape_like_neutralises_wildcards() {
+        assert_eq!(escape_like("stroke"), "stroke");
+        assert_eq!(escape_like("100%"), "100\\%");
+        assert_eq!(escape_like("a_b"), "a\\_b");
+        // Backslash is escaped first so it can't re-enable a wildcard.
+        assert_eq!(escape_like("a\\%"), "a\\\\\\%");
     }
 }

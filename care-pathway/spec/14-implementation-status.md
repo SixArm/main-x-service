@@ -19,6 +19,7 @@ Aspirational items live in §15, not here.
 | service | API docs | OpenAPI 3 (`src/openapi.rs`, hand-written) + Swagger UI at `/api-docs/openapi.json` · `/swagger-ui` (`controllers/docs.rs`) |
 | service | Matching endpoints | `/match` (rank explicit candidates), `/check-duplicates` (scan ≤ 1 000 stored rows, ranked hits) |
 | service | Audit + streaming | `audit_logs` table + best-effort row per CRUD (action + snapshot + `actor`); in-memory `PathwayEvent` stream (cap 1 000); read at `/audit/recent`, `/{pid}/audit`, `/events/recent` |
+| service | Name search | `GET /search?q=` — Postgres `ILIKE` substring match on the denormalised `name` (cap 50, wildcards escaped); blank `q` → `400` |
 | service | Record merge | `POST /merge` folds a duplicate into a survivor (union fields, former-title alias, soft-delete, `merge_records` history, `Merged` event); pure `src/merge.rs`; `/merges/recent` history |
 | service | JWT verification | Offline RS256 verification against the auth-service JWKS (`src/auth.rs`, embeds `authentication-verifier`); `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit `actor` stamped from the token |
 | service | Tests | DB-free `tests/matching.rs` (matcher embedding + JSON round-trip) + controller validation unit tests (422 pin); request-level loco tests `tests/requests/care_pathways.rs` (`#[ignore]`-gated on Postgres); green build + clippy |
@@ -37,7 +38,7 @@ Open gaps drive tasks in §13. Live gap list:
 | Event streaming is in-memory only (process-local ring buffer); no durable broker, no cross-replica delivery | T-3 follow-up / §15 |
 | Request-level tests exist but are `#[ignore]`-gated; no DB-backed run in CI yet | T-4 follow-up |
 | No front-end unit / e2e tests | T-5 |
-| No full-text search; `check-duplicates` full scan capped at 1 000 rows | T-6 |
+| Name search is Postgres `ILIKE` only — no full-text/fuzzy search over the JSONB payload, and `check-duplicates` still full-scans (capped at 1 000 rows) rather than using search-blocked candidates | T-6 follow-up |
 | JWT verification exists (extractor + `/whoami` + audit `actor`) but is not yet *enforced* on every `/api/*` route, and the JWKS is injected via env rather than fetched from the auth service | T-7 follow-up |
 | Record merge has no front-end action yet (backend `POST /merge` is done) | T-8 follow-up / T-5 |
 | No terminology-server check that codes exist in a published release (formats are validated; existence is not) | T-9 follow-up |

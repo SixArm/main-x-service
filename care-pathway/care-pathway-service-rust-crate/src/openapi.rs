@@ -39,6 +39,17 @@ pub fn spec() -> Value {
                     }
                 }
             },
+            "/api/care-pathways/search": {
+                "get": {
+                    "tags": ["care-pathways"],
+                    "summary": "Case-insensitive name search (Postgres ILIKE, cap 50)",
+                    "parameters": [{ "name": "q", "in": "query", "required": true, "schema": { "type": "string" } }],
+                    "responses": {
+                        "200": { "description": "Matches", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PathwayRef" } } } } },
+                        "400": { "description": "Missing or blank `q`" }
+                    }
+                }
+            },
             "/api/care-pathways/match": {
                 "post": {
                     "tags": ["matching"],
@@ -180,6 +191,14 @@ mod tests {
         assert!(paths["/api/care-pathways/audit/recent"]["get"].is_object());
         assert!(paths["/api/care-pathways/events/recent"]["get"].is_object());
         assert!(paths["/api/care-pathways/{pid}/audit"]["get"].is_object());
+    }
+
+    #[test]
+    fn spec_documents_search_endpoint() {
+        let s = spec();
+        let op = &s["paths"]["/api/care-pathways/search"]["get"];
+        assert!(op.is_object());
+        assert_eq!(op["parameters"][0]["name"], "q");
     }
 
     #[test]

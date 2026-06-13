@@ -21,6 +21,7 @@ Base URL in development: `http://localhost:5150`.
 |---|---|---|---|
 | POST | `/api/care-pathways` | `CarePathway` | `{pid, name}` |
 | GET | `/api/care-pathways` | — | `[{pid, name}]` (active, most-recent first, cap 100) |
+| GET | `/api/care-pathways/search?q=` | — | `[{pid, name}]` — `ILIKE` name match (cap 50); blank `q` → `400` |
 | GET | `/api/care-pathways/{pid}` | — | stored `CarePathway` |
 | PUT | `/api/care-pathways/{pid}` | `CarePathway` | `{pid, name}` |
 | DELETE | `/api/care-pathways/{pid}` | — | `{}` (soft delete) |

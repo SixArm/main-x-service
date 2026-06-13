@@ -9,6 +9,7 @@ Endpoint detail: [`AGENTS/restful.md`](../AGENTS/restful.md); source:
 |---|---|---|---|
 | POST | `/api/care-pathways` | Create (body: `CarePathway`; blank `name` rejected) | `{pid, name}` |
 | GET | `/api/care-pathways` | List active, most-recent first, capped 100 | `[{pid, name}]` |
+| GET | `/api/care-pathways/search?q=` | Case-insensitive name search (Postgres `ILIKE`, cap 50); blank `q` → `400` | `[{pid, name}]` |
 | GET | `/api/care-pathways/{pid}` | Fetch the stored `CarePathway` | `CarePathway` |
 | PUT | `/api/care-pathways/{pid}` | Replace the payload | `{pid, name}` |
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete | empty JSON |
