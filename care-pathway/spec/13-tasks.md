@@ -79,9 +79,18 @@ manual check confirms it. Split tasks too big for one PR
     `Merged` event; front-end merge action from the duplicates list.
   - **Acceptance:** integration test merges two stored pathways and
     verifies survivor contents + soft-deleted duplicate.
-- [ ] **T-9 — OpenAPI / Swagger + richer validation.** (deferred)
+- [ ] **T-9 — OpenAPI / Swagger + richer validation.** (partly done)
   - [ ] utoipa schema + Swagger UI.
-  - [ ] ICD-10 / ICD-11 / SNOMED CT code-format validation on
-    `condition_codes` (`422` on failure).
+  - [x] ICD-10 / ICD-11 / SNOMED CT code-format validation on
+    `condition_codes` (`422` on failure). **Done (2026-06-13):**
+    `src/validation.rs` format-checks each `condition_codes` entry
+    against its `system` — ICD-10 / ICD-11 structural patterns and the
+    SNOMED CT SCTID Verhoeff check digit; `Custom` codes need only be
+    non-blank. `validate()` reports every problem (incl. blank `name`)
+    in one `422`. Pinned un-gated by 9 `validation` unit tests + the
+    controller test `malformed_condition_code_returns_422`, and
+    (DB-gated) by `malformed_condition_code_on_create_returns_422`.
+    Existence-in-a-release validation (terminology server) stays
+    deferred.
   - **Acceptance:** Swagger UI serves the seven endpoints; malformed
-    code test returns `422`.
+    code test returns `422`. *(Validation leg met; Swagger leg open.)*

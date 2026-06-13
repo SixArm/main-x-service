@@ -26,4 +26,5 @@ pub mod data;
 pub mod initializers;
 pub mod models;
 pub mod tasks;
+pub mod validation;
 pub mod workers;

@@ -30,17 +30,24 @@ pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
 /// loco has no `unprocessable_entity` helper, so this uses
 /// `Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY, …)`.
 ///
+/// The concrete rules — required `name`, and ICD-10 / ICD-11 / SNOMED CT
+/// code-format checks on `condition_codes` — live in
+/// [`crate::validation`]; every problem found is reported in one
+/// response so the caller can fix them in a single round-trip.
+///
 /// # Errors
 ///
-/// Returns a `422` error when `name` is blank.
+/// Returns a `422` error when `name` is blank or any `condition_codes`
+/// entry is malformed for its declared coding system.
 pub fn validate(pathway: &CarePathway) -> Result<()> {
-    if pathway.name.trim().is_empty() {
-        return Err(Error::CustomError(
-            StatusCode::UNPROCESSABLE_ENTITY,
-            ErrorDetail::new("validation", "name is required"),
-        ));
+    let problems = crate::validation::problems(pathway);
+    if problems.is_empty() {
+        return Ok(());
     }
-    Ok(())
+    Err(Error::CustomError(
+        StatusCode::UNPROCESSABLE_ENTITY,
+        ErrorDetail::new("validation", &problems.join("; ")),
+    ))
 }
 
 #[derive(Debug, Serialize)]
@@ -213,6 +220,26 @@ mod tests {
     #[test]
     fn non_blank_name_passes_validation() {
         assert!(validate(&CarePathway::new("Acute Stroke Care Pathway")).is_ok());
+    }
+
+    /// A malformed clinical code (here, an ICD-10 code that is not
+    /// well-formed) is a validation failure surfaced as `422`, the same
+    /// status as a blank name. Runs without a database.
+    #[test]
+    fn malformed_condition_code_returns_422() {
+        use care_pathway_matcher::{CodeSystem, ConditionCode};
+        let pathway = CarePathway {
+            condition_codes: vec![ConditionCode {
+                system: CodeSystem::Icd10,
+                code: "not-a-code".to_string(),
+            }],
+            ..CarePathway::new("Acute Stroke Care Pathway")
+        };
+        let err = validate(&pathway).expect_err("malformed code must fail");
+        assert_eq!(
+            err.into_response().status(),
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
     }
 
     /// Pins the documented `check-duplicates` in-memory scan cap. The

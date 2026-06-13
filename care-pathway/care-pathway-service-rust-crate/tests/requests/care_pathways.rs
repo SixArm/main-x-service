@@ -68,6 +68,24 @@ async fn blank_name_on_create_returns_422() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn malformed_condition_code_on_create_returns_422() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let mut payload = stroke_pathway();
+        // A code that is not a well-formed ICD-10 code (spec §6 / T-9).
+        payload["condition_codes"] = json!([{"system": "Icd10", "code": "not-a-code"}]);
+        let response = request.post("/api/care-pathways").json(&payload).await;
+        assert_eq!(
+            response.status_code(),
+            422,
+            "malformed condition code should be 422"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn blank_name_on_update_returns_422() {
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request

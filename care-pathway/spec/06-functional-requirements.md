@@ -8,13 +8,20 @@ are marked and tracked in §13 / §15.
 - **FR-1** Create a care pathway: `POST /api/care-pathways` with a
   `CarePathway` body; reject a blank `name` with `422`; return
   `{pid, name}`.
+- **FR-1a** Validate clinical codes (service): reject with `422` any
+  `condition_codes` entry whose `code` is malformed for its declared
+  `system` — ICD-10, ICD-11, and SNOMED CT (SCTID Verhoeff check digit)
+  are format-checked; `Custom` codes need only be non-blank. All
+  problems (including a blank `name`) are reported in one response. Code
+  rules live in [`crate::validation`](../care-pathway-service-rust-crate/src/validation.rs).
+  Existence-in-a-release checks (terminology server) remain deferred (§13 T-9).
 - **FR-2** List active pathways: `GET /api/care-pathways` returns
   `{pid, name}` refs, most-recent first, capped at 100.
 - **FR-3** Read: `GET /api/care-pathways/{pid}` returns the stored
   `CarePathway`; `404` for unknown or soft-deleted `pid`.
 - **FR-4** Update: `PUT /api/care-pathways/{pid}` replaces the whole
-  payload (and the denormalised `name`); reject a blank `name` with
-  `422`.
+  payload (and the denormalised `name`); reject a blank `name` or a
+  malformed `condition_codes` entry (FR-1a) with `422`.
 - **FR-5** Soft delete: `DELETE /api/care-pathways/{pid}` sets
   `deleted_at`; the record disappears from list/read/match.
 

@@ -36,8 +36,10 @@ Plus loco's default `/_health`, `/_ping`.
 
 ## MVP scope
 
-CRUD + matching. Deferred (spec §13): Tantivy search, streaming, audit,
-privacy, OpenAPI, richer validation (ICD/SNOMED formats).
+CRUD + matching, with `condition_codes` format validation (ICD-10 /
+ICD-11 / SNOMED CT SCTID Verhoeff; `src/validation.rs`). Deferred
+(spec §13): Tantivy search, streaming, audit, privacy, OpenAPI,
+terminology-server code-existence checks.
 
 ## Golden rules
 
@@ -55,6 +57,7 @@ src/
 ├── app.rs                 loco Hooks (routes, truncate)
 ├── bin/main.rs            loco CLI entrypoint
 ├── controllers/care_pathways.rs   CRUD + match + check-duplicates
+├── validation.rs          name + condition-code (ICD/SNOMED) checks → 422
 ├── models/
 │   ├── care_pathways.rs   CRUD helpers over the stored payload
 │   └── _entities/care_pathways.rs  SeaORM entity
