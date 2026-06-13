@@ -53,7 +53,11 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    candidates}` set (no persistence).
 7. `POST /api/care-pathways/check-duplicates` — match a query against
    stored pathways; return those above threshold, ranked.
-8. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3
+8. `GET /api/care-pathways/audit/recent` + `/{pid}/audit` — audit-log
+   query; `GET /api/care-pathways/events/recent` — in-memory event
+   stream. Each CRUD action writes an `audit_logs` row and publishes a
+   `created`/`updated`/`deleted` event.
+9. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3
    document and a Swagger UI page rendering it.
 
 ## 7. Non-functional requirements
@@ -78,8 +82,10 @@ problem reported in one body); `400` for a malformed body.
 
 ## 10. Persistence
 
-PostgreSQL via SeaORM + `sea-orm-migration`. Migration
-`m20220101_000001_care_pathways`. `auto_migrate` on in development.
+PostgreSQL via SeaORM + `sea-orm-migration`. Migrations
+`m20220101_000001_care_pathways` (the `care_pathways` table) and
+`m20220101_000002_audit_logs` (the CRUD `audit_logs` trail).
+`auto_migrate` on in development.
 
 ## 11. Testing strategy
 
@@ -101,7 +107,11 @@ access controls added later.
 ## 13. Tasks (live work queue)
 
 - [ ] Tantivy full-text search.
-- [ ] Event streaming + audit log on CRUD.
+- [x] Event streaming + audit log on CRUD — `audit_logs` table +
+  best-effort row per create/update/delete (`models/audit_logs.rs`);
+  in-memory `PathwayEvent` stream (`streaming.rs`); read at
+  `/audit/recent`, `/{pid}/audit`, `/events/recent`. Durable broker +
+  `actor` (needs auth) remain roadmap.
 - [ ] Privacy controls if any restricted fields appear.
 - [ ] Record merge with link tracking.
 - [x] OpenAPI/Swagger — hand-written `src/openapi.rs` (matcher DTO is
@@ -123,8 +133,10 @@ Done: loco boot; care_pathways table + migration; CRUD with `422`
 validation on create/update (blank `name` + ICD-10 / ICD-11 / SNOMED CT
 `condition_codes` format checks, all problems reported together);
 `/match` and `/check-duplicates` embedding care-pathway-matcher;
-OpenAPI 3 doc + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`);
-DB-free tests + gated request-level tests; green build + clippy.
+audit log + in-memory event streaming on every CRUD (`/audit/recent`,
+`/{pid}/audit`, `/events/recent`); OpenAPI 3 doc + Swagger UI
+(`/api-docs/openapi.json`, `/swagger-ui`); DB-free tests + gated
+request-level tests; green build + clippy.
 
 ## 15. Roadmap
 

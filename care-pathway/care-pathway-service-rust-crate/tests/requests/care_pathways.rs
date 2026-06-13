@@ -227,6 +227,66 @@ async fn can_check_duplicates_against_stored_pathways() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn crud_writes_audit_log_and_events() {
+    request::<App, _, _>(|request, _ctx| async move {
+        // Create → update → delete one pathway.
+        let created: Value = request
+            .post("/api/care-pathways")
+            .json(&stroke_pathway())
+            .await
+            .json();
+        let pid = created["pid"].as_str().expect("pid").to_string();
+
+        let mut updated = stroke_pathway();
+        updated["name"] = json!("Acute Stroke Pathway (rev 2)");
+        let response = request
+            .put(&format!("/api/care-pathways/{pid}"))
+            .json(&updated)
+            .await;
+        assert_eq!(response.status_code(), 200);
+
+        let response = request.delete(&format!("/api/care-pathways/{pid}")).await;
+        assert_eq!(response.status_code(), 200);
+
+        // Three audit rows for this pathway: created, updated, deleted.
+        let entity_audit: Value = request
+            .get(&format!("/api/care-pathways/{pid}/audit"))
+            .await
+            .json();
+        let rows = entity_audit.as_array().expect("audit rows array");
+        assert_eq!(rows.len(), 3, "create + update + delete should each audit");
+        let actions: Vec<&str> = rows.iter().filter_map(|r| r["action"].as_str()).collect();
+        assert!(actions.contains(&"created"));
+        assert!(actions.contains(&"updated"));
+        assert!(actions.contains(&"deleted"));
+
+        // System-wide recent-audit endpoint returns entries too.
+        let recent_audit: Value = request.get("/api/care-pathways/audit/recent").await.json();
+        assert!(!recent_audit
+            .as_array()
+            .expect("recent audit array")
+            .is_empty());
+
+        // The in-memory event stream carries the three events for this pid.
+        let events: Value = request.get("/api/care-pathways/events/recent").await.json();
+        let mine: Vec<&Value> = events
+            .as_array()
+            .expect("events array")
+            .iter()
+            .filter(|e| e["pid"] == pid)
+            .collect();
+        assert_eq!(mine.len(), 3, "three events published for this pathway");
+        let kinds: Vec<&str> = mine.iter().filter_map(|e| e["kind"].as_str()).collect();
+        assert!(kinds.contains(&"created"));
+        assert!(kinds.contains(&"updated"));
+        assert!(kinds.contains(&"deleted"));
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn openapi_json_is_served() {
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/api-docs/openapi.json").await;

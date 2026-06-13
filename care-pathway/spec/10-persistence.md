@@ -6,7 +6,7 @@ the service crate. Family conventions:
 
 ### 10.1 Tables
 
-One table, `care_pathways`, created by migration
+The `care_pathways` table, created by migration
 [`m20220101_000001_care_pathways`](../care-pathway-service-rust-crate/migration/src/m20220101_000001_care_pathways.rs):
 
 | Column | Type | Notes |
@@ -17,6 +17,18 @@ One table, `care_pathways`, created by migration
 | `data` | `JsonBinary` (JSONB) | Full `CarePathway` payload |
 | `active` | `BooleanWithDefault(true)` | Registry flag |
 | `deleted_at` | `TimestampWithTimeZoneNull` | Soft delete |
+
+The `audit_logs` table, created by migration
+[`m20220101_000002_audit_logs`](../care-pathway-service-rust-crate/migration/src/m20220101_000002_audit_logs.rs)
+— one row per CRUD action (T-3):
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `PkAuto` | Internal row id |
+| `entity_pid` | `Uuid` | The care pathway the entry concerns |
+| `action` | `String` | `created` / `updated` / `deleted` |
+| `actor` | `StringNull` | User / system id — `NULL` until JWT auth (T-7) |
+| `snapshot` | `JsonBinaryNull` | The record's `data` at the time of the action |
 
 ### 10.2 JSONB rationale
 

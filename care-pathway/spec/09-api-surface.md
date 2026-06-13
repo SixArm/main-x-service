@@ -14,10 +14,18 @@ Endpoint detail: [`AGENTS/restful.md`](../AGENTS/restful.md); source:
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete | empty JSON |
 | POST | `/api/care-pathways/match` | Rank `{query, candidates}` (no persistence) | `[(index, MatchResult)]` |
 | POST | `/api/care-pathways/check-duplicates` | Match a query against stored pathways | `[{pid, name, score, confidence, is_match}]` sorted by score |
+| GET | `/api/care-pathways/audit/recent` | Recent audit-log entries (all pathways), newest first, cap 100 | `[AuditLog]` |
+| GET | `/api/care-pathways/{pid}/audit` | Audit trail for one pathway, newest first | `[AuditLog]` |
+| GET | `/api/care-pathways/events/recent` | Recent CRUD events from the in-memory stream | `[PathwayEvent]` |
 | GET | `/api-docs/openapi.json` | OpenAPI 3 document for the API | `OpenAPI` JSON |
 | GET | `/swagger-ui` | Swagger UI rendering the spec (CDN assets) | HTML |
 
 Plus loco's built-in `/_health` and `/_ping`.
+
+Every create / update / delete writes a best-effort `audit_logs` row
+(action + JSON snapshot, durable in Postgres) and publishes a
+`PathwayEvent` (`created`/`updated`/`deleted`) to the in-memory event
+stream. A durable broker is roadmap (§15).
 
 Conventions: **raw loco JSON** (no `{success, data, error}` envelope
 — this is the loco-era convention, unlike the pre-loco person

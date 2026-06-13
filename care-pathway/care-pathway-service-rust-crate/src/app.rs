@@ -19,7 +19,10 @@ use std::path::Path;
 
 #[allow(unused_imports)]
 use crate::{
-    controllers, models::_entities::care_pathways, tasks, workers::downloader::DownloadWorker,
+    controllers,
+    models::_entities::{audit_logs, care_pathways},
+    tasks,
+    workers::downloader::DownloadWorker,
 };
 
 /// The loco.rs application hooks for `care-pathway-service`.
@@ -71,6 +74,7 @@ impl Hooks for App {
         // tasks-inject (do not remove)
     }
     async fn truncate(ctx: &AppContext) -> Result<()> {
+        truncate_table(&ctx.db, audit_logs::Entity).await?;
         truncate_table(&ctx.db, care_pathways::Entity).await?;
         Ok(())
     }

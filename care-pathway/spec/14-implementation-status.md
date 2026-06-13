@@ -18,6 +18,7 @@ Aspirational items live in §15, not here.
 | service | Validation | `condition_codes` format-checked per `system` — ICD-10, ICD-11, SNOMED CT (SCTID Verhoeff); all problems reported in one `422` (`src/validation.rs`) |
 | service | API docs | OpenAPI 3 (`src/openapi.rs`, hand-written) + Swagger UI at `/api-docs/openapi.json` · `/swagger-ui` (`controllers/docs.rs`) |
 | service | Matching endpoints | `/match` (rank explicit candidates), `/check-duplicates` (scan ≤ 1 000 stored rows, ranked hits) |
+| service | Audit + streaming | `audit_logs` table + best-effort row per CRUD (action + snapshot); in-memory `PathwayEvent` stream (cap 1 000); read at `/audit/recent`, `/{pid}/audit`, `/events/recent` |
 | service | Tests | DB-free `tests/matching.rs` (matcher embedding + JSON round-trip) + controller validation unit tests (422 pin); request-level loco tests `tests/requests/care_pathways.rs` (`#[ignore]`-gated on Postgres); green build + clippy |
 | front-end | Routes | `/`, `/new`, `/[pid]` (detail + delete + check-duplicates), `/[pid]/edit` |
 | front-end | API layer | Lean raw-JSON client, `CarePathwayRepository`, hand-mirrored TS types |
@@ -31,7 +32,8 @@ Open gaps drive tasks in §13. Live gap list:
 | Gap | Task |
 |---|---|
 | Single-file crate specs; no service `AGENTS/` reference set | T-1 |
-| No audit log, no event streaming | T-3 |
+| Event streaming is in-memory only (process-local ring buffer); no durable broker, no cross-replica delivery | T-3 follow-up / §15 |
+| Audit rows have no `actor` (no auth yet) | T-7 |
 | Request-level tests exist but are `#[ignore]`-gated; no DB-backed run in CI yet | T-4 follow-up |
 | No front-end unit / e2e tests | T-5 |
 | No full-text search; `check-duplicates` full scan capped at 1 000 rows | T-6 |

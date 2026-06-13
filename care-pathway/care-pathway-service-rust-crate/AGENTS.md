@@ -31,17 +31,22 @@ adapter to drift.
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete |
 | POST | `/api/care-pathways/match` | Rank a `{query, candidates}` set |
 | POST | `/api/care-pathways/check-duplicates` | Match a query against stored pathways |
+| GET | `/api/care-pathways/audit/recent` · `/{pid}/audit` | Audit-log query |
+| GET | `/api/care-pathways/events/recent` | In-memory event stream |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 
-Plus loco's default `/_health`, `/_ping`.
+Plus loco's default `/_health`, `/_ping`. Every CRUD action writes an
+`audit_logs` row and publishes a `created`/`updated`/`deleted` event.
 
 ## MVP scope
 
 CRUD + matching, with `condition_codes` format validation (ICD-10 /
-ICD-11 / SNOMED CT SCTID Verhoeff; `src/validation.rs`) and OpenAPI 3 +
-Swagger UI (`src/openapi.rs`, `controllers/docs.rs`). Deferred
-(spec §13): Tantivy search, streaming, audit, privacy, record merge,
-JWT, terminology-server code-existence checks.
+ICD-11 / SNOMED CT SCTID Verhoeff; `src/validation.rs`), OpenAPI 3 +
+Swagger UI (`src/openapi.rs`, `controllers/docs.rs`), and an audit log +
+in-memory event stream on every CRUD (`models/audit_logs.rs`,
+`src/streaming.rs`). Deferred (spec §13): Tantivy search, durable event
+bus, privacy, record merge, JWT, terminology-server code-existence
+checks.
 
 ## Golden rules
 
@@ -58,13 +63,15 @@ JWT, terminology-server code-existence checks.
 src/
 ├── app.rs                 loco Hooks (routes, truncate)
 ├── bin/main.rs            loco CLI entrypoint
-├── controllers/care_pathways.rs   CRUD + match + check-duplicates
+├── controllers/care_pathways.rs   CRUD + match + check-duplicates + audit/events
 ├── controllers/docs.rs    OpenAPI JSON + Swagger UI
 ├── openapi.rs             hand-written OpenAPI 3 document
+├── streaming.rs           in-memory CRUD event stream (PathwayEvent)
 ├── validation.rs          name + condition-code (ICD/SNOMED) checks → 422
 ├── models/
 │   ├── care_pathways.rs   CRUD helpers over the stored payload
-│   └── _entities/care_pathways.rs  SeaORM entity
-migration/src/            m20220101_000001_care_pathways
+│   ├── audit_logs.rs      audit-trail record/query helpers
+│   └── _entities/{care_pathways,audit_logs}.rs  SeaORM entities
+migration/src/            m20220101_000001_care_pathways, …_000002_audit_logs
 config/                   development/production/test yaml
 ```

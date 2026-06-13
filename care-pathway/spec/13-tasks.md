@@ -29,14 +29,28 @@ manual check confirms it. Split tasks too big for one PR
     DB-free unit tests in `src/controllers/care_pathways.rs` and by
     the (DB-gated) request tests
     `blank_name_on_{create,update}_returns_422`.
-- [ ] **T-3 — Audit log + event streaming on CRUD.** (deferred MVP
-  feature; compliance driver §12.3)
-  - [ ] Audit row (old/new JSON, user context, timestamp) per
-    create/update/delete.
-  - [ ] Event publish per CRUD per
+- [x] **T-3 — Audit log + event streaming on CRUD.** (compliance
+  driver §12.3)
+  - [x] Audit row (action + JSON snapshot + timestamp) per
+    create/update/delete. **Done (2026-06-13):** `audit_logs` table
+    (migration `m20220101_000002_audit_logs`), `models/audit_logs.rs`
+    (`record` / `recent` / `for_entity`); the controller writes a
+    best-effort row on each CRUD action (logs on failure, never fails
+    the request — the `actor` column is `NULL` until JWT auth lands,
+    T-7). Read endpoints `GET /api/care-pathways/audit/recent` and
+    `GET /api/care-pathways/{pid}/audit`.
+  - [x] Event publish per CRUD per
     [`agents/share/auditability.md`](../../agents/share/auditability.md).
+    **Done:** `streaming.rs` in-memory ring buffer (cap 1 000,
+    `OnceLock` global, same MVP shape as the organization service —
+    siblings swap a real broker behind `publish`); `created`/`updated`/
+    `deleted` published per CRUD; read at
+    `GET /api/care-pathways/events/recent`. Durable broker is roadmap
+    (§15).
   - **Acceptance:** integration test creates + updates + deletes a
     pathway and reads back three audit rows and three events.
+    **Met (DB-gated):** `crud_writes_audit_log_and_events`. Streaming
+    is also pinned un-gated by `streaming::publish_and_read_back`.
 - [x] **T-4 — Request-level integration tests (PostgreSQL).**
   - [x] loco testing harness over CRUD, `/match`,
     `/check-duplicates` (dev-dependencies already present:

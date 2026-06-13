@@ -11,7 +11,9 @@ use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::models::audit_logs::Model as AuditModel;
 use crate::models::care_pathways::Model as PathwayModel;
+use crate::streaming::{self, EventKind};
 
 /// Maximum number of stored pathways scanned in-memory by
 /// `check-duplicates`.
@@ -88,7 +90,21 @@ async fn create(
 ) -> Result<Response> {
     validate(&pathway)?;
     let model = PathwayModel::create(&ctx.db, &pathway).await?;
+    audit(&ctx, model.pid, "created", Some(model.data.clone())).await;
+    streaming::publish(EventKind::Created, &model.pid.to_string(), &model.name);
     format::json(PathwayRef::of(&model))
+}
+
+/// Best-effort audit write: log on failure but never fail the request.
+async fn audit(
+    ctx: &AppContext,
+    entity_pid: uuid::Uuid,
+    action: &str,
+    snapshot: Option<serde_json::Value>,
+) {
+    if let Err(err) = AuditModel::record(&ctx.db, entity_pid, action, snapshot).await {
+        tracing::warn!(error = %err, action, "failed to write audit log");
+    }
 }
 
 /// Fetch a care pathway by public id.
@@ -111,6 +127,8 @@ async fn update(
         .into_active_model()
         .update_data(&ctx.db, &pathway)
         .await?;
+    audit(&ctx, updated.pid, "updated", Some(updated.data.clone())).await;
+    streaming::publish(EventKind::Updated, &updated.pid.to_string(), &updated.name);
     format::json(PathwayRef::of(&updated))
 }
 
@@ -118,7 +136,10 @@ async fn update(
 #[debug_handler]
 async fn remove(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
     let model = PathwayModel::find_by_pid(&ctx.db, &pid).await?;
+    let (entity_pid, name) = (model.pid, model.name.clone());
     model.into_active_model().soft_delete(&ctx.db).await?;
+    audit(&ctx, entity_pid, "deleted", None).await;
+    streaming::publish(EventKind::Deleted, &entity_pid.to_string(), &name);
     format::empty_json()
 }
 
@@ -175,8 +196,31 @@ async fn check_duplicates(
     format::json(hits)
 }
 
+/// Recent audit-log entries across all care pathways.
+#[debug_handler]
+async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
+    let rows = AuditModel::recent(&ctx.db, 100).await?;
+    format::json(rows)
+}
+
+/// Audit trail for a single care pathway.
+#[debug_handler]
+async fn entity_audit(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+    let Ok(uuid) = uuid::Uuid::parse_str(&pid) else {
+        return bad_request("invalid pid");
+    };
+    let rows = AuditModel::for_entity(&ctx.db, uuid).await?;
+    format::json(rows)
+}
+
+/// Recent events from the in-memory event stream.
+#[debug_handler]
+async fn recent_events() -> Result<Response> {
+    format::json(streaming::recent(100))
+}
+
 /// Build the `/api/care-pathways` route table (CRUD + match +
-/// check-duplicates).
+/// check-duplicates + audit / event endpoints).
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/care-pathways")
@@ -184,9 +228,12 @@ pub fn routes() -> Routes {
         .add("/", get(list))
         .add("/match", post(match_against))
         .add("/check-duplicates", post(check_duplicates))
+        .add("/audit/recent", get(recent_audit))
+        .add("/events/recent", get(recent_events))
         .add("/{pid}", get(get_one))
         .add("/{pid}", put(update))
         .add("/{pid}", delete(remove))
+        .add("/{pid}/audit", get(entity_audit))
 }
 
 #[cfg(test)]

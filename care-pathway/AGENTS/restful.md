@@ -32,6 +32,18 @@ Base URL in development: `http://localhost:5150`.
 | POST | `/api/care-pathways/match` | `{query, candidates}` | ranked `[(index, MatchResult)]` |
 | POST | `/api/care-pathways/check-duplicates` | `CarePathway` | `[{pid, name, score, confidence, is_match}]`, score-descending |
 
+### Audit & events
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/api/care-pathways/audit/recent` | recent `audit_logs` rows (all pathways, cap 100) |
+| GET | `/api/care-pathways/{pid}/audit` | audit trail for one pathway |
+| GET | `/api/care-pathways/events/recent` | recent `PathwayEvent`s from the in-memory stream |
+
+Each create / update / delete writes a best-effort `audit_logs` row
+(durable) and publishes a `created`/`updated`/`deleted` event to the
+in-memory stream. Durable broker is roadmap.
+
 ### API documentation
 
 | Method | Path | Returns |

@@ -11,9 +11,10 @@ and accept. Ordered roughly by intent.
   queue, merge with link tracking and snapshots, batch deduplicate
   scan. (Seeds: T-6, T-8.)
 - **Auditability.** Audit log + audit query API + event streaming on
-  every CRUD/merge; then a **durable event bus** (replacing
-  in-process publishing) so peer registries and analytics can
-  subscribe. (Seed: T-3.)
+  every CRUD shipped under T-3 (in-process). Next: a **durable event
+  bus** (replacing in-process publishing) so peer registries and
+  analytics can subscribe across replicas, and an `actor` on each audit
+  row once JWT auth (T-7) supplies the caller identity.
 - **Security.** JWT enforcement on `/api/*` verifying RS256 tokens
   against the central auth-service JWKS; role split between
   read-side integrators and registry operators; rate limiting.

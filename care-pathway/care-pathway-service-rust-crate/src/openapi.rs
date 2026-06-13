@@ -56,6 +56,12 @@ pub fn spec() -> Value {
                         "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ScoredRef" } } } } } }
                 }
             },
+            "/api/care-pathways/audit/recent": {
+                "get": { "tags": ["audit"], "summary": "Recent audit-log entries across all pathways", "responses": { "200": { "description": "Audit entries" } } }
+            },
+            "/api/care-pathways/events/recent": {
+                "get": { "tags": ["audit"], "summary": "Recent events from the in-memory stream", "responses": { "200": { "description": "Events" } } }
+            },
             "/api/care-pathways/{pid}": {
                 "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
                 "get": { "tags": ["care-pathways"], "summary": "Fetch the stored care pathway",
@@ -64,6 +70,10 @@ pub fn spec() -> Value {
                     "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CarePathway" } } } },
                     "responses": { "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PathwayRef" } } } }, "404": { "description": "Not found" }, "422": { "description": "Validation failure: blank name or malformed condition_codes" } } },
                 "delete": { "tags": ["care-pathways"], "summary": "Soft-delete a care pathway", "responses": { "200": { "description": "Deleted" } } }
+            },
+            "/api/care-pathways/{pid}/audit": {
+                "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "get": { "tags": ["audit"], "summary": "Audit trail for one care pathway", "responses": { "200": { "description": "Audit entries" } } }
             }
         },
         "components": {
@@ -116,10 +126,10 @@ mod tests {
     }
 
     #[test]
-    fn spec_documents_all_seven_endpoints() {
+    fn spec_documents_core_endpoints() {
         let s = spec();
         let paths = &s["paths"];
-        // 4 path templates carrying 7 operations.
+        // The seven core CRUD + matching operations.
         assert!(paths["/api/care-pathways"]["get"].is_object());
         assert!(paths["/api/care-pathways"]["post"].is_object());
         assert!(paths["/api/care-pathways/match"]["post"].is_object());
@@ -127,5 +137,14 @@ mod tests {
         assert!(paths["/api/care-pathways/{pid}"]["get"].is_object());
         assert!(paths["/api/care-pathways/{pid}"]["put"].is_object());
         assert!(paths["/api/care-pathways/{pid}"]["delete"].is_object());
+    }
+
+    #[test]
+    fn spec_documents_audit_and_event_endpoints() {
+        let s = spec();
+        let paths = &s["paths"];
+        assert!(paths["/api/care-pathways/audit/recent"]["get"].is_object());
+        assert!(paths["/api/care-pathways/events/recent"]["get"].is_object());
+        assert!(paths["/api/care-pathways/{pid}/audit"]["get"].is_object());
     }
 }
