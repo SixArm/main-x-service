@@ -44,8 +44,9 @@ Plus loco's default `/_health`, `/_ping`. Every CRUD action writes an
 
 ## MVP scope
 
-CRUD + `ILIKE` name search + matching, with `condition_codes` format
-validation (ICD-10 / ICD-11 / SNOMED CT SCTID Verhoeff;
+CRUD + `ILIKE` name search + matching, with payload validation
+(`condition_codes` ICD-10 / ICD-11 / SNOMED CT SCTID Verhoeff;
+`identifiers` UUID / DOI shapes; `in_language` BCP-47 syntax;
 `src/validation.rs`), OpenAPI 3 +
 Swagger UI (`src/openapi.rs`, `controllers/docs.rs`), an audit log +
 in-memory event stream on every CRUD/merge (`models/audit_logs.rs`,

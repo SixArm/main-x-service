@@ -20,6 +20,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **`identifiers` and `in_language` payload validation** in
+  `src/validation.rs`: each `identifiers` entry is structurally checked
+  against its `scheme` — a canonical 8-4-4-4-12 hex UUID for `Uuid`, the
+  `10.<registrant>/<suffix>` shape for `Doi`, and non-blank for every
+  other scheme — and each `in_language` entry is checked for BCP-47
+  syntax. A malformed entry joins the existing single `422` (all
+  problems reported together). Rejecting a malformed *deterministic*
+  identifier (UUID / DOI) matters because a shared value short-circuits
+  the matcher to `1.0`. Pinned by 6 new DB-free `validation` unit tests
+  and the DB-gated request test
+  `malformed_identifier_on_create_returns_422`.
+
 - Request-level integration tests
   (`tests/requests/care_pathways.rs`, loco testing harness) covering
   all seven endpoints: create, blank-name `422` on create/update,

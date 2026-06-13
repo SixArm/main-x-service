@@ -62,6 +62,17 @@
   that branch plus grouped/bare-form parity and the documented invalid
   numbers. Rust `nhs.rs` 6→8 lib tests; Svelte `nhs.test.ts` adds 4
   assertions.
+- [x] **T-16** Geofence-breach derivation made pure + unit-tested (D-12,
+  FR-20). The cross-building alert logic behind `GET /api/alerts` was
+  extracted from the Loco controller into a pure `detect_geofence_breaches`
+  function (plus a `cabinet_buildings` hierarchy resolver) and now has 6
+  in-crate tests covering every branch of the boundary-crossing rule
+  (cross-building breach, same-building suppression, `None`-endpoint
+  in-transit/created-in-place, unknown cabinet, orphan-room hierarchy,
+  mixed-log filtering). Previously reachable only via Postgres-gated request
+  tests. Service lib tests 8→14; no behaviour change. Also corrected
+  service-edition doc drift: `testing.md`/`README.md` unit count (6→14) and
+  request-test count (29→49).
 
 ## Production gates (blocked on deployment decisions)
 

@@ -161,5 +161,20 @@ manual check confirms it. Split tasks too big for one PR
     (DB-gated) by `malformed_condition_code_on_create_returns_422`.
     Existence-in-a-release validation (terminology server) stays
     deferred.
+  - [x] *Extended (2026-06-13):* `identifiers` and `in_language`
+    validation. `src/validation.rs` now also structurally checks each
+    `identifiers` entry against its `scheme` — a canonical 8-4-4-4-12 hex
+    UUID for `Uuid`, the `10.<registrant>/<suffix>` shape for `Doi`, and
+    non-blank for every other scheme (the open-valued deterministic ones
+    `Wikidata`/`GuidelineId`/`Uri` plus the provider-scoped/custom ones).
+    Rejecting a malformed *deterministic* identifier matters because a
+    shared value short-circuits the matcher to `1.0` (R-0). `in_language`
+    entries are checked for BCP-47 syntax (2–3 or 5–8 letter primary
+    subtag, then `-`-separated 1–8 alphanumeric subtags). Pinned un-gated
+    by 6 new `validation` unit tests (UUID/DOI accept+reject, open-scheme
+    non-blank, indexed-problem reporting, BCP-47 accept+reject,
+    malformed-tag problem) and (DB-gated) by
+    `malformed_identifier_on_create_returns_422`. IANA-registry and
+    terminology-server existence checks stay deferred.
   - **Acceptance:** Swagger UI serves the seven endpoints; malformed
     code test returns `422`. *(Validation leg met; Swagger leg open.)*

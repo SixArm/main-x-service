@@ -39,17 +39,20 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
 
 ## 6. Functional requirements
 
-1. `POST /api/care-pathways` — create; `name` required and
+1. `POST /api/care-pathways` — create; `name` required,
    `condition_codes` format-validated against their `system` (ICD-10 /
-   ICD-11 / SNOMED CT SCTID Verhoeff; `Custom` non-blank); `422` on any
-   problem, all reported together — also enforced on update. Rules in
-   [`src/validation.rs`](../src/validation.rs).
+   ICD-11 / SNOMED CT SCTID Verhoeff; `Custom` non-blank), `identifiers`
+   structurally checked (canonical UUID for `Uuid`; `10.…/…` shape for
+   `Doi`; other schemes non-blank), and `in_language` checked for BCP-47
+   syntax; `422` on any problem, all reported together — also enforced on
+   update. Rules in [`src/validation.rs`](../src/validation.rs).
 2. `GET /api/care-pathways` — list active (cap 100), `{pid, name}`.
    `GET /api/care-pathways/search?q=` — case-insensitive name search
    (Postgres `ILIKE`, cap 50; blank `q` → `400`).
 3. `GET /api/care-pathways/{pid}` — return the stored `CarePathway`.
 4. `PUT /api/care-pathways/{pid}` — replace the payload (`422` if
-   `name` is blank or a `condition_codes` entry is malformed).
+   `name` is blank, or any `condition_codes` / `identifiers` /
+   `in_language` entry is malformed).
 5. `DELETE /api/care-pathways/{pid}` — soft-delete.
 6. `POST /api/care-pathways/match` — rank an explicit `{query,
    candidates}` set (no persistence).
@@ -83,8 +86,9 @@ directly on the deserialised payloads — no adapter.
 ## 9. API surface
 
 See §6. Raw loco JSON. `404` for unknown `pid`; `422` for a validation
-failure (blank `name`, or a `condition_codes` entry malformed for its
-coding system — family convention, via
+failure (blank `name`, a `condition_codes` entry malformed for its
+coding system, an `identifiers` entry malformed for its scheme, or an
+`in_language` tag that is not valid BCP-47 — family convention, via
 `Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY, …)`, with every
 problem reported in one body); `400` for a malformed body.
 
@@ -100,7 +104,8 @@ PostgreSQL via SeaORM + `sea-orm-migration`. Migrations
 
 DB-free tests: `tests/matching.rs` (matcher embedding + JSON
 round-trip), the `src/validation.rs` unit tests (ICD-10 / ICD-11 /
-SNOMED-Verhoeff format checks), the `src/auth.rs` unit tests (mint a
+SNOMED-Verhoeff code formats, UUID / DOI identifier shapes, and BCP-47
+`in_language` syntax), the `src/auth.rs` unit tests (mint a
 real RS256 token + matching JWKS in-process, then assert valid → claims
 and missing / non-bearer / expired / tampered / empty-verifier → `401`),
 the `src/merge.rs` unit tests (former-title alias, scalar fallback, list
@@ -137,10 +142,13 @@ access controls added later.
   dependency-light, so no utoipa, matching the organization service)
   served at `/api-docs/openapi.json` + `/swagger-ui` by
   `controllers/docs.rs`.
-- [x] Richer validation (ICD/SNOMED code formats) — `src/validation.rs`
-  format-checks `condition_codes` per `system` (ICD-10, ICD-11, SNOMED
-  CT SCTID Verhoeff); `422` with all problems. Terminology-server
-  existence checks remain out of scope.
+- [x] Richer validation (ICD/SNOMED code formats, identifier shapes,
+  language tags) — `src/validation.rs` format-checks `condition_codes`
+  per `system` (ICD-10, ICD-11, SNOMED CT SCTID Verhoeff), `identifiers`
+  per `scheme` (canonical UUID for `Uuid`, `10.…/…` shape for `Doi`,
+  non-blank for the rest), and `in_language` for BCP-47 syntax; `422`
+  with all problems. Terminology-server / IANA-registry existence checks
+  remain out of scope.
 - [x] Request-level integration tests (Postgres) — landed
   `#[ignore]`-gated (entity spec §13 T-4); wiring a DB-backed run
   into CI remains.
@@ -154,8 +162,9 @@ access controls added later.
 ## 14. Implementation status
 
 Done: loco boot; care_pathways table + migration; CRUD with `422`
-validation on create/update (blank `name` + ICD-10 / ICD-11 / SNOMED CT
-`condition_codes` format checks, all problems reported together);
+validation on create/update (blank `name`; ICD-10 / ICD-11 / SNOMED CT
+`condition_codes` format checks; UUID / DOI `identifiers` shapes; BCP-47
+`in_language` syntax — all problems reported together);
 `ILIKE` name search; `/match`, `/check-duplicates`, and `/merge`
 (record merge + history)
 embedding care-pathway-matcher; audit log + in-memory event streaming on

@@ -12,6 +12,7 @@ healthcare contexts add
 | GDPR Art. 32 (security of processing) | Passwordless (no password database to breach); RS256 asymmetric keys (no shared secret distribution); short token TTL; TLS at the edge. |
 | ISO/IEC 27001 (ISMS) | Access control alignment: single sign-on chokepoint, per-token sessions with issuance + revocation timestamps, key custody via environment injection (A.9 / A.10-style controls); operational controls are deployment-side. |
 | ISO/IEC 42001:2023 (AIMS) | Not applicable today — no ML in the auth path; applies family-wide where matcher tuning is ML-driven. |
+| Welsh Language (Wales) Measure 2011 / public-sector Welsh-language duty | The user-facing surfaces (magic-link email + front-end UI) ship in **Welsh (`cy`)** alongside English (T-7), so a Welsh-speaking citizen can sign in in Welsh — treating Welsh no less favourably than English. Locale catalogs (`src/i18n.rs`, `src/lib/i18n.svelte.ts`) are structured so further national languages are added by extension. |
 
 ### Audit of authentication events
 

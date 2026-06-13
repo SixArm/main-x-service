@@ -1,5 +1,6 @@
 <script lang="ts">
     import { AuthRepository } from "$lib/api/auth";
+    import { i18n, t } from "$lib/i18n.svelte";
 
     const repo = AuthRepository.withFetch();
 
@@ -13,37 +14,36 @@
         error = null;
         submitting = true;
         try {
-            await repo.requestMagicLink(email);
+            await repo.requestMagicLink(email, i18n.locale);
             sent = true;
         } catch (err) {
-            error = err instanceof Error ? err.message : "Request failed";
+            error = err instanceof Error ? err.message : t("signin.failed");
         } finally {
             submitting = false;
         }
     }
 </script>
 
-<svelte:head><title>Sign in — Main X Auth</title></svelte:head>
+<svelte:head><title>{t("signin.title")} — {t("brand")}</title></svelte:head>
 
-<h1>Sign in</h1>
+<h1>{t("signin.title")}</h1>
 
 {#if sent}
-    <p class="banner">
-        If that email has an account, a magic link is on its way. In development
-        the link is printed to the auth service console — open it to sign in.
-    </p>
+    <p class="banner">{t("signin.sent")}</p>
 {:else}
     <form class="stack" onsubmit={handleSubmit}>
         <label>
-            Email
+            {t("signin.email")}
             <input type="email" bind:value={email} required autocomplete="email" />
         </label>
         <button class="button" type="submit" disabled={submitting}>
-            {submitting ? "Sending…" : "Email me a magic link"}
+            {submitting ? t("signin.submitting") : t("signin.submit")}
         </button>
         {#if error}
             <p class="banner" role="alert">{error}</p>
         {/if}
     </form>
-    <p><small>No account yet? <a href="/signup">Create one</a></small></p>
+    <p>
+        <small>{t("signin.noAccount")} <a href="/signup">{t("signin.create")}</a></small>
+    </p>
 {/if}

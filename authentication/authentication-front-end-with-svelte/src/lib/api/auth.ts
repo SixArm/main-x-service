@@ -11,14 +11,18 @@ export class AuthRepository {
         return new AuthRepository(new ApiClient({ baseUrl: API_BASE_URL, fetch: fetchFn }));
     }
 
-    /// Create a passwordless account and trigger a magic link.
-    signup(email: string, name?: string): Promise<unknown> {
-        return this.http.post("/api/auth/signup", { body: { email, name } });
+    /// Create a passwordless account and trigger a magic link. The
+    /// optional `locale` selects the magic-link email language; when
+    /// omitted it drops out of the JSON body and the service defaults to
+    /// English.
+    signup(email: string, name?: string, locale?: string): Promise<unknown> {
+        return this.http.post("/api/auth/signup", { body: { email, name, locale } });
     }
 
-    /// Request a magic link for an existing account (sign in).
-    requestMagicLink(email: string): Promise<unknown> {
-        return this.http.post("/api/auth/magic-link", { body: { email } });
+    /// Request a magic link for an existing account (sign in). `locale`
+    /// is optional (see `signup`).
+    requestMagicLink(email: string, locale?: string): Promise<unknown> {
+        return this.http.post("/api/auth/magic-link", { body: { email, locale } });
     }
 
     /// Consume a magic-link token, returning an access token + profile.

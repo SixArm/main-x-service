@@ -8,6 +8,7 @@
 
 use place_service::models::address::PostalAddress;
 use place_service::models::geo::GeoCoordinates;
+use place_service::models::opening_hours::{DayOfWeek, OpeningHoursSpecification};
 use place_service::models::place::Place;
 use place_service::validation::{normalize_place, validate_place};
 
@@ -62,6 +63,10 @@ fn test_full_place_lifecycle_validation() {
         postal_code: Some("94111".into()),
     });
     place.geo = Some(GeoCoordinates::new(37.7749, -122.4194));
+    place.opening_hours = vec![
+        OpeningHoursSpecification::new(DayOfWeek::Monday, "09:00", "17:00"),
+        OpeningHoursSpecification::new(DayOfWeek::Sunday, "00:00", "23:59"),
+    ];
 
     assert!(validate_place(&place).is_empty());
     normalize_place(&mut place);
@@ -69,5 +74,32 @@ fn test_full_place_lifecycle_validation() {
     assert_eq!(
         place.address.as_ref().unwrap().address_locality.as_deref(),
         Some("San Francisco")
+    );
+}
+
+/// Malformed opening-hours times fail validation with indexed field paths,
+/// and every bad window/field is reported (not just the first).
+#[test]
+fn test_invalid_opening_hours_validation() {
+    let mut place = Place::new("Test Place");
+    place.opening_hours = vec![
+        OpeningHoursSpecification::new(DayOfWeek::Monday, "09:00", "17:00"), // valid
+        OpeningHoursSpecification::new(DayOfWeek::Tuesday, "25:00", "5pm"),  // both bad
+    ];
+
+    let errors = validate_place(&place);
+    assert!(
+        errors.iter().any(|e| e.field == "opening_hours[1].opens"),
+        "Errors: {errors:?}"
+    );
+    assert!(
+        errors.iter().any(|e| e.field == "opening_hours[1].closes"),
+        "Errors: {errors:?}"
+    );
+    // The valid first window contributes no errors.
+    assert!(
+        !errors
+            .iter()
+            .any(|e| e.field.starts_with("opening_hours[0]"))
     );
 }

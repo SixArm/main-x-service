@@ -8,6 +8,20 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — privacy masking UTF-8 safety
+
+- `privacy::mask_value` is now char-based instead of byte-based. The
+  previous implementation sliced the string at byte offset
+  `len - visible_chars`; when that offset fell inside a multibyte UTF-8
+  character it **panicked** (`end byte index … is not a char boundary`),
+  so the masked-view endpoint (`GET /api/persons/{id}/masked`) would
+  500 on any person whose tax ID, identifier, document number, or phone
+  carried a non-ASCII character near the tail (accented names, non-Latin
+  identifiers). Masking now counts Unicode scalar values and keeps
+  exactly the last four *characters* visible. Pinned by
+  `privacy::tests::test_mask_value_multibyte_does_not_panic`; the
+  contract is recorded in spec §6.6.
+
 ### Added — matcher bridge
 
 - New `src/matching/adapter.rs` exposing

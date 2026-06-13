@@ -107,7 +107,12 @@ standardised. Failed validation → `422`.
 Per-field masking, GDPR Article 15 export at
 `GET /api/persons/{id}/export`, masked view at
 `GET /api/persons/{id}/masked`, consent model with type + status +
-dates, `has_active_consent()` utility. See
+dates, `has_active_consent()` utility. Masking keeps the last four
+**characters** of each redacted value visible and replaces preceding
+alphanumeric characters with `*` (non-alphanumeric separators pass
+through); it counts Unicode scalar values, not bytes, so multibyte
+input (accented names, non-Latin identifiers) is masked without
+panicking. See
 [`agents/share/privacy.md`](../../../agents/share/privacy.md).
 
 ### 6.7 Audit

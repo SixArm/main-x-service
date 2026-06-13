@@ -99,7 +99,8 @@ Pagination via `offset` + `limit`.
 ### 6.5 Validation and normalisation
 
 Required `name`; coordinate bounds; GLN check digit; URL protocol;
-telephone format; address completeness; place hierarchy acyclicity.
+telephone format; opening-hours times (24-hour `HH:MM`); address
+completeness; place hierarchy acyclicity.
 Address normalised (title-case locality, uppercase region / country,
 expand St. / Ave. / Rd. abbreviations). Coordinate normalisation
 (decimal degrees, WGS 84). Failed validation → `422`.

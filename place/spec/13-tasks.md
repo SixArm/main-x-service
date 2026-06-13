@@ -100,3 +100,22 @@ or clearly described manual check confirms the acceptance criterion.
   - **Acceptance:** a GLN with a wrong GS1 check digit is rejected with a
     `422`-eligible `ValidationError`; spec §14 + `CLAUDE.md` describe the
     delivered check; tests pin valid + invalid check digits.
+- [x] **E-13 — Opening-hours time validation (spec-vs-code drift).**
+  *(2026-06-13: service `CLAUDE.md` listed "Opening hours validation" as a
+  delivered Data-Quality feature, but `validate_place` performed none —
+  `OpeningHoursSpecification.opens` / `.closes` are free `HH:MM` strings,
+  so garbage like `"25:99"` or `"5pm"` was accepted. Added
+  `validation::time_is_valid` (24-hour `HH:MM`: 2 ASCII digits, colon,
+  2 ASCII digits; hours `00..=23`, minutes `00..=59`) and looped it over
+  `place.opening_hours`, reporting indexed field paths
+  (`opening_hours[i].opens` / `.closes`). Brought the source of truth into
+  agreement: service spec §6.5 + §14.1 now list the opening-hours check.
+  Verified un-gated: `cargo test --lib` (124 pass, +4),
+  `cargo test --test integration_validation` (4 pass, +1), bridge
+  `duplicate_detection` (14 pass), `integration_edge_cases` (16) /
+  `integration_models` (13) green, validation doctests (5) green,
+  `cargo fmt --check` clean, clippy adds no new warnings.)*
+  - **Acceptance:** an opening-hours window with an out-of-range or
+    malformed time is rejected with a `422`-eligible `ValidationError`
+    carrying an indexed field path; spec §6.5 + §14 + `CLAUDE.md` describe
+    the delivered check; tests pin valid + invalid times.

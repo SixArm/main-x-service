@@ -600,3 +600,64 @@ fn signup_params_accept_an_optional_name() {
     serde_json::from_value::<SignupParams>(serde_json::json!({"name": "A"}))
         .expect_err("email should be required");
 }
+
+#[test]
+fn signup_params_accept_an_optional_locale() {
+    use authentication_service::controllers::auth::SignupParams;
+
+    let with_locale: SignupParams =
+        serde_json::from_value(serde_json::json!({"email": "a@example.com", "locale": "cy"}))
+            .expect("email + locale should deserialize");
+    assert_eq!(with_locale.locale.as_deref(), Some("cy"));
+
+    let without_locale: SignupParams =
+        serde_json::from_value(serde_json::json!({"email": "a@example.com"}))
+            .expect("locale should be optional");
+    assert!(without_locale.locale.is_none());
+}
+
+#[test]
+fn magic_link_params_accept_an_optional_locale() {
+    use authentication_service::controllers::auth::MagicLinkParams;
+
+    let with_locale: MagicLinkParams =
+        serde_json::from_value(serde_json::json!({"email": "a@example.com", "locale": "cy"}))
+            .expect("email + locale should deserialize");
+    assert_eq!(with_locale.locale.as_deref(), Some("cy"));
+
+    let without_locale: MagicLinkParams =
+        serde_json::from_value(serde_json::json!({"email": "a@example.com"}))
+            .expect("locale should be optional");
+    assert!(without_locale.locale.is_none());
+}
+
+/// Anti-enumeration is locale-independent: passing an unknown / Welsh /
+/// absent `locale` must not change the always-`200` response shape. The
+/// email language differs (covered by the un-gated `i18n` unit tests),
+/// but the wire response does not.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn signup_locale_does_not_change_the_response_shape() {
+    request::<App, _, _>(|request, _ctx| async move {
+        for locale in [
+            serde_json::Value::Null,
+            serde_json::json!("cy"),
+            serde_json::json!("fr"),
+            serde_json::json!("not-a-locale"),
+        ] {
+            let payload = serde_json::json!({
+                "email": "locale-probe@loco.com",
+                "name": "loco",
+                "locale": locale,
+            });
+            let response = request.post("/api/auth/signup").json(&payload).await;
+            assert_eq!(
+                response.status_code(),
+                200,
+                "signup must be 200 regardless of locale {locale:?}"
+            );
+        }
+    })
+    .await;
+}

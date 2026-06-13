@@ -148,9 +148,11 @@ pub fn spec() -> Value {
             "schemas": {
                 "SignupParams": { "type": "object", "required": ["email"], "properties": {
                     "email": { "type": "string", "format": "email", "description": "Email to register and the magic-link recipient." },
-                    "name": { "type": "string", "nullable": true, "description": "Optional display name; defaults from the email local-part." } } },
+                    "name": { "type": "string", "nullable": true, "description": "Optional display name; defaults from the email local-part." },
+                    "locale": { "type": "string", "nullable": true, "description": "Optional BCP-47 locale (e.g. 'en', 'cy') for the magic-link email language; unknown/absent falls back to English." } } },
                 "MagicLinkParams": { "type": "object", "required": ["email"], "properties": {
-                    "email": { "type": "string", "format": "email", "description": "Email of the existing account to sign in." } } },
+                    "email": { "type": "string", "format": "email", "description": "Email of the existing account to sign in." },
+                    "locale": { "type": "string", "nullable": true, "description": "Optional BCP-47 locale (e.g. 'en', 'cy') for the magic-link email language; unknown/absent falls back to English." } } },
                 "LoginResponse": { "type": "object", "required": ["token", "pid", "name", "email", "is_verified"], "properties": {
                     "token": { "type": "string", "description": "RS256 access token (bearer)." },
                     "pid": { "type": "string", "format": "uuid", "description": "User public id." },

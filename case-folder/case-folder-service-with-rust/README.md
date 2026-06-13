@@ -163,7 +163,7 @@ cargo run -- task seed         # populate demo records across all services
 
 # Tests (use stub clients — no real services needed)
 DATABASE_URL=postgres://postgres@localhost:5432/case_folder_test \
-  cargo test                   # 6 unit (nhs) + 49 request tests
+  cargo test                   # 14 unit (nhs + geofence) + 49 request tests
 ```
 
 The request tests need a Postgres database (`case_folder_test`

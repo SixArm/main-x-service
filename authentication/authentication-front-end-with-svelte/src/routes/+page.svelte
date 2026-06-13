@@ -4,6 +4,7 @@
     import { AuthRepository } from "$lib/api/auth";
     import { ApiError } from "$lib/api/client";
     import { session } from "$lib/auth/session.svelte";
+    import { t } from "$lib/i18n.svelte";
 
     const repo = AuthRepository.withFetch();
 
@@ -23,7 +24,7 @@
             if (err instanceof ApiError && err.isUnauthorized) {
                 session.clear();
             } else {
-                error = err instanceof Error ? err.message : "Failed to load profile";
+                error = err instanceof Error ? err.message : t("account.loadFailed");
             }
         } finally {
             loading = false;
@@ -43,25 +44,25 @@
     }
 </script>
 
-<svelte:head><title>Main X Auth</title></svelte:head>
+<svelte:head><title>{t("brand")}</title></svelte:head>
 
-<h1>Account</h1>
+<h1>{t("account.title")}</h1>
 
 {#if loading}
-    <p>Loading…</p>
+    <p>{t("account.loading")}</p>
 {:else if session.isAuthenticated && session.user}
     <div class="surface stack">
-        <div><strong>Name:</strong> {session.user.name}</div>
-        <div><strong>Email:</strong> {session.user.email}</div>
-        <div><strong>ID:</strong> <code>{session.user.pid}</code></div>
-        <button class="button" onclick={handleSignout}>Sign out</button>
+        <div><strong>{t("account.name")}</strong> {session.user.name}</div>
+        <div><strong>{t("account.email")}</strong> {session.user.email}</div>
+        <div><strong>{t("account.id")}</strong> <code>{session.user.pid}</code></div>
+        <button class="button" onclick={handleSignout}>{t("account.signout")}</button>
     </div>
 {:else}
-    <p>You are not signed in.</p>
+    <p>{t("account.notSignedIn")}</p>
     <p>
-        <a class="button" href="/signin">Sign in</a>
-        or
-        <a href="/signup">create an account</a>.
+        <a class="button" href="/signin">{t("account.signinPrompt.signin")}</a>
+        {t("account.signinPrompt.or")}
+        <a href="/signup">{t("account.signinPrompt.create")}</a>.
     </p>
 {/if}
 

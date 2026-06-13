@@ -81,18 +81,28 @@ pub fn mask_person(person: &Person) -> Person {
 /// punctuation (e.g. hyphens) is preserved for readability, so
 /// `"123-45-6789"` with `visible_chars = 4` becomes `"***-**-6789"`.
 /// Values no longer than `visible_chars` are returned unchanged.
+///
+/// Counts Unicode scalar values (`char`s), not bytes, so multibyte
+/// input (accented names, non-Latin identifiers) is masked correctly
+/// and never slices across a UTF-8 char boundary.
 fn mask_value(value: &str, visible_chars: usize) -> String {
-    if value.len() <= visible_chars {
+    let char_count = value.chars().count();
+    if char_count <= visible_chars {
         return value.to_string();
     }
 
-    let visible_start = value.len() - visible_chars;
-    let masked_part: String = value[..visible_start]
+    let hidden = char_count - visible_chars;
+    value
         .chars()
-        .map(|c| if c.is_alphanumeric() { '*' } else { c })
-        .collect();
-
-    format!("{}{}", masked_part, &value[visible_start..])
+        .enumerate()
+        .map(|(i, c)| {
+            if i < hidden && c.is_alphanumeric() {
+                '*'
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 /// Return `true` if `consents` contains an active, unexpired consent of
@@ -134,6 +144,23 @@ mod tests {
         assert_eq!(mask_value("123-45-6789", 4), "***-**-6789");
         assert_eq!(mask_value("AB12345", 4), "***2345");
         assert_eq!(mask_value("short", 10), "short");
+    }
+
+    /// Masking is char-based, not byte-based: a value whose tail-cut byte
+    /// boundary would split a multibyte UTF-8 char must not panic, and must
+    /// keep exactly the last `visible_chars` *characters* visible.
+    /// Regression test for the byte-indexed `mask_value` that panicked on
+    /// `"1é345"` (cut at byte 2, inside `é`).
+    #[test]
+    fn test_mask_value_multibyte_does_not_panic() {
+        // 'é' is two UTF-8 bytes; the naive byte cut at len-4 lands inside it.
+        assert_eq!(mask_value("1é345", 4), "*é345");
+        // Wholly non-ASCII prefix: alphanumerics masked, last 4 chars kept.
+        assert_eq!(mask_value("naïve12", 4), "***ve12");
+        // Char count, not byte count, drives the short-circuit.
+        assert_eq!(mask_value("café", 4), "café");
+        // A long accented value is masked end-to-end without panicking.
+        assert_eq!(mask_value("Müller-9981", 4), "******-9981");
     }
 
     /// mask_person redacts tax ID and SSN but leaves the family name.

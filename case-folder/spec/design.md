@@ -112,7 +112,12 @@ The iFIT-inspired features are layered on what already exists, with no new
 storage. **Geofence alerts** are derived in a controller: each move whose
 from/to cabinets resolve (via the place hierarchy) to different buildings
 is a boundary crossing — exposed at `GET /api/alerts`, mirroring how
-`/api/places/{id}/history` derives presence ([D-10](design.md)).
+`/api/places/{id}/history` derives presence ([D-10](design.md)). The
+derivation itself is a pure function (`detect_geofence_breaches`) so the
+boundary-crossing rule — skip an in-transit/created-in-place endpoint, skip
+an unresolvable cabinet, suppress same-building moves — is unit-tested in
+isolation (`cargo test --lib`); the handler only supplies upstream data and
+serialises the result.
 **Reports** are composed client-side from the existing `stats`, `moves`,
 `places`, `volumes`, and `workers` endpoints (API-first, [D-4](design.md)).
 **Scan-to-move** is pure front-end: an NHS/id field reuses

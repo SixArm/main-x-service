@@ -3,9 +3,11 @@
 //! The service stores the matcher's `CarePathway` verbatim, so payload
 //! validation is the *service's* responsibility — the matcher is a pure
 //! scoring library and deliberately performs no validation. These checks
-//! enforce the required `name` and clinical code-format constraints on
-//! `condition_codes`, returning human-readable problem strings that the
-//! controller surfaces as a single `422 Unprocessable Entity`.
+//! enforce the required `name`, clinical code-format constraints on
+//! `condition_codes`, structural checks on the globally-unique
+//! `identifiers`, and BCP-47 syntax on `in_language` — returning
+//! human-readable problem strings that the controller surfaces as a
+//! single `422 Unprocessable Entity`.
 //!
 //! ## Code-format rules
 //!
@@ -26,9 +28,37 @@
 //!   [Verhoeff] check digit. The check digit is verified exactly.
 //! - **Custom**: only required to be non-blank; no format is imposed.
 //!
+//! ## Identifier rules
+//!
+//! Identifiers under a **deterministic** scheme are globally unique and
+//! drive the matcher's R-0 short-circuit (a shared value pins the score
+//! to `1.0`), so a malformed value there is not merely untidy — it can
+//! poison matching. These checks reject the obviously-wrong shapes
+//! before they reach storage:
+//!
+//! - **Uuid**: a canonical 8-4-4-4-12 hex UUID (any version/variant).
+//! - **Doi**: the registrant prefix `10.` followed by a registrant code
+//!   and a `/` suffix — e.g. `10.1000/xyz123`.
+//! - **Wikidata / `GuidelineId` / Uri**: only required to be non-blank
+//!   (their value spaces are too open to format-check meaningfully here);
+//!   a blank deterministic identifier is rejected because the matcher
+//!   silently drops it, so storing it is a latent data-quality defect.
+//! - **`PathwayCode` / `LocalId` / Custom**: provider-scoped or free-form;
+//!   only required to be non-blank.
+//!
+//! ## Language rules
+//!
+//! - **`in_language`**: each entry must be a syntactically valid BCP-47
+//!   language tag — a 2–3 letter (or 5–8 letter) primary subtag,
+//!   optionally followed by `-` subtags of 1–8 alphanumerics — e.g.
+//!   `en`, `en-GB`, `zh-Hans`. Existence in the IANA registry is not
+//!   checked.
+//!
 //! [Verhoeff]: https://en.wikipedia.org/wiki/Verhoeff_algorithm
 
-use care_pathway_matcher::{CarePathway, CodeSystem, ConditionCode};
+use care_pathway_matcher::{
+    CarePathway, CodeSystem, ConditionCode, IdentifierScheme, PathwayIdentifier,
+};
 
 /// Collect every validation problem for `pathway`. An empty vector means
 /// the payload is valid.
@@ -47,7 +77,41 @@ pub fn problems(pathway: &CarePathway) -> Vec<String> {
             out.push(problem);
         }
     }
+    for (i, id) in pathway.identifiers.iter().enumerate() {
+        if let Some(problem) = identifier_problem(i, id) {
+            out.push(problem);
+        }
+    }
+    for (i, tag) in pathway.in_language.iter().enumerate() {
+        if !is_valid_bcp47(tag.trim()) {
+            out.push(format!(
+                "in_language[{i}]: {tag:?} is not a valid BCP-47 language tag"
+            ));
+        }
+    }
     out
+}
+
+/// Return a problem string for one `identifiers[i]`, or `None` when it is
+/// well-formed for its declared scheme.
+fn identifier_problem(i: usize, id: &PathwayIdentifier) -> Option<String> {
+    let raw = id.value.trim();
+    let (label, ok) = match &id.scheme {
+        IdentifierScheme::Uuid => ("UUID", is_valid_uuid(raw)),
+        IdentifierScheme::Doi => ("DOI", is_valid_doi(raw)),
+        // Open value spaces: only require non-blank.
+        IdentifierScheme::Wikidata
+        | IdentifierScheme::GuidelineId
+        | IdentifierScheme::Uri
+        | IdentifierScheme::PathwayCode
+        | IdentifierScheme::LocalId
+        | IdentifierScheme::Custom(_) => {
+            return raw
+                .is_empty()
+                .then(|| format!("identifiers[{i}]: value must not be blank"));
+        }
+    };
+    (!ok).then(|| format!("identifiers[{i}]: {:?} is not a valid {label}", id.value))
 }
 
 /// Return a problem string for one `condition_codes[i]`, or `None` when it
@@ -143,6 +207,71 @@ fn is_alnum_upper(b: u8) -> bool {
 /// Allowed ICD-11 character: digit or uppercase letter excluding `O`/`I`.
 fn is_icd11_char(b: u8) -> bool {
     b.is_ascii_digit() || (b.is_ascii_uppercase() && b != b'O' && b != b'I')
+}
+
+/// Canonical 8-4-4-4-12 hex UUID (case-insensitive, any version/variant).
+/// `urn:`/brace wrappers are intentionally not accepted — the stored
+/// value should be the bare UUID.
+#[must_use]
+fn is_valid_uuid(value: &str) -> bool {
+    let b = value.as_bytes();
+    if b.len() != 36 {
+        return false;
+    }
+    for (i, &c) in b.iter().enumerate() {
+        let expect_hyphen = matches!(i, 8 | 13 | 18 | 23);
+        if expect_hyphen {
+            if c != b'-' {
+                return false;
+            }
+        } else if !c.is_ascii_hexdigit() {
+            return false;
+        }
+    }
+    true
+}
+
+/// DOI: the registrant prefix `10.`, then a non-empty registrant code
+/// (digits / `.` per ISO 26324), a `/`, and a non-empty suffix —
+/// e.g. `10.1000/xyz123`. Case is irrelevant. A bare URL form
+/// (`https://doi.org/10…`) is intentionally not accepted; store the DOI.
+#[must_use]
+fn is_valid_doi(value: &str) -> bool {
+    let Some(rest) = value.strip_prefix("10.") else {
+        return false;
+    };
+    let Some((registrant, suffix)) = rest.split_once('/') else {
+        return false;
+    };
+    if suffix.is_empty() {
+        return false;
+    }
+    // The registrant code is one or more dot-separated numeric runs.
+    !registrant.is_empty()
+        && registrant
+            .split('.')
+            .all(|seg| !seg.is_empty() && seg.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// Syntactic BCP-47 check: a primary subtag of 2–3 or 5–8 ASCII letters,
+/// then zero or more `-`-separated subtags of 1–8 alphanumerics. This
+/// covers the common `en`, `en-GB`, `zh-Hans`, `de-DE-1996` shapes
+/// without consulting the IANA registry. (Length 4 is reserved for
+/// script subtags and is not a valid primary subtag.)
+#[must_use]
+fn is_valid_bcp47(tag: &str) -> bool {
+    let mut parts = tag.split('-');
+    let Some(primary) = parts.next() else {
+        return false;
+    };
+    let n = primary.len();
+    if !((2..=3).contains(&n) || (5..=8).contains(&n)) {
+        return false;
+    }
+    if !primary.bytes().all(|b| b.is_ascii_alphabetic()) {
+        return false;
+    }
+    parts.all(|sub| (1..=8).contains(&sub.len()) && sub.bytes().all(|b| b.is_ascii_alphanumeric()))
 }
 
 /// Verhoeff dihedral-group (D5) checksum validation. Returns `true` when
@@ -282,6 +411,109 @@ mod tests {
     }
 
     #[test]
+    fn uuid_identifiers_must_be_canonical() {
+        for v in [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "00000000-0000-0000-0000-000000000000",
+            "550E8400-E29B-41D4-A716-446655440000", // case-insensitive
+        ] {
+            assert!(is_valid_uuid(v), "should accept UUID {v:?}");
+        }
+        for v in [
+            "",
+            "not-a-uuid",
+            "550e8400e29b41d4a716446655440000",       // no hyphens
+            "550e8400-e29b-41d4-a716-44665544000",    // too short
+            "550e8400-e29b-41d4-a716-4466554400000",  // too long
+            "550e8400-e29b-41d4-a716-44665544000g",   // non-hex
+            "{550e8400-e29b-41d4-a716-446655440000}", // wrapped
+        ] {
+            assert!(!is_valid_uuid(v), "should reject UUID {v:?}");
+        }
+    }
+
+    #[test]
+    fn doi_identifiers_must_have_prefix_and_suffix() {
+        for v in ["10.1000/xyz123", "10.1038/nphys1170", "10.1000.10/123"] {
+            assert!(is_valid_doi(v), "should accept DOI {v:?}");
+        }
+        for v in [
+            "",
+            "1000/xyz",                       // missing 10. prefix
+            "10.1000",                        // no slash
+            "10.1000/",                       // empty suffix
+            "10./xyz",                        // empty registrant
+            "10.abc/xyz",                     // non-numeric registrant
+            "https://doi.org/10.1000/xyz123", // URL form not accepted
+        ] {
+            assert!(!is_valid_doi(v), "should reject DOI {v:?}");
+        }
+    }
+
+    #[test]
+    fn open_deterministic_schemes_only_require_non_blank() {
+        let ok = PathwayIdentifier {
+            scheme: IdentifierScheme::Uri,
+            value: "urn:nice:ng128".into(),
+        };
+        assert!(identifier_problem(0, &ok).is_none());
+        let blank = PathwayIdentifier {
+            scheme: IdentifierScheme::Wikidata,
+            value: "   ".into(),
+        };
+        assert!(identifier_problem(0, &blank).is_some());
+    }
+
+    #[test]
+    fn malformed_identifier_is_reported_with_index() {
+        let p = CarePathway {
+            identifiers: vec![
+                PathwayIdentifier {
+                    scheme: IdentifierScheme::Uuid,
+                    value: "550e8400-e29b-41d4-a716-446655440000".into(),
+                }, // ok
+                PathwayIdentifier {
+                    scheme: IdentifierScheme::Doi,
+                    value: "not-a-doi".into(),
+                }, // bad → [1]
+            ],
+            ..CarePathway::new("Stroke pathway")
+        };
+        let problems = problems(&p);
+        assert_eq!(problems.len(), 1);
+        assert!(problems[0].contains("identifiers[1]"));
+    }
+
+    #[test]
+    fn bcp47_language_tags_are_checked() {
+        for t in ["en", "en-GB", "zh-Hans", "de-DE-1996", "cy", "yue"] {
+            assert!(is_valid_bcp47(t), "should accept BCP-47 {t:?}");
+        }
+        for t in [
+            "",
+            "e",     // primary too short
+            "engl",  // length 4 reserved (not a primary subtag)
+            "en_GB", // wrong separator
+            "en-",   // empty subtag
+            "en-toolongsubtag",
+            "123", // primary not letters
+        ] {
+            assert!(!is_valid_bcp47(t), "should reject BCP-47 {t:?}");
+        }
+    }
+
+    #[test]
+    fn malformed_language_tag_is_a_problem() {
+        let p = CarePathway {
+            in_language: vec!["en".into(), "nope_NO".into()],
+            ..CarePathway::new("X")
+        };
+        let problems = problems(&p);
+        assert_eq!(problems.len(), 1);
+        assert!(problems[0].contains("in_language[1]"));
+    }
+
+    #[test]
     fn blank_name_is_a_problem() {
         assert_eq!(problems(&CarePathway::new("   ")), vec!["name is required"]);
     }
@@ -293,6 +525,17 @@ mod tests {
                 cc(CodeSystem::Icd10, "I63.9"),
                 cc(CodeSystem::Snomed, "22298006"),
             ],
+            identifiers: vec![
+                PathwayIdentifier {
+                    scheme: IdentifierScheme::Uuid,
+                    value: "550e8400-e29b-41d4-a716-446655440000".into(),
+                },
+                PathwayIdentifier {
+                    scheme: IdentifierScheme::Doi,
+                    value: "10.1038/nphys1170".into(),
+                },
+            ],
+            in_language: vec!["en".into(), "en-GB".into()],
             ..CarePathway::new("Acute Stroke Care Pathway")
         };
         assert!(problems(&p).is_empty());

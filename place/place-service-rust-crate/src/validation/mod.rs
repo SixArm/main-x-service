@@ -11,8 +11,9 @@
 //!   inputs compare and store consistently.
 //!
 //! The rules are intentionally lightweight (range checks, prefix checks,
-//! digit counts) with one exception: the GLN is fully verified, including
-//! its GS1 mod-10 check digit (see [`gln_is_valid`]).
+//! digit counts) with two exceptions: the GLN is fully verified, including
+//! its GS1 mod-10 check digit (see [`gln_is_valid`]), and opening-hours times
+//! are checked against a real 24-hour `HH:MM` clock (see [`time_is_valid`]).
 //!
 //! # Examples
 //!
@@ -48,8 +49,9 @@ pub struct ValidationError {
 /// Checks (each independent, all reported): non-empty name; latitude in
 /// `[-90, 90]` and longitude in `[-180, 180]` when geo is present; a 13-digit
 /// numeric GLN with a valid GS1 check digit; `http(s)://` URL scheme;
-/// `+`-prefixed telephone; and that any present address carries at least a
-/// locality, postal code, or country.
+/// `+`-prefixed telephone; valid 24-hour `HH:MM` opening/closing times; and
+/// that any present address carries at least a locality, postal code, or
+/// country.
 ///
 /// # Examples
 ///
@@ -127,6 +129,30 @@ pub fn validate_place(place: &Place) -> Vec<ValidationError> {
         });
     }
 
+    // Opening hours: each window's `opens`/`closes` must be a valid 24-hour
+    // `HH:MM` clock time. The field paths are indexed so the caller can point
+    // at the offending entry.
+    for (i, spec) in place.opening_hours.iter().enumerate() {
+        if !time_is_valid(&spec.opens) {
+            errors.push(ValidationError {
+                field: format!("opening_hours[{i}].opens"),
+                message: format!(
+                    "Opening time must be a valid 24-hour HH:MM clock time, got {:?}",
+                    spec.opens
+                ),
+            });
+        }
+        if !time_is_valid(&spec.closes) {
+            errors.push(ValidationError {
+                field: format!("opening_hours[{i}].closes"),
+                message: format!(
+                    "Closing time must be a valid 24-hour HH:MM clock time, got {:?}",
+                    spec.closes
+                ),
+            });
+        }
+    }
+
     // A present address needs at least one locating field; a lone street line
     // is not enough to place it.
     if let Some(addr) = &place.address {
@@ -186,6 +212,48 @@ pub fn gln_is_valid(gln: &str) -> bool {
         .sum();
     let check = (10 - (sum % 10)) % 10;
     check == digits[12]
+}
+
+/// Validate a 24-hour `HH:MM` clock time: exactly five ASCII characters with a
+/// `:` separator, hours in `00..=23`, and minutes in `00..=59`.
+///
+/// Used by [`validate_place`] to reject malformed
+/// [`OpeningHoursSpecification`](crate::models::opening_hours::OpeningHoursSpecification)
+/// times such as `"25:99"`, `"9am"`, or `""`. Schema.org stores opening hours
+/// as plain strings, so without this check any text would be accepted.
+///
+/// # Examples
+///
+/// ```
+/// use place_service::validation::time_is_valid;
+///
+/// assert!(time_is_valid("09:00"));
+/// assert!(time_is_valid("23:59"));
+/// assert!(time_is_valid("00:00"));
+/// assert!(!time_is_valid("24:00")); // hour out of range
+/// assert!(!time_is_valid("12:60")); // minute out of range
+/// assert!(!time_is_valid("9:00")); // not zero-padded
+/// assert!(!time_is_valid("0900")); // missing separator
+/// assert!(!time_is_valid("")); // empty
+/// ```
+#[must_use]
+pub fn time_is_valid(time: &str) -> bool {
+    // Require the canonical `HH:MM` shape: 2 ASCII digits, colon, 2 ASCII
+    // digits. Checking the digits explicitly avoids `parse` quirks such as
+    // accepting a leading `+` (e.g. "+9").
+    let bytes = time.as_bytes();
+    if bytes.len() != 5
+        || bytes[2] != b':'
+        || !bytes[0].is_ascii_digit()
+        || !bytes[1].is_ascii_digit()
+        || !bytes[3].is_ascii_digit()
+        || !bytes[4].is_ascii_digit()
+    {
+        return false;
+    }
+    let hours = (bytes[0] - b'0') * 10 + (bytes[1] - b'0');
+    let minutes = (bytes[3] - b'0') * 10 + (bytes[4] - b'0');
+    hours < 24 && minutes < 60
 }
 
 /// Normalize a place's address (title-case locality, uppercase region/country).
@@ -255,6 +323,7 @@ mod tests {
     use super::*;
     use crate::models::address::PostalAddress;
     use crate::models::geo::GeoCoordinates;
+    use crate::models::opening_hours::{DayOfWeek, OpeningHoursSpecification};
 
     /// A minimal place (name only) passes validation.
     #[test]
@@ -361,6 +430,71 @@ mod tests {
         assert!(!gln_is_valid("06141419999966"));
         // Non-digit character.
         assert!(!gln_is_valid("061414199999A"));
+    }
+
+    /// Well-formed opening hours pass validation.
+    #[test]
+    fn test_valid_opening_hours() {
+        let mut place = Place::new("Test");
+        place.opening_hours = vec![
+            OpeningHoursSpecification::new(DayOfWeek::Monday, "09:00", "17:00"),
+            OpeningHoursSpecification::new(DayOfWeek::Saturday, "00:00", "23:59"),
+        ];
+        let errors = validate_place(&place);
+        assert!(errors.is_empty(), "Errors: {errors:?}");
+    }
+
+    /// An out-of-range opening time is rejected with an indexed field path.
+    #[test]
+    fn test_invalid_opening_time() {
+        let mut place = Place::new("Test");
+        place.opening_hours = vec![OpeningHoursSpecification::new(
+            DayOfWeek::Monday,
+            "25:99",
+            "17:00",
+        )];
+        let errors = validate_place(&place);
+        assert!(
+            errors.iter().any(|e| e.field == "opening_hours[0].opens"),
+            "Errors: {errors:?}"
+        );
+    }
+
+    /// A malformed closing time is rejected; the index points at the entry.
+    #[test]
+    fn test_invalid_closing_time() {
+        let mut place = Place::new("Test");
+        place.opening_hours = vec![
+            OpeningHoursSpecification::new(DayOfWeek::Monday, "09:00", "17:00"),
+            OpeningHoursSpecification::new(DayOfWeek::Tuesday, "09:00", "5pm"),
+        ];
+        let errors = validate_place(&place);
+        assert!(
+            errors.iter().any(|e| e.field == "opening_hours[1].closes"),
+            "Errors: {errors:?}"
+        );
+    }
+
+    /// `time_is_valid` accepts canonical 24-hour times and rejects the common
+    /// malformed shapes.
+    #[test]
+    fn test_time_is_valid_helper() {
+        // Valid boundaries.
+        assert!(time_is_valid("00:00"));
+        assert!(time_is_valid("23:59"));
+        assert!(time_is_valid("09:05"));
+        // Hour / minute out of range.
+        assert!(!time_is_valid("24:00"));
+        assert!(!time_is_valid("12:60"));
+        assert!(!time_is_valid("99:99"));
+        // Wrong shape.
+        assert!(!time_is_valid("9:00")); // not zero-padded
+        assert!(!time_is_valid("0900")); // missing separator
+        assert!(!time_is_valid("09:00:00")); // seconds not allowed
+        assert!(!time_is_valid("9am")); // not numeric
+        assert!(!time_is_valid("")); // empty
+        assert!(!time_is_valid("+9:00")); // sign rejected
+        assert!(!time_is_valid(" 9:00")); // leading space rejected
     }
 
     /// A URL without an http(s) scheme is rejected.

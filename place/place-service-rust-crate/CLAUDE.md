@@ -59,7 +59,7 @@ Based on [schema.org/Place](https://schema.org/Place):
 - GLN format validation (13-digit with check digit)
 - URL format validation
 - Telephone format validation
-- Opening hours validation
+- Opening hours validation (24-hour HH:MM times)
 - Address standardization (title-case locality, uppercase region/country, expand abbreviations)
 - Coordinate normalization (decimal degrees, WGS 84)
 - Validation integrated into create and update handlers (returns 422)
@@ -467,13 +467,13 @@ cargo bench -- name_similarity                # Specific benchmark
 
 - Models (32 tests): Place, PostalAddress, GeoCoordinates, PlaceType, PlaceIdentifier, AmenityFeature, OpeningHoursSpecification, Consent
 - Matching (45 tests): Name (8), Address (5), Geo (7), Identifier (7), Phonetic/Soundex (10), Scoring (8)
-- Validation (19 tests): Name, coordinates, GLN, URL, telephone, address, normalization
+- Validation (23 tests): Name, coordinates, GLN, opening-hours times, URL, telephone, address, normalization
 - Privacy (8 tests): Phone/fax masking, geo rounding, GDPR export
 
 **Integration Test Breakdown:**
 
 - Matching Pipeline (7 tests): Duplicate detection, fuzzy matching, GLN deterministic, batch matching
-- Validation Pipeline (3 tests): Validate-normalize workflow, lifecycle validation
+- Validation Pipeline (4 tests): Validate-normalize workflow, lifecycle validation, opening-hours time validation
 - Privacy Pipeline (4 tests): Mask-export workflow, GDPR export, soft delete export
 - Models Pipeline (16 tests): Full construction, serialization, hierarchy, geo symmetry, identifiers, consent, place types, opening hours
 - Scoring Pipeline (24 tests): Unicode, edge cases, custom weights, confidence boundaries, score ranges, phonetic bonus, all components, batch sorting

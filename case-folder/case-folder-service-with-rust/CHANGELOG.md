@@ -12,6 +12,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **LT-16 / T-16 — Geofence-breach derivation made pure + unit-tested.**
+  Extracted the cross-building alert logic behind `GET /api/alerts` from the
+  controller into a pure `detect_geofence_breaches` function (plus a
+  `cabinet_buildings` cabinet→room→building resolver). Added 6 in-crate tests
+  covering every branch of the boundary-crossing rule (cross-building breach,
+  same-building suppression, `None`-endpoint in-transit/created-in-place,
+  unknown cabinet, orphan-room hierarchy, mixed-log filtering). Lib tests
+  8→14; no behaviour change — the logic was previously reachable only through
+  Postgres-gated request tests. Also corrected stale doc counts in
+  `spec/testing.md` and `README.md` (unit 6→14, request 29→49).
 - **LT-6 / T-15 — Modulus-11 hardening.** `src/nhs.rs` now has 8 lib tests
   (was 6). Added explicit coverage for the `check == 10 → invalid` branch
   (`999 000 0140`), the documented invalid number `614 309 0431`,

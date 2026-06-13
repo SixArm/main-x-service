@@ -64,10 +64,12 @@ confirms the acceptance criterion.
     regeneration command; task stays open.
   - **Acceptance:** documented command regenerates the file from the
     migrations; CI or checklist flags drift.
-- [ ] **T-7 — Decide the ODS identifier's matcher-side fate.**
-  - [ ] `IdentifierType::ODS` falls through the adapter unmapped
+- [x] **T-7 — Decide the ODS identifier's matcher-side fate.** *(Done
+  2026-06-13.)*
+  - [x] `IdentifierType::ODS` falls through the adapter unmapped
     (§5.3). Either propose an ODS parser to the matcher crate
     (its §23) or record the fall-through as permanent in both specs.
+    *(Decision: permanent fall-through, recorded on both sides.)*
   - **Finding (2026-06-13):** the matcher has **no suitable scheme**
     — all 42 identifier slots are person-level national schemes,
     while an ODS code identifies an organisation/site shared by every
@@ -78,11 +80,20 @@ confirms the acceptance criterion.
     [spec §6.2](../worker-service-rust-crate/spec/06-functional-requirements.md)
     and the adapter's routing comment, and pinned by two bridge tests
     (`ods_organisation_code_falls_through_unmapped`,
-    `shared_ods_code_does_not_make_different_workers_match`). Left
-    open pending the second leg: record the decision on the matcher
-    side (its spec §23) or formally declare it permanent there.
+    `shared_ods_code_does_not_make_different_workers_match`).
+  - **Second leg (2026-06-13):** the matcher side now formally declares
+    organisation-level identifiers permanently out of scope —
+    [matcher spec §2](../worker-matcher-rust-crate/spec/02-scope.md)
+    gains an "Out of scope (permanently): organisation-level
+    identifiers" paragraph, and two matcher integration tests (§16a,
+    `test_local_id_difference_does_not_lower_score`,
+    `test_shared_local_id_adds_no_signal_between_unrelated_workers`)
+    pin that the unscored `local_id` field — where such a code would
+    live — adds no signal in either direction. The decision is thus
+    recorded and test-backed on **both** sides of the seam.
   - **Acceptance:** decision recorded; if mapped, a bridge test pins
-    the routing.
+    the routing. ✓ *(Recorded as permanent on both specs; bridge tests
+    pin the service-side fall-through and matcher-side non-scoring.)*
 - [ ] **T-8 — Close the front-end verification gaps.**
   - [ ] Front-end [§14](../worker-front-end-with-svelte/spec/14-implementation-status.md)
     still lists `pnpm install` / `pnpm test` verification and the

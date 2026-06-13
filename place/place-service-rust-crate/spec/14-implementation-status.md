@@ -15,7 +15,7 @@
 | Audit log | AuditLogRepository with old / new JSON |
 | Duplicate detection | Real-time + explicit + batch with review queue |
 | Merging | Transfer + alternate-name + link + soft-delete + snapshot + event |
-| Validation | Coordinate bounds, GLN GS1 check digit, URL protocol, telephone format, address completeness, `422` |
+| Validation | Coordinate bounds, GLN GS1 check digit, URL protocol, telephone format, opening-hours `HH:MM` times, address completeness, `422` |
 | Normalisation | Title-case locality, uppercase region/country, abbreviation expansion |
 | Privacy | Phone / fax masking, geo-coordinate rounding (2 dp), GDPR export |
 | Tests | 171 tests + 16 Criterion benchmarks |

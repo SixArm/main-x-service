@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documented — organisation-level identifiers are permanently out of scope
+
+- Spec §2 now records, under a new "Out of scope (permanently):
+  organisation-level identifiers" paragraph, that codes identifying an
+  *organisation / site / practice* (e.g. UK NHS ODS, GLN, employer codes)
+  are deliberately never scored and never gain a slot — every scored
+  identifier is a person-level national scheme whose exact-match
+  short-circuit relies on identifying one human. Such a value belongs in
+  the unscored `local_id` field (§8 / OQ-2). Two new
+  `tests/integration_tests.rs` cases (§16a) pin that `local_id` adds no
+  signal in either direction: a differing `local_id` does not lower the
+  score, and a *shared* `local_id` does not force unrelated workers to
+  match. This is the matcher-side half of `worker-service` entity task
+  T-7 (the service-side adapter already drops ODS codes; see that crate's
+  spec §6.2).
+
 ### Changed — date handling on `jiff`, `chrono` eliminated (0.6.0)
 
 - Bumped to 0.6.0. The crate's date handling is fully on `jiff`

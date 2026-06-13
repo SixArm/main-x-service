@@ -10,6 +10,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Changed — validation
 
+- Opening-hours times are now validated. `validate_place` checks every
+  `OpeningHoursSpecification.opens` / `.closes` against a real 24-hour
+  `HH:MM` clock via the new public helper `validation::time_is_valid(&str)`
+  (2 ASCII digits, colon, 2 ASCII digits; hours `00..=23`, minutes
+  `00..=59`), reporting indexed field paths (`opening_hours[i].opens` /
+  `.closes`). Previously these were free strings, so `"25:99"` / `"5pm"`
+  were accepted. Closes the drift between `CLAUDE.md` (which already
+  listed "Opening hours validation") and the code (which did none); spec
+  §6.5 + §14.1 now list the check. Added unit + integration coverage.
 - GLN validation now verifies the GS1 mod-10 check digit, not just the
   13-digit length. New public helper `validation::gln_is_valid(&str)`;
   `validate_place` rejects a GLN whose check digit is wrong with

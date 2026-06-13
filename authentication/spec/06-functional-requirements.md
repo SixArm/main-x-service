@@ -22,9 +22,24 @@ Each requirement names its owning subproject. Endpoint detail:
 - **FR-4 — Delivery.** The magic link is logged to the tracing console
   (authoritative in development; the mailer is disabled in
   `config/development.yaml`) and best-effort emailed via the
-  `AuthMailer` `magic_link` template in production (SMTP from loco
-  config). Templates: `magic_link`, `welcome`, `forgot` under
-  [`src/mailers/auth/`](../authentication-service-rust-crate/src/mailers/auth/).
+  `AuthMailer` in production (SMTP from loco config). The `welcome` /
+  `forgot` emails render from the on-disk templates under
+  [`src/mailers/auth/`](../authentication-service-rust-crate/src/mailers/auth/);
+  the magic-link email is localised (FR-4a).
+- **FR-4a — Localised magic-link email (T-7).** The magic-link email
+  subject + plain-text + HTML bodies are localised via the
+  dependency-light catalog
+  [`src/i18n.rs`](../authentication-service-rust-crate/src/i18n.rs)
+  (`magic_link_email(locale) -> EmailStrings`), not the on-disk
+  template directory. Supported locales: **English (`en`)** and
+  **Welsh (`cy`)** — Welsh chosen for the public-sector Welsh-language
+  duty (§7, §12); more locales are added by extending the catalog.
+  The locale is selected per request from the optional `locale` field
+  on the signup / magic-link request body (`select_locale`); unknown,
+  malformed, or absent input falls back to `en`, and a region subtag
+  (`cy-GB`) is reduced to its primary language (`cy`). Locale affects
+  **only** the rendered email language — the always-`200` response
+  shape (FR-1/FR-2) is unchanged regardless of locale.
 
 ### 6.3 Token issuance (service)
 
@@ -109,3 +124,13 @@ Each requirement names its owning subproject. Endpoint detail:
   email}` in `localStorage` (`mxi.auth.token`, `mxi.auth.user`), and
   redirects to `/`; `/` loads FR-7 and offers sign-out (FR-8 +
   session clear). On `401` the session is cleared.
+- **FR-12 — Localised UI (T-7).** All user-facing UI strings (nav,
+  sign-up / sign-in / link-sent / verify / account / sign-out / error
+  messages) come from a dependency-light strings catalog
+  (`src/lib/i18n.svelte.ts`: a per-locale map + reactive `t(key)`
+  accessor over a `$state` current-locale). Supported locales match
+  FR-4a: **English (`en`)** + **Welsh (`cy`)**; an unknown key or
+  locale falls back to `en`. A locale switcher in the layout persists
+  the choice to `localStorage` (`mxi.auth.locale`), and the chosen
+  locale is sent as the `locale` field on the signup / magic-link
+  request (FR-4a) so the email matches the UI language.

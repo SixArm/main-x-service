@@ -4,6 +4,7 @@
     import { page } from "$app/state";
     import { AuthRepository } from "$lib/api/auth";
     import { session } from "$lib/auth/session.svelte";
+    import { t } from "$lib/i18n.svelte";
 
     const repo = AuthRepository.withFetch();
 
@@ -14,7 +15,7 @@
         const token = page.url.searchParams.get("token");
         if (!token) {
             status = "error";
-            error = "This link is missing its token.";
+            error = t("verify.error.missingToken");
             return;
         }
         try {
@@ -23,18 +24,18 @@
             await goto("/");
         } catch (err) {
             status = "error";
-            error = err instanceof Error ? err.message : "This link is invalid or expired.";
+            error = err instanceof Error ? err.message : t("verify.error.invalid");
         }
     });
 </script>
 
-<svelte:head><title>Verifying — Main X Auth</title></svelte:head>
+<svelte:head><title>{t("verify.working.title")} — {t("brand")}</title></svelte:head>
 
 {#if status === "working"}
-    <h1>Signing you in…</h1>
-    <p>Verifying your magic link.</p>
+    <h1>{t("verify.working.title")}</h1>
+    <p>{t("verify.working.body")}</p>
 {:else}
-    <h1>Could not sign you in</h1>
+    <h1>{t("verify.error.title")}</h1>
     <p class="banner" role="alert">{error}</p>
-    <p><a class="button" href="/signin">Request a new link</a></p>
+    <p><a class="button" href="/signin">{t("verify.error.requestNew")}</a></p>
 {/if}

@@ -2430,6 +2430,106 @@ fn test_email_dot_folding_does_not_affect_non_gmail_domains() {
 }
 
 // ============================================================
+// §16a. `local_id` is never scored (organisation-level / cross-org codes)
+// ============================================================
+//
+// Per spec §2 ("Out of scope (permanently): organisation-level
+// identifiers") and §8 / OQ-2, `local_id` is carried but deliberately
+// NOT scored: different organisations may issue colliding values, and an
+// organisation-level code (e.g. a UK NHS ODS code) is shared by every
+// worker at the same practice. These tests pin that the field adds no
+// signal in either direction — the matcher-side half of `worker-service`
+// entity task T-7.
+
+#[test]
+fn test_local_id_difference_does_not_lower_score() {
+    // Two records identical except for `local_id` must score the same as
+    // the field-free pair: `local_id` contributes nothing.
+    let with_a = Worker::builder()
+        .given_name("Asha")
+        .family_name("Patel")
+        .date_of_birth(dob(1970, 4, 1))
+        .gender(Gender::Female)
+        .local_id("PRACTICE-A/MRN-1")
+        .build();
+    let with_b = Worker::builder()
+        .given_name("Asha")
+        .family_name("Patel")
+        .date_of_birth(dob(1970, 4, 1))
+        .gender(Gender::Female)
+        .local_id("PRACTICE-B/MRN-2")
+        .build();
+    let without = Worker::builder()
+        .given_name("Asha")
+        .family_name("Patel")
+        .date_of_birth(dob(1970, 4, 1))
+        .gender(Gender::Female)
+        .build();
+
+    let engine = MatchingEngine::default_config();
+    let differing = engine.match_workers(&with_a, &with_b);
+    let absent = engine.match_workers(&without, &without.clone());
+
+    assert!(
+        (differing.score - absent.score).abs() < 1e-9,
+        "differing local_id must not change the score (got {} vs {})",
+        differing.score,
+        absent.score
+    );
+    assert!(differing.is_match);
+}
+
+#[test]
+fn test_shared_local_id_adds_no_signal_between_unrelated_workers() {
+    // A shared organisation-level code (same value on two unrelated
+    // workers — e.g. colleagues at one practice) must NOT push them to a
+    // match: `local_id` is never an exact-match short-circuit.
+    let shared = "RXX01"; // illustrative NHS ODS-style organisation code
+    let a = Worker::builder()
+        .given_name("Asha")
+        .family_name("Patel")
+        .date_of_birth(dob(1970, 4, 1))
+        .gender(Gender::Female)
+        .local_id(shared)
+        .build();
+    let b = Worker::builder()
+        .given_name("Sven")
+        .family_name("Olsen")
+        .date_of_birth(dob(1992, 12, 24))
+        .gender(Gender::Male)
+        .local_id(shared)
+        .build();
+
+    let engine = MatchingEngine::default_config();
+    let shared_code = engine.match_workers(&a, &b);
+    let no_code = engine.match_workers(
+        &Worker::builder()
+            .given_name("Asha")
+            .family_name("Patel")
+            .date_of_birth(dob(1970, 4, 1))
+            .gender(Gender::Female)
+            .build(),
+        &Worker::builder()
+            .given_name("Sven")
+            .family_name("Olsen")
+            .date_of_birth(dob(1992, 12, 24))
+            .gender(Gender::Male)
+            .build(),
+    );
+
+    assert!(
+        !shared_code.is_match,
+        "a shared local_id must not force a match"
+    );
+    assert!(
+        (shared_code.score - no_code.score).abs() < 1e-9,
+        "shared local_id must add no signal (got {} with code vs {} without)",
+        shared_code.score,
+        no_code.score
+    );
+}
+
+// ============================================================
 // §17. Confidence band
 // ============================================================
 

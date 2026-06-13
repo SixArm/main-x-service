@@ -86,6 +86,25 @@ async fn malformed_condition_code_on_create_returns_422() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn malformed_identifier_on_create_returns_422() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let mut payload = stroke_pathway();
+        // A Uuid-scheme identifier whose value is not a canonical UUID
+        // (spec §6 / validation.rs identifier rules).
+        payload["identifiers"] = json!([{"scheme": "Uuid", "value": "not-a-uuid"}]);
+        let response = request.post("/api/care-pathways").json(&payload).await;
+        assert_eq!(
+            response.status_code(),
+            422,
+            "malformed UUID identifier should be 422"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn blank_name_on_update_returns_422() {
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request

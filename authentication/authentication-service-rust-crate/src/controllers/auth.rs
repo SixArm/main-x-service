@@ -54,6 +54,9 @@ pub struct SignupParams {
     pub email: String,
     /// Optional display name; defaults from the email local-part.
     pub name: Option<String>,
+    /// Optional BCP-47 locale (e.g. `en`, `cy`) selecting the language of
+    /// the magic-link email. Unknown/absent ⇒ English (see [`crate::i18n`]).
+    pub locale: Option<String>,
 }
 
 /// Request body for `POST /api/auth/magic-link` (sign-in request).
@@ -61,6 +64,9 @@ pub struct SignupParams {
 pub struct MagicLinkParams {
     /// Email address of the existing account to sign in.
     pub email: String,
+    /// Optional BCP-47 locale (e.g. `en`, `cy`) selecting the language of
+    /// the magic-link email. Unknown/absent ⇒ English (see [`crate::i18n`]).
+    pub locale: Option<String>,
 }
 
 fn default_name(email: &str) -> String {
@@ -73,8 +79,9 @@ fn default_name(email: &str) -> String {
 }
 
 /// Logs the magic link to the console (dev) and best-effort emails it
-/// (prod). The console log is authoritative in development.
-async fn deliver_magic_link(ctx: &AppContext, user: &users::Model) {
+/// (prod), rendering the email in `locale`. The console log is
+/// authoritative in development.
+async fn deliver_magic_link(ctx: &AppContext, user: &users::Model, locale: &str) {
     let Some(token) = user.magic_link_token.as_ref() else {
         return;
     };
@@ -83,10 +90,11 @@ async fn deliver_magic_link(ctx: &AppContext, user: &users::Model) {
     let link = format!("{frontend}/verify?token={token}");
     tracing::info!(
         email = %user.email,
+        locale = %locale,
         magic_link = %link,
         "magic link issued (dev: open the link, or GET /api/auth/magic-link/{{token}})"
     );
-    if let Err(err) = AuthMailer::send_magic_link(ctx, user).await {
+    if let Err(err) = AuthMailer::send_magic_link(ctx, user, locale).await {
         tracing::debug!(error = %err, "magic link email not sent; console log above is authoritative");
     }
 }
@@ -163,7 +171,10 @@ async fn signup(
         Some(if existing { "existing" } else { "created" }),
     )
     .await;
-    deliver_magic_link(&ctx, &user).await;
+    // Locale selection affects only the rendered email language; the
+    // response shape is unchanged (anti-enumeration contract holds).
+    let locale = crate::i18n::select_locale(params.locale.as_deref());
+    deliver_magic_link(&ctx, &user, &locale).await;
     format::empty_json()
 }
 
@@ -210,7 +221,8 @@ async fn request_magic_link(
         Some("issued"),
     )
     .await;
-    deliver_magic_link(&ctx, &user).await;
+    let locale = crate::i18n::select_locale(params.locale.as_deref());
+    deliver_magic_link(&ctx, &user, &locale).await;
     format::empty_json()
 }
 

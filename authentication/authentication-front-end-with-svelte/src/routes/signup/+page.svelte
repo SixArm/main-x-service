@@ -1,5 +1,6 @@
 <script lang="ts">
     import { AuthRepository } from "$lib/api/auth";
+    import { i18n, t } from "$lib/i18n.svelte";
 
     const repo = AuthRepository.withFetch();
 
@@ -14,43 +15,41 @@
         error = null;
         submitting = true;
         try {
-            await repo.signup(email, name.trim() ? name.trim() : undefined);
+            await repo.signup(email, name.trim() ? name.trim() : undefined, i18n.locale);
             sent = true;
         } catch (err) {
-            error = err instanceof Error ? err.message : "Sign up failed";
+            error = err instanceof Error ? err.message : t("signup.failed");
         } finally {
             submitting = false;
         }
     }
 </script>
 
-<svelte:head><title>Sign up — Main X Auth</title></svelte:head>
+<svelte:head><title>{t("signup.title")} — {t("brand")}</title></svelte:head>
 
-<h1>Create account</h1>
+<h1>{t("signup.title")}</h1>
 
 {#if sent}
-    <p class="banner">
-        If that email is valid, a magic link is on its way. In development the
-        link is printed to the auth service console — open it to finish signing
-        in.
-    </p>
-    <p><a href="/signin">Back to sign in</a></p>
+    <p class="banner">{t("signup.sent")}</p>
+    <p><a href="/signin">{t("signup.backToSignin")}</a></p>
 {:else}
     <form class="stack" onsubmit={handleSubmit}>
         <label>
-            Email
+            {t("signup.email")}
             <input type="email" bind:value={email} required autocomplete="email" />
         </label>
         <label>
-            Name <small>(optional)</small>
+            {t("signup.name")} <small>{t("signup.nameOptional")}</small>
             <input type="text" bind:value={name} autocomplete="name" />
         </label>
         <button class="button" type="submit" disabled={submitting}>
-            {submitting ? "Sending…" : "Send magic link"}
+            {submitting ? t("signup.submitting") : t("signup.submit")}
         </button>
         {#if error}
             <p class="banner" role="alert">{error}</p>
         {/if}
     </form>
-    <p><small>Already have an account? <a href="/signin">Sign in</a></small></p>
+    <p>
+        <small>{t("signup.haveAccount")} <a href="/signin">{t("signup.signin")}</a></small>
+    </p>
 {/if}

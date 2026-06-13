@@ -8,15 +8,31 @@
 | Type check    | `cargo check`                                       | required green                                                     |
 | Lint          | `cargo clippy -- -D warnings`                       | required green                                                     |
 | Format        | `cargo fmt --check`                                 | required green                                                     |
-| Unit          | `cargo test --lib` (in-crate `#[cfg(test)]`)        | **6 in repo (nhs)**                                                |
-| Request tests | `cargo test --test requests` (Loco testing harness) | **29 in repo** (use `StubClient`s — no real Patient/Worker needed) |
+| Unit          | `cargo test --lib` (in-crate `#[cfg(test)]`)        | **14 in repo (nhs + geofence)**                                   |
+| Request tests | `cargo test --test requests` (Loco testing harness) | **49 in repo** (use `StubClient`s — no real Patient/Worker needed) |
 
-## Unit tests in repo (`src/nhs.rs`)
+## Unit tests in repo
+
+### `src/nhs.rs` — Modulus-11 (8 tests)
 
 - `normalises_to_digits`
 - `formats_full_numbers`, `formats_partial_inputs`
 - `validates_known_good` (six Modulus-11-valid numbers)
-- `rejects_bad_check_digit`, `rejects_wrong_length`
+- `accepts_grouped_and_bare_forms_identically`
+- `rejects_bad_check_digit`, `rejects_check_digit_of_ten`, `rejects_wrong_length`
+
+### `src/controllers/alerts.rs` — geofence breach derivation (6 tests)
+
+The `detect_geofence_breaches` pure function and its `cabinet_buildings`
+hierarchy resolver are tested directly, covering every branch of the
+boundary-crossing rule:
+
+- `cross_building_move_is_a_breach`, `same_building_move_is_not_a_breach`
+- `move_with_missing_endpoint_cabinet_is_not_a_breach` (in-transit /
+  created-in-place — a `None` endpoint)
+- `move_via_unresolvable_cabinet_is_not_a_breach` (unknown cabinet id)
+- `cabinet_under_orphan_room_is_unresolved` (room whose building is absent)
+- `only_breaching_moves_are_returned_from_a_mixed_log`
 
 ## Request tests in repo (`tests/requests/*.rs`)
 
@@ -24,7 +40,10 @@ Run with `DATABASE_URL=postgres://…/case_folder_test cargo test
 --test requests`. Each test marks `#[serial]` and calls `clean_db()` at
 the top (which resets all five stub services), so it starts from an
 empty world. Each test asserts a status code + JSON shape — no HTML
-markup.
+markup. The table below is a representative subset of the 49 tests;
+`auth.rs`, `alerts.rs`, and `volumes.rs` add the remainder (auth
+request/verify/guard, geofence cross-building vs same-building, and the
+volume CRUD + move flow).
 
 | File          | Test                                                                     | Asserts                                                               |
 | ------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |

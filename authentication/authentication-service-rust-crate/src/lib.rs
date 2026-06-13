@@ -21,6 +21,8 @@ pub mod auth;
 pub mod controllers;
 /// Static data loaders (loco `data/` convention).
 pub mod data;
+/// Localised user-facing copy (magic-link email subject + bodies).
+pub mod i18n;
 /// Loco app initializers.
 pub mod initializers;
 /// Mailers (magic-link / welcome emails).

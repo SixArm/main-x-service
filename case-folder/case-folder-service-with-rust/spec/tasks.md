@@ -25,6 +25,14 @@
 
 ## Active / next
 
+- [x] **LT-16** Extract the geofence-breach derivation behind `GET /api/alerts`
+  into a pure `detect_geofence_breaches` (+ `cabinet_buildings`) function and
+  unit-test every branch of the boundary-crossing rule (D-12). Previously the
+  logic was reachable only through Postgres-gated request tests; it now has 6
+  in-crate `#[cfg(test)]` tests (cross-building breach, same-building
+  suppression, `None`-endpoint in-transit/created-in-place, unknown cabinet,
+  orphan-room hierarchy, mixed-log filtering). No behaviour change. Lib tests
+  8→14.
 - [ ] **LT-11** OpenAPI / JSON Schema document for every endpoint (P1) — AR-4
 - [ ] **LT-12** SSE on `/api/moves` (P1)
 - [ ] **LT-13** Soft-delete cabinets, refusing while occupied (P2)

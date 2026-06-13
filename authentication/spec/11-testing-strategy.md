@@ -14,7 +14,15 @@ Per-subproject detail: [`AGENTS/testing.md`](../AGENTS/testing.md).
   JWKS surface (§13 T-3 done). The PostgreSQL-backed tests are
   `#[ignore]`d so plain `cargo test` stays green without a database;
   run them with `cargo test -- --ignored`. DB-free route-table and
-  params-contract assertions always run.
+  params-contract assertions always run (including the optional
+  `locale` field on `SignupParams` / `MagicLinkParams`).
+- **i18n (DB-free):** `src/i18n.rs` `#[cfg(test)]` (8 tests) pins the
+  magic-link email catalog — `en` / `cy` copy, `{link}` substitution,
+  `en` fallback for unknown locales, region-subtag reduction, and the
+  `select_locale` input→locale mapping. The DB-gated
+  `signup_locale_does_not_change_the_response_shape` request test
+  asserts the always-`200` shape across `en` / `cy` / unknown / absent
+  locales.
 
 ### 11.2 Verifier
 
