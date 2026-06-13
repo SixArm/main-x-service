@@ -7,26 +7,39 @@ use uuid::Uuid;
 
 pub use super::_entities::users::{self, ActiveModel, Entity, Model};
 
+/// Length (chars) of a generated magic-link token.
 pub const MAGIC_LINK_LENGTH: i8 = 32;
+/// Magic-link validity window, in minutes.
 pub const MAGIC_LINK_EXPIRATION_MIN: i8 = 5;
 
+/// Password-login params (loco scaffold; unused in the passwordless flow).
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginParams {
+    /// Account email.
     pub email: String,
+    /// Plaintext password.
     pub password: String,
 }
 
+/// Password-registration params (loco scaffold; unused — see
+/// [`Model::create_passwordless`]).
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RegisterParams {
+    /// Account email.
     pub email: String,
+    /// Plaintext password.
     pub password: String,
+    /// Display name.
     pub name: String,
 }
 
+/// Field validator for the user `ActiveModel` (name length + email).
 #[derive(Debug, Validate, Deserialize)]
 pub struct Validator {
+    /// Display name — at least two characters.
     #[validate(length(min = 2, message = "Name must be at least 2 characters long."))]
     pub name: String,
+    /// Email — must be a syntactically valid address.
     #[validate(email(message = "invalid email"))]
     pub email: String,
 }
@@ -241,9 +254,9 @@ impl Model {
         let password_hash =
             hash::hash_password(&params.password).map_err(|e| ModelError::Any(e.into()))?;
         let user = users::ActiveModel {
-            email: ActiveValue::set(params.email.to_string()),
+            email: ActiveValue::set(params.email.clone()),
             password: ActiveValue::set(password_hash),
-            name: ActiveValue::set(params.name.to_string()),
+            name: ActiveValue::set(params.name.clone()),
             ..Default::default()
         }
         .insert(&txn)

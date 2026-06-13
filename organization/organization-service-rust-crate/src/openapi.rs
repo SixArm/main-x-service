@@ -8,7 +8,10 @@
 
 use serde_json::{json, Value};
 
-/// The full OpenAPI document, served at `/api-docs/openapi.json`.
+/// The full `OpenAPI` document, served at `/api-docs/openapi.json`.
+// One contiguous `json!` literal: splitting it into helpers would
+// scatter the document and hurt readability, so the length is allowed.
+#[allow(clippy::too_many_lines)]
 #[must_use]
 pub fn spec() -> Value {
     json!({

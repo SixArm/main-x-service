@@ -8,7 +8,8 @@ seams. Crate-internal work belongs in the owning subproject's queue
 Tick the box when an automated test or clearly described manual check
 confirms the acceptance criterion.
 
-- [ ] **T-1 — Reconcile the FHIR resource path discrepancy.**
+- [x] **T-1 — Reconcile the FHIR resource path discrepancy.** *(Done
+  2026-06-13.)*
   - [x] Service [spec §6.8 / §9](../worker-service-rust-crate/spec/09-api-surface.md)
     say `/fhir/Practitioner`; service
     [`AGENTS/restful.md`](../worker-service-rust-crate/AGENTS/restful.md)
@@ -16,13 +17,14 @@ confirms the acceptance criterion.
     fix the loser. *(Done 2026-06-13: the code's handlers and wire
     `resourceType` are `Worker` / `/fhir/Worker` — the spec was the
     loser; §2/§6.8/§8/§9/§12/§13/§14 now say `/fhir/Worker`.)*
-  - [ ] Pin with a route test. **Blocked by a code finding:** the
-    FHIR handlers are implemented but never mounted — `App::routes`
-    registers only the REST + metrics groups, so *no* FHIR path is
-    currently served. Mounting + the route test is service
-    [§13 T-9](../worker-service-rust-crate/spec/13-tasks.md).
+  - [x] Pin with a route test. *(Done 2026-06-13: the previously
+    unmounted FHIR handlers are now registered via `fhir_routes()` in
+    `App::routes` — service [§13 T-9](../worker-service-rust-crate/spec/13-tasks.md)
+    — and pinned by `tests/api_integration_test.rs::test_fhir_worker_route_is_mounted`
+    (un-gated) plus `::test_fhir_worker_not_found_returns_operation_outcome`
+    (DB-gated).)*
   - **Acceptance:** spec, AGENTS doc, and an integration test agree on
-    one path.
+    one path. ✓
 - [x] **T-2 — Refresh the matcher spec banner version.** *(Done
   2026-06-13.)*
   - [x] [matcher `spec/index.md`](../worker-matcher-rust-crate/spec/index.md)

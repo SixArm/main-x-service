@@ -43,6 +43,44 @@
 //! | `tax_id` | `us_ssn` (default; overridden if a TAX identifier carries a non-US system URI) |
 //! | `identifiers[]` with `IdentifierType` + `system` URI | country-specific slot via `route_identifier` |
 //! | `documents[]` of type `Passport` | `passport_books` (one per passport) |
+//!
+//! # Identifier scheme-routing audit (spec §5.3.1 / E-8)
+//!
+//! The matcher exposes **26** national-ID builder slots. [`route_identifier`]
+//! reaches **14** of them via `system`-URI substring fast paths (plus the
+//! type-based `tax_id` / `SSN` / `TAX` → `us_ssn` defaults). The other 12
+//! slots are **unreachable from current service data** — no routing rule
+//! targets them.
+//!
+//! ## Routable (`system` URI substring → matcher slot)
+//!
+//! | URI contains | Matcher slot |
+//! |---|---|
+//! | `nhs.uk` / `uk-nhs` / `nhs-number` | `united_kingdom_national_health_service_number` |
+//! | `us-ssn` / `ssa.gov` (+ type SSN/TAX, + `tax_id`) | `us_ssn` |
+//! | `cpf` | `br_cpf` |
+//! | `nir` / `ameli.fr` | `fr_nir` |
+//! | `tsi` / `ingesa` | `es_tsi` |
+//! | `aadhaar` / `uidai` | `in_aadhaar` |
+//! | `my-number` / `myna` | `jp_my_number` |
+//! | `curp` | `mx_curp` |
+//! | `personnummer` | `se_personnummer` |
+//! | `kvnr` | `de_kvnr` |
+//! | `bsn` | `nl_bsn` |
+//! | `nhi` | `nz_nhi` |
+//! | `ihi` (≥14 digits) | `au_ihi` |
+//! | `ihi` (<14 digits) | `ie_ihi` |
+//!
+//! ## Unreachable (matcher-only; no routing rule today)
+//!
+//! `uk_hc_number`, `uk_chi_number`, `uk_nino`, `it_cf`, `bg_egn`, `es_dni`,
+//! `hr_oib`, `no_fnr`, `pl_pesel`, `ro_cnp`, `si_emso`, `cn_rrn`.
+//!
+//! Each routable scheme is pinned by `tests/duplicate_detection.rs`
+//! (`routable_identifier_systems_reach_their_matcher_slot`,
+//! `ihi_disambiguates_au_vs_ie_by_digit_count`). Adding a scheme is a
+//! three-part change: a fast path here, a table row here + in spec §5.3.1,
+//! and a test case.
 
 use person_matcher::{
     Address as MAddress, Gender as MGender, PassportBook as MPassport, Person as MPerson,

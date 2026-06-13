@@ -372,6 +372,49 @@ mod tests {
         assert_eq!(MatchConfidence::from_score(0.40), MatchConfidence::Unlikely);
     }
 
+    /// Boundary pinning for the service↔matcher confidence vocabulary
+    /// bridge (entity task T-8, spec §5.3 normative note).
+    ///
+    /// The service classifies the *raw `f64` score* with its own
+    /// 4-band [`MatchConfidence`]; it never translates the embedded
+    /// `thing-matcher` crate's 3-band `Confidence` label back into this
+    /// vocabulary. The two band edges interleave (matcher cuts at 0.90
+    /// and 0.75; service cuts at 0.95, 0.80, 0.60), so the only safe
+    /// bridge is to carry the score across the adapter and re-derive
+    /// here. This test pins the exact service cut points — including the
+    /// matcher's interleaving edges (0.90, 0.75) — so any drift in
+    /// `from_score` fails loudly.
+    #[test]
+    fn test_confidence_boundary_pins() {
+        // Service Certain edge (inclusive).
+        assert_eq!(MatchConfidence::from_score(0.95), MatchConfidence::Certain);
+        // Matcher High edge falls inside service Probable.
+        assert_eq!(
+            MatchConfidence::from_score(0.90),
+            MatchConfidence::Probable
+        );
+        // Service Probable edge (inclusive).
+        assert_eq!(
+            MatchConfidence::from_score(0.80),
+            MatchConfidence::Probable
+        );
+        // Matcher Medium edge falls inside service Possible.
+        assert_eq!(
+            MatchConfidence::from_score(0.75),
+            MatchConfidence::Possible
+        );
+        // Service Possible edge (inclusive).
+        assert_eq!(
+            MatchConfidence::from_score(0.60),
+            MatchConfidence::Possible
+        );
+        // Just below the Possible edge → Unlikely.
+        assert_eq!(
+            MatchConfidence::from_score(0.5999),
+            MatchConfidence::Unlikely
+        );
+    }
+
     /// The default weight set sums to exactly 1.0.
     #[test]
     fn test_default_weights_sum_to_one() {

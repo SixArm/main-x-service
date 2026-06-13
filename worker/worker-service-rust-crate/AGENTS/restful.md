@@ -136,10 +136,15 @@ is [`api::rest::handlers::metrics_prom`](../src/api/rest/handlers.rs).
 ## FHIR R5 Endpoints
 
 > **Status:** the handlers below are implemented in
-> `src/api/fhir/handlers.rs` (wire `resourceType: "Worker"`), but they
-> are **not yet mounted** on the loco router — `App::routes` registers
-> only the REST and metrics route groups. Mounting + a pinning route
-> test is spec §13 T-9.
+> `src/api/fhir/handlers.rs` (wire `resourceType: "Worker"`) and are
+> **mounted** on the loco router — `App::routes` registers
+> `workers_routes()`, `fhir_routes()`, and `metrics_routes()`, and the
+> standalone `create_router` mirrors the same `/fhir/Worker` surface for
+> the integration-test harness. Pinned by
+> `tests/api_integration_test.rs::test_fhir_worker_route_is_mounted`
+> (un-gated, asserts the route is reachable) and
+> `::test_fhir_worker_not_found_returns_operation_outcome` (DB-gated,
+> asserts a FHIR `OperationOutcome`). Closes spec §13 T-9 / entity T-1.
 
 | Method | Path                | Description         |
 | ------ | ------------------- | ------------------- |

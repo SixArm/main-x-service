@@ -1,3 +1,7 @@
+//! loco.rs application wiring: the [`App`] `Hooks` implementation that
+//! registers routes, background workers, and the truncate/seed
+//! lifecycle for `care-pathway-service`.
+
 use async_trait::async_trait;
 use loco_rs::{
     app::{AppContext, Hooks, Initializer},
@@ -18,6 +22,11 @@ use crate::{
     controllers, models::_entities::care_pathways, tasks, workers::downloader::DownloadWorker,
 };
 
+/// The loco.rs application hooks for `care-pathway-service`.
+///
+/// Implements [`Hooks`] to register routes, background workers, and the
+/// truncate/seed lifecycle; the binary entrypoint drives it via the
+/// loco CLI.
 pub struct App;
 #[async_trait]
 impl Hooks for App {

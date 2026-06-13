@@ -142,9 +142,14 @@ Bidirectional `Worker` resource conversion under `/fhir/Worker`
 `"Worker"`). Search parameters: `name`, `family`, `given`,
 `identifier`, `birthdate`, `gender`, `_count`.
 
-**Status caveat:** the FHIR handlers are implemented and unit-level
-complete, but they are **not currently mounted** on the loco router
-(`App::routes` registers only the REST and metrics routes). Mounting
-them — and pinning the path with a route test — is tracked in §13
-T-9.
+**Status:** the FHIR handlers are implemented and **mounted** on the
+loco router — `App::routes` registers `fhir_routes()` alongside the
+REST and metrics route groups, and `create_router` mirrors the same
+`/fhir/Worker` surface for the integration-test harness. The mount is
+pinned by `tests/api_integration_test.rs::test_fhir_worker_route_is_mounted`
+(un-gated, asserts the route is reachable via a `400` from the
+`Path<Uuid>` extractor) and
+`::test_fhir_worker_not_found_returns_operation_outcome` (DB-gated,
+asserts a FHIR `OperationOutcome`). Tracked in §13 T-9 (done
+2026-06-13).
 

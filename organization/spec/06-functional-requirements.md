@@ -17,9 +17,13 @@ contract.
 - **FR-3 — Duplicate check** *(service + matcher)*.
   `POST /api/organizations/check-duplicates` scores a query
   `Organization` against stored active records (current scan cap
-  1 000) and returns the ones with `is_match == true` as
+  `CHECK_DUPLICATES_SCAN_CAP` = 1 000, a named constant) and returns
+  the ones with `is_match == true` as
   `{pid, name, score, confidence, is_match}`, ranked by score
-  descending.
+  descending. The cap is a known scale cliff: when the scan returns
+  exactly the cap the handler emits a `WARN` log so the truncation is
+  observable rather than a silent miss of candidates beyond the cap.
+  Lifting the cap via blocking / candidate pre-selection is task T-7.
 - **FR-4 — Deterministic short-circuits** *(matcher)*. Score pinned
   to 1.0 on: R-0 shared value on a deterministic scheme (LEI, DUNS,
   ISO 6523, GLN, Wikidata, ROR, ISNI, VAT); R-1 shared non-empty

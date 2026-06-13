@@ -64,7 +64,7 @@ Based on [schema.org/Place](https://schema.org/Place):
 - Coordinate normalization (decimal degrees, WGS 84)
 - Validation integrated into create and update handlers (returns 422)
 
-@AGENTS/architecture.md
+@../../agents/share/architecture.md
 @AGENTS/matching.md
 @AGENTS/models.md
 @AGENTS/restful.md

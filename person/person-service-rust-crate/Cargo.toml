@@ -85,7 +85,7 @@ argon2 = "0.5"
 jsonwebtoken = "9.3"
 # Offline RS256 verification of authentication-service tokens against its
 # published JWKS — no shared secret, no per-request introspection hop.
-authentication-verifier = { path = "../authentication-verifier-rust-crate", features = ["fetch"] }
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 mimalloc = "0.1.52"
 
 [dev-dependencies]

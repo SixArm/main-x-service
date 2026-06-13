@@ -18,8 +18,8 @@
 - Record merging with link tracking and JSON snapshots.
 - Per-field privacy masking, GDPR Article 15 export, consent records.
 - REST API (Axum) + FHIR R5 `Worker` resource (`/fhir/Worker`;
-  handlers implemented, router mounting pending — §13 T-9) + gRPC
-  stub.
+  handlers implemented and mounted on the loco router via
+  `fhir_routes()` — §13 T-9 done) + gRPC stub.
 - PostgreSQL persistence via SeaORM.
 
 ### 2.2 Out of scope (today)

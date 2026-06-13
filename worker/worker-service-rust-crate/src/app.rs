@@ -23,7 +23,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, metrics_routes, workers_routes},
+    api::rest::{ApiDoc, AppState, fhir_routes, metrics_routes, workers_routes},
     config::Config,
     matching::ProbabilisticMatcher,
     search::SearchEngine,
@@ -63,6 +63,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes()
             .add_route(workers_routes())
+            .add_route(fhir_routes())
             .add_route(metrics_routes())
     }
 

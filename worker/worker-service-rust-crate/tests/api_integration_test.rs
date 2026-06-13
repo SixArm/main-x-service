@@ -380,3 +380,57 @@ async fn test_get_worker_not_found() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
+
+/// The FHIR route `GET /fhir/Worker/{id}` is mounted on the router.
+///
+/// Un-gated: drives a malformed UUID so the `Path<Uuid>` extractor rejects the
+/// request with `400 Bad Request` *before* any database access. A `400` proves
+/// the path matched a registered handler — a missing route would yield a
+/// route-level `404` with an empty body. Pins spec §13 T-9 / entity T-1 (the
+/// FHIR surface is reachable) without a live database.
+#[tokio::test]
+async fn test_fhir_worker_route_is_mounted() {
+    let app = common::create_test_router_no_db();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/fhir/Worker/not-a-uuid")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // 400 from the Path<Uuid> extractor — the route exists and was reached.
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+/// `GET /fhir/Worker/{id}` for an unknown id returns a FHIR `OperationOutcome`.
+///
+/// DB-gated: a valid-but-absent UUID reaches the handler, which queries the
+/// repository and returns a FHIR-conformant `404` (resourceType
+/// `OperationOutcome`), confirming the mounted route serves FHIR responses.
+#[tokio::test]
+#[ignore]
+async fn test_fhir_worker_not_found_returns_operation_outcome() {
+    let app = common::create_test_router().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/fhir/Worker/00000000-0000-0000-0000-000000000001")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+    assert!(body_str.contains("OperationOutcome"));
+}

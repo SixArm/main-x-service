@@ -36,6 +36,9 @@ validator = { version = "0.20" }
 uuid = { version = "1.23", features = ["v4", "serde"] }
 include_dir = { version = "0.7" }
 
+# Faster memory allocator, used only for MUSL static builds (see src/bin/main.rs).
+mimalloc = "0.1.52"
+
 # Canonical matching algorithm — embedded and used directly as the API DTO.
 organization-matcher = { path = "../organization-matcher-rust-crate" }
 

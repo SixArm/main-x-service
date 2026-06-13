@@ -1,6 +1,10 @@
 //! `SeaORM` Entity — `audit_logs`. One row per CRUD action on an
 //! organization (who / what / when + a snapshot).
 
+// SeaORM-generated entity: the field-level shape is documented by the
+// migration and the `audit_logs` table, not by per-field rustdoc.
+#![allow(missing_docs)]
+
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 

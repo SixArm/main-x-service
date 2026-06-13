@@ -82,22 +82,29 @@ Prefix `ET-` distinguishes these from per-crate task numbers.
     real data, including create-409 and merge.
   - **Acceptance:** front-end spec §14 rows flip to ✅ with the
     verification noted.
-- [ ] **ET-8 — Pin the language-tag contract.**
+- [x] **ET-8 — Pin the language-tag contract.**
   The service validates `in_language` as 2-letter ISO 639-1; the
   matcher documents `in_language` as BCP 47. ~~The adapter currently
   drops the field~~ (correction 2026-06-13: the adapter **does**
-  project the first non-empty `in_language` entry —
-  `src/matching/adapter.rs` — but the matcher treats the field as
-  data-only and never scores it, so nothing breaks). The contract
-  is now documented but not yet test-pinned.
+  project the first `in_language` entry — `src/matching/adapter.rs`
+  reads `e.in_language.first()`, projecting it when non-empty — but
+  the matcher treats the field as data-only and never scores it, so
+  nothing breaks). Contract now documented **and** test-pinned.
   - [x] Documentation: §5.3 table row added; divergence note in
     service spec §6.2 and service `AGENTS/matching.md`
     (2026-06-13, docs-only round).
-  - [ ] Bridge test pinning the first-entry projection (the field
-    **is** projected, so per the original acceptance a test is due;
-    deferred — docs-only round).
+  - [x] Bridge test pinning the projection + inertness
+    (2026-06-13): `tests/duplicate_detection.rs` adds
+    `in_language_first_entry_is_projected` (first entry carried,
+    later entries dropped, leading-empty entry projects nothing —
+    adapter reads only `.first()`, no scan-ahead) and
+    `in_language_difference_does_not_affect_match` (two events
+    differing only in `in_language` score identically — the matcher
+    never scores the field; there is no `in_language_score` in
+    `MatchBreakdown`). `cargo test --test duplicate_detection`: 18
+    passed.
   - **Acceptance:** §5.3 table row added; adapter comment + bridge
-    test if the field is ever projected.
+    test pinning the projection. ✓
 - [ ] **ET-9 — Load test at governmental scale.**
   - [ ] Seed millions of synthetic Events; measure NFR-2…NFR-6 and
     re-state them as measured multi-instance figures.

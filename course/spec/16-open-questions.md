@@ -26,9 +26,13 @@ front-end [§16](../course-front-end-with-svelte/spec/16-open-questions.md)).
   it from migrations, or document it as a snapshot artefact.
   *Update 2026-06-13:* inspected and documented in §10.3 — it is a
   hand-written normalization design document (not a dump), with no
-  regeneration story, and it has already drifted from the live
-  schema in two table names. The delete / generate / adopt decision
-  remains open.
+  regeneration story. The two drifted table names
+  (`course_syllabus_sections`→`syllabus_sections`,
+  `course_review_queue`→`course_match_scores`) have been **reconciled**
+  to the migration names, and a dependency-free guard
+  (`../bin/check-schema-drift`, §10.3.1) now fails CI on any future
+  table-name drift. The higher-level delete / generate / adopt
+  ownership decision remains open.
 - **OQ-5**: Erasure depth for instructor personal data: is
   soft-delete + masking sufficient for GDPR erasure requests against
   `instructor_names` in historical instances and merge snapshots, or

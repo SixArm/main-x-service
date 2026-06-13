@@ -16,6 +16,12 @@ or clearly described manual check confirms the acceptance criterion.
     **code** bug — `place-front-end-with-svelte/src/lib/api/places.ts`
     POSTs `/api/places/duplicates` (its unit test pins the wrong path)
     and will 404 against the live service.)*
+  - [x] Front-end **code** bug fixed: `place-front-end-with-svelte/src/lib/api/places.ts`
+    now POSTs `/api/places/check-duplicates`, and its unit test
+    (`tests/unit/places.test.ts`) asserts the correct path. Verified by
+    executing the front-end unit suite (`vitest run`: 8 passed) and by
+    grep-consistency across client + test + service route.
+    *(2026-06-13)*
   - **Acceptance:** all three docs + code agree; a service route test
     covers the path.
 - [ ] **E-2 — Purge person-entity copy artifacts from the front-end.**

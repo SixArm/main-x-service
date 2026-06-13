@@ -52,14 +52,27 @@ or clearly described manual check confirms it. Split oversized tasks
   - **Acceptance:** locale switch renders the persons list and create
     form fully translated; e2e test asserts no hard-coded English in
     those routes.
-- [ ] **E-8 — Audit adapter coverage of the matcher's 42 schemes.**
-  - [ ] Table in §5.3 (or `adapter.rs` rustdoc) enumerating which
+- [x] **E-8 — Audit adapter coverage of the matcher's national-ID schemes.**
+  - [x] Table in §5.3.1 + `adapter.rs` rustdoc enumerating which
     identifier `system` URIs route to which matcher scheme slot, and
     which schemes are unreachable from service data today.
-  - [ ] Bridge tests for each newly routed scheme.
+  - [x] Bridge tests for each newly routed scheme.
   - **Acceptance:** documented routing table matches
     `to_matcher_person` behaviour; `cargo test --test
     duplicate_detection` covers every routed scheme family.
+  - *(Done 2026-06-13: the matcher exposes 26 national-ID builder
+    slots; `route_identifier` reaches 14 (UK NHS, US SSN, BR CPF,
+    FR NIR, ES TSI, IN Aadhaar, JP My-Number, MX CURP, SE
+    personnummer, DE KVNR, NL BSN, NZ NHI, AU/IE IHI) via system-URI
+    fast paths + the `tax_id`/SSN/TAX → us_ssn defaults; 12 remain
+    unreachable (uk_hc_number, uk_chi_number, uk_nino, it_cf, bg_egn,
+    es_dni, hr_oib, no_fnr, pl_pesel, ro_cnp, si_emso, cn_rrn).
+    Routing table added to spec §5.3.1 and the adapter module rustdoc;
+    `tests/duplicate_detection.rs` grew +3 tests
+    (`routable_identifier_systems_reach_their_matcher_slot`,
+    `ihi_disambiguates_au_vs_ie_by_digit_count`,
+    `shared_cpf_system_uri_is_deterministic_match`) → 17 pass, 0
+    fail.)*
 - [x] **E-9 — Repair repo-root links broken by entity nesting.**
   - [x] Crate docs still link `../../agents/share/…` and
     `../../AGENTS.md`, which after nesting resolve inside `person/`
@@ -77,7 +90,14 @@ or clearly described manual check confirms it. Split oversized tasks
     pointing at never-committed files — LICENSE / LICENSE-MIT /
     LICENSE-APACHE / ARCHITECTURE.md / API_GUIDE.md / task-10.md —
     plus a pre-existing dangling `@AGENTS/architecture.md` include in
-    the service `CLAUDE.md`; left for a service-level task.)*
+    the service `CLAUDE.md`; left for a service-level task. **Resolved
+    2026-06-13:** license links re-pointed to the `Cargo.toml` SPDX
+    expression (no LICENSE files exist; crate is multi-licensed),
+    `ARCHITECTURE.md`→`spec/08-architecture.md`,
+    `API_GUIDE.md`→`AGENTS/restful.md`, `task-10.md`→`spec/13-tasks.md`,
+    and the `CLAUDE.md` include re-pointed to
+    `../../agents/share/architecture.md`. Link-checker over
+    `person/**/*.md`: 508 relative links resolve, zero dangling.)*
 - [ ] **E-10 — Regeneration / drift-check story for
   `person-service-schema.sql`.**
   - [ ] Decide whether the entity-root schema file is generated

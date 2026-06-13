@@ -2,6 +2,10 @@
 //! `organization_matcher::Organization` payload is stored in `data`
 //! (JSONB); `pid` and `name` are denormalised for lookup and listing.
 
+// SeaORM-generated entity: the field-level shape is documented by the
+// migration and the `organizations` table, not by per-field rustdoc.
+#![allow(missing_docs)]
+
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 

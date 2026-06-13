@@ -40,12 +40,32 @@ at the entity directory level. What it is, on inspection:
   `normalize_course_collections` migration. It is not a `pg_dump`
   output and there is **no regeneration story** — nothing produces
   or refreshes it from the migrations or from a live database.
-- The migration implements the design but **deviates in two table
-  names**: the live schema keeps the pre-existing
-  `syllabus_sections` and `course_match_scores`, where the file
-  says `course_syllabus_sections` and `course_review_queue`. The
-  file has already drifted, exactly as OQ-4 predicted.
 - The service crate's `migrations/` (run through the `migration/`
   loco Migrator crate) remain the executable source of truth; treat
   this file as a historical design snapshot until OQ-4 (delete /
   generate / formally adopt) is resolved.
+
+#### 10.3.1 Drift-check script
+
+[`../bin/check-schema-drift`](../bin/check-schema-drift) detects
+table-name drift between the hand-written `course-service-schema.sql`
+and the authoritative migrations **without a live database**. It is
+dependency-free (POSIX `sh` + `grep`/`sed`/`sort`/`comm`): it extracts
+the `CREATE TABLE` name set from every migration `up.sql`, extracts the
+same set from `course-service-schema.sql`, and diffs them. Exit `0`
+means the sets agree; exit `1` prints the divergent names (which side
+each is missing from) and fails; exit `2` is a usage/environment error.
+
+```sh
+course/bin/check-schema-drift   # run from anywhere; resolves its own paths
+```
+
+The migrations are authoritative: when the script reports drift, fix
+`course-service-schema.sql` to match the migrations, not the reverse.
+
+The two historical divergences flagged by OQ-4 —
+`course_syllabus_sections` vs the migration's `syllabus_sections`, and
+`course_review_queue` vs the migration's `course_match_scores` — have
+been **reconciled** by renaming the hand-written schema's tables to the
+migration names; the script now reports the two sides agree on all 16
+table names.

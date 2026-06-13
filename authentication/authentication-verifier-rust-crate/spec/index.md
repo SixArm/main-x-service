@@ -124,6 +124,14 @@ ever transits to a third party.
 
 ## 13. Tasks (live work queue)
 
+- [x] Pin every validated claim rule with an offline unit test.
+      *(2026-06-13)* `exp`, `aud`, `iss`, `kid`, signature, and
+      structural failures each have a dedicated test; `iss` mismatch
+      added (`wrong_issuer_is_rejected`). `nbf` is intentionally not in
+      `Claims`, so it is not validated and nothing to pin.
+- [x] Crate-level lints: `#![forbid(unsafe_code)]`,
+      `#![warn(clippy::pedantic)]`, `#![deny(missing_docs)]` all land
+      green. *(2026-06-13)*
 - [ ] Refetch-on-`UnknownKid` helper (or document the pattern per
       entity spec §13 T-5 key rotation).
 - [ ] Property-test the JWKS parser against fuzzed documents.

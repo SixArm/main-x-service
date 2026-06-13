@@ -151,6 +151,20 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
     format::json(results)
 }
 
+/// Maximum number of stored organizations scanned per `check-duplicates`
+/// request.
+///
+/// `check-duplicates` does an in-memory full scan: it loads up to this
+/// many rows and scores the query against each. The cap bounds the
+/// request's memory and latency, but it is a known scale cliff — beyond
+/// this many active organizations the scan silently misses candidates.
+/// When the scan returns exactly this many rows the handler logs a
+/// `WARN` so the truncation is observable rather than silent. Lifting
+/// the cap requires blocking / candidate pre-selection (spec §6 R-DUP,
+/// task T-7); until then this constant is the single source of truth for
+/// the limit and is asserted by tests.
+pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
+
 /// Find stored organizations that match the query above the threshold.
 #[debug_handler]
 async fn check_duplicates(
@@ -158,7 +172,14 @@ async fn check_duplicates(
     Json(query): Json<Organization>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
-    let rows = OrgModel::list(&ctx.db, 1000).await?;
+    let rows = OrgModel::list(&ctx.db, CHECK_DUPLICATES_SCAN_CAP).await?;
+    if rows.len() as u64 == CHECK_DUPLICATES_SCAN_CAP {
+        tracing::warn!(
+            cap = CHECK_DUPLICATES_SCAN_CAP,
+            "check-duplicates scan hit the row cap; results may be truncated \
+             (silent miss of candidates beyond the cap). See task T-7."
+        );
+    }
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
         let candidate = row.to_org()?;
@@ -224,6 +245,8 @@ async fn recent_events() -> Result<Response> {
     format::json(streaming::recent(100))
 }
 
+/// All organization routes, mounted under `/api/organizations`: CRUD,
+/// name search, matching, duplicate-check, and audit / event endpoints.
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/organizations")
@@ -262,5 +285,16 @@ mod tests {
     fn non_blank_name_passes_validation() {
         let org = Organization::new("Acme, Inc.");
         assert!(validate(&org).is_ok());
+    }
+
+    /// DB-free pin for task T-7 (observable cap): the `check-duplicates`
+    /// scan cap is the named constant the handler queries with, so a
+    /// scan returning exactly this many rows is the truncation trigger.
+    /// Pinning the value here keeps the constant the single source of
+    /// truth (request-level truncation behaviour is exercised by the
+    /// Postgres-gated suite).
+    #[test]
+    fn check_duplicates_scan_cap_is_pinned() {
+        assert_eq!(CHECK_DUPLICATES_SCAN_CAP, 1000);
     }
 }

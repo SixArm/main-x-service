@@ -10,6 +10,8 @@ static welcome: Dir<'_> = include_dir!("src/mailers/auth/welcome");
 static forgot: Dir<'_> = include_dir!("src/mailers/auth/forgot");
 static magic_link: Dir<'_> = include_dir!("src/mailers/auth/magic_link");
 
+/// Mailer for auth emails (magic-link, welcome, forgot). In development
+/// the magic link is logged rather than sent (no SMTP configured).
 #[allow(clippy::module_name_repetitions)]
 pub struct AuthMailer {}
 impl Mailer for AuthMailer {}
@@ -24,7 +26,7 @@ impl AuthMailer {
             ctx,
             &welcome,
             mailer::Args {
-                to: user.email.to_string(),
+                to: user.email.clone(),
                 locals: json!({
                   "name": user.name,
                   "verifyToken": user.email_verification_token,
@@ -48,7 +50,7 @@ impl AuthMailer {
             ctx,
             &forgot,
             mailer::Args {
-                to: user.email.to_string(),
+                to: user.email.clone(),
                 locals: json!({
                   "name": user.name,
                   "resetToken": user.reset_token,
@@ -72,7 +74,7 @@ impl AuthMailer {
             ctx,
             &magic_link,
             mailer::Args {
-                to: user.email.to_string(),
+                to: user.email.clone(),
                 locals: json!({
                   "name": user.name,
                   "token": user.magic_link_token.clone().ok_or_else(|| Error::string(

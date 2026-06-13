@@ -143,6 +143,13 @@ an audit trail of issuance and revocation.
       with this crate's `auth` module and verifies through the
       `authentication-verifier` dev-dependency, pinning the `Claims`
       round-trip and the `kid` thumbprint contract. DB-free, un-gated.
+- [x] Binary/library lint conformance: `src/bin/main.rs` carries the
+      `//!` crate doc, `#![warn(clippy::pedantic)]`,
+      `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`, and the
+      `cfg(target_env = "musl")` `mimalloc` global allocator; `src/lib.rs`
+      carries the same three lints with `deny(missing_docs)` satisfied
+      across the whole crate (generated `_entities` are `allow`ed at the
+      module). Clippy is warning-free. *(2026-06-13)*
 - [ ] Key rotation: support multiple JWKS entries (`kid` already
       stamped) and a grace window.
 - [ ] Optional Mailpit docker-compose service for realistic dev email.

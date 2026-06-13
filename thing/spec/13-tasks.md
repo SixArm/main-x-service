@@ -78,19 +78,29 @@ clearly described manual check confirms the acceptance criterion.
     `deduplicate` results view; masked-view toggle; GDPR-export
     download (front-end §13 T-17–T-20).
   - **Acceptance:** Playwright e2e covers each new route.
-- [ ] **T-8 — Reconcile the two match-confidence vocabularies.**
-  - [ ] Service responses use Certain / Probable / Possible / Unlikely
+- [x] **T-8 — Reconcile the two match-confidence vocabularies.**
+  - [x] Service responses use Certain / Probable / Possible / Unlikely
     (thresholds 0.95 / 0.80 / 0.60); the embedded matcher returns
-    High / Medium / Low (0.90 / 0.75). Decide the API-facing
-    vocabulary and map at the adapter (see §16 OQ-2).
+    High / Medium / Low (0.90 / 0.75). Resolved by re-classifying from
+    the raw `f64` score (never label→label) at the scoring boundary;
+    final API-facing-vocabulary choice still tracked in §16 OQ-2.
   - **Acceptance:** §5.3 documents the mapping; a bridge test pins it.
-  - *Progress 2026-06-13 (documentation only): the two scales have
+    ✓ §5.3 now carries the normative "Confidence-vocabulary bridge"
+    note; `MatchConfidence::from_score`'s `test_confidence_boundary_pins`
+    unit test pins the exact cut points (0.95, 0.90, 0.80, 0.75, 0.60).
+  - *Progress 2026-06-13 (documentation): the two scales have
     **no 1:1 label mapping** — the cut points interleave
     (0.95/0.80/0.60 vs 0.90/0.75), so e.g. matcher High spans service
     Certain plus the top of Probable. A score-range overlay table is
-    now documented in service
+    documented in service
     [`AGENTS/matching.md`](../thing-service-rust-crate/AGENTS/matching.md)
     ("Relationship to the embedded matcher's confidence bands"), with
-    a pointer from entity [`AGENTS/matching.md`](../AGENTS/matching.md).
-    Still open: the API-facing-vocabulary decision (OQ-2), the §5.3
-    normative mapping, and the bridge test.*
+    a pointer from entity [`AGENTS/matching.md`](../AGENTS/matching.md).*
+  - *Progress 2026-06-13 (code): confirmed the service re-derives
+    `MatchConfidence` solely via `MatchConfidence::from_score` from the
+    raw score — `compute_match` (`src/matching/scoring.rs`) and
+    `confidence_label`/`score` (`src/matching/mod.rs`) never translate
+    the matcher's `Confidence` label; the adapter (`adapter.rs`) carries
+    only the domain record. Added §5.3 normative note + boundary unit
+    test `test_confidence_boundary_pins`. Remaining open: the
+    API-facing-vocabulary decision (OQ-2).*

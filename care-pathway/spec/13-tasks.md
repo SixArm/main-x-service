@@ -58,6 +58,13 @@ manual check confirms it. Split tasks too big for one PR
     endpoint contract.
 - [ ] **T-6 — Search + candidate blocking.** (deferred MVP feature)
   - [ ] Tantivy full-text search endpoint + front-end search box.
+  - [x] Make the `check-duplicates` in-memory scan cap a named,
+    documented const with a WARN on hit (interim safety, ahead of
+    the redesign). **Done (2026-06-13):** `CHECK_DUPLICATES_SCAN_CAP`
+    (= 1000) in `src/controllers/care_pathways.rs`; the handler passes
+    it to `Model::list` and emits `tracing::warn!` when the returned
+    row count reaches the cap. Pinned by the DB-free unit test
+    `check_duplicates_scan_cap_is_the_documented_value`.
   - [ ] Replace the 1 000-row in-memory scan in `check-duplicates`
     with search-blocked candidates (NFR-1 / NFR-2; OQ-2).
   - **Acceptance:** `check-duplicates` latency test passes at

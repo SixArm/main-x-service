@@ -2613,6 +2613,7 @@ dependencies = [
  "insta",
  "loco-rs",
  "migration",
+ "mimalloc",
  "organization-matcher",
  "regex",
  "rstest",

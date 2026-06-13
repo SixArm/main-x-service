@@ -1,3 +1,8 @@
+//! Domain models layered over the generated `SeaORM` entities.
+
+/// Generated `SeaORM` entity definitions.
 pub mod _entities;
+/// Session model — token issuance and revocation (`jid` = JWT `jti`).
 pub mod sessions;
+/// User model — passwordless magic-link accounts.
 pub mod users;

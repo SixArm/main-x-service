@@ -580,6 +580,7 @@ dependencies = [
  "insta",
  "loco-rs",
  "migration",
+ "mimalloc",
  "regex",
  "rstest",
  "sea-orm",

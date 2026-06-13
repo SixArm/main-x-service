@@ -50,12 +50,12 @@ centralized registry of person identities across source systems.
   - Document number match (type + number)
 - **Score Breakdown**: Full per-component score breakdown in API responses
 
-@AGENTS/architecture.md
 @AGENTS/matching.md
 @AGENTS/models.md
 @AGENTS/restful.md
 @AGENTS/testing.md
 
+@../../agents/share/architecture.md
 @../../agents/share/auditability.md
 @../../agents/share/availability.md
 @../../agents/share/match-search-merge.md

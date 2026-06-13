@@ -90,6 +90,11 @@ static KEYS: OnceLock<AuthKeys> = OnceLock::new();
 /// Process-wide accessor for the resolved key material. Initialised on
 /// first use; a misconfiguration here is a fatal boot error, so it
 /// panics with actionable context rather than degrading silently.
+///
+/// # Panics
+///
+/// Panics if key material cannot be loaded (see [`load_keys`]): missing
+/// or invalid RSA PEM from the env/file sources.
 pub fn keys() -> &'static AuthKeys {
     KEYS.get_or_init(|| {
         load_keys().unwrap_or_else(|e| {
@@ -114,6 +119,9 @@ fn env_or(name: &str, default: &str) -> String {
 /// # Errors
 ///
 /// Returns [`AuthError::Keys`] when a key is missing or not valid RSA.
+// The inline-PEM-or-file `match` arms read clearer than `if let … else`
+// for this security-critical key resolution; keep the explicit shape.
+#[allow(clippy::single_match_else)]
 pub fn load_keys() -> Result<AuthKeys, AuthError> {
     let private_pem = match std::env::var("JWT_PRIVATE_KEY_PEM") {
         Ok(pem) => pem,

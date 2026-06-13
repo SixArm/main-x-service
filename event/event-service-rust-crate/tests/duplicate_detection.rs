@@ -440,3 +440,75 @@ fn sparse_records_do_not_panic_and_stay_in_range() {
     let result = engine().match_events(&to_matcher_event(&a), &to_matcher_event(&b));
     assert!(result.score >= 0.0 && result.score <= 1.0);
 }
+
+// =============================================================================
+// Language tag (`in_language`) — ET-8 contract pinning
+// =============================================================================
+//
+// The service validates `in_language` as 2-letter ISO 639-1 codes; the
+// embedded `event-matcher` documents the field as a full IETF BCP 47 tag
+// (ISO 639-1 ⊂ BCP 47). The bridge (`src/matching/adapter.rs`) projects the
+// FIRST non-empty `in_language` entry onto the matcher's single
+// `Option<String> in_language` field, but the matcher treats that field as
+// data-only: there is no `in_language_score` in `MatchBreakdown` and the
+// probabilistic pipeline never reads it. The divergence is therefore inert.
+//
+// These two tests lock the documented contract (service spec §6.2,
+// `AGENTS/matching.md`, entity task ET-8) so a future change to either side
+// — scoring the field, or dropping the projection — fails here loudly.
+
+/// The adapter projects the FIRST `in_language` entry onto the matcher's
+/// single `in_language` field; later entries are dropped (the matcher
+/// carries only one tag). A leading empty/whitespace entry projects
+/// nothing — the adapter inspects only `.first()`, it does not scan ahead
+/// for the first *non-empty* entry.
+#[test]
+fn in_language_first_entry_is_projected() {
+    // First entry populated: it is carried across, later entries dropped.
+    let mut e = event("Polyglot Summit", start_at(2026, 6, 1, 9));
+    e.in_language = vec!["en".into(), "fr".into()];
+    assert_eq!(
+        to_matcher_event(&e).in_language.as_deref(),
+        Some("en"),
+        "adapter must project the first in_language entry"
+    );
+
+    // First entry empty: nothing is projected (no scan-ahead).
+    let mut blank_first = event("Polyglot Summit", start_at(2026, 6, 1, 9));
+    blank_first.in_language = vec![String::new(), "fr".into()];
+    assert_eq!(
+        to_matcher_event(&blank_first).in_language,
+        None,
+        "a leading empty entry projects nothing (adapter reads only .first())"
+    );
+}
+
+/// Two events that are identical apart from `in_language` still match with
+/// the same score: the matcher never scores the field, so it is inert.
+#[test]
+fn in_language_difference_does_not_affect_match() {
+    // Baseline: a fully-populated conference compared against its clone.
+    let base = conference();
+    let baseline = engine().match_events(&to_matcher_event(&base), &to_matcher_event(&base));
+
+    // Same pair, but the two sides now carry different language tags.
+    let mut a = conference();
+    let mut b = conference();
+    a.in_language = vec!["en".into()];
+    b.in_language = vec!["fr".into()];
+    let differing = engine().match_events(&to_matcher_event(&a), &to_matcher_event(&b));
+
+    // The projection happened (field is present on both sides) ...
+    assert_eq!(to_matcher_event(&a).in_language.as_deref(), Some("en"));
+    assert_eq!(to_matcher_event(&b).in_language.as_deref(), Some("fr"));
+
+    // ... yet the differing language tags leave the score untouched.
+    assert!(
+        (differing.score - baseline.score).abs() < f64::EPSILON,
+        "in_language is inert: differing tags changed the score \
+         (baseline {}, differing {})",
+        baseline.score,
+        differing.score
+    );
+    assert!(differing.is_match, "the events should still be a match");
+}

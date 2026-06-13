@@ -6,7 +6,7 @@ Targets are set for the worldwide-governmental-system goal; the
 
 | # | Attribute | Target | Today |
 |---|---|---|---|
-| NFR-1 | Scale | Millions of organization records (national company-register / GLEIF-LEI order of magnitude); millions of operator and machine users across the index | Single Postgres; list capped 100; `check-duplicates` scans ≤ 1 000 rows in-process — needs blocking/candidate search before register scale |
+| NFR-1 | Scale | Millions of organization records (national company-register / GLEIF-LEI order of magnitude); millions of operator and machine users across the index | Single Postgres; list capped 100; `check-duplicates` scans ≤ `CHECK_DUPLICATES_SCAN_CAP` (1 000) rows in-process and logs a `WARN` on cap saturation so truncation is observable — still needs blocking/candidate search (T-7) before register scale |
 | NFR-2 | Availability | HADR; stateless app tier behind a load balancer; PostgreSQL replication; health-checked orchestration (see [`agents/share/availability.md`](../../agents/share/availability.md)) | loco `/_health` + `/_ping`; single instance; in-memory event buffer is per-process (not HA-safe) |
 | NFR-3 | Performance | Read ≤ 5 ms p50; search ≤ 100 ms p50; duplicate check ≤ 500 ms p99 at full register volume | Unmeasured; no benchmarks in the service crate (matcher is pure CPU and fast by construction) |
 | NFR-4 | i18n / locales | Legal-suffix handling across jurisdictions; diacritic-correct matching; operator UI localized per [`agents/share/locales.md`](../../agents/share/locales.md) | Matcher: legal-suffix list (const), NFKC fold, diacritics preserved, ISO 3166 jurisdictions. UI: English only; suffix list not yet configurable |

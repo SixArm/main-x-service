@@ -24,6 +24,8 @@
 //! [`authentication-service`]: https://github.com/sixarm/authentication-service-rust-crate
 
 #![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
+#![deny(missing_docs)]
 
 use std::collections::HashMap;
 
@@ -312,6 +314,18 @@ wwIDAQAB\n\
         let (jwks, kid) = test_jwks();
         let verifier =
             Verifier::from_jwks_value(&jwks, ISSUER, "some-other-service").expect("build");
+        let token = sign(&kid, &claims(3600));
+        assert!(matches!(verifier.verify(&token), Err(VerifyError::Jwt(_))));
+    }
+
+    #[test]
+    fn wrong_issuer_is_rejected() {
+        // The verifier's policy demands `iss == ISSUER`. A token whose
+        // `iss` claim names a different issuer must be rejected even
+        // though the signature, kid, audience, and expiry are all valid.
+        let (jwks, kid) = test_jwks();
+        let verifier =
+            Verifier::from_jwks_value(&jwks, "some-other-issuer", AUDIENCE).expect("build");
         let token = sign(&kid, &claims(3600));
         assert!(matches!(verifier.verify(&token), Err(VerifyError::Jwt(_))));
     }

@@ -63,6 +63,11 @@ oversized tasks (`T-2a`, `T-2b`).
   - **Acceptance:** integration test merges two records and verifies
     snapshot + soft delete + event.
 - [ ] **T-7 — Scale the duplicate check beyond the 1 000-row scan.**
+  - [x] Observable cap: the scan limit is the named constant
+    `CHECK_DUPLICATES_SCAN_CAP` (= 1 000) with a doc comment, the
+    handler emits a `WARN` when the scan saturates the cap (silent
+    truncation becomes observable), and a unit test pins the constant.
+    (spec §6 FR-3, §7 NFR-1)
   - [ ] Blocking / candidate pre-selection (name trigram or
     identifier lookup) before scoring; lift the cap.
   - **Acceptance:** check-duplicates returns identical top results on

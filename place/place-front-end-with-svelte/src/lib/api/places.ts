@@ -21,8 +21,8 @@ export interface SearchOptions {
 }
 
 // REST client for Place Service. Endpoint shape per
-// place-service-rust-crate/AGENTS/restful.md. Note Place Service uses
-// `/duplicates` (not `/check-duplicates`) for duplicate-check.
+// place-service-rust-crate/AGENTS/restful.md. Place Service uses
+// `/check-duplicates` for duplicate-check.
 export class PlaceRepository {
     constructor(private readonly http: ApiClient) {}
 
@@ -69,7 +69,7 @@ export class PlaceRepository {
     }
 
     checkDuplicates(candidate: Partial<Place>): Promise<MatchResult[]> {
-        return this.http.post<MatchResult[]>("/api/places/duplicates", { body: candidate });
+        return this.http.post<MatchResult[]>("/api/places/check-duplicates", { body: candidate });
     }
 
     merge(request: MergeRequest): Promise<MergeResponse> {

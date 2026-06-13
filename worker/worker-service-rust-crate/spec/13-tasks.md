@@ -43,14 +43,20 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] Per-worker timeline of role / organisation assignments.
   - **Acceptance:** new assignment creates a timeline entry visible
     via `GET /api/workers/{id}/timeline`.
-- [ ] **T-9 — Mount the FHIR routes on the loco router.**
-  - [ ] The `/fhir/Worker` handlers in `src/api/fhir/handlers.rs` are
-    implemented but never registered: `App::routes` adds only
-    `workers_routes()` + `metrics_routes()`, and `create_router`
-    nests only the REST surface. Add a `fhir_routes()` `Routes` group
-    (GET/POST `/fhir/Worker`, GET/PUT/DELETE `/fhir/Worker/{id}`) and
-    register it in `App::routes`.
-  - **Acceptance:** a route test pins `GET /fhir/Worker/{id}` (the
-    path documented in §6.8 / §9 and `AGENTS/restful.md`) returning a
-    FHIR resource, closing entity-level task T-1.
+- [x] **T-9 — Mount the FHIR routes on the loco router.** *(Done
+  2026-06-13.)*
+  - [x] The `/fhir/Worker` handlers in `src/api/fhir/handlers.rs` are
+    now registered: `App::routes` adds `workers_routes()` +
+    `fhir_routes()` + `metrics_routes()`, and `create_router` mirrors
+    the `/fhir/Worker` surface for the integration-test harness. The
+    new `fhir_routes()` `Routes` group serves GET/POST `/fhir/Worker`
+    and GET/PUT/DELETE `/fhir/Worker/{id}`; its handlers extract
+    `AppState` via `FromRef` exactly like the REST surface.
+  - [x] **Acceptance:** the mount is pinned by two route tests in
+    `tests/api_integration_test.rs` — `test_fhir_worker_route_is_mounted`
+    (un-gated; a malformed UUID makes the `Path<Uuid>` extractor return
+    `400`, proving the route matched a handler rather than a route-level
+    `404`) and `test_fhir_worker_not_found_returns_operation_outcome`
+    (DB-gated; a valid-but-absent id returns a FHIR `OperationOutcome`
+    `404`). Closes entity-level task T-1.
 

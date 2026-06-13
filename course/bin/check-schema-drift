@@ -1,0 +1,79 @@
+#!/usr/bin/env sh
+# check-schema-drift — detect table-name drift between the hand-maintained
+# `course-service-schema.sql` reference and the authoritative SeaORM
+# migrations' `up.sql` files, WITHOUT needing a live database.
+#
+# It extracts the set of CREATE TABLE names from each side and diffs them.
+# Migrations are authoritative; the hand-written schema.sql must match.
+#
+# Exit status:
+#   0  table-name sets are identical
+#   1  drift detected (a table exists on one side only) — details printed
+#   2  usage / environment error (missing inputs)
+#
+# Dependency-free: POSIX sh + grep + sed + sort + comm only. No DB, no cargo.
+#
+# Usage:
+#   course/bin/check-schema-drift
+#   (run from anywhere; paths are resolved relative to this script)
+
+set -eu
+
+# Resolve the `course/` directory regardless of caller CWD.
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+COURSE_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+
+SCHEMA_SQL="$COURSE_DIR/course-service-schema.sql"
+MIGRATIONS_DIR="$COURSE_DIR/course-service-rust-crate/migrations"
+
+if [ ! -f "$SCHEMA_SQL" ]; then
+    echo "error: schema file not found: $SCHEMA_SQL" >&2
+    exit 2
+fi
+if [ ! -d "$MIGRATIONS_DIR" ]; then
+    echo "error: migrations dir not found: $MIGRATIONS_DIR" >&2
+    exit 2
+fi
+
+# extract_tables <files...> — print one lowercased table name per line, sorted
+# & unique. Tolerates `IF NOT EXISTS` and optional double-quotes around names.
+extract_tables() {
+    grep -hioE 'CREATE TABLE[[:space:]]+(IF NOT EXISTS[[:space:]]+)?"?[a-zA-Z_][a-zA-Z0-9_]*"?' "$@" \
+        | sed -E 's/.*TABLE[[:space:]]+(IF NOT EXISTS[[:space:]]+)?"?([a-zA-Z_][a-zA-Z0-9_]*)"?/\2/' \
+        | tr '[:upper:]' '[:lower:]' \
+        | sort -u
+}
+
+MIG_UPS=$(find "$MIGRATIONS_DIR" -name up.sql | sort)
+if [ -z "$MIG_UPS" ]; then
+    echo "error: no up.sql files under $MIGRATIONS_DIR" >&2
+    exit 2
+fi
+
+TMP_MIG=$(mktemp)
+TMP_SCHEMA=$(mktemp)
+trap 'rm -f "$TMP_MIG" "$TMP_SCHEMA"' EXIT
+
+# shellcheck disable=SC2086
+extract_tables $MIG_UPS > "$TMP_MIG"
+extract_tables "$SCHEMA_SQL" > "$TMP_SCHEMA"
+
+ONLY_MIG=$(comm -23 "$TMP_MIG" "$TMP_SCHEMA")
+ONLY_SCHEMA=$(comm -13 "$TMP_MIG" "$TMP_SCHEMA")
+
+if [ -z "$ONLY_MIG" ] && [ -z "$ONLY_SCHEMA" ]; then
+    COUNT=$(wc -l < "$TMP_MIG" | tr -d ' ')
+    echo "OK: schema.sql and migrations agree on $COUNT table names."
+    exit 0
+fi
+
+echo "DRIFT: course-service-schema.sql disagrees with the migrations." >&2
+if [ -n "$ONLY_MIG" ]; then
+    echo "  In migrations but NOT in schema.sql (migrations are authoritative):" >&2
+    echo "$ONLY_MIG" | sed 's/^/    - /' >&2
+fi
+if [ -n "$ONLY_SCHEMA" ]; then
+    echo "  In schema.sql but NOT in migrations (stale / renamed?):" >&2
+    echo "$ONLY_SCHEMA" | sed 's/^/    - /' >&2
+fi
+exit 1

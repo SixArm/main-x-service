@@ -428,6 +428,110 @@ fn typed_ssn_identifier_with_us_system_uri_routes_to_us_ssn() {
 }
 
 // =============================================================================
+// Adapter scheme-routing audit (spec §13 E-8)
+// =============================================================================
+//
+// `adapter::route_identifier` reaches a subset of the matcher's 26
+// national-ID slots via system-URI fast paths. This block pins every
+// **routable** scheme so the documented routing table in
+// `src/matching/adapter.rs` cannot silently drift from code. Schemes the
+// adapter cannot reach today (e.g. `it_cf`, `pl_pesel`, `uk_nino`) have no
+// test here by construction — see the "Unreachable" column of the adapter
+// rustdoc table.
+
+/// Build an identifier carrying the given `system` URI (type `Other`, so the
+/// URI is the sole routing key).
+fn sys_identifier(system: &str, value: &str) -> Identifier {
+    Identifier::new(IdentifierType::Other, system.into(), value.into())
+}
+
+/// Every routable system-URI fragment maps to the matcher slot the routing
+/// table promises. Asserts on the projected `person_matcher::Person` field
+/// directly (the adapter is the unit under test, not the scorer).
+#[test]
+fn routable_identifier_systems_reach_their_matcher_slot() {
+    let p0 = person("Routing", "Test");
+
+    // (system-URI fragment, value, accessor on the projected matcher Person)
+    type Accessor = fn(&person_service::matching::matcher_lib::Person) -> Option<&str>;
+    let cases: &[(&str, &str, Accessor)] = &[
+        (
+            "https://fhir.nhs.uk/Id/nhs-number",
+            "943 476 5919",
+            |m| m.united_kingdom_national_health_service_number.as_deref(),
+        ),
+        ("http://hl7.org/fhir/sid/us-ssn", "111-22-3333", |m| {
+            m.us_ssn.as_deref()
+        }),
+        ("urn:br:cpf", "390.533.447-05", |m| m.br_cpf.as_deref()),
+        ("urn:fr:nir:ameli.fr", "1800575121157", |m| {
+            m.fr_nir.as_deref()
+        }),
+        ("urn:es:tsi:ingesa", "ABCD1234567890", |m| m.es_tsi.as_deref()),
+        ("urn:in:aadhaar:uidai", "2341 2345 6789", |m| {
+            m.in_aadhaar.as_deref()
+        }),
+        ("urn:jp:my-number", "123456789018", |m| {
+            m.jp_my_number.as_deref()
+        }),
+        ("urn:mx:curp", "HEGG560427MVZRRL04", |m| m.mx_curp.as_deref()),
+        ("urn:se:personnummer", "811218-9876", |m| {
+            m.se_personnummer.as_deref()
+        }),
+        ("urn:de:kvnr", "A123456780", |m| m.de_kvnr.as_deref()),
+        ("urn:nl:bsn", "111222333", |m| m.nl_bsn.as_deref()),
+        ("urn:nz:nhi", "ZZZ0016", |m| m.nz_nhi.as_deref()),
+    ];
+
+    for (system, value, accessor) in cases {
+        let mut p = p0.clone();
+        p.id = Uuid::new_v4();
+        p.identifiers.push(sys_identifier(system, value));
+        let m = to_matcher_person(&p);
+        assert_eq!(
+            accessor(&m),
+            Some(*value),
+            "system `{system}` did not route to its expected matcher slot"
+        );
+    }
+}
+
+/// The `ihi` fragment disambiguates AU (≥14 digits) vs IE (shorter) by digit
+/// count, per the routing table.
+#[test]
+fn ihi_disambiguates_au_vs_ie_by_digit_count() {
+    let mut au = person("Au", "Test");
+    au.identifiers
+        .push(sys_identifier("urn:au:ihi", "8003 6080 0001 2345")); // 16 digits
+    let mau = to_matcher_person(&au);
+    assert_eq!(mau.au_ihi.as_deref(), Some("8003 6080 0001 2345"));
+    assert_eq!(mau.ie_ihi, None);
+
+    let mut ie = person("Ie", "Test");
+    ie.identifiers.push(sys_identifier("urn:ie:ihi", "1234567")); // 7 digits
+    let mie = to_matcher_person(&ie);
+    assert_eq!(mie.ie_ihi.as_deref(), Some("1234567"));
+    assert_eq!(mie.au_ihi, None);
+}
+
+/// A shared CPF (Brazilian tax id) carried on a CPF system URI is a
+/// deterministic full-credit match end-to-end through the scorer.
+#[test]
+fn shared_cpf_system_uri_is_deterministic_match() {
+    let mut a = person("Silva", "Joao");
+    a.identifiers.push(sys_identifier("urn:br:cpf", "390.533.447-05"));
+    let mut b = person("Souza", "Joana"); // divergent name on purpose
+    b.identifiers.push(sys_identifier("urn:br:cpf", "39053344705")); // unformatted
+
+    let result = engine().match_persons(&to_matcher_person(&a), &to_matcher_person(&b));
+    assert_eq!(
+        result.breakdown.br_cpf_score,
+        Some(1.0),
+        "matching CPFs (formatting-insensitive) should score br_cpf = 1.0"
+    );
+}
+
+// =============================================================================
 // Config presets — strict vs lenient threshold behaviour
 // =============================================================================
 

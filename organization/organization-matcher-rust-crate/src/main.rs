@@ -1,6 +1,12 @@
 //! Demo binary — a runnable walkthrough of the `organization-matcher`
-//! public API. Not part of the SemVer surface.
+//! public API. Not part of the `SemVer` surface.
 
+// Always start with high quality coding conventions.
+#![warn(clippy::pedantic)]
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+
+// When we build for MUSL static, use faster memory allocator.
 #[cfg(target_env = "musl")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;

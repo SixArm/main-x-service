@@ -105,6 +105,25 @@ pub struct ApiDoc;
 /// `/metrics.prom` scrape endpoint, the Swagger UI, and a permissive CORS
 /// layer. Shared [`AppState`] is injected into the API routes.
 pub fn create_router(state: AppState) -> Router {
+    // FHIR R5 `/fhir/Worker` surface, mirroring the loco mount in
+    // `crate::app::App::routes` (built from [`fhir_routes`]) so the
+    // integration-test router matches production.
+    let fhir_routes = {
+        use crate::api::fhir::handlers as fhir;
+        Router::new()
+            .route(
+                "/Worker",
+                get(fhir::search_fhir_workers).post(fhir::create_fhir_worker),
+            )
+            .route(
+                "/Worker/{id}",
+                get(fhir::get_fhir_worker)
+                    .put(fhir::update_fhir_worker)
+                    .delete(fhir::delete_fhir_worker),
+            )
+            .with_state(state.clone())
+    };
+
     let api_routes = Router::new()
         // Health
         .route("/health", get(handlers::health_check))
@@ -135,6 +154,7 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         .nest("/api/v1", api_routes)
+        .nest("/fhir", fhir_routes)
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
@@ -177,4 +197,29 @@ pub fn workers_routes() -> loco_rs::controller::Routes {
 pub fn metrics_routes() -> loco_rs::controller::Routes {
     use loco_rs::prelude::{Routes, get};
     Routes::new().add("/metrics.prom", get(handlers::metrics_prom))
+}
+
+/// HL7 FHIR R5 `/fhir/Worker` controller routes.
+///
+/// Mounts the handlers in [`crate::api::fhir::handlers`] as a loco `Routes`
+/// group. The handlers extract [`AppState`] from the `AppContext` shared
+/// store via `FromRef`, exactly like the REST surface, so they reuse the same
+/// repository, search engine, and matcher. Wired into the router by
+/// [`crate::app::App::routes`].
+#[must_use]
+pub fn fhir_routes() -> loco_rs::controller::Routes {
+    use crate::api::fhir::handlers;
+    use loco_rs::prelude::{Routes, get};
+    Routes::new()
+        .prefix("/fhir")
+        .add(
+            "/Worker",
+            get(handlers::search_fhir_workers).post(handlers::create_fhir_worker),
+        )
+        .add(
+            "/Worker/{id}",
+            get(handlers::get_fhir_worker)
+                .put(handlers::update_fhir_worker)
+                .delete(handlers::delete_fhir_worker),
+        )
 }

@@ -44,6 +44,28 @@ pub async fn create_test_router() -> Router {
     create_router(state)
 }
 
+/// Builds the full application [`Router`] over an [`AppState`] backed by a
+/// **disconnected** `SeaORM` connection and a throwaway search index — no live
+/// database required.
+///
+/// Suitable only for tests that assert on routing/extractor behaviour *before*
+/// any database access (e.g. a malformed path that the `Path<Uuid>` extractor
+/// rejects with `400`). Any handler that actually queries the database will
+/// fail against this router.
+pub fn create_test_router_no_db() -> Router {
+    let config = Config::default();
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp dir for search index");
+    let search_engine = SearchEngine::new(temp_dir.path().to_str().unwrap())
+        .expect("Failed to create search engine");
+    let matcher = ProbabilisticMatcher::new(config.matching.clone());
+    let db = sea_orm::DatabaseConnection::Disconnected;
+    let state = AppState::new(db, search_engine, matcher, config);
+    // Keep the temp index alive for the lifetime of the test by leaking it;
+    // tests are short-lived processes and this avoids a dangling index dir.
+    std::mem::forget(temp_dir);
+    create_router(state)
+}
+
 /// Returns a worker family name unique to this instant
 /// (`TestWorker{suffix}_{micros}`) so tests sharing one database do not match
 /// each other's records during search/dedup assertions.

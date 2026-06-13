@@ -35,6 +35,7 @@ chrono = { version = "0.4" }
 validator = { version = "0.20" }
 uuid = { version = "1.23", features = ["v4", "serde"] }
 include_dir = { version = "0.7" }
+mimalloc = { version = "0.1.52" }
 
 # Canonical matching algorithm — embedded and used directly as the API DTO.
 care-pathway-matcher = { path = "../care-pathway-matcher-rust-crate" }

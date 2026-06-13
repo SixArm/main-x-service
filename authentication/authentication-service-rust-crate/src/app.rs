@@ -21,6 +21,8 @@ use crate::{
     workers::downloader::DownloadWorker,
 };
 
+/// Loco application type. Implements [`Hooks`] to wire up routes,
+/// workers, tasks, seeding, and table truncation for the auth service.
 pub struct App;
 #[async_trait]
 impl Hooks for App {

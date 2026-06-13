@@ -13,6 +13,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::care_pathways::Model as PathwayModel;
 
+/// Maximum number of stored pathways scanned in-memory by
+/// `check-duplicates`.
+///
+/// `check-duplicates` has no search-backed candidate blocking yet
+/// (deferred — spec §13 T-6), so it loads up to this many active rows
+/// and matches each against the query. When the scan reaches this cap
+/// the result may be incomplete; the handler emits a `WARN`. Raising
+/// the cap is a stop-gap — the real fix is search-blocked candidates.
+pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
+
 /// Validate an incoming `CarePathway` payload.
 ///
 /// Family convention (OQ-1 resolution): validation failures return
@@ -128,7 +138,14 @@ async fn check_duplicates(
     Json(query): Json<CarePathway>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
-    let rows = PathwayModel::list(&ctx.db, 1000).await?;
+    let rows = PathwayModel::list(&ctx.db, CHECK_DUPLICATES_SCAN_CAP).await?;
+    if rows.len() as u64 == CHECK_DUPLICATES_SCAN_CAP {
+        tracing::warn!(
+            cap = CHECK_DUPLICATES_SCAN_CAP,
+            "check-duplicates in-memory scan hit its row cap; results may be \
+             incomplete until search-backed candidate blocking lands (spec §13 T-6)"
+        );
+    }
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
         let candidate = row.to_pathway()?;
@@ -151,6 +168,8 @@ async fn check_duplicates(
     format::json(hits)
 }
 
+/// Build the `/api/care-pathways` route table (CRUD + match +
+/// check-duplicates).
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/care-pathways")
@@ -194,5 +213,13 @@ mod tests {
     #[test]
     fn non_blank_name_passes_validation() {
         assert!(validate(&CarePathway::new("Acute Stroke Care Pathway")).is_ok());
+    }
+
+    /// Pins the documented `check-duplicates` in-memory scan cap. The
+    /// handler must pass this named const to `list` (not a magic
+    /// number) and WARN when the scan reaches it (spec §13 T-6).
+    #[test]
+    fn check_duplicates_scan_cap_is_the_documented_value() {
+        assert_eq!(CHECK_DUPLICATES_SCAN_CAP, 1000);
     }
 }

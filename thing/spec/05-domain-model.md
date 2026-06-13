@@ -62,6 +62,35 @@ Both sides of this contract are pinned by
 the matcher's scoring MUST update this section, the adapter, and the
 bridge tests in one PR.
 
+#### Confidence-vocabulary bridge (normative)
+
+The service and the embedded matcher classify the **same** `[0.0, 1.0]`
+score with **different vocabularies and different cut points**:
+
+- Service — `MatchConfidence::from_score`
+  (`src/matching/scoring.rs`): Certain ≥ 0.95, Probable ≥ 0.80,
+  Possible ≥ 0.60, else Unlikely.
+- Matcher — `thing_matcher::Confidence::from_score`: High ≥ 0.90,
+  Medium ≥ 0.75, else Low.
+
+The band edges **interleave** (0.95 / 0.80 / 0.60 vs 0.90 / 0.75), so
+there is **no 1:1 label mapping** — e.g. matcher High spans service
+Certain plus the top of Probable. The full score-range overlay table
+lives in service
+[`AGENTS/matching.md`](../thing-service-rust-crate/AGENTS/matching.md).
+
+Normative rule: the service MUST **re-classify from the raw `f64`
+score**, never from the matcher's label. The adapter carries only the
+domain record (`to_matcher_thing`); the matcher's `Confidence` label is
+never translated back into the service vocabulary. `compute_match`
+derives `MatchConfidence` solely via `MatchConfidence::from_score`, and
+the API layer (`confidence_label`) renders that service band. The exact
+cut points — including the matcher's interleaving edges (0.90, 0.75) —
+are pinned by `MatchConfidence::from_score`'s
+`test_confidence_boundary_pins` unit test. Any future "map at the
+adapter" design (OQ-2) MUST still re-derive from the score, not from a
+label.
+
 ### 5.4 Shared invariants
 
 Every subproject MUST uphold:

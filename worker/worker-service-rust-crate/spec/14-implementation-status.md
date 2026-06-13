@@ -9,7 +9,7 @@
 | Matching | Probabilistic + deterministic; Jaro-Winkler + Levenshtein + Soundex; configurable weights |
 | Search | Tantivy 11-field index; fuzzy + phonetic + bulk + blocking |
 | REST API | 15 endpoints + OpenAPI/Swagger + CORS + structured errors |
-| FHIR R5 | `Worker` bidirectional conversion + search parameters (handlers only; not yet mounted on the router — T-9) |
+| FHIR R5 | `Worker` bidirectional conversion + search parameters; routes **mounted** via `fhir_routes()` in `App::routes` (and mirrored in `create_router`); pinned by `tests/api_integration_test.rs::test_fhir_worker_route_is_mounted` |
 | Repository | SeaORM CRUD with transactions, soft delete |
 | Event streaming | InMemoryEventPublisher (Created / Updated / Deleted / Merged / Linked / Unlinked) |
 | Audit log | AuditLogRepository with old / new JSON + user context |
@@ -34,5 +34,5 @@
 | gRPC API | T-6 |
 | Credential-expiry workflow | T-7 |
 | Role / assignment history | T-8 |
-| FHIR routes not mounted on the loco router | T-9 |
+| FHIR routes mounted on the loco router | T-9 (done 2026-06-13) |
 

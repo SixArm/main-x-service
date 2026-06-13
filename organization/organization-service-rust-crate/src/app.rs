@@ -18,6 +18,9 @@ use crate::{
     models::_entities::{audit_logs, organizations},
 };
 
+/// The loco application type. Carries no state; it exists to implement
+/// [`Hooks`], which loco's CLI drives to boot the service, register
+/// routes, and run migrations.
 pub struct App;
 #[async_trait]
 impl Hooks for App {

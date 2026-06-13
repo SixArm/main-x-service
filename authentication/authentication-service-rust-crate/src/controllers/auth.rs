@@ -21,14 +21,19 @@ use crate::{
     views::auth::{CurrentResponse, LoginResponse},
 };
 
+/// Request body for `POST /api/auth/signup`.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SignupParams {
+    /// Email address to register (also the magic-link recipient).
     pub email: String,
+    /// Optional display name; defaults from the email local-part.
     pub name: Option<String>,
 }
 
+/// Request body for `POST /api/auth/magic-link` (sign-in request).
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MagicLinkParams {
+    /// Email address of the existing account to sign in.
     pub email: String,
 }
 
@@ -158,6 +163,8 @@ async fn signout(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Respon
     format::empty_json()
 }
 
+/// Routes for the passwordless magic-link auth surface, mounted under
+/// `/api/auth`: signup, magic-link request, redeem, me, signout.
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/auth")

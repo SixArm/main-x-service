@@ -12,6 +12,8 @@ async fn jwks() -> Result<Response> {
     format::json(crate::auth::keys().jwks.clone())
 }
 
+/// Route for `GET /.well-known/jwks.json` — the public JWKS used by peer
+/// services to verify RS256 tokens offline.
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/.well-known")

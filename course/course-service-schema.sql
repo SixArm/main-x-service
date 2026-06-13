@@ -145,21 +145,23 @@ CREATE INDEX idx_course_credentials_course ON course_credentials (course_id);
 -- ----------------------------------------------------------------------------
 -- Syllabus sections (recursive: a section may have sub-sections)
 -- ----------------------------------------------------------------------------
-CREATE TABLE course_syllabus_sections (
+-- Migration table name is `syllabus_sections` (see migration
+-- 2026060400000003_create_course_instances). Keep the name in sync.
+CREATE TABLE syllabus_sections (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id           UUID         NOT NULL REFERENCES courses (id) ON DELETE CASCADE,
-    parent_section_id   UUID REFERENCES course_syllabus_sections (id) ON DELETE CASCADE,
+    parent_section_id   UUID REFERENCES syllabus_sections (id) ON DELETE CASCADE,
     name                VARCHAR(500) NOT NULL,
     description         TEXT,
     position            INTEGER      NOT NULL DEFAULT 0,
     time_required       VARCHAR(64)
 );
-CREATE INDEX idx_course_syllabus_course ON course_syllabus_sections (course_id);
-CREATE INDEX idx_course_syllabus_parent ON course_syllabus_sections (parent_section_id);
+CREATE INDEX idx_syllabus_sections_course ON syllabus_sections (course_id);
+CREATE INDEX idx_syllabus_sections_parent ON syllabus_sections (parent_section_id);
 
 CREATE TABLE course_syllabus_text_values (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    section_id  UUID          NOT NULL REFERENCES course_syllabus_sections (id) ON DELETE CASCADE,
+    section_id  UUID          NOT NULL REFERENCES syllabus_sections (id) ON DELETE CASCADE,
     field       VARCHAR(16)   NOT NULL,  -- teaches|resource
     value       VARCHAR(2048) NOT NULL,
     position    INTEGER       NOT NULL DEFAULT 0,
@@ -236,9 +238,12 @@ CREATE TABLE course_merge_records (
 CREATE INDEX idx_course_merge_main ON course_merge_records (main_course_id);
 
 -- ----------------------------------------------------------------------------
--- Deduplication review queue (score_breakdown is opaque → JSONB by design)
+-- Deduplication match scores / review queue
+-- (score_breakdown is opaque → JSONB by design)
+-- Migration table name is `course_match_scores` (see migration
+-- 2026060400000004_create_audit_and_review). Keep the name in sync.
 -- ----------------------------------------------------------------------------
-CREATE TABLE course_review_queue (
+CREATE TABLE course_match_scores (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id_a         UUID         NOT NULL,
     course_id_b         UUID         NOT NULL,
@@ -251,7 +256,7 @@ CREATE TABLE course_review_queue (
     created_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     reviewed_at         TIMESTAMP WITH TIME ZONE
 );
-CREATE INDEX idx_course_review_status ON course_review_queue (status);
+CREATE INDEX idx_course_match_scores_status ON course_match_scores (status);
 
 -- ----------------------------------------------------------------------------
 -- Audit log (old/new values are opaque snapshots → JSONB by design)

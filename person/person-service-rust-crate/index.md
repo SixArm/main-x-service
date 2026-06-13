@@ -3,7 +3,7 @@
 A high-performance, enterprise-grade Person Service system built with Rust.
 
 [![Rust](https://img.shields.io/badge/rust-1.93%2B-orange.svg)](https://www.rust-lang.org/)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](Cargo.toml)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](Dockerfile)
 
 ## Overview
@@ -304,7 +304,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 
 ### Component Details
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
+See [spec/08-architecture.md](spec/08-architecture.md) for detailed architecture documentation.
 
 ## Development
 
@@ -423,7 +423,7 @@ curl -X POST http://localhost:8080/api/persons/match \
 curl "http://localhost:8080/api/persons/{id}/audit?limit=50"
 ```
 
-See [API_GUIDE.md](API_GUIDE.md) for complete API documentation.
+See [AGENTS/restful.md](AGENTS/restful.md) for complete API documentation.
 
 ## Configuration
 
@@ -492,7 +492,7 @@ podman compose -f docker-compose.test.yml up --build
 - API Endpoints: 8 tests
 - Core Utilities: 11 tests
 
-See [task-10.md](task-10.md) for integration testing details.
+See [spec/13-tasks.md](spec/13-tasks.md) for integration testing details.
 
 ## Deployment
 
@@ -645,12 +645,14 @@ Contributions welcome! Please:
 
 ## License
 
-This project is dual-licensed under:
+This project is multi-licensed under the SPDX expression declared in
+[`Cargo.toml`](Cargo.toml):
 
-- MIT License ([LICENSE-MIT](LICENSE-MIT))
-- Apache License 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+```
+MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only
+```
 
-You may choose either license for your use.
+You may choose any one of these licenses for your use.
 
 ## Support
 

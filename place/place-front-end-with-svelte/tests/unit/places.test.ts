@@ -42,7 +42,7 @@ describe("PlaceRepository", () => {
         expect(result.id).toBe("place-1");
     });
 
-    it("uses /api/places/duplicates (NOT /check-duplicates) for duplicate check", async () => {
+    it("uses /api/places/check-duplicates for duplicate check", async () => {
         let capturedUrl = "";
         const client = new ApiClient({
             baseUrl: "http://test",
@@ -53,8 +53,7 @@ describe("PlaceRepository", () => {
         });
         const repo = new PlaceRepository(client);
         await repo.checkDuplicates({ name: "Central Park" });
-        expect(capturedUrl).toContain("/api/places/duplicates");
-        expect(capturedUrl).not.toContain("check-duplicates");
+        expect(capturedUrl).toContain("/api/places/check-duplicates");
     });
 
     it("normalises search responses to {items, total}", async () => {
