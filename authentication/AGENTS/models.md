@@ -11,7 +11,7 @@ attributes live in the person entity).
 **Files:**
 [`src/models/users.rs`](../authentication-service-rust-crate/src/models/users.rs),
 entity in `src/models/_entities/users.rs`, migration
-[`m20220101_000001_users.rs`](../authentication-service-rust-crate/migration/src/m20220101_000001_users.rs).
+[`m20220101_000001_users.rs`](../authentication-service-rust-crate/src/migration/m20220101_000001_users.rs).
 
 | Field | Type | Description |
 |---|---|---|
@@ -39,7 +39,7 @@ One row per issued token; the unit of revocation.
 **Files:**
 [`src/models/sessions.rs`](../authentication-service-rust-crate/src/models/sessions.rs),
 migration
-[`m20220101_000002_sessions.rs`](../authentication-service-rust-crate/migration/src/m20220101_000002_sessions.rs).
+[`m20220101_000002_sessions.rs`](../authentication-service-rust-crate/src/migration/m20220101_000002_sessions.rs).
 
 | Field | Type | Description |
 |---|---|---|

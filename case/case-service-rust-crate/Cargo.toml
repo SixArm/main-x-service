@@ -3,9 +3,17 @@
 [package]
 name = "case-service"
 version = "0.1.0"
-edition = "2021"
-publish = false
+edition = "2024"
+publish = true 
 default-run = "case-service"
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Case service"
+readme = "README.md"
+repository = "https://github.com/sixarm/main-x-servie/"
+license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
+keywords = ["case", "social", "medical", "legal", "financial"]
+categories = ["development-tools", "rust-patterns"]
+include = ["src/**/*", "LICENSE.md", "README.md", "llms.txt", "llms.json"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -41,7 +49,7 @@ mimalloc = { version = "0.1.52" }
 case-matcher = { path = "../case-matcher-rust-crate" }
 
 # Offline RS256 JWT verification against the authentication-service JWKS.
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
+authentication-verifier = "0.1"
 
 [[bin]]
 name = "case-service"

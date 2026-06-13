@@ -66,6 +66,23 @@ accepted (see `feedback_front_end_drift` memory) — no shared package.
 | [care-pathway-front-end-with-svelte](care-pathway/care-pathway-front-end-with-svelte/) | [care-pathway-service](care-pathway/care-pathway-service-rust-crate/) | [spec](care-pathway/care-pathway-front-end-with-svelte/spec/index.md) | [CHANGELOG](care-pathway/care-pathway-front-end-with-svelte/CHANGELOG.md) |
 | [case-front-end-with-svelte](case/case-front-end-with-svelte/) | [case-service](case/case-service-rust-crate/) | [spec](case/case-front-end-with-svelte/spec/index.md) | [CHANGELOG](case/case-front-end-with-svelte/CHANGELOG.md) |
 
+### Consumer applications
+
+Application subprojects that **consume** the index services rather than
+being one of the matcher-backed index entities. They follow a different
+internal shape (a cross-cutting `spec/` plus a per-edition service +
+front-end) and are not part of the entity trio tables above.
+
+> Note: distinct from the **`case`** index entity above. `case` is a
+> matcher-backed registry of case *identities* (deduplicated, matchable);
+> **`case-folder`** is an operational app that tracks the physical
+> *location* of NHS paper case-note folders, consuming the person /
+> place / worker services.
+
+| Project | Purpose | Editions |
+|---|---|---|
+| [case-folder](case-folder/spec/index.md) | NHS paper case-note folder location tracking ("where is the folder for NHS Number X right now?") — barcode/QR/RFID move audit trail | [service-with-rust](case-folder/case-folder-service-with-rust/spec/index.md) (Loco JSON API) · [front-end-with-svelte](case-folder/case-folder-front-end-with-svelte/spec/index.md) (SvelteKit + SVAR + Lily) |
+
 ## Shared reference docs
 
 @agents/share/index.md

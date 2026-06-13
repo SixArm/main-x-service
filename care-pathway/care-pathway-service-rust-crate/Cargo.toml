@@ -41,7 +41,7 @@ mimalloc = { version = "0.1.52" }
 care-pathway-matcher = { path = "../care-pathway-matcher-rust-crate" }
 
 # Offline RS256 JWT verification against the authentication-service JWKS.
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
+authentication-verifier = "0.1"
 
 [[bin]]
 name = "care-pathway-service"

@@ -19,4 +19,14 @@
   ML-based match scoring, worker photo storage, consent enforcement,
   **credential-expiry-warning workflow**, **role + assignment history
   timeline**, NPI / DEA registry import pipelines.
+- **NHS ODS organization expansion** — align the embedded
+  `Organization` model with the NHS Organisation Data Service: ODS-style
+  fields (`ods_code`, status, record class, assigning authority,
+  operative date periods) plus new domain models for
+  `OrganizationRole`, `OrganizationRelationship`,
+  `OrganizationSuccession`, `PostcodeGeography`, and ODS `CodeSystem`
+  reference data — each with a domain model, migration, SeaORM entity,
+  and tests. (Detailed task breakdown was folded here from a former
+  `docs/superpowers/plans/2026-03-22-nhs-ods-organizations*.md`
+  implementation plan, now removed.)
 

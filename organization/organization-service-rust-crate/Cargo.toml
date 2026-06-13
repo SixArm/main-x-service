@@ -43,7 +43,7 @@ mimalloc = "0.1.52"
 organization-matcher = { path = "../organization-matcher-rust-crate" }
 
 # Offline RS256 JWT verification against the authentication-service JWKS.
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
+authentication-verifier = "0.1"
 
 [[bin]]
 name = "organization-service"

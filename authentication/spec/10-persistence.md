@@ -3,12 +3,12 @@
 ### 10.1 Service — PostgreSQL via SeaORM
 
 Migrations (`sea-orm-migration`, registered in
-[`migration/src/lib.rs`](../authentication-service-rust-crate/migration/src/lib.rs)):
+[`src/migration/mod.rs`](../authentication-service-rust-crate/src/migration/mod.rs)):
 `m20220101_000001_users`, `m20220101_000002_sessions`. `auto_migrate`
 is on in development, off in production.
 
 **`users`** (from
-[`m20220101_000001_users.rs`](../authentication-service-rust-crate/migration/src/m20220101_000001_users.rs)):
+[`m20220101_000001_users.rs`](../authentication-service-rust-crate/src/migration/m20220101_000001_users.rs)):
 
 | Column | Type | Notes |
 |---|---|---|
@@ -25,7 +25,7 @@ is on in development, off in production.
 | `magic_link_expiration` | timestamptz, nullable | Now + 5 min |
 
 **`sessions`** (from
-[`m20220101_000002_sessions.rs`](../authentication-service-rust-crate/migration/src/m20220101_000002_sessions.rs)):
+[`m20220101_000002_sessions.rs`](../authentication-service-rust-crate/src/migration/m20220101_000002_sessions.rs)):
 
 | Column | Type | Notes |
 |---|---|---|

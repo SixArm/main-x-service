@@ -61,8 +61,8 @@ room.
   Willow theme) for the dashboard data grid.
 - [Lily Design System (Svelte headless)](https://lilydesignsystem.io)
   for accessible UI primitives, styled with NHS UK design tokens.
-- [Lily Svelte helpers](../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers)
-  — `lily-design-system-svelte-locale-picker` and
+- Lily Svelte helpers (`~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers`,
+  cloned alongside this repo) — `lily-design-system-svelte-locale-picker` and
   `lily-design-system-svelte-theme-picker`, consumed in-source via
   SvelteKit `kit.alias` (no copying, no npm publish).
 

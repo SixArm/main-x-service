@@ -1,6 +1,0 @@
-.DS_Store
-.claude/settings.local.json
-# Large downloaded iFIT reference material (vendor case study + admin PDF)
-case-tracker-front-end-with-svelte/spec/ifit/
-spec/ifit/
-*.md~

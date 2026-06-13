@@ -25,11 +25,11 @@ records or go offline.
 
 - **[Loco](https://loco.rs)** 0.16 — Rails-style Rust web framework on Axum
 - **PostgreSQL** dependency is currently *vestigial* — Loco still needs a database connection at boot, but the tracker has zero local tables.
-- **[main-person-service-rust-crate](../../sixarm/main-x-service/main-person-service-rust-crate)** — Main Patient Service backend
-- **[main-place-service-rust-crate](../../sixarm/main-x-service/main-place-service-rust-crate)** — Main Place Service backend
-- **[main-worker-service-rust-crate](../../sixarm/main-x-service/main-worker-service-rust-crate)** — Main Worker Service backend
-- **[main-thing-service-rust-crate](../../sixarm/main-x-service/main-thing-service-rust-crate)** — Main Thing Service backend *(see caveat below)*
-- **[main-event-service-rust-crate](../../sixarm/main-x-service/main-event-service-rust-crate)** — Main Event Service backend
+- **[main-person-service-rust-crate](../../person/person-service-rust-crate)** — Main Patient Service backend
+- **[main-place-service-rust-crate](../../place/place-service-rust-crate)** — Main Place Service backend
+- **[main-worker-service-rust-crate](../../worker/worker-service-rust-crate)** — Main Worker Service backend
+- **[main-thing-service-rust-crate](../../thing/thing-service-rust-crate)** — Main Thing Service backend *(see caveat below)*
+- **[main-event-service-rust-crate](../../event/event-service-rust-crate)** — Main Event Service backend
 
 > ⚠️ **Thing-service caveat.** As of writing, `main-thing-service`
 > ships a working web UI but **no REST endpoints yet** — its spec

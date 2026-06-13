@@ -69,7 +69,7 @@ required-features = []
 # The peer-side verifier library. Used by tests/sign_verify_contract.rs
 # to pin the duplicated-by-convention Claims shape and kid derivation:
 # this service signs, the verifier crate verifies, the claims round-trip.
-authentication-verifier = { path = "../authentication-verifier-rust-crate" }
+authentication-verifier = "0.1"
 loco-rs = { workspace = true, features = ["testing"] }
 serial_test = { version = "3.5.0" }
 rstest = { version = "0.25" }
