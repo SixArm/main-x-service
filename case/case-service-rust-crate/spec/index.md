@@ -161,7 +161,9 @@ added later. Subjects are stored as opaque identifiers, not embedded PII.
 - [x] Event streaming + audit log on CRUD — `audit_logs` table +
   best-effort row per create/update/delete (`models/audit_logs.rs`);
   in-memory `CaseEvent` stream (`streaming.rs`); read at `/audit/recent`,
-  `/{pid}/audit`, `/events/recent`. Durable broker remains roadmap.
+  `/{pid}/audit`, `/events/recent`. The durable broker is designed in
+  [`agents/share/event-bus.md`](../../../agents/share/event-bus.md)
+  (transactional outbox → Fluvio) and remains roadmap.
 - [ ] Privacy controls if any restricted fields appear.
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-title alias, soft-delete, `merge_records`

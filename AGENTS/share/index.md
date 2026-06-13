@@ -46,6 +46,7 @@ Per-crate `spec.md`:
 | [overview.md](overview.md)                                       | High-level project overview (consumed by `@` includes) |
 | [architecture.md](architecture.md)                               | Architecture                                           |
 | [auditability.md](auditability.md)                               | Audit logging and event streaming                      |
+| [event-bus.md](event-bus.md)                                     | Durable event bus design (outbox → Fluvio)             |
 | [availability.md](availability.md)                               | Availability, scaling, health checks                   |
 | [dataflow.md](dataflow.md)                                       | Create / match / merge / search data flows             |
 | [match.md](match.md)                                             | Matching algorithms                                    |

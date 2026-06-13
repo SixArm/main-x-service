@@ -118,7 +118,10 @@ personal data — honour GDPR when the privacy layer lands (§13).
 
 ## 13. Tasks (live work queue)
 
-- [x] Event streaming + audit log on CRUD.
+- [x] Event streaming + audit log on CRUD. (In-memory `OrgEvent` stream;
+  the durable broker is designed in
+  [`agents/share/event-bus.md`](../../../agents/share/event-bus.md) —
+  transactional outbox → Fluvio — and remains roadmap.)
 - [x] Name search (Postgres `ILIKE`) + OpenAPI/Swagger.
 - [ ] Tantivy full-text search + fuzzy/blocking (replacing the `ILIKE`
       search).
