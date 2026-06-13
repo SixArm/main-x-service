@@ -53,7 +53,7 @@ fn test_full_place_lifecycle_validation() {
     let mut place = Place::new("Test Place");
     place.url = Some("https://example.com".into());
     place.telephone = Some("+1-555-0100".into());
-    place.global_location_number = Some("1234567890123".into());
+    place.global_location_number = Some("0614141999996".into());
     place.address = Some(PostalAddress {
         street_address: Some("100 broadway".into()),
         address_locality: Some("san francisco".into()),

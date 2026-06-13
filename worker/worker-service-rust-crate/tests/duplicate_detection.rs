@@ -165,6 +165,36 @@ fn shared_nhs_number_drives_match_via_uk_nhs_number_slot() {
     assert_eq!(result.breakdown.uk_nhs_number_score, Some(1.0));
 }
 
+/// A shared Polish PESEL (newly-wired adapter scheme) routes to `pl_pesel`
+/// and deterministically matches two fuzzy-named workers — proving the
+/// expanded `route_identifier` coverage actually drives a match rather than
+/// silently falling through.
+#[test]
+fn shared_pesel_drives_match_via_pl_pesel_slot() {
+    let pesel = |w: &mut Worker, v: &str| {
+        w.identifiers.push(Identifier::new(
+            IdentifierType::Other,
+            "urn:gov.pl:pesel".into(),
+            v.into(),
+        ));
+    };
+    let mut a = worker("Kowalski", "Jan");
+    pesel(&mut a, "44051401359");
+    let mut b = worker("Kowalsky", "Jon"); // fuzzy name variation
+    pesel(&mut b, "44051401359");
+
+    let ma = to_matcher_worker(&a);
+    let mb = to_matcher_worker(&b);
+    assert!(ma.pl_pesel.is_some(), "adapter must populate pl_pesel");
+
+    assert!(
+        engine().deterministic_match(&ma, &mb),
+        "shared PESEL must trigger deterministic_match"
+    );
+    let result = engine().match_workers(&ma, &mb);
+    assert_eq!(result.breakdown.pl_pesel_score, Some(1.0));
+}
+
 /// A shared tax id (default-routed to US SSN) drives the score ≥ 0.90.
 #[test]
 fn shared_tax_id_default_routes_to_us_ssn() {

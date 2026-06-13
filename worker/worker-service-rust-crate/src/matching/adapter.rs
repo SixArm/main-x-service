@@ -203,6 +203,13 @@ fn map_address(a: &Address) -> Option<MAddress> {
 /// `br_cpf`, …). Service-side identifiers carry a free-form `system` URI;
 /// when that URI mentions a known scheme it wins, otherwise fall back to the
 /// generic `IdentifierType` enum.
+///
+/// The system-URI table below recognises a distinctive token per scheme
+/// (e.g. `pesel`, `nino`, `codice-fiscale`). Tokens are deliberately chosen
+/// not to overlap — `nino` is the UK National Insurance number and never
+/// collides with the French `nir`, and short ambiguous abbreviations (`chi`,
+/// `hc`) require a longer qualifier (`chi-number`, `hc-number`). An
+/// unrecognised URI falls through to the `IdentifierType` match arm.
 fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
     let sys = id.system.to_ascii_lowercase();
     let val = id.value.trim();
@@ -255,6 +262,10 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
         }
         return b.ie_ihi(val);
     }
+    let (b, matched) = route_additional_scheme(b, &sys, val);
+    if matched {
+        return b;
+    }
 
     match id.identifier_type {
         IdentifierType::TAX | IdentifierType::SSN => b.us_ssn(val),
@@ -278,6 +289,77 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
         | IdentifierType::NPI
         | IdentifierType::Other => b,
     }
+}
+
+/// Route the remaining national schemes the matcher scores deterministically
+/// but [`route_identifier`]'s primary block does not cover.
+///
+/// `sys` is the already-lowercased system URI; `val` is the trimmed value.
+/// Returns `(builder, true)` when a scheme token matched (the slot is now
+/// filled), or `(builder, false)` — the untouched builder — so the caller can
+/// fall through to its `IdentifierType` arm. Each token is distinctive enough
+/// not to collide with the primary block (e.g. `nino` is the UK National
+/// Insurance number and never overlaps the French `nir`); short ambiguous
+/// abbreviations (`chi`, `hc`) require a longer qualifier. Every target slot
+/// carries its own weight + breakdown score + deterministic short-circuit in
+/// the matcher (spec §12), so wiring them here lets a service-side identifier
+/// drive a match instead of silently falling through.
+fn route_additional_scheme(b: MBuilder, sys: &str, val: &str) -> (MBuilder, bool) {
+    if sys.contains("pesel") {
+        return (b.pl_pesel(val), true);
+    }
+    if sys.contains("nip") {
+        return (b.pl_nip(val), true);
+    }
+    if sys.contains("cnp") {
+        return (b.ro_cnp(val), true);
+    }
+    if sys.contains("nino") || sys.contains("ni-number") || sys.contains("national-insurance") {
+        return (b.uk_nino(val), true);
+    }
+    if sys.contains("chi-number") || sys.contains("community-health-index") {
+        return (b.uk_chi_number(val), true);
+    }
+    if sys.contains("hc-number") || sys.contains("health-and-care-number") {
+        return (b.uk_hc_number(val), true);
+    }
+    if sys.contains("codice-fiscale") || sys.contains("codicefiscale") {
+        return (b.it_cf(val), true);
+    }
+    if sys.contains("dni") {
+        return (b.es_dni(val), true);
+    }
+    if sys.contains("nif") {
+        return (b.pt_nif(val), true);
+    }
+    if sys.contains("hetu") {
+        return (b.fi_hetu(val), true);
+    }
+    if sys.contains("cpr") {
+        return (b.dk_cpr(val), true);
+    }
+    if sys.contains("oib") {
+        return (b.hr_oib(val), true);
+    }
+    if sys.contains("fnr") || sys.contains("fodselsnummer") || sys.contains("fødselsnummer") {
+        return (b.no_fnr(val), true);
+    }
+    if sys.contains("egn") {
+        return (b.bg_egn(val), true);
+    }
+    if sys.contains("emso") {
+        return (b.si_emso(val), true);
+    }
+    if sys.contains("rrn") {
+        return (b.cn_rrn(val), true);
+    }
+    if sys.contains("za-id") || sys.contains("south-africa") {
+        return (b.za_id(val), true);
+    }
+    if sys.contains("rijksregister") || sys.contains("be-nn") {
+        return (b.be_nn(val), true);
+    }
+    (b, false)
 }
 
 /// Builds a matcher `PassportBook` from an [`IdentityDocument`], or `None`
@@ -359,5 +441,70 @@ mod tests {
         ));
         let m = to_matcher_worker(&svc);
         assert_eq!(m.uk_nhs_number.as_deref(), Some("943 476 5919"));
+    }
+
+    /// Pushes an identifier with the given system URI and returns the routed
+    /// matcher worker, so each scheme assertion is a one-liner.
+    fn route(system: &str, value: &str) -> MWorker {
+        let mut svc = svc_worker("Nowak", "Jan");
+        svc.identifiers.push(Identifier::new(
+            IdentifierType::Other,
+            system.into(),
+            value.into(),
+        ));
+        to_matcher_worker(&svc)
+    }
+
+    /// Each newly-wired national scheme routes to its own matcher slot from a
+    /// distinctive system-URI token — and nothing else lands in a sibling slot.
+    #[test]
+    fn routes_additional_national_schemes_by_system_uri() {
+        assert_eq!(
+            route("urn:gov.pl:pesel", "44051401359").pl_pesel.as_deref(),
+            Some("44051401359")
+        );
+        assert_eq!(
+            route("urn:gov.ro:cnp", "1960229052089").ro_cnp.as_deref(),
+            Some("1960229052089")
+        );
+        assert_eq!(
+            route("https://fhir.hl7.org.uk/Id/ni-number", "QQ123456C")
+                .uk_nino
+                .as_deref(),
+            Some("QQ123456C")
+        );
+        assert_eq!(
+            route("urn:nhs.scot:chi-number", "0101336489")
+                .uk_chi_number
+                .as_deref(),
+            Some("0101336489")
+        );
+        assert_eq!(
+            route("urn:it:codice-fiscale", "RSSMRA80A01H501U")
+                .it_cf
+                .as_deref(),
+            Some("RSSMRA80A01H501U")
+        );
+        assert_eq!(
+            route("urn:dk:cpr", "0101701234").dk_cpr.as_deref(),
+            Some("0101701234")
+        );
+        assert_eq!(
+            route("urn:fi:hetu", "131052-308T").fi_hetu.as_deref(),
+            Some("131052-308T")
+        );
+    }
+
+    /// `nino` (UK National Insurance) must not be swallowed by the earlier
+    /// `nir` (FR) check, and vice-versa — the two tokens are kept distinct.
+    #[test]
+    fn uk_nino_and_fr_nir_do_not_cross_route() {
+        let nino = route("urn:uk:nino", "QQ123456C");
+        assert_eq!(nino.uk_nino.as_deref(), Some("QQ123456C"));
+        assert!(nino.fr_nir.is_none(), "nino must not leak into fr_nir");
+
+        let nir = route("urn:fr:nir", "180057402048077");
+        assert_eq!(nir.fr_nir.as_deref(), Some("180057402048077"));
+        assert!(nir.uk_nino.is_none(), "nir must not leak into uk_nino");
     }
 }

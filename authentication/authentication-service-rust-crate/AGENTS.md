@@ -84,6 +84,13 @@ existence.
    production (`JWT_PRIVATE_KEY_FILE` / `JWT_PUBLIC_KEY_FILE` or the
    `*_PEM` inline variants); the committed `config/keys/*_dev.pem` are
    **dev only**.
+7. **Key rotation is a key set.** `auth::AuthKeys` holds one *primary*
+   signing key plus zero or more *additional* verify-only public keys
+   (`JWT_ADDITIONAL_PUBLIC_KEY_FILES` / `_PEMS`). Signing always uses the
+   primary; verification selects by the token header `kid`; the JWKS
+   publishes all keys. To rotate with zero downtime, follow the runbook
+   in `config/keys/README.md` (spec §8.4). Unset additional vars ⇒ the
+   single-key behaviour is unchanged.
 
 ---
 
@@ -117,6 +124,8 @@ config/                    development/production/test yaml + dev RSA keys
 | `JWT_PRIVATE_KEY_FILE` | `config/keys/jwt_private_dev.pem` | RSA private signing key (PEM). |
 | `JWT_PUBLIC_KEY_FILE` | `config/keys/jwt_public_dev.pem` | RSA public verification key (PEM). |
 | `JWT_PRIVATE_KEY_PEM` / `JWT_PUBLIC_KEY_PEM` | — | Inline PEM (takes precedence over the file vars). |
+| `JWT_ADDITIONAL_PUBLIC_KEY_FILES` | — | Comma-separated paths to extra **verify-only** public keys (rotated-out keys whose tokens are still live). See key rotation below. |
+| `JWT_ADDITIONAL_PUBLIC_KEY_PEMS` | — | Inline verify-only public PEMs (comma- or newline-separated). Combined with the files var. |
 | `JWT_ISSUER` | `authentication-service` | `iss` claim. |
 | `JWT_AUDIENCE` | `main-x-service` | `aud` claim. |
 | `JWT_EXPIRATION` | `3600` | Access-token lifetime (seconds). |

@@ -156,12 +156,12 @@ a test here.
 
 Run with: `cargo test --test duplicate_detection`
 
-### Coverage (14 tests)
+### Coverage (15 tests)
 
 | Category | What it pins |
 |---|---|
 | Identical / near-duplicate | identical-clone score ≥ 0.95, name-typo fuzzy match, ordering invariants (closer-evidence outscores farther) |
-| Deterministic short-circuits | shared `uk_nhs_number` (matcher's shorter slot name), tax_id default-routed to US SSN, passport books, NPI typed identifier falling through unmapped, ODS organisation code passthrough (deliberate permanent fall-through — spec §6.2) |
+| Deterministic short-circuits | shared `uk_nhs_number` (matcher's shorter slot name), shared PL `pl_pesel` (one of the expanded scheme routes), tax_id default-routed to US SSN, passport books, NPI typed identifier falling through unmapped, ODS organisation code passthrough (deliberate permanent fall-through — spec §6.2) |
 | Negative cases | unrelated records score low, common-name + divergent demographics not flagged as duplicate |
 | Field-routing pinning | per-adapter mapping tests (telecom → phone/email, address field renames, identifier-system-URI routing) |
 | Edge cases | sparse records, empty fields, config presets |

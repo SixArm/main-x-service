@@ -30,7 +30,7 @@ cache.upsertFolder(f)
 cache.buildingById(id)
 cache.roomById(id)
 cache.cabinetById(id)
-cache.cabinetLocation(id)   // string, "In transit" when id is null
+cache.cabinetLocation(id)   // string; "In transit" when id is null or not cached
 
 // Mutations (return promises; throw on API failure):
 cache.addFolder({ nhsNumber, patientName?, dateOfBirth?, title, cabinetId?, notes? }): Folder
@@ -51,6 +51,16 @@ cache.addCabinet({ label, roomId, capacity?, description? }): string
   list rendered alongside the move form reflects the change.
 - `addBuilding/Room/Cabinet` — calls `POST /api/places` with the
   matching `kind`. The new place is appended to the relevant array.
+
+## Lookup contracts
+
+- `buildingById` / `roomById` / `cabinetById` return `undefined` for a
+  `null` / `undefined` / unknown id (never throw).
+- `cabinetLocation` resolves a human-readable location string:
+  1. `"In transit"` when the id is `null` or the cabinet is not cached.
+  2. the cabinet's `containerPath` when that is non-empty.
+  3. otherwise a derived `"Building — Room"` string, substituting `"?"`
+     for an unresolved room or building.
 
 ## What the cache does not do
 

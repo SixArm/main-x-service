@@ -59,6 +59,25 @@ fallbacks, passport documents → `passport_books`). Service-only
 fields (`id`, `active`, `worker_type`, `deceased_datetime`,
 `managing_organization`, `links`, `created_at`, …) are dropped.
 
+Identifier `system`-URI routing recognises a distinctive token per
+national scheme and fills the matching matcher slot. The covered set
+is UK NHS / US SSN / BR CPF / FR NIR / ES TSI / IN Aadhaar / JP My
+Number / MX CURP / SE Personnummer / DE KVNR / NL BSN / NZ NHI / AU+IE
+IHI (length-disambiguated), plus PL PESEL / PL NIP / RO CNP / UK NINO /
+UK CHI / UK H&C / IT Codice Fiscale / ES DNI / PT NIF / FI HETU / DK
+CPR / HR OIB / NO FNR / BG EGN / SI EMŠO / CN RRN / ZA ID / BE NN.
+Tokens are chosen not to collide (e.g. `nino` never overlaps `nir`;
+short abbreviations such as `chi`/`hc` require a longer qualifier).
+Every covered slot carries its own weight + breakdown score +
+deterministic short-circuit in the matcher (its spec §12), so a shared
+value drives a match rather than silently falling through. An
+unrecognised URI falls back to the `IdentifierType` enum
+(`TAX`/`SSN` → US SSN; `ODS`/`MRN`/`DL`/`NPI`/`Other` unmapped).
+Routing is pinned by the adapter's own unit tests and by
+[`tests/duplicate_detection.rs`](../tests/duplicate_detection.rs)
+(`shared_pesel_drives_match_via_pl_pesel_slot`,
+`shared_nhs_number_drives_match_via_uk_nhs_number_slot`).
+
 The matcher's `uk_nhs_number` slot is the per-worker equivalent of
 the person matcher's `uk_nhs_number` (both crates settled on the
 shorter method name once published to crates.io).

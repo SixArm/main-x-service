@@ -431,13 +431,12 @@ fn typed_ssn_identifier_with_us_system_uri_routes_to_us_ssn() {
 // Adapter scheme-routing audit (spec §13 E-8)
 // =============================================================================
 //
-// `adapter::route_identifier` reaches a subset of the matcher's 26
-// national-ID slots via system-URI fast paths. This block pins every
-// **routable** scheme so the documented routing table in
-// `src/matching/adapter.rs` cannot silently drift from code. Schemes the
-// adapter cannot reach today (e.g. `it_cf`, `pl_pesel`, `uk_nino`) have no
-// test here by construction — see the "Unreachable" column of the adapter
-// rustdoc table.
+// `adapter::route_identifier` reaches all 26 of the matcher's national-ID
+// slots via system-URI fast paths. This block pins every routable scheme so
+// the documented routing table in `src/matching/adapter.rs` cannot silently
+// drift from code. `all_national_id_schemes_route_to_their_slot` exercises
+// the full table against deterministic matching; the cases below pin
+// specific projection / disambiguation behaviour.
 
 /// Build an identifier carrying the given `system` URI (type `Other`, so the
 /// URI is the sole routing key).
@@ -512,6 +511,68 @@ fn ihi_disambiguates_au_vs_ie_by_digit_count() {
     let mie = to_matcher_person(&ie);
     assert_eq!(mie.ie_ihi.as_deref(), Some("1234567"));
     assert_eq!(mie.au_ihi, None);
+}
+
+/// Every national-ID scheme the adapter routes reaches its matcher slot, and
+/// a shared (well-formed) value drives a deterministic match even when the two
+/// records' names diverge. This pins the full 26-slot routing table — the 14
+/// original fast paths plus the 12 E-8 additions (`uk_hc_number`,
+/// `uk_chi_number`, `uk_nino`, `it_cf`, `bg_egn`, `es_dni`, `hr_oib`,
+/// `no_fnr`, `pl_pesel`, `ro_cnp`, `si_emso`, `cn_rrn`) — against the
+/// matcher's deterministic-match behaviour. The values are synthetic but
+/// well-formed (check digits valid where the scheme has them) so each
+/// scheme's parser accepts them and the equality path can fire.
+#[test]
+fn all_national_id_schemes_route_to_their_slot() {
+    // (system-URI fragment, well-formed value). Each value passes the
+    // corresponding matcher parser's validation so the deterministic
+    // identifier-equality path can fire.
+    let cases: &[(&str, &str)] = &[
+        // 14 original fast paths.
+        ("https://fhir.nhs.uk/Id/nhs-number", "943 476 5919"),
+        ("http://hl7.org/fhir/sid/us-ssn", "111-22-3333"),
+        ("urn:br:cpf", "390.533.447-05"),
+        ("urn:fr:nir:ameli.fr", "1 80 12 75 123 456 42"),
+        ("urn:es:tsi:ingesa", "ABCD123456XY1234"),
+        ("urn:in:aadhaar:uidai", "2341 2341 2346"),
+        ("urn:jp:my-number", "123456789018"),
+        ("urn:mx:curp", "HEGG560427MVZRRL04"),
+        ("urn:se:personnummer", "460324-3850"),
+        ("urn:de:kvnr", "A123456780"),
+        ("urn:nl:bsn", "111222333"),
+        ("urn:nz:nhi", "ZAA0083"),
+        ("urn:au:ihi", "8003 6012 3456 7894"),
+        ("urn:ie:ihi", "1234567"),
+        // 12 E-8 additions.
+        ("urn:uk:hc-number", "9434765919"),
+        ("urn:uk:chi-number", "0101701233"),
+        ("urn:uk:nino", "AB123456A"),
+        ("urn:it:codice-fiscale", "RSSMRA85T10A562S"),
+        ("urn:bg:egn", "8001010013"),
+        ("urn:es:dni", "12345678Z"),
+        ("urn:hr:oib", "12345678903"),
+        ("urn:no:fnr", "15018012399"),
+        ("urn:pl:pesel", "80011500014"),
+        ("urn:ro:cnp", "1800115400012"),
+        ("urn:si:emso", "1501980500015"),
+        ("urn:cn:rrn", "11010519491231002X"),
+    ];
+
+    for (system, value) in cases {
+        let mut a = person("Smith", "John");
+        a.identifiers.push(sys_identifier(system, value));
+        let mut b = person("Jones", "Jane"); // deliberately divergent name
+        b.id = Uuid::new_v4();
+        b.identifiers.push(sys_identifier(system, value));
+
+        let ma = to_matcher_person(&a);
+        let mb = to_matcher_person(&b);
+        assert!(
+            engine().deterministic_match(&ma, &mb),
+            "scheme `{system}` (value `{value}`) must route to a slot that \
+             deterministic-matches despite divergent names"
+        );
+    }
 }
 
 /// A shared CPF (Brazilian tax id) carried on a CPF system URI is a

@@ -51,12 +51,30 @@ confirms it. Split larger tasks (`T-5a`, `T-5b`).
     one DB-free, un-gated test; a `kid` mismatch fails with
     `UnknownKid`; the `kid = base64url(SHA-256(modulus))` thumbprint
     is recomputed independently.
-- [ ] **T-5 — Key rotation.**
-  - [ ] Service: publish multiple JWKS entries (`kid` already stamped)
-    with a grace window ≥ max token TTL.
-  - [ ] Verifier: document (or implement) refetch-on-`UnknownKid`.
-  - **Acceptance:** tokens signed with the previous key verify during
-    the grace window; after it, they are rejected.
+- [x] **T-5 — Key rotation.** *(2026-06-13)*
+  - [x] Service: `AuthKeys` is now a **key set** — one primary signing
+    key plus zero or more additional verify-only public keys, loaded from
+    `JWT_ADDITIONAL_PUBLIC_KEY_FILES` / `JWT_ADDITIONAL_PUBLIC_KEY_PEMS`
+    (unset ⇒ single primary, fully backward-compatible). `sign_access_token`
+    signs with the primary and stamps its `kid`; `verify_token` selects the
+    verifying key by the token header `kid` from {primary} ∪ {additional};
+    the JWKS publishes all keys (primary first). `kid` stays
+    `base64url(SHA-256(modulus))` for every key. A `load_from(...)` test
+    constructor builds deterministic multi-key sets without env mutation.
+    Operator rotation runbook documented in service spec §8.4 +
+    `config/keys/README.md`.
+  - [x] Verifier: already selects by `kid` and documents
+    refetch-on-`UnknownKid` (the multi-key JWKS contract is now pinned by
+    `tests/sign_verify_contract.rs::multi_key_jwks_verifies_primary_and_rejects_unknown_kid`).
+  - **Acceptance met:** un-gated unit tests
+    (`src/auth/mod.rs`: backward-compat single key, JWKS publishes all
+    keys primary-first, a token signed by a now-additional key still
+    verifies, unknown-kid rejected, duplicate-key dedup, PEM splitting)
+    plus a contract test that a verifier built from the full multi-key
+    JWKS verifies a primary-signed token and rejects an unknown `kid`. The
+    grace-window semantics hold by construction: an additional key is
+    retired only after the max token TTL elapses, after which its tokens
+    have expired and are rejected. No auto-rotation scheduler (follow-up).
 - [x] **T-6 — Rate limiting / abuse resistance for magic-link issuance.**
   *(2026-06-13)*
   - [x] Per-email issuance limit with a monotonic-clock sliding window

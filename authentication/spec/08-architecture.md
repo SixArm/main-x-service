@@ -64,17 +64,53 @@ key rotation. The request hot path never leaves the process.
 
 ### 8.4 Key management
 
-- Signing material loads once at boot (`auth::load_keys`), resolution
-  order: `JWT_PRIVATE_KEY_PEM` / `JWT_PUBLIC_KEY_PEM` inline env →
-  `JWT_PRIVATE_KEY_FILE` / `JWT_PUBLIC_KEY_FILE` paths → committed dev
-  keypair `config/keys/jwt_{private,public}_dev.pem`.
-- `kid` = base64url(SHA-256(public modulus)) — derived, stable, and
-  identical in the JWKS and every token header.
+The service holds a **key set**, not a single key: one *primary*
+signing key plus zero or more *additional* verify-only public keys.
+
+- The **primary** signing material loads once at boot
+  (`auth::load_keys`), resolution order: `JWT_PRIVATE_KEY_PEM` /
+  `JWT_PUBLIC_KEY_PEM` inline env → `JWT_PRIVATE_KEY_FILE` /
+  `JWT_PUBLIC_KEY_FILE` paths → committed dev keypair
+  `config/keys/jwt_{private,public}_dev.pem`.
+- **Additional** verify-only public keys load from
+  `JWT_ADDITIONAL_PUBLIC_KEY_FILES` (comma-separated file paths) and/or
+  `JWT_ADDITIONAL_PUBLIC_KEY_PEMS` (inline PEM blocks, comma- or
+  newline-separated). Unset/empty ⇒ just the primary
+  (fully backward-compatible single-key behaviour). Keys are
+  de-duplicated by `kid`; the primary always wins.
+- `kid` = base64url(SHA-256(public modulus)) for **every** key —
+  derived, stable, and identical in the JWKS and the token header.
+- `sign_access_token` signs with the **primary** and stamps its `kid`;
+  `verify_token` selects the verifying key from {primary} ∪ {additional}
+  by the token header `kid`. So a token signed by a key that has since
+  been rotated down to "additional" still verifies locally until it
+  expires; an unknown `kid` is rejected.
+- The JWKS (`/.well-known/jwks.json`) publishes the **whole set**,
+  primary first, so peers trust every live `kid`.
 - Misconfigured keys are a **fatal boot error** (panic with actionable
   context), never silent degradation.
-- Rotation (roadmap §13 T-5): publish old + new JWKs together, sign
-  with the new key, retire the old after a grace window ≥ max token
-  TTL.
+
+#### Rotation runbook (operator-driven, zero-downtime)
+
+This is **config-driven** — no database, no auto-rotation scheduler
+(that is a follow-up). To rotate the signing key with no downtime:
+
+1. **Generate** a fresh RSA keypair (`openssl genpkey` / `rsa` per
+   `config/keys/README.md`).
+2. **Promote** the new keypair to primary: set `JWT_PRIVATE_KEY_*` /
+   `JWT_PUBLIC_KEY_*` to it, and **move the OLD public key** into
+   `JWT_ADDITIONAL_PUBLIC_KEY_FILES` (or `…_PEMS`) so its still-live
+   tokens keep verifying.
+3. **Restart** the service. The JWKS now publishes both keys (new
+   primary first, old key as additional). Peers refresh the JWKS at
+   their next boot / on the first `UnknownKid` and now trust both
+   `kid`s. New tokens are signed by the new key; old tokens still
+   verify against the retained old key.
+4. **Wait** at least the max access-token lifetime (`JWT_EXPIRATION`,
+   default 1h) so every token signed by the old key has expired.
+5. **Retire** the old key: drop it from the additional list and
+   restart. The grace window (step 4) guarantees no live token is
+   orphaned.
 
 ### 8.5 Module boundaries
 

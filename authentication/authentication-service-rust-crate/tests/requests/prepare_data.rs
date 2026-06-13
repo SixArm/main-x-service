@@ -3,7 +3,7 @@
 
 use authentication_service::{models::users, views::auth::LoginResponse};
 use axum::http::{HeaderName, HeaderValue};
-use loco_rs::{app::AppContext, TestServer};
+use loco_rs::{TestServer, app::AppContext};
 
 const USER_EMAIL: &str = "test@loco.com";
 const USER_NAME: &str = "loco";

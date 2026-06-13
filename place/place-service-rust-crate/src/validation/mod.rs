@@ -11,8 +11,8 @@
 //!   inputs compare and store consistently.
 //!
 //! The rules are intentionally lightweight (range checks, prefix checks,
-//! digit counts) rather than authoritative validations — e.g. GLN is only
-//! length/digit-checked here, not check-digit-verified.
+//! digit counts) with one exception: the GLN is fully verified, including
+//! its GS1 mod-10 check digit (see [`gln_is_valid`]).
 //!
 //! # Examples
 //!
@@ -46,9 +46,10 @@ pub struct ValidationError {
 /// Validate a place, returning all validation errors.
 ///
 /// Checks (each independent, all reported): non-empty name; latitude in
-/// `[-90, 90]` and longitude in `[-180, 180]` when geo is present; 13-digit
-/// numeric GLN; `http(s)://` URL scheme; `+`-prefixed telephone; and that any
-/// present address carries at least a locality, postal code, or country.
+/// `[-90, 90]` and longitude in `[-180, 180]` when geo is present; a 13-digit
+/// numeric GLN with a valid GS1 check digit; `http(s)://` URL scheme;
+/// `+`-prefixed telephone; and that any present address carries at least a
+/// locality, postal code, or country.
 ///
 /// # Examples
 ///
@@ -94,13 +95,13 @@ pub fn validate_place(place: &Place) -> Vec<ValidationError> {
         }
     }
 
-    // GLN must be exactly 13 ASCII digits (check digit not verified here).
+    // GLN must be exactly 13 ASCII digits with a valid GS1 mod-10 check digit.
     if let Some(gln) = &place.global_location_number
-        && (gln.len() != 13 || !gln.chars().all(|c| c.is_ascii_digit()))
+        && !gln_is_valid(gln)
     {
         errors.push(ValidationError {
             field: "global_location_number".into(),
-            message: "GLN must be exactly 13 digits".into(),
+            message: "GLN must be exactly 13 digits with a valid GS1 check digit".into(),
         });
     }
 
@@ -144,6 +145,47 @@ pub fn validate_place(place: &Place) -> Vec<ValidationError> {
     }
 
     errors
+}
+
+/// Validate a Global Location Number (GLN): exactly 13 ASCII digits whose
+/// last digit is the correct GS1 mod-10 check digit.
+///
+/// The GS1 check-digit algorithm weights the 12 data digits right-to-left by
+/// alternating 3, 1, 3, 1, …; the check digit is the value that brings the
+/// weighted sum up to the next multiple of 10.
+///
+/// # Examples
+///
+/// ```
+/// use place_service::validation::gln_is_valid;
+///
+/// assert!(gln_is_valid("0614141999996")); // valid GS1 check digit
+/// assert!(!gln_is_valid("0614141999990")); // wrong check digit
+/// assert!(!gln_is_valid("12345")); // wrong length
+/// assert!(!gln_is_valid("061414199999A")); // non-digit
+/// ```
+#[must_use]
+pub fn gln_is_valid(gln: &str) -> bool {
+    if gln.len() != 13 {
+        return false;
+    }
+    let mut digits = [0u32; 13];
+    for (slot, ch) in digits.iter_mut().zip(gln.chars()) {
+        match ch.to_digit(10) {
+            Some(d) => *slot = d,
+            None => return false,
+        }
+    }
+    // Weight the 12 data digits right-to-left by 3, 1, 3, 1, …; the index from
+    // the right (0-based) being even gets weight 3, odd gets weight 1.
+    let sum: u32 = digits[..12]
+        .iter()
+        .rev()
+        .enumerate()
+        .map(|(i, &d)| if i % 2 == 0 { d * 3 } else { d })
+        .sum();
+    let check = (10 - (sum % 10)) % 10;
+    check == digits[12]
 }
 
 /// Normalize a place's address (title-case locality, uppercase region/country).
@@ -285,13 +327,40 @@ mod tests {
         assert!(errors.iter().any(|e| e.field == "global_location_number"));
     }
 
-    /// A well-formed 13-digit GLN passes.
+    /// A well-formed 13-digit GLN with a valid GS1 check digit passes.
     #[test]
     fn test_valid_gln() {
         let mut place = Place::new("Test");
-        place.global_location_number = Some("1234567890123".into());
+        place.global_location_number = Some("0614141999996".into());
         let errors = validate_place(&place);
-        assert!(errors.is_empty());
+        assert!(errors.is_empty(), "Errors: {errors:?}");
+    }
+
+    /// A 13-digit GLN with a wrong GS1 check digit is rejected. Same first 12
+    /// digits as the valid case above, last digit corrupted 6 → 0.
+    #[test]
+    fn test_invalid_gln_check_digit() {
+        let mut place = Place::new("Test");
+        place.global_location_number = Some("0614141999990".into());
+        let errors = validate_place(&place);
+        assert!(errors.iter().any(|e| e.field == "global_location_number"));
+    }
+
+    /// `gln_is_valid` accepts real GS1 GLNs and rejects length / digit /
+    /// check-digit failures.
+    #[test]
+    fn test_gln_is_valid_helper() {
+        // Valid: correct length, all digits, correct GS1 check digit.
+        assert!(gln_is_valid("0614141999996"));
+        assert!(gln_is_valid("4006381333931"));
+        // Wrong check digit (last digit corrupted).
+        assert!(!gln_is_valid("0614141999990"));
+        assert!(!gln_is_valid("4006381333930"));
+        // Wrong length.
+        assert!(!gln_is_valid("061414199999"));
+        assert!(!gln_is_valid("06141419999966"));
+        // Non-digit character.
+        assert!(!gln_is_valid("061414199999A"));
     }
 
     /// A URL without an http(s) scheme is rejected.

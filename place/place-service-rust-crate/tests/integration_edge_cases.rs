@@ -41,17 +41,21 @@ fn test_validate_just_past_boundary() {
     assert!(!validate_place(&place).is_empty());
 }
 
-/// Only an exactly-13-digit GLN passes; 12 or 14 digits fail.
+/// A 13-digit GLN with a valid GS1 check digit passes; 12 or 14 digits, or a
+/// wrong check digit, fail.
 #[test]
 fn test_validate_gln_exactly_13_digits() {
     let mut place = Place::new("Test");
-    place.global_location_number = Some("1234567890123".into());
+    place.global_location_number = Some("0614141999996".into()); // valid check digit
     assert!(validate_place(&place).is_empty());
 
-    place.global_location_number = Some("123456789012".into()); // 12 digits
+    place.global_location_number = Some("061414199999".into()); // 12 digits
     assert!(!validate_place(&place).is_empty());
 
-    place.global_location_number = Some("12345678901234".into()); // 14 digits
+    place.global_location_number = Some("06141419999966".into()); // 14 digits
+    assert!(!validate_place(&place).is_empty());
+
+    place.global_location_number = Some("0614141999990".into()); // wrong check digit
     assert!(!validate_place(&place).is_empty());
 }
 

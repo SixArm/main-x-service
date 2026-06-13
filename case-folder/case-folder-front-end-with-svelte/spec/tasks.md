@@ -36,6 +36,16 @@
   number `614 309 0431`, leading-zero normalisation, empty input, and
   grouped/bare parity; `nhs.ts` reorders the `check === 10` guard to mirror
   the Rust edition (no behaviour change). vitest unit count 24→26.
+- [x] **ST-13c** vitest unit tests for the cache singleton
+  (`cache.svelte.test.ts`, P1) — UR-7. Covers the rune store's setters /
+  `clearUser` / `upsertFolder` (insert vs replace), the four synchronous
+  lookups, and `cabinetLocation`'s three-step resolution
+  (`containerPath` → derived `Building — Room` → `? — ?` fallbacks). With
+  `api.*` mocked it also asserts the cache side effects of `recordMove`
+  (prepend + in-place folder relocation, including the in-transit and
+  folder-not-cached branches), `addFolder`, and `addBuilding/Room/Cabinet`.
+  Also fixed a `cache-api.md` drift: `cabinetLocation` returns "In transit"
+  for an unknown id, not only `null`. vitest unit count 26→43.
 - [ ] **ST-14** ESLint + svelte-eslint (P1)
 - [ ] **ST-15** `@axe-core/playwright` scans in CI (P1) — UR-9
 - [ ] **ST-16** Codegen client types from API OpenAPI/JSON Schema (P1) — UR-6

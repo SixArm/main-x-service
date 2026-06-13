@@ -99,6 +99,72 @@ fn kid_mismatch_fails_peer_side_verification() {
 }
 
 #[test]
+fn multi_key_jwks_verifies_primary_and_rejects_unknown_kid() {
+    // Key rotation (T-5): a peer building a Verifier from a JWKS that
+    // carries MORE than the primary key must still verify a primary-signed
+    // token (selecting the primary by its kid) and must reject a token
+    // signed under a kid absent from the published set.
+    let keys = auth::keys();
+    let (token, _, _) = auth::sign_access_token(PID, EMAIL, NAME).expect("sign");
+
+    // Synthesise a second, unrelated RSA JWK and splice it into the
+    // service's published JWKS — emulating a rotated-out additional key.
+    let other_pub = "-----BEGIN PUBLIC KEY-----\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAm/AOGzHpbO3hC0whTHF8\n\
+iUzHUNJNpJQMZD4z0R3QLcM1furi4ygZSNjU7m5FJdAXCiyqV9RvZg43IkIoGuX6\n\
+0P0F/SHnShnVN2i6NAb6XsACtk5kcA3uPIt3frhlj2w3A3fQxtIRM+roHQl3gnF3\n\
+pHXLF/HvGxfROBWCvtg2iPcYlYTEEvMUmOzLdzrP0/BgU9u/yXSpM6F9mZ7WIjjo\n\
+ccHMM7UvlvMtalQ+m9/YTwqNr25fp8hXTerc9NC/6mpCTFeACY1zmIU+TVwWCCPd\n\
+r5pc52DVjU7QcppmhoXrO0WyG/QL4AtjyWXZOe0sZdLT+9QrCF9j/0YzwwKBMaTn\n\
+wwIDAQAB\n\
+-----END PUBLIC KEY-----\n";
+    let pub_key = rsa::RsaPublicKey::from_public_key_pem(other_pub).expect("parse other pub");
+    let n_bytes = pub_key.n().to_bytes_be();
+    let e_bytes = pub_key.e().to_bytes_be();
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let other_kid = b64.encode(Sha256::digest(&n_bytes));
+
+    let mut multi = keys.jwks.clone();
+    multi["keys"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "kty": "RSA", "use": "sig", "alg": "RS256",
+            "kid": other_kid, "n": b64.encode(&n_bytes), "e": b64.encode(&e_bytes),
+        }));
+
+    let verifier = Verifier::from_jwks_value(&multi, &keys.issuer, &keys.audience).expect("build");
+    assert_eq!(
+        verifier.key_count(),
+        2,
+        "the multi-key JWKS publishes two keys"
+    );
+
+    // The primary-signed token still verifies (kid selects the primary).
+    let claims = verifier.verify(&token).expect("primary token verifies");
+    assert_eq!(claims.sub, PID);
+
+    // A JWKS that does NOT publish the signing kid must reject the token:
+    // republish the primary's modulus under a different kid so no entry
+    // matches the token header's kid.
+    let header = jsonwebtoken::decode_header(&token).expect("header");
+    let mut wrong = serde_json::json!({ "keys": [] });
+    wrong["keys"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "kty": "RSA", "use": "sig", "alg": "RS256",
+            "kid": "definitely-not-the-signing-kid",
+            "n": keys.jwks["keys"][0]["n"], "e": keys.jwks["keys"][0]["e"],
+        }));
+    let no_match = Verifier::from_jwks_value(&wrong, &keys.issuer, &keys.audience).expect("build");
+    assert!(
+        matches!(no_match.verify(&token), Err(VerifyError::UnknownKid(kid)) if kid == header.kid.unwrap()),
+        "a token whose kid is absent from the JWKS must be rejected as UnknownKid"
+    );
+}
+
+#[test]
 fn issuer_and_audience_policy_is_enforced_peer_side() {
     let keys = auth::keys();
     let (token, _, _) = auth::sign_access_token(PID, EMAIL, NAME).expect("sign");

@@ -38,11 +38,11 @@ fn test_place_full_construction_and_serialization() {
     place.geo = Some(GeoCoordinates::new(48.8584, 2.2945));
     place.telephone = Some("+33-892-70-12-39".into());
     place.url = Some("https://www.toureiffel.paris".into());
-    place.global_location_number = Some("1234567890123".into());
+    place.global_location_number = Some("0614141999996".into());
     place.branch_code = Some("EIFFEL-01".into());
     place.keywords = vec!["landmark".into(), "tourism".into(), "paris".into()];
     place.identifiers = vec![
-        PlaceIdentifier::gln("1234567890123"),
+        PlaceIdentifier::gln("0614141999996"),
         PlaceIdentifier::new(IdentifierType::OpenStreetMap, "5013364"),
     ];
     place.amenity_features = vec![

@@ -47,10 +47,9 @@
 //! # Identifier scheme-routing audit (spec §5.3.1 / E-8)
 //!
 //! The matcher exposes **26** national-ID builder slots. [`route_identifier`]
-//! reaches **14** of them via `system`-URI substring fast paths (plus the
-//! type-based `tax_id` / `SSN` / `TAX` → `us_ssn` defaults). The other 12
-//! slots are **unreachable from current service data** — no routing rule
-//! targets them.
+//! reaches **all 26** via `system`-URI substring fast paths (plus the
+//! type-based `tax_id` / `SSN` / `TAX` → `us_ssn` defaults). No slot is
+//! unreachable from service data.
 //!
 //! ## Routable (`system` URI substring → matcher slot)
 //!
@@ -70,14 +69,27 @@
 //! | `nhi` | `nz_nhi` |
 //! | `ihi` (≥14 digits) | `au_ihi` |
 //! | `ihi` (<14 digits) | `ie_ihi` |
+//! | `hc-number` / `health-and-care` | `uk_hc_number` |
+//! | `chi-number` / `:chi` / `/chi` | `uk_chi_number` |
+//! | `nino` / `national-insurance` | `uk_nino` |
+//! | `codice` / `it-cf` / `:cf` | `it_cf` |
+//! | `egn` | `bg_egn` |
+//! | `dni` | `es_dni` |
+//! | `oib` | `hr_oib` |
+//! | `fnr` / `fodselsnummer` | `no_fnr` |
+//! | `pesel` | `pl_pesel` |
+//! | `cnp` | `ro_cnp` |
+//! | `emso` | `si_emso` |
+//! | `rrn` | `cn_rrn` |
 //!
-//! ## Unreachable (matcher-only; no routing rule today)
+//! Routing order is **most-specific-first**: the `nhs-number` /`ihi` /`nir`
+//! fast paths run before the shorter fragments below them, so e.g. an
+//! `nhs-number` URI never falls through to the bare `chi`/`nir` checks, and
+//! `cpf` is matched before the bare `:cf` codice-fiscale fragment.
 //!
-//! `uk_hc_number`, `uk_chi_number`, `uk_nino`, `it_cf`, `bg_egn`, `es_dni`,
-//! `hr_oib`, `no_fnr`, `pl_pesel`, `ro_cnp`, `si_emso`, `cn_rrn`.
-//!
-//! Each routable scheme is pinned by `tests/duplicate_detection.rs`
+//! Every routable scheme is pinned by `tests/duplicate_detection.rs`
 //! (`routable_identifier_systems_reach_their_matcher_slot`,
+//! `all_national_id_schemes_route_to_their_slot`,
 //! `ihi_disambiguates_au_vs_ie_by_digit_count`). Adding a scheme is a
 //! three-part change: a fast path here, a table row here + in spec §5.3.1,
 //! and a test case.
@@ -291,6 +303,50 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
             return b.au_ihi(val);
         }
         return b.ie_ihi(val);
+    }
+
+    // UK NI Health & Care number is distinct from the NHS number above; key
+    // on an explicit `hc-number` / `health-and-care` fragment so it does not
+    // collide with the `nhs-number` fast path.
+    if sys.contains("hc-number") || sys.contains("health-and-care") {
+        return b.uk_hc_number(val);
+    }
+    // Scotland CHI. `chi` is specific enough; the `nhi` fast path above does
+    // not contain it.
+    if sys.contains("chi-number") || sys.contains(":chi") || sys.contains("/chi") {
+        return b.uk_chi_number(val);
+    }
+    if sys.contains("nino") || sys.contains("national-insurance") {
+        return b.uk_nino(val);
+    }
+    // IT codice fiscale — avoid a bare `cf` substring (too collision-prone);
+    // require an explicit fragment.
+    if sys.contains("codice") || sys.contains("it-cf") || sys.contains(":cf") {
+        return b.it_cf(val);
+    }
+    if sys.contains("egn") {
+        return b.bg_egn(val);
+    }
+    if sys.contains("dni") {
+        return b.es_dni(val);
+    }
+    if sys.contains("oib") {
+        return b.hr_oib(val);
+    }
+    if sys.contains("fnr") || sys.contains("fodselsnummer") {
+        return b.no_fnr(val);
+    }
+    if sys.contains("pesel") {
+        return b.pl_pesel(val);
+    }
+    if sys.contains("cnp") {
+        return b.ro_cnp(val);
+    }
+    if sys.contains("emso") {
+        return b.si_emso(val);
+    }
+    if sys.contains("rrn") {
+        return b.cn_rrn(val);
     }
 
     // Type-based defaults.

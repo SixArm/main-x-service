@@ -11,6 +11,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Recent-activity view.** The list page (`/`) gains a "Show recent
+  activity" toggle that lazy-loads `GET /api/care-pathways/events/recent`
+  on first open (it does not auto-load on mount) via a new
+  `CarePathwayRepository.recentEvents()` → returning a `PathwayEvent[]`
+  (`{kind, pid, name, seq}`, mirroring the service's
+  `streaming::PathwayEvent`; `kind` is created/updated/deleted/merged).
+  Events render newest-first (highest `seq` first) with the kind, the
+  name (linked to the pathway by pid), and the `seq`; loading, empty, and
+  error states are handled. vitest adds 1 unit test (path); Playwright
+  adds 1 smoke test (toggle → events render newest-first with kind +
+  seq).
 - **Audit-trail view.** The detail page (`/[pid]`) gains a "Show audit
   trail" toggle that lazy-loads `GET /api/care-pathways/{pid}/audit` on
   first open (it does not auto-load on mount) via a new

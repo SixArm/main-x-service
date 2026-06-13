@@ -8,6 +8,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed — validation
+
+- GLN validation now verifies the GS1 mod-10 check digit, not just the
+  13-digit length. New public helper `validation::gln_is_valid(&str)`;
+  `validate_place` rejects a GLN whose check digit is wrong with
+  "GLN must be exactly 13 digits with a valid GS1 check digit". This
+  closes the drift between spec §6 / §14 (which already promised a "GLN
+  check digit") and the code (which only counted digits). Tests updated
+  to use real GS1 GLNs (`0614141999996`, `4006381333931`); added
+  check-digit unit + integration coverage.
+
 ### Added — matcher bridge
 
 - New `src/matching/adapter.rs` exposing

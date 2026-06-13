@@ -2,7 +2,14 @@
 
 import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
-import type { AuditEntry, CarePathway, MergeResult, PathwayRef, ScoredRef } from "./types";
+import type {
+    AuditEntry,
+    CarePathway,
+    MergeResult,
+    PathwayEvent,
+    PathwayRef,
+    ScoredRef,
+} from "./types";
 
 export class CarePathwayRepository {
     constructor(private readonly http: ApiClient) {}
@@ -65,5 +72,12 @@ export class CarePathwayRepository {
         return this.http.get<AuditEntry[]>(
             `/api/care-pathways/${encodeURIComponent(pid)}/audit`,
         );
+    }
+
+    /// Recent system-wide CRUD/merge events from the service's in-memory
+    /// stream. Returned roughly oldest-first (highest `seq` last); the UI
+    /// sorts newest-first.
+    recentEvents(): Promise<PathwayEvent[]> {
+        return this.http.get<PathwayEvent[]>("/api/care-pathways/events/recent");
     }
 }

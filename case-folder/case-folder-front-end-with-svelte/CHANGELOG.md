@@ -12,6 +12,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **ST-13c — cache store unit coverage.** New `cache.svelte.test.ts`
+  exercises the rune cache singleton with no backend: setters / `clearUser` /
+  `upsertFolder` (insert vs replace), the synchronous lookups, and
+  `cabinetLocation`'s three-step resolution (`containerPath` → derived
+  `Building — Room` → `? — ?` fallback). With `$lib/api/client` mocked it also
+  asserts the cache side effects of `recordMove` (prepend + in-place folder
+  relocation, plus the in-transit and folder-not-cached branches), `addFolder`,
+  and `addBuilding/Room/Cabinet`. Fixed a `cache-api.md` drift:
+  `cabinetLocation` returns "In transit" for an unknown id, not only `null`.
+  vitest unit count is now 43 (was 26).
 - **T-15 — Modulus-11 hardening.** `nhs.test.ts` now covers the genuine
   `check === 10 → invalid` branch (`999 000 0140`, asserted across all ten
   trailing digits), the documented invalid number `614 309 0431`, leading-zero

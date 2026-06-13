@@ -7,7 +7,7 @@
 | ------------- | ------------------------------------- | ----------------------------------------------- |
 | Type check    | `svelte-check`                        | ✓ in repo (`npm run check`)                     |
 | Lint          | ESLint (flat) + typescript-eslint + eslint-plugin-svelte | ✓ in repo (`npm run lint`)           |
-| Unit          | vitest                                | ✓ in repo (`npm run test:unit` — nhs + client mappers) |
+| Unit          | vitest                                | ✓ in repo (`npm run test:unit` — nhs + client mappers + cache store) |
 | Component     | `@testing-library/svelte` (+ jsdom)   | ✓ in repo (`npm run test:unit` — Icon, InputCount, AddressographBox, ButtonBar) |
 | E2E           | Playwright (Chromium)                 | ✓ in repo (`npm run test:e2e`)                  |
 | Accessibility | `@axe-core/playwright`                | ✓ in repo (`tests/e2e/a11y.spec.ts`)            |

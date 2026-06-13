@@ -156,7 +156,7 @@ a test here.
 
 Run with: `cargo test --test duplicate_detection`
 
-### Coverage (14 tests)
+### Coverage (18 tests)
 
 | Category | What it pins |
 |---|---|
@@ -164,6 +164,7 @@ Run with: `cargo test --test duplicate_detection`
 | Deterministic short-circuits | NHS number deterministic match (FHIR system URI routing), shared tax_id default-routed to US SSN, passport-book identity, DOB off-by-one ordering, strict ⊆ lenient config invariant |
 | Negative cases | unrelated records score low, common-name + divergent demographics not flagged as duplicate |
 | Field-routing pinning | per-adapter mapping tests (telecom → phone/email, address field renames, identifier-system-URI routing) |
+| National-ID scheme audit | all 26 matcher national-ID slots route from a `system`-URI fragment and deterministic-match on a shared well-formed value (`all_national_id_schemes_route_to_their_slot`); AU/IE IHI digit-count disambiguation; CPF deterministic full-credit |
 | Edge cases | sparse records, empty fields, config presets |
 
 ### Running

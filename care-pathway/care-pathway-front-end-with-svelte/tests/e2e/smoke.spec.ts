@@ -28,6 +28,15 @@ async function stubApi(page: Page) {
     const method = req.method();
     const path = url.pathname;
 
+    if (path === "/api/care-pathways/events/recent" && method === "GET") {
+      // Returned oldest-first (highest seq last), as the service does.
+      return route.fulfill({
+        json: [
+          { kind: "created", pid: PID, name: PATHWAY.name, seq: 1 },
+          { kind: "updated", pid: PID, name: PATHWAY.name, seq: 2 },
+        ],
+      });
+    }
     if (path === "/api/care-pathways/search" && method === "GET") {
       const q = (url.searchParams.get("q") ?? "").toLowerCase();
       const hit = PATHWAY.name.toLowerCase().includes(q);
@@ -181,6 +190,24 @@ test("audit trail toggle loads and renders the trail", async ({ page }) => {
   await expect(page.getByText("updated")).toBeVisible();
   await expect(page.getByText("created")).toBeVisible();
   await expect(page.getByText("—").first()).toBeVisible();
+});
+
+test("recent-activity toggle loads and renders the event stream", async ({
+  page,
+}) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+
+  // The panel is collapsed by default; open it to lazy-load the stream.
+  await page.getByRole("button", { name: "Show recent activity" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Recent activity" }),
+  ).toBeVisible();
+
+  // Newest-first: both events render with kind + seq marker.
+  await expect(page.getByText("updated")).toBeVisible();
+  await expect(page.getByText("created")).toBeVisible();
+  await expect(page.getByText("#2")).toBeVisible();
+  await expect(page.getByText("#1")).toBeVisible();
 });
 
 test("merge action folds a duplicate into the survivor", async ({ page }) => {

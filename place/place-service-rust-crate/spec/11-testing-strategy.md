@@ -3,7 +3,7 @@
 Layered: [`AGENTS/testing.md`](../AGENTS/testing.md).
 
 - **Unit tests** — `#[cfg(test)]` modules; models (32), matching
-  (45), validation (19), privacy (8). 104 tests.
+  (45), validation (21), privacy (8). 106 tests.
 - **Integration tests** — `tests/integration_*.rs`; end-to-end
   workflows + edge cases (unicode names, geo poles, date line, GLN
   deterministic override, address normalisation edge cases, GDPR

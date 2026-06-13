@@ -133,7 +133,7 @@ pub fn spec() -> Value {
                 "get": {
                     "tags": ["jwks"],
                     "summary": "Public keys for offline token verification",
-                    "description": "The JSON Web Key Set peer services fetch once to verify RS256 tokens locally — no shared secret, no introspection round-trip.",
+                    "description": "The JSON Web Key Set peer services fetch once to verify RS256 tokens locally — no shared secret, no introspection round-trip. May publish MULTIPLE keys during a key rotation: the primary (active signing) key is first, followed by any additional verify-only keys whose recently-issued tokens are still within their lifetime. Peers select the verifying key by the token header kid, so every published kid is trusted until it is retired.",
                     "responses": {
                         "200": { "description": "JWKS document", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Jwks" } } } }
                     }
@@ -180,7 +180,7 @@ pub fn spec() -> Value {
                     "n": { "type": "string", "description": "RSA modulus (base64url)." },
                     "e": { "type": "string", "description": "RSA exponent (base64url)." } } },
                 "Jwks": { "type": "object", "required": ["keys"], "properties": {
-                    "keys": { "type": "array", "items": { "$ref": "#/components/schemas/Jwk" } } } },
+                    "keys": { "type": "array", "description": "One or more RSA signing keys. The primary (active signer) is first; additional entries are verify-only keys retained across a rotation until their last-issued tokens expire.", "items": { "$ref": "#/components/schemas/Jwk" } } } },
                 "AuthEvent": { "type": "object",
                     "description": "One authentication audit-trail row. Never carries tokens or secrets.",
                     "required": ["id", "event", "created_at", "updated_at"], "properties": {
@@ -313,6 +313,25 @@ mod tests {
         assert!(
             schema["properties"]["token"].is_null(),
             "auth audit rows must not expose tokens"
+        );
+    }
+
+    #[test]
+    fn jwks_endpoint_documents_multiple_keys_for_rotation() {
+        let s = spec();
+        // The JWKS description notes it may publish multiple keys during a
+        // rotation (key-rotation T-5).
+        let desc = s["paths"]["/.well-known/jwks.json"]["get"]["description"]
+            .as_str()
+            .unwrap();
+        assert!(
+            desc.to_lowercase().contains("multiple"),
+            "JWKS description must mention multiple keys (rotation)"
+        );
+        // The Jwks schema keys array is still an array of Jwk.
+        assert_eq!(
+            s["components"]["schemas"]["Jwks"]["properties"]["keys"]["items"]["$ref"],
+            "#/components/schemas/Jwk"
         );
     }
 

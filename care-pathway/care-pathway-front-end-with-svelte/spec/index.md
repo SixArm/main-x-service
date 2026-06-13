@@ -15,9 +15,10 @@ service.
 
 In scope: the four routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`), the
 API client, the care-pathway form, a name-search box on the list, a
-merge-duplicate action on the detail page, and a per-pathway audit-trail
-view on the detail page. Out of scope: fuzzy/full-text search UI,
-system-wide audit/event feeds, auth.
+merge-duplicate action on the detail page, a per-pathway audit-trail
+view on the detail page, and a system-wide recent-activity (event
+stream) view on the list page. Out of scope: fuzzy/full-text search UI,
+system-wide audit feed, auth.
 
 ## 3. Stakeholders and users
 
@@ -45,6 +46,12 @@ Clinical informaticians and pathway authors.
      `GET /api/care-pathways/search?q=` (URL-encoded) and renders the
      filtered results; **Clear** (or an empty query) restores the full
      list. Loading and empty-result states are shown.
+   - Recent activity: a "Show recent activity" toggle lazy-loads
+     `GET /api/care-pathways/events/recent` on first open and renders the
+     events newest-first (highest `seq` first): the kind
+     (created/updated/deleted/merged), the name (linked to the pathway by
+     pid), and the `seq`. Loading, empty, and error states are shown; the
+     panel does not auto-load on mount.
 2. Create (`POST`), redirect to the new detail page.
 3. Detail: render the stored `CarePathway`; offer edit, delete, and
    check-duplicates.
@@ -83,6 +90,7 @@ editable rows).
 |---|---|
 | `/` list | `GET /api/care-pathways` |
 | `/` search | `GET /api/care-pathways/search?q=` |
+| `/` recent activity | `GET /api/care-pathways/events/recent` (→ `PathwayEvent[]`) |
 | `/new` | `POST /api/care-pathways` |
 | `/[pid]` load | `GET /api/care-pathways/{pid}` |
 | `/[pid]` delete | `DELETE /api/care-pathways/{pid}` |
@@ -103,16 +111,18 @@ error-classification/empty-body) and `CarePathwayRepository` (every
 method's path + verb, incl. a regression pinning `check-duplicates`,
 `search()` pinning the `/search?q=` path with URL-encoding, and
 `merge()` pinning `POST /merge` with the `{main_pid, duplicate_pid,
-reason?}` body — pids in the body, not the URL; and `audit()` pinning
-`GET /{pid}/audit` with URL-encoding). **Playwright** smoke
+reason?}` body — pids in the body, not the URL; `audit()` pinning
+`GET /{pid}/audit` with URL-encoding; and `recentEvents()` pinning
+`GET /events/recent`). **Playwright** smoke
 tests (`tests/e2e/`) load the four routes (`/`, `/new`, `/[pid]`,
 `/[pid]/edit`) with the API stubbed via `page.route`, asserting each
 renders; one test exercises the list search box (matching query keeps
 the row, non-matching shows the empty-result message); one test drives
 the detail-page merge action (check-duplicates → confirm merge →
 success message, asserting the merge endpoint fired); one test opens the
-detail-page audit trail (toggle → rows render with action + "—" actor).
-They run against the production
+detail-page audit trail (toggle → rows render with action + "—" actor);
+one test opens the list-page recent-activity panel (toggle → events
+render newest-first with kind + seq). They run against the production
 build (`vite preview`) to avoid the `vite dev` cold-start module race.
 Run: `pnpm test` (vitest) and `pnpm test:e2e` (Playwright).
 
@@ -137,6 +147,11 @@ for any access/audit requirements.
   newest-first (action, actor or "—", timestamp) with loading/empty/error
   states. `repository.audit()` + `AuditEntry` type added; vitest (2) +
   Playwright (1) cover it.
+- [x] Recent-activity view on the list page — a "Show recent activity"
+  toggle lazy-loads `GET /api/care-pathways/events/recent` and renders
+  the events newest-first (kind, name linked by pid, seq) with
+  loading/empty/error states. `repository.recentEvents()` + `PathwayEvent`
+  type added; vitest (1) + Playwright (1) cover it.
 - [ ] `Custom(label)` editing for code systems / settings / schemes.
 - [x] Search box once the service ships search — list page calls
   `GET /api/care-pathways/search?q=` (search-on-submit + Clear);
@@ -146,15 +161,16 @@ for any access/audit requirements.
 ## 14. Implementation status
 
 Done: all four routes; lean client; repository (incl. `search()`,
-`merge()`, and `audit()`); list search box; detail-page merge-duplicate
-action; detail-page audit-trail view; form (incl. condition codes +
-identifiers editors); SPA config. `pnpm run check` clean; production
-build succeeds.
+`merge()`, `audit()`, and `recentEvents()`); list search box;
+list-page recent-activity (event-stream) view; detail-page
+merge-duplicate action; detail-page audit-trail view; form (incl.
+condition codes + identifiers editors); SPA config. `pnpm run check`
+clean; production build succeeds.
 
 ## 15. Roadmap
 
 v0.1 (here): CRUD + duplicate-check UI. v0.2: tests + search box.
-v0.3: audit-trail view (done) + auth token.
+v0.3: audit-trail view (done) + recent-activity view (done) + auth token.
 
 ## 16. Open questions
 

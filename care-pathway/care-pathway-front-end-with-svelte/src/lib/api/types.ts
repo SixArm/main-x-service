@@ -113,3 +113,15 @@ export interface AuditEntry {
     snapshot?: unknown;
     created_at?: string;
 }
+
+/// One event from the service's in-memory CRUD/merge stream, returned by
+/// `GET /api/care-pathways/events/recent`. Mirrors the service's
+/// `streaming::PathwayEvent` (its `EventKind` serializes lowercase):
+/// `kind` (created/updated/deleted/merged), the pathway's `pid` and
+/// `name` at the time of the event, and a per-process monotonic `seq`.
+export interface PathwayEvent {
+    kind: "created" | "updated" | "deleted" | "merged";
+    pid: string;
+    name: string;
+    seq: number;
+}

@@ -73,6 +73,18 @@ or clearly described manual check confirms it. Split oversized tasks
     `ihi_disambiguates_au_vs_ie_by_digit_count`,
     `shared_cpf_system_uri_is_deterministic_match`) → 17 pass, 0
     fail.)*
+  - *(Follow-up 2026-06-13: the 12 previously-unreachable slots are now
+    routed via `system`-URI fast paths — `uk_hc_number` (`hc-number`/
+    `health-and-care`), `uk_chi_number` (`chi-number`/`:chi`/`/chi`),
+    `uk_nino` (`nino`/`national-insurance`), `it_cf` (`codice`/`it-cf`/
+    `:cf`), `bg_egn` (`egn`), `es_dni` (`dni`), `hr_oib` (`oib`),
+    `no_fnr` (`fnr`/`fodselsnummer`), `pl_pesel` (`pesel`),
+    `ro_cnp` (`cnp`), `si_emso` (`emso`), `cn_rrn` (`rrn`). All **26**
+    matcher slots are now reachable; the routing table moved to spec
+    §5.3.1 and is pinned by a new bridge test
+    `all_national_id_schemes_route_to_their_slot` that asserts each
+    scheme routes **and** deterministic-matches on a shared well-formed
+    value → `cargo test --test duplicate_detection` 18 pass, 0 fail.)*
 - [x] **E-9 — Repair repo-root links broken by entity nesting.**
   - [x] Crate docs still link `../../agents/share/…` and
     `../../AGENTS.md`, which after nesting resolve inside `person/`

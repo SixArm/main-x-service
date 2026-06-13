@@ -25,6 +25,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   every public matcher type without taking a separate dependency.
 - Field-routing rules are inline-documented in `adapter.rs` and
   pinned by `tests/duplicate_detection.rs`.
+- Expanded identifier `system`-URI routing in `adapter.rs` to cover
+  the remaining national schemes the matcher already scores
+  deterministically: PL PESEL / PL NIP, RO CNP, UK NINO / UK CHI /
+  UK H&C, IT Codice Fiscale, ES DNI, PT NIF, FI HETU, DK CPR, HR OIB,
+  NO FNR, BG EGN, SI EMŠO, CN RRN, ZA ID, BE NN. Tokens are chosen
+  not to collide (e.g. `nino` never overlaps `nir`); extraction into
+  the `route_additional_scheme` helper keeps both functions within the
+  pedantic line cap. A shared value in any covered scheme now drives a
+  deterministic match instead of silently falling through. Pinned by
+  new adapter unit tests and the new bridge test
+  `shared_pesel_drives_match_via_pl_pesel_slot`.
 
 ### Added — tests
 

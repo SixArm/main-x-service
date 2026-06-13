@@ -127,4 +127,13 @@ describe("CarePathwayRepository", () => {
       "http://svc.test/api/care-pathways/a%20b/audit",
     );
   });
+
+  it("recentEvents() GETs the event-stream endpoint", async () => {
+    const { repo, calls } = spyClient();
+    await repo.recentEvents();
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/care-pathways/events/recent",
+    );
+  });
 });

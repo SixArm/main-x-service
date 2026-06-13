@@ -10,14 +10,29 @@
 //! Key material is loaded from the environment (production) or from the
 //! committed dev keypair under `config/keys/` (development). See
 //! [`load_keys`] for the resolution order.
+//!
+//! ## Key rotation (zero-downtime)
+//!
+//! [`AuthKeys`] is a **key set**, not a single key: one *primary*
+//! signing key plus zero or more *additional* verify-only public keys.
+//! [`sign_access_token`] always signs with the primary and stamps the
+//! primary's `kid`; [`verify_token`] selects the verifying key by the
+//! token header's `kid`, so a token signed by a key that has since been
+//! rotated down to "additional" still verifies locally until it expires.
+//! The JWKS publishes the whole set (primary first), so peers trust
+//! every live `kid`. Additional keys load from
+//! `JWT_ADDITIONAL_PUBLIC_KEY_FILES` / `JWT_ADDITIONAL_PUBLIC_KEY_PEMS`;
+//! unset ⇒ just the primary (fully backward-compatible). See the spec
+//! §8.4 key-management runbook for the operator rotation procedure.
 
+use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use axum::extract::FromRequestParts;
-use axum::http::request::Parts;
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use base64::Engine;
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, decode_header, encode};
 use rsa::pkcs8::DecodePublicKey;
 use rsa::traits::PublicKeyParts;
 use serde::{Deserialize, Serialize};
@@ -28,11 +43,33 @@ use sha2::{Digest, Sha256};
 /// services until they expire, so we keep the window small.
 const DEFAULT_EXPIRATION_SECS: i64 = 3600;
 
-/// Resolved signing/verification material plus the published JWKS.
-pub struct AuthKeys {
-    encoding: EncodingKey,
+/// One RSA public verification key plus the `kid` it is published under.
+/// Used both for the primary's verify side and for each verify-only
+/// additional key.
+struct VerifyKey {
+    /// JWK key id — `base64url(SHA-256(big-endian modulus))`.
+    kid: String,
+    /// The decoding key used to check RS256 signatures.
     decoding: DecodingKey,
-    /// JWK key id — SHA-256 thumbprint of the public modulus.
+    /// Pre-rendered JWK (`kty`/`use`/`alg`/`kid`/`n`/`e`) for the JWKS.
+    jwk: serde_json::Value,
+}
+
+/// Resolved signing/verification material plus the published JWKS.
+///
+/// Holds a **set** of keys: exactly one primary signing key (used by
+/// [`sign_access_token`]) and zero or more additional verify-only public
+/// keys (recently rotated-out keys whose still-live tokens must keep
+/// verifying). [`verify_token`] selects among them by the token header
+/// `kid`. The JWKS publishes all of them, primary first.
+pub struct AuthKeys {
+    /// Primary signing key.
+    encoding: EncodingKey,
+    /// Verification keys keyed by `kid`: the primary plus any additional.
+    by_kid: HashMap<String, DecodingKey>,
+    /// JWK key id of the **primary** key — stamped into every token
+    /// header and the first entry of the JWKS. SHA-256 thumbprint of the
+    /// primary public modulus.
     pub kid: String,
     /// `iss` claim and JWKS issuer.
     pub issuer: String,
@@ -41,7 +78,16 @@ pub struct AuthKeys {
     /// Access-token lifetime in seconds.
     pub expiration: i64,
     /// Pre-rendered JWKS document served at `/.well-known/jwks.json`.
+    /// Carries every key in the set (primary first).
     pub jwks: serde_json::Value,
+}
+
+impl AuthKeys {
+    /// Number of verification keys in the set (1 primary + additional).
+    #[must_use]
+    pub fn key_count(&self) -> usize {
+        self.by_kid.len()
+    }
 }
 
 /// JWT claims. `sub` carries the user's public id (`pid`).
@@ -111,10 +157,89 @@ fn env_or(name: &str, default: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| default.to_string())
 }
 
-/// Resolve key material. PEM is taken inline from `JWT_PRIVATE_KEY_PEM`
-/// / `JWT_PUBLIC_KEY_PEM` when set, else read from the files named by
-/// `JWT_PRIVATE_KEY_FILE` / `JWT_PUBLIC_KEY_FILE`, which default to the
-/// committed dev keypair.
+/// Derive the verify-side material (`kid`, decoding key, JWK) from a
+/// public-key PEM. The `kid` is `base64url(SHA-256(big-endian modulus))`,
+/// stable across restarts and identical in token headers and the JWKS.
+///
+/// # Errors
+///
+/// Returns [`AuthError::Keys`] when the PEM is not a valid RSA public key.
+fn verify_key_from_public_pem(public_pem: &str) -> Result<VerifyKey, AuthError> {
+    let decoding = DecodingKey::from_rsa_pem(public_pem.as_bytes())
+        .map_err(|e| AuthError::Keys(format!("public key: {e}")))?;
+    let pub_key = rsa::RsaPublicKey::from_public_key_pem(public_pem)
+        .map_err(|e| AuthError::Keys(format!("parse public key: {e}")))?;
+    let n_bytes = pub_key.n().to_bytes_be();
+    let e_bytes = pub_key.e().to_bytes_be();
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let kid = b64.encode(Sha256::digest(&n_bytes));
+    let jwk = serde_json::json!({
+        "kty": "RSA",
+        "use": "sig",
+        "alg": "RS256",
+        "kid": kid,
+        "n": b64.encode(&n_bytes),
+        "e": b64.encode(&e_bytes),
+    });
+    Ok(VerifyKey { kid, decoding, jwk })
+}
+
+/// Split an inline-PEM env value (`JWT_ADDITIONAL_PUBLIC_KEY_PEMS`) into
+/// individual PEM blocks. Multiple keys may be separated by commas or
+/// blank lines; we just split on the `-----END ...-----` boundary so the
+/// caller can paste a concatenation of standard PEM blocks.
+fn split_pems(blob: &str) -> Vec<String> {
+    let mut pems = Vec::new();
+    let mut current = String::new();
+    for line in blob.lines() {
+        let trimmed = line.trim();
+        // A lone comma separator between blocks is ignored.
+        if trimmed.is_empty() || trimmed == "," {
+            continue;
+        }
+        current.push_str(trimmed);
+        current.push('\n');
+        if trimmed.starts_with("-----END") {
+            pems.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.trim().is_empty() {
+        pems.push(current);
+    }
+    pems
+}
+
+/// Resolve the *additional* verify-only public keys from the environment.
+/// `JWT_ADDITIONAL_PUBLIC_KEY_FILES` is a comma-separated list of file
+/// paths; `JWT_ADDITIONAL_PUBLIC_KEY_PEMS` carries inline PEM blocks
+/// (comma- or newline-separated). Both are optional and may be combined;
+/// unset/empty ⇒ no additional keys (backward-compatible single-key set).
+///
+/// # Errors
+///
+/// Returns [`AuthError::Keys`] when a listed file cannot be read or a PEM
+/// is not a valid RSA public key.
+fn additional_public_pems() -> Result<Vec<String>, AuthError> {
+    let mut pems = Vec::new();
+    if let Ok(files) = std::env::var("JWT_ADDITIONAL_PUBLIC_KEY_FILES") {
+        for path in files.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+            let pem = std::fs::read_to_string(path)
+                .map_err(|e| AuthError::Keys(format!("read additional key {path}: {e}")))?;
+            pems.push(pem);
+        }
+    }
+    if let Ok(inline) = std::env::var("JWT_ADDITIONAL_PUBLIC_KEY_PEMS") {
+        pems.extend(split_pems(&inline));
+    }
+    Ok(pems)
+}
+
+/// Resolve key material. The primary signing key's PEM is taken inline
+/// from `JWT_PRIVATE_KEY_PEM` / `JWT_PUBLIC_KEY_PEM` when set, else read
+/// from the files named by `JWT_PRIVATE_KEY_FILE` / `JWT_PUBLIC_KEY_FILE`,
+/// which default to the committed dev keypair. Additional verify-only
+/// keys come from `JWT_ADDITIONAL_PUBLIC_KEY_FILES` /
+/// `JWT_ADDITIONAL_PUBLIC_KEY_PEMS` (see [`additional_public_pems`]).
 ///
 /// # Errors
 ///
@@ -140,20 +265,50 @@ pub fn load_keys() -> Result<AuthKeys, AuthError> {
         }
     };
 
-    let encoding = EncodingKey::from_rsa_pem(private_pem.as_bytes())
-        .map_err(|e| AuthError::Keys(format!("private key: {e}")))?;
-    let decoding = DecodingKey::from_rsa_pem(public_pem.as_bytes())
-        .map_err(|e| AuthError::Keys(format!("public key: {e}")))?;
+    let additional = additional_public_pems()?;
+    load_from(&private_pem, &public_pem, &additional)
+}
 
-    // Derive JWK (n, e) + a stable kid from the public key.
-    let pub_key = rsa::RsaPublicKey::from_public_key_pem(&public_pem)
-        .map_err(|e| AuthError::Keys(format!("parse public key: {e}")))?;
-    let n_bytes = pub_key.n().to_bytes_be();
-    let e_bytes = pub_key.e().to_bytes_be();
-    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    let n = b64.encode(&n_bytes);
-    let e = b64.encode(&e_bytes);
-    let kid = b64.encode(Sha256::digest(&n_bytes));
+/// Build an [`AuthKeys`] set from explicit PEM strings, reading the
+/// issuer / audience / expiration policy from the environment (with the
+/// usual defaults). Factored out of [`load_keys`] so tests can construct
+/// a deterministic multi-key set without mutating process env or files.
+///
+/// `primary_private_pem` / `primary_public_pem` are the signing keypair;
+/// `additional_public_pems` are extra verify-only public keys. Keys are
+/// de-duplicated by `kid`, and the primary always wins the `kid` slot and
+/// the JWKS-first position.
+///
+/// # Errors
+///
+/// Returns [`AuthError::Keys`] when any PEM is missing or not valid RSA.
+pub fn load_from(
+    primary_private_pem: &str,
+    primary_public_pem: &str,
+    additional_public_pems: &[String],
+) -> Result<AuthKeys, AuthError> {
+    let encoding = EncodingKey::from_rsa_pem(primary_private_pem.as_bytes())
+        .map_err(|e| AuthError::Keys(format!("private key: {e}")))?;
+
+    let primary = verify_key_from_public_pem(primary_public_pem)?;
+    let kid = primary.kid.clone();
+
+    // Build the JWKS (primary first) and the kid→decoding map, skipping
+    // any additional key that duplicates the primary or a prior kid.
+    let mut by_kid: HashMap<String, DecodingKey> = HashMap::new();
+    let mut jwk_list: Vec<serde_json::Value> = Vec::new();
+
+    jwk_list.push(primary.jwk);
+    by_kid.insert(primary.kid, primary.decoding);
+
+    for pem in additional_public_pems {
+        let extra = verify_key_from_public_pem(pem)?;
+        if by_kid.contains_key(&extra.kid) {
+            continue; // already present (e.g. duplicate of primary)
+        }
+        jwk_list.push(extra.jwk);
+        by_kid.insert(extra.kid, extra.decoding);
+    }
 
     let issuer = env_or("JWT_ISSUER", "authentication-service");
     let audience = env_or("JWT_AUDIENCE", "main-x-service");
@@ -162,20 +317,11 @@ pub fn load_keys() -> Result<AuthKeys, AuthError> {
         .and_then(|v| v.parse::<i64>().ok())
         .unwrap_or(DEFAULT_EXPIRATION_SECS);
 
-    let jwks = serde_json::json!({
-        "keys": [{
-            "kty": "RSA",
-            "use": "sig",
-            "alg": "RS256",
-            "kid": kid,
-            "n": n,
-            "e": e,
-        }]
-    });
+    let jwks = serde_json::json!({ "keys": jwk_list });
 
     Ok(AuthKeys {
         encoding,
-        decoding,
+        by_kid,
         kid,
         issuer,
         audience,
@@ -216,18 +362,31 @@ pub fn sign_access_token(
     Ok((token, jti, exp))
 }
 
-/// Verify an RS256 token against the local public key, checking issuer,
-/// audience, and expiry.
+/// Verify an RS256 token against the local key **set**, checking issuer,
+/// audience, and expiry. The verifying key is selected by the token
+/// header's `kid`, so a token signed by a key that has since rotated down
+/// to "additional" (verify-only) still verifies until it expires. A token
+/// whose `kid` is absent or matches no key in the set is rejected.
 ///
 /// # Errors
 ///
-/// Returns the underlying `jsonwebtoken` error on any validation failure.
+/// Returns the underlying `jsonwebtoken` error on any validation failure,
+/// including an `InvalidSignature` when the header `kid` is missing or
+/// unknown (no key in the set can verify it).
 pub fn verify_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
     let k = keys();
+    let header = decode_header(token)?;
+    let decoding = header
+        .kid
+        .as_deref()
+        .and_then(|kid| k.by_kid.get(kid))
+        .ok_or_else(|| {
+            jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidSignature)
+        })?;
     let mut validation = Validation::new(jsonwebtoken::Algorithm::RS256);
     validation.set_issuer(std::slice::from_ref(&k.issuer));
     validation.set_audience(std::slice::from_ref(&k.audience));
-    decode::<Claims>(token, &k.decoding, &validation).map(|data| data.claims)
+    decode::<Claims>(token, decoding, &validation).map(|data| data.claims)
 }
 
 /// Axum extractor for a verified bearer token. Pulls `Authorization:
@@ -313,5 +472,173 @@ mod tests {
     fn garbage_token_is_rejected() {
         assert!(verify_token("not.a.jwt").is_err());
         assert!(verify_token("").is_err());
+    }
+
+    // --- Key rotation (T-5) ---------------------------------------------
+    //
+    // These build deterministic key sets in-process via `load_from`
+    // (no env mutation, no extra files), so they exercise the multi-key
+    // path without disturbing the shared `keys()` singleton.
+
+    // The committed dev keypair (the same one `keys()` resolves). Reading
+    // it here lets a test build a multi-key set whose primary equals the
+    // process primary, so tokens from `sign_access_token` are verifiable.
+    fn dev_keypair() -> (String, String) {
+        let private = std::fs::read_to_string("config/keys/jwt_private_dev.pem")
+            .expect("committed dev private key");
+        let public = std::fs::read_to_string("config/keys/jwt_public_dev.pem")
+            .expect("committed dev public key");
+        (private, public)
+    }
+
+    // A second, throwaway RSA keypair distinct from the dev keypair. Used
+    // as an "additional" (rotated-out) key and as an unknown signer.
+    const OTHER_PRIVATE_PEM: &str = "-----BEGIN PRIVATE KEY-----\n\
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCb8A4bMels7eEL\n\
+TCFMcXyJTMdQ0k2klAxkPjPRHdAtwzV+6uLjKBlI2NTubkUl0BcKLKpX1G9mDjci\n\
+Qiga5frQ/QX9IedKGdU3aLo0BvpewAK2TmRwDe48i3d+uGWPbDcDd9DG0hEz6ugd\n\
+CXeCcXekdcsX8e8bF9E4FYK+2DaI9xiVhMQS8xSY7Mt3Os/T8GBT27/JdKkzoX2Z\n\
+ntYiOOhxwcwztS+W8y1qVD6b39hPCo2vbl+nyFdN6tz00L/qakJMV4AJjXOYhT5N\n\
+XBYII92vmlznYNWNTtBymmaGhes7RbIb9AvgC2PJZdk57Sxl0tP71CsIX2P/RjPD\n\
+AoExpOfDAgMBAAECggEAKwLNGUIslM+OJZwTiS66P3KufUPsh4sQWevwRes3uw+f\n\
+Z0jpWOd8BeRM4xEGQJZDbJqCR6SAL4GXQntF7Zlmk5NevgHGdmFmtphL18Le9xh2\n\
+BwvbVy74ebmsNYct+B/MksfPDa/ub8gIys2MKa4bZoDZCltAbNQmcJY6UGJ5tFAp\n\
+ItKFgoA8wnxJroUGcw1r7B8WRyxBGxSqjYVmwtRyUcbea1gCVfCXGwkkVgv42Miu\n\
+YY6C7y9e0zlwcAXdkZGTgfYlz/hiBWd2xAg+tGV2bwVBRlX3Io1qcNUEphOHDp+l\n\
+iTf/E8DkLvln3J9DsBD6jscWE8lK8HDzLHPpT1EkSQKBgQDQ7KW2so/ZMPMvLo+R\n\
+j61XUqvRW9sJgsQvZsukGt+dbq/YDJho6J0mu2OC8Sag2ZvLezGmGdjMkUHIvza/\n\
+3KpHau4vPG0LByqZv2sF+9XAOLo5YAVPZlZFb8egYH7X2bOmVaupyGKSsmcMUsHa\n\
+x7jZf84vIY033RcLhirjDDg6ywKBgQC/Evw1CXby8WVKBPNB8pr7VKE6oy6DK76d\n\
+TESJiirq1Z8am1WKxOzvo9OlZPibfuZKeY/XiF2fj5YHWc1xR7S7+OPMlwZdVx64\n\
+h7Iv3j9yFS7jwX1AVxmOB/b48ki+QEItTEiQJqEQXiFEGr0MgI6fTj/opKEltv5L\n\
+6cfdqOCP6QKBgQCu4LchQzvnV/Lm1nl0JSi6REfvuYyR3HRtHQVuOtRcig8EsB5P\n\
+Cg6pIgd8znBACYY//8GiQFZZfWjsKSoh1QpvN1FiFplLttbw1Oo3mwHjoVg3uGkZ\n\
+ehbSjmsxkjP6Z47ZtzI2rrXcBxr8lLURdUYEQNeMWfBEB3tHuSli3ZKfmwKBgQCn\n\
+YfdEcuUbz7H+lLWQqPlxgGK5HmhJilGyNDS6FCqii76ULU1Tgk1ZZLesZPaQKSuO\n\
+RE1o71GszLkN+XJKcRl3rYHJIOf3brE/z8edvWDxDHOGG2MgsOx3Cq0kygJFf785\n\
+NWE/vkdMMlmL8qx3vkqybXb40vdENbkxQTvQBvepuQKBgGHKxTj314X4xObeQ5BY\n\
+yteRm758Id7MoieW0dYZC62a05STaiyCB5ulVCijNa66616uxyAMhquKru9xT1Bt\n\
+zGUi4GKlyqqAH7webJPHDR58z5Jj4XqAblYzRFY3nqSAd6lxdjMdIftQi0xrG6+x\n\
+UOsbyJ6S44rLeDtZ9KGxR0gS\n\
+-----END PRIVATE KEY-----\n";
+
+    const OTHER_PUBLIC_PEM: &str = "-----BEGIN PUBLIC KEY-----\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAm/AOGzHpbO3hC0whTHF8\n\
+iUzHUNJNpJQMZD4z0R3QLcM1furi4ygZSNjU7m5FJdAXCiyqV9RvZg43IkIoGuX6\n\
+0P0F/SHnShnVN2i6NAb6XsACtk5kcA3uPIt3frhlj2w3A3fQxtIRM+roHQl3gnF3\n\
+pHXLF/HvGxfROBWCvtg2iPcYlYTEEvMUmOzLdzrP0/BgU9u/yXSpM6F9mZ7WIjjo\n\
+ccHMM7UvlvMtalQ+m9/YTwqNr25fp8hXTerc9NC/6mpCTFeACY1zmIU+TVwWCCPd\n\
+r5pc52DVjU7QcppmhoXrO0WyG/QL4AtjyWXZOe0sZdLT+9QrCF9j/0YzwwKBMaTn\n\
+wwIDAQAB\n\
+-----END PUBLIC KEY-----\n";
+
+    // Sign a token with an arbitrary keypair + kid (mirrors how
+    // `sign_access_token` builds the header) so tests can produce tokens
+    // for primary, additional, and unknown signers deterministically.
+    fn sign_with(private_pem: &str, kid: &str, k: &AuthKeys) -> String {
+        let now = chrono::Utc::now().timestamp();
+        let claims = Claims {
+            sub: "11111111-1111-1111-1111-111111111111".to_string(),
+            email: "alice@example.com".to_string(),
+            name: "Alice".to_string(),
+            iss: k.issuer.clone(),
+            aud: k.audience.clone(),
+            exp: now + 3600,
+            iat: now,
+            jti: uuid::Uuid::new_v4().to_string(),
+        };
+        let mut header = Header::new(jsonwebtoken::Algorithm::RS256);
+        header.kid = Some(kid.to_string());
+        let enc = EncodingKey::from_rsa_pem(private_pem.as_bytes()).expect("encoding key");
+        encode(&header, &claims, &enc).expect("encode")
+    }
+
+    // Verify against an explicit key set (the rotation tests build their
+    // own `AuthKeys`, so they can't use the singleton `verify_token`).
+    fn verify_with(k: &AuthKeys, token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+        let header = decode_header(token)?;
+        let decoding = header
+            .kid
+            .as_deref()
+            .and_then(|kid| k.by_kid.get(kid))
+            .ok_or_else(|| {
+                jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidSignature)
+            })?;
+        let mut validation = Validation::new(jsonwebtoken::Algorithm::RS256);
+        validation.set_issuer(std::slice::from_ref(&k.issuer));
+        validation.set_audience(std::slice::from_ref(&k.audience));
+        decode::<Claims>(token, decoding, &validation).map(|data| data.claims)
+    }
+
+    #[test]
+    fn no_additional_keys_is_backward_compatible_single_key() {
+        let (private, public) = dev_keypair();
+        let set = load_from(&private, &public, &[]).expect("load");
+        // One key only, and its kid equals the singleton's kid.
+        assert_eq!(set.key_count(), 1);
+        assert_eq!(set.jwks["keys"].as_array().unwrap().len(), 1);
+        assert_eq!(set.kid, keys().kid);
+        assert_eq!(set.jwks["keys"][0]["kid"].as_str().unwrap(), set.kid);
+    }
+
+    #[test]
+    fn jwks_publishes_all_keys_primary_first() {
+        let (private, public) = dev_keypair();
+        let set = load_from(&private, &public, &[OTHER_PUBLIC_PEM.to_string()]).expect("load");
+        assert_eq!(set.key_count(), 2);
+        let arr = set.jwks["keys"].as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        // Primary is first; the additional key is present under its own kid.
+        assert_eq!(arr[0]["kid"].as_str().unwrap(), set.kid);
+        let other = verify_key_from_public_pem(OTHER_PUBLIC_PEM).expect("derive");
+        assert_eq!(arr[1]["kid"].as_str().unwrap(), other.kid);
+        assert_ne!(set.kid, other.kid);
+    }
+
+    #[test]
+    fn token_from_now_additional_key_still_verifies() {
+        // Simulate a rotation: the OTHER key used to be primary, and is
+        // now an additional (verify-only) key alongside the new primary.
+        let (private, public) = dev_keypair();
+        let set = load_from(&private, &public, &[OTHER_PUBLIC_PEM.to_string()]).expect("load");
+        let other = verify_key_from_public_pem(OTHER_PUBLIC_PEM).expect("derive");
+
+        // A token signed by the (now additional) OTHER key verifies.
+        let token = sign_with(OTHER_PRIVATE_PEM, &other.kid, &set);
+        let claims = verify_with(&set, &token).expect("additional-key token verifies");
+        assert_eq!(claims.email, "alice@example.com");
+
+        // A token signed by the primary also verifies.
+        let primary_token = sign_with(&private, &set.kid, &set);
+        assert!(verify_with(&set, &primary_token).is_ok());
+    }
+
+    #[test]
+    fn unknown_kid_token_is_rejected() {
+        let (private, public) = dev_keypair();
+        // Set with only the primary; OTHER is NOT in the set.
+        let set = load_from(&private, &public, &[]).expect("load");
+        let token = sign_with(OTHER_PRIVATE_PEM, "some-unknown-kid", &set);
+        assert!(verify_with(&set, &token).is_err());
+    }
+
+    #[test]
+    fn duplicate_additional_key_is_deduplicated() {
+        let (private, public) = dev_keypair();
+        // Passing the primary's own public key as "additional" must not
+        // produce a second JWKS entry.
+        let set = load_from(&private, &public, std::slice::from_ref(&public)).expect("load");
+        assert_eq!(set.key_count(), 1);
+        assert_eq!(set.jwks["keys"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn split_pems_separates_concatenated_blocks() {
+        let blob = format!("{OTHER_PUBLIC_PEM}\n{OTHER_PUBLIC_PEM}");
+        let pems = split_pems(&blob);
+        assert_eq!(pems.len(), 2);
+        for pem in &pems {
+            assert!(verify_key_from_public_pem(pem).is_ok());
+        }
     }
 }

@@ -130,6 +130,18 @@ self-contained module (`src/auth`) using `jsonwebtoken` (RS256) and
 plain Axum `FromRequestParts`, so peer services can reuse the same
 verification approach.
 
+**Key set & rotation.** `auth::AuthKeys` holds a **set** of keys: one
+primary signing key plus zero or more additional verify-only public
+keys (loaded from `JWT_ADDITIONAL_PUBLIC_KEY_FILES` /
+`JWT_ADDITIONAL_PUBLIC_KEY_PEMS`; unset ⇒ just the primary,
+backward-compatible). `sign_access_token` signs with the primary and
+stamps its `kid`; `verify_token` selects the verifying key by the token
+header `kid` from {primary} ∪ {additional}; the JWKS publishes all keys
+(primary first). This enables operator-driven, **zero-downtime key
+rotation** — see the entity spec §8.4 runbook and
+[`config/keys/README.md`](../config/keys/README.md). No auto-rotation
+scheduler (follow-up).
+
 ## 9. API surface
 
 See §6. Responses are raw loco JSON (no envelope). Errors use loco's
@@ -161,7 +173,13 @@ off in production.
 ## 11. Testing strategy
 
 - **Unit (DB-free):** `src/auth` — sign/verify roundtrip, JWKS shape,
-  tampered/garbage-token rejection. Run with `cargo test --lib`.
+  tampered/garbage-token rejection, and **key rotation**: a single-key
+  set is byte-for-byte backward-compatible (same `kid`), a multi-key set
+  publishes all keys (primary first), a token signed by a now-additional
+  (verify-only) key still verifies via `kid` lookup, an unknown `kid` is
+  rejected, duplicate additional keys are de-duplicated, and inline-PEM
+  splitting works. Built deterministically via the `load_from(...)` test
+  constructor (no env mutation). Run with `cargo test --lib`.
 - **Request tests:** loco's `tests/requests/auth.rs` exercises the §6
   magic-link surface (signup / magic-link / redeem incl. single-use and
   anti-enumeration / me / signout / JWKS). The HTTP tests require a
@@ -194,7 +212,9 @@ off in production.
   a token signed by `auth::sign_access_token` verifies through the
   verifier crate built from this service's published JWKS; the claims
   round-trip and `kid` = base64url(SHA-256(modulus)) holds; a `kid`
-  mismatch fails.
+  mismatch fails. A **multi-key** case asserts a verifier built from a
+  JWKS carrying more than the primary key still verifies a primary-signed
+  token and rejects a token whose `kid` is absent from the set.
 
 ## 12. Compliance
 
@@ -287,8 +307,16 @@ that subject, while the operator-facing system feed stays open.
       DB-gated request tests; OpenAPI documents the three endpoints +
       `AccountExport`/`AccountSessionExport`/`AccountAuditExport`
       schemas. *(2026-06-13; entity spec T-9.)*
-- [ ] Key rotation: support multiple JWKS entries (`kid` already
-      stamped) and a grace window.
+- [x] Key rotation (`src/auth`): `AuthKeys` is a **key set** — one
+      primary signing key + zero or more additional verify-only public
+      keys from `JWT_ADDITIONAL_PUBLIC_KEY_FILES` /
+      `JWT_ADDITIONAL_PUBLIC_KEY_PEMS` (unset ⇒ single primary,
+      backward-compatible). `sign_access_token` signs with the primary;
+      `verify_token` selects by token-header `kid`; the JWKS publishes all
+      keys (primary first); unknown `kid` rejected. `load_from(...)` test
+      constructor + un-gated unit tests; multi-key contract test in
+      `tests/sign_verify_contract.rs`. Operator runbook in §8.4 /
+      `config/keys/README.md`. *(2026-06-13; entity spec T-5.)*
 - [ ] Optional Mailpit docker-compose service for realistic dev email.
 
 ## 14. Implementation status
@@ -303,14 +331,17 @@ hand-written OpenAPI 3 + Swagger UI; durable `auth_events` audit trail
 (`GET /api/auth/audit/recent`); GDPR subject-rights workflow
 (`GET /api/auth/account/export`, `GET /api/auth/account/audit`,
 `DELETE /api/auth/account` — right of access + soft-delete/anonymise
-erasure, `users.deleted_at`).
+erasure, `users.deleted_at`); operator-driven **zero-downtime key
+rotation** (`AuthKeys` is a primary + additional verify-only key set;
+JWKS publishes all keys; `verify_token` selects by `kid`).
 
 ## 15. Roadmap
 
 v0.1 (here): core magic-link + RS256/JWKS + signout, reworked request
-tests, peer-service verifier + contract test. v0.2: key rotation,
-Mailpit. v0.3: begin loco conversion of the sibling services using this
-as the template (peers adopt `authentication-verifier`).
+tests, peer-service verifier + contract test, operator-driven key
+rotation (multi-key set). v0.2: Mailpit, auto-rotation scheduler. v0.3:
+begin loco conversion of the sibling services using this as the template
+(peers adopt `authentication-verifier`).
 
 ## 16. Open questions
 

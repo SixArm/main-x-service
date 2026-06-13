@@ -95,7 +95,11 @@ async fn can_request_magic_link_for_existing_account() {
 
         let payload = serde_json::json!({ "email": "user1@example.com" });
         let response = request.post("/api/auth/magic-link").json(&payload).await;
-        assert_eq!(response.status_code(), 200, "Magic link request should succeed");
+        assert_eq!(
+            response.status_code(),
+            200,
+            "Magic link request should succeed"
+        );
 
         let user = users::Model::find_by_email(&ctx.db, "user1@example.com")
             .await
@@ -173,7 +177,11 @@ async fn invalid_magic_link_token_is_rejected() {
         seed::<App>(&ctx).await.unwrap();
 
         let response = request.get("/api/auth/magic-link/invalid-token").await;
-        assert_eq!(response.status_code(), 401, "Invalid token must be rejected");
+        assert_eq!(
+            response.status_code(),
+            401,
+            "Invalid token must be rejected"
+        );
     })
     .await;
 }
@@ -190,7 +198,11 @@ async fn can_get_current_user() {
             .get("/api/auth/me")
             .add_header(auth_key, auth_value)
             .await;
-        assert_eq!(response.status_code(), 200, "/me should succeed with a bearer token");
+        assert_eq!(
+            response.status_code(),
+            200,
+            "/me should succeed with a bearer token"
+        );
 
         let body: serde_json::Value = serde_json::from_str(&response.text()).unwrap();
         assert_eq!(body["pid"], logged_in.user.pid.to_string());
@@ -231,7 +243,11 @@ async fn signout_revokes_the_session() {
             .get("/api/auth/me")
             .add_header(auth_key, auth_value)
             .await;
-        assert_eq!(me.status_code(), 401, "Revoked session must be rejected by /me");
+        assert_eq!(
+            me.status_code(),
+            401,
+            "Revoked session must be rejected by /me"
+        );
     })
     .await;
 }
@@ -359,8 +375,9 @@ async fn auth_events_are_recorded_and_queryable() {
             "audit/recent should include the signup event"
         );
         assert!(
-            events.iter().any(|e| e["event"] == "magic_link_requested"
-                && e["detail"] == "unknown_email"),
+            events
+                .iter()
+                .any(|e| e["event"] == "magic_link_requested" && e["detail"] == "unknown_email"),
             "audit/recent should include the unknown_email magic-link event"
         );
 
@@ -383,7 +400,11 @@ async fn account_export_returns_the_callers_data() {
             .get("/api/auth/account/export")
             .add_header(auth_key, auth_value)
             .await;
-        assert_eq!(response.status_code(), 200, "export should succeed with a bearer token");
+        assert_eq!(
+            response.status_code(),
+            200,
+            "export should succeed with a bearer token"
+        );
 
         let body: serde_json::Value = serde_json::from_str(&response.text()).unwrap();
         assert_eq!(body["user"]["pid"], logged_in.user.pid.to_string());
@@ -395,14 +416,25 @@ async fn account_export_returns_the_callers_data() {
         );
         // The audit trail (signup + redeem) is present.
         assert!(
-            body["auth_events"].as_array().is_some_and(|e| !e.is_empty()),
+            body["auth_events"]
+                .as_array()
+                .is_some_and(|e| !e.is_empty()),
             "export should include the subject's auth events"
         );
         // No credentials/secrets ever appear.
         let raw = response.text();
-        assert!(!raw.contains("password"), "export must not expose the password");
-        assert!(!raw.contains("api_key"), "export must not expose the api key");
-        assert!(!raw.contains("\"token\""), "export must not expose any token");
+        assert!(
+            !raw.contains("password"),
+            "export must not expose the password"
+        );
+        assert!(
+            !raw.contains("api_key"),
+            "export must not expose the api key"
+        );
+        assert!(
+            !raw.contains("\"token\""),
+            "export must not expose any token"
+        );
     })
     .await;
 }
@@ -457,7 +489,10 @@ async fn account_erasure_soft_deletes_anonymises_revokes_and_audits() {
             .expect("the row must survive erasure for audit integrity");
         assert!(erased.deleted_at.is_some(), "deleted_at must be stamped");
         assert_ne!(erased.email, original_email, "email must be anonymised");
-        assert!(erased.email.ends_with("@invalid"), "email must be tombstoned");
+        assert!(
+            erased.email.ends_with("@invalid"),
+            "email must be tombstoned"
+        );
         assert_eq!(erased.name, "deleted user", "name must be tombstoned");
         // The original email no longer resolves.
         assert!(
@@ -496,7 +531,11 @@ async fn account_erasure_soft_deletes_anonymises_revokes_and_audits() {
             .get("/api/auth/account/export")
             .add_header(auth_key, auth_value)
             .await;
-        assert_eq!(export.status_code(), 401, "export must reject an erased account");
+        assert_eq!(
+            export.status_code(),
+            401,
+            "export must reject an erased account"
+        );
     })
     .await;
 }
@@ -521,7 +560,10 @@ fn route_table_covers_the_magic_link_surface() {
         "/account/audit",
         "/account",
     ] {
-        assert!(uris.contains(&expected), "missing route {expected}; have {uris:?}");
+        assert!(
+            uris.contains(&expected),
+            "missing route {expected}; have {uris:?}"
+        );
     }
 
     let jwks = authentication_service::controllers::jwks::routes();

@@ -7,7 +7,7 @@ use authentication_service::{
     app::App,
     models::users::{self, Model, RegisterParams},
 };
-use chrono::{offset::Local, Duration};
+use chrono::{Duration, offset::Local};
 use insta::assert_debug_snapshot;
 use loco_rs::testing::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue, IntoActiveModel};

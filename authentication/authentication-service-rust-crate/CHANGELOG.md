@@ -12,6 +12,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Zero-downtime key rotation** (entity spec T-5). `auth::AuthKeys` is
+  now a **key set**: one *primary* signing key plus zero or more
+  *additional* verify-only public keys.
+  - New config: `JWT_ADDITIONAL_PUBLIC_KEY_FILES` (comma-separated file
+    paths) and `JWT_ADDITIONAL_PUBLIC_KEY_PEMS` (inline PEM blocks,
+    comma- or newline-separated) load the additional keys. Unset/empty ⇒
+    a single-key set, byte-for-byte the previous behaviour (same `kid`).
+  - `sign_access_token` signs with the primary and stamps its `kid`
+    (unchanged for the common case); `verify_token` selects the verifying
+    key by the token header `kid` from {primary} ∪ {additional}, so a
+    token signed by a key that has since rotated down to "additional"
+    still verifies locally until it expires; an unknown `kid` is rejected.
+  - `/.well-known/jwks.json` now publishes **all** keys in the set
+    (primary first). `kid` stays `base64url(SHA-256(modulus))` for every
+    key. OpenAPI updated to note the JWKS may publish multiple keys.
+  - A `load_from(...)` constructor builds a deterministic multi-key set
+    from explicit PEMs (no env mutation), used by the un-gated unit
+    tests. The cross-crate `tests/sign_verify_contract.rs` gains a
+    multi-key case (a verifier built from the full set verifies a
+    primary-signed token and rejects an unknown `kid`).
+  - Operator runbook: `config/keys/README.md` + spec §8.4. No
+    auto-rotation scheduler (planned follow-up).
 - **GDPR subject-rights workflow** (entity spec T-9). Three bearer-gated
   account endpoints on the `auth` controller:
   - `GET /api/auth/account/export` — **right of access** (Art. 15):

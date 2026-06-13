@@ -78,7 +78,8 @@ async fn deliver_magic_link(ctx: &AppContext, user: &users::Model) {
     let Some(token) = user.magic_link_token.as_ref() else {
         return;
     };
-    let frontend = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+    let frontend =
+        std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
     let link = format!("{frontend}/verify?token={token}");
     tracing::info!(
         email = %user.email,
@@ -94,7 +95,10 @@ async fn deliver_magic_link(ctx: &AppContext, user: &users::Model) {
 /// leaking whether an email is already registered, an existing email
 /// still receives a fresh link and the response is always 200.
 #[debug_handler]
-async fn signup(State(ctx): State<AppContext>, Json(params): Json<SignupParams>) -> Result<Response> {
+async fn signup(
+    State(ctx): State<AppContext>,
+    Json(params): Json<SignupParams>,
+) -> Result<Response> {
     // Throttle per email before any work, so abuse cannot email-bomb a
     // victim or probe for accounts. Over the limit → 429, no token issued.
     if rate_limit::check(&params.email).is_err() {

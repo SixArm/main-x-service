@@ -87,3 +87,16 @@ or clearly described manual check confirms the acceptance criterion.
   worldwide-deployment consequences in matcher spec §10.
   - **Acceptance:** decision recorded in matcher spec; tests cover at
     least one non-English vocabulary or the documented exclusion.
+- [x] **E-12 — GLN check-digit validation (spec-vs-code drift).**
+  *(2026-06-13: service spec §6 / §14 and `CLAUDE.md` promised a "GLN
+  check digit", but `validate_place` only counted 13 digits. Added
+  `validation::gln_is_valid` implementing the GS1 mod-10 check digit and
+  wired it into `validate_place`; updated stale test fixtures to real
+  GLNs (`0614141999996`, `4006381333931`) and added check-digit unit +
+  integration tests. Verified un-gated: `cargo build`, `cargo test --lib`
+  (120 pass), `cargo test --test duplicate_detection` (14 pass),
+  `integration_validation` / `integration_edge_cases` / `integration_models`
+  green, `cargo fmt --check` clean, clippy adds no new warnings.)*
+  - **Acceptance:** a GLN with a wrong GS1 check digit is rejected with a
+    `422`-eligible `ValidationError`; spec §14 + `CLAUDE.md` describe the
+    delivered check; tests pin valid + invalid check digits.
