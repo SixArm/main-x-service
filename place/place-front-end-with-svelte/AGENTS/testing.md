@@ -30,9 +30,11 @@ Conventions:
 - One file per source module under test (`client.test.ts`,
   `places.test.ts`).
 - Mock `fetch` via `vi.fn()`; assert on URL, method, headers, body.
-- For repository tests: pin the exact route path (e.g.
-  `POST /api/places/duplicates` — Place Service uses `/duplicates`,
-  not `/check-duplicates`).
+- For repository tests: pin the exact route path. **Known bug
+  (2026-06-13):** `PlaceRepository` calls
+  `POST /api/places/duplicates`, but the Place Service serves
+  `POST /api/places/check-duplicates` — the client path (and the
+  unit test pinning it) needs fixing; tracked in entity spec §13 E-1.
 - For envelope tests: assert that `ApiClient` unwraps `{success,
   data, error}` correctly and surfaces `ApiError` with `isConflict`
   / `isNotFound` / `isValidation` shortcuts.

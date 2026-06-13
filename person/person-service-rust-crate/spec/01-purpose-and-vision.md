@@ -4,7 +4,7 @@
 
 The Person Service is a general-purpose centralised registry of
 **person identities**. It sits alongside the more domain-specific
-[Worker](../../worker-service-rust-crate/) index and gives callers one
+[Worker](../../../worker/worker-service-rust-crate/) index and gives callers one
 canonical record per real-world person regardless of how many source
 systems hold a shard of that identity. It carries the structured
 fields (tax ID, identity documents, emergency contacts, multi-country

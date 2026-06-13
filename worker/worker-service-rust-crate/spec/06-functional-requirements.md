@@ -61,13 +61,34 @@ fields (`id`, `active`, `worker_type`, `deceased_datetime`,
 
 The matcher's `uk_nhs_number` slot is the per-worker equivalent of
 the person matcher's `uk_nhs_number` (both crates settled on the
-shorter method name once published to crates.io). The service's
-worker-specific
-`IdentifierType::ODS` (NHS Organisation Data Service code) has no
-country-slot counterpart and falls through unmapped; surface it on
-the matcher side only if a future matcher release adds an ODS
-parser. See [`AGENTS/matching.md`](../AGENTS/matching.md) for the
-in-service algorithm and the matcher crate's
+shorter method name once published to crates.io).
+
+**ODS routing decision (entity task T-7, 2026-06-13):** the service's
+worker-specific `IdentifierType::ODS` (NHS Organisation Data Service
+code) has **no suitable matcher slot and is deliberately left
+unmapped**. Grounding:
+
+- Every matcher identifier slot is a *person-level* national scheme
+  (42 schemes: `uk_nhs_number`, `us_ssn`, `fr_nir`, …). An ODS code
+  identifies an *organisation or site* (RC1/RC2 record classes), not
+  the worker; every worker at the same practice shares it.
+- Routing it into any person slot would make the deterministic
+  exact-match short-circuit declare colleagues to be the same person
+  — a catastrophic false positive.
+- The matcher's `local_id` slot is deliberately never scored (matcher
+  spec resolved OQ-2: organisation-issued values collide), so routing
+  ODS there would be a silent no-op.
+
+The fall-through is pinned by two bridge tests in
+[`tests/duplicate_detection.rs`](../tests/duplicate_detection.rs):
+`ods_organisation_code_falls_through_unmapped` (matching continues on
+remaining fields) and
+`shared_ods_code_does_not_make_different_workers_match` (a shared ODS
+code never short-circuits two different workers to a match). Revisit
+only if the matcher crate ever adds an organisation-affiliation
+signal (its spec §23). See
+[`AGENTS/matching.md`](../AGENTS/matching.md) for the in-service
+algorithm and the matcher crate's
 [`spec.md §12`](../../worker-matcher-rust-crate/spec/index.md) for the
 canonical algorithm.
 
@@ -106,7 +127,7 @@ Per-field masking, GDPR Article 15 export at
 dates, `has_active_consent()` utility. Sensitive fields specific to
 workforce data (SSN, tax ID, DEA, home address) are masked by default
 in the masked view. See
-[`agents/share/privacy.md`](../../agents/share/privacy.md).
+[`agents/share/privacy.md`](../../../agents/share/privacy.md).
 
 ### 6.7 Audit
 
@@ -116,7 +137,14 @@ system-wide, per-user.
 
 ### 6.8 FHIR R5
 
-Bidirectional Practitioner resource conversion under
-`/fhir/Practitioner`. Search parameters: `name`, `family`, `given`,
+Bidirectional `Worker` resource conversion under `/fhir/Worker`
+(handlers in `src/api/fhir/handlers.rs`; the wire `resourceType` is
+`"Worker"`). Search parameters: `name`, `family`, `given`,
 `identifier`, `birthdate`, `gender`, `_count`.
+
+**Status caveat:** the FHIR handlers are implemented and unit-level
+complete, but they are **not currently mounted** on the loco router
+(`App::routes` registers only the REST and metrics routes). Mounting
+them — and pinning the path with a route test — is tracked in §13
+T-9.
 

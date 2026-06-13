@@ -5,7 +5,7 @@
 - Dashboard with service-health + recent audit feed.
 - Events list with full-text / fuzzy / phonetic search and SVAR DataGrid.
 - Create event with 409-duplicate handling that surfaces the match candidates inline.
-- Detail view: identity, identifiers, addresses, telecom, emergency contacts.
+- Detail view: identity (time window, status, type, attendance mode, time zone, duration), locations, organizers, performers, identifiers, offers.
 - Edit form (full Event record).
 - Soft-delete (with confirm).
 - Match check page (score a hypothetical record against the index).

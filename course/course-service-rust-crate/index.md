@@ -8,9 +8,9 @@ the abstract template (CS101 — Introduction to Computer Science);
 its `CourseInstance` sub-resource is the specific offering (CS101,
 Fall 2026, Prof. Smith, in-person). One course → many instances.
 
-Sits between the [Thing Service](../thing-service-rust-crate/)
+Sits between the [Thing Service](../../thing/thing-service-rust-crate/)
 (anything with an identity) and the
-[Event Service](../event-service-rust-crate/) (occurrences with
+[Event Service](../../event/event-service-rust-crate/) (occurrences with
 locations and parties).
 
 > **Status.** Production-ready MVP. FR-1..FR-9 (CRUD / search /
@@ -76,13 +76,15 @@ The Event Service uses `/api/v1/`; Course does NOT — direct `/api`.
 
 ## Configuration
 
+Server binding, logger, database pool, and the background queue are
+owned by the loco environment config in `config/<environment>.yaml`
+(development binds `localhost:8084`; `DATABASE_URL` is interpolated
+into the `database` and `queue` blocks). Domain knobs still come
+from the environment via `Config::from_env`:
+
 | Variable                   | Description                | Default                 |
 | -------------------------- | -------------------------- | ----------------------- |
 | `DATABASE_URL`             | Postgres connection string | —                       |
-| `DATABASE_MAX_CONNECTIONS` | Pool max                   | `10`                    |
-| `DATABASE_MIN_CONNECTIONS` | Pool min                   | `2`                     |
-| `SERVER_HOST`              | REST bind address          | `0.0.0.0`               |
-| `SERVER_PORT`              | REST port                  | `8080`                  |
 | `SEARCH_INDEX_PATH`        | Tantivy index directory    | `./data/search_index`   |
 | `MATCHING_THRESHOLD`       | Probabilistic match cutoff | `0.85`                  |
 | `RUST_LOG`                 | tracing-subscriber filter  | `info`                  |

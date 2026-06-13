@@ -9,7 +9,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **Validation failures now return `422 Unprocessable Entity`**
+  (was `400`) for a blank `name`, on both create and update — the
+  family convention (entity spec OQ-1 / T-2). Implemented as a shared
+  controller `validate()` returning
+  `Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY, …)`; pinned
+  by DB-free unit tests.
+
 ### Added
+
+- Request-level integration tests
+  (`tests/requests/care_pathways.rs`, loco testing harness) covering
+  all seven endpoints: create, blank-name `422` on create/update,
+  get-by-pid `200`/`404`, list, `/match`, and a stored near-duplicate
+  `/check-duplicates` round-trip. `#[ignore]`-gated — they need a
+  PostgreSQL `DATABASE_URL`; run with `cargo test -- --ignored`.
 
 - **Inaugural scaffold (v0.1.0).** loco.rs clinical care-pathway
   registry.
@@ -29,5 +45,4 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Notes
 
 - MVP scope is CRUD + matching. Search, streaming, audit, privacy,
-  OpenAPI, richer validation, and request-level tests are tracked in
-  spec §13.
+  OpenAPI, and richer validation are tracked in spec §13.

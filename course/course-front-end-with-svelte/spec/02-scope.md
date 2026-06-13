@@ -5,7 +5,7 @@
 - Dashboard with service-health + recent audit feed.
 - Courses list with full-text / fuzzy / phonetic search and SVAR DataGrid.
 - Create course with 409-duplicate handling that surfaces the match candidates inline.
-- Detail view: identity, identifiers, addresses, telecom, emergency contacts.
+- Detail view: identity (course code, status, educational level, credits, time required), identifiers, teaches, keywords, alternate names, same-as links, instances (read-only).
 - Edit form (full Course record).
 - Soft-delete (with confirm).
 - Match check page (score a hypothetical record against the index).

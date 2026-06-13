@@ -12,6 +12,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Cross-crate sign→verify contract test**
+  (`tests/sign_verify_contract.rs`): signs with this crate's `auth`
+  module and verifies through the sibling
+  [`authentication-verifier`](../authentication-verifier-rust-crate)
+  crate (new dev-dependency), pinning the duplicated-by-convention
+  `Claims` shape and the `kid = base64url(SHA-256(modulus))`
+  derivation. DB-free; runs in every `cargo test`.
+- **Magic-link request tests**: `tests/requests/auth.rs` now covers
+  signup / magic-link / redeem (single-use, anti-enumeration) / me /
+  signout / JWKS with direct assertions. Postgres-backed tests are
+  `#[ignore]`d (run with `cargo test -- --ignored`) so plain
+  `cargo test` stays green; DB-free route-table and params-contract
+  tests always run.
+
+### Removed
+
+- The starter's password-flow request tests and their insta snapshots
+  (`register`/`login`/`forgot`/`reset`/`verify` endpoints no longer
+  exist).
+
+### Added (inaugural)
+
 - **Inaugural scaffold (v0.1.0).** The Main X Index family's central
   single sign-on provider and reference loco.rs application.
   - Real loco.rs 0.16 app generated via `loco new` (Postgres,
@@ -34,6 +56,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Notes
 
-- Loco's generated request tests (`tests/`) still reflect the starter's
-  password flow and require Postgres to run; reworking them for the
-  magic-link surface is tracked in spec §13.
+- The Postgres-backed model tests (`tests/models/users.rs`) are
+  `#[ignore]`d so `cargo test` stays green without a database; several
+  still exercise password-era model helpers that survive only to
+  satisfy the schema.

@@ -136,7 +136,7 @@ histograms) is in [`src/metrics.rs`](../src/metrics.rs).
 | DELETE | `/api/things/{id}`        | Soft delete thing     |
 | GET    | `/api/things/search`      | Search things         |
 | POST   | `/api/things/match`       | Match things          |
-| POST   | `/api/things/duplicates`  | Check for duplicates  |
+| POST   | `/api/things/check-duplicates` | Check for duplicates |
 | POST   | `/api/things/merge`       | Merge things          |
 | POST   | `/api/things/deduplicate` | Batch deduplication   |
 | GET    | `/api/things/{id}/export` | GDPR data export      |

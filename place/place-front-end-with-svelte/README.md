@@ -9,7 +9,7 @@ SvelteKit front-end for the **[Place Service](../place-service-rust-crate/)** in
 | `/` | Dashboard — service health + recent audit activity |
 | `/places` | List & search (full-text, fuzzy, phonetic) with SVAR DataGrid |
 | `/places/new` | Create place; surfaces 409 duplicate candidates |
-| `/places/[id]` | Detail view — identity, identifiers, addresses, telecom, emergency contacts |
+| `/places/[id]` | Detail view — identity, address, geo coordinates, identifiers, opening hours, amenities |
 | `/places/[id]/edit` | Edit |
 | `/places/[id]/audit` | Per-place audit log |
 | `/places/match` | Match check — score a hypothetical record against the index |
@@ -67,7 +67,7 @@ src/
   lib/
     config.ts              - PUBLIC_API_BASE_URL
     api/
-      types.ts             - Place, HumanName, MatchResult, … (mirrors the Rust models)
+      types.ts             - Place, PostalAddress, GeoCoordinates, MatchResult, … (mirrors the Rust models)
       client.ts            - ApiClient + ApiError (envelope-aware fetch)
       places.ts           - PlaceRepository (CRUD + search + match + merge + audit)
     forms/
@@ -78,7 +78,8 @@ src/
     components/
       SearchBox.svelte
       PlaceGrid.svelte    - SVAR DataGrid binding
-      HumanNameInput.svelte
+      PostalAddressInput.svelte
+      GeoCoordinatesInput.svelte
       PlaceForm.svelte
       MatchResultsList.svelte
   routes/

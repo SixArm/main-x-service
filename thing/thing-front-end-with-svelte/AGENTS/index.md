@@ -32,6 +32,6 @@ Detailed reference documentation for the Thing Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../AGENTS.md](../../AGENTS.md) | Repo-level agent guide |
-| [../../agents/share/restful.md](../../agents/share/restful.md) | REST conventions |
-| [../../agents/share/observability.md](../../agents/share/observability.md) | Tracing + OpenTelemetry summary |
+| [../../../AGENTS.md](../../../AGENTS.md) | Repo-level agent guide |
+| [../../../agents/share/restful.md](../../../agents/share/restful.md) | REST conventions |
+| [../../../agents/share/observability.md](../../../agents/share/observability.md) | Tracing + OpenTelemetry summary |

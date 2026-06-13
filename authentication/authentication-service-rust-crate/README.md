@@ -53,11 +53,14 @@ curl -s localhost:5150/api/auth/magic-link/<TOKEN>
 ## Testing
 
 ```bash
-cargo test --lib    # DB-free unit tests for the RS256/JWKS module
+cargo test               # DB-free tests: RS256/JWKS unit tests, route table,
+                         # and the cross-crate sign→verify contract test
+cargo test -- --ignored  # Postgres-backed model + request tests (magic-link surface)
 cargo clippy --bins
 ```
 
-Loco's request tests under `tests/` require a Postgres instance.
+The Postgres-backed tests under `tests/` are `#[ignore]`d so plain
+`cargo test` stays green without a database.
 
 ## How peers verify tokens
 
@@ -65,3 +68,11 @@ Fetch `/.well-known/jwks.json` once, then verify each `Authorization:
 Bearer <jwt>` locally with RS256, checking `iss = authentication-service`
 and `aud = main-x-service`. No call back to this service is needed on the
 hot path.
+
+Use the sibling
+[authentication-verifier](../authentication-verifier-rust-crate) crate
+rather than re-implementing this: `Verifier::from_jwks_value` (or
+`from_jwks_url` with its `fetch` feature), then `verify(token)` per
+request. The cross-crate contract test
+(`tests/sign_verify_contract.rs`) keeps this service and the verifier
+in lock-step on the `Claims` shape and `kid` derivation.

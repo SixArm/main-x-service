@@ -16,7 +16,10 @@ A **loco.rs** service that authenticates users via **passwordless email
 magic links** and issues **RS256 JWT** access tokens. Every other Main X
 service verifies those tokens **offline** against the public keys at
 `/.well-known/jwks.json` — no shared secret, no per-request
-introspection.
+introspection. Peers do that by embedding the sibling
+[authentication-verifier](../authentication-verifier-rust-crate) library;
+`tests/sign_verify_contract.rs` pins the shared `Claims` shape and `kid`
+derivation across the two crates.
 
 It is also the family's **reference loco.rs application**: the existing
 service crates only *declare* `loco-rs` but actually run hand-rolled
@@ -29,7 +32,7 @@ template (see root `AGENTS.md`).
 | Auth model | Passwordless magic link. No passwords are ever checked. |
 | Tokens | RS256 JWT; public keys published as JWKS for offline verification. |
 | Build | `cargo build` |
-| Test | `cargo test --lib` (DB-free unit tests); full request tests need Postgres. |
+| Test | `cargo test` (DB-free: unit + contract tests); `cargo test -- --ignored` for the Postgres-backed model/request tests. |
 | Lint | `cargo clippy --bins` |
 | Run | `cargo loco start` (needs Postgres; see README). |
 

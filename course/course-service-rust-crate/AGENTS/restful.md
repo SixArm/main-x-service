@@ -1,6 +1,8 @@
 # RESTful API reference — Course Service
 
-All endpoints mount under `/api` (per spec.md §9). The `Event`
+All endpoints mount under `/api` (per spec.md §9): `courses_routes()`
+is a loco `Routes` table with prefix `/api`, registered in
+`App::routes` alongside loco's default ops routes. The `Event`
 service uses `/api/v1`; `course` does NOT — clients should call
 `/api/courses/...` directly. The front-end's
 [`CourseRepository`](../../course-front-end-with-svelte/src/lib/api/courses.ts)
@@ -9,17 +11,24 @@ assumes this base path.
 ## Library API
 
 ```rust
-use course_service::api::rest::{create_router, serve, AppState};
+use course_service::app::App;                  // loco Hooks (boot, routes, after_routes)
+use course_service::api::rest::{create_router, courses_routes, AppState};
 use course_service::api::{ApiResponse, ApiError};
 use course_service::models::{Course, CourseInstance, CourseIdentifier};
 use course_service::matching::{CourseMatcher, MatchResult, MatchConfidence};
 ```
 
-## Health
+The binary boots through the loco CLI (`cargo loco start`);
+`create_router` is retained for the `tower::oneshot` integration
+tests.
+
+## Health & ops
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/health` | Health check (returns `HealthResponse`) |
+| GET | `/api/health` | Service health check (envelope-wrapped `HealthResponse`) |
+| GET | `/_health` | loco built-in readiness (DB + queue) — plain, no envelope |
+| GET | `/_ping` | loco built-in liveness — plain, no envelope |
 
 ## Course CRUD
 
@@ -125,7 +134,12 @@ The full spec is rendered at runtime by [`utoipa`](https://docs.rs/utoipa):
 
 ## Source files
 
+- `src/app.rs` — loco `Hooks`: registers `courses_routes()` in
+  `App::routes`, builds `AppState` into the `AppContext` shared
+  store and layers Swagger UI + CORS in `after_routes`
 - `src/api/mod.rs` — `ApiResponse`, `ApiError`
-- `src/api/rest/mod.rs` — router setup, `serve`, `ApiDoc` aggregator
+- `src/api/rest/mod.rs` — `courses_routes()` (loco `Routes`, prefix
+  `/api`), `create_router` (test-only Axum router), `ApiDoc`
+  aggregator
 - `src/api/rest/handlers.rs` — endpoint handlers (FR-1..FR-9 + FR-14..FR-18 wired)
-- `src/api/rest/state.rs` — `AppState`
+- `src/api/rest/state.rs` — `AppState` + `FromRef<AppContext>` bridge

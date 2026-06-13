@@ -95,7 +95,7 @@ When you finish a task:
 ## Drift policy (project-wide)
 
 Per the family-wide decision recorded in
-[`../../AGENTS.md`](../../AGENTS.md): each `*-front-end-with-svelte`
+[`../../AGENTS.md`](../../../AGENTS.md): each `*-front-end-with-svelte`
 project keeps its **own** copy of API types, client, and form
 primitives. Drift between sibling front-ends is **accepted**. Do
 NOT factor shared code into a `mxi-svelte-core` package without

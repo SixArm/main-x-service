@@ -3,7 +3,7 @@
 The Worker Service is an identity-registry system that maintains a
 centralized registry of worker identities across source systems.
 
-@agents/share/overview.md
+@../../agents/share/overview.md
 
 ## Table of Contents
 
@@ -56,13 +56,13 @@ centralized registry of worker identities across source systems.
 @AGENTS/restful.md
 @AGENTS/testing.md
 
-@agents/share/auditability.md
-@agents/share/availability.md
-@agents/share/match-search-merge.md
-@agents/share/observability.md
-@agents/share/privacy.md
-@agents/share/restful.md
-@agents/share/technology.md
+@../../agents/share/auditability.md
+@../../agents/share/availability.md
+@../../agents/share/match-search-merge.md
+@../../agents/share/observability.md
+@../../agents/share/privacy.md
+@../../agents/share/restful.md
+@../../agents/share/loco.md
 
 ### Data Quality & Validation
 

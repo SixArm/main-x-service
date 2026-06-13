@@ -7,7 +7,7 @@ src/
 ├── api/
 │   ├── mod.rs               # ApiResponse, ApiError
 │   ├── rest/                # REST API (Axum) — 15 endpoints
-│   ├── fhir/                # FHIR R5 Practitioner
+│   ├── fhir/                # FHIR R5 Worker resource
 │   └── grpc/                # Tonic stub
 ├── models/                  # Worker, HumanName, Identifier, …
 ├── db/                      # SeaORM entities + repositories + audit

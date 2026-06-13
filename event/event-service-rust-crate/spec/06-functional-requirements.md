@@ -87,6 +87,17 @@ the two crates disagree on:
   `maximum_virtual_attendee_capacity`),
   `is_accessible_for_free`, and `super_event` (UUID → string) pass
   through unchanged
+- **Language tags — known divergence (ET-8).** The service validates
+  `in_language` entries as 2-letter ISO 639-1 codes (§6.5); the
+  matcher documents its single `in_language` field as a full IETF
+  BCP 47 tag. The adapter projects only the **first** `in_language`
+  entry (trimmed; skipped when empty); any further entries are
+  dropped. The projected value is **data-only** on the matcher side —
+  no scoring component consults it — so the divergence is currently
+  inert, and every ISO 639-1 code is a syntactically valid BCP 47
+  tag. Revisit (and pin with a bridge test) if the matcher ever
+  scores `in_language` or the service widens validation to full
+  BCP 47
 
 Service-only fields (`id`, `active`, `duration`, `time_zone`,
 `all_day`, `image`, `same_as`, `disambiguating_description`,
@@ -140,7 +151,7 @@ and party emails; external party IDs stripped from the masked view.
 GDPR Article 15 export at `GET /api/v1/events/{id}/export`. Consent
 records (`Consent` model) let callers grant / revoke processing /
 sharing / marketing / research consent per event. See
-[`agents/share/privacy.md`](../../agents/share/privacy.md).
+[`agents/share/privacy.md`](../../../agents/share/privacy.md).
 
 ### 6.7 Audit
 

@@ -1,7 +1,7 @@
 ## 10. Persistence
 
 PostgreSQL 18+ via SeaORM. Schema overview:
-[`agents/share/postgresql.md`](../../agents/share/postgresql.md).
+[`agents/share/postgresql.md`](../../../agents/share/postgresql.md).
 
 ### 10.1 Tables (12+)
 

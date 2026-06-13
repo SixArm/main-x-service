@@ -4,7 +4,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 > **Navigating the docs:** [`index.md`](./index.md) is the top-level documentation index — start there if you don't know what to read first.
 >
-> **Domain change in 0.5.0.** The crate was repurposed from geographic *place* matching to schema.org/Event matcher. Sections of `spec.md` written for 0.4.x still describe the place-matcher surface; the live API is in `src/`, `README.md`, and the 0.5.0 CHANGELOG entry. Treat any conflict in favour of the current source.
+> **Domain change in 0.5.0.** The crate was repurposed from geographic *place* matching to a schema.org/Event matcher. `spec.md` has been rewritten against the event surface and is authoritative again; the 0.4.x place behaviour survives only in the 0.5.0 CHANGELOG entry and the `0.4.x` releases.
 
 ---
 
@@ -13,7 +13,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 | Question | Answer |
 |---|---|
 | What does the crate do? | Pairwise matching of event records (festivals, conferences, concerts, sports fixtures, screenings, hackathons, meetups), modelled on [schema.org/Event](https://schema.org/Event), deterministic and probabilistic, for de-duplication and record linkage. |
-| Where is the spec? | [`spec.md`](./spec/index.md) (0.4.x place spec; cross-reference with `src/` and `README.md` for 0.5.0 event surface). |
+| Where is the spec? | [`spec.md`](./spec/index.md) — living SSOT for the event-matcher surface. |
 | Where does new behaviour get specified? | In `spec.md` and `CHANGELOG.md` in the same PR as the code change. See [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md). |
 | Build command | `cargo build` |
 | Test command | `cargo test` (unit + integration + property + doctest) |
@@ -38,7 +38,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 4. **Deterministic.** No clocks, no RNGs, no environment variables. Same inputs => same outputs, byte-for-byte. (`spec.md` §8)
 5. **Explainability over cleverness.** Every probabilistic match returns a per-field `MatchBreakdown`. Don't add black boxes. (`spec.md` §3.7)
 6. **Diacritic-correct.** Unicode diacritics (`â`, `ŷ`, `é`, `ü`, `ł`, …) must round-trip through normalisation. Don't break this. (`spec.md` §4.1)
-7. **No real personal data in tests.** A place can carry an associated phone, email, or local-id that is personal data; use synthetic examples only. Reuse existing illustrative fixtures (`example.org` per RFC 2606, drama-reserved `07700 900xxx` UK ranges, fictitious `(415) 555-…` US ranges). See [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md).
+7. **No real personal data in tests.** An event can carry an organiser, performers, a virtual URL, or a local-id that is personal data; use synthetic examples only. Reuse existing illustrative fixtures (`example.org` per RFC 2606, drama-reserved `07700 900xxx` UK ranges, fictitious `(415) 555-…` US ranges). See [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md).
 8. **No `println!` in `src/` except `src/main.rs`.**
 9. **Run the full test suite before declaring success.** `cargo test` must pass; `cargo clippy --all-targets -- -D warnings` must be clean; `cargo doc --no-deps` must build without warnings.
 
@@ -86,10 +86,10 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 - Do not change default weights or thresholds without updating `spec.md` §7 and `CHANGELOG.md` in the same PR.
 - Do not silently widen or narrow the public API; every re-export from `lib.rs` is part of the SemVer contract. (`spec.md` §9)
 - Do not add panicking unwraps in library code. `Option` / `Result` is the answer. (`spec.md` §8)
-- Do not log place data. Do not `Debug`-format records into traces.
+- Do not log event data. Do not `Debug`-format records into traces.
 - Do not score `local_id`. Different organisations may issue colliding values. (`spec.md` §3.1.1)
-- Do not cross-match `PlaceId` values across schemes. A `(Google, "abc")` and an `(OsmNode, "abc")` refer to different things and must not match. (`spec.md` §3.5)
-- Do not construct `Place`, `Address`, `PlaceCategory`, `PlaceIdScheme`, or `MatchingError` via struct-literal syntax from downstream code. All carry `#[non_exhaustive]`.
+- Do not cross-match `EventId` values across schemes. An `(Eventbrite, "abc")` and a `(Meetup, "abc")` refer to different things and must not match. (`spec.md` §3.8)
+- Do not construct `Event`, `Location`, `Address`, `EventCategory`, `EventStatus`, `EventAttendanceMode`, `EventIdScheme`, or `MatchingError` via struct-literal syntax from downstream code. All carry `#[non_exhaustive]`.
 
 ---
 

@@ -21,6 +21,8 @@ dedupe   ──>  POST /api/organizations/check-duplicates  {query}     -> [{pid
 match    ──>  POST /api/organizations/match   {query, candidates}   -> ranked results
 ```
 
-The `Organization` body shape is the `organization-matcher` type
-(name, legalName, identifiers (LEI/DUNS/…), url, sameAs, address,
-jurisdiction, foundingDate, keywords).
+The `Organization` body shape is the `organization-matcher` type,
+serialized snake_case (`name`, `legal_name`, `identifiers`
+(LEI/DUNS/…), `url`, `same_as`, `address`, `jurisdiction`,
+`founding_date`, `keywords`) — not schema.org's camelCase (entity
+spec OQ-1, resolved).

@@ -3,7 +3,7 @@
 The Place Service is a critical enterprise system that maintains a
 centralized registry of place identities across multiple areas.
 
-@agents/share/overview.md
+@../../agents/share/overview.md
 
 ## Table of Contents
 
@@ -49,7 +49,7 @@ Based on [schema.org/Place](https://schema.org/Place):
   - GLN exact match (deterministic, short-circuits to 1.0)
 - **Score Breakdown**: Full per-component score breakdown in API responses
 
-@agents/share/match-search-merge.md
+@../../agents/share/match-search-merge.md
 
 ### Data Quality & Validation
 
@@ -70,13 +70,13 @@ Based on [schema.org/Place](https://schema.org/Place):
 @AGENTS/restful.md
 @AGENTS/testing.md
 
-@agents/share/auditability.md
-@agents/share/availability.md
-@agents/share/match-search-merge.md
-@agents/share/observability.md
-@agents/share/privacy.md
-@agents/share/restful.md
-@agents/share/technology.md
+@../../agents/share/auditability.md
+@../../agents/share/availability.md
+@../../agents/share/match-search-merge.md
+@../../agents/share/observability.md
+@../../agents/share/privacy.md
+@../../agents/share/restful.md
+@../../agents/share/loco.md
 
 ## Quick Start
 
@@ -109,15 +109,13 @@ curl http://localhost:8080/api/health
   podman compose --profile tools up -d
   ```
 
-See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
-
 ### Option 2: Local Development
 
 **Prerequisites:**
 
 - Rust 1.75+ ([Install Rust](https://rustup.rs/))
 - PostgreSQL 15+
-- Diesel CLI: `cargo install diesel_cli --no-default-features --features postgres`
+- No extra CLI tooling: migrations are a SeaORM migration crate (`migration/`) run through the built-in loco CLI
 
 ```bash
 # Clone repository
@@ -129,8 +127,8 @@ createdb mpi
 cp .env.example .env
 # Edit .env and set DATABASE_URL
 
-# Run migrations
-diesel migration run
+# Run migrations (loco CLI + SeaORM migration crate)
+cargo run -- db migrate
 
 # Build and run
 cargo build --release
@@ -175,7 +173,7 @@ cargo run --release
          |                     |                     |
 +--------v------+  +-----------v------+  +-----------v--------+
 |  PostgreSQL   |  |   Tantivy        |  |  Event Stream      |
-|  (Diesel)     |  |   Search         |  |  (In-Memory)       |
+|  (SeaORM)     |  |   Search         |  |  (In-Memory)       |
 |               |  |   Index          |  |                    |
 |  - places     |  |                  |  |  - PlaceEvents     |
 |  - audit_log  |  |                  |  |  - Subscribers     |
@@ -298,12 +296,17 @@ cargo test --lib             # Run unit tests
 
 ### Database Migrations
 
+Migrations live in the `migration/` SeaORM migration crate and run
+through the loco CLI (`src/bin/main.rs` wires `cli::main::<App, Migrator>`):
+
 ```bash
-diesel migration generate migration_name
-diesel migration run
-diesel migration revert
-diesel migration list
+cargo run -- db migrate    # apply pending migrations
+cargo run -- db status     # show migration status
+cargo run -- db reset      # drop and re-run all migrations
 ```
+
+Add a migration by creating a new `m*.rs` file in `migration/src/` and
+registering it in `migration/src/lib.rs`.
 
 ## API Documentation
 
@@ -485,8 +488,6 @@ cargo bench -- name_similarity                # Specific benchmark
 - Privacy (4 benchmarks): Mask place, mask minimal, GDPR export, GDPR batch 100
 
 ## Deployment
-
-See [DEPLOY.md](DEPLOY.md) for comprehensive deployment guide.
 
 ```bash
 podman compose up -d                                    # Development

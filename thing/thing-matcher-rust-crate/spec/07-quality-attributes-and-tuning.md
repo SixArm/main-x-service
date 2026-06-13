@@ -11,7 +11,7 @@ The crate produces identical bytes for identical inputs across runs, processes, 
 
 ### 7.3 Stability
 
-Once `0.4.0` ships, the public types (`Thing`, `MatchConfig`, `MatchResult`, `MatchBreakdown`, `Identifier`, `Confidence`, `MatchingError`, `SimilarityAlgorithm`, `MatchingEngine`, `Normalizer`, `Scorer`) and their semantics are stable under SemVer. Field additions to `Thing` and `MatchBreakdown` go via `#[non_exhaustive]` so they are not breaking. New `MatchingError` variants are non-breaking for the same reason.
+Since `0.4.0` shipped (the crate is now at `0.6.1`), the public types (`Thing`, `MatchConfig`, `MatchResult`, `MatchBreakdown`, `Identifier`, `Confidence`, `MatchingError`, `SimilarityAlgorithm`, `MatchingEngine`, `Normalizer`, `Scorer`) and their semantics are stable under SemVer. Field additions to `Thing` and `MatchBreakdown` go via `#[non_exhaustive]` so they are not breaking. New `MatchingError` variants are non-breaking for the same reason.
 
 ### 7.4 Tuning guidance
 

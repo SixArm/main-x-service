@@ -20,14 +20,17 @@ to the spec; not the other way around.
 | You're changing… | Update spec section… |
 |---|---|
 | `Thing` field list or types | §5.1 |
-| Supporting types (`Location`, `Party`, `Offer`, `Identifier`, …) | §5.2 |
-| Domain invariants (time window, capacity, attendance mode) | §5.3 |
-| New capability surface (e.g. iCalendar I/O, recurrence) | §6.x |
-| Default match weights, strong-identifier list, thresholds | §6.2 |
-| Indexed field set or blocking strategy | §6.3 |
+| `ThingIdentifier` shape or `IdentifierType` variants | §5.2 |
+| Supporting types (`MergeRequest`, `ReviewQueueItem`, `Consent`, …) | §5.3 |
+| Domain invariants (required `name`, URL schemes, identifier formats) | §5.4 |
+| New capability surface (e.g. a new endpoint family) | §6.x |
+| Default match weights, deterministic-identifier list, thresholds | §6.2 |
+| Adapter projection to the embedded `thing-matcher` crate | §6.2 (interoperability subsection) |
+| Indexed field set or search behaviour | §6.3 |
+| Duplicate detection or merge behaviour | §6.4 |
 | Validation / normalisation rules | §6.5 |
 | Privacy / masking / consent behaviour | §6.6 |
-| FHIR coverage | §6.8 |
+| Audit-trail behaviour | §6.7 |
 | Non-functional targets (latency, throughput, scale) | §7 |
 | Module layout | §8.1 |
 | Layering rules | §8.2 |

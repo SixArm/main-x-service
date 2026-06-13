@@ -176,10 +176,10 @@ Tracked in `spec.md §23`:
 ### Cross-references
 
 - Sibling matcher crates for the algorithmic family:
-  [`person-matcher-rust-crate`](../person-matcher-rust-crate/),
-  [`event-matcher-rust-crate`](../event-matcher-rust-crate/),
-  [`place-matcher-rust-crate`](../place-matcher-rust-crate/),
-  [`thing-matcher-rust-crate`](../thing-matcher-rust-crate/),
-  [`worker-matcher-rust-crate`](../worker-matcher-rust-crate/).
+  [`person-matcher-rust-crate`](../../person/person-matcher-rust-crate/),
+  [`event-matcher-rust-crate`](../../event/event-matcher-rust-crate/),
+  [`place-matcher-rust-crate`](../../place/place-matcher-rust-crate/),
+  [`thing-matcher-rust-crate`](../../thing/thing-matcher-rust-crate/),
+  [`worker-matcher-rust-crate`](../../worker/worker-matcher-rust-crate/).
 - Embedding service:
   [`course-service-rust-crate`](../course-service-rust-crate/).

@@ -34,7 +34,7 @@ The SPA mounts at `/`. All operator workflows live under `/courses`.
 | `/` | Dashboard — service health + recent audit feed |
 | `/courses` | List + search (SVAR DataGrid; name / identifier / additional_type filters) |
 | `/courses/new` | Create form with real-time 409 duplicate detection inline |
-| `/courses/[id]` | Detail view (identity, identifiers, alternate names, same-as, images) |
+| `/courses/[id]` | Detail view (identity, identifiers, teaches, keywords, alternate names, same-as links, instances read-only) |
 | `/courses/[id]/edit` | Edit form |
 | `/courses/[id]/audit` | Per-record audit log |
 | `/courses/match` | Score-bearing match check against a candidate Course |

@@ -36,10 +36,11 @@ pnpm dev                 # http://localhost:5173
 ## How it works
 
 The organization record body **is** the `organization_matcher::Organization`
-shape (name, legalName, alternateName, identifiers (LEI/DUNS/…), url,
-sameAs, address, jurisdiction, foundingDate, keywords). The form edits
-these; `check-duplicates` posts the current record and lists stored
-matches with their scores.
+shape, serialized snake_case (`name`, `legal_name`, `alternate_names`,
+`identifiers` (LEI/DUNS/…), `url`, `same_as`, `address`,
+`jurisdiction`, `founding_date`, `keywords` — entity spec OQ-1,
+resolved). The form edits these; `check-duplicates` posts the current
+record and lists stored matches with their scores.
 
 ## Testing
 

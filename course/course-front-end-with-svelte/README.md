@@ -9,7 +9,7 @@ SvelteKit front-end for the **[Course Service](../course-service-rust-crate/)** 
 | `/` | Dashboard — service health + recent audit activity |
 | `/courses` | List & search (full-text, fuzzy, phonetic) with SVAR DataGrid |
 | `/courses/new` | Create course; surfaces 409 duplicate candidates |
-| `/courses/[id]` | Detail view — identity, identifiers, addresses, telecom, emergency contacts |
+| `/courses/[id]` | Detail view — identity (course code, status, educational level, credits, time required), identifiers, teaches, keywords, alternate names, same-as links, instances (read-only) |
 | `/courses/[id]/edit` | Edit |
 | `/courses/[id]/audit` | Per-course audit log |
 | `/courses/match` | Match check — score a hypothetical record against the index |

@@ -135,6 +135,12 @@ is [`api::rest::handlers::metrics_prom`](../src/api/rest/handlers.rs).
 
 ## FHIR R5 Endpoints
 
+> **Status:** the handlers below are implemented in
+> `src/api/fhir/handlers.rs` (wire `resourceType: "Worker"`), but they
+> are **not yet mounted** on the loco router — `App::routes` registers
+> only the REST and metrics route groups. Mounting + a pinning route
+> test is spec §13 T-9.
+
 | Method | Path                | Description         |
 | ------ | ------------------- | ------------------- |
 | GET    | `/fhir/Worker/{id}` | Get FHIR Worker     |

@@ -7,7 +7,7 @@
 - Identity documents with expiry tracking.
 - Multiple addresses, telecom, emergency contacts.
 - Automatic event publish on every CRUD. See
-  [`agents/share/auditability.md`](../../agents/share/auditability.md).
+  [`agents/share/auditability.md`](../../../agents/share/auditability.md).
 
 ### 6.2 Matching
 
@@ -108,14 +108,14 @@ Per-field masking, GDPR Article 15 export at
 `GET /api/persons/{id}/export`, masked view at
 `GET /api/persons/{id}/masked`, consent model with type + status +
 dates, `has_active_consent()` utility. See
-[`agents/share/privacy.md`](../../agents/share/privacy.md).
+[`agents/share/privacy.md`](../../../agents/share/privacy.md).
 
 ### 6.7 Audit
 
 Every CRUD / merge / link writes to `audit_log` with old + new JSON,
 user ID, IP, user agent, timestamp. Queries: per-person, recent
 system-wide, per-user. See
-[`agents/share/auditability.md`](../../agents/share/auditability.md).
+[`agents/share/auditability.md`](../../../agents/share/auditability.md).
 
 ### 6.8 FHIR R5
 

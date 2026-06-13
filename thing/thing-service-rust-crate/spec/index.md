@@ -9,8 +9,8 @@
 > edit + test edit. See [`AGENTS/spec-driven-development.md`](../AGENTS/spec-driven-development.md).
 
 For shared infrastructure (technology stack, observability,
-compliance), see the project-root [`AGENTS.md`](../../AGENTS.md) and
-[`agents/share/*`](../../agents/share/).
+compliance), see the repo-root [`AGENTS.md`](../../../AGENTS.md) and
+[`agents/share/*`](../../../agents/share/).
 For per-crate reference detail (architecture, model field tables,
 matching constants), see [`AGENTS/`](../AGENTS/).
 

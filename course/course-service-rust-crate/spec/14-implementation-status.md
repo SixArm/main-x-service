@@ -3,7 +3,8 @@
 | Area | Status |
 |---|---|
 | Skeleton (compiles, binary runs end-to-end) | ✅ |
-| SeaORM entities | ✅ 9 modules (providers, courses, identifiers, links, instances, syllabus_sections, audit_log, course_match_scores, course_merge_records) |
+| loco.rs conversion (Hooks boot, native controllers, config/*.yaml, Postgres queue, loco Migrator) | ✅ family reference |
+| SeaORM entities | ✅ 15 modules (providers, courses, identifiers, links, instances, syllabus_sections, audit_log, course_match_scores, course_merge_records + the normalized collection child tables) |
 | Repository CRUD | ✅ courses + identifiers + links + instances + merge records; syllabus_sections still UI-only |
 | Search engine | ✅ index / fuzzy / exact / blocking-query / delete |
 | Validation | ✅ FR-21..FR-28 |

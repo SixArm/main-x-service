@@ -31,4 +31,4 @@ peers verify   ──>  GET  /.well-known/jwks.json  (fetch once, verify offline
 This is the first **real** loco.rs crate in the repo. The other service
 crates declare `loco-rs` but run hand-rolled Axum; they will be converted
 to idiomatic loco using this crate as the reference. See the root
-[AGENTS.md](../AGENTS.md).
+[AGENTS.md](../../AGENTS.md).

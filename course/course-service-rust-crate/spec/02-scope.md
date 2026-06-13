@@ -17,7 +17,8 @@
 - Record merging with link tracking and transferred-data snapshots.
 - Data validation + normalisation at the boundary.
 - Per-field privacy masking, GDPR Article 15 export.
-- REST API (Axum) at `/api/courses` and `/api/courses/{id}/instances`.
+- REST API (loco.rs controllers on Axum) at `/api/courses` and
+  `/api/courses/{id}/instances`.
 - PostgreSQL persistence via SeaORM, with migrations.
 - Observability (tracing + OpenTelemetry OTLP).
 

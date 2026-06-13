@@ -259,6 +259,36 @@ fn ods_organisation_code_falls_through_unmapped() {
     );
 }
 
+/// A shared ODS organisation code must never short-circuit two different
+/// workers to a match: ODS codes identify the organisation, so every worker
+/// at the same practice carries the same value. Pins the deliberate,
+/// permanent fall-through recorded in service spec §6.2 (entity task T-7).
+#[test]
+fn shared_ods_code_does_not_make_different_workers_match() {
+    let ods = |w: &mut Worker| {
+        w.identifiers.push(Identifier::new(
+            IdentifierType::ODS,
+            "https://fhir.nhs.uk/Id/ods-organization-code".into(),
+            "RXX01".into(),
+        ));
+    };
+    let mut a = worker_with_dob("Patel", "Asha", jiff::civil::date(1970, 4, 1));
+    let mut b = worker_with_dob("Olsen", "Sven", jiff::civil::date(1992, 12, 24));
+    ods(&mut a);
+    ods(&mut b);
+
+    let result = engine().match_workers(&to_matcher_worker(&a), &to_matcher_worker(&b));
+    assert!(
+        !result.is_match,
+        "colleagues sharing an ODS code must not be declared the same person"
+    );
+    assert!(
+        result.score < 0.70,
+        "shared org-level ODS code must add no person-level signal, got {}",
+        result.score
+    );
+}
+
 // =============================================================================
 // Negative cases
 // =============================================================================

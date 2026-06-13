@@ -13,15 +13,15 @@ per-crate `AGENTS/spec-driven-development.md` files for the discipline.
 
 | Crate | Entity | Spec | Index |
 |---|---|---|---|
-| [Person Service](person-service-rust-crate/) | Person (general) | [spec](person-service-rust-crate/spec/index.md) | [index](person-service-rust-crate/index.md) |
-| [Worker Service](worker-service-rust-crate/) | Worker (workforce / professional) | [spec](worker-service-rust-crate/spec/index.md) | [index](worker-service-rust-crate/index.md) |
-| [Place Service](place-service-rust-crate/) | Place (schema.org/Place) | [spec](place-service-rust-crate/spec/index.md) | [index](place-service-rust-crate/index.md) |
-| [Thing Service](thing-service-rust-crate/) | Thing (schema.org/Thing — generic) | [spec](thing-service-rust-crate/spec/index.md) | [index](thing-service-rust-crate/index.md) |
-| [Event Service](event-service-rust-crate/) | Event (schema.org/Event — time-bounded) | [spec](event-service-rust-crate/spec/index.md) | [index](event-service-rust-crate/index.md) |
-| [Course Service](course-service-rust-crate/) | Course (schema.org/Course) — template + `CourseInstance` sub-resource | [spec](course-service-rust-crate/spec/index.md) | [index](course-service-rust-crate/index.md) |
-| [Authentication Service](authentication-service-rust-crate/) | User (central single sign-on provider) — passwordless magic-link, RS256 JWT + JWKS. **First real loco.rs crate**; reference for converting the others. | [spec](authentication-service-rust-crate/spec/index.md) | [index](authentication-service-rust-crate/index.md) |
-| [Organization Service](organization-service-rust-crate/) | Organization (schema.org/Organization) — loco.rs CRUD + matching, embeds organization-matcher (MVP) | [spec](organization-service-rust-crate/spec/index.md) | [index](organization-service-rust-crate/index.md) |
-| [Care Pathway Service](care-pathway-service-rust-crate/) | Care pathway (clinical pathway) — loco.rs CRUD + matching, embeds care-pathway-matcher (MVP) | [spec](care-pathway-service-rust-crate/spec/index.md) | [index](care-pathway-service-rust-crate/index.md) |
+| [Person Service](person/person-service-rust-crate/) | Person (general) | [spec](person/person-service-rust-crate/spec/index.md) | [index](person/person-service-rust-crate/index.md) |
+| [Worker Service](worker/worker-service-rust-crate/) | Worker (workforce / professional) | [spec](worker/worker-service-rust-crate/spec/index.md) | [index](worker/worker-service-rust-crate/index.md) |
+| [Place Service](place/place-service-rust-crate/) | Place (schema.org/Place) | [spec](place/place-service-rust-crate/spec/index.md) | [index](place/place-service-rust-crate/index.md) |
+| [Thing Service](thing/thing-service-rust-crate/) | Thing (schema.org/Thing — generic) | [spec](thing/thing-service-rust-crate/spec/index.md) | [index](thing/thing-service-rust-crate/index.md) |
+| [Event Service](event/event-service-rust-crate/) | Event (schema.org/Event — time-bounded) | [spec](event/event-service-rust-crate/spec/index.md) | [index](event/event-service-rust-crate/index.md) |
+| [Course Service](course/course-service-rust-crate/) | Course (schema.org/Course) — template + `CourseInstance` sub-resource | [spec](course/course-service-rust-crate/spec/index.md) | [index](course/course-service-rust-crate/index.md) |
+| [Authentication Service](authentication/authentication-service-rust-crate/) | User (central single sign-on provider) — passwordless magic-link, RS256 JWT + JWKS. **First real loco.rs crate**; reference for converting the others. | [spec](authentication/authentication-service-rust-crate/spec/index.md) | [index](authentication/authentication-service-rust-crate/index.md) |
+| [Organization Service](organization/organization-service-rust-crate/) | Organization (schema.org/Organization) — loco.rs CRUD + matching, embeds organization-matcher (MVP) | [spec](organization/organization-service-rust-crate/spec/index.md) | [index](organization/organization-service-rust-crate/index.md) |
+| [Care Pathway Service](care-pathway/care-pathway-service-rust-crate/) | Care pathway (clinical pathway) — loco.rs CRUD + matching, embeds care-pathway-matcher (MVP) | [spec](care-pathway/care-pathway-service-rust-crate/spec/index.md) | [index](care-pathway/care-pathway-service-rust-crate/index.md) |
 
 ### Matcher crates
 
@@ -33,14 +33,14 @@ the corresponding service crate's matching layer.
 
 | Crate | Entity | Spec | Index |
 |---|---|---|---|
-| [Person Matcher](person-matcher-rust-crate/) | Person | [spec](person-matcher-rust-crate/spec/index.md) | [index](person-matcher-rust-crate/index.md) |
-| [Worker Matcher](worker-matcher-rust-crate/) | Worker | [spec](worker-matcher-rust-crate/spec/index.md) | [index](worker-matcher-rust-crate/index.md) |
-| [Place Matcher](place-matcher-rust-crate/) | Place | [spec](place-matcher-rust-crate/spec/index.md) | [index](place-matcher-rust-crate/index.md) |
-| [Thing Matcher](thing-matcher-rust-crate/) | Thing | [spec](thing-matcher-rust-crate/spec/index.md) | [index](thing-matcher-rust-crate/index.md) |
-| [Event Matcher](event-matcher-rust-crate/) | Event | [spec](event-matcher-rust-crate/spec/index.md) | [index](event-matcher-rust-crate/index.md) |
-| [Course Matcher](course-matcher-rust-crate/) | Course | [spec](course-matcher-rust-crate/spec/index.md) | [index](course-matcher-rust-crate/index.md) |
-| [Organization Matcher](organization-matcher-rust-crate/) | Organization (schema.org/Organization) | [spec](organization-matcher-rust-crate/spec/index.md) | [index](organization-matcher-rust-crate/index.md) |
-| [Care Pathway Matcher](care-pathway-matcher-rust-crate/) | Care pathway (clinical pathway) | [spec](care-pathway-matcher-rust-crate/spec/index.md) | [index](care-pathway-matcher-rust-crate/index.md) |
+| [Person Matcher](person/person-matcher-rust-crate/) | Person | [spec](person/person-matcher-rust-crate/spec/index.md) | [index](person/person-matcher-rust-crate/index.md) |
+| [Worker Matcher](worker/worker-matcher-rust-crate/) | Worker | [spec](worker/worker-matcher-rust-crate/spec/index.md) | [index](worker/worker-matcher-rust-crate/index.md) |
+| [Place Matcher](place/place-matcher-rust-crate/) | Place | [spec](place/place-matcher-rust-crate/spec/index.md) | [index](place/place-matcher-rust-crate/index.md) |
+| [Thing Matcher](thing/thing-matcher-rust-crate/) | Thing | [spec](thing/thing-matcher-rust-crate/spec/index.md) | [index](thing/thing-matcher-rust-crate/index.md) |
+| [Event Matcher](event/event-matcher-rust-crate/) | Event | [spec](event/event-matcher-rust-crate/spec/index.md) | [index](event/event-matcher-rust-crate/index.md) |
+| [Course Matcher](course/course-matcher-rust-crate/) | Course | [spec](course/course-matcher-rust-crate/spec/index.md) | [index](course/course-matcher-rust-crate/index.md) |
+| [Organization Matcher](organization/organization-matcher-rust-crate/) | Organization (schema.org/Organization) | [spec](organization/organization-matcher-rust-crate/spec/index.md) | [index](organization/organization-matcher-rust-crate/index.md) |
+| [Care Pathway Matcher](care-pathway/care-pathway-matcher-rust-crate/) | Care pathway (clinical pathway) | [spec](care-pathway/care-pathway-matcher-rust-crate/spec/index.md) | [index](care-pathway/care-pathway-matcher-rust-crate/index.md) |
 
 ### Front-end projects
 
@@ -53,15 +53,15 @@ accepted (see `feedback_front_end_drift` memory) — no shared package.
 
 | Project | Consumes | Spec | Changelog |
 |---|---|---|---|
-| [person-front-end-with-svelte](person-front-end-with-svelte/) | [person-service](person-service-rust-crate/) | [spec](person-front-end-with-svelte/spec/index.md) | [CHANGELOG](person-front-end-with-svelte/CHANGELOG.md) |
-| [worker-front-end-with-svelte](worker-front-end-with-svelte/) | [worker-service](worker-service-rust-crate/) | [spec](worker-front-end-with-svelte/spec/index.md) | [CHANGELOG](worker-front-end-with-svelte/CHANGELOG.md) |
-| [place-front-end-with-svelte](place-front-end-with-svelte/) | [place-service](place-service-rust-crate/) | [spec](place-front-end-with-svelte/spec/index.md) | [CHANGELOG](place-front-end-with-svelte/CHANGELOG.md) |
-| [thing-front-end-with-svelte](thing-front-end-with-svelte/) | [thing-service](thing-service-rust-crate/) | [spec](thing-front-end-with-svelte/spec/index.md) | [CHANGELOG](thing-front-end-with-svelte/CHANGELOG.md) |
-| [event-front-end-with-svelte](event-front-end-with-svelte/) | [event-service](event-service-rust-crate/) | [spec](event-front-end-with-svelte/spec/index.md) | [CHANGELOG](event-front-end-with-svelte/CHANGELOG.md) |
-| [course-front-end-with-svelte](course-front-end-with-svelte/) | [course-service](course-service-rust-crate/) | [spec](course-front-end-with-svelte/spec/index.md) | [CHANGELOG](course-front-end-with-svelte/CHANGELOG.md) |
-| [authentication-front-end-with-svelte](authentication-front-end-with-svelte/) | [authentication-service](authentication-service-rust-crate/) | [spec](authentication-front-end-with-svelte/spec/index.md) | [CHANGELOG](authentication-front-end-with-svelte/CHANGELOG.md) |
-| [organization-front-end-with-svelte](organization-front-end-with-svelte/) | [organization-service](organization-service-rust-crate/) | [spec](organization-front-end-with-svelte/spec/index.md) | [CHANGELOG](organization-front-end-with-svelte/CHANGELOG.md) |
-| [care-pathway-front-end-with-svelte](care-pathway-front-end-with-svelte/) | [care-pathway-service](care-pathway-service-rust-crate/) | [spec](care-pathway-front-end-with-svelte/spec/index.md) | [CHANGELOG](care-pathway-front-end-with-svelte/CHANGELOG.md) |
+| [person-front-end-with-svelte](person/person-front-end-with-svelte/) | [person-service](person/person-service-rust-crate/) | [spec](person/person-front-end-with-svelte/spec/index.md) | [CHANGELOG](person/person-front-end-with-svelte/CHANGELOG.md) |
+| [worker-front-end-with-svelte](worker/worker-front-end-with-svelte/) | [worker-service](worker/worker-service-rust-crate/) | [spec](worker/worker-front-end-with-svelte/spec/index.md) | [CHANGELOG](worker/worker-front-end-with-svelte/CHANGELOG.md) |
+| [place-front-end-with-svelte](place/place-front-end-with-svelte/) | [place-service](place/place-service-rust-crate/) | [spec](place/place-front-end-with-svelte/spec/index.md) | [CHANGELOG](place/place-front-end-with-svelte/CHANGELOG.md) |
+| [thing-front-end-with-svelte](thing/thing-front-end-with-svelte/) | [thing-service](thing/thing-service-rust-crate/) | [spec](thing/thing-front-end-with-svelte/spec/index.md) | [CHANGELOG](thing/thing-front-end-with-svelte/CHANGELOG.md) |
+| [event-front-end-with-svelte](event/event-front-end-with-svelte/) | [event-service](event/event-service-rust-crate/) | [spec](event/event-front-end-with-svelte/spec/index.md) | [CHANGELOG](event/event-front-end-with-svelte/CHANGELOG.md) |
+| [course-front-end-with-svelte](course/course-front-end-with-svelte/) | [course-service](course/course-service-rust-crate/) | [spec](course/course-front-end-with-svelte/spec/index.md) | [CHANGELOG](course/course-front-end-with-svelte/CHANGELOG.md) |
+| [authentication-front-end-with-svelte](authentication/authentication-front-end-with-svelte/) | [authentication-service](authentication/authentication-service-rust-crate/) | [spec](authentication/authentication-front-end-with-svelte/spec/index.md) | [CHANGELOG](authentication/authentication-front-end-with-svelte/CHANGELOG.md) |
+| [organization-front-end-with-svelte](organization/organization-front-end-with-svelte/) | [organization-service](organization/organization-service-rust-crate/) | [spec](organization/organization-front-end-with-svelte/spec/index.md) | [CHANGELOG](organization/organization-front-end-with-svelte/CHANGELOG.md) |
+| [care-pathway-front-end-with-svelte](care-pathway/care-pathway-front-end-with-svelte/) | [care-pathway-service](care-pathway/care-pathway-service-rust-crate/) | [spec](care-pathway/care-pathway-front-end-with-svelte/spec/index.md) | [CHANGELOG](care-pathway/care-pathway-front-end-with-svelte/CHANGELOG.md) |
 
 ## Shared reference docs
 
@@ -78,8 +78,8 @@ accepted (see `feedback_front_end_drift` memory) — no shared package.
 @agents/share/availability.md
 @agents/share/observability.md
 @agents/share/restful.md
-@agents/share/technology.md
-@agents/share/stack-for-rust-loco.md
+@agents/share/loco.md
+@agents/share/rust-loco-stack.md
 @agents/share/postgresql.md
 @agents/share/locales.md
 @agents/share/compliance-for-healthcare.md

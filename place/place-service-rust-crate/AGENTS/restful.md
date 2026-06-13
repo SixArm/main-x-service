@@ -153,7 +153,7 @@ histograms) is in [`src/metrics.rs`](../src/metrics.rs).
 | DELETE | `/api/places/{id}`        | Soft delete place     |
 | GET    | `/api/places/search`      | Search places         |
 | POST   | `/api/places/match`       | Match places          |
-| POST   | `/api/places/duplicates`  | Check for duplicates  |
+| POST   | `/api/places/check-duplicates` | Check for duplicates |
 | POST   | `/api/places/merge`       | Merge places          |
 | POST   | `/api/places/deduplicate` | Batch deduplication   |
 | GET    | `/api/places/{id}/export` | GDPR data export      |

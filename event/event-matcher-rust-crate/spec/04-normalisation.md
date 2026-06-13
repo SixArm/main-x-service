@@ -38,7 +38,7 @@ Match `+CC` / `00CC` / default-country trunk; strip the national trunk prefix; v
 
 `default_country` is an ISO 3166-1 alpha-2 code (`"GB"`, `"FR"`, `"US"`, …); pass `None` to refuse to assume a default — only explicit `+CC` / `00CC` inputs will parse.
 
-Supported countries (per the in-code `COUNTRY_PHONE_TABLE`, **39 entries**): `GB`, `FR`, `DE`, `ES`, `IE`, `IT`, `NL`, `BE`, `PT`, `CH`, `AT`, `SE`, `NO`, `DK`, `FI`, `PL`, `AU`, `NZ`, `US`, `CA`, `JP`, `CN`, `IN`, `BR`, `MX`, `ZA`, `BG`, `CZ`, `EE`, `GR`, `HR`, `IS`, `LI`, `LT`, `LV`, `MT`, `RO`, `SI`, `SK`. Each entry pins the dial code, the national trunk prefix (`"0"` for most of Europe and Asia; `"8"` for Lithuania; `None` for NANP / Spain / Portugal / several others), and the min / max NSN length. The matching engine MUST prefer the E.164 form when both inputs canonicalise, and MUST fall back to the legacy form otherwise (§6.8).
+Supported countries (per the in-code `COUNTRY_PHONE_TABLE`, **39 entries**): `GB`, `FR`, `DE`, `ES`, `IE`, `IT`, `NL`, `BE`, `PT`, `CH`, `AT`, `SE`, `NO`, `DK`, `FI`, `PL`, `AU`, `NZ`, `US`, `CA`, `JP`, `CN`, `IN`, `BR`, `MX`, `ZA`, `BG`, `CZ`, `EE`, `GR`, `HR`, `IS`, `LI`, `LT`, `LV`, `MT`, `RO`, `SI`, `SK`. Each entry pins the dial code, the national trunk prefix (`"0"` for most of Europe and Asia; `"8"` for Lithuania; `None` for NANP / Spain / Portugal / several others), and the min / max NSN length. Note: `Event` carries no phone field, so the matching engine does not consult either phone normaliser; both remain public library utilities for callers.
 
 ### 4.4 Email — `Normalizer::normalize_email`
 
@@ -80,6 +80,16 @@ Whole-token expansion of English abbreviations: `St` → `street`, `Rd` → `roa
 Normalise the name (§4.1), then apply American Soundex (`soundex::american_soundex`). Empty input returns `""` (not a default Soundex value).
 
 Soundex is tuned for English-language names; non-English phonemes may be lost. A locale-aware encoder (Double Metaphone, Daitch-Mokotoff) is tracked as OQ-E.
+
+### 4.7 ISO 8601 date-times — `Normalizer::parse_iso8601_unix_seconds`
+
+```rust
+fn parse_iso8601_unix_seconds(input: &str) -> Option<i64>;
+```
+
+Total, dependency-free parser from an ISO 8601 / RFC 3339 date or date-time string to Unix seconds. Accepted shapes: `YYYY-MM-DD` (anchors at midnight UTC), `YYYY-MM-DDTHH:MM:SS` with optional fractional seconds (truncated), and a trailing `Z` or `±HH:MM` / `±HHMM` / `±HH` offset; the `T` separator may also be lowercase `t` or a single space. Returns `None` for malformed input or out-of-range components (month not in `1..=12`, day beyond the calendar month — leap years honoured, hour not in `0..=23`, minute not in `0..=59`, second not in `0..=60` — leap seconds permitted).
+
+Deterministic and idempotent under canonicalisation: distinct textual layouts denoting the same instant (e.g. `2024-06-26T09:00:00Z` and `2024-06-26T11:00:00+02:00`) MUST return the same number. Consumed by `Scorer::seconds_between` (§6.3) and by deterministic rule 2 (§5.1).
 
 ---
 

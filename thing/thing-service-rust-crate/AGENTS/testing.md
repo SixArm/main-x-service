@@ -140,8 +140,8 @@ Run with: `cargo test --test duplicate_detection`
 |---|---|
 | Identical / near-duplicate | identical-clone score ≥ 0.95, name-typo fuzzy match, ordering invariants (closer-evidence outscores farther) |
 | Deterministic short-circuits | shared DOI/ISBN/UUID deterministic short-circuits, different ISBNs reject, SKU non-deterministic distinction (service-side filter), `Custom(s)` property_id passthrough, shared `same_as` URL contribution |
-| Negative cases | unrelated records score low, common-name + divergent demographics not flagged as duplicate |
-| Field-routing pinning | per-adapter mapping tests (telecom → phone/email, address field renames, identifier-system-URI routing) |
+| Negative cases | unrelated records score low and do not match, same name + different ISBNs does not short-circuit |
+| Field-routing pinning | per-adapter mapping tests (`additional_type` singular → `additional_types` vec, first `images` entry → matcher `image`, `Isbn` property_id lowercases to the canonical `isbn` token) |
 | Edge cases | sparse records, empty fields, config presets |
 
 ### Running

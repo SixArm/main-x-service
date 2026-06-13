@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use loco_rs::{
     app::{AppContext, Hooks, Initializer},
-    bgworker::{BackgroundWorker, Queue},
+    bgworker::Queue,
     boot::{create_app, BootResult, StartMode},
     config::Config,
     controller::AppRoutes,
@@ -13,12 +13,9 @@ use loco_rs::{
 use migration::Migrator;
 use std::path::Path;
 
-#[allow(unused_imports)]
 use crate::{
     controllers,
     models::_entities::{audit_logs, organizations},
-    tasks,
-    workers::downloader::DownloadWorker,
 };
 
 pub struct App;
@@ -55,8 +52,9 @@ impl Hooks for App {
             .add_route(controllers::organizations::routes())
             .add_route(controllers::docs::routes())
     }
-    async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
-        queue.register(DownloadWorker::build(ctx)).await?;
+    async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {
+        // No background workers (the loco scaffold's DownloadWorker stub
+        // was removed; see entity spec §13 T-12).
         Ok(())
     }
 

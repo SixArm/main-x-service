@@ -31,7 +31,7 @@ batch jobs, or notebooks.
 
 ```toml
 [dependencies]
-thing-matcher = "0.4"
+thing-matcher = "0.6.1"
 ```
 
 ## Quick start — probabilistic match

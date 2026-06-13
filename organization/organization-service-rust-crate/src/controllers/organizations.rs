@@ -5,6 +5,8 @@
 //! `organization-matcher` engine, so there is no separate model or
 //! adapter to drift.
 
+use axum::http::StatusCode;
+use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
 use organization_matcher::{MatchConfig, MatchingEngine, Organization};
 use serde::{Deserialize, Serialize};
@@ -43,12 +45,38 @@ struct ScoredRef {
     is_match: bool,
 }
 
+/// Validate an incoming `Organization` payload.
+///
+/// Family convention: validation failures are `422 Unprocessable
+/// Entity` (loco's `bad_request` is reserved for malformed requests).
+///
+/// # Errors
+///
+/// `Error::CustomError(422)` when `name` is blank.
+fn validate(org: &Organization) -> Result<()> {
+    if org.name.trim().is_empty() {
+        return Err(Error::CustomError(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ErrorDetail::new("unprocessable_entity", "name is required"),
+        ));
+    }
+    Ok(())
+}
+
+/// Map model-layer errors to HTTP errors: an unknown `pid` is `404
+/// Not Found` (loco's default mapping for `ModelError::EntityNotFound`
+/// is a 500, which would break the spec'd `404` contract).
+fn http_err(err: ModelError) -> Error {
+    match err {
+        ModelError::EntityNotFound => Error::NotFound,
+        other => Error::Model(other),
+    }
+}
+
 /// Create an organization.
 #[debug_handler]
 async fn create(State(ctx): State<AppContext>, Json(org): Json<Organization>) -> Result<Response> {
-    if org.name.trim().is_empty() {
-        return bad_request("name is required");
-    }
+    validate(&org)?;
     let model = OrgModel::create(&ctx.db, &org).await?;
     audit(&ctx, model.pid, "created", Some(model.data.clone())).await;
     streaming::publish(EventKind::Created, &model.pid.to_string(), &model.name);
@@ -58,7 +86,9 @@ async fn create(State(ctx): State<AppContext>, Json(org): Json<Organization>) ->
 /// Fetch an organization by public id.
 #[debug_handler]
 async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
-    let model = OrgModel::find_by_pid(&ctx.db, &pid).await?;
+    let model = OrgModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(http_err)?;
     let org = model.to_org()?;
     format::json(org)
 }
@@ -70,7 +100,10 @@ async fn update(
     State(ctx): State<AppContext>,
     Json(org): Json<Organization>,
 ) -> Result<Response> {
-    let model = OrgModel::find_by_pid(&ctx.db, &pid).await?;
+    validate(&org)?;
+    let model = OrgModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(http_err)?;
     let updated = model.into_active_model().update_data(&ctx.db, &org).await?;
     audit(&ctx, updated.pid, "updated", Some(updated.data.clone())).await;
     streaming::publish(EventKind::Updated, &updated.pid.to_string(), &updated.name);
@@ -80,7 +113,9 @@ async fn update(
 /// Soft-delete an organization.
 #[debug_handler]
 async fn remove(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
-    let model = OrgModel::find_by_pid(&ctx.db, &pid).await?;
+    let model = OrgModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(http_err)?;
     let (entity_pid, name) = (model.pid, model.name.clone());
     model.into_active_model().soft_delete(&ctx.db).await?;
     audit(&ctx, entity_pid, "deleted", None).await;
@@ -203,4 +238,29 @@ pub fn routes() -> Routes {
         .add("/{pid}", put(update))
         .add("/{pid}", delete(remove))
         .add("/{pid}/audit", get(entity_audit))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// DB-free pin: blank-name validation must map to HTTP 422
+    /// (family convention; spec §6/§9, entity spec T-2).
+    #[test]
+    fn blank_name_validation_is_422() {
+        let org = Organization::new("   ");
+        let err = validate(&org).expect_err("blank name must fail validation");
+        match err {
+            Error::CustomError(status, _) => {
+                assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+            }
+            other => panic!("expected CustomError(422), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn non_blank_name_passes_validation() {
+        let org = Organization::new("Acme, Inc.");
+        assert!(validate(&org).is_ok());
+    }
 }

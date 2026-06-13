@@ -2,7 +2,7 @@
 
 The crate follows Semantic Versioning. Pre-1.0, minor bumps MAY contain breaking API changes (Cargo convention) and MUST be documented under "Breaking" in the CHANGELOG entry for that version.
 
-- **0.4.0** is the first release of `Event-matcher` under the geographic Event-matcher domain. The 0.3.x line targeted a different domain and is not upgrade-compatible.
+- **0.5.0** repurposed the crate from geographic place matching to schema.org/Event matching. The 0.4.x line (place matcher) is not upgrade-compatible; pin to `0.4.x` for the place-matcher behaviour. See the 0.5.0 `CHANGELOG.md` entry for the full rename / removal table.
 - The set of items re-exported from `lib.rs` is the public surface. Adding to it is non-breaking; removing or renaming is breaking.
 - Default-weight or default-threshold changes count as observable behaviour changes and MUST be documented under "Behaviour Change" in the CHANGELOG. They MAY require a minor bump.
 - Every behavioural change SHOULD ship with a new CHANGELOG entry (under "Unreleased" until the next release).
@@ -11,15 +11,15 @@ The crate follows Semantic Versioning. Pre-1.0, minor bumps MAY contain breaking
 
 The following items carry `#[non_exhaustive]`:
 
-- `Place` and `Address` — adding fields is non-breaking. Downstream code MUST construct via the builder / `new` rather than struct-literal syntax.
-- `PlaceCategory` and `PlaceIdScheme` — adding variants is non-breaking. Downstream `match` statements MUST include a `_ => ...` arm.
+- `Event`, `Address`, and `Location` — adding fields is non-breaking. Downstream code MUST construct via the builder / `new` rather than struct-literal syntax.
+- `EventCategory`, `EventStatus`, `EventAttendanceMode`, and `EventIdScheme` — adding variants is non-breaking. Downstream `match` statements MUST include a `_ => ...` arm.
 - `MatchingError` — adding variants is non-breaking.
 
 Removing fields or variants is breaking.
 
 ### 9.2 JSON shape stability
 
-Every public data type derives `serde::{Serialize, Deserialize}`. `MatchConfig` carries `#[serde(default)]` at struct level so partial documents inherit defaults from `MatchConfig::default()`. `MatchBreakdown::email_score` and `MatchResult::confidence` carry `#[serde(default)]` to allow legacy payloads predating those fields to round-trip.
+Every public data type derives `serde::{Serialize, Deserialize}`. `MatchConfig` carries `#[serde(default)]` at struct level so partial documents inherit defaults from `MatchConfig::default()`. `MatchResult::confidence` carries `#[serde(default)]` to allow legacy payloads predating the field to round-trip.
 
 Renaming a JSON key or changing its type is breaking.
 

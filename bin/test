@@ -43,7 +43,7 @@ test_repository() {
 }
 
 test_loco_projects() {
-    find "$top" -type d -name '*-rust-crate' -maxdepth 1 | sort |
+    find "$top" -maxdepth 2 -type d -name '*-rust-crate' | sort |
     while read -r dir; do
         "$top/bin/test-loco-project" "$dir" || true
     done

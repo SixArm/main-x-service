@@ -15,7 +15,8 @@ clearly described manual check confirms the acceptance criterion.
     record end-to-end against a local Fluvio broker.
 - [ ] **T-3 — FHIR capability statement + bundle handling.**
   - [ ] `GET /fhir/metadata` returns a CapabilityStatement listing
-    Practitioner.
+    the `Worker` resource (the wire `resourceType` this server
+    actually emits — see §6.8).
   - [ ] `Bundle` GET / POST / search wrapping.
   - **Acceptance:** Touchstone FHIR validator passes on a sample
     bundle round-trip.
@@ -42,4 +43,14 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] Per-worker timeline of role / organisation assignments.
   - **Acceptance:** new assignment creates a timeline entry visible
     via `GET /api/workers/{id}/timeline`.
+- [ ] **T-9 — Mount the FHIR routes on the loco router.**
+  - [ ] The `/fhir/Worker` handlers in `src/api/fhir/handlers.rs` are
+    implemented but never registered: `App::routes` adds only
+    `workers_routes()` + `metrics_routes()`, and `create_router`
+    nests only the REST surface. Add a `fhir_routes()` `Routes` group
+    (GET/POST `/fhir/Worker`, GET/PUT/DELETE `/fhir/Worker/{id}`) and
+    register it in `App::routes`.
+  - **Acceptance:** a route test pins `GET /fhir/Worker/{id}` (the
+    path documented in §6.8 / §9 and `AGENTS/restful.md`) returning a
+    FHIR resource, closing entity-level task T-1.
 

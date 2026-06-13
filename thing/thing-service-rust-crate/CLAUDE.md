@@ -12,7 +12,7 @@ The Thing service shares its architecture with every other Main X
 Index crate: REST + gRPC API on top of PostgreSQL, Tantivy, and an
 event stream.
 
-@agents/share/overview.md
+@../../agents/share/overview.md
 
 ## Features
 
@@ -76,13 +76,13 @@ event stream.
 @AGENTS/restful.md
 @AGENTS/testing.md
 
-@agents/share/auditability.md
-@agents/share/availability.md
-@agents/share/match-search-merge.md
-@agents/share/observability.md
-@agents/share/privacy.md
-@agents/share/restful.md
-@agents/share/technology.md
+@../../agents/share/auditability.md
+@../../agents/share/availability.md
+@../../agents/share/match-search-merge.md
+@../../agents/share/observability.md
+@../../agents/share/privacy.md
+@../../agents/share/restful.md
+@../../agents/share/loco.md
 
 ## Quick start
 

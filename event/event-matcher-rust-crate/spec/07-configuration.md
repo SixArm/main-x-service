@@ -6,19 +6,20 @@
 pub struct MatchConfig {
     pub match_threshold: f64,
     pub name_weight: f64,
-    pub coordinates_weight: f64,
+    pub start_date_weight: f64,
+    pub start_date_scale_seconds: f64,
+    pub end_date_weight: f64,
+    pub location_weight: f64,
     pub coordinates_scale_metres: f64,
-    pub address_weight: f64,
     pub category_weight: f64,
     pub country_code_weight: f64,
-    pub place_ids_weight: f64,
-    pub phone_weight: f64,
-    pub email_weight: f64,
+    pub event_ids_weight: f64,
+    pub organizer_weight: f64,
+    pub performers_weight: f64,
+    pub url_weight: f64,
     pub use_phonetic_matching: bool,
     pub name_algorithm: SimilarityAlgorithm,
     pub strict_mode: bool,
-    pub gmail_dot_folding: bool,
-    pub phone_default_country: Option<String>,
 }
 ```
 
@@ -30,19 +31,20 @@ pub struct MatchConfig {
 |---|---|---|
 | `match_threshold` | `0.80` | Score at or above which `is_match` is `true`. |
 | `name_weight` | `0.20` | Weight of the name component (§6.1). |
-| `coordinates_weight` | `0.30` | Weight of the coordinates component (§6.3). |
-| `coordinates_scale_metres` | `50.0` | Gaussian-decay scale `s` in metres (§6.3). |
-| `address_weight` | `0.10` | Weight of the address component (§6.4). |
-| `category_weight` | `0.10` | Weight of the category component (§6.5). |
-| `country_code_weight` | `0.05` | Weight of the country-code component (§6.6). |
-| `place_ids_weight` | `0.15` | Weight of the place-IDs component (§6.7). |
-| `phone_weight` | `0.03` | Weight of the phone component (§6.8). |
-| `email_weight` | `0.02` | Weight of the email component (§6.9). |
+| `start_date_weight` | `0.25` | Weight of the start-date component (§6.3). |
+| `start_date_scale_seconds` | `3600.0` | Gaussian-decay scale `s` in seconds — one hour (§6.3). Shared by the end-date component. |
+| `end_date_weight` | `0.05` | Weight of the end-date component (§6.3). |
+| `location_weight` | `0.15` | Weight of the location component (§6.4). |
+| `coordinates_scale_metres` | `100.0` | Gaussian-decay scale `s` in metres for the coordinates sub-score inside location (§6.4). |
+| `category_weight` | `0.08` | Weight of the category component (§6.5). |
+| `country_code_weight` | `0.04` | Weight of the country-code component (§6.6). |
+| `event_ids_weight` | `0.15` | Weight of the event-IDs component (§6.7). |
+| `organizer_weight` | `0.04` | Weight of the organizer component (§6.8). |
+| `performers_weight` | `0.02` | Weight of the performers component (§6.9). |
+| `url_weight` | `0.02` | Weight of the URL component (§6.10). |
 | `use_phonetic_matching` | `false` | Compute Soundex-bonus (§6.2). |
 | `name_algorithm` | `SimilarityAlgorithm::Combined` | Algorithm used by `name_score`. |
 | `strict_mode` | `false` | Tighten `is_match` to also require `deterministic_match` (§5.2.3). |
-| `gmail_dot_folding` | `false` | Apply Gmail-specific localpart canonicalisation (§4.4). |
-| `phone_default_country` | `Some("GB")` | Fallback ISO 3166-1 alpha-2 country for E.164 parsing (§4.3.2). |
 
 ### 7.2 Strict — `MatchConfig::strict()`
 
@@ -64,7 +66,6 @@ Under strict mode, `is_match` additionally requires `deterministic_match`. `scor
 
 ### 7.4 Tuning guidance
 
-Tuning recipes (false positives → raise `match_threshold`; chain-branch collapse → tighten `coordinates_scale_metres`; cross-country phone collisions → pin or null out `phone_default_country`; etc.) live in [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md). The defaults table above remains normative.
+Tuning recipes (false positives → raise `match_threshold`; recurring weekly series collapsing into one event → tighten `start_date_scale_seconds`; multi-room venue confusion → tighten `coordinates_scale_metres`; tour-stop collisions (same name + performers, different cities) → raise `location_weight`; etc.) live in [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md). The defaults table above remains normative.
 
 ---
-

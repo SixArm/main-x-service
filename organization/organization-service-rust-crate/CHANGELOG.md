@@ -11,6 +11,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Request-level integration tests.** `tests/requests/organizations.rs`
+  (loco testing harness + `serial_test`): create round-trip
+  (snake_case wire), blank-name `422` on create + update, unknown-pid
+  `404`, search (+ blank-`q` `400`), check-duplicates ranking.
+  `#[ignore]`-gated so the default `cargo test` stays green without
+  Postgres; run with `cargo test -- --ignored`.
+
+### Changed
+
+- **Validation failures now return `422 Unprocessable Entity`** (was
+  `400`): blank `name` on create and on replace (`PUT`), per the
+  family convention. A DB-free unit test pins the mapping; OpenAPI
+  updated.
+- **Unknown `pid` now returns `404`** on get/replace/delete (loco's
+  default `ModelError::EntityNotFound` mapping produced a `500`,
+  breaking the documented contract).
+- Docs (`README.md`, `index.md`, `AGENTS.md`) now describe the wire
+  format as snake_case (`legal_name`, `same_as`, `founding_date`, …)
+  matching the actual DTO serialization — entity spec OQ-1 resolved:
+  no serde rename; snake_case is canonical.
+
+### Removed
+
+- loco scaffolding leftovers: `src/workers/downloader.rs` (TODO stub)
+  and its worker registration, plus the empty `src/data/` and
+  `src/tasks/` modules.
+
 - **Audit log + event streaming.** `audit_logs` table records every
   create/update/delete (with a JSONB snapshot); a process-global
   in-memory event stream publishes Created/Updated/Deleted events.

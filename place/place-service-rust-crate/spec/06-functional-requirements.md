@@ -35,8 +35,8 @@ Match quality (configurable thresholds):
 
 #### Interoperability with `place-matcher`
 
-The service embeds the sibling `place-matcher` crate (path dependency
-declared in `Cargo.toml`) and re-exports it from
+The service embeds the sibling `place-matcher` crate (registry
+dependency `place-matcher = "0.6.1"` in `Cargo.toml`) and re-exports it from
 `src/matching/mod.rs` as `matcher_lib`. The matcher crate is the
 **canonical reference algorithm** — it carries the full
 `PlaceCategory` vocabulary (34 variants), `PlaceIdScheme` for

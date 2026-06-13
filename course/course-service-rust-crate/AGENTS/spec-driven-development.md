@@ -22,9 +22,9 @@ three.
 | §5 Domain Model | `src/models/`, `migrations/` |
 | §6 Functional Requirements | `src/api/rest/handlers.rs`, validation, matcher adapter |
 | §7 Non-Functional Requirements | benches, profiling, deployment config |
-| §8 Architecture | `src/lib.rs`, `src/main.rs`, module layout |
+| §8 Architecture | `src/lib.rs`, `src/app.rs` (loco Hooks), `src/bin/main.rs`, module layout |
 | §9 API Surface | `src/api/rest/mod.rs` + `AGENTS/restful.md` |
-| §10 Persistence | `migrations/`, `src/db/` |
+| §10 Persistence | `migrations/` + `migration/` (loco Migrator), `src/db/` |
 | §11 Testing Strategy | `tests/`, `AGENTS/testing.md` |
 | §12 Compliance | `src/privacy/`, audit-log writes |
 | §13 Tasks | live work queue — the only place tasks live |

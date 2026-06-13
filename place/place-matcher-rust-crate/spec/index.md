@@ -1,6 +1,6 @@
 # Place matcher — specification
 
-**Crate:** `place-matcher` &nbsp;·&nbsp; **Version targeted:** `0.4.0` &nbsp;·&nbsp; **Status:** authoritative
+**Crate:** `place-matcher` &nbsp;·&nbsp; **Version targeted:** `0.6.1` &nbsp;·&nbsp; **Status:** authoritative
 
 This document is the living, single source of truth (SSOT) for the `place-matcher` Rust crate. Every other document in the repository (`README.md`, `index.md`, `AGENTS.md`, `AGENTS/*.md`, `CHANGELOG.md`) summarises or quotes this file — none contradicts or extends it. When prose elsewhere disagrees with this file, this file wins; when this file disagrees with the code, see §9.
 

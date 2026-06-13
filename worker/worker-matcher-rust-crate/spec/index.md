@@ -2,7 +2,7 @@
 
 > **Status:** Living document. Canonical SDD specification for the `worker-matcher` Rust crate — single source of truth; consolidates what would otherwise live in `spec.md` + `plan.md` + `tasks.md`. Delivered tasks archived in [`AGENTS/delivered-tasks.md`](../AGENTS/delivered-tasks.md) + [`AGENTS/delivered-tasks-2.md`](../AGENTS/delivered-tasks-2.md); research-spike outcomes in [`AGENTS/roadmap-research.md`](../AGENTS/roadmap-research.md).
 >
-> **Version:** 0.3.0 · **Maintainer:** Joel Parker Henderson — `joel@joelparkerhenderson.com` · **Crate:** `worker-matcher` (Cargo) · **Edition:** Rust 2024 · **Licence:** MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause · **Repository:** https://github.com/sixarm/worker-matcher-rust-crate
+> **Version:** 0.6.1 · **Maintainer:** Joel Parker Henderson — `joel@joelparkerhenderson.com` · **Crate:** `worker-matcher` (Cargo) · **Edition:** Rust 2024 · **Licence:** MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause · **Repository:** https://github.com/sixarm/worker-matcher-rust-crate
 >
 > See also: [index.md](../index.md), [AGENTS.md](../AGENTS.md), [README.md](../README.md), [CHANGELOG.md](../CHANGELOG.md).
 

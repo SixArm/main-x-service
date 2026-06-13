@@ -43,16 +43,21 @@ curl -s localhost:5150/api/care-pathways -H 'content-type: application/json' \
 ## Testing
 
 ```bash
-cargo test --test matching   # DB-free: matcher embedding + JSON round-trip
+cargo test                   # DB-free: matcher embedding, JSON round-trip,
+                             # blank-name → 422 validation pin
+cargo test -- --ignored      # request-level tests (need Postgres DATABASE_URL)
 cargo clippy --all-targets
 ```
+
+Validation failures (blank `name` on create or update) return
+`422 Unprocessable Entity` — the family convention.
 
 ## Status
 
 MVP: CRUD + matching. Search, streaming, audit, privacy, OpenAPI, and
 richer validation are tracked in [spec §13](./spec/index.md). JWT auth is
 provided by the central
-[authentication-service](../authentication-service-rust-crate).
+[authentication-service](../../authentication/authentication-service-rust-crate).
 
 ## License
 

@@ -12,13 +12,16 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 - New `src/matching/adapter.rs` exposing
   `to_matcher_thing(&service::Thing) -> thing_matcher::Thing`.
-  Projects the FHIR/schema.org-shaped service record into the matcher
-  crate's builder shape: name flattening (`HumanName` → flat
-  `given_name`/`family_name`/`middle_name`), telecom sampling
-  (first phone / sms / email of each system),
-  identifier routing by FHIR-style `system` URI (schema.org / FHIR system URI → matcher scheme enum
-  with type-based fallbacks), DOI/ISBN/UUID deterministic and address field
-  renaming (`state` → `county`, `postal_code` → `postcode`).
+  Projects the schema.org-shaped service record into the matcher
+  crate's builder shape: 1:1 mapping for `name`, `description`,
+  `disambiguating_description`, `url`, `main_entity_of_page`,
+  `owner`, `alternate_names`, `same_as`; singular `additional_type`
+  / `subject_of` become first entries of the matcher's list fields;
+  first `images` entry becomes the matcher's single `image`;
+  identifiers map via `map_identifier_property` to schema.org
+  canonical tokens (`doi`, `isbn`, `issn`, `gtin`, `sku`, `mpn`,
+  `serialNumber`, `uri`, `uuid`; `Custom(s)` passes through
+  verbatim); registry-only fields are dropped.
 - `src/matching/mod.rs` now re-exports the sibling `thing-matcher` crate
   as `matcher_lib`, so callers can reach `MatchingEngine`,
   `MatchConfig`, `MatchResult`, `MatchBreakdown`, `Confidence`, and
@@ -32,8 +35,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   drive service records through `to_matcher_thing` and assert on
   the canonical `MatchingEngine::match_things` output. Covers
   identical clones, name typos (Jaro-Winkler), deterministic
-  short-circuits (national / strong identifiers), negative cases
-  (unrelated records, divergent demographics), per-adapter field
+  short-circuits (DOI / ISBN / UUID), negative cases
+  (unrelated records, same name + different ISBNs), per-adapter field
   routing, and config-preset invariants (strict ⊆ lenient).
 
 ### Added — bridge benchmarks

@@ -87,6 +87,43 @@ contribute to the weighted average.
 | Possible | ≥ 0.60 | Potential match |
 | Unlikely | < 0.60 | Not a match |
 
+### Relationship to the embedded matcher's confidence bands
+
+The service and the embedded `thing-matcher` crate classify the *same*
+`[0.0, 1.0]` score with **different vocabularies and different cut
+points**, so there is **no 1:1 label mapping** — the band edges
+interleave:
+
+- Service — `MatchConfidence::from_score`
+  (`src/matching/scoring.rs`): Certain ≥ 0.95, Probable ≥ 0.80,
+  Possible ≥ 0.60, else Unlikely.
+- Matcher — `thing_matcher::Confidence::from_score`
+  (matcher `src/matcher.rs`): High ≥ 0.90, Medium ≥ 0.75, else Low.
+
+Overlay by score range:
+
+| Score range | Service (4-band) | Matcher (3-band) |
+|---|---|---|
+| 0.95 ≤ s | Certain | High |
+| 0.90 ≤ s < 0.95 | Probable | High |
+| 0.80 ≤ s < 0.90 | Probable | Medium |
+| 0.75 ≤ s < 0.80 | Possible | Medium |
+| 0.60 ≤ s < 0.75 | Possible | Low |
+| s < 0.60 | Unlikely | Low |
+
+Consequences:
+
+- **Certain ⊂ High** is the only clean containment. Every other label
+  spans two labels on the other side (e.g. matcher High covers both
+  service Certain and the top of Probable).
+- **Never translate label → label.** Both classifiers are pure
+  functions of the score, so the safe bridge is to carry the raw
+  `score` across the adapter and re-classify with whichever
+  vocabulary the caller needs.
+- Which vocabulary is API-facing is still open — see entity spec
+  §16 OQ-2 and entity task T-8 in
+  [`../../spec/13-tasks.md`](../../spec/13-tasks.md).
+
 ### MatchResult
 
 ```rust

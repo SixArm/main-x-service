@@ -137,10 +137,10 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
 #[debug_handler]
 async fn me(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
     let AuthUser(claims) = auth;
-    if let Ok(session) = sessions::Model::find_by_jid(&ctx.db, &claims.jti).await {
-        if !session.is_active() {
-            return unauthorized("session signed out");
-        }
+    if let Ok(session) = sessions::Model::find_by_jid(&ctx.db, &claims.jti).await
+        && !session.is_active()
+    {
+        return unauthorized("session signed out");
     }
     let user = users::Model::find_by_pid(&ctx.db, &claims.sub).await?;
     format::json(CurrentResponse::new(&user))

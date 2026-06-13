@@ -7,5 +7,5 @@
 | ISO/IEC 27001 | Operational controls (deployment-side) |
 
 Technology compliance:
-[`agents/share/compliance-for-technology.md`](../../agents/share/compliance-for-technology.md).
+[`agents/share/compliance-for-technology.md`](../../../agents/share/compliance-for-technology.md).
 

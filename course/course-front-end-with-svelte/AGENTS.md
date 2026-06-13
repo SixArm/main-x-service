@@ -42,6 +42,6 @@ Per repo decision (2026-06-02), each `*-front-end-with-svelte` project keeps its
 ## What does NOT live here
 
 - Authentication. Out of scope until the service ships auth (Course Service spec §15).
-- FHIR Course UI. Out of scope for MVP.
-- Consent management UI. Out of scope for MVP (Course Service has `/consents` endpoints but no front-end yet).
+- FHIR Course UI. Out of scope — the service has no FHIR surface (service spec §2.2).
+- Consent management UI. Out of scope for MVP (the Course Service exposes no consent endpoints).
 - GDPR-export download UI. Out of scope for MVP.

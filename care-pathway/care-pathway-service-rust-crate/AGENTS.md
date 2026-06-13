@@ -16,7 +16,7 @@ adapter to drift.
 | Question | Answer |
 |---|---|
 | Framework | loco.rs 0.16 (`Hooks`/`AppContext`/CLI, loco config, `sea-orm-migration`). |
-| Build / test | `cargo build` · `cargo test` (DB-free tests in `tests/matching.rs`). |
+| Build / test | `cargo build` · `cargo test` (DB-free: `tests/matching.rs` + controller 422 pin) · `cargo test -- --ignored` (request tests, need Postgres). |
 | Run | `cargo loco start` (needs Postgres). |
 | Persistence | One `care_pathways` table: `pid`, `name`, `data` (JSONB CarePathway), `active`, soft-delete. |
 
@@ -24,7 +24,7 @@ adapter to drift.
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/care-pathways` | Create (body: `CarePathway`) → `{pid, name}` |
+| POST | `/api/care-pathways` | Create (body: `CarePathway`; blank `name` → `422`) → `{pid, name}` |
 | GET | `/api/care-pathways` | List active (capped 100) |
 | GET | `/api/care-pathways/{pid}` | Fetch the stored `CarePathway` |
 | PUT | `/api/care-pathways/{pid}` | Replace payload |
@@ -37,7 +37,7 @@ Plus loco's default `/_health`, `/_ping`.
 ## MVP scope
 
 CRUD + matching. Deferred (spec §13): Tantivy search, streaming, audit,
-privacy, OpenAPI, richer validation, request-level tests.
+privacy, OpenAPI, richer validation (ICD/SNOMED formats).
 
 ## Golden rules
 
@@ -46,7 +46,7 @@ privacy, OpenAPI, richer validation, request-level tests.
    tables are `sea-orm-migration` migrations.
 3. **Reuse the matcher type.** Do not fork a `CarePathway` DTO.
 4. **JWT auth** comes from the central
-   [authentication-service](../authentication-service-rust-crate).
+   [authentication-service](../../authentication/authentication-service-rust-crate).
 
 ## Layout
 

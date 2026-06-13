@@ -43,7 +43,8 @@ The API DTO is `organization_matcher::Organization`: `name`,
 1. `POST /api/organizations` — create; `name` required (422 if blank).
 2. `GET /api/organizations` — list active (cap 100), `{pid, name}`.
 3. `GET /api/organizations/{pid}` — return the stored `Organization`.
-4. `PUT /api/organizations/{pid}` — replace the payload.
+4. `PUT /api/organizations/{pid}` — replace the payload; `name`
+   required (422 if blank).
 5. `DELETE /api/organizations/{pid}` — soft-delete (`active=false`,
    `deleted_at` stamped).
 6. `POST /api/organizations/match` — rank an explicit `{query,
@@ -65,8 +66,10 @@ directly on the deserialised payloads — no adapter.
 
 ## 9. API surface
 
-See §6. Responses are raw loco JSON. `404` for unknown `pid`, `400`/`422`
-for invalid input.
+See §6. Responses are raw loco JSON. `404` for unknown `pid`; `422
+Unprocessable Entity` for validation failures (blank `name` on create
+or replace — family convention); `400` for malformed requests (blank
+search `q`, invalid audit pid).
 
 ## 10. Persistence
 
@@ -75,8 +78,15 @@ PostgreSQL via SeaORM + `sea-orm-migration`. Migration
 
 ## 11. Testing strategy
 
-DB-free tests (`tests/matching.rs`): matcher embedding + JSON
-round-trip. Request-level tests require Postgres (deferred, §13).
+DB-free tests: `tests/matching.rs` (matcher embedding + JSON
+round-trip) and unit tests in `src/` (validation → `422` pin, OpenAPI
+shape, streaming). Request-level tests
+(`tests/requests/organizations.rs`): boot the real app via loco's
+`testing` harness and cover create round-trip, blank-name `422`
+(create + update), unknown-pid `404`, search, and check-duplicates;
+they require Postgres (`config/test.yaml`) and are `#[ignore]`d so
+the default `cargo test` stays green — run with `cargo test --
+--ignored`.
 
 ## 12. Compliance
 
@@ -92,15 +102,17 @@ personal data — honour GDPR when the privacy layer lands (§13).
 - [ ] Per-field masking + GDPR export endpoint.
 - [ ] Record merge with link tracking.
 - [ ] Richer validation (identifier formats, URL, country codes).
-- [ ] Request-level integration tests (Postgres).
+- [x] Request-level integration tests (Postgres; `#[ignore]`-gated).
 - [ ] JWT verification middleware consuming the auth-service JWKS.
 
 ## 14. Implementation status
 
-Done: loco boot; organizations table + migration; CRUD; `/match` and
-`/check-duplicates` embedding organization-matcher; audit log; in-memory
-event streaming; name search (`ILIKE`); OpenAPI 3 + Swagger UI; DB-free
-tests; green build + clippy.
+Done: loco boot; organizations table + migration; CRUD (blank name →
+`422`, unknown pid → `404`); `/match` and `/check-duplicates` embedding
+organization-matcher; audit log; in-memory event streaming; name search
+(`ILIKE`); OpenAPI 3 + Swagger UI; DB-free tests; request-level test
+suite (Postgres, `#[ignore]`-gated); loco scaffolding leftovers removed
+(no workers/tasks/data stubs); green build + clippy.
 
 ## 15. Roadmap
 

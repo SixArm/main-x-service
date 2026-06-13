@@ -4,13 +4,22 @@
 
 ## Subprojects
 
-| Crate | Entity | Path |
-|-------|--------|------|
-| Person Service | Person | [person-service-rust-crate](person-service-rust-crate/) |
-| Place Service | Place | [place-service-rust-crate](place-service-rust-crate/) |
-| Thing Service | Thing | [thing-service-rust-crate](thing-service-rust-crate/) |
-| Event Service | Event | [event-service-rust-crate](event-service-rust-crate/) |
-| Worker Service | Worker | [worker-service-rust-crate](worker-service-rust-crate/) |
+Subprojects are grouped one directory per entity. Each entity
+directory holds a front-end web app, a matcher (or verifier) library
+crate, a service API crate, and entity-level `spec/` + `AGENTS/`
+umbrella docs.
+
+| Entity | Service | Library | Front-end | Umbrella |
+|--------|---------|---------|-----------|----------|
+| Person | [person-service-rust-crate](person/person-service-rust-crate/) | [person-matcher-rust-crate](person/person-matcher-rust-crate/) | [person-front-end-with-svelte](person/person-front-end-with-svelte/) | [spec](person/spec/index.md) |
+| Worker | [worker-service-rust-crate](worker/worker-service-rust-crate/) | [worker-matcher-rust-crate](worker/worker-matcher-rust-crate/) | [worker-front-end-with-svelte](worker/worker-front-end-with-svelte/) | [spec](worker/spec/index.md) |
+| Place | [place-service-rust-crate](place/place-service-rust-crate/) | [place-matcher-rust-crate](place/place-matcher-rust-crate/) | [place-front-end-with-svelte](place/place-front-end-with-svelte/) | [spec](place/spec/index.md) |
+| Thing | [thing-service-rust-crate](thing/thing-service-rust-crate/) | [thing-matcher-rust-crate](thing/thing-matcher-rust-crate/) | [thing-front-end-with-svelte](thing/thing-front-end-with-svelte/) | [spec](thing/spec/index.md) |
+| Event | [event-service-rust-crate](event/event-service-rust-crate/) | [event-matcher-rust-crate](event/event-matcher-rust-crate/) | [event-front-end-with-svelte](event/event-front-end-with-svelte/) | [spec](event/spec/index.md) |
+| Course | [course-service-rust-crate](course/course-service-rust-crate/) | [course-matcher-rust-crate](course/course-matcher-rust-crate/) | [course-front-end-with-svelte](course/course-front-end-with-svelte/) | [spec](course/spec/index.md) |
+| Organization | [organization-service-rust-crate](organization/organization-service-rust-crate/) | [organization-matcher-rust-crate](organization/organization-matcher-rust-crate/) | [organization-front-end-with-svelte](organization/organization-front-end-with-svelte/) | [spec](organization/spec/index.md) |
+| Care pathway | [care-pathway-service-rust-crate](care-pathway/care-pathway-service-rust-crate/) | [care-pathway-matcher-rust-crate](care-pathway/care-pathway-matcher-rust-crate/) | [care-pathway-front-end-with-svelte](care-pathway/care-pathway-front-end-with-svelte/) | [spec](care-pathway/spec/index.md) |
+| Authentication | [authentication-service-rust-crate](authentication/authentication-service-rust-crate/) | [authentication-verifier-rust-crate](authentication/authentication-verifier-rust-crate/) | [authentication-front-end-with-svelte](authentication/authentication-front-end-with-svelte/) | [spec](authentication/spec/index.md) |
 
 Each crate is self-contained: it owns its REST API, its persistence schema, and its matching algorithm. They share an architecture and a documentation layout, not code.
 
@@ -28,7 +37,7 @@ Each crate is self-contained: it owns its REST API, its persistence schema, and 
 - **gRPC stub** (Tonic) for high-throughput callers
 - **Observability** — `tracing` + OpenTelemetry OTLP
 
-See [agents/share/technology.md](agents/share/technology.md) for the full dependency inventory.
+See [agents/share/rust-loco-stack.md](agents/share/rust-loco-stack.md) for the full dependency inventory.
 
 ## Running
 
@@ -53,8 +62,8 @@ Top-level reference docs in [`agents/share/`](agents/share/):
 |------|---------|
 | [overview.md](agents/share/overview.md) | High-level project overview |
 | [architecture.md](agents/share/architecture.md) | Layered architecture |
-| [stack-for-rust-loco.md](agents/share/stack-for-rust-loco.md) | Full Rust + Loco dependency stack |
-| [technology.md](agents/share/technology.md) | Tech stack summary |
+| [rust-loco-stack.md](agents/share/rust-loco-stack.md) | Full Rust + Loco dependency stack |
+| [loco.md](agents/share/loco.md) | Loco framework (backend-only conventions) |
 | [match-search-merge.md](agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [match.md](agents/share/match.md) | Matching algorithms |
 | [search.md](agents/share/search.md) | Search (Tantivy) |
@@ -64,7 +73,7 @@ Top-level reference docs in [`agents/share/`](agents/share/):
 | [auditability.md](agents/share/auditability.md) | Audit logging + event streaming |
 | [availability.md](agents/share/availability.md) | Health, scaling |
 | [observability.md](agents/share/observability.md) | Tracing + OpenTelemetry (summary) |
-| [observability-for-rust-loco.md](agents/share/observability-for-rust-loco.md) | Tracing + OpenTelemetry (full) |
+| [rust-tracing-opentelemetry-stack.md](agents/share/rust-tracing-opentelemetry-stack.md) | Tracing + OpenTelemetry (full) |
 | [restful.md](agents/share/restful.md) | REST API conventions |
 | [postgresql.md](agents/share/postgresql.md) | PostgreSQL setup |
 | [locales.md](agents/share/locales.md) | i18n & l10n |

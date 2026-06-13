@@ -12,7 +12,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 | Question | Answer |
 |---|---|
-| What does the crate do? | Pairwise matching of geographic-place records (landmarks, natural features, chain branches, administrative areas), deterministic and probabilistic, for de-duplication and record linkage. |
+| What does the crate do? | Pairwise matching of `schema.org/Thing` records (books, articles, products, landmarks, software, …), deterministic and probabilistic, for de-duplication and record linkage. |
 | Where is the canonical spec? | [`spec.md`](./spec/index.md). |
 | Where does new behaviour get specified? | In `spec.md` first, then code. See [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md). |
 | Build command | `cargo build` |
@@ -21,11 +21,11 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 | Format command | `cargo fmt` |
 | Where do public types live? | `src/lib.rs` re-exports; defined under `src/{models,matcher,scorer,normalizer,error}.rs`. |
 | Where are demo runs? | `cargo run` and `cargo run --example basic_usage` and `cargo run --example custom_config`. |
-| What's the deterministic-match rule? | Any shared `(scheme, value)` pair across `place_ids`, OR identical normalised `name` plus identical normalised `address.postcode`. See [`spec.md` §5.1](./spec/index.md). |
-| What's the probabilistic-match pipeline? | Weighted, weight-renormalised sum across name / coordinates / address / category / country_code / place_ids / phone / email; missing fields skip. Optional Soundex bonus when phonetic gating clears. See [`spec.md` §5.2, §6](./spec/index.md). |
-| Default match threshold | `0.80`. Strict: `0.95`. Lenient: `0.65`. See [`spec.md` §7](./spec/index.md). |
-| Default coordinates scale | `50.0` metres. Gaussian decay `exp(-(d/s)^2)`. See [`spec.md` §6.3](./spec/index.md). |
-| `#[non_exhaustive]` items | `Place`, `Address`, `PlaceCategory`, `PlaceIdScheme`, `MatchingError`. Construct via builders / `new`. See [`spec.md` §9.1](./spec/index.md). |
+| What's the deterministic-match rule? | Any shared `(property_id, value)` pair across `identifiers`, OR any shared `sameAs` URL after normalisation, OR equal normalised canonical `url`. See [`spec.md` §5.1](./spec/05-matching-engine.md). |
+| What's the probabilistic-match pipeline? | Weighted, weight-renormalised sum across name / description / disambiguatingDescription / identifiers / url / sameAs / image / mainEntityOfPage / additionalType; missing fields skip. Optional Soundex bonus when phonetic gating clears. See [`spec.md` §5.2, §6](./spec/index.md). |
+| Default match threshold | `0.80`. Strict: `0.95`. Lenient: `0.65`. See [`spec.md` §3.4](./spec/03-data-model.md). |
+| Default name similarity | `SimilarityAlgorithm::Combined` = 0.7 × Jaro-Winkler + 0.3 × Levenshtein, best-of cartesian product over primary + alternate names. See [`spec.md` §3.5, §6](./spec/03-data-model.md). |
+| `#[non_exhaustive]` items | `Thing`, `MatchingError`. Construct via `Thing::builder()` / `Identifier::new`. See [`spec.md` §7.3](./spec/07-quality-attributes-and-tuning.md). |
 
 ---
 
@@ -36,8 +36,8 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 3. **No `unsafe`.** Enforced by `#![forbid(unsafe_code)]` in `lib.rs`. Do not remove the attribute.
 4. **Deterministic.** No clocks, no RNGs, no environment variables. Same inputs => same outputs, byte-for-byte. (`spec.md` §8)
 5. **Explainability over cleverness.** Every probabilistic match returns a per-field `MatchBreakdown`. Don't add black boxes. (`spec.md` §3.7)
-6. **Diacritic-correct.** Unicode diacritics (`â`, `ŷ`, `é`, `ü`, `ł`, …) must round-trip through normalisation. Don't break this. (`spec.md` §4.1)
-7. **No real personal data in tests.** A place can carry an associated phone, email, or local-id that is personal data; use synthetic examples only. Reuse existing illustrative fixtures (`example.org` per RFC 2606, drama-reserved `07700 900xxx` UK ranges, fictitious `(415) 555-…` US ranges). See [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md).
+6. **Diacritic-stable.** Name normalisation strips Latin diacritics (`é`, `ü`, `ó`, …) before similarity and Soundex scoring; this stripping is intentional and stable — don't change it casually. (`spec.md` §4)
+7. **No real personal data in tests.** A `Thing` record can carry associated personal data via `owner` (a person's name) or `local_id` (a CRM key); use synthetic examples only. Reuse existing illustrative fixtures (`example.org` / `example.com` URLs per RFC 2606; well-known cultural items — Eiffel Tower, Pride and Prejudice, Big Ben — for names). See [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md).
 8. **No `println!` in `src/` except `src/main.rs`.**
 9. **Run the full test suite before declaring success.** `cargo test` must pass; `cargo clippy --all-targets -- -D warnings` must be clean; `cargo doc --no-deps` must build without warnings.
 
@@ -85,10 +85,10 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 - Do not change default weights or thresholds without updating `spec.md` §7 and `CHANGELOG.md` in the same PR.
 - Do not silently widen or narrow the public API; every re-export from `lib.rs` is part of the SemVer contract. (`spec.md` §9)
 - Do not add panicking unwraps in library code. `Option` / `Result` is the answer. (`spec.md` §8)
-- Do not log place data. Do not `Debug`-format records into traces.
-- Do not score `local_id`. Different organisations may issue colliding values. (`spec.md` §3.1.1)
-- Do not cross-match `PlaceId` values across schemes. A `(Google, "abc")` and an `(OsmNode, "abc")` refer to different things and must not match. (`spec.md` §3.5)
-- Do not construct `Place`, `Address`, `PlaceCategory`, `PlaceIdScheme`, or `MatchingError` via struct-literal syntax from downstream code. All carry `#[non_exhaustive]`.
+- Do not log thing data. Do not `Debug`-format records into traces.
+- Do not score `local_id`. Different organisations may issue colliding values. (`spec.md` §3.1)
+- Do not cross-match `Identifier` values across schemes. A `("wikidata", "X42")` and an `("isbn", "X42")` refer to different identifiers and must not match; `property_id` is an opaque, case-sensitive string. (`spec.md` §3.3)
+- Do not construct `Thing` or `MatchingError` via struct-literal syntax from downstream code. Both carry `#[non_exhaustive]`; use `Thing::builder()` and the error constructors.
 
 ---
 
@@ -115,8 +115,8 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 ├── README.md                 ← user-facing
 ├── benches/                  ← criterion benchmarks
 ├── examples/                 ← runnable examples (basic_usage, custom_config)
-├── index.md                  ← documentation entry point
-├── spec.md                   ← LIVING SPECIFICATION (SSOT — read this)
+├── index.md                  ← documentation entry point (README.md symlinks here)
+├── spec/                     ← LIVING SPECIFICATION (SSOT — start at spec/index.md)
 ├── scripts/                  ← spec-drift check
 ├── src/                      ← crate source
 └── tests/                    ← integration tests, property tests

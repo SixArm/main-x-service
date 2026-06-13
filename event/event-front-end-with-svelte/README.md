@@ -9,7 +9,7 @@ SvelteKit front-end for the **[Event Service](../event-service-rust-crate/)** in
 | `/` | Dashboard — service health + recent audit activity |
 | `/events` | List & search (full-text, fuzzy, phonetic) with SVAR DataGrid |
 | `/events/new` | Create event; surfaces 409 duplicate candidates |
-| `/events/[id]` | Detail view — identity, identifiers, addresses, telecom, emergency contacts |
+| `/events/[id]` | Detail view — identity (time window, status, type, attendance mode), locations, organizers, performers, identifiers, offers |
 | `/events/[id]/edit` | Edit |
 | `/events/[id]/audit` | Per-event audit log |
 | `/events/match` | Match check — score a hypothetical record against the index |
@@ -67,7 +67,7 @@ src/
   lib/
     config.ts              - PUBLIC_API_BASE_URL
     api/
-      types.ts             - Event, HumanName, MatchResult, … (mirrors the Rust models)
+      types.ts             - Event, Location, Party, Offer, Identifier, MatchResult, … (mirrors the Rust models)
       client.ts            - ApiClient + ApiError (envelope-aware fetch)
       events.ts           - EventRepository (CRUD + search + match + merge + audit)
     forms/
@@ -78,7 +78,6 @@ src/
     components/
       SearchBox.svelte
       EventGrid.svelte    - SVAR DataGrid binding
-      HumanNameInput.svelte
       EventForm.svelte
       MatchResultsList.svelte
   routes/

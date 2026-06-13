@@ -1,0 +1,173 @@
+//! Request-level integration tests for the organizations API.
+//!
+//! These boot the real loco app against the `test` environment config
+//! (`config/test.yaml`), so they require a reachable PostgreSQL
+//! instance (default `postgres://loco:loco@localhost:5432/organization-service_test`,
+//! overridable via `DATABASE_URL`). Following the family convention
+//! (see person-service `tests/api_integration_test.rs`) they are
+//! `#[ignore]`d so the default `cargo test` run stays green without a
+//! database; run them with:
+//!
+//! ```bash
+//! cargo test -- --ignored
+//! ```
+//!
+//! The blank-name → 422 contract is additionally pinned DB-free by a
+//! unit test in `src/controllers/organizations.rs`.
+
+use loco_rs::testing::prelude::*;
+use organization_service::app::App;
+use serde_json::json;
+use serial_test::serial;
+
+/// A representative create payload (the body is the
+/// `organization_matcher::Organization` shape, snake_case wire format).
+fn acme() -> serde_json::Value {
+    json!({
+        "name": "Acme, Inc.",
+        "legal_name": "Acme Incorporated",
+        "url": "https://acme.com",
+        "same_as": ["https://www.wikidata.org/wiki/Q42"],
+        "jurisdiction": "US",
+        "founding_date": "1985-04-01",
+        "keywords": ["anvils"]
+    })
+}
+
+/// Create happy path: POST returns a `{pid, name}` ref, and the stored
+/// payload round-trips verbatim through `GET /{pid}`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn can_create_and_round_trip() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let response = request.post("/api/organizations").json(&acme()).await;
+        assert_eq!(response.status_code(), 200, "create should succeed");
+        let body: serde_json::Value = response.json();
+        let pid = body["pid"].as_str().expect("pid in create response");
+        assert_eq!(body["name"], "Acme, Inc.");
+
+        let fetched = request.get(&format!("/api/organizations/{pid}")).await;
+        assert_eq!(fetched.status_code(), 200);
+        let org: serde_json::Value = fetched.json();
+        // Snake_case wire format, round-tripped verbatim (OQ-1).
+        assert_eq!(org["name"], "Acme, Inc.");
+        assert_eq!(org["legal_name"], "Acme Incorporated");
+        assert_eq!(org["same_as"][0], "https://www.wikidata.org/wiki/Q42");
+        assert_eq!(org["founding_date"], "1985-04-01");
+        assert_eq!(org["jurisdiction"], "US");
+    })
+    .await;
+}
+
+/// Blank `name` is a validation failure: `422 Unprocessable Entity`
+/// (family convention; spec §6/§9, entity spec T-2).
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn blank_name_returns_422() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let response = request
+            .post("/api/organizations")
+            .json(&json!({"name": " "}))
+            .await;
+        assert_eq!(response.status_code(), 422, "blank name must be 422");
+    })
+    .await;
+}
+
+/// Updating with a blank `name` is the same validation failure.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn update_with_blank_name_returns_422() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let created: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&acme())
+            .await
+            .json();
+        let pid = created["pid"].as_str().expect("pid");
+
+        let response = request
+            .put(&format!("/api/organizations/{pid}"))
+            .json(&json!({"name": ""}))
+            .await;
+        assert_eq!(response.status_code(), 422);
+    })
+    .await;
+}
+
+/// Unknown pid → `404 Not Found`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn get_unknown_pid_returns_404() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let response = request
+            .get("/api/organizations/00000000-0000-4000-8000-000000000000")
+            .await;
+        assert_eq!(response.status_code(), 404);
+    })
+    .await;
+}
+
+/// Case-insensitive name search finds the seeded record; blank `q`
+/// is a `400`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn can_search_by_name() {
+    request::<App, _, _>(|request, _ctx| async move {
+        request.post("/api/organizations").json(&acme()).await;
+        request
+            .post("/api/organizations")
+            .json(&json!({"name": "Globex Corporation"}))
+            .await;
+
+        let response = request.get("/api/organizations/search?q=acme").await;
+        assert_eq!(response.status_code(), 200);
+        let hits: serde_json::Value = response.json();
+        let hits = hits.as_array().expect("array of refs");
+        assert_eq!(hits.len(), 1, "only Acme should match");
+        assert_eq!(hits[0]["name"], "Acme, Inc.");
+
+        let blank = request.get("/api/organizations/search?q=%20").await;
+        assert_eq!(blank.status_code(), 400, "blank q is a bad request");
+    })
+    .await;
+}
+
+/// check-duplicates scores the query against stored organizations and
+/// returns hits above the threshold.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn can_check_duplicates() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let created: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&acme())
+            .await
+            .json();
+        let pid = created["pid"].as_str().expect("pid");
+        request
+            .post("/api/organizations")
+            .json(&json!({"name": "Completely Unrelated Widgets Ltd"}))
+            .await;
+
+        // Same sameAs URL → deterministic short-circuit match.
+        let response = request
+            .post("/api/organizations/check-duplicates")
+            .json(&acme())
+            .await;
+        assert_eq!(response.status_code(), 200);
+        let hits: serde_json::Value = response.json();
+        let hits = hits.as_array().expect("array of scored refs");
+        assert!(!hits.is_empty(), "the stored Acme must be reported");
+        assert_eq!(hits[0]["pid"], pid);
+        assert_eq!(hits[0]["is_match"], true);
+        assert!(hits[0]["score"].as_f64().expect("score") >= 0.95);
+    })
+    .await;
+}

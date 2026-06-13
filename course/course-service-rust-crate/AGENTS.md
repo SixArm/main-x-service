@@ -19,20 +19,20 @@ for the discipline this crate practises.
 ## Shared docs (project root)
 
 Shared reference docs live at the project root under
-[`../agents/share/`](../agents/share/).
+[`../agents/share/`](../../agents/share/).
 
 | Document | Description |
 |---|---|
-| [overview.md](../agents/share/overview.md) | High-level project overview |
-| [architecture.md](../agents/share/architecture.md) | Layered architecture |
-| [stack-for-rust-loco.md](../agents/share/stack-for-rust-loco.md) | Full Rust + Loco dependency stack |
-| [technology.md](../agents/share/technology.md) | Tech stack summary |
-| [match-search-merge.md](../agents/share/match-search-merge.md) | Match / search / merge workflows |
-| [restful.md](../agents/share/restful.md) | REST API conventions |
-| [postgresql.md](../agents/share/postgresql.md) | PostgreSQL conventions |
-| [auditability.md](../agents/share/auditability.md) | Audit-log conventions |
-| [privacy.md](../agents/share/privacy.md) | Masking, GDPR, consent |
-| [observability.md](../agents/share/observability.md) | Tracing + OpenTelemetry summary |
+| [overview.md](../../agents/share/overview.md) | High-level project overview |
+| [architecture.md](../../agents/share/architecture.md) | Layered architecture |
+| [rust-loco-stack.md](../../agents/share/rust-loco-stack.md) | Full Rust + Loco dependency stack |
+| [loco.md](../../agents/share/loco.md) | Tech stack summary |
+| [match-search-merge.md](../../agents/share/match-search-merge.md) | Match / search / merge workflows |
+| [restful.md](../../agents/share/restful.md) | REST API conventions |
+| [postgresql.md](../../agents/share/postgresql.md) | PostgreSQL conventions |
+| [auditability.md](../../agents/share/auditability.md) | Audit-log conventions |
+| [privacy.md](../../agents/share/privacy.md) | Masking, GDPR, consent |
+| [observability.md](../../agents/share/observability.md) | Tracing + OpenTelemetry summary |
 
 ## Where work lives
 

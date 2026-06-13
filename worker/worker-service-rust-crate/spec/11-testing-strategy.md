@@ -10,7 +10,8 @@ Layered: [`AGENTS/testing.md`](../AGENTS/testing.md).
   drives service-side records through `adapter::to_matcher_worker` and
   asserts on `MatchingEngine::match_workers` end-to-end. Covers
   identical clones, name typos, deterministic identifier short-circuits,
-  field-routing pinning, and config-preset invariants. 13 tests.
+  field-routing pinning, and config-preset invariants. 14 tests
+  (including the shared-ODS-code negative pin, spec §6.2).
 - **Benchmarks** — Criterion: matching, search, validation.
 - **CI** — `test.yml`, `quality.yml`, `security.yml`.
 

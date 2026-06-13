@@ -126,6 +126,16 @@ Soundex (4-character code: first letter + three digits). Used by
 | R | 6 |
 | A, E, I, O, U, H, W, Y | ignored |
 
+## Language tags (`in_language`) — known divergence
+
+The service validates `in_language` entries as 2-letter ISO 639-1
+codes; the embedded `event-matcher` crate documents its single
+`in_language` field as a full IETF BCP 47 tag. The bridge
+(`src/matching/adapter.rs`) projects only the first non-empty entry,
+and the matcher treats the field as data-only (never scored), so the
+divergence is currently inert. Documented in service spec §6.2;
+tracked as entity task ET-8.
+
 ## Source files
 
 - `src/matching/mod.rs` — `EventMatcher` trait, `ProbabilisticMatcher`, `DeterministicMatcher`, `MatchResult`, `MatchScoreBreakdown`

@@ -9,9 +9,9 @@ Computer Science") separately from its specific offerings
 in-person, Tue/Thu 09:00"). One course → many instances.
 
 It sits in the Main X Index family between the more-abstract
-[Thing Service](../../thing-service-rust-crate/) (anything with an
+[Thing Service](../../../thing/thing-service-rust-crate/) (anything with an
 identity) and the time-bounded
-[Event Service](../../event-service-rust-crate/) (occurrences with
+[Event Service](../../../event/event-service-rust-crate/) (occurrences with
 locations and parties). A `Course` is a template; a `CourseInstance`
 is closer to an `Event` and may eventually reference one.
 

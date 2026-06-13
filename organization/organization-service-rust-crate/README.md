@@ -22,9 +22,12 @@ matching, built on **loco.rs** and embedding the canonical
 | POST | `/api/organizations/check-duplicates` | Match query vs stored orgs |
 
 The request/response body for an organization **is** the
-`organization_matcher::Organization` shape (name, legalName,
-alternateName, identifiers, url, sameAs, address, jurisdiction,
-foundingDate, keywords).
+`organization_matcher::Organization` shape, serialized snake_case
+(`name`, `legal_name`, `alternate_names`, `identifiers`, `url`,
+`same_as`, `address`, `jurisdiction`, `founding_date`, `keywords`).
+schema.org publishes the camelCase property names (`legalName`,
+`sameAs`, …); the wire format here is the Rust DTO's snake_case
+(entity spec OQ-1, resolved).
 
 ## Quick start
 
@@ -41,18 +44,22 @@ curl -s localhost:5150/api/organizations -H 'content-type: application/json' \
 ## Testing
 
 ```bash
-cargo test --test matching   # DB-free: matcher embedding + JSON round-trip
+cargo test                   # DB-free: unit + matcher embedding + JSON round-trip
+cargo test -- --ignored      # request-level suite; needs Postgres (config/test.yaml)
 cargo clippy --all-targets
 ```
 
-Request-level tests require a Postgres instance (standard loco).
+The request-level tests (`tests/requests/organizations.rs`) boot the
+real app against `config/test.yaml` and are `#[ignore]`d so the
+default run stays green without a database. Validation failures
+(blank `name`) return `422 Unprocessable Entity`.
 
 ## Status
 
 MVP: CRUD + matching. Tantivy search, streaming, audit, privacy/GDPR,
 OpenAPI, and richer validation are tracked in [spec §13](./spec/index.md).
 JWT auth is provided by the central
-[authentication-service](../authentication-service-rust-crate).
+[authentication-service](../../authentication/authentication-service-rust-crate).
 
 ## License
 

@@ -5,8 +5,8 @@
 | FR-1 | List page MUST issue `GET /api/places/search?q=…` on mount and on search submission. |
 | FR-2 | List page MUST expose toggles for `fuzzy` and `phonetic`. |
 | FR-3 | Create page MUST capture HTTP 409 from `POST /api/places` and render the match candidates from `error.details`. |
-| FR-4 | Create page MUST surface inline field-level validation (family + given required, birth date not in future). |
-| FR-5 | Detail page MUST render identifiers, addresses, telecom, emergency contacts when present. |
+| FR-4 | Create page MUST surface inline field-level validation (name required, latitude −90…90, longitude −180…180, GLN 13 digits). |
+| FR-5 | Detail page MUST render address, geo coordinates, identifiers, opening hours, amenities when present. |
 | FR-6 | Edit page MUST PUT the full Place record. |
 | FR-7 | Soft-delete MUST be confirmed via `confirm()` before issuing DELETE. |
 | FR-8 | Match page MUST POST to `/api/places/match` and render quality + score breakdown. |

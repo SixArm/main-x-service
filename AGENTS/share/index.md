@@ -13,11 +13,11 @@ artefact**. Code conforms to the spec; not the other way around.
 
 Per-crate `spec.md`:
 
-- [person-service/spec.md](../../person-service-rust-crate/spec/index.md)
-- [event-service/spec.md](../../event-service-rust-crate/spec/index.md)
-- [worker-service/spec.md](../../worker-service-rust-crate/spec/index.md)
-- [place-service/spec.md](../../place-service-rust-crate/spec/index.md)
-- [thing-service/spec.md](../../thing-service-rust-crate/spec/index.md)
+- [person-service/spec.md](../../person/person-service-rust-crate/spec/index.md)
+- [event-service/spec.md](../../event/event-service-rust-crate/spec/index.md)
+- [worker-service/spec.md](../../worker/worker-service-rust-crate/spec/index.md)
+- [place-service/spec.md](../../place/place-service-rust-crate/spec/index.md)
+- [thing-service/spec.md](../../thing/thing-service-rust-crate/spec/index.md)
 
 ## Overview
 
@@ -56,10 +56,9 @@ Per-crate `spec.md`:
 | [compliance-for-technology.md](compliance-for-technology.md)     | Compliance for technology (ISO, GDPR, …)               |
 | [locales.md](locales.md)                                         | Locales, localization, internationalization, languages |
 | [observability.md](observability.md)                             | Observability summary (alias for the Loco doc)         |
-| [observability-for-rust-loco.md](observability-for-rust-loco.md) | OpenTelemetry, tracing, metrics, logs, spans           |
+| [rust-tracing-opentelemetry-stack.md](rust-tracing-opentelemetry-stack.md) | OpenTelemetry, tracing, metrics, logs, spans           |
 | [postgresql.md](postgresql.md)                                   | PostgreSQL database, extensions                        |
 | [privacy.md](privacy.md)                                         | Data masking, GDPR, consent                            |
 | [restful.md](restful.md)                                         | RESTful API guidance                                   |
-| [technology.md](technology.md)                                   | Technology stack summary (alias for the Loco doc)      |
-| [stack-for-rust-loco.md](stack-for-rust-loco.md)                 | Stack for Rust, Loco (database, search, …)             |
+| [rust-loco-stack.md](rust-loco-stack.md)                         | Stack for Rust, Loco (database, search, …)             |
 | [loco.md](loco.md)                                               | Loco framework (backend-only conventions)              |

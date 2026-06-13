@@ -258,8 +258,19 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
 
     match id.identifier_type {
         IdentifierType::TAX | IdentifierType::SSN => b.us_ssn(val),
-        // PPN passports flow via IdentityDocument; ODS / MRN / DL / NPI / Other
+        // PPN passports flow via IdentityDocument; MRN / DL / NPI / Other
         // have no per-country matcher slot.
+        //
+        // ODS is a *deliberate, permanent* fall-through (entity task T-7,
+        // service spec §6.2): an NHS ODS code identifies an organisation or
+        // site, not the worker, so every matcher slot (all person-level
+        // national schemes) would be a wrong mapping — an exact-match
+        // short-circuit would declare colleagues at the same practice to be
+        // the same person. The matcher's `local_id` is never scored, so
+        // routing there would be a silent no-op. Pinned by
+        // `tests/duplicate_detection.rs`
+        // (`ods_organisation_code_falls_through_unmapped`,
+        // `shared_ods_code_does_not_make_different_workers_match`).
         IdentifierType::PPN
         | IdentifierType::ODS
         | IdentifierType::MRN

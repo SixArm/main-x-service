@@ -32,7 +32,7 @@ pub fn spec() -> Value {
                     "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Organization" } } } },
                     "responses": {
                         "200": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrgRef" } } } },
-                        "400": { "description": "name is required" }
+                        "422": { "description": "Validation failure: name is required" }
                     }
                 }
             },
@@ -74,7 +74,7 @@ pub fn spec() -> Value {
                     "responses": { "200": { "description": "Organization", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Organization" } } } }, "404": { "description": "Not found" } } },
                 "put": { "tags": ["organizations"], "summary": "Replace an organization's payload",
                     "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Organization" } } } },
-                    "responses": { "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrgRef" } } } } } },
+                    "responses": { "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrgRef" } } } }, "404": { "description": "Not found" }, "422": { "description": "Validation failure: name is required" } } },
                 "delete": { "tags": ["organizations"], "summary": "Soft-delete an organization", "responses": { "200": { "description": "Deleted" } } }
             },
             "/api/organizations/{pid}/audit": {

@@ -1,3 +1,8 @@
+//! Model tests. All of these boot the loco app and therefore require
+//! the PostgreSQL instance from `config/test.yaml`, so they are
+//! `#[ignore]`d to keep `cargo test` green on a checkout without
+//! Postgres. Run them with: `cargo test -- --ignored`.
+
 use authentication_service::{
     app::App,
     models::users::{self, Model, RegisterParams},
@@ -18,6 +23,7 @@ macro_rules! configure_insta {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
 async fn test_can_validate_model() {
     configure_insta!();
@@ -38,6 +44,7 @@ async fn test_can_validate_model() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
 async fn can_create_with_password() {
     configure_insta!();
@@ -61,6 +68,7 @@ async fn can_create_with_password() {
     });
 }
 #[tokio::test]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
 async fn handle_create_with_password_with_duplicate() {
     configure_insta!();
@@ -86,6 +94,7 @@ async fn handle_create_with_password_with_duplicate() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
 async fn can_find_by_email() {
     configure_insta!();
@@ -106,6 +115,7 @@ async fn can_find_by_email() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
 async fn can_find_by_pid() {
     configure_insta!();
@@ -127,6 +137,7 @@ async fn can_find_by_pid() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
 async fn can_verification_token() {
     configure_insta!();
@@ -173,6 +184,7 @@ async fn can_verification_token() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
 async fn can_set_forgot_password_sent() {
     configure_insta!();
@@ -216,6 +228,7 @@ async fn can_set_forgot_password_sent() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
 async fn can_verified() {
     configure_insta!();
@@ -254,6 +267,7 @@ async fn can_verified() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
 async fn can_reset_password() {
     configure_insta!();
@@ -293,6 +307,7 @@ async fn can_reset_password() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
 async fn magic_link() {
     let boot = boot_test::<App>().await.unwrap();

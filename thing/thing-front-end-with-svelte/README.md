@@ -9,7 +9,7 @@ SvelteKit front-end for the **[Thing Service](../thing-service-rust-crate/)** in
 | `/` | Dashboard — service health + recent audit activity |
 | `/things` | List & search (full-text, fuzzy, phonetic) with SVAR DataGrid |
 | `/things/new` | Create thing; surfaces 409 duplicate candidates |
-| `/things/[id]` | Detail view — identity, identifiers, addresses, telecom, emergency contacts |
+| `/things/[id]` | Detail view — identity, identifiers, alternate names, same-as URLs, images |
 | `/things/[id]/edit` | Edit |
 | `/things/[id]/audit` | Per-thing audit log |
 | `/things/match` | Match check — score a hypothetical record against the index |
@@ -67,7 +67,7 @@ src/
   lib/
     config.ts              - PUBLIC_API_BASE_URL
     api/
-      types.ts             - Thing, HumanName, MatchResult, … (mirrors the Rust models)
+      types.ts             - Thing, ThingIdentifier, MatchResult, … (mirrors the Rust models)
       client.ts            - ApiClient + ApiError (envelope-aware fetch)
       things.ts           - ThingRepository (CRUD + search + match + merge + audit)
     forms/
@@ -78,7 +78,7 @@ src/
     components/
       SearchBox.svelte
       ThingGrid.svelte    - SVAR DataGrid binding
-      HumanNameInput.svelte
+      ThingIdentifierInput.svelte
       ThingForm.svelte
       MatchResultsList.svelte
   routes/

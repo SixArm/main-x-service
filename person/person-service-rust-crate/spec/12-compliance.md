@@ -10,7 +10,7 @@
 | ISO/IEC 42001:2023 | AIMS controls (where matcher tuning is ML-driven) |
 
 Domain-specific compliance:
-[`agents/share/compliance-for-healthcare.md`](../../agents/share/compliance-for-healthcare.md).
+[`agents/share/compliance-for-healthcare.md`](../../../agents/share/compliance-for-healthcare.md).
 Technology compliance:
-[`agents/share/compliance-for-technology.md`](../../agents/share/compliance-for-technology.md).
+[`agents/share/compliance-for-technology.md`](../../../agents/share/compliance-for-technology.md).
 

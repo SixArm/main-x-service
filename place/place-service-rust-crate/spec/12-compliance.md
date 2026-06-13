@@ -8,5 +8,5 @@
 | schema.org/Place | Domain-model conformance |
 
 Technology compliance:
-[`agents/share/compliance-for-technology.md`](../../agents/share/compliance-for-technology.md).
+[`agents/share/compliance-for-technology.md`](../../../agents/share/compliance-for-technology.md).
 

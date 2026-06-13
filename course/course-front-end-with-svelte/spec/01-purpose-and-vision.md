@@ -17,5 +17,5 @@ A web interface that:
 
 - **Not** a public-facing portal — assumes authenticated operator users (auth itself out of scope until the service ships it).
 - **Not** a substitute for direct API access — power users use Swagger UI / curl.
-- **Not** a FHIR client — FHIR routes are out of scope (the service exposes them; this UI doesn't render them).
+- **Not** a FHIR client — the Course Service exposes no FHIR surface (no FHIR resource fits Course cleanly; service spec §2.2).
 

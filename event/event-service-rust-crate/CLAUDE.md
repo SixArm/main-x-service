@@ -5,7 +5,7 @@ appointments, encounters, shifts, sessions, screenings, sales,
 deliveries, incidents. The domain model is aligned with
 [schema.org/Event](https://schema.org/Event).
 
-@agents/share/overview.md
+@../../agents/share/overview.md
 
 ## Features
 
@@ -109,13 +109,13 @@ optional email / URL.
 @AGENTS/restful.md
 @AGENTS/testing.md
 
-@agents/share/auditability.md
-@agents/share/availability.md
-@agents/share/match-search-merge.md
-@agents/share/observability.md
-@agents/share/privacy.md
-@agents/share/restful.md
-@agents/share/technology.md
+@../../agents/share/auditability.md
+@../../agents/share/availability.md
+@../../agents/share/match-search-merge.md
+@../../agents/share/observability.md
+@../../agents/share/privacy.md
+@../../agents/share/restful.md
+@../../agents/share/loco.md
 
 ## Quick start
 

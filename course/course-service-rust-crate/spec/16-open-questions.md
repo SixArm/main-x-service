@@ -1,7 +1,7 @@
 ## 16. Open Questions
 
 - **OQ-1**: Should `CourseInstance` reference the
-  [event-service](../../event-service-rust-crate/) `Event` resource
+  [event-service](../../../event/event-service-rust-crate/) `Event` resource
   rather than carry its own `schedule` field? Decision deferred until
   we see a real cross-service integration requirement; for MVP we
   keep `Schedule` inline so the front-end works without joining

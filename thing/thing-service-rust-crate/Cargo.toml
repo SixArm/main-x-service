@@ -15,11 +15,11 @@ path = "src/bin/main.rs"
 
 [dependencies]
 # Async Runtime
-tokio = { version = "1.49", features = ["full"] }
+tokio = { version = "1.52", features = ["full"] }
 
 # Web Framework & HTTP (axum 0.8 to match loco 0.16)
 axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
-hyper = { version = "1.8", features = ["full"] }
+hyper = { version = "1.10", features = ["full"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
 
@@ -33,7 +33,7 @@ sea-orm-migration = { version = "1.1", features = ["sqlx-postgres", "runtime-tok
 bigdecimal = { version = "0.4", features = ["serde"] }
 
 # Web Framework (Loco conventions; web/template tier removed)
-loco-rs = { version = "0.16.3", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
+loco-rs = { version = "0.16.4", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
 migration = { path = "migration" }
 
 # Search Engine
@@ -44,7 +44,7 @@ tonic = { version = "0.12", features = ["transport", "codegen", "prost"] }
 prost = "0.13"
 
 # OpenAPI Documentation
-utoipa = { version = "5.4", features = ["axum_extras", "jiff_0_2", "uuid"] }
+utoipa = { version = "5.5", features = ["axum_extras", "jiff_0_2", "uuid"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 openapiv3 = "2.2"
 
@@ -61,7 +61,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-opentelemetry = "0.28"
 
 # Utilities
-uuid = { version = "1.19", features = ["v4", "serde"] }
+uuid = { version = "1.23", features = ["v4", "serde"] }
 jiff = { version = "0.2", features = ["serde"] }
 time = "0.3"
 thiserror = "2.0"
@@ -87,10 +87,10 @@ mimalloc = "0.1.52"
 
 [dev-dependencies]
 # Testing
-assertables = "9.8"
+assertables = "10"
 tokio-test = "0.4"
 mockall = "0.13"
-tempfile = "3.24"
+tempfile = "3.27"
 
 # Benchmarking
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }

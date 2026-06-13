@@ -105,10 +105,19 @@ on in development, off in production.
 
 - **Unit (DB-free):** `src/auth` — sign/verify roundtrip, JWKS shape,
   tampered/garbage-token rejection. Run with `cargo test --lib`.
-- **Request tests:** loco's `tests/requests` exercise the HTTP flow and
-  require a Postgres instance (standard loco). These currently still
-  reflect the generated password flow and are a §13 task to rework for
-  the magic-link surface.
+- **Request tests:** loco's `tests/requests/auth.rs` exercises the §6
+  magic-link surface (signup / magic-link / redeem incl. single-use and
+  anti-enumeration / me / signout / JWKS). The HTTP tests require a
+  Postgres instance (standard loco) and are `#[ignore]`d so plain
+  `cargo test` stays green; run them with `cargo test -- --ignored`.
+  DB-free route-table and params-contract assertions always run.
+- **Cross-crate contract test (DB-free):** `tests/sign_verify_contract.rs`
+  pins the convention shared with
+  [`authentication-verifier`](../../authentication-verifier-rust-crate/index.md):
+  a token signed by `auth::sign_access_token` verifies through the
+  verifier crate built from this service's published JWKS; the claims
+  round-trip and `kid` = base64url(SHA-256(modulus)) holds; a `kid`
+  mismatch fails.
 
 ## 12. Compliance
 
@@ -118,26 +127,41 @@ an audit trail of issuance and revocation.
 
 ## 13. Tasks (live work queue)
 
-- [ ] Rework `tests/requests/auth.rs` + snapshots for the magic-link /
-      signout / me / JWKS surface (drop password-flow tests).
+- [x] Rework `tests/requests/auth.rs` + snapshots for the magic-link /
+      signout / me / JWKS surface (drop password-flow tests). Done:
+      assertion-based tests covering signup / magic-link / redeem
+      (incl. single-use + anti-enumeration) / me / signout / JWKS;
+      Postgres-requiring tests are `#[ignore]`d (run with
+      `cargo test -- --ignored`); the old password-flow snapshots are
+      removed.
+- [x] A reusable verifier crate/snippet for peer services to consume the
+      JWKS (input to the loco conversion of the other crates). Done:
+      [`../authentication-verifier-rust-crate/`](../../authentication-verifier-rust-crate/index.md)
+      — offline RS256 verification (`Verifier::from_jwks_value` /
+      `from_jwks_url` behind the `fetch` feature), mirrored `Claims`.
+- [x] Cross-crate contract test: `tests/sign_verify_contract.rs` signs
+      with this crate's `auth` module and verifies through the
+      `authentication-verifier` dev-dependency, pinning the `Claims`
+      round-trip and the `kid` thumbprint contract. DB-free, un-gated.
 - [ ] Key rotation: support multiple JWKS entries (`kid` already
       stamped) and a grace window.
 - [ ] Optional Mailpit docker-compose service for realistic dev email.
-- [ ] A reusable verifier crate/snippet for peer services to consume the
-      JWKS (input to the loco conversion of the other crates).
 
 ## 14. Implementation status
 
 Done: real loco scaffold; passwordless magic-link flow; RS256 signing;
 JWKS endpoint; sessions + signout; console magic links; Postgres queue;
-green `cargo build`, clippy clean, DB-free unit tests passing.
+green `cargo build`, clippy clean, DB-free unit tests passing;
+magic-link request tests (Postgres-gated); peer-service verifier crate
+(`../authentication-verifier-rust-crate/`) with a DB-free cross-crate
+contract test.
 
 ## 15. Roadmap
 
-v0.1 (here): core magic-link + RS256/JWKS + signout. v0.2: reworked
-request tests, key rotation, Mailpit. v0.3: peer-service verifier +
-begin loco conversion of the sibling services using this as the
-template.
+v0.1 (here): core magic-link + RS256/JWKS + signout, reworked request
+tests, peer-service verifier + contract test. v0.2: key rotation,
+Mailpit. v0.3: begin loco conversion of the sibling services using this
+as the template (peers adopt `authentication-verifier`).
 
 ## 16. Open questions
 

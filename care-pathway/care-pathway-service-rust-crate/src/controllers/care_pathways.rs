@@ -5,11 +5,33 @@
 //! `care-pathway-matcher` engine, so there is no separate model or
 //! adapter to drift.
 
+use axum::http::StatusCode;
 use care_pathway_matcher::{CarePathway, MatchConfig, MatchingEngine};
+use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::models::care_pathways::Model as PathwayModel;
+
+/// Validate an incoming `CarePathway` payload.
+///
+/// Family convention (OQ-1 resolution): validation failures return
+/// `422 Unprocessable Entity`, matching the person/place services.
+/// loco has no `unprocessable_entity` helper, so this uses
+/// `Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY, …)`.
+///
+/// # Errors
+///
+/// Returns a `422` error when `name` is blank.
+pub fn validate(pathway: &CarePathway) -> Result<()> {
+    if pathway.name.trim().is_empty() {
+        return Err(Error::CustomError(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ErrorDetail::new("validation", "name is required"),
+        ));
+    }
+    Ok(())
+}
 
 #[derive(Debug, Serialize)]
 struct PathwayRef {
@@ -47,9 +69,7 @@ async fn create(
     State(ctx): State<AppContext>,
     Json(pathway): Json<CarePathway>,
 ) -> Result<Response> {
-    if pathway.name.trim().is_empty() {
-        return bad_request("name is required");
-    }
+    validate(&pathway)?;
     let model = PathwayModel::create(&ctx.db, &pathway).await?;
     format::json(PathwayRef::of(&model))
 }
@@ -68,6 +88,7 @@ async fn update(
     State(ctx): State<AppContext>,
     Json(pathway): Json<CarePathway>,
 ) -> Result<Response> {
+    validate(&pathway)?;
     let model = PathwayModel::find_by_pid(&ctx.db, &pid).await?;
     let updated = model
         .into_active_model()
@@ -140,4 +161,38 @@ pub fn routes() -> Routes {
         .add("/{pid}", get(get_one))
         .add("/{pid}", put(update))
         .add("/{pid}", delete(remove))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Pins the OQ-1 / T-2 decision: blank-name validation failure is
+    /// `422 Unprocessable Entity` (family convention), not `400`.
+    /// Runs without a database, so the pin holds on default `cargo test`.
+    #[test]
+    fn blank_name_validation_returns_422() {
+        for name in ["", "   ", "\t\n"] {
+            let err = validate(&CarePathway::new(name)).expect_err("blank name must fail");
+            match err {
+                Error::CustomError(status, _) => {
+                    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+                }
+                other => panic!("expected CustomError(422), got {other:?}"),
+            }
+        }
+    }
+
+    /// The 422 must survive loco's error-to-response conversion.
+    #[test]
+    fn blank_name_validation_response_status_is_422() {
+        let err = validate(&CarePathway::new("")).expect_err("blank name must fail");
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
+    fn non_blank_name_passes_validation() {
+        assert!(validate(&CarePathway::new("Acute Stroke Care Pathway")).is_ok());
+    }
 }

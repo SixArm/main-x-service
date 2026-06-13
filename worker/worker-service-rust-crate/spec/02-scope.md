@@ -17,7 +17,9 @@
   auto-merge.
 - Record merging with link tracking and JSON snapshots.
 - Per-field privacy masking, GDPR Article 15 export, consent records.
-- REST API (Axum) + FHIR R5 Practitioner + gRPC stub.
+- REST API (Axum) + FHIR R5 `Worker` resource (`/fhir/Worker`;
+  handlers implemented, router mounting pending — §13 T-9) + gRPC
+  stub.
 - PostgreSQL persistence via SeaORM.
 
 ### 2.2 Out of scope (today)
@@ -25,7 +27,7 @@
 - Authentication / authorisation middleware (planned — §15).
 - Production Fluvio publisher / consumers (today: in-memory stub).
 - FHIR Organization resource and capability statement / bundles
-  (Practitioner ✔; supporting resources partial).
+  (`Worker` resource handlers ✔; supporting resources partial).
 - ML-based match scoring.
 - Credential-expiry workflow / alerting (roadmap, §15).
 - Role + assignment history timeline.

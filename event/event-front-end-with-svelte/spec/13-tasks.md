@@ -14,7 +14,7 @@
 - [x] T-12: Playwright e2e smoke for every MVP route.
 - [ ] T-13: SSR-safe load functions using `event.fetch` for SEO-irrelevant but warm-cache wins.
 - [ ] T-14: Integrate Lily Headless components beyond Button (Dialog for merge confirm, Combobox for identifier system, Banner for error states).
-- [ ] T-15: Identifier / address / emergency-contact edit (currently read-only on detail; edit form re-PUTs whole record but no UI to add/remove sub-records).
+- [ ] T-15: Sub-record edit for identifiers / locations / parties (organizers, performers) / offers (currently read-only on detail; edit form re-PUTs the whole record but has no UI to add/remove sub-records). (Rewritten 2026-06-13: previous wording named person-service sub-records — addresses / emergency contacts — which Event does not have.)
 - [ ] T-16: Theming tokens in `app.css` extracted to a small theme module.
 - [ ] T-17: `check-duplicates` endpoint wired into create form (preview before commit).
 - [ ] T-18: Batch deduplicate-scan results UI.

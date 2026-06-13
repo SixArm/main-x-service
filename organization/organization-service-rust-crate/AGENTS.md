@@ -17,7 +17,7 @@ there is no separate model or adapter to drift.
 | Question | Answer |
 |---|---|
 | Framework | loco.rs 0.16 (`Hooks`/`AppContext`/CLI, loco config, `sea-orm-migration`). |
-| Build / test | `cargo build` · `cargo test` (DB-free tests in `tests/matching.rs`). |
+| Build / test | `cargo build` · `cargo test` (DB-free) · `cargo test -- --ignored` (request-level suite; needs Postgres). |
 | Run | `cargo loco start` (needs Postgres). |
 | Persistence | One `organizations` table: `pid`, `name`, `data` (JSONB Organization), `active`, soft-delete. |
 
@@ -42,9 +42,12 @@ Plus loco's default `/_health`, `/_ping`.
 ## Scope
 
 CRUD + matching + **name search** + **audit log** + **event streaming**
-+ **OpenAPI/Swagger** are wired. Still deferred (spec §13): Tantivy
-full-text (this uses Postgres `ILIKE`), per-field privacy/GDPR export,
-record merge, richer validation, request-level tests.
++ **OpenAPI/Swagger** + **request-level tests** (Postgres,
+`#[ignore]`-gated) are wired. The wire format is snake_case
+(`legal_name`, `same_as`, …) and validation failures return `422`.
+Still deferred (spec §13): Tantivy full-text (this uses Postgres
+`ILIKE`), per-field privacy/GDPR export, record merge, richer
+validation.
 
 ## Golden rules
 
@@ -54,7 +57,7 @@ record merge, richer validation, request-level tests.
 3. **Reuse the matcher type.** Do not fork an `Organization` DTO — the
    service uses `organization_matcher::Organization` directly.
 4. **JWT auth** comes from the central
-   [authentication-service](../authentication-service-rust-crate) (not
+   [authentication-service](../../authentication/authentication-service-rust-crate) (not
    embedded here).
 
 ## Layout

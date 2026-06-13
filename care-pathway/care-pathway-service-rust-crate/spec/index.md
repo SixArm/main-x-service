@@ -39,10 +39,12 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
 
 ## 6. Functional requirements
 
-1. `POST /api/care-pathways` — create; `name` required (422 if blank).
+1. `POST /api/care-pathways` — create; `name` required (`422` if
+   blank — also enforced on update).
 2. `GET /api/care-pathways` — list active (cap 100), `{pid, name}`.
 3. `GET /api/care-pathways/{pid}` — return the stored `CarePathway`.
-4. `PUT /api/care-pathways/{pid}` — replace the payload.
+4. `PUT /api/care-pathways/{pid}` — replace the payload (`422` if
+   `name` is blank).
 5. `DELETE /api/care-pathways/{pid}` — soft-delete.
 6. `POST /api/care-pathways/match` — rank an explicit `{query,
    candidates}` set (no persistence).
@@ -63,8 +65,10 @@ directly on the deserialised payloads — no adapter.
 
 ## 9. API surface
 
-See §6. Raw loco JSON. `404` for unknown `pid`, `400`/`422` for invalid
-input.
+See §6. Raw loco JSON. `404` for unknown `pid`; `422` for a validation
+failure (blank `name` — family convention, via
+`Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY, …)`); `400` for a
+malformed body.
 
 ## 10. Persistence
 
@@ -73,8 +77,12 @@ PostgreSQL via SeaORM + `sea-orm-migration`. Migration
 
 ## 11. Testing strategy
 
-DB-free tests (`tests/matching.rs`): matcher embedding + JSON
-round-trip. Request-level tests require Postgres (deferred, §13).
+DB-free tests: `tests/matching.rs` (matcher embedding + JSON
+round-trip) and controller validation unit tests (blank-name → `422`
+pin). Request-level tests (`tests/requests/care_pathways.rs`, loco
+testing harness) cover all seven endpoints but require Postgres, so
+they are `#[ignore]`-gated — run with `cargo test -- --ignored` and a
+`DATABASE_URL`.
 
 ## 12. Compliance
 
@@ -90,14 +98,17 @@ access controls added later.
 - [ ] Record merge with link tracking.
 - [ ] OpenAPI/Swagger via utoipa.
 - [ ] Richer validation (ICD/SNOMED code formats).
-- [ ] Request-level integration tests (Postgres).
+- [x] Request-level integration tests (Postgres) — landed
+  `#[ignore]`-gated (entity spec §13 T-4); wiring a DB-backed run
+  into CI remains.
 - [ ] JWT verification middleware consuming the auth-service JWKS.
 
 ## 14. Implementation status
 
-Done: loco boot; care_pathways table + migration; CRUD; `/match` and
-`/check-duplicates` embedding care-pathway-matcher; DB-free tests; green
-build + clippy.
+Done: loco boot; care_pathways table + migration; CRUD with `422`
+blank-name validation on create/update; `/match` and
+`/check-duplicates` embedding care-pathway-matcher; DB-free tests +
+gated request-level tests; green build + clippy.
 
 ## 15. Roadmap
 
