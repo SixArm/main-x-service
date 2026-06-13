@@ -65,11 +65,23 @@ manual check confirms it. Split tasks too big for one PR
     without a database; run with a Postgres URL via
     `cargo test -- --ignored`. (Caveat: authored on a machine with
     no reachable Postgres — first DB-backed run still pending.)
-- [ ] **T-5 — Front-end tests.**
-  - [ ] vitest units for `ApiClient` + `CarePathwayRepository`.
-  - [ ] Playwright smoke over `/`, `/new`, `/[pid]`, `/[pid]/edit`.
-  - **Acceptance:** both suites run in CI and fail on a broken
-    endpoint contract.
+- [x] **T-5 — Front-end tests.**
+  - [x] vitest units for `ApiClient` + `CarePathwayRepository`.
+    **Done (2026-06-13):** `tests/unit/` (16 tests) — client verb/
+    body/headers/bearer/error-classification/empty-body, and every
+    repository method's path + verb, including a regression pinning
+    `check-duplicates` (not `/duplicates`).
+  - [x] Playwright smoke over `/`, `/new`, `/[pid]`, `/[pid]/edit`.
+    **Done:** `tests/e2e/smoke.spec.ts` (4 tests) with the API stubbed
+    via `page.route`; runs against the production build (`vite
+    preview`) to avoid the `vite dev` cold-start module-load race.
+    Also fixed two scaffold copy artifacts (`client.ts` "Authentication
+    Service" header, `app.html` "Course Service" description).
+  - **Acceptance:** both suites run and fail on a broken endpoint
+    contract. **Met:** `pnpm test` (vitest, 16) + `pnpm test:e2e`
+    (Playwright, 4) both green locally; the `check-duplicates`
+    regression test fails if the path drifts. (CI wiring is the
+    remaining follow-up.)
 - [ ] **T-6 — Search + candidate blocking.** (partly done)
   - [x] Name search endpoint. **Done (2026-06-13):**
     `GET /api/care-pathways/search?q=` — pragmatic Postgres `ILIKE`

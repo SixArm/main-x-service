@@ -11,6 +11,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Test suites (T-5).** vitest unit tests (`tests/unit/`, 16) for the
+  `ApiClient` and `CarePathwayRepository` — verb/path/body/bearer-token,
+  error classification, and a regression pinning the `check-duplicates`
+  path. Playwright smoke tests (`tests/e2e/`, 4) load the four routes
+  with the API stubbed via `page.route`; they run against the
+  production build (`vite preview`) to dodge the `vite dev` cold-start
+  module-load race. `playwright.config.ts` added.
+
+### Fixed
+
+- Copy-paste artifacts from the scaffold source: `client.ts` header
+  said "Authentication Service"; `app.html` description said "Course
+  Service" — both now read "Care Pathway Service".
+
+### Added (scaffold)
+
 - **Inaugural scaffold (v0.1.0).** SvelteKit 2 / Svelte 5 (runes) SPA
   for the Care Pathway Service, copy-adapted from
   organization-front-end-with-svelte (same loco raw-JSON client).

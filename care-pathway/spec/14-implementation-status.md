@@ -27,6 +27,7 @@ Aspirational items live in §15, not here.
 | front-end | API layer | Lean raw-JSON client, `CarePathwayRepository`, hand-mirrored TS types |
 | front-end | Form | Full-DTO editing incl. condition-code and identifier row editors |
 | front-end | Quality bar | `pnpm run check` strict 0/0; production build green |
+| front-end | Tests | vitest units (`tests/unit/`, 16 — client + repository, `check-duplicates` regression) + Playwright smoke (`tests/e2e/`, 4 routes, API-stubbed, runs on `vite preview`) |
 
 ### 14.2 Open gaps
 
@@ -37,7 +38,7 @@ Open gaps drive tasks in §13. Live gap list:
 | Single-file crate specs; no service `AGENTS/` reference set | T-1 |
 | Event streaming is in-memory only (process-local ring buffer); no durable broker, no cross-replica delivery | T-3 follow-up / §15 |
 | Request-level tests exist but are `#[ignore]`-gated; no DB-backed run in CI yet | T-4 follow-up |
-| No front-end unit / e2e tests | T-5 |
+| Front-end tests run locally but aren't wired into CI; no merge-action UI yet | T-5 follow-up |
 | Name search is Postgres `ILIKE` only — no full-text/fuzzy search over the JSONB payload, and `check-duplicates` still full-scans (capped at 1 000 rows) rather than using search-blocked candidates | T-6 follow-up |
 | JWT verification exists (extractor + `/whoami` + audit `actor`) but is not yet *enforced* on every `/api/*` route, and the JWKS is injected via env rather than fetched from the auth service | T-7 follow-up |
 | Record merge has no front-end action yet (backend `POST /merge` is done) | T-8 follow-up / T-5 |
