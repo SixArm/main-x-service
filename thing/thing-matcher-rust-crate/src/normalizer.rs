@@ -197,9 +197,13 @@ impl Normalizer {
     /// ```
     pub fn normalize_url(url: &str) -> String {
         let trimmed = url.trim();
-        // Drop fragment, if present.
+        // Drop fragment, if present. Re-trim the trailing end: removing the
+        // `#fragment` can expose whitespace that sat just before the `#`
+        // (e.g. `"x \u{2000}#frag"`), which the initial `trim` could not
+        // reach. Without this, a second pass would strip that whitespace and
+        // `normalize_url` would not be idempotent.
         let no_frag = match trimmed.find('#') {
-            Some(idx) => &trimmed[..idx],
+            Some(idx) => trimmed[..idx].trim_end(),
             None => trimmed,
         };
 
@@ -404,12 +408,22 @@ mod tests {
             "https://example.org/",
             "HTTPS://EXAMPLE.org/foo#frag",
             "urn:isbn:123",
+            // Whitespace sitting just before a `#fragment`: dropping the
+            // fragment exposes it, so it must be re-trimmed (regression).
+            "\u{1F300}\u{2000}#",
+            "http://h/p \u{2000}#x",
         ];
         for c in cases {
             let once = Normalizer::normalize_url(c);
             let twice = Normalizer::normalize_url(&once);
             assert_eq!(once, twice, "non-idempotent for {c:?}");
         }
+    }
+
+    #[test]
+    fn normalize_url_retrims_after_fragment_removal() {
+        assert_eq!(Normalizer::normalize_url("http://h/p \u{2000}#x"), "http://h/p");
+        assert_eq!(Normalizer::normalize_url("\u{1F300}\u{2000}#frag"), "\u{1F300}");
     }
 
     // ---------- phonetic_code ----------

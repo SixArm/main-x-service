@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] → 0.6.0
 
+### Fixed — `normalize_url` idempotency on whitespace before a fragment
+
+- `Normalizer::normalize_url` was not idempotent when a `#fragment` was
+  preceded by whitespace (e.g. `"http://h/p \u{2000}#x"`): dropping the
+  fragment exposed trailing whitespace that the initial trim could not
+  reach, so a second pass produced a different string — violating the
+  §4 idempotency contract and intermittently failing the
+  `normalize_url_is_idempotent` property test on Unicode-whitespace
+  seeds. The pre-fragment slice is now re-trimmed. Added a unit
+  regression (`normalize_url_retrims_after_fragment_removal`) and two
+  seeds to the idempotency unit test. Spec §4 unchanged (the fix
+  restores documented behaviour).
+
 ### Changed — `chrono` eliminated
 
 - Bumped to 0.6.0. `chrono` (an unused manifest dependency flagged for
