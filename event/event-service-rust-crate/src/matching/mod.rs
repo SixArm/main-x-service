@@ -76,6 +76,7 @@ impl MatchScoreBreakdown {
     /// Human-readable summary listing which components matched well
     /// (above per-component display thresholds), or
     /// `"no strong matches"` when none cleared the bar.
+    #[must_use]
     pub fn summary(&self) -> String {
         let mut parts = Vec::new();
         if self.name_score >= 0.90 {
@@ -114,9 +115,17 @@ impl MatchScoreBreakdown {
 /// can hold an `Arc<dyn EventMatcher>` in [`AppState`](crate::api::rest::state::AppState).
 pub trait EventMatcher: Send + Sync {
     /// Score a single `candidate` against `event`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if scoring fails.
     fn match_events(&self, event: &Event, candidate: &Event) -> Result<MatchResult>;
     /// Score all `candidates`, keep those above threshold, sorted by
     /// descending score.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if scoring any candidate fails.
     fn find_matches(&self, event: &Event, candidates: &[Event]) -> Result<Vec<MatchResult>>;
     /// Whether a score counts as a match for this strategy.
     fn is_match(&self, score: f64) -> bool;
@@ -133,6 +142,7 @@ pub struct ProbabilisticMatcher {
 impl ProbabilisticMatcher {
     /// Construct from a [`MatchingConfig`]; the threshold is taken from
     /// `config.threshold_score`.
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         let threshold = config.threshold_score;
         Self {
@@ -142,11 +152,13 @@ impl ProbabilisticMatcher {
     }
 
     /// The configured match threshold.
+    #[must_use]
     pub fn threshold(&self) -> f64 {
         self.threshold
     }
 
     /// Classify a score into a [`MatchQuality`] band.
+    #[must_use]
     pub fn classify_match(&self, score: f64) -> MatchQuality {
         self.scorer.classify_match(score)
     }
@@ -189,6 +201,7 @@ pub struct DeterministicMatcher {
 
 impl DeterministicMatcher {
     /// Construct from a [`MatchingConfig`].
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self {
             scorer: DeterministicScorer::new(config),
@@ -294,6 +307,6 @@ mod tests {
         a.identifiers.push(id.clone());
         b.identifiers.push(id);
         let r = m.match_events(&a, &b).unwrap();
-        assert_eq!(r.score, 1.0);
+        assert!((r.score - 1.0).abs() < f64::EPSILON);
     }
 }

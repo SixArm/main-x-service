@@ -122,6 +122,7 @@ impl Identifier {
     /// assert_eq!(id.identifier_type, IdentifierType::NPI);
     /// assert!(id.use_type.is_none());
     /// ```
+    #[must_use]
     pub fn new(identifier_type: IdentifierType, system: String, value: String) -> Self {
         Self {
             use_type: None,
@@ -142,16 +143,17 @@ impl Identifier {
     /// ```
     /// use worker_service::models::{Identifier, IdentifierType};
     ///
-    /// let mrn = Identifier::mrn("HOSP-A".into(), "00112233".into());
+    /// let mrn = Identifier::mrn("HOSP-A", "00112233".into());
     /// assert_eq!(mrn.identifier_type, IdentifierType::MRN);
     /// assert_eq!(mrn.system, "urn:oid:facility:HOSP-A");
     /// ```
-    pub fn mrn(facility: String, value: String) -> Self {
+    #[must_use]
+    pub fn mrn(facility: &str, value: String) -> Self {
         Self::new(
             IdentifierType::MRN,
             // Embed the facility so the same MRN value at two facilities is
             // treated as two distinct identifiers.
-            format!("urn:oid:facility:{}", facility),
+            format!("urn:oid:facility:{facility}"),
             value,
         )
     }
@@ -167,6 +169,7 @@ impl Identifier {
     /// let ssn = Identifier::ssn("078-05-1120".into());
     /// assert_eq!(ssn.system, "http://hl7.org/fhir/sid/us-ssn");
     /// ```
+    #[must_use]
     pub fn ssn(value: String) -> Self {
         Self::new(
             IdentifierType::SSN,

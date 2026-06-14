@@ -26,7 +26,7 @@ use crate::models::{Address, HumanName, Identifier, IdentityDocument};
 
 /// Name comparison: family + given + prefix/suffix, fuzzy and phonetic.
 pub mod name_matching {
-    use super::*;
+    use super::{HumanName, jaro_winkler, normalized_levenshtein};
 
     /// Score overall name similarity in `[0.0, 1.0]`.
     ///
@@ -43,6 +43,7 @@ pub mod name_matching {
     /// let b = a.clone();
     /// assert!(match_names(&a, &b) > 0.99);
     /// ```
+    #[must_use]
     pub fn match_names(name1: &HumanName, name2: &HumanName) -> f64 {
         // Weight factors for the three name components. Family name
         // carries the most weight (`0.5`) because it is the strongest
@@ -78,10 +79,11 @@ pub mod name_matching {
     /// ```
     /// use person_service::matching::algorithms::name_matching::match_family_names;
     ///
-    /// assert_eq!(match_family_names("Smith", "Smith"), 1.0);
+    /// assert!((match_family_names("Smith", "Smith") - 1.0).abs() < f64::EPSILON);
     /// assert!(match_family_names("Smith", "Smyth") > 0.8);
-    /// assert_eq!(match_family_names("", "Smith"), 0.0);
+    /// assert!((match_family_names("", "Smith") - 0.0).abs() < f64::EPSILON);
     /// ```
+    #[must_use]
     pub fn match_family_names(family1: &str, family2: &str) -> f64 {
         if family1.is_empty() || family2.is_empty() {
             return 0.0;
@@ -132,10 +134,16 @@ pub mod name_matching {
     /// ```
     /// use person_service::matching::algorithms::name_matching::match_given_names;
     ///
-    /// assert_eq!(match_given_names(&["John".into()], &["John".into()]), 1.0);
-    /// assert_eq!(match_given_names(&["William".into()], &["Bill".into()]), 0.95);
-    /// assert_eq!(match_given_names(&[], &["John".into()]), 0.0);
+    /// assert!((match_given_names(&["John".into()], &["John".into()]) - 1.0).abs() < f64::EPSILON);
+    /// assert!((match_given_names(&["William".into()], &["Bill".into()]) - 0.95).abs() < f64::EPSILON);
+    /// assert!((match_given_names(&[], &["John".into()]) - 0.0).abs() < f64::EPSILON);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Does not panic: the early empty-slice guard ensures the subsequent
+    /// `first().unwrap()` calls always succeed.
+    #[must_use]
     pub fn match_given_names(given1: &[String], given2: &[String]) -> f64 {
         if given1.is_empty() || given2.is_empty() {
             return 0.0;
@@ -244,13 +252,13 @@ pub mod name_matching {
             max_score
         };
 
-        (prefix_match + suffix_match) / 2.0
+        f64::midpoint(prefix_match, suffix_match)
     }
 }
 
 /// Birth-date comparison tolerant of common data-entry errors.
 pub mod dob_matching {
-    use super::*;
+    use super::{Datelike, NaiveDate};
 
     /// Score birth-date similarity in `[0.0, 1.0]`, tolerating typos.
     ///
@@ -267,10 +275,11 @@ pub mod dob_matching {
     /// use person_service::matching::algorithms::dob_matching::match_birth_dates;
     ///
     /// let d = NaiveDate::from_ymd_opt(1980, 1, 15);
-    /// assert_eq!(match_birth_dates(d, d), 1.0);
-    /// assert_eq!(match_birth_dates(None, None), 0.5);
-    /// assert_eq!(match_birth_dates(d, None), 0.0);
+    /// assert!((match_birth_dates(d, d) - 1.0).abs() < f64::EPSILON);
+    /// assert!((match_birth_dates(None, None) - 0.5).abs() < f64::EPSILON);
+    /// assert!((match_birth_dates(d, None) - 0.0).abs() < f64::EPSILON);
     /// ```
+    #[must_use]
     pub fn match_birth_dates(dob1: Option<NaiveDate>, dob2: Option<NaiveDate>) -> f64 {
         match (dob1, dob2) {
             (None, None) => 0.5,                      // Both missing - neutral
@@ -288,10 +297,8 @@ pub mod dob_matching {
 
                 // Same year+month, day off by 1-2: a fat-finger day typo,
                 // still almost certainly the same date — `0.95`.
-                if d1.year() == d2.year() && d1.month() == d2.month() {
-                    if days_diff <= 2 {
-                        return 0.95;
-                    }
+                if d1.year() == d2.year() && d1.month() == d2.month() && days_diff <= 2 {
+                    return 0.95;
                 }
 
                 // Month/day transposition (e.g. 03/12 vs 12/03): a very
@@ -346,10 +353,11 @@ pub mod gender_matching {
     /// use person_service::models::Gender;
     /// use person_service::matching::algorithms::gender_matching::match_gender;
     ///
-    /// assert_eq!(match_gender(Gender::Male, Gender::Male), 1.0);
-    /// assert_eq!(match_gender(Gender::Male, Gender::Unknown), 0.5);
-    /// assert_eq!(match_gender(Gender::Male, Gender::Female), 0.0);
+    /// assert!((match_gender(Gender::Male, Gender::Male) - 1.0).abs() < f64::EPSILON);
+    /// assert!((match_gender(Gender::Male, Gender::Unknown) - 0.5).abs() < f64::EPSILON);
+    /// assert!((match_gender(Gender::Male, Gender::Female) - 0.0).abs() < f64::EPSILON);
     /// ```
+    #[must_use]
     pub fn match_gender(gender1: Gender, gender2: Gender) -> f64 {
         if gender1 == gender2 {
             1.0
@@ -363,13 +371,19 @@ pub mod gender_matching {
 
 /// Postal-address comparison across postal code, city, state, street.
 pub mod address_matching {
-    use super::*;
+    use super::{Address, jaro_winkler};
 
     /// Score the best address pair between two address lists.
     ///
     /// Currently compares only the *primary* (first) address of each
     /// list via [`match_address`]. Returns `0.0` if either list is
     /// empty.
+    ///
+    /// # Panics
+    ///
+    /// Does not panic: the early empty-slice guard ensures the subsequent
+    /// `first().unwrap()` calls always succeed.
+    #[must_use]
     pub fn match_addresses(addresses1: &[Address], addresses2: &[Address]) -> f64 {
         if addresses1.is_empty() || addresses2.is_empty() {
             return 0.0;
@@ -387,6 +401,7 @@ pub mod address_matching {
     /// A weighted sum of four components: postal code (0.3), city (0.2),
     /// state (0.2), and street line 1 (0.3). Missing components on
     /// either side contribute `0.0`.
+    #[must_use]
     pub fn match_address(addr1: &Address, addr2: &Address) -> f64 {
         // Component weights summing to `1.0`. Postal code and street
         // line (`0.3` each) are the most discriminating address parts;
@@ -426,11 +441,10 @@ pub mod address_matching {
     /// `0.70`; anything else (or a missing code) scores `0.0`.
     pub(crate) fn match_postal_codes(zip1: Option<&str>, zip2: Option<&str>) -> f64 {
         match (zip1, zip2) {
-            (None, None) => 0.0,
-            (None, Some(_)) | (Some(_), None) => 0.0,
+            (None, None | Some(_)) | (Some(_), None) => 0.0,
             (Some(z1), Some(z2)) => {
-                let z1 = z1.trim().replace("-", "");
-                let z2 = z2.trim().replace("-", "");
+                let z1 = z1.trim().replace('-', "");
+                let z2 = z2.trim().replace('-', "");
 
                 if z1 == z2 {
                     return 1.0;
@@ -439,19 +453,15 @@ pub mod address_matching {
                 // Sharing the first 5 chars means the same base US ZIP
                 // (differing only in the `+4` extension), which is almost
                 // as strong as an exact match — hence `0.95`.
-                if z1.len() >= 5 && z2.len() >= 5 {
-                    if &z1[0..5] == &z2[0..5] {
-                        return 0.95;
-                    }
+                if z1.len() >= 5 && z2.len() >= 5 && z1[0..5] == z2[0..5] {
+                    return 0.95;
                 }
 
                 // Sharing the first 3 chars means the same sectional
                 // center / delivery area: same neighborhood, weaker
                 // evidence — hence `0.70`.
-                if z1.len() >= 3 && z2.len() >= 3 {
-                    if &z1[0..3] == &z2[0..3] {
-                        return 0.70;
-                    }
+                if z1.len() >= 3 && z2.len() >= 3 && z1[0..3] == z2[0..3] {
+                    return 0.70;
                 }
 
                 0.0
@@ -466,8 +476,7 @@ pub mod address_matching {
     /// side scores `0.0`.
     fn match_cities(city1: Option<&str>, city2: Option<&str>) -> f64 {
         match (city1, city2) {
-            (None, None) => 0.0,
-            (None, Some(_)) | (Some(_), None) => 0.0,
+            (None, None | Some(_)) | (Some(_), None) => 0.0,
             (Some(c1), Some(c2)) => {
                 let c1 = c1.trim().to_lowercase();
                 let c2 = c2.trim().to_lowercase();
@@ -489,8 +498,7 @@ pub mod address_matching {
     /// `0.0`.
     fn match_states(state1: Option<&str>, state2: Option<&str>) -> f64 {
         match (state1, state2) {
-            (None, None) => 0.0,
-            (None, Some(_)) | (Some(_), None) => 0.0,
+            (None, None | Some(_)) | (Some(_), None) => 0.0,
             (Some(s1), Some(s2)) => {
                 let s1 = s1.trim().to_uppercase();
                 let s2 = s2.trim().to_uppercase();
@@ -507,8 +515,7 @@ pub mod address_matching {
     /// Jaro-Winkler fuzzy score applies. A missing street scores `0.0`.
     fn match_street_addresses(street1: Option<&str>, street2: Option<&str>) -> f64 {
         match (street1, street2) {
-            (None, None) => 0.0,
-            (None, Some(_)) | (Some(_), None) => 0.0,
+            (None, None | Some(_)) | (Some(_), None) => 0.0,
             (Some(s1), Some(s2)) => {
                 let s1 = normalize_street(s1);
                 let s2 = normalize_street(s2);
@@ -541,19 +548,19 @@ pub mod address_matching {
             .replace("lane", "ln")
             .replace("court", "ct")
             .replace("circle", "cir")
-            .replace(".", "")
-            .replace(",", "")
+            .replace(['.', ','], "")
     }
 }
 
 /// Identifier comparison: type + system + value exact match.
 pub mod identifier_matching {
-    use super::*;
+    use super::Identifier;
 
     /// Score the best identifier pair across two identifier lists.
     ///
     /// Returns the maximum [`match_identifier`] score over every
     /// cross-pair, or `0.0` if either list is empty.
+    #[must_use]
     pub fn match_identifiers(ids1: &[Identifier], ids2: &[Identifier]) -> f64 {
         if ids1.is_empty() || ids2.is_empty() {
             return 0.0;
@@ -576,6 +583,7 @@ pub mod identifier_matching {
     /// The identifiers must agree on both `identifier_type` and `system`
     /// (otherwise `0.0`). Values then compare exactly for `1.0`, or
     /// `0.98` when they differ only by hyphen/space formatting.
+    #[must_use]
     pub fn match_identifier(id1: &Identifier, id2: &Identifier) -> f64 {
         // Must be same type and system
         if id1.identifier_type != id2.identifier_type {
@@ -594,8 +602,8 @@ pub mod identifier_matching {
             1.0 // Exact match
         } else {
             // Allow minor differences (e.g., formatting)
-            let v1_clean = v1.replace("-", "").replace(" ", "");
-            let v2_clean = v2.replace("-", "").replace(" ", "");
+            let v1_clean = v1.replace(['-', ' '], "");
+            let v2_clean = v2.replace(['-', ' '], "");
 
             if v1_clean == v2_clean {
                 // Same digits, only punctuation differs: treat as a match
@@ -620,6 +628,7 @@ pub mod tax_id_matching {
     /// returns `1.0` only on a non-empty exact match. A missing tax ID
     /// on either side yields `0.0`. A `1.0` here drives the deterministic
     /// scorer's short-circuit to a certain match.
+    #[must_use]
     pub fn match_tax_ids(person: &Person, candidate: &Person) -> f64 {
         let tid1 = person.effective_tax_id();
         let tid2 = candidate.effective_tax_id();
@@ -639,7 +648,7 @@ pub mod tax_id_matching {
     /// to `123456789`.
     fn normalize_tax_id(tid: &str) -> String {
         tid.chars()
-            .filter(|c| c.is_ascii_alphanumeric())
+            .filter(char::is_ascii_alphanumeric)
             .collect::<String>()
             .to_lowercase()
     }
@@ -647,12 +656,13 @@ pub mod tax_id_matching {
 
 /// Identity-document comparison: type + number exact match.
 pub mod document_matching {
-    use super::*;
+    use super::IdentityDocument;
 
     /// Score the best document pair across two document lists.
     ///
     /// Returns the maximum [`match_document`] score over every
     /// cross-pair, or `0.0` if either list is empty.
+    #[must_use]
     pub fn match_documents(docs1: &[IdentityDocument], docs2: &[IdentityDocument]) -> f64 {
         if docs1.is_empty() || docs2.is_empty() {
             return 0.0;
@@ -677,6 +687,7 @@ pub mod document_matching {
     /// before comparison; an exact number match scores `1.0` when the
     /// issuing country also matches, or `0.95` when it differs. An empty
     /// or mismatched number scores `0.0`.
+    #[must_use]
     pub fn match_document(doc1: &IdentityDocument, doc2: &IdentityDocument) -> f64 {
         // Must be same document type
         if doc1.document_type != doc2.document_type {
@@ -734,7 +745,7 @@ mod tests {
         let name2 = name1.clone();
 
         let score = name_matching::match_names(&name1, &name2);
-        assert!(score > 0.99, "Exact match should score ~1.0, got {}", score);
+        assert!(score > 0.99, "Exact match should score ~1.0, got {score}");
     }
 
     /// A one-letter spelling variant (Smith/Smyth) still scores high.
@@ -757,11 +768,7 @@ mod tests {
         };
 
         let score = name_matching::match_names(&name1, &name2);
-        assert!(
-            score > 0.85,
-            "Similar names should score high, got {}",
-            score
-        );
+        assert!(score > 0.85, "Similar names should score high, got {score}");
     }
 
     /// Nickname variants (William/Bill) score high via the variant table.
@@ -784,11 +791,7 @@ mod tests {
         };
 
         let score = name_matching::match_names(&name1, &name2);
-        assert!(
-            score > 0.90,
-            "Name variants should score high, got {}",
-            score
-        );
+        assert!(score > 0.90, "Name variants should score high, got {score}");
     }
 
     /// Identical birth dates score 1.0.
@@ -796,7 +799,7 @@ mod tests {
     fn test_exact_dob_match() {
         let dob = Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap());
         let score = dob_matching::match_birth_dates(dob, dob);
-        assert_eq!(score, 1.0);
+        assert!((score - 1.0).abs() < f64::EPSILON);
     }
 
     /// A single-day difference is treated as a typo and scores high.
@@ -807,8 +810,7 @@ mod tests {
         let score = dob_matching::match_birth_dates(dob1, dob2);
         assert!(
             score > 0.90,
-            "Minor DOB typo should score high, got {}",
-            score
+            "Minor DOB typo should score high, got {score}"
         );
     }
 
@@ -817,17 +819,16 @@ mod tests {
     fn test_gender_match() {
         use crate::models::Gender;
 
-        assert_eq!(
-            gender_matching::match_gender(Gender::Male, Gender::Male),
-            1.0
+        assert!(
+            (gender_matching::match_gender(Gender::Male, Gender::Male) - 1.0).abs() < f64::EPSILON
         );
-        assert_eq!(
-            gender_matching::match_gender(Gender::Male, Gender::Female),
-            0.0
+        assert!(
+            (gender_matching::match_gender(Gender::Male, Gender::Female) - 0.0).abs()
+                < f64::EPSILON
         );
-        assert_eq!(
-            gender_matching::match_gender(Gender::Male, Gender::Unknown),
-            0.5
+        assert!(
+            (gender_matching::match_gender(Gender::Male, Gender::Unknown) - 0.5).abs()
+                < f64::EPSILON
         );
     }
 
@@ -835,7 +836,7 @@ mod tests {
     #[test]
     fn test_postal_code_match() {
         let score = address_matching::match_postal_codes(Some("12345"), Some("12345"));
-        assert_eq!(score, 1.0);
+        assert!((score - 1.0).abs() < f64::EPSILON);
 
         let score = address_matching::match_postal_codes(Some("12345-6789"), Some("12345"));
         assert!(score > 0.90);
@@ -846,20 +847,20 @@ mod tests {
     fn test_name_match_empty_strings() {
         let name1 = HumanName {
             use_type: None,
-            family: "".to_string(),
+            family: String::new(),
             given: vec![],
             prefix: vec![],
             suffix: vec![],
         };
         let name2 = HumanName {
             use_type: None,
-            family: "".to_string(),
+            family: String::new(),
             given: vec![],
             prefix: vec![],
             suffix: vec![],
         };
         let score = name_matching::match_names(&name1, &name2);
-        assert!(score < 0.5, "Empty names should score low, got {}", score);
+        assert!(score < 0.5, "Empty names should score low, got {score}");
     }
 
     /// Near-spellings like Muller/Mueller score reasonably high.
@@ -882,8 +883,7 @@ mod tests {
         let score = name_matching::match_names(&name1, &name2);
         assert!(
             score > 0.70,
-            "Unicode-similar names should score reasonably, got {}",
-            score
+            "Unicode-similar names should score reasonably, got {score}"
         );
     }
 
@@ -907,8 +907,7 @@ mod tests {
         let score = name_matching::match_names(&name1, &name2);
         assert!(
             score > 0.99,
-            "Case-insensitive match should score ~1.0, got {}",
-            score
+            "Case-insensitive match should score ~1.0, got {score}"
         );
     }
 
@@ -918,7 +917,10 @@ mod tests {
         let dob1 = Some(NaiveDate::from_ymd_opt(1990, 6, 15).unwrap());
         let dob2 = Some(NaiveDate::from_ymd_opt(1990, 6, 15).unwrap());
         let score = dob_matching::match_birth_dates(dob1, dob2);
-        assert_eq!(score, 1.0, "Exact DOB match should be 1.0");
+        assert!(
+            (score - 1.0).abs() < f64::EPSILON,
+            "Exact DOB match should be 1.0"
+        );
     }
 
     /// A one-year-off date with the same month/day scores high.
@@ -929,8 +931,7 @@ mod tests {
         let score = dob_matching::match_birth_dates(dob1, dob2);
         assert!(
             score > 0.80,
-            "Off-by-one year with same month/day should score high, got {}",
-            score
+            "Off-by-one year with same month/day should score high, got {score}"
         );
     }
 
@@ -938,19 +939,16 @@ mod tests {
     #[test]
     fn test_dob_match_none_values() {
         let dob = Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap());
-        assert_eq!(
-            dob_matching::match_birth_dates(None, None),
-            0.5,
+        assert!(
+            (dob_matching::match_birth_dates(None, None) - 0.5).abs() < f64::EPSILON,
             "Both None should be neutral 0.5"
         );
-        assert_eq!(
-            dob_matching::match_birth_dates(dob, None),
-            0.0,
+        assert!(
+            (dob_matching::match_birth_dates(dob, None) - 0.0).abs() < f64::EPSILON,
             "One None should be 0.0"
         );
-        assert_eq!(
-            dob_matching::match_birth_dates(None, dob),
-            0.0,
+        assert!(
+            (dob_matching::match_birth_dates(None, dob) - 0.0).abs() < f64::EPSILON,
             "One None should be 0.0"
         );
     }
@@ -959,13 +957,13 @@ mod tests {
     #[test]
     fn test_gender_match_same() {
         use crate::models::Gender;
-        assert_eq!(
-            gender_matching::match_gender(Gender::Female, Gender::Female),
-            1.0
+        assert!(
+            (gender_matching::match_gender(Gender::Female, Gender::Female) - 1.0).abs()
+                < f64::EPSILON
         );
-        assert_eq!(
-            gender_matching::match_gender(Gender::Other, Gender::Other),
-            1.0
+        assert!(
+            (gender_matching::match_gender(Gender::Other, Gender::Other) - 1.0).abs()
+                < f64::EPSILON
         );
     }
 
@@ -973,13 +971,13 @@ mod tests {
     #[test]
     fn test_gender_match_different() {
         use crate::models::Gender;
-        assert_eq!(
-            gender_matching::match_gender(Gender::Male, Gender::Female),
-            0.0
+        assert!(
+            (gender_matching::match_gender(Gender::Male, Gender::Female) - 0.0).abs()
+                < f64::EPSILON
         );
-        assert_eq!(
-            gender_matching::match_gender(Gender::Female, Gender::Other),
-            0.0
+        assert!(
+            (gender_matching::match_gender(Gender::Female, Gender::Other) - 0.0).abs()
+                < f64::EPSILON
         );
     }
 
@@ -987,17 +985,17 @@ mod tests {
     #[test]
     fn test_gender_match_unknown() {
         use crate::models::Gender;
-        assert_eq!(
-            gender_matching::match_gender(Gender::Unknown, Gender::Male),
-            0.5
+        assert!(
+            (gender_matching::match_gender(Gender::Unknown, Gender::Male) - 0.5).abs()
+                < f64::EPSILON
         );
-        assert_eq!(
-            gender_matching::match_gender(Gender::Female, Gender::Unknown),
-            0.5
+        assert!(
+            (gender_matching::match_gender(Gender::Female, Gender::Unknown) - 0.5).abs()
+                < f64::EPSILON
         );
-        assert_eq!(
-            gender_matching::match_gender(Gender::Unknown, Gender::Unknown),
-            1.0
+        assert!(
+            (gender_matching::match_gender(Gender::Unknown, Gender::Unknown) - 1.0).abs()
+                < f64::EPSILON
         );
     }
 
@@ -1013,11 +1011,11 @@ mod tests {
             postal_code: Some("62701".to_string()),
             country: Some("US".to_string()),
         };
-        let score = address_matching::match_addresses(&[addr.clone()], &[addr]);
+        let addrs = [addr];
+        let score = address_matching::match_addresses(&addrs, &addrs);
         assert!(
             score > 0.99,
-            "Exact address match should score ~1.0, got {}",
-            score
+            "Exact address match should score ~1.0, got {score}"
         );
     }
 
@@ -1045,8 +1043,7 @@ mod tests {
         let score = address_matching::match_addresses(&[addr1], &[addr2]);
         assert!(
             score > 0.0,
-            "Partial address match (same city/state) should score > 0, got {}",
-            score
+            "Partial address match (same city/state) should score > 0, got {score}"
         );
         assert!(score < 1.0, "Partial match should be < 1.0");
     }
@@ -1064,9 +1061,15 @@ mod tests {
             country: None,
         };
         let score = address_matching::match_addresses(&[], &[addr]);
-        assert_eq!(score, 0.0, "Empty address list should score 0.0");
+        assert!(
+            (score - 0.0).abs() < f64::EPSILON,
+            "Empty address list should score 0.0"
+        );
         let score2 = address_matching::match_addresses(&[], &[]);
-        assert_eq!(score2, 0.0, "Both empty address lists should score 0.0");
+        assert!(
+            (score2 - 0.0).abs() < f64::EPSILON,
+            "Both empty address lists should score 0.0"
+        );
     }
 
     /// Same type+system+value identifiers score 1.0.
@@ -1083,7 +1086,10 @@ mod tests {
             "MRN-12345".to_string(),
         );
         let score = identifier_matching::match_identifiers(&[id1], &[id2]);
-        assert_eq!(score, 1.0, "Exact identifier match should be 1.0");
+        assert!(
+            (score - 1.0).abs() < f64::EPSILON,
+            "Exact identifier match should be 1.0"
+        );
     }
 
     /// Differing identifier types never match, even with equal values.
@@ -1100,7 +1106,10 @@ mod tests {
             "12345".to_string(),
         );
         let score = identifier_matching::match_identifiers(&[id1], &[id2]);
-        assert_eq!(score, 0.0, "Different identifier types should not match");
+        assert!(
+            (score - 0.0).abs() < f64::EPSILON,
+            "Different identifier types should not match"
+        );
     }
 
     /// Equal tax IDs (after normalization) score 1.0.
@@ -1132,7 +1141,10 @@ mod tests {
         p2.tax_id = Some("123-45-6789".to_string());
 
         let score = tax_id_matching::match_tax_ids(&p1, &p2);
-        assert_eq!(score, 1.0, "Exact tax ID match should be 1.0");
+        assert!(
+            (score - 1.0).abs() < f64::EPSILON,
+            "Exact tax ID match should be 1.0"
+        );
     }
 
     /// Persons without tax IDs score 0.0.
@@ -1160,7 +1172,10 @@ mod tests {
             Gender::Male,
         );
         let score = tax_id_matching::match_tax_ids(&p1, &p2);
-        assert_eq!(score, 0.0, "Both None tax IDs should score 0.0");
+        assert!(
+            (score - 0.0).abs() < f64::EPSILON,
+            "Both None tax IDs should score 0.0"
+        );
     }
 
     /// Same type+number+country documents score 1.0 (verified flag ignored).
@@ -1185,8 +1200,8 @@ mod tests {
             verified: false,
         };
         let score = document_matching::match_documents(&[doc1], &[doc2]);
-        assert_eq!(
-            score, 1.0,
+        assert!(
+            (score - 1.0).abs() < f64::EPSILON,
             "Exact document match with same country should be 1.0"
         );
     }
@@ -1213,6 +1228,9 @@ mod tests {
             verified: true,
         };
         let score = document_matching::match_documents(&[doc1], &[doc2]);
-        assert_eq!(score, 0.0, "Different document types should not match");
+        assert!(
+            (score - 0.0).abs() < f64::EPSILON,
+            "Different document types should not match"
+        );
     }
 }

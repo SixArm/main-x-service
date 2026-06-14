@@ -133,9 +133,9 @@ fn identical_clones_score_near_one_high_confidence() {
 fn typo_in_given_name_still_matches_fuzzy() {
     let dob = NaiveDate::from_ymd_opt(1980, 5, 15).unwrap();
     let alice = person_with_dob("Williams", "Alice", dob);
-    let alyce = person_with_dob("Williams", "Alyce", dob); // single-letter Jaro-Winkler typo
+    let typo = person_with_dob("Williams", "Alyce", dob); // single-letter Jaro-Winkler typo
 
-    let result = engine().match_persons(&to_matcher_person(&alice), &to_matcher_person(&alyce));
+    let result = engine().match_persons(&to_matcher_person(&alice), &to_matcher_person(&typo));
 
     assert!(
         result.score >= 0.85,
@@ -473,10 +473,11 @@ fn sys_identifier(system: &str, value: &str) -> Identifier {
 /// directly (the adapter is the unit under test, not the scorer).
 #[test]
 fn routable_identifier_systems_reach_their_matcher_slot() {
-    let p0 = person("Routing", "Test");
-
     // (system-URI fragment, value, accessor on the projected matcher Person)
     type Accessor = fn(&person_service::matching::matcher_lib::Person) -> Option<&str>;
+
+    let p0 = person("Routing", "Test");
+
     let cases: &[(&str, &str, Accessor)] = &[
         ("https://fhir.nhs.uk/Id/nhs-number", "943 476 5919", |m| {
             m.united_kingdom_national_health_service_number.as_deref()

@@ -79,26 +79,27 @@ pub enum EventEvent {
 
 impl EventEvent {
     /// Return the timestamp carried by any variant.
+    #[must_use]
     pub fn timestamp(&self) -> DateTime<Utc> {
         match self {
-            EventEvent::Created { timestamp, .. } => *timestamp,
-            EventEvent::Updated { timestamp, .. } => *timestamp,
-            EventEvent::Deleted { timestamp, .. } => *timestamp,
-            EventEvent::Merged { timestamp, .. } => *timestamp,
-            EventEvent::Linked { timestamp, .. } => *timestamp,
-            EventEvent::Unlinked { timestamp, .. } => *timestamp,
+            EventEvent::Created { timestamp, .. }
+            | EventEvent::Updated { timestamp, .. }
+            | EventEvent::Deleted { timestamp, .. }
+            | EventEvent::Merged { timestamp, .. }
+            | EventEvent::Linked { timestamp, .. }
+            | EventEvent::Unlinked { timestamp, .. } => *timestamp,
         }
     }
 
     /// Return the primary event id involved (for `Merged`, the source id).
+    #[must_use]
     pub fn event_id(&self) -> Uuid {
         match self {
-            EventEvent::Created { event, .. } => event.id,
-            EventEvent::Updated { event, .. } => event.id,
-            EventEvent::Deleted { event_id, .. } => *event_id,
+            EventEvent::Created { event, .. } | EventEvent::Updated { event, .. } => event.id,
             EventEvent::Merged { source_id, .. } => *source_id,
-            EventEvent::Linked { event_id, .. } => *event_id,
-            EventEvent::Unlinked { event_id, .. } => *event_id,
+            EventEvent::Deleted { event_id, .. }
+            | EventEvent::Linked { event_id, .. }
+            | EventEvent::Unlinked { event_id, .. } => *event_id,
         }
     }
 }
@@ -107,6 +108,10 @@ impl EventEvent {
 /// be held as `Arc<dyn EventProducer>` in shared application state.
 pub trait EventProducer: Send + Sync {
     /// Publish one event onto the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event cannot be published to the stream.
     fn publish(&self, event: EventEvent) -> Result<()>;
 }
 
@@ -115,8 +120,16 @@ pub use producer::InMemoryEventPublisher;
 /// Strategy trait for consuming [`EventEvent`]s from the stream.
 pub trait EventConsumer {
     /// Begin a subscription to the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the subscription cannot be established.
     fn subscribe(&mut self) -> Result<()>;
 
     /// Pull the next event, or `None` when none is currently available.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading the next event from the stream fails.
     fn next_event(&mut self) -> Result<Option<EventEvent>>;
 }

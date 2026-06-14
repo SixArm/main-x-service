@@ -35,6 +35,7 @@ use chrono::Utc;
 /// values, all document numbers, and phone/SMS/fax contact values,
 /// keeping only the last four characters of each visible. Names,
 /// addresses, and emails are left intact.
+#[must_use]
 pub fn mask_person(person: &Person) -> Person {
     let mut masked = person.clone();
 
@@ -46,10 +47,10 @@ pub fn mask_person(person: &Person) -> Person {
     // Mask SSN and other sensitive identifiers
     for id in &mut masked.identifiers {
         match id.identifier_type {
-            crate::models::IdentifierType::SSN | crate::models::IdentifierType::TAX => {
-                id.value = mask_value(&id.value, 4);
-            }
-            crate::models::IdentifierType::PPN | crate::models::IdentifierType::DL => {
+            crate::models::IdentifierType::SSN
+            | crate::models::IdentifierType::TAX
+            | crate::models::IdentifierType::PPN
+            | crate::models::IdentifierType::DL => {
                 id.value = mask_value(&id.value, 4);
             }
             _ => {}
@@ -112,16 +113,17 @@ fn mask_value(value: &str, visible_chars: usize) -> String {
 /// A consent counts when its `consent_type` matches, its status is
 /// [`ConsentStatus::Active`](crate::models::ConsentStatus::Active), and
 /// its `expiry_date` is absent or not in the past.
+#[must_use]
 pub fn has_active_consent(
     consents: &[crate::models::Consent],
-    consent_type: crate::models::ConsentType,
+    consent_type: &crate::models::ConsentType,
 ) -> bool {
     let today = Utc::now().date_naive();
 
     consents.iter().any(|c| {
-        c.consent_type == consent_type
+        c.consent_type == *consent_type
             && c.status == crate::models::ConsentStatus::Active
-            && c.expiry_date.map_or(true, |exp| exp >= today)
+            && c.expiry_date.is_none_or(|exp| exp >= today)
     })
 }
 
@@ -129,6 +131,7 @@ pub fn has_active_consent(
 ///
 /// Supports the data-subject right of access. Returns
 /// [`serde_json::Value::Null`] only if serialization unexpectedly fails.
+#[must_use]
 pub fn export_person_data(person: &Person) -> serde_json::Value {
     serde_json::to_value(person).unwrap_or(serde_json::Value::Null)
 }
@@ -163,7 +166,7 @@ mod tests {
         assert_eq!(mask_value("Müller-9981", 4), "******-9981");
     }
 
-    /// mask_person redacts tax ID and SSN but leaves the family name.
+    /// `mask_person` redacts tax ID and SSN but leaves the family name.
     #[test]
     fn test_mask_person() {
         use crate::models::*;
@@ -195,10 +198,10 @@ mod tests {
     fn test_mask_email() {
         // mask_value on an email-like string
         let masked = mask_value("john.doe@example.com", 4);
-        assert!(
-            masked.ends_with(".com"),
-            "Should keep last 4 chars visible, got {}",
-            masked
+        assert_eq!(
+            &masked[masked.len() - 4..],
+            ".com",
+            "Should keep last 4 chars visible, got {masked}"
         );
         assert!(masked.contains('*'), "Should contain masked characters");
     }
@@ -209,8 +212,7 @@ mod tests {
         let masked = mask_value("+1-555-123-4567", 4);
         assert!(
             masked.ends_with("4567"),
-            "Last 4 digits should be visible, got {}",
-            masked
+            "Last 4 digits should be visible, got {masked}"
         );
     }
 
@@ -280,7 +282,7 @@ mod tests {
             updated_at: Utc::now(),
         };
 
-        assert!(has_active_consent(&[consent], ConsentType::DataProcessing));
+        assert!(has_active_consent(&[consent], &ConsentType::DataProcessing));
     }
 
     /// A past-expiry consent is not considered active.
@@ -303,7 +305,7 @@ mod tests {
         };
 
         assert!(
-            !has_active_consent(&[expired_consent], ConsentType::Marketing),
+            !has_active_consent(&[expired_consent], &ConsentType::Marketing),
             "Expired consent should not be considered active"
         );
     }

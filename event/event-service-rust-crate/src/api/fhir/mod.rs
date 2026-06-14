@@ -41,6 +41,7 @@ pub struct FhirEvent {
 impl FhirEvent {
     /// Construct an empty `Event`-typed payload with all optional
     /// fields unset.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             resource_type: "Event".into(),

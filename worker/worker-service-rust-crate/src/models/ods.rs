@@ -17,7 +17,7 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// ODS record status. Serializes in snake_case.
+/// ODS record status. Serializes in `snake_case`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OdsStatus {

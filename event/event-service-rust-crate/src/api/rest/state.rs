@@ -48,6 +48,7 @@ impl AppState {
     /// then constructs the [`SeaOrmEventRepository`] with both attached
     /// so every CRUD write also streams an event and records an audit
     /// entry.
+    #[must_use]
     pub fn new(
         db: DatabaseConnection,
         search_engine: SearchEngine,

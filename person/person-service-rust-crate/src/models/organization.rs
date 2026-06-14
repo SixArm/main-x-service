@@ -65,6 +65,7 @@ impl Organization {
     ///
     /// Generates a fresh UUID, stamps timestamps, marks it `active`, and
     /// leaves every collection empty and `part_of` unset.
+    #[must_use]
     pub fn new(name: String) -> Self {
         let now = Utc::now();
         Self {

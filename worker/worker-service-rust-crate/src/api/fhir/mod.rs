@@ -14,7 +14,10 @@
 //! crate's tests.
 
 use crate::Result;
-use crate::models::{Address, ContactPoint, Identifier, Worker};
+use crate::api::fhir::resources::{
+    FhirCodeableConcept, FhirCoding, FhirHumanName, FhirIdentifier, FhirReference,
+};
+use crate::models::{Address, ContactPoint, Gender, HumanName, Identifier, Worker};
 
 /// FHIR `Bundle` handling for search responses.
 pub mod bundle;
@@ -27,6 +30,75 @@ pub mod search_parameters;
 
 pub use resources::{FhirOperationOutcome, FhirWorker};
 
+/// Maps an internal [`HumanName`] to a FHIR `HumanName`, omitting empty lists.
+fn to_fhir_human_name(name: &HumanName, text: String) -> FhirHumanName {
+    FhirHumanName {
+        use_: name
+            .use_type
+            .as_ref()
+            .map(|u| format!("{u:?}").to_lowercase()),
+        text: Some(text),
+        family: Some(name.family.clone()),
+        given: (!name.given.is_empty()).then(|| name.given.clone()),
+        prefix: (!name.prefix.is_empty()).then(|| name.prefix.clone()),
+        suffix: (!name.suffix.is_empty()).then(|| name.suffix.clone()),
+    }
+}
+
+/// Builds the FHIR identifier list for `worker`.
+fn to_fhir_identifiers(worker: &Worker) -> Vec<FhirIdentifier> {
+    worker
+        .identifiers
+        .iter()
+        .map(|id| FhirIdentifier {
+            use_: id
+                .use_type
+                .as_ref()
+                .map(|u| format!("{u:?}").to_lowercase()),
+            type_: Some(FhirCodeableConcept {
+                coding: Some(vec![FhirCoding {
+                    system: Some(id.system.clone()),
+                    code: Some(id.identifier_type.to_string()),
+                    display: Some(id.identifier_type.to_string()),
+                }]),
+                text: Some(id.identifier_type.to_string()),
+            }),
+            system: Some(id.system.clone()),
+            value: Some(id.value.clone()),
+            assigner: id.assigner.as_ref().map(|a| FhirReference {
+                reference: None,
+                display: Some(a.clone()),
+            }),
+        })
+        .collect()
+}
+
+/// Builds the FHIR telecom list for `worker`.
+fn to_fhir_telecom_points(worker: &Worker) -> Vec<resources::FhirContactPoint> {
+    worker
+        .telecom
+        .iter()
+        .map(|cp| resources::FhirContactPoint {
+            system: Some(format!("{:?}", cp.system).to_lowercase()),
+            value: Some(cp.value.clone()),
+            use_: cp
+                .use_type
+                .as_ref()
+                .map(|u| format!("{u:?}").to_lowercase()),
+        })
+        .collect()
+}
+
+/// Builds the FHIR name list (primary name first, then additional names).
+fn to_fhir_names(worker: &Worker) -> Vec<FhirHumanName> {
+    let mut names = vec![to_fhir_human_name(&worker.name, worker.full_name())];
+    for add_name in &worker.additional_names {
+        let text = format!("{} {}", add_name.given.join(" "), add_name.family);
+        names.push(to_fhir_human_name(add_name, text));
+    }
+    names
+}
+
 /// Maps an internal [`Worker`] to a FHIR R5 `Patient`-shaped [`FhirWorker`].
 ///
 /// Copies identity, names (primary plus additional), telecom, gender, birth
@@ -34,8 +106,11 @@ pub use resources::{FhirOperationOutcome, FhirWorker};
 /// links, and managing organization, formatting enums as lowercase FHIR codes
 /// and building references as `Resource/{id}` strings. Fields the internal
 /// model does not carry (e.g. address `use`/`type`) are left `None`.
+#[must_use]
 pub fn to_fhir_worker(worker: &Worker) -> FhirWorker {
-    use resources::*;
+    use resources::{
+        FhirAddress, FhirDeceased, FhirMeta, FhirMultipleBirth, FhirWorker, FhirWorkerLink,
+    };
 
     let mut fhir_worker = FhirWorker::new();
 
@@ -51,104 +126,15 @@ pub fn to_fhir_worker(worker: &Worker) -> FhirWorker {
 
     // Identifiers
     if !worker.identifiers.is_empty() {
-        fhir_worker.identifier = Some(
-            worker
-                .identifiers
-                .iter()
-                .map(|id| FhirIdentifier {
-                    use_: id
-                        .use_type
-                        .as_ref()
-                        .map(|u| format!("{:?}", u).to_lowercase()),
-                    type_: Some(FhirCodeableConcept {
-                        coding: Some(vec![FhirCoding {
-                            system: Some(id.system.clone()),
-                            code: Some(id.identifier_type.to_string()),
-                            display: Some(id.identifier_type.to_string()),
-                        }]),
-                        text: Some(id.identifier_type.to_string()),
-                    }),
-                    system: Some(id.system.clone()),
-                    value: Some(id.value.clone()),
-                    assigner: id.assigner.as_ref().map(|a| FhirReference {
-                        reference: None,
-                        display: Some(a.clone()),
-                    }),
-                })
-                .collect(),
-        );
+        fhir_worker.identifier = Some(to_fhir_identifiers(worker));
     }
 
-    // Name
-    let mut names = vec![FhirHumanName {
-        use_: worker
-            .name
-            .use_type
-            .as_ref()
-            .map(|u| format!("{:?}", u).to_lowercase()),
-        text: Some(worker.full_name()),
-        family: Some(worker.name.family.clone()),
-        given: if worker.name.given.is_empty() {
-            None
-        } else {
-            Some(worker.name.given.clone())
-        },
-        prefix: if worker.name.prefix.is_empty() {
-            None
-        } else {
-            Some(worker.name.prefix.clone())
-        },
-        suffix: if worker.name.suffix.is_empty() {
-            None
-        } else {
-            Some(worker.name.suffix.clone())
-        },
-    }];
-
-    // Additional names
-    for add_name in &worker.additional_names {
-        names.push(FhirHumanName {
-            use_: add_name
-                .use_type
-                .as_ref()
-                .map(|u| format!("{:?}", u).to_lowercase()),
-            text: Some(format!("{} {}", add_name.given.join(" "), add_name.family)),
-            family: Some(add_name.family.clone()),
-            given: if add_name.given.is_empty() {
-                None
-            } else {
-                Some(add_name.given.clone())
-            },
-            prefix: if add_name.prefix.is_empty() {
-                None
-            } else {
-                Some(add_name.prefix.clone())
-            },
-            suffix: if add_name.suffix.is_empty() {
-                None
-            } else {
-                Some(add_name.suffix.clone())
-            },
-        });
-    }
-    fhir_worker.name = Some(names);
+    // Names (primary plus any additional)
+    fhir_worker.name = Some(to_fhir_names(worker));
 
     // Telecom
     if !worker.telecom.is_empty() {
-        fhir_worker.telecom = Some(
-            worker
-                .telecom
-                .iter()
-                .map(|cp| FhirContactPoint {
-                    system: Some(format!("{:?}", cp.system).to_lowercase()),
-                    value: Some(cp.value.clone()),
-                    use_: cp
-                        .use_type
-                        .as_ref()
-                        .map(|u| format!("{:?}", u).to_lowercase()),
-                })
-                .collect(),
-        );
+        fhir_worker.telecom = Some(to_fhir_telecom_points(worker));
     }
 
     // Gender
@@ -233,7 +219,7 @@ pub fn to_fhir_worker(worker: &Worker) -> FhirWorker {
     // Managing organization
     if let Some(ref org_id) = worker.managing_organization {
         fhir_worker.managing_organization = Some(FhirReference {
-            reference: Some(format!("Organization/{}", org_id)),
+            reference: Some(format!("Organization/{org_id}")),
             display: None,
         });
     }
@@ -241,157 +227,179 @@ pub fn to_fhir_worker(worker: &Worker) -> FhirWorker {
     fhir_worker
 }
 
-/// Maps a FHIR [`FhirWorker`] back to an internal [`Worker`].
+/// Extracts the primary [`HumanName`] from the first FHIR name entry.
 ///
-/// Parses the id (generating a fresh UUID when absent), takes the first name
-/// entry (erroring if there is none), and decodes gender / birth date /
-/// deceased / identifiers / addresses / telecom from their FHIR codes.
-/// Returns [`crate::Error::Validation`] on an invalid UUID or a missing name.
-/// Several fields are not yet round-tripped (see the `TODO` markers) and are
-/// left at their defaults.
-pub fn from_fhir_worker(fhir_worker: &FhirWorker) -> Result<Worker> {
-    use crate::api::fhir::resources::FhirDeceased;
-    use crate::models::{ContactPointSystem, ContactPointUse, Gender, HumanName, NameUse};
-    use chrono::Utc;
-    use uuid::Uuid;
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] if the worker has no name entries.
+fn parse_fhir_name(fhir_worker: &FhirWorker) -> Result<HumanName> {
+    use crate::models::NameUse;
 
-    // Parse ID
-    let id = if let Some(ref id_str) = fhir_worker.id {
-        Uuid::parse_str(id_str)
-            .map_err(|e| crate::Error::Validation(format!("Invalid UUID: {}", e)))?
-    } else {
-        Uuid::new_v4()
+    let Some(names) = fhir_worker.name.as_ref() else {
+        return Err(crate::Error::Validation(
+            "Worker must have at least one name".to_string(),
+        ));
     };
-
-    // Parse name (use first name)
-    let name = if let Some(ref names) = fhir_worker.name {
-        if let Some(first_name) = names.first() {
-            HumanName {
-                use_type: first_name.use_.as_ref().and_then(|u| match u.as_str() {
-                    "usual" => Some(NameUse::Usual),
-                    "official" => Some(NameUse::Official),
-                    "temp" => Some(NameUse::Temp),
-                    "nickname" => Some(NameUse::Nickname),
-                    "anonymous" => Some(NameUse::Anonymous),
-                    "old" => Some(NameUse::Old),
-                    "maiden" => Some(NameUse::Maiden),
-                    _ => None,
-                }),
-                family: first_name.family.clone().unwrap_or_default(),
-                given: first_name.given.clone().unwrap_or_default(),
-                prefix: first_name.prefix.clone().unwrap_or_default(),
-                suffix: first_name.suffix.clone().unwrap_or_default(),
-            }
-        } else {
-            return Err(crate::Error::Validation(
-                "Worker must have at least one name".to_string(),
-            ));
-        }
-    } else {
+    let Some(first_name) = names.first() else {
         return Err(crate::Error::Validation(
             "Worker must have at least one name".to_string(),
         ));
     };
 
-    // Parse gender
-    let gender = if let Some(ref g) = fhir_worker.gender {
-        match g.as_str() {
-            "male" => Gender::Male,
-            "female" => Gender::Female,
-            "other" => Gender::Other,
-            "unknown" => Gender::Unknown,
-            _ => Gender::Unknown,
-        }
-    } else {
-        Gender::Unknown
-    };
+    Ok(HumanName {
+        use_type: first_name.use_.as_ref().and_then(|u| match u.as_str() {
+            "usual" => Some(NameUse::Usual),
+            "official" => Some(NameUse::Official),
+            "temp" => Some(NameUse::Temp),
+            "nickname" => Some(NameUse::Nickname),
+            "anonymous" => Some(NameUse::Anonymous),
+            "old" => Some(NameUse::Old),
+            "maiden" => Some(NameUse::Maiden),
+            _ => None,
+        }),
+        family: first_name.family.clone().unwrap_or_default(),
+        given: first_name.given.clone().unwrap_or_default(),
+        prefix: first_name.prefix.clone().unwrap_or_default(),
+        suffix: first_name.suffix.clone().unwrap_or_default(),
+    })
+}
 
-    // Parse birth date
-    let birth_date = fhir_worker
-        .birth_date
-        .as_ref()
-        .and_then(|d| d.parse::<chrono::NaiveDate>().ok());
+/// Decodes a FHIR gender code into a [`Gender`], defaulting to `Unknown`.
+fn parse_fhir_gender(code: Option<&str>) -> Gender {
+    match code {
+        Some("male") => Gender::Male,
+        Some("female") => Gender::Female,
+        Some("other") => Gender::Other,
+        _ => Gender::Unknown,
+    }
+}
 
-    // Parse deceased
-    let (deceased, deceased_datetime) = match &fhir_worker.deceased {
+/// Decodes the FHIR `deceased[x]` choice element into a `(deceased, datetime)`
+/// pair.
+fn parse_fhir_deceased(fhir_worker: &FhirWorker) -> (bool, Option<chrono::DateTime<chrono::Utc>>) {
+    use crate::api::fhir::resources::FhirDeceased;
+
+    match &fhir_worker.deceased {
         Some(FhirDeceased::Boolean(b)) => (*b, None),
         Some(FhirDeceased::DateTime(dt)) => {
             let parsed_dt = dt.parse::<chrono::DateTime<chrono::Utc>>().ok();
             (true, parsed_dt)
         }
         None => (false, None),
-    };
+    }
+}
 
-    // Parse identifiers
-    let identifiers = if let Some(ref ids) = fhir_worker.identifier {
-        ids.iter()
-            .filter_map(|fid| {
-                Some(Identifier::new(
-                    crate::models::IdentifierType::Other, // TODO: Parse from coding
-                    fid.system.clone()?,
-                    fid.value.clone()?,
-                ))
-            })
-            .collect()
-    } else {
-        vec![]
+/// Maps the FHIR identifier list onto internal [`Identifier`]s, skipping any
+/// entry missing a system or value.
+fn parse_fhir_identifiers(fhir_worker: &FhirWorker) -> Vec<Identifier> {
+    let Some(ids) = fhir_worker.identifier.as_ref() else {
+        return vec![];
     };
+    ids.iter()
+        .filter_map(|fid| {
+            Some(Identifier::new(
+                crate::models::IdentifierType::Other, // TODO: Parse from coding
+                fid.system.clone()?,
+                fid.value.clone()?,
+            ))
+        })
+        .collect()
+}
 
-    // Parse addresses
-    let addresses = if let Some(ref addrs) = fhir_worker.address {
-        addrs
-            .iter()
-            .map(|faddr| {
-                let lines = faddr.line.clone().unwrap_or_default();
-                Address {
-                    use_type: None,
-                    line1: lines.get(0).cloned(),
-                    line2: lines.get(1).cloned(),
-                    city: faddr.city.clone(),
-                    state: faddr.state.clone(),
-                    postal_code: faddr.postal_code.clone(),
-                    country: faddr.country.clone(),
-                }
-            })
-            .collect()
-    } else {
-        vec![]
+/// Maps the FHIR address list onto internal [`Address`]es.
+fn parse_fhir_addresses(fhir_worker: &FhirWorker) -> Vec<Address> {
+    let Some(addrs) = fhir_worker.address.as_ref() else {
+        return vec![];
     };
+    addrs
+        .iter()
+        .map(|faddr| {
+            let lines = faddr.line.clone().unwrap_or_default();
+            Address {
+                use_type: None,
+                line1: lines.first().cloned(),
+                line2: lines.get(1).cloned(),
+                city: faddr.city.clone(),
+                state: faddr.state.clone(),
+                postal_code: faddr.postal_code.clone(),
+                country: faddr.country.clone(),
+            }
+        })
+        .collect()
+}
 
-    // Parse telecom
-    let telecom = if let Some(ref tels) = fhir_worker.telecom {
-        tels.iter()
-            .filter_map(|ftel| {
-                let system = ftel.system.as_ref().and_then(|s| match s.as_str() {
-                    "phone" => Some(ContactPointSystem::Phone),
-                    "fax" => Some(ContactPointSystem::Fax),
-                    "email" => Some(ContactPointSystem::Email),
-                    "pager" => Some(ContactPointSystem::Pager),
-                    "url" => Some(ContactPointSystem::Url),
-                    "sms" => Some(ContactPointSystem::Sms),
-                    "other" => Some(ContactPointSystem::Other),
+/// Maps the FHIR telecom list onto internal [`ContactPoint`]s, skipping any
+/// entry with an unrecognized system or missing value.
+fn parse_fhir_telecom(fhir_worker: &FhirWorker) -> Vec<ContactPoint> {
+    use crate::models::{ContactPointSystem, ContactPointUse};
+
+    let Some(tels) = fhir_worker.telecom.as_ref() else {
+        return vec![];
+    };
+    tels.iter()
+        .filter_map(|ftel| {
+            let system = ftel.system.as_ref().and_then(|s| match s.as_str() {
+                "phone" => Some(ContactPointSystem::Phone),
+                "fax" => Some(ContactPointSystem::Fax),
+                "email" => Some(ContactPointSystem::Email),
+                "pager" => Some(ContactPointSystem::Pager),
+                "url" => Some(ContactPointSystem::Url),
+                "sms" => Some(ContactPointSystem::Sms),
+                "other" => Some(ContactPointSystem::Other),
+                _ => None,
+            })?;
+
+            let value = ftel.value.clone()?;
+
+            Some(ContactPoint {
+                system,
+                value,
+                use_type: ftel.use_.as_ref().and_then(|u| match u.as_str() {
+                    "home" => Some(ContactPointUse::Home),
+                    "work" => Some(ContactPointUse::Work),
+                    "temp" => Some(ContactPointUse::Temp),
+                    "old" => Some(ContactPointUse::Old),
+                    "mobile" => Some(ContactPointUse::Mobile),
                     _ => None,
-                })?;
-
-                let value = ftel.value.clone()?;
-
-                Some(ContactPoint {
-                    system,
-                    value,
-                    use_type: ftel.use_.as_ref().and_then(|u| match u.as_str() {
-                        "home" => Some(ContactPointUse::Home),
-                        "work" => Some(ContactPointUse::Work),
-                        "temp" => Some(ContactPointUse::Temp),
-                        "old" => Some(ContactPointUse::Old),
-                        "mobile" => Some(ContactPointUse::Mobile),
-                        _ => None,
-                    }),
-                })
+                }),
             })
-            .collect()
+        })
+        .collect()
+}
+
+/// Maps a FHIR [`FhirWorker`] back to an internal [`Worker`].
+///
+/// Parses the id (generating a fresh UUID when absent), takes the first name
+/// entry (erroring if there is none), and decodes gender / birth date /
+/// deceased / identifiers / addresses / telecom from their FHIR codes.
+/// Several fields are not yet round-tripped (see the `TODO` markers) and are
+/// left at their defaults.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] on an invalid UUID or a missing name.
+pub fn from_fhir_worker(fhir_worker: &FhirWorker) -> Result<Worker> {
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    // Parse ID
+    let id = if let Some(ref id_str) = fhir_worker.id {
+        Uuid::parse_str(id_str)
+            .map_err(|e| crate::Error::Validation(format!("Invalid UUID: {e}")))?
     } else {
-        vec![]
+        Uuid::new_v4()
     };
+
+    let name = parse_fhir_name(fhir_worker)?;
+    let gender = parse_fhir_gender(fhir_worker.gender.as_deref());
+    let birth_date = fhir_worker
+        .birth_date
+        .as_ref()
+        .and_then(|d| d.parse::<chrono::NaiveDate>().ok());
+    let (deceased, deceased_datetime) = parse_fhir_deceased(fhir_worker);
+    let identifiers = parse_fhir_identifiers(fhir_worker);
+    let addresses = parse_fhir_addresses(fhir_worker);
+    let telecom = parse_fhir_telecom(fhir_worker);
 
     Ok(Worker {
         id,

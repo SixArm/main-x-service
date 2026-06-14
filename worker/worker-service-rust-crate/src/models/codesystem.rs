@@ -13,9 +13,9 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// ODSOrganisationRole — reference data for Primary and Non-Primary Roles
+/// `ODSOrganisationRole` — reference data for Primary and Non-Primary Roles
 ///
-/// CodeSystem: <https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSOrganisationRole>
+/// `CodeSystem`: <https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSOrganisationRole>
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OdsRoleReference {
     /// Role ID (e.g. "RO197", "RO76")
@@ -26,9 +26,9 @@ pub struct OdsRoleReference {
     pub is_primary_role_type: bool,
 }
 
-/// ODSRelationship — reference data for relationship types
+/// `ODSRelationship` — reference data for relationship types
 ///
-/// CodeSystem: <https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSRelationship>
+/// `CodeSystem`: <https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSRelationship>
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OdsRelationshipReference {
     /// Relationship Type ID (e.g. "RE4", "RE6")
@@ -37,9 +37,9 @@ pub struct OdsRelationshipReference {
     pub relationship_name: String,
 }
 
-/// ODSRecordClass — reference data for record classes
+/// `ODSRecordClass` — reference data for record classes
 ///
-/// CodeSystem: <https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSRecordClass>
+/// `CodeSystem`: <https://digital.nhs.uk/services/organisation-data-service/CodeSystem/ODSRecordClass>
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OdsRecordClassReference {
     /// Record class code (e.g. "RC1", "RC2")
@@ -48,12 +48,12 @@ pub struct OdsRecordClassReference {
     pub name: String,
 }
 
-/// ODSRecordUseType — reference data for record use types
+/// `ODSRecordUseType` — reference data for record use types
 ///
-/// Full = current complete records, RefOnly = minimal records for referential integrity
+/// Full = current complete records, `RefOnly` = minimal records for referential integrity
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OdsRecordUseTypeReference {
-    /// Use type code (e.g. "Full", "RefOnly")
+    /// Use type code (e.g. "Full", "`RefOnly`")
     pub code: String,
     /// Use type name
     pub name: String,
@@ -75,7 +75,7 @@ pub struct PractitionerRoleReference {
 /// geography-name — reference data for ONS identifiers
 ///
 /// Names for ONS (Office for National Statistics) identifiers used within
-/// the postcode CodeSystem.
+/// the postcode `CodeSystem`.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct GeographyNameReference {
     /// ONS code (e.g. "E09000033")

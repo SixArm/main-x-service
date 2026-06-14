@@ -50,7 +50,7 @@ pub enum DocumentType {
     Other,
 }
 
-/// Renders the canonical SCREAMING_SNAKE_CASE code (e.g. `PASSPORT`).
+/// Renders the canonical `SCREAMING_SNAKE_CASE` code (e.g. `PASSPORT`).
 ///
 /// Kept in lock-step with the serde `rename` attributes so the textual
 /// form is stable across the wire, the database, and logs.
@@ -115,7 +115,7 @@ mod tests {
             DocumentType::Other,
         ];
         for dt in &types {
-            let display = format!("{}", dt);
+            let display = format!("{dt}");
             assert!(
                 !display.is_empty(),
                 "DocumentType Display should not be empty"

@@ -84,28 +84,29 @@ pub enum WorkerEvent {
 
 impl WorkerEvent {
     /// Returns the event's timestamp regardless of variant.
+    #[must_use]
     pub fn timestamp(&self) -> DateTime<Utc> {
         match self {
-            WorkerEvent::Created { timestamp, .. } => *timestamp,
-            WorkerEvent::Updated { timestamp, .. } => *timestamp,
-            WorkerEvent::Deleted { timestamp, .. } => *timestamp,
-            WorkerEvent::Merged { timestamp, .. } => *timestamp,
-            WorkerEvent::Linked { timestamp, .. } => *timestamp,
-            WorkerEvent::Unlinked { timestamp, .. } => *timestamp,
+            WorkerEvent::Created { timestamp, .. }
+            | WorkerEvent::Updated { timestamp, .. }
+            | WorkerEvent::Deleted { timestamp, .. }
+            | WorkerEvent::Merged { timestamp, .. }
+            | WorkerEvent::Linked { timestamp, .. }
+            | WorkerEvent::Unlinked { timestamp, .. } => *timestamp,
         }
     }
 
     /// Returns the primary worker ID involved in the event. For `Merged` this
     /// is the merge source; for `Linked`/`Unlinked` it is the originating
     /// worker.
+    #[must_use]
     pub fn worker_id(&self) -> Uuid {
         match self {
-            WorkerEvent::Created { worker, .. } => worker.id,
-            WorkerEvent::Updated { worker, .. } => worker.id,
-            WorkerEvent::Deleted { worker_id, .. } => *worker_id,
+            WorkerEvent::Created { worker, .. } | WorkerEvent::Updated { worker, .. } => worker.id,
+            WorkerEvent::Deleted { worker_id, .. }
+            | WorkerEvent::Linked { worker_id, .. }
+            | WorkerEvent::Unlinked { worker_id, .. } => *worker_id,
             WorkerEvent::Merged { source_id, .. } => *source_id,
-            WorkerEvent::Linked { worker_id, .. } => *worker_id,
-            WorkerEvent::Unlinked { worker_id, .. } => *worker_id,
         }
     }
 }

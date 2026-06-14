@@ -284,6 +284,7 @@ pub struct FhirOperationOutcomeIssue {
 impl FhirOperationOutcome {
     /// Builds an `error`-severity outcome with the given issue `code` and
     /// diagnostic message.
+    #[must_use]
     pub fn error(code: &str, diagnostics: &str) -> Self {
         Self {
             resource_type: "OperationOutcome".to_string(),
@@ -297,14 +298,16 @@ impl FhirOperationOutcome {
     }
 
     /// Builds a `not-found` outcome for the given resource type and id.
+    #[must_use]
     pub fn not_found(resource_type: &str, id: &str) -> Self {
         Self::error(
             "not-found",
-            &format!("{} with id '{}' not found", resource_type, id),
+            &format!("{resource_type} with id '{id}' not found"),
         )
     }
 
     /// Builds an `invalid` outcome carrying a validation message.
+    #[must_use]
     pub fn invalid(message: &str) -> Self {
         Self::error("invalid", message)
     }
@@ -313,6 +316,7 @@ impl FhirOperationOutcome {
 impl FhirWorker {
     /// Creates an empty `Worker` resource with every optional element unset
     /// (only `resourceType` is populated). Build it up field by field.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             // Wire discriminator: every emitted resource carries

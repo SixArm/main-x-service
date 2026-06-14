@@ -51,6 +51,7 @@ pub struct PersonIndexSchema {
 
 impl PersonIndexSchema {
     /// Build the schema and resolve every field handle.
+    #[must_use]
     pub fn new() -> Self {
         let mut schema_builder = Schema::builder();
 
@@ -115,16 +116,21 @@ pub struct PersonIndex {
 
 impl PersonIndex {
     /// Create a brand-new index in the (empty) directory `index_path`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if Tantivy cannot create the index
+    /// in `index_path` or cannot build the reader.
     pub fn create<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let schema_def = PersonIndexSchema::new();
         let index = Index::create_in_dir(index_path, schema_def.schema.clone())
-            .map_err(|e| crate::Error::Search(format!("Failed to create index: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to create index: {e}")))?;
 
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommitWithDelay)
             .try_into()
-            .map_err(|e| crate::Error::Search(format!("Failed to create reader: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to create reader: {e}")))?;
 
         Ok(Self {
             index,
@@ -134,16 +140,21 @@ impl PersonIndex {
     }
 
     /// Open an existing index already present at `index_path`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if Tantivy cannot open the index at
+    /// `index_path` or cannot build the reader.
     pub fn open<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let schema_def = PersonIndexSchema::new();
         let index = Index::open_in_dir(index_path)
-            .map_err(|e| crate::Error::Search(format!("Failed to open index: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to open index: {e}")))?;
 
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommitWithDelay)
             .try_into()
-            .map_err(|e| crate::Error::Search(format!("Failed to create reader: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to create reader: {e}")))?;
 
         Ok(Self {
             index,
@@ -153,6 +164,11 @@ impl PersonIndex {
     }
 
     /// Open the index if `meta.json` exists, otherwise create it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the underlying
+    /// [`open`](Self::open) or [`create`](Self::create) call fails.
     pub fn create_or_open<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let path = index_path.as_ref();
         let meta_path = path.join("meta.json");
@@ -165,38 +181,57 @@ impl PersonIndex {
     }
 
     /// Create an index writer with a `heap_size_mb` MiB write buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if Tantivy cannot allocate the
+    /// writer (e.g. the heap size is invalid).
     pub fn writer(&self, heap_size_mb: usize) -> Result<IndexWriter> {
         self.index
             .writer(heap_size_mb * 1_000_000)
-            .map_err(|e| crate::Error::Search(format!("Failed to create writer: {}", e)))
+            .map_err(|e| crate::Error::Search(format!("Failed to create writer: {e}")))
     }
 
     /// Borrow the underlying Tantivy [`Index`] (for query parsers).
+    #[must_use]
     pub fn index(&self) -> &Index {
         &self.index
     }
 
     /// Borrow the cached schema and field handles.
+    #[must_use]
     pub fn schema(&self) -> &PersonIndexSchema {
         &self.schema
     }
 
     /// Borrow the shared [`IndexReader`].
+    #[must_use]
     pub fn reader(&self) -> &IndexReader {
         &self.reader
     }
 
     /// Force the reader to observe the latest committed segments.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if Tantivy fails to reload the
+    /// reader.
     pub fn reload(&self) -> Result<()> {
         self.reader
             .reload()
-            .map_err(|e| crate::Error::Search(format!("Failed to reload reader: {}", e)))
+            .map_err(|e| crate::Error::Search(format!("Failed to reload reader: {e}")))
     }
 
     /// Return document/segment counts for the current reader view.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] only if the current implementation
+    /// is changed to surface a searcher error; the present body is
+    /// infallible.
     pub fn stats(&self) -> Result<IndexStats> {
         let searcher = self.reader.searcher();
-        let num_docs = searcher.num_docs() as usize;
+        let num_docs = usize::try_from(searcher.num_docs()).unwrap_or(usize::MAX);
         let num_segments = searcher.segment_readers().len();
 
         Ok(IndexStats {
@@ -211,11 +246,16 @@ impl PersonIndex {
     /// [`wait_merging_threads`](IndexWriter::wait_merging_threads), so on
     /// return segment merges are settled and the on-disk layout is
     /// compact. Useful after a large bulk index before serving queries.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the writer cannot be created or
+    /// if waiting on the merge threads fails.
     pub fn optimize(&self) -> Result<()> {
         let writer = self.writer(50)?;
         writer
             .wait_merging_threads()
-            .map_err(|e| crate::Error::Search(format!("Failed to optimize index: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to optimize index: {e}")))?;
         Ok(())
     }
 }
@@ -320,7 +360,7 @@ mod tests {
 
         let mut writer = person_index.writer(50).unwrap();
         let mut doc = tantivy::TantivyDocument::default();
-        doc.add_text(schema.id, &uuid::Uuid::new_v4().to_string());
+        doc.add_text(schema.id, uuid::Uuid::new_v4().to_string());
         doc.add_text(schema.family_name, "johnson");
         doc.add_text(schema.given_names, "robert");
         doc.add_text(schema.full_name, "robert johnson");
@@ -424,7 +464,7 @@ mod tests {
         // Add two persons: same name, different birth years
         for birth_date in &["1980-01-15", "1990-06-20"] {
             let mut doc = tantivy::TantivyDocument::default();
-            doc.add_text(schema.id, &uuid::Uuid::new_v4().to_string());
+            doc.add_text(schema.id, uuid::Uuid::new_v4().to_string());
             doc.add_text(schema.family_name, "smith");
             doc.add_text(schema.given_names, "john");
             doc.add_text(schema.full_name, "john smith");

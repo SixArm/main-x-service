@@ -106,7 +106,7 @@ pub struct Event {
     /// rescheduled (schema.org/previousStartDate).
     pub previous_start_date: Option<DateTime<Utc>>,
 
-    /// IANA time-zone name for display (e.g. "America/Los_Angeles").
+    /// IANA time-zone name for display (e.g. "`America/Los_Angeles`").
     /// Storage is always UTC.
     pub time_zone: Option<String>,
 
@@ -347,6 +347,7 @@ impl Event {
     /// assert_eq!(event.identifier_value(IdentifierType::TicketNumber), Some("T-42"));
     /// assert_eq!(event.identifier_value(IdentifierType::BookingNumber), None);
     /// ```
+    #[must_use]
     pub fn identifier_value(&self, kind: super::IdentifierType) -> Option<&str> {
         self.identifiers
             .iter()

@@ -13,10 +13,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// The crate-wide error type. Every variant carries a human-readable message
 /// (via `thiserror`'s `Display`), and [`Database`](Error::Database) also wraps
-/// the underlying SeaORM error for source-chain inspection.
+/// the underlying `SeaORM` error for source-chain inspection.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// A database operation failed; wraps the SeaORM error verbatim. The
+    /// A database operation failed; wraps the `SeaORM` error verbatim. The
     /// REST layer maps this to HTTP `500 Internal Server Error`.
     #[error("Database error: {0}")]
     Database(#[from] sea_orm::DbErr),
@@ -74,7 +74,7 @@ pub enum Error {
 
 impl Error {
     /// Builds a [`Database`](Error::Database) error from a custom message,
-    /// wrapping it in a `DbErr::Custom` so callers need not import SeaORM.
+    /// wrapping it in a `DbErr::Custom` so callers need not import `SeaORM`.
     pub fn database(msg: impl Into<String>) -> Self {
         Error::Database(sea_orm::DbErr::Custom(msg.into()))
     }

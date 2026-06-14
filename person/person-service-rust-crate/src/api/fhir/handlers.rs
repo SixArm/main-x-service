@@ -61,8 +61,13 @@ pub struct FhirSearchParams {
 /// `GET /fhir/Person/{id}` — fetch a person and render it as FHIR.
 ///
 /// Returns `200` with the FHIR Person JSON on success, `404` with a
-/// `not-found` OperationOutcome if no such person exists, or `500` with
-/// a `database-error` OperationOutcome on a repository failure.
+/// `not-found` `OperationOutcome` if no such person exists, or `500` with
+/// a `database-error` `OperationOutcome` on a repository failure.
+///
+/// # Panics
+///
+/// Panics only if serializing the FHIR response body to JSON fails,
+/// which cannot happen for these statically-typed payloads.
 pub async fn get_fhir_person(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -99,6 +104,11 @@ pub async fn get_fhir_person(
 /// (a search-index failure is logged but does not fail the request).
 /// Returns `201` with the created FHIR Person, `400` for an invalid
 /// payload, or `500` on a database error.
+///
+/// # Panics
+///
+/// Panics only if serializing the FHIR response body to JSON fails,
+/// which cannot happen for these statically-typed payloads.
 pub async fn create_fhir_person(
     State(state): State<AppState>,
     Json(fhir_person): Json<FhirPerson>,
@@ -150,6 +160,11 @@ pub async fn create_fhir_person(
 /// Updates the database record and refreshes the search index (index
 /// failures are logged, not fatal). Returns `200` with the updated FHIR
 /// Person, `400` for an invalid payload, or `500` on a database error.
+///
+/// # Panics
+///
+/// Panics only if serializing the FHIR response body to JSON fails,
+/// which cannot happen for these statically-typed payloads.
 pub async fn update_fhir_person(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -198,7 +213,12 @@ pub async fn update_fhir_person(
 ///
 /// Delegates to the repository's soft delete (the record is retained for
 /// audit). Returns `204 No Content` on success or `500` with a
-/// `database-error` OperationOutcome on failure.
+/// `database-error` `OperationOutcome` on failure.
+///
+/// # Panics
+///
+/// Panics only if serializing the FHIR response body to JSON fails,
+/// which cannot happen for these statically-typed payloads.
 pub async fn delete_fhir_person(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -223,6 +243,11 @@ pub async fn delete_fhir_person(
 /// wraps the results in a `searchset` Bundle. Index entries missing
 /// from the database are skipped with a warning. Returns `400` if no
 /// search parameter is supplied, or `500` on a search-engine error.
+///
+/// # Panics
+///
+/// Panics only if serializing the FHIR response body to JSON fails,
+/// which cannot happen for these statically-typed payloads.
 pub async fn search_fhir_persons(
     State(state): State<AppState>,
     Query(params): Query<FhirSearchParams>,

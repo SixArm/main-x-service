@@ -116,6 +116,7 @@ impl Identifier {
     /// );
     /// assert_eq!(id.value, "1234567890");
     /// ```
+    #[must_use]
     pub fn new(identifier_type: IdentifierType, system: String, value: String) -> Self {
         Self {
             use_type: None,
@@ -130,16 +131,18 @@ impl Identifier {
     ///
     /// The `system` URI is derived from the facility name so MRNs from
     /// different facilities don't collide.
-    pub fn mrn(facility: String, value: String) -> Self {
+    #[must_use]
+    pub fn mrn(facility: &str, value: String) -> Self {
         Self::new(
             IdentifierType::MRN,
-            format!("urn:oid:facility:{}", facility),
+            format!("urn:oid:facility:{facility}"),
             value,
         )
     }
 
     /// Create a US Social Security Number identifier with the standard
     /// HL7 SSN system URI.
+    #[must_use]
     pub fn ssn(value: String) -> Self {
         Self::new(
             IdentifierType::SSN,

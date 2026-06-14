@@ -20,7 +20,6 @@
 //! never physically deleted by the repository; a non-null `deleted_at` marks
 //! the row as logically removed and queries filter it out.
 
-use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 // `DeriveEntityModel` expands each `Model` into the full SeaORM entity set
@@ -37,7 +36,8 @@ use serde::{Deserialize, Serialize};
 /// Core `workers` table: one row per worker identity record (demographics,
 /// status flags, soft-delete and audit columns).
 pub mod workers {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `workers` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -157,7 +157,8 @@ pub mod workers {
 /// `worker_names` table: a worker's primary and additional names (one row per
 /// name, with `is_primary` flagging the canonical one).
 pub mod worker_names {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `worker_names` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -214,7 +215,8 @@ pub mod worker_names {
 /// `worker_identifiers` table: external identifiers for a worker (type +
 /// system + value), e.g. MRN, SSN, national IDs.
 pub mod worker_identifiers {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `worker_identifiers` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -268,7 +270,8 @@ pub mod worker_identifiers {
 
 /// `worker_addresses` table: a worker's physical addresses (one row each).
 pub mod worker_addresses {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `worker_addresses` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -328,7 +331,8 @@ pub mod worker_addresses {
 
 /// `worker_contacts` table: a worker's contact points (phone, email, fax).
 pub mod worker_contacts {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `worker_contacts` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -381,7 +385,8 @@ pub mod worker_contacts {
 /// `worker_links` table: directed links between workers (e.g. `Replaces`,
 /// `ReplacedBy`) used by merge and aliasing.
 pub mod worker_links {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `worker_links` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -394,7 +399,7 @@ pub mod worker_links {
         pub worker_id: Uuid,
         /// Target worker foreign key.
         pub other_worker_id: Uuid,
-        /// Link type code (Replaces, ReplacedBy, …).
+        /// Link type code (Replaces, `ReplacedBy`, …).
         pub link_type: String,
         /// Creation timestamp.
         pub created_at: TimeDateTimeWithTimeZone,
@@ -430,7 +435,8 @@ pub mod worker_links {
 /// `organizations` table: managing organizations (with NHS ODS fields), one
 /// row per organization.
 pub mod organizations {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `organizations` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -546,7 +552,8 @@ pub mod organizations {
 
 /// `organization_addresses` table: an organization's physical addresses.
 pub mod organization_addresses {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `organization_addresses` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -606,7 +613,8 @@ pub mod organization_addresses {
 
 /// `organization_contacts` table: an organization's contact points.
 pub mod organization_contacts {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `organization_contacts` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -658,7 +666,8 @@ pub mod organization_contacts {
 
 /// `organization_identifiers` table: external identifiers for an organization.
 pub mod organization_identifiers {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `organization_identifiers` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -713,7 +722,8 @@ pub mod organization_identifiers {
 /// `worker_match_scores` table: persisted match-score history between a worker
 /// and a candidate, with per-component sub-scores as decimals.
 pub mod worker_match_scores {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `worker_match_scores` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -778,7 +788,8 @@ pub mod worker_match_scores {
 /// `audit_log` table: HIPAA-style change trail (action, entity, old/new JSON,
 /// actor metadata). Written via [`crate::db::audit::AuditLogRepository`].
 pub mod audit_log {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `audit_log` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -824,7 +835,8 @@ pub mod audit_log {
 /// `organization_roles` table (NHS ODS): roles an organization holds, each
 /// with status and an optional set of validity periods.
 pub mod organization_roles {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `organization_roles` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -887,7 +899,8 @@ pub mod organization_roles {
 /// `organization_role_periods` table (NHS ODS): validity periods for an
 /// organization role.
 pub mod organization_role_periods {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `organization_role_periods` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -934,7 +947,8 @@ pub mod organization_role_periods {
 /// `organization_relationships` table (NHS ODS): typed relationships between
 /// organizations (e.g. "is commissioned by"), each with validity periods.
 pub mod organization_relationships {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `organization_relationships` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -999,7 +1013,8 @@ pub mod organization_relationships {
 /// `organization_relationship_periods` table (NHS ODS): validity periods for
 /// an organization relationship.
 pub mod organization_relationship_periods {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `organization_relationship_periods` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1046,7 +1061,8 @@ pub mod organization_relationship_periods {
 /// `organization_successions` table (NHS ODS): predecessor/successor links
 /// recording organizational mergers and splits over time.
 pub mod organization_successions {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `organization_successions` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1101,7 +1117,8 @@ pub mod organization_successions {
 /// `organization_periods` table (NHS ODS): operational/legal validity periods
 /// for an organization as a whole.
 pub mod organization_periods {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `organization_periods` table.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1148,7 +1165,8 @@ pub mod organization_periods {
 /// `postcode_geography` table: reference data mapping UK postcodes to NHS and
 /// administrative geographies (LSOA, local authority, ICB, region, etc.).
 pub mod postcode_geography {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `postcode_geography` table, keyed by postcode.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1194,10 +1212,11 @@ pub mod postcode_geography {
 // ODS CodeSystem Reference Tables
 // ============================================================================
 
-/// `ods_role_references` table: ODS CodeSystem lookup mapping role IDs to
+/// `ods_role_references` table: ODS `CodeSystem` lookup mapping role IDs to
 /// human-readable role names.
 pub mod ods_role_references {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `ods_role_references` table, keyed by role ID.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1221,10 +1240,11 @@ pub mod ods_role_references {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// `ods_relationship_references` table: ODS CodeSystem lookup mapping
+/// `ods_relationship_references` table: ODS `CodeSystem` lookup mapping
 /// relationship IDs to human-readable names.
 pub mod ods_relationship_references {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `ods_relationship_references` table, keyed by relationship ID.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1246,10 +1266,11 @@ pub mod ods_relationship_references {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// `ods_record_class_references` table: ODS CodeSystem lookup mapping
+/// `ods_record_class_references` table: ODS `CodeSystem` lookup mapping
 /// record-class codes to names.
 pub mod ods_record_class_references {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `ods_record_class_references` table, keyed by code.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1271,10 +1292,11 @@ pub mod ods_record_class_references {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// `ods_record_use_type_references` table: ODS CodeSystem lookup mapping
+/// `ods_record_use_type_references` table: ODS `CodeSystem` lookup mapping
 /// record-use-type codes to names.
 pub mod ods_record_use_type_references {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `ods_record_use_type_references` table, keyed by code.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1299,7 +1321,8 @@ pub mod ods_record_use_type_references {
 /// `practitioner_role_references` table: lookup mapping practitioner-role
 /// codes to names and optional categories.
 pub mod practitioner_role_references {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `practitioner_role_references` table, keyed by role code.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1326,7 +1349,8 @@ pub mod practitioner_role_references {
 /// `geography_name_references` table: lookup mapping ONS geography codes to
 /// names and geography types.
 pub mod geography_name_references {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in the `geography_name_references` table, keyed by ONS code.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1356,7 +1380,8 @@ pub mod geography_name_references {
 
 /// The `worker_documents` table: identity documents per worker.
 pub mod worker_documents {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// An identity-document row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1411,7 +1436,8 @@ pub mod worker_documents {
 /// The `worker_emergency_contacts` table (address flattened; telecom in
 /// `worker_emergency_contact_telecom`).
 pub mod worker_emergency_contacts {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// An emergency-contact row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1467,7 +1493,8 @@ pub mod worker_emergency_contacts {
 
 /// The `worker_emergency_contact_telecom` table.
 pub mod worker_emergency_contact_telecom {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A telecom row for one emergency contact.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -1513,7 +1540,8 @@ pub mod worker_emergency_contact_telecom {
 
 /// The `worker_photos` table: photo references per worker.
 pub mod worker_photos {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A photo-reference row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]

@@ -29,7 +29,7 @@ use utoipa::ToSchema;
 
 /// The kind of an [`IdentityDocument`].
 ///
-/// Each variant serializes to a fixed SCREAMING_SNAKE_CASE token (e.g.
+/// Each variant serializes to a fixed `SCREAMING_SNAKE_CASE` token (e.g.
 /// `"PASSPORT"`, `"DRIVERS_LICENSE"`); unrecognized wire values deserialize to
 /// [`Other`](Self::Other) via `#[serde(other)]`.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
@@ -63,7 +63,7 @@ pub enum DocumentType {
     Other,
 }
 
-/// Renders the SCREAMING_SNAKE_CASE wire token for each variant (e.g.
+/// Renders the `SCREAMING_SNAKE_CASE` wire token for each variant (e.g.
 /// `DocumentType::DriversLicense` → `"DRIVERS_LICENSE"`), matching its serde form.
 impl std::fmt::Display for DocumentType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -129,7 +129,7 @@ mod tests {
             DocumentType::Other,
         ];
         for dt in &types {
-            let display = format!("{}", dt);
+            let display = format!("{dt}");
             assert!(
                 !display.is_empty(),
                 "DocumentType Display should not be empty"

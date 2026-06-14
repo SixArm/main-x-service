@@ -19,6 +19,7 @@ use time::{Date as TimeDate, Month, OffsetDateTime};
 /// Panics if the `chrono` instant falls outside `time::OffsetDateTime`'s
 /// representable range. In practice both ranges cover real-world event
 /// timestamps, so this cannot fire for stored event data.
+#[must_use]
 pub fn ts_to_offset(ts: DateTime<Utc>) -> OffsetDateTime {
     let nanos =
         i128::from(ts.timestamp()) * 1_000_000_000 + i128::from(ts.timestamp_subsec_nanos());
@@ -35,6 +36,7 @@ pub fn ts_to_offset(ts: DateTime<Utc>) -> OffsetDateTime {
 /// Panics if the `time` instant falls outside `chrono::DateTime`'s
 /// representable range (see [`ts_to_offset`]); unreachable for stored
 /// event data.
+#[must_use]
 pub fn offset_to_ts(odt: OffsetDateTime) -> DateTime<Utc> {
     DateTime::from_timestamp(odt.unix_timestamp(), odt.nanosecond())
         .expect("time::OffsetDateTime within chrono DateTime range")
@@ -51,9 +53,12 @@ pub fn offset_to_ts(odt: OffsetDateTime) -> DateTime<Utc> {
 /// Panics if the month is not `1..=12` or the year/day combination is
 /// not a real calendar date. A `chrono::NaiveDate` is always valid, so
 /// neither `expect` can fire for inputs produced by `chrono`.
+#[must_use]
 pub fn date_to_time(d: NaiveDate) -> TimeDate {
-    let month = Month::try_from(d.month() as u8).expect("valid month");
-    TimeDate::from_calendar_date(d.year(), month, d.day() as u8).expect("valid date")
+    let month_num = u8::try_from(d.month()).expect("chrono month in 1..=12");
+    let day_num = u8::try_from(d.day()).expect("chrono day in 1..=31");
+    let month = Month::try_from(month_num).expect("valid month");
+    TimeDate::from_calendar_date(d.year(), month, day_num).expect("valid date")
 }
 
 /// `time::Date` → `chrono::NaiveDate`.
@@ -65,6 +70,7 @@ pub fn date_to_time(d: NaiveDate) -> TimeDate {
 ///
 /// Panics if the components do not form a valid `chrono` date;
 /// unreachable for a value produced by `time::Date`.
+#[must_use]
 pub fn time_to_date(d: TimeDate) -> NaiveDate {
     NaiveDate::from_ymd_opt(d.year(), u32::from(u8::from(d.month())), u32::from(d.day()))
         .expect("valid date")

@@ -6,21 +6,38 @@
 //! private `log_action`, and the `get_*` queries back the audit REST
 //! endpoints.
 
-use sea_orm::*;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set,
+};
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
 
 use super::models::audit_log;
 use crate::Result;
 
+/// Actor metadata recorded alongside an audit entry, borrowed for the duration
+/// of the write. Groups the user/IP/user-agent triple so the `log_*` helpers
+/// take a single argument rather than three.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AuditActor<'a> {
+    /// Acting user's identifier.
+    pub user_id: Option<&'a str>,
+    /// Originating client IP address.
+    pub ip_address: Option<&'a str>,
+    /// Originating client user-agent string.
+    pub user_agent: Option<&'a str>,
+}
+
 /// Repository that writes and queries entries in the `audit_log` table.
 pub struct AuditLogRepository {
-    /// SeaORM connection used for all audit reads and writes.
+    /// `SeaORM` connection used for all audit reads and writes.
     db: DatabaseConnection,
 }
 
 impl AuditLogRepository {
     /// Wraps an existing database connection in an audit repository.
+    #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
@@ -39,9 +56,7 @@ impl AuditLogRepository {
         entity_type: &str,
         entity_id: Uuid,
         new_values: JsonValue,
-        user_id: Option<String>,
-        ip_address: Option<String>,
-        user_agent: Option<String>,
+        actor: &AuditActor<'_>,
     ) -> Result<()> {
         self.log_action(
             "CREATE",
@@ -49,9 +64,7 @@ impl AuditLogRepository {
             entity_id,
             None,
             Some(new_values),
-            user_id,
-            ip_address,
-            user_agent,
+            actor,
         )
         .await
     }
@@ -68,9 +81,7 @@ impl AuditLogRepository {
         entity_id: Uuid,
         old_values: JsonValue,
         new_values: JsonValue,
-        user_id: Option<String>,
-        ip_address: Option<String>,
-        user_agent: Option<String>,
+        actor: &AuditActor<'_>,
     ) -> Result<()> {
         self.log_action(
             "UPDATE",
@@ -78,9 +89,7 @@ impl AuditLogRepository {
             entity_id,
             Some(old_values),
             Some(new_values),
-            user_id,
-            ip_address,
-            user_agent,
+            actor,
         )
         .await
     }
@@ -99,9 +108,7 @@ impl AuditLogRepository {
         entity_type: &str,
         entity_id: Uuid,
         old_values: JsonValue,
-        user_id: Option<String>,
-        ip_address: Option<String>,
-        user_agent: Option<String>,
+        actor: &AuditActor<'_>,
     ) -> Result<()> {
         self.log_action(
             "DELETE",
@@ -109,9 +116,7 @@ impl AuditLogRepository {
             entity_id,
             Some(old_values),
             None,
-            user_id,
-            ip_address,
-            user_agent,
+            actor,
         )
         .await
     }
@@ -130,23 +135,21 @@ impl AuditLogRepository {
         entity_id: Uuid,
         old_values: Option<JsonValue>,
         new_values: Option<JsonValue>,
-        user_id: Option<String>,
-        ip_address: Option<String>,
-        user_agent: Option<String>,
+        actor: &AuditActor<'_>,
     ) -> Result<()> {
         // Build the row: server-assigned UUID + server clock; the JSON
         // snapshots and actor metadata pass through verbatim.
         let new_audit = audit_log::ActiveModel {
             id: Set(Uuid::new_v4()),
             timestamp: Set(time::OffsetDateTime::now_utc()),
-            user_id: Set(user_id),
+            user_id: Set(actor.user_id.map(String::from)),
             action: Set(action.to_string()),
             entity_type: Set(entity_type.to_string()),
             entity_id: Set(entity_id),
             old_values: Set(old_values),
             new_values: Set(new_values),
-            ip_address: Set(ip_address),
-            user_agent: Set(user_agent),
+            ip_address: Set(actor.ip_address.map(String::from)),
+            user_agent: Set(actor.user_agent.map(String::from)),
         };
 
         new_audit.insert(&self.db).await?;

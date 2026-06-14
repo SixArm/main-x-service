@@ -23,7 +23,7 @@ pub mod state;
 
 pub use state::AppState;
 
-/// utoipa OpenAPI document: aggregates every handler path and schema into the
+/// utoipa `OpenAPI` document: aggregates every handler path and schema into the
 /// spec served at `/api-docs/openapi.json` and rendered by the Swagger UI.
 #[derive(OpenApi)]
 #[openapi(

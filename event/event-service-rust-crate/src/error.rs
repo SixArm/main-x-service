@@ -23,7 +23,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// source error, for [`Error::Database`]).
 #[derive(Error, Debug)]
 pub enum Error {
-    /// A SeaORM database operation failed (wraps the source error).
+    /// A `SeaORM` database operation failed (wraps the source error).
     #[error("Database error: {0}")]
     Database(#[from] sea_orm::DbErr),
 

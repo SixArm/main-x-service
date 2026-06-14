@@ -6,12 +6,37 @@
 //! JSON snapshots. Read-side queries fetch the trail per entity, per
 //! user, or system-wide, always newest-first.
 
-use sea_orm::*;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set,
+};
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
 
 use super::models::audit_log;
 use crate::Result;
+
+/// Who/where/what context attached to each audited write.
+#[derive(Debug, Clone)]
+pub struct AuditContext {
+    /// Acting user id (defaults to `"system"`).
+    pub user_id: Option<String>,
+    /// Originating IP address.
+    pub ip_address: Option<String>,
+    /// Originating user-agent string.
+    pub user_agent: Option<String>,
+}
+
+impl Default for AuditContext {
+    /// A `system`-attributed context with no IP / user-agent.
+    fn default() -> Self {
+        Self {
+            user_id: Some("system".into()),
+            ip_address: None,
+            user_agent: None,
+        }
+    }
+}
 
 /// Audit log repository for recording changes
 pub struct AuditLogRepository {
@@ -22,6 +47,7 @@ pub struct AuditLogRepository {
 impl AuditLogRepository {
     /// Create a new audit log repository wrapping the given pooled
     /// `SeaORM` [`DatabaseConnection`].
+    #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
@@ -40,9 +66,7 @@ impl AuditLogRepository {
         entity_type: &str,
         entity_id: Uuid,
         new_values: JsonValue,
-        user_id: Option<String>,
-        ip_address: Option<String>,
-        user_agent: Option<String>,
+        context: &AuditContext,
     ) -> Result<()> {
         self.log_action(
             "CREATE",
@@ -50,9 +74,7 @@ impl AuditLogRepository {
             entity_id,
             None,
             Some(new_values),
-            user_id,
-            ip_address,
-            user_agent,
+            context,
         )
         .await
     }
@@ -72,9 +94,7 @@ impl AuditLogRepository {
         entity_id: Uuid,
         old_values: JsonValue,
         new_values: JsonValue,
-        user_id: Option<String>,
-        ip_address: Option<String>,
-        user_agent: Option<String>,
+        context: &AuditContext,
     ) -> Result<()> {
         self.log_action(
             "UPDATE",
@@ -82,9 +102,7 @@ impl AuditLogRepository {
             entity_id,
             Some(old_values),
             Some(new_values),
-            user_id,
-            ip_address,
-            user_agent,
+            context,
         )
         .await
     }
@@ -104,9 +122,7 @@ impl AuditLogRepository {
         entity_type: &str,
         entity_id: Uuid,
         old_values: JsonValue,
-        user_id: Option<String>,
-        ip_address: Option<String>,
-        user_agent: Option<String>,
+        context: &AuditContext,
     ) -> Result<()> {
         self.log_action(
             "DELETE",
@@ -114,9 +130,7 @@ impl AuditLogRepository {
             entity_id,
             Some(old_values),
             None,
-            user_id,
-            ip_address,
-            user_agent,
+            context,
         )
         .await
     }
@@ -140,9 +154,7 @@ impl AuditLogRepository {
         entity_id: Uuid,
         old_values: Option<JsonValue>,
         new_values: Option<JsonValue>,
-        user_id: Option<String>,
-        ip_address: Option<String>,
-        user_agent: Option<String>,
+        context: &AuditContext,
     ) -> Result<()> {
         // Build the immutable audit row: a fresh UUID and a server-side
         // UTC timestamp from the `time` crate (the column type is
@@ -151,14 +163,14 @@ impl AuditLogRepository {
         let new_audit = audit_log::ActiveModel {
             id: Set(Uuid::new_v4()),
             timestamp: Set(time::OffsetDateTime::now_utc()),
-            user_id: Set(user_id),
+            user_id: Set(context.user_id.clone()),
             action: Set(action.to_string()),
             entity_type: Set(entity_type.to_string()),
             entity_id: Set(entity_id),
             old_values: Set(old_values),
             new_values: Set(new_values),
-            ip_address: Set(ip_address),
-            user_agent: Set(user_agent),
+            ip_address: Set(context.ip_address.clone()),
+            user_agent: Set(context.user_agent.clone()),
         };
 
         new_audit.insert(&self.db).await?;

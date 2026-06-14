@@ -177,7 +177,7 @@ pub async fn create_worker(
             // Any repository failure surfaces as 500 with a `DATABASE_ERROR` code.
             let error = ApiResponse::<Worker>::error(
                 "DATABASE_ERROR",
-                format!("Failed to create worker: {}", e),
+                format!("Failed to create worker: {e}"),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -205,14 +205,14 @@ pub async fn get_worker(State(state): State<AppState>, Path(id): Path<Uuid>) -> 
         Ok(None) => {
             let error = ApiResponse::<Worker>::error(
                 "NOT_FOUND",
-                format!("Worker with id '{}' not found", id),
+                format!("Worker with id '{id}' not found"),
             );
             (StatusCode::NOT_FOUND, Json(error))
         }
         Err(e) => {
             let error = ApiResponse::<Worker>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve worker: {}", e),
+                format!("Failed to retrieve worker: {e}"),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -275,7 +275,7 @@ pub async fn update_worker(
         Err(e) => {
             let error = ApiResponse::<Worker>::error(
                 "DATABASE_ERROR",
-                format!("Failed to update worker: {}", e),
+                format!("Failed to update worker: {e}"),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -314,10 +314,8 @@ pub async fn delete_worker(
             (StatusCode::NO_CONTENT, Json(ApiResponse::<()>::success(())))
         }
         Err(e) => {
-            let error = ApiResponse::<()>::error(
-                "DATABASE_ERROR",
-                format!("Failed to delete worker: {}", e),
-            );
+            let error =
+                ApiResponse::<()>::error("DATABASE_ERROR", format!("Failed to delete worker: {e}"));
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
     }
@@ -451,10 +449,8 @@ pub async fn search_workers(
             (StatusCode::OK, Json(ApiResponse::success(response)))
         }
         Err(e) => {
-            let error = ApiResponse::<SearchResponse>::error(
-                "SEARCH_ERROR",
-                format!("Search failed: {}", e),
-            );
+            let error =
+                ApiResponse::<SearchResponse>::error("SEARCH_ERROR", format!("Search failed: {e}"));
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
     }
@@ -569,7 +565,7 @@ pub async fn match_worker(
                 Err(e) => {
                     let error = ApiResponse::<MatchResultsResponse>::error(
                         "MATCH_ERROR",
-                        format!("Matching failed: {}", e),
+                        format!("Matching failed: {e}"),
                     );
                     return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
                 }
@@ -614,7 +610,7 @@ pub async fn match_worker(
         Err(e) => {
             let error = ApiResponse::<MatchResultsResponse>::error(
                 "MATCH_ERROR",
-                format!("Matching failed: {}", e),
+                format!("Matching failed: {e}"),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -642,14 +638,13 @@ async fn check_duplicates_internal(state: &AppState, worker: &Worker) -> Vec<Mat
     let family_name = &worker.name.family;
     let birth_year = worker.birth_date.map(|d| d.year());
 
-    let candidate_ids =
-        match state
+    let Ok(candidate_ids) =
+        state
             .search_engine
             .search_by_name_and_year(family_name, birth_year, 50)
-        {
-            Ok(ids) => ids,
-            Err(_) => return Vec::new(),
-        };
+    else {
+        return Vec::new();
+    };
 
     let mut candidates = Vec::new();
     for id_str in candidate_ids {
@@ -665,9 +660,8 @@ async fn check_duplicates_internal(state: &AppState, worker: &Worker) -> Vec<Mat
 
     // On a matcher error, return no duplicates rather than failing the caller:
     // a detection failure must never block a create.
-    let match_results = match state.matcher.find_matches(worker, &candidates) {
-        Ok(r) => r,
-        Err(_) => return Vec::new(),
+    let Ok(match_results) = state.matcher.find_matches(worker, &candidates) else {
+        return Vec::new();
     };
 
     // Surface only candidates at/above the 0.7 review threshold, best-first,
@@ -722,81 +716,15 @@ pub async fn check_duplicates(
 
 // ─── Record Merging ─────────────────────────────────────────────────────────
 
-/// Merges a duplicate worker into a surviving main worker.
+/// Copies the duplicate's data into a clone of `main`, de-duping where it can,
+/// and returns the merged worker plus a JSON snapshot of what was transferred.
 ///
-/// Fetches both (`404` if either is missing), copies the duplicate's
-/// identifiers, names (its primary name becomes an `Old` alias), addresses,
-/// contacts, documents, emergency contacts, and tax id into main (de-duping
-/// where it can), adds a `Replaces` link, persists main, soft-deletes the
-/// duplicate, updates the search index, publishes a `Merged` event, and
-/// returns a [`crate::models::MergeRecord`] with a snapshot of transferred
-/// data.
-#[utoipa::path(
-    post,
-    path = "/api/v1/workers/merge",
-    tag = "deduplication",
-    request_body = crate::models::MergeRequest,
-    responses(
-        (status = 200, description = "Merge completed", body = crate::models::MergeResponse),
-        (status = 404, description = "Worker not found"),
-        (status = 500, description = "Merge error")
-    )
-)]
-pub async fn merge_workers(
-    State(state): State<AppState>,
-    Json(req): Json<crate::models::MergeRequest>,
-) -> impl IntoResponse {
-    // Fetch both workers up front; a missing main or duplicate is a 404 (the
-    // merge cannot proceed without both records).
-    let main = match state.worker_repository.get_by_id(&req.main_worker_id).await {
-        Ok(Some(p)) => p,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "NOT_FOUND",
-                    format!("Main worker {} not found", req.main_worker_id),
-                )),
-            );
-        }
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to fetch main worker: {}", e),
-                )),
-            );
-        }
-    };
-
-    let duplicate = match state
-        .worker_repository
-        .get_by_id(&req.duplicate_worker_id)
-        .await
-    {
-        Ok(Some(p)) => p,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "NOT_FOUND",
-                    format!("Duplicate worker {} not found", req.duplicate_worker_id),
-                )),
-            );
-        }
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to fetch duplicate worker: {}", e),
-                )),
-            );
-        }
-    };
-
-    // Merge data from duplicate into main
+/// The duplicate's primary name becomes an `Old` alias, and a `Replaces` link
+/// to the duplicate is added.
+fn transfer_worker_data(
+    main: &Worker,
+    duplicate: &Worker,
+) -> (Worker, serde_json::Map<String, serde_json::Value>) {
     let mut merged = main.clone();
     let mut transferred = serde_json::Map::new();
 
@@ -806,12 +734,12 @@ pub async fn merge_workers(
             existing.value == id.value && existing.identifier_type == id.identifier_type
         }) {
             merged.identifiers.push(id.clone());
-            transferred
+            let entry = transferred
                 .entry("identifiers".to_string())
-                .or_insert_with(|| serde_json::Value::Array(vec![]))
-                .as_array_mut()
-                .unwrap()
-                .push(serde_json::to_value(id).unwrap_or_default());
+                .or_insert_with(|| serde_json::Value::Array(vec![]));
+            if let Some(arr) = entry.as_array_mut() {
+                arr.push(serde_json::to_value(id).unwrap_or_default());
+            }
         }
     }
 
@@ -862,7 +790,7 @@ pub async fn merge_workers(
 
     // Transfer tax_id if main doesn't have one
     if merged.tax_id.is_none() && duplicate.tax_id.is_some() {
-        merged.tax_id = duplicate.tax_id.clone();
+        merged.tax_id.clone_from(&duplicate.tax_id);
         transferred.insert(
             "tax_id".into(),
             serde_json::to_value(&duplicate.tax_id).unwrap_or_default(),
@@ -875,13 +803,93 @@ pub async fn merge_workers(
         link_type: crate::models::LinkType::Replaces,
     });
 
+    (merged, transferred)
+}
+
+/// Merges a duplicate worker into a surviving main worker.
+///
+/// Fetches both (`404` if either is missing), copies the duplicate's
+/// identifiers, names (its primary name becomes an `Old` alias), addresses,
+/// contacts, documents, emergency contacts, and tax id into main (de-duping
+/// where it can), adds a `Replaces` link, persists main, soft-deletes the
+/// duplicate, updates the search index, publishes a `Merged` event, and
+/// returns a [`crate::models::MergeRecord`] with a snapshot of transferred
+/// data.
+#[utoipa::path(
+    post,
+    path = "/api/v1/workers/merge",
+    tag = "deduplication",
+    request_body = crate::models::MergeRequest,
+    responses(
+        (status = 200, description = "Merge completed", body = crate::models::MergeResponse),
+        (status = 404, description = "Worker not found"),
+        (status = 500, description = "Merge error")
+    )
+)]
+pub async fn merge_workers(
+    State(state): State<AppState>,
+    Json(req): Json<crate::models::MergeRequest>,
+) -> impl IntoResponse {
+    // Fetch both workers up front; a missing main or duplicate is a 404 (the
+    // merge cannot proceed without both records).
+    let main = match state.worker_repository.get_by_id(&req.main_worker_id).await {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::<crate::models::MergeResponse>::error(
+                    "NOT_FOUND",
+                    format!("Main worker {} not found", req.main_worker_id),
+                )),
+            );
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<crate::models::MergeResponse>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to fetch main worker: {e}"),
+                )),
+            );
+        }
+    };
+
+    let duplicate = match state
+        .worker_repository
+        .get_by_id(&req.duplicate_worker_id)
+        .await
+    {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::<crate::models::MergeResponse>::error(
+                    "NOT_FOUND",
+                    format!("Duplicate worker {} not found", req.duplicate_worker_id),
+                )),
+            );
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<crate::models::MergeResponse>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to fetch duplicate worker: {e}"),
+                )),
+            );
+        }
+    };
+
+    // Merge data from duplicate into main, recording a snapshot of what moved.
+    let (merged, transferred) = transfer_worker_data(&main, &duplicate);
+
     // Update main worker
     if let Err(e) = state.worker_repository.update(&merged).await {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse::<crate::models::MergeResponse>::error(
                 "DATABASE_ERROR",
-                format!("Failed to update main worker: {}", e),
+                format!("Failed to update main worker: {e}"),
             )),
         );
     }
@@ -967,7 +975,7 @@ pub async fn batch_deduplicate(
                 Json(
                     ApiResponse::<crate::models::BatchDeduplicationResponse>::error(
                         "DATABASE_ERROR",
-                        format!("Failed to list workers: {}", e),
+                        format!("Failed to list workers: {e}"),
                     ),
                 ),
             );
@@ -992,9 +1000,8 @@ pub async fn batch_deduplicate(
             continue;
         }
 
-        let matches = match state.matcher.find_matches(worker, &candidates) {
-            Ok(m) => m,
-            Err(_) => continue,
+        let Ok(matches) = state.matcher.find_matches(worker, &candidates) else {
+            continue;
         };
 
         for m in matches {
@@ -1094,14 +1101,14 @@ pub async fn export_worker_data(
         Ok(None) => {
             let error = ApiResponse::<serde_json::Value>::error(
                 "NOT_FOUND",
-                format!("Worker with id '{}' not found", id),
+                format!("Worker with id '{id}' not found"),
             );
             (StatusCode::NOT_FOUND, Json(error))
         }
         Err(e) => {
             let error = ApiResponse::<serde_json::Value>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve worker: {}", e),
+                format!("Failed to retrieve worker: {e}"),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -1135,14 +1142,14 @@ pub async fn get_worker_masked(
         Ok(None) => {
             let error = ApiResponse::<Worker>::error(
                 "NOT_FOUND",
-                format!("Worker with id '{}' not found", id),
+                format!("Worker with id '{id}' not found"),
             );
             (StatusCode::NOT_FOUND, Json(error))
         }
         Err(e) => {
             let error = ApiResponse::<Worker>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve worker: {}", e),
+                format!("Failed to retrieve worker: {e}"),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -1190,14 +1197,14 @@ pub async fn get_worker_audit_logs(
     // newest-first by the repository.
     match state
         .audit_log
-        .get_logs_for_entity("Worker", id, limit as u64)
+        .get_logs_for_entity("Worker", id, u64::try_from(limit).unwrap_or(0))
         .await
     {
         Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
         Err(e) => {
             let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve audit logs: {}", e),
+                format!("Failed to retrieve audit logs: {e}"),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -1221,12 +1228,16 @@ pub async fn get_recent_audit_logs(
 ) -> impl IntoResponse {
     let limit = params.limit.min(500);
 
-    match state.audit_log.get_recent_logs(limit as u64).await {
+    match state
+        .audit_log
+        .get_recent_logs(u64::try_from(limit).unwrap_or(0))
+        .await
+    {
         Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
         Err(e) => {
             let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve audit logs: {}", e),
+                format!("Failed to retrieve audit logs: {e}"),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
@@ -1263,14 +1274,14 @@ pub async fn get_user_audit_logs(
 
     match state
         .audit_log
-        .get_logs_by_user(&params.user_id, limit as u64)
+        .get_logs_by_user(&params.user_id, u64::try_from(limit).unwrap_or(0))
         .await
     {
         Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
         Err(e) => {
             let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
                 "DATABASE_ERROR",
-                format!("Failed to retrieve audit logs: {}", e),
+                format!("Failed to retrieve audit logs: {e}"),
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }

@@ -43,7 +43,7 @@ pub struct ServerConfig {
     pub grpc_port: u16,
 }
 
-/// PostgreSQL connection and pool settings.
+/// `PostgreSQL` connection and pool settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     /// Connection URL (`postgres://user:pass@host/db`).
@@ -96,7 +96,7 @@ pub struct StreamingConfig {
 
 impl Default for Config {
     /// Local-development defaults: binds `0.0.0.0:8080`, a localhost
-    /// PostgreSQL URL, an on-disk search index, and the standard
+    /// `PostgreSQL` URL, an on-disk search index, and the standard
     /// matching thresholds. [`Config::from_env`] overrides these.
     fn default() -> Self {
         Self {
@@ -151,6 +151,8 @@ impl Config {
     /// | `OTLP_SERVICE_NAME` | `observability.service_name` |
     /// | `OTLP_ENDPOINT` | `observability.otlp_endpoint` |
     /// | `RUST_LOG` | `observability.log_level` |
+    ///
+    /// # Errors
     ///
     /// Returns `Error::Config(_)` with the offending variable name
     /// when a value fails to parse (e.g. `SERVER_PORT=not-a-number`).

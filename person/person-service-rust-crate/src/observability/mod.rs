@@ -22,12 +22,21 @@ pub mod traces;
 
 /// Initialize process-wide tracing/logging and (eventually) OTLP export.
 ///
-/// Builds an OTel [`Resource`] tagging `service.name` / `service.version`,
+/// Builds an `OTel` [`Resource`] tagging `service.name` / `service.version`,
 /// then installs a JSON `tracing` subscriber whose level comes from the
 /// `RUST_LOG` env filter or, failing that, `config.log_level`. The OTLP
 /// exporter and the OpenTelemetry layer are currently commented out
 /// (TODO). Must be called exactly once; a second call will panic because
 /// the global subscriber can only be set once.
+///
+/// # Errors
+///
+/// Returns an error if the telemetry pipeline fails to initialize.
+///
+/// # Panics
+///
+/// Panics if called more than once, because the global `tracing`
+/// subscriber can only be set a single time per process.
 pub fn init_telemetry(config: &ObservabilityConfig) -> Result<()> {
     // Set up resource with service information
     let _resource = Resource::new(vec![
@@ -89,9 +98,20 @@ pub mod custom_metrics {
 
     impl PersonMetrics {
         /// Build and register the instrument set (not yet implemented).
+        ///
+        /// # Panics
+        ///
+        /// Always panics: metric initialization is not yet implemented.
+        #[must_use]
         pub fn new() -> Self {
             // TODO: Initialize metrics
             todo!("Initialize OpenTelemetry metrics")
+        }
+    }
+
+    impl Default for PersonMetrics {
+        fn default() -> Self {
+            Self::new()
         }
     }
 }

@@ -74,6 +74,7 @@ impl MatchScoreBreakdown {
     /// Return a comma-joined list of the components that matched
     /// strongly (each above its own confidence cutoff), or
     /// `"no strong matches"` when none did.
+    #[must_use]
     pub fn summary(&self) -> String {
         let mut parts = Vec::new();
 
@@ -119,10 +120,18 @@ impl MatchScoreBreakdown {
 /// async request handlers.
 pub trait PersonMatcher: Send + Sync {
     /// Score `person` against a single `candidate`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if scoring fails for the implementation.
     fn match_persons(&self, person: &Person, candidate: &Person) -> Result<MatchResult>;
 
     /// Score `person` against every candidate, returning only those that
     /// meet the threshold, sorted by score descending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if scoring any candidate fails.
     fn find_matches(&self, person: &Person, candidates: &[Person]) -> Result<Vec<MatchResult>>;
 
     /// Return `true` when a score meets this matcher's threshold.
@@ -137,6 +146,7 @@ pub struct ProbabilisticMatcher {
 
 impl ProbabilisticMatcher {
     /// Create a probabilistic matcher from a [`MatchingConfig`].
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self {
             scorer: ProbabilisticScorer::new(config),
@@ -147,11 +157,13 @@ impl ProbabilisticMatcher {
     ///
     /// Currently a hard-coded `0.85`; wiring this to the config is a
     /// known TODO.
+    #[must_use]
     pub fn threshold(&self) -> f64 {
         0.85 // TODO: expose config properly
     }
 
     /// Bucket a score into a [`MatchQuality`] via the underlying scorer.
+    #[must_use]
     pub fn classify_match(&self, score: f64) -> MatchQuality {
         self.scorer.classify_match(score)
     }
@@ -195,6 +207,7 @@ pub struct DeterministicMatcher {
 
 impl DeterministicMatcher {
     /// Create a deterministic matcher from a [`MatchingConfig`].
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self {
             scorer: DeterministicScorer::new(config),
@@ -280,7 +293,7 @@ mod tests {
         }
     }
 
-    /// find_matches returns above-threshold candidates, best first.
+    /// `find_matches` returns above-threshold candidates, best first.
     #[test]
     fn test_probabilistic_find_matches() {
         let config = MatchingConfig {
@@ -303,18 +316,18 @@ mod tests {
             ), // No match
         ];
 
-        let matches = matcher.find_matches(&person, &candidates).unwrap();
+        let results = matcher.find_matches(&person, &candidates).unwrap();
 
         // Should find at least one match (the exact match)
         assert!(
-            matches.len() >= 1,
+            !results.is_empty(),
             "Expected at least 1 match, got {}",
-            matches.len()
+            results.len()
         );
 
         // First match should have highest score
-        if matches.len() > 1 {
-            assert!(matches[0].score >= matches[1].score);
+        if results.len() > 1 {
+            assert!(results[0].score >= results[1].score);
         }
     }
 
@@ -333,7 +346,7 @@ mod tests {
         assert!(matcher.is_match(result.score));
     }
 
-    /// summary() lists the strongly-matching components.
+    /// `summary()` lists the strongly-matching components.
     #[test]
     fn test_match_score_breakdown_summary() {
         let breakdown = MatchScoreBreakdown {
@@ -376,7 +389,7 @@ mod tests {
         assert!(matcher.is_match(result.score));
     }
 
-    /// find_matches results are sorted by descending score.
+    /// `find_matches` results are sorted by descending score.
     #[test]
     fn test_match_result_ordering_by_score() {
         let config = MatchingConfig {
@@ -399,11 +412,11 @@ mod tests {
             create_test_person("Smyth", "John", dob), // Close match
         ];
 
-        let matches = matcher.find_matches(&person, &candidates).unwrap();
-        assert!(!matches.is_empty(), "Should find at least one match");
+        let results = matcher.find_matches(&person, &candidates).unwrap();
+        assert!(!results.is_empty(), "Should find at least one match");
 
         // Results should be sorted descending by score
-        for window in matches.windows(2) {
+        for window in results.windows(2) {
             assert!(
                 window[0].score >= window[1].score,
                 "Results should be sorted descending: {} >= {}",
@@ -422,9 +435,9 @@ mod tests {
         let dob = Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap());
         let person = create_test_person("Smith", "John", dob);
 
-        let matches = matcher.find_matches(&person, &[]).unwrap();
+        let results = matcher.find_matches(&person, &[]).unwrap();
         assert!(
-            matches.is_empty(),
+            results.is_empty(),
             "Empty candidates should produce empty results"
         );
     }

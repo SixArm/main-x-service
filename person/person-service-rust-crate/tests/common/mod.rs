@@ -40,5 +40,5 @@ pub async fn create_test_router() -> Router {
 /// Create a unique test person name to avoid conflicts
 pub fn unique_person_name(suffix: &str) -> String {
     let timestamp = Utc::now().timestamp_micros();
-    format!("TestPerson{}_{}", suffix, timestamp)
+    format!("TestPerson{suffix}_{timestamp}")
 }

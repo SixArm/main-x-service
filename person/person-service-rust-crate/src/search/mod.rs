@@ -44,6 +44,10 @@ pub struct SearchEngine {
 
 impl SearchEngine {
     /// Open the index at `index_path`, creating it if absent.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the index cannot be opened or created at `index_path`.
     pub fn new<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let index = PersonIndex::create_or_open(index_path)?;
         Ok(Self { index })
@@ -81,7 +85,7 @@ impl SearchEngine {
         let identifiers: Vec<String> = person
             .identifiers
             .iter()
-            .map(|id| format!("{}:{}", id.identifier_type.to_string(), id.value))
+            .map(|id| format!("{}:{}", id.identifier_type, id.value))
             .collect();
         let identifiers_str = identifiers.join(" ");
 
@@ -114,11 +118,11 @@ impl SearchEngine {
 
         writer
             .add_document(doc)
-            .map_err(|e| crate::Error::Search(format!("Failed to add document: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to add document: {e}")))?;
 
         writer
             .commit()
-            .map_err(|e| crate::Error::Search(format!("Failed to commit: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to commit: {e}")))?;
 
         // Force reader to pick up the new segment so a search issued
         // immediately after this call (as the create / update / merge
@@ -131,6 +135,10 @@ impl SearchEngine {
 
     /// Index many persons in one writer batch (single commit), then
     /// reload the reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the writer cannot be created, a document fails to index, or the commit/reload fails.
     pub fn index_persons(&self, persons: &[Person]) -> Result<()> {
         let mut writer = self.index.writer(100)?;
         let schema = self.index.schema();
@@ -141,7 +149,7 @@ impl SearchEngine {
             let identifiers: Vec<String> = person
                 .identifiers
                 .iter()
-                .map(|id| format!("{}:{}", id.identifier_type.to_string(), id.value))
+                .map(|id| format!("{}:{}", id.identifier_type, id.value))
                 .collect();
             let identifiers_str = identifiers.join(" ");
 
@@ -171,12 +179,12 @@ impl SearchEngine {
 
             writer
                 .add_document(doc)
-                .map_err(|e| crate::Error::Search(format!("Failed to add document: {}", e)))?;
+                .map_err(|e| crate::Error::Search(format!("Failed to add document: {e}")))?;
         }
 
         writer
             .commit()
-            .map_err(|e| crate::Error::Search(format!("Failed to commit: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to commit: {e}")))?;
 
         self.index.reload()?;
         Ok(())
@@ -184,6 +192,10 @@ impl SearchEngine {
 
     /// Run a parsed query across name and identifier fields, returning
     /// up to `limit` matching person IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if query parsing or the Tantivy search fails.
     pub fn search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
@@ -201,22 +213,22 @@ impl SearchEngine {
 
         let query = query_parser
             .parse_query(query_str)
-            .map_err(|e| crate::Error::Search(format!("Failed to parse query: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to parse query: {e}")))?;
 
         let top_docs = searcher
             .search(&query, &TopDocs::with_limit(limit))
-            .map_err(|e| crate::Error::Search(format!("Search failed: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Search failed: {e}")))?;
 
         let mut person_ids = Vec::new();
         for (_score, doc_address) in top_docs {
             let retrieved_doc: tantivy::TantivyDocument = searcher
                 .doc(doc_address)
-                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {}", e)))?;
+                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {e}")))?;
 
-            if let Some(id_value) = retrieved_doc.get_first(schema.id) {
-                if let Some(id_text) = id_value.as_str() {
-                    person_ids.push(id_text.to_string());
-                }
+            if let Some(id_value) = retrieved_doc.get_first(schema.id)
+                && let Some(id_text) = id_value.as_str()
+            {
+                person_ids.push(id_text.to_string());
             }
         }
 
@@ -232,6 +244,10 @@ impl SearchEngine {
     /// match across `family_name`, `given_names`, or `full_name`
     /// counts. A query that tokenizes to nothing returns an empty
     /// result rather than an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the Tantivy search fails.
     pub fn fuzzy_search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
@@ -242,7 +258,7 @@ impl SearchEngine {
         let tokens: Vec<String> = query_str
             .split(|c: char| !c.is_alphanumeric())
             .filter(|s| !s.is_empty())
-            .map(|t| t.to_lowercase())
+            .map(str::to_lowercase)
             .collect();
 
         if tokens.is_empty() {
@@ -261,18 +277,18 @@ impl SearchEngine {
         let bool_query = BooleanQuery::new(subqueries);
         let top_docs = searcher
             .search(&bool_query, &TopDocs::with_limit(limit))
-            .map_err(|e| crate::Error::Search(format!("Fuzzy search failed: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Fuzzy search failed: {e}")))?;
 
         let mut person_ids = Vec::new();
         for (_score, doc_address) in top_docs {
             let retrieved_doc: tantivy::TantivyDocument = searcher
                 .doc(doc_address)
-                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {}", e)))?;
+                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {e}")))?;
 
-            if let Some(id_value) = retrieved_doc.get_first(schema.id) {
-                if let Some(id_text) = id_value.as_str() {
-                    person_ids.push(id_text.to_string());
-                }
+            if let Some(id_value) = retrieved_doc.get_first(schema.id)
+                && let Some(id_text) = id_value.as_str()
+            {
+                person_ids.push(id_text.to_string());
             }
         }
 
@@ -286,6 +302,10 @@ impl SearchEngine {
     /// edit-distance-2 fuzzy clause; a present `birth_year` is added as a
     /// `Should` clause so same-year records rank higher without
     /// excluding others.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the Tantivy search fails.
     pub fn search_by_name_and_year(
         &self,
         family_name: &str,
@@ -305,7 +325,7 @@ impl SearchEngine {
         let tokens: Vec<String> = family_name
             .split(|c: char| !c.is_alphanumeric())
             .filter(|s| !s.is_empty())
-            .map(|t| t.to_lowercase())
+            .map(str::to_lowercase)
             .collect();
         if tokens.is_empty() {
             return Ok(Vec::new());
@@ -351,18 +371,18 @@ impl SearchEngine {
 
         let top_docs = searcher
             .search(final_query.as_ref(), &TopDocs::with_limit(limit))
-            .map_err(|e| crate::Error::Search(format!("Search failed: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Search failed: {e}")))?;
 
         let mut person_ids = Vec::new();
         for (_score, doc_address) in top_docs {
             let retrieved_doc: tantivy::TantivyDocument = searcher
                 .doc(doc_address)
-                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {}", e)))?;
+                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {e}")))?;
 
-            if let Some(id_value) = retrieved_doc.get_first(schema.id) {
-                if let Some(id_text) = id_value.as_str() {
-                    person_ids.push(id_text.to_string());
-                }
+            if let Some(id_value) = retrieved_doc.get_first(schema.id)
+                && let Some(id_text) = id_value.as_str()
+            {
+                person_ids.push(id_text.to_string());
             }
         }
 
@@ -371,6 +391,10 @@ impl SearchEngine {
 
     /// Delete the indexed document with the given person ID, then
     /// reload the reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the writer cannot be created or the delete commit/reload fails.
     pub fn delete_person(&self, person_id: &str) -> Result<()> {
         let mut writer = self.index.writer(50)?;
         let schema = self.index.schema();
@@ -380,18 +404,26 @@ impl SearchEngine {
 
         writer
             .commit()
-            .map_err(|e| crate::Error::Search(format!("Failed to commit deletion: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to commit deletion: {e}")))?;
 
         self.index.reload()?;
         Ok(())
     }
 
     /// Return index statistics (e.g. document count).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the underlying index stats lookup fails.
     pub fn stats(&self) -> Result<IndexStats> {
         self.index.stats()
     }
 
     /// Merge index segments to reclaim space and speed queries.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if segment merging fails.
     pub fn optimize(&self) -> Result<()> {
         self.index.optimize()
     }
@@ -400,6 +432,10 @@ impl SearchEngine {
     ///
     /// Useful in tests (and after writes) to guarantee a subsequent
     /// query sees freshly indexed documents.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the reader reload fails.
     pub fn reload(&self) -> Result<()> {
         self.index.reload()
     }

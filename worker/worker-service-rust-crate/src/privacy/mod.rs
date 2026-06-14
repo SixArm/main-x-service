@@ -32,6 +32,7 @@ use crate::models::Worker;
 /// SSN/TAX/passport/driver's-license identifiers, all document numbers, and
 /// phone/SMS/fax telecom values are masked to their last four characters.
 /// Names, addresses, and email are left untouched.
+#[must_use]
 pub fn mask_worker(worker: &Worker) -> Worker {
     let mut masked = worker.clone();
 
@@ -43,10 +44,10 @@ pub fn mask_worker(worker: &Worker) -> Worker {
     // Mask SSN and other sensitive identifiers
     for id in &mut masked.identifiers {
         match id.identifier_type {
-            crate::models::IdentifierType::SSN | crate::models::IdentifierType::TAX => {
-                id.value = mask_value(&id.value, 4);
-            }
-            crate::models::IdentifierType::PPN | crate::models::IdentifierType::DL => {
+            crate::models::IdentifierType::SSN
+            | crate::models::IdentifierType::TAX
+            | crate::models::IdentifierType::PPN
+            | crate::models::IdentifierType::DL => {
                 id.value = mask_value(&id.value, 4);
             }
             _ => {}
@@ -94,6 +95,7 @@ fn mask_value(value: &str, visible_chars: usize) -> String {
 /// Returns `true` when `consents` contains an entry of the given type that is
 /// [`Active`](crate::models::ConsentStatus::Active) and not past its expiry
 /// date (a `None` expiry is treated as never-expiring).
+#[must_use]
 pub fn has_active_consent(
     consents: &[crate::models::Consent],
     consent_type: crate::models::ConsentType,
@@ -103,7 +105,7 @@ pub fn has_active_consent(
     consents.iter().any(|c| {
         c.consent_type == consent_type
             && c.status == crate::models::ConsentStatus::Active
-            && c.expiry_date.map_or(true, |exp| exp >= today)
+            && c.expiry_date.is_none_or(|exp| exp >= today)
     })
 }
 
@@ -111,6 +113,7 @@ pub fn has_active_consent(
 /// right-of-access export. Falls back to `Value::Null` only if serialisation
 /// fails (which, for the always-serializable [`Worker`], does not happen in
 /// practice).
+#[must_use]
 pub fn export_worker_data(worker: &Worker) -> serde_json::Value {
     serde_json::to_value(worker).unwrap_or(serde_json::Value::Null)
 }
@@ -159,10 +162,10 @@ mod tests {
     fn test_mask_email() {
         // mask_value on an email-like string
         let masked = mask_value("john.doe@example.com", 4);
-        assert!(
-            masked.ends_with(".com"),
-            "Should keep last 4 chars visible, got {}",
-            masked
+        assert_eq!(
+            masked.get(masked.len() - 4..),
+            Some(".com"),
+            "Should keep last 4 chars visible, got {masked}"
         );
         assert!(masked.contains('*'), "Should contain masked characters");
     }
@@ -173,8 +176,7 @@ mod tests {
         let masked = mask_value("+1-555-123-4567", 4);
         assert!(
             masked.ends_with("4567"),
-            "Last 4 digits should be visible, got {}",
-            masked
+            "Last 4 digits should be visible, got {masked}"
         );
     }
 

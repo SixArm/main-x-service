@@ -16,7 +16,9 @@ use event_service::matching::algorithms::{
 };
 use event_service::matching::phonetic;
 use event_service::matching::{EventMatcher, ProbabilisticMatcher};
-use event_service::models::*;
+use event_service::models::{
+    Address, Event, Identifier, IdentifierType, Location, Party, PartyKind, Place,
+};
 
 /// Build a top-of-hour UTC timestamp for deterministic benchmarks.
 fn dt(year: i32, month: u32, day: u32, hour: u32) -> DateTime<Utc> {
@@ -144,7 +146,12 @@ fn bench_probabilistic_match(c: &mut Criterion) {
     let matcher = ProbabilisticMatcher::new(config);
     let query = make_event("Concert", dt(2026, 3, 1, 9));
     let candidates: Vec<Event> = (0..50)
-        .map(|i| make_event(&format!("Concert {i}"), dt(2026, 3, 1, 9 + (i as u32 % 8))))
+        .map(|i| {
+            make_event(
+                &format!("Concert {i}"),
+                dt(2026, 3, 1, 9 + (u32::try_from(i).unwrap_or(0) % 8)),
+            )
+        })
         .collect();
     c.bench_function("probabilistic_match_50_candidates", |c| {
         c.iter(|| {

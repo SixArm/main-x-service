@@ -42,7 +42,12 @@ fn build_seeded_engine(n: usize) -> (TempDir, SearchEngine) {
     let tmp = TempDir::new().unwrap();
     let engine = SearchEngine::new(tmp.path()).unwrap();
     let events: Vec<Event> = (0..n)
-        .map(|i| make_event(TITLES[i % TITLES.len()], (9 + (i as u32 % 12)) % 24))
+        .map(|i| {
+            make_event(
+                TITLES[i % TITLES.len()],
+                (9 + (u32::try_from(i).unwrap_or(0) % 12)) % 24,
+            )
+        })
         .collect();
     engine.index_events(&events).unwrap();
     engine.reload().unwrap();
@@ -55,7 +60,7 @@ fn bench_index_single_event(c: &mut Criterion) {
     let engine = SearchEngine::new(tmp.path()).unwrap();
     let event = make_event("Annual Conference", 9);
     c.bench_function("index_single_event", |b| {
-        b.iter(|| black_box(engine.index_event(black_box(&event)).unwrap()));
+        b.iter(|| engine.index_event(black_box(&event)).unwrap());
     });
 }
 

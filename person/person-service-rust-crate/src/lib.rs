@@ -5,10 +5,10 @@
 //! This library provides:
 //! - Person matcher algorithms (probabilistic and deterministic)
 //! - Full-text search capabilities via Tantivy
-//! - RESTful API via Axum
+//! - `RESTful` API via Axum
 //! - HL7 FHIR R5 support
 //! - gRPC API via Tonic
-//! - PostgreSQL persistence via SeaORM
+//! - `PostgreSQL` persistence via `SeaORM`
 //! - Event streaming via Fluvio
 //! - Data quality validation
 //! - Privacy and data masking

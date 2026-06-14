@@ -18,7 +18,13 @@ pub mod proto {
 
 /// Start the gRPC server. Currently a no-op stub that returns `Ok(())`
 /// immediately; the commented body sketches the intended Tonic setup.
-pub async fn serve(_config: ServerConfig) -> Result<()> {
+///
+/// # Errors
+///
+/// Currently infallible (the stub always returns `Ok(())`). The future
+/// Tonic implementation will return an error if the address cannot be
+/// parsed or the server fails to bind/serve.
+pub fn serve(_config: ServerConfig) -> Result<()> {
     // TODO: Implement gRPC server
     // let addr = format!("{}:{}", config.host, config.grpc_port)
     //     .parse::<std::net::SocketAddr>()

@@ -21,7 +21,7 @@ pub struct Config {
     /// HTTP/gRPC server binding (host, REST port, gRPC port).
     pub server: ServerConfig,
 
-    /// PostgreSQL connection URL and pool sizing.
+    /// `PostgreSQL` connection URL and pool sizing.
     pub database: DatabaseConfig,
 
     /// Tantivy search-index path and cache budget.
@@ -52,7 +52,7 @@ pub struct ServerConfig {
     pub grpc_port: u16,
 }
 
-/// PostgreSQL connection-pool configuration.
+/// `PostgreSQL` connection-pool configuration.
 ///
 /// Maps to env vars `DATABASE_URL` / `DATABASE_MAX_CONNECTIONS` /
 /// `DATABASE_MIN_CONNECTIONS`.
@@ -126,7 +126,7 @@ pub struct StreamingConfig {
 
 impl Default for Config {
     /// Returns development-friendly defaults: localhost binding on port 8080,
-    /// a local PostgreSQL URL, a relative search-index path, a 0.85 match
+    /// a local `PostgreSQL` URL, a relative search-index path, a 0.85 match
     /// threshold, and localhost telemetry/streaming endpoints.
     fn default() -> Self {
         Self {

@@ -186,7 +186,7 @@ pub enum WorkerType {
     Other,
 }
 
-/// Renders the snake_case wire token for each variant (e.g. `WorkerType::Doctor`
+/// Renders the `snake_case` wire token for each variant (e.g. `WorkerType::Doctor`
 /// → `"doctor"`), matching its serde representation.
 impl std::fmt::Display for WorkerType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -253,6 +253,7 @@ impl Worker {
     /// assert!(worker.active);
     /// assert!(worker.identifiers.is_empty());
     /// ```
+    #[must_use]
     pub fn new(name: HumanName, gender: Gender) -> Self {
         let now = Utc::now();
         Self {
@@ -301,6 +302,7 @@ impl Worker {
     /// let worker = Worker::new(name, Gender::Female);
     /// assert_eq!(worker.full_name(), "Maria Elena Garcia");
     /// ```
+    #[must_use]
     pub fn full_name(&self) -> String {
         let given = self.name.given.join(" ");
         format!("{} {}", given, self.name.family)
@@ -329,6 +331,7 @@ impl Worker {
     /// worker.tax_id = Some("123-45-6789".into());
     /// assert_eq!(worker.effective_tax_id(), Some("123-45-6789"));
     /// ```
+    #[must_use]
     pub fn effective_tax_id(&self) -> Option<&str> {
         // The dedicated field wins when present.
         if let Some(ref tid) = self.tax_id {

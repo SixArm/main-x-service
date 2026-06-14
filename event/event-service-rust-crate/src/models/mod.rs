@@ -84,7 +84,7 @@ pub use review_queue::{
 /// A postal address. Mirrors [schema.org/PostalAddress](https://schema.org/PostalAddress).
 ///
 /// Every field is optional so that partial addresses (e.g. just a city
-/// + country) can be represented; the validation layer decides which
+/// and country) can be represented; the validation layer decides which
 /// combinations are acceptable for a given use.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
 pub struct Address {
@@ -269,7 +269,7 @@ pub enum PartyKind {
 // Reference (for about / workFeatured / workPerformed)
 // ===========================================================================
 
-/// A typed pointer to another resource (Thing, CreativeWork, …).
+/// A typed pointer to another resource (Thing, `CreativeWork`, …).
 ///
 /// Used for the `about` (subject matter) and `works` (featured /
 /// performed works) properties of an [`Event`].
@@ -282,7 +282,7 @@ pub struct Reference {
     pub name: String,
     /// Canonical URL of the referenced resource.
     pub url: Option<String>,
-    /// Optional schema.org type (e.g., "CreativeWork", "Thing").
+    /// Optional schema.org type (e.g., "`CreativeWork`", "Thing").
     pub kind: Option<String>,
 }
 
@@ -366,7 +366,7 @@ pub enum EventAttendanceMode {
 }
 
 /// Discriminates event subtypes (mirrors schema.org Event subtypes
-/// like ConferenceEvent / SportsEvent / EducationEvent, plus operational
+/// like `ConferenceEvent` / `SportsEvent` / `EducationEvent`, plus operational
 /// subtypes such as Appointment / Encounter / Shift / Incident).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]

@@ -68,6 +68,7 @@ impl Organization {
     /// assert!(org.active);
     /// assert!(org.telecom.is_empty());
     /// ```
+    #[must_use]
     pub fn new(name: String) -> Self {
         let now = Utc::now();
         Self {

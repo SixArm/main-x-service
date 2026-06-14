@@ -8,11 +8,11 @@
 //! authentication by taking an `AuthUser` argument.
 
 use authentication_verifier::Claims;
+use axum::Json;
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::response::IntoResponse;
-use axum::Json;
 
 use super::state::AppState;
 

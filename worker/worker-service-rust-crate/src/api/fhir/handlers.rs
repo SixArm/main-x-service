@@ -56,6 +56,11 @@ pub struct FhirSearchParams {
 
 /// `GET /fhir/Worker/{id}` — returns the worker as a FHIR resource, a
 /// `not-found` outcome (`404`), or a `database-error` outcome (`500`).
+///
+/// # Panics
+///
+/// Panics only if a FHIR response or `OperationOutcome` fails to serialize to
+/// JSON, which cannot happen for these statically-typed structs.
 pub async fn get_fhir_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -88,6 +93,11 @@ pub async fn get_fhir_worker(
 /// `POST /fhir/Worker` — parses the FHIR body into the internal model
 /// (`400` invalid outcome on failure), assigns a UUID if absent, persists,
 /// indexes, and returns the created resource (`201`).
+///
+/// # Panics
+///
+/// Panics only if a FHIR response or `OperationOutcome` fails to serialize to
+/// JSON, which cannot happen for these statically-typed structs.
 pub async fn create_fhir_worker(
     State(state): State<AppState>,
     Json(fhir_worker): Json<FhirWorker>,
@@ -135,6 +145,11 @@ pub async fn create_fhir_worker(
 
 /// `PUT /fhir/Worker/{id}` — parses the body, forces its id to the path id,
 /// updates, re-indexes, and returns the updated resource (`200`).
+///
+/// # Panics
+///
+/// Panics only if a FHIR response or `OperationOutcome` fails to serialize to
+/// JSON, which cannot happen for these statically-typed structs.
 pub async fn update_fhir_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -181,6 +196,11 @@ pub async fn update_fhir_worker(
 
 /// `DELETE /fhir/Worker/{id}` — soft-deletes the worker, returning `204`
 /// (empty body) or a `database-error` outcome (`500`).
+///
+/// # Panics
+///
+/// Panics only if an `OperationOutcome` fails to serialize to JSON, which
+/// cannot happen for this statically-typed struct.
 pub async fn delete_fhir_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -200,6 +220,11 @@ pub async fn delete_fhir_worker(
 /// `GET /fhir/Worker?...` — searches by the first provided name parameter
 /// (`name`, else `family`, else `given`; `400` if none), hydrates hits, and
 /// returns them as a FHIR `searchset` `Bundle`. `_count` caps the page (≤100).
+///
+/// # Panics
+///
+/// Panics only if an `OperationOutcome` fails to serialize to JSON, which
+/// cannot happen for this statically-typed struct.
 pub async fn search_fhir_workers(
     State(state): State<AppState>,
     Query(params): Query<FhirSearchParams>,

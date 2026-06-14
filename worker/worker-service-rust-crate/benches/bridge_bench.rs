@@ -175,7 +175,7 @@ fn bench_one_to_many(c: &mut Criterion) {
         .map(|i| {
             let mut p = rich_worker();
             p.id = Uuid::new_v4();
-            p.name.given[0] = format!("Variant{}", i);
+            p.name.given[0] = format!("Variant{i}");
             p
         })
         .collect();

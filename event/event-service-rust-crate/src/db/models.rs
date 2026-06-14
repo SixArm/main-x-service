@@ -8,16 +8,16 @@
 //! `event_sub_events`. Organizations and audit log retain their own
 //! tables.
 
-use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // events
 // ============================================================================
 
-/// SeaORM entity for the `events` table (the event aggregate root).
+/// `SeaORM` entity for the `events` table (the event aggregate root).
 pub mod events {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One row of the `events` table: scalar event fields plus JSONB
     /// arrays for short multi-valued attributes.
@@ -88,22 +88,22 @@ pub mod events {
     /// Relations from `events` to its child tables.
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
-        /// `has_many` event_identifiers.
+        /// `has_many` `event_identifiers`.
         #[sea_orm(has_many = "super::event_identifiers::Entity")]
         Identifiers,
-        /// `has_many` event_locations.
+        /// `has_many` `event_locations`.
         #[sea_orm(has_many = "super::event_locations::Entity")]
         Locations,
-        /// `has_many` event_parties.
+        /// `has_many` `event_parties`.
         #[sea_orm(has_many = "super::event_parties::Entity")]
         Parties,
-        /// `has_many` event_offers.
+        /// `has_many` `event_offers`.
         #[sea_orm(has_many = "super::event_offers::Entity")]
         Offers,
-        /// `has_many` event_links.
+        /// `has_many` `event_links`.
         #[sea_orm(has_many = "super::event_links::Entity")]
         Links,
-        /// `has_many` event_sub_events.
+        /// `has_many` `event_sub_events`.
         #[sea_orm(has_many = "super::event_sub_events::Entity")]
         SubEvents,
     }
@@ -146,9 +146,10 @@ pub mod events {
 // event_identifiers
 // ============================================================================
 
-/// SeaORM entity for the `event_identifiers` child table.
+/// `SeaORM` entity for the `event_identifiers` child table.
 pub mod event_identifiers {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One external identifier belonging to an event.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -203,11 +204,12 @@ pub mod event_identifiers {
 // variant are populated. `position` preserves ordering.
 // ============================================================================
 
-/// SeaORM entity for the `event_locations` child table. The `kind`
+/// `SeaORM` entity for the `event_locations` child table. The `kind`
 /// column discriminates the `Location` variant; only that variant's
 /// columns are populated, and `position` preserves ordering.
 pub mod event_locations {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One location row for an event (place / postal / virtual / text).
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -220,7 +222,7 @@ pub mod event_locations {
         pub event_id: Uuid,
         /// Ordering position within the event's location list.
         pub position: i32,
-        /// "place" | "postal_address" | "virtual" | "text"
+        /// "place" | "`postal_address`" | "virtual" | "text"
         pub kind: String,
         /// For "place": optional external place-service id.
         pub place_id: Option<Uuid>,
@@ -276,10 +278,11 @@ pub mod event_locations {
 // event_parties (organizer / performer / attendee / sponsor / ...)
 // ============================================================================
 
-/// SeaORM entity for the `event_parties` child table (organizers,
+/// `SeaORM` entity for the `event_parties` child table (organizers,
 /// performers, attendees, sponsors, funders, contributors).
 pub mod event_parties {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One party row attached to an event in a particular role.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -336,9 +339,10 @@ pub mod event_parties {
 // event_offers
 // ============================================================================
 
-/// SeaORM entity for the `event_offers` child table (ticket/pricing tiers).
+/// `SeaORM` entity for the `event_offers` child table (ticket/pricing tiers).
 pub mod event_offers {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One offer row (price, currency, availability, validity window).
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -397,9 +401,10 @@ pub mod event_offers {
 // event_links
 // ============================================================================
 
-/// SeaORM entity for the `event_links` child table (cross-event links).
+/// `SeaORM` entity for the `event_links` child table (cross-event links).
 pub mod event_links {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One typed link from an event to another event.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -412,7 +417,7 @@ pub mod event_links {
         pub event_id: Uuid,
         /// Target event id.
         pub other_event_id: Uuid,
-        /// Serialized `LinkType` (Replaces / ReplacedBy / Refer / Seealso).
+        /// Serialized `LinkType` (Replaces / `ReplacedBy` / Refer / Seealso).
         pub link_type: String,
         /// Row creation timestamp.
         pub created_at: TimeDateTimeWithTimeZone,
@@ -445,10 +450,11 @@ pub mod event_links {
 // event_sub_events (the schema.org/subEvent list)
 // ============================================================================
 
-/// SeaORM entity for the `event_sub_events` child table (schema.org
+/// `SeaORM` entity for the `event_sub_events` child table (schema.org
 /// `subEvent` ordering list).
 pub mod event_sub_events {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One ordered sub-event membership row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -492,9 +498,10 @@ pub mod event_sub_events {
 // organizations (and child tables — unchanged from prior shape)
 // ============================================================================
 
-/// SeaORM entity for the `organizations` table.
+/// `SeaORM` entity for the `organizations` table.
 pub mod organizations {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One organization row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -530,13 +537,13 @@ pub mod organizations {
     /// Relations from `organizations` to its child tables.
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
-        /// `has_many` organization_addresses.
+        /// `has_many` `organization_addresses`.
         #[sea_orm(has_many = "super::organization_addresses::Entity")]
         Addresses,
-        /// `has_many` organization_contacts.
+        /// `has_many` `organization_contacts`.
         #[sea_orm(has_many = "super::organization_contacts::Entity")]
         Contacts,
-        /// `has_many` organization_identifiers.
+        /// `has_many` `organization_identifiers`.
         #[sea_orm(has_many = "super::organization_identifiers::Entity")]
         Identifiers,
     }
@@ -560,9 +567,10 @@ pub mod organizations {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// SeaORM entity for the `organization_addresses` child table.
+/// `SeaORM` entity for the `organization_addresses` child table.
 pub mod organization_addresses {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One postal address belonging to an organization.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -616,9 +624,10 @@ pub mod organization_addresses {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// SeaORM entity for the `organization_contacts` child table.
+/// `SeaORM` entity for the `organization_contacts` child table.
 pub mod organization_contacts {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One contact point (phone / email / …) for an organization.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -664,9 +673,10 @@ pub mod organization_contacts {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// SeaORM entity for the `organization_identifiers` child table.
+/// `SeaORM` entity for the `organization_identifiers` child table.
 pub mod organization_identifiers {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One external identifier belonging to an organization.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -718,9 +728,10 @@ pub mod organization_identifiers {
 // audit_log (unchanged)
 // ============================================================================
 
-/// SeaORM entity for the `audit_log` table (HIPAA-style audit trail).
+/// `SeaORM` entity for the `audit_log` table (HIPAA-style audit trail).
 pub mod audit_log {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One audit-log entry recording a who/what/when change.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -759,9 +770,10 @@ pub mod audit_log {
 // ───────────────────── event_text_values ─────────────────────
 
 /// Tagged table for the Event's parallel string-list properties
-/// (alternate_name | image | same_as | keyword | in_language).
+/// (`alternate_name` | image | `same_as` | keyword | `in_language`).
 pub mod event_text_values {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One `(field, value)` row for an event string list.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]

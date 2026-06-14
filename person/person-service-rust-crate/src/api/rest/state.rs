@@ -56,6 +56,7 @@ impl AppState {
     /// them in `Arc`s. The repository is built with both the event
     /// publisher and audit log attached, so every mutation through it
     /// emits events and audit rows.
+    #[must_use]
     pub fn new(
         db: DatabaseConnection,
         search_engine: SearchEngine,

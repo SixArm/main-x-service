@@ -58,7 +58,7 @@ pub struct Organization {
     #[serde(default)]
     pub record_class: Option<RecordClass>,
 
-    /// Record use type: Full or RefOnly
+    /// Record use type: Full or `RefOnly`
     #[serde(default)]
     pub record_use_type: Option<RecordUseType>,
 
@@ -124,6 +124,7 @@ impl Organization {
     /// assert!(org.active);
     /// assert!(org.ods_code.is_none());
     /// ```
+    #[must_use]
     pub fn new(name: String) -> Self {
         let now = Utc::now();
         Self {
@@ -155,12 +156,14 @@ impl Organization {
     ///
     /// Per the ODS model each organisation has exactly one primary role; this
     /// returns the first role flagged [`is_primary`](OrganizationRole::is_primary).
+    #[must_use]
     pub fn primary_role(&self) -> Option<&OrganizationRole> {
         self.roles.iter().find(|r| r.is_primary)
     }
 
     /// Returns only the relationships whose status is
     /// [`OdsStatus::Active`], filtering out inactive/historical ones.
+    #[must_use]
     pub fn active_relationships(&self) -> Vec<&OrganizationRelationship> {
         self.relationships
             .iter()
@@ -170,6 +173,7 @@ impl Organization {
 
     /// Returns succession records pointing to *predecessor* organisations
     /// (those this organisation absorbed or replaced).
+    #[must_use]
     pub fn predecessors(&self) -> Vec<&OrganizationSuccession> {
         self.successions
             .iter()
@@ -179,6 +183,7 @@ impl Organization {
 
     /// Returns succession records pointing to *successor* organisations
     /// (those that took over from this one).
+    #[must_use]
     pub fn successors(&self) -> Vec<&OrganizationSuccession> {
         self.successions
             .iter()

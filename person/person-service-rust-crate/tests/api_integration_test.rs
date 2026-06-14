@@ -6,7 +6,7 @@
 //! [`common::create_test_router`] (which opens a database connection and
 //! search index from the environment config) and drive it with
 //! `tower::ServiceExt::oneshot` requests, asserting on status codes and
-//! decoded [`ApiResponse`] bodies. They require a reachable PostgreSQL
+//! decoded [`ApiResponse`] bodies. They require a reachable `PostgreSQL`
 //! instance (see `docker-compose.test.yml`) and exercise the full
 //! create / get / update / delete / search lifecycle plus the
 //! not-found path.
@@ -24,7 +24,7 @@ use person_service::{api::ApiResponse, models::Person};
 
 /// `GET /api/v1/health` returns 200 and identifies the service.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_health_check() {
     let app = common::create_test_router().await;
 
@@ -52,7 +52,7 @@ async fn test_health_check() {
 /// `POST /api/v1/persons` creates a person and assigns a fresh UUID
 /// (ignoring the all-zero id in the payload).
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_create_person() {
     let app = common::create_test_router().await;
 
@@ -99,7 +99,7 @@ async fn test_create_person() {
 /// Create a person, then `GET /api/v1/persons/{id}` returns the same
 /// record.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_create_and_get_person() {
     let app = common::create_test_router().await;
 
@@ -144,7 +144,7 @@ async fn test_create_and_get_person() {
     let get_response = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/v1/persons/{}", person_id))
+                .uri(format!("/api/v1/persons/{person_id}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -168,7 +168,7 @@ async fn test_create_and_get_person() {
 /// Create a person, then `PUT /api/v1/persons/{id}` persists a changed
 /// given-name list.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_update_person() {
     let app = common::create_test_router().await;
 
@@ -213,7 +213,7 @@ async fn test_update_person() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(&format!("/api/v1/persons/{}", person.id))
+                .uri(format!("/api/v1/persons/{}", person.id))
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&person).unwrap()))
                 .unwrap(),
@@ -236,7 +236,7 @@ async fn test_update_person() {
 /// Create a person, soft-delete it (204), then confirm a subsequent GET
 /// returns 404.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_delete_person() {
     let app = common::create_test_router().await;
 
@@ -280,7 +280,7 @@ async fn test_delete_person() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(&format!("/api/v1/persons/{}", person.id))
+                .uri(format!("/api/v1/persons/{}", person.id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -293,7 +293,7 @@ async fn test_delete_person() {
     let get_response = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/v1/persons/{}", person.id))
+                .uri(format!("/api/v1/persons/{}", person.id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -307,7 +307,7 @@ async fn test_delete_person() {
 /// Create a person, then `GET /api/v1/persons/search` finds it by family
 /// name (after a brief indexing delay).
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_search_persons() {
     let app = common::create_test_router().await;
 
@@ -347,10 +347,7 @@ async fn test_search_persons() {
     let search_response = app
         .oneshot(
             Request::builder()
-                .uri(&format!(
-                    "/api/v1/persons/search?q={}&limit=10",
-                    family_name
-                ))
+                .uri(format!("/api/v1/persons/search?q={family_name}&limit=10"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -371,7 +368,7 @@ async fn test_search_persons() {
 
 /// `GET /api/v1/persons/{id}` for an unknown id returns 404.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_get_person_not_found() {
     let app = common::create_test_router().await;
 

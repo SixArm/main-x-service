@@ -27,7 +27,7 @@ pub mod state;
 
 pub use state::AppState;
 
-/// The OpenAPI 3 document: endpoint paths, schemas, and tags.
+/// The `OpenAPI` 3 document: endpoint paths, schemas, and tags.
 #[derive(OpenApi)]
 #[openapi(
     info(

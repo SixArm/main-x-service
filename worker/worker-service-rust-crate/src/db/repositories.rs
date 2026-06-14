@@ -9,18 +9,36 @@
 //! recorded alongside those audit entries.
 
 use sea_orm::sea_query::Expr;
-use sea_orm::*;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
+};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use super::convert::{date_to_time, offset_to_ts, time_to_date, ts_to_offset};
 
-use super::models::*;
+use super::models::{
+    worker_addresses, worker_contacts, worker_documents, worker_emergency_contact_telecom,
+    worker_emergency_contacts, worker_identifiers, worker_links, worker_names, worker_photos,
+    workers,
+};
 use crate::Result;
 use crate::models::{
     Address, ContactPoint, ContactPointSystem, DocumentType, EmergencyContact, HumanName,
     Identifier, IdentityDocument, Worker, WorkerLink, WorkerType,
 };
+
+/// The full set of `SeaORM` `ActiveModel`s produced from one [`Worker`]: the
+/// core row plus its name / identifier / address / contact / link child rows.
+type WorkerActiveModels = (
+    workers::ActiveModel,
+    Vec<worker_names::ActiveModel>,
+    Vec<worker_identifiers::ActiveModel>,
+    Vec<worker_addresses::ActiveModel>,
+    Vec<worker_contacts::ActiveModel>,
+    Vec<worker_links::ActiveModel>,
+);
 
 /// Serialize a fieldless enum to its canonical serde string tag.
 ///
@@ -41,9 +59,9 @@ fn enum_to_tag<T: serde::Serialize>(value: &T) -> Option<String> {
 /// Inverse of [`enum_to_tag`]: wraps the stored tag as a JSON string and
 /// deserializes it. Returns `None` for a missing tag or one that no longer
 /// maps to a known variant.
-fn tag_to_enum<T: serde::de::DeserializeOwned>(tag: &Option<String>) -> Option<T> {
-    let t = tag.as_ref()?;
-    serde_json::from_value(serde_json::Value::String(t.clone())).ok()
+fn tag_to_enum<T: serde::de::DeserializeOwned>(tag: Option<&str>) -> Option<T> {
+    let t = tag?;
+    serde_json::from_value(serde_json::Value::String(t.to_string())).ok()
 }
 
 /// Insert the normalized document / emergency-contact (+ telecom) / photo
@@ -75,7 +93,7 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
             issue_date: Set(doc.issue_date.map(date_to_time)),
             expiry_date: Set(doc.expiry_date.map(date_to_time)),
             verified: Set(doc.verified),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await?;
@@ -96,7 +114,7 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
             address_state: Set(addr.and_then(|a| a.state.clone())),
             address_postal_code: Set(addr.and_then(|a| a.postal_code.clone())),
             address_country: Set(addr.and_then(|a| a.country.clone())),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await?;
@@ -107,7 +125,7 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
                 system: Set(enum_to_tag(&cp.system).unwrap_or_default()),
                 value: Set(cp.value.clone()),
                 use_type: Set(cp.use_type.as_ref().and_then(enum_to_tag)),
-                position: Set(j as i32),
+                position: Set(i32::try_from(j).unwrap_or(i32::MAX)),
             }
             .insert(conn)
             .await?;
@@ -118,7 +136,7 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
             id: Set(Uuid::new_v4()),
             worker_id: Set(worker.id),
             url: Set(url.clone()),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await?;
@@ -216,6 +234,7 @@ pub struct SeaOrmWorkerRepository {
 
 impl SeaOrmWorkerRepository {
     /// Builds a repository over `db` with no event publisher or audit log.
+    #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
             db,
@@ -225,6 +244,7 @@ impl SeaOrmWorkerRepository {
     }
 
     /// Builder method attaching an event publisher; returns `self` for chaining.
+    #[must_use]
     pub fn with_event_publisher(
         mut self,
         publisher: std::sync::Arc<dyn crate::streaming::EventProducer>,
@@ -234,6 +254,7 @@ impl SeaOrmWorkerRepository {
     }
 
     /// Builder method attaching an audit-log repository; returns `self` for chaining.
+    #[must_use]
     pub fn with_audit_log(
         mut self,
         audit_log: std::sync::Arc<super::audit::AuditLogRepository>,
@@ -245,10 +266,10 @@ impl SeaOrmWorkerRepository {
     /// Publishes `event` if a publisher is configured; logs (but swallows) any
     /// publish error so a streaming failure never aborts the database write.
     fn publish_event(&self, event: crate::streaming::WorkerEvent) {
-        if let Some(ref publisher) = self.event_publisher {
-            if let Err(e) = publisher.publish(event) {
-                tracing::error!("Failed to publish event: {}", e);
-            }
+        if let Some(ref publisher) = self.event_publisher
+            && let Err(e) = publisher.publish(event)
+        {
+            tracing::error!("Failed to publish event: {}", e);
         }
     }
 
@@ -270,6 +291,11 @@ impl SeaOrmWorkerRepository {
         context: &AuditContext,
     ) {
         if let Some(ref audit_log) = self.audit_log {
+            let actor = super::audit::AuditActor {
+                user_id: context.user_id.as_deref(),
+                ip_address: context.ip_address.as_deref(),
+                user_agent: context.user_agent.as_deref(),
+            };
             let result = match action {
                 "CREATE" => {
                     audit_log
@@ -277,9 +303,7 @@ impl SeaOrmWorkerRepository {
                             "Worker",
                             entity_id,
                             new_values.unwrap_or(serde_json::Value::Null),
-                            context.user_id.clone(),
-                            context.ip_address.clone(),
-                            context.user_agent.clone(),
+                            &actor,
                         )
                         .await
                 }
@@ -290,9 +314,7 @@ impl SeaOrmWorkerRepository {
                             entity_id,
                             old_values.unwrap_or(serde_json::Value::Null),
                             new_values.unwrap_or(serde_json::Value::Null),
-                            context.user_id.clone(),
-                            context.ip_address.clone(),
-                            context.user_agent.clone(),
+                            &actor,
                         )
                         .await
                 }
@@ -302,9 +324,7 @@ impl SeaOrmWorkerRepository {
                             "Worker",
                             entity_id,
                             old_values.unwrap_or(serde_json::Value::Null),
-                            context.user_id.clone(),
-                            context.ip_address.clone(),
-                            context.user_agent.clone(),
+                            &actor,
                         )
                         .await
                 }
@@ -317,7 +337,40 @@ impl SeaOrmWorkerRepository {
         }
     }
 
-    /// Flattens a domain [`Worker`] into the set of SeaORM `ActiveModel`s for
+    /// Builds the `worker_names` rows for `worker`: the primary name (flagged
+    /// `is_primary`) followed by any additional names.
+    fn name_active_models(worker: &Worker) -> Vec<worker_names::ActiveModel> {
+        let mut names = vec![worker_names::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            worker_id: Set(worker.id),
+            use_type: Set(worker.name.use_type.as_ref().map(|u| format!("{u:?}"))),
+            family: Set(worker.name.family.clone()),
+            given: Set(worker.name.given.clone()),
+            prefix: Set(worker.name.prefix.clone()),
+            suffix: Set(worker.name.suffix.clone()),
+            is_primary: Set(true),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
+        }];
+
+        for add_name in &worker.additional_names {
+            names.push(worker_names::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                worker_id: Set(worker.id),
+                use_type: Set(add_name.use_type.as_ref().map(|u| format!("{u:?}"))),
+                family: Set(add_name.family.clone()),
+                given: Set(add_name.given.clone()),
+                prefix: Set(add_name.prefix.clone()),
+                suffix: Set(add_name.suffix.clone()),
+                is_primary: Set(false),
+                created_at: Set(OffsetDateTime::now_utc()),
+                updated_at: Set(OffsetDateTime::now_utc()),
+            });
+        }
+        names
+    }
+
+    /// Flattens a domain [`Worker`] into the set of `SeaORM` `ActiveModel`s for
     /// each backing table (worker row plus name/identifier/address/contact/
     /// link rows). The first name is marked primary; the first address and
     /// contact are marked primary. Demographic/use-type enums are stored via
@@ -327,21 +380,14 @@ impl SeaOrmWorkerRepository {
     /// assigned to child rows. This does not cover the document / emergency-
     /// contact / photo collections — those are handled by
     /// [`insert_extra_collections`].
-    fn to_active_models(
-        &self,
-        worker: &Worker,
-    ) -> (
-        workers::ActiveModel,
-        Vec<worker_names::ActiveModel>,
-        Vec<worker_identifiers::ActiveModel>,
-        Vec<worker_addresses::ActiveModel>,
-        Vec<worker_contacts::ActiveModel>,
-        Vec<worker_links::ActiveModel>,
-    ) {
+    fn to_active_models(worker: &Worker) -> WorkerActiveModels {
         let new_worker = workers::ActiveModel {
             id: Set(worker.id),
             active: Set(worker.active),
-            worker_type: Set(worker.worker_type.as_ref().map(|wt| wt.to_string())),
+            worker_type: Set(worker
+                .worker_type
+                .as_ref()
+                .map(std::string::ToString::to_string)),
             gender: Set(format!("{:?}", worker.gender)),
             birth_date: Set(worker.birth_date.map(date_to_time)),
             tax_id: Set(worker.tax_id.clone()),
@@ -358,35 +404,7 @@ impl SeaOrmWorkerRepository {
             deleted_by: Set(None),
         };
 
-        // Primary name
-        let mut names = vec![worker_names::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            worker_id: Set(worker.id),
-            use_type: Set(worker.name.use_type.as_ref().map(|u| format!("{:?}", u))),
-            family: Set(worker.name.family.clone()),
-            given: Set(worker.name.given.clone()),
-            prefix: Set(worker.name.prefix.clone()),
-            suffix: Set(worker.name.suffix.clone()),
-            is_primary: Set(true),
-            created_at: Set(OffsetDateTime::now_utc()),
-            updated_at: Set(OffsetDateTime::now_utc()),
-        }];
-
-        // Additional names
-        for add_name in &worker.additional_names {
-            names.push(worker_names::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                worker_id: Set(worker.id),
-                use_type: Set(add_name.use_type.as_ref().map(|u| format!("{:?}", u))),
-                family: Set(add_name.family.clone()),
-                given: Set(add_name.given.clone()),
-                prefix: Set(add_name.prefix.clone()),
-                suffix: Set(add_name.suffix.clone()),
-                is_primary: Set(false),
-                created_at: Set(OffsetDateTime::now_utc()),
-                updated_at: Set(OffsetDateTime::now_utc()),
-            });
-        }
+        let names = Self::name_active_models(worker);
 
         // Identifiers
         let identifiers = worker
@@ -395,7 +413,7 @@ impl SeaOrmWorkerRepository {
             .map(|id| worker_identifiers::ActiveModel {
                 id: Set(Uuid::new_v4()),
                 worker_id: Set(worker.id),
-                use_type: Set(id.use_type.as_ref().map(|u| format!("{:?}", u))),
+                use_type: Set(id.use_type.as_ref().map(|u| format!("{u:?}"))),
                 identifier_type: Set(format!("{:?}", id.identifier_type)),
                 system: Set(id.system.clone()),
                 value: Set(id.value.clone()),
@@ -436,7 +454,7 @@ impl SeaOrmWorkerRepository {
                 worker_id: Set(worker.id),
                 system: Set(format!("{:?}", cp.system)),
                 value: Set(cp.value.clone()),
-                use_type: Set(cp.use_type.as_ref().map(|u| format!("{:?}", u))),
+                use_type: Set(cp.use_type.as_ref().map(|u| format!("{u:?}"))),
                 is_primary: Set(idx == 0),
                 created_at: Set(OffsetDateTime::now_utc()),
                 updated_at: Set(OffsetDateTime::now_utc()),
@@ -460,105 +478,35 @@ impl SeaOrmWorkerRepository {
         (new_worker, names, identifiers, addresses, contacts, links)
     }
 
-    /// Reassembles a domain [`Worker`] from its database rows, parsing the
-    /// string-stored enums (gender, worker type, name/identifier/contact/link
-    /// use types) back into their typed forms. Requires a primary name row;
-    /// returns a [`crate::Error::Validation`] if none is present. Unparseable
-    /// contact/link tags are dropped (`filter_map`) rather than erroring. The
-    /// `documents` / `emergency_contacts` / `photo` collections are left empty
-    /// here and populated separately by
-    /// [`load_extra_collections`](Self::load_extra_collections).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::Validation`] if `db_names` contains no primary
-    /// name row.
-    fn from_db_models(
-        &self,
-        db_worker: workers::Model,
-        db_names: Vec<worker_names::Model>,
-        db_identifiers: Vec<worker_identifiers::Model>,
-        db_addresses: Vec<worker_addresses::Model>,
-        db_contacts: Vec<worker_contacts::Model>,
-        db_links: Vec<worker_links::Model>,
-    ) -> Result<Worker> {
-        use crate::models::{
-            ContactPointSystem, ContactPointUse, Gender, IdentifierType, IdentifierUse, LinkType,
-            NameUse,
-        };
+    /// Maps one `worker_names` row back into a domain [`HumanName`], parsing
+    /// the string-stored name-use tag.
+    fn human_name_from_db(n: &worker_names::Model) -> HumanName {
+        use crate::models::NameUse;
 
-        // Parse gender
-        let gender = match db_worker.gender.as_str() {
-            "Male" => Gender::Male,
-            "Female" => Gender::Female,
-            "Other" => Gender::Other,
-            _ => Gender::Unknown,
-        };
+        HumanName {
+            use_type: n.use_type.as_ref().and_then(|u| match u.as_str() {
+                "Usual" => Some(NameUse::Usual),
+                "Official" => Some(NameUse::Official),
+                "Temp" => Some(NameUse::Temp),
+                "Nickname" => Some(NameUse::Nickname),
+                "Anonymous" => Some(NameUse::Anonymous),
+                "Old" => Some(NameUse::Old),
+                "Maiden" => Some(NameUse::Maiden),
+                _ => None,
+            }),
+            family: n.family.clone(),
+            given: n.given.clone(),
+            prefix: n.prefix.clone(),
+            suffix: n.suffix.clone(),
+        }
+    }
 
-        // Parse worker_type
-        let worker_type = db_worker.worker_type.as_deref().and_then(|wt| match wt {
-            "doctor" => Some(WorkerType::Doctor),
-            "nurse" => Some(WorkerType::Nurse),
-            "carer" => Some(WorkerType::Carer),
-            "staff" => Some(WorkerType::Staff),
-            "employee" => Some(WorkerType::Employee),
-            "manager" => Some(WorkerType::Manager),
-            "supervisor" => Some(WorkerType::Supervisor),
-            "consultant" => Some(WorkerType::Consultant),
-            "other" => Some(WorkerType::Other),
-            _ => None,
-        });
+    /// Maps the `worker_identifiers` rows back into domain [`Identifier`]s,
+    /// parsing the string-stored type / use-type tags.
+    fn identifiers_from_db(db_identifiers: &[worker_identifiers::Model]) -> Vec<Identifier> {
+        use crate::models::{IdentifierType, IdentifierUse};
 
-        // Get primary name
-        let primary_name = db_names
-            .iter()
-            .find(|n| n.is_primary)
-            .ok_or_else(|| crate::Error::Validation("Worker has no primary name".to_string()))?;
-
-        let name = HumanName {
-            use_type: primary_name
-                .use_type
-                .as_ref()
-                .and_then(|u| match u.as_str() {
-                    "Usual" => Some(NameUse::Usual),
-                    "Official" => Some(NameUse::Official),
-                    "Temp" => Some(NameUse::Temp),
-                    "Nickname" => Some(NameUse::Nickname),
-                    "Anonymous" => Some(NameUse::Anonymous),
-                    "Old" => Some(NameUse::Old),
-                    "Maiden" => Some(NameUse::Maiden),
-                    _ => None,
-                }),
-            family: primary_name.family.clone(),
-            given: primary_name.given.clone(),
-            prefix: primary_name.prefix.clone(),
-            suffix: primary_name.suffix.clone(),
-        };
-
-        // Additional names
-        let additional_names = db_names
-            .iter()
-            .filter(|n| !n.is_primary)
-            .map(|n| HumanName {
-                use_type: n.use_type.as_ref().and_then(|u| match u.as_str() {
-                    "Usual" => Some(NameUse::Usual),
-                    "Official" => Some(NameUse::Official),
-                    "Temp" => Some(NameUse::Temp),
-                    "Nickname" => Some(NameUse::Nickname),
-                    "Anonymous" => Some(NameUse::Anonymous),
-                    "Old" => Some(NameUse::Old),
-                    "Maiden" => Some(NameUse::Maiden),
-                    _ => None,
-                }),
-                family: n.family.clone(),
-                given: n.given.clone(),
-                prefix: n.prefix.clone(),
-                suffix: n.suffix.clone(),
-            })
-            .collect();
-
-        // Identifiers
-        let identifiers = db_identifiers
+        db_identifiers
             .iter()
             .map(|id| {
                 let identifier_type = match id.identifier_type.as_str() {
@@ -589,24 +537,15 @@ impl SeaOrmWorkerRepository {
                     assigner: id.assigner.clone(),
                 }
             })
-            .collect();
+            .collect()
+    }
 
-        // Addresses
-        let addresses = db_addresses
-            .iter()
-            .map(|addr| Address {
-                use_type: None,
-                line1: addr.line1.clone(),
-                line2: addr.line2.clone(),
-                city: addr.city.clone(),
-                state: addr.state.clone(),
-                postal_code: addr.postal_code.clone(),
-                country: addr.country.clone(),
-            })
-            .collect();
+    /// Maps the `worker_contacts` rows back into domain [`ContactPoint`]s,
+    /// dropping any row whose system tag is unrecognized.
+    fn telecom_from_db(db_contacts: &[worker_contacts::Model]) -> Vec<ContactPoint> {
+        use crate::models::{ContactPointSystem, ContactPointUse};
 
-        // Telecom
-        let telecom = db_contacts
+        db_contacts
             .iter()
             .filter_map(|cp| {
                 let system = match cp.system.as_str() {
@@ -635,7 +574,86 @@ impl SeaOrmWorkerRepository {
                     use_type,
                 })
             })
+            .collect()
+    }
+
+    /// Reassembles a domain [`Worker`] from its database rows, parsing the
+    /// string-stored enums (gender, worker type, name/identifier/contact/link
+    /// use types) back into their typed forms. Requires a primary name row;
+    /// returns a [`crate::Error::Validation`] if none is present. Unparseable
+    /// contact/link tags are dropped (`filter_map`) rather than erroring. The
+    /// `documents` / `emergency_contacts` / `photo` collections are left empty
+    /// here and populated separately by
+    /// [`load_extra_collections`](Self::load_extra_collections).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `db_names` contains no primary
+    /// name row.
+    fn from_db_models(
+        db_worker: workers::Model,
+        db_names: &[worker_names::Model],
+        db_identifiers: &[worker_identifiers::Model],
+        db_addresses: &[worker_addresses::Model],
+        db_contacts: &[worker_contacts::Model],
+        db_links: &[worker_links::Model],
+    ) -> Result<Worker> {
+        use crate::models::{Gender, LinkType};
+
+        // Parse gender
+        let gender = match db_worker.gender.as_str() {
+            "Male" => Gender::Male,
+            "Female" => Gender::Female,
+            "Other" => Gender::Other,
+            _ => Gender::Unknown,
+        };
+
+        // Parse worker_type
+        let worker_type = db_worker.worker_type.as_deref().and_then(|wt| match wt {
+            "doctor" => Some(WorkerType::Doctor),
+            "nurse" => Some(WorkerType::Nurse),
+            "carer" => Some(WorkerType::Carer),
+            "staff" => Some(WorkerType::Staff),
+            "employee" => Some(WorkerType::Employee),
+            "manager" => Some(WorkerType::Manager),
+            "supervisor" => Some(WorkerType::Supervisor),
+            "consultant" => Some(WorkerType::Consultant),
+            "other" => Some(WorkerType::Other),
+            _ => None,
+        });
+
+        // Get primary name
+        let primary_name = db_names
+            .iter()
+            .find(|n| n.is_primary)
+            .ok_or_else(|| crate::Error::Validation("Worker has no primary name".to_string()))?;
+
+        let name = Self::human_name_from_db(primary_name);
+
+        // Additional names
+        let additional_names = db_names
+            .iter()
+            .filter(|n| !n.is_primary)
+            .map(Self::human_name_from_db)
             .collect();
+
+        let identifiers = Self::identifiers_from_db(db_identifiers);
+
+        // Addresses
+        let addresses = db_addresses
+            .iter()
+            .map(|addr| Address {
+                use_type: None,
+                line1: addr.line1.clone(),
+                line2: addr.line2.clone(),
+                city: addr.city.clone(),
+                state: addr.state.clone(),
+                postal_code: addr.postal_code.clone(),
+                country: addr.country.clone(),
+            })
+            .collect();
+
+        let telecom = Self::telecom_from_db(db_contacts);
 
         // Links
         let links = db_links
@@ -761,7 +779,8 @@ impl SeaOrmWorkerRepository {
         worker.documents = doc_rows
             .into_iter()
             .map(|r| IdentityDocument {
-                document_type: tag_to_enum(&Some(r.document_type)).unwrap_or(DocumentType::Other),
+                document_type: tag_to_enum(Some(r.document_type.as_str()))
+                    .unwrap_or(DocumentType::Other),
                 number: r.number,
                 issuing_country: r.issuing_country,
                 issuing_authority: r.issuing_authority,
@@ -786,9 +805,10 @@ impl SeaOrmWorkerRepository {
             let telecom = tel_rows
                 .into_iter()
                 .map(|t| ContactPoint {
-                    system: tag_to_enum(&Some(t.system)).unwrap_or(ContactPointSystem::Other),
+                    system: tag_to_enum(Some(t.system.as_str()))
+                        .unwrap_or(ContactPointSystem::Other),
                     value: t.value,
-                    use_type: tag_to_enum(&t.use_type),
+                    use_type: tag_to_enum(t.use_type.as_deref()),
                 })
                 .collect();
             let has_address = ec.address_use_type.is_some()
@@ -799,7 +819,7 @@ impl SeaOrmWorkerRepository {
                 || ec.address_postal_code.is_some()
                 || ec.address_country.is_some();
             let address = has_address.then(|| Address {
-                use_type: tag_to_enum(&ec.address_use_type),
+                use_type: tag_to_enum(ec.address_use_type.as_deref()),
                 line1: ec.address_line1,
                 line2: ec.address_line2,
                 city: ec.address_city,
@@ -838,7 +858,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         let txn = self.db.begin().await?;
 
         let (new_worker, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-            self.to_active_models(worker);
+            Self::to_active_models(worker);
 
         // Insert worker
         let db_worker = new_worker.insert(&txn).await?;
@@ -881,13 +901,13 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
             self.load_associations(&db_worker.id).await?;
 
-        let mut result = self.from_db_models(
+        let mut result = Self::from_db_models(
             db_worker,
-            db_names,
-            db_identifiers,
-            db_addresses,
-            db_contacts,
-            db_links,
+            &db_names,
+            &db_identifiers,
+            &db_addresses,
+            &db_contacts,
+            &db_links,
         )?;
         self.load_extra_collections(&mut result).await?;
 
@@ -918,21 +938,20 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             .one(&self.db)
             .await?;
 
-        let db_worker = match db_worker {
-            Some(p) => p,
-            None => return Ok(None),
+        let Some(db_worker) = db_worker else {
+            return Ok(None);
         };
 
         let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
             self.load_associations(id).await?;
 
-        let mut worker = self.from_db_models(
+        let mut worker = Self::from_db_models(
             db_worker,
-            db_names,
-            db_identifiers,
-            db_addresses,
-            db_contacts,
-            db_links,
+            &db_names,
+            &db_identifiers,
+            &db_addresses,
+            &db_contacts,
+            &db_links,
         )?;
         self.load_extra_collections(&mut worker).await?;
         Ok(Some(worker))
@@ -950,7 +969,10 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         let update_model = workers::ActiveModel {
             id: Set(worker.id),
             active: Set(worker.active),
-            worker_type: Set(worker.worker_type.as_ref().map(|wt| wt.to_string())),
+            worker_type: Set(worker
+                .worker_type
+                .as_ref()
+                .map(std::string::ToString::to_string)),
             gender: Set(format!("{:?}", worker.gender)),
             birth_date: Set(worker.birth_date.map(date_to_time)),
             tax_id: Set(worker.tax_id.clone()),
@@ -1007,7 +1029,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
 
         // Re-insert associated data
         let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-            self.to_active_models(worker);
+            Self::to_active_models(worker);
 
         for name in new_names {
             name.insert(&txn).await?;
@@ -1044,17 +1066,16 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         if let Some(old_json) = old_worker
             .as_ref()
             .and_then(|p| serde_json::to_value(p).ok())
+            && let Ok(new_json) = serde_json::to_value(&result)
         {
-            if let Ok(new_json) = serde_json::to_value(&result) {
-                self.log_audit(
-                    "UPDATE",
-                    result.id,
-                    Some(old_json),
-                    Some(new_json),
-                    &AuditContext::default(),
-                )
-                .await;
-            }
+            self.log_audit(
+                "UPDATE",
+                result.id,
+                Some(old_json),
+                Some(new_json),
+                &AuditContext::default(),
+            )
+            .await;
         }
 
         Ok(result)
@@ -1080,17 +1101,17 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         });
 
         // Log audit
-        if let Some(old_worker) = old_worker {
-            if let Ok(old_json) = serde_json::to_value(&old_worker) {
-                self.log_audit(
-                    "DELETE",
-                    *id,
-                    Some(old_json),
-                    None,
-                    &AuditContext::default(),
-                )
-                .await;
-            }
+        if let Some(old_worker) = old_worker
+            && let Ok(old_json) = serde_json::to_value(&old_worker)
+        {
+            self.log_audit(
+                "DELETE",
+                *id,
+                Some(old_json),
+                None,
+                &AuditContext::default(),
+            )
+            .await;
         }
 
         Ok(())

@@ -3,9 +3,9 @@
 //! End-to-end duplicate-detection integration tests for the
 //! event-service ↔ event-matcher bridge.
 //!
-//! Exercises the schema.org/Event identity model: DateTime → ISO 8601
+//! Exercises the schema.org/Event identity model: `DateTime` → ISO 8601
 //! string projection, `Vec<Location>` → first matcher `Location` dispatch
-//! (Place / PostalAddress / Virtual / Text), `Vec<Party>` → single matcher
+//! (Place / `PostalAddress` / Virtual / Text), `Vec<Party>` → single matcher
 //! organizer / performers list, identifier scheme mapping by system URI
 //! (Eventbrite, Meetup, Wikidata, Google Calendar, iCalendar).
 

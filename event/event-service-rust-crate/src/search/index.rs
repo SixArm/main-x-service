@@ -62,6 +62,7 @@ pub struct EventIndexSchema {
 impl EventIndexSchema {
     /// Build the event schema, registering every field with its
     /// indexing options (TEXT for full-text, STRING for exact facets).
+    #[must_use]
     pub fn new() -> Self {
         let mut b = Schema::builder();
         let id = b.add_text_field("id", STRING | STORED);
@@ -128,6 +129,10 @@ pub struct EventIndex {
 
 impl EventIndex {
     /// Create a brand-new index in `index_path` (errors if one exists).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index or its reader cannot be created.
     pub fn create<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let s = EventIndexSchema::new();
         let index = Index::create_in_dir(index_path, s.schema.clone())
@@ -145,6 +150,11 @@ impl EventIndex {
     }
 
     /// Open an existing index in `index_path`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index cannot be opened or its reader
+    /// cannot be created.
     pub fn open<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let s = EventIndexSchema::new();
         let index = Index::open_in_dir(index_path)
@@ -162,6 +172,10 @@ impl EventIndex {
     }
 
     /// Open the index if `meta.json` exists, otherwise create it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if opening or creating the index fails.
     pub fn create_or_open<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let path = index_path.as_ref();
         if path.join("meta.json").exists() {
@@ -172,6 +186,10 @@ impl EventIndex {
     }
 
     /// Build a writer with a heap budget of `heap_size_mb` megabytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer cannot be created.
     pub fn writer(&self, heap_size_mb: usize) -> Result<IndexWriter> {
         self.index
             .writer(heap_size_mb * 1_000_000)
@@ -179,21 +197,28 @@ impl EventIndex {
     }
 
     /// Borrow the underlying Tantivy [`Index`].
+    #[must_use]
     pub fn index(&self) -> &Index {
         &self.index
     }
 
     /// Borrow the typed schema-field handles.
+    #[must_use]
     pub fn schema(&self) -> &EventIndexSchema {
         &self.schema
     }
 
     /// Borrow the index reader.
+    #[must_use]
     pub fn reader(&self) -> &IndexReader {
         &self.reader
     }
 
     /// Reload the reader so newly committed documents become visible.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reader cannot be reloaded.
     pub fn reload(&self) -> Result<()> {
         self.reader
             .reload()
@@ -201,15 +226,23 @@ impl EventIndex {
     }
 
     /// Return current index statistics (document and segment counts).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index cannot be read.
     pub fn stats(&self) -> Result<IndexStats> {
         let searcher = self.reader.searcher();
         Ok(IndexStats {
-            num_docs: searcher.num_docs() as usize,
+            num_docs: usize::try_from(searcher.num_docs()).unwrap_or(usize::MAX),
             num_segments: searcher.segment_readers().len(),
         })
     }
 
     /// Wait for background segment merges to finish, compacting the index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if waiting for the merge threads fails.
     pub fn optimize(&self) -> Result<()> {
         let writer = self.writer(50)?;
         writer

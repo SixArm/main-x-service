@@ -12,13 +12,20 @@
 
 use chrono::Utc;
 use sea_orm::sea_query::Expr;
-use sea_orm::*;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
+};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use super::convert::{date_to_time, offset_to_ts, time_to_date, ts_to_offset};
 
-use super::models::*;
+use super::models::{
+    person_addresses, person_contacts, person_documents, person_emergency_contact_telecom,
+    person_emergency_contacts, person_identifiers, person_links, person_names, person_photos,
+    persons,
+};
 use crate::Result;
 use crate::models::{
     Address, ContactPoint, ContactPointSystem, DocumentType, EmergencyContact, HumanName,
@@ -35,8 +42,8 @@ fn enum_to_tag<T: serde::Serialize>(value: &T) -> Option<String> {
 
 /// Parse a stored string tag back into a fieldless enum, or `None` if it is
 /// absent or unrecognized.
-fn tag_to_enum<T: serde::de::DeserializeOwned>(tag: &Option<String>) -> Option<T> {
-    let t = tag.as_ref()?;
+fn tag_to_enum<T: serde::de::DeserializeOwned>(tag: Option<&String>) -> Option<T> {
+    let t = tag?;
     serde_json::from_value(serde_json::Value::String(t.clone())).ok()
 }
 
@@ -57,7 +64,7 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
             issue_date: Set(doc.issue_date.map(date_to_time)),
             expiry_date: Set(doc.expiry_date.map(date_to_time)),
             verified: Set(doc.verified),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await?;
@@ -78,7 +85,7 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
             address_state: Set(addr.and_then(|a| a.state.clone())),
             address_postal_code: Set(addr.and_then(|a| a.postal_code.clone())),
             address_country: Set(addr.and_then(|a| a.country.clone())),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await?;
@@ -89,7 +96,7 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
                 system: Set(enum_to_tag(&cp.system).unwrap_or_default()),
                 value: Set(cp.value.clone()),
                 use_type: Set(cp.use_type.as_ref().and_then(enum_to_tag)),
-                position: Set(j as i32),
+                position: Set(i32::try_from(j).unwrap_or(i32::MAX)),
             }
             .insert(conn)
             .await?;
@@ -100,13 +107,24 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
             id: Set(Uuid::new_v4()),
             person_id: Set(person.id),
             url: Set(url.clone()),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await?;
     }
     Ok(())
 }
+
+/// The active-model tuple produced by exploding a [`Person`] into the
+/// parent row plus its child-table rows, ready for insertion.
+type PersonActiveModels = (
+    persons::ActiveModel,
+    Vec<person_names::ActiveModel>,
+    Vec<person_identifiers::ActiveModel>,
+    Vec<person_addresses::ActiveModel>,
+    Vec<person_contacts::ActiveModel>,
+    Vec<person_links::ActiveModel>,
+);
 
 /// Request provenance attached to audit-log writes.
 ///
@@ -158,12 +176,12 @@ pub trait PersonRepository: Send + Sync {
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Person>>;
 }
 
-/// PostgreSQL [`PersonRepository`] backed by SeaORM.
+/// `PostgreSQL` [`PersonRepository`] backed by `SeaORM`.
 ///
 /// Optionally fans out to an event publisher and audit log; both are set
 /// via the `with_*` builder methods and are no-ops when absent.
 pub struct SeaOrmPersonRepository {
-    /// The SeaORM connection (cheap to clone, internally pooled).
+    /// The `SeaORM` connection (cheap to clone, internally pooled).
     db: DatabaseConnection,
     /// Optional sink for [`PersonEvent`](crate::streaming::PersonEvent)s.
     event_publisher: Option<std::sync::Arc<dyn crate::streaming::EventProducer>>,
@@ -173,6 +191,7 @@ pub struct SeaOrmPersonRepository {
 
 impl SeaOrmPersonRepository {
     /// Build a repository over `db` with no event/audit sinks attached.
+    #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
             db,
@@ -182,6 +201,7 @@ impl SeaOrmPersonRepository {
     }
 
     /// Attach an event publisher; returns `self` for chaining.
+    #[must_use]
     pub fn with_event_publisher(
         mut self,
         publisher: std::sync::Arc<dyn crate::streaming::EventProducer>,
@@ -191,6 +211,7 @@ impl SeaOrmPersonRepository {
     }
 
     /// Attach an audit-log repository; returns `self` for chaining.
+    #[must_use]
     pub fn with_audit_log(
         mut self,
         audit_log: std::sync::Arc<super::audit::AuditLogRepository>,
@@ -201,10 +222,10 @@ impl SeaOrmPersonRepository {
 
     /// Publish `event` if a publisher is set; log and swallow any error.
     fn publish_event(&self, event: crate::streaming::PersonEvent) {
-        if let Some(ref publisher) = self.event_publisher {
-            if let Err(e) = publisher.publish(event) {
-                tracing::error!("Failed to publish event: {}", e);
-            }
+        if let Some(ref publisher) = self.event_publisher
+            && let Err(e) = publisher.publish(event)
+        {
+            tracing::error!("Failed to publish event: {}", e);
         }
     }
 
@@ -228,9 +249,7 @@ impl SeaOrmPersonRepository {
                             "Person",
                             entity_id,
                             new_values.unwrap_or(serde_json::Value::Null),
-                            context.user_id.clone(),
-                            context.ip_address.clone(),
-                            context.user_agent.clone(),
+                            context,
                         )
                         .await
                 }
@@ -241,9 +260,7 @@ impl SeaOrmPersonRepository {
                             entity_id,
                             old_values.unwrap_or(serde_json::Value::Null),
                             new_values.unwrap_or(serde_json::Value::Null),
-                            context.user_id.clone(),
-                            context.ip_address.clone(),
-                            context.user_agent.clone(),
+                            context,
                         )
                         .await
                 }
@@ -253,9 +270,7 @@ impl SeaOrmPersonRepository {
                             "Person",
                             entity_id,
                             old_values.unwrap_or(serde_json::Value::Null),
-                            context.user_id.clone(),
-                            context.ip_address.clone(),
-                            context.user_agent.clone(),
+                            context,
                         )
                         .await
                 }
@@ -268,24 +283,35 @@ impl SeaOrmPersonRepository {
         }
     }
 
-    /// Explode a domain [`Person`] into the SeaORM active models for the
+    /// Explode a domain [`Person`] into the `SeaORM` active models for the
     /// parent row and each child table.
     ///
     /// The primary name gets `is_primary = true`; the first address and
     /// first contact are flagged primary by position. Enum fields are
     /// stringified (`{:?}`) except `gender`, which is lowercased to honor
     /// the DB CHECK constraint.
-    fn to_active_models(
-        &self,
-        person: &Person,
-    ) -> (
-        persons::ActiveModel,
-        Vec<person_names::ActiveModel>,
-        Vec<person_identifiers::ActiveModel>,
-        Vec<person_addresses::ActiveModel>,
-        Vec<person_contacts::ActiveModel>,
-        Vec<person_links::ActiveModel>,
-    ) {
+    /// Build the `person_names` active models: the primary name (flagged
+    /// `is_primary = true`) followed by any additional names.
+    fn name_active_models(person: &Person) -> Vec<person_names::ActiveModel> {
+        let to_model = |name: &HumanName, is_primary: bool| person_names::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            person_id: Set(person.id),
+            use_type: Set(name.use_type.as_ref().map(|u| format!("{u:?}"))),
+            family: Set(name.family.clone()),
+            given: Set(name.given.clone()),
+            prefix: Set(name.prefix.clone()),
+            suffix: Set(name.suffix.clone()),
+            is_primary: Set(is_primary),
+            created_at: Set(OffsetDateTime::now_utc()),
+            updated_at: Set(OffsetDateTime::now_utc()),
+        };
+
+        let mut names = vec![to_model(&person.name, true)];
+        names.extend(person.additional_names.iter().map(|n| to_model(n, false)));
+        names
+    }
+
+    fn to_active_models(person: &Person) -> PersonActiveModels {
         let new_person = persons::ActiveModel {
             id: Set(person.id),
             active: Set(person.active),
@@ -307,35 +333,7 @@ impl SeaOrmPersonRepository {
             deleted_by: Set(None),
         };
 
-        // Primary name
-        let mut names = vec![person_names::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            person_id: Set(person.id),
-            use_type: Set(person.name.use_type.as_ref().map(|u| format!("{:?}", u))),
-            family: Set(person.name.family.clone()),
-            given: Set(person.name.given.clone()),
-            prefix: Set(person.name.prefix.clone()),
-            suffix: Set(person.name.suffix.clone()),
-            is_primary: Set(true),
-            created_at: Set(OffsetDateTime::now_utc()),
-            updated_at: Set(OffsetDateTime::now_utc()),
-        }];
-
-        // Additional names
-        for add_name in &person.additional_names {
-            names.push(person_names::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                person_id: Set(person.id),
-                use_type: Set(add_name.use_type.as_ref().map(|u| format!("{:?}", u))),
-                family: Set(add_name.family.clone()),
-                given: Set(add_name.given.clone()),
-                prefix: Set(add_name.prefix.clone()),
-                suffix: Set(add_name.suffix.clone()),
-                is_primary: Set(false),
-                created_at: Set(OffsetDateTime::now_utc()),
-                updated_at: Set(OffsetDateTime::now_utc()),
-            });
-        }
+        let names = Self::name_active_models(person);
 
         // Identifiers
         let identifiers = person
@@ -344,7 +342,7 @@ impl SeaOrmPersonRepository {
             .map(|id| person_identifiers::ActiveModel {
                 id: Set(Uuid::new_v4()),
                 person_id: Set(person.id),
-                use_type: Set(id.use_type.as_ref().map(|u| format!("{:?}", u))),
+                use_type: Set(id.use_type.as_ref().map(|u| format!("{u:?}"))),
                 identifier_type: Set(format!("{:?}", id.identifier_type)),
                 system: Set(id.system.clone()),
                 value: Set(id.value.clone()),
@@ -385,7 +383,7 @@ impl SeaOrmPersonRepository {
                 person_id: Set(person.id),
                 system: Set(format!("{:?}", cp.system)),
                 value: Set(cp.value.clone()),
-                use_type: Set(cp.use_type.as_ref().map(|u| format!("{:?}", u))),
+                use_type: Set(cp.use_type.as_ref().map(|u| format!("{u:?}"))),
                 is_primary: Set(idx == 0),
                 created_at: Set(OffsetDateTime::now_utc()),
                 updated_at: Set(OffsetDateTime::now_utc()),
@@ -409,6 +407,59 @@ impl SeaOrmPersonRepository {
         (new_person, names, identifiers, addresses, contacts, links)
     }
 
+    /// Rebuild a domain [`HumanName`] from a stored `person_names` row,
+    /// parsing the stringified `use_type` back to its [`NameUse`](crate::models::NameUse) variant.
+    fn human_name_from_db(n: &person_names::Model) -> HumanName {
+        use crate::models::NameUse;
+        let use_type = n.use_type.as_ref().and_then(|u| match u.as_str() {
+            "Usual" => Some(NameUse::Usual),
+            "Official" => Some(NameUse::Official),
+            "Temp" => Some(NameUse::Temp),
+            "Nickname" => Some(NameUse::Nickname),
+            "Anonymous" => Some(NameUse::Anonymous),
+            "Old" => Some(NameUse::Old),
+            "Maiden" => Some(NameUse::Maiden),
+            _ => None,
+        });
+        HumanName {
+            use_type,
+            family: n.family.clone(),
+            given: n.given.clone(),
+            prefix: n.prefix.clone(),
+            suffix: n.suffix.clone(),
+        }
+    }
+
+    /// Rebuild a domain [`Identifier`] from a stored `person_identifiers`
+    /// row, parsing the stringified `identifier_type` / `use_type`.
+    fn identifier_from_db(id: &person_identifiers::Model) -> Identifier {
+        use crate::models::{IdentifierType, IdentifierUse};
+        let identifier_type = match id.identifier_type.as_str() {
+            "MRN" => IdentifierType::MRN,
+            "SSN" => IdentifierType::SSN,
+            "DL" => IdentifierType::DL,
+            "NPI" => IdentifierType::NPI,
+            "PPN" => IdentifierType::PPN,
+            "TAX" => IdentifierType::TAX,
+            _ => IdentifierType::Other,
+        };
+        let use_type = id.use_type.as_ref().and_then(|u| match u.as_str() {
+            "Usual" => Some(IdentifierUse::Usual),
+            "Official" => Some(IdentifierUse::Official),
+            "Temp" => Some(IdentifierUse::Temp),
+            "Secondary" => Some(IdentifierUse::Secondary),
+            "Old" => Some(IdentifierUse::Old),
+            _ => None,
+        });
+        Identifier {
+            identifier_type,
+            use_type,
+            system: id.system.clone(),
+            value: id.value.clone(),
+            assigner: id.assigner.clone(),
+        }
+    }
+
     /// Reassemble a domain [`Person`] from its parent row and child rows.
     ///
     /// Parses stringified enums back to their domain variants (unknown
@@ -416,18 +467,14 @@ impl SeaOrmPersonRepository {
     /// primary name is present. Note `tax_id`, `documents`, and
     /// `emergency_contacts` are not yet persisted and come back empty.
     fn from_db_models(
-        &self,
         db_person: persons::Model,
-        db_names: Vec<person_names::Model>,
-        db_identifiers: Vec<person_identifiers::Model>,
-        db_addresses: Vec<person_addresses::Model>,
-        db_contacts: Vec<person_contacts::Model>,
-        db_links: Vec<person_links::Model>,
+        db_names: &[person_names::Model],
+        db_identifiers: &[person_identifiers::Model],
+        db_addresses: &[person_addresses::Model],
+        db_contacts: &[person_contacts::Model],
+        db_links: &[person_links::Model],
     ) -> Result<Person> {
-        use crate::models::{
-            ContactPointSystem, ContactPointUse, Gender, IdentifierType, IdentifierUse, LinkType,
-            NameUse,
-        };
+        use crate::models::{ContactPointSystem, ContactPointUse, Gender, LinkType};
 
         // Parse gender. DB stores lowercase per CHECK constraint
         // ('male'/'female'/'other'/'unknown'); accept PascalCase too
@@ -445,80 +492,19 @@ impl SeaOrmPersonRepository {
             .iter()
             .find(|n| n.is_primary)
             .ok_or_else(|| crate::Error::Validation("Person has no primary name".to_string()))?;
-
-        let name = HumanName {
-            use_type: primary_name
-                .use_type
-                .as_ref()
-                .and_then(|u| match u.as_str() {
-                    "Usual" => Some(NameUse::Usual),
-                    "Official" => Some(NameUse::Official),
-                    "Temp" => Some(NameUse::Temp),
-                    "Nickname" => Some(NameUse::Nickname),
-                    "Anonymous" => Some(NameUse::Anonymous),
-                    "Old" => Some(NameUse::Old),
-                    "Maiden" => Some(NameUse::Maiden),
-                    _ => None,
-                }),
-            family: primary_name.family.clone(),
-            given: primary_name.given.clone(),
-            prefix: primary_name.prefix.clone(),
-            suffix: primary_name.suffix.clone(),
-        };
+        let name = Self::human_name_from_db(primary_name);
 
         // Additional names
         let additional_names = db_names
             .iter()
             .filter(|n| !n.is_primary)
-            .map(|n| HumanName {
-                use_type: n.use_type.as_ref().and_then(|u| match u.as_str() {
-                    "Usual" => Some(NameUse::Usual),
-                    "Official" => Some(NameUse::Official),
-                    "Temp" => Some(NameUse::Temp),
-                    "Nickname" => Some(NameUse::Nickname),
-                    "Anonymous" => Some(NameUse::Anonymous),
-                    "Old" => Some(NameUse::Old),
-                    "Maiden" => Some(NameUse::Maiden),
-                    _ => None,
-                }),
-                family: n.family.clone(),
-                given: n.given.clone(),
-                prefix: n.prefix.clone(),
-                suffix: n.suffix.clone(),
-            })
+            .map(Self::human_name_from_db)
             .collect();
 
         // Identifiers
         let identifiers = db_identifiers
             .iter()
-            .map(|id| {
-                let identifier_type = match id.identifier_type.as_str() {
-                    "MRN" => IdentifierType::MRN,
-                    "SSN" => IdentifierType::SSN,
-                    "DL" => IdentifierType::DL,
-                    "NPI" => IdentifierType::NPI,
-                    "PPN" => IdentifierType::PPN,
-                    "TAX" => IdentifierType::TAX,
-                    _ => IdentifierType::Other,
-                };
-
-                let use_type = id.use_type.as_ref().and_then(|u| match u.as_str() {
-                    "Usual" => Some(IdentifierUse::Usual),
-                    "Official" => Some(IdentifierUse::Official),
-                    "Temp" => Some(IdentifierUse::Temp),
-                    "Secondary" => Some(IdentifierUse::Secondary),
-                    "Old" => Some(IdentifierUse::Old),
-                    _ => None,
-                });
-
-                Identifier {
-                    identifier_type,
-                    use_type,
-                    system: id.system.clone(),
-                    value: id.value.clone(),
-                    assigner: id.assigner.clone(),
-                }
-            })
+            .map(Self::identifier_from_db)
             .collect();
 
         // Addresses
@@ -671,7 +657,7 @@ impl SeaOrmPersonRepository {
         person.documents = doc_rows
             .into_iter()
             .map(|r| IdentityDocument {
-                document_type: tag_to_enum(&Some(r.document_type)).unwrap_or(DocumentType::Other),
+                document_type: tag_to_enum(Some(&r.document_type)).unwrap_or(DocumentType::Other),
                 number: r.number,
                 issuing_country: r.issuing_country,
                 issuing_authority: r.issuing_authority,
@@ -696,9 +682,9 @@ impl SeaOrmPersonRepository {
             let telecom = tel_rows
                 .into_iter()
                 .map(|t| ContactPoint {
-                    system: tag_to_enum(&Some(t.system)).unwrap_or(ContactPointSystem::Other),
+                    system: tag_to_enum(Some(&t.system)).unwrap_or(ContactPointSystem::Other),
                     value: t.value,
-                    use_type: tag_to_enum(&t.use_type),
+                    use_type: tag_to_enum(t.use_type.as_ref()),
                 })
                 .collect();
             let has_address = ec.address_use_type.is_some()
@@ -709,7 +695,7 @@ impl SeaOrmPersonRepository {
                 || ec.address_postal_code.is_some()
                 || ec.address_country.is_some();
             let address = has_address.then(|| Address {
-                use_type: tag_to_enum(&ec.address_use_type),
+                use_type: tag_to_enum(ec.address_use_type.as_ref()),
                 line1: ec.address_line1,
                 line2: ec.address_line2,
                 city: ec.address_city,
@@ -746,7 +732,7 @@ impl PersonRepository for SeaOrmPersonRepository {
         let txn = self.db.begin().await?;
 
         let (new_person, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-            self.to_active_models(person);
+            Self::to_active_models(person);
 
         // Insert person
         let db_person = new_person.insert(&txn).await?;
@@ -785,13 +771,13 @@ impl PersonRepository for SeaOrmPersonRepository {
         let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
             self.load_associations(&db_person.id).await?;
 
-        let mut result = self.from_db_models(
+        let mut result = Self::from_db_models(
             db_person,
-            db_names,
-            db_identifiers,
-            db_addresses,
-            db_contacts,
-            db_links,
+            &db_names,
+            &db_identifiers,
+            &db_addresses,
+            &db_contacts,
+            &db_links,
         )?;
         self.load_extra_collections(&mut result).await?;
 
@@ -823,21 +809,20 @@ impl PersonRepository for SeaOrmPersonRepository {
             .one(&self.db)
             .await?;
 
-        let db_person = match db_person {
-            Some(p) => p,
-            None => return Ok(None),
+        let Some(db_person) = db_person else {
+            return Ok(None);
         };
 
         let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
             self.load_associations(id).await?;
 
-        let mut person = self.from_db_models(
+        let mut person = Self::from_db_models(
             db_person,
-            db_names,
-            db_identifiers,
-            db_addresses,
-            db_contacts,
-            db_links,
+            &db_names,
+            &db_identifiers,
+            &db_addresses,
+            &db_contacts,
+            &db_links,
         )?;
         self.load_extra_collections(&mut person).await?;
         Ok(Some(person))
@@ -914,7 +899,7 @@ impl PersonRepository for SeaOrmPersonRepository {
 
         // Re-insert associated data
         let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-            self.to_active_models(person);
+            Self::to_active_models(person);
 
         for name in new_names {
             name.insert(&txn).await?;
@@ -951,17 +936,16 @@ impl PersonRepository for SeaOrmPersonRepository {
         if let Some(old_json) = old_person
             .as_ref()
             .and_then(|p| serde_json::to_value(p).ok())
+            && let Ok(new_json) = serde_json::to_value(&result)
         {
-            if let Ok(new_json) = serde_json::to_value(&result) {
-                self.log_audit(
-                    "UPDATE",
-                    result.id,
-                    Some(old_json),
-                    Some(new_json),
-                    &AuditContext::default(),
-                )
-                .await;
-            }
+            self.log_audit(
+                "UPDATE",
+                result.id,
+                Some(old_json),
+                Some(new_json),
+                &AuditContext::default(),
+            )
+            .await;
         }
 
         Ok(result)
@@ -989,17 +973,17 @@ impl PersonRepository for SeaOrmPersonRepository {
         });
 
         // Log audit
-        if let Some(old_person) = old_person {
-            if let Ok(old_json) = serde_json::to_value(&old_person) {
-                self.log_audit(
-                    "DELETE",
-                    *id,
-                    Some(old_json),
-                    None,
-                    &AuditContext::default(),
-                )
-                .await;
-            }
+        if let Some(old_person) = old_person
+            && let Ok(old_json) = serde_json::to_value(&old_person)
+        {
+            self.log_audit(
+                "DELETE",
+                *id,
+                Some(old_json),
+                None,
+                &AuditContext::default(),
+            )
+            .await;
         }
 
         Ok(())

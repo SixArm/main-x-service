@@ -19,7 +19,7 @@ use uuid::Uuid;
 /// the JSON wire format. The privacy layer (`crate::privacy`) gates each
 /// data-handling action on the presence of an [`Active`](ConsentStatus::Active)
 /// consent of the matching type.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ConsentType {
     /// Consent for data processing

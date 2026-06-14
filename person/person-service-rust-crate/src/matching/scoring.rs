@@ -36,6 +36,7 @@ pub struct ProbabilisticScorer {
 
 impl ProbabilisticScorer {
     /// Create a new probabilistic scorer from a [`MatchingConfig`].
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self { config }
     }
@@ -47,7 +48,28 @@ impl ProbabilisticScorer {
     /// otherwise returns the weight-renormalized average over the
     /// components present on both records. The full
     /// [`MatchScoreBreakdown`] is always included.
+    #[must_use]
     pub fn calculate_score(&self, person: &Person, candidate: &Person) -> MatchResult {
+        /// Weight of the name component — the dominant demographic
+        /// signal, hence the largest share (`0.30`).
+        const NAME_WEIGHT: f64 = 0.30;
+        /// Weight of the birth-date component (`0.25`), the second
+        /// strongest demographic discriminator.
+        const DOB_WEIGHT: f64 = 0.25;
+        /// Weight of the gender component (`0.10`); low-entropy (roughly
+        /// binary), so it contributes little on its own.
+        const GENDER_WEIGHT: f64 = 0.10;
+        /// Weight of the address component (`0.10`).
+        const ADDRESS_WEIGHT: f64 = 0.10;
+        /// Weight of the identifier component (`0.10`).
+        const IDENTIFIER_WEIGHT: f64 = 0.10;
+        /// Weight of the tax-ID component (`0.10`) when it does not
+        /// short-circuit above.
+        const TAX_ID_WEIGHT: f64 = 0.10;
+        /// Weight of the document component (`0.05`) when it does not
+        /// short-circuit above.
+        const DOCUMENT_WEIGHT: f64 = 0.05;
+
         // Calculate individual component scores
         let name_score = name_matching::match_names(&person.name, &candidate.name);
 
@@ -114,26 +136,6 @@ impl ProbabilisticScorer {
         // components rather than penalising absent ones. Two records
         // with identical name+DOB+gender (and no address / identifier /
         // tax_id / documents) therefore score 1.0, not 0.65.
-        /// Weight of the name component — the dominant demographic
-        /// signal, hence the largest share (`0.30`).
-        const NAME_WEIGHT: f64 = 0.30;
-        /// Weight of the birth-date component (`0.25`), the second
-        /// strongest demographic discriminator.
-        const DOB_WEIGHT: f64 = 0.25;
-        /// Weight of the gender component (`0.10`); low-entropy (roughly
-        /// binary), so it contributes little on its own.
-        const GENDER_WEIGHT: f64 = 0.10;
-        /// Weight of the address component (`0.10`).
-        const ADDRESS_WEIGHT: f64 = 0.10;
-        /// Weight of the identifier component (`0.10`).
-        const IDENTIFIER_WEIGHT: f64 = 0.10;
-        /// Weight of the tax-ID component (`0.10`) when it does not
-        /// short-circuit above.
-        const TAX_ID_WEIGHT: f64 = 0.10;
-        /// Weight of the document component (`0.05`) when it does not
-        /// short-circuit above.
-        const DOCUMENT_WEIGHT: f64 = 0.05;
-
         let mut weighted_sum = 0.0_f64;
         let mut weight_sum = 0.0_f64;
 
@@ -194,6 +196,7 @@ impl ProbabilisticScorer {
     }
 
     /// Return `true` when `score` meets the configured threshold.
+    #[must_use]
     pub fn is_match(&self, score: f64) -> bool {
         score >= self.config.threshold_score
     }
@@ -202,6 +205,7 @@ impl ProbabilisticScorer {
     ///
     /// `>= 0.95` is definite, `>= threshold` is probable, `>= 0.50` is
     /// possible, anything lower is unlikely.
+    #[must_use]
     pub fn classify_match(&self, score: f64) -> MatchQuality {
         // `0.95` is the fixed definite/probable cutoff (auto-merge-grade
         // confidence); below it but at/above the configured threshold is
@@ -233,6 +237,7 @@ pub struct DeterministicScorer {
 
 impl DeterministicScorer {
     /// Create a new deterministic scorer from a [`MatchingConfig`].
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self { _config: config }
     }
@@ -244,6 +249,7 @@ impl DeterministicScorer {
     /// for name `>= 0.90`, DOB `>= 0.95`, and exact gender, and Rule 3
     /// adds an optional address point; the final score is points earned
     /// over points available.
+    #[must_use]
     pub fn calculate_score(&self, person: &Person, candidate: &Person) -> MatchResult {
         let mut total_score = 0.0;
         let mut points_available = 0.0;
@@ -380,6 +386,7 @@ impl DeterministicScorer {
 
     /// Return `true` when a deterministic score meets the `0.75` bar
     /// (at least three of the four rules satisfied).
+    #[must_use]
     pub fn is_match(&self, score: f64) -> bool {
         score >= 0.75 // Require at least 3/4 rules to match
     }
@@ -401,6 +408,7 @@ pub enum MatchQuality {
 impl MatchQuality {
     /// Lowercase string name (`"definite"`, `"probable"`, …) for API
     /// responses and review-queue records.
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             MatchQuality::Definite => "definite",
@@ -412,6 +420,7 @@ impl MatchQuality {
 
     /// Return `true` for qualities that count as a match (definite or
     /// probable).
+    #[must_use]
     pub fn is_match(&self) -> bool {
         matches!(self, MatchQuality::Definite | MatchQuality::Probable)
     }
@@ -605,7 +614,7 @@ mod tests {
         person2.addresses = vec![addr];
 
         // Add matching identifiers
-        let id = crate::models::Identifier::mrn("hospital-a".into(), "MRN-001".into());
+        let id = crate::models::Identifier::mrn("hospital-a", "MRN-001".into());
         person1.identifiers = vec![id.clone()];
         person2.identifiers = vec![id];
 
@@ -684,11 +693,11 @@ mod tests {
         person2.tax_id = Some("123-45-6789".into());
 
         let result = scorer.calculate_score(&person1, &person2);
-        assert_eq!(
-            result.score, 1.0,
+        assert!(
+            (result.score - 1.0).abs() < f64::EPSILON,
             "Tax ID match should short-circuit to 1.0"
         );
-        assert_eq!(result.breakdown.tax_id_score, 1.0);
+        assert!((result.breakdown.tax_id_score - 1.0).abs() < f64::EPSILON);
     }
 
     /// A shared exact identifier short-circuits to 1.0.
@@ -706,8 +715,8 @@ mod tests {
         person2.identifiers = vec![id];
 
         let result = scorer.calculate_score(&person1, &person2);
-        assert_eq!(
-            result.score, 1.0,
+        assert!(
+            (result.score - 1.0).abs() < f64::EPSILON,
             "Exact identifier match should short-circuit to 1.0"
         );
     }

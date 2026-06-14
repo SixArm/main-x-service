@@ -1,6 +1,6 @@
 //! Shared helpers for integration tests.
 //!
-//! These tests need a real PostgreSQL — point `DATABASE_URL` at one
+//! These tests need a real `PostgreSQL` — point `DATABASE_URL` at one
 //! before running `cargo test --test api_integration_test`. The
 //! helpers are async because [`event_service::db::create_connection`]
 //! is.

@@ -128,18 +128,18 @@ pub fn to_matcher_person(p: &Person) -> MPerson {
         b = b.family_name(family);
     }
     // `name.given[0]` → matcher `given_name` (the first/primary forename)
-    if let Some(g) = p.name.given.first() {
-        if !g.trim().is_empty() {
-            b = b.given_name(g.trim());
-        }
+    if let Some(g) = p.name.given.first()
+        && !g.trim().is_empty()
+    {
+        b = b.given_name(g.trim());
     }
     // `name.given[1]` → matcher `middle_name` (the second forename, if any).
     // Any further given names (`given[2..]`) have no matcher slot and are
     // intentionally dropped.
-    if let Some(m) = p.name.given.get(1) {
-        if !m.trim().is_empty() {
-            b = b.middle_name(m.trim());
-        }
+    if let Some(m) = p.name.given.get(1)
+        && !m.trim().is_empty()
+    {
+        b = b.middle_name(m.trim());
     }
 
     // --- Demographics -----------------------------------------------------
@@ -160,16 +160,16 @@ pub fn to_matcher_person(p: &Person) -> MPerson {
     // wants three distinct scalar slots. Split the vector by channel and
     // sample the FIRST entry of each into its slot:
     //   first telecom with system Phone → matcher `phone`
-    if let Some(v) = first_telecom(&p.telecom, ContactPointSystem::Phone) {
+    if let Some(v) = first_telecom(&p.telecom, &ContactPointSystem::Phone) {
         b = b.phone(v);
     }
     //   first telecom with system Sms   → matcher `mobile` (SMS-capable ≈ cell)
-    if let Some(v) = first_telecom(&p.telecom, ContactPointSystem::Sms) {
+    if let Some(v) = first_telecom(&p.telecom, &ContactPointSystem::Sms) {
         b = b.mobile(v);
     }
     //   first telecom with system Email → matcher `email`
     // Fax / Pager / Url / Other channels have no matcher slot and are dropped.
-    if let Some(v) = first_telecom(&p.telecom, ContactPointSystem::Email) {
+    if let Some(v) = first_telecom(&p.telecom, &ContactPointSystem::Email) {
         b = b.email(v);
     }
 
@@ -245,10 +245,10 @@ fn map_gender(g: Gender) -> MGender {
 /// Used to sample one phone / SMS / email out of the heterogeneous
 /// telecom vector for the matcher's scalar slots. Returns `None` when no
 /// contact point uses the requested channel.
-fn first_telecom(telecom: &[ContactPoint], system: ContactPointSystem) -> Option<String> {
+fn first_telecom(telecom: &[ContactPoint], system: &ContactPointSystem) -> Option<String> {
     telecom
         .iter()
-        .find(|c| matches_system(&c.system, &system))
+        .find(|c| matches_system(&c.system, system))
         .map(|c| c.value.clone())
 }
 
@@ -328,7 +328,7 @@ fn map_address(a: &Address) -> Option<MAddress> {
 /// Routing key is `(IdentifierType, system)` — the URI takes precedence so a
 /// `SSN` carrying a Brazilian CPF system URI maps to `br_cpf`, not `us_ssn`.
 /// Unknown system URIs for typed identifiers fall back to the type's default
-/// country (SSN→US, PPN→passport_book, etc.).
+/// country (SSN→US, `PPN→passport_book`, etc.).
 fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
     let sys = id.system.to_ascii_lowercase();
     let val = id.value.trim();
@@ -375,7 +375,7 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
     }
     if sys.contains("ihi") {
         // AU and IE both call theirs IHI; AU is 16 digits, IE is 7.
-        if val.chars().filter(|c| c.is_ascii_digit()).count() >= 14 {
+        if val.chars().filter(char::is_ascii_digit).count() >= 14 {
             return b.au_ihi(val);
         }
         return b.ie_ihi(val);
@@ -427,10 +427,14 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
 
     // Type-based defaults.
     match id.identifier_type {
-        IdentifierType::TAX => b.us_ssn(val),
-        IdentifierType::SSN => b.us_ssn(val),
-        IdentifierType::PPN => b, // passports are handled via IdentityDocument
-        IdentifierType::MRN | IdentifierType::DL | IdentifierType::NPI | IdentifierType::Other => b,
+        IdentifierType::TAX | IdentifierType::SSN => b.us_ssn(val),
+        // PPN passports are handled via IdentityDocument; the remaining
+        // types have no national-ID matcher slot.
+        IdentifierType::PPN
+        | IdentifierType::MRN
+        | IdentifierType::DL
+        | IdentifierType::NPI
+        | IdentifierType::Other => b,
     }
 }
 

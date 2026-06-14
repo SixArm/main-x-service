@@ -22,7 +22,7 @@ use worker_service::{api::ApiResponse, models::Worker};
 
 /// `GET /api/v1/health` returns 200 with the service name and "healthy".
 #[tokio::test]
-#[ignore]
+#[ignore = "requires a running PostgreSQL database"]
 async fn test_health_check() {
     let app = common::create_test_router().await;
 
@@ -49,7 +49,7 @@ async fn test_health_check() {
 
 /// `POST /api/v1/workers` creates a worker and returns it in the response.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires a running PostgreSQL database"]
 async fn test_create_worker() {
     let app = common::create_test_router().await;
 
@@ -95,7 +95,7 @@ async fn test_create_worker() {
 
 /// A created worker can be fetched back by its id via `GET /workers/{id}`.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires a running PostgreSQL database"]
 async fn test_create_and_get_worker() {
     let app = common::create_test_router().await;
 
@@ -140,7 +140,7 @@ async fn test_create_and_get_worker() {
     let get_response = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/v1/workers/{}", worker_id))
+                .uri(format!("/api/v1/workers/{worker_id}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -163,7 +163,7 @@ async fn test_create_and_get_worker() {
 
 /// `PUT /workers/{id}` updates an existing worker's fields.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires a running PostgreSQL database"]
 async fn test_update_worker() {
     let app = common::create_test_router().await;
 
@@ -208,7 +208,7 @@ async fn test_update_worker() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(&format!("/api/v1/workers/{}", worker.id))
+                .uri(format!("/api/v1/workers/{}", worker.id))
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&worker).unwrap()))
                 .unwrap(),
@@ -230,7 +230,7 @@ async fn test_update_worker() {
 
 /// `DELETE /workers/{id}` soft-deletes a worker (subsequent reads 404).
 #[tokio::test]
-#[ignore]
+#[ignore = "requires a running PostgreSQL database"]
 async fn test_delete_worker() {
     let app = common::create_test_router().await;
 
@@ -274,7 +274,7 @@ async fn test_delete_worker() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(&format!("/api/v1/workers/{}", worker.id))
+                .uri(format!("/api/v1/workers/{}", worker.id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -287,7 +287,7 @@ async fn test_delete_worker() {
     let get_response = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/v1/workers/{}", worker.id))
+                .uri(format!("/api/v1/workers/{}", worker.id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -300,7 +300,7 @@ async fn test_delete_worker() {
 
 /// `GET /workers/search` returns previously created workers by name.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires a running PostgreSQL database"]
 async fn test_search_workers() {
     let app = common::create_test_router().await;
 
@@ -340,10 +340,7 @@ async fn test_search_workers() {
     let search_response = app
         .oneshot(
             Request::builder()
-                .uri(&format!(
-                    "/api/v1/workers/search?q={}&limit=10",
-                    family_name
-                ))
+                .uri(format!("/api/v1/workers/search?q={family_name}&limit=10"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -364,7 +361,7 @@ async fn test_search_workers() {
 
 /// `GET /workers/{id}` for an unknown id returns 404.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires a running PostgreSQL database"]
 async fn test_get_worker_not_found() {
     let app = common::create_test_router().await;
 
@@ -412,7 +409,7 @@ async fn test_fhir_worker_route_is_mounted() {
 /// repository and returns a FHIR-conformant `404` (resourceType
 /// `OperationOutcome`), confirming the mounted route serves FHIR responses.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires a running PostgreSQL database"]
 async fn test_fhir_worker_not_found_returns_operation_outcome() {
     let app = common::create_test_router().await;
 

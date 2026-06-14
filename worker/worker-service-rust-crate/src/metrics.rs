@@ -183,6 +183,7 @@ impl Metrics {
     /// Panics only on impossible conditions: encoding into an in-memory
     /// `Vec` cannot fail, and the Prometheus text encoder always emits valid
     /// UTF-8, so the inner `.expect(...)` calls never fire in practice.
+    #[must_use]
     pub fn render(&self) -> String {
         let encoder = TextEncoder::new();
         let metric_families = self.registry.gather();

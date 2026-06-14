@@ -57,22 +57,22 @@ pub fn to_matcher_worker(w: &Worker) -> MWorker {
     if !family.is_empty() {
         b = b.family_name(family);
     }
-    if let Some(g) = w.name.given.first() {
-        if !g.trim().is_empty() {
-            b = b.given_name(g.trim());
-        }
+    if let Some(g) = w.name.given.first()
+        && !g.trim().is_empty()
+    {
+        b = b.given_name(g.trim());
     }
-    if let Some(m) = w.name.given.get(1) {
-        if !m.trim().is_empty() {
-            b = b.middle_name(m.trim());
-        }
+    if let Some(m) = w.name.given.get(1)
+        && !m.trim().is_empty()
+    {
+        b = b.middle_name(m.trim());
     }
 
     // --- Demographics -----------------------------------------------------
-    if let Some(dob) = w.birth_date {
-        if dob.year() > 1 {
-            b = b.date_of_birth(dob);
-        }
+    if let Some(dob) = w.birth_date
+        && dob.year() > 1
+    {
+        b = b.date_of_birth(dob);
     }
     b = b.gender(map_gender(w.gender));
 
@@ -138,7 +138,7 @@ fn map_gender(g: Gender) -> MGender {
 fn first_telecom(telecom: &[ContactPoint], system: ContactPointSystem) -> Option<String> {
     telecom
         .iter()
-        .find(|c| matches_system(&c.system, &system))
+        .find(|c| matches_system(c.system, system))
         .map(|c| c.value.clone())
 }
 
@@ -146,7 +146,7 @@ fn first_telecom(telecom: &[ContactPoint], system: ContactPointSystem) -> Option
 ///
 /// A dedicated comparison (rather than `PartialEq`) keeps the variant list
 /// explicit, so adding a new system forces a deliberate decision here.
-fn matches_system(a: &ContactPointSystem, b: &ContactPointSystem) -> bool {
+fn matches_system(a: ContactPointSystem, b: ContactPointSystem) -> bool {
     matches!(
         (a, b),
         (ContactPointSystem::Phone, ContactPointSystem::Phone)
@@ -267,7 +267,7 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
         // "IHI" is ambiguous between Australia and Ireland; disambiguate by
         // length — the Australian IHI is a 16-digit number, the Irish one is
         // shorter — so a 14+-digit value routes to AU, else IE.
-        if val.chars().filter(|c| c.is_ascii_digit()).count() >= 14 {
+        if val.chars().filter(char::is_ascii_digit).count() >= 14 {
             return b.au_ihi(val);
         }
         return b.ie_ihi(val);

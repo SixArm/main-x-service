@@ -71,5 +71,5 @@ pub fn create_test_router_no_db() -> Router {
 /// each other's records during search/dedup assertions.
 pub fn unique_worker_name(suffix: &str) -> String {
     let timestamp = chrono::Utc::now().timestamp_micros();
-    format!("TestWorker{}_{}", suffix, timestamp)
+    format!("TestWorker{suffix}_{timestamp}")
 }

@@ -121,6 +121,7 @@ impl MatchScoreBreakdown {
     /// assert!(s.contains("name"));
     /// assert!(s.contains("gender"));
     /// ```
+    #[must_use]
     pub fn summary(&self) -> String {
         let mut parts = Vec::new();
 
@@ -165,10 +166,18 @@ impl MatchScoreBreakdown {
 pub trait WorkerMatcher: Send + Sync {
     /// Scores `worker` against a single `candidate`, returning the candidate,
     /// the overall score, and the component breakdown.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying scoring fails.
     fn match_workers(&self, worker: &Worker, candidate: &Worker) -> Result<MatchResult>;
 
     /// Scores `worker` against every candidate, keeps those that clear the
     /// threshold, and returns them sorted by descending score.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if scoring any candidate fails.
     fn find_matches(&self, worker: &Worker, candidates: &[Worker]) -> Result<Vec<MatchResult>>;
 
     /// Returns `true` when `score` is at or above this matcher's threshold.
@@ -184,6 +193,7 @@ pub struct ProbabilisticMatcher {
 
 impl ProbabilisticMatcher {
     /// Builds a probabilistic matcher from the given matching configuration.
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self {
             scorer: ProbabilisticScorer::new(config),
@@ -194,12 +204,14 @@ impl ProbabilisticMatcher {
     ///
     /// Currently hard-coded to `0.85`; wiring this through to the config is
     /// tracked as a TODO in the source.
+    #[must_use]
     pub fn threshold(&self) -> f64 {
         0.85 // TODO: expose config properly
     }
 
     /// Classifies a raw score into a coarse [`MatchQuality`] band (definite /
     /// probable / possible / unlikely).
+    #[must_use]
     pub fn classify_match(&self, score: f64) -> MatchQuality {
         self.scorer.classify_match(score)
     }
@@ -243,6 +255,7 @@ pub struct DeterministicMatcher {
 
 impl DeterministicMatcher {
     /// Builds a deterministic matcher from the given matching configuration.
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self {
             scorer: DeterministicScorer::new(config),
@@ -350,18 +363,18 @@ mod tests {
             ), // No match
         ];
 
-        let matches = matcher.find_matches(&worker, &candidates).unwrap();
+        let match_results = matcher.find_matches(&worker, &candidates).unwrap();
 
         // Should find at least one match (the exact match)
         assert!(
-            matches.len() >= 1,
+            !match_results.is_empty(),
             "Expected at least 1 match, got {}",
-            matches.len()
+            match_results.len()
         );
 
         // First match should have highest score
-        if matches.len() > 1 {
-            assert!(matches[0].score >= matches[1].score);
+        if match_results.len() > 1 {
+            assert!(match_results[0].score >= match_results[1].score);
         }
     }
 
@@ -446,11 +459,11 @@ mod tests {
             create_test_worker("Smyth", "John", dob), // Close match
         ];
 
-        let matches = matcher.find_matches(&worker, &candidates).unwrap();
-        assert!(!matches.is_empty(), "Should find at least one match");
+        let match_results = matcher.find_matches(&worker, &candidates).unwrap();
+        assert!(!match_results.is_empty(), "Should find at least one match");
 
         // Results should be sorted descending by score
-        for window in matches.windows(2) {
+        for window in match_results.windows(2) {
             assert!(
                 window[0].score >= window[1].score,
                 "Results should be sorted descending: {} >= {}",
@@ -469,9 +482,9 @@ mod tests {
         let dob = Some(chrono::NaiveDate::from_ymd_opt(1980, 1, 15).unwrap());
         let worker = create_test_worker("Smith", "John", dob);
 
-        let matches = matcher.find_matches(&worker, &[]).unwrap();
+        let match_results = matcher.find_matches(&worker, &[]).unwrap();
         assert!(
-            matches.is_empty(),
+            match_results.is_empty(),
             "Empty candidates should produce empty results"
         );
     }

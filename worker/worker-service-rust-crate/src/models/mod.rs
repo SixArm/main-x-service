@@ -178,7 +178,7 @@ pub struct ContactPoint {
 
 /// The communication system a [`ContactPoint`] value uses. Serializes in
 /// lowercase to match the FHIR wire format.
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum ContactPointSystem {
     /// Telephone number.

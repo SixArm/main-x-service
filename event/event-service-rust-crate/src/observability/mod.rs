@@ -25,6 +25,10 @@ pub mod traces;
 /// Initialize tracing/logging from [`ObservabilityConfig`]: build the
 /// OTLP resource, install a JSON `tracing` subscriber, and honor
 /// `RUST_LOG` (falling back to the configured log level).
+///
+/// # Errors
+///
+/// Returns an error if the tracing subscriber cannot be installed.
 pub fn init_telemetry(config: &ObservabilityConfig) -> Result<()> {
     // Set up resource with service information
     let _resource = Resource::new(vec![
@@ -80,9 +84,17 @@ pub mod custom_metrics {
 
     impl EventMetrics {
         /// Build the instrument set. Currently unimplemented (`todo!`).
+        #[must_use]
         pub fn new() -> Self {
             // TODO: Initialize metrics
             todo!("Initialize OpenTelemetry metrics")
+        }
+    }
+
+    impl Default for EventMetrics {
+        /// Same as [`EventMetrics::new`].
+        fn default() -> Self {
+            Self::new()
         }
     }
 }

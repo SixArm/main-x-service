@@ -12,7 +12,7 @@ use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use tempfile::TempDir;
 use uuid::Uuid;
 
-use worker_service::models::*;
+use worker_service::models::{Gender, HumanName, Worker};
 use worker_service::search::SearchEngine;
 
 /// Builds a minimal indexable [`Worker`] fixture for the search benchmarks.
@@ -119,7 +119,7 @@ fn bench_index_single_worker(c: &mut Criterion) {
     );
 
     c.bench_function("index_single_worker", |b| {
-        b.iter(|| engine.index_worker(black_box(&worker)).unwrap())
+        b.iter(|| engine.index_worker(black_box(&worker)).unwrap());
     });
 }
 
@@ -141,7 +141,7 @@ fn bench_index_bulk_workers(c: &mut Criterion) {
                 (temp_dir, engine)
             },
             |(_temp_dir, engine)| engine.index_workers(black_box(&workers_50)).unwrap(),
-        )
+        );
     });
 }
 
@@ -156,10 +156,12 @@ fn bench_search_queries(c: &mut Criterion) {
         .map(|i| {
             let family = FAMILY_NAMES[i % FAMILY_NAMES.len()];
             let given = GIVEN_NAMES[i % GIVEN_NAMES.len()];
+            let year_offset = i32::try_from(i).unwrap_or(0);
+            let date_seed = u32::try_from(i).unwrap_or(0);
             let dob = chrono::NaiveDate::from_ymd_opt(
-                1950 + (i as i32 % 50),
-                1 + (i as u32 % 12),
-                1 + (i as u32 % 28),
+                1950 + (year_offset % 50),
+                1 + (date_seed % 12),
+                1 + (date_seed % 28),
             );
             create_test_worker(family, given, dob)
         })
@@ -169,15 +171,15 @@ fn bench_search_queries(c: &mut Criterion) {
     engine.reload().unwrap();
 
     c.bench_function("search_1000_workers_exact", |b| {
-        b.iter(|| engine.search(black_box("Smith"), 10).unwrap())
+        b.iter(|| engine.search(black_box("Smith"), 10).unwrap());
     });
 
     c.bench_function("search_1000_workers_limit_50", |b| {
-        b.iter(|| engine.search(black_box("Smith"), 50).unwrap())
+        b.iter(|| engine.search(black_box("Smith"), 50).unwrap());
     });
 
     c.bench_function("fuzzy_search_1000_workers", |b| {
-        b.iter(|| engine.fuzzy_search(black_box("Smyth"), 10).unwrap())
+        b.iter(|| engine.fuzzy_search(black_box("Smyth"), 10).unwrap());
     });
 
     c.bench_function("search_by_name_and_year_1000", |b| {
@@ -185,11 +187,11 @@ fn bench_search_queries(c: &mut Criterion) {
             engine
                 .search_by_name_and_year(black_box("Smith"), black_box(Some(1980)), 10)
                 .unwrap()
-        })
+        });
     });
 
     c.bench_function("search_no_results", |b| {
-        b.iter(|| engine.search(black_box("Zzzzxyzzy"), 10).unwrap())
+        b.iter(|| engine.search(black_box("Zzzzxyzzy"), 10).unwrap());
     });
 }
 
@@ -207,7 +209,7 @@ fn bench_delete_worker(c: &mut Criterion) {
                 (temp_dir, engine, id)
             },
             |(_temp_dir, engine, id)| engine.delete_worker(black_box(&id)).unwrap(),
-        )
+        );
     });
 }
 

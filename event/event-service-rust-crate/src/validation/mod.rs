@@ -29,6 +29,7 @@ impl ValidationError {
 }
 
 /// Validate an event, collecting every error rather than returning early.
+#[must_use]
 pub fn validate_event(event: &Event) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
@@ -38,101 +39,13 @@ pub fn validate_event(event: &Event) -> Vec<ValidationError> {
     }
 
     // ---- Time window ----------------------------------------------------
-    if let Some(end) = event.end_date {
-        if end < event.start_date {
-            errors.push(ValidationError::new(
-                "end_date",
-                "end_date must be on or after start_date",
-            ));
-        }
-    }
-
-    if let Some(door) = event.door_time {
-        if door > event.start_date {
-            errors.push(ValidationError::new(
-                "door_time",
-                "door_time must be on or before start_date",
-            ));
-        }
-    }
-
-    if let Some(ref duration) = event.duration {
-        if !is_iso8601_duration(duration) {
-            errors.push(ValidationError::new(
-                "duration",
-                "duration must be an ISO 8601 duration (e.g. \"PT1H30M\")",
-            ));
-        }
-    }
-
-    if let Some(ref tz) = event.time_zone {
-        if tz.trim().is_empty() {
-            errors.push(ValidationError::new(
-                "time_zone",
-                "time_zone must be a non-empty IANA name (e.g. \"Europe/London\")",
-            ));
-        }
-    }
+    errors.extend(validate_time_window(event));
 
     // ---- Attendance mode <-> location coherence -------------------------
-    match event.event_attendance_mode {
-        EventAttendanceMode::Online => {
-            let has_virtual = event
-                .location
-                .iter()
-                .any(|loc| matches!(loc, Location::Virtual(_)));
-            if !has_virtual && !event.location.is_empty() {
-                errors.push(ValidationError::new(
-                    "location",
-                    "online events should include at least one Virtual location",
-                ));
-            }
-        }
-        EventAttendanceMode::Mixed => {
-            let has_physical = event
-                .location
-                .iter()
-                .any(|loc| matches!(loc, Location::Place(_) | Location::PostalAddress(_)));
-            let has_virtual = event
-                .location
-                .iter()
-                .any(|loc| matches!(loc, Location::Virtual(_)));
-            if !(has_physical && has_virtual) && !event.location.is_empty() {
-                errors.push(ValidationError::new(
-                    "location",
-                    "mixed events should include both a physical and a Virtual location",
-                ));
-            }
-        }
-        EventAttendanceMode::Offline => {}
-    }
+    errors.extend(validate_attendance_location(event));
 
     // ---- Capacities -----------------------------------------------------
-    // u32 already excludes negatives. Cross-check: physical + virtual <= total.
-    if let (Some(total), Some(phys), Some(virt)) = (
-        event.maximum_attendee_capacity,
-        event.maximum_physical_attendee_capacity,
-        event.maximum_virtual_attendee_capacity,
-    ) {
-        if phys.saturating_add(virt) > total {
-            errors.push(ValidationError::new(
-                "maximum_attendee_capacity",
-                "physical + virtual capacity exceeds total maximum_attendee_capacity",
-            ));
-        }
-    }
-
-    if let (Some(remaining), Some(total)) = (
-        event.remaining_attendee_capacity,
-        event.maximum_attendee_capacity,
-    ) {
-        if remaining > total {
-            errors.push(ValidationError::new(
-                "remaining_attendee_capacity",
-                "remaining_attendee_capacity cannot exceed maximum_attendee_capacity",
-            ));
-        }
-    }
+    errors.extend(validate_capacities(event));
 
     // ---- Languages ------------------------------------------------------
     for (i, lang) in event.in_language.iter().enumerate() {
@@ -155,21 +68,21 @@ pub fn validate_event(event: &Event) -> Vec<ValidationError> {
                         "Place name is required",
                     ));
                 }
-                if let Some(lat) = place.latitude {
-                    if !(-90.0..=90.0).contains(&lat) {
-                        errors.push(ValidationError::new(
-                            format!("{prefix}.latitude"),
-                            "latitude must be between -90 and 90",
-                        ));
-                    }
+                if let Some(lat) = place.latitude
+                    && !(-90.0..=90.0).contains(&lat)
+                {
+                    errors.push(ValidationError::new(
+                        format!("{prefix}.latitude"),
+                        "latitude must be between -90 and 90",
+                    ));
                 }
-                if let Some(lon) = place.longitude {
-                    if !(-180.0..=180.0).contains(&lon) {
-                        errors.push(ValidationError::new(
-                            format!("{prefix}.longitude"),
-                            "longitude must be between -180 and 180",
-                        ));
-                    }
+                if let Some(lon) = place.longitude
+                    && !(-180.0..=180.0).contains(&lon)
+                {
+                    errors.push(ValidationError::new(
+                        format!("{prefix}.longitude"),
+                        "longitude must be between -180 and 180",
+                    ));
                 }
                 if let Some(ref addr) = place.address {
                     errors.extend(validate_address(addr, &format!("{prefix}.address")));
@@ -193,6 +106,22 @@ pub fn validate_event(event: &Event) -> Vec<ValidationError> {
     }
 
     // ---- Identifiers ----------------------------------------------------
+    errors.extend(validate_identifiers(event));
+
+    // ---- Parties (organizer/performer/attendee/...) ---------------------
+    errors.extend(validate_parties(event));
+
+    // ---- Offers --------------------------------------------------------
+    for (i, offer) in event.offers.iter().enumerate() {
+        errors.extend(validate_offer(offer, &format!("offers[{i}]")));
+    }
+
+    errors
+}
+
+/// Validate each external identifier: `system` and `value` non-empty.
+fn validate_identifiers(event: &Event) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
     for (i, id) in event.identifiers.iter().enumerate() {
         if id.system.trim().is_empty() {
             errors.push(ValidationError::new(
@@ -207,42 +136,136 @@ pub fn validate_event(event: &Event) -> Vec<ValidationError> {
             ));
         }
     }
-
-    // ---- Parties (organizer/performer/attendee/...) ---------------------
-    for (i, party) in event.organizers.iter().enumerate() {
-        if party.name.trim().is_empty() {
-            errors.push(ValidationError::new(
-                format!("organizers[{i}].name"),
-                "organizer.name is required",
-            ));
-        }
-    }
-    for (i, party) in event.performers.iter().enumerate() {
-        if party.name.trim().is_empty() {
-            errors.push(ValidationError::new(
-                format!("performers[{i}].name"),
-                "performer.name is required",
-            ));
-        }
-    }
-    for (i, party) in event.attendees.iter().enumerate() {
-        if party.name.trim().is_empty() {
-            errors.push(ValidationError::new(
-                format!("attendees[{i}].name"),
-                "attendee.name is required",
-            ));
-        }
-    }
-
-    // ---- Offers --------------------------------------------------------
-    for (i, offer) in event.offers.iter().enumerate() {
-        errors.extend(validate_offer(offer, &format!("offers[{i}]")));
-    }
-
     errors
 }
 
-/// Validate an [`Address`]. At least one of city / postal_code /
+/// Validate the party role-lists: each organizer / performer / attendee
+/// must carry a non-empty `name`.
+fn validate_parties(event: &Event) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+    for (role, singular, parties) in [
+        ("organizers", "organizer", &event.organizers),
+        ("performers", "performer", &event.performers),
+        ("attendees", "attendee", &event.attendees),
+    ] {
+        for (i, party) in parties.iter().enumerate() {
+            if party.name.trim().is_empty() {
+                errors.push(ValidationError::new(
+                    format!("{role}[{i}].name"),
+                    format!("{singular}.name is required"),
+                ));
+            }
+        }
+    }
+    errors
+}
+
+/// Validate the time-window fields: `end_date >= start_date`,
+/// `door_time <= start_date`, ISO 8601 `duration`, non-empty `time_zone`.
+fn validate_time_window(event: &Event) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+    if let Some(end) = event.end_date
+        && end < event.start_date
+    {
+        errors.push(ValidationError::new(
+            "end_date",
+            "end_date must be on or after start_date",
+        ));
+    }
+    if let Some(door) = event.door_time
+        && door > event.start_date
+    {
+        errors.push(ValidationError::new(
+            "door_time",
+            "door_time must be on or before start_date",
+        ));
+    }
+    if let Some(ref duration) = event.duration
+        && !is_iso8601_duration(duration)
+    {
+        errors.push(ValidationError::new(
+            "duration",
+            "duration must be an ISO 8601 duration (e.g. \"PT1H30M\")",
+        ));
+    }
+    if let Some(ref tz) = event.time_zone
+        && tz.trim().is_empty()
+    {
+        errors.push(ValidationError::new(
+            "time_zone",
+            "time_zone must be a non-empty IANA name (e.g. \"Europe/London\")",
+        ));
+    }
+    errors
+}
+
+/// Validate coherence between `event_attendance_mode` and the location
+/// list (online ⇒ a Virtual location; mixed ⇒ physical + Virtual).
+fn validate_attendance_location(event: &Event) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+    match event.event_attendance_mode {
+        EventAttendanceMode::Online => {
+            let has_virtual = event
+                .location
+                .iter()
+                .any(|loc| matches!(loc, Location::Virtual(_)));
+            if !has_virtual && !event.location.is_empty() {
+                errors.push(ValidationError::new(
+                    "location",
+                    "online events should include at least one Virtual location",
+                ));
+            }
+        }
+        EventAttendanceMode::Mixed => {
+            let has_physical = event
+                .location
+                .iter()
+                .any(|loc| matches!(loc, Location::Place(_) | Location::PostalAddress(_)));
+            let has_virtual = event
+                .location
+                .iter()
+                .any(|loc| matches!(loc, Location::Virtual(_)));
+            if !(event.location.is_empty() || has_physical && has_virtual) {
+                errors.push(ValidationError::new(
+                    "location",
+                    "mixed events should include both a physical and a Virtual location",
+                ));
+            }
+        }
+        EventAttendanceMode::Offline => {}
+    }
+    errors
+}
+
+/// Validate the attendee-capacity invariants: physical + virtual ≤ total
+/// and remaining ≤ total (`u32` already excludes negatives).
+fn validate_capacities(event: &Event) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+    if let (Some(total), Some(phys), Some(virt)) = (
+        event.maximum_attendee_capacity,
+        event.maximum_physical_attendee_capacity,
+        event.maximum_virtual_attendee_capacity,
+    ) && phys.saturating_add(virt) > total
+    {
+        errors.push(ValidationError::new(
+            "maximum_attendee_capacity",
+            "physical + virtual capacity exceeds total maximum_attendee_capacity",
+        ));
+    }
+    if let (Some(remaining), Some(total)) = (
+        event.remaining_attendee_capacity,
+        event.maximum_attendee_capacity,
+    ) && remaining > total
+    {
+        errors.push(ValidationError::new(
+            "remaining_attendee_capacity",
+            "remaining_attendee_capacity cannot exceed maximum_attendee_capacity",
+        ));
+    }
+    errors
+}
+
+/// Validate an [`Address`]. At least one of city / `postal_code` /
 /// country must be present.
 fn validate_address(addr: &Address, prefix: &str) -> Vec<ValidationError> {
     let mut errors = Vec::new();
@@ -278,7 +301,7 @@ fn validate_virtual(v: &VirtualLocation, prefix: &str) -> Vec<ValidationError> {
     errors
 }
 
-/// Validate an [`Offer`]: paired price + currency, valid_from <= valid_through.
+/// Validate an [`Offer`]: paired price + currency, `valid_from` <= `valid_through`.
 fn validate_offer(offer: &Offer, prefix: &str) -> Vec<ValidationError> {
     let mut errors = Vec::new();
     match (offer.price.as_ref(), offer.price_currency.as_ref()) {
@@ -286,37 +309,36 @@ fn validate_offer(offer: &Offer, prefix: &str) -> Vec<ValidationError> {
             format!("{prefix}.price_currency"),
             "price_currency is required when price is set",
         )),
-        (Some(price), _) => {
-            if price.parse::<f64>().is_err() {
-                errors.push(ValidationError::new(
-                    format!("{prefix}.price"),
-                    "price must be a decimal number",
-                ));
-            }
+        (Some(price), _) if price.parse::<f64>().is_err() => {
+            errors.push(ValidationError::new(
+                format!("{prefix}.price"),
+                "price must be a decimal number",
+            ));
         }
         _ => {}
     }
-    if let Some(ref c) = offer.price_currency {
-        if c.len() != 3 || !c.chars().all(|c| c.is_ascii_alphabetic()) {
-            errors.push(ValidationError::new(
-                format!("{prefix}.price_currency"),
-                "price_currency must be a 3-letter ISO 4217 code",
-            ));
-        }
+    if let Some(ref c) = offer.price_currency
+        && (c.len() != 3 || !c.chars().all(|c| c.is_ascii_alphabetic()))
+    {
+        errors.push(ValidationError::new(
+            format!("{prefix}.price_currency"),
+            "price_currency must be a 3-letter ISO 4217 code",
+        ));
     }
-    if let (Some(from), Some(through)) = (offer.valid_from, offer.valid_through) {
-        if through < from {
-            errors.push(ValidationError::new(
-                format!("{prefix}.valid_through"),
-                "valid_through must be on or after valid_from",
-            ));
-        }
+    if let (Some(from), Some(through)) = (offer.valid_from, offer.valid_through)
+        && through < from
+    {
+        errors.push(ValidationError::new(
+            format!("{prefix}.valid_through"),
+            "valid_through must be on or after valid_from",
+        ));
     }
     errors
 }
 
 /// Validate a contact point (used by Party.email / Place.url scenarios
 /// and by callers outside this module).
+#[must_use]
 pub fn validate_contact_point(cp: &ContactPoint, prefix: &str) -> Vec<ValidationError> {
     let mut errors = Vec::new();
     if cp.value.trim().is_empty() {
@@ -327,16 +349,14 @@ pub fn validate_contact_point(cp: &ContactPoint, prefix: &str) -> Vec<Validation
         return errors;
     }
     match cp.system {
-        ContactPointSystem::Email => {
-            if !cp.value.contains('@') || !cp.value.contains('.') {
-                errors.push(ValidationError::new(
-                    format!("{prefix}.value"),
-                    "Invalid email format",
-                ));
-            }
+        ContactPointSystem::Email if (!cp.value.contains('@') || !cp.value.contains('.')) => {
+            errors.push(ValidationError::new(
+                format!("{prefix}.value"),
+                "Invalid email format",
+            ));
         }
         ContactPointSystem::Phone | ContactPointSystem::Sms | ContactPointSystem::Fax => {
-            let digits: String = cp.value.chars().filter(|c| c.is_ascii_digit()).collect();
+            let digits: String = cp.value.chars().filter(char::is_ascii_digit).collect();
             if digits.len() < 7 {
                 errors.push(ValidationError::new(
                     format!("{prefix}.value"),
@@ -371,8 +391,9 @@ fn is_valid_language_code(s: &str) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Normalize/standardize a phone number to E.164-like format.
+#[must_use]
 pub fn normalize_phone(phone: &str, default_country_code: &str) -> String {
-    let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = phone.chars().filter(char::is_ascii_digit).collect();
     if digits.is_empty() {
         return String::new();
     }
@@ -389,6 +410,7 @@ pub fn normalize_phone(phone: &str, default_country_code: &str) -> String {
 }
 
 /// Trim/title-case/uppercase an address for consistent storage.
+#[must_use]
 pub fn standardize_address(addr: &Address) -> Address {
     Address {
         use_type: addr.use_type.clone(),
@@ -453,7 +475,7 @@ mod tests {
     fn valid_event_passes() {
         let event = Event::new("Test", start());
         let errors = validate_event(&event);
-        assert!(errors.is_empty(), "expected no errors, got {:?}", errors);
+        assert!(errors.is_empty(), "expected no errors, got {errors:?}");
     }
 
     /// An empty name yields a `name` error.
@@ -519,7 +541,7 @@ mod tests {
             url: "https://example.test/zoom".into(),
         }));
         let errors = validate_event(&event);
-        assert!(errors.is_empty(), "unexpected errors: {:?}", errors);
+        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
     }
 
     /// Non-ISO durations fail; a valid `PT1H30M` passes.

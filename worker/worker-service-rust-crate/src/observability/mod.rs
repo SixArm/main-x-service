@@ -102,6 +102,14 @@ pub mod custom_metrics {
         pub search_query_duration: Histogram<f64>,
     }
 
+    impl Default for WorkerMetrics {
+        /// Equivalent to [`WorkerMetrics::new`]; panics for the same reason
+        /// (the OpenTelemetry meter pipeline is not yet built).
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl WorkerMetrics {
         /// Not yet implemented — construct the OpenTelemetry instruments here
         /// once the meter is wired up.
@@ -111,6 +119,7 @@ pub mod custom_metrics {
         /// Always panics via `todo!` because the OpenTelemetry meter pipeline
         /// is not yet built; use [`crate::metrics::METRICS`] for runtime
         /// metrics in the meantime.
+        #[must_use]
         pub fn new() -> Self {
             // TODO: Initialize metrics — obtain a meter from the global
             // provider and create each counter/histogram instrument.

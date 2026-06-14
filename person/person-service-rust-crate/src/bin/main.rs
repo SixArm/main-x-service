@@ -1,6 +1,6 @@
 //! Person Service binary entry point.
 //!
-//! Boots the loco.rs application (Axum REST API, SeaORM persistence,
+//! Boots the loco.rs application (Axum REST API, `SeaORM` persistence,
 //! matching, search, streaming, observability) via the loco CLI. See
 //! [`person_service::app::App`] for the wiring and `lib.rs` for the
 //! supported library surface.

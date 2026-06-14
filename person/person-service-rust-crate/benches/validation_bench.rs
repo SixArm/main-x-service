@@ -11,7 +11,10 @@ use chrono::{NaiveDate, Utc};
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use uuid::Uuid;
 
-use person_service::models::*;
+use person_service::models::{
+    Address, AddressUse, ContactPoint, ContactPointSystem, ContactPointUse, DocumentType,
+    EmergencyContact, Gender, HumanName, IdentityDocument, Person,
+};
 use person_service::validation::{normalize_phone, standardize_address, validate_person};
 
 /// Build a minimal [`Person`] for validation benchmarks.
@@ -57,7 +60,7 @@ fn bench_validate_simple_person(c: &mut Criterion) {
     );
 
     c.bench_function("validate_simple_person", |b| {
-        b.iter(|| validate_person(black_box(&person)))
+        b.iter(|| validate_person(black_box(&person)));
     });
 }
 
@@ -116,7 +119,7 @@ fn bench_validate_complex_person(c: &mut Criterion) {
     });
 
     c.bench_function("validate_complex_person", |b| {
-        b.iter(|| validate_person(black_box(&person)))
+        b.iter(|| validate_person(black_box(&person)));
     });
 }
 
@@ -129,30 +132,30 @@ fn bench_validate_invalid_person(c: &mut Criterion) {
         use_type: None,
     });
     person.emergency_contacts.push(EmergencyContact {
-        name: "".to_string(),
-        relationship: "".to_string(),
+        name: String::new(),
+        relationship: String::new(),
         telecom: vec![],
         address: None,
         is_primary: false,
     });
 
     c.bench_function("validate_invalid_person", |b| {
-        b.iter(|| validate_person(black_box(&person)))
+        b.iter(|| validate_person(black_box(&person)));
     });
 }
 
 /// Benchmark phone normalization across input formats.
 fn bench_normalize_phone(c: &mut Criterion) {
     c.bench_function("normalize_phone_us_format", |b| {
-        b.iter(|| normalize_phone(black_box("(555) 123-4567"), black_box("1")))
+        b.iter(|| normalize_phone(black_box("(555) 123-4567"), black_box("1")));
     });
 
     c.bench_function("normalize_phone_international", |b| {
-        b.iter(|| normalize_phone(black_box("+1-555-123-4567"), black_box("1")))
+        b.iter(|| normalize_phone(black_box("+1-555-123-4567"), black_box("1")));
     });
 
     c.bench_function("normalize_phone_raw_digits", |b| {
-        b.iter(|| normalize_phone(black_box("5551234567"), black_box("1")))
+        b.iter(|| normalize_phone(black_box("5551234567"), black_box("1")));
     });
 }
 
@@ -169,7 +172,7 @@ fn bench_standardize_address(c: &mut Criterion) {
     };
 
     c.bench_function("standardize_address_full", |b| {
-        b.iter(|| standardize_address(black_box(&addr)))
+        b.iter(|| standardize_address(black_box(&addr)));
     });
 
     let addr_minimal = Address {
@@ -183,7 +186,7 @@ fn bench_standardize_address(c: &mut Criterion) {
     };
 
     c.bench_function("standardize_address_minimal", |b| {
-        b.iter(|| standardize_address(black_box(&addr_minimal)))
+        b.iter(|| standardize_address(black_box(&addr_minimal)));
     });
 }
 

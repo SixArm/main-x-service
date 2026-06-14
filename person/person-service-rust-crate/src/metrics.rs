@@ -161,6 +161,13 @@ impl Metrics {
 
     /// Render the registry to Prometheus text exposition format
     /// (`text/plain; version=0.0.4`).
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the Prometheus text encoder fails to write to an
+    /// in-memory buffer or produces non-UTF-8 output; neither occurs in
+    /// practice.
+    #[must_use]
     pub fn render(&self) -> String {
         let encoder = TextEncoder::new();
         let metric_families = self.registry.gather();

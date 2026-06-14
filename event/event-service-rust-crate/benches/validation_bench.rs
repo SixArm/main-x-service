@@ -10,7 +10,10 @@
 use chrono::{TimeZone, Utc};
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
-use event_service::models::*;
+use event_service::models::{
+    Address, Event, EventAttendanceMode, EventType, Location, Party, PartyKind, Place,
+    VirtualLocation,
+};
 use event_service::validation::{normalize_phone, standardize_address, validate_event};
 
 /// Build a minimal event with the given name at a fixed start time.

@@ -1,9 +1,9 @@
 #![warn(clippy::pedantic)]
 
-//! REST API integration tests. Requires a running PostgreSQL
+//! REST API integration tests. Requires a running `PostgreSQL`
 //! reachable via `DATABASE_URL`.
 //!
-//! All tests are marked `#[ignore]` so they are skipped by a bare
+//! All tests are marked `#[ignore = "requires a running PostgreSQL via DATABASE_URL"]` so they are skipped by a bare
 //! `cargo test`; run them explicitly with
 //! `DATABASE_URL=… cargo test --test api_integration_test -- --ignored`.
 
@@ -19,7 +19,7 @@ use tower::ServiceExt;
 
 /// `GET /api/v1/health` returns 200 and names the service.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
 async fn health_check_returns_healthy() {
     let app = common::create_test_router().await;
     let response = app
@@ -43,7 +43,7 @@ async fn health_check_returns_healthy() {
 /// Creating an event mints a fresh id and the record reads back
 /// identically via `GET /api/v1/events/{id}`.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
 async fn create_event_round_trip() {
     let app = common::create_test_router().await;
     let title = common::unique_event_name("CreateRoundTrip");
@@ -85,7 +85,7 @@ async fn create_event_round_trip() {
     let get = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/v1/events/{}", event.id))
+                .uri(format!("/api/v1/events/{}", event.id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -103,7 +103,7 @@ async fn create_event_round_trip() {
 
 /// An empty `name` is rejected with `422 Unprocessable Entity`.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
 async fn validation_rejects_missing_name() {
     let app = common::create_test_router().await;
     let payload = json!({

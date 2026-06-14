@@ -39,6 +39,11 @@ pub struct SearchEngine {
 
 impl SearchEngine {
     /// Open (or create) the index at `index_path` and wrap it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index directory cannot be created or the
+    /// index cannot be opened.
     pub fn new<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         Ok(Self {
             index: EventIndex::create_or_open(index_path)?,
@@ -46,6 +51,11 @@ impl SearchEngine {
     }
 
     /// Add (or re-add) one event to the index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the document cannot be written or the commit
+    /// fails.
     pub fn index_event(&self, event: &Event) -> Result<()> {
         let mut writer = self.index.writer(50)?;
         let s = self.index.schema();
@@ -60,6 +70,11 @@ impl SearchEngine {
     }
 
     /// Bulk index. Single commit at the end.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any document cannot be written or the commit
+    /// fails.
     pub fn index_events(&self, events: &[Event]) -> Result<()> {
         let mut writer = self.index.writer(100)?;
         let s = self.index.schema();
@@ -75,7 +90,11 @@ impl SearchEngine {
     }
 
     /// Free-text search across name / description / keywords /
-    /// alternate_names / organizer / performer / identifier_value.
+    /// `alternate_names` / organizer / performer / `identifier_value`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query cannot be parsed or executed.
     pub fn search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let s = self.index.schema();
@@ -101,6 +120,10 @@ impl SearchEngine {
     }
 
     /// Fuzzy search on the event title.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the search cannot be executed.
     pub fn fuzzy_search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let s = self.index.schema();
@@ -114,6 +137,10 @@ impl SearchEngine {
 
     /// Filter by a `start_date` range (inclusive). Either bound may
     /// be `None` for unbounded.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the range query cannot be parsed or executed.
     pub fn search_by_date_range(
         &self,
         from_yyyy_mm_dd: Option<&str>,
@@ -139,6 +166,10 @@ impl SearchEngine {
 
     /// Combined name + date filter (used by the matching layer as a
     /// blocking step).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the combined query cannot be executed.
     pub fn search_by_name_and_date(
         &self,
         name: &str,
@@ -169,6 +200,10 @@ impl SearchEngine {
     }
 
     /// Remove an event from the index by its id string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the delete commit fails.
     pub fn delete_event(&self, event_id: &str) -> Result<()> {
         let mut writer = self.index.writer(50)?;
         let s = self.index.schema();
@@ -181,16 +216,28 @@ impl SearchEngine {
     }
 
     /// Return index statistics (document count, …).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index cannot be read.
     pub fn stats(&self) -> Result<IndexStats> {
         self.index.stats()
     }
 
     /// Merge index segments to reclaim space and speed up reads.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the segment merge fails.
     pub fn optimize(&self) -> Result<()> {
         self.index.optimize()
     }
 
     /// Reload the reader so recently committed writes become visible.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reader cannot be reloaded.
     pub fn reload(&self) -> Result<()> {
         self.index.reload()
     }
@@ -307,7 +354,7 @@ fn summarize_locations(locs: &[Location]) -> (String, String, String, String) {
 fn serde_plain<T: serde::Serialize>(v: &T) -> String {
     serde_json::to_value(v)
         .ok()
-        .and_then(|x| x.as_str().map(|s| s.to_string()))
+        .and_then(|x| x.as_str().map(std::string::ToString::to_string))
         .unwrap_or_default()
 }
 
@@ -324,10 +371,10 @@ fn extract_ids(
             Ok(d) => d,
             Err(_) => continue,
         };
-        if let Some(v) = doc.get_first(id_field) {
-            if let Some(s) = v.as_str() {
-                ids.push(s.to_string());
-            }
+        if let Some(v) = doc.get_first(id_field)
+            && let Some(s) = v.as_str()
+        {
+            ids.push(s.to_string());
         }
     }
     ids

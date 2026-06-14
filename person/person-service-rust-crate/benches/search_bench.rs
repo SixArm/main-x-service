@@ -12,7 +12,7 @@ use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use tempfile::TempDir;
 use uuid::Uuid;
 
-use person_service::models::*;
+use person_service::models::{Gender, HumanName, Person};
 use person_service::search::SearchEngine;
 
 /// Build a minimal [`Person`] for indexing/search benchmarks.
@@ -118,7 +118,7 @@ fn bench_index_single_person(c: &mut Criterion) {
     );
 
     c.bench_function("index_single_person", |b| {
-        b.iter(|| engine.index_person(black_box(&person)).unwrap())
+        b.iter(|| engine.index_person(black_box(&person)).unwrap());
     });
 }
 
@@ -140,7 +140,7 @@ fn bench_index_bulk_persons(c: &mut Criterion) {
                 (temp_dir, engine)
             },
             |(_temp_dir, engine)| engine.index_persons(black_box(&persons_50)).unwrap(),
-        )
+        );
     });
 }
 
@@ -157,9 +157,9 @@ fn bench_search_queries(c: &mut Criterion) {
             let given = GIVEN_NAMES[i % GIVEN_NAMES.len()];
             let dob = Some(
                 NaiveDate::from_ymd_opt(
-                    1950 + (i as i32 % 50),
-                    1 + (i as u32 % 12),
-                    1 + (i as u32 % 28),
+                    1950 + i32::try_from(i % 50).unwrap_or(0),
+                    1 + u32::try_from(i % 12).unwrap_or(0),
+                    1 + u32::try_from(i % 28).unwrap_or(0),
                 )
                 .unwrap(),
             );
@@ -171,15 +171,15 @@ fn bench_search_queries(c: &mut Criterion) {
     engine.reload().unwrap();
 
     c.bench_function("search_1000_persons_exact", |b| {
-        b.iter(|| engine.search(black_box("Smith"), 10).unwrap())
+        b.iter(|| engine.search(black_box("Smith"), 10).unwrap());
     });
 
     c.bench_function("search_1000_persons_limit_50", |b| {
-        b.iter(|| engine.search(black_box("Smith"), 50).unwrap())
+        b.iter(|| engine.search(black_box("Smith"), 50).unwrap());
     });
 
     c.bench_function("fuzzy_search_1000_persons", |b| {
-        b.iter(|| engine.fuzzy_search(black_box("Smyth"), 10).unwrap())
+        b.iter(|| engine.fuzzy_search(black_box("Smyth"), 10).unwrap());
     });
 
     c.bench_function("search_by_name_and_year_1000", |b| {
@@ -187,11 +187,11 @@ fn bench_search_queries(c: &mut Criterion) {
             engine
                 .search_by_name_and_year(black_box("Smith"), black_box(Some(1980)), 10)
                 .unwrap()
-        })
+        });
     });
 
     c.bench_function("search_no_results", |b| {
-        b.iter(|| engine.search(black_box("Zzzzxyzzy"), 10).unwrap())
+        b.iter(|| engine.search(black_box("Zzzzxyzzy"), 10).unwrap());
     });
 }
 
@@ -209,7 +209,7 @@ fn bench_delete_person(c: &mut Criterion) {
                 (temp_dir, engine, id)
             },
             |(_temp_dir, engine, id)| engine.delete_person(black_box(&id)).unwrap(),
-        )
+        );
     });
 }
 

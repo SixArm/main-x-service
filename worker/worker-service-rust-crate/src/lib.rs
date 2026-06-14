@@ -17,8 +17,8 @@
 //!   that bridges service records into the canonical `worker-matcher` crate.
 //! - **Search** ([`search`]) — full-text, fuzzy, and phonetic search backed by
 //!   the embedded [Tantivy](https://github.com/quickwit-oss/tantivy) index.
-//! - **Persistence** ([`db`]) — SeaORM entities, repositories, and an audit
-//!   log repository for PostgreSQL.
+//! - **Persistence** ([`db`]) — `SeaORM` entities, repositories, and an audit
+//!   log repository for `PostgreSQL`.
 //! - **API surface** ([`api`]) — REST (Axum), FHIR R5, and a gRPC stub.
 //! - **Cross-cutting concerns** — [`validation`], [`privacy`],
 //!   [`streaming`] (event publishing), [`observability`] (OpenTelemetry),

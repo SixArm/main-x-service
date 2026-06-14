@@ -176,14 +176,14 @@ fn first_party_name(parties: &[Party]) -> Option<String> {
 /// projected as `EventScheduled` (it ran on schedule).
 fn map_status(s: EventStatus) -> MStatus {
     match s {
-        EventStatus::Scheduled => MStatus::EventScheduled,
+        // The matcher does not carry a `Completed` variant — closest
+        // semantic is `Scheduled` (the event happened on schedule), so
+        // `Scheduled` and `Completed` share this arm.
+        EventStatus::Scheduled | EventStatus::Completed => MStatus::EventScheduled,
         EventStatus::Cancelled => MStatus::EventCancelled,
         EventStatus::Postponed => MStatus::EventPostponed,
         EventStatus::Rescheduled => MStatus::EventRescheduled,
         EventStatus::MovedOnline => MStatus::EventMovedOnline,
-        // The matcher does not carry a Completed variant — closest semantic
-        // is Scheduled (the event happened on schedule).
-        EventStatus::Completed => MStatus::EventScheduled,
     }
 }
 
@@ -204,6 +204,7 @@ fn map_attendance_mode(m: EventAttendanceMode) -> MMode {
 /// model (`Appointment`, `Encounter`, `Shift`, `Incident`, `Generic`,
 /// `Session`, `Course`, `Series`) flow through as `Other(name)` so the
 /// scheme name still participates in matching.
+#[must_use]
 pub fn map_event_type(t: &EventType) -> MCategory {
     match t {
         EventType::Business => MCategory::BusinessEvent,
@@ -348,10 +349,11 @@ fn identifier_to_event_id(id: &Identifier) -> Option<MEventId> {
 ///
 /// The matcher's vocabulary is venue/ticketing-centric (Eventbrite,
 /// Meetup, Ticketmaster, Songkick, Wikidata, …); the service's vocabulary
-/// is operational (BookingNumber, ConfirmationCode, TicketNumber, …). When
+/// is operational (`BookingNumber`, `ConfirmationCode`, `TicketNumber`, …). When
 /// the `system` URI hints at one of the matcher's known schemes that wins,
 /// otherwise the identifier-type name flows through as `Other(name)` so the
 /// scheme label still participates in `(scheme, value)` equality.
+#[must_use]
 pub fn map_identifier_scheme(t: &IdentifierType, system: &str) -> MScheme {
     let sys = system.to_ascii_lowercase();
     if sys.contains("eventbrite") {

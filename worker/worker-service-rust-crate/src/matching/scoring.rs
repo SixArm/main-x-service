@@ -36,6 +36,7 @@ pub struct ProbabilisticScorer {
 
 impl ProbabilisticScorer {
     /// Creates a scorer that uses the given threshold configuration.
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self { config }
     }
@@ -47,7 +48,24 @@ impl ProbabilisticScorer {
     /// match to 0.98; otherwise the result is the weighted sum (name 0.30,
     /// birth date 0.25, gender/address/identifier/tax-ID 0.10 each, document
     /// 0.05).
+    #[must_use]
     pub fn calculate_score(&self, worker: &Worker, candidate: &Worker) -> MatchResult {
+        // Weight factors for each component (probabilistic). These sum to 1.0
+        // (0.30 + 0.25 + 0.10 + 0.10 + 0.10 + 0.10 + 0.05) so the weighted total
+        // is itself a value in [0, 1]. Name and birth date carry the most weight
+        // because together they are the strongest demographic discriminators;
+        // gender/address/identifier/tax-ID are corroborating evidence at 0.10
+        // each, and document is the lightest at 0.05 (it rarely differs between
+        // records that already agree on the others). Keep these in sync with the
+        // table in `AGENTS/matching.md`.
+        const NAME_WEIGHT: f64 = 0.30;
+        const DOB_WEIGHT: f64 = 0.25;
+        const GENDER_WEIGHT: f64 = 0.10;
+        const ADDRESS_WEIGHT: f64 = 0.10;
+        const IDENTIFIER_WEIGHT: f64 = 0.10;
+        const TAX_ID_WEIGHT: f64 = 0.10;
+        const DOCUMENT_WEIGHT: f64 = 0.05;
+
         // Calculate individual component scores
         let name_score = name_matching::match_names(&worker.name, &candidate.name);
 
@@ -109,22 +127,6 @@ impl ProbabilisticScorer {
             };
         }
 
-        // Weight factors for each component (probabilistic). These sum to 1.0
-        // (0.30 + 0.25 + 0.10 + 0.10 + 0.10 + 0.10 + 0.05) so the weighted total
-        // is itself a value in [0, 1]. Name and birth date carry the most weight
-        // because together they are the strongest demographic discriminators;
-        // gender/address/identifier/tax-ID are corroborating evidence at 0.10
-        // each, and document is the lightest at 0.05 (it rarely differs between
-        // records that already agree on the others). Keep these in sync with the
-        // table in `AGENTS/matching.md`.
-        const NAME_WEIGHT: f64 = 0.30;
-        const DOB_WEIGHT: f64 = 0.25;
-        const GENDER_WEIGHT: f64 = 0.10;
-        const ADDRESS_WEIGHT: f64 = 0.10;
-        const IDENTIFIER_WEIGHT: f64 = 0.10;
-        const TAX_ID_WEIGHT: f64 = 0.10;
-        const DOCUMENT_WEIGHT: f64 = 0.05;
-
         // Calculate weighted total score
         let total_score = (name_score * NAME_WEIGHT)
             + (birth_date_score * DOB_WEIGHT)
@@ -152,12 +154,14 @@ impl ProbabilisticScorer {
     }
 
     /// Returns `true` when `score` meets the configured threshold.
+    #[must_use]
     pub fn is_match(&self, score: f64) -> bool {
         score >= self.config.threshold_score
     }
 
     /// Buckets `score` into a [`MatchQuality`]: Definite (≥0.95), Probable
     /// (≥ threshold), Possible (≥0.50), else Unlikely.
+    #[must_use]
     pub fn classify_match(&self, score: f64) -> MatchQuality {
         // Bucket boundaries, checked high-to-low so the first satisfied arm
         // wins: 0.95 is the fixed "certain" line (auto-merge-worthy), the
@@ -192,6 +196,7 @@ pub struct DeterministicScorer {
 impl DeterministicScorer {
     /// Creates a deterministic scorer. The config is retained but the rule
     /// thresholds are fixed constants.
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self { _config: config }
     }
@@ -203,6 +208,7 @@ impl DeterministicScorer {
     /// earns one point out of three available, and — when both records have
     /// addresses — a strong address match (≥0.80) earns a fourth point. The
     /// returned score is earned/available.
+    #[must_use]
     pub fn calculate_score(&self, worker: &Worker, candidate: &Worker) -> MatchResult {
         // `total_score` accumulates points earned; `points_available` the
         // points in play. The final score is the ratio, so a rule that does not
@@ -341,6 +347,7 @@ impl DeterministicScorer {
 
     /// Returns `true` when `score` clears the deterministic bar of 0.75
     /// (at least three of four rules satisfied).
+    #[must_use]
     pub fn is_match(&self, score: f64) -> bool {
         score >= 0.75 // Require at least 3/4 rules to match
     }
@@ -365,6 +372,7 @@ pub enum MatchQuality {
 impl MatchQuality {
     /// Returns the lower-case wire string for this quality
     /// ("definite"/"probable"/"possible"/"unlikely").
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             MatchQuality::Definite => "definite",
@@ -375,6 +383,7 @@ impl MatchQuality {
     }
 
     /// Returns `true` for qualities treated as a match (Definite or Probable).
+    #[must_use]
     pub fn is_match(&self) -> bool {
         matches!(self, MatchQuality::Definite | MatchQuality::Probable)
     }
@@ -563,7 +572,7 @@ mod tests {
         worker2.addresses = vec![addr];
 
         // Add matching identifiers
-        let id = crate::models::Identifier::mrn("hospital-a".into(), "MRN-001".into());
+        let id = crate::models::Identifier::mrn("hospital-a", "MRN-001".into());
         worker1.identifiers = vec![id.clone()];
         worker2.identifiers = vec![id];
 
@@ -648,11 +657,11 @@ mod tests {
         worker2.tax_id = Some("123-45-6789".into());
 
         let result = scorer.calculate_score(&worker1, &worker2);
-        assert_eq!(
-            result.score, 1.0,
+        assert!(
+            (result.score - 1.0).abs() < f64::EPSILON,
             "Tax ID match should short-circuit to 1.0"
         );
-        assert_eq!(result.breakdown.tax_id_score, 1.0);
+        assert!((result.breakdown.tax_id_score - 1.0).abs() < f64::EPSILON);
     }
 
     /// A shared exact identifier short-circuits to a 1.0 score.
@@ -674,8 +683,8 @@ mod tests {
         worker2.identifiers = vec![id];
 
         let result = scorer.calculate_score(&worker1, &worker2);
-        assert_eq!(
-            result.score, 1.0,
+        assert!(
+            (result.score - 1.0).abs() < f64::EPSILON,
             "Exact identifier match should short-circuit to 1.0"
         );
     }
@@ -688,7 +697,7 @@ mod tests {
         assert_eq!(scorer.classify_match(0.949), MatchQuality::Probable);
     }
 
-    /// is_match is inclusive at the configured threshold (here 0.70).
+    /// `is_match` is inclusive at the configured threshold (here 0.70).
     #[test]
     fn test_score_boundary_0_70() {
         let config = MatchingConfig {

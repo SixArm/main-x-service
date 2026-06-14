@@ -38,7 +38,7 @@ use super::{Address, ContactPoint, EmergencyContact, Gender, Identifier, Identit
 ///
 /// Server-generated fields (`id`, `created_at`, `updated_at`) and all
 /// collection-typed fields default to sensible empty values when
-/// missing from an incoming JSON body. Callers POSTing a new person
+/// missing from an incoming JSON body. Callers `POSTing` a new person
 /// therefore only need to supply `name` + the demographic fields they
 /// know — the service fills the rest. This is what the front-end's
 /// `PersonRepository.create()` relies on.
@@ -237,6 +237,7 @@ impl Person {
     /// assert!(person.active);
     /// assert!(person.identifiers.is_empty());
     /// ```
+    #[must_use]
     pub fn new(name: HumanName, gender: Gender) -> Self {
         let now = Utc::now();
         Self {
@@ -284,6 +285,7 @@ impl Person {
     /// let person = Person::new(name, Gender::Female);
     /// assert_eq!(person.full_name(), "Maria Elena Garcia");
     /// ```
+    #[must_use]
     pub fn full_name(&self) -> String {
         let given = self.name.given.join(" ");
         format!("{} {}", given, self.name.family)
@@ -296,6 +298,7 @@ impl Person {
     /// [`TAX`](super::IdentifierType::TAX)-typed entry in `identifiers`.
     /// The deterministic matcher uses this so a tax ID supplied either
     /// way short-circuits to a confident match.
+    #[must_use]
     pub fn effective_tax_id(&self) -> Option<&str> {
         if let Some(ref tid) = self.tax_id {
             return Some(tid.as_str());

@@ -113,6 +113,7 @@ impl Identifier {
     /// assert_eq!(id.value, "T-1");
     /// assert!(id.assigner.is_none());
     /// ```
+    #[must_use]
     pub fn new(identifier_type: IdentifierType, system: String, value: String) -> Self {
         Self {
             use_type: None,
@@ -124,11 +125,13 @@ impl Identifier {
     }
 
     /// Convenience: build a confirmation-code identifier under a given system.
+    #[must_use]
     pub fn confirmation_code(system: String, value: String) -> Self {
         Self::new(IdentifierType::ConfirmationCode, system, value)
     }
 
     /// Convenience: build a booking-number identifier under a given system.
+    #[must_use]
     pub fn booking_number(system: String, value: String) -> Self {
         Self::new(IdentifierType::BookingNumber, system, value)
     }
@@ -138,7 +141,7 @@ impl Identifier {
 mod tests {
     use super::*;
 
-    /// `Display` renders the SCREAMING_SNAKE_CASE wire form per variant.
+    /// `Display` renders the `SCREAMING_SNAKE_CASE` wire form per variant.
     #[test]
     fn display_format() {
         assert_eq!(IdentifierType::BookingNumber.to_string(), "BOOKING_NUMBER");

@@ -23,6 +23,7 @@
 /// assert_eq!(soundex("Rupert"), "R163"); // sounds the same
 /// assert_eq!(soundex("Lee"), "L000");    // padded with zeros
 /// ```
+#[must_use]
 pub fn soundex(name: &str) -> String {
     let name = name.trim().to_uppercase();
     if name.is_empty() {
@@ -30,7 +31,7 @@ pub fn soundex(name: &str) -> String {
     }
 
     // Keep only letters; punctuation and digits carry no phonetic value.
-    let chars: Vec<char> = name.chars().filter(|c| c.is_ascii_alphabetic()).collect();
+    let chars: Vec<char> = name.chars().filter(char::is_ascii_alphabetic).collect();
     if chars.is_empty() {
         return String::new();
     }
@@ -100,6 +101,7 @@ pub fn soundex(name: &str) -> String {
 /// assert!(soundex_match("Smith", "Smyth"));
 /// assert!(!soundex_match("Smith", "Johnson"));
 /// ```
+#[must_use]
 pub fn soundex_match(name1: &str, name2: &str) -> bool {
     let s1 = soundex(name1);
     let s2 = soundex(name2);
@@ -116,9 +118,10 @@ pub fn soundex_match(name1: &str, name2: &str) -> bool {
 /// ```
 /// use worker_service::matching::phonetic::phonetic_similarity;
 ///
-/// assert_eq!(phonetic_similarity("Smith", "Smyth"), 1.0);
-/// assert_eq!(phonetic_similarity("", "Smith"), 0.0);
+/// assert!((phonetic_similarity("Smith", "Smyth") - 1.0).abs() < f64::EPSILON);
+/// assert!((phonetic_similarity("", "Smith") - 0.0).abs() < f64::EPSILON);
 /// ```
+#[must_use]
 pub fn phonetic_similarity(name1: &str, name2: &str) -> f64 {
     let s1 = soundex(name1);
     let s2 = soundex(name2);
@@ -138,7 +141,7 @@ pub fn phonetic_similarity(name1: &str, name2: &str) -> f64 {
         .zip(s2.chars())
         .take_while(|(a, b)| a == b)
         .count();
-    matching as f64 / 4.0
+    f64::from(u32::try_from(matching).unwrap_or(u32::MAX)) / 4.0
 }
 
 #[cfg(test)]
@@ -173,9 +176,9 @@ mod tests {
     /// Identical codes score 1.0, dissimilar names low, empty input 0.0.
     #[test]
     fn test_phonetic_similarity() {
-        assert_eq!(phonetic_similarity("Smith", "Smyth"), 1.0);
+        assert!((phonetic_similarity("Smith", "Smyth") - 1.0).abs() < f64::EPSILON);
         assert!(phonetic_similarity("Smith", "Johnson") < 0.5);
-        assert_eq!(phonetic_similarity("", "Smith"), 0.0);
+        assert!((phonetic_similarity("", "Smith") - 0.0).abs() < f64::EPSILON);
     }
 
     /// Empty and whitespace-only inputs both yield an empty code.
@@ -193,7 +196,7 @@ mod tests {
         assert_eq!(soundex("M"), "M000");
     }
 
-    /// Non-letters are filtered, so "O'Brien" and "OBrien" encode alike.
+    /// Non-letters are filtered, so "O'Brien" and "`OBrien`" encode alike.
     #[test]
     fn test_soundex_special_characters() {
         // Non-alphabetic characters should be filtered out
@@ -219,8 +222,7 @@ mod tests {
         assert_eq!(code.len(), 4);
         assert!(
             code.starts_with('A'),
-            "Ashcraft should start with A, got {}",
-            code
+            "Ashcraft should start with A, got {code}"
         );
     }
 }

@@ -23,7 +23,12 @@ pub mod proto {
 /// Accepts the [`ServerConfig`] for forward compatibility (host/port)
 /// but performs no work and returns `Ok(())` immediately. Will bind and
 /// serve the Tonic service once the gRPC API is implemented.
-pub async fn serve(_config: ServerConfig) -> Result<()> {
+///
+/// # Errors
+///
+/// Currently infallible (always returns `Ok(())`). Once implemented it
+/// will return [`crate::Error::Api`] on bind/serve failures.
+pub fn serve(_config: ServerConfig) -> Result<()> {
     // TODO: Implement gRPC server
     // let addr = format!("{}:{}", config.host, config.grpc_port)
     //     .parse::<std::net::SocketAddr>()

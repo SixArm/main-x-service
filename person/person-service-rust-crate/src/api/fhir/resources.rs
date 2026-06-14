@@ -115,7 +115,7 @@ pub struct FhirHumanName {
     /// Honorific prefixes (Dr., Mr., …).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<Vec<String>>,
-    /// Honorific suffixes (Jr., PhD, …).
+    /// Honorific suffixes (Jr., `PhD`, …).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suffix: Option<Vec<String>>,
 }
@@ -276,8 +276,9 @@ pub struct FhirOperationOutcomeIssue {
 }
 
 impl FhirOperationOutcome {
-    /// Build a single-issue `error`-severity OperationOutcome with the
+    /// Build a single-issue `error`-severity `OperationOutcome` with the
     /// given machine `code` and human-readable `diagnostics` text.
+    #[must_use]
     pub fn error(code: &str, diagnostics: &str) -> Self {
         Self {
             resource_type: "OperationOutcome".to_string(),
@@ -290,17 +291,19 @@ impl FhirOperationOutcome {
         }
     }
 
-    /// Build a `not-found` OperationOutcome for a missing resource of the
+    /// Build a `not-found` `OperationOutcome` for a missing resource of the
     /// given `resource_type` and `id` (maps to HTTP 404).
+    #[must_use]
     pub fn not_found(resource_type: &str, id: &str) -> Self {
         Self::error(
             "not-found",
-            &format!("{} with id '{}' not found", resource_type, id),
+            &format!("{resource_type} with id '{id}' not found"),
         )
     }
 
-    /// Build an `invalid` OperationOutcome carrying the given message
+    /// Build an `invalid` `OperationOutcome` carrying the given message
     /// (maps to HTTP 400 for malformed/invalid input).
+    #[must_use]
     pub fn invalid(message: &str) -> Self {
         Self::error("invalid", message)
     }
@@ -309,6 +312,7 @@ impl FhirOperationOutcome {
 impl FhirPerson {
     /// Construct a minimal [`FhirPerson`] with `resourceType` set to
     /// `"Person"` and every optional element left as `None`.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             resource_type: "Person".to_string(),

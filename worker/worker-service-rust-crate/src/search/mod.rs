@@ -84,7 +84,7 @@ impl SearchEngine {
         let identifiers: Vec<String> = worker
             .identifiers
             .iter()
-            .map(|id| format!("{}:{}", id.identifier_type.to_string(), id.value))
+            .map(|id| format!("{}:{}", id.identifier_type, id.value))
             .collect();
         let identifiers_str = identifiers.join(" ");
 
@@ -116,17 +116,17 @@ impl SearchEngine {
             schema.city => city,
             schema.state => state,
             schema.identifiers => identifiers_str,
-            schema.worker_type => worker.worker_type.as_ref().map(|wt| wt.to_string()).unwrap_or_default(),
+            schema.worker_type => worker.worker_type.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
             schema.active => if worker.active { "true" } else { "false" },
         );
 
         writer
             .add_document(doc)
-            .map_err(|e| crate::Error::Search(format!("Failed to add document: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to add document: {e}")))?;
 
         writer
             .commit()
-            .map_err(|e| crate::Error::Search(format!("Failed to commit: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to commit: {e}")))?;
 
         Ok(())
     }
@@ -151,7 +151,7 @@ impl SearchEngine {
             let identifiers: Vec<String> = worker
                 .identifiers
                 .iter()
-                .map(|id| format!("{}:{}", id.identifier_type.to_string(), id.value))
+                .map(|id| format!("{}:{}", id.identifier_type, id.value))
                 .collect();
             let identifiers_str = identifiers.join(" ");
 
@@ -176,18 +176,18 @@ impl SearchEngine {
                 schema.city => city,
                 schema.state => state,
                 schema.identifiers => identifiers_str,
-                schema.worker_type => worker.worker_type.as_ref().map(|wt| wt.to_string()).unwrap_or_default(),
+                schema.worker_type => worker.worker_type.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
                 schema.active => if worker.active { "true" } else { "false" },
             );
 
             writer
                 .add_document(doc)
-                .map_err(|e| crate::Error::Search(format!("Failed to add document: {}", e)))?;
+                .map_err(|e| crate::Error::Search(format!("Failed to add document: {e}")))?;
         }
 
         writer
             .commit()
-            .map_err(|e| crate::Error::Search(format!("Failed to commit: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to commit: {e}")))?;
 
         Ok(())
     }
@@ -221,23 +221,23 @@ impl SearchEngine {
 
         let query = query_parser
             .parse_query(query_str)
-            .map_err(|e| crate::Error::Search(format!("Failed to parse query: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to parse query: {e}")))?;
 
         let top_docs = searcher
             .search(&query, &TopDocs::with_limit(limit))
-            .map_err(|e| crate::Error::Search(format!("Search failed: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Search failed: {e}")))?;
 
         // Resolve each hit's stored `id` field into a worker-ID string.
         let mut worker_ids = Vec::new();
         for (_score, doc_address) in top_docs {
             let retrieved_doc: tantivy::TantivyDocument = searcher
                 .doc(doc_address)
-                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {}", e)))?;
+                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {e}")))?;
 
-            if let Some(id_value) = retrieved_doc.get_first(schema.id) {
-                if let Some(id_text) = id_value.as_str() {
-                    worker_ids.push(id_text.to_string());
-                }
+            if let Some(id_value) = retrieved_doc.get_first(schema.id)
+                && let Some(id_text) = id_value.as_str()
+            {
+                worker_ids.push(id_text.to_string());
             }
         }
 
@@ -265,19 +265,19 @@ impl SearchEngine {
 
         let top_docs = searcher
             .search(&fuzzy_query, &TopDocs::with_limit(limit))
-            .map_err(|e| crate::Error::Search(format!("Fuzzy search failed: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Fuzzy search failed: {e}")))?;
 
         // Resolve each hit's stored `id` field into a worker-ID string.
         let mut worker_ids = Vec::new();
         for (_score, doc_address) in top_docs {
             let retrieved_doc: tantivy::TantivyDocument = searcher
                 .doc(doc_address)
-                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {}", e)))?;
+                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {e}")))?;
 
-            if let Some(id_value) = retrieved_doc.get_first(schema.id) {
-                if let Some(id_text) = id_value.as_str() {
-                    worker_ids.push(id_text.to_string());
-                }
+            if let Some(id_value) = retrieved_doc.get_first(schema.id)
+                && let Some(id_text) = id_value.as_str()
+            {
+                worker_ids.push(id_text.to_string());
             }
         }
 
@@ -333,19 +333,19 @@ impl SearchEngine {
 
         let top_docs = searcher
             .search(final_query.as_ref(), &TopDocs::with_limit(limit))
-            .map_err(|e| crate::Error::Search(format!("Search failed: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Search failed: {e}")))?;
 
         // Resolve each hit's stored `id` field into a worker-ID string.
         let mut worker_ids = Vec::new();
         for (_score, doc_address) in top_docs {
             let retrieved_doc: tantivy::TantivyDocument = searcher
                 .doc(doc_address)
-                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {}", e)))?;
+                .map_err(|e| crate::Error::Search(format!("Failed to retrieve document: {e}")))?;
 
-            if let Some(id_value) = retrieved_doc.get_first(schema.id) {
-                if let Some(id_text) = id_value.as_str() {
-                    worker_ids.push(id_text.to_string());
-                }
+            if let Some(id_value) = retrieved_doc.get_first(schema.id)
+                && let Some(id_text) = id_value.as_str()
+            {
+                worker_ids.push(id_text.to_string());
             }
         }
 
@@ -370,7 +370,7 @@ impl SearchEngine {
 
         writer
             .commit()
-            .map_err(|e| crate::Error::Search(format!("Failed to commit deletion: {}", e)))?;
+            .map_err(|e| crate::Error::Search(format!("Failed to commit deletion: {e}")))?;
 
         Ok(())
     }

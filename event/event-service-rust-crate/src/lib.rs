@@ -22,7 +22,7 @@
 //! - **Validation** ([`validation`]) — data-quality rules,
 //!   normalization, and standardization at the API boundary.
 //! - **Privacy** ([`privacy`]) — field masking, GDPR export, consent.
-//! - **Persistence** ([`db`]) — PostgreSQL via SeaORM, plus a
+//! - **Persistence** ([`db`]) — `PostgreSQL` via `SeaORM`, plus a
 //!   HIPAA-style audit log.
 //! - **APIs** ([`api`]) — REST (Axum), FHIR stubs, gRPC stub.
 //! - **Event streaming** ([`streaming`]) and **observability**

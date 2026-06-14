@@ -449,33 +449,32 @@ pub async fn search_events(
     let paginated: Vec<_> = ids.into_iter().skip(params.offset).take(limit).collect();
     let mut events = Vec::new();
     for id_str in paginated {
-        let id = match Uuid::parse_str(&id_str) {
-            Ok(id) => id,
-            Err(_) => continue,
+        let Ok(id) = Uuid::parse_str(&id_str) else {
+            continue;
         };
         if let Ok(Some(event)) = state.event_repository.get_by_id(&id).await {
-            if let Some(ref s) = params.event_status {
-                if event.event_status != *s {
-                    continue;
-                }
+            if let Some(ref s) = params.event_status
+                && event.event_status != *s
+            {
+                continue;
             }
-            if let Some(ref t) = params.event_type {
-                if event.event_type != *t {
-                    continue;
-                }
+            if let Some(ref t) = params.event_type
+                && event.event_type != *t
+            {
+                continue;
             }
             // Date bounds compare ISO `yyyy-mm-dd` strings, which sort
             // lexicographically the same as chronologically; keeps only
             // events whose start-date day is within [date_from, date_to].
-            if let Some(from) = params.date_from.as_deref() {
-                if event.start_date.format("%Y-%m-%d").to_string().as_str() < from {
-                    continue;
-                }
+            if let Some(from) = params.date_from.as_deref()
+                && event.start_date.format("%Y-%m-%d").to_string().as_str() < from
+            {
+                continue;
             }
-            if let Some(to) = params.date_to.as_deref() {
-                if event.start_date.format("%Y-%m-%d").to_string().as_str() > to {
-                    continue;
-                }
+            if let Some(to) = params.date_to.as_deref()
+                && event.start_date.format("%Y-%m-%d").to_string().as_str() > to
+            {
+                continue;
             }
             // Redact PII (party emails, identifier values) on request,
             // e.g. for lower-trust consumers of the search surface.
@@ -717,6 +716,97 @@ pub async fn check_duplicates(
 // Merge
 // ---------------------------------------------------------------------------
 
+/// Build the survivor event by unioning `duplicate`'s data into a clone
+/// of `main`, returning the merged event plus a `transferred` snapshot
+/// map of the data carried over.
+///
+/// De-duplicates identifiers by `(value, identifier_type)`; locations,
+/// parties (organizers / performers / attendees), `same_as`,
+/// `alternate_names`, and `keywords` by value equality. Records the
+/// duplicate's primary name as an alternate name and adds a `Replaces`
+/// link main → duplicate.
+fn merge_event_data(
+    main: &Event,
+    duplicate: &Event,
+) -> (Event, serde_json::Map<String, serde_json::Value>) {
+    let mut merged = main.clone();
+    let mut transferred = serde_json::Map::new();
+
+    // Identifiers: add ones not already present.
+    for id in &duplicate.identifiers {
+        let dup = merged
+            .identifiers
+            .iter()
+            .any(|x| x.value == id.value && x.identifier_type == id.identifier_type);
+        if !dup {
+            merged.identifiers.push(id.clone());
+            transferred
+                .entry("identifiers".to_string())
+                .or_insert_with(|| serde_json::Value::Array(vec![]))
+                .as_array_mut()
+                .unwrap()
+                .push(serde_json::to_value(id).unwrap_or_default());
+        }
+    }
+
+    // The duplicate's name becomes an alternate name on the main.
+    if !merged.alternate_names.contains(&duplicate.name) {
+        merged.alternate_names.push(duplicate.name.clone());
+    }
+
+    // Union of alternate_names.
+    for n in &duplicate.alternate_names {
+        if !merged.alternate_names.contains(n) {
+            merged.alternate_names.push(n.clone());
+        }
+    }
+
+    // Union of keywords.
+    for k in &duplicate.keywords {
+        if !merged.keywords.contains(k) {
+            merged.keywords.push(k.clone());
+        }
+    }
+
+    // Append locations, parties, offers, same_as where not already
+    // present. Each `Location` is a variant union (Place / address /
+    // virtual / text) and each `Party` carries no own id, so both are
+    // de-duplicated by full structural equality (`l == loc`).
+    for loc in &duplicate.location {
+        if !merged.location.iter().any(|l| l == loc) {
+            merged.location.push(loc.clone());
+        }
+    }
+    for p in &duplicate.organizers {
+        if !merged.organizers.iter().any(|x| x == p) {
+            merged.organizers.push(p.clone());
+        }
+    }
+    for p in &duplicate.performers {
+        if !merged.performers.iter().any(|x| x == p) {
+            merged.performers.push(p.clone());
+        }
+    }
+    for p in &duplicate.attendees {
+        if !merged.attendees.iter().any(|x| x == p) {
+            merged.attendees.push(p.clone());
+        }
+    }
+    for s in &duplicate.same_as {
+        if !merged.same_as.contains(s) {
+            merged.same_as.push(s.clone());
+        }
+    }
+
+    // Link main → replaces duplicate.
+    merged.links.push(EventLink {
+        other_event_id: duplicate.id,
+        link_type: LinkType::Replaces,
+    });
+
+    (merged, transferred)
+}
+
 #[utoipa::path(
     post,
     path = "/api/v1/events/merge",
@@ -814,80 +904,7 @@ pub async fn merge_events(
         }
     };
 
-    let mut merged = main.clone();
-    let mut transferred = serde_json::Map::new();
-
-    // Identifiers: add ones not already present.
-    for id in &duplicate.identifiers {
-        let dup = merged
-            .identifiers
-            .iter()
-            .any(|x| x.value == id.value && x.identifier_type == id.identifier_type);
-        if !dup {
-            merged.identifiers.push(id.clone());
-            transferred
-                .entry("identifiers".to_string())
-                .or_insert_with(|| serde_json::Value::Array(vec![]))
-                .as_array_mut()
-                .unwrap()
-                .push(serde_json::to_value(id).unwrap_or_default());
-        }
-    }
-
-    // The duplicate's name becomes an alternate name on the main.
-    if !merged.alternate_names.contains(&duplicate.name) {
-        merged.alternate_names.push(duplicate.name.clone());
-    }
-
-    // Union of alternate_names.
-    for n in &duplicate.alternate_names {
-        if !merged.alternate_names.contains(n) {
-            merged.alternate_names.push(n.clone());
-        }
-    }
-
-    // Union of keywords.
-    for k in &duplicate.keywords {
-        if !merged.keywords.contains(k) {
-            merged.keywords.push(k.clone());
-        }
-    }
-
-    // Append locations, parties, offers, same_as where not already
-    // present. Each `Location` is a variant union (Place / address /
-    // virtual / text) and each `Party` carries no own id, so both are
-    // de-duplicated by full structural equality (`l == loc`).
-    for loc in &duplicate.location {
-        if !merged.location.iter().any(|l| l == loc) {
-            merged.location.push(loc.clone());
-        }
-    }
-    for p in &duplicate.organizers {
-        if !merged.organizers.iter().any(|x| x == p) {
-            merged.organizers.push(p.clone());
-        }
-    }
-    for p in &duplicate.performers {
-        if !merged.performers.iter().any(|x| x == p) {
-            merged.performers.push(p.clone());
-        }
-    }
-    for p in &duplicate.attendees {
-        if !merged.attendees.iter().any(|x| x == p) {
-            merged.attendees.push(p.clone());
-        }
-    }
-    for s in &duplicate.same_as {
-        if !merged.same_as.contains(s) {
-            merged.same_as.push(s.clone());
-        }
-    }
-
-    // Link main → replaces duplicate.
-    merged.links.push(EventLink {
-        other_event_id: duplicate.id,
-        link_type: LinkType::Replaces,
-    });
+    let (merged, transferred) = merge_event_data(&main, &duplicate);
 
     if let Err(e) = state.event_repository.update(&merged).await {
         return (
@@ -988,7 +1005,7 @@ pub async fn batch_deduplicate(
     let events_scanned = events.len();
     let mut review_items = Vec::new();
     let mut auto_merged = 0usize;
-    let mut seen: std::collections::HashSet<(Uuid, Uuid)> = Default::default();
+    let mut seen: std::collections::HashSet<(Uuid, Uuid)> = std::collections::HashSet::default();
 
     for (i, event) in events.iter().enumerate() {
         let candidates: Vec<_> = events[i + 1..]
@@ -999,9 +1016,8 @@ pub async fn batch_deduplicate(
         if candidates.is_empty() {
             continue;
         }
-        let matches = match state.matcher.find_matches(event, &candidates) {
-            Ok(m) => m,
-            Err(_) => continue,
+        let Ok(matches) = state.matcher.find_matches(event, &candidates) else {
+            continue;
         };
         for m in matches {
             if m.score < req.threshold {
@@ -1204,7 +1220,7 @@ pub async fn get_event_audit_logs(
     let limit = params.limit.min(500);
     match state
         .audit_log
-        .get_logs_for_entity("Event", id, limit as u64)
+        .get_logs_for_entity("Event", id, u64::try_from(limit).unwrap_or(0))
         .await
     {
         Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
@@ -1240,7 +1256,11 @@ pub async fn get_recent_audit_logs(
     Query(params): Query<AuditLogQuery>,
 ) -> impl IntoResponse {
     let limit = params.limit.min(500);
-    match state.audit_log.get_recent_logs(limit as u64).await {
+    match state
+        .audit_log
+        .get_recent_logs(u64::try_from(limit).unwrap_or(0))
+        .await
+    {
         Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -1287,7 +1307,7 @@ pub async fn get_user_audit_logs(
     let limit = params.limit.min(500);
     match state
         .audit_log
-        .get_logs_by_user(&params.user_id, limit as u64)
+        .get_logs_by_user(&params.user_id, u64::try_from(limit).unwrap_or(0))
         .await
     {
         Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),

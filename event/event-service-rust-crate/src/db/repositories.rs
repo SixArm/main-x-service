@@ -4,7 +4,10 @@
 
 use super::convert::{offset_to_ts, ts_to_offset};
 use sea_orm::sea_query::Expr;
-use sea_orm::*;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, NotSet, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait,
+};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -15,29 +18,12 @@ use crate::models::{
     Place, VirtualLocation,
 };
 
-use super::models::*;
+use super::models::{
+    event_identifiers, event_links, event_locations, event_offers, event_parties, event_sub_events,
+    event_text_values, events,
+};
 
-/// Who/where/what context attached to each audited write.
-#[derive(Debug, Clone)]
-pub struct AuditContext {
-    /// Acting user id (defaults to `"system"`).
-    pub user_id: Option<String>,
-    /// Originating IP address.
-    pub ip_address: Option<String>,
-    /// Originating user-agent string.
-    pub user_agent: Option<String>,
-}
-
-impl Default for AuditContext {
-    /// A `system`-attributed context with no IP / user-agent.
-    fn default() -> Self {
-        Self {
-            user_id: Some("system".into()),
-            ip_address: None,
-            user_agent: None,
-        }
-    }
-}
+pub use super::audit::AuditContext;
 
 /// CRUD + simple search abstraction for [`Event`]. Object-safe (via
 /// `async_trait`) so it can be held as `Arc<dyn EventRepository>`.
@@ -97,6 +83,7 @@ pub struct SeaOrmEventRepository {
 
 impl SeaOrmEventRepository {
     /// Construct a repository over `db` with no publisher or audit log.
+    #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
             db,
@@ -106,6 +93,7 @@ impl SeaOrmEventRepository {
     }
 
     /// Builder: attach an event-stream publisher.
+    #[must_use]
     pub fn with_event_publisher(
         mut self,
         publisher: std::sync::Arc<dyn crate::streaming::EventProducer>,
@@ -115,6 +103,7 @@ impl SeaOrmEventRepository {
     }
 
     /// Builder: attach an audit-log repository.
+    #[must_use]
     pub fn with_audit_log(
         mut self,
         audit_log: std::sync::Arc<super::audit::AuditLogRepository>,
@@ -126,10 +115,10 @@ impl SeaOrmEventRepository {
     /// Publish a streaming event if a publisher is attached, logging
     /// (but swallowing) any publish error.
     fn publish_event(&self, event: crate::streaming::EventEvent) {
-        if let Some(ref publisher) = self.event_publisher {
-            if let Err(e) = publisher.publish(event) {
-                tracing::error!("Failed to publish event: {}", e);
-            }
+        if let Some(ref publisher) = self.event_publisher
+            && let Err(e) = publisher.publish(event)
+        {
+            tracing::error!("Failed to publish event: {}", e);
         }
     }
 
@@ -156,9 +145,7 @@ impl SeaOrmEventRepository {
                         "Event",
                         entity_id,
                         new_values.unwrap_or(serde_json::Value::Null),
-                        context.user_id.clone(),
-                        context.ip_address.clone(),
-                        context.user_agent.clone(),
+                        context,
                     )
                     .await
             }
@@ -169,9 +156,7 @@ impl SeaOrmEventRepository {
                         entity_id,
                         old_values.unwrap_or(serde_json::Value::Null),
                         new_values.unwrap_or(serde_json::Value::Null),
-                        context.user_id.clone(),
-                        context.ip_address.clone(),
-                        context.user_agent.clone(),
+                        context,
                     )
                     .await
             }
@@ -181,9 +166,7 @@ impl SeaOrmEventRepository {
                         "Event",
                         entity_id,
                         old_values.unwrap_or(serde_json::Value::Null),
-                        context.user_id.clone(),
-                        context.ip_address.clone(),
-                        context.user_agent.clone(),
+                        context,
                     )
                     .await
             }
@@ -216,17 +199,38 @@ struct ChildRows {
     links: Vec<event_links::ActiveModel>,
     /// `event_sub_events` rows (sub-event id references in order).
     sub_events: Vec<event_sub_events::ActiveModel>,
-    /// `event_text_values` rows (alternate_name/image/same_as/keyword/in_language).
+    /// `event_text_values` rows (`alternate_name/image/same_as/keyword/in_language`).
     text_values: Vec<event_text_values::ActiveModel>,
 }
 
-/// Flatten a domain [`Event`] into a [`ChildRows`] bundle of SeaORM
+/// All child-table rows loaded back for one event, in fixed order
+/// (identifiers, locations, parties, offers, links, sub-events,
+/// text-values), ready to feed into [`from_rows`].
+struct LoadedChildRows {
+    /// `event_identifiers` rows.
+    identifiers: Vec<event_identifiers::Model>,
+    /// `event_locations` rows.
+    locations: Vec<event_locations::Model>,
+    /// `event_parties` rows across all six role lists.
+    parties: Vec<event_parties::Model>,
+    /// `event_offers` rows.
+    offers: Vec<event_offers::Model>,
+    /// `event_links` rows.
+    links: Vec<event_links::Model>,
+    /// `event_sub_events` rows.
+    sub_events: Vec<event_sub_events::Model>,
+    /// `event_text_values` rows (ordered by `position`).
+    text_values: Vec<event_text_values::Model>,
+}
+
+/// Flatten a domain [`Event`] into a [`ChildRows`] bundle of `SeaORM`
 /// `ActiveModel`s. Stamps `created_at`/`updated_at` to "now"; mints
 /// fresh `Uuid`s for child rows; serializes the JSONB array fields;
 /// and fans the six party role-lists out via [`push_party_rows`].
-fn to_rows(event: &Event) -> ChildRows {
-    let now = OffsetDateTime::now_utc();
-    let event_row = events::ActiveModel {
+/// Build the parent `events` [`ActiveModel`](events::ActiveModel) for a
+/// fresh insert, stamping `created_at`/`updated_at` to `now`.
+fn event_active_model(event: &Event, now: OffsetDateTime) -> events::ActiveModel {
+    events::ActiveModel {
         id: Set(event.id),
         active: Set(event.active),
         name: Set(event.name.clone()),
@@ -248,14 +252,14 @@ fn to_rows(event: &Event) -> ChildRows {
         // Capacities are `u32` in the domain but stored as Postgres
         // `i32`; values above `i32::MAX` would wrap (not expected for
         // real attendee counts). Read-back casts `i32` → `u32`.
-        maximum_attendee_capacity: Set(event.maximum_attendee_capacity.map(|v| v as i32)),
+        maximum_attendee_capacity: Set(event.maximum_attendee_capacity.map(u32::cast_signed)),
         maximum_physical_attendee_capacity: Set(event
             .maximum_physical_attendee_capacity
-            .map(|v| v as i32)),
+            .map(u32::cast_signed)),
         maximum_virtual_attendee_capacity: Set(event
             .maximum_virtual_attendee_capacity
-            .map(|v| v as i32)),
-        remaining_attendee_capacity: Set(event.remaining_attendee_capacity.map(|v| v as i32)),
+            .map(u32::cast_signed)),
+        remaining_attendee_capacity: Set(event.remaining_attendee_capacity.map(u32::cast_signed)),
         super_event_id: Set(event.super_event),
         created_at: Set(now),
         updated_at: Set(now),
@@ -263,7 +267,64 @@ fn to_rows(event: &Event) -> ChildRows {
         updated_by: Set(None),
         deleted_at: Set(None),
         deleted_by: Set(None),
-    };
+    }
+}
+
+/// Build the `event_offers` rows (one per [`Offer`] in order). Price is
+/// parsed from its decimal-string form into `BigDecimal`; an
+/// unparseable string stores no price.
+fn offer_rows(event: &Event, now: OffsetDateTime) -> Vec<event_offers::ActiveModel> {
+    event
+        .offers
+        .iter()
+        .enumerate()
+        .map(|(pos, o)| event_offers::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            event_id: Set(event.id),
+            position: Set(i32::try_from(pos).unwrap_or(i32::MAX)),
+            name: Set(o.name.clone()),
+            price: Set(o
+                .price
+                .as_deref()
+                .and_then(|s| s.parse::<bigdecimal::BigDecimal>().ok())),
+            price_currency: Set(o.price_currency.clone()),
+            url: Set(o.url.clone()),
+            availability: Set(o.availability.as_ref().map(enum_to_str)),
+            valid_from: Set(o.valid_from.map(ts_to_offset)),
+            valid_through: Set(o.valid_through.map(ts_to_offset)),
+            created_at: Set(now),
+            updated_at: Set(now),
+        })
+        .collect()
+}
+
+/// Build the tagged `event_text_values` rows from the five string-list
+/// properties (`alternate_name`/`image`/`same_as`/`keyword`/`in_language`).
+fn text_value_rows(event: &Event) -> Vec<event_text_values::ActiveModel> {
+    let mut text_values = Vec::new();
+    for (field, values) in [
+        ("alternate_name", &event.alternate_names),
+        ("image", &event.image),
+        ("same_as", &event.same_as),
+        ("keyword", &event.keywords),
+        ("in_language", &event.in_language),
+    ] {
+        for (pos, value) in values.iter().enumerate() {
+            text_values.push(event_text_values::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                event_id: Set(event.id),
+                field: Set(field.to_string()),
+                value: Set(value.clone()),
+                position: Set(i32::try_from(pos).unwrap_or(i32::MAX)),
+            });
+        }
+    }
+    text_values
+}
+
+fn to_rows(event: &Event) -> ChildRows {
+    let now = OffsetDateTime::now_utc();
+    let event_row = event_active_model(event, now);
 
     let identifiers = event
         .identifiers
@@ -285,7 +346,9 @@ fn to_rows(event: &Event) -> ChildRows {
         .location
         .iter()
         .enumerate()
-        .map(|(pos, loc)| location_to_row(event.id, pos as i32, loc, now))
+        .map(|(pos, loc)| {
+            location_to_row(event.id, i32::try_from(pos).unwrap_or(i32::MAX), loc, now)
+        })
         .collect();
 
     let mut parties = Vec::new();
@@ -302,31 +365,7 @@ fn to_rows(event: &Event) -> ChildRows {
         now,
     );
 
-    let offers = event
-        .offers
-        .iter()
-        .enumerate()
-        .map(|(pos, o)| event_offers::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            event_id: Set(event.id),
-            position: Set(pos as i32),
-            name: Set(o.name.clone()),
-            // Price is a decimal-as-string in the domain; parse it into
-            // `BigDecimal` for the numeric column. An unparseable string
-            // silently becomes `None` (no price stored).
-            price: Set(o
-                .price
-                .as_deref()
-                .and_then(|s| s.parse::<bigdecimal::BigDecimal>().ok())),
-            price_currency: Set(o.price_currency.clone()),
-            url: Set(o.url.clone()),
-            availability: Set(o.availability.as_ref().map(enum_to_str)),
-            valid_from: Set(o.valid_from.map(ts_to_offset)),
-            valid_through: Set(o.valid_through.map(ts_to_offset)),
-            created_at: Set(now),
-            updated_at: Set(now),
-        })
-        .collect();
+    let offers = offer_rows(event, now);
 
     let links = event
         .links
@@ -349,30 +388,13 @@ fn to_rows(event: &Event) -> ChildRows {
             id: Set(Uuid::new_v4()),
             event_id: Set(event.id),
             sub_event_id: Set(*sub_id),
-            position: Set(pos as i32),
+            position: Set(i32::try_from(pos).unwrap_or(i32::MAX)),
             created_at: Set(now),
         })
         .collect();
 
     // String-list properties → tagged `event_text_values` rows.
-    let mut text_values = Vec::new();
-    for (field, values) in [
-        ("alternate_name", &event.alternate_names),
-        ("image", &event.image),
-        ("same_as", &event.same_as),
-        ("keyword", &event.keywords),
-        ("in_language", &event.in_language),
-    ] {
-        for (pos, value) in values.iter().enumerate() {
-            text_values.push(event_text_values::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                event_id: Set(event.id),
-                field: Set(field.to_string()),
-                value: Set(value.clone()),
-                position: Set(pos as i32),
-            });
-        }
-    }
+    let text_values = text_value_rows(event);
 
     ChildRows {
         event_row,
@@ -400,7 +422,7 @@ fn push_party_rows(
         rows.push(event_parties::ActiveModel {
             id: Set(Uuid::new_v4()),
             event_id: Set(event_id),
-            position: Set(pos as i32),
+            position: Set(i32::try_from(pos).unwrap_or(i32::MAX)),
             role: Set(role.to_string()),
             party_kind: Set(enum_to_str(&p.kind)),
             party_id: Set(p.id),
@@ -487,59 +509,24 @@ fn location_to_row(
 /// insertion order; JSONB arrays are deserialized; parties are bucketed
 /// back into the six role lists by their `role` column; and `about` /
 /// `works` are reset to empty (not yet persisted as child tables).
-fn from_rows(
-    event_row: events::Model,
-    identifiers: Vec<event_identifiers::Model>,
-    locations: Vec<event_locations::Model>,
-    parties: Vec<event_parties::Model>,
-    offers: Vec<event_offers::Model>,
-    links: Vec<event_links::Model>,
-    sub_events: Vec<event_sub_events::Model>,
-    text_values: Vec<event_text_values::Model>,
-) -> Event {
-    let text_of = |field: &str| -> Vec<String> {
-        text_values
-            .iter()
-            .filter(|r| r.field == field)
-            .map(|r| r.value.clone())
-            .collect()
-    };
-    let alternate_names = text_of("alternate_name");
-    let image = text_of("image");
-    let same_as = text_of("same_as");
-    let keywords = text_of("keyword");
-    let in_language = text_of("in_language");
+/// Project the `event_text_values` rows for `field` into an ordered
+/// `Vec<String>` (rows already arrive ordered by `position`).
+fn text_values_of(rows: &[event_text_values::Model], field: &str) -> Vec<String> {
+    rows.iter()
+        .filter(|r| r.field == field)
+        .map(|r| r.value.clone())
+        .collect()
+}
 
-    let event_status = str_to_enum(&event_row.event_status, EventStatus::Scheduled);
-    let event_attendance_mode = str_to_enum(
-        &event_row.event_attendance_mode,
-        EventAttendanceMode::Offline,
-    );
-    let event_type = str_to_enum(&event_row.event_type, EventType::Generic);
-
-    let identifiers = identifiers
-        .into_iter()
-        .map(|id| Identifier {
-            use_type: id.use_type.as_deref().and_then(parse_identifier_use),
-            identifier_type: parse_identifier_type(&id.identifier_type),
-            system: id.system,
-            value: id.value,
-            assigner: id.assigner,
-        })
-        .collect();
-
-    let mut sorted_locations = locations;
-    sorted_locations.sort_by_key(|l| l.position);
-    let location = sorted_locations
-        .into_iter()
-        .filter_map(row_to_location)
-        .collect();
-
+/// Reassemble the six party role-lists from the flat `event_parties`
+/// rows, keyed by `role` and ordered by `position`.
+fn parties_by_role(
+    mut parties: Vec<event_parties::Model>,
+) -> std::collections::HashMap<String, Vec<Party>> {
+    parties.sort_by_key(|p| p.position);
     let mut by_role: std::collections::HashMap<String, Vec<Party>> =
         std::collections::HashMap::new();
-    let mut parties_sorted = parties;
-    parties_sorted.sort_by_key(|p| p.position);
-    for p in parties_sorted {
+    for p in parties {
         let kind = if p.party_kind == "organization" {
             PartyKind::Organization
         } else {
@@ -553,36 +540,92 @@ fn from_rows(
             url: p.url,
         });
     }
+    by_role
+}
 
-    let mut offers_sorted = offers;
-    offers_sorted.sort_by_key(|o| o.position);
-    let offers = offers_sorted
-        .into_iter()
+/// Map `event_identifiers` rows back into domain [`Identifier`]s.
+fn identifiers_from_rows(rows: Vec<event_identifiers::Model>) -> Vec<Identifier> {
+    rows.into_iter()
+        .map(|id| Identifier {
+            use_type: id.use_type.as_deref().and_then(parse_identifier_use),
+            identifier_type: parse_identifier_type(&id.identifier_type),
+            system: id.system,
+            value: id.value,
+            assigner: id.assigner,
+        })
+        .collect()
+}
+
+/// Sort `event_locations` rows by `position` and map them back into
+/// domain [`Location`] variants, dropping unrecognized rows.
+fn locations_from_rows(mut rows: Vec<event_locations::Model>) -> Vec<Location> {
+    rows.sort_by_key(|l| l.position);
+    rows.iter().filter_map(row_to_location).collect()
+}
+
+/// Sort `event_offers` rows by `position` and map them back into domain
+/// [`Offer`]s.
+fn offers_from_rows(mut rows: Vec<event_offers::Model>) -> Vec<Offer> {
+    rows.sort_by_key(|o| o.position);
+    rows.into_iter()
         .map(|o| Offer {
             name: o.name,
-            price: o.price.as_ref().map(|p| p.to_string()),
+            price: o.price.as_ref().map(std::string::ToString::to_string),
             price_currency: o.price_currency,
             url: o.url,
             availability: o.availability.as_deref().and_then(parse_offer_availability),
             valid_from: o.valid_from.map(offset_to_ts),
             valid_through: o.valid_through.map(offset_to_ts),
         })
-        .collect();
+        .collect()
+}
 
-    let links = links
-        .into_iter()
+/// Map `event_links` rows back into domain [`EventLink`]s.
+fn links_from_rows(rows: Vec<event_links::Model>) -> Vec<EventLink> {
+    rows.into_iter()
         .map(|l| EventLink {
             other_event_id: l.other_event_id,
             link_type: str_to_enum(&l.link_type, LinkType::Seealso),
         })
-        .collect();
+        .collect()
+}
 
-    let mut sub_events_sorted = sub_events;
-    sub_events_sorted.sort_by_key(|s| s.position);
-    let sub_events_ids = sub_events_sorted
-        .into_iter()
-        .map(|s| s.sub_event_id)
-        .collect();
+/// Sort `event_sub_events` rows by `position` and project their ids.
+fn sub_event_ids_from_rows(mut rows: Vec<event_sub_events::Model>) -> Vec<Uuid> {
+    rows.sort_by_key(|s| s.position);
+    rows.into_iter().map(|s| s.sub_event_id).collect()
+}
+
+fn from_rows(event_row: events::Model, children: LoadedChildRows) -> Event {
+    let LoadedChildRows {
+        identifiers,
+        locations,
+        parties,
+        offers,
+        links,
+        sub_events,
+        text_values,
+    } = children;
+
+    let alternate_names = text_values_of(&text_values, "alternate_name");
+    let image = text_values_of(&text_values, "image");
+    let same_as = text_values_of(&text_values, "same_as");
+    let keywords = text_values_of(&text_values, "keyword");
+    let in_language = text_values_of(&text_values, "in_language");
+
+    let event_status = str_to_enum(&event_row.event_status, EventStatus::Scheduled);
+    let event_attendance_mode = str_to_enum(
+        &event_row.event_attendance_mode,
+        EventAttendanceMode::Offline,
+    );
+    let event_type = str_to_enum(&event_row.event_type, EventType::Generic);
+
+    let identifiers = identifiers_from_rows(identifiers);
+    let location = locations_from_rows(locations);
+    let mut by_role = parties_by_role(parties);
+    let offers = offers_from_rows(offers);
+    let links = links_from_rows(links);
+    let sub_events_ids = sub_event_ids_from_rows(sub_events);
 
     Event {
         id: event_row.id,
@@ -609,14 +652,16 @@ fn from_rows(
         typical_age_range: event_row.typical_age_range,
         in_language,
         is_accessible_for_free: event_row.is_accessible_for_free,
-        maximum_attendee_capacity: event_row.maximum_attendee_capacity.map(|v| v as u32),
+        maximum_attendee_capacity: event_row.maximum_attendee_capacity.map(i32::cast_unsigned),
         maximum_physical_attendee_capacity: event_row
             .maximum_physical_attendee_capacity
-            .map(|v| v as u32),
+            .map(i32::cast_unsigned),
         maximum_virtual_attendee_capacity: event_row
             .maximum_virtual_attendee_capacity
-            .map(|v| v as u32),
-        remaining_attendee_capacity: event_row.remaining_attendee_capacity.map(|v| v as u32),
+            .map(i32::cast_unsigned),
+        remaining_attendee_capacity: event_row
+            .remaining_attendee_capacity
+            .map(i32::cast_unsigned),
         location,
         organizers: by_role.remove("organizer").unwrap_or_default(),
         performers: by_role.remove("performer").unwrap_or_default(),
@@ -639,17 +684,17 @@ fn from_rows(
 /// row, dispatching on the `kind` column. Returns `None` for an
 /// unrecognized `kind` or a `text` row missing its value, so callers
 /// `filter_map` over the results.
-fn row_to_location(row: event_locations::Model) -> Option<Location> {
+fn row_to_location(row: &event_locations::Model) -> Option<Location> {
     match row.kind.as_str() {
         "place" => Some(Location::Place(Place {
             id: row.place_id,
             name: row.name.clone().unwrap_or_default(),
-            address: address_from_row(&row),
+            address: address_from_row(row),
             latitude: row.latitude,
             longitude: row.longitude,
             url: row.url.clone(),
         })),
-        "postal_address" => address_from_row(&row).map(Location::PostalAddress),
+        "postal_address" => address_from_row(row).map(Location::PostalAddress),
         "virtual" => Some(Location::Virtual(VirtualLocation {
             name: row.name.clone(),
             url: row.url.clone().unwrap_or_default(),
@@ -689,7 +734,7 @@ fn address_from_row(row: &event_locations::Model) -> Option<Address> {
 fn enum_to_str<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_value(value)
         .ok()
-        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .and_then(|v| v.as_str().map(std::string::ToString::to_string))
         .unwrap_or_default()
 }
 
@@ -732,18 +777,7 @@ impl SeaOrmEventRepository {
     ///
     /// Returns the `SeaORM` error if any of the per-child-table queries
     /// fails.
-    async fn load_children(
-        &self,
-        event_id: &Uuid,
-    ) -> Result<(
-        Vec<event_identifiers::Model>,
-        Vec<event_locations::Model>,
-        Vec<event_parties::Model>,
-        Vec<event_offers::Model>,
-        Vec<event_links::Model>,
-        Vec<event_sub_events::Model>,
-        Vec<event_text_values::Model>,
-    )> {
+    async fn load_children(&self, event_id: &Uuid) -> Result<LoadedChildRows> {
         let identifiers = event_identifiers::Entity::find()
             .filter(event_identifiers::Column::EventId.eq(*event_id))
             .all(&self.db)
@@ -773,7 +807,7 @@ impl SeaOrmEventRepository {
             .order_by_asc(event_text_values::Column::Position)
             .all(&self.db)
             .await?;
-        Ok((
+        Ok(LoadedChildRows {
             identifiers,
             locations,
             parties,
@@ -781,7 +815,7 @@ impl SeaOrmEventRepository {
             links,
             sub_events,
             text_values,
-        ))
+        })
     }
 }
 
@@ -822,18 +856,8 @@ impl EventRepository for SeaOrmEventRepository {
 
         // Reload children and reassemble the canonical domain `Event`
         // (positions/JSON round-tripped) to return to the caller.
-        let (identifiers, locations, parties, offers, links, sub_events, text_values) =
-            self.load_children(&inserted.id).await?;
-        let result = from_rows(
-            inserted,
-            identifiers,
-            locations,
-            parties,
-            offers,
-            links,
-            sub_events,
-            text_values,
-        );
+        let children = self.load_children(&inserted.id).await?;
+        let result = from_rows(inserted, children);
 
         // Fire-and-forget side effects: publish a `Created` stream event
         // (chrono `DateTime<Utc>` on the streaming side vs `time` on the row),
@@ -865,18 +889,8 @@ impl EventRepository for SeaOrmEventRepository {
         let Some(event_row) = event_row else {
             return Ok(None);
         };
-        let (identifiers, locations, parties, offers, links, sub_events, text_values) =
-            self.load_children(id).await?;
-        Ok(Some(from_rows(
-            event_row,
-            identifiers,
-            locations,
-            parties,
-            offers,
-            links,
-            sub_events,
-            text_values,
-        )))
+        let children = self.load_children(id).await?;
+        Ok(Some(from_rows(event_row, children)))
     }
 
     async fn update(&self, event: &Event) -> Result<Event> {
@@ -959,17 +973,17 @@ impl EventRepository for SeaOrmEventRepository {
         // Record an UPDATE audit row only when both the pre-image and
         // both JSON serializations succeed; otherwise skip the trail
         // rather than write a misleading half-diff.
-        if let (Some(old), Ok(new_json)) = (old, serde_json::to_value(&result)) {
-            if let Ok(old_json) = serde_json::to_value(&old) {
-                self.log_audit(
-                    "UPDATE",
-                    result.id,
-                    Some(old_json),
-                    Some(new_json),
-                    &AuditContext::default(),
-                )
-                .await;
-            }
+        if let (Some(old), Ok(new_json)) = (old, serde_json::to_value(&result))
+            && let Ok(old_json) = serde_json::to_value(&old)
+        {
+            self.log_audit(
+                "UPDATE",
+                result.id,
+                Some(old_json),
+                Some(new_json),
+                &AuditContext::default(),
+            )
+            .await;
         }
         Ok(result)
     }
@@ -992,17 +1006,17 @@ impl EventRepository for SeaOrmEventRepository {
             event_id: *id,
             timestamp: chrono::Utc::now(),
         });
-        if let Some(old) = old {
-            if let Ok(old_json) = serde_json::to_value(&old) {
-                self.log_audit(
-                    "DELETE",
-                    *id,
-                    Some(old_json),
-                    None,
-                    &AuditContext::default(),
-                )
-                .await;
-            }
+        if let Some(old) = old
+            && let Ok(old_json) = serde_json::to_value(&old)
+        {
+            self.log_audit(
+                "DELETE",
+                *id,
+                Some(old_json),
+                None,
+                &AuditContext::default(),
+            )
+            .await;
         }
         Ok(())
     }

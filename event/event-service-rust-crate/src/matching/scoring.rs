@@ -42,6 +42,7 @@ pub struct ProbabilisticScorer {
 
 impl ProbabilisticScorer {
     /// Construct a scorer from the given [`MatchingConfig`].
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self { config }
     }
@@ -49,6 +50,7 @@ impl ProbabilisticScorer {
     /// Score `candidate` against `event`, returning a [`MatchResult`]
     /// with the overall score and per-component breakdown. An exact
     /// strong-identifier match short-circuits to `1.0`.
+    #[must_use]
     pub fn calculate_score(&self, event: &Event, candidate: &Event) -> MatchResult {
         let name = name_matching::match_name_with_alternates(
             &event.name,
@@ -104,12 +106,14 @@ impl ProbabilisticScorer {
     }
 
     /// `true` when `score` meets or exceeds the configured threshold.
+    #[must_use]
     pub fn is_match(&self, score: f64) -> bool {
         score >= self.config.threshold_score
     }
 
     /// Bucket a score into a [`MatchQuality`] band (Definite ≥ 0.95,
     /// Probable ≥ threshold, Possible ≥ 0.50, else Unlikely).
+    #[must_use]
     pub fn classify_match(&self, score: f64) -> MatchQuality {
         if score >= 0.95 {
             MatchQuality::Definite
@@ -135,6 +139,7 @@ pub struct DeterministicScorer {
 
 impl DeterministicScorer {
     /// Construct a scorer from the given [`MatchingConfig`].
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self { _config: config }
     }
@@ -142,6 +147,7 @@ impl DeterministicScorer {
     /// Score `candidate` against `event` by counting satisfied rules
     /// over available rules. A strong-identifier exact match
     /// short-circuits to `1.0`.
+    #[must_use]
     pub fn calculate_score(&self, event: &Event, candidate: &Event) -> MatchResult {
         let identifier =
             identifier_matching::match_identifiers(&event.identifiers, &candidate.identifiers);
@@ -226,6 +232,7 @@ impl DeterministicScorer {
 
     /// `true` when the deterministic score meets the fixed `0.75`
     /// threshold.
+    #[must_use]
     pub fn is_match(&self, score: f64) -> bool {
         score >= 0.75
     }
@@ -273,6 +280,7 @@ pub enum MatchQuality {
 impl MatchQuality {
     /// Lowercase string form (`"definite"`, `"probable"`, …) for
     /// serialization and the review-queue `match_quality` field.
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             MatchQuality::Definite => "definite",
@@ -284,6 +292,7 @@ impl MatchQuality {
 
     /// `true` for the `Definite` and `Probable` bands — i.e. quality
     /// levels that count as an actual match.
+    #[must_use]
     pub fn is_match(&self) -> bool {
         matches!(self, MatchQuality::Definite | MatchQuality::Probable)
     }
@@ -341,7 +350,7 @@ mod tests {
         a.identifiers.push(id.clone());
         b.identifiers.push(id);
         let r = p.calculate_score(&a, &b);
-        assert_eq!(r.score, 1.0);
+        assert!((r.score - 1.0).abs() < f64::EPSILON);
     }
 
     /// Identical name + start satisfies rule 1, passing the

@@ -48,6 +48,7 @@ pub struct ValidationError {
 /// );
 /// assert!(validate_worker(&w).is_empty());
 /// ```
+#[must_use]
 pub fn validate_worker(worker: &Worker) -> Vec<ValidationError> {
     // Collect every failure rather than returning on the first, so the API can
     // surface a complete 422 list in one round-trip.
@@ -71,18 +72,18 @@ pub fn validate_worker(worker: &Worker) -> Vec<ValidationError> {
     }
 
     // Validate birth_date is not in the future
-    if let Some(dob) = worker.birth_date {
-        if dob > chrono::Utc::now().date_naive() {
-            errors.push(ValidationError {
-                field: "birth_date".into(),
-                message: "Birth date cannot be in the future".into(),
-            });
-        }
+    if let Some(dob) = worker.birth_date
+        && dob > chrono::Utc::now().date_naive()
+    {
+        errors.push(ValidationError {
+            field: "birth_date".into(),
+            message: "Birth date cannot be in the future".into(),
+        });
     }
 
     // Validate tax_id format if present
     if let Some(ref tid) = worker.tax_id {
-        let cleaned: String = tid.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        let cleaned: String = tid.chars().filter(char::is_ascii_alphanumeric).collect();
         if cleaned.is_empty() {
             errors.push(ValidationError {
                 field: "tax_id".into(),
@@ -93,30 +94,30 @@ pub fn validate_worker(worker: &Worker) -> Vec<ValidationError> {
 
     // Validate contact points
     for (i, cp) in worker.telecom.iter().enumerate() {
-        errors.extend(validate_contact_point(cp, &format!("telecom[{}]", i)));
+        errors.extend(validate_contact_point(cp, &format!("telecom[{i}]")));
     }
 
     // Validate addresses
     for (i, addr) in worker.addresses.iter().enumerate() {
-        errors.extend(validate_address(addr, &format!("addresses[{}]", i)));
+        errors.extend(validate_address(addr, &format!("addresses[{i}]")));
     }
 
     // Validate documents
     for (i, doc) in worker.documents.iter().enumerate() {
-        errors.extend(validate_document(doc, &format!("documents[{}]", i)));
+        errors.extend(validate_document(doc, &format!("documents[{i}]")));
     }
 
     // Validate emergency contacts
     for (i, ec) in worker.emergency_contacts.iter().enumerate() {
         if ec.name.trim().is_empty() {
             errors.push(ValidationError {
-                field: format!("emergency_contacts[{}].name", i),
+                field: format!("emergency_contacts[{i}].name"),
                 message: "Emergency contact name is required".into(),
             });
         }
         if ec.relationship.trim().is_empty() {
             errors.push(ValidationError {
-                field: format!("emergency_contacts[{}].relationship", i),
+                field: format!("emergency_contacts[{i}].relationship"),
                 message: "Emergency contact relationship is required".into(),
             });
         }
@@ -133,26 +134,24 @@ fn validate_contact_point(cp: &ContactPoint, prefix: &str) -> Vec<ValidationErro
 
     if cp.value.trim().is_empty() {
         errors.push(ValidationError {
-            field: format!("{}.value", prefix),
+            field: format!("{prefix}.value"),
             message: "Contact value is required".into(),
         });
         return errors;
     }
 
     match cp.system {
-        ContactPointSystem::Email => {
-            if !cp.value.contains('@') || !cp.value.contains('.') {
-                errors.push(ValidationError {
-                    field: format!("{}.value", prefix),
-                    message: "Invalid email format".into(),
-                });
-            }
+        ContactPointSystem::Email if (!cp.value.contains('@') || !cp.value.contains('.')) => {
+            errors.push(ValidationError {
+                field: format!("{prefix}.value"),
+                message: "Invalid email format".into(),
+            });
         }
         ContactPointSystem::Phone | ContactPointSystem::Sms | ContactPointSystem::Fax => {
-            let digits: String = cp.value.chars().filter(|c| c.is_ascii_digit()).collect();
+            let digits: String = cp.value.chars().filter(char::is_ascii_digit).collect();
             if digits.len() < 7 {
                 errors.push(ValidationError {
-                    field: format!("{}.value", prefix),
+                    field: format!("{prefix}.value"),
                     message: "Phone number must have at least 7 digits".into(),
                 });
             }
@@ -179,7 +178,7 @@ fn validate_address(addr: &Address, prefix: &str) -> Vec<ValidationError> {
 
     if !has_location {
         errors.push(ValidationError {
-            field: format!("{}", prefix),
+            field: prefix.to_string(),
             message: "Address must have at least a city, postal code, or country".into(),
         });
     }
@@ -195,29 +194,29 @@ fn validate_document(doc: &IdentityDocument, prefix: &str) -> Vec<ValidationErro
 
     if doc.number.trim().is_empty() {
         errors.push(ValidationError {
-            field: format!("{}.number", prefix),
+            field: format!("{prefix}.number"),
             message: "Document number is required".into(),
         });
     }
 
     // Check expiry
-    if let Some(expiry) = doc.expiry_date {
-        if expiry < chrono::Utc::now().date_naive() {
-            errors.push(ValidationError {
-                field: format!("{}.expiry_date", prefix),
-                message: "Document has expired".into(),
-            });
-        }
+    if let Some(expiry) = doc.expiry_date
+        && expiry < chrono::Utc::now().date_naive()
+    {
+        errors.push(ValidationError {
+            field: format!("{prefix}.expiry_date"),
+            message: "Document has expired".into(),
+        });
     }
 
     // Check issue date before expiry date
-    if let (Some(issue), Some(expiry)) = (doc.issue_date, doc.expiry_date) {
-        if issue > expiry {
-            errors.push(ValidationError {
-                field: format!("{}.issue_date", prefix),
-                message: "Issue date cannot be after expiry date".into(),
-            });
-        }
+    if let (Some(issue), Some(expiry)) = (doc.issue_date, doc.expiry_date)
+        && issue > expiry
+    {
+        errors.push(ValidationError {
+            field: format!("{prefix}.issue_date"),
+            message: "Issue date cannot be after expiry date".into(),
+        });
     }
 
     errors
@@ -237,8 +236,9 @@ fn validate_document(doc: &IdentityDocument, prefix: &str) -> Vec<ValidationErro
 /// assert_eq!(normalize_phone("(555) 123-4567", "1"), "+15551234567");
 /// assert_eq!(normalize_phone("+44 20 7946 0958", "44"), "+442079460958");
 /// ```
+#[must_use]
 pub fn normalize_phone(phone: &str, default_country_code: &str) -> String {
-    let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = phone.chars().filter(char::is_ascii_digit).collect();
 
     if digits.is_empty() {
         return String::new();
@@ -246,21 +246,21 @@ pub fn normalize_phone(phone: &str, default_country_code: &str) -> String {
 
     // If already has a country code (10+ digits starting with country code)
     if digits.len() >= 10 && digits.starts_with(default_country_code) {
-        return format!("+{}", digits);
+        return format!("+{digits}");
     }
 
     // If exactly 10 digits (US format), prepend country code
     if digits.len() == 10 {
-        return format!("+{}{}", default_country_code, digits);
+        return format!("+{default_country_code}{digits}");
     }
 
     // If starts with +, keep as-is but clean
     if phone.starts_with('+') {
-        return format!("+{}", digits);
+        return format!("+{digits}");
     }
 
     // Return cleaned digits
-    format!("+{}{}", default_country_code, digits)
+    format!("+{default_country_code}{digits}")
 }
 
 /// Standardizes an address: trims whitespace, expands street abbreviations in
@@ -282,6 +282,7 @@ pub fn normalize_phone(phone: &str, default_country_code: &str) -> String {
 /// assert_eq!(s.city.as_deref(), Some("New York"));
 /// assert_eq!(s.state.as_deref(), Some("NY"));
 /// ```
+#[must_use]
 pub fn standardize_address(addr: &Address) -> Address {
     Address {
         use_type: addr.use_type.clone(),
@@ -322,7 +323,7 @@ fn title_case(s: &str) -> String {
                 Some(first) => {
                     let upper: String = first.to_uppercase().collect();
                     let rest: String = chars.collect::<String>().to_lowercase();
-                    format!("{}{}", upper, rest)
+                    format!("{upper}{rest}")
                 }
             }
         })
@@ -341,7 +342,7 @@ mod tests {
         let worker = Worker::new(
             HumanName {
                 use_type: None,
-                family: "".into(),
+                family: String::new(),
                 given: vec!["John".into()],
                 prefix: vec![],
                 suffix: vec![],
@@ -507,7 +508,7 @@ mod tests {
         );
         worker.documents.push(IdentityDocument {
             document_type: DocumentType::Passport,
-            number: "".into(),
+            number: String::new(),
             issuing_country: Some("US".into()),
             issuing_authority: None,
             issue_date: None,
@@ -566,7 +567,7 @@ mod tests {
             Gender::Male,
         );
         worker.emergency_contacts.push(EmergencyContact {
-            name: "".into(),
+            name: String::new(),
             relationship: "spouse".into(),
             telecom: vec![],
             address: None,

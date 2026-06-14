@@ -34,13 +34,14 @@
 /// assert_eq!(soundex("Lee"), "L000");
 /// assert_eq!(soundex(""), "");
 /// ```
+#[must_use]
 pub fn soundex(name: &str) -> String {
     let name = name.trim().to_uppercase();
     if name.is_empty() {
         return String::new();
     }
 
-    let chars: Vec<char> = name.chars().filter(|c| c.is_ascii_alphabetic()).collect();
+    let chars: Vec<char> = name.chars().filter(char::is_ascii_alphabetic).collect();
     if chars.is_empty() {
         return String::new();
     }
@@ -100,6 +101,7 @@ pub fn soundex(name: &str) -> String {
 /// use event_service::matching::phonetic::soundex_match;
 /// assert!(soundex_match("Robert", "Rupert"));
 /// ```
+#[must_use]
 pub fn soundex_match(name1: &str, name2: &str) -> bool {
     let s1 = soundex(name1);
     let s2 = soundex(name2);
@@ -119,6 +121,7 @@ pub fn soundex_match(name1: &str, name2: &str) -> bool {
 /// assert_eq!(phonetic_similarity("Smith", "Smyth"), 1.0);
 /// assert_eq!(phonetic_similarity("", "Smith"), 0.0);
 /// ```
+#[must_use]
 pub fn phonetic_similarity(name1: &str, name2: &str) -> f64 {
     let s1 = soundex(name1);
     let s2 = soundex(name2);
@@ -133,12 +136,14 @@ pub fn phonetic_similarity(name1: &str, name2: &str) -> f64 {
 
     // Partial match: count how many leading characters agree before the
     // first divergence, scaled by the fixed code length of 4.
+    // At most 4 (the Soundex code length), so the `u8` conversion is
+    // lossless and `f64::from` avoids a wide `usize` → `f64` cast.
     let matching = s1
         .chars()
         .zip(s2.chars())
         .take_while(|(a, b)| a == b)
         .count();
-    matching as f64 / 4.0
+    f64::from(u8::try_from(matching).unwrap_or(4)) / 4.0
 }
 
 #[cfg(test)]
@@ -174,9 +179,9 @@ mod tests {
     /// and 0.0 when one input is empty.
     #[test]
     fn test_phonetic_similarity() {
-        assert_eq!(phonetic_similarity("Smith", "Smyth"), 1.0);
+        assert!((phonetic_similarity("Smith", "Smyth") - 1.0).abs() < f64::EPSILON);
         assert!(phonetic_similarity("Smith", "Johnson") < 0.5);
-        assert_eq!(phonetic_similarity("", "Smith"), 0.0);
+        assert!(phonetic_similarity("", "Smith").abs() < f64::EPSILON);
     }
 
     /// Empty and whitespace-only inputs both yield an empty code.
@@ -220,8 +225,7 @@ mod tests {
         assert_eq!(code.len(), 4);
         assert!(
             code.starts_with('A'),
-            "Ashcraft should start with A, got {}",
-            code
+            "Ashcraft should start with A, got {code}"
         );
     }
 }

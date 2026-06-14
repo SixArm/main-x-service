@@ -53,7 +53,7 @@ pub struct ServerConfig {
     pub grpc_port: u16,
 }
 
-/// PostgreSQL connection settings.
+/// `PostgreSQL` connection settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     /// Connection string (`postgres://…`).
@@ -144,6 +144,10 @@ impl Default for Config {
 
 impl Config {
     /// Load configuration from environment variables
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a configuration value is present but invalid.
     pub fn from_env() -> crate::Result<Self> {
         dotenvy::dotenv().ok();
         // TODO: Implement environment variable loading

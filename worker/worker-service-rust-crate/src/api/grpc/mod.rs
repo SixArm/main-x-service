@@ -14,8 +14,14 @@ pub mod proto {
 }
 
 /// Starts the gRPC server (not yet implemented — returns `Ok(())` without
-/// binding). The intended implementation is sketched in the commented body.
-pub async fn serve(_config: ServerConfig) -> Result<()> {
+/// binding). The intended implementation is sketched in the commented body and
+/// will become `async` again once it awaits the Tonic server.
+///
+/// # Errors
+///
+/// Currently infallible; the future implementation will return an error if the
+/// configured address fails to parse or the server fails to bind.
+pub fn serve(_config: ServerConfig) -> Result<()> {
     // TODO: Implement gRPC server
     // let addr = format!("{}:{}", config.host, config.grpc_port)
     //     .parse::<std::net::SocketAddr>()

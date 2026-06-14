@@ -23,6 +23,7 @@ pub struct InMemoryEventPublisher {
 
 impl InMemoryEventPublisher {
     /// Create a publisher with an empty event buffer.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             events: Arc::new(Mutex::new(Vec::new())),
@@ -30,16 +31,30 @@ impl InMemoryEventPublisher {
     }
 
     /// Return a snapshot clone of every event published so far.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
+    #[must_use]
     pub fn get_events(&self) -> Vec<PersonEvent> {
         self.events.lock().unwrap().clone()
     }
 
     /// Discard all buffered events (test convenience).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     pub fn clear(&self) {
         self.events.lock().unwrap().clear();
     }
 
     /// Return the number of events currently buffered.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
+    #[must_use]
     pub fn event_count(&self) -> usize {
         self.events.lock().unwrap().len()
     }

@@ -49,6 +49,7 @@ impl AppState {
     /// event and an audit entry. All services are wrapped in `Arc`s (and the
     /// repository/matcher boxed as trait objects) so the returned [`AppState`]
     /// is cheap to clone into Axum's per-request state.
+    #[must_use]
     pub fn new(
         db: DatabaseConnection,
         search_engine: SearchEngine,

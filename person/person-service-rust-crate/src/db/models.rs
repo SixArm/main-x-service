@@ -27,7 +27,11 @@ use serde::{Deserialize, Serialize};
 /// The `persons` table: the core person record (scalar fields only;
 /// names/identifiers/etc. live in child tables).
 pub mod persons {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDate, TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// A row in `persons`. Soft-delete is via `deleted_at`/`deleted_by`.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -72,22 +76,22 @@ pub mod persons {
     /// (optionally) its managing organization.
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
-        /// `has_many` person_names.
+        /// `has_many` `person_names`.
         #[sea_orm(has_many = "super::person_names::Entity")]
         PersonNames,
-        /// `has_many` person_identifiers.
+        /// `has_many` `person_identifiers`.
         #[sea_orm(has_many = "super::person_identifiers::Entity")]
         PersonIdentifiers,
-        /// `has_many` person_addresses.
+        /// `has_many` `person_addresses`.
         #[sea_orm(has_many = "super::person_addresses::Entity")]
         PersonAddresses,
-        /// `has_many` person_contacts.
+        /// `has_many` `person_contacts`.
         #[sea_orm(has_many = "super::person_contacts::Entity")]
         PersonContacts,
-        /// `has_many` person_links.
+        /// `has_many` `person_links`.
         #[sea_orm(has_many = "super::person_links::Entity")]
         PersonLinks,
-        /// `has_many` person_match_scores.
+        /// `has_many` `person_match_scores`.
         #[sea_orm(has_many = "super::person_match_scores::Entity")]
         PersonMatchScores,
         /// `belongs_to` the managing organization (nullable FK).
@@ -139,7 +143,11 @@ pub mod persons {
 
 /// The `person_names` table: primary and additional names per person.
 pub mod person_names {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// A name row; `is_primary` flags the person's main [`HumanName`](crate::models::person::HumanName).
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -195,7 +203,11 @@ pub mod person_names {
 
 /// The `person_identifiers` table: external IDs (MRN, SSN, TAX, …).
 pub mod person_identifiers {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// An identifier row (type + system + value) for one person.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -249,7 +261,11 @@ pub mod person_identifiers {
 
 /// The `person_addresses` table: physical/postal addresses per person.
 pub mod person_addresses {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// An address row; `is_primary` flags the person's main address.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -309,7 +325,11 @@ pub mod person_addresses {
 
 /// The `person_contacts` table: telecom contact points per person.
 pub mod person_contacts {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// A contact-point row (system + value) for one person.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -362,7 +382,11 @@ pub mod person_contacts {
 /// The `person_links` table: typed links between two person records
 /// (e.g. `Replaces` after a merge).
 pub mod person_links {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// A link row from `person_id` to `other_person_id` with a type.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -410,7 +434,11 @@ pub mod person_links {
 
 /// The `organizations` table: managing/owning organizations.
 pub mod organizations {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// An organization row; `part_of` is a self-referential parent FK.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -446,13 +474,13 @@ pub mod organizations {
     /// Foreign-key relations from `organizations` to its child tables.
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
-        /// `has_many` organization_addresses.
+        /// `has_many` `organization_addresses`.
         #[sea_orm(has_many = "super::organization_addresses::Entity")]
         Addresses,
-        /// `has_many` organization_contacts.
+        /// `has_many` `organization_contacts`.
         #[sea_orm(has_many = "super::organization_contacts::Entity")]
         Contacts,
-        /// `has_many` organization_identifiers.
+        /// `has_many` `organization_identifiers`.
         #[sea_orm(has_many = "super::organization_identifiers::Entity")]
         Identifiers,
     }
@@ -482,7 +510,11 @@ pub mod organizations {
 
 /// The `organization_addresses` table: addresses per organization.
 pub mod organization_addresses {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// An address row for one organization.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -542,7 +574,11 @@ pub mod organization_addresses {
 
 /// The `organization_contacts` table: telecom points per organization.
 pub mod organization_contacts {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// A contact-point row for one organization.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -594,7 +630,11 @@ pub mod organization_contacts {
 
 /// The `organization_identifiers` table: external IDs per organization.
 pub mod organization_identifiers {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// An identifier row (type + system + value) for one organization.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -649,7 +689,11 @@ pub mod organization_identifiers {
 /// The `person_match_scores` table: persisted match-score history with
 /// per-component breakdown (decimals stored as `BigDecimal`).
 pub mod person_match_scores {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// A scored person/candidate pair with component sub-scores.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -712,7 +756,10 @@ pub mod person_match_scores {
 /// The `audit_log` table: the HIPAA-style change trail
 /// (see [`AuditLogRepository`](super::audit::AuditLogRepository)).
 pub mod audit_log {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EnumIter, PrimaryKeyTrait, Serialize, TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// One audit row: action + entity + old/new JSON + request context.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -755,7 +802,11 @@ pub mod audit_log {
 
 /// The `person_documents` table: identity documents per person.
 pub mod person_documents {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDate, Uuid,
+    };
 
     /// An identity-document row (passport, driver's license, …).
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -810,7 +861,11 @@ pub mod person_documents {
 /// The `person_emergency_contacts` table: emergency contacts per person
 /// (address flattened; telecom lives in `person_emergency_contact_telecom`).
 pub mod person_emergency_contacts {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        Uuid,
+    };
 
     /// An emergency-contact row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -867,7 +922,11 @@ pub mod person_emergency_contacts {
 /// The `person_emergency_contact_telecom` table: contact points per
 /// emergency contact.
 pub mod person_emergency_contact_telecom {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        Uuid,
+    };
 
     /// A telecom row for one emergency contact.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -878,7 +937,7 @@ pub mod person_emergency_contact_telecom {
         pub id: Uuid,
         /// Owning emergency-contact id (FK).
         pub emergency_contact_id: Uuid,
-        /// Contact system (PascalCase debug form).
+        /// Contact system (`PascalCase` debug form).
         pub system: String,
         /// Contact value.
         pub value: String,
@@ -913,7 +972,11 @@ pub mod person_emergency_contact_telecom {
 
 /// The `person_photos` table: photo references per person.
 pub mod person_photos {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        Uuid,
+    };
 
     /// A photo-reference row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]

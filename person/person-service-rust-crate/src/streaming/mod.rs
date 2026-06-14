@@ -84,14 +84,15 @@ pub enum PersonEvent {
 
 impl PersonEvent {
     /// Return the wall-clock timestamp common to every variant.
+    #[must_use]
     pub fn timestamp(&self) -> DateTime<Utc> {
         match self {
-            PersonEvent::Created { timestamp, .. } => *timestamp,
-            PersonEvent::Updated { timestamp, .. } => *timestamp,
-            PersonEvent::Deleted { timestamp, .. } => *timestamp,
-            PersonEvent::Merged { timestamp, .. } => *timestamp,
-            PersonEvent::Linked { timestamp, .. } => *timestamp,
-            PersonEvent::Unlinked { timestamp, .. } => *timestamp,
+            PersonEvent::Created { timestamp, .. }
+            | PersonEvent::Updated { timestamp, .. }
+            | PersonEvent::Deleted { timestamp, .. }
+            | PersonEvent::Merged { timestamp, .. }
+            | PersonEvent::Linked { timestamp, .. }
+            | PersonEvent::Unlinked { timestamp, .. } => *timestamp,
         }
     }
 
@@ -101,14 +102,14 @@ impl PersonEvent {
     /// record being absorbed); for [`Linked`](PersonEvent::Linked) /
     /// [`Unlinked`](PersonEvent::Unlinked) it is the `person_id` end of
     /// the relationship.
+    #[must_use]
     pub fn person_id(&self) -> Uuid {
         match self {
-            PersonEvent::Created { person, .. } => person.id,
-            PersonEvent::Updated { person, .. } => person.id,
-            PersonEvent::Deleted { person_id, .. } => *person_id,
+            PersonEvent::Created { person, .. } | PersonEvent::Updated { person, .. } => person.id,
+            PersonEvent::Deleted { person_id, .. }
+            | PersonEvent::Linked { person_id, .. }
+            | PersonEvent::Unlinked { person_id, .. } => *person_id,
             PersonEvent::Merged { source_id, .. } => *source_id,
-            PersonEvent::Linked { person_id, .. } => *person_id,
-            PersonEvent::Unlinked { person_id, .. } => *person_id,
         }
     }
 }
@@ -119,6 +120,11 @@ impl PersonEvent {
 /// shared across request handlers behind an `Arc`.
 pub trait EventProducer: Send + Sync {
     /// Publish one event, returning an error if the transport fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying transport fails to accept the
+    /// event.
     fn publish(&self, event: PersonEvent) -> Result<()>;
 }
 
@@ -127,8 +133,16 @@ pub use producer::InMemoryEventPublisher;
 /// Consumes [`PersonEvent`]s from a stream (stub interface).
 pub trait EventConsumer {
     /// Begin a subscription, establishing any underlying connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the subscription cannot be established.
     fn subscribe(&mut self) -> Result<()>;
 
     /// Pull the next event, or `Ok(None)` when the stream is exhausted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading the next event from the stream fails.
     fn next_event(&mut self) -> Result<Option<PersonEvent>>;
 }

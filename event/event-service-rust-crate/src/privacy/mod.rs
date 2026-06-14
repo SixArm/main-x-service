@@ -9,6 +9,7 @@
 use crate::models::{Event, Party};
 
 /// Return a copy of `event` with sensitive fields masked.
+#[must_use]
 pub fn mask_event(event: &Event) -> Event {
     let mut masked = event.clone();
 
@@ -57,19 +58,21 @@ fn mask_value(value: &str, visible_chars: usize) -> String {
 
 /// Whether `consents` contains an active, non-expired consent of the
 /// given type.
+#[must_use]
 pub fn has_active_consent(
     consents: &[crate::models::Consent],
-    consent_type: crate::models::ConsentType,
+    consent_type: &crate::models::ConsentType,
 ) -> bool {
     let today = chrono::Utc::now().date_naive();
     consents.iter().any(|c| {
-        c.consent_type == consent_type
+        c.consent_type == *consent_type
             && c.status == crate::models::ConsentStatus::Active
-            && c.expiry_date.map_or(true, |exp| exp >= today)
+            && c.expiry_date.is_none_or(|exp| exp >= today)
     })
 }
 
 /// GDPR right-of-access export: every field stored about an event.
+#[must_use]
 pub fn export_event_data(event: &Event) -> serde_json::Value {
     serde_json::to_value(event).unwrap_or(serde_json::Value::Null)
 }

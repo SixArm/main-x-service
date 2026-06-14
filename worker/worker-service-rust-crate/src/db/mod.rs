@@ -35,12 +35,12 @@ pub mod schema;
 pub use audit::AuditLogRepository;
 pub use repositories::{AuditContext, SeaOrmWorkerRepository, WorkerRepository};
 
-/// Opens a pooled PostgreSQL connection using the URL and pool bounds from
+/// Opens a pooled `PostgreSQL` connection using the URL and pool bounds from
 /// `config`. Maps connection failures to [`crate::Error::Pool`].
 ///
 /// # Errors
 ///
-/// Returns [`crate::Error::Pool`] (carrying the underlying SeaORM error text)
+/// Returns [`crate::Error::Pool`] (carrying the underlying `SeaORM` error text)
 /// if the connection cannot be established — e.g. an unreachable host, bad
 /// credentials, or a malformed connection URL.
 pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {

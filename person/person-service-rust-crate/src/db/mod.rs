@@ -28,12 +28,17 @@ pub mod schema;
 pub use audit::AuditLogRepository;
 pub use repositories::{AuditContext, PersonRepository, SeaOrmPersonRepository};
 
-/// Open a pooled PostgreSQL connection from the given configuration.
+/// Open a pooled `PostgreSQL` connection from the given configuration.
 ///
 /// Applies the configured min/max pool sizes. Connection errors are
 /// mapped to [`crate::Error::Pool`]. The returned
 /// [`DatabaseConnection`] is cheap to clone and is shared across
 /// handlers via [`AppState`](crate::api::rest::state::AppState).
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Pool`] if the database connection cannot be
+/// established.
 pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {
     let mut opt = sea_orm::ConnectOptions::new(&config.url);
     opt.max_connections(config.max_connections)
