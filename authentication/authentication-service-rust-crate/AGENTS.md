@@ -58,7 +58,9 @@ template (see root `AGENTS.md`).
 To avoid account enumeration, `signup` and `magic-link` always return
 `200` regardless of whether the email exists. They are also
 **rate-limited per email** (`src/rate_limit.rs`: `MAX_REQUESTS` = 5 per
-`WINDOW` = 5 min, monotonic-clock sliding window); over the cap they
+`WINDOW` = 5 min, Postgres-backed sliding window via the
+`auth_rate_limits` table + per-key advisory lock, shared across
+instances); over the cap they
 return `429` and issue no token / send no mail, without leaking account
 existence.
 
@@ -112,7 +114,7 @@ src/
 │   ├── sessions.rs        session issue/revoke (jid = jwt jti); revoke_all_for_user for erasure
 │   └── _entities/         generated SeaORM entities
 ├── mailers/auth.rs        magic-link mailer (prod)
-├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at
+├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits
 └── views/auth.rs          LoginResponse / CurrentResponse
 config/                    development/production/test yaml + dev RSA keys
 ```

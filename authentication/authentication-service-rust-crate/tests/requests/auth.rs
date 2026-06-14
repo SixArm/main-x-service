@@ -302,10 +302,10 @@ async fn jwks_endpoint_publishes_the_signing_key() {
 async fn magic_link_issuance_is_rate_limited() {
     use authentication_service::rate_limit;
 
-    request::<App, _, _>(|request, _ctx| async move {
-        // The limiter store is process-wide; start from a clean slate so
-        // the per-email window is deterministic for this email.
-        rate_limit::reset();
+    request::<App, _, _>(|request, ctx| async move {
+        // The limiter is DB-backed; start from a clean slate so the
+        // per-email window is deterministic for this email.
+        rate_limit::reset(&ctx.db).await.ok();
 
         let email = "rate-limit@example.com";
         let payload = serde_json::json!({ "email": email });
@@ -329,7 +329,7 @@ async fn magic_link_issuance_is_rate_limited() {
             "the (MAX_REQUESTS+1)th request must be rate-limited"
         );
 
-        rate_limit::reset();
+        rate_limit::reset(&ctx.db).await.ok();
     })
     .await;
 }
@@ -344,7 +344,7 @@ async fn auth_events_are_recorded_and_queryable() {
     use authentication_service::{models::auth_events::Model as AuthEvent, rate_limit};
 
     request::<App, _, _>(|request, ctx| async move {
-        rate_limit::reset();
+        rate_limit::reset(&ctx.db).await.ok();
 
         // A signup writes a `signup` audit row (created/existing).
         let signup_email = "audit-signup@example.com";
@@ -406,7 +406,7 @@ async fn auth_events_are_recorded_and_queryable() {
             "audit/recent should include the unknown_email magic-link event"
         );
 
-        rate_limit::reset();
+        rate_limit::reset(&ctx.db).await.ok();
     })
     .await;
 }

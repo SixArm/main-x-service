@@ -109,7 +109,7 @@ async fn signup(
 ) -> Result<Response> {
     // Throttle per email before any work, so abuse cannot email-bomb a
     // victim or probe for accounts. Over the limit → 429, no token issued.
-    if rate_limit::check(&params.email).is_err() {
+    if rate_limit::check(&ctx.db, &params.email).await.is_err() {
         AuthEvent::record_best_effort(
             &ctx.db,
             "signup",
@@ -186,7 +186,7 @@ async fn request_magic_link(
     Json(params): Json<MagicLinkParams>,
 ) -> Result<Response> {
     // Throttle per email before any lookup (see `signup`).
-    if rate_limit::check(&params.email).is_err() {
+    if rate_limit::check(&ctx.db, &params.email).await.is_err() {
         AuthEvent::record_best_effort(
             &ctx.db,
             "magic_link_requested",

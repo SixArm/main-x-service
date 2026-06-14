@@ -1,4 +1,5 @@
-//! In-memory, per-key sliding-window rate limiter for magic-link issuance.
+//! Postgres-backed, per-key sliding-window rate limiter for magic-link
+//! issuance.
 //!
 //! The unauthenticated magic-link endpoints (`POST /api/auth/signup` and
 //! `POST /api/auth/magic-link`) can be abused to email-bomb a victim or to
@@ -8,24 +9,39 @@
 //!
 //! Design notes:
 //!
-//! - **Monotonic clock.** The window is measured with [`Instant`], not
-//!   wall-clock time, so it is immune to clock skew and to the env-free
-//!   constraint of the loco boot. Tests inject a synthetic "now" through
-//!   [`check_at`] for determinism.
-//! - **Process-wide store.** Loco has no per-request shared state for this,
-//!   so the store is a `OnceLock`-initialised global, mirroring the family's
-//!   in-memory event-stream pattern.
+//! - **Durable, multi-instance.** The window log lives in the
+//!   `auth_rate_limits` table, so the quota is shared across
+//!   horizontally-scaled instances (the previous implementation was an
+//!   in-memory `OnceLock` map, correct only for a single process). One row
+//!   is recorded per *allowed* request; rejected requests are never
+//!   recorded, so a throttled caller cannot push the window forward.
+//! - **Wall-clock window.** A distributed limiter must compare against a
+//!   shared clock, so the window is measured with `requested_at`
+//!   (`TIMESTAMPTZ`) rather than a per-process monotonic `Instant`. Tests
+//!   inject a synthetic "now" through [`check_at`] for determinism.
+//! - **Exact under concurrency.** Each check serialises on a per-key
+//!   transaction-scoped advisory lock (`pg_advisory_xact_lock(hashtext(key))`),
+//!   so two simultaneous requests for the same email cannot both slip past
+//!   the cap. Different emails hash to different lock slots, so there is no
+//!   cross-email contention.
+//! - **Fail-open on DB error.** If the limiter's own query fails, the
+//!   request is allowed (logged at WARN). A DB outage already breaks the
+//!   surrounding handler (it must write the magic-link token), so failing
+//!   *closed* here would only lock out legitimate sign-ins on a transient
+//!   blip without preventing any abuse.
 //! - **Anti-enumeration preserved.** The limiter keys on request *volume*,
 //!   never on whether an account exists; the handlers keep their always-`200`
 //!   success shape and only swap in `429` once the volume cap is exceeded.
 
-use std::collections::{HashMap, VecDeque};
-use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use chrono::{DateTime, Utc};
+use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, TransactionTrait};
 
 /// Maximum number of issuance requests allowed per key within [`WINDOW`].
-/// The N+1th request inside the window is rejected.
-pub const MAX_REQUESTS: usize = 5;
+/// The N+1th request inside the window is rejected. Typed `i64` to compare
+/// directly against the SQL `count(*)`.
+pub const MAX_REQUESTS: i64 = 5;
 
 /// Length of the sliding window over which [`MAX_REQUESTS`] is counted.
 /// Five minutes balances legitimate retries (a user who mistypes, or whose
@@ -45,196 +61,151 @@ pub fn normalize_key(email: &str) -> String {
     email.trim().to_lowercase()
 }
 
-/// Per-key history of in-window request instants (oldest at the front).
-type Store = Mutex<HashMap<String, VecDeque<Instant>>>;
-
-fn store() -> &'static Store {
-    static STORE: OnceLock<Store> = OnceLock::new();
-    STORE.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
 /// Record a request for `key` and decide whether it is allowed, using the
-/// real monotonic clock. Returns `Ok(())` when the request is within the
-/// quota, or `Err(RetryAfter)` when the cap is exceeded (in which case the
-/// request is *not* counted, so a throttled caller cannot push the window
-/// forward).
+/// real wall clock. Returns `Ok(())` when the request is within quota, or
+/// `Err(RetryAfter)` when the cap is exceeded (in which case the request is
+/// *not* recorded). A database error is treated as allow (fail-open; see the
+/// module docs) and never surfaces as `Err(RetryAfter)`.
 ///
 /// # Errors
 ///
-/// Returns [`RetryAfter`] when `key` already has [`MAX_REQUESTS`] requests
-/// inside the current [`WINDOW`].
-pub fn check(key: &str) -> Result<(), RetryAfter> {
-    check_at(key, Instant::now())
+/// Returns [`RetryAfter`] when `key` has already reached [`MAX_REQUESTS`]
+/// within the current [`WINDOW`]. Database failures fail open (the request is
+/// allowed) and are never returned as an error.
+pub async fn check(db: &DatabaseConnection, key: &str) -> Result<(), RetryAfter> {
+    check_at(db, key, Utc::now()).await
 }
 
-/// Clock-injectable core of [`check`]. `now` is the synthetic instant to
-/// evaluate the window against; production callers pass `Instant::now()`.
-/// Exposed for deterministic unit tests.
+/// Clock-injectable core of [`check`]. `now` is the synthetic instant the
+/// window is evaluated against; production callers pass `Utc::now()`. Exposed
+/// for deterministic (DB-gated) tests.
+///
+/// On a database error the request is allowed (fail-open) and a WARN is
+/// logged; only an actual quota breach yields `Err(RetryAfter)`.
 ///
 /// # Errors
 ///
-/// Returns [`RetryAfter`] when `key` already has [`MAX_REQUESTS`] requests
-/// inside the window ending at `now`.
-pub fn check_at(key: &str, now: Instant) -> Result<(), RetryAfter> {
-    let key = normalize_key(key);
-    let mut map = store()
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let history = map.entry(key).or_default();
-
-    // Drop requests that have aged out of the window.
-    while let Some(&front) = history.front() {
-        if now.duration_since(front) >= WINDOW {
-            history.pop_front();
-        } else {
-            break;
+/// Returns [`RetryAfter`] when `key` has already reached [`MAX_REQUESTS`]
+/// within the [`WINDOW`] ending at `now`. Database failures fail open and are
+/// never returned as an error.
+pub async fn check_at(
+    db: &DatabaseConnection,
+    key: &str,
+    now: DateTime<Utc>,
+) -> Result<(), RetryAfter> {
+    match check_at_inner(db, key, now).await {
+        Ok(decision) => decision,
+        Err(error) => {
+            tracing::warn!(%error, "magic-link rate limiter DB error; allowing request (fail-open)");
+            Ok(())
         }
     }
-
-    // `history.front()` is `Some` whenever the bucket is full (a non-empty
-    // `VecDeque`), so the cap check piggybacks on it without an `unwrap`.
-    if let Some(&oldest) = history.front()
-        && history.len() >= MAX_REQUESTS
-    {
-        // Rejected: do not record this request. Retry once the oldest
-        // in-window request ages out.
-        let retry = WINDOW.saturating_sub(now.duration_since(oldest));
-        return Err(RetryAfter(retry));
-    }
-
-    history.push_back(now);
-    Ok(())
 }
 
-/// Clear all rate-limit state. A test-support helper so that suites which
-/// share the process-wide store (unit tests here and the DB-gated request
-/// tests) can start from a known-empty slate. Not used on any production
-/// code path.
-pub fn reset() {
-    store()
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clear();
+/// The fallible core: returns the throttle decision (`Ok`/`Err(RetryAfter)`)
+/// wrapped in a `Result` whose outer error is any database failure.
+///
+/// Runs in one transaction: take a per-key advisory lock so concurrent
+/// same-key checks serialise, prune rows older than the window, count what
+/// remains, then insert iff under the cap.
+async fn check_at_inner(
+    db: &DatabaseConnection,
+    key: &str,
+    now: DateTime<Utc>,
+) -> Result<Result<(), RetryAfter>, sea_orm::DbErr> {
+    let key = normalize_key(key);
+    // Window start: rows older than this have aged out.
+    let cutoff =
+        now - chrono::Duration::seconds(i64::try_from(WINDOW.as_secs()).unwrap_or(i64::MAX));
+
+    let txn = db.begin().await?;
+
+    // Serialise concurrent checks for this exact key (different keys hash to
+    // different lock slots, so unrelated emails never block each other). The
+    // lock is held until the transaction commits.
+    txn.execute(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "SELECT pg_advisory_xact_lock(hashtext($1))",
+        [key.clone().into()],
+    ))
+    .await?;
+
+    // Drop this key's requests that have aged out of the window — keeps the
+    // table bounded and makes the count below a pure in-window count.
+    txn.execute(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "DELETE FROM auth_rate_limits WHERE email_key = $1 AND requested_at < $2",
+        [key.clone().into(), cutoff.into()],
+    ))
+    .await?;
+
+    // Count what remains (all in-window) and find the oldest, used to tell a
+    // throttled caller when a slot will free.
+    let row = txn
+        .query_one(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT count(*) AS cnt, min(requested_at) AS oldest FROM auth_rate_limits WHERE email_key = $1",
+            [key.clone().into()],
+        ))
+        .await?;
+    // `count(*)` always returns exactly one row (cnt = 0, oldest = NULL when
+    // empty), so `row` is `Some`.
+    let (count, oldest) = match row {
+        Some(r) => (
+            r.try_get::<i64>("", "cnt")?,
+            r.try_get::<Option<DateTime<Utc>>>("", "oldest")?,
+        ),
+        None => (0, None),
+    };
+
+    if count >= MAX_REQUESTS {
+        // Over quota: do not record this request. Releasing the lock (commit)
+        // is enough; the prune above is worth keeping.
+        txn.commit().await?;
+        let retry = oldest.map_or(WINDOW, |oldest| {
+            let elapsed = (now - oldest).to_std().unwrap_or(Duration::ZERO);
+            WINDOW.saturating_sub(elapsed)
+        });
+        return Ok(Err(RetryAfter(retry)));
+    }
+
+    // Under quota: record this request and allow it.
+    txn.execute(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "INSERT INTO auth_rate_limits (email_key, requested_at) VALUES ($1, $2)",
+        [key.into(), now.into()],
+    ))
+    .await?;
+    txn.commit().await?;
+    Ok(Ok(()))
+}
+
+/// Clear all rate-limit state (empty the table). A test-support helper so
+/// DB-gated suites that share a database can start from a known-empty slate.
+/// Not used on any production code path.
+///
+/// # Errors
+///
+/// Propagates any database error from the `DELETE`.
+pub async fn reset(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
+    db.execute(Statement::from_string(
+        DbBackend::Postgres,
+        "DELETE FROM auth_rate_limits",
+    ))
+    .await?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // These tests share the process-wide store, so they must not run
-    // concurrently with one another. A test-local mutex serialises them
-    // (cargo runs tests in parallel by default); each guards `reset()` +
-    // its assertions under the same lock.
-    static TEST_LOCK: Mutex<()> = Mutex::new(());
-
-    fn guard() -> std::sync::MutexGuard<'static, ()> {
-        TEST_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-    }
-
+    // The sliding-window behaviour is exercised against a real database in
+    // `tests/requests/rate_limit.rs` (DB-gated), where a `now` can be
+    // injected via `check_at`. Here we only unit-test the pure key
+    // normalisation, so the default `cargo test` stays DB-free.
     #[test]
     fn normalize_key_trims_and_lowercases() {
         assert_eq!(normalize_key("  Alice@Example.COM "), "alice@example.com");
-    }
-
-    #[test]
-    fn allows_up_to_max_then_rejects_the_next() {
-        let _g = guard();
-        reset();
-        let key = "allows-up-to-max@example.com";
-        let now = Instant::now();
-        for i in 0..MAX_REQUESTS {
-            assert!(
-                check_at(key, now).is_ok(),
-                "request {i} (<= MAX_REQUESTS) should be allowed"
-            );
-        }
-        // The MAX_REQUESTS+1th request inside the window is rejected.
-        let err = check_at(key, now).expect_err("the N+1th request must be throttled");
-        assert!(err.0 <= WINDOW);
-    }
-
-    #[test]
-    fn window_resets_after_the_window_elapses() {
-        let _g = guard();
-        reset();
-        let key = "window-resets@example.com";
-        let start = Instant::now();
-        for _ in 0..MAX_REQUESTS {
-            check_at(key, start).expect("within quota");
-        }
-        check_at(key, start).expect_err("over quota at the start");
-
-        // Once the whole window has elapsed, the bucket is empty again.
-        let later = start + WINDOW + Duration::from_secs(1);
-        assert!(
-            check_at(key, later).is_ok(),
-            "the window should reset after WINDOW elapses"
-        );
-    }
-
-    #[test]
-    fn sliding_window_frees_one_slot_at_a_time() {
-        let _g = guard();
-        reset();
-        let key = "sliding@example.com";
-        let start = Instant::now();
-        // Spread MAX_REQUESTS requests one second apart.
-        for i in 0..MAX_REQUESTS {
-            check_at(key, start + Duration::from_secs(i as u64)).expect("within quota");
-        }
-        // Still full at the moment the last one landed.
-        let full_at = start + Duration::from_secs((MAX_REQUESTS - 1) as u64);
-        check_at(key, full_at).expect_err("bucket is full");
-
-        // Just after the *first* request ages out, exactly one slot frees.
-        let one_freed = start + WINDOW + Duration::from_millis(1);
-        check_at(key, one_freed).expect("one slot should have freed");
-        // ...but only one: the next is rejected again.
-        check_at(key, one_freed).expect_err("only one slot frees per aged-out request");
-    }
-
-    #[test]
-    fn distinct_keys_have_independent_quotas() {
-        let _g = guard();
-        reset();
-        let now = Instant::now();
-        for _ in 0..MAX_REQUESTS {
-            check_at("a@example.com", now).expect("a within quota");
-        }
-        check_at("a@example.com", now).expect_err("a is over quota");
-        // A different key is unaffected.
-        check_at("b@example.com", now).expect("b has its own quota");
-    }
-
-    #[test]
-    fn normalized_keys_share_a_bucket() {
-        let _g = guard();
-        reset();
-        let now = Instant::now();
-        for _ in 0..MAX_REQUESTS {
-            check_at("  Mixed@Example.com ", now).expect("within quota");
-        }
-        // A differently-spelled but equal email shares the same bucket.
-        check_at("mixed@example.com", now).expect_err("normalised spellings share a quota");
-    }
-
-    #[test]
-    fn rejection_does_not_consume_further_quota() {
-        let _g = guard();
-        reset();
-        let key = "no-consume@example.com";
-        let now = Instant::now();
-        for _ in 0..MAX_REQUESTS {
-            check_at(key, now).expect("within quota");
-        }
-        // Many rejected attempts must not push the window forward; once the
-        // window elapses from the *original* requests, the bucket frees.
-        for _ in 0..10 {
-            check_at(key, now).expect_err("over quota");
-        }
-        let later = now + WINDOW + Duration::from_secs(1);
-        check_at(key, later).expect("window should free despite the rejected attempts");
     }
 }

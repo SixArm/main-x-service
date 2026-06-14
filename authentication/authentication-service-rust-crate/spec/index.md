@@ -85,9 +85,14 @@ single-use (cleared on consumption).
    (`{"error":"rate_limited",…}`) and issues no token / sends no mail.
    The limiter keys on request *volume*, not account existence, so the
    always-`200` anti-enumeration shape of the success path is preserved.
-   The window is measured with a monotonic `Instant` clock (no wall-clock
-   / env coupling); `src/rate_limit.rs` is pure and unit-testable via a
-   clock-injecting `check_at(key, now)` and a `reset()` test helper.
+   The window log is stored in Postgres (the `auth_rate_limits` table) and
+   each check runs under a per-key advisory lock, so the quota is exact and
+   **shared across horizontally-scaled instances**. The window is wall-clock
+   (`TIMESTAMPTZ`); `src/rate_limit.rs` exposes a clock-injecting
+   `check_at(db, key, now)` plus a `reset(db)` test helper, so the
+   sliding-window behaviour is verified by DB-gated tests. A DB error fails
+   open (the request is allowed) — the surrounding handler needs the DB
+   anyway, so failing closed would only lock out legitimate sign-ins.
 
 8. `GET /api-docs/openapi.json` + `GET /swagger-ui` — the hand-written
    OpenAPI 3 document and a Swagger UI page.
@@ -118,8 +123,9 @@ single-use (cleared on consumption).
 - **Abuse resistance**: per-email sliding-window rate limiting on
   magic-link issuance (`MAX_REQUESTS` = 5 per `WINDOW` = 5 min) bounds
   email-bombing and account-probing without breaking anti-enumeration.
-  In-memory, process-wide (single-instance MVP); a shared store
-  (Redis/DB) would be needed for horizontal scaling.
+  Backed by Postgres (the `auth_rate_limits` table) under a per-key
+  advisory lock, so the quota is exact and shared across
+  horizontally-scaled instances.
 
 ## 8. Architecture
 
@@ -167,8 +173,9 @@ documented paths, the bearer scheme, and the schemas.
 PostgreSQL via SeaORM + `sea-orm-migration`. Migrations:
 `m20220101_000001_users`, `m20220101_000002_sessions`,
 `m20220101_000003_auth_events`, `m20220101_000004_users_deleted_at` (the
-GDPR-erasure soft-delete column). `auto_migrate` is on in development,
-off in production.
+GDPR-erasure soft-delete column), and `m20220101_000005_auth_rate_limits`
+(the magic-link rate-limiter window log). `auto_migrate` is on in
+development, off in production.
 
 ## 11. Testing strategy
 
@@ -186,12 +193,14 @@ off in production.
   Postgres instance (standard loco) and are `#[ignore]`d so plain
   `cargo test` stays green; run them with `cargo test -- --ignored`.
   DB-free route-table and params-contract assertions always run.
-- **Rate-limit unit tests (DB-free):** `src/rate_limit.rs` — allow up to
+- **Rate-limit tests:** the pure key normalisation is unit-tested DB-free
+  in `src/rate_limit.rs`. The sliding-window behaviour is DB-gated
+  (`tests/requests/rate_limit.rs`, `#[ignore]`d): allow up to
   `MAX_REQUESTS`, reject the next, window reset, sliding-window single-slot
   release, per-key isolation, normalised-key sharing, non-consuming
-  rejection (clock injected via `check_at`, serialised over the shared
-  store). The DB-gated `magic_link_issuance_is_rate_limited` request test
-  asserts the `(MAX_REQUESTS+1)`th magic-link POST returns `429`.
+  rejection — each driving the real `auth_rate_limits` table with a `now`
+  injected via `check_at`. The end-to-end `magic_link_issuance_is_rate_limited`
+  request test asserts the `(MAX_REQUESTS+1)`th magic-link POST returns `429`.
 - **OpenAPI unit tests (DB-free):** `src/openapi.rs` `spec()` — well-formed,
   documents every endpoint, the bearer scheme is present + applied (incl.
   the GDPR account endpoints), core schemas exist, and the account export

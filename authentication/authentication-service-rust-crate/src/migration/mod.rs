@@ -15,6 +15,8 @@ mod m20220101_000002_sessions;
 mod m20220101_000003_auth_events;
 /// `users.deleted_at` column — soft-delete / GDPR-erasure tombstone.
 mod m20220101_000004_users_deleted_at;
+/// `auth_rate_limits` table — Postgres-backed magic-link issuance limiter.
+mod m20220101_000005_auth_rate_limits;
 
 /// loco/`SeaORM` migrator that runs every migration in order.
 pub struct Migrator;
@@ -30,6 +32,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000002_sessions::Migration),
             Box::new(m20220101_000003_auth_events::Migration),
             Box::new(m20220101_000004_users_deleted_at::Migration),
+            Box::new(m20220101_000005_auth_rate_limits::Migration),
             // inject-above (do not remove this comment)
         ]
     }

@@ -10,6 +10,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **Magic-link rate limiter is now Postgres-backed.** The per-email
+  sliding-window limiter (`src/rate_limit.rs`, `MAX_REQUESTS` = 5 /
+  `WINDOW` = 5 min) moved from a process-local in-memory `OnceLock` map to
+  the new `auth_rate_limits` table (migration
+  `m20220101_000005_auth_rate_limits`). Each check runs in one transaction
+  under a per-key advisory lock (`pg_advisory_xact_lock(hashtext(key))`) —
+  prune aged-out rows, count, insert iff under the cap — so the quota is
+  **exact and shared across horizontally-scaled instances**. The window is
+  now wall-clock (`TIMESTAMPTZ`); `check`/`check_at`/`reset` are async and
+  take the DB connection. A DB error fails open (logged WARN). Behaviour
+  (cap, window, anti-enumeration always-`200` shape, `429` on breach) is
+  unchanged. Sliding-window tests moved to DB-gated
+  `tests/requests/rate_limit.rs`; the pure key-normalisation unit test
+  stays DB-free.
+
 ### Added
 
 - **Zero-downtime key rotation** (entity spec T-5). `auth::AuthKeys` is
