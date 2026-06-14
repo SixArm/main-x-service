@@ -50,21 +50,21 @@ person-matcher = "0.1.0"
 
 ```rust
 use person_matcher::{Person, MatchingEngine, MatchConfig};
-use jiff::civil::date;
+use chrono::NaiveDate;
 
 fn main() {
     // Create two person records
     let person1 = Person::builder()
         .given_name("John")
         .family_name("Smith")
-        .date_of_birth(date(1980, 5, 15))
+        .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
         .united_kingdom_national_health_service_number("1234567890")
         .build();
 
     let person2 = Person::builder()
         .given_name("Jon")  // Typo
         .family_name("Smith")
-        .date_of_birth(date(1980, 5, 15))
+        .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
         .united_kingdom_national_health_service_number("1234567890")
         .build();
 
@@ -298,7 +298,7 @@ Supported countries: UK, France, Spain, Ireland, UK Northern Ireland (via GB dia
 Passport book numbers don't fit the per-scheme `Option<String>` national-identifier pattern: a person may hold passports from several countries, each book has its own number, and book numbers change with each renewal. The crate models this directly with a `Vec<PassportBook>` on `Person`:
 
 ```rust
-use jiff::civil::date;
+use chrono::NaiveDate;
 use person_matcher::{MatchingEngine, PassportBook, Person};
 
 let alice = Person::builder()
@@ -307,8 +307,8 @@ let alice = Person::builder()
     // Current UK passport
     .add_passport_book(
         PassportBook::new("GB", "123456789").unwrap()
-            .with_issued(date(2024, 6, 1))
-            .with_expires(date(2034, 6, 1)),
+            .with_issued(NaiveDate::from_ymd_opt(2024, 6, 1).unwrap())
+            .with_expires(NaiveDate::from_ymd_opt(2034, 6, 1).unwrap()),
     )
     // Dual citizen: also carries a US passport
     .add_passport_book(PassportBook::new("US", "AB1234567").unwrap())

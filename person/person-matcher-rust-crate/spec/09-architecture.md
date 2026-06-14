@@ -6,7 +6,7 @@
 
 ### 9.2 Dependency Graph
 
-`matcher → normalizer / scorer / models / identifiers / error`; `identifiers → united-kingdom-national-health-service-number`; `models → serde / jiff`; `scorer → strsim`; `normalizer → unicode-normalization / soundex`; `error → thiserror`. No cycles. `lib.rs` only re-exports.
+`matcher → normalizer / scorer / models / identifiers / error`; `identifiers → united-kingdom-national-health-service-number`; `models → serde / chrono`; `scorer → strsim`; `normalizer → unicode-normalization / soundex`; `error → thiserror`. No cycles. `lib.rs` only re-exports.
 
 ### 9.3 Layering Rules
 

@@ -35,8 +35,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   an `EventPublisher` trait, and an `InMemoryPublisher` ring buffer
   (process-wide `OnceLock`) implementing it — replacing the flat
   `OrgEvent` free-function buffer. `occurred_at`/`data` are deferred to
-  the outbox stage (Phase 2; no new dependency added — the project
-  mandates `jiff`, not the already-present `chrono`). CRUD/merge call
+  the outbox stage (Phase 2; the in-memory envelope is kept minimal).
+  CRUD/merge call
   sites now stamp the bearer `actor` via `publish_with_actor`
   (`publish` kept as a `None`-actor shim). Pure refactor: behaviour is
   identical and the `GET /api/organizations/events/recent` wire shape is

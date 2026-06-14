@@ -30,7 +30,7 @@ the family-wide source of truth; the briefer versions under
 | ----- | ----------- |
 | [architecture](architecture/index.md) | System architecture — the family shape, the two service generations (loco vs older Axum), layering, cross-service integration |
 | [dataflow](dataflow/index.md) | Request/data flows — create, match, merge, search, read/masked/export, auth |
-| [tech-stack](tech-stack/index.md) | Technology stack + hard constraints (Podman/Tokio/MiMalloc/PostgreSQL/jiff) and current drift |
+| [tech-stack](tech-stack/index.md) | Technology stack + hard constraints (Podman/Tokio/MiMalloc/PostgreSQL/chrono) and current drift |
 
 ### Data & persistence
 

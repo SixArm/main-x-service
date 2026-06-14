@@ -181,7 +181,7 @@ longitude in `[-180, 180]`. Boundary values (90, 180) are valid;
   and `2024-02-30` are rejected, `2024-02-29` is accepted).
   Implemented in `is_valid_iso_date` / `is_valid_ymd`.
 - **person `birth_date`**: when present, must **not be in the future**
-  (compared against `jiff` UTC today).
+  (compared against `chrono` UTC today).
 
 ---
 
@@ -227,7 +227,7 @@ checked for:
 
 - a **non-empty `number`**;
 - **not already expired** — `expiry_date`, when present, must not be in
-  the past (`jiff` UTC today);
+  the past (`chrono` UTC today);
 - **issue before expiry** — when both dates are present, `issue_date`
   must not be after `expiry_date`.
 
@@ -283,7 +283,7 @@ does not model that field, not that validation was skipped.
 | Address standardization (case + abbreviations) | ✓ | ✓³ | | | |
 
 ¹ person validates birth dates as non-future rather than parsing a string
-(the model already holds a `jiff` date).
+(the model already holds a `chrono` date).
 ² case-folder normalizes/formats NHS numbers (`normalise_nhs_number`,
 `format_nhs_number`) rather than validating a phone.
 ³ place normalizes locality/region/country case but does not expand

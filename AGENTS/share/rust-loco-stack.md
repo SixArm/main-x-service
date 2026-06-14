@@ -21,7 +21,7 @@
 | **gRPC**             | Tonic                                             | High-performance RPC framework              |
 | **Protocols**        | Prost                                             | Protocol buffers                            |
 | **Environment**      | dotenvy                                           | Config env var                              |
-| **Timestamps**       | jiff                                              | Dates, times, durations                     |
+| **Timestamps**       | chrono                                              | Dates, times, durations                     |
 | **Error Handling**   | thiserror, anyhow                                 | Typed and contextual error handling         |
 | **Security**         | argon2                                            | Password hashing                            |
 | **Authentication**   | jsonwebtoken                                      | JWT authentication                          |
@@ -39,8 +39,8 @@ Constraints:
 - Tokio NOT async_std
 - MiMalloc NOT jemalloc
 - PostgreSQL NOT SQLite
-- jiff NOT chrono
-- sea-orm feature "with-jiff" NOT "with-chrono"
+- chrono (sea-orm and loco-rs require it; sea-orm has no `with-jiff` feature)
+- sea-orm feature "with-chrono" (loco services) or "with-time" (older services)
 
 ## Configurations
 

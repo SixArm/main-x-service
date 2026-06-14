@@ -22,7 +22,7 @@ follow the conventions below.
   `with-time` or `with-chrono` depending on the crate (the authentication
   service uses chrono; the constraint in
   [`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md) prefers
-  `with-jiff`/`with-time` for new work).
+  `with-chrono`/`with-time` for new work).
 
 ## 2. One database per service
 

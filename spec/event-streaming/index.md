@@ -120,7 +120,7 @@ enum:
   "event_type")]`) with variants `Created` / `Updated` / `Deleted` /
   `Merged` / `Linked` / `Unlinked`. Data-bearing variants embed the
   **full record** (so consumers need no follow-up fetch); every variant
-  carries a `jiff::Timestamp`.
+  carries a `chrono::DateTime<Utc>`.
 - **`EventProducer`** trait — `publish(&self, event) -> Result<()>`.
 - **`EventConsumer`** trait (stub) — `subscribe()` / `next_event()`.
 - **`InMemoryEventPublisher`** — the default in-process producer; a

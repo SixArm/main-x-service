@@ -314,7 +314,7 @@ MatchConfig {
 ## Dependencies
 
 ```toml
-jiff = { version = "0.2", features = ["serde"] }     # Date handling
+chrono = { version = "0.4", features = ["serde"] }   # Date handling
 serde = { version = "1.0", features = ["derive"] }  # Serialization
 serde_json = "1.0"                                   # JSON support
 unicode-normalization = "0.1"                        # Text normalization

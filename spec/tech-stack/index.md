@@ -56,7 +56,7 @@ representative service manifests
 | String matching | strsim, fuzzy-matcher | Jaro-Winkler, Levenshtein |
 | Geo | geo, haversine | Coordinate distance (place / event matching) |
 | gRPC | Tonic 0.12 + Prost 0.13 | High-throughput RPC stub |
-| Timestamps | jiff 0.2 | Dates, times, durations (NOT chrono) |
+| Timestamps | chrono 0.4 | Dates, times, durations |
 | Error handling | thiserror 2 + anyhow 1 | Typed + contextual errors |
 | Password hashing | argon2 0.5 | Magic-link / credential hashing (where used) |
 | JWT | jsonwebtoken 9 (RS256) + authentication-verifier 0.1 | Offline RS256 token verification against the auth-service JWKS |
@@ -92,8 +92,8 @@ ecosystem fragmentation across the ten entity slices.
 | Tokio | async_std | One async runtime across the family |
 | MiMalloc | jemalloc | Faster MUSL static builds |
 | PostgreSQL | SQLite | One production database; SeaORM Postgres feature only |
-| jiff | chrono | One date/time crate |
-| sea-orm `with-jiff` | sea-orm `with-chrono` | Keep ORM date types aligned with jiff |
+| chrono | jiff | One date/time crate (sea-orm has no `with-jiff`) |
+| sea-orm `with-chrono` / `with-time` | sea-orm `with-jiff` | `with-jiff` does not exist in sea-orm 1.1 |
 | Postgres-backed background jobs (`bg_pg`) | Redis (`bg_redis`) / SQLite (`bg_sqlt`) | No extra infra dependency for the job queue |
 
 Loco background-job config (target):
@@ -114,9 +114,7 @@ to be closed, not as an alternative standard:
 
 | Crate | Deviation | Target |
 |---|---|---|
-| `organization-service` | `edition = "2021"`; pulls `chrono`; SeaORM features include `sqlx-sqlite` alongside `sqlx-postgres` | edition 2024; jiff; Postgres-only |
-| `authentication-service` | uses `chrono` for its existing User/token models | jiff |
-| `person-service` (and peers) | SeaORM uses `with-time` (and pulls the `time` crate) rather than `with-jiff` | sea-orm `with-jiff` |
+| Older services (`person` and peers) | SeaORM columns use `with-time` (the `time` crate) at the persistence boundary; the domain layer is `chrono` (bridged in `db/convert.rs`) | unify on SeaORM `with-chrono` |
 | Several services | ILIKE / Postgres `pg_trgm` name search rather than Tantivy full-text | Tantivy 0.22 |
 | Event streaming | in-memory publisher | Fluvio durable stream |
 
@@ -222,7 +220,7 @@ Pulls in (beyond the loco set): `hyper` + `tower` + `tower-http`
 explicitly, `sea-orm-migration` directly, `tantivy` 0.22, `tonic` +
 `prost` + `tonic-build` (gRPC, with a `build.rs`), `utoipa` +
 `utoipa-swagger-ui` + `openapiv3`, `fluvio`, the full OpenTelemetry
-0.27 stack + `tracing-opentelemetry` + `prometheus`, `jiff` **and**
+0.27 stack + `tracing-opentelemetry` + `prometheus`, `chrono` **and**
 `time`, `strsim` + `fuzzy-matcher`, `argon2`, `bigdecimal`, `dotenvy`,
 plus Criterion benches (`matching`, `search`, `validation`, `bridge`)
 and a tuned `[profile.release]` (`lto = true`, `codegen-units = 1`,

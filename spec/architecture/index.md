@@ -290,7 +290,7 @@ stub in both styles.
 The full dependency stack (Rust 2024, Tokio, Axum/loco, SeaORM,
 PostgreSQL 18, Tantivy, Utoipa, OpenTelemetry, strsim, geo/haversine,
 Podman, …) and its hard constraints (Podman not Docker, PostgreSQL not
-SQLite, jiff not chrono, MiMalloc not jemalloc) are specified in:
+SQLite, chrono, MiMalloc not jemalloc) are specified in:
 
 - [../../agents/share/rust-loco-stack.md](../../agents/share/rust-loco-stack.md) — the canonical stack table + constraints
 - [../../agents/share/loco.md](../../agents/share/loco.md) — loco backend conventions (no view tier; Postgres-backed background jobs)

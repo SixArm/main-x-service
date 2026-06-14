@@ -44,7 +44,7 @@ parse_br_cpf("123.456.789-09") -> Option<String>
 
 parse_cn_rrn("11010519491231002X") -> Option<String>
     1. Keep ASCII alphanumeric → require exactly 18; require first 17 to be digits, 18th to be digit or 'X'/'x'.
-    2. Substring validation: chars 6..14 form a valid YYYYMMDD date (jiff::civil::Date::strptime).
+    2. Substring validation: chars 6..14 form a valid YYYYMMDD date (chrono::NaiveDate::parse_from_str).
     3. Compute Σ(d[i] × WEIGHTS[i]) for i ∈ 0..17, mod 11; lookup CHECK_CHARS table.
     4. Verify input[17].to_uppercase() == expected.
     5. Return Some("11010519491231002X") (canonical, X uppercased).
@@ -64,7 +64,7 @@ parse_jp_my_number("123456789018") -> Option<String>
 parse_mx_curp("HEGG560427MVZRRL04") -> Option<String>
     1. Strip whitespace and uppercase → require exactly 18.
     2. Structural regex: ^[A-Z][AEIOUX][A-Z]{2}\d{6}[HM][A-Z]{5}[A-Z\d]\d$
-    3. Date substring chars 4..10 forms a valid YYMMDD date (jiff).
+    3. Date substring chars 4..10 forms a valid YYMMDD date (chrono).
     4. Compute Mod-10 weighted check digit over chars 0..17 using A=10, B=11, …, ñ=18.
     5. Verify input[17] == check.
     6. Return Some("HEGG560427MVZRRL04").
@@ -188,7 +188,7 @@ parse_za_id("9001015009087") -> Option<String>
 
 | Option | Quality | Build cost | IO / network | Licence | Verdict |
 |---|---|---|---|---|---|
-| **libpostal** (statistical, OSM-trained, C library) | Best-in-class | Heavy C dep; multi-GB runtime model file; complicates cross-platform builds (Windows, WASM) | None | MIT | **Ruled out by §17 portability axiom** (pure Rust, no C deps beyond `jiff`/`strsim` defaults). |
+| **libpostal** (statistical, OSM-trained, C library) | Best-in-class | Heavy C dep; multi-GB runtime model file; complicates cross-platform builds (Windows, WASM) | None | MIT | **Ruled out by §17 portability axiom** (pure Rust, no C deps beyond `chrono`/`strsim` defaults). |
 | **`postal` Rust bindings to libpostal** | Same as libpostal | Same as libpostal + unmaintained binding crate | None | MIT | **Ruled out for the same reasons.** |
 | **Rust-native parsers** (`address-parser`, etc.) | Comparable to our in-house parser | Light | None | Permissive | **No incremental value** — none rivals libpostal, and any of them is roughly what `Normalizer::parse_address_line` already does (T-20). |
 | **UK Royal Mail PAF / OS AddressBase** | Authoritative, UK-only | Light Rust glue | None (file-based dataset) | Licensed (PAF is paid; AddressBase is OGL-restricted for non-government) | **Ruled out** by jurisdiction scope (35 schemes supported, no single dataset covers them) and licence cost. |

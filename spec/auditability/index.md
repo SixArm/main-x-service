@@ -102,7 +102,7 @@ JSON snapshot plus request provenance:
 | Column | Meaning |
 |---|---|
 | `id` (`Uuid`) | Surrogate key. |
-| `timestamp` | UTC write time (`jiff`/`time` `now_utc`). |
+| `timestamp` | UTC write time (`chrono`/`time` `now_utc`). |
 | `action` | `CREATE` / `UPDATE` / `DELETE`. |
 | `entity_type` | The entity kind (e.g. `person`). |
 | `entity_id` (`Uuid`) | The record id. |
