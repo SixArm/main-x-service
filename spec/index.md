@@ -18,11 +18,55 @@ API crate, plus entity-level `spec/` and `AGENTS/` umbrella docs.
 | thing | [thing-front-end-with-svelte](../thing/thing-front-end-with-svelte/) | [thing-matcher-rust-crate](../thing/thing-matcher-rust-crate/) | [thing-service-rust-crate](../thing/thing-service-rust-crate/) | [spec](../thing/spec/index.md) · [AGENTS](../thing/AGENTS/index.md) |
 | worker | [worker-front-end-with-svelte](../worker/worker-front-end-with-svelte/) | [worker-matcher-rust-crate](../worker/worker-matcher-rust-crate/) | [worker-service-rust-crate](../worker/worker-service-rust-crate/) | [spec](../worker/spec/index.md) · [AGENTS](../worker/AGENTS/index.md) |
 
-## Monorepo-wide docs
+## Monorepo-wide topic specs
+
+Comprehensive, repo-grounded specs for each cross-cutting topic. Each is
+the family-wide source of truth; the briefer versions under
+[`../agents/share/`](../agents/share/index.md) remain as quick references.
+
+### Foundations
+
+| Topic | Description |
+| ----- | ----------- |
+| [architecture](architecture/index.md) | System architecture — the family shape, the two service generations (loco vs older Axum), layering, cross-service integration |
+| [dataflow](dataflow/index.md) | Request/data flows — create, match, merge, search, read/masked/export, auth |
+| [tech-stack](tech-stack/index.md) | Technology stack + hard constraints (Podman/Tokio/MiMalloc/PostgreSQL/jiff) and current drift |
+
+### Data & persistence
+
+| Topic | Description |
+| ----- | ----------- |
+| [postgresql](postgresql/index.md) | PostgreSQL — version, per-service DBs, pooling, the two persistence styles, extensions, JSONB, locks, migrations, ops |
+| [data-modeling.md](data-modeling.md) | Data-modeling rules (SQL-first, child tables, discriminators, JSONB policy) |
+| [data.md](data.md) | Data conventions |
+
+### Domain capabilities
+
+| Topic | Description |
+| ----- | ----------- |
+| [matching](matching/index.md) | Record matching — probabilistic + deterministic algorithms, short-circuits, confidence bands, matcher crates + bridge |
+| [search](search/index.md) | Search — Postgres `ILIKE` (today) + Tantivy full-text/fuzzy/phonetic (planned), geo-radius, blocking |
+| [merge](merge/index.md) | Record merge — fold duplicate into main, history, soft-delete, events, review queue |
+| [validation](validation/index.md) | Data quality & validation — 422 contract, checksum validators (GLN, NHS, Verhoeff, …), normalization |
+
+### Cross-cutting concerns
+
+| Topic | Description |
+| ----- | ----------- |
+| [authentication](authentication/index.md) | SSO — passwordless magic-link, RS256 JWT + JWKS, key rotation, sessions, rate limiter, blanket enforcement, token handoff |
+| [restful](restful/index.md) | REST API conventions — routes, status codes, OpenAPI/Swagger, auth, FHIR/gRPC, pagination, metrics |
+| [auditability](auditability/index.md) | Audit log + change-event stream — who/what/when, the actor, event taxonomy |
+| [event-streaming](event-streaming/index.md) | Event stream — the in-memory Phase 1 seam + the durable outbox→Fluvio design |
+| [privacy](privacy/index.md) | Privacy — masking, GDPR export/erasure, consent, anti-enumeration, per-entity sensitivity |
+| [observability](observability/index.md) | Observability — tracing, OpenTelemetry/OTLP, Prometheus `/metrics.prom` |
+| [availability](availability/index.md) | Availability — stateless design, pooling, health checks, Podman, horizontal scaling |
+| [locales](locales/index.md) | i18n/l10n — the authentication email/UI catalog pattern, supported languages, BCP-47, RTL |
+| [testing](testing/index.md) | Testing strategy — un-gated unit, DB-gated request, bridge tests, front-end vitest/Playwright, CI |
+| [compliance](compliance/index.md) | Regulatory compliance — target regimes, obligation→control map, data-sensitivity, ISO 42001, gaps |
+
+### Pointers
 
 | Document | Description |
 | -------- | ----------- |
-| [data.md](data.md) | Data conventions |
-| [data-modeling.md](data-modeling.md) | Data-modeling rules (SQL-first, child tables, discriminators, JSONB policy) |
 | [../AGENTS.md](../AGENTS.md) | Root agent guide — subproject directory and shared reference docs |
-| [../agents/share/index.md](../agents/share/index.md) | Shared reference docs (architecture, matching, compliance, …) |
+| [../agents/share/index.md](../agents/share/index.md) | Shared reference docs (the briefer versions of the topics above) |
