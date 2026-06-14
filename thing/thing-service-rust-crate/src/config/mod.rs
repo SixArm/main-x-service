@@ -81,6 +81,10 @@ pub struct StreamingConfig {
 }
 
 impl Default for Config {
+    /// Development-friendly defaults: bind `0.0.0.0:8080` (gRPC 50051), a
+    /// local Postgres pool (10/2), an on-disk Tantivy index with a 512 MB
+    /// cache, and a 0.7 match threshold. `from_env` overrides these from
+    /// the environment.
     fn default() -> Self {
         Self {
             server: ServerConfig {

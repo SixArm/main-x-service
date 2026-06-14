@@ -136,6 +136,14 @@ impl SeaOrmThingRepository {
 
 #[async_trait::async_trait]
 impl ThingRepository for SeaOrmThingRepository {
+    /// Insert the scalar row plus all child-collection rows in one
+    /// transaction, then re-hydrate so the caller gets the stored form
+    /// (including any DB-side defaults). Rolls back on any failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] on any DB failure, or if the row
+    /// cannot be read back after insert.
     async fn create(&self, thing: &Thing) -> Result<Thing> {
         let txn = self.db.begin().await.map_err(map_db)?;
         to_active(thing).insert(&txn).await.map_err(map_db)?;
@@ -146,6 +154,12 @@ impl ThingRepository for SeaOrmThingRepository {
             .ok_or_else(|| crate::Error::Database("thing not found after insert".into()))
     }
 
+    /// Fetch by primary key. Soft-deleted rows are treated as absent
+    /// (returns `None`), so callers never see logically-deleted things.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] on any DB failure.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Thing>> {
         let row = things::Entity::find_by_id(*id)
             .one(&self.db)
@@ -158,6 +172,14 @@ impl ThingRepository for SeaOrmThingRepository {
         Ok(Some(self.hydrate(row).await?))
     }
 
+    /// Replace an existing thing. Child collections are deleted and
+    /// re-inserted wholesale (simpler and safer than a per-row diff), all
+    /// inside one transaction. Returns the re-hydrated stored form.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::NotFound`] if no row has this id, or
+    /// [`crate::Error::Database`] on any DB failure.
     async fn update(&self, thing: &Thing) -> Result<Thing> {
         let exists = things::Entity::find_by_id(thing.id)
             .one(&self.db)
@@ -176,6 +198,14 @@ impl ThingRepository for SeaOrmThingRepository {
             .ok_or(crate::Error::NotFound)
     }
 
+    /// Soft-delete: flip `is_deleted` and stamp `deleted_at`/`updated_at`
+    /// rather than removing the row, preserving the audit trail. The row
+    /// stays in the table but is filtered out of reads and lists.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::NotFound`] if no row has this id, or
+    /// [`crate::Error::Database`] on any DB failure.
     async fn soft_delete(&self, id: &Uuid) -> Result<()> {
         let row = things::Entity::find_by_id(*id)
             .one(&self.db)
@@ -190,6 +220,13 @@ impl ThingRepository for SeaOrmThingRepository {
         Ok(())
     }
 
+    /// List non-deleted things newest-first, paged by `limit`/`offset`.
+    /// Each row is hydrated with its child collections (a per-row query),
+    /// so large pages are intentionally avoided by the caller.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] on any DB failure.
     async fn list(&self, limit: u64, offset: u64) -> Result<Vec<Thing>> {
         let rows = things::Entity::find()
             .filter(things::Column::IsDeleted.eq(false))
@@ -206,6 +243,13 @@ impl ThingRepository for SeaOrmThingRepository {
         Ok(out)
     }
 
+    /// Persist a merge-history row (a snapshot of the transferred data),
+    /// giving every merge a durable audit record. Returns the input clone
+    /// unchanged since the row is fully caller-supplied.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] on any DB failure.
     async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord> {
         let active = thing_merge_records::ActiveModel {
             id: Set(rec.id),

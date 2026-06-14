@@ -38,10 +38,15 @@ pub struct App;
 
 #[async_trait]
 impl Hooks for App {
+    /// Service name loco uses in logs and banners; taken from the crate
+    /// name at compile time so it never drifts from `Cargo.toml`.
     fn app_name() -> &'static str {
         env!("CARGO_CRATE_NAME")
     }
 
+    /// Human-readable version string: package version plus a short build
+    /// id. The build id prefers `BUILD_SHA`, falls back to GitHub Actions'
+    /// `GITHUB_SHA`, and is `"dev"` for local builds.
     fn app_version() -> String {
         format!(
             "{} ({})",
@@ -52,6 +57,13 @@ impl Hooks for App {
         )
     }
 
+    /// Boot the loco application for the given mode/environment, delegating
+    /// to loco's `create_app` with this crate's `Migrator` so migrations run
+    /// as part of boot.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any loco boot error (config load, DB connect, migration).
     async fn boot(
         mode: StartMode,
         environment: &Environment,
@@ -60,10 +72,22 @@ impl Hooks for App {
         create_app::<Self, Migrator>(mode, environment, config).await
     }
 
+    /// Register the loco route table: the framework defaults plus the
+    /// hand-written `things_routes()` group.
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes().add_route(things_routes())
     }
 
+    /// Post-routing hook where the hand-written Axum surface is attached.
+    ///
+    /// Builds the boot-time singletons (`Config`, `SearchEngine`,
+    /// `ThingMatcher`), stuffs the assembled [`AppState`] into loco's shared
+    /// store so the legacy handlers can extract it, then mounts Swagger UI
+    /// and a permissive CORS layer onto the router.
+    ///
+    /// # Errors
+    ///
+    /// Returns a loco error if config load or search-index open fails.
     async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         let config = Config::from_env().map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let search_engine = SearchEngine::new(&config.search.index_path)
@@ -77,16 +101,34 @@ impl Hooks for App {
         Ok(router)
     }
 
+    /// Worker-registration hook. No background workers are registered yet,
+    /// so this is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// Never errors in the current implementation.
     async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {
         Ok(())
     }
 
+    /// CLI-task registration hook. No custom tasks are registered yet.
     fn register_tasks(_tasks: &mut Tasks) {}
 
+    /// Test-support hook to wipe tables. Intentionally a no-op here; the
+    /// service relies on soft-delete and has no truncate workflow.
+    ///
+    /// # Errors
+    ///
+    /// Never errors in the current implementation.
     async fn truncate(_ctx: &AppContext) -> Result<()> {
         Ok(())
     }
 
+    /// Seed-data hook. No fixtures are loaded; a fresh database starts empty.
+    ///
+    /// # Errors
+    ///
+    /// Never errors in the current implementation.
     async fn seed(_ctx: &AppContext, _base: &Path) -> Result<()> {
         Ok(())
     }

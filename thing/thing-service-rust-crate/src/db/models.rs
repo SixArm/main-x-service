@@ -67,21 +67,25 @@ pub mod things {
     }
 
     impl Related<super::thing_alternate_names::Entity> for Entity {
+        /// Relation from `things` to its `thing_alternate_names` children.
         fn to() -> RelationDef {
             Relation::AlternateNames.def()
         }
     }
     impl Related<super::thing_identifiers::Entity> for Entity {
+        /// Relation from `things` to its `thing_identifiers` children.
         fn to() -> RelationDef {
             Relation::Identifiers.def()
         }
     }
     impl Related<super::thing_images::Entity> for Entity {
+        /// Relation from `things` to its `thing_images` children.
         fn to() -> RelationDef {
             Relation::Images.def()
         }
     }
     impl Related<super::thing_same_as::Entity> for Entity {
+        /// Relation from `things` to its `thing_same_as` children.
         fn to() -> RelationDef {
             Relation::SameAs.def()
         }
@@ -121,6 +125,7 @@ pub mod thing_alternate_names {
         Thing,
     }
     impl Related<super::things::Entity> for Entity {
+        /// Inverse relation: this child belongs to its parent `things` row.
         fn to() -> RelationDef {
             Relation::Thing.def()
         }
@@ -167,6 +172,7 @@ pub mod thing_identifiers {
         Thing,
     }
     impl Related<super::things::Entity> for Entity {
+        /// Inverse relation: this child belongs to its parent `things` row.
         fn to() -> RelationDef {
             Relation::Thing.def()
         }
@@ -205,6 +211,7 @@ pub mod thing_images {
         Thing,
     }
     impl Related<super::things::Entity> for Entity {
+        /// Inverse relation: this child belongs to its parent `things` row.
         fn to() -> RelationDef {
             Relation::Thing.def()
         }
@@ -243,6 +250,7 @@ pub mod thing_same_as {
         Thing,
     }
     impl Related<super::things::Entity> for Entity {
+        /// Inverse relation: this child belongs to its parent `things` row.
         fn to() -> RelationDef {
             Relation::Thing.def()
         }

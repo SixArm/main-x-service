@@ -60,4 +60,7 @@ pub mod search;
 pub mod streaming;
 pub mod validation;
 
+/// Re-export the crate's error type and its `Result` alias at the crate
+/// root so callers can write `place_service::{Error, Result}` without
+/// reaching into the `error` module.
 pub use error::{Error, Result};

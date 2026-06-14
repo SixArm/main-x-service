@@ -201,9 +201,12 @@ fn tokenise(s: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for the Tantivy-backed `SearchEngine` (index + query).
     use super::*;
     use tempfile::TempDir;
 
+    /// Test helper: a minimally-populated `Thing` with just a name, enough
+    /// to exercise name indexing and querying.
     fn thing(name: &str) -> Thing {
         Thing::new(name)
     }

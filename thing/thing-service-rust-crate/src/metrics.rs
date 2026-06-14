@@ -54,6 +54,15 @@ pub struct Metrics {
 }
 
 impl Metrics {
+    /// Construct the metric set: build each counter/histogram and register
+    /// it on a fresh Prometheus `Registry`. Called once via the process-wide
+    /// lazy singleton, so the `expect`s below can only fire on a programmer
+    /// error in the static opts.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a metric's static options are invalid or if registration
+    /// collides — both impossible with the hard-coded opts here.
     fn new() -> Self {
         let registry = Registry::new();
 
@@ -178,8 +187,12 @@ pub const CONTENT_TYPE: &str = "text/plain; version=0.0.4; charset=utf-8";
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for the Prometheus metrics registry and rendering.
     use super::*;
 
+    /// Pins that `render` emits the text-exposition format and that the
+    /// registry actually contains the entity counter (after an increment)
+    /// plus the HTTP latency histogram — i.e. the registration wiring works.
     #[test]
     fn render_includes_default_counters() {
         METRICS.thing_created_total.inc();

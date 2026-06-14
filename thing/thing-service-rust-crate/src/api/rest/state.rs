@@ -60,6 +60,14 @@ impl AppState {
 /// controllers: extracts the cheaply-cloneable `AppState` from the
 /// `AppContext` shared store (populated once at boot in `after_routes`).
 impl axum::extract::FromRef<loco_rs::app::AppContext> for AppState {
+    /// Pull the boot-time `AppState` out of the shared store. The clone is
+    /// cheap because every field is an `Arc`/handle.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `after_routes` never inserted the state — a programmer
+    /// error that would otherwise surface as a confusing per-request 500,
+    /// so it fails loudly at the first request instead.
     fn from_ref(ctx: &loco_rs::app::AppContext) -> Self {
         ctx.shared_store
             .get::<AppState>()

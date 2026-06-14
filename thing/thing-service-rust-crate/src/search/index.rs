@@ -51,6 +51,8 @@ impl ThingIndexSchema {
 }
 
 impl Default for ThingIndexSchema {
+    /// Equivalent to [`ThingIndexSchema::new`]; provided so the schema can be
+    /// built with `Default::default()` in generic contexts.
     fn default() -> Self {
         Self::new()
     }

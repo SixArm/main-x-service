@@ -25,10 +25,15 @@ use place_service::models::{
 
 // -------- fixtures -----------------------------------------------------------
 
+/// Smallest realistic fixture: a name-only place. Isolates the adapter's
+/// fixed per-call overhead (no optional fields to project).
 fn minimal_place() -> Place {
     Place::new("Test Site")
 }
 
+/// Fully-populated fixture exercising every adapter routing branch
+/// (alternate name, place type, address, geo+elevation, telephone, GLN, an
+/// OSM identifier, capacity) — the worst-case projection cost.
 fn rich_place() -> Place {
     let mut p = Place::new("Central Park");
     p.alternate_name = Some("The Central Park".into());
@@ -55,6 +60,8 @@ fn rich_place() -> Place {
     p
 }
 
+/// Construct a matching engine from the default `MatchConfig` — the same
+/// preset the bridge tests pin, so benchmark numbers track the tested path.
 fn engine() -> MatchingEngine {
     MatchingEngine::new(MatchConfig::default())
 }
@@ -63,6 +70,9 @@ fn engine() -> MatchingEngine {
 // Group 1: adapter projection cost (minimal vs rich record)
 // =============================================================================
 
+/// Benchmark the `to_matcher_place` projection alone, for a minimal vs. a
+/// rich record, to attribute any bridge regression to the adapter rather
+/// than the matcher.
 fn bench_adapter_only(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_adapter_only");
     let minimal = minimal_place();
@@ -88,6 +98,9 @@ fn bench_adapter_only(c: &mut Criterion) {
 // Group 2: end-to-end bridge — adapter + engine
 // =============================================================================
 
+/// Benchmark the full dedup path — adapter projection plus one
+/// `match_places` call — on clone pairs (minimal and rich), the realistic
+/// per-comparison cost.
 fn bench_end_to_end(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_end_to_end");
     let engine = engine();
@@ -122,6 +135,9 @@ fn bench_end_to_end(c: &mut Criterion) {
 // Group 3: one-vs-many — the realistic dedup-on-create path
 // =============================================================================
 
+/// Benchmark one query scored against 10/50/100 varied candidates — the
+/// dedup-on-create fan-out — keeping the best score. Candidate names are
+/// perturbed so the matcher cannot trivially short-circuit.
 fn bench_one_to_many(c: &mut Criterion) {
     let mut group = c.benchmark_group("bridge_one_to_many");
     let engine = engine();
