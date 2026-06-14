@@ -37,7 +37,7 @@ opened date, subjects, keywords, identifiers, sameAs, languages).
 Requires PostgreSQL.
 
 ```bash
-export DATABASE_URL=postgres://loco:loco@localhost:5432/case-service_development
+export DATABASE_URL=postgres://loco:loco@localhost:5432/case_service_development
 cargo loco start        # migrations auto-run in development
 
 curl -s localhost:5150/api/cases -H 'content-type: application/json' \

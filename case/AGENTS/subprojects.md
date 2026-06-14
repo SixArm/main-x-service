@@ -30,7 +30,7 @@ cargo run                    # demo binary (not SemVer surface)
 
 # Service — needs PostgreSQL; port 5150
 cd case-service-rust-crate
-export DATABASE_URL=postgres://loco:loco@localhost:5432/case-service_development
+export DATABASE_URL=postgres://loco:loco@localhost:5432/case_service_development
 # optional SSO env (verifier is env-injected):
 #   CASE_JWKS=… CASE_JWT_ISSUER=… CASE_JWT_AUDIENCE=…
 cargo loco start             # migrations auto-run in development

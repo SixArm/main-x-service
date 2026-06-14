@@ -34,10 +34,10 @@ workers:
   
 # Queue Configuration
 queue:
-  kind: Redis
-  # Redis connection URI
-  uri: {{ get_env(name="REDIS_URL", default="redis://127.0.0.1") }}
-  # Dangerously flush all data in Redis on startup. dangerous operation, make sure that you using this flag only on dev environments or test mode
+  kind: Postgres
+  # Postgres-backed background jobs (repo convention — NOT Redis); shares the app database.
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/case_service_test") }}
+  # Flush all queued jobs on startup — dev/test only, never production.
   dangerously_flush: false
 
 # Mailer Configuration.
@@ -67,7 +67,7 @@ mailer:
 # Database Configuration
 database:
   # Database connection URI
-  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/case-service_test") }}
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/case_service_test") }}
   # When enabled, the sql query will be logged.
   enable_logging: false
   # Set the timeout duration when acquiring a connection.

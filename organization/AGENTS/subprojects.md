@@ -35,7 +35,7 @@ cargo test && cargo run            # demo binary (not SemVer surface)
 
 # service — needs PostgreSQL; default port 5150
 cd organization-service-rust-crate
-export DATABASE_URL=postgres://loco:loco@localhost:5432/organization-service_development
+export DATABASE_URL=postgres://loco:loco@localhost:5432/organization_service_development
 cargo loco start                   # migrations auto-run in development
 cargo test --test matching         # DB-free tests
 

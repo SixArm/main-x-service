@@ -60,15 +60,6 @@ jobs:
       contents: read
     
     services:
-      redis:
-        image: redis
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - "6379:6379"
       postgres:
         image: postgres
         env:
@@ -97,6 +88,5 @@ jobs:
           command: test
           args: --all-features --all
         env:
-          REDIS_URL: redis://localhost:${{job.services.redis.ports[6379]}}
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres_test
           

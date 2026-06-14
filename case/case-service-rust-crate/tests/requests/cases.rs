@@ -8,7 +8,7 @@
 //! stays green on a database-less machine. Run them with:
 //!
 //! ```sh
-//! DATABASE_URL=postgres://loco:loco@localhost:5432/case-service_test \
+//! DATABASE_URL=postgres://loco:loco@localhost:5432/case_service_test \
 //!   cargo test -- --ignored
 //! ```
 //!

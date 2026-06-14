@@ -33,7 +33,7 @@ codes (ICD/SNOMED), interventions, keywords, identifiers, sameAs).
 Requires PostgreSQL.
 
 ```bash
-export DATABASE_URL=postgres://loco:loco@localhost:5432/care-pathway-service_development
+export DATABASE_URL=postgres://loco:loco@localhost:5432/care_pathway_service_development
 cargo loco start        # migrations auto-run in development
 
 curl -s localhost:5150/api/care-pathways -H 'content-type: application/json' \

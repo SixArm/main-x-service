@@ -2,7 +2,7 @@
 //!
 //! These boot the real loco app against the `test` environment config
 //! (`config/test.yaml`), so they require a reachable PostgreSQL
-//! instance (default `postgres://loco:loco@localhost:5432/organization-service_test`,
+//! instance (default `postgres://loco:loco@localhost:5432/organization_service_test`,
 //! overridable via `DATABASE_URL`). Following the family convention
 //! (see person-service `tests/api_integration_test.rs`) they are
 //! `#[ignore]`d so the default `cargo test` run stays green without a

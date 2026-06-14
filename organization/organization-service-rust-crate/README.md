@@ -34,7 +34,7 @@ schema.org publishes the camelCase property names (`legalName`,
 Requires PostgreSQL.
 
 ```bash
-export DATABASE_URL=postgres://loco:loco@localhost:5432/organization-service_development
+export DATABASE_URL=postgres://loco:loco@localhost:5432/organization_service_development
 cargo loco start        # migrations auto-run in development
 
 curl -s localhost:5150/api/organizations -H 'content-type: application/json' \

@@ -39,7 +39,7 @@ workers:
 # the application database connection.
 queue:
   kind: Postgres
-  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/authentication-service_development") }}
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/authentication_service_development") }}
   dangerously_flush: false
 
 # Mailer Configuration.
@@ -67,7 +67,7 @@ mailer:
 # Database Configuration
 database:
   # Database connection URI
-  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/authentication-service_development") }}
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/authentication_service_development") }}
   # When enabled, the sql query will be logged.
   enable_logging: false
   # Set the timeout duration when acquiring a connection.
