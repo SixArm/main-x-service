@@ -19,7 +19,7 @@ fn bench_name_similarity(c: &mut Criterion) {
                 black_box("Pride and Prejudice"),
                 black_box("Pride and Prejudice"),
             )
-        })
+        });
     });
     c.bench_function("name_similarity_fuzzy", |b| {
         b.iter(|| {
@@ -27,10 +27,10 @@ fn bench_name_similarity(c: &mut Criterion) {
                 black_box("Pride and Prejudice"),
                 black_box("Prde and Prejudice"),
             )
-        })
+        });
     });
     c.bench_function("name_similarity_different", |b| {
-        b.iter(|| name_similarity(black_box("Pride and Prejudice"), black_box("War and Peace")))
+        b.iter(|| name_similarity(black_box("Pride and Prejudice"), black_box("War and Peace")));
     });
 }
 
@@ -42,7 +42,7 @@ fn bench_url_similarity(c: &mut Criterion) {
                 black_box("https://en.wikipedia.org/wiki/Pride_and_Prejudice"),
                 black_box("https://en.wikipedia.org/wiki/Pride_and_Prejudice"),
             )
-        })
+        });
     });
     c.bench_function("url_similarity_different", |bench| {
         bench.iter(|| {
@@ -50,7 +50,7 @@ fn bench_url_similarity(c: &mut Criterion) {
                 black_box("https://en.wikipedia.org/wiki/Pride_and_Prejudice"),
                 black_box("https://www.rust-lang.org"),
             )
-        })
+        });
     });
 }
 
@@ -58,7 +58,7 @@ fn bench_url_similarity(c: &mut Criterion) {
 fn bench_soundex(c: &mut Criterion) {
     c.bench_function("soundex_short", |b| b.iter(|| soundex(black_box("Book"))));
     c.bench_function("soundex_long", |b| {
-        b.iter(|| soundex(black_box("Springfield")))
+        b.iter(|| soundex(black_box("Springfield")));
     });
 }
 
@@ -78,7 +78,7 @@ fn bench_full_match(c: &mut Criterion) {
     let weights = MatchWeights::default();
 
     c.bench_function("full_thing_match", |bench| {
-        bench.iter(|| compute_match(black_box(&a), black_box(&b), black_box(&weights)))
+        bench.iter(|| compute_match(black_box(&a), black_box(&b), black_box(&weights)));
     });
 }
 
@@ -93,9 +93,13 @@ fn bench_batch_matching(c: &mut Criterion) {
     c.bench_function("batch_match_100_candidates", |b| {
         b.iter(|| {
             for c in &candidates {
-                compute_match(black_box(&target), black_box(c), black_box(&weights));
+                black_box(compute_match(
+                    black_box(&target),
+                    black_box(c),
+                    black_box(&weights),
+                ));
             }
-        })
+        });
     });
 }
 

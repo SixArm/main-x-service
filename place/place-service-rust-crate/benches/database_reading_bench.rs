@@ -12,7 +12,7 @@ use place_service::models::place::Place;
 /// Benchmark constructing a single `Place`.
 fn bench_place_construction(c: &mut Criterion) {
     c.bench_function("place_construction", |b| {
-        b.iter(|| Place::new(black_box("Test Place")))
+        b.iter(|| Place::new(black_box("Test Place")));
     });
 }
 
@@ -24,7 +24,7 @@ fn bench_place_batch_construction(c: &mut Criterion) {
                 .map(|i| Place::new(&format!("Place {i}")))
                 .collect();
             black_box(places);
-        })
+        });
     });
 }
 

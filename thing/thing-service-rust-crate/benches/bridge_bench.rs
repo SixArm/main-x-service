@@ -128,7 +128,7 @@ fn bench_one_to_many(c: &mut Criterion) {
     let candidates: Vec<Thing> = (0..100)
         .map(|i| {
             let mut p = rich_thing();
-            p.name = format!("Variant{}", i);
+            p.name = format!("Variant{i}");
             p
         })
         .collect();

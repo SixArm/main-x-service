@@ -39,7 +39,7 @@ fn pride_and_prejudice() -> Thing {
 // Identical / near-duplicate cases
 // =============================================================================
 
-/// Identical clones score ≥ 0.95 with High confidence and is_match true.
+/// Identical clones score ≥ 0.95 with High confidence and `is_match` true.
 #[test]
 fn identical_clones_score_near_one_high_confidence() {
     let a = pride_and_prejudice();
@@ -76,7 +76,7 @@ fn typo_in_name_still_matches_with_supporting_identifier() {
 // Deterministic short-circuit — globally-unique identifiers
 // =============================================================================
 
-/// A shared ISBN triggers deterministic_match and a 1.0 identifiers score.
+/// A shared ISBN triggers `deterministic_match` and a 1.0 identifiers score.
 #[test]
 fn shared_isbn_short_circuits_to_one() {
     // ISBN is one of the matcher's deterministic identifier schemes
@@ -205,7 +205,7 @@ fn custom_identifier_property_id_passes_through_verbatim() {
 // Same-as / URL cross-references
 // =============================================================================
 
-/// A shared `same_as` URL contributes positive same_as evidence.
+/// A shared `same_as` URL contributes positive `same_as` evidence.
 #[test]
 fn shared_same_as_url_drives_evidence() {
     let mut a = Thing::new("Linux kernel");
@@ -281,7 +281,7 @@ fn first_image_url_becomes_matcher_image() {
     assert_eq!(m.image.as_deref(), Some("https://example.com/a.jpg"));
 }
 
-/// An ISBN identifier maps to the canonical lowercase `isbn` property_id.
+/// An ISBN identifier maps to the canonical lowercase `isbn` `property_id`.
 #[test]
 fn isbn_property_id_lowercases_to_canonical_token() {
     let mut a = Thing::new("Book");

@@ -51,6 +51,7 @@ pub struct ValidationError {
 }
 
 /// Validate a Thing, returning all errors. An empty Vec means valid.
+#[must_use]
 pub fn validate_thing(thing: &Thing) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
@@ -61,14 +62,18 @@ pub fn validate_thing(thing: &Thing) -> Vec<ValidationError> {
         });
     }
 
-    check_optional_http_url(&thing.url, "url", &mut errors);
-    check_optional_http_url(&thing.additional_type, "additional_type", &mut errors);
+    check_optional_http_url(thing.url.as_ref(), "url", &mut errors);
     check_optional_http_url(
-        &thing.main_entity_of_page,
+        thing.additional_type.as_ref(),
+        "additional_type",
+        &mut errors,
+    );
+    check_optional_http_url(
+        thing.main_entity_of_page.as_ref(),
         "main_entity_of_page",
         &mut errors,
     );
-    check_optional_http_url(&thing.subject_of, "subject_of", &mut errors);
+    check_optional_http_url(thing.subject_of.as_ref(), "subject_of", &mut errors);
 
     for (i, img) in thing.images.iter().enumerate() {
         if !is_http_url(img) {
@@ -146,7 +151,7 @@ pub fn normalize_thing(thing: &mut Thing) {
 /// Push a `must be an http(s) URL` error for `field` when an optional URL is
 /// present but not an http(s) URL. A `None` value is valid (the field is
 /// optional) and produces no error.
-fn check_optional_http_url(value: &Option<String>, field: &str, errors: &mut Vec<ValidationError>) {
+fn check_optional_http_url(value: Option<&String>, field: &str, errors: &mut Vec<ValidationError>) {
     if let Some(v) = value
         && !is_http_url(v)
     {
@@ -189,7 +194,7 @@ fn dedupe(iter: impl Iterator<Item = String>) -> Vec<String> {
 
 /// Dispatch per-scheme format validation. Deterministic schemes with a
 /// well-known shape are checked; all other schemes (SKU, MPN,
-/// SerialNumber, Custom) are accepted unconditionally.
+/// `SerialNumber`, Custom) are accepted unconditionally.
 fn validate_identifier(id: &ThingIdentifier) -> Result<(), String> {
     match &id.property_id {
         IdentifierType::Isbn => validate_isbn(&id.value),
@@ -225,8 +230,7 @@ fn validate_isbn(v: &str) -> Result<(), String> {
             && digits
                 .chars()
                 .last()
-                .map(|c| c.is_ascii_digit() || c == 'X')
-                .unwrap_or(false)
+                .is_some_and(|c| c.is_ascii_digit() || c == 'X')
     } else {
         digits.chars().all(|c| c.is_ascii_digit())
     };
@@ -250,8 +254,7 @@ fn validate_issn(v: &str) -> Result<(), String> {
     let tail_ok = s
         .chars()
         .last()
-        .map(|c| c.is_ascii_digit() || c == 'X')
-        .unwrap_or(false);
+        .is_some_and(|c| c.is_ascii_digit() || c == 'X');
     if !head_ok || !tail_ok {
         return Err("ISSN contains invalid characters".into());
     }
@@ -270,7 +273,7 @@ fn validate_doi(v: &str) -> Result<(), String> {
 /// Validate a GTIN: 8, 12, 13, or 14 digits (GTIN-8/UPC/EAN/GTIN-14) after
 /// dropping any non-digit characters. The check digit is not verified.
 fn validate_gtin(v: &str) -> Result<(), String> {
-    let digits: String = v.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = v.chars().filter(char::is_ascii_digit).collect();
     if !matches!(digits.len(), 8 | 12 | 13 | 14) {
         return Err(format!(
             "GTIN must be 8, 12, 13, or 14 digits, got {}",
@@ -456,7 +459,7 @@ mod tests {
     #[test]
     fn test_alternate_name_empty() {
         let mut thing = Thing::new("X");
-        thing.alternate_names = vec!["".into()];
+        thing.alternate_names = vec![String::new()];
         let errors = validate_thing(&thing);
         assert!(errors.iter().any(|e| e.field == "alternate_names[0]"));
     }

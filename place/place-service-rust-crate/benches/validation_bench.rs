@@ -16,7 +16,7 @@ use place_service::validation::{normalize_place, validate_place};
 fn bench_validate_simple(c: &mut Criterion) {
     let place = Place::new("Simple Place");
     c.bench_function("validate_simple_place", |b| {
-        b.iter(|| validate_place(black_box(&place)))
+        b.iter(|| validate_place(black_box(&place)));
     });
 }
 
@@ -36,7 +36,7 @@ fn bench_validate_full(c: &mut Criterion) {
     });
 
     c.bench_function("validate_full_place", |b| {
-        b.iter(|| validate_place(black_box(&place)))
+        b.iter(|| validate_place(black_box(&place)));
     });
 }
 
@@ -57,7 +57,7 @@ fn bench_normalize(c: &mut Criterion) {
             },
             |mut place| normalize_place(black_box(&mut place)),
             criterion::BatchSize::SmallInput,
-        )
+        );
     });
 }
 

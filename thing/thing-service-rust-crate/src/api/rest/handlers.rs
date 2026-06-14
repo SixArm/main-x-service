@@ -214,13 +214,13 @@ pub async fn update_thing(
                     serde_json::json!({ "name": stored.name }),
                 ))
                 .await;
-            if let (Some(old), Ok(new_v)) = (old, serde_json::to_value(&stored)) {
-                if let Ok(old_v) = serde_json::to_value(&old) {
-                    let _ = state
-                        .audit_log
-                        .log_update("thing", stored.id, old_v, new_v, &AuditContext::default())
-                        .await;
-                }
+            if let (Some(old), Ok(new_v)) = (old, serde_json::to_value(&stored))
+                && let Ok(old_v) = serde_json::to_value(&old)
+            {
+                let _ = state
+                    .audit_log
+                    .log_update("thing", stored.id, old_v, new_v, &AuditContext::default())
+                    .await;
             }
             (StatusCode::OK, Json(ApiResponse::success(stored)))
         }
@@ -248,13 +248,13 @@ pub async fn delete_thing(
                     serde_json::json!({}),
                 ))
                 .await;
-            if let Some(old) = old {
-                if let Ok(v) = serde_json::to_value(&old) {
-                    let _ = state
-                        .audit_log
-                        .log_delete("thing", id, v, &AuditContext::default())
-                        .await;
-                }
+            if let Some(old) = old
+                && let Ok(v) = serde_json::to_value(&old)
+            {
+                let _ = state
+                    .audit_log
+                    .log_delete("thing", id, v, &AuditContext::default())
+                    .await;
             }
             StatusCode::NO_CONTENT.into_response()
         }
@@ -309,14 +309,14 @@ pub async fn search_things(
     // that no longer resolve (e.g. soft-deleted between index and read).
     let mut results = Vec::new();
     for id in ids {
-        if let Ok(uuid) = Uuid::parse_str(&id) {
-            if let Ok(Some(t)) = state.thing_repository.get_by_id(&uuid).await {
-                results.push(if q.mask_sensitive.unwrap_or(false) {
-                    mask_thing(&t)
-                } else {
-                    t
-                });
-            }
+        if let Ok(uuid) = Uuid::parse_str(&id)
+            && let Ok(Some(t)) = state.thing_repository.get_by_id(&uuid).await
+        {
+            results.push(if q.mask_sensitive.unwrap_or(false) {
+                mask_thing(&t)
+            } else {
+                t
+            });
         }
     }
     let total = results.len();

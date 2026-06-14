@@ -1,7 +1,7 @@
 //! Shared harness for the DB-backed integration suite.
 //!
 //! The tests are driven through `tower::ServiceExt::oneshot` against
-//! the full Axum router with real PostgreSQL + Tantivy + the in-memory
+//! the full Axum router with real `PostgreSQL` + Tantivy + the in-memory
 //! event publisher. They require a running Postgres reachable via
 //! `DATABASE_URL` (the rest of the env-var table from
 //! `Config::from_env` applies). All integration tests are tagged with
@@ -46,7 +46,7 @@ pub async fn create_test_app_state() -> AppState {
     let search_engine =
         SearchEngine::new(&config.search.index_path).expect("create Tantivy search engine");
 
-    let matcher = CourseMatcher::new(config.matching.clone());
+    let matcher = CourseMatcher::new(config.matching);
 
     AppState::new(db, search_engine, matcher, config)
 }

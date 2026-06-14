@@ -41,6 +41,7 @@ use crate::models::identifier::{IdentifierType, PlaceIdentifier};
 /// // The shared FIPS code is enough to score 1.0.
 /// assert_eq!(identifier_similarity(&a, &b), 1.0);
 /// ```
+#[must_use]
 pub fn identifier_similarity(a: &[PlaceIdentifier], b: &[PlaceIdentifier]) -> f64 {
     // No identifiers to compare on one side ⇒ no signal.
     if a.is_empty() || b.is_empty() {
@@ -79,6 +80,7 @@ pub fn identifier_similarity(a: &[PlaceIdentifier], b: &[PlaceIdentifier]) -> f6
 /// let b = vec![PlaceIdentifier::gln("1234567890123")];
 /// assert!(!has_gln_match(&a, &b));
 /// ```
+#[must_use]
 pub fn has_gln_match(a: &[PlaceIdentifier], b: &[PlaceIdentifier]) -> bool {
     // Collect the GLN values on side `a` once, then scan side `b` against
     // them. Only GLN-typed entries qualify on either side.

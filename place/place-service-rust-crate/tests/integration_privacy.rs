@@ -15,7 +15,7 @@ use place_service::privacy::{gdpr_export, mask_place};
 fn test_mask_then_export_workflow() {
     let mut place = Place::new("Sensitive Place");
     place.telephone = Some("+1-555-867-5309".into());
-    place.geo = Some(GeoCoordinates::new(40.78293456, -73.96543210));
+    place.geo = Some(GeoCoordinates::new(40.782_934_56, -73.965_432_10));
 
     let masked = mask_place(&place);
     let export = gdpr_export(&masked);

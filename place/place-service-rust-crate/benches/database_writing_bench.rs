@@ -26,7 +26,7 @@ fn bench_place_create_validate(c: &mut Criterion) {
             });
             let errors = validate_place(black_box(&place));
             black_box(errors);
-        })
+        });
     });
 }
 
@@ -47,7 +47,7 @@ fn bench_place_create_normalize(c: &mut Criterion) {
             },
             |mut place| normalize_place(black_box(&mut place)),
             criterion::BatchSize::SmallInput,
-        )
+        );
     });
 }
 

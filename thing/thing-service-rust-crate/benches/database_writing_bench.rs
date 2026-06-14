@@ -17,7 +17,7 @@ fn bench_thing_create_validate(c: &mut Criterion) {
             thing.identifiers = vec![ThingIdentifier::isbn("9780141439518")];
             let errors = validate_thing(black_box(&thing));
             black_box(errors);
-        })
+        });
     });
 }
 
@@ -33,7 +33,7 @@ fn bench_thing_create_normalize(c: &mut Criterion) {
             },
             |mut thing| normalize_thing(black_box(&mut thing)),
             criterion::BatchSize::SmallInput,
-        )
+        );
     });
 }
 

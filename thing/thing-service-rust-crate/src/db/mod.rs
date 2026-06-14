@@ -29,6 +29,10 @@ use models::{
 };
 
 /// Open a connection pool from a [`DatabaseConfig`].
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be established.
 pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {
     let mut opt = sea_orm::ConnectOptions::new(&config.url);
     opt.max_connections(config.max_connections)
@@ -55,14 +59,15 @@ pub trait ThingRepository: Send + Sync {
     async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord>;
 }
 
-/// SeaORM-backed [`ThingRepository`] over a PostgreSQL connection pool.
+/// SeaORM-backed [`ThingRepository`] over a `PostgreSQL` connection pool.
 pub struct SeaOrmThingRepository {
-    /// The shared SeaORM connection pool.
+    /// The shared `SeaORM` connection pool.
     db: DatabaseConnection,
 }
 
 impl SeaOrmThingRepository {
     /// Wrap an existing connection pool in a repository.
+    #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
@@ -76,7 +81,7 @@ impl SeaOrmThingRepository {
             .order_by_asc(thing_alternate_names::Column::Position)
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let alternate_names = alt_rows.into_iter().map(|r| r.name).collect();
 
         let id_rows = thing_identifiers::Entity::find()
@@ -84,7 +89,7 @@ impl SeaOrmThingRepository {
             .order_by_asc(thing_identifiers::Column::Position)
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let identifiers = id_rows
             .into_iter()
             .map(|r| ThingIdentifier {
@@ -100,7 +105,7 @@ impl SeaOrmThingRepository {
             .order_by_asc(thing_images::Column::Position)
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let images = img_rows.into_iter().map(|r| r.url).collect();
 
         let same_rows = thing_same_as::Entity::find()
@@ -108,7 +113,7 @@ impl SeaOrmThingRepository {
             .order_by_asc(thing_same_as::Column::Position)
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let same_as = same_rows.into_iter().map(|r| r.url).collect();
 
         Ok(Thing {
@@ -145,10 +150,13 @@ impl ThingRepository for SeaOrmThingRepository {
     /// Returns [`crate::Error::Database`] on any DB failure, or if the row
     /// cannot be read back after insert.
     async fn create(&self, thing: &Thing) -> Result<Thing> {
-        let txn = self.db.begin().await.map_err(map_db)?;
-        to_active(thing).insert(&txn).await.map_err(map_db)?;
+        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
+        to_active(thing)
+            .insert(&txn)
+            .await
+            .map_err(|e| map_db(&e))?;
         insert_collections(&txn, thing).await?;
-        txn.commit().await.map_err(map_db)?;
+        txn.commit().await.map_err(|e| map_db(&e))?;
         self.get_by_id(&thing.id)
             .await?
             .ok_or_else(|| crate::Error::Database("thing not found after insert".into()))
@@ -164,7 +172,7 @@ impl ThingRepository for SeaOrmThingRepository {
         let row = things::Entity::find_by_id(*id)
             .one(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let Some(row) = row else { return Ok(None) };
         if row.is_deleted {
             return Ok(None);
@@ -184,15 +192,18 @@ impl ThingRepository for SeaOrmThingRepository {
         let exists = things::Entity::find_by_id(thing.id)
             .one(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         if exists.is_none() {
             return Err(crate::Error::NotFound);
         }
-        let txn = self.db.begin().await.map_err(map_db)?;
-        to_active(thing).update(&txn).await.map_err(map_db)?;
+        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
+        to_active(thing)
+            .update(&txn)
+            .await
+            .map_err(|e| map_db(&e))?;
         delete_collections(&txn, thing.id).await?;
         insert_collections(&txn, thing).await?;
-        txn.commit().await.map_err(map_db)?;
+        txn.commit().await.map_err(|e| map_db(&e))?;
         self.get_by_id(&thing.id)
             .await?
             .ok_or(crate::Error::NotFound)
@@ -210,13 +221,13 @@ impl ThingRepository for SeaOrmThingRepository {
         let row = things::Entity::find_by_id(*id)
             .one(&self.db)
             .await
-            .map_err(map_db)?
+            .map_err(|e| map_db(&e))?
             .ok_or(crate::Error::NotFound)?;
         let mut active: things::ActiveModel = row.into();
         active.is_deleted = Set(true);
         active.deleted_at = Set(Some(OffsetDateTime::now_utc()));
         active.updated_at = Set(OffsetDateTime::now_utc());
-        active.update(&self.db).await.map_err(map_db)?;
+        active.update(&self.db).await.map_err(|e| map_db(&e))?;
         Ok(())
     }
 
@@ -235,7 +246,7 @@ impl ThingRepository for SeaOrmThingRepository {
             .offset(offset)
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
             out.push(self.hydrate(row).await?);
@@ -259,18 +270,22 @@ impl ThingRepository for SeaOrmThingRepository {
             transferred_data: Set(rec.transferred_data.clone()),
             merged_at: Set(ts_to_offset(rec.merged_at)),
         };
-        active.insert(&self.db).await.map_err(map_db)?;
+        active.insert(&self.db).await.map_err(|e| map_db(&e))?;
         Ok(rec.clone())
     }
 }
 
 /// Count non-deleted things (diagnostics / benches).
+///
+/// # Errors
+///
+/// Returns an error if the count query fails.
 pub async fn count_active(db: &DatabaseConnection) -> Result<u64> {
     things::Entity::find()
         .filter(things::Column::IsDeleted.eq(false))
         .count(db)
         .await
-        .map_err(map_db)
+        .map_err(|e| map_db(&e))
 }
 
 /// Build the `things` scalar active model from a domain [`Thing`].
@@ -300,11 +315,11 @@ async fn insert_collections<C: ConnectionTrait>(conn: &C, thing: &Thing) -> Resu
             id: Set(Uuid::new_v4()),
             thing_id: Set(thing.id),
             name: Set(name.clone()),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     }
     for (i, ident) in thing.identifiers.iter().enumerate() {
         let (property_id, custom_label) = ident_type_parts(&ident.property_id);
@@ -316,33 +331,33 @@ async fn insert_collections<C: ConnectionTrait>(conn: &C, thing: &Thing) -> Resu
             value: Set(ident.value.clone()),
             name: Set(ident.name.clone()),
             url: Set(ident.url.clone()),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     }
     for (i, url) in thing.images.iter().enumerate() {
         thing_images::ActiveModel {
             id: Set(Uuid::new_v4()),
             thing_id: Set(thing.id),
             url: Set(url.clone()),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     }
     for (i, url) in thing.same_as.iter().enumerate() {
         thing_same_as::ActiveModel {
             id: Set(Uuid::new_v4()),
             thing_id: Set(thing.id),
             url: Set(url.clone()),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     }
     Ok(())
 }
@@ -353,22 +368,22 @@ async fn delete_collections<C: ConnectionTrait>(conn: &C, thing_id: Uuid) -> Res
         .filter(thing_alternate_names::Column::ThingId.eq(thing_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     thing_identifiers::Entity::delete_many()
         .filter(thing_identifiers::Column::ThingId.eq(thing_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     thing_images::Entity::delete_many()
         .filter(thing_images::Column::ThingId.eq(thing_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     thing_same_as::Entity::delete_many()
         .filter(thing_same_as::Column::ThingId.eq(thing_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     Ok(())
 }
 
@@ -404,8 +419,8 @@ fn parse_ident_type(property_id: &str, custom_label: Option<String>) -> Identifi
     }
 }
 
-/// Map a SeaORM `DbErr` into the crate error type.
-fn map_db(e: sea_orm::DbErr) -> crate::Error {
+/// Map a `SeaORM` `DbErr` into the crate error type.
+fn map_db(e: &sea_orm::DbErr) -> crate::Error {
     crate::Error::Database(e.to_string())
 }
 

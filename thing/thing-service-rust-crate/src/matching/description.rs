@@ -29,9 +29,10 @@ use strsim::jaro_winkler;
 /// ```
 /// use thing_service::matching::description::description_similarity;
 ///
-/// assert_eq!(description_similarity("", ""), 1.0);
-/// assert_eq!(description_similarity("", "non-empty"), 0.0);
+/// assert!((description_similarity("", "") - 1.0).abs() < f64::EPSILON);
+/// assert!(description_similarity("", "non-empty").abs() < f64::EPSILON);
 /// ```
+#[must_use]
 pub fn description_similarity(a: &str, b: &str) -> f64 {
     // Same empty-string conventions as name matching: both empty → perfect,
     // one empty → mismatch.
@@ -85,12 +86,12 @@ mod tests {
     /// Two empty descriptions score 1.0.
     #[test]
     fn test_both_empty() {
-        assert_eq!(description_similarity("", ""), 1.0);
+        assert!((description_similarity("", "") - 1.0).abs() < f64::EPSILON);
     }
 
     /// One empty description scores 0.0.
     #[test]
     fn test_one_empty() {
-        assert_eq!(description_similarity("", "non-empty"), 0.0);
+        assert!(description_similarity("", "non-empty").abs() < f64::EPSILON);
     }
 }

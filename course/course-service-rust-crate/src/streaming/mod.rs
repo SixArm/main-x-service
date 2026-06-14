@@ -1,6 +1,6 @@
 //! Event-streaming publisher (FR-18).
 //!
-//! Every CRUD operation on Course or CourseInstance emits an event.
+//! Every CRUD operation on Course or `CourseInstance` emits an event.
 //! MVP carries an in-memory `Vec` so tests can observe; a Fluvio
 //! adapter is planned under a feature flag (see `spec.md §15`).
 
@@ -33,6 +33,7 @@ pub struct CourseEvent {
 
 impl CourseEvent {
     /// Build a parent-course event (no `parent_id`).
+    #[must_use]
     pub fn course(kind: EventKind, course_id: Uuid, payload: serde_json::Value) -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -45,6 +46,7 @@ impl CourseEvent {
     }
     /// Build an instance event, recording the parent `course_id` in
     /// `parent_id` and the `instance_id` as `entity_id`.
+    #[must_use]
     pub fn instance(
         kind: EventKind,
         course_id: Uuid,
@@ -63,7 +65,7 @@ impl CourseEvent {
 }
 
 /// The CRUD operation a [`CourseEvent`] represents. Serialises in
-/// PascalCase (e.g. `"CourseCreated"`).
+/// `PascalCase` (e.g. `"CourseCreated"`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub enum EventKind {
@@ -102,16 +104,29 @@ pub struct InMemoryEventPublisher {
 
 impl InMemoryEventPublisher {
     /// Create an empty in-memory publisher.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Snapshot of all captured events in publish order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal events mutex has been poisoned by a prior
+    /// panic while the lock was held.
+    #[must_use]
     pub fn events(&self) -> Vec<CourseEvent> {
         self.events.lock().expect("events mutex poisoned").clone()
     }
 
     /// Number of events captured so far.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal events mutex has been poisoned by a prior
+    /// panic while the lock was held.
+    #[must_use]
     pub fn count(&self) -> usize {
         self.events.lock().expect("events mutex poisoned").len()
     }
@@ -149,7 +164,7 @@ mod tests {
         assert_eq!(captured[0].kind, EventKind::CourseCreated);
     }
 
-    /// `EventKind` serialises in PascalCase.
+    /// `EventKind` serialises in `PascalCase`.
     #[test]
     fn event_kind_serialises_pascal_case() {
         let s = serde_json::to_string(&EventKind::CourseInstanceCreated).unwrap();

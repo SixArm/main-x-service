@@ -1,17 +1,15 @@
-//! SeaORM entity modules.
+//! `SeaORM` entity modules.
 //!
 //! One module per table from `migrations/`. JSONB columns are typed as
 //! `serde_json::Value` and rehydrated to typed collections by the
 //! repository.
 
-use sea_orm::entity::prelude::*;
-use serde::{Deserialize, Serialize};
-
 // ───────────────────────── providers ─────────────────────────
 
 /// Entity for the `providers` table (course-authoring organisations).
 pub mod providers {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// A row in the `providers` table; maps to
     /// [`Provider`](crate::models::organization::Provider).
@@ -56,7 +54,8 @@ pub mod providers {
 
 /// Entity for the `courses` table — the schema.org/Course template row.
 pub mod courses {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// A row in the `courses` table; maps to
     /// [`Course`](crate::models::course::Course). Collection fields are
@@ -166,7 +165,8 @@ pub mod courses {
 
 /// Entity for the `course_identifiers` table (external identifiers).
 pub mod course_identifiers {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// A row in `course_identifiers`; maps to
     /// [`CourseIdentifier`](crate::models::identifier::CourseIdentifier).
@@ -219,7 +219,8 @@ pub mod course_identifiers {
 
 /// Entity for the `course_links` table (typed course-to-course links).
 pub mod course_links {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// A row in `course_links`; maps to
     /// [`CourseLink`](crate::models::course::CourseLink).
@@ -264,7 +265,8 @@ pub mod course_links {
 
 /// Entity for the `course_instances` table (specific offerings).
 pub mod course_instances {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// A row in `course_instances`; maps to
     /// [`CourseInstance`](crate::models::course_instance::CourseInstance).
@@ -335,7 +337,8 @@ pub mod course_instances {
 
 /// Entity for the `syllabus_sections` table (course-outline tree).
 pub mod syllabus_sections {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// A row in `syllabus_sections`; maps to
     /// [`Syllabus`](crate::models::syllabus::Syllabus). `parent_id`
@@ -387,7 +390,8 @@ pub mod syllabus_sections {
 
 /// Entity for the `audit_log` table (HIPAA-style change trail).
 pub mod audit_log {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// A row in `audit_log`; projected to
     /// [`AuditEntry`](crate::db::audit::AuditEntry) for the API.
@@ -428,7 +432,8 @@ pub mod audit_log {
 
 /// Entity for the `course_match_scores` table (review-queue rows).
 pub mod course_match_scores {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// A row in `course_match_scores`; backs
     /// [`ReviewQueueItem`](crate::models::review_queue::ReviewQueueItem).
@@ -471,7 +476,8 @@ pub mod course_match_scores {
 
 /// Entity for the `course_merge_records` table (merge audit rows).
 pub mod course_merge_records {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// A row in `course_merge_records`; maps to
     /// [`MergeRecord`](crate::models::merge::MergeRecord).
@@ -510,7 +516,8 @@ pub mod course_merge_records {
 
 /// Tagged table for the Course aggregate's parallel string-list properties.
 pub mod course_text_values {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// One `(field, value)` row for a course string list.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -552,7 +559,8 @@ pub mod course_text_values {
 
 /// Educational / occupational credential awarded by a course.
 pub mod course_credentials {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// One credential row (`role` = educational|occupational).
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -600,7 +608,8 @@ pub mod course_credentials {
 
 /// Languages of instruction for a course instance.
 pub mod course_instance_languages {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// One language row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -640,7 +649,8 @@ pub mod course_instance_languages {
 
 /// Instructors (id and/or name) for a course instance.
 pub mod course_instance_instructors {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// One instructor row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -682,7 +692,8 @@ pub mod course_instance_instructors {
 
 /// Individual scheduled sessions for a course instance.
 pub mod course_instance_sessions {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// One session row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -726,7 +737,8 @@ pub mod course_instance_sessions {
 
 /// Tagged table for syllabus-section `teaches` / `resource` lists.
 pub mod course_syllabus_text_values {
-    use super::*;
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     /// One `(field, value)` row for a syllabus section.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]

@@ -33,6 +33,14 @@ pub struct Syllabus {
     #[serde(default)]
     pub resources: Vec<String>,
     /// Nested sub-sections.
+    ///
+    /// `#[schema(no_recursion)]` stops utoipa from inlining the
+    /// `Syllabus` schema into itself when building the `OpenAPI`
+    /// document; the field still emits a `$ref` to the registered
+    /// `Syllabus` component, so the wire/OpenAPI output is unchanged
+    /// while the otherwise-infinite recursion (stack overflow in
+    /// `ApiDoc::openapi()`) is broken.
     #[serde(default)]
+    #[schema(no_recursion)]
     pub sub_sections: Vec<Syllabus>,
 }

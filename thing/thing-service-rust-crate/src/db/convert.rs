@@ -1,7 +1,7 @@
 //! Date/time conversions across the persistence boundary.
 //!
-//! Domain models use `chrono` (`DateTime<Utc>`); the SeaORM entity models
-//! use the `time` crate (`OffsetDateTime`) because SeaORM 1.1 is configured
+//! Domain models use `chrono` (`DateTime<Utc>`); the `SeaORM` entity models
+//! use the `time` crate (`OffsetDateTime`) because `SeaORM` 1.1 is configured
 //! with `with-time`.
 
 use chrono::{DateTime, Utc};

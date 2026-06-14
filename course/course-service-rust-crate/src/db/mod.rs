@@ -35,6 +35,11 @@ use models::{
 };
 
 /// Open a connection pool from a `DatabaseConfig`.
+///
+/// # Errors
+///
+/// Returns [`enum@crate::Error`] if the pool cannot connect to the
+/// configured database URL.
 pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {
     let mut opt = sea_orm::ConnectOptions::new(&config.url);
     opt.max_connections(config.max_connections)
@@ -84,15 +89,16 @@ pub trait CourseRepository: Send + Sync {
     async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord>;
 }
 
-/// SeaORM-backed [`CourseRepository`] implementation over a PostgreSQL
+/// SeaORM-backed [`CourseRepository`] implementation over a `PostgreSQL`
 /// connection pool.
 pub struct SeaOrmCourseRepository {
-    /// The shared SeaORM connection pool.
+    /// The shared `SeaORM` connection pool.
     db: DatabaseConnection,
 }
 
 impl SeaOrmCourseRepository {
     /// Wrap an existing connection pool in a repository.
+    #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
@@ -103,13 +109,13 @@ impl CourseRepository for SeaOrmCourseRepository {
     async fn create(&self, course: &Course) -> Result<Course> {
         // One transaction so the parent row and every child collection
         // (identifiers, links, text-values, credentials) commit atomically.
-        let txn = self.db.begin().await.map_err(map_db)?;
+        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
         let active = to_course_active(course, false)?;
-        active.insert(&txn).await.map_err(map_db)?;
+        active.insert(&txn).await.map_err(|e| map_db(&e))?;
         insert_identifiers(&txn, course.id, &course.identifiers).await?;
         insert_links(&txn, course.id, &course.links).await?;
         insert_course_collections(&txn, course).await?;
-        txn.commit().await.map_err(map_db)?;
+        txn.commit().await.map_err(|e| map_db(&e))?;
         // Re-read through the normal hydrate path so the returned value
         // reflects exactly what was persisted (defaults, ordering, etc).
         self.get_by_id(&course.id)
@@ -121,7 +127,7 @@ impl CourseRepository for SeaOrmCourseRepository {
         let row = courses::Entity::find_by_id(*id)
             .one(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let Some(row) = row else { return Ok(None) };
         // Soft-deleted rows read as absent — callers never see them.
         if row.deleted_at.is_some() {
@@ -143,13 +149,13 @@ impl CourseRepository for SeaOrmCourseRepository {
         let exists = courses::Entity::find_by_id(course.id)
             .one(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         if exists.is_none() {
             return Err(crate::Error::NotFound);
         }
-        let txn = self.db.begin().await.map_err(map_db)?;
+        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
         let active = to_course_active(course, true)?;
-        active.update(&txn).await.map_err(map_db)?;
+        active.update(&txn).await.map_err(|e| map_db(&e))?;
         // Child collections are replace-not-merge: delete the existing
         // rows then re-insert from the incoming course, so the persisted
         // state mirrors the request body exactly (PUT semantics).
@@ -157,17 +163,17 @@ impl CourseRepository for SeaOrmCourseRepository {
             .filter(course_identifiers::Column::CourseId.eq(course.id))
             .exec(&txn)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         course_links::Entity::delete_many()
             .filter(course_links::Column::CourseId.eq(course.id))
             .exec(&txn)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         delete_course_collections(&txn, course.id).await?;
         insert_identifiers(&txn, course.id, &course.identifiers).await?;
         insert_links(&txn, course.id, &course.links).await?;
         insert_course_collections(&txn, course).await?;
-        txn.commit().await.map_err(map_db)?;
+        txn.commit().await.map_err(|e| map_db(&e))?;
         self.get_by_id(&course.id)
             .await?
             .ok_or(crate::Error::NotFound)
@@ -177,7 +183,7 @@ impl CourseRepository for SeaOrmCourseRepository {
         let row = courses::Entity::find_by_id(*id)
             .one(&self.db)
             .await
-            .map_err(map_db)?
+            .map_err(|e| map_db(&e))?
             .ok_or(crate::Error::NotFound)?;
         // Soft delete: flip `active` off and stamp `deleted_at` rather
         // than removing the row, preserving it for the audit trail.
@@ -185,7 +191,7 @@ impl CourseRepository for SeaOrmCourseRepository {
         active.active = Set(false);
         active.deleted_at = Set(Some(OffsetDateTime::now_utc()));
         active.updated_at = Set(OffsetDateTime::now_utc());
-        active.update(&self.db).await.map_err(map_db)?;
+        active.update(&self.db).await.map_err(|e| map_db(&e))?;
         Ok(())
     }
 
@@ -197,7 +203,7 @@ impl CourseRepository for SeaOrmCourseRepository {
             .offset(offset)
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
             let id = row.id;
@@ -223,14 +229,14 @@ impl CourseRepository for SeaOrmCourseRepository {
             .filter(course_instances::Column::DeletedAt.is_null())
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
             out.push(hydrate_instance(&self.db, row).await?);
         }
         // FR-10 — `schedule.start_date DESC NULLS LAST`. Sort in-memory
         // after hydration.
-        out.sort_by(|a, b| schedule_start(b).cmp(&schedule_start(a)));
+        out.sort_by_key(|b| std::cmp::Reverse(schedule_start(b)));
         Ok(out)
     }
 
@@ -243,7 +249,7 @@ impl CourseRepository for SeaOrmCourseRepository {
             .filter(course_instances::Column::CourseId.eq(*course_id))
             .one(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let Some(row) = row else { return Ok(None) };
         if row.deleted_at.is_some() {
             return Ok(None);
@@ -252,13 +258,13 @@ impl CourseRepository for SeaOrmCourseRepository {
     }
 
     async fn create_instance(&self, instance: &CourseInstance) -> Result<CourseInstance> {
-        let txn = self.db.begin().await.map_err(map_db)?;
+        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
         to_instance_active(instance, false)?
             .insert(&txn)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         insert_instance_collections(&txn, instance).await?;
-        txn.commit().await.map_err(map_db)?;
+        txn.commit().await.map_err(|e| map_db(&e))?;
         self.get_instance(&instance.course_id, &instance.id)
             .await?
             .ok_or_else(|| crate::Error::Database("instance not found after insert".into()))
@@ -269,21 +275,21 @@ impl CourseRepository for SeaOrmCourseRepository {
             .filter(course_instances::Column::CourseId.eq(instance.course_id))
             .one(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let Some(row) = exists else {
             return Err(crate::Error::NotFound);
         };
         if row.deleted_at.is_some() {
             return Err(crate::Error::NotFound);
         }
-        let txn = self.db.begin().await.map_err(map_db)?;
+        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
         to_instance_active(instance, true)?
             .update(&txn)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         delete_instance_collections(&txn, instance.id).await?;
         insert_instance_collections(&txn, instance).await?;
-        txn.commit().await.map_err(map_db)?;
+        txn.commit().await.map_err(|e| map_db(&e))?;
         self.get_instance(&instance.course_id, &instance.id)
             .await?
             .ok_or(crate::Error::NotFound)
@@ -294,7 +300,7 @@ impl CourseRepository for SeaOrmCourseRepository {
             .filter(course_instances::Column::CourseId.eq(*course_id))
             .one(&self.db)
             .await
-            .map_err(map_db)?
+            .map_err(|e| map_db(&e))?
             .ok_or(crate::Error::NotFound)?;
         if row.deleted_at.is_some() {
             return Err(crate::Error::NotFound);
@@ -302,7 +308,7 @@ impl CourseRepository for SeaOrmCourseRepository {
         let mut active: course_instances::ActiveModel = row.into();
         active.deleted_at = Set(Some(OffsetDateTime::now_utc()));
         active.updated_at = Set(OffsetDateTime::now_utc());
-        active.update(&self.db).await.map_err(map_db)?;
+        active.update(&self.db).await.map_err(|e| map_db(&e))?;
         Ok(())
     }
 
@@ -318,7 +324,7 @@ impl CourseRepository for SeaOrmCourseRepository {
             transferred_data: Set(rec.transferred_data.clone()),
             merged_at: Set(ts_to_offset(rec.merged_at)),
         };
-        active.insert(&self.db).await.map_err(map_db)?;
+        active.insert(&self.db).await.map_err(|e| map_db(&e))?;
         Ok(rec.clone())
     }
 }
@@ -330,7 +336,7 @@ fn schedule_start(i: &CourseInstance) -> Option<chrono::DateTime<chrono::Utc>> {
 
 // ────────────────── Domain ↔ DB conversion ──────────────────
 
-/// Build a `courses` SeaORM `ActiveModel` from a domain [`Course`],
+/// Build a `courses` `SeaORM` `ActiveModel` from a domain [`Course`],
 /// serialising collection fields to JSONB. On update, `updated_at` is
 /// stamped to now; on insert the model's own timestamp is kept.
 fn to_course_active(course: &Course, is_update: bool) -> Result<courses::ActiveModel> {
@@ -365,8 +371,12 @@ fn to_course_active(course: &Course, is_update: bool) -> Result<courses::ActiveM
             .map(enum_to_string)
             .transpose()?),
         course_code: Set(course.course_code.clone()),
-        number_of_credits: Set(course.number_of_credits.map(|v| v as i32)),
-        total_historical_enrollment: Set(course.total_historical_enrollment.map(|v| v as i64)),
+        number_of_credits: Set(course
+            .number_of_credits
+            .map(|v| i32::try_from(v).unwrap_or(i32::MAX))),
+        total_historical_enrollment: Set(course
+            .total_historical_enrollment
+            .map(|v| i64::try_from(v).unwrap_or(i64::MAX))),
         status: Set(enum_to_string(&course.status)?),
         active: Set(course.active),
         provider_id: Set(course.provider_id),
@@ -411,11 +421,11 @@ async fn insert_course_collections<C: sea_orm::ConnectionTrait>(
                 course_id: Set(course.id),
                 field: Set(field.to_string()),
                 value: Set(value.clone()),
-                position: Set(i as i32),
+                position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
             }
             .insert(conn)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         }
     }
     if let Some(cred) = &course.educational_credential_awarded {
@@ -446,7 +456,7 @@ async fn insert_credential<C: sea_orm::ConnectionTrait>(
     }
     .insert(conn)
     .await
-    .map_err(map_db)?;
+    .map_err(|e| map_db(&e))?;
     Ok(())
 }
 
@@ -459,12 +469,12 @@ async fn delete_course_collections<C: sea_orm::ConnectionTrait>(
         .filter(course_text_values::Column::CourseId.eq(course_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     course_credentials::Entity::delete_many()
         .filter(course_credentials::Column::CourseId.eq(course_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     Ok(())
 }
 
@@ -481,12 +491,12 @@ async fn load_course_collections(
         .order_by_asc(course_text_values::Column::Position)
         .all(db)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     let credentials = course_credentials::Entity::find()
         .filter(course_credentials::Column::CourseId.eq(course_id))
         .all(db)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     Ok((text_values, credentials))
 }
 
@@ -569,13 +579,15 @@ fn hydrate_course(
             .map(enum_from_string::<InteractivityType>)
             .transpose()?,
         course_code: row.course_code,
-        number_of_credits: row.number_of_credits.map(|v| v as u32),
+        number_of_credits: row.number_of_credits.map(|v| u32::try_from(v).unwrap_or(0)),
         course_prerequisites: texts(text_values, "course_prerequisite"),
         available_language: texts(text_values, "available_language"),
         financial_aid_eligible: texts(text_values, "financial_aid_eligible"),
         educational_credential_awarded: credential_of(credentials, "educational")?,
         occupational_credential_awarded: credential_of(credentials, "occupational")?,
-        total_historical_enrollment: row.total_historical_enrollment.map(|v| v as u64),
+        total_historical_enrollment: row
+            .total_historical_enrollment
+            .map(|v| u64::try_from(v).unwrap_or(0)),
         syllabus_sections: vec![],
         instances: vec![],
         status: enum_from_string::<CourseStatus>(&row.status)?,
@@ -605,8 +617,12 @@ fn to_instance_active(
         status: Set(enum_to_string(&i.status)?),
         location: Set(i.location.clone()),
         location_id: Set(i.location_id),
-        maximum_attendee_capacity: Set(i.maximum_attendee_capacity.map(|v| v as i32)),
-        enrolled_count: Set(i.enrolled_count.map(|v| v as i32)),
+        maximum_attendee_capacity: Set(i
+            .maximum_attendee_capacity
+            .map(|v| i32::try_from(v).unwrap_or(i32::MAX))),
+        enrolled_count: Set(i
+            .enrolled_count
+            .map(|v| i32::try_from(v).unwrap_or(i32::MAX))),
         enrollment_opens: Set(i.enrollment_opens.map(ts_to_offset)),
         enrollment_closes: Set(i.enrollment_closes.map(ts_to_offset)),
         schedule_start_date: Set(sched.and_then(|s| s.start_date).map(ts_to_offset)),
@@ -634,11 +650,11 @@ async fn insert_instance_collections<C: sea_orm::ConnectionTrait>(
             id: Set(Uuid::new_v4()),
             instance_id: Set(i.id),
             language: Set(lang.clone()),
-            position: Set(idx as i32),
+            position: Set(i32::try_from(idx).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     }
     // Instructor ids and names are parallel lists in the domain model; emit
     // one row per position, carrying whichever of (id, name) is present.
@@ -649,11 +665,11 @@ async fn insert_instance_collections<C: sea_orm::ConnectionTrait>(
             instance_id: Set(i.id),
             instructor_id: Set(i.instructor_ids.get(idx).copied()),
             instructor_name: Set(i.instructor_names.get(idx).cloned()),
-            position: Set(idx as i32),
+            position: Set(i32::try_from(idx).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     }
     if let Some(s) = &i.schedule {
         for (idx, session) in s.sessions.iter().enumerate() {
@@ -663,11 +679,11 @@ async fn insert_instance_collections<C: sea_orm::ConnectionTrait>(
                 start_at: Set(ts_to_offset(session.start)),
                 end_at: Set(session.end.map(ts_to_offset)),
                 label: Set(session.label.clone()),
-                position: Set(idx as i32),
+                position: Set(i32::try_from(idx).unwrap_or(i32::MAX)),
             }
             .insert(conn)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         }
     }
     Ok(())
@@ -682,17 +698,17 @@ async fn delete_instance_collections<C: sea_orm::ConnectionTrait>(
         .filter(course_instance_languages::Column::InstanceId.eq(instance_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     course_instance_instructors::Entity::delete_many()
         .filter(course_instance_instructors::Column::InstanceId.eq(instance_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     course_instance_sessions::Entity::delete_many()
         .filter(course_instance_sessions::Column::InstanceId.eq(instance_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     Ok(())
 }
 
@@ -709,7 +725,7 @@ async fn hydrate_instance(
         .order_by_asc(course_instance_languages::Column::Position)
         .all(db)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     let in_language = lang_rows.into_iter().map(|r| r.language).collect();
 
     let inst_rows = course_instance_instructors::Entity::find()
@@ -717,7 +733,7 @@ async fn hydrate_instance(
         .order_by_asc(course_instance_instructors::Column::Position)
         .all(db)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     let instructor_ids = inst_rows.iter().filter_map(|r| r.instructor_id).collect();
     let instructor_names = inst_rows
         .into_iter()
@@ -729,7 +745,7 @@ async fn hydrate_instance(
         .order_by_asc(course_instance_sessions::Column::Position)
         .all(db)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     let sessions: Vec<crate::models::course_instance::Session> = session_rows
         .into_iter()
         .map(|s| crate::models::course_instance::Session {
@@ -767,8 +783,10 @@ async fn hydrate_instance(
         location_id: row.location_id,
         instructor_ids,
         instructor_names,
-        maximum_attendee_capacity: row.maximum_attendee_capacity.map(|v| v as u32),
-        enrolled_count: row.enrolled_count.map(|v| v as u32),
+        maximum_attendee_capacity: row
+            .maximum_attendee_capacity
+            .map(|v| u32::try_from(v).unwrap_or(0)),
+        enrolled_count: row.enrolled_count.map(|v| u32::try_from(v).unwrap_or(0)),
         enrollment_opens: row.enrollment_opens.map(offset_to_ts),
         enrollment_closes: row.enrollment_closes.map(offset_to_ts),
         schedule,
@@ -800,10 +818,10 @@ where
             value: Set(ident.value.clone()),
             name: Set(ident.name.clone()),
             url: Set(ident.url.clone()),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
             created_at: Set(OffsetDateTime::now_utc()),
         };
-        row.insert(conn).await.map_err(map_db)?;
+        row.insert(conn).await.map_err(|e| map_db(&e))?;
     }
     Ok(())
 }
@@ -841,7 +859,7 @@ where
             link_type: Set(enum_to_string(&link.link_type)?),
             created_at: Set(OffsetDateTime::now_utc()),
         };
-        row.insert(conn).await.map_err(map_db)?;
+        row.insert(conn).await.map_err(|e| map_db(&e))?;
     }
     Ok(())
 }
@@ -856,7 +874,7 @@ async fn load_identifiers(
         .order_by_asc(course_identifiers::Column::Position)
         .all(db)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     rows.into_iter()
         .map(|r| {
             Ok(CourseIdentifier {
@@ -875,7 +893,7 @@ async fn load_links(db: &DatabaseConnection, course_id: Uuid) -> Result<Vec<Cour
         .filter(course_links::Column::CourseId.eq(course_id))
         .all(db)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     rows.into_iter()
         .map(|r| {
             Ok(CourseLink {
@@ -888,8 +906,8 @@ async fn load_links(db: &DatabaseConnection, course_id: Uuid) -> Result<Vec<Cour
 
 // ────────────────── Helpers ──────────────────
 
-/// Map a SeaORM error into the crate's [`Error::Database`](crate::Error).
-fn map_db(e: sea_orm::DbErr) -> crate::Error {
+/// Map a `SeaORM` error into the crate's [`Error::Database`](crate::Error).
+fn map_db(e: &sea_orm::DbErr) -> crate::Error {
     crate::Error::Database(e.to_string())
 }
 
@@ -898,7 +916,7 @@ fn map_db(e: sea_orm::DbErr) -> crate::Error {
 fn enum_to_string<T: Serialize>(v: &T) -> Result<String> {
     let json = serde_json::to_value(v).map_err(|e| crate::Error::Database(e.to_string()))?;
     json.as_str()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| crate::Error::Database("enum did not serialise to a string".into()))
 }
 
@@ -945,7 +963,7 @@ mod tests {
         }
     }
 
-    /// `to_course_active` copies scalar fields onto the ActiveModel.
+    /// `to_course_active` copies scalar fields onto the `ActiveModel`.
     #[test]
     fn course_active_model_carries_all_scalar_fields() {
         let mut course = Course::new("Intro to CS");

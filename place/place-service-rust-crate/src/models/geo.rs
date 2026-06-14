@@ -77,6 +77,7 @@ impl GeoCoordinates {
     /// assert_eq!(p.latitude, 40.7829);
     /// assert!(p.elevation.is_none());
     /// ```
+    #[must_use]
     pub fn new(latitude: f64, longitude: f64) -> Self {
         Self {
             latitude,
@@ -112,6 +113,7 @@ impl GeoCoordinates {
     /// // Distance from a point to itself is zero.
     /// assert!(a.distance_to(&a).abs() < 0.01);
     /// ```
+    #[must_use]
     pub fn distance_to(&self, other: &GeoCoordinates) -> f64 {
         // Mean Earth radius in meters; the Haversine formula assumes a sphere.
         const EARTH_RADIUS_M: f64 = 6_371_000.0;

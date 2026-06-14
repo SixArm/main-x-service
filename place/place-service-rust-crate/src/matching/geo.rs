@@ -39,6 +39,7 @@ use crate::models::geo::GeoCoordinates;
 /// let london = GeoCoordinates::new(51.5074, -0.1278);
 /// assert!(geo_similarity(&nyc, &london) < 0.001);
 /// ```
+#[must_use]
 pub fn geo_similarity(a: &GeoCoordinates, b: &GeoCoordinates) -> f64 {
     geo_similarity_with_reference(a, b, 1.0)
 }
@@ -63,6 +64,7 @@ pub fn geo_similarity(a: &GeoCoordinates, b: &GeoCoordinates) -> f64 {
 /// let loose = geo_similarity_with_reference(&a, &b, 10.0);
 /// assert!(loose > tight);
 /// ```
+#[must_use]
 pub fn geo_similarity_with_reference(
     a: &GeoCoordinates,
     b: &GeoCoordinates,
@@ -89,6 +91,7 @@ pub fn geo_similarity_with_reference(
 /// assert!(within_radius(&a, &b, 100.0));
 /// assert!(!within_radius(&a, &b, 0.1));
 /// ```
+#[must_use]
 pub fn within_radius(a: &GeoCoordinates, b: &GeoCoordinates, radius_m: f64) -> bool {
     a.distance_to(b) <= radius_m
 }

@@ -32,6 +32,7 @@ use strsim::jaro_winkler;
 /// assert_eq!(name_similarity("", ""), 1.0);           // both empty
 /// assert_eq!(name_similarity("", "Linux"), 0.0);      // one empty
 /// ```
+#[must_use]
 pub fn name_similarity(a: &str, b: &str) -> f64 {
     // Two absent names are treated as a perfect match (nothing to disagree
     // on); one absent name is a definite mismatch.

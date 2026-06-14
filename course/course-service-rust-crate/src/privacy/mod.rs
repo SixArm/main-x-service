@@ -20,6 +20,7 @@ use crate::models::Course;
 
 /// Return a masked copy of the course for FR-16. The original is left
 /// unchanged.
+#[must_use]
 pub fn mask_course(c: &Course) -> Course {
     let mut out = c.clone();
     out.provider_id = None;
@@ -55,6 +56,7 @@ pub struct CourseExport<'a> {
 /// Serialise an FR-15 export envelope wrapping `c` to JSON. Falls back
 /// to `Value::Null` only if serialisation somehow fails (it cannot for
 /// this always-serialisable shape).
+#[must_use]
 pub fn export_course(c: &Course) -> Value {
     let envelope = CourseExport {
         exported_at: Utc::now(),
@@ -95,7 +97,7 @@ mod tests {
         }
     }
 
-    /// Masking clears provider_id and instructor refs/names.
+    /// Masking clears `provider_id` and instructor refs/names.
     #[test]
     fn masking_clears_provider_and_instructor_refs() {
         let mut c = Course::new("Intro to CS");

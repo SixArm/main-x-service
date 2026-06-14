@@ -9,7 +9,7 @@ use thing_service::models::thing::Thing;
 /// Benchmark constructing a single `Thing`.
 fn bench_thing_construction(c: &mut Criterion) {
     c.bench_function("thing_construction", |b| {
-        b.iter(|| Thing::new(black_box("Test Thing")))
+        b.iter(|| Thing::new(black_box("Test Thing")));
     });
 }
 
@@ -21,7 +21,7 @@ fn bench_thing_batch_construction(c: &mut Criterion) {
                 .map(|i| Thing::new(&format!("Thing {i}")))
                 .collect();
             black_box(things);
-        })
+        });
     });
 }
 

@@ -71,17 +71,22 @@ pub struct AuditContext {
 
 /// Repository for writing and querying the `audit_log` table.
 pub struct AuditLogRepository {
-    /// Shared SeaORM connection pool.
+    /// Shared `SeaORM` connection pool.
     db: DatabaseConnection,
 }
 
 impl AuditLogRepository {
     /// Wrap an existing connection pool.
+    #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
 
     /// Record a `CREATE` with only post-change values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`enum@crate::Error`] if the audit-log row cannot be inserted.
     pub async fn log_create(
         &self,
         entity_type: &str,
@@ -101,6 +106,10 @@ impl AuditLogRepository {
     }
 
     /// Record an `UPDATE` with both pre- and post-change values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`enum@crate::Error`] if the audit-log row cannot be inserted.
     pub async fn log_update(
         &self,
         entity_type: &str,
@@ -121,6 +130,10 @@ impl AuditLogRepository {
     }
 
     /// Record a `DELETE` with only pre-change values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`enum@crate::Error`] if the audit-log row cannot be inserted.
     pub async fn log_delete(
         &self,
         entity_type: &str,
@@ -169,6 +182,10 @@ impl AuditLogRepository {
 
     /// FR-14 — entries for a Course (or any of its child entities
     /// whose `entity_id` was set to the course id), newest first.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`enum@crate::Error`] if the query fails.
     pub async fn list_for_entity(&self, entity_id: Uuid, limit: u64) -> Result<Vec<AuditEntry>> {
         let rows = audit_log::Entity::find()
             .filter(audit_log::Column::EntityId.eq(entity_id))
@@ -181,6 +198,10 @@ impl AuditLogRepository {
     }
 
     /// `GET /api/audit/recent` — system-wide tail, newest first.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`enum@crate::Error`] if the query fails.
     pub async fn list_recent(&self, limit: u64) -> Result<Vec<AuditEntry>> {
         let rows = audit_log::Entity::find()
             .order_by_desc(audit_log::Column::CreatedAt)

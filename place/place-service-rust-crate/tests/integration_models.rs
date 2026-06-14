@@ -131,11 +131,14 @@ fn test_geo_distance_triangle_inequality() {
     let chicago = GeoCoordinates::new(41.8781, -87.6298);
     let lax = GeoCoordinates::new(33.9425, -118.4081);
 
-    let d_nc = nyc.distance_to(&chicago);
-    let d_cl = chicago.distance_to(&lax);
-    let d_nl = nyc.distance_to(&lax);
+    let dist_nyc_chicago = nyc.distance_to(&chicago);
+    let dist_chicago_lax = chicago.distance_to(&lax);
+    let dist_nyc_lax = nyc.distance_to(&lax);
 
-    assert!(d_nl <= d_nc + d_cl + 1.0, "Triangle inequality violated");
+    assert!(
+        dist_nyc_lax <= dist_nyc_chicago + dist_chicago_lax + 1.0,
+        "Triangle inequality violated"
+    );
 }
 
 // -- Identifier integration tests --

@@ -41,6 +41,7 @@
 /// assert_eq!(url_similarity("https://EXAMPLE.com", "https://example.com"), 1.0);
 /// assert_eq!(url_similarity("", "https://example.com"), 0.0);
 /// ```
+#[must_use]
 pub fn url_similarity(a: &str, b: &str) -> f64 {
     let a_n = normalize(a);
     let b_n = normalize(b);
@@ -82,6 +83,7 @@ pub fn url_similarity(a: &str, b: &str) -> f64 {
 /// ];
 /// assert_eq!(url_list_similarity(&a, &b), 1.0);
 /// ```
+#[must_use]
 pub fn url_list_similarity(a: &[String], b: &[String]) -> f64 {
     let mut best = 0.0_f64;
     // O(n*m) scan; the lists are small (a handful of authoritative URLs).
@@ -125,37 +127,29 @@ mod tests {
     /// Byte-identical URLs score 1.0.
     #[test]
     fn test_identical() {
-        assert_eq!(
-            url_similarity("https://example.com", "https://example.com"),
-            1.0
-        );
+        let s = url_similarity("https://example.com", "https://example.com");
+        assert!((s - 1.0).abs() < f64::EPSILON);
     }
 
     /// `http` vs `https` normalizes to the same URL.
     #[test]
     fn test_scheme_insensitive() {
-        assert_eq!(
-            url_similarity("http://example.com", "https://example.com"),
-            1.0
-        );
+        let s = url_similarity("http://example.com", "https://example.com");
+        assert!((s - 1.0).abs() < f64::EPSILON);
     }
 
     /// A trailing slash is stripped during normalization.
     #[test]
     fn test_trailing_slash_normalized() {
-        assert_eq!(
-            url_similarity("https://example.com/", "https://example.com"),
-            1.0
-        );
+        let s = url_similarity("https://example.com/", "https://example.com");
+        assert!((s - 1.0).abs() < f64::EPSILON);
     }
 
     /// Host case is folded away.
     #[test]
     fn test_case_insensitive() {
-        assert_eq!(
-            url_similarity("https://EXAMPLE.com", "https://example.com"),
-            1.0
-        );
+        let s = url_similarity("https://EXAMPLE.com", "https://example.com");
+        assert!((s - 1.0).abs() < f64::EPSILON);
     }
 
     /// Same host with different paths scores 0.75.
@@ -169,14 +163,14 @@ mod tests {
     #[test]
     fn test_different_host() {
         let s = url_similarity("https://example.com", "https://other.com");
-        assert_eq!(s, 0.0);
+        assert!(s.abs() < f64::EPSILON);
     }
 
     /// An empty URL on either side scores 0.0.
     #[test]
     fn test_empty() {
-        assert_eq!(url_similarity("", "https://example.com"), 0.0);
-        assert_eq!(url_similarity("", ""), 0.0);
+        assert!(url_similarity("", "https://example.com").abs() < f64::EPSILON);
+        assert!(url_similarity("", "").abs() < f64::EPSILON);
     }
 
     /// List similarity returns the best-matching pair's score.
@@ -187,7 +181,7 @@ mod tests {
             "https://www.wikidata.org/wiki/Q170583".to_string(),
             "https://en.wikipedia.org/wiki/Pride_and_Prejudice".to_string(),
         ];
-        assert_eq!(url_list_similarity(&a, &b), 1.0);
+        assert!((url_list_similarity(&a, &b) - 1.0).abs() < f64::EPSILON);
     }
 
     /// An empty list yields 0.0.
@@ -195,6 +189,6 @@ mod tests {
     fn test_list_empty() {
         let a: Vec<String> = vec![];
         let b = vec!["https://example.com".to_string()];
-        assert_eq!(url_list_similarity(&a, &b), 0.0);
+        assert!(url_list_similarity(&a, &b).abs() < f64::EPSILON);
     }
 }

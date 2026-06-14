@@ -35,6 +35,7 @@ pub struct PlaceIndexSchema {
 
 impl PlaceIndexSchema {
     /// Build the schema, registering every field with its index options.
+    #[must_use]
     pub fn new() -> Self {
         let mut b = Schema::builder();
         let id = b.add_text_field("id", STRING | STORED);
@@ -76,6 +77,10 @@ pub struct PlaceIndex {
 
 impl PlaceIndex {
     /// Create a brand-new index in an empty directory at `path`.
+    ///
+    /// # Errors
+    /// Returns [`crate::Error::Search`] if the index or its reader cannot
+    /// be created at `path`.
     pub fn create<P: AsRef<Path>>(path: P) -> Result<Self> {
         let schema = PlaceIndexSchema::new();
         let index = Index::create_in_dir(path, schema.schema.clone())
@@ -93,6 +98,10 @@ impl PlaceIndex {
     }
 
     /// Open an existing index previously created at `path`.
+    ///
+    /// # Errors
+    /// Returns [`crate::Error::Search`] if the index or its reader cannot
+    /// be opened at `path`.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let schema = PlaceIndexSchema::new();
         let index = Index::open_in_dir(path)
@@ -110,6 +119,10 @@ impl PlaceIndex {
     }
 
     /// Open the index if a `meta.json` already exists, otherwise create.
+    ///
+    /// # Errors
+    /// Returns [`crate::Error::Search`] if the underlying open or create
+    /// operation fails.
     pub fn create_or_open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let p = path.as_ref();
         if p.join("meta.json").exists() {
@@ -120,6 +133,9 @@ impl PlaceIndex {
     }
 
     /// Acquire a writer with a `heap_mb`-megabyte budget.
+    ///
+    /// # Errors
+    /// Returns [`crate::Error::Search`] if Tantivy cannot allocate the writer.
     pub fn writer(&self, heap_mb: usize) -> Result<IndexWriter> {
         self.index
             .writer(heap_mb * 1_000_000)
@@ -127,19 +143,25 @@ impl PlaceIndex {
     }
 
     /// Borrow the underlying Tantivy index (for query-parser setup).
+    #[must_use]
     pub fn index(&self) -> &Index {
         &self.index
     }
     /// Borrow the schema + field handles.
+    #[must_use]
     pub fn schema(&self) -> &PlaceIndexSchema {
         &self.schema
     }
     /// Borrow the live reader.
+    #[must_use]
     pub fn reader(&self) -> &IndexReader {
         &self.reader
     }
 
     /// Force the reader to pick up the latest committed segments.
+    ///
+    /// # Errors
+    /// Returns [`crate::Error::Search`] if the reader reload fails.
     pub fn reload(&self) -> Result<()> {
         self.reader
             .reload()
@@ -147,10 +169,14 @@ impl PlaceIndex {
     }
 
     /// Document and segment counts for the current searcher.
+    ///
+    /// # Errors
+    /// Currently infallible, but returns `Result` to mirror the other
+    /// index operations and allow future fallible implementations.
     pub fn stats(&self) -> Result<IndexStats> {
         let searcher = self.reader.searcher();
         Ok(IndexStats {
-            num_docs: searcher.num_docs() as usize,
+            num_docs: usize::try_from(searcher.num_docs()).unwrap_or(usize::MAX),
             num_segments: searcher.segment_readers().len(),
         })
     }

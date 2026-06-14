@@ -99,7 +99,7 @@ fn test_multiple_identifier_types() {
     );
 }
 
-/// An identifier's optional PropertyValue `name`/`url` survive serialization.
+/// An identifier's optional `PropertyValue` `name`/`url` survive serialization.
 #[test]
 fn test_identifier_with_property_value_fields() {
     let mut id = ThingIdentifier::isbn("9780141439518");
@@ -132,7 +132,7 @@ fn test_consent_lifecycle() {
     assert!(!consent.is_active());
 }
 
-/// Every ConsentType variant round-trips through JSON.
+/// Every `ConsentType` variant round-trips through JSON.
 #[test]
 fn test_consent_all_types_serialization() {
     let types = [

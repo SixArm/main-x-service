@@ -12,7 +12,7 @@ use thing_service::validation::{normalize_thing, validate_thing};
 fn bench_validate_simple(c: &mut Criterion) {
     let thing = Thing::new("Simple Thing");
     c.bench_function("validate_simple_thing", |b| {
-        b.iter(|| validate_thing(black_box(&thing)))
+        b.iter(|| validate_thing(black_box(&thing)));
     });
 }
 
@@ -29,7 +29,7 @@ fn bench_validate_full(c: &mut Criterion) {
     thing.same_as = vec!["https://www.wikidata.org/wiki/Q170583".into()];
 
     c.bench_function("validate_full_thing", |b| {
-        b.iter(|| validate_thing(black_box(&thing)))
+        b.iter(|| validate_thing(black_box(&thing)));
     });
 }
 
@@ -46,7 +46,7 @@ fn bench_normalize(c: &mut Criterion) {
             },
             |mut thing| normalize_thing(black_box(&mut thing)),
             criterion::BatchSize::SmallInput,
-        )
+        );
     });
 }
 

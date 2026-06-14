@@ -34,9 +34,9 @@ async fn send(
     uri: &str,
     body: Option<Value>,
 ) -> (StatusCode, Value) {
-    let req_body = body
-        .map(|v| Body::from(serde_json::to_vec(&v).unwrap()))
-        .unwrap_or(Body::empty());
+    let req_body = body.map_or(Body::empty(), |v| {
+        Body::from(serde_json::to_vec(&v).unwrap())
+    });
     let mut builder = Request::builder().method(method).uri(uri);
     if !uri.is_empty() {
         builder = builder.header("content-type", "application/json");
@@ -57,7 +57,7 @@ async fn send(
 
 /// Health probe returns `200` with the `healthy` envelope.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn health_returns_ok() {
     let app = common::create_test_router().await;
     let (status, body) = send(&app, Method::GET, "/api/health", None).await;
@@ -69,7 +69,7 @@ async fn health_returns_ok() {
 
 /// Full CRUD lifecycle: create → get → update → soft-delete → 404.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn create_get_update_softdelete_lifecycle() {
     let app = common::create_test_router().await;
     let body = common::course_json("Lifecycle");
@@ -115,7 +115,7 @@ async fn create_get_update_softdelete_lifecycle() {
 
 /// Invalid create body yields `422` with a field-scoped `details` array.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn validation_failure_returns_422_with_details() {
     let app = common::create_test_router().await;
     let bad = json!({
@@ -143,7 +143,7 @@ async fn validation_failure_returns_422_with_details() {
 
 /// A freshly created course is discoverable via the search endpoint.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn search_finds_created_record() {
     let app = common::create_test_router().await;
     let body = common::course_json("Search");
@@ -163,7 +163,7 @@ async fn search_finds_created_record() {
 
 /// The check-duplicates endpoint flags an identical-shape probe.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn check_duplicates_flags_a_clone() {
     let app = common::create_test_router().await;
     let body = common::course_json("DupCheck");
@@ -189,7 +189,7 @@ async fn check_duplicates_flags_a_clone() {
 
 /// The match endpoint returns the existing record among ranked candidates.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn match_endpoint_returns_ranked_candidates() {
     let app = common::create_test_router().await;
     let body = common::course_json("Match");
@@ -209,7 +209,7 @@ async fn match_endpoint_returns_ranked_candidates() {
 
 /// Merge completes and soft-deletes the duplicate (subsequent GET → 404).
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn merge_folds_duplicate_into_main() {
     let app = common::create_test_router().await;
     let body_a = common::course_json("MergeMain");
@@ -246,7 +246,7 @@ async fn merge_folds_duplicate_into_main() {
 
 /// Batch dedup returns the full counter + review-items response shape.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn batch_dedup_returns_response_shape() {
     let app = common::create_test_router().await;
     let req = json!({
@@ -264,9 +264,9 @@ async fn batch_dedup_returns_response_shape() {
     assert!(data["review_items"].is_array());
 }
 
-/// CourseInstance sub-resource: create → list → soft-delete round trip.
+/// `CourseInstance` sub-resource: create → list → soft-delete round trip.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn instance_subresource_round_trips() {
     let app = common::create_test_router().await;
     let course_body = common::course_json("InstanceParent");
@@ -316,7 +316,7 @@ async fn instance_subresource_round_trips() {
 
 /// Create + update produce `CREATE` and `UPDATE` audit-log entries.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn audit_log_records_create_then_update() {
     let app = common::create_test_router().await;
     let body = common::course_json("Audit");
@@ -354,7 +354,7 @@ async fn audit_log_records_create_then_update() {
 
 /// The masked view nulls out provider (and other sensitive) fields.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn masked_view_clears_provider_and_instructors() {
     let app = common::create_test_router().await;
     let body = common::course_json("Masked");
@@ -375,7 +375,7 @@ async fn masked_view_clears_provider_and_instructors() {
 
 /// The GDPR export wraps the record in the source/schema envelope.
 #[tokio::test]
-#[ignore]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn gdpr_export_envelopes_the_record() {
     let app = common::create_test_router().await;
     let body = common::course_json("Export");

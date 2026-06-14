@@ -185,7 +185,7 @@ fn test_batch_matching_multiple_candidates() {
     assert!(results[1].score > results[2].score);
 }
 
-/// A shared `same_as` URL contributes a perfect same_as component score.
+/// A shared `same_as` URL contributes a perfect `same_as` component score.
 #[test]
 fn test_same_as_url_contributes() {
     let mut a = Thing::new("Linux");

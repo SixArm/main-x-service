@@ -59,6 +59,7 @@ impl OpeningHoursSpecification {
     /// let oh = OpeningHoursSpecification::new(DayOfWeek::Friday, "08:00", "22:00");
     /// assert_eq!(oh.closes, "22:00");
     /// ```
+    #[must_use]
     pub fn new(day: DayOfWeek, opens: &str, closes: &str) -> Self {
         Self {
             day_of_week: day,

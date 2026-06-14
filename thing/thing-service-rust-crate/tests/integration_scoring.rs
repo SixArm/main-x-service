@@ -70,19 +70,15 @@ fn test_description_similarity_different() {
 /// Identical URLs score 1.0.
 #[test]
 fn test_url_similarity_identical() {
-    assert_eq!(
-        url_similarity("https://example.com", "https://example.com"),
-        1.0
-    );
+    let s = url_similarity("https://example.com", "https://example.com");
+    assert!((s - 1.0).abs() < f64::EPSILON);
 }
 
 /// http vs https normalizes to a perfect URL match.
 #[test]
 fn test_url_similarity_scheme_insensitive() {
-    assert_eq!(
-        url_similarity("http://example.com", "https://example.com"),
-        1.0
-    );
+    let s = url_similarity("http://example.com", "https://example.com");
+    assert!((s - 1.0).abs() < f64::EPSILON);
 }
 
 /// URL-list similarity returns the best-matching pair's score.
@@ -93,7 +89,7 @@ fn test_url_list_best_match() {
         "https://other.com".to_string(),
         "https://example.com".to_string(),
     ];
-    assert_eq!(url_list_similarity(&a, &b), 1.0);
+    assert!((url_list_similarity(&a, &b) - 1.0).abs() < f64::EPSILON);
 }
 
 // -- Identifier matching edge cases --
@@ -115,7 +111,7 @@ fn test_identifier_similarity_multiple_matches() {
 fn test_identifier_no_match_different_values() {
     let a = vec![ThingIdentifier::isbn("9780141439518")];
     let b = vec![ThingIdentifier::isbn("9780199536566")];
-    assert_eq!(identifier_similarity(&a, &b), 0.0);
+    assert!(identifier_similarity(&a, &b).abs() < f64::EPSILON);
 }
 
 /// A deterministic match is found even amid non-deterministic identifiers.

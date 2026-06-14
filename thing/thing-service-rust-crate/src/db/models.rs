@@ -1,18 +1,18 @@
-//! SeaORM entity definitions for the Thing Service.
+//! `SeaORM` entity definitions for the Thing Service.
 //!
 //! Fully normalized: the Thing aggregate's repeating collections
-//! (alternate_names, identifiers, images, same_as) live in dedicated child
+//! (`alternate_names`, identifiers, images, `same_as`) live in dedicated child
 //! tables joined by `thing_id`, rather than JSONB columns. JSONB is used
-//! only for opaque snapshots (audit old/new values, merge transferred_data).
-//! Timestamps use the `time` crate at the SeaORM boundary; the repository
+//! only for opaque snapshots (audit old/new values, merge `transferred_data`).
+//! Timestamps use the `time` crate at the `SeaORM` boundary; the repository
 //! converts to/from `chrono::DateTime<Utc>`.
 
-use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// The `things` table: the core thing record (scalar fields only).
 pub mod things {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row in `things`. Soft-delete is via `is_deleted`/`deleted_at`.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -61,7 +61,7 @@ pub mod things {
         /// images.
         #[sea_orm(has_many = "super::thing_images::Entity")]
         Images,
-        /// same_as URLs.
+        /// `same_as` URLs.
         #[sea_orm(has_many = "super::thing_same_as::Entity")]
         SameAs,
     }
@@ -96,7 +96,8 @@ pub mod things {
 
 /// The `thing_alternate_names` table.
 pub mod thing_alternate_names {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One alternate name for a thing.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -133,9 +134,10 @@ pub mod thing_alternate_names {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// The `thing_identifiers` table (schema.org PropertyValue shape).
+/// The `thing_identifiers` table (schema.org `PropertyValue` shape).
 pub mod thing_identifiers {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One typed identifier for a thing.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -182,7 +184,8 @@ pub mod thing_identifiers {
 
 /// The `thing_images` table.
 pub mod thing_images {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One image URL for a thing.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -221,7 +224,8 @@ pub mod thing_images {
 
 /// The `thing_same_as` table.
 pub mod thing_same_as {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One `sameAs` authoritative URL for a thing.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -258,9 +262,10 @@ pub mod thing_same_as {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// The `thing_merge_records` table (transferred_data is an opaque snapshot).
+/// The `thing_merge_records` table (`transferred_data` is an opaque snapshot).
 pub mod thing_merge_records {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// A row recording the fold of a duplicate thing into a main thing.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -290,7 +295,8 @@ pub mod thing_merge_records {
 
 /// The `audit_log` table (old/new values are opaque snapshots).
 pub mod audit_log {
-    use super::*;
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
 
     /// One audit row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]

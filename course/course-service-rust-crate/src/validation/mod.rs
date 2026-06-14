@@ -56,6 +56,7 @@ const CREDITS_MAX: u32 = 10_000;
 /// Validate a [`Course`] against FR-21..FR-28, recursing into nested
 /// instances. Returns an empty `Vec` when the record is valid;
 /// otherwise one [`ValidationError`] per failing field.
+#[must_use]
 pub fn validate_course(c: &Course) -> Vec<ValidationError> {
     let mut errs = Vec::new();
 
@@ -79,13 +80,13 @@ pub fn validate_course(c: &Course) -> Vec<ValidationError> {
     }
 
     // FR-23
-    if let Some(n) = c.number_of_credits {
-        if n > CREDITS_MAX {
-            errs.push(ValidationError::new(
-                "number_of_credits",
-                format!("number_of_credits must be ≤ {CREDITS_MAX}"),
-            ));
-        }
+    if let Some(n) = c.number_of_credits
+        && n > CREDITS_MAX
+    {
+        errs.push(ValidationError::new(
+            "number_of_credits",
+            format!("number_of_credits must be ≤ {CREDITS_MAX}"),
+        ));
     }
 
     // FR-24
@@ -107,13 +108,13 @@ pub fn validate_course(c: &Course) -> Vec<ValidationError> {
     }
 
     // FR-25
-    if let Some(url) = c.url.as_deref() {
-        if !is_http_url(url) {
-            errs.push(ValidationError::new(
-                "url",
-                "url must start with http:// or https://",
-            ));
-        }
+    if let Some(url) = c.url.as_deref()
+        && !is_http_url(url)
+    {
+        errs.push(ValidationError::new(
+            "url",
+            "url must start with http:// or https://",
+        ));
     }
     for (i, u) in c.image.iter().enumerate() {
         if !is_http_url(u) {
@@ -132,13 +133,13 @@ pub fn validate_course(c: &Course) -> Vec<ValidationError> {
         }
     }
     for (i, ident) in c.identifiers.iter().enumerate() {
-        if let Some(u) = ident.url.as_deref() {
-            if !is_http_url(u) {
-                errs.push(ValidationError::new(
-                    format!("identifiers[{i}].url"),
-                    "identifier url must start with http:// or https://",
-                ));
-            }
+        if let Some(u) = ident.url.as_deref()
+            && !is_http_url(u)
+        {
+            errs.push(ValidationError::new(
+                format!("identifiers[{i}].url"),
+                "identifier url must start with http:// or https://",
+            ));
         }
     }
 
@@ -156,6 +157,7 @@ pub fn validate_course(c: &Course) -> Vec<ValidationError> {
 /// Validate a [`CourseInstance`] against FR-24 and FR-26..FR-28
 /// (language codes, schedule ordering, enrollment-window ordering,
 /// capacity vs. enrolled count). Returns an empty `Vec` when valid.
+#[must_use]
 pub fn validate_instance(inst: &CourseInstance) -> Vec<ValidationError> {
     let mut errs = Vec::new();
 
@@ -170,35 +172,34 @@ pub fn validate_instance(inst: &CourseInstance) -> Vec<ValidationError> {
     }
 
     // FR-26
-    if let Some(sched) = inst.schedule.as_ref() {
-        if let (Some(start), Some(end)) = (sched.start_date, sched.end_date) {
-            if end < start {
-                errs.push(ValidationError::new(
-                    "schedule.end_date",
-                    "end_date must be on or after start_date",
-                ));
-            }
-        }
+    if let Some(sched) = inst.schedule.as_ref()
+        && let (Some(start), Some(end)) = (sched.start_date, sched.end_date)
+        && end < start
+    {
+        errs.push(ValidationError::new(
+            "schedule.end_date",
+            "end_date must be on or after start_date",
+        ));
     }
 
     // FR-27
-    if let (Some(opens), Some(closes)) = (inst.enrollment_opens, inst.enrollment_closes) {
-        if closes < opens {
-            errs.push(ValidationError::new(
-                "enrollment_closes",
-                "enrollment_closes must be on or after enrollment_opens",
-            ));
-        }
+    if let (Some(opens), Some(closes)) = (inst.enrollment_opens, inst.enrollment_closes)
+        && closes < opens
+    {
+        errs.push(ValidationError::new(
+            "enrollment_closes",
+            "enrollment_closes must be on or after enrollment_opens",
+        ));
     }
 
     // FR-28
-    if let (Some(max), Some(enrolled)) = (inst.maximum_attendee_capacity, inst.enrolled_count) {
-        if max < enrolled {
-            errs.push(ValidationError::new(
-                "maximum_attendee_capacity",
-                "maximum_attendee_capacity must be ≥ enrolled_count",
-            ));
-        }
+    if let (Some(max), Some(enrolled)) = (inst.maximum_attendee_capacity, inst.enrolled_count)
+        && max < enrolled
+    {
+        errs.push(ValidationError::new(
+            "maximum_attendee_capacity",
+            "maximum_attendee_capacity must be ≥ enrolled_count",
+        ));
     }
 
     errs
@@ -216,7 +217,7 @@ fn is_http_url(s: &str) -> bool {
 /// Full RFC-5646 validation is deferred — see FR-24 in `spec.md`.
 fn is_plausible_bcp47(s: &str) -> bool {
     let len = s.len();
-    if len < BCP47_MIN || len > BCP47_MAX {
+    if !(BCP47_MIN..=BCP47_MAX).contains(&len) {
         return false;
     }
     let bytes = s.as_bytes();
@@ -231,7 +232,7 @@ mod tests {
     use super::*;
     use chrono::Utc;
 
-    use crate::models::{CourseIdentifier, IdentifierType, Schedule};
+    use crate::models::{CourseIdentifier, CourseInstanceStatus, IdentifierType, Schedule};
 
     /// Test fixture: a course that passes every FR-21..FR-28 rule.
     fn valid_course() -> Course {
@@ -257,7 +258,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.field == "name"));
     }
 
-    /// FR-22: a course_code longer than the cap is rejected.
+    /// FR-22: a `course_code` longer than the cap is rejected.
     #[test]
     fn over_length_course_code_is_rejected() {
         let mut c = valid_course();
@@ -266,7 +267,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.field == "course_code"));
     }
 
-    /// FR-22: an empty-but-present course_code is rejected.
+    /// FR-22: an empty-but-present `course_code` is rejected.
     #[test]
     fn empty_course_code_is_rejected() {
         let mut c = valid_course();
@@ -321,7 +322,7 @@ mod tests {
             course_id: uuid::Uuid::new_v4(),
             name: None,
             course_mode: None,
-            status: Default::default(),
+            status: CourseInstanceStatus::default(),
             schedule: None,
             in_language: vec![],
             location: None,
@@ -356,7 +357,7 @@ mod tests {
             course_id: uuid::Uuid::new_v4(),
             name: None,
             course_mode: None,
-            status: Default::default(),
+            status: CourseInstanceStatus::default(),
             schedule: None,
             in_language: vec![],
             location: None,
@@ -366,7 +367,7 @@ mod tests {
             maximum_attendee_capacity: None,
             enrolled_count: None,
             enrollment_opens: Some(Utc::now()),
-            enrollment_closes: Some(Utc::now() - chrono::Duration::hours(24 * (1))),
+            enrollment_closes: Some(Utc::now() - chrono::Duration::hours(24)),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -374,7 +375,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.field == "enrollment_closes"));
     }
 
-    /// FR-28: enrolled_count exceeding capacity is rejected.
+    /// FR-28: `enrolled_count` exceeding capacity is rejected.
     #[test]
     fn enrolled_cannot_exceed_capacity() {
         let inst = CourseInstance {
@@ -382,7 +383,7 @@ mod tests {
             course_id: uuid::Uuid::new_v4(),
             name: None,
             course_mode: None,
-            status: Default::default(),
+            status: CourseInstanceStatus::default(),
             schedule: None,
             in_language: vec![],
             location: None,
@@ -409,7 +410,7 @@ mod tests {
             course_id: c.id,
             name: None,
             course_mode: None,
-            status: Default::default(),
+            status: CourseInstanceStatus::default(),
             schedule: None,
             in_language: vec![],
             location: None,

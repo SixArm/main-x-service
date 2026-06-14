@@ -88,7 +88,7 @@ pub struct Place {
     pub keywords: Vec<String>,
     /// External identifiers (FIPS, GNIS, OSM, custom, …). See [`PlaceIdentifier`].
     pub identifiers: Vec<PlaceIdentifier>,
-    /// Amenity features (WiFi, parking, …). See [`AmenityFeature`].
+    /// Amenity features (`WiFi`, parking, …). See [`AmenityFeature`].
     pub amenity_features: Vec<AmenityFeature>,
     /// Per-day opening hours. See [`OpeningHoursSpecification`].
     pub opening_hours: Vec<OpeningHoursSpecification>,
@@ -128,6 +128,7 @@ impl Place {
     /// assert!(p.geo.is_none());
     /// assert_eq!(p.created_at, p.updated_at);
     /// ```
+    #[must_use]
     pub fn new(name: &str) -> Self {
         let now = Utc::now();
         Self {

@@ -19,9 +19,9 @@ fn bench_search_by_name(c: &mut Criterion) {
         b.iter(|| {
             let query = "Place 42";
             for place in &places {
-                name_similarity(black_box(query), black_box(&place.name));
+                black_box(name_similarity(black_box(query), black_box(&place.name)));
             }
-        })
+        });
     });
 }
 
@@ -35,9 +35,9 @@ fn bench_search_by_name_fuzzy(c: &mut Criterion) {
         b.iter(|| {
             let query = "Plce 42";
             for place in &places {
-                name_similarity(black_box(query), black_box(&place.name));
+                black_box(name_similarity(black_box(query), black_box(&place.name)));
             }
-        })
+        });
     });
 }
 

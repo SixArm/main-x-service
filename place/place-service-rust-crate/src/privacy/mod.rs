@@ -49,6 +49,7 @@ use serde_json::Value;
 /// // The original is untouched.
 /// assert_eq!(place.telephone.as_deref(), Some("+1-555-867-5309"));
 /// ```
+#[must_use]
 pub fn mask_place(place: &Place) -> Place {
     // Work on a clone so the caller's record is never mutated.
     let mut masked = place.clone();
@@ -99,6 +100,7 @@ fn mask_phone(phone: &str) -> String {
 /// let export = gdpr_export(&place);
 /// assert_eq!(export["name"], "Export Test");
 /// ```
+#[must_use]
 pub fn gdpr_export(place: &Place) -> Value {
     serde_json::to_value(place).unwrap_or(Value::Null)
 }
@@ -133,7 +135,7 @@ mod tests {
     #[test]
     fn test_mask_geo_coordinates() {
         let mut place = Place::new("Test");
-        place.geo = Some(GeoCoordinates::new(40.78293456, -73.96543210));
+        place.geo = Some(GeoCoordinates::new(40.782_934_56, -73.965_432_10));
         let masked = mask_place(&place);
         let geo = masked.geo.unwrap();
         assert!((geo.latitude - 40.78).abs() < 0.01);

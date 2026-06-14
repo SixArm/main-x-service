@@ -1,4 +1,4 @@
-//! Tantivy-backed search facade for Thing records.
+//! `Tantivy`-backed search facade for Thing records.
 //!
 //! [`SearchEngine`] wraps a [`ThingIndex`] with the operations the REST layer
 //! needs: index/delete a record, exact full-text search, fuzzy (typo-tolerant)
@@ -26,7 +26,7 @@ pub use index::{IndexStats, ThingIndex, ThingIndexSchema};
 
 /// High-level search facade over a [`ThingIndex`].
 pub struct SearchEngine {
-    /// The underlying Tantivy index wrapper.
+    /// The underlying `Tantivy` index wrapper.
     index: ThingIndex,
     /// Filesystem path the index lives at (for diagnostics / reopen).
     pub index_path: String,
@@ -35,6 +35,11 @@ pub struct SearchEngine {
 impl SearchEngine {
     /// Open or create the index under `path`, creating the directory if
     /// it does not yet exist.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be created or the index
+    /// cannot be opened or created.
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let p = path.as_ref();
         std::fs::create_dir_all(p)
@@ -47,6 +52,10 @@ impl SearchEngine {
     }
 
     /// Index (or re-index) one thing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the document cannot be written or committed.
     pub fn index_thing(&self, thing: &Thing) -> Result<()> {
         // 50 MB writer heap budget — ample for single-document writes.
         let mut writer = self.index.writer(50)?;
@@ -80,8 +89,12 @@ impl SearchEngine {
         Ok(())
     }
 
-    /// Full-text search over name + alternate_names + description +
+    /// Full-text search over name + `alternate_names` + description +
     /// identifiers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query cannot be parsed or executed.
     pub fn search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let s = self.index.schema();
@@ -92,10 +105,14 @@ impl SearchEngine {
         let query = parser
             .parse_query(query_str)
             .map_err(|e| crate::Error::Search(format!("parse query: {e}")))?;
-        self.collect_ids(searcher, query.as_ref(), limit)
+        self.collect_ids(&searcher, query.as_ref(), limit)
     }
 
     /// Fuzzy search — tolerates typos.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query cannot be executed.
     pub fn fuzzy_search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let s = self.index.schema();
@@ -116,10 +133,14 @@ impl SearchEngine {
             }
         }
         let q = BooleanQuery::new(sub);
-        self.collect_ids(searcher, &q, limit)
+        self.collect_ids(&searcher, &q, limit)
     }
 
     /// Blocking query used by the duplicate detector: fuzzy name match.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query cannot be executed.
     pub fn search_by_name(&self, name: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let s = self.index.schema();
@@ -139,10 +160,14 @@ impl SearchEngine {
             })
             .collect();
         let q = BooleanQuery::new(sub);
-        self.collect_ids(searcher, &q, limit)
+        self.collect_ids(&searcher, &q, limit)
     }
 
     /// Delete a thing from the index by id.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the delete cannot be committed.
     pub fn delete_thing(&self, thing_id: &str) -> Result<()> {
         let mut writer = self.index.writer(50)?;
         let s = self.index.schema();
@@ -156,11 +181,19 @@ impl SearchEngine {
     }
 
     /// Document and segment counts for the live index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if index statistics cannot be read.
     pub fn stats(&self) -> Result<IndexStats> {
         self.index.stats()
     }
 
     /// Force the reader to observe the latest committed segments.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reader fails to reload.
     pub fn reload(&self) -> Result<()> {
         self.index.reload()
     }
@@ -168,7 +201,7 @@ impl SearchEngine {
     /// Run `query` and project the top `limit` hits to their `id` strings.
     fn collect_ids(
         &self,
-        searcher: tantivy::Searcher,
+        searcher: &tantivy::Searcher,
         query: &dyn Query,
         limit: usize,
     ) -> Result<Vec<String>> {
@@ -181,10 +214,10 @@ impl SearchEngine {
             let doc: TantivyDocument = searcher
                 .doc(addr)
                 .map_err(|e| crate::Error::Search(format!("retrieve doc: {e}")))?;
-            if let Some(v) = doc.get_first(s.id) {
-                if let Some(t) = v.as_str() {
-                    ids.push(t.to_string());
-                }
+            if let Some(v) = doc.get_first(s.id)
+                && let Some(t) = v.as_str()
+            {
+                ids.push(t.to_string());
             }
         }
         Ok(ids)
@@ -195,7 +228,7 @@ impl SearchEngine {
 fn tokenise(s: &str) -> Vec<String> {
     s.split(|c: char| !c.is_alphanumeric())
         .filter(|s| !s.is_empty())
-        .map(|t| t.to_lowercase())
+        .map(str::to_lowercase)
         .collect()
 }
 

@@ -65,6 +65,7 @@ pub struct ValidationError {
 /// let errors = validate_place(&place);
 /// assert!(errors.iter().any(|e| e.field == "geo.latitude"));
 /// ```
+#[must_use]
 pub fn validate_place(place: &Place) -> Vec<ValidationError> {
     // Accumulate every violation rather than returning on the first, so the
     // API can surface a complete error body in one response.

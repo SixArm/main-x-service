@@ -50,6 +50,7 @@ use strsim::jaro_winkler;
 /// // No field is populated in both, so there is nothing to compare.
 /// assert_eq!(address_similarity(&a, &b), 0.0);
 /// ```
+#[must_use]
 pub fn address_similarity(a: &PostalAddress, b: &PostalAddress) -> f64 {
     // Accumulate weight*similarity for shared fields, plus the weight that
     // actually participated, so the final divide normalizes correctly.

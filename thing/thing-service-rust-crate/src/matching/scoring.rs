@@ -69,7 +69,7 @@ pub struct MatchWeights {
 
 impl Default for MatchWeights {
     /// The standard weights: name 0.40, identifier 0.30, description 0.10,
-    /// url 0.10, same_as 0.10 (sum 1.0).
+    /// url 0.10, `same_as` 0.10 (sum 1.0).
     fn default() -> Self {
         Self {
             name: 0.40,
@@ -142,6 +142,7 @@ impl MatchConfidence {
     /// assert_eq!(MatchConfidence::from_score(0.96), MatchConfidence::Certain);
     /// assert_eq!(MatchConfidence::from_score(0.50), MatchConfidence::Unlikely);
     /// ```
+    #[must_use]
     pub fn from_score(score: f64) -> Self {
         if score >= 0.95 {
             Self::Certain
@@ -162,7 +163,7 @@ impl MatchConfidence {
 /// score is pinned at 1.0.
 ///
 /// Otherwise: weighted average over available components (name,
-/// identifier, description, url, same_as), with a +0.05 phonetic bonus
+/// identifier, description, url, `same_as`), with a +0.05 phonetic bonus
 /// when the name's Soundex matches and the base score is below 0.95.
 ///
 /// Only components for which *both* records carry data participate in the
@@ -183,6 +184,7 @@ impl MatchConfidence {
 /// assert!(result.score > 0.85);
 /// assert_ne!(result.confidence, MatchConfidence::Unlikely);
 /// ```
+#[must_use]
 pub fn compute_match(a: &Thing, b: &Thing, weights: &MatchWeights) -> MatchResult {
     // Step 1: deterministic short-circuit. A shared globally-unique
     // identifier is conclusive, so skip all fuzzy scoring and pin to 1.0.
@@ -280,7 +282,7 @@ mod tests {
     use crate::models::identifier::ThingIdentifier;
 
     /// A fully-populated canonical fixture (name, description, url, ISBN,
-    /// same_as) reused across the scoring tests.
+    /// `same_as`) reused across the scoring tests.
     fn pride_and_prejudice() -> Thing {
         let mut t = Thing::new("Pride and Prejudice");
         t.description = Some("A novel of manners by Jane Austen".into());

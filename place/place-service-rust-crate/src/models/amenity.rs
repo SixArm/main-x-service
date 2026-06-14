@@ -42,6 +42,7 @@ impl AmenityFeature {
     /// let a = AmenityFeature::new("Elevator");
     /// assert!(a.value.is_none());
     /// ```
+    #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -59,6 +60,7 @@ impl AmenityFeature {
     /// let a = AmenityFeature::with_value("Restaurant", "Le Jules Verne");
     /// assert_eq!(a.value.as_deref(), Some("Le Jules Verne"));
     /// ```
+    #[must_use]
     pub fn with_value(name: &str, value: &str) -> Self {
         Self {
             name: name.to_string(),

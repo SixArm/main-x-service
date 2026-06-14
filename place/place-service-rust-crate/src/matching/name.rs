@@ -32,6 +32,7 @@ use strsim::jaro_winkler;
 /// assert_eq!(name_similarity("", "Park"), 0.0);
 /// assert!(name_similarity("Park", "Central Park") < 1.0);
 /// ```
+#[must_use]
 pub fn name_similarity(a: &str, b: &str) -> f64 {
     // Two empty names are vacuously identical.
     if a.is_empty() && b.is_empty() {

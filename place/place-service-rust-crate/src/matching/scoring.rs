@@ -127,6 +127,7 @@ impl MatchConfidence {
     /// assert_eq!(MatchConfidence::from_score(0.95), MatchConfidence::Certain);
     /// assert_eq!(MatchConfidence::from_score(0.50), MatchConfidence::Unlikely);
     /// ```
+    #[must_use]
     pub fn from_score(score: f64) -> Self {
         if score >= 0.95 {
             Self::Certain
@@ -162,6 +163,7 @@ impl MatchConfidence {
 /// assert_eq!(r.score, 1.0);
 /// assert!(r.breakdown.deterministic_match);
 /// ```
+#[must_use]
 pub fn compute_match(a: &Place, b: &Place, weights: &MatchWeights) -> MatchResult {
     // Deterministic: GLN match short-circuits to 1.0
     let deterministic = has_gln_match(&a.identifiers, &b.identifiers);
@@ -194,13 +196,7 @@ pub fn compute_match(a: &Place, b: &Place, weights: &MatchWeights) -> MatchResul
     };
 
     let place_type_score = match (&a.place_type, &b.place_type) {
-        (Some(ta), Some(tb)) => {
-            if ta == tb {
-                1.0
-            } else {
-                0.0
-            }
-        }
+        (Some(ta), Some(tb)) if ta == tb => 1.0,
         _ => 0.0,
     };
 

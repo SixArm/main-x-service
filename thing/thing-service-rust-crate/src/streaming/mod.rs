@@ -28,6 +28,7 @@ pub struct ThingEvent {
 
 impl ThingEvent {
     /// Build a thing event of the given kind.
+    #[must_use]
     pub fn new(kind: EventKind, thing_id: Uuid, payload: serde_json::Value) -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -39,7 +40,7 @@ impl ThingEvent {
     }
 }
 
-/// The CRUD operation a [`ThingEvent`] represents. Serialises in PascalCase.
+/// The CRUD operation a [`ThingEvent`] represents. Serialises in `PascalCase`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub enum EventKind {
@@ -69,16 +70,29 @@ pub struct InMemoryEventPublisher {
 
 impl InMemoryEventPublisher {
     /// Create an empty in-memory publisher.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Snapshot of all captured events in publish order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex has been poisoned by a panic in another
+    /// thread while holding the lock.
+    #[must_use]
     pub fn events(&self) -> Vec<ThingEvent> {
         self.events.lock().expect("events mutex poisoned").clone()
     }
 
     /// Number of events captured so far.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex has been poisoned by a panic in another
+    /// thread while holding the lock.
+    #[must_use]
     pub fn count(&self) -> usize {
         self.events.lock().expect("events mutex poisoned").len()
     }
@@ -115,7 +129,7 @@ mod tests {
         assert_eq!(publisher.events()[0].kind, EventKind::ThingCreated);
     }
 
-    /// `EventKind` serialises in PascalCase.
+    /// `EventKind` serialises in `PascalCase`.
     #[test]
     fn event_kind_serialises_pascal_case() {
         let s = serde_json::to_string(&EventKind::ThingMerged).unwrap();

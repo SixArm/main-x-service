@@ -174,7 +174,7 @@ fn test_mask_place_with_all_sensitive_fields() {
     let mut place = Place::new("Full Privacy Test");
     place.telephone = Some("+1-555-867-5309".into());
     place.fax_number = Some("+1-555-123-4567".into());
-    place.geo = Some(GeoCoordinates::new(40.78293456, -73.96543210));
+    place.geo = Some(GeoCoordinates::new(40.782_934_56, -73.965_432_10));
 
     let masked = mask_place(&place);
 
@@ -282,7 +282,7 @@ fn test_validate_normalize_match_workflow() {
 fn test_validate_normalize_mask_export_workflow() {
     let mut place = Place::new("  Sensitive Place  ");
     place.telephone = Some("+1-555-867-5309".into());
-    place.geo = Some(GeoCoordinates::new(40.78293456, -73.96543210));
+    place.geo = Some(GeoCoordinates::new(40.782_934_56, -73.965_432_10));
     place.address = Some(PostalAddress {
         street_address: None,
         address_locality: Some("new york".into()),

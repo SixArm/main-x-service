@@ -42,6 +42,7 @@ use crate::models::identifier::ThingIdentifier;
 /// let b = vec![ThingIdentifier::sku("WIDGET-42")];
 /// assert_eq!(identifier_similarity(&a, &b), 1.0); // exact pair match
 /// ```
+#[must_use]
 pub fn identifier_similarity(a: &[ThingIdentifier], b: &[ThingIdentifier]) -> f64 {
     if a.is_empty() || b.is_empty() {
         return 0.0;
@@ -76,6 +77,7 @@ pub fn identifier_similarity(a: &[ThingIdentifier], b: &[ThingIdentifier]) -> f6
 /// let b = vec![ThingIdentifier::sku("WIDGET-42")];
 /// assert!(!has_deterministic_match(&a, &b));
 /// ```
+#[must_use]
 pub fn has_deterministic_match(a: &[ThingIdentifier], b: &[ThingIdentifier]) -> bool {
     // Consider only globally-unique schemes on both sides; a SKU collision,
     // for example, must not pin two unrelated products to a perfect score.
@@ -107,7 +109,7 @@ mod tests {
     fn test_different_isbn() {
         let a = vec![ThingIdentifier::isbn("9780141439518")];
         let b = vec![ThingIdentifier::isbn("9780199536566")];
-        assert_eq!(identifier_similarity(&a, &b), 0.0);
+        assert!(identifier_similarity(&a, &b).abs() < f64::EPSILON);
     }
 
     /// An empty identifier list scores 0.0.
@@ -115,7 +117,7 @@ mod tests {
     fn test_empty_identifiers() {
         let a: Vec<ThingIdentifier> = vec![];
         let b = vec![ThingIdentifier::isbn("9780141439518")];
-        assert_eq!(identifier_similarity(&a, &b), 0.0);
+        assert!(identifier_similarity(&a, &b).abs() < f64::EPSILON);
     }
 
     /// A match on any one shared pair (here a Custom id) scores 1.0.

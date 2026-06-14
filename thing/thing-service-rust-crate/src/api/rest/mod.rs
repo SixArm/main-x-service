@@ -1,4 +1,4 @@
-//! REST API surface — Axum router + state + OpenAPI doc.
+//! REST API surface — Axum router + state + `OpenAPI` doc.
 
 use axum::{
     Router,
@@ -64,7 +64,7 @@ pub use state::AppState;
         (name = "audit",    description = "Audit log queries"),
     ),
 )]
-/// utoipa OpenAPI document aggregating every path, schema, and tag.
+/// utoipa `OpenAPI` document aggregating every path, schema, and tag.
 pub struct ApiDoc;
 
 /// Build the REST router with the given application state.

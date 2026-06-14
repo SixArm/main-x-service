@@ -32,8 +32,9 @@ pub struct AppState {
 
 impl AppState {
     /// Assemble state from the externally-built services, constructing
-    /// the SeaORM repository, audit log, and in-memory event publisher
+    /// the `SeaORM` repository, audit log, and in-memory event publisher
     /// from the shared connection.
+    #[must_use]
     pub fn new(
         db: DatabaseConnection,
         search_engine: SearchEngine,

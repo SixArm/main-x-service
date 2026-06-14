@@ -1,17 +1,21 @@
-//! SeaORM entity definitions for the Place Service.
+//! `SeaORM` entity definitions for the Place Service.
 //!
-//! Fully normalized: the 0..1 nested objects (PostalAddress,
-//! GeoCoordinates) are flattened onto the `places` row; the repeating
-//! collections (keywords, identifiers, amenity_features, opening_hours)
+//! Fully normalized: the 0..1 nested objects (`PostalAddress`,
+//! `GeoCoordinates`) are flattened onto the `places` row; the repeating
+//! collections (keywords, identifiers, `amenity_features`, `opening_hours`)
 //! live in dedicated child tables joined by `place_id`. JSONB is used only
-//! for opaque snapshots (audit old/new values, merge transferred_data).
+//! for opaque snapshots (audit old/new values, merge `transferred_data`).
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// The `places` table: core place record + flattened address/geo.
 pub mod places {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// A row in `places`. Soft-delete is via `is_deleted`/`deleted_at`.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -26,25 +30,25 @@ pub mod places {
         pub alternate_name: Option<String>,
         /// Free-text description.
         pub description: Option<String>,
-        /// PlaceType enum tag (or `other`).
+        /// `PlaceType` enum tag (or `other`).
         pub place_type: Option<String>,
-        /// Free-text label for PlaceType::Other(_).
+        /// Free-text label for `PlaceType::Other(_)`.
         pub place_type_custom: Option<String>,
-        /// PostalAddress.street_address (flattened).
+        /// `PostalAddress.street_address` (flattened).
         pub address_street_address: Option<String>,
-        /// PostalAddress.address_locality (flattened).
+        /// `PostalAddress.address_locality` (flattened).
         pub address_locality: Option<String>,
-        /// PostalAddress.address_region (flattened).
+        /// `PostalAddress.address_region` (flattened).
         pub address_region: Option<String>,
-        /// PostalAddress.address_country (flattened).
+        /// `PostalAddress.address_country` (flattened).
         pub address_country: Option<String>,
-        /// PostalAddress.postal_code (flattened).
+        /// `PostalAddress.postal_code` (flattened).
         pub address_postal_code: Option<String>,
-        /// GeoCoordinates.latitude (flattened).
+        /// `GeoCoordinates.latitude` (flattened).
         pub geo_latitude: Option<f64>,
-        /// GeoCoordinates.longitude (flattened).
+        /// `GeoCoordinates.longitude` (flattened).
         pub geo_longitude: Option<f64>,
-        /// GeoCoordinates.elevation (flattened).
+        /// `GeoCoordinates.elevation` (flattened).
         pub geo_elevation: Option<f64>,
         /// Telephone number.
         pub telephone: Option<String>,
@@ -119,7 +123,11 @@ pub mod places {
 
 /// The `place_keywords` table.
 pub mod place_keywords {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        Uuid,
+    };
 
     /// One keyword for a place.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -157,7 +165,11 @@ pub mod place_keywords {
 
 /// The `place_identifiers` table.
 pub mod place_identifiers {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        Uuid,
+    };
 
     /// One external identifier for a place.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -199,7 +211,11 @@ pub mod place_identifiers {
 
 /// The `place_amenity_features` table.
 pub mod place_amenity_features {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        Uuid,
+    };
 
     /// One amenity feature (key/value) for a place.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -239,7 +255,11 @@ pub mod place_amenity_features {
 
 /// The `place_opening_hours` table.
 pub mod place_opening_hours {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Related, RelationDef, RelationTrait, Serialize,
+        Uuid,
+    };
 
     /// One opening-hours specification for a place.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -279,9 +299,12 @@ pub mod place_opening_hours {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// The `place_merge_records` table (transferred_data is an opaque snapshot).
+/// The `place_merge_records` table (`transferred_data` is an opaque snapshot).
 pub mod place_merge_records {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EnumIter, Json, PrimaryKeyTrait, Serialize, TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// A row recording the fold of a duplicate place into a main place.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -311,7 +334,10 @@ pub mod place_merge_records {
 
 /// The `audit_log` table (old/new values are opaque snapshots).
 pub mod audit_log {
-    use super::*;
+    use super::{
+        ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
+        EnumIter, Json, PrimaryKeyTrait, Serialize, TimeDateTimeWithTimeZone, Uuid,
+    };
 
     /// One audit row.
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]

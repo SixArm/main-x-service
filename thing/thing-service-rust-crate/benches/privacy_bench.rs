@@ -24,7 +24,7 @@ fn bench_mask_thing(c: &mut Criterion) {
 fn bench_mask_thing_minimal(c: &mut Criterion) {
     let thing = Thing::new("Minimal Thing");
     c.bench_function("mask_thing_minimal", |b| {
-        b.iter(|| mask_thing(black_box(&thing)))
+        b.iter(|| mask_thing(black_box(&thing)));
     });
 }
 
@@ -51,9 +51,9 @@ fn bench_gdpr_export_batch(c: &mut Criterion) {
     c.bench_function("gdpr_export_batch_100", |b| {
         b.iter(|| {
             for t in &things {
-                gdpr_export(black_box(t));
+                black_box(gdpr_export(black_box(t)));
             }
-        })
+        });
     });
 }
 

@@ -28,6 +28,7 @@ pub struct PlaceEvent {
 
 impl PlaceEvent {
     /// Build a place event of the given kind.
+    #[must_use]
     pub fn new(kind: EventKind, place_id: Uuid, payload: serde_json::Value) -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -39,7 +40,7 @@ impl PlaceEvent {
     }
 }
 
-/// The CRUD operation a [`PlaceEvent`] represents. Serialises in PascalCase.
+/// The CRUD operation a [`PlaceEvent`] represents. Serialises in `PascalCase`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub enum EventKind {
@@ -69,16 +70,27 @@ pub struct InMemoryEventPublisher {
 
 impl InMemoryEventPublisher {
     /// Create an empty in-memory publisher.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Snapshot of all captured events in publish order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the events mutex is poisoned (a prior holder panicked).
+    #[must_use]
     pub fn events(&self) -> Vec<PlaceEvent> {
         self.events.lock().expect("events mutex poisoned").clone()
     }
 
     /// Number of events captured so far.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the events mutex is poisoned (a prior holder panicked).
+    #[must_use]
     pub fn count(&self) -> usize {
         self.events.lock().expect("events mutex poisoned").len()
     }
@@ -115,7 +127,7 @@ mod tests {
         assert_eq!(publisher.events()[0].kind, EventKind::PlaceCreated);
     }
 
-    /// `EventKind` serialises in PascalCase.
+    /// `EventKind` serialises in `PascalCase`.
     #[test]
     fn event_kind_serialises_pascal_case() {
         let s = serde_json::to_string(&EventKind::PlaceMerged).unwrap();

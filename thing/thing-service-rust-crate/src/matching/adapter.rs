@@ -152,6 +152,7 @@ fn thing_identifier_to_matcher(id: &ThingIdentifier) -> Option<MIdentifier> {
 /// `property_id`. Names follow schema.org's canonical lowercase tokens
 /// (`doi`, `isbn`, `issn`, `gtin`, `sku`, `mpn`, `serialNumber`, `uri`,
 /// `uuid`); `Custom(s)` passes the carried label through verbatim.
+#[must_use]
 pub fn map_identifier_property(t: &IdentifierType) -> &str {
     match t {
         IdentifierType::Doi => "doi",
@@ -171,7 +172,7 @@ pub fn map_identifier_property(t: &IdentifierType) -> &str {
 mod tests {
     use super::*;
 
-    /// Core fields (name, alternate names, additional_type, ISBN) project
+    /// Core fields (name, alternate names, `additional_type`, ISBN) project
     /// across with the expected matcher-side cardinality and tokens.
     #[test]
     fn round_trip_basic() {
@@ -203,7 +204,7 @@ mod tests {
         assert_eq!(m.image.as_deref(), Some("https://a.example/1.jpg"));
     }
 
-    /// A `Custom(label)` identifier passes its label through as property_id.
+    /// A `Custom(label)` identifier passes its label through as `property_id`.
     #[test]
     fn custom_identifier_passes_through() {
         let mut svc = Thing::new("Thing");

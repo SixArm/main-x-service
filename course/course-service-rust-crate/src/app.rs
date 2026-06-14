@@ -1,7 +1,7 @@
 //! Loco application hooks.
 //!
 //! The service boots through loco (CLI, `AppContext`, config, migrations,
-//! background queue). The existing REST router — handlers, OpenAPI, CORS
+//! background queue). The existing REST router — handlers, `OpenAPI`, CORS
 //! — is built in [`App::after_routes`] and merged onto loco's router, so
 //! the hand-written Axum surface keeps working while loco owns the
 //! lifecycle. The boot-time singletons (`SearchEngine`, `CourseMatcher`,
@@ -75,7 +75,7 @@ impl Hooks for App {
         let config = Config::from_env().map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let search_engine = SearchEngine::new(&config.search.index_path)
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
-        let matcher = CourseMatcher::new(config.matching.clone());
+        let matcher = CourseMatcher::new(config.matching);
         let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
         ctx.shared_store.insert(state);
         // Swagger UI + permissive CORS layered on top of the controllers.

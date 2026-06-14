@@ -1,4 +1,4 @@
-//! Tantivy index schema + lifecycle for Thing records.
+//! `Tantivy` index schema + lifecycle for Thing records.
 //!
 //! Field-set: `id` (stored STRING), `name`, `alternate_names`,
 //! `description`, `identifiers` (TEXT).
@@ -12,10 +12,10 @@ use tantivy::{
 
 use crate::Result;
 
-/// The Tantivy [`Schema`] plus typed handles to each [`Field`].
+/// The `Tantivy` [`Schema`] plus typed handles to each [`Field`].
 #[derive(Clone)]
 pub struct ThingIndexSchema {
-    /// The built Tantivy schema.
+    /// The built `Tantivy` schema.
     pub schema: Schema,
     /// Stored thing UUID (STRING) — the retrievable primary key.
     pub id: Field,
@@ -31,6 +31,7 @@ pub struct ThingIndexSchema {
 
 impl ThingIndexSchema {
     /// Build the schema, registering every field with its index options.
+    #[must_use]
     pub fn new() -> Self {
         let mut b = Schema::builder();
         let id = b.add_text_field("id", STRING | STORED);
@@ -58,9 +59,9 @@ impl Default for ThingIndexSchema {
     }
 }
 
-/// An open Tantivy index together with its schema and a live reader.
+/// An open `Tantivy` index together with its schema and a live reader.
 pub struct ThingIndex {
-    /// The underlying Tantivy index.
+    /// The underlying `Tantivy` index.
     index: Index,
     /// Cached schema + field handles.
     schema: ThingIndexSchema,
@@ -70,6 +71,10 @@ pub struct ThingIndex {
 
 impl ThingIndex {
     /// Create a brand-new index in an empty directory at `path`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index or its reader cannot be created.
     pub fn create<P: AsRef<Path>>(path: P) -> Result<Self> {
         let schema = ThingIndexSchema::new();
         let index = Index::create_in_dir(path, schema.schema.clone())
@@ -87,6 +92,10 @@ impl ThingIndex {
     }
 
     /// Open an existing index previously created at `path`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index or its reader cannot be opened.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let schema = ThingIndexSchema::new();
         let index = Index::open_in_dir(path)
@@ -104,6 +113,10 @@ impl ThingIndex {
     }
 
     /// Open the index if a `meta.json` already exists, otherwise create.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index cannot be opened or created.
     pub fn create_or_open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let p = path.as_ref();
         if p.join("meta.json").exists() {
@@ -114,26 +127,37 @@ impl ThingIndex {
     }
 
     /// Acquire a writer with a `heap_mb`-megabyte budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer cannot be created.
     pub fn writer(&self, heap_mb: usize) -> Result<IndexWriter> {
         self.index
             .writer(heap_mb * 1_000_000)
             .map_err(|e| crate::Error::Search(format!("create writer: {e}")))
     }
 
-    /// Borrow the underlying Tantivy index (for query-parser setup).
+    /// Borrow the underlying `Tantivy` index (for query-parser setup).
+    #[must_use]
     pub fn index(&self) -> &Index {
         &self.index
     }
     /// Borrow the schema + field handles.
+    #[must_use]
     pub fn schema(&self) -> &ThingIndexSchema {
         &self.schema
     }
     /// Borrow the live reader.
+    #[must_use]
     pub fn reader(&self) -> &IndexReader {
         &self.reader
     }
 
     /// Force the reader to pick up the latest committed segments.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reader fails to reload.
     pub fn reload(&self) -> Result<()> {
         self.reader
             .reload()
@@ -141,10 +165,14 @@ impl ThingIndex {
     }
 
     /// Document and segment counts for the current searcher.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the searcher cannot read index statistics.
     pub fn stats(&self) -> Result<IndexStats> {
         let searcher = self.reader.searcher();
         Ok(IndexStats {
-            num_docs: searcher.num_docs() as usize,
+            num_docs: usize::try_from(searcher.num_docs()).unwrap_or(usize::MAX),
             num_segments: searcher.segment_readers().len(),
         })
     }

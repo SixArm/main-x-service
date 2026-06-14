@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     /// HTTP bind settings.
     pub server: ServerConfig,
-    /// PostgreSQL connection settings.
+    /// `PostgreSQL` connection settings.
     pub database: DatabaseConfig,
     /// Tantivy search-index settings.
     pub search: SearchConfig,
@@ -36,7 +36,7 @@ pub struct ServerConfig {
     pub grpc_port: u16,
 }
 
-/// PostgreSQL connection-pool configuration.
+/// `PostgreSQL` connection-pool configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     /// Connection URL (`postgres://…`). Env `DATABASE_URL`; defaults to

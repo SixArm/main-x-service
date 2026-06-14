@@ -99,7 +99,7 @@ impl Hooks for App {
         let config = Config::from_env().map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let search_engine = SearchEngine::new(&config.search.index_path)
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
-        let matcher = PlaceMatcher::new(config.matching.clone());
+        let matcher = PlaceMatcher::new(&config.matching);
         let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
         ctx.shared_store.insert(state);
         let router = router

@@ -130,6 +130,7 @@ impl Thing {
     /// assert!(t.description.is_none());
     /// assert!(!t.is_deleted);
     /// ```
+    #[must_use]
     pub fn new(name: &str) -> Self {
         let now = Utc::now();
         Self {

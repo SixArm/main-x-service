@@ -52,7 +52,8 @@ pub struct PlaceMatcher {
 
 impl PlaceMatcher {
     /// Build a matcher from the service [`MatchingConfig`].
-    pub fn new(config: MatchingConfig) -> Self {
+    #[must_use]
+    pub fn new(config: &MatchingConfig) -> Self {
         Self {
             weights: MatchWeights::default(),
             threshold: config.threshold_score,
@@ -60,22 +61,26 @@ impl PlaceMatcher {
     }
 
     /// Score two places, returning the full [`MatchResult`](scoring::MatchResult).
+    #[must_use]
     pub fn score(&self, a: &Place, b: &Place) -> MatchResult {
         compute_match(a, b, &self.weights)
     }
 
     /// Whether two places score at or above the configured threshold.
+    #[must_use]
     pub fn is_match(&self, a: &Place, b: &Place) -> bool {
         self.score(a, b).score >= self.threshold
     }
 
     /// The configured `is_match` threshold.
+    #[must_use]
     pub fn threshold(&self) -> f64 {
         self.threshold
     }
 }
 
 /// Classify a confidence band into a stable string label for API responses.
+#[must_use]
 pub fn confidence_label(c: &MatchConfidence) -> &'static str {
     match c {
         MatchConfidence::Certain => "certain",

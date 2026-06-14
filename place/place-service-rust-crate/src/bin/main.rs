@@ -1,7 +1,7 @@
 //! Binary entry point for the **Place Service** microservice.
 //!
 //! Wires the loco.rs CLI to the service [`App`](place_service::app::App) and
-//! the SeaORM [`Migrator`](migration::Migrator). Run `cargo run -- --help`
+//! the `SeaORM` [`Migrator`](migration::Migrator). Run `cargo run -- --help`
 //! for the available subcommands (start the server, run migrations, …).
 
 // Always start with high quality coding conventions.

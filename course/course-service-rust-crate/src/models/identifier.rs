@@ -42,7 +42,7 @@ pub enum IdentifierType {
     LmsCourseId,
     /// Provider's catalog code (e.g. "CS101"). May not be globally unique.
     CourseCode,
-    /// Coursera / edX / Udemy / FutureLearn / openSAP course slug.
+    /// Coursera / edX / Udemy / `FutureLearn` / openSAP course slug.
     PlatformSlug,
     /// Open Education Resource (OER) identifier.
     Oer,
@@ -83,6 +83,7 @@ impl IdentifierType {
     /// assert!(!IdentifierType::CourseCode.is_deterministic());
     /// assert!(!IdentifierType::LmsCourseId.is_deterministic());
     /// ```
+    #[must_use]
     pub fn is_deterministic(&self) -> bool {
         matches!(
             self,

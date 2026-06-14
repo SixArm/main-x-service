@@ -1,8 +1,8 @@
-//! REST API surface — Axum router + state + OpenAPI doc.
+//! REST API surface — Axum router + state + `OpenAPI` doc.
 //!
 //! Routes mount under `/api` (matches `spec.md §9` and the front-end's
 //! `CourseRepository`). Swagger UI is served at `/swagger-ui` with the
-//! raw OpenAPI 3 JSON at `/api-docs/openapi.json`.
+//! raw `OpenAPI` 3 JSON at `/api-docs/openapi.json`.
 
 use axum::{
     Router,
@@ -97,7 +97,7 @@ pub use state::AppState;
         (name = "metrics",    description = "Prometheus metrics"),
     ),
 )]
-/// utoipa OpenAPI document aggregating every path, schema, and tag for
+/// utoipa `OpenAPI` document aggregating every path, schema, and tag for
 /// the Course Service REST API. Rendered at `/swagger-ui` and served as
 /// JSON at `/api-docs/openapi.json`.
 pub struct ApiDoc;
@@ -211,7 +211,7 @@ pub fn metrics_routes() -> loco_rs::controller::Routes {
     Routes::new().add("/metrics.prom", get(handlers::metrics_prom))
 }
 
-/// DB-free pins for the metrics route registration.
+/// DB-free pins for the metrics route registration and the `OpenAPI` doc.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,5 +233,45 @@ mod tests {
             routes.handlers.iter().any(|h| h.uri == "/metrics.prom"),
             "missing /metrics.prom handler in metrics_routes()"
         );
+    }
+
+    /// `ApiDoc::openapi()` must return without panicking. This is a
+    /// regression guard for the self-referential `Syllabus` schema
+    /// (`sub_sections: Vec<Syllabus>`), which previously drove utoipa
+    /// into unbounded recursion and overflowed the stack while building
+    /// the document. The fix is `#[schema(no_recursion)]` on that field;
+    /// if it is removed, this test aborts with a stack overflow.
+    ///
+    /// Building the full document is DB-free, so it also lets us assert
+    /// the path surface directly — including the root-mounted
+    /// `/metrics.prom` endpoint — rather than only inspecting the typed
+    /// loco `Routes`.
+    #[test]
+    fn openapi_doc_builds_with_expected_paths() {
+        let doc = ApiDoc::openapi();
+        let paths = &doc.paths.paths;
+
+        // Prometheus metrics endpoint, mounted at the application root.
+        assert!(
+            paths.contains_key("/metrics.prom"),
+            "OpenAPI doc is missing the /metrics.prom path; got {:?}",
+            paths.keys().collect::<Vec<_>>()
+        );
+
+        // A representative sample of the `/api` surface, to prove the
+        // document is fully populated (not merely non-empty).
+        for expected in [
+            "/api/health",
+            "/api/courses",
+            "/api/courses/{id}",
+            "/api/courses/merge",
+            "/api/courses/{id}/instances",
+        ] {
+            assert!(
+                paths.contains_key(expected),
+                "OpenAPI doc is missing the {expected} path; got {:?}",
+                paths.keys().collect::<Vec<_>>()
+            );
+        }
     }
 }

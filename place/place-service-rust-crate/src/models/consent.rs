@@ -94,6 +94,7 @@ impl Consent {
     /// };
     /// assert!(!expired.is_active());
     /// ```
+    #[must_use]
     pub fn is_active(&self) -> bool {
         // A non-Active status is decisive regardless of any expiry.
         if self.status != ConsentStatus::Active {

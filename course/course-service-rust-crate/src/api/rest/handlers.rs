@@ -191,7 +191,7 @@ pub async fn create_course(
 ) -> impl IntoResponse {
     let errs = validate_course(&course);
     if !errs.is_empty() {
-        return validation_response(errs);
+        return validation_response(&errs);
     }
 
     match find_probable_duplicates(&state, &course).await {
@@ -204,12 +204,12 @@ pub async fn create_course(
             return (StatusCode::CONFLICT, Json(body)).into_response();
         }
         Ok(_) => {}
-        Err(e) => return error_response(e),
+        Err(e) => return error_response(&e),
     }
 
     let created = match state.course_repository.create(&course).await {
         Ok(c) => c,
-        Err(e) => return error_response(e),
+        Err(e) => return error_response(&e),
     };
     if let Err(e) = state.search_engine.index_course(&created) {
         tracing::warn!("indexing course after create failed: {e}");
@@ -244,7 +244,7 @@ pub async fn get_course(State(state): State<AppState>, Path(id): Path<Uuid>) -> 
     let mut course = match state.course_repository.get_by_id(&id).await {
         Ok(Some(c)) => c,
         Ok(None) => return not_found_response("Course not found"),
-        Err(e) => return error_response(e),
+        Err(e) => return error_response(&e),
     };
     match state.course_repository.list_instances(&id).await {
         Ok(instances) => course.instances = instances,
@@ -275,7 +275,7 @@ pub async fn update_course(
     course.id = id;
     let errs = validate_course(&course);
     if !errs.is_empty() {
-        return validation_response(errs);
+        return validation_response(&errs);
     }
     // Snapshot the existing row so the audit entry can carry old/new
     // values. Failure to read the prior state is non-fatal — the
@@ -284,7 +284,7 @@ pub async fn update_course(
     let updated = match state.course_repository.update(&course).await {
         Ok(c) => c,
         Err(crate::Error::NotFound) => return not_found_response("Course not found"),
-        Err(e) => return error_response(e),
+        Err(e) => return error_response(&e),
     };
     if let Err(e) = state.search_engine.delete_course(&id.to_string()) {
         tracing::warn!("removing prior course segment after update failed: {e}");
@@ -337,7 +337,7 @@ pub async fn delete_course(
             StatusCode::NO_CONTENT.into_response()
         }
         Err(crate::Error::NotFound) => not_found_response("Course not found"),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -363,17 +363,23 @@ pub async fn search_courses(
                 }))
                 .into_response();
             }
-            Err(e) => return error_response(e),
+            Err(e) => return error_response(&e),
         }
     } else if q.fuzzy {
-        match state.search_engine.fuzzy_search(&query, q.limit as usize) {
+        match state
+            .search_engine
+            .fuzzy_search(&query, usize::try_from(q.limit).unwrap_or(usize::MAX))
+        {
             Ok(v) => v,
-            Err(e) => return error_response(e),
+            Err(e) => return error_response(&e),
         }
     } else {
-        match state.search_engine.search(&query, q.limit as usize) {
+        match state
+            .search_engine
+            .search(&query, usize::try_from(q.limit).unwrap_or(usize::MAX))
+        {
             Ok(v) => v,
-            Err(e) => return error_response(e),
+            Err(e) => return error_response(&e),
         }
     };
 
@@ -385,7 +391,7 @@ pub async fn search_courses(
         match state.course_repository.get_by_id(&uuid).await {
             Ok(Some(c)) => items.push(c),
             Ok(None) => {} // stale index entry
-            Err(e) => return error_response(e),
+            Err(e) => return error_response(&e),
         }
     }
     let total = items.len();
@@ -413,7 +419,7 @@ pub async fn list_instances(
     }
     match state.course_repository.list_instances(&course_id).await {
         Ok(items) => Json(ApiResponse::success(items)).into_response(),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -440,14 +446,14 @@ pub async fn create_instance(
     instance.course_id = course_id;
     let errs = validate_instance(&instance);
     if !errs.is_empty() {
-        return validation_response(errs);
+        return validation_response(&errs);
     }
     match state.course_repository.create_instance(&instance).await {
         Ok(created) => {
             record_instance_create(&state, course_id, &created).await;
             (StatusCode::CREATED, Json(ApiResponse::success(created))).into_response()
         }
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -475,7 +481,7 @@ pub async fn update_instance_handler(
     instance.id = instance_id;
     let errs = validate_instance(&instance);
     if !errs.is_empty() {
-        return validation_response(errs);
+        return validation_response(&errs);
     }
     let prior = state
         .course_repository
@@ -489,7 +495,7 @@ pub async fn update_instance_handler(
             Json(ApiResponse::success(updated)).into_response()
         }
         Err(crate::Error::NotFound) => not_found_response("CourseInstance not found"),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -519,7 +525,7 @@ pub async fn get_instance(
     {
         Ok(Some(i)) => Json(ApiResponse::success(i)).into_response(),
         Ok(None) => not_found_response("CourseInstance not found"),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -556,7 +562,7 @@ pub async fn delete_instance(
             StatusCode::NO_CONTENT.into_response()
         }
         Err(crate::Error::NotFound) => not_found_response("CourseInstance not found"),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -570,7 +576,7 @@ async fn require_course_exists(
     match state.course_repository.get_by_id(course_id).await {
         Ok(Some(_)) => Ok(()),
         Ok(None) => Err(not_found_response("Course not found")),
-        Err(e) => Err(error_response(e)),
+        Err(e) => Err(error_response(&e)),
     }
 }
 
@@ -587,7 +593,7 @@ pub async fn check_duplicates(
 ) -> impl IntoResponse {
     match find_probable_duplicates(&state, &course).await {
         Ok(hits) => Json(ApiResponse::success(hits)).into_response(),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -662,11 +668,11 @@ fn confidence_label(c: crate::matching::MatchConfidence) -> &'static str {
 
 /// Build a `422 Unprocessable Entity` response carrying the field-scoped
 /// validation errors in the envelope's `details`.
-fn validation_response(errs: Vec<ValidationError>) -> axum::response::Response {
+fn validation_response(errs: &[ValidationError]) -> axum::response::Response {
     let body: ApiResponse<Vec<ValidationError>> = ApiResponse::error_with_details(
         "VALIDATION_FAILED",
         "Request failed validation; see `details` for field-scoped errors.",
-        &errs,
+        errs,
     );
     (StatusCode::UNPROCESSABLE_ENTITY, Json(body)).into_response()
 }
@@ -704,7 +710,7 @@ pub async fn match_course(
     }
     match score_all_blocked_candidates(&state, &probe).await {
         Ok(hits) => Json(ApiResponse::success(hits)).into_response(),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -724,7 +730,7 @@ pub async fn merge_courses(
     Json(req): Json<MergeRequest>,
 ) -> impl IntoResponse {
     if req.main_course_id == req.duplicate_course_id {
-        return validation_response(vec![ValidationError {
+        return validation_response(&[ValidationError {
             field: "duplicate_course_id".into(),
             message: "main_course_id and duplicate_course_id must differ".into(),
         }]);
@@ -733,7 +739,7 @@ pub async fn merge_courses(
     let main = match state.course_repository.get_by_id(&req.main_course_id).await {
         Ok(Some(c)) => c,
         Ok(None) => return not_found_response("main course not found"),
-        Err(e) => return error_response(e),
+        Err(e) => return error_response(&e),
     };
     let duplicate = match state
         .course_repository
@@ -742,7 +748,7 @@ pub async fn merge_courses(
     {
         Ok(Some(c)) => c,
         Ok(None) => return not_found_response("duplicate course not found"),
-        Err(e) => return error_response(e),
+        Err(e) => return error_response(&e),
     };
 
     let match_result = state.matcher.match_courses(&main, &duplicate);
@@ -752,7 +758,7 @@ pub async fn merge_courses(
     let updated = match state.course_repository.update(&merged).await {
         Ok(c) => c,
         Err(crate::Error::NotFound) => return not_found_response("main course not found"),
-        Err(e) => return error_response(e),
+        Err(e) => return error_response(&e),
     };
     if let Err(e) = state.search_engine.delete_course(&main.id.to_string()) {
         tracing::warn!("removing main course segment during merge failed: {e}");
@@ -781,7 +787,7 @@ pub async fn merge_courses(
     };
     let merge_record = match state.course_repository.record_merge(&merge_record).await {
         Ok(r) => r,
-        Err(e) => return error_response(e),
+        Err(e) => return error_response(&e),
     };
 
     // FR-17 / FR-18 — audit + event for both sides + the merge itself.
@@ -985,7 +991,7 @@ pub async fn deduplicate(
         || !(0.0..=1.0).contains(&req.auto_merge_threshold)
         || req.auto_merge_threshold < req.threshold
     {
-        return validation_response(vec![ValidationError {
+        return validation_response(&[ValidationError {
             field: "thresholds".into(),
             message: "thresholds must be in [0, 1] with auto_merge_threshold >= threshold".into(),
         }]);
@@ -993,7 +999,7 @@ pub async fn deduplicate(
 
     match run_batch_dedup(&state, &req).await {
         Ok(resp) => Json(ApiResponse::success(resp)).into_response(),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -1181,7 +1187,7 @@ pub async fn masked_course(
     match state.course_repository.get_by_id(&id).await {
         Ok(Some(c)) => Json(ApiResponse::success(crate::privacy::mask_course(&c))).into_response(),
         Ok(None) => not_found_response("Course not found"),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -1204,7 +1210,7 @@ pub async fn export_course_data(
             Json(ApiResponse::success(crate::privacy::export_course(&c))).into_response()
         }
         Ok(None) => not_found_response("Course not found"),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -1238,7 +1244,7 @@ pub async fn audit_for_course(
 ) -> impl IntoResponse {
     match state.audit_log.list_for_entity(id, q.limit).await {
         Ok(rows) => Json(ApiResponse::success(rows)).into_response(),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -1255,7 +1261,7 @@ pub async fn audit_recent(
 ) -> impl IntoResponse {
     match state.audit_log.list_recent(q.limit).await {
         Ok(rows) => Json(ApiResponse::success(rows)).into_response(),
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -1299,9 +1305,9 @@ async fn record_update(
     new_value: &impl Serialize,
     event_kind: EventKind,
 ) {
-    let old_json = old
-        .map(|v| serde_json::to_value(v).unwrap_or(serde_json::Value::Null))
-        .unwrap_or(serde_json::Value::Null);
+    let old_json = old.map_or(serde_json::Value::Null, |v| {
+        serde_json::to_value(v).unwrap_or(serde_json::Value::Null)
+    });
     let new_json = serde_json::to_value(new_value).unwrap_or(serde_json::Value::Null);
     if let Err(e) = state
         .audit_log
@@ -1332,9 +1338,9 @@ async fn record_delete(
     old: Option<&impl Serialize>,
     event_kind: EventKind,
 ) {
-    let old_json = old
-        .map(|v| serde_json::to_value(v).unwrap_or(serde_json::Value::Null))
-        .unwrap_or(serde_json::Value::Null);
+    let old_json = old.map_or(serde_json::Value::Null, |v| {
+        serde_json::to_value(v).unwrap_or(serde_json::Value::Null)
+    });
     if let Err(e) = state
         .audit_log
         .log_delete(
@@ -1389,9 +1395,9 @@ async fn record_instance_update(
     prior: Option<&CourseInstance>,
     updated: &CourseInstance,
 ) {
-    let old_json = prior
-        .map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null))
-        .unwrap_or(serde_json::Value::Null);
+    let old_json = prior.map_or(serde_json::Value::Null, |p| {
+        serde_json::to_value(p).unwrap_or(serde_json::Value::Null)
+    });
     let new_json = serde_json::to_value(updated).unwrap_or(serde_json::Value::Null);
     if let Err(e) = state
         .audit_log
@@ -1425,9 +1431,9 @@ async fn record_instance_delete(
     instance_id: Uuid,
     prior: Option<&CourseInstance>,
 ) {
-    let payload = prior
-        .map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null))
-        .unwrap_or(serde_json::Value::Null);
+    let payload = prior.map_or(serde_json::Value::Null, |p| {
+        serde_json::to_value(p).unwrap_or(serde_json::Value::Null)
+    });
     if let Err(e) = state
         .audit_log
         .log_delete(
@@ -1455,8 +1461,8 @@ async fn record_instance_delete(
 /// domain [`Error`](enum@crate::Error) variants to status + stable code
 /// (404 / 422 / 409, everything else 500) and wraps the message in the
 /// standard failure envelope.
-fn error_response(e: crate::Error) -> axum::response::Response {
-    let (status, code) = match &e {
+fn error_response(e: &crate::Error) -> axum::response::Response {
+    let (status, code) = match e {
         crate::Error::NotFound => (StatusCode::NOT_FOUND, "NOT_FOUND"),
         crate::Error::Validation(_) => (StatusCode::UNPROCESSABLE_ENTITY, "VALIDATION_FAILED"),
         crate::Error::Conflict(_) => (StatusCode::CONFLICT, "CONFLICT"),

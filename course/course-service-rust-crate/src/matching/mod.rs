@@ -33,9 +33,12 @@ pub struct CourseMatcher {
 impl CourseMatcher {
     /// Build a matcher from the service's [`MatchingConfig`], seeding the
     /// underlying engine's threshold from `threshold_score`.
+    #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
-        let mut cfg = MatchConfig::default();
-        cfg.threshold = config.threshold_score;
+        let cfg = MatchConfig {
+            threshold: config.threshold_score,
+            ..MatchConfig::default()
+        };
         Self {
             threshold: config.threshold_score,
             engine: MatchingEngine::new(cfg),
@@ -43,17 +46,19 @@ impl CourseMatcher {
     }
 
     /// The configured `is_match` threshold score.
+    #[must_use]
     pub fn threshold(&self) -> f64 {
         self.threshold
     }
 
     /// Score two service-side `Course` records via the canonical
     /// `course-matcher` algorithm.
+    #[must_use]
     pub fn match_courses(&self, a: &Course, b: &Course) -> MatchResult {
         let ma = adapter::to_matcher_course(a);
         let mb = adapter::to_matcher_course(b);
         let r = self.engine.match_courses(&ma, &mb);
-        from_matcher_result(r)
+        from_matcher_result(&r)
     }
 
     /// Rank `candidates` against `course` by descending score.
@@ -63,7 +68,7 @@ impl CourseMatcher {
         self.engine
             .rank(&mc, &mcands)
             .into_iter()
-            .map(|(_idx, r)| from_matcher_result(r))
+            .map(|(_idx, r)| from_matcher_result(&r))
             .collect()
     }
 }
@@ -73,7 +78,7 @@ impl CourseMatcher {
 /// per-component score across. `identifier_score` is left `None`
 /// because the matcher folds identifier matches into the deterministic
 /// short-circuit rather than a weighted component.
-fn from_matcher_result(r: course_matcher::MatchResult) -> MatchResult {
+fn from_matcher_result(r: &course_matcher::MatchResult) -> MatchResult {
     MatchResult {
         score: r.score,
         is_match: r.is_match,

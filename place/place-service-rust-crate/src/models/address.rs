@@ -56,6 +56,7 @@ impl PostalAddress {
     /// let addr = PostalAddress::new();
     /// assert!(addr.postal_code.is_none());
     /// ```
+    #[must_use]
     pub fn new() -> Self {
         Self {
             street_address: None,

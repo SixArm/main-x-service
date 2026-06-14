@@ -102,20 +102,18 @@ pub fn to_matcher_place(p: &Place) -> MPlace {
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
+        && let Some(pid) = MPlaceId::new(MScheme::Other("GLN".into()), gln)
     {
-        if let Some(pid) = MPlaceId::new(MScheme::Other("GLN".into()), gln) {
-            b = b.add_place_id(pid);
-        }
+        b = b.add_place_id(pid);
     }
     if let Some(bc) = p
         .branch_code
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
+        && let Some(pid) = MPlaceId::new(MScheme::Other("BranchCode".into()), bc)
     {
-        if let Some(pid) = MPlaceId::new(MScheme::Other("BranchCode".into()), bc) {
-            b = b.add_place_id(pid);
-        }
+        b = b.add_place_id(pid);
     }
 
     for id in &p.identifiers {
@@ -137,6 +135,7 @@ pub fn to_matcher_place(p: &Place) -> MPlace {
 ///
 /// The matcher's vocabulary is broader (34 variants vs. the service's 12);
 /// service-side `Other(s)` flows through as `MCategory::Other(s)`.
+#[must_use]
 pub fn map_place_type(t: &PlaceType) -> MCategory {
     match t {
         PlaceType::LocalBusiness => MCategory::Other("LocalBusiness".into()),
@@ -160,6 +159,7 @@ pub fn map_place_type(t: &PlaceType) -> MCategory {
 /// The matcher uses its enumerated `PlaceIdScheme` (Google, OSM nodes,
 /// Wikidata, …) plus `Other(String)` for everything else; service-side
 /// schemes that have no direct enum variant fall through as `Other(name)`.
+#[must_use]
 pub fn map_identifier_scheme(t: &IdentifierType) -> MScheme {
     match t {
         IdentifierType::GlobalLocationNumber => MScheme::Other("GLN".into()),

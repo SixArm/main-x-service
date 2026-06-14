@@ -194,6 +194,7 @@ impl Metrics {
     /// The `expect`s are unreachable in practice: the encoder writes into an
     /// in-memory `Vec` (which never fails) and emits valid UTF-8, so the
     /// final `from_utf8` cannot error.
+    #[must_use]
     pub fn render(&self) -> String {
         let encoder = TextEncoder::new();
         let metric_families = self.registry.gather();

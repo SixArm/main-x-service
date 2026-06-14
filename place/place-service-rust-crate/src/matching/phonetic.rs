@@ -39,10 +39,11 @@
 /// assert_eq!(soundex("A"), "A000");
 /// assert_eq!(soundex("Washington"), "W252");
 /// ```
+#[must_use]
 pub fn soundex(s: &str) -> String {
     // Normalize: uppercase, then keep only ASCII letters.
     let s = s.trim().to_uppercase();
-    let chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect();
+    let chars: Vec<char> = s.chars().filter(char::is_ascii_alphabetic).collect();
 
     // No letters at all ⇒ the conventional empty Soundex code.
     if chars.is_empty() {
@@ -101,6 +102,7 @@ pub fn soundex(s: &str) -> String {
 /// assert!(soundex_match("Springfield", "Springfeild"));
 /// assert!(!soundex_match("Robert", "Smith"));
 /// ```
+#[must_use]
 pub fn soundex_match(a: &str, b: &str) -> bool {
     soundex(a) == soundex(b)
 }

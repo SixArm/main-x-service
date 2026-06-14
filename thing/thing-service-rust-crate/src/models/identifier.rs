@@ -100,6 +100,7 @@ impl ThingIdentifier {
     /// let id = ThingIdentifier::new(IdentifierType::Custom("OpenLibrary".into()), "OL1394865W");
     /// assert_eq!(id.value, "OL1394865W");
     /// ```
+    #[must_use]
     pub fn new(property_id: IdentifierType, value: &str) -> Self {
         Self {
             property_id,
@@ -110,38 +111,47 @@ impl ThingIdentifier {
     }
 
     /// Constructs a [`Doi`](IdentifierType::Doi) identifier.
+    #[must_use]
     pub fn doi(value: &str) -> Self {
         Self::new(IdentifierType::Doi, value)
     }
     /// Constructs an [`Isbn`](IdentifierType::Isbn) identifier.
+    #[must_use]
     pub fn isbn(value: &str) -> Self {
         Self::new(IdentifierType::Isbn, value)
     }
     /// Constructs an [`Issn`](IdentifierType::Issn) identifier.
+    #[must_use]
     pub fn issn(value: &str) -> Self {
         Self::new(IdentifierType::Issn, value)
     }
     /// Constructs a [`Gtin`](IdentifierType::Gtin) identifier.
+    #[must_use]
     pub fn gtin(value: &str) -> Self {
         Self::new(IdentifierType::Gtin, value)
     }
     /// Constructs a [`Sku`](IdentifierType::Sku) identifier.
+    #[must_use]
     pub fn sku(value: &str) -> Self {
         Self::new(IdentifierType::Sku, value)
     }
     /// Constructs an [`Mpn`](IdentifierType::Mpn) identifier.
+    #[must_use]
     pub fn mpn(value: &str) -> Self {
         Self::new(IdentifierType::Mpn, value)
     }
     /// Constructs a [`SerialNumber`](IdentifierType::SerialNumber) identifier.
+    #[must_use]
     pub fn serial_number(value: &str) -> Self {
         Self::new(IdentifierType::SerialNumber, value)
     }
     /// Constructs a [`Uri`](IdentifierType::Uri) identifier.
+    #[must_use]
     pub fn uri(value: &str) -> Self {
         Self::new(IdentifierType::Uri, value)
     }
     /// Constructs a [`Uuid`](IdentifierType::Uuid) identifier.
+    #[must_use]
     pub fn uuid(value: &str) -> Self {
         Self::new(IdentifierType::Uuid, value)
     }
@@ -161,6 +171,7 @@ impl ThingIdentifier {
     /// assert!(ThingIdentifier::isbn("9780141439518").is_deterministic());
     /// assert!(!ThingIdentifier::sku("WIDGET-42").is_deterministic());
     /// ```
+    #[must_use]
     pub fn is_deterministic(&self) -> bool {
         matches!(
             self.property_id,
@@ -230,7 +241,7 @@ mod tests {
         assert_eq!(id, deserialized);
     }
 
-    /// Optional `name` and `url` PropertyValue fields round-trip.
+    /// Optional `name` and `url` `PropertyValue` fields round-trip.
     #[test]
     fn test_identifier_with_name_and_url() {
         let mut id = ThingIdentifier::isbn("9780141439518");

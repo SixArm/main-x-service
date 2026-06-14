@@ -38,12 +38,13 @@ use serde_json::Value;
 /// - `identifiers` — each `value` is truncated to its last four
 ///   characters; any per-identifier `url` is cleared. The
 ///   `property_id` is preserved.
+#[must_use]
 pub fn mask_thing(thing: &Thing) -> Thing {
     let mut masked = thing.clone();
     if masked.owner.is_some() {
         masked.owner = Some("[owner withheld]".to_string());
     }
-    for id in masked.identifiers.iter_mut() {
+    for id in &mut masked.identifiers {
         id.value = mask_value(&id.value);
         id.url = None;
     }
@@ -62,6 +63,7 @@ fn mask_value(v: &str) -> String {
 }
 
 /// GDPR Article 15 export — full Thing JSON, unmodified.
+#[must_use]
 pub fn gdpr_export(thing: &Thing) -> Value {
     serde_json::to_value(thing).unwrap_or(Value::Null)
 }

@@ -3,7 +3,7 @@
 //! [`SeaOrmPlaceRepository`] round-trips a domain [`Place`] against a fully
 //! normalized relational schema: scalar fields plus the flattened 0..1
 //! address/geo objects live on the `places` row; the keywords, identifiers,
-//! amenity_features, and opening_hours collections live in dedicated child
+//! `amenity_features`, and `opening_hours` collections live in dedicated child
 //! tables joined by `place_id`. Writes are transactional; updates replace
 //! the child rows.
 
@@ -34,15 +34,15 @@ use models::{
     place_opening_hours, places,
 };
 
-/// Open a SeaORM connection pool from a [`DatabaseConfig`].
+/// Open a `SeaORM` connection pool from a [`DatabaseConfig`].
 ///
 /// Applies the configured `max`/`min` pool bounds so the service caps its
-/// concurrent database connections (PostgreSQL has a finite backend slot
+/// concurrent database connections (`PostgreSQL` has a finite backend slot
 /// budget) while keeping a warm minimum to avoid cold-connect latency on
 /// the first request after idle.
 ///
 /// # Errors
-/// Returns [`crate::Error::Pool`] if SeaORM cannot establish the pool
+/// Returns [`crate::Error::Pool`] if `SeaORM` cannot establish the pool
 /// (bad URL, unreachable server, auth failure, …).
 pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {
     // SeaORM's connect options carry the pool sizing knobs.
@@ -59,7 +59,7 @@ pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnec
 ///
 /// Abstracting persistence behind a trait lets `AppState` carry an
 /// `Arc<dyn PlaceRepository>` so handlers depend on the contract, not the
-/// SeaORM implementation — easing testing and any future storage swap.
+/// `SeaORM` implementation — easing testing and any future storage swap.
 /// `Send + Sync` is required because the repository is shared across Axum's
 /// worker tasks.
 #[async_trait::async_trait]
@@ -100,15 +100,16 @@ pub trait PlaceRepository: Send + Sync {
     async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord>;
 }
 
-/// SeaORM-backed [`PlaceRepository`] over a PostgreSQL connection pool.
+/// `SeaORM`-backed [`PlaceRepository`] over a `PostgreSQL` connection pool.
 pub struct SeaOrmPlaceRepository {
-    /// The shared SeaORM connection pool.
+    /// The shared `SeaORM` connection pool.
     db: DatabaseConnection,
 }
 
 impl SeaOrmPlaceRepository {
     /// Wrap an existing connection pool in a repository. Cheap: the pool
     /// (a `DatabaseConnection`) is itself a clonable handle.
+    #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
@@ -132,7 +133,7 @@ impl SeaOrmPlaceRepository {
             .order_by_asc(place_keywords::Column::Position)
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let keywords = kw_rows.into_iter().map(|r| r.keyword).collect();
 
         // Identifiers: the stored `(type tag, custom_label)` pair is decoded
@@ -142,7 +143,7 @@ impl SeaOrmPlaceRepository {
             .order_by_asc(place_identifiers::Column::Position)
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let identifiers = id_rows
             .into_iter()
             .map(|r| PlaceIdentifier {
@@ -156,7 +157,7 @@ impl SeaOrmPlaceRepository {
             .order_by_asc(place_amenity_features::Column::Position)
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let amenity_features = am_rows
             .into_iter()
             .map(|r| AmenityFeature {
@@ -170,7 +171,7 @@ impl SeaOrmPlaceRepository {
             .order_by_asc(place_opening_hours::Column::Position)
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let opening_hours = oh_rows
             .into_iter()
             .map(|r| OpeningHoursSpecification {
@@ -215,7 +216,9 @@ impl SeaOrmPlaceRepository {
             is_accessible_for_free: row.is_accessible_for_free,
             public_access: row.public_access,
             smoking_allowed: row.smoking_allowed,
-            maximum_attendee_capacity: row.maximum_attendee_capacity.map(|v| v as u32),
+            maximum_attendee_capacity: row
+                .maximum_attendee_capacity
+                .map(|v| u32::try_from(v).unwrap_or_default()),
             is_deleted: row.is_deleted,
             deleted_at: row.deleted_at.map(offset_to_ts),
             created_at: offset_to_ts(row.created_at),
@@ -227,10 +230,13 @@ impl SeaOrmPlaceRepository {
 #[async_trait::async_trait]
 impl PlaceRepository for SeaOrmPlaceRepository {
     async fn create(&self, place: &Place) -> Result<Place> {
-        let txn = self.db.begin().await.map_err(map_db)?;
-        to_active(place).insert(&txn).await.map_err(map_db)?;
+        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
+        to_active(place)
+            .insert(&txn)
+            .await
+            .map_err(|e| map_db(&e))?;
         insert_collections(&txn, place).await?;
-        txn.commit().await.map_err(map_db)?;
+        txn.commit().await.map_err(|e| map_db(&e))?;
         self.get_by_id(&place.id)
             .await?
             .ok_or_else(|| crate::Error::Database("place not found after insert".into()))
@@ -240,7 +246,7 @@ impl PlaceRepository for SeaOrmPlaceRepository {
         let row = places::Entity::find_by_id(*id)
             .one(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let Some(row) = row else { return Ok(None) };
         if row.is_deleted {
             return Ok(None);
@@ -252,15 +258,18 @@ impl PlaceRepository for SeaOrmPlaceRepository {
         let exists = places::Entity::find_by_id(place.id)
             .one(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         if exists.is_none() {
             return Err(crate::Error::NotFound);
         }
-        let txn = self.db.begin().await.map_err(map_db)?;
-        to_active(place).update(&txn).await.map_err(map_db)?;
+        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
+        to_active(place)
+            .update(&txn)
+            .await
+            .map_err(|e| map_db(&e))?;
         delete_collections(&txn, place.id).await?;
         insert_collections(&txn, place).await?;
-        txn.commit().await.map_err(map_db)?;
+        txn.commit().await.map_err(|e| map_db(&e))?;
         self.get_by_id(&place.id)
             .await?
             .ok_or(crate::Error::NotFound)
@@ -270,13 +279,13 @@ impl PlaceRepository for SeaOrmPlaceRepository {
         let row = places::Entity::find_by_id(*id)
             .one(&self.db)
             .await
-            .map_err(map_db)?
+            .map_err(|e| map_db(&e))?
             .ok_or(crate::Error::NotFound)?;
         let mut active: places::ActiveModel = row.into();
         active.is_deleted = Set(true);
         active.deleted_at = Set(Some(OffsetDateTime::now_utc()));
         active.updated_at = Set(OffsetDateTime::now_utc());
-        active.update(&self.db).await.map_err(map_db)?;
+        active.update(&self.db).await.map_err(|e| map_db(&e))?;
         Ok(())
     }
 
@@ -288,7 +297,7 @@ impl PlaceRepository for SeaOrmPlaceRepository {
             .offset(offset)
             .all(&self.db)
             .await
-            .map_err(map_db)?;
+            .map_err(|e| map_db(&e))?;
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
             out.push(self.hydrate(row).await?);
@@ -305,18 +314,21 @@ impl PlaceRepository for SeaOrmPlaceRepository {
             transferred_data: Set(rec.transferred_data.clone()),
             merged_at: Set(ts_to_offset(rec.merged_at)),
         };
-        active.insert(&self.db).await.map_err(map_db)?;
+        active.insert(&self.db).await.map_err(|e| map_db(&e))?;
         Ok(rec.clone())
     }
 }
 
 /// Count non-deleted places (diagnostics / benches).
+///
+/// # Errors
+/// Propagates any database error from the count query.
 pub async fn count_active(db: &DatabaseConnection) -> Result<u64> {
     places::Entity::find()
         .filter(places::Column::IsDeleted.eq(false))
         .count(db)
         .await
-        .map_err(map_db)
+        .map_err(|e| map_db(&e))
 }
 
 /// Build the `places` scalar+flattened active model from a domain [`Place`].
@@ -364,7 +376,9 @@ fn to_active(place: &Place) -> places::ActiveModel {
         is_accessible_for_free: Set(place.is_accessible_for_free),
         public_access: Set(place.public_access),
         smoking_allowed: Set(place.smoking_allowed),
-        maximum_attendee_capacity: Set(place.maximum_attendee_capacity.map(|v| v as i32)),
+        maximum_attendee_capacity: Set(place
+            .maximum_attendee_capacity
+            .map(|v| i32::try_from(v).unwrap_or(i32::MAX))),
         is_deleted: Set(place.is_deleted),
         deleted_at: Set(place.deleted_at.map(ts_to_offset)),
         created_at: Set(ts_to_offset(place.created_at)),
@@ -399,11 +413,11 @@ async fn insert_collections<C: ConnectionTrait>(conn: &C, place: &Place) -> Resu
             id: Set(Uuid::new_v4()),
             place_id: Set(place.id),
             keyword: Set(keyword.clone()),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     }
     for (i, ident) in place.identifiers.iter().enumerate() {
         let (identifier_type, custom_label) = ident_type_parts(&ident.identifier_type);
@@ -413,11 +427,11 @@ async fn insert_collections<C: ConnectionTrait>(conn: &C, place: &Place) -> Resu
             identifier_type: Set(identifier_type),
             custom_label: Set(custom_label),
             value: Set(ident.value.clone()),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     }
     for (i, am) in place.amenity_features.iter().enumerate() {
         place_amenity_features::ActiveModel {
@@ -425,11 +439,11 @@ async fn insert_collections<C: ConnectionTrait>(conn: &C, place: &Place) -> Resu
             place_id: Set(place.id),
             name: Set(am.name.clone()),
             value: Set(am.value.clone()),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     }
     for (i, oh) in place.opening_hours.iter().enumerate() {
         place_opening_hours::ActiveModel {
@@ -438,11 +452,11 @@ async fn insert_collections<C: ConnectionTrait>(conn: &C, place: &Place) -> Resu
             day_of_week: Set(day_of_week_str(&oh.day_of_week)),
             opens: Set(oh.opens.clone()),
             closes: Set(oh.closes.clone()),
-            position: Set(i as i32),
+            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
         }
         .insert(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     }
     Ok(())
 }
@@ -453,22 +467,22 @@ async fn delete_collections<C: ConnectionTrait>(conn: &C, place_id: Uuid) -> Res
         .filter(place_keywords::Column::PlaceId.eq(place_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     place_identifiers::Entity::delete_many()
         .filter(place_identifiers::Column::PlaceId.eq(place_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     place_amenity_features::Entity::delete_many()
         .filter(place_amenity_features::Column::PlaceId.eq(place_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     place_opening_hours::Entity::delete_many()
         .filter(place_opening_hours::Column::PlaceId.eq(place_id))
         .exec(conn)
         .await
-        .map_err(map_db)?;
+        .map_err(|e| map_db(&e))?;
     Ok(())
 }
 
@@ -561,8 +575,8 @@ fn parse_day_of_week(tag: &str) -> DayOfWeek {
     }
 }
 
-/// Map a SeaORM `DbErr` into the crate error type.
-fn map_db(e: sea_orm::DbErr) -> crate::Error {
+/// Map a `SeaORM` [`DbErr`](sea_orm::DbErr) into the crate error type.
+fn map_db(e: &sea_orm::DbErr) -> crate::Error {
     crate::Error::Database(e.to_string())
 }
 

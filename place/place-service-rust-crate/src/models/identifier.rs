@@ -63,6 +63,7 @@ impl PlaceIdentifier {
     /// let id = PlaceIdentifier::new(IdentifierType::Gnis, "975772");
     /// assert_eq!(id.value, "975772");
     /// ```
+    #[must_use]
     pub fn new(identifier_type: IdentifierType, value: &str) -> Self {
         Self {
             identifier_type,
@@ -80,6 +81,7 @@ impl PlaceIdentifier {
     /// let id = PlaceIdentifier::gln("1234567890123");
     /// assert_eq!(id.identifier_type, IdentifierType::GlobalLocationNumber);
     /// ```
+    #[must_use]
     pub fn gln(value: &str) -> Self {
         Self::new(IdentifierType::GlobalLocationNumber, value)
     }

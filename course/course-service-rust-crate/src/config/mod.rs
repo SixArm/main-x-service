@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     /// HTTP / gRPC bind settings.
     pub server: ServerConfig,
-    /// PostgreSQL connection settings.
+    /// `PostgreSQL` connection settings.
     pub database: DatabaseConfig,
     /// Tantivy search-index settings.
     pub search: SearchConfig,
@@ -37,7 +37,7 @@ pub struct ServerConfig {
     pub grpc_port: u16,
 }
 
-/// PostgreSQL connection-pool configuration.
+/// `PostgreSQL` connection-pool configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     /// Connection URL (`postgres://…`).
@@ -58,7 +58,7 @@ pub struct SearchConfig {
 }
 
 /// Matcher tuning shared with [`crate::matching::CourseMatcher`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct MatchingConfig {
     /// `is_match` cut-off score in `[0.0, 1.0]`.
     pub threshold_score: f64,
@@ -126,6 +126,12 @@ impl Config {
     /// `SERVER_HOST`, `SERVER_PORT`, `GRPC_PORT`,
     /// `SEARCH_INDEX_PATH`, `MATCHING_THRESHOLD`,
     /// `OTLP_SERVICE_NAME`, `OTLP_ENDPOINT`, `RUST_LOG`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`enum@crate::Error`] if an environment variable holds a
+    /// value that cannot be parsed into the target field type (e.g. a
+    /// non-numeric port or connection count).
     pub fn from_env() -> crate::Result<Self> {
         dotenvy::dotenv().ok();
         let mut config = Self::default();

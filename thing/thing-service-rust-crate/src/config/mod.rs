@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     /// HTTP bind settings.
     pub server: ServerConfig,
-    /// PostgreSQL connection settings.
+    /// `PostgreSQL` connection settings.
     pub database: DatabaseConfig,
     /// Tantivy search-index settings.
     pub search: SearchConfig,
@@ -33,7 +33,7 @@ pub struct ServerConfig {
     pub grpc_port: u16,
 }
 
-/// PostgreSQL connection-pool configuration.
+/// `PostgreSQL` connection-pool configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     /// Connection URL (`postgres://…`).
@@ -121,6 +121,12 @@ impl Config {
     /// Load configuration from environment variables.
     ///
     /// Resolution order: explicit env var → `.env` file → struct default.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a numeric environment variable
+    /// (e.g. `DATABASE_MAX_CONNECTIONS`, `SERVER_PORT`) is set but cannot
+    /// be parsed into its target type.
     pub fn from_env() -> crate::Result<Self> {
         dotenvy::dotenv().ok();
         let mut config = Self::default();

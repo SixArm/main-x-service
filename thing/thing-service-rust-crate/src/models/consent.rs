@@ -118,6 +118,7 @@ impl Consent {
     /// };
     /// assert!(!expired.is_active());
     /// ```
+    #[must_use]
     pub fn is_active(&self) -> bool {
         // A non-Active status (Revoked / Expired) is conclusive.
         if self.status != ConsentStatus::Active {
@@ -173,7 +174,7 @@ mod tests {
             consent_type: ConsentType::DataSharing,
             status: ConsentStatus::Active,
             granted_at: Utc::now() - chrono::Duration::hours(24 * (365)),
-            expires_at: Some(Utc::now() - chrono::Duration::hours(24 * (1))),
+            expires_at: Some(Utc::now() - chrono::Duration::hours(24)),
         };
         assert!(!consent.is_active());
     }
