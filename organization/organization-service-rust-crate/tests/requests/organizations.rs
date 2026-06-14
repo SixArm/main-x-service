@@ -207,11 +207,13 @@ async fn merge_folds_duplicate_into_survivor() {
         assert_eq!(merged["name"], "Acme, Inc.");
         let alts = merged["alternate_names"].as_array().expect("alt names");
         assert!(alts.iter().any(|n| n == "Acme Incorporated"));
-        assert!(merged["keywords"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|k| k == "hardware"));
+        assert!(
+            merged["keywords"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|k| k == "hardware")
+        );
         assert_eq!(merged["identifiers"].as_array().unwrap().len(), 1);
 
         // Duplicate is soft-deleted.
@@ -221,20 +223,24 @@ async fn merge_folds_duplicate_into_survivor() {
         // Merge-history row exists.
         let merges: serde_json::Value =
             request.get("/api/organizations/merges/recent").await.json();
-        assert!(merges
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|r| r["duplicate_pid"].as_str() == Some(dup_pid.as_str())));
+        assert!(
+            merges
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|r| r["duplicate_pid"].as_str() == Some(dup_pid.as_str()))
+        );
 
         // Merged event published for the survivor.
         let events: serde_json::Value =
             request.get("/api/organizations/events/recent").await.json();
-        assert!(events
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|e| e["kind"] == "merged" && e["pid"] == main_pid));
+        assert!(
+            events
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|e| e["kind"] == "merged" && e["pid"] == main_pid)
+        );
     })
     .await;
 }

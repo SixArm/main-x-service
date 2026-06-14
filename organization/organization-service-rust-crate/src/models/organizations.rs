@@ -3,8 +3,8 @@
 
 use loco_rs::prelude::*;
 use organization_matcher::Organization as MatchOrg;
-use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::sea_query::Expr;
+use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -72,15 +72,18 @@ impl Model {
     }
 
     /// Case-insensitive substring search on the denormalised `name`,
-    /// over active rows. (Postgres `ILIKE '%q%'`.)
+    /// over active rows. (Postgres `ILIKE '%q%'`.) The query is wildcard-
+    /// escaped via [`escape_like`] so `%`/`_`/`\` in user input match
+    /// literally rather than acting as `LIKE` metacharacters.
     ///
     /// # Errors
     ///
     /// When the query fails.
     pub async fn search(db: &DatabaseConnection, q: &str, limit: u64) -> ModelResult<Vec<Self>> {
+        let pattern = format!("%{}%", escape_like(q));
         let rows = organizations::Entity::find()
             .filter(organizations::Column::DeletedAt.is_null())
-            .filter(Expr::col(organizations::Column::Name).ilike(format!("%{q}%")))
+            .filter(Expr::col(organizations::Column::Name).ilike(pattern))
             .order_by_desc(organizations::Column::Id)
             .limit(limit)
             .all(db)
@@ -134,5 +137,31 @@ impl ActiveModel {
         // soft-delete stamp, not domain time.
         self.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
         self.update(db).await.map_err(ModelError::from)
+    }
+}
+
+/// Escape `LIKE`/`ILIKE` wildcards in a user query so it matches
+/// literally: backslash first (so it can't re-enable a wildcard), then `%`
+/// and `_`. Used by [`Model::search`] to keep `name` search robust against
+/// metacharacter injection. Mirrors the sibling care-pathway / case services.
+fn escape_like(q: &str) -> String {
+    q.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::escape_like;
+
+    /// `escape_like` neutralises `%`, `_`, and `\` so a user query matches
+    /// literally rather than as `ILIKE` metacharacters.
+    #[test]
+    fn escape_like_neutralises_wildcards() {
+        assert_eq!(escape_like("acme"), "acme");
+        assert_eq!(escape_like("100%"), "100\\%");
+        assert_eq!(escape_like("a_b"), "a\\_b");
+        // Backslash is escaped first so it can't re-enable a wildcard.
+        assert_eq!(escape_like("a\\%"), "a\\\\\\%");
     }
 }

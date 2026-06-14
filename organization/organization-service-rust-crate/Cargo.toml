@@ -3,7 +3,7 @@
 [package]
 name = "organization-service"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 publish = false
 default-run = "organization-service"
 
@@ -26,7 +26,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = { version = "1.12" }
 migration = { path = "migration" }
 sea-orm = { version = "1.1", features = [
-  "sqlx-sqlite",
   "sqlx-postgres",
   "runtime-tokio-rustls",
   "macros",

@@ -127,10 +127,11 @@ mod tests {
         };
         let out = merge_orgs(&main, &dup);
         assert_eq!(out.merged.name, "Acme Inc");
-        assert!(out
-            .merged
-            .alternate_names
-            .contains(&"Acme Incorporated".to_string()));
+        assert!(
+            out.merged
+                .alternate_names
+                .contains(&"Acme Incorporated".to_string())
+        );
     }
 
     /// When the duplicate's name equals main's, it is not duplicated into
