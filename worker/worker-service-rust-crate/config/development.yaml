@@ -36,3 +36,10 @@ auth:
   jwt:
     secret: "PLEASE_CHANGE_ME_DEVELOPMENT_ONLY"
     expiration: 604800
+
+# Cache provider: Redis. (Background jobs remain Postgres-backed — see
+# `queue:`; this is the separate cache layer.)
+cache:
+  kind: Redis
+  uri: {{ get_env(name="REDIS_URL", default="redis://127.0.0.1") }}
+  max_size: 10

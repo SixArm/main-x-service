@@ -93,3 +93,10 @@ auth:
     secret: yUeFrPJXsdok8nXskYsI
     # Token expiration time in seconds
     expiration: 604800 # 7 days
+
+# Cache provider: Redis. (Background jobs remain Postgres-backed — see
+# `queue:`; this is the separate cache layer.)
+cache:
+  kind: Redis
+  uri: {{ get_env(name="REDIS_URL", default="redis://127.0.0.1") }}
+  max_size: 10

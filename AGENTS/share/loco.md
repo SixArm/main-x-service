@@ -33,3 +33,17 @@ queue:
   dangerously_flush: false
   num_workers: 2
 ```
+
+## Cache
+
+The background-job **queue** is Postgres-backed (above); the loco
+**cache** layer is **Redis** (loco feature `cache_redis`). Dev/prod
+configure it; tests leave it at the `Null` default so the test harness
+and CI need no Redis.
+
+```
+cache:
+  kind: Redis
+  uri: {{ get_env(name="REDIS_URL", default="redis://127.0.0.1") }}
+  max_size: 10
+```

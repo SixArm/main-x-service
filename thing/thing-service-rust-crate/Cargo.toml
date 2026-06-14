@@ -33,7 +33,7 @@ sea-orm-migration = { version = "1.1", features = ["sqlx-postgres", "runtime-tok
 bigdecimal = { version = "0.4", features = ["serde"] }
 
 # Web Framework (Loco conventions; web/template tier removed)
-loco-rs = { version = "0.16.4", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
+loco-rs = { version = "0.16.4", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_redis", "bg_pg"] }
 migration = { path = "migration" }
 
 # Search Engine

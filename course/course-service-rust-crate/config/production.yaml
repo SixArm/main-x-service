@@ -37,3 +37,9 @@ auth:
   jwt:
     secret: {{ get_env(name="JWT_SECRET", default="unused-course-service-does-not-issue-tokens") }}
     expiration: 604800
+
+# Cache provider: Redis (REDIS_URL required in production).
+cache:
+  kind: Redis
+  uri: {{ get_env(name="REDIS_URL") }}
+  max_size: 10
