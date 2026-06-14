@@ -118,10 +118,11 @@ mod tests {
         let dup = CarePathway::new("Cerebrovascular Accident Pathway");
         let out = merge_pathways(&main, &dup);
         assert_eq!(out.merged.name, "Acute Stroke Care Pathway");
-        assert!(out
-            .merged
-            .alternate_names
-            .contains(&"Cerebrovascular Accident Pathway".to_string()));
+        assert!(
+            out.merged
+                .alternate_names
+                .contains(&"Cerebrovascular Accident Pathway".to_string())
+        );
     }
 
     /// An identical duplicate title is not duplicated into the survivor's

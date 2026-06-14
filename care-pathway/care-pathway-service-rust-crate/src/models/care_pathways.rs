@@ -3,8 +3,8 @@
 
 use care_pathway_matcher::CarePathway as MatchPathway;
 use loco_rs::prelude::*;
-use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::sea_query::Expr;
+use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{QueryOrder, QuerySelect};
 use uuid::Uuid;
 

@@ -17,7 +17,7 @@
 
 use care_pathway_service::app::App;
 use loco_rs::testing::prelude::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use serial_test::serial;
 
 /// A minimal valid pathway payload (the body *is*
@@ -327,11 +327,13 @@ async fn merge_folds_duplicate_into_survivor() {
         let alts = merged["alternate_names"].as_array().expect("alt names");
         assert!(alts.iter().any(|n| n == "Cerebrovascular Accident Pathway"));
         assert_eq!(merged["condition_codes"].as_array().unwrap().len(), 2);
-        assert!(merged["keywords"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|k| k == "acute"));
+        assert!(
+            merged["keywords"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|k| k == "acute")
+        );
 
         // The duplicate is gone (soft-deleted).
         let response = request.get(&format!("/api/care-pathways/{dup_pid}")).await;
@@ -344,17 +346,20 @@ async fn merge_folds_duplicate_into_survivor() {
         // A merge-history record exists.
         let merges: Value = request.get("/api/care-pathways/merges/recent").await.json();
         let rows = merges.as_array().expect("merge rows");
-        assert!(rows
-            .iter()
-            .any(|r| r["duplicate_pid"].as_str() == Some(dup_pid.as_str())));
+        assert!(
+            rows.iter()
+                .any(|r| r["duplicate_pid"].as_str() == Some(dup_pid.as_str()))
+        );
 
         // A Merged event was published for the survivor.
         let events: Value = request.get("/api/care-pathways/events/recent").await.json();
-        assert!(events
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|e| e["kind"] == "merged" && e["pid"] == main_pid));
+        assert!(
+            events
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|e| e["kind"] == "merged" && e["pid"] == main_pid)
+        );
     })
     .await;
 }
@@ -447,10 +452,12 @@ async fn crud_writes_audit_log_and_events() {
 
         // System-wide recent-audit endpoint returns entries too.
         let recent_audit: Value = request.get("/api/care-pathways/audit/recent").await.json();
-        assert!(!recent_audit
-            .as_array()
-            .expect("recent audit array")
-            .is_empty());
+        assert!(
+            !recent_audit
+                .as_array()
+                .expect("recent audit array")
+                .is_empty()
+        );
 
         // The in-memory event stream carries the three events for this pid.
         let events: Value = request.get("/api/care-pathways/events/recent").await.json();

@@ -225,7 +225,7 @@ impl<S: Send + Sync> FromRequestParts<S> for MaybeAuthUser {
 mod tests {
     use super::*;
     use base64::Engine;
-    use jsonwebtoken::{encode, EncodingKey, Header};
+    use jsonwebtoken::{EncodingKey, Header, encode};
     use rsa::pkcs8::DecodePrivateKey;
     use rsa::traits::PublicKeyParts;
 

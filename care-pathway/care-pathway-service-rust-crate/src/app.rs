@@ -4,21 +4,21 @@
 
 use async_trait::async_trait;
 use axum::{
+    Router as AxumRouter,
     extract::Request,
     middleware::Next,
     response::{IntoResponse, Response},
-    Router as AxumRouter,
 };
 use loco_rs::{
+    Result,
     app::{AppContext, Hooks, Initializer},
     bgworker::{BackgroundWorker, Queue},
-    boot::{create_app, BootResult, StartMode},
+    boot::{BootResult, StartMode, create_app},
     config::Config,
     controller::AppRoutes,
     db::truncate_table,
     environment::Environment,
     task::Tasks,
-    Result,
 };
 use migration::Migrator;
 use std::path::Path;

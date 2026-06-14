@@ -10,7 +10,7 @@ use axum::body::Body;
 use axum::http::header::CONTENT_TYPE as CONTENT_TYPE_HEADER;
 use loco_rs::prelude::*;
 
-use crate::metrics::{Metrics, CONTENT_TYPE};
+use crate::metrics::{CONTENT_TYPE, Metrics};
 
 /// Render the process-wide Prometheus registry as text-exposition format.
 ///

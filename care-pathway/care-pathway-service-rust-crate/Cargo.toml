@@ -3,7 +3,7 @@
 [package]
 name = "care-pathway-service"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 publish = false
 default-run = "care-pathway-service"
 
