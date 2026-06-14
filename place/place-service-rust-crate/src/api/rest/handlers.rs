@@ -429,7 +429,7 @@ pub async fn merge_places(
         duplicate_place_id: dup.id,
         merge_reason: req.merge_reason.clone(),
         transferred_data: transferred,
-        merged_at: jiff::Timestamp::now(),
+        merged_at: chrono::Utc::now(),
     };
     let record = match state.place_repository.record_merge(&record).await {
         Ok(r) => r,

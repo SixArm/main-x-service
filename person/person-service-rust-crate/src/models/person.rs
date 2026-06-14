@@ -27,7 +27,7 @@
 //! assert!(person.active);
 //! ```
 
-use jiff::{Timestamp, civil::Date};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -76,7 +76,7 @@ pub struct Person {
 
     /// Date of birth (FHIR `Person.birthDate`), if known.
     #[serde(default)]
-    pub birth_date: Option<Date>,
+    pub birth_date: Option<NaiveDate>,
 
     /// National tax identifier (CPF, SSN, TIN, …). A convenience field
     /// distinct from the typed `identifiers` vector; see
@@ -100,7 +100,7 @@ pub struct Person {
 
     /// Date/time of death, if recorded (FHIR `Person.deceasedDateTime`).
     #[serde(default)]
-    pub deceased_datetime: Option<Timestamp>,
+    pub deceased_datetime: Option<DateTime<Utc>>,
 
     /// Physical / postal addresses (FHIR `Person.address`).
     #[serde(default)]
@@ -131,12 +131,12 @@ pub struct Person {
     pub links: Vec<PersonLink>,
 
     /// Created timestamp — set server-side on create.
-    #[serde(default = "Timestamp::now")]
-    pub created_at: Timestamp,
+    #[serde(default = "Utc::now")]
+    pub created_at: DateTime<Utc>,
 
     /// Updated timestamp — set server-side on create and on update.
-    #[serde(default = "Timestamp::now")]
-    pub updated_at: Timestamp,
+    #[serde(default = "Utc::now")]
+    pub updated_at: DateTime<Utc>,
 }
 
 /// serde default for [`Person::active`] — new records are active.
@@ -238,7 +238,7 @@ impl Person {
     /// assert!(person.identifiers.is_empty());
     /// ```
     pub fn new(name: HumanName, gender: Gender) -> Self {
-        let now = Timestamp::now();
+        let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             identifiers: Vec::new(),
@@ -354,7 +354,7 @@ mod tests {
             suffix: vec!["Jr.".into()],
         };
         let mut person = Person::new(name, Gender::Male);
-        person.birth_date = Some(jiff::civil::date(1985, 3, 20));
+        person.birth_date = Some(NaiveDate::from_ymd_opt(1985, 3, 20).unwrap());
         person.tax_id = Some("123-45-6789".into());
 
         let json = serde_json::to_string(&person).expect("Serialization should succeed");

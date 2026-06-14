@@ -42,11 +42,11 @@ sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls"
 tantivy = "0.22"
 
 # OpenAPI documentation
-utoipa = { version = "5.5", features = ["axum_extras", "jiff_0_2", "uuid"] }
+utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
 # Common types
-jiff = { version = "0.2", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
 time = "0.3"
 uuid = { version = "1.23", features = ["serde", "v4"] }
 

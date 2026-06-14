@@ -61,7 +61,7 @@ pub async fn create_test_router() -> Router {
 /// Generate a per-test unique course name so concurrent tests don't
 /// step on each other inside the shared Postgres instance.
 pub fn unique_name(suffix: &str) -> String {
-    let ts = jiff::Timestamp::now().as_microsecond();
+    let ts = chrono::Utc::now().timestamp_micros();
     format!("Integration {suffix} {ts}")
 }
 

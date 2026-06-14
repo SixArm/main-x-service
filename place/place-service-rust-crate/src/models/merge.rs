@@ -1,6 +1,6 @@
 //! Merge request/response/record types for folding duplicate places.
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -33,7 +33,7 @@ pub struct MergeRecord {
     /// Snapshot of data transferred from duplicate to main.
     pub transferred_data: Option<serde_json::Value>,
     /// When the merge happened.
-    pub merged_at: Timestamp,
+    pub merged_at: DateTime<Utc>,
 }
 
 /// Response returned by the merge endpoint.

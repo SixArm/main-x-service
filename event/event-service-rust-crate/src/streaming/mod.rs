@@ -11,7 +11,7 @@
 //! intended to be Fluvio in production but is abstracted behind the
 //! traits.
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -32,21 +32,21 @@ pub enum EventEvent {
         /// The newly created event.
         event: Event,
         /// When the change occurred.
-        timestamp: Timestamp,
+        timestamp: DateTime<Utc>,
     },
     /// An event record was updated.
     Updated {
         /// The updated event.
         event: Event,
         /// When the change occurred.
-        timestamp: Timestamp,
+        timestamp: DateTime<Utc>,
     },
     /// An event record was (soft) deleted.
     Deleted {
         /// Id of the deleted event.
         event_id: Uuid,
         /// When the change occurred.
-        timestamp: Timestamp,
+        timestamp: DateTime<Utc>,
     },
     /// Two records were merged.
     Merged {
@@ -55,7 +55,7 @@ pub enum EventEvent {
         /// Id of the surviving target event.
         target_id: Uuid,
         /// When the change occurred.
-        timestamp: Timestamp,
+        timestamp: DateTime<Utc>,
     },
     /// A link was created between two events.
     Linked {
@@ -64,7 +64,7 @@ pub enum EventEvent {
         /// Id of the newly linked event.
         linked_id: Uuid,
         /// When the change occurred.
-        timestamp: Timestamp,
+        timestamp: DateTime<Utc>,
     },
     /// A link between two events was removed.
     Unlinked {
@@ -73,13 +73,13 @@ pub enum EventEvent {
         /// Id of the unlinked event.
         unlinked_id: Uuid,
         /// When the change occurred.
-        timestamp: Timestamp,
+        timestamp: DateTime<Utc>,
     },
 }
 
 impl EventEvent {
     /// Return the timestamp carried by any variant.
-    pub fn timestamp(&self) -> Timestamp {
+    pub fn timestamp(&self) -> DateTime<Utc> {
         match self {
             EventEvent::Created { timestamp, .. } => *timestamp,
             EventEvent::Updated { timestamp, .. } => *timestamp,

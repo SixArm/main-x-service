@@ -1,78 +1,85 @@
 //! Date/time conversions across the persistence boundary.
 //!
-//! Domain models use `jiff` (`Timestamp`, `civil::Date`); the SeaORM
+//! Domain models use `chrono` (`DateTime<Utc>`, `NaiveDate`); the SeaORM
 //! entity models use the `time` crate (`OffsetDateTime`, `Date`) because
-//! SeaORM 1.1 has no native `jiff` support. These helpers translate
-//! between the two representations when reading/writing rows.
+//! SeaORM 1.1 has no native `chrono` support configured here. These
+//! helpers translate between the two representations when reading/writing
+//! rows.
 
-use jiff::Timestamp;
-use jiff::civil::Date as JiffDate;
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use time::{Date as TimeDate, Month, OffsetDateTime};
 
-/// Convert a `jiff::Timestamp` to a `time::OffsetDateTime` in UTC.
+/// Convert a `chrono::DateTime<Utc>` to a `time::OffsetDateTime` in UTC.
 ///
 /// Both types are nanosecond-precision instants, so the conversion goes
 /// through the Unix-nanosecond representation and stays in UTC; no
-/// timezone information is lost because `jiff::Timestamp` is itself a
-/// UTC instant.
+/// timezone information is lost because `DateTime<Utc>` is itself a UTC
+/// instant.
 ///
 /// # Panics
 ///
-/// Panics if the `jiff` nanosecond value falls outside the representable
-/// range of `time::OffsetDateTime`. In practice this cannot happen for
-/// real-world birth/death/audit timestamps; the wider `jiff` range only
-/// matters near the year-9999 boundary.
-pub fn ts_to_offset(ts: Timestamp) -> OffsetDateTime {
+/// Panics if the chrono nanosecond value cannot be represented (only near
+/// the chrono timestamp-nanosecond range limits, ~1677–2262), or if it
+/// falls outside the representable range of `time::OffsetDateTime`. In
+/// practice this cannot happen for real-world birth/death/audit
+/// timestamps.
+pub fn ts_to_offset(ts: DateTime<Utc>) -> OffsetDateTime {
     // Round-trip via Unix nanoseconds: the lossless common denominator
     // between the two instant types.
-    OffsetDateTime::from_unix_timestamp_nanos(ts.as_nanosecond())
-        .expect("jiff Timestamp within time::OffsetDateTime range")
+    let nanos = ts
+        .timestamp_nanos_opt()
+        .expect("chrono DateTime within nanosecond range");
+    OffsetDateTime::from_unix_timestamp_nanos(i128::from(nanos))
+        .expect("chrono DateTime within time::OffsetDateTime range")
 }
 
-/// Convert a `time::OffsetDateTime` to a `jiff::Timestamp`.
+/// Convert a `time::OffsetDateTime` to a `chrono::DateTime<Utc>`.
 ///
 /// Inverse of [`ts_to_offset`]. `time::OffsetDateTime` carries an offset,
 /// but `unix_timestamp_nanos` normalizes it to a UTC instant first, so
-/// the resulting `jiff::Timestamp` is offset-independent.
+/// the resulting `DateTime<Utc>` is offset-independent.
 ///
 /// # Panics
 ///
 /// Panics if the Unix-nanosecond value is outside the representable
-/// range of `jiff::Timestamp`. Unreachable for stored real-world rows.
-pub fn offset_to_ts(odt: OffsetDateTime) -> Timestamp {
-    Timestamp::from_nanosecond(odt.unix_timestamp_nanos())
-        .expect("time::OffsetDateTime within jiff Timestamp range")
+/// range of `chrono::DateTime<Utc>`. Unreachable for stored real-world
+/// rows.
+pub fn offset_to_ts(odt: OffsetDateTime) -> DateTime<Utc> {
+    let nanos = i64::try_from(odt.unix_timestamp_nanos())
+        .expect("time::OffsetDateTime within chrono nanosecond range");
+    DateTime::<Utc>::from_timestamp_nanos(nanos)
 }
 
-/// Convert a `jiff::civil::Date` to a `time::Date` (calendar date only).
+/// Convert a `chrono::NaiveDate` to a `time::Date` (calendar date only).
 ///
 /// Used for `birth_date` and document issue/expiry columns, which are
-/// stored as bare SQL `DATE` values. The `jiff` month is a `1..=12`
+/// stored as bare SQL `DATE` values. The chrono month is a `1..=12`
 /// integer; `time` models the month as a `Month` enum, so it is bridged
 /// through `Month::try_from`.
 ///
 /// # Panics
 ///
 /// Panics if the month is not `1..=12` or the year/day combination is
-/// not a valid calendar date. A well-formed `jiff::civil::Date` always
-/// satisfies both, so this is unreachable for values produced by `jiff`.
-pub fn date_to_time(d: JiffDate) -> TimeDate {
-    // jiff months are 1-based integers; time wants its Month enum.
+/// not a valid calendar date. A well-formed `NaiveDate` always
+/// satisfies both, so this is unreachable for values produced by chrono.
+pub fn date_to_time(d: NaiveDate) -> TimeDate {
+    // chrono months are 1-based integers; time wants its Month enum.
     let month = Month::try_from(d.month() as u8).expect("valid month");
-    TimeDate::from_calendar_date(d.year() as i32, month, d.day() as u8).expect("valid date")
+    TimeDate::from_calendar_date(d.year(), month, d.day() as u8).expect("valid date")
 }
 
-/// Convert a `time::Date` to a `jiff::civil::Date` (calendar date only).
+/// Convert a `time::Date` to a `chrono::NaiveDate` (calendar date only).
 ///
 /// Inverse of [`date_to_time`], used when hydrating domain models from
 /// stored `DATE` columns. `u8::from(d.month())` turns the `time` `Month`
-/// enum back into its `1..=12` ordinal, which `jiff` expects as an `i8`.
+/// enum back into its `1..=12` ordinal, which chrono expects as a `u32`.
 ///
 /// # Panics
 ///
 /// Panics if the year/month/day triple is not a valid calendar date. A
 /// value read from a valid `time::Date` always is, so this is
 /// unreachable for stored rows.
-pub fn time_to_date(d: TimeDate) -> JiffDate {
-    JiffDate::new(d.year() as i16, u8::from(d.month()) as i8, d.day() as i8).expect("valid date")
+pub fn time_to_date(d: TimeDate) -> NaiveDate {
+    NaiveDate::from_ymd_opt(d.year(), u32::from(u8::from(d.month())), u32::from(d.day()))
+        .expect("valid date")
 }

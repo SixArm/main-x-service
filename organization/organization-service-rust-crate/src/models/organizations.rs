@@ -132,9 +132,8 @@ impl ActiveModel {
     /// When the update fails.
     pub async fn soft_delete(mut self, db: &DatabaseConnection) -> ModelResult<Model> {
         self.active = ActiveValue::set(false);
-        // `chrono` here is `SeaORM`'s timestamp type for this column (the
-        // `with-jiff` migration is tracked separately); this is a
-        // soft-delete stamp, not domain time.
+        // `chrono` is the family-standard timestamp type (`SeaORM`'s type
+        // for this column); this is a soft-delete stamp, not domain time.
         self.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
         self.update(db).await.map_err(ModelError::from)
     }

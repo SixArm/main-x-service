@@ -11,8 +11,8 @@
 //! - `bridge_end_to_end`   — adapter + engine call (the realistic dedup path).
 //! - `bridge_one_to_many`  — single query vs. 100 candidates.
 
+use chrono::Utc;
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
-use jiff::Timestamp;
 use uuid::Uuid;
 
 use worker_service::matching::adapter::to_matcher_worker;
@@ -37,7 +37,7 @@ fn minimal_worker() -> Worker {
         Gender::Female,
     );
     w.id = Uuid::new_v4();
-    w.created_at = Timestamp::now();
+    w.created_at = Utc::now();
     w.updated_at = w.created_at;
     w
 }
@@ -46,7 +46,7 @@ fn minimal_worker() -> Worker {
 /// tax id) exercising every adapter routing branch — the expensive case.
 fn rich_worker() -> Worker {
     let mut w = minimal_worker();
-    w.birth_date = Some(jiff::civil::date(1970, 4, 1));
+    w.birth_date = Some(chrono::NaiveDate::from_ymd_opt(1970, 4, 1).unwrap());
     w.tax_id = Some("123-45-6789".into());
     w.identifiers.push(Identifier::new(
         IdentifierType::Other,
@@ -84,8 +84,8 @@ fn rich_worker() -> Worker {
         number: "X12345678".into(),
         issuing_country: Some("US".into()),
         issuing_authority: None,
-        issue_date: Some(jiff::civil::date(2020, 1, 1)),
-        expiry_date: Some(jiff::civil::date(2030, 1, 1)),
+        issue_date: Some(chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()),
+        expiry_date: Some(chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap()),
         verified: true,
     });
     w

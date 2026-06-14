@@ -16,7 +16,7 @@
 //! against the service's domain model. If either side breaks the contract,
 //! a test here will fire.
 
-use jiff::{Timestamp, civil::Date};
+use chrono::{NaiveDate, Utc};
 use uuid::Uuid;
 
 use person_service::matching::adapter::to_matcher_person;
@@ -43,13 +43,13 @@ fn human_name(family: &str, given: &str) -> HumanName {
 fn person(family: &str, given: &str) -> Person {
     let mut p = Person::new(human_name(family, given), Gender::Female);
     p.id = Uuid::new_v4();
-    p.created_at = Timestamp::now();
+    p.created_at = Utc::now();
     p.updated_at = p.created_at;
     p
 }
 
 /// Build a [`person`] that also carries a birth date.
-fn person_with_dob(family: &str, given: &str, dob: Date) -> Person {
+fn person_with_dob(family: &str, given: &str, dob: NaiveDate) -> Person {
     let mut p = person(family, given);
     p.birth_date = Some(dob);
     p
@@ -112,7 +112,7 @@ fn engine() -> MatchingEngine {
 /// High confidence.
 #[test]
 fn identical_clones_score_near_one_high_confidence() {
-    let dob = jiff::civil::date(1980, 5, 15);
+    let dob = NaiveDate::from_ymd_opt(1980, 5, 15).unwrap();
     let a = person_with_dob("Williams", "Alice", dob);
     let b = a.clone();
 
@@ -131,7 +131,7 @@ fn identical_clones_score_near_one_high_confidence() {
 /// ≥ 0.85.
 #[test]
 fn typo_in_given_name_still_matches_fuzzy() {
-    let dob = jiff::civil::date(1980, 5, 15);
+    let dob = NaiveDate::from_ymd_opt(1980, 5, 15).unwrap();
     let alice = person_with_dob("Williams", "Alice", dob);
     let alyce = person_with_dob("Williams", "Alyce", dob); // single-letter Jaro-Winkler typo
 
@@ -149,8 +149,16 @@ fn typo_in_given_name_still_matches_fuzzy() {
 /// below the exact-DOB case.
 #[test]
 fn off_by_one_day_dob_softly_penalised_not_dropped() {
-    let alice_a = person_with_dob("Williams", "Alice", jiff::civil::date(1980, 5, 15));
-    let alice_b = person_with_dob("Williams", "Alice", jiff::civil::date(1980, 5, 16));
+    let alice_a = person_with_dob(
+        "Williams",
+        "Alice",
+        NaiveDate::from_ymd_opt(1980, 5, 15).unwrap(),
+    );
+    let alice_b = person_with_dob(
+        "Williams",
+        "Alice",
+        NaiveDate::from_ymd_opt(1980, 5, 16).unwrap(),
+    );
 
     let exact = engine().match_persons(&to_matcher_person(&alice_a), &to_matcher_person(&alice_a));
     let off_by_one =
@@ -267,8 +275,16 @@ fn matching_passport_books_short_circuit() {
 /// Unrelated persons score < 0.70 and never classify as a match.
 #[test]
 fn completely_different_persons_score_low_and_do_not_match() {
-    let a = person_with_dob("Williams", "Alice", jiff::civil::date(1980, 5, 15));
-    let b = person_with_dob("Tanaka", "Hiroshi", jiff::civil::date(1953, 11, 2));
+    let a = person_with_dob(
+        "Williams",
+        "Alice",
+        NaiveDate::from_ymd_opt(1980, 5, 15).unwrap(),
+    );
+    let b = person_with_dob(
+        "Tanaka",
+        "Hiroshi",
+        NaiveDate::from_ymd_opt(1953, 11, 2).unwrap(),
+    );
 
     let result = engine().match_persons(&to_matcher_person(&a), &to_matcher_person(&b));
 
@@ -287,8 +303,16 @@ fn completely_different_persons_score_low_and_do_not_match() {
 fn same_name_different_dob_and_no_shared_identifier_does_not_short_circuit() {
     // Common name like John Smith with no shared ID and different DOB must
     // not auto-match — false-positive prevention.
-    let a = person_with_dob("Smith", "John", jiff::civil::date(1955, 1, 1));
-    let b = person_with_dob("Smith", "John", jiff::civil::date(1990, 12, 31));
+    let a = person_with_dob(
+        "Smith",
+        "John",
+        NaiveDate::from_ymd_opt(1955, 1, 1).unwrap(),
+    );
+    let b = person_with_dob(
+        "Smith",
+        "John",
+        NaiveDate::from_ymd_opt(1990, 12, 31).unwrap(),
+    );
 
     let result = engine().match_persons(&to_matcher_person(&a), &to_matcher_person(&b));
 
@@ -454,11 +478,9 @@ fn routable_identifier_systems_reach_their_matcher_slot() {
     // (system-URI fragment, value, accessor on the projected matcher Person)
     type Accessor = fn(&person_service::matching::matcher_lib::Person) -> Option<&str>;
     let cases: &[(&str, &str, Accessor)] = &[
-        (
-            "https://fhir.nhs.uk/Id/nhs-number",
-            "943 476 5919",
-            |m| m.united_kingdom_national_health_service_number.as_deref(),
-        ),
+        ("https://fhir.nhs.uk/Id/nhs-number", "943 476 5919", |m| {
+            m.united_kingdom_national_health_service_number.as_deref()
+        }),
         ("http://hl7.org/fhir/sid/us-ssn", "111-22-3333", |m| {
             m.us_ssn.as_deref()
         }),
@@ -466,14 +488,18 @@ fn routable_identifier_systems_reach_their_matcher_slot() {
         ("urn:fr:nir:ameli.fr", "1800575121157", |m| {
             m.fr_nir.as_deref()
         }),
-        ("urn:es:tsi:ingesa", "ABCD1234567890", |m| m.es_tsi.as_deref()),
+        ("urn:es:tsi:ingesa", "ABCD1234567890", |m| {
+            m.es_tsi.as_deref()
+        }),
         ("urn:in:aadhaar:uidai", "2341 2345 6789", |m| {
             m.in_aadhaar.as_deref()
         }),
         ("urn:jp:my-number", "123456789018", |m| {
             m.jp_my_number.as_deref()
         }),
-        ("urn:mx:curp", "HEGG560427MVZRRL04", |m| m.mx_curp.as_deref()),
+        ("urn:mx:curp", "HEGG560427MVZRRL04", |m| {
+            m.mx_curp.as_deref()
+        }),
         ("urn:se:personnummer", "811218-9876", |m| {
             m.se_personnummer.as_deref()
         }),
@@ -580,9 +606,11 @@ fn all_national_id_schemes_route_to_their_slot() {
 #[test]
 fn shared_cpf_system_uri_is_deterministic_match() {
     let mut a = person("Silva", "Joao");
-    a.identifiers.push(sys_identifier("urn:br:cpf", "390.533.447-05"));
+    a.identifiers
+        .push(sys_identifier("urn:br:cpf", "390.533.447-05"));
     let mut b = person("Souza", "Joana"); // divergent name on purpose
-    b.identifiers.push(sys_identifier("urn:br:cpf", "39053344705")); // unformatted
+    b.identifiers
+        .push(sys_identifier("urn:br:cpf", "39053344705")); // unformatted
 
     let result = engine().match_persons(&to_matcher_person(&a), &to_matcher_person(&b));
     assert_eq!(
@@ -603,7 +631,11 @@ fn strict_config_demands_more_evidence_than_lenient_for_same_pair() {
     // A near-duplicate that hits the default match threshold may or may not
     // hit the strict threshold; either way, strict ≥ lenient on the
     // `is_match` boolean transition.
-    let a = person_with_dob("Garcia", "Maria", jiff::civil::date(1972, 3, 8));
+    let a = person_with_dob(
+        "Garcia",
+        "Maria",
+        NaiveDate::from_ymd_opt(1972, 3, 8).unwrap(),
+    );
     let mut b = a.clone();
     b.name.given[0] = "Mária".into(); // diacritic variation
     b.id = Uuid::new_v4(); // distinct record id

@@ -13,7 +13,7 @@
 //! [`MergeStatus`] tracks whether a merge is [`Completed`](MergeStatus::Completed)
 //! or was later [`Reversed`](MergeStatus::Reversed).
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -62,7 +62,7 @@ pub struct MergeRecord {
     pub transferred_data: Option<serde_json::Value>,
 
     /// When the merge was performed
-    pub merged_at: Timestamp,
+    pub merged_at: DateTime<Utc>,
 }
 
 /// Request to merge two worker records.

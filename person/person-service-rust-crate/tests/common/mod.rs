@@ -6,6 +6,7 @@
 //! clash on unique fields.
 
 use axum::Router;
+use chrono::Utc;
 use person_service::{
     api::rest::{AppState, create_router},
     config::Config,
@@ -38,6 +39,6 @@ pub async fn create_test_router() -> Router {
 
 /// Create a unique test person name to avoid conflicts
 pub fn unique_person_name(suffix: &str) -> String {
-    let timestamp = jiff::Timestamp::now().as_microsecond();
+    let timestamp = Utc::now().timestamp_micros();
     format!("TestPerson{}_{}", suffix, timestamp)
 }

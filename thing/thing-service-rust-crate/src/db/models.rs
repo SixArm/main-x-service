@@ -5,7 +5,7 @@
 //! tables joined by `thing_id`, rather than JSONB columns. JSONB is used
 //! only for opaque snapshots (audit old/new values, merge transferred_data).
 //! Timestamps use the `time` crate at the SeaORM boundary; the repository
-//! converts to/from `jiff::Timestamp`.
+//! converts to/from `chrono::DateTime<Utc>`.
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};

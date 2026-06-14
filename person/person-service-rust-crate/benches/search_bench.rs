@@ -7,8 +7,8 @@
 //! delete+reindex. Each bench builds its index in a `TempDir`. Run with
 //! `cargo bench`.
 
+use chrono::{NaiveDate, Utc};
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use jiff::{Timestamp, civil::Date};
 use tempfile::TempDir;
 use uuid::Uuid;
 
@@ -16,8 +16,8 @@ use person_service::models::*;
 use person_service::search::SearchEngine;
 
 /// Build a minimal [`Person`] for indexing/search benchmarks.
-fn create_test_person(family: &str, given: &str, birth_date: Option<Date>) -> Person {
-    let now = Timestamp::now();
+fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Person {
+    let now = Utc::now();
     Person {
         id: Uuid::new_v4(),
         identifiers: vec![],
@@ -111,7 +111,11 @@ const GIVEN_NAMES: &[&str] = &[
 fn bench_index_single_person(c: &mut Criterion) {
     let temp_dir = TempDir::new().unwrap();
     let engine = SearchEngine::new(temp_dir.path()).unwrap();
-    let person = create_test_person("Smith", "John", Some(jiff::civil::date(1980, 1, 15)));
+    let person = create_test_person(
+        "Smith",
+        "John",
+        Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap()),
+    );
 
     c.bench_function("index_single_person", |b| {
         b.iter(|| engine.index_person(black_box(&person)).unwrap())
@@ -151,11 +155,14 @@ fn bench_search_queries(c: &mut Criterion) {
         .map(|i| {
             let family = FAMILY_NAMES[i % FAMILY_NAMES.len()];
             let given = GIVEN_NAMES[i % GIVEN_NAMES.len()];
-            let dob = Some(jiff::civil::date(
-                1950 + (i as i16 % 50),
-                1 + (i as i8 % 12),
-                1 + (i as i8 % 28),
-            ));
+            let dob = Some(
+                NaiveDate::from_ymd_opt(
+                    1950 + (i as i32 % 50),
+                    1 + (i as u32 % 12),
+                    1 + (i as u32 % 28),
+                )
+                .unwrap(),
+            );
             create_test_person(family, given, dob)
         })
         .collect();

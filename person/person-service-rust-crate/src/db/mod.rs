@@ -16,7 +16,7 @@ use crate::config::DatabaseConfig;
 
 /// Audit-log repository for the HIPAA-style trail.
 pub mod audit;
-/// jiff <-> time conversions at the persistence boundary.
+/// chrono <-> time conversions at the persistence boundary.
 pub mod convert;
 /// SeaORM entity (ActiveModel/Model) definitions.
 pub mod models;

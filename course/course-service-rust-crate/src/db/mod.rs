@@ -324,7 +324,7 @@ impl CourseRepository for SeaOrmCourseRepository {
 }
 
 /// Pull an instance's schedule start date for FR-10 in-memory sorting.
-fn schedule_start(i: &CourseInstance) -> Option<jiff::Timestamp> {
+fn schedule_start(i: &CourseInstance) -> Option<chrono::DateTime<chrono::Utc>> {
     i.schedule.as_ref().and_then(|s| s.start_date)
 }
 

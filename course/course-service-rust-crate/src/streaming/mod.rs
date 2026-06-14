@@ -7,7 +7,7 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -28,7 +28,7 @@ pub struct CourseEvent {
     /// Operation-specific JSON payload captured by the handler.
     pub payload: serde_json::Value,
     /// When the event was emitted.
-    pub emitted_at: Timestamp,
+    pub emitted_at: DateTime<Utc>,
 }
 
 impl CourseEvent {
@@ -40,7 +40,7 @@ impl CourseEvent {
             entity_id: course_id,
             parent_id: None,
             payload,
-            emitted_at: Timestamp::now(),
+            emitted_at: Utc::now(),
         }
     }
     /// Build an instance event, recording the parent `course_id` in
@@ -57,7 +57,7 @@ impl CourseEvent {
             entity_id: instance_id,
             parent_id: Some(course_id),
             payload,
-            emitted_at: Timestamp::now(),
+            emitted_at: Utc::now(),
         }
     }
 }

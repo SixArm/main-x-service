@@ -836,11 +836,11 @@ impl EventRepository for SeaOrmEventRepository {
         );
 
         // Fire-and-forget side effects: publish a `Created` stream event
-        // (jiff `Timestamp` on the streaming side vs `time` on the row),
+        // (chrono `DateTime<Utc>` on the streaming side vs `time` on the row),
         // then record a CREATE audit row with only a `new_values` snapshot.
         self.publish_event(crate::streaming::EventEvent::Created {
             event: result.clone(),
-            timestamp: jiff::Timestamp::now(),
+            timestamp: chrono::Utc::now(),
         });
         if let Ok(json) = serde_json::to_value(&result) {
             self.log_audit(
@@ -954,7 +954,7 @@ impl EventRepository for SeaOrmEventRepository {
 
         self.publish_event(crate::streaming::EventEvent::Updated {
             event: result.clone(),
-            timestamp: jiff::Timestamp::now(),
+            timestamp: chrono::Utc::now(),
         });
         // Record an UPDATE audit row only when both the pre-image and
         // both JSON serializations succeed; otherwise skip the trail
@@ -990,7 +990,7 @@ impl EventRepository for SeaOrmEventRepository {
         row.update(&self.db).await?;
         self.publish_event(crate::streaming::EventEvent::Deleted {
             event_id: *id,
-            timestamp: jiff::Timestamp::now(),
+            timestamp: chrono::Utc::now(),
         });
         if let Some(old) = old {
             if let Ok(old_json) = serde_json::to_value(&old) {

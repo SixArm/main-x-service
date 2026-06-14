@@ -11,8 +11,8 @@
 //! - `bridge_end_to_end`   — adapter + engine call (the realistic dedup path).
 //! - `bridge_one_to_many`  — single query vs. 100 candidates.
 
+use chrono::{DateTime, TimeZone, Utc};
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
-use jiff::Timestamp;
 
 use event_service::matching::adapter::to_matcher_event;
 use event_service::matching::matcher_lib::{MatchConfig, MatchingEngine};
@@ -22,11 +22,8 @@ use event_service::models::{
 };
 
 /// A fixed top-of-hour UTC start for deterministic fixtures.
-fn start_at() -> Timestamp {
-    jiff::civil::datetime(2026, 6, 1, 9, 0, 0, 0)
-        .in_tz("UTC")
-        .unwrap()
-        .timestamp()
+fn start_at() -> DateTime<Utc> {
+    Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap()
 }
 
 // -------- fixtures -----------------------------------------------------------
@@ -41,7 +38,7 @@ fn minimal_event() -> Event {
 /// identifier) — the realistic adapter input.
 fn rich_event() -> Event {
     let mut e = Event::new("Annual Conference", start_at());
-    e.end_date = Some(start_at() + jiff::SignedDuration::from_hours(8));
+    e.end_date = Some(start_at() + chrono::Duration::hours(8));
     e.event_type = EventType::Conference;
     e.event_status = EventStatus::Scheduled;
     e.location = vec![Location::Place(Place {

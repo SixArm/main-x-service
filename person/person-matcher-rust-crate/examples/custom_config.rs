@@ -20,6 +20,7 @@
 //! demographic fields — a deliberate illustration of how weighting a field
 //! that is absent on both records contributes nothing.
 
+use chrono::NaiveDate;
 use person_matcher::{
     Gender, MatchConfig, MatchingEngine, NicknameTable, Person, SimilarityAlgorithm,
 };
@@ -32,14 +33,14 @@ fn main() {
     let person1 = Person::builder()
         .given_name("Robert")
         .family_name("Jones")
-        .date_of_birth(jiff::civil::date(1975, 6, 20))
+        .date_of_birth(NaiveDate::from_ymd_opt(1975, 6, 20).unwrap())
         .gender(Gender::Male)
         .build();
 
     let person2 = Person::builder()
         .given_name("Bob") // Nickname
         .family_name("Jones")
-        .date_of_birth(jiff::civil::date(1975, 6, 20))
+        .date_of_birth(NaiveDate::from_ymd_opt(1975, 6, 20).unwrap())
         .gender(Gender::Male)
         .build();
 

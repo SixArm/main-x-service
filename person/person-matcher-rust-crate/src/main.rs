@@ -16,6 +16,7 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+use chrono::NaiveDate;
 use person_matcher::{Address, Gender, MatchConfig, MatchingEngine, Person};
 
 /// Entry point for the demo binary.
@@ -37,7 +38,7 @@ fn main() {
         .united_kingdom_national_health_service_number("1234567890")
         .given_name("Dafydd")
         .family_name("Jones")
-        .date_of_birth(jiff::civil::date(1980, 5, 15))
+        .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
         .gender(Gender::Male)
         .build();
 
@@ -54,14 +55,14 @@ fn main() {
     let patient3 = Person::builder()
         .given_name("Stephen")
         .family_name("Williams")
-        .date_of_birth(jiff::civil::date(1975, 8, 22))
+        .date_of_birth(NaiveDate::from_ymd_opt(1975, 8, 22).unwrap())
         .gender(Gender::Male)
         .build();
 
     let patient4 = Person::builder()
         .given_name("Steven") // Different spelling
         .family_name("Williams")
-        .date_of_birth(jiff::civil::date(1975, 8, 22))
+        .date_of_birth(NaiveDate::from_ymd_opt(1975, 8, 22).unwrap())
         .gender(Gender::Male)
         .build();
 
@@ -82,14 +83,14 @@ fn main() {
     let patient5 = Person::builder()
         .given_name("Siân") // With diacritic
         .family_name("Evans")
-        .date_of_birth(jiff::civil::date(1990, 3, 10))
+        .date_of_birth(NaiveDate::from_ymd_opt(1990, 3, 10).unwrap())
         .gender(Gender::Female)
         .build();
 
     let patient6 = Person::builder()
         .given_name("Sian") // Without diacritic
         .family_name("Evans")
-        .date_of_birth(jiff::civil::date(1990, 3, 10))
+        .date_of_birth(NaiveDate::from_ymd_opt(1990, 3, 10).unwrap())
         .gender(Gender::Female)
         .build();
 
@@ -114,14 +115,14 @@ fn main() {
         .given_name("Emma")
         .family_name("Davies")
         .address(address1)
-        .date_of_birth(jiff::civil::date(1985, 12, 1))
+        .date_of_birth(NaiveDate::from_ymd_opt(1985, 12, 1).unwrap())
         .build();
 
     let patient8 = Person::builder()
         .given_name("Emma")
         .family_name("Davies")
         .address(address2)
-        .date_of_birth(jiff::civil::date(1985, 12, 1))
+        .date_of_birth(NaiveDate::from_ymd_opt(1985, 12, 1).unwrap())
         .build();
 
     let result4 = engine.match_persons(&patient7, &patient8);
@@ -137,14 +138,14 @@ fn main() {
     let patient9 = Person::builder()
         .given_name("Alice")
         .family_name("Anderson")
-        .date_of_birth(jiff::civil::date(1990, 1, 1))
+        .date_of_birth(NaiveDate::from_ymd_opt(1990, 1, 1).unwrap())
         .gender(Gender::Female)
         .build();
 
     let patient10 = Person::builder()
         .given_name("Zachary")
         .family_name("Zimmerman")
-        .date_of_birth(jiff::civil::date(2000, 12, 31))
+        .date_of_birth(NaiveDate::from_ymd_opt(2000, 12, 31).unwrap())
         .gender(Gender::Male)
         .build();
 
@@ -158,13 +159,13 @@ fn main() {
     let patient11 = Person::builder()
         .given_name("Michael") // Formal name (not nickname)
         .family_name("Thomas")
-        .date_of_birth(jiff::civil::date(1978, 6, 15))
+        .date_of_birth(NaiveDate::from_ymd_opt(1978, 6, 15).unwrap())
         .build();
 
     let patient12 = Person::builder()
         .given_name("Mike") // Nickname (not formal name)
         .family_name("Thomas")
-        .date_of_birth(jiff::civil::date(1978, 6, 15))
+        .date_of_birth(NaiveDate::from_ymd_opt(1978, 6, 15).unwrap())
         .build();
 
     let strict_engine = MatchingEngine::new(MatchConfig::strict());

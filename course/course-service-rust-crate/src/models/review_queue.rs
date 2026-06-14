@@ -7,7 +7,7 @@
 //! the whole index and either auto-merges high-confidence pairs or
 //! queues the rest.
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -50,10 +50,10 @@ pub struct ReviewQueueItem {
     #[serde(default)]
     pub reviewed_by: Option<String>,
     /// When the item was queued.
-    pub created_at: Timestamp,
+    pub created_at: DateTime<Utc>,
     /// When the item was reviewed, if it has been.
     #[serde(default)]
-    pub reviewed_at: Option<Timestamp>,
+    pub reviewed_at: Option<DateTime<Utc>>,
 }
 
 /// Inbound tuning for a full-index deduplication scan.

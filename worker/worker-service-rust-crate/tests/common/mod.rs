@@ -70,6 +70,6 @@ pub fn create_test_router_no_db() -> Router {
 /// (`TestWorker{suffix}_{micros}`) so tests sharing one database do not match
 /// each other's records during search/dedup assertions.
 pub fn unique_worker_name(suffix: &str) -> String {
-    let timestamp = jiff::Timestamp::now().as_microsecond();
+    let timestamp = chrono::Utc::now().timestamp_micros();
     format!("TestWorker{}_{}", suffix, timestamp)
 }

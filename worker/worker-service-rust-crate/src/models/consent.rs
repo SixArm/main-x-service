@@ -8,7 +8,7 @@
 //! transition happened. The privacy layer (`crate::privacy`) consults these
 //! records before sharing or processing data.
 
-use jiff::{Timestamp, civil::Date};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -65,14 +65,14 @@ pub struct Consent {
     pub status: ConsentStatus,
 
     /// Date the consent was granted (always present).
-    pub granted_date: Date,
+    pub granted_date: NaiveDate,
 
     /// Date the consent expires; `None` for open-ended consent.
-    pub expiry_date: Option<Date>,
+    pub expiry_date: Option<NaiveDate>,
 
     /// Date the consent was revoked; `None` unless `status` is
     /// [`ConsentStatus::Revoked`].
-    pub revoked_date: Option<Date>,
+    pub revoked_date: Option<NaiveDate>,
 
     /// Free-text description of the purpose the consent covers.
     pub purpose: Option<String>,
@@ -81,7 +81,7 @@ pub struct Consent {
     pub method: Option<String>,
 
     /// When this consent record was created.
-    pub created_at: Timestamp,
+    pub created_at: DateTime<Utc>,
     /// When this consent record was last updated.
-    pub updated_at: Timestamp,
+    pub updated_at: DateTime<Utc>,
 }

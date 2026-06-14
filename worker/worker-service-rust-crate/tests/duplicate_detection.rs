@@ -16,7 +16,7 @@
 //! either side fails a test here. All assertions `unwrap`/`assert`, so a
 //! contract violation panics the test rather than returning an error.
 
-use jiff::{Timestamp, civil::Date};
+use chrono::{NaiveDate, Utc};
 use uuid::Uuid;
 
 use worker_service::matching::adapter::to_matcher_worker;
@@ -49,13 +49,13 @@ fn human_name(family: &str, given: &str) -> HumanName {
 fn worker(family: &str, given: &str) -> Worker {
     let mut w = Worker::new(human_name(family, given), Gender::Female);
     w.id = Uuid::new_v4();
-    w.created_at = Timestamp::now();
+    w.created_at = Utc::now();
     w.updated_at = w.created_at;
     w
 }
 
 /// Like [`worker`], but also sets the birth date (most match tests need one).
-fn worker_with_dob(family: &str, given: &str, dob: Date) -> Worker {
+fn worker_with_dob(family: &str, given: &str, dob: NaiveDate) -> Worker {
     let mut w = worker(family, given);
     w.birth_date = Some(dob);
     w
@@ -129,7 +129,7 @@ fn engine() -> MatchingEngine {
 /// contribute to a perfect-evidence score.
 #[test]
 fn identical_clones_score_near_one_high_confidence() {
-    let dob = jiff::civil::date(1970, 4, 1);
+    let dob = chrono::NaiveDate::from_ymd_opt(1970, 4, 1).unwrap();
     let a = worker_with_dob("Patel", "Asha", dob);
     let b = a.clone();
 
@@ -149,7 +149,7 @@ fn identical_clones_score_near_one_high_confidence() {
 /// pair below the match band.
 #[test]
 fn typo_in_given_name_still_matches_fuzzy() {
-    let dob = jiff::civil::date(1970, 4, 1);
+    let dob = chrono::NaiveDate::from_ymd_opt(1970, 4, 1).unwrap();
     let a = worker_with_dob("Patel", "Asha", dob);
     let b = worker_with_dob("Patel", "Ashaa", dob); // one-char insertion
 
@@ -273,7 +273,7 @@ fn npi_typed_identifier_does_not_short_circuit_through_country_slots() {
     // counterpart in the matcher (yet). The adapter falls through unmapped,
     // so an NPI match should NOT trigger an NHS / SSN / etc. signal — the
     // pair must still be evaluated on demographics alone.
-    let dob = jiff::civil::date(1965, 8, 12);
+    let dob = chrono::NaiveDate::from_ymd_opt(1965, 8, 12).unwrap();
     let mut a = worker_with_dob("Garcia", "Maria", dob);
     a.identifiers.push(Identifier::new(
         IdentifierType::NPI,
@@ -336,8 +336,16 @@ fn shared_ods_code_does_not_make_different_workers_match() {
             "RXX01".into(),
         ));
     };
-    let mut a = worker_with_dob("Patel", "Asha", jiff::civil::date(1970, 4, 1));
-    let mut b = worker_with_dob("Olsen", "Sven", jiff::civil::date(1992, 12, 24));
+    let mut a = worker_with_dob(
+        "Patel",
+        "Asha",
+        chrono::NaiveDate::from_ymd_opt(1970, 4, 1).unwrap(),
+    );
+    let mut b = worker_with_dob(
+        "Olsen",
+        "Sven",
+        chrono::NaiveDate::from_ymd_opt(1992, 12, 24).unwrap(),
+    );
     ods(&mut a);
     ods(&mut b);
 
@@ -362,8 +370,16 @@ fn shared_ods_code_does_not_make_different_workers_match() {
 /// against the matcher over-scoring on incidental overlap.
 #[test]
 fn completely_different_workers_score_low_and_do_not_match() {
-    let a = worker_with_dob("Patel", "Asha", jiff::civil::date(1970, 4, 1));
-    let b = worker_with_dob("Olsen", "Sven", jiff::civil::date(1992, 12, 24));
+    let a = worker_with_dob(
+        "Patel",
+        "Asha",
+        chrono::NaiveDate::from_ymd_opt(1970, 4, 1).unwrap(),
+    );
+    let b = worker_with_dob(
+        "Olsen",
+        "Sven",
+        chrono::NaiveDate::from_ymd_opt(1992, 12, 24).unwrap(),
+    );
 
     let result = engine().match_workers(&to_matcher_worker(&a), &to_matcher_worker(&b));
     assert!(
@@ -380,8 +396,16 @@ fn completely_different_workers_score_low_and_do_not_match() {
 /// different people the same when the DOB evidence contradicts it.
 #[test]
 fn same_name_different_dob_does_not_short_circuit() {
-    let a = worker_with_dob("Smith", "John", jiff::civil::date(1960, 1, 1));
-    let b = worker_with_dob("Smith", "John", jiff::civil::date(1995, 12, 31));
+    let a = worker_with_dob(
+        "Smith",
+        "John",
+        chrono::NaiveDate::from_ymd_opt(1960, 1, 1).unwrap(),
+    );
+    let b = worker_with_dob(
+        "Smith",
+        "John",
+        chrono::NaiveDate::from_ymd_opt(1995, 12, 31).unwrap(),
+    );
 
     let result = engine().match_workers(&to_matcher_worker(&a), &to_matcher_worker(&b));
     assert!(
@@ -459,7 +483,7 @@ fn sparse_records_do_not_panic_and_stay_in_range() {
 /// the lenient preset must accept.
 #[test]
 fn strict_config_matches_subset_of_lenient_config() {
-    let dob = jiff::civil::date(1972, 3, 8);
+    let dob = chrono::NaiveDate::from_ymd_opt(1972, 3, 8).unwrap();
     let a = worker_with_dob("Garcia", "Maria", dob);
     let mut b = a.clone();
     b.name.given[0] = "Mária".into(); // diacritic

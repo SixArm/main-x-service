@@ -48,9 +48,9 @@ pub enum EventKind {
 /// One shape for every entity and every transport. Phase 1 omits
 /// `occurred_at` and `data`: those are added at the outbox stage
 /// (Phase 2), where the handler transaction supplies an authoritative
-/// timestamp and the full record snapshot. No timestamp is included
-/// here because the project mandates `jiff` (not the already-present
-/// `chrono`) and Phase 1 must add no new dependency.
+/// timestamp and the full record snapshot. No timestamp is included here
+/// because Phase 1 keeps the in-memory envelope minimal — the wall-clock
+/// `occurred_at` belongs with the durable outbox row, not the ring buffer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Envelope {
     /// Idempotency / dedup key, end to end (UUID v4).

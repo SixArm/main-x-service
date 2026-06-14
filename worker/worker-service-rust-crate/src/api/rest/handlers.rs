@@ -18,6 +18,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -529,7 +530,7 @@ pub async fn match_worker(
     // Blocking step: narrow the universe to candidates sharing family name +
     // birth year so the matcher scores O(candidates) records, not every worker.
     let family_name = &payload.worker.name.family;
-    let birth_year = payload.worker.birth_date.map(|d| d.year() as i32);
+    let birth_year = payload.worker.birth_date.map(|d| d.year());
 
     let candidate_ids = state
         .search_engine
@@ -639,7 +640,7 @@ pub struct DuplicateCheckResponse {
 /// on any search/match error so a detection failure never blocks a create.
 async fn check_duplicates_internal(state: &AppState, worker: &Worker) -> Vec<MatchResponse> {
     let family_name = &worker.name.family;
-    let birth_year = worker.birth_date.map(|d| d.year() as i32);
+    let birth_year = worker.birth_date.map(|d| d.year());
 
     let candidate_ids =
         match state
@@ -907,7 +908,7 @@ pub async fn merge_workers(
         .publish(crate::streaming::WorkerEvent::Merged {
             source_id: duplicate.id,
             target_id: merged.id,
-            timestamp: jiff::Timestamp::now(),
+            timestamp: chrono::Utc::now(),
         })
         .ok();
 
@@ -923,7 +924,7 @@ pub async fn merge_workers(
         merge_reason: req.merge_reason,
         match_score: None,
         transferred_data: Some(serde_json::Value::Object(transferred)),
-        merged_at: jiff::Timestamp::now(),
+        merged_at: chrono::Utc::now(),
     };
 
     let response = crate::models::MergeResponse {
@@ -1042,7 +1043,7 @@ pub async fn batch_deduplicate(
                 score_breakdown: serde_json::to_value(&m.breakdown).ok(),
                 status,
                 reviewed_by: None,
-                created_at: jiff::Timestamp::now(),
+                created_at: chrono::Utc::now(),
                 reviewed_at: None,
             });
         }

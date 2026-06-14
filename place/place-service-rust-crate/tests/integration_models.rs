@@ -16,7 +16,7 @@ use place_service::models::opening_hours::{DayOfWeek, OpeningHoursSpecification}
 use place_service::models::place::Place;
 use place_service::models::place_type::PlaceType;
 
-use jiff::{SignedDuration, Timestamp};
+use chrono::{Duration, Utc};
 use uuid::Uuid;
 
 // -- Place lifecycle tests --
@@ -181,8 +181,8 @@ fn test_consent_lifecycle() {
         place_id,
         consent_type: ConsentType::DataProcessing,
         status: ConsentStatus::Active,
-        granted_at: Timestamp::now(),
-        expires_at: Some(Timestamp::now() + SignedDuration::from_hours(24 * 365)),
+        granted_at: Utc::now(),
+        expires_at: Some(Utc::now() + Duration::hours(24 * 365)),
     };
     assert!(consent.is_active());
 

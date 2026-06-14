@@ -7,7 +7,7 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -23,7 +23,7 @@ pub struct PlaceEvent {
     /// Operation-specific JSON payload captured by the handler.
     pub payload: serde_json::Value,
     /// When the event was emitted.
-    pub emitted_at: Timestamp,
+    pub emitted_at: DateTime<Utc>,
 }
 
 impl PlaceEvent {
@@ -34,7 +34,7 @@ impl PlaceEvent {
             kind,
             entity_id: place_id,
             payload,
-            emitted_at: Timestamp::now(),
+            emitted_at: Utc::now(),
         }
     }
 }

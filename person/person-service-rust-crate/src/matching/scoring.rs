@@ -421,7 +421,7 @@ impl MatchQuality {
 mod tests {
     use super::*;
     use crate::models::{Gender, HumanName};
-    use jiff::civil::Date;
+    use chrono::{NaiveDate, Utc};
 
     /// Build a default config with an 0.85 probable threshold.
     fn create_test_config() -> MatchingConfig {
@@ -433,7 +433,7 @@ mod tests {
     }
 
     /// Build a minimal male "John <name>" person with the given DOB.
-    fn create_test_person(name: &str, dob: Option<Date>) -> Person {
+    fn create_test_person(name: &str, dob: Option<NaiveDate>) -> Person {
         Person {
             id: uuid::Uuid::new_v4(),
             identifiers: vec![],
@@ -460,8 +460,8 @@ mod tests {
             photo: vec![],
             managing_organization: None,
             links: vec![],
-            created_at: jiff::Timestamp::now(),
-            updated_at: jiff::Timestamp::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         }
     }
 
@@ -471,7 +471,7 @@ mod tests {
         let config = create_test_config();
         let scorer = ProbabilisticScorer::new(config);
 
-        let dob = Some(jiff::civil::date(1980, 1, 15));
+        let dob = Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap());
         let person1 = create_test_person("Smith", dob);
         let person2 = create_test_person("Smith", dob);
 
@@ -496,8 +496,8 @@ mod tests {
         let config = create_test_config();
         let scorer = ProbabilisticScorer::new(config);
 
-        let dob1 = Some(jiff::civil::date(1980, 1, 15));
-        let dob2 = Some(jiff::civil::date(1980, 1, 16)); // One day off
+        let dob1 = Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap());
+        let dob2 = Some(NaiveDate::from_ymd_opt(1980, 1, 16).unwrap()); // One day off
 
         let person1 = create_test_person("Smith", dob1);
         let person2 = create_test_person("Smyth", dob2); // Spelling variant
@@ -522,8 +522,8 @@ mod tests {
         let config = create_test_config();
         let scorer = ProbabilisticScorer::new(config);
 
-        let dob1 = Some(jiff::civil::date(1980, 1, 15));
-        let dob2 = Some(jiff::civil::date(1990, 6, 20));
+        let dob1 = Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap());
+        let dob2 = Some(NaiveDate::from_ymd_opt(1990, 6, 20).unwrap());
 
         let person1 = create_test_person("Smith", dob1);
         let person2 = create_test_person("Johnson", dob2);
@@ -544,7 +544,7 @@ mod tests {
         let config = create_test_config();
         let scorer = DeterministicScorer::new(config);
 
-        let dob = Some(jiff::civil::date(1980, 1, 15));
+        let dob = Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap());
         let person1 = create_test_person("Smith", dob);
         let person2 = create_test_person("Smith", dob);
 
@@ -587,7 +587,7 @@ mod tests {
         let config = create_test_config();
         let scorer = ProbabilisticScorer::new(config);
 
-        let dob = Some(jiff::civil::date(1980, 1, 15));
+        let dob = Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap());
         let mut person1 = create_test_person("Smith", dob);
         let mut person2 = create_test_person("Smith", dob);
 
@@ -623,9 +623,13 @@ mod tests {
         let config = create_test_config();
         let scorer = ProbabilisticScorer::new(config);
 
-        let mut person1 = create_test_person("Smith", Some(jiff::civil::date(1980, 1, 15)));
+        let mut person1 =
+            create_test_person("Smith", Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap()));
         person1.gender = Gender::Male;
-        let mut person2 = create_test_person("Johnson", Some(jiff::civil::date(1995, 8, 22)));
+        let mut person2 = create_test_person(
+            "Johnson",
+            Some(NaiveDate::from_ymd_opt(1995, 8, 22).unwrap()),
+        );
         person2.gender = Gender::Female;
 
         let result = scorer.calculate_score(&person1, &person2);
@@ -648,8 +652,10 @@ mod tests {
         let scorer = ProbabilisticScorer::new(config);
 
         // Same name but different DOB
-        let person1 = create_test_person("Smith", Some(jiff::civil::date(1980, 1, 15)));
-        let person2 = create_test_person("Smith", Some(jiff::civil::date(1990, 6, 20)));
+        let person1 =
+            create_test_person("Smith", Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap()));
+        let person2 =
+            create_test_person("Smith", Some(NaiveDate::from_ymd_opt(1990, 6, 20).unwrap()));
 
         let result = scorer.calculate_score(&person1, &person2);
         assert!(
@@ -670,9 +676,11 @@ mod tests {
         let config = create_test_config();
         let scorer = DeterministicScorer::new(config);
 
-        let mut person1 = create_test_person("Smith", Some(jiff::civil::date(1980, 1, 15)));
+        let mut person1 =
+            create_test_person("Smith", Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap()));
         person1.tax_id = Some("123-45-6789".into());
-        let mut person2 = create_test_person("Jones", Some(jiff::civil::date(1995, 12, 1)));
+        let mut person2 =
+            create_test_person("Jones", Some(NaiveDate::from_ymd_opt(1995, 12, 1).unwrap()));
         person2.tax_id = Some("123-45-6789".into());
 
         let result = scorer.calculate_score(&person1, &person2);
@@ -690,9 +698,11 @@ mod tests {
         let scorer = DeterministicScorer::new(config);
 
         let id = crate::models::Identifier::ssn("123-45-6789".into());
-        let mut person1 = create_test_person("Smith", Some(jiff::civil::date(1980, 1, 15)));
+        let mut person1 =
+            create_test_person("Smith", Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap()));
         person1.identifiers = vec![id.clone()];
-        let mut person2 = create_test_person("Jones", Some(jiff::civil::date(1995, 12, 1)));
+        let mut person2 =
+            create_test_person("Jones", Some(NaiveDate::from_ymd_opt(1995, 12, 1).unwrap()));
         person2.identifiers = vec![id];
 
         let result = scorer.calculate_score(&person1, &person2);

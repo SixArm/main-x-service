@@ -61,9 +61,7 @@ pub fn has_active_consent(
     consents: &[crate::models::Consent],
     consent_type: crate::models::ConsentType,
 ) -> bool {
-    let today = jiff::Timestamp::now()
-        .to_zoned(jiff::tz::TimeZone::UTC)
-        .date();
+    let today = chrono::Utc::now().date_naive();
     consents.iter().any(|c| {
         c.consent_type == consent_type
             && c.status == crate::models::ConsentStatus::Active
@@ -80,6 +78,7 @@ pub fn export_event_data(event: &Event) -> serde_json::Value {
 mod tests {
     use super::*;
     use crate::models::{Identifier, IdentifierType, Party, PartyKind};
+    use chrono::TimeZone;
 
     /// Only the last 4 chars stay visible; separators are preserved and
     /// short values pass through unchanged.
@@ -96,10 +95,7 @@ mod tests {
     fn mask_event_masks_identifiers() {
         let mut event = Event::new(
             "Concert",
-            jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0)
-                .in_tz("UTC")
-                .unwrap()
-                .timestamp(),
+            chrono::Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap(),
         );
         event.identifiers.push(Identifier::new(
             IdentifierType::TicketNumber,
@@ -116,10 +112,7 @@ mod tests {
     fn mask_event_masks_party_emails() {
         let mut event = Event::new(
             "X",
-            jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0)
-                .in_tz("UTC")
-                .unwrap()
-                .timestamp(),
+            chrono::Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap(),
         );
         event.attendees.push(Party {
             kind: PartyKind::Person,
@@ -148,10 +141,7 @@ mod tests {
     fn export_includes_all_fields() {
         let event = Event::new(
             "X",
-            jiff::civil::datetime(2026, 3, 1, 9, 0, 0, 0)
-                .in_tz("UTC")
-                .unwrap()
-                .timestamp(),
+            chrono::Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap(),
         );
         let exported = export_event_data(&event);
         let obj = exported.as_object().unwrap();

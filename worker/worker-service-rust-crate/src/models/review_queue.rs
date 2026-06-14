@@ -8,7 +8,7 @@
 //! per-component score breakdown is preserved so reviewers can see *why* a
 //! pair was flagged.
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -58,10 +58,10 @@ pub struct ReviewQueueItem {
     pub reviewed_by: Option<String>,
 
     /// When this item was created
-    pub created_at: Timestamp,
+    pub created_at: DateTime<Utc>,
 
     /// When this item was last reviewed
-    pub reviewed_at: Option<Timestamp>,
+    pub reviewed_at: Option<DateTime<Utc>>,
 }
 
 /// Request to run batch deduplication

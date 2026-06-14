@@ -102,16 +102,16 @@ pub fn to_matcher_event(e: &Event) -> MEvent {
         b = b.typical_age_range(age);
     }
 
-    // Times: Timestamp → RFC 3339.
-    b = b.start_date(e.start_date.to_string());
+    // Times: DateTime<Utc> → RFC 3339.
+    b = b.start_date(e.start_date.to_rfc3339());
     if let Some(t) = e.end_date {
-        b = b.end_date(t.to_string());
+        b = b.end_date(t.to_rfc3339());
     }
     if let Some(t) = e.door_time {
-        b = b.door_time(t.to_string());
+        b = b.door_time(t.to_rfc3339());
     }
     if let Some(t) = e.previous_start_date {
-        b = b.previous_start_date(t.to_string());
+        b = b.previous_start_date(t.to_rfc3339());
     }
 
     b = b.event_status(map_status(e.event_status));
@@ -403,15 +403,13 @@ mod tests {
         Event, EventStatus, Location, Party, PartyKind, Place, VirtualLocation,
         identifier::Identifier,
     };
+    use chrono::TimeZone;
 
     /// Build a minimal service `Event` with a fixed start date for tests.
     fn svc_event(name: &str) -> Event {
         Event::new(
             name,
-            jiff::civil::datetime(2026, 6, 1, 9, 0, 0, 0)
-                .in_tz("UTC")
-                .unwrap()
-                .timestamp(),
+            chrono::Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap(),
         )
     }
 

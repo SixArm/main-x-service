@@ -15,14 +15,14 @@ fn main() {
     let worker1 = Worker::builder()
         .given_name("Robert")
         .family_name("Jones")
-        .date_of_birth(jiff::civil::date(1975, 6, 20))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(1975, 6, 20).unwrap())
         .gender(Gender::Male)
         .build();
 
     let worker2 = Worker::builder()
         .given_name("Bob") // Nickname
         .family_name("Jones")
-        .date_of_birth(jiff::civil::date(1975, 6, 20))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(1975, 6, 20).unwrap())
         .gender(Gender::Male)
         .build();
 

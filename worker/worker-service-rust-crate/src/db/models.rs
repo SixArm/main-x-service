@@ -12,8 +12,8 @@
 //! they reference. Timestamp columns use the `time` crate's
 //! `OffsetDateTime` (aliased `TimeDateTimeWithTimeZone` in SeaORM's prelude)
 //! and date columns use `time::Date` (`TimeDate`), since SeaORM 1.1 lacks
-//! native `jiff` support; the [`crate::db::convert`] helpers bridge to the
-//! domain `jiff` types. The authoritative column reference is
+//! native `chrono` interop here; the [`crate::db::convert`] helpers bridge to
+//! the domain `chrono` types. The authoritative column reference is
 //! `AGENTS/models.md`.
 //!
 //! Soft-delete convention: tables carrying `deleted_at` / `deleted_by` are

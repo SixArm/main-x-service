@@ -23,6 +23,7 @@
 //! If a public symbol must change, update *this test in the same PR* — the
 //! purpose is to make every breaking API change deliberate.
 
+use chrono::NaiveDate;
 use person_matcher::{
     Address, Confidence, Gender, MatchConfig, MatchingEngine, PassportBook, Person, PersonBuilder,
 };
@@ -36,8 +37,8 @@ use person_matcher::{
 /// or removed, this fails to build.
 #[test]
 fn person_builder_demographic_and_contact_surface() {
-    let dob = jiff::civil::date(1980, 5, 15);
-    let death = jiff::civil::date(2070, 1, 1);
+    let dob = NaiveDate::from_ymd_opt(1980, 5, 15).unwrap();
+    let death = NaiveDate::from_ymd_opt(2070, 1, 1).unwrap();
     let addr = Address::new().with_line1("1 Test St").with_city("Town");
 
     let p: Person = Person::builder()
@@ -130,8 +131,8 @@ fn person_builder_passport_book_surface() {
 
     let pb = PassportBook::new("US", "X12345678")
         .expect("non-empty country + number must construct")
-        .with_issued(jiff::civil::date(2020, 1, 1))
-        .with_expires(jiff::civil::date(2030, 1, 1));
+        .with_issued(NaiveDate::from_ymd_opt(2020, 1, 1).unwrap())
+        .with_expires(NaiveDate::from_ymd_opt(2030, 1, 1).unwrap());
     assert_eq!(pb.country, "US");
     assert_eq!(pb.number, "X12345678");
 

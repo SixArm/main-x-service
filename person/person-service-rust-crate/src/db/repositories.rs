@@ -10,6 +10,7 @@
 //! for every mutation. [`AuditContext`] carries who/where provenance
 //! into those audit rows.
 
+use chrono::Utc;
 use sea_orm::sea_query::Expr;
 use sea_orm::*;
 use time::OffsetDateTime;
@@ -797,7 +798,7 @@ impl PersonRepository for SeaOrmPersonRepository {
         // Publish event
         self.publish_event(crate::streaming::PersonEvent::Created {
             person: result.clone(),
-            timestamp: jiff::Timestamp::now(),
+            timestamp: Utc::now(),
         });
 
         // Log audit
@@ -943,7 +944,7 @@ impl PersonRepository for SeaOrmPersonRepository {
         // Publish event
         self.publish_event(crate::streaming::PersonEvent::Updated {
             person: result.clone(),
-            timestamp: jiff::Timestamp::now(),
+            timestamp: Utc::now(),
         });
 
         // Log audit
@@ -984,7 +985,7 @@ impl PersonRepository for SeaOrmPersonRepository {
         // Publish event
         self.publish_event(crate::streaming::PersonEvent::Deleted {
             person_id: *id,
-            timestamp: jiff::Timestamp::now(),
+            timestamp: Utc::now(),
         });
 
         // Log audit

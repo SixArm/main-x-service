@@ -11,14 +11,14 @@
 // the loop-counter cast operates on small, bounded benchmark sizes.
 #![allow(clippy::similar_names, clippy::cast_possible_truncation)]
 
+use chrono::NaiveDate;
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
-use jiff::civil::Date;
 use worker_matcher::{
     Address, Gender, MatchConfig, MatchingEngine, NicknameTable, SimilarityAlgorithm, Worker,
 };
 
-fn dob(y: i16, m: i8, d: i8) -> Date {
-    jiff::civil::date(y, m, d)
+fn dob(y: i32, m: u32, d: u32) -> NaiveDate {
+    NaiveDate::from_ymd_opt(y, m, d).expect("valid date")
 }
 
 fn build_alice() -> Worker {
@@ -88,7 +88,7 @@ fn make_candidate(idx: usize) -> Worker {
             "Other"
         })
         .family_name(last[idx % last.len()])
-        .date_of_birth(dob(1980, 5, (idx % 28 + 1) as i8))
+        .date_of_birth(dob(1980, 5, (idx % 28 + 1) as u32))
         .gender(if idx.is_multiple_of(2) {
             Gender::Female
         } else {

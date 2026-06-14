@@ -894,7 +894,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // Publish event
         self.publish_event(crate::streaming::WorkerEvent::Created {
             worker: result.clone(),
-            timestamp: jiff::Timestamp::now(),
+            timestamp: chrono::Utc::now(),
         });
 
         // Log audit
@@ -1037,7 +1037,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // Publish event
         self.publish_event(crate::streaming::WorkerEvent::Updated {
             worker: result.clone(),
-            timestamp: jiff::Timestamp::now(),
+            timestamp: chrono::Utc::now(),
         });
 
         // Log audit
@@ -1076,7 +1076,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // Publish event
         self.publish_event(crate::streaming::WorkerEvent::Deleted {
             worker_id: *id,
-            timestamp: jiff::Timestamp::now(),
+            timestamp: chrono::Utc::now(),
         });
 
         // Log audit

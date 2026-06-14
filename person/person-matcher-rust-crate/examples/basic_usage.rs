@@ -14,6 +14,7 @@
 //! parsers (the original six plus the T-17.1 batch of seven), and address
 //! line parsing. It is illustrative output, not an assertion harness.
 
+use chrono::NaiveDate;
 use person_matcher::{
     Address, BloodType, Gender, MatchConfig, MatchingEngine, NicknameTable, Normalizer,
     PassportBook, Person,
@@ -29,7 +30,7 @@ fn main() {
         .united_kingdom_national_health_service_number("123 456 7890")
         .given_name("Catherine")
         .family_name("Williams")
-        .date_of_birth(jiff::civil::date(1985, 3, 15))
+        .date_of_birth(NaiveDate::from_ymd_opt(1985, 3, 15).unwrap())
         .gender(Gender::Female)
         .phone("07700 900123")
         .build();
@@ -38,7 +39,7 @@ fn main() {
         .united_kingdom_national_health_service_number("1234567890") // Same United Kingdom National Health Service Number, different format
         .given_name("Katherine") // Different spelling
         .family_name("Williams")
-        .date_of_birth(jiff::civil::date(1985, 3, 15))
+        .date_of_birth(NaiveDate::from_ymd_opt(1985, 3, 15).unwrap())
         .gender(Gender::Female)
         .phone("+44 7700 900123") // Same phone, different format
         .build();
@@ -155,17 +156,17 @@ fn main() {
     let p_jan_10 = Person::builder()
         .given_name("Thomas")
         .family_name("Price")
-        .date_of_birth(jiff::civil::date(1995, 1, 10))
+        .date_of_birth(NaiveDate::from_ymd_opt(1995, 1, 10).unwrap())
         .build();
     let p_oct_1 = Person::builder()
         .given_name("Thomas")
         .family_name("Price")
-        .date_of_birth(jiff::civil::date(1995, 10, 1))
+        .date_of_birth(NaiveDate::from_ymd_opt(1995, 10, 1).unwrap())
         .build();
     let p_unrelated = Person::builder()
         .given_name("Thomas")
         .family_name("Price")
-        .date_of_birth(jiff::civil::date(1980, 6, 30))
+        .date_of_birth(NaiveDate::from_ymd_opt(1980, 6, 30).unwrap())
         .build();
     let transposed = engine.match_persons(&p_jan_10, &p_oct_1);
     let unrelated = engine.match_persons(&p_jan_10, &p_unrelated);
@@ -281,13 +282,13 @@ fn main() {
     let p_op = Person::builder()
         .given_name("Ada")
         .family_name("Lovelace")
-        .date_of_birth(jiff::civil::date(1815, 12, 10))
+        .date_of_birth(NaiveDate::from_ymd_opt(1815, 12, 10).unwrap())
         .blood_type(BloodType::OPositive)
         .build();
     let p_an = Person::builder()
         .given_name("Ada")
         .family_name("Lovelace")
-        .date_of_birth(jiff::civil::date(1815, 12, 10))
+        .date_of_birth(NaiveDate::from_ymd_opt(1815, 12, 10).unwrap())
         .blood_type(BloodType::ANegative)
         .build();
     let r = engine.match_persons(&p_op, &p_an);
@@ -301,14 +302,14 @@ fn main() {
     let twin1 = Person::builder()
         .given_name("Alex")
         .family_name("Smith")
-        .date_of_birth(jiff::civil::date(2000, 6, 15))
+        .date_of_birth(NaiveDate::from_ymd_opt(2000, 6, 15).unwrap())
         .gender(Gender::Female)
         .multiple_birth(1)
         .build();
     let twin2 = Person::builder()
         .given_name("Alex")
         .family_name("Smith")
-        .date_of_birth(jiff::civil::date(2000, 6, 15))
+        .date_of_birth(NaiveDate::from_ymd_opt(2000, 6, 15).unwrap())
         .gender(Gender::Female)
         .multiple_birth(2)
         .build();
@@ -369,15 +370,15 @@ fn main() {
     let alan_a = Person::builder()
         .given_name("Alan")
         .family_name("Turing")
-        .date_of_birth(jiff::civil::date(1912, 6, 23))
-        .death_date(jiff::civil::date(1954, 6, 7))
+        .date_of_birth(NaiveDate::from_ymd_opt(1912, 6, 23).unwrap())
+        .death_date(NaiveDate::from_ymd_opt(1954, 6, 7).unwrap())
         .death_place(Address::new().with_city("Wilmslow").with_country("England"))
         .build();
     let alan_b = Person::builder()
         .given_name("Alan")
         .family_name("Turing")
-        .date_of_birth(jiff::civil::date(1912, 6, 23))
-        .death_date(jiff::civil::date(1954, 6, 7))
+        .date_of_birth(NaiveDate::from_ymd_opt(1912, 6, 23).unwrap())
+        .death_date(NaiveDate::from_ymd_opt(1954, 6, 7).unwrap())
         .death_place(Address::new().with_city("Wilmslow").with_country("England"))
         .build();
     let r = engine.match_persons(&alan_a, &alan_b);
@@ -388,7 +389,7 @@ fn main() {
     let alan_c = Person::builder()
         .given_name("Alan")
         .family_name("Turing")
-        .death_date(jiff::civil::date(1954, 7, 6))
+        .death_date(NaiveDate::from_ymd_opt(1954, 7, 6).unwrap())
         .build();
     let r = engine.match_persons(&alan_a, &alan_c);
     println!(
@@ -404,7 +405,7 @@ fn main() {
         .add_passport_book(
             PassportBook::new("GB", "123456789")
                 .unwrap()
-                .with_issued(jiff::civil::date(2024, 6, 1)),
+                .with_issued(NaiveDate::from_ymd_opt(2024, 6, 1).unwrap()),
         )
         .add_passport_book(PassportBook::new("US", "AB1234567").unwrap())
         .add_passport_book(PassportBook::new("GB", "OLD-BOOK-NUM").unwrap())

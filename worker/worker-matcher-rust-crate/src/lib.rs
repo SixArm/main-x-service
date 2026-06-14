@@ -34,19 +34,19 @@
 //!
 //! ```
 //! use worker_matcher::{Gender, MatchingEngine, MatchConfig, Worker};
-//! use jiff::civil::Date;
+//! use chrono::NaiveDate;
 //!
 //! let alice = Worker::builder()
 //!     .given_name("Alice")
 //!     .family_name("Williams")
-//!     .date_of_birth(jiff::civil::date(1980, 5, 15))
+//!     .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
 //!     .gender(Gender::Female)
 //!     .build();
 //!
 //! let alyce = Worker::builder()
 //!     .given_name("Alyce")   // alternate spelling
 //!     .family_name("Williams")
-//!     .date_of_birth(jiff::civil::date(1980, 5, 15))
+//!     .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
 //!     .gender(Gender::Female)
 //!     .build();
 //!
@@ -79,12 +79,12 @@
 //!
 //! ```
 //! use worker_matcher::{MatchingEngine, Worker};
-//! use jiff::civil::Date;
+//! use chrono::NaiveDate;
 //!
 //! let p1 = Worker::builder()
 //!     .given_name("John")
 //!     .family_name("Smith")
-//!     .date_of_birth(jiff::civil::date(1980, 5, 15))
+//!     .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
 //!     .build();
 //! let p2 = p1.clone();
 //!

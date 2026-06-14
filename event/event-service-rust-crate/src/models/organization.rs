@@ -6,7 +6,7 @@
 //! lightweight [`Party`](crate::models::Party) reference embedded in an
 //! event's organizer / performer lists.
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -48,10 +48,10 @@ pub struct Organization {
     pub part_of: Option<Uuid>,
 
     /// Created timestamp
-    pub created_at: Timestamp,
+    pub created_at: DateTime<Utc>,
 
     /// Updated timestamp
-    pub updated_at: Timestamp,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Organization {
@@ -69,7 +69,7 @@ impl Organization {
     /// assert!(org.telecom.is_empty());
     /// ```
     pub fn new(name: String) -> Self {
-        let now = jiff::Timestamp::now();
+        let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             identifiers: Vec::new(),

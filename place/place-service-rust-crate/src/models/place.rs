@@ -18,7 +18,7 @@
 //! assert!(p.is_deleted);
 //! ```
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -105,12 +105,12 @@ pub struct Place {
     pub is_deleted: bool,
     /// When the record was soft-deleted, if it has been. Paired with
     /// [`is_deleted`](Self::is_deleted).
-    pub deleted_at: Option<Timestamp>,
+    pub deleted_at: Option<DateTime<Utc>>,
     /// Creation timestamp, set once at construction.
-    pub created_at: Timestamp,
+    pub created_at: DateTime<Utc>,
     /// Last-modification timestamp. Initialized equal to
     /// [`created_at`](Self::created_at).
-    pub updated_at: Timestamp,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Place {
@@ -129,7 +129,7 @@ impl Place {
     /// assert_eq!(p.created_at, p.updated_at);
     /// ```
     pub fn new(name: &str) -> Self {
-        let now = Timestamp::now();
+        let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             name: name.to_string(),
@@ -175,7 +175,7 @@ impl Place {
     /// ```
     pub fn soft_delete(&mut self) {
         self.is_deleted = true;
-        self.deleted_at = Some(Timestamp::now());
+        self.deleted_at = Some(Utc::now());
     }
 }
 

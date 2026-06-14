@@ -19,7 +19,7 @@ fn main() {
         .uk_nhs_number("123 456 7890")
         .given_name("Catherine")
         .family_name("Williams")
-        .date_of_birth(jiff::civil::date(1985, 3, 15))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(1985, 3, 15).unwrap())
         .gender(Gender::Female)
         .phone("07700 900123")
         .build();
@@ -28,7 +28,7 @@ fn main() {
         .uk_nhs_number("1234567890") // Same NHS, different format
         .given_name("Katherine") // Different spelling
         .family_name("Williams")
-        .date_of_birth(jiff::civil::date(1985, 3, 15))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(1985, 3, 15).unwrap())
         .gender(Gender::Female)
         .phone("+44 7700 900123") // Same phone, different format
         .build();
@@ -137,17 +137,17 @@ fn main() {
     let p_jan_10 = Worker::builder()
         .given_name("Thomas")
         .family_name("Price")
-        .date_of_birth(jiff::civil::date(1995, 1, 10))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(1995, 1, 10).unwrap())
         .build();
     let p_oct_1 = Worker::builder()
         .given_name("Thomas")
         .family_name("Price")
-        .date_of_birth(jiff::civil::date(1995, 10, 1))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(1995, 10, 1).unwrap())
         .build();
     let p_unrelated = Worker::builder()
         .given_name("Thomas")
         .family_name("Price")
-        .date_of_birth(jiff::civil::date(1980, 6, 30))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(1980, 6, 30).unwrap())
         .build();
     let transposed = engine.match_workers(&p_jan_10, &p_oct_1);
     let unrelated = engine.match_workers(&p_jan_10, &p_unrelated);
@@ -263,13 +263,13 @@ fn main() {
     let p_op = Worker::builder()
         .given_name("Ada")
         .family_name("Lovelace")
-        .date_of_birth(jiff::civil::date(1815, 12, 10))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(1815, 12, 10).unwrap())
         .blood_type(BloodType::OPositive)
         .build();
     let p_an = Worker::builder()
         .given_name("Ada")
         .family_name("Lovelace")
-        .date_of_birth(jiff::civil::date(1815, 12, 10))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(1815, 12, 10).unwrap())
         .blood_type(BloodType::ANegative)
         .build();
     let r = engine.match_workers(&p_op, &p_an);
@@ -283,14 +283,14 @@ fn main() {
     let twin1 = Worker::builder()
         .given_name("Alex")
         .family_name("Smith")
-        .date_of_birth(jiff::civil::date(2000, 6, 15))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(2000, 6, 15).unwrap())
         .gender(Gender::Female)
         .multiple_birth(1)
         .build();
     let twin2 = Worker::builder()
         .given_name("Alex")
         .family_name("Smith")
-        .date_of_birth(jiff::civil::date(2000, 6, 15))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(2000, 6, 15).unwrap())
         .gender(Gender::Female)
         .multiple_birth(2)
         .build();
@@ -351,15 +351,15 @@ fn main() {
     let alan_a = Worker::builder()
         .given_name("Alan")
         .family_name("Turing")
-        .date_of_birth(jiff::civil::date(1912, 6, 23))
-        .death_date(jiff::civil::date(1954, 6, 7))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(1912, 6, 23).unwrap())
+        .death_date(chrono::NaiveDate::from_ymd_opt(1954, 6, 7).unwrap())
         .death_place(Address::new().with_city("Wilmslow").with_country("England"))
         .build();
     let alan_b = Worker::builder()
         .given_name("Alan")
         .family_name("Turing")
-        .date_of_birth(jiff::civil::date(1912, 6, 23))
-        .death_date(jiff::civil::date(1954, 6, 7))
+        .date_of_birth(chrono::NaiveDate::from_ymd_opt(1912, 6, 23).unwrap())
+        .death_date(chrono::NaiveDate::from_ymd_opt(1954, 6, 7).unwrap())
         .death_place(Address::new().with_city("Wilmslow").with_country("England"))
         .build();
     let r = engine.match_workers(&alan_a, &alan_b);
@@ -370,7 +370,7 @@ fn main() {
     let alan_c = Worker::builder()
         .given_name("Alan")
         .family_name("Turing")
-        .death_date(jiff::civil::date(1954, 7, 6))
+        .death_date(chrono::NaiveDate::from_ymd_opt(1954, 7, 6).unwrap())
         .build();
     let r = engine.match_workers(&alan_a, &alan_c);
     println!(
@@ -386,7 +386,7 @@ fn main() {
         .add_passport_book(
             PassportBook::new("GB", "123456789")
                 .unwrap()
-                .with_issued(jiff::civil::date(2024, 6, 1)),
+                .with_issued(chrono::NaiveDate::from_ymd_opt(2024, 6, 1).unwrap()),
         )
         .add_passport_book(PassportBook::new("US", "AB1234567").unwrap())
         .add_passport_book(PassportBook::new("GB", "OLD-BOOK-NUM").unwrap())

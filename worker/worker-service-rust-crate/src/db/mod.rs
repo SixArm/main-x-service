@@ -21,7 +21,7 @@ use crate::config::DatabaseConfig;
 
 /// HIPAA-style audit-log repository ([`audit::AuditLogRepository`]).
 pub mod audit;
-/// `jiff` <-> `time` conversions at the persistence boundary.
+/// `chrono` <-> `time` conversions at the persistence boundary.
 pub mod convert;
 /// SeaORM entity modules (one per PostgreSQL table).
 pub mod models;

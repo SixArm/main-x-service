@@ -31,7 +31,7 @@
 //! assert!(worker.active);
 //! ```
 
-use jiff::{Timestamp, civil::Date};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -72,7 +72,7 @@ pub struct Worker {
     pub worker_type: Option<WorkerType>,
 
     /// Birth date
-    pub birth_date: Option<Date>,
+    pub birth_date: Option<NaiveDate>,
 
     /// Tax ID number (CPF, SSN, TIN, etc.)
     #[serde(default)]
@@ -90,7 +90,7 @@ pub struct Worker {
     pub deceased: bool,
 
     /// Deceased date/time
-    pub deceased_datetime: Option<Timestamp>,
+    pub deceased_datetime: Option<DateTime<Utc>>,
 
     /// Addresses
     pub addresses: Vec<Address>,
@@ -111,10 +111,10 @@ pub struct Worker {
     pub links: Vec<WorkerLink>,
 
     /// Created timestamp
-    pub created_at: Timestamp,
+    pub created_at: DateTime<Utc>,
 
     /// Updated timestamp
-    pub updated_at: Timestamp,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// A structured human name, modeled on the FHIR `HumanName` datatype.
@@ -254,7 +254,7 @@ impl Worker {
     /// assert!(worker.identifiers.is_empty());
     /// ```
     pub fn new(name: HumanName, gender: Gender) -> Self {
-        let now = Timestamp::now();
+        let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             identifiers: Vec::new(),
@@ -388,7 +388,7 @@ mod tests {
             suffix: vec!["Jr.".into()],
         };
         let mut worker = Worker::new(name, Gender::Male);
-        worker.birth_date = Some(jiff::civil::date(1985, 3, 20));
+        worker.birth_date = Some(NaiveDate::from_ymd_opt(1985, 3, 20).unwrap());
         worker.tax_id = Some("123-45-6789".into());
 
         let json = serde_json::to_string(&worker).expect("Serialization should succeed");

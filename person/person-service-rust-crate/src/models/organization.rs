@@ -16,7 +16,7 @@
 //! assert!(org.addresses.is_empty());
 //! ```
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -54,10 +54,10 @@ pub struct Organization {
     pub part_of: Option<Uuid>,
 
     /// Created timestamp
-    pub created_at: Timestamp,
+    pub created_at: DateTime<Utc>,
 
     /// Updated timestamp
-    pub updated_at: Timestamp,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Organization {
@@ -66,7 +66,7 @@ impl Organization {
     /// Generates a fresh UUID, stamps timestamps, marks it `active`, and
     /// leaves every collection empty and `part_of` unset.
     pub fn new(name: String) -> Self {
-        let now = Timestamp::now();
+        let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             identifiers: Vec::new(),

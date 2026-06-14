@@ -441,14 +441,11 @@ fn title_case(s: &str) -> String {
 mod tests {
     use super::*;
     use crate::models::{Event, EventAttendanceMode, Location, VirtualLocation};
-    use jiff::Timestamp;
+    use chrono::{DateTime, TimeZone, Utc};
 
     /// A fixed start instant for building test events.
-    fn start() -> Timestamp {
-        jiff::civil::datetime(2026, 3, 1, 12, 0, 0, 0)
-            .in_tz("UTC")
-            .unwrap()
-            .timestamp()
+    fn start() -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 3, 1, 12, 0, 0).unwrap()
     }
 
     /// A minimal valid event produces no validation errors.
@@ -471,7 +468,7 @@ mod tests {
     #[test]
     fn end_before_start_fails() {
         let mut event = Event::new("Test", start());
-        event.end_date = Some(start() - jiff::SignedDuration::from_hours(1));
+        event.end_date = Some(start() - chrono::Duration::hours(1));
         let errors = validate_event(&event);
         assert!(errors.iter().any(|e| e.field == "end_date"));
     }
@@ -480,7 +477,7 @@ mod tests {
     #[test]
     fn door_after_start_fails() {
         let mut event = Event::new("Test", start());
-        event.door_time = Some(start() + jiff::SignedDuration::from_hours(1));
+        event.door_time = Some(start() + chrono::Duration::hours(1));
         let errors = validate_event(&event);
         assert!(errors.iter().any(|e| e.field == "door_time"));
     }

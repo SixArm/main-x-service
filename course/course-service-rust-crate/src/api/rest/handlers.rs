@@ -19,7 +19,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use jiff::Timestamp;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -751,7 +751,7 @@ pub async fn merge_courses(
         merge_reason: req.merge_reason.clone(),
         match_score: Some(match_result.score),
         transferred_data: Some(transferred),
-        merged_at: Timestamp::now(),
+        merged_at: Utc::now(),
     };
     let merge_record = match state.course_repository.record_merge(&merge_record).await {
         Ok(r) => r,
@@ -1049,7 +1049,7 @@ async fn run_batch_dedup(
                         score_breakdown: serde_json::to_value(&r.breakdown).ok(),
                         status: ReviewStatus::Pending,
                         reviewed_by: None,
-                        created_at: Timestamp::now(),
+                        created_at: Utc::now(),
                         reviewed_at: None,
                     });
                     response.queued_for_review += 1;
@@ -1096,7 +1096,7 @@ async fn auto_merge(
         merge_reason: Some("auto-merge above auto_merge_threshold".into()),
         match_score: Some(score),
         transferred_data: Some(transferred),
-        merged_at: Timestamp::now(),
+        merged_at: Utc::now(),
     };
     let merge_record = state.course_repository.record_merge(&merge_record).await?;
 

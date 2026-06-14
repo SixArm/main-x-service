@@ -4,7 +4,7 @@
 //! transferring the duplicate's data onto main and recording the
 //! operation as a [`MergeRecord`] for auditability and reversal.
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -66,7 +66,7 @@ pub struct MergeRecord {
     #[serde(default)]
     pub transferred_data: Option<serde_json::Value>,
     /// When the merge was applied.
-    pub merged_at: Timestamp,
+    pub merged_at: DateTime<Utc>,
 }
 
 /// Response body for a successful merge.

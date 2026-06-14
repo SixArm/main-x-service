@@ -247,7 +247,7 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
 pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
     use crate::api::fhir::resources::FhirDeceased;
     use crate::models::{ContactPointSystem, ContactPointUse, Gender, HumanName, NameUse};
-    use jiff::Timestamp;
+    use chrono::Utc;
     use uuid::Uuid;
 
     // Parse ID
@@ -305,13 +305,13 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
     let birth_date = fhir_person
         .birth_date
         .as_ref()
-        .and_then(|d| d.parse::<jiff::civil::Date>().ok());
+        .and_then(|d| d.parse::<chrono::NaiveDate>().ok());
 
     // Parse deceased
     let (deceased, deceased_datetime) = match &fhir_person.deceased {
         Some(FhirDeceased::Boolean(b)) => (*b, None),
         Some(FhirDeceased::DateTime(dt)) => {
-            let parsed_dt = dt.parse::<jiff::Timestamp>().ok();
+            let parsed_dt = dt.parse::<chrono::DateTime<chrono::Utc>>().ok();
             (true, parsed_dt)
         }
         None => (false, None),
@@ -408,7 +408,7 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
         photo: vec![],
         managing_organization: None, // TODO: Parse organization reference
         links: vec![],
-        created_at: Timestamp::now(),
-        updated_at: Timestamp::now(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     })
 }

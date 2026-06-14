@@ -15,7 +15,7 @@
 //! columns existed still deserializes (pinned by
 //! `tests::test_organization_deserialize_without_ods_fields`).
 
-use jiff::{Timestamp, civil::Date};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -90,7 +90,7 @@ pub struct Organization {
 
     /// Last change date from ODS
     #[serde(default)]
-    pub last_change_date: Option<Date>,
+    pub last_change_date: Option<NaiveDate>,
 
     /// Roles assigned to this organisation (primary + non-primary)
     #[serde(default)]
@@ -105,10 +105,10 @@ pub struct Organization {
     pub successions: Vec<OrganizationSuccession>,
 
     /// When this record was first created.
-    pub created_at: Timestamp,
+    pub created_at: DateTime<Utc>,
 
     /// When this record was last modified.
-    pub updated_at: Timestamp,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Organization {
@@ -125,7 +125,7 @@ impl Organization {
     /// assert!(org.ods_code.is_none());
     /// ```
     pub fn new(name: String) -> Self {
-        let now = Timestamp::now();
+        let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             identifiers: Vec::new(),

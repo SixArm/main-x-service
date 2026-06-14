@@ -13,6 +13,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use chrono::{Datelike, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -480,7 +481,7 @@ pub async fn match_person(
 ) -> impl IntoResponse {
     // Use search engine to get candidate persons (blocking)
     let family_name = &payload.person.name.family;
-    let birth_year = payload.person.birth_date.map(|d| d.year() as i32);
+    let birth_year = payload.person.birth_date.map(|d| d.year());
 
     let candidate_ids = state
         .search_engine
@@ -588,7 +589,7 @@ pub struct DuplicateCheckResponse {
 /// empty result rather than failing the caller.
 async fn check_duplicates_internal(state: &AppState, person: &Person) -> Vec<MatchResponse> {
     let family_name = &person.name.family;
-    let birth_year = person.birth_date.map(|d| d.year() as i32);
+    let birth_year = person.birth_date.map(|d| d.year());
 
     let candidate_ids =
         match state
@@ -850,7 +851,7 @@ pub async fn merge_persons(
         .publish(crate::streaming::PersonEvent::Merged {
             source_id: duplicate.id,
             target_id: merged.id,
-            timestamp: jiff::Timestamp::now(),
+            timestamp: Utc::now(),
         })
         .ok();
 
@@ -864,7 +865,7 @@ pub async fn merge_persons(
         merge_reason: req.merge_reason,
         match_score: None,
         transferred_data: Some(serde_json::Value::Object(transferred)),
-        merged_at: jiff::Timestamp::now(),
+        merged_at: Utc::now(),
     };
 
     let response = crate::models::MergeResponse {
@@ -978,7 +979,7 @@ pub async fn batch_deduplicate(
                 score_breakdown: serde_json::to_value(&m.breakdown).ok(),
                 status,
                 reviewed_by: None,
-                created_at: jiff::Timestamp::now(),
+                created_at: Utc::now(),
                 reviewed_at: None,
             });
         }

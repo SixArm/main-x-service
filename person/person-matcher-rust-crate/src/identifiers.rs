@@ -1935,7 +1935,7 @@ pub fn parse_cn_rrn(s: &str) -> Option<String> {
     let yyyy: i32 = cleaned[6..10].parse().ok()?;
     let mm: u32 = cleaned[10..12].parse().ok()?;
     let dd: u32 = cleaned[12..14].parse().ok()?;
-    jiff::civil::Date::new(yyyy as i16, mm as i8, dd as i8).ok()?;
+    chrono::NaiveDate::from_ymd_opt(yyyy, mm, dd)?;
     // ISO 7064 MOD 11-2: the weights are the powers of 2 mod 11 for each
     // position (2^17 down to 2^1), precomputed as this fixed array. Sum the
     // 17 weighted digits, take mod 11, and look up the check character in
@@ -2128,7 +2128,7 @@ pub fn parse_mx_curp(s: &str) -> Option<String> {
     let mm: u32 = cleaned[6..8].parse().ok()?;
     let dd: u32 = cleaned[8..10].parse().ok()?;
     let yyyy = if yy <= 29 { 2000 + yy } else { 1900 + yy };
-    jiff::civil::Date::new(yyyy as i16, mm as i8, dd as i8).ok()?;
+    chrono::NaiveDate::from_ymd_opt(yyyy, mm, dd)?;
     // CURP value table: digits map to themselves; letters A..N → 10..23,
     // Ñ → 24, O..Z → 25..36. Ñ sits between N and O so the alphabet stays
     // contiguous despite the extra Spanish letter.
@@ -2271,7 +2271,7 @@ pub fn parse_za_id(s: &str) -> Option<String> {
     let mm: u32 = digits[2..4].parse().ok()?;
     let dd: u32 = digits[4..6].parse().ok()?;
     let yyyy = if yy <= 29 { 2000 + yy } else { 1900 + yy };
-    jiff::civil::Date::new(yyyy as i16, mm as i8, dd as i8).ok()?;
+    chrono::NaiveDate::from_ymd_opt(yyyy, mm, dd)?;
     let bytes = digits.as_bytes();
     let mut sum: u32 = 0;
     // Standard Luhn: process right-to-left, double every second digit

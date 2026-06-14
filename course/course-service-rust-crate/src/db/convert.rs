@@ -1,33 +1,39 @@
 //! Date/time conversions across the persistence boundary.
 //!
-//! Domain models use `jiff` (`Timestamp`, `civil::Date`); the SeaORM
+//! Domain models use `chrono` (`DateTime<Utc>`, `NaiveDate`); the SeaORM
 //! entity models use the `time` crate (`OffsetDateTime`, `Date`) because
-//! SeaORM 1.1 has no native `jiff` support. These helpers translate
-//! between the two representations when reading/writing rows.
+//! SeaORM 1.1 is configured with the `with-time` feature. These helpers
+//! translate between the two representations when reading/writing rows.
 
-use jiff::Timestamp;
-use jiff::civil::Date as JiffDate;
+use chrono::{DateTime, NaiveDate, Utc};
 use time::{Date as TimeDate, Month, OffsetDateTime};
 
-/// `jiff::Timestamp` → `time::OffsetDateTime` (UTC).
-pub fn ts_to_offset(ts: Timestamp) -> OffsetDateTime {
-    OffsetDateTime::from_unix_timestamp_nanos(ts.as_nanosecond())
-        .expect("jiff Timestamp within time::OffsetDateTime range")
+/// `chrono::DateTime<Utc>` → `time::OffsetDateTime` (UTC).
+pub fn ts_to_offset(ts: DateTime<Utc>) -> OffsetDateTime {
+    OffsetDateTime::from_unix_timestamp_nanos(i128::from(
+        ts.timestamp_nanos_opt()
+            .expect("chrono DateTime within nanosecond range"),
+    ))
+    .expect("chrono DateTime within time::OffsetDateTime range")
 }
 
-/// `time::OffsetDateTime` → `jiff::Timestamp`.
-pub fn offset_to_ts(odt: OffsetDateTime) -> Timestamp {
-    Timestamp::from_nanosecond(odt.unix_timestamp_nanos())
-        .expect("time::OffsetDateTime within jiff Timestamp range")
+/// `time::OffsetDateTime` → `chrono::DateTime<Utc>`.
+pub fn offset_to_ts(odt: OffsetDateTime) -> DateTime<Utc> {
+    DateTime::from_timestamp_nanos(
+        i64::try_from(odt.unix_timestamp_nanos())
+            .expect("time::OffsetDateTime within nanosecond range"),
+    )
 }
 
-/// `jiff::civil::Date` → `time::Date`.
-pub fn date_to_time(d: JiffDate) -> TimeDate {
+/// `chrono::NaiveDate` → `time::Date`.
+pub fn date_to_time(d: NaiveDate) -> TimeDate {
+    use chrono::Datelike;
     let month = Month::try_from(d.month() as u8).expect("valid month");
-    TimeDate::from_calendar_date(d.year() as i32, month, d.day() as u8).expect("valid date")
+    TimeDate::from_calendar_date(d.year(), month, d.day() as u8).expect("valid date")
 }
 
-/// `time::Date` → `jiff::civil::Date`.
-pub fn time_to_date(d: TimeDate) -> JiffDate {
-    JiffDate::new(d.year() as i16, u8::from(d.month()) as i8, d.day() as i8).expect("valid date")
+/// `time::Date` → `chrono::NaiveDate`.
+pub fn time_to_date(d: TimeDate) -> NaiveDate {
+    NaiveDate::from_ymd_opt(d.year(), u8::from(d.month()) as u32, d.day() as u32)
+        .expect("valid date")
 }

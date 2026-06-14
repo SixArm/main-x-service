@@ -13,7 +13,7 @@
 //! with the United Kingdom National Health Service England Organisation Data
 //! Terminology FHIR API.
 
-use jiff::civil::Date;
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -63,9 +63,9 @@ pub struct DatePeriod {
     /// Whether this is a legal or operational period.
     pub period_type: PeriodType,
     /// Start of the period; `None` means open-ended in the past.
-    pub start_date: Option<Date>,
+    pub start_date: Option<NaiveDate>,
     /// End of the period; `None` means still ongoing.
-    pub end_date: Option<Date>,
+    pub end_date: Option<NaiveDate>,
 }
 
 /// A role assigned to an organisation or site (e.g. RO197 = NHS Trust)
@@ -135,7 +135,7 @@ pub struct OrganizationSuccession {
     /// Target's primary role at time of succession
     pub target_primary_role_id: Option<String>,
     /// Legal start date of the succession
-    pub legal_start_date: Option<Date>,
+    pub legal_start_date: Option<NaiveDate>,
     /// Flag indicating whether the target has also been succeeded
     pub has_forward_succession: bool,
 }
@@ -182,7 +182,7 @@ mod tests {
     fn test_date_period_construction() {
         let period = DatePeriod {
             period_type: PeriodType::Legal,
-            start_date: Some(jiff::civil::date(2020, 1, 1)),
+            start_date: Some(NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()),
             end_date: None,
         };
         assert!(period.end_date.is_none());
@@ -200,7 +200,7 @@ mod tests {
             status: OdsStatus::Active,
             periods: vec![DatePeriod {
                 period_type: PeriodType::Legal,
-                start_date: Some(jiff::civil::date(2000, 4, 1)),
+                start_date: Some(NaiveDate::from_ymd_opt(2000, 4, 1).unwrap()),
                 end_date: None,
             }],
         };
@@ -232,7 +232,7 @@ mod tests {
             succession_type: SuccessionType::Predecessor,
             target_ods_code: "RAV".to_string(),
             target_primary_role_id: Some("RO197".to_string()),
-            legal_start_date: Some(jiff::civil::date(1993, 4, 1)),
+            legal_start_date: Some(NaiveDate::from_ymd_opt(1993, 4, 1).unwrap()),
             has_forward_succession: false,
         };
         assert_eq!(succ.succession_type, SuccessionType::Predecessor);

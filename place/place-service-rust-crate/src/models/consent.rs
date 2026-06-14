@@ -9,7 +9,7 @@
 //! # Examples
 //!
 //! ```
-//! use jiff::{SignedDuration, Timestamp};
+//! use chrono::{Duration, Utc};
 //! use uuid::Uuid;
 //! use place_service::models::consent::{Consent, ConsentStatus, ConsentType};
 //!
@@ -18,13 +18,13 @@
 //!     place_id: Uuid::new_v4(),
 //!     consent_type: ConsentType::DataProcessing,
 //!     status: ConsentStatus::Active,
-//!     granted_at: Timestamp::now(),
-//!     expires_at: Some(Timestamp::now() + SignedDuration::from_hours(24 * 365)),
+//!     granted_at: Utc::now(),
+//!     expires_at: Some(Utc::now() + Duration::hours(24 * 365)),
 //! };
 //! assert!(consent.is_active());
 //! ```
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -64,9 +64,9 @@ pub struct Consent {
     /// The current lifecycle state.
     pub status: ConsentStatus,
     /// When the consent was granted.
-    pub granted_at: Timestamp,
+    pub granted_at: DateTime<Utc>,
     /// When the consent expires, if ever. `None` means open-ended.
-    pub expires_at: Option<Timestamp>,
+    pub expires_at: Option<DateTime<Utc>>,
 }
 
 impl Consent {
@@ -80,7 +80,7 @@ impl Consent {
     /// # Examples
     ///
     /// ```
-    /// use jiff::{SignedDuration, Timestamp};
+    /// use chrono::{Duration, Utc};
     /// use uuid::Uuid;
     /// use place_service::models::consent::{Consent, ConsentStatus, ConsentType};
     ///
@@ -89,8 +89,8 @@ impl Consent {
     ///     place_id: Uuid::new_v4(),
     ///     consent_type: ConsentType::Marketing,
     ///     status: ConsentStatus::Active,
-    ///     granted_at: Timestamp::now() - SignedDuration::from_hours(24 * 2),
-    ///     expires_at: Some(Timestamp::now() - SignedDuration::from_hours(24)),
+    ///     granted_at: Utc::now() - Duration::hours(24 * 2),
+    ///     expires_at: Some(Utc::now() - Duration::hours(24)),
     /// };
     /// assert!(!expired.is_active());
     /// ```
@@ -101,7 +101,7 @@ impl Consent {
         }
         // An Active status can still be effectively expired by its deadline.
         if let Some(expires) = self.expires_at {
-            return Timestamp::now() < expires;
+            return Utc::now() < expires;
         }
         // Active with no expiry: in force indefinitely.
         true
@@ -111,7 +111,7 @@ impl Consent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jiff::SignedDuration;
+    use chrono::Duration;
 
     /// An active, never-expiring consent reports active.
     #[test]
@@ -121,7 +121,7 @@ mod tests {
             place_id: Uuid::new_v4(),
             consent_type: ConsentType::DataProcessing,
             status: ConsentStatus::Active,
-            granted_at: Timestamp::now(),
+            granted_at: Utc::now(),
             expires_at: None,
         };
         assert!(consent.is_active());
@@ -135,7 +135,7 @@ mod tests {
             place_id: Uuid::new_v4(),
             consent_type: ConsentType::Marketing,
             status: ConsentStatus::Revoked,
-            granted_at: Timestamp::now(),
+            granted_at: Utc::now(),
             expires_at: None,
         };
         assert!(!consent.is_active());
@@ -149,8 +149,8 @@ mod tests {
             place_id: Uuid::new_v4(),
             consent_type: ConsentType::DataSharing,
             status: ConsentStatus::Active,
-            granted_at: Timestamp::now() - SignedDuration::from_hours(24 * 365),
-            expires_at: Some(Timestamp::now() - SignedDuration::from_hours(24)),
+            granted_at: Utc::now() - Duration::hours(24 * 365),
+            expires_at: Some(Utc::now() - Duration::hours(24)),
         };
         assert!(!consent.is_active());
     }
@@ -163,8 +163,8 @@ mod tests {
             place_id: Uuid::new_v4(),
             consent_type: ConsentType::Research,
             status: ConsentStatus::Active,
-            granted_at: Timestamp::now(),
-            expires_at: Some(Timestamp::now() + SignedDuration::from_hours(24 * 365)),
+            granted_at: Utc::now(),
+            expires_at: Some(Utc::now() + Duration::hours(24 * 365)),
         };
         assert!(consent.is_active());
     }

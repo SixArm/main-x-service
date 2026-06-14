@@ -8,7 +8,7 @@
 //! main person. See the merge handler in
 //! [`crate::api::rest::handlers`] for the full flow.
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -51,7 +51,7 @@ pub struct MergeRecord {
     pub transferred_data: Option<serde_json::Value>,
 
     /// When the merge was performed
-    pub merged_at: Timestamp,
+    pub merged_at: DateTime<Utc>,
 }
 
 /// Request to merge two person records

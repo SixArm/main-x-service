@@ -14,15 +14,16 @@
 //! ```
 //! use event_service::models::Event;
 //!
-//! let start = jiff::civil::datetime(2026, 6, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
+//! use chrono::{TimeZone, Utc};
+//! let start = Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap();
 //! let mut event = Event::new("Summer Festival", start);
-//! event.end_date = Some(start + jiff::SignedDuration::from_hours(8));
+//! event.end_date = Some(start + chrono::Duration::hours(8));
 //! event.keywords.push("music".into());
 //! assert_eq!(event.name, "Summer Festival");
 //! assert!(event.identifiers.is_empty());
 //! ```
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -88,14 +89,14 @@ pub struct Event {
     // Time window (schema.org/Event time properties)
     // -----------------------------------------------------------------------
     /// When the event starts (schema.org/startDate). Required.
-    pub start_date: Timestamp,
+    pub start_date: DateTime<Utc>,
 
     /// When the event ends (schema.org/endDate). When absent, the
     /// event is open-ended.
-    pub end_date: Option<Timestamp>,
+    pub end_date: Option<DateTime<Utc>>,
 
     /// When the doors open / admission begins (schema.org/doorTime).
-    pub door_time: Option<Timestamp>,
+    pub door_time: Option<DateTime<Utc>>,
 
     /// ISO 8601 duration (e.g. "PT1H30M") if no end date is recorded
     /// (schema.org/duration).
@@ -103,7 +104,7 @@ pub struct Event {
 
     /// The originally scheduled start date if the event was
     /// rescheduled (schema.org/previousStartDate).
-    pub previous_start_date: Option<Timestamp>,
+    pub previous_start_date: Option<DateTime<Utc>>,
 
     /// IANA time-zone name for display (e.g. "America/Los_Angeles").
     /// Storage is always UTC.
@@ -225,9 +226,9 @@ pub struct Event {
     // Audit timestamps
     // -----------------------------------------------------------------------
     /// When this record was first created (set by [`Event::new`]).
-    pub created_at: Timestamp,
+    pub created_at: DateTime<Utc>,
     /// When this record was last modified.
-    pub updated_at: Timestamp,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// A typed link from one event to another (merge / refer / see-also).
@@ -268,7 +269,8 @@ impl Event {
     /// use event_service::models::Event;
     /// use event_service::models::{EventStatus, EventAttendanceMode, EventType};
     ///
-    /// let start = jiff::civil::datetime(2026, 1, 15, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
+    /// use chrono::{TimeZone, Utc};
+    /// let start = Utc.with_ymd_and_hms(2026, 1, 15, 9, 0, 0).unwrap();
     /// let event = Event::new("Annual Conference", start);
     /// assert!(event.active);
     /// assert_eq!(event.event_status, EventStatus::Scheduled);
@@ -276,8 +278,8 @@ impl Event {
     /// assert_eq!(event.event_type, EventType::Generic);
     /// assert!(event.end_date.is_none());
     /// ```
-    pub fn new(name: impl Into<String>, start_date: Timestamp) -> Self {
-        let now = jiff::Timestamp::now();
+    pub fn new(name: impl Into<String>, start_date: DateTime<Utc>) -> Self {
+        let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             identifiers: Vec::new(),
@@ -336,7 +338,8 @@ impl Event {
     /// ```
     /// use event_service::models::{Event, Identifier, IdentifierType};
     ///
-    /// let start = jiff::civil::datetime(2026, 1, 1, 0, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
+    /// use chrono::{TimeZone, Utc};
+    /// let start = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
     /// let mut event = Event::new("Show", start);
     /// event.identifiers.push(Identifier::new(
     ///     IdentifierType::TicketNumber, "box-office".into(), "T-42".into(),
@@ -356,13 +359,11 @@ impl Event {
 mod tests {
     use super::*;
     use crate::models::{Address, Location, Party, PartyKind, Place, VirtualLocation};
+    use chrono::TimeZone;
 
     /// A fixed timestamp used across the tests for reproducibility.
-    fn jan_2026() -> Timestamp {
-        jiff::civil::datetime(2026, 1, 15, 9, 0, 0, 0)
-            .in_tz("UTC")
-            .unwrap()
-            .timestamp()
+    fn jan_2026() -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 1, 15, 9, 0, 0).unwrap()
     }
 
     /// `new` leaves all collections empty and applies enum defaults.

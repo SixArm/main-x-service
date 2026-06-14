@@ -8,7 +8,7 @@
 //!
 //! All enums serialize lowercase to match the wire/DB contract.
 
-use jiff::{Timestamp, civil::Date};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -57,13 +57,13 @@ pub struct Consent {
     pub status: ConsentStatus,
 
     /// Date consent was granted
-    pub granted_date: Date,
+    pub granted_date: NaiveDate,
 
     /// Date consent expires (if applicable)
-    pub expiry_date: Option<Date>,
+    pub expiry_date: Option<NaiveDate>,
 
     /// Date consent was revoked (if applicable)
-    pub revoked_date: Option<Date>,
+    pub revoked_date: Option<NaiveDate>,
 
     /// Purpose description
     pub purpose: Option<String>,
@@ -72,7 +72,7 @@ pub struct Consent {
     pub method: Option<String>,
 
     /// When this consent record was created.
-    pub created_at: Timestamp,
+    pub created_at: DateTime<Utc>,
     /// When this consent record was last modified.
-    pub updated_at: Timestamp,
+    pub updated_at: DateTime<Utc>,
 }

@@ -94,6 +94,7 @@
 //! three-part change: a fast path here, a table row here + in spec §5.3.1,
 //! and a test case.
 
+use chrono::Datelike;
 use person_matcher::{
     Address as MAddress, Gender as MGender, PassportBook as MPassport, Person as MPerson,
     PersonBuilder as MBuilder,
@@ -142,7 +143,7 @@ pub fn to_matcher_person(p: &Person) -> MPerson {
     }
 
     // --- Demographics -----------------------------------------------------
-    // `birth_date` → matcher `date_of_birth` (same `jiff::civil::Date`).
+    // `birth_date` → matcher `date_of_birth` (same `chrono::NaiveDate`).
     if let Some(dob) = p.birth_date {
         // Guard against placeholder dates (e.g. year 1) that some source
         // systems use as a "no DOB" sentinel — feeding those to the matcher
@@ -467,7 +468,7 @@ fn build_passport(d: &IdentityDocument) -> Option<MPassport> {
 mod tests {
     use super::*;
     use crate::models::{HumanName, Identifier, IdentifierType, Person};
-    use jiff::Timestamp;
+    use chrono::{NaiveDate, Utc};
     use uuid::Uuid;
 
     /// Build a minimal female `Person` with the given family/given name and
@@ -487,7 +488,7 @@ mod tests {
             additional_names: vec![],
             telecom: vec![],
             gender: Gender::Female,
-            birth_date: Some(jiff::civil::date(1980, 5, 15)),
+            birth_date: Some(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap()),
             tax_id: None,
             documents: vec![],
             emergency_contacts: vec![],
@@ -499,8 +500,8 @@ mod tests {
             photo: vec![],
             managing_organization: None,
             links: vec![],
-            created_at: Timestamp::now(),
-            updated_at: Timestamp::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         }
     }
 
@@ -512,7 +513,10 @@ mod tests {
         let m = to_matcher_person(&svc);
         assert_eq!(m.family_name.as_deref(), Some("Williams"));
         assert_eq!(m.given_name.as_deref(), Some("Alice"));
-        assert_eq!(m.date_of_birth, Some(jiff::civil::date(1980, 5, 15)));
+        assert_eq!(
+            m.date_of_birth,
+            Some(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
+        );
     }
 
     /// An identifier carrying an NHS-number FHIR scheme URI routes to the

@@ -7,16 +7,16 @@
 //! [`standardize_address`] on full and minimal addresses. All functions
 //! are pure, so these isolate CPU cost. Run with `cargo bench`.
 
+use chrono::{NaiveDate, Utc};
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use jiff::{Timestamp, civil::Date};
 use uuid::Uuid;
 
 use person_service::models::*;
 use person_service::validation::{normalize_phone, standardize_address, validate_person};
 
 /// Build a minimal [`Person`] for validation benchmarks.
-fn create_test_person(family: &str, given: &str, birth_date: Option<Date>) -> Person {
-    let now = Timestamp::now();
+fn create_test_person(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Person {
+    let now = Utc::now();
     Person {
         id: Uuid::new_v4(),
         identifiers: vec![],
@@ -50,7 +50,11 @@ fn create_test_person(family: &str, given: &str, birth_date: Option<Date>) -> Pe
 
 /// Benchmark validating a simple, valid person.
 fn bench_validate_simple_person(c: &mut Criterion) {
-    let person = create_test_person("Smith", "John", Some(jiff::civil::date(1980, 1, 15)));
+    let person = create_test_person(
+        "Smith",
+        "John",
+        Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap()),
+    );
 
     c.bench_function("validate_simple_person", |b| {
         b.iter(|| validate_person(black_box(&person)))
@@ -60,7 +64,11 @@ fn bench_validate_simple_person(c: &mut Criterion) {
 /// Benchmark validating a fully-populated person (telecom, address,
 /// document, emergency contact).
 fn bench_validate_complex_person(c: &mut Criterion) {
-    let mut person = create_test_person("Smith", "John", Some(jiff::civil::date(1980, 1, 15)));
+    let mut person = create_test_person(
+        "Smith",
+        "John",
+        Some(NaiveDate::from_ymd_opt(1980, 1, 15).unwrap()),
+    );
 
     person.tax_id = Some("123-45-6789".to_string());
 
@@ -90,8 +98,8 @@ fn bench_validate_complex_person(c: &mut Criterion) {
         number: "X12345678".to_string(),
         issuing_country: Some("US".to_string()),
         issuing_authority: None,
-        issue_date: Some(jiff::civil::date(2020, 1, 1)),
-        expiry_date: Some(jiff::civil::date(2030, 1, 1)),
+        issue_date: Some(NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()),
+        expiry_date: Some(NaiveDate::from_ymd_opt(2030, 1, 1).unwrap()),
         verified: false,
     });
 

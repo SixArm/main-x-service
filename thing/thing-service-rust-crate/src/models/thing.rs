@@ -23,7 +23,7 @@
 //! assert!(!book.is_deleted);
 //! ```
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -104,12 +104,12 @@ pub struct Thing {
     /// hides them while preserving the audit trail. See [`Thing::soft_delete`].
     pub is_deleted: bool,
     /// Timestamp the record was soft-deleted, or `None` if still active.
-    pub deleted_at: Option<Timestamp>,
+    pub deleted_at: Option<DateTime<Utc>>,
     /// Creation timestamp, set once by [`Thing::new`].
-    pub created_at: Timestamp,
+    pub created_at: DateTime<Utc>,
     /// Last-update timestamp. Equal to [`created_at`](Self::created_at) on a
     /// freshly constructed record.
-    pub updated_at: Timestamp,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Thing {
@@ -131,7 +131,7 @@ impl Thing {
     /// assert!(!t.is_deleted);
     /// ```
     pub fn new(name: &str) -> Self {
-        let now = Timestamp::now();
+        let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             name: name.to_string(),
@@ -173,7 +173,7 @@ impl Thing {
     /// ```
     pub fn soft_delete(&mut self) {
         self.is_deleted = true;
-        self.deleted_at = Some(Timestamp::now());
+        self.deleted_at = Some(Utc::now());
     }
 }
 

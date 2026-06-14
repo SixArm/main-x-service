@@ -36,7 +36,8 @@
 //! ```
 //! use event_service::models::Event;
 //!
-//! let start = jiff::civil::datetime(2026, 6, 1, 9, 0, 0, 0).in_tz("UTC").unwrap().timestamp();
+//! use chrono::{TimeZone, Utc};
+//! let start = Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap();
 //! let event = Event::new("Annual Conference", start);
 //! assert_eq!(event.name, "Annual Conference");
 //! assert!(event.active);

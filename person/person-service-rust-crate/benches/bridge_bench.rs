@@ -11,8 +11,8 @@
 //! - `bridge_end_to_end`   — adapter + engine call (the realistic dedup path).
 //! - `bridge_one_to_many`  — single query vs. 100 candidates.
 
+use chrono::{NaiveDate, Utc};
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
-use jiff::Timestamp;
 use uuid::Uuid;
 
 use person_service::matching::adapter::to_matcher_person;
@@ -38,7 +38,7 @@ fn minimal_person() -> Person {
         Gender::Male,
     );
     p.id = Uuid::new_v4();
-    p.created_at = Timestamp::now();
+    p.created_at = Utc::now();
     p.updated_at = p.created_at;
     p
 }
@@ -47,7 +47,7 @@ fn minimal_person() -> Person {
 /// addresses, a passport) that exercises every adapter routing branch.
 fn rich_person() -> Person {
     let mut p = minimal_person();
-    p.birth_date = Some(jiff::civil::date(1980, 5, 15));
+    p.birth_date = Some(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap());
     p.tax_id = Some("123-45-6789".into());
 
     // 3 identifiers — exercises the routing loop.
@@ -103,8 +103,8 @@ fn rich_person() -> Person {
         number: "X12345678".into(),
         issuing_country: Some("US".into()),
         issuing_authority: None,
-        issue_date: Some(jiff::civil::date(2020, 1, 1)),
-        expiry_date: Some(jiff::civil::date(2030, 1, 1)),
+        issue_date: Some(NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()),
+        expiry_date: Some(NaiveDate::from_ymd_opt(2030, 1, 1).unwrap()),
         verified: true,
     });
     p

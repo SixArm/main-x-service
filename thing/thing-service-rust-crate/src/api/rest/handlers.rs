@@ -449,7 +449,7 @@ pub async fn merge_things(
         duplicate_thing_id: dup.id,
         merge_reason: req.merge_reason.clone(),
         transferred_data: transferred,
-        merged_at: jiff::Timestamp::now(),
+        merged_at: chrono::Utc::now(),
     };
     let record = match state.thing_repository.record_merge(&record).await {
         Ok(r) => r,

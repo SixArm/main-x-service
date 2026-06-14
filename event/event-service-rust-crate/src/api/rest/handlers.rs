@@ -468,12 +468,12 @@ pub async fn search_events(
             // lexicographically the same as chronologically; keeps only
             // events whose start-date day is within [date_from, date_to].
             if let Some(from) = params.date_from.as_deref() {
-                if event.start_date.strftime("%Y-%m-%d").to_string().as_str() < from {
+                if event.start_date.format("%Y-%m-%d").to_string().as_str() < from {
                     continue;
                 }
             }
             if let Some(to) = params.date_to.as_deref() {
-                if event.start_date.strftime("%Y-%m-%d").to_string().as_str() > to {
+                if event.start_date.format("%Y-%m-%d").to_string().as_str() > to {
                     continue;
                 }
             }
@@ -645,7 +645,7 @@ async fn check_duplicates_internal(state: &AppState, event: &Event) -> Vec<Match
 async fn blocking_candidates(state: &AppState, event: &Event) -> Vec<Event> {
     // Block on the calendar day of the start date (yyyy-mm-dd); the
     // matcher's time component still scores sub-day proximity.
-    let date = event.start_date.strftime("%Y-%m-%d").to_string();
+    let date = event.start_date.format("%Y-%m-%d").to_string();
     let candidate_ids = state
         .search_engine
         .search_by_name_and_date(&event.name, Some(&date), 100)
@@ -916,7 +916,7 @@ pub async fn merge_events(
         .publish(crate::streaming::EventEvent::Merged {
             source_id: duplicate.id,
             target_id: merged.id,
-            timestamp: jiff::Timestamp::now(),
+            timestamp: chrono::Utc::now(),
         })
         .ok();
 
@@ -929,7 +929,7 @@ pub async fn merge_events(
         merge_reason: req.merge_reason,
         match_score: None,
         transferred_data: Some(serde_json::Value::Object(transferred)),
-        merged_at: jiff::Timestamp::now(),
+        merged_at: chrono::Utc::now(),
     };
 
     let response = crate::models::MergeResponse {
@@ -1040,7 +1040,7 @@ pub async fn batch_deduplicate(
                 score_breakdown: serde_json::to_value(&m.breakdown).ok(),
                 status,
                 reviewed_by: None,
-                created_at: jiff::Timestamp::now(),
+                created_at: chrono::Utc::now(),
                 reviewed_at: None,
             });
         }

@@ -15,7 +15,7 @@ use crate::config::DatabaseConfig;
 
 /// Audit-log repository.
 pub mod audit;
-/// jiff <-> time conversions at the persistence boundary.
+/// chrono <-> time conversions at the persistence boundary.
 pub mod convert;
 /// SeaORM entity models.
 pub mod models;

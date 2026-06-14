@@ -6,16 +6,16 @@
 //! records, plus phone normalization (several input formats) and address
 //! standardization (full and minimal). Run with `cargo bench`.
 
+use chrono::{NaiveDate, Utc};
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use jiff::{Timestamp, civil::Date};
 use uuid::Uuid;
 
 use worker_service::models::*;
 use worker_service::validation::{normalize_phone, standardize_address, validate_worker};
 
 /// Builds a minimal [`Worker`] fixture; the more complex benches extend it.
-fn create_test_worker(family: &str, given: &str, birth_date: Option<Date>) -> Worker {
-    let now = Timestamp::now();
+fn create_test_worker(family: &str, given: &str, birth_date: Option<NaiveDate>) -> Worker {
+    let now = Utc::now();
     Worker {
         id: Uuid::new_v4(),
         identifiers: vec![],
@@ -50,7 +50,11 @@ fn create_test_worker(family: &str, given: &str, birth_date: Option<Date>) -> Wo
 
 /// Benchmarks validating a minimal valid worker (name + DOB).
 fn bench_validate_simple_worker(c: &mut Criterion) {
-    let worker = create_test_worker("Smith", "John", Some(jiff::civil::date(1980, 1, 15)));
+    let worker = create_test_worker(
+        "Smith",
+        "John",
+        Some(chrono::NaiveDate::from_ymd_opt(1980, 1, 15).unwrap()),
+    );
 
     c.bench_function("validate_simple_worker", |b| {
         b.iter(|| validate_worker(black_box(&worker)))
@@ -60,7 +64,11 @@ fn bench_validate_simple_worker(c: &mut Criterion) {
 /// Benchmarks validating a fully-populated worker (telecom, address,
 /// document, emergency contact, tax id) — the worst case for validation cost.
 fn bench_validate_complex_worker(c: &mut Criterion) {
-    let mut worker = create_test_worker("Smith", "John", Some(jiff::civil::date(1980, 1, 15)));
+    let mut worker = create_test_worker(
+        "Smith",
+        "John",
+        Some(chrono::NaiveDate::from_ymd_opt(1980, 1, 15).unwrap()),
+    );
 
     worker.tax_id = Some("123-45-6789".to_string());
 
@@ -90,8 +98,8 @@ fn bench_validate_complex_worker(c: &mut Criterion) {
         number: "X12345678".to_string(),
         issuing_country: Some("US".to_string()),
         issuing_authority: None,
-        issue_date: Some(jiff::civil::date(2020, 1, 1)),
-        expiry_date: Some(jiff::civil::date(2030, 1, 1)),
+        issue_date: Some(chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()),
+        expiry_date: Some(chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap()),
         verified: false,
     });
 

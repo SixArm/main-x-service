@@ -22,8 +22,8 @@ use worker_matcher::{
 
 #[test]
 fn worker_builder_demographic_and_contact_surface() {
-    let dob = jiff::civil::date(1970, 4, 1);
-    let death = jiff::civil::date(2060, 1, 1);
+    let dob = chrono::NaiveDate::from_ymd_opt(1970, 4, 1).unwrap();
+    let death = chrono::NaiveDate::from_ymd_opt(2060, 1, 1).unwrap();
     let addr = Address::new().with_line1("1 Test St").with_city("Town");
 
     let w: Worker = Worker::builder()
@@ -105,8 +105,8 @@ fn worker_builder_passport_book_surface() {
 
     let pb = PassportBook::new("US", "X12345678")
         .expect("non-empty country + number must construct")
-        .with_issued(jiff::civil::date(2020, 1, 1))
-        .with_expires(jiff::civil::date(2030, 1, 1));
+        .with_issued(chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap())
+        .with_expires(chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap());
     assert_eq!(pb.country, "US");
     assert_eq!(pb.number, "X12345678");
 

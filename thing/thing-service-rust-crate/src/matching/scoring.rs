@@ -389,25 +389,13 @@ mod tests {
         // Service Certain edge (inclusive).
         assert_eq!(MatchConfidence::from_score(0.95), MatchConfidence::Certain);
         // Matcher High edge falls inside service Probable.
-        assert_eq!(
-            MatchConfidence::from_score(0.90),
-            MatchConfidence::Probable
-        );
+        assert_eq!(MatchConfidence::from_score(0.90), MatchConfidence::Probable);
         // Service Probable edge (inclusive).
-        assert_eq!(
-            MatchConfidence::from_score(0.80),
-            MatchConfidence::Probable
-        );
+        assert_eq!(MatchConfidence::from_score(0.80), MatchConfidence::Probable);
         // Matcher Medium edge falls inside service Possible.
-        assert_eq!(
-            MatchConfidence::from_score(0.75),
-            MatchConfidence::Possible
-        );
+        assert_eq!(MatchConfidence::from_score(0.75), MatchConfidence::Possible);
         // Service Possible edge (inclusive).
-        assert_eq!(
-            MatchConfidence::from_score(0.60),
-            MatchConfidence::Possible
-        );
+        assert_eq!(MatchConfidence::from_score(0.60), MatchConfidence::Possible);
         // Just below the Possible edge → Unlikely.
         assert_eq!(
             MatchConfidence::from_score(0.5999),

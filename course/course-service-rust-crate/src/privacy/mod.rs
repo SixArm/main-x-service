@@ -12,7 +12,7 @@
 //! or learner referenced from the row) can be served the data we
 //! hold about them.
 
-use jiff::Timestamp;
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -43,7 +43,7 @@ const MASK_LABEL: &str = "[REDACTED]";
 #[derive(Debug, Clone, Serialize)]
 pub struct CourseExport<'a> {
     /// When the snapshot was taken.
-    pub exported_at: Timestamp,
+    pub exported_at: DateTime<Utc>,
     /// Originating service name.
     pub source: &'static str,
     /// schema.org type URL the record conforms to.
@@ -57,7 +57,7 @@ pub struct CourseExport<'a> {
 /// this always-serialisable shape).
 pub fn export_course(c: &Course) -> Value {
     let envelope = CourseExport {
-        exported_at: Timestamp::now(),
+        exported_at: Utc::now(),
         source: "course-service",
         schema: "https://schema.org/Course",
         course: c,
@@ -90,8 +90,8 @@ mod tests {
             enrolled_count: Some(12),
             enrollment_opens: None,
             enrollment_closes: None,
-            created_at: Timestamp::now(),
-            updated_at: Timestamp::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         }
     }
 

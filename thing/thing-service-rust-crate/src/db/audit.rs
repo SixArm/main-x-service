@@ -35,7 +35,7 @@ pub struct AuditEntry {
     /// Post-change snapshot (absent for deletes).
     pub new_values: Option<JsonValue>,
     /// When the action occurred.
-    pub created_at: jiff::Timestamp,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl From<audit_log::Model> for AuditEntry {
