@@ -52,4 +52,5 @@ Shared reference docs live at the project root under
 | Integration tests | [`tests/api_integration_test.rs`](tests/api_integration_test.rs) (T-12, `#[ignore]`-tagged) |
 | Benchmarks | `benches/` (T-13, three criterion files) |
 | OpenAPI | served at `/swagger-ui` + `/api-docs/openapi.json` (T-14) |
+| Metrics | `src/metrics.rs` (process-wide Prometheus registry, `OnceLock`); served at root `/metrics.prom` via `metrics_routes()` in `src/api/rest/mod.rs` (T-16) |
 | Migrations | `migrations/` |

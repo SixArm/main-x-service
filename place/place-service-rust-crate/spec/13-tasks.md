@@ -3,6 +3,16 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
+- [x] **T-0 — Prometheus metrics scrape endpoint.**
+  - [x] Serve `crate::metrics::METRICS.render()` at the root path
+    `GET /metrics.prom` (`text/plain; version=0.0.4`), not under `/api`,
+    so a default scraper finds it; handler
+    `api::rest::handlers::metrics_prom`, registered via
+    `api::rest::metrics_routes()` and in the `create_router` Axum surface.
+  - [x] Add the path to the OpenAPI document (`observability` tag).
+  - **Acceptance:** DB-free tests — `metrics::tests` (registry render +
+    counter) and `api::rest::tests::openapi_includes_metrics_prom_path`
+    (OpenAPI advertises `/metrics.prom`).
 - [ ] **T-1 — PostGIS-backed spatial queries.**
   - [ ] Add `geometry(Point, 4326)` column on `place_geo_coordinates`.
   - [ ] GiST index + `ST_DWithin` for geo-radius search.

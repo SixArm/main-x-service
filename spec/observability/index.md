@@ -32,7 +32,7 @@ crate (older Axum services vs. loco-native services — see §2).
 | Pillar | Crate / mechanism | Where | Status |
 |---|---|---|---|
 | **Logging / tracing** | `tracing` + `tracing-subscriber` (JSON or compact); loco `logger:` config block; SeaORM SQL query logging via `database.enable_logging` | every service | implemented |
-| **Metrics** | Prometheus text exposition at `GET /metrics.prom` (the `prometheus` crate registry in `src/metrics.rs`) | older Axum services only | implemented (5 services); deferred elsewhere |
+| **Metrics** | Prometheus text exposition at `GET /metrics.prom` (the `prometheus` crate registry in `src/metrics.rs`) | every service | implemented (all 10 services) |
 | **Distributed tracing** | OpenTelemetry OTLP export, `opentelemetry-semantic-conventions` | `src/observability/` bootstrap | scaffolded; OTLP exporter stubbed (`todo!` / commented) |
 
 ### 1.1 Logging / tracing
@@ -148,12 +148,14 @@ Histogram buckets are tuned per metric:
 
 | Generation | Services | `/metrics.prom`? |
 |---|---|---|
-| Older Axum services | person, worker, place, thing, event | **Yes** — `src/metrics.rs` + handler |
-| Loco-native services | course, organization, care-pathway, case | **No** — deferred (see §6) |
+| Older Axum services | person, worker, place, thing, event, course | **Yes** — `src/metrics.rs` + handler |
+| Loco-native services | organization, care-pathway, case, authentication | **Yes** — `src/metrics.rs` + `src/controllers/metrics.rs` |
 
-The loco-native services expose loco's default `/_health` and `/_ping`
-endpoints but do **not** yet ship a Prometheus surface. Adding it is
-roadmap (§6).
+Every service exposes the Prometheus surface at the root path
+`/metrics.prom` (public, `text/plain; version=0.0.4`) alongside loco's
+default `/_health` and `/_ping`. The two generations differ only in how
+the route is wired (an Axum `metrics_prom` handler vs. a loco controller
+`Routes`), not in the exposition format.
 
 ### 2.4 Scrape configuration
 
@@ -352,7 +354,6 @@ where geo is modeled) are catalogued in the same postgresql spec.
 | Full OTLP exporter wiring | scaffolded | exporter + `tracing_opentelemetry` layer commented out in `src/observability/mod.rs`; `custom_metrics::*Metrics::new()` is `todo!()` |
 | `traceparent` propagation helpers | reserved | `src/observability/traces.rs` placeholder |
 | OTLP metric counterpart | reserved | `src/observability/metrics.rs` placeholder (mirrors the Prometheus set over OTLP) |
-| Prometheus metrics on loco services | deferred | course, organization, care-pathway, case have no `src/metrics.rs` / `/metrics.prom` yet |
 | DB connection-pool gauges | deferred | surface pool saturation as a first-class metric |
 | Durable event bus | deferred | replace in-memory stream (Fluvio per the stack reference) |
 | Background-job metrics | deferred | Postgres-backed queue is configured but idle |

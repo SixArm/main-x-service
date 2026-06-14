@@ -30,6 +30,10 @@ REST routes mount under `/api/places/*`. See
 [`AGENTS/restful.md`](AGENTS/restful.md) for the full list. All
 endpoints return the standard `{success, data, error}` envelope.
 
+Prometheus metrics are exposed at the root path `GET /metrics.prom`
+(text-exposition format, `text/plain; version=0.0.4`) — not under
+`/api` — so a default scraper (`metrics_path: /metrics.prom`) finds it.
+
 Interactive OpenAPI 3 documentation:
 
 - Swagger UI: `http://localhost:8080/swagger-ui`

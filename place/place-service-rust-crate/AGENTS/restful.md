@@ -137,10 +137,12 @@ let similarity = geo_similarity(&nyc, &lax); // ~0.0003
 | ------ | ---------------- | ---------------------------------------------------------------------------- |
 | GET    | `/metrics.prom`  | Prometheus text-exposition format (`text/plain; version=0.0.4`) for scraping |
 
-The canonical `/metrics` endpoint serves the HTML performance dashboard;
-configure your scraper with `metrics_path: /metrics.prom`. The metric
-inventory (entity-CRUD counters, HTTP request counter, latency
-histograms) is in [`src/metrics.rs`](../src/metrics.rs).
+Served at the application root (not under `/api`), so configure your
+scraper with `metrics_path: /metrics.prom`. The metric inventory
+(`place_*` CRUD counters, HTTP request counter, latency histograms) is
+in [`src/metrics.rs`](../src/metrics.rs). The handler is
+[`api::rest::handlers::metrics_prom`](../src/api/rest/handlers.rs),
+registered at root via `api::rest::metrics_routes()`.
 
 ## RESTful API Endpoints
 

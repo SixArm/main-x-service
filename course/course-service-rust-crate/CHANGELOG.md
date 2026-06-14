@@ -9,6 +9,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Prometheus metrics — `GET /metrics.prom`** (T-16). A new
+  process-wide `prometheus::Registry` (`src/metrics.rs`, behind a
+  `OnceLock` reached via `Metrics::global()`) is served at the
+  application **root** path `/metrics.prom` in text-exposition format
+  (`text/plain; version=0.0.4`) by a loco controller route
+  (`metrics_routes()` in `src/api/rest/mod.rs`, mounted at root like the
+  docs; also wired into `create_router` for the Axum test surface). The
+  metric set: `course_created_total`, `course_updated_total`,
+  `course_deleted_total`, `course_merged_total` (plain counters,
+  incremented one per success path in the create/update/delete/merge
+  handlers) plus a labelled `http_requests_total` (`path`/`status`)
+  declared for a future request middleware. The endpoint is public (no
+  bearer token needed to scrape) and carries a `#[utoipa::path]`
+  annotation so it appears in the OpenAPI document. New DB-free tests:
+  registry render + counter increment (`metrics::tests`) and root
+  mounting of the metrics route (`api::rest::tests`). Brings parity with
+  the sibling services, which already expose Prometheus metrics.
+
 ### Fixed
 
 - **Dockerfile non-root user was named `mpi`** (Master Patient

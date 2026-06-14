@@ -46,6 +46,7 @@ pub use state::AppState;
         handlers::export_course_data,
         handlers::audit_for_course,
         handlers::audit_recent,
+        handlers::metrics_prom,
     ),
     components(schemas(
         crate::api::ApiError,
@@ -93,6 +94,7 @@ pub use state::AppState;
         (name = "matching",   description = "Match / dedup / merge"),
         (name = "privacy",    description = "Masking + GDPR export"),
         (name = "audit",      description = "Audit log queries"),
+        (name = "metrics",    description = "Prometheus metrics"),
     ),
 )]
 /// utoipa OpenAPI document aggregating every path, schema, and tag for
@@ -146,6 +148,9 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         .nest("/api", api_routes)
+        // Prometheus metrics at the application root (not under `/api`),
+        // alongside the docs. Public — no bearer token needed to scrape.
+        .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
 }
@@ -193,4 +198,40 @@ pub fn courses_routes() -> loco_rs::controller::Routes {
         .add("/courses/{id}/masked", get(handlers::masked_course))
         .add("/courses/{id}/audit", get(handlers::audit_for_course))
         .add("/audit/recent", get(handlers::audit_recent))
+}
+
+/// Native loco controller route for the Prometheus metrics endpoint,
+/// mounted at the application **root** (`/metrics.prom`, not under
+/// `/api`) — alongside the Swagger UI. Registered in `App::routes`
+/// separately from [`courses_routes`] because that set is prefixed
+/// `/api`. Public: scraping needs no bearer token.
+#[must_use]
+pub fn metrics_routes() -> loco_rs::controller::Routes {
+    use loco_rs::prelude::{Routes, get};
+    Routes::new().add("/metrics.prom", get(handlers::metrics_prom))
+}
+
+/// DB-free pins for the metrics route registration.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The Prometheus metrics endpoint is mounted at the application
+    /// **root** (`/metrics.prom`), not under the `/api` prefix that
+    /// [`courses_routes`] carries. Asserting against the typed loco
+    /// `Routes` (rather than building the full `ApiDoc` document) keeps
+    /// the test DB-free and cheap.
+    #[test]
+    fn metrics_route_is_mounted_at_root() {
+        let routes = metrics_routes();
+        assert!(
+            routes.prefix.is_none(),
+            "metrics route must be at root, not prefixed; got {:?}",
+            routes.prefix
+        );
+        assert!(
+            routes.handlers.iter().any(|h| h.uri == "/metrics.prom"),
+            "missing /metrics.prom handler in metrics_routes()"
+        );
+    }
 }

@@ -55,10 +55,22 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   `_matched_total`, labeled `http_requests_total`) and histograms
   (`http_request_duration_seconds`, `thing_match_score`,
   `thing_search_duration_seconds`).
-- New `GET /metrics.prom` route on the web router serving Prometheus
-  text-exposition format (`text/plain; version=0.0.4`). The
-  canonical `/metrics` continues to render the HTML dashboard;
-  configure scrapers with `metrics_path: /metrics.prom`.
+- **Prometheus metrics endpoint `GET /metrics.prom`.** The previously
+  dead `src/metrics.rs` registry is now actually scraped: a new
+  `handlers::metrics_prom` handler renders `thing::metrics::METRICS`
+  in text-exposition format (`text/plain; version=0.0.4`), served at
+  the application **root** path `/metrics.prom` (not under `/api`) so
+  a default Prometheus scrape config (`metrics_path: /metrics.prom`)
+  finds it. Wired both as a loco controller group
+  (`api::rest::metrics_routes`, registered in `App::routes`) and on the
+  hand-written Axum router (`create_router`), and added to the
+  `OpenAPI` document under a new `observability` tag. The `thing_*`
+  counters (`thing_created_total` / `_updated_total` / `_deleted_total`
+  / `_matched_total`) and the latency/score histograms are now
+  externally observable. New DB-free tests pin the `/metrics.prom`
+  `OpenAPI` path and the root loco-route binding (`api::rest::tests`).
+  Brings parity with the older Axum services, which already expose
+  Prometheus metrics.
 
 ### Added — UI
 

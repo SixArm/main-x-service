@@ -23,7 +23,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, courses_routes},
+    api::rest::{ApiDoc, AppState, courses_routes, metrics_routes},
     config::Config,
     matching::CourseMatcher,
     search::SearchEngine,
@@ -65,6 +65,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // loco /_health, /_ping
             .add_route(courses_routes())
+            .add_route(metrics_routes()) // GET /metrics.prom (root, public)
     }
 
     async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {

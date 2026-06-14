@@ -72,6 +72,10 @@ Interactive OpenAPI 3 documentation ships with the binary:
 - Swagger UI: `http://localhost:8084/swagger-ui`
 - Raw spec: `http://localhost:8084/api-docs/openapi.json`
 
+Prometheus metrics are served at the application root:
+
+- `GET /metrics.prom` — text-exposition format (`text/plain; version=0.0.4`), public (no bearer token). Counters: `course_created_total`, `course_updated_total`, `course_deleted_total`, `course_merged_total`, plus a labelled `http_requests_total{path,status}`. Configure your scraper with `metrics_path: /metrics.prom`.
+
 The Event Service uses `/api/v1/`; Course does NOT — direct `/api`.
 
 ## Configuration

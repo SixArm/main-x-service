@@ -8,6 +8,28 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — observability
+
+- **Prometheus metrics endpoint — `GET /metrics.prom`.** The process-wide
+  `prometheus::Registry` in [`src/metrics.rs`](./src/metrics.rs) (reached
+  via the `METRICS` `LazyLock`) is now served at the application **root**
+  path `/metrics.prom` in text-exposition format
+  (`text/plain; version=0.0.4`) by the handler
+  `api::rest::handlers::metrics_prom`, registered both in the loco route
+  table via `api::rest::metrics_routes()` and in the `create_router` Axum
+  surface — not under `/api`, so a default scraper
+  (`metrics_path: /metrics.prom`) finds it. The metric set:
+  `place_created_total`, `place_updated_total`, `place_deleted_total`,
+  `place_matched_total` plus a labelled `http_requests_total`
+  (`method`/`path`/`status`) and latency/score histograms. The path is
+  added to the OpenAPI document under a new `observability` tag. Before,
+  the registry was built but never exposed over HTTP, so the counters
+  were dead. New DB-free test
+  `api::rest::tests::openapi_includes_metrics_prom_path` (the existing
+  `metrics::tests` already pins registry render + counter increment).
+  Brings parity with the sibling person-service, which already exposes
+  this endpoint.
+
 ### Changed — validation
 
 - Opening-hours times are now validated. `validate_place` checks every

@@ -32,4 +32,14 @@ clearly described manual check confirms the acceptance criterion.
     changes without a `spec.md` edit.
   - **Acceptance:** `bash scripts/spec-drift-check.sh main HEAD`
     exits non-zero on a code-only PR.
+- [x] **T-7 — Expose Prometheus metrics endpoint.**
+  - [x] Add a `handlers::metrics_prom` handler rendering
+    `thing::metrics::METRICS` as `text/plain; version=0.0.4`.
+  - [x] Mount it at the application **root** `/metrics.prom` (not
+    under `/api`) via `api::rest::metrics_routes` (registered in
+    `App::routes`) and on the hand-written `create_router`; add it to
+    the `OpenAPI` document under an `observability` tag.
+  - **Acceptance:** DB-free tests pin the `/metrics.prom` `OpenAPI`
+    path and the root loco-route binding (`api::rest::tests`); the
+    registry render test lives in `metrics::tests`.
 

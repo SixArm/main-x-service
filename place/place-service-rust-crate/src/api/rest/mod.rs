@@ -25,6 +25,7 @@ pub use state::AppState;
     ),
     paths(
         handlers::health,
+        handlers::metrics_prom,
         handlers::create_place,
         handlers::get_place,
         handlers::update_place,
@@ -64,6 +65,7 @@ pub use state::AppState;
     )),
     tags(
         (name = "health",   description = "Liveness probe"),
+        (name = "observability", description = "Prometheus metrics endpoint"),
         (name = "places",   description = "Place CRUD"),
         (name = "search",   description = "Full-text + fuzzy search"),
         (name = "matching", description = "Match / dedup / merge"),
@@ -98,6 +100,7 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         .nest("/api", api_routes)
+        .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
 }
@@ -128,4 +131,28 @@ pub fn places_routes() -> loco_rs::controller::Routes {
         .add("/places/{id}/masked", get(handlers::masked_place))
         .add("/places/{id}/audit", get(handlers::audit_for_place))
         .add("/audit/recent", get(handlers::audit_recent))
+}
+
+/// Root-level Prometheus scrape route (`GET /metrics.prom`).
+#[must_use]
+pub fn metrics_routes() -> loco_rs::controller::Routes {
+    use loco_rs::prelude::{Routes, get};
+    Routes::new().add("/metrics.prom", get(handlers::metrics_prom))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The generated `OpenAPI` document advertises the root-level
+    /// `/metrics.prom` scrape path (DB-free — built from `ApiDoc`).
+    #[test]
+    fn openapi_includes_metrics_prom_path() {
+        let doc = ApiDoc::openapi();
+        assert!(
+            doc.paths.paths.contains_key("/metrics.prom"),
+            "OpenAPI paths missing /metrics.prom: {:?}",
+            doc.paths.paths.keys().collect::<Vec<_>>()
+        );
+    }
 }

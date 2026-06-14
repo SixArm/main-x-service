@@ -20,6 +20,8 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod matching;
+/// Process-wide Prometheus metrics, served at `/metrics.prom`.
+pub mod metrics;
 pub mod models;
 pub mod privacy;
 pub mod search;

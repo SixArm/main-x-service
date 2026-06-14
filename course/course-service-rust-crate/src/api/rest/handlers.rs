@@ -74,6 +74,29 @@ pub async fn not_implemented(State(_state): State<AppState>) -> impl IntoRespons
     (StatusCode::NOT_IMPLEMENTED, Json(body))
 }
 
+/// Prometheus metrics in text-exposition format.
+///
+/// `GET /metrics.prom` — served at the application **root** (not under
+/// `/api`), alongside the Swagger UI. Returns `200` with the rendered
+/// process-wide registry (see [`crate::metrics`]) and
+/// `Content-Type: text/plain; version=0.0.4`. Public — scraping needs no
+/// bearer token. Configure your scraper with `metrics_path: /metrics.prom`.
+#[utoipa::path(
+    get, path = "/metrics.prom",
+    responses((status = 200, description = "Prometheus text-exposition metrics", content_type = "text/plain")),
+    tag = "metrics",
+)]
+pub async fn metrics_prom() -> impl IntoResponse {
+    let body = crate::metrics::Metrics::global().render();
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            crate::metrics::CONTENT_TYPE,
+        )],
+        body,
+    )
+}
+
 // ────────────────── Query / body types ──────────────────
 
 /// Pagination query string for plain list endpoints. Reserved for the
@@ -199,6 +222,7 @@ pub async fn create_course(
         EventKind::CourseCreated,
     )
     .await;
+    crate::metrics::Metrics::global().course_created_total.inc();
     (StatusCode::CREATED, Json(ApiResponse::success(created))).into_response()
 }
 
@@ -277,6 +301,7 @@ pub async fn update_course(
         EventKind::CourseUpdated,
     )
     .await;
+    crate::metrics::Metrics::global().course_updated_total.inc();
     Json(ApiResponse::success(updated)).into_response()
 }
 
@@ -308,6 +333,7 @@ pub async fn delete_course(
                 EventKind::CourseDeleted,
             )
             .await;
+            crate::metrics::Metrics::global().course_deleted_total.inc();
             StatusCode::NO_CONTENT.into_response()
         }
         Err(crate::Error::NotFound) => not_found_response("Course not found"),
@@ -784,6 +810,7 @@ pub async fn merge_courses(
         EventKind::CourseMerged,
     )
     .await;
+    crate::metrics::Metrics::global().course_merged_total.inc();
 
     Json(ApiResponse::success(MergeResponse {
         merge_record,

@@ -23,7 +23,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, things_routes},
+    api::rest::{ApiDoc, AppState, metrics_routes, things_routes},
     config::Config,
     matching::ThingMatcher,
     search::SearchEngine,
@@ -73,9 +73,12 @@ impl Hooks for App {
     }
 
     /// Register the loco route table: the framework defaults plus the
-    /// hand-written `things_routes()` group.
+    /// hand-written `things_routes()` group and the root-level
+    /// `metrics_routes()` Prometheus scrape route.
     fn routes(_ctx: &AppContext) -> AppRoutes {
-        AppRoutes::with_default_routes().add_route(things_routes())
+        AppRoutes::with_default_routes()
+            .add_route(things_routes())
+            .add_route(metrics_routes())
     }
 
     /// Post-routing hook where the hand-written Axum surface is attached.

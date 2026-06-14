@@ -64,6 +64,29 @@ pub async fn health() -> impl IntoResponse {
     }))
 }
 
+/// Prometheus metrics endpoint (text-exposition format).
+///
+/// Renders [`crate::metrics::METRICS`] for scraping. Mounted at the
+/// root (`/metrics.prom`) — not under `/api` — so a default Prometheus
+/// scrape config (`metrics_path: /metrics.prom`) finds it.
+#[utoipa::path(
+    get,
+    path = "/metrics.prom",
+    tag = "observability",
+    responses(
+        (status = 200, description = "Prometheus text-exposition format", content_type = "text/plain; version=0.0.4; charset=utf-8")
+    )
+)]
+pub async fn metrics_prom() -> impl IntoResponse {
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            crate::metrics::CONTENT_TYPE,
+        )],
+        crate::metrics::METRICS.render(),
+    )
+}
+
 /// Create a place (with real-time duplicate detection).
 #[utoipa::path(post, path = "/api/places", tag = "places",
     request_body = Place,

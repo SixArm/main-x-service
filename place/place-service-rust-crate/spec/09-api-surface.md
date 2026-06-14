@@ -6,6 +6,7 @@ Complete reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 |---|---|
 | REST (Axum) | 15 endpoints under `/api/places/*` + `/api/audit/*` + `/api/health` |
 | Geo-radius | `GET /api/places/nearby?lat=&lon=&radius_km=` |
+| Observability | `GET /metrics.prom` (root path, Prometheus text-exposition `text/plain; version=0.0.4`) |
 | gRPC (Tonic) | Stubbed |
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
 | Docs | Swagger UI at `/swagger-ui` |

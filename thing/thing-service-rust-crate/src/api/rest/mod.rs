@@ -22,6 +22,7 @@ pub use state::AppState;
     ),
     paths(
         handlers::health,
+        handlers::metrics_prom,
         handlers::create_thing,
         handlers::get_thing,
         handlers::update_thing,
@@ -55,6 +56,7 @@ pub use state::AppState;
     )),
     tags(
         (name = "health",   description = "Liveness probe"),
+        (name = "observability", description = "Prometheus metrics endpoint"),
         (name = "things",   description = "Thing CRUD"),
         (name = "search",   description = "Full-text + fuzzy search"),
         (name = "matching", description = "Match / dedup / merge"),
@@ -89,6 +91,7 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         .nest("/api", api_routes)
+        .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(CorsLayer::permissive())
 }
@@ -119,4 +122,43 @@ pub fn things_routes() -> loco_rs::controller::Routes {
         .add("/things/{id}/masked", get(handlers::masked_thing))
         .add("/things/{id}/audit", get(handlers::audit_for_thing))
         .add("/audit/recent", get(handlers::audit_recent))
+}
+
+/// Root-level Prometheus scrape route (`GET /metrics.prom`).
+///
+/// Mounted at the root rather than under `/api` so a default Prometheus
+/// scrape config (`metrics_path: /metrics.prom`) finds it.
+#[must_use]
+pub fn metrics_routes() -> loco_rs::controller::Routes {
+    use loco_rs::prelude::{Routes, get};
+    Routes::new().add("/metrics.prom", get(handlers::metrics_prom))
+}
+
+#[cfg(test)]
+mod tests {
+    //! DB-free tests for `OpenAPI` wiring of the Prometheus scrape route.
+    use super::*;
+
+    /// The `/metrics.prom` path is registered in the `OpenAPI` document at
+    /// the root (not under `/api`), so Swagger/scrapers can discover it.
+    #[test]
+    fn openapi_exposes_metrics_prom_path() {
+        let doc = ApiDoc::openapi();
+        assert!(
+            doc.paths.paths.contains_key("/metrics.prom"),
+            "OpenAPI paths missing /metrics.prom: {:?}",
+            doc.paths.paths.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// The root-level loco route group binds exactly the `/metrics.prom`
+    /// scrape path.
+    #[test]
+    fn metrics_routes_binds_metrics_prom() {
+        let routes = metrics_routes();
+        assert!(
+            routes.handlers.iter().any(|h| h.uri == "/metrics.prom"),
+            "metrics_routes missing /metrics.prom binding"
+        );
+    }
 }

@@ -8,6 +8,7 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 | Ops (loco built-ins) | `GET /_health` (DB + queue readiness) and `GET /_ping` (liveness), from loco's default routes — for orchestration probes, outside `/api` |
 | gRPC (Tonic) | Out of MVP scope. |
 | Docs | Swagger UI at `/swagger-ui`, raw OpenAPI 3 JSON at `/api-docs/openapi.json` (utoipa). |
+| Metrics | `GET /metrics.prom` — Prometheus text-exposition format (`text/plain; version=0.0.4`), mounted at the application **root** (not under `/api`), public (no bearer token needed). Counters: `course_created_total`, `course_updated_total`, `course_deleted_total`, `course_merged_total`, plus a labelled `http_requests_total{path,status}`. |
 
 All `/api` endpoints return `{ "success": bool, "data": …, "error": … }`.
 HTTP status codes follow REST conventions: `409` for duplicate

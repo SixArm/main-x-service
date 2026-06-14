@@ -23,7 +23,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, places_routes},
+    api::rest::{ApiDoc, AppState, metrics_routes, places_routes},
     config::Config,
     matching::PlaceMatcher,
     search::SearchEngine,
@@ -74,9 +74,12 @@ impl Hooks for App {
     }
 
     /// Register the application's controller routes: loco's default routes
-    /// plus this service's `places_routes()` (the `/api` surface).
+    /// plus this service's `places_routes()` (the `/api` surface) and the
+    /// root-level `metrics_routes()` (`/metrics.prom` scrape path).
     fn routes(_ctx: &AppContext) -> AppRoutes {
-        AppRoutes::with_default_routes().add_route(places_routes())
+        AppRoutes::with_default_routes()
+            .add_route(places_routes())
+            .add_route(metrics_routes())
     }
 
     /// Post-routing hook: construct boot-time singletons and merge the

@@ -301,7 +301,7 @@ handler in `src/api/rest/handlers.rs`.
 | FHIR R5 | No | Implemented (partial) |
 | gRPC (Tonic) | No | Stub |
 | Privacy masking / GDPR export | Deferred | Implemented |
-| `/metrics.prom` | Deferred | Implemented |
+| `/metrics.prom` | Implemented | Implemented |
 
 ---
 
