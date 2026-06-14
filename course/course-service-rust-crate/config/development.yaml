@@ -13,7 +13,7 @@ server:
 workers:
   mode: BackgroundQueue
 
-# Postgres-backed background jobs (repo convention — NOT Redis).
+# Postgres-backed background jobs.
 queue:
   kind: Postgres
   uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/course_service_development") }}
@@ -38,9 +38,8 @@ auth:
     secret: PLEASE_CHANGE_ME_DEVELOPMENT_ONLY
     expiration: 604800
 
-# Cache provider: Redis. (Background jobs remain Postgres-backed — see
-# `queue:`; this is the separate cache layer.)
+
+# Cache provider: in-memory (loco `cache_inmem`, enabled by default).
 cache:
-  kind: Redis
-  uri: {{ get_env(name="REDIS_URL", default="redis://127.0.0.1") }}
-  max_size: 10
+  kind: InMem
+  max_capacity: 33554432 # 32MiB (default if not specified)

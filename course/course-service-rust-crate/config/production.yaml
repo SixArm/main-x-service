@@ -38,8 +38,8 @@ auth:
     secret: {{ get_env(name="JWT_SECRET", default="unused-course-service-does-not-issue-tokens") }}
     expiration: 604800
 
-# Cache provider: Redis (REDIS_URL required in production).
+
+# Cache provider: in-memory (loco `cache_inmem`, enabled by default).
 cache:
-  kind: Redis
-  uri: {{ get_env(name="REDIS_URL") }}
-  max_size: 10
+  kind: InMem
+  max_capacity: 33554432 # 32MiB (default if not specified)

@@ -274,7 +274,7 @@ is part of availability — see
 ### 4.4 Background jobs
 
 Per [`agents/share/loco.md`](../../agents/share/loco.md), background
-jobs run on a **Postgres-backed** queue (not SQLite, not Redis), with
+jobs run on a **Postgres-backed** queue (not SQLite), with
 `num_workers: 2`. Instrument job throughput, failures, and queue depth
 once workers carry domain work; today the queue is configured but
 largely idle.

@@ -266,7 +266,7 @@ Each is a standalone Fluvio consumer (Rust, sharing `mxi-events`),
 
 The relay worker is a **loco Postgres-backed background job**
 (`queue.kind: Postgres`; per [`agents/share/loco.md`](../../agents/share/loco.md),
-NOT SQLite- or Redis-backed). It polls `event_outbox` with `FOR UPDATE
+not SQLite-backed). It polls `event_outbox` with `FOR UPDATE
 SKIP LOCKED`, which is the same Postgres concurrency primitive the job
 queue itself uses. See
 [`spec/postgresql/index.md`](../postgresql/index.md) §10 (Background

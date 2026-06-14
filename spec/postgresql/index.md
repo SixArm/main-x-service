@@ -169,7 +169,7 @@ The one sanctioned exception is the loco services' entity `data` column
 
 ## 10. Background jobs
 
-Background jobs are **Postgres-backed**, not Redis (loco `bg_pg` /
+Background jobs are **Postgres-backed** (loco `bg_pg` /
 `queue.kind: Postgres`), sharing the app database — loco creates its own
 queue tables there. Config lives under `queue:` in `config/*.yaml`. See
 [`agents/share/loco.md`](../../agents/share/loco.md).

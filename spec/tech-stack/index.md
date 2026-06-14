@@ -94,7 +94,7 @@ ecosystem fragmentation across the ten entity slices.
 | PostgreSQL | SQLite | One production database; SeaORM Postgres feature only |
 | chrono | jiff | One date/time crate (sea-orm has no `with-jiff`) |
 | sea-orm `with-chrono` / `with-time` | sea-orm `with-jiff` | `with-jiff` does not exist in sea-orm 1.1 |
-| Postgres-backed background jobs (`bg_pg`) | Redis (`bg_redis`) / SQLite (`bg_sqlt`) | No extra infra dependency for the job queue |
+| Postgres-backed background jobs (`bg_pg`) | SQLite (`bg_sqlt`) / external broker | No extra infra dependency for the job queue |
 
 Loco background-job config (target):
 

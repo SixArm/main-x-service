@@ -23,7 +23,7 @@ tokio = { version = "1.52", features = ["full"] }
 
 # Loco framework (backend-only; the service boots through loco's
 # Hooks/AppContext/CLI and mounts its REST router via after_routes).
-loco-rs = { version = "0.16", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_redis", "bg_pg"] }
+loco-rs = { version = "0.16", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
 migration = { path = "migration" }
 
 # Web framework (axum 0.8 to match loco 0.16)

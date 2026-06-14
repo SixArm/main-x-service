@@ -35,7 +35,7 @@ workers:
 
   
 # Queue Configuration
-# Postgres-backed background jobs (repo convention — NOT Redis). Shares
+# Postgres-backed background jobs. Shares
 # the application database connection.
 queue:
   kind: Postgres
@@ -94,9 +94,8 @@ auth:
     # Token expiration time in seconds
     expiration: 604800 # 7 days
 
-# Cache provider: Redis. (Background jobs remain Postgres-backed — see
-# `queue:`; this is the separate cache layer.)
+
+# Cache provider: in-memory (loco `cache_inmem`, enabled by default).
 cache:
-  kind: Redis
-  uri: {{ get_env(name="REDIS_URL", default="redis://127.0.0.1") }}
-  max_size: 10
+  kind: InMem
+  max_capacity: 33554432 # 32MiB (default if not specified)

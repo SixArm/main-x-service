@@ -20,9 +20,8 @@ Use:
 
 https://loco.rs/docs/processing/workers/
 
-- Use Postgres-backed background jobs
-- NOT SQLite-backed background jobs (bg_sqlt)
-- NOT Redis-backed background jobs (bg_redis)
+- Use Postgres-backed background jobs (`bg_pg`) — no external broker
+- NOT SQLite-backed background jobs (`bg_sqlt`)
 
 Config:
 
@@ -36,14 +35,12 @@ queue:
 
 ## Cache
 
-The background-job **queue** is Postgres-backed (above); the loco
-**cache** layer is **Redis** (loco feature `cache_redis`). Dev/prod
-configure it; tests leave it at the `Null` default so the test harness
-and CI need no Redis.
+The loco **cache** layer is **in-memory** (loco feature `cache_inmem`,
+enabled by default) — no external cache server. Jobs are Postgres-backed
+(above) and the cache is in-process.
 
 ```
 cache:
-  kind: Redis
-  uri: {{ get_env(name="REDIS_URL", default="redis://127.0.0.1") }}
-  max_size: 10
+  kind: InMem
+  max_capacity: 33554432 # 32MiB (default if not specified)
 ```

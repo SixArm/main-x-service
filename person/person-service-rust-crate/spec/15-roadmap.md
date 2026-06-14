@@ -8,7 +8,7 @@ and accept.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`person_created`, `match_score_histogram`,
   …), Grafana dashboards + alerting.
-- **Performance** — query caching (Redis or in-memory), N+1 batch
+- **Performance** — query caching (in-memory), N+1 batch
   fixes, load test at realistic person volumes, profile matching hot
   paths.
 - **Infrastructure as code** — OpenTofu modules (PostgreSQL + app
