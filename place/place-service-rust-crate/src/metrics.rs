@@ -53,6 +53,16 @@ pub struct Metrics {
 }
 
 impl Metrics {
+    /// Construct the metric handles and register every collector against a
+    /// fresh [`Registry`]. Called exactly once via the [`METRICS`]
+    /// `LazyLock`, so its `expect`s only fire on programmer error (a
+    /// duplicate metric name or malformed opts), never at runtime.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a metric's static opts are invalid or if two collectors
+    /// share a name — both are construction-time bugs caught in tests, not
+    /// recoverable runtime conditions.
     fn new() -> Self {
         let registry = Registry::new();
 
@@ -77,6 +87,9 @@ impl Metrics {
         ))
         .expect("static counter opts are always valid");
 
+        // Labeled by method/path/status. Cardinality is bounded only if
+        // `path` is the *route template* (e.g. `/api/places/{id}`), not the
+        // raw URL — emitting per-id paths would explode the series count.
         let http_requests_total = IntCounterVec::new(
             Opts::new(
                 "http_requests_total",
@@ -86,6 +99,10 @@ impl Metrics {
         )
         .expect("static counter-vec opts are always valid");
 
+        // Request-latency buckets span 1 ms → 10 s on a roughly 1-2-5
+        // progression, covering fast cache hits through slow DB/index work
+        // so the p50/p95/p99 land on real boundaries rather than the +Inf
+        // overflow bucket.
         let http_request_duration_seconds = Histogram::with_opts(
             HistogramOpts::new(
                 "http_request_duration_seconds",
@@ -97,6 +114,10 @@ impl Metrics {
         )
         .expect("static histogram opts are always valid");
 
+        // Score buckets are 0.0..=1.0. The grid is deliberately finer near
+        // the top (0.85 / 0.95) so it aligns with the confidence-band
+        // thresholds (Possible ≥ 0.60, Probable ≥ 0.80/0.85, Certain ≥ 0.95)
+        // and you can read off how many matches cleared each band.
         let place_match_score = Histogram::with_opts(
             HistogramOpts::new(
                 "place_match_score",
@@ -108,6 +129,9 @@ impl Metrics {
         )
         .expect("static histogram opts are always valid");
 
+        // Search latency tops out at 2.5 s (vs. 10 s for general HTTP):
+        // a query slower than that is a problem, so anything beyond falls
+        // into +Inf rather than wasting buckets on it.
         let place_search_duration_seconds = Histogram::with_opts(
             HistogramOpts::new(
                 "place_search_duration_seconds",
@@ -119,6 +143,9 @@ impl Metrics {
         )
         .expect("static histogram opts are always valid");
 
+        // Register the four CRUD counters in one boxed-collector loop, then
+        // the remaining handles individually (their concrete types differ,
+        // so they cannot share the same homogeneous array).
         for c in [
             Box::new(place_created_total.clone()) as Box<dyn prometheus::core::Collector>,
             Box::new(place_updated_total.clone()),
@@ -157,6 +184,16 @@ impl Metrics {
 
     /// Render the registry to Prometheus text exposition format
     /// (`text/plain; version=0.0.4`).
+    ///
+    /// Gathers every registered metric family and encodes it via
+    /// [`TextEncoder`]. Returns the body as a `String` ready to serve from
+    /// the scrape endpoint.
+    ///
+    /// # Panics
+    ///
+    /// The `expect`s are unreachable in practice: the encoder writes into an
+    /// in-memory `Vec` (which never fails) and emits valid UTF-8, so the
+    /// final `from_utf8` cannot error.
     pub fn render(&self) -> String {
         let encoder = TextEncoder::new();
         let metric_families = self.registry.gather();
@@ -179,6 +216,9 @@ pub const CONTENT_TYPE: &str = "text/plain; version=0.0.4; charset=utf-8";
 mod tests {
     use super::*;
 
+    /// Incrementing a counter and rendering the registry produces text that
+    /// names both that counter and a histogram — i.e. the default metric set
+    /// is registered and the Prometheus text encoder round-trips.
     #[test]
     fn render_includes_default_counters() {
         METRICS.place_created_total.inc();

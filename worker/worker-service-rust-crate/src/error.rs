@@ -16,47 +16,58 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// the underlying SeaORM error for source-chain inspection.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// A database operation failed; wraps the SeaORM error verbatim.
+    /// A database operation failed; wraps the SeaORM error verbatim. The
+    /// REST layer maps this to HTTP `500 Internal Server Error`.
     #[error("Database error: {0}")]
     Database(#[from] sea_orm::DbErr),
 
     /// A connection-pool operation failed (e.g. acquisition timeout).
+    /// Maps to HTTP `500 Internal Server Error`.
     #[error("Connection pool error: {0}")]
     Pool(String),
 
-    /// A search-index (Tantivy) operation failed.
+    /// A search-index (Tantivy) operation failed. Maps to HTTP `500
+    /// Internal Server Error`.
     #[error("Search error: {0}")]
     Search(String),
 
-    /// The requested worker does not exist; carries the lookup key.
+    /// The requested worker does not exist; carries the lookup key. Maps to
+    /// HTTP `404 Not Found`.
     #[error("Worker not found: {0}")]
     WorkerNotFound(String),
 
-    /// Input failed data-quality validation; maps to HTTP 422.
+    /// Input failed data-quality validation. Maps to HTTP `422
+    /// Unprocessable Entity`.
     #[error("Validation error: {0}")]
     Validation(String),
 
-    /// A matching/scoring operation failed.
+    /// A matching/scoring operation failed. Maps to HTTP `500 Internal
+    /// Server Error`.
     #[error("Matching error: {0}")]
     Matching(String),
 
-    /// A generic API-layer error (bad request, serialization, …).
+    /// A generic API-layer error (bad request, serialization, …). Maps to
+    /// HTTP `400 Bad Request`.
     #[error("API error: {0}")]
     Api(String),
 
-    /// Configuration could not be loaded or was invalid.
+    /// Configuration could not be loaded or was invalid. Maps to HTTP `500
+    /// Internal Server Error`.
     #[error("Configuration error: {0}")]
     Config(String),
 
-    /// An event-streaming publish/consume operation failed.
+    /// An event-streaming publish/consume operation failed. Maps to HTTP
+    /// `500 Internal Server Error`.
     #[error("Streaming error: {0}")]
     Streaming(String),
 
-    /// A FHIR conversion or resource error.
+    /// A FHIR conversion or resource error. Maps to HTTP `400 Bad Request`
+    /// (returned as a FHIR `OperationOutcome` by the FHIR layer).
     #[error("FHIR error: {0}")]
     Fhir(String),
 
-    /// An unexpected internal error with no more specific variant.
+    /// An unexpected internal error with no more specific variant. Maps to
+    /// HTTP `500 Internal Server Error`.
     #[error("Internal error: {0}")]
     Internal(String),
 }

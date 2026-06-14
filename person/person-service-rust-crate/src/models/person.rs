@@ -48,73 +48,85 @@ pub struct Person {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    /// Person identifiers (MRN, SSN, etc.)
+    /// External identity keys (MRN, SSN, passport, tax, national IDs).
+    /// Maps to the FHIR `Person.identifier` element; the matcher treats an
+    /// exact identifier match as a strong (often short-circuiting) signal.
     #[serde(default)]
     pub identifiers: Vec<Identifier>,
 
-    /// Active status
+    /// Whether this record is active. Soft delete sets this `false` rather
+    /// than removing the row (FHIR `Person.active`). Defaults to `true`.
     #[serde(default = "default_true")]
     pub active: bool,
 
-    /// Person name
+    /// Primary name (FHIR `Person.name`, the first / preferred entry).
     pub name: HumanName,
 
-    /// Additional names
+    /// Aliases, former names, and other non-primary names
+    /// (FHIR `Person.name` entries beyond the first).
     #[serde(default)]
     pub additional_names: Vec<HumanName>,
 
-    /// Telecom contacts
+    /// Contact points — phone, email, fax, etc. (FHIR `Person.telecom`).
     #[serde(default)]
     pub telecom: Vec<ContactPoint>,
 
-    /// Gender
+    /// Administrative gender (FHIR `Person.gender`).
     pub gender: Gender,
 
-    /// Birth date
+    /// Date of birth (FHIR `Person.birthDate`), if known.
     #[serde(default)]
     pub birth_date: Option<Date>,
 
-    /// Tax ID number (CPF, SSN, TIN, etc.)
+    /// National tax identifier (CPF, SSN, TIN, …). A convenience field
+    /// distinct from the typed `identifiers` vector; see
+    /// [`Person::effective_tax_id`] for how the two combine.
     #[serde(default)]
     pub tax_id: Option<String>,
 
-    /// Identity documents (passport, birth certificate, etc.)
+    /// Identity documents — passport, birth certificate, national ID, etc.
+    /// (stronger proofs of identity than a bare `Identifier`).
     #[serde(default)]
     pub documents: Vec<IdentityDocument>,
 
-    /// Emergency contacts
+    /// Next-of-kin / points of contact to reach in an emergency.
     #[serde(default)]
     pub emergency_contacts: Vec<EmergencyContact>,
 
-    /// Deceased indicator
+    /// Whether the person is recorded as deceased (FHIR
+    /// `Person.deceasedBoolean`). Paired with `deceased_datetime`.
     #[serde(default)]
     pub deceased: bool,
 
-    /// Deceased date/time
+    /// Date/time of death, if recorded (FHIR `Person.deceasedDateTime`).
     #[serde(default)]
     pub deceased_datetime: Option<Timestamp>,
 
-    /// Addresses
+    /// Physical / postal addresses (FHIR `Person.address`).
     #[serde(default)]
     pub addresses: Vec<Address>,
 
-    /// Marital status
+    /// Marital status as a free-text / coded string
+    /// (FHIR `Person.maritalStatus`), if known.
     #[serde(default)]
     pub marital_status: Option<String>,
 
-    /// Multiple birth indicator
+    /// Whether the person was part of a multiple birth
+    /// (FHIR `Person.multipleBirthBoolean`), if known.
     #[serde(default)]
     pub multiple_birth: Option<bool>,
 
-    /// Photo attachments
+    /// References to photo attachments (FHIR `Person.photo`).
     #[serde(default)]
     pub photo: Vec<String>,
 
-    /// Managing organization
+    /// The organization responsible for this record
+    /// (FHIR `Person.managingOrganization`), by UUID.
     #[serde(default)]
     pub managing_organization: Option<Uuid>,
 
-    /// Links to other person records
+    /// Typed links to other person records (FHIR `Person.link`), created
+    /// by the merge workflow (e.g. `Replaces` from main → duplicate).
     #[serde(default)]
     pub links: Vec<PersonLink>,
 

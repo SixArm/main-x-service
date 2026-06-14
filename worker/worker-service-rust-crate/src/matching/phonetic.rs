@@ -41,6 +41,13 @@ pub fn soundex(name: &str) -> String {
     code.push(first);
 
     // Maps a consonant to its Soundex digit; vowels and H/W/Y map to None.
+    //
+    // The six digit classes are the standard American Soundex groupings of
+    // consonants that are articulated similarly (and so are easily confused in
+    // spelling): 1 = labials (B/F/P/V), 2 = gutturals & sibilants
+    // (C/G/J/K/Q/S/X/Z), 3 = dentals (D/T), 4 = L, 5 = nasals (M/N), 6 = R.
+    // Vowels plus H/W/Y are "silent" — they map to `None` so they neither emit
+    // a digit nor (on their own) break a run of like digits.
     let to_digit = |c: char| -> Option<char> {
         match c {
             'B' | 'F' | 'P' | 'V' => Some('1'),

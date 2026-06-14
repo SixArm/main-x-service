@@ -1,8 +1,14 @@
-//! ODS CodeSystem reference data types
+//! ODS CodeSystem reference-data types.
 //!
-//! Reference data for NHS ODS CodeSystems including organisation roles,
-//! relationships, record classes, practitioner roles, and geographic names.
-//! These are aligned with the United Kingdom National Health Service England Organisation Data Terminology FHIR API.
+//! These structs hold the *lookup tables* (code → human-readable name) behind
+//! the NHS ODS CodeSystems: organisation roles, relationship types, record
+//! classes, record use types, practitioner roles, and ONS geography names.
+//! They are reference data, not per-organisation instance data — the instance
+//! shapes that *use* these codes live in [`ods`](crate::models::ods) (e.g.
+//! [`OrganizationRole`](crate::models::ods::OrganizationRole) references a role
+//! code defined by [`OdsRoleReference`]). All are aligned with the United
+//! Kingdom National Health Service England Organisation Data Terminology FHIR
+//! API.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

@@ -315,6 +315,8 @@ impl FhirWorker {
     /// (only `resourceType` is populated). Build it up field by field.
     pub fn new() -> Self {
         Self {
+            // Wire discriminator: every emitted resource carries
+            // `"resourceType": "Worker"`.
             resource_type: "Worker".to_string(),
             id: None,
             meta: None,

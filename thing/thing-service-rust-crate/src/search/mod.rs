@@ -1,4 +1,11 @@
 //! Tantivy-backed search facade for Thing records.
+//!
+//! [`SearchEngine`] wraps a [`ThingIndex`] with the operations the REST layer
+//! needs: index/delete a record, exact full-text search, fuzzy (typo-tolerant)
+//! search, and the name-only "blocking" query the duplicate detector uses to
+//! narrow the candidate set before scoring. The index stores only the `id`
+//! (the searchable text fields are indexed for retrieval of ids), so every hit
+//! is later hydrated from the database.
 
 use std::path::Path;
 
@@ -41,9 +48,12 @@ impl SearchEngine {
 
     /// Index (or re-index) one thing.
     pub fn index_thing(&self, thing: &Thing) -> Result<()> {
+        // 50 MB writer heap budget — ample for single-document writes.
         let mut writer = self.index.writer(50)?;
         let s = self.index.schema();
 
+        // Flatten the repeating collections into single space-joined text
+        // fields so they are searchable as ordinary tokens.
         let alt = thing.alternate_names.join(" ");
         let idents: String = thing
             .identifiers
@@ -94,10 +104,14 @@ impl SearchEngine {
             return Ok(Vec::new());
         }
         let fields = [s.name, s.alternate_names, s.description];
+        // Build a Should-of-fuzzy-terms boolean query: each token may match any
+        // field within a Levenshtein distance of 2, with prefix matching on
+        // (so a missing trailing char still hits). Any one match contributes.
         let mut sub: Vec<(Occur, Box<dyn Query>)> = Vec::new();
         for t in &tokens {
             for f in fields {
                 let term = Term::from_field_text(f, t);
+                // distance = 2 (max edits), transposition_cost_one = true (prefix).
                 sub.push((Occur::Should, Box::new(FuzzyTermQuery::new(term, 2, true))));
             }
         }

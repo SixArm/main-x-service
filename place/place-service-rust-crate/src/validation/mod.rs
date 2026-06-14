@@ -202,14 +202,19 @@ pub fn gln_is_valid(gln: &str) -> bool {
             None => return false,
         }
     }
-    // Weight the 12 data digits right-to-left by 3, 1, 3, 1, …; the index from
-    // the right (0-based) being even gets weight 3, odd gets weight 1.
+    // GS1 mod-10: weight the 12 data digits right-to-left by 3, 1, 3, 1, …
+    // (the rightmost data digit gets 3). Here `digits[..12]` excludes the
+    // check digit, `.rev()` walks right-to-left, and even `i` (0, 2, …) maps
+    // to the ×3 positions, odd `i` to the ×1 positions.
     let sum: u32 = digits[..12]
         .iter()
         .rev()
         .enumerate()
         .map(|(i, &d)| if i % 2 == 0 { d * 3 } else { d })
         .sum();
+    // The check digit is whatever rounds the weighted sum up to the next
+    // multiple of 10. The outer `% 10` maps the "sum already a multiple of
+    // 10" case (10 − 0 = 10) back to a 0 check digit.
     let check = (10 - (sum % 10)) % 10;
     check == digits[12]
 }

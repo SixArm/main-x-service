@@ -64,6 +64,11 @@ impl<T> ApiResponse<T> {
 impl<T> From<crate::Error> for ApiResponse<T> {
     /// Converts any [`crate::Error`] into a generic `INTERNAL_ERROR` response
     /// carrying the error's `Display` text.
+    ///
+    /// This is the catch-all fallback: it flattens every error variant to the
+    /// same code, so handlers that need a more specific code/status (e.g.
+    /// `NOT_FOUND` → 404, `VALIDATION_ERROR` → 422) build the [`ApiError`]
+    /// explicitly rather than going through this `From`.
     fn from(err: crate::Error) -> Self {
         ApiResponse {
             success: false,

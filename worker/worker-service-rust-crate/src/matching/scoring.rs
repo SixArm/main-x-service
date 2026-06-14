@@ -28,7 +28,9 @@ use crate::models::Worker;
 /// weights sum to 1.0 so the overall score is also in `[0,1]`. Strong
 /// deterministic signals (tax ID, document number) bypass the weighting.
 pub struct ProbabilisticScorer {
-    /// Configuration for matching thresholds and weights
+    /// Threshold/score configuration. Only `threshold_score` is consulted at
+    /// runtime (by `is_match` / `classify_match`); the component weights are
+    /// fixed `const`s in `calculate_score`, not read from here.
     config: MatchingConfig,
 }
 
@@ -65,7 +67,11 @@ impl ProbabilisticScorer {
         let document_score =
             document_matching::match_documents(&worker.documents, &candidate.documents);
 
-        // Tax ID exact match is a strong deterministic signal — short-circuit
+        // Tax ID exact match is a strong deterministic signal — short-circuit.
+        // A government-issued tax ID is unique per person, so an exact match
+        // pins the overall score to a perfect 1.0 regardless of the weaker
+        // fuzzy components. The component scores are still recorded in the
+        // breakdown for transparency in the API response / review queue.
         if tax_id_score >= 1.0 {
             return MatchResult {
                 worker: candidate.clone(),
@@ -82,7 +88,11 @@ impl ProbabilisticScorer {
             };
         }
 
-        // Document number exact match is also a strong signal — short-circuit
+        // Document number exact match is also a strong signal — short-circuit.
+        // Capped at 0.98 (not 1.0) because a document number is slightly weaker
+        // evidence than a tax ID: numbers can be re-used across document types /
+        // issuers and are more prone to transcription collisions, so we leave a
+        // small margin below "certain".
         if document_score >= 1.0 {
             return MatchResult {
                 worker: candidate.clone(),
@@ -100,7 +110,13 @@ impl ProbabilisticScorer {
         }
 
         // Weight factors for each component (probabilistic). These sum to 1.0
-        // so the weighted total is itself a value in [0, 1].
+        // (0.30 + 0.25 + 0.10 + 0.10 + 0.10 + 0.10 + 0.05) so the weighted total
+        // is itself a value in [0, 1]. Name and birth date carry the most weight
+        // because together they are the strongest demographic discriminators;
+        // gender/address/identifier/tax-ID are corroborating evidence at 0.10
+        // each, and document is the lightest at 0.05 (it rarely differs between
+        // records that already agree on the others). Keep these in sync with the
+        // table in `AGENTS/matching.md`.
         const NAME_WEIGHT: f64 = 0.30;
         const DOB_WEIGHT: f64 = 0.25;
         const GENDER_WEIGHT: f64 = 0.10;
@@ -143,6 +159,11 @@ impl ProbabilisticScorer {
     /// Buckets `score` into a [`MatchQuality`]: Definite (≥0.95), Probable
     /// (≥ threshold), Possible (≥0.50), else Unlikely.
     pub fn classify_match(&self, score: f64) -> MatchQuality {
+        // Bucket boundaries, checked high-to-low so the first satisfied arm
+        // wins: 0.95 is the fixed "certain" line (auto-merge-worthy), the
+        // configured threshold (default 0.85) separates Probable from the
+        // review-only Possible band, and 0.50 is the floor below which a pair is
+        // Unlikely. These bands are surfaced verbatim in the review queue.
         if score >= 0.95 {
             MatchQuality::Definite
         } else if score >= self.config.threshold_score {
@@ -183,10 +204,15 @@ impl DeterministicScorer {
     /// addresses — a strong address match (≥0.80) earns a fourth point. The
     /// returned score is earned/available.
     pub fn calculate_score(&self, worker: &Worker, candidate: &Worker) -> MatchResult {
+        // `total_score` accumulates points earned; `points_available` the
+        // points in play. The final score is the ratio, so a rule that does not
+        // apply (e.g. no addresses on either side) is excluded from both —
+        // neither rewarding nor penalising its absence.
         let mut total_score = 0.0;
         let mut points_available = 0.0;
 
-        // Rule 0: Tax ID exact match = definite match
+        // Rule 0: Tax ID exact match = definite match. A unique government ID
+        // overrides every fuzzy signal, so short-circuit straight to 1.0.
         let tax_id_score = tax_id_matching::match_tax_ids(worker, candidate);
         if tax_id_score >= 1.0 {
             return MatchResult {
@@ -204,7 +230,10 @@ impl DeterministicScorer {
             };
         }
 
-        // Rule 1: Exact identifier match = definite match
+        // Rule 1: Exact identifier match = definite match. The 0.98 bar admits
+        // both a perfect value match (1.0) and a formatting-only difference
+        // (0.98, e.g. "123-45-6789" vs "123456789") — both require type + system
+        // to already agree, so either is conclusive enough to short-circuit.
         let identifier_score =
             identifier_matching::match_identifiers(&worker.identifiers, &candidate.identifiers);
 
@@ -224,7 +253,10 @@ impl DeterministicScorer {
             };
         }
 
-        // Rule 1b: Document number exact match = definite match
+        // Rule 1b: Document number exact match = definite match. Here the bar is
+        // a strict 1.0 (same type AND same number AND same issuing country); a
+        // same-number/different-country pair scores 0.95 and is intentionally
+        // NOT treated as a deterministic short-circuit.
         let document_score =
             document_matching::match_documents(&worker.documents, &candidate.documents);
 
@@ -244,11 +276,16 @@ impl DeterministicScorer {
             };
         }
 
-        // Rule 2: Name + DOB + Gender must all match
+        // Rule 2: Name + DOB + Gender each contribute one point of three. The
+        // per-component bars are deliberately strict (a near-miss earns nothing,
+        // unlike the probabilistic sum): name ≥ 0.90 (strong fuzzy agreement),
+        // DOB ≥ 0.95 (exact or a one-/two-day typo), gender exactly 1.0 (an exact
+        // match — "Unknown" scores 0.5 and so never earns the point).
         let name_score = name_matching::match_names(&worker.name, &candidate.name);
         let dob_score = dob_matching::match_birth_dates(worker.birth_date, candidate.birth_date);
         let gender_score = gender_matching::match_gender(worker.gender, candidate.gender);
 
+        // These three rules are always in play, so three points are available.
         points_available += 3.0;
 
         if name_score >= 0.90 {
@@ -263,7 +300,9 @@ impl DeterministicScorer {
             total_score += 1.0;
         }
 
-        // Rule 3: Address is optional but adds confidence
+        // Rule 3: Address is optional but adds confidence. Only counted when
+        // BOTH records carry an address — otherwise its absence must not dilute
+        // the ratio — and a strong (≥ 0.80) match earns the fourth point.
         let address_score =
             address_matching::match_addresses(&worker.addresses, &candidate.addresses);
 
@@ -274,7 +313,9 @@ impl DeterministicScorer {
             }
         }
 
-        // Calculate final score as percentage of available points
+        // Final score is the fraction of available points earned (e.g. 3 of 4 =
+        // 0.75). Guard against a zero denominator, which cannot occur here
+        // (Rule 2 always adds 3.0) but keeps the division total.
         let final_score = if points_available > 0.0 {
             total_score / points_available
         } else {
@@ -309,13 +350,15 @@ impl DeterministicScorer {
 /// review queue.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MatchQuality {
-    /// Definite match (score >= 0.95)
+    /// Definite match (score >= 0.95). Confident enough to auto-merge.
     Definite,
-    /// Probable match (score >= threshold)
+    /// Probable match (score >= the configured threshold, default 0.85, but
+    /// below 0.95). Treated as a match but typically routed for review.
     Probable,
-    /// Possible match (score >= 0.50)
+    /// Possible match (score >= 0.50 but below threshold). Not a match;
+    /// surfaced as a weak candidate for human review.
     Possible,
-    /// Unlikely match (score < 0.50)
+    /// Unlikely match (score < 0.50). Effectively a non-match.
     Unlikely,
 }
 

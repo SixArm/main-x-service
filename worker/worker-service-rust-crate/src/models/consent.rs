@@ -13,7 +13,12 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-/// Type of consent
+/// Type of consent — the purpose for which a worker granted permission.
+///
+/// Serializes in lowercase (`"dataprocessing"`, `"datasharing"`, …) to match
+/// the JSON wire format. The privacy layer (`crate::privacy`) gates each
+/// data-handling action on the presence of an [`Active`](ConsentStatus::Active)
+/// consent of the matching type.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ConsentType {
@@ -29,7 +34,9 @@ pub enum ConsentType {
     EmergencyAccess,
 }
 
-/// Status of a consent record
+/// Status of a consent record — its position in the grant/revoke/expire
+/// lifecycle. Serializes in lowercase (`"active"`, `"revoked"`, `"expired"`).
+/// Only [`Active`](Self::Active) consent authorizes data handling.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ConsentStatus {
@@ -41,31 +48,33 @@ pub enum ConsentStatus {
     Expired,
 }
 
-/// A consent record for a worker
+/// A consent record for a worker — one grant of permission of a given
+/// [`ConsentType`], with the dates that bound its validity.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Consent {
-    /// Unique consent record ID
+    /// Unique consent record ID (a fresh v4 UUID).
     pub id: Uuid,
 
-    /// Worker who granted (or revoked) consent
+    /// The [`Worker`](crate::models::Worker) this consent belongs to, by ID.
     pub worker_id: Uuid,
 
-    /// Type of consent
+    /// What the worker consented to (data processing, sharing, …).
     pub consent_type: ConsentType,
 
-    /// Current status
+    /// Where the consent sits in its lifecycle (active / revoked / expired).
     pub status: ConsentStatus,
 
-    /// Date consent was granted
+    /// Date the consent was granted (always present).
     pub granted_date: Date,
 
-    /// Date consent expires (if applicable)
+    /// Date the consent expires; `None` for open-ended consent.
     pub expiry_date: Option<Date>,
 
-    /// Date consent was revoked (if applicable)
+    /// Date the consent was revoked; `None` unless `status` is
+    /// [`ConsentStatus::Revoked`].
     pub revoked_date: Option<Date>,
 
-    /// Purpose description
+    /// Free-text description of the purpose the consent covers.
     pub purpose: Option<String>,
 
     /// How consent was obtained (e.g., "written", "electronic", "verbal")

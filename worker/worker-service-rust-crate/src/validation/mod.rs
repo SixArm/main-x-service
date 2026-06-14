@@ -49,9 +49,12 @@ pub struct ValidationError {
 /// assert!(validate_worker(&w).is_empty());
 /// ```
 pub fn validate_worker(worker: &Worker) -> Vec<ValidationError> {
+    // Collect every failure rather than returning on the first, so the API can
+    // surface a complete 422 list in one round-trip.
     let mut errors = Vec::new();
 
-    // Required: family name
+    // Required: family name — the matcher and search index both key on it, so a
+    // blank family name would leave a record effectively unfindable.
     if worker.name.family.trim().is_empty() {
         errors.push(ValidationError {
             field: "name.family".into(),

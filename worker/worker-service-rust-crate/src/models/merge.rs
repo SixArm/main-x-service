@@ -18,7 +18,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-/// Status of a merge operation
+/// Status of a merge operation. Serializes in lowercase (`"completed"` /
+/// `"reversed"`) to match the JSON wire format.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum MergeStatus {
@@ -28,7 +29,12 @@ pub enum MergeStatus {
     Reversed,
 }
 
-/// Record of a worker merge operation
+/// Record of a worker merge operation — the persisted audit trail of one merge.
+///
+/// One row per merge: it names the surviving [`main_worker_id`](Self::main_worker_id)
+/// and the now-inactive [`duplicate_worker_id`](Self::duplicate_worker_id),
+/// and keeps a JSON [`transferred_data`](Self::transferred_data) snapshot so the
+/// merge can be audited (and, in principle, reversed) after the fact.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MergeRecord {
     /// Unique merge operation identifier
@@ -59,7 +65,11 @@ pub struct MergeRecord {
     pub merged_at: Timestamp,
 }
 
-/// Request to merge two worker records
+/// Request to merge two worker records.
+///
+/// Deserialize-only (the inbound API body); the caller picks which record
+/// survives ([`main_worker_id`](Self::main_worker_id)) and which is absorbed
+/// ([`duplicate_worker_id`](Self::duplicate_worker_id)).
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct MergeRequest {
     /// The main/surviving worker ID
@@ -75,7 +85,12 @@ pub struct MergeRequest {
     pub merged_by: Option<String>,
 }
 
-/// Response after a merge operation
+/// Response after a merge operation.
+///
+/// Serialize-only (the outbound API body): pairs the persisted
+/// [`merge_record`](Self::merge_record) with the post-merge survivor
+/// ([`main_worker`](Self::main_worker)) so the caller sees the merged result
+/// without a second fetch.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct MergeResponse {
     /// The merge record

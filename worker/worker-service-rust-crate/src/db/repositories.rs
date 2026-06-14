@@ -23,13 +23,24 @@ use crate::models::{
 };
 
 /// Serialize a fieldless enum to its canonical serde string tag.
+///
+/// Used to store domain enums (document type, contact-point system, etc.) as
+/// their externally-tagged string form in a single text column. Returns `None`
+/// if the value does not serialize to a bare JSON string (i.e. it is not a
+/// fieldless/unit enum variant).
 fn enum_to_tag<T: serde::Serialize>(value: &T) -> Option<String> {
+    // Round-trip through serde_json so the stored tag matches the enum's
+    // `#[serde(rename = ...)]` representation exactly.
     serde_json::to_value(value)
         .ok()
         .and_then(|v| v.as_str().map(String::from))
 }
 
 /// Parse a stored string tag back into a fieldless enum, or `None`.
+///
+/// Inverse of [`enum_to_tag`]: wraps the stored tag as a JSON string and
+/// deserializes it. Returns `None` for a missing tag or one that no longer
+/// maps to a known variant.
 fn tag_to_enum<T: serde::de::DeserializeOwned>(tag: &Option<String>) -> Option<T> {
     let t = tag.as_ref()?;
     serde_json::from_value(serde_json::Value::String(t.clone())).ok()
@@ -37,6 +48,18 @@ fn tag_to_enum<T: serde::de::DeserializeOwned>(tag: &Option<String>) -> Option<T
 
 /// Insert the normalized document / emergency-contact (+ telecom) / photo
 /// child rows for `worker` on connection `conn`.
+///
+/// These three collections live in their own tables (rather than the flat
+/// name/identifier/address/contact set handled by `to_active_models`) and
+/// preserve list order via a `position` column. Each child row gets a fresh
+/// UUID; emergency-contact telecom rows reference the parent contact's UUID.
+/// Generic over `ConnectionTrait` so it runs equally on a pooled connection or
+/// inside a transaction.
+///
+/// # Errors
+///
+/// Returns an error if any child-row insert fails; when run inside a
+/// transaction the caller rolls the whole write back.
 async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
     conn: &C,
     worker: &Worker,
@@ -132,21 +155,48 @@ impl Default for AuditContext {
 pub trait WorkerRepository: Send + Sync {
     /// Persists a new worker (and its names/identifiers/addresses/contacts/
     /// links), returning the stored record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transactional insert fails, or if reloading the
+    /// just-written record fails (e.g. a missing primary name).
     async fn create(&self, worker: &Worker) -> Result<Worker>;
 
     /// Fetches a non-deleted worker by ID, or `None` if absent/soft-deleted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a database query fails, or if a found row cannot be
+    /// reassembled into a domain [`Worker`].
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Worker>>;
 
     /// Replaces a worker and its associated rows, returning the new state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transactional update fails, or if the worker is
+    /// not found after the update.
     async fn update(&self, worker: &Worker) -> Result<Worker>;
 
     /// Soft-deletes a worker by stamping its `deleted_at` column.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the update fails.
     async fn delete(&self, id: &Uuid) -> Result<()>;
 
     /// Finds workers whose family name matches `query` (case-insensitive).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a database query fails.
     async fn search(&self, query: &str) -> Result<Vec<Worker>>;
 
     /// Returns a page of active, non-deleted workers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a database query fails.
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Worker>>;
 }
 
@@ -205,6 +255,12 @@ impl SeaOrmWorkerRepository {
     /// Writes a `CREATE`/`UPDATE`/`DELETE` audit entry for a `Worker` if an
     /// audit log is configured. Unknown actions are no-ops; errors are logged
     /// but not propagated.
+    ///
+    /// Dispatches on `action` to the matching typed helper on the audit
+    /// repository, passing the JSON snapshots and actor metadata. A `None`
+    /// snapshot is substituted with JSON `null` for the column. Like
+    /// [`Self::publish_event`], an audit failure is logged but never surfaced,
+    /// so the audit trail is best-effort and decoupled from the primary write.
     async fn log_audit(
         &self,
         action: &str,
@@ -264,8 +320,13 @@ impl SeaOrmWorkerRepository {
     /// Flattens a domain [`Worker`] into the set of SeaORM `ActiveModel`s for
     /// each backing table (worker row plus name/identifier/address/contact/
     /// link rows). The first name is marked primary; the first address and
-    /// contact are marked primary. Enum values are stored via their `Debug`
-    /// form, and fresh UUIDs/timestamps are assigned to child rows.
+    /// contact are marked primary. Demographic/use-type enums are stored via
+    /// their `Debug` form (`format!("{:?}", …)`) while `worker_type` uses its
+    /// `Display`/`to_string`; [`from_db_models`](Self::from_db_models) parses
+    /// these string forms back. Fresh UUIDs and `now_utc()` timestamps are
+    /// assigned to child rows. This does not cover the document / emergency-
+    /// contact / photo collections — those are handled by
+    /// [`insert_extra_collections`].
     fn to_active_models(
         &self,
         worker: &Worker,
@@ -402,8 +463,16 @@ impl SeaOrmWorkerRepository {
     /// Reassembles a domain [`Worker`] from its database rows, parsing the
     /// string-stored enums (gender, worker type, name/identifier/contact/link
     /// use types) back into their typed forms. Requires a primary name row;
-    /// returns a [`crate::Error::Validation`] if none is present. (Tax ID,
-    /// documents, and emergency contacts are not yet loaded from the DB.)
+    /// returns a [`crate::Error::Validation`] if none is present. Unparseable
+    /// contact/link tags are dropped (`filter_map`) rather than erroring. The
+    /// `documents` / `emergency_contacts` / `photo` collections are left empty
+    /// here and populated separately by
+    /// [`load_extra_collections`](Self::load_extra_collections).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `db_names` contains no primary
+    /// name row.
     fn from_db_models(
         &self,
         db_worker: workers::Model,
@@ -617,6 +686,13 @@ impl SeaOrmWorkerRepository {
     /// Fetches the child rows (names, identifiers, addresses, contacts, links)
     /// belonging to `worker_id` in a fixed tuple order matching
     /// [`from_db_models`](Self::from_db_models).
+    ///
+    /// Runs one `find` per child table; the tuple order is the contract
+    /// `from_db_models` relies on, so keep them in lockstep.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the child-table queries fail.
     async fn load_associations(
         &self,
         worker_id: &Uuid,
@@ -663,6 +739,17 @@ impl SeaOrmWorkerRepository {
 
     /// Load the normalized document / emergency-contact / photo child rows
     /// for `worker.id` and populate them onto `worker`.
+    ///
+    /// The companion to [`insert_extra_collections`]: each collection is read
+    /// back ordered by its `position` column so list order is preserved, and
+    /// emergency-contact telecom rows are fetched per contact. String tags are
+    /// decoded with [`tag_to_enum`], falling back to the `Other` variant for an
+    /// unknown tag. An emergency-contact address is reconstructed only when at
+    /// least one flattened address column is present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the child-table queries fail.
     async fn load_extra_collections(&self, worker: &mut Worker) -> Result<()> {
         let id = worker.id;
 
@@ -784,9 +871,13 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // Insert documents / emergency contacts / photos (normalized).
         insert_extra_collections(&txn, worker).await?;
 
+        // Commit closes the transaction boundary: everything above is now
+        // durable. The reload + event + audit steps below run post-commit and
+        // are best-effort (a streaming/audit failure must not undo the write).
         txn.commit().await?;
 
-        // Load associations
+        // Reload from the DB so the returned record reflects exactly what was
+        // persisted (server-assigned timestamps, normalized child rows).
         let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
             self.load_associations(&db_worker.id).await?;
 
@@ -1022,6 +1113,9 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             .all(&self.db)
             .await?;
 
+        // Hydrate each match through `get_by_id` (one query set per worker);
+        // this also re-applies the soft-delete filter, so a name matching a
+        // soft-deleted worker is skipped.
         let mut workers = Vec::new();
         for worker_id in worker_ids {
             if let Some(worker) = self.get_by_id(&worker_id).await? {
@@ -1041,6 +1135,8 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             .all(&self.db)
             .await?;
 
+        // Page the parent rows in SQL (limit/offset), then hydrate each into a
+        // full domain worker via `get_by_id`.
         let mut workers = Vec::new();
         for db_worker in db_workers {
             if let Some(worker) = self.get_by_id(&db_worker.id).await? {

@@ -101,6 +101,8 @@ impl SeaOrmCourseRepository {
 #[async_trait::async_trait]
 impl CourseRepository for SeaOrmCourseRepository {
     async fn create(&self, course: &Course) -> Result<Course> {
+        // One transaction so the parent row and every child collection
+        // (identifiers, links, text-values, credentials) commit atomically.
         let txn = self.db.begin().await.map_err(map_db)?;
         let active = to_course_active(course, false)?;
         active.insert(&txn).await.map_err(map_db)?;
@@ -108,6 +110,8 @@ impl CourseRepository for SeaOrmCourseRepository {
         insert_links(&txn, course.id, &course.links).await?;
         insert_course_collections(&txn, course).await?;
         txn.commit().await.map_err(map_db)?;
+        // Re-read through the normal hydrate path so the returned value
+        // reflects exactly what was persisted (defaults, ordering, etc).
         self.get_by_id(&course.id)
             .await?
             .ok_or_else(|| crate::Error::Database("course not found after insert".into()))
@@ -119,6 +123,7 @@ impl CourseRepository for SeaOrmCourseRepository {
             .await
             .map_err(map_db)?;
         let Some(row) = row else { return Ok(None) };
+        // Soft-deleted rows read as absent — callers never see them.
         if row.deleted_at.is_some() {
             return Ok(None);
         }
@@ -145,6 +150,9 @@ impl CourseRepository for SeaOrmCourseRepository {
         let txn = self.db.begin().await.map_err(map_db)?;
         let active = to_course_active(course, true)?;
         active.update(&txn).await.map_err(map_db)?;
+        // Child collections are replace-not-merge: delete the existing
+        // rows then re-insert from the incoming course, so the persisted
+        // state mirrors the request body exactly (PUT semantics).
         course_identifiers::Entity::delete_many()
             .filter(course_identifiers::Column::CourseId.eq(course.id))
             .exec(&txn)
@@ -171,6 +179,8 @@ impl CourseRepository for SeaOrmCourseRepository {
             .await
             .map_err(map_db)?
             .ok_or(crate::Error::NotFound)?;
+        // Soft delete: flip `active` off and stamp `deleted_at` rather
+        // than removing the row, preserving it for the audit trail.
         let mut active: courses::ActiveModel = row.into();
         active.active = Set(false);
         active.deleted_at = Set(Some(OffsetDateTime::now_utc()));

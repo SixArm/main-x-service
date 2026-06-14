@@ -1,8 +1,19 @@
-//! Organization model definition
+//! Organization model definition.
 //!
-//! Supports NHS ODS (Organisation Data Service) fields including
-//! ODS code, record class, assigning authority, roles, relationships,
-//! succession records, and geographic boundary data.
+//! [`Organization`] is the registry's record for an NHS-aligned organisation
+//! (hospital, trust, GP practice, ICB, site, …). It carries the generic
+//! identity fields (identifiers, name, addresses, telecom, parent link) plus a
+//! block of NHS **ODS** (Organisation Data Service) metadata: the ODS code,
+//! record class, assigning authority, roles, relationships, and succession
+//! records. The ODS field shapes themselves live in the sibling
+//! [`ods`](crate::models::ods) module; this file composes them onto the
+//! aggregate and adds convenience accessors
+//! ([`primary_role`](Organization::primary_role),
+//! [`predecessors`](Organization::predecessors), …).
+//!
+//! Every ODS field is `#[serde(default)]` so JSON produced before the ODS
+//! columns existed still deserializes (pinned by
+//! `tests::test_organization_deserialize_without_ods_fields`).
 
 use jiff::{Timestamp, civil::Date};
 use serde::{Deserialize, Serialize};
@@ -31,7 +42,11 @@ pub struct Organization {
     /// Active status
     pub active: bool,
 
-    /// ODS code — unique identification code (max 12 chars, never reused)
+    /// ODS code — unique identification code (max 12 chars, never reused).
+    /// This is the canonical NHS organisation key (e.g. `"RJ1"`); ODS never
+    /// re-uses a code, so a former code stays bound to its original org.
+    // `#[serde(default)]` here (and on the ODS fields below) lets pre-ODS JSON
+    // round-trip: the field simply defaults to `None`/empty when absent.
     #[serde(default)]
     pub ods_code: Option<String>,
 
@@ -51,22 +66,22 @@ pub struct Organization {
     #[serde(default)]
     pub assigning_authority: Option<String>,
 
-    /// Organization type (Hospital, Clinic, etc.)
+    /// Free-text organisation-type tags (e.g. `"Hospital"`, `"Clinic"`).
     pub org_type: Vec<String>,
 
-    /// Organization name
+    /// Primary display name of the organisation (always present).
     pub name: String,
 
-    /// Alias names
+    /// Alternative / trading / historical names for the organisation.
     pub alias: Vec<String>,
 
-    /// Telecom contacts
+    /// Telecom contact points (phone, email, fax, …).
     pub telecom: Vec<ContactPoint>,
 
-    /// Addresses
+    /// Physical addresses (registered office, sites, …).
     pub addresses: Vec<Address>,
 
-    /// Part of (parent organization UUID)
+    /// Parent organisation, by internal [`Uuid`]; `None` for a top-level org.
     pub part_of: Option<Uuid>,
 
     /// Legal and operational date periods
@@ -89,10 +104,10 @@ pub struct Organization {
     #[serde(default)]
     pub successions: Vec<OrganizationSuccession>,
 
-    /// Created timestamp
+    /// When this record was first created.
     pub created_at: Timestamp,
 
-    /// Updated timestamp
+    /// When this record was last modified.
     pub updated_at: Timestamp,
 }
 

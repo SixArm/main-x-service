@@ -1,8 +1,17 @@
-//! NHS ODS (Organisation Data Service) domain types
+//! NHS ODS (Organisation Data Service) domain types.
 //!
-//! Models for organization roles, relationships, succession,
-//! and ODS-specific reference data aligned with the United Kingdom National Health Service England
-//! Organisation Data Terminology FHIR API.
+//! These are the *instance* shapes that hang off an
+//! [`Organization`](crate::models::organization::Organization): its roles
+//! ([`OrganizationRole`]), directional relationships
+//! ([`OrganizationRelationship`]), merger/acquisition links
+//! ([`OrganizationSuccession`]), and the small enums and
+//! [`DatePeriod`] they share. The matching lookup tables (code → name) for the
+//! codes referenced here live in [`codesystem`](crate::models::codesystem).
+//!
+//! All enums serialize in `snake_case` to match the JSON wire format, and the
+//! `RC1`/`RC2` and `Full`/`RefOnly` mappings follow the ODS CodeSystem. Aligned
+//! with the United Kingdom National Health Service England Organisation Data
+//! Terminology FHIR API.
 
 use jiff::civil::Date;
 use serde::{Deserialize, Serialize};

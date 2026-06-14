@@ -162,9 +162,14 @@ pub fn create_router(state: AppState) -> Router {
         .with_state(state);
 
     Router::new()
+        // All entity/audit routes live under `/api/v1`; `/metrics.prom`
+        // sits at the root so a default Prometheus scrape config finds
+        // it, and the Swagger UI is mounted at the root as well.
         .nest("/api/v1", api_routes)
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        // Permissive CORS: this is a backend service fronted elsewhere;
+        // tighten if exposed directly to browsers.
         .layer(CorsLayer::permissive())
 }
 

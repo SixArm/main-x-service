@@ -44,16 +44,43 @@ impl Default for AuditContext {
 #[async_trait::async_trait]
 pub trait EventRepository: Send + Sync {
     /// Insert a new event (and its child rows); returns the stored event.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction, any row insert, or the
+    /// reload of child rows fails.
     async fn create(&self, event: &Event) -> Result<Event>;
     /// Fetch one non-deleted event by id, if it exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the parent or child-row queries fail.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Event>>;
     /// Replace an event and its child rows; returns the stored event.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction or any query fails, or
+    /// [`Error::Validation`](crate::Error::Validation) if the event
+    /// cannot be re-read after the update.
     async fn update(&self, event: &Event) -> Result<Event>;
     /// Soft-delete an event by id.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the update query fails.
     async fn delete(&self, id: &Uuid) -> Result<()>;
     /// Case-insensitive substring search over event names.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the id query or any per-id reload fails.
     async fn search(&self, query: &str) -> Result<Vec<Event>>;
     /// List active events with `limit`/`offset` pagination.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the id query or any per-id reload fails.
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Event>>;
 }
 
@@ -218,6 +245,9 @@ fn to_rows(event: &Event) -> ChildRows {
         event_type: Set(enum_to_str(&event.event_type)),
         typical_age_range: Set(event.typical_age_range.clone()),
         is_accessible_for_free: Set(event.is_accessible_for_free),
+        // Capacities are `u32` in the domain but stored as Postgres
+        // `i32`; values above `i32::MAX` would wrap (not expected for
+        // real attendee counts). Read-back casts `i32` → `u32`.
         maximum_attendee_capacity: Set(event.maximum_attendee_capacity.map(|v| v as i32)),
         maximum_physical_attendee_capacity: Set(event
             .maximum_physical_attendee_capacity
@@ -281,6 +311,9 @@ fn to_rows(event: &Event) -> ChildRows {
             event_id: Set(event.id),
             position: Set(pos as i32),
             name: Set(o.name.clone()),
+            // Price is a decimal-as-string in the domain; parse it into
+            // `BigDecimal` for the numeric column. An unparseable string
+            // silently becomes `None` (no price stored).
             price: Set(o
                 .price
                 .as_deref()
@@ -689,9 +722,16 @@ fn parse_offer_availability(s: &str) -> Option<OfferAvailability> {
 // ---------------------------------------------------------------------------
 
 impl SeaOrmEventRepository {
-    /// Load all six child-row vectors for one event id in fixed order
-    /// (identifiers, locations, parties, offers, links, sub-events),
-    /// ready to feed into [`from_rows`].
+    /// Load all child-row vectors for one event id in fixed order
+    /// (identifiers, locations, parties, offers, links, sub-events,
+    /// text-values), ready to feed into [`from_rows`]. The text-values
+    /// query is ordered by `position` so list order is preserved; the
+    /// other child rows are sorted inside [`from_rows`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the `SeaORM` error if any of the per-child-table queries
+    /// fails.
     async fn load_children(
         &self,
         event_id: &Uuid,
@@ -748,8 +788,12 @@ impl SeaOrmEventRepository {
 #[async_trait::async_trait]
 impl EventRepository for SeaOrmEventRepository {
     async fn create(&self, event: &Event) -> Result<Event> {
+        // All parent + child inserts run under one transaction so a
+        // partial failure leaves no orphan child rows.
         let txn = self.db.begin().await?;
 
+        // Flatten the domain event into parent + child `ActiveModel`s,
+        // then insert the parent first (children reference its id).
         let rows = to_rows(event);
         let inserted = rows.event_row.insert(&txn).await?;
         for r in rows.identifiers {
@@ -776,6 +820,8 @@ impl EventRepository for SeaOrmEventRepository {
 
         txn.commit().await?;
 
+        // Reload children and reassemble the canonical domain `Event`
+        // (positions/JSON round-tripped) to return to the caller.
         let (identifiers, locations, parties, offers, links, sub_events, text_values) =
             self.load_children(&inserted.id).await?;
         let result = from_rows(
@@ -789,6 +835,9 @@ impl EventRepository for SeaOrmEventRepository {
             text_values,
         );
 
+        // Fire-and-forget side effects: publish a `Created` stream event
+        // (jiff `Timestamp` on the streaming side vs `time` on the row),
+        // then record a CREATE audit row with only a `new_values` snapshot.
         self.publish_event(crate::streaming::EventEvent::Created {
             event: result.clone(),
             timestamp: jiff::Timestamp::now(),
@@ -807,6 +856,8 @@ impl EventRepository for SeaOrmEventRepository {
     }
 
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Event>> {
+        // Soft-delete aware: a non-null `deleted_at` hides the row, so a
+        // tombstoned event reads back as `None`.
         let event_row = events::Entity::find_by_id(*id)
             .filter(events::Column::DeletedAt.is_null())
             .one(&self.db)
@@ -829,6 +880,8 @@ impl EventRepository for SeaOrmEventRepository {
     }
 
     async fn update(&self, event: &Event) -> Result<Event> {
+        // Snapshot the pre-update state first so the audit log can carry
+        // an accurate `old_values` even though children are replaced.
         let old = self.get_by_id(&event.id).await?;
         let txn = self.db.begin().await?;
 
@@ -903,6 +956,9 @@ impl EventRepository for SeaOrmEventRepository {
             event: result.clone(),
             timestamp: jiff::Timestamp::now(),
         });
+        // Record an UPDATE audit row only when both the pre-image and
+        // both JSON serializations succeed; otherwise skip the trail
+        // rather than write a misleading half-diff.
         if let (Some(old), Ok(new_json)) = (old, serde_json::to_value(&result)) {
             if let Ok(old_json) = serde_json::to_value(&old) {
                 self.log_audit(
@@ -919,7 +975,12 @@ impl EventRepository for SeaOrmEventRepository {
     }
 
     async fn delete(&self, id: &Uuid) -> Result<()> {
+        // Capture the pre-image for the DELETE audit `old_values`.
         let old = self.get_by_id(id).await?;
+        // Soft delete: stamp `deleted_at`/`deleted_by` only. The other
+        // fields stay `NotSet` (via `..Default::default()`) so this is a
+        // partial UPDATE that leaves the rest of the row untouched and
+        // the child rows in place.
         let row = events::ActiveModel {
             id: Set(*id),
             deleted_at: Set(Some(OffsetDateTime::now_utc())),
@@ -947,7 +1008,12 @@ impl EventRepository for SeaOrmEventRepository {
     }
 
     async fn search(&self, query: &str) -> Result<Vec<Event>> {
+        // Case-insensitive substring match: lower-case both sides and
+        // wrap the query in `%…%`. The pattern is bound as `$1` so the
+        // user text is never interpolated into the SQL string.
         let pattern = format!("%{}%", query.to_lowercase());
+        // First pass: project just the matching ids (excluding
+        // soft-deleted rows) to keep the scan cheap.
         let event_ids: Vec<Uuid> = events::Entity::find()
             .filter(events::Column::DeletedAt.is_null())
             .filter(Expr::cust_with_values("LOWER(name) LIKE $1", [pattern]))
@@ -956,6 +1022,8 @@ impl EventRepository for SeaOrmEventRepository {
             .into_tuple()
             .all(&self.db)
             .await?;
+        // Second pass: hydrate each match (with children) into a full
+        // domain `Event` via the soft-delete-aware `get_by_id`.
         let mut events = Vec::new();
         for id in event_ids {
             if let Some(e) = self.get_by_id(&id).await? {

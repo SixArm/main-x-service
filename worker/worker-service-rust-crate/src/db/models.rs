@@ -7,12 +7,28 @@
 //! domain models in [`crate::models`]; repository code in
 //! [`crate::db::repositories`] converts between the two.
 //!
-//! Field-level docs are omitted on these generated-style structs because the
-//! column names are self-describing and map 1:1 to the SQL schema; the
-//! authoritative column reference is `AGENTS/models.md`.
+//! Each `Model` field maps 1:1 to a SQL column of the same name; `Option<T>`
+//! marks a nullable column, and `Uuid` foreign-key fields name the parent row
+//! they reference. Timestamp columns use the `time` crate's
+//! `OffsetDateTime` (aliased `TimeDateTimeWithTimeZone` in SeaORM's prelude)
+//! and date columns use `time::Date` (`TimeDate`), since SeaORM 1.1 lacks
+//! native `jiff` support; the [`crate::db::convert`] helpers bridge to the
+//! domain `jiff` types. The authoritative column reference is
+//! `AGENTS/models.md`.
+//!
+//! Soft-delete convention: tables carrying `deleted_at` / `deleted_by` are
+//! never physically deleted by the repository; a non-null `deleted_at` marks
+//! the row as logically removed and queries filter it out.
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
+
+// `DeriveEntityModel` expands each `Model` into the full SeaORM entity set
+// (`Entity`, `Column`, `PrimaryKey`, `ActiveModel`). `Serialize`/`Deserialize`
+// let rows cross the API and audit-JSON boundaries directly. `#[sea_orm(...)]`
+// attributes carry table/column metadata; a `///` doc placed *above* such an
+// attribute is safe because doc comments desugar to `#[doc = ...]` attributes
+// that the derive ignores.
 
 // ============================================================================
 // Worker Models
@@ -48,7 +64,8 @@ pub mod workers {
         pub marital_status: Option<String>,
         /// Multiple-birth indicator.
         pub multiple_birth: Option<bool>,
-        /// Managing organization foreign key.
+        /// Managing organization foreign key (nullable; references
+        /// `organizations.id`).
         pub managing_organization_id: Option<Uuid>,
         /// Creation timestamp.
         pub created_at: TimeDateTimeWithTimeZone,
@@ -58,13 +75,18 @@ pub mod workers {
         pub created_by: Option<String>,
         /// Actor who last updated the row.
         pub updated_by: Option<String>,
-        /// Soft-delete timestamp.
+        // Soft-delete pair: a non-null `deleted_at` flags the row as logically
+        // removed; reads filter on `deleted_at IS NULL` (see the repository's
+        // `get_by_id` / `list_active`).
+        /// Soft-delete timestamp (non-null once the worker is soft-deleted).
         pub deleted_at: Option<TimeDateTimeWithTimeZone>,
         /// Actor who soft-deleted the row.
         pub deleted_by: Option<String>,
     }
 
-    /// Foreign-key relations for this entity (empty when it has none).
+    /// Foreign-key relations for this entity. Workers own several child
+    /// collections (`has_many`) and reference one managing organization
+    /// (`belongs_to`).
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
         /// Has many `worker_names`.
@@ -704,6 +726,8 @@ pub mod worker_match_scores {
         pub worker_id: Uuid,
         /// Candidate worker foreign key.
         pub candidate_id: Uuid,
+        // Scores are persisted as fixed NUMERIC(10,6) (via `BigDecimal`) rather
+        // than floating point, so a stored match score round-trips exactly.
         /// Overall match score.
         #[sea_orm(column_type = "Decimal(Some((10, 6)))")]
         pub total_score: bigdecimal::BigDecimal,
@@ -773,9 +797,12 @@ pub mod audit_log {
         pub entity_type: String,
         /// Entity ID acted upon.
         pub entity_id: Uuid,
-        /// Previous values as JSON.
+        // old/new are stored as JSONB snapshots of the serialized domain record:
+        // `old_values` is null on CREATE, `new_values` is null on DELETE, and
+        // both are populated on UPDATE to form the before/after diff.
+        /// Previous values as JSON (null for a CREATE action).
         pub old_values: Option<serde_json::Value>,
-        /// New values as JSON.
+        /// New values as JSON (null for a DELETE action).
         pub new_values: Option<serde_json::Value>,
         /// Originating IP address.
         pub ip_address: Option<String>,

@@ -41,7 +41,9 @@ pub mod name_matching {
     /// assert!(match_names(&a, &b) > 0.99);
     /// ```
     pub fn match_names(name1: &HumanName, name2: &HumanName) -> f64 {
-        // Weight factors for different components
+        // Weight factors for different components, summing to 1.0. Family name
+        // dominates (0.5) as the most stable identifier, given names follow
+        // (0.4), and prefix/suffix (Dr., Jr.) are weak signal at 0.1.
         const FAMILY_WEIGHT: f64 = 0.5;
         const GIVEN_WEIGHT: f64 = 0.4;
         const PREFIX_SUFFIX_WEIGHT: f64 = 0.1;
@@ -82,12 +84,17 @@ pub mod name_matching {
         // Use normalized Levenshtein distance
         let lev_score = normalized_levenshtein(&f1, &f2);
 
-        // Phonetic matching (Soundex)
+        // Phonetic matching (Soundex): collapses homophones (Smith/Smyth) that
+        // edit-distance under-scores onto the same code.
         let phonetic_score = crate::matching::phonetic::phonetic_similarity(&f1, &f2);
-        // Phonetic match provides a floor — if names sound alike, score at least 0.85
+        // Phonetic match provides a floor — if the names sound exactly alike
+        // (identical Soundex code, similarity 1.0), guarantee at least 0.85 so a
+        // homophone is never scored as a poor match. A partial phonetic overlap
+        // contributes no floor (boost stays 0.0).
         let phonetic_boost = if phonetic_score >= 1.0 { 0.85 } else { 0.0 };
 
-        // Take the maximum of all methods so the best evidence wins.
+        // Take the maximum of all three methods so the single strongest piece of
+        // evidence wins (rather than averaging, which would dilute one good signal).
         f64::max(f64::max(jw_score, lev_score), phonetic_boost)
     }
 
@@ -107,7 +114,9 @@ pub mod name_matching {
             return 1.0;
         }
 
-        // Check for common nicknames/variants
+        // Check for common nicknames/variants (William/Bill). A recognised
+        // variant scores 0.95 — just shy of an exact 1.0, since a nickname is
+        // strong but not certain evidence of the same given name.
         if are_name_variants(&first1, &first2) {
             return 0.95;
         }
@@ -123,7 +132,9 @@ pub mod name_matching {
     /// (e.g. both are forms of "Robert"). Backed by a small hand-curated table;
     /// inputs are expected already lowercased.
     fn are_name_variants(name1: &str, name2: &str) -> bool {
-        // Common name variants (simplified list)
+        // Hand-curated nickname groups: every spelling in a row is considered a
+        // variant of every other spelling in that row. Intentionally small and
+        // English-centric — it is a precision aid, not an exhaustive table.
         let variants = [
             vec!["william", "bill", "billy", "will"],
             vec!["robert", "bob", "bobby", "rob"],
@@ -214,32 +225,40 @@ pub mod dob_matching {
                     return 1.0; // Exact match
                 }
 
-                // Allow for common data entry errors
+                // Allow for common data entry errors. The score tiers below are
+                // ordered from most-specific/most-confident to least, and each
+                // tier targets a recognisable transcription mistake. The first
+                // matching tier wins.
                 let days_diff = (d1 - d2).get_days().abs();
 
-                // Same month and year, day off by 1-2 (typo)
+                // Same month and year, day off by 1-2 (a fat-finger day typo):
+                // very likely the same date, so 0.95.
                 if d1.year() == d2.year() && d1.month() == d2.month() {
                     if days_diff <= 2 {
                         return 0.95;
                     }
                 }
 
-                // Month/day transposition (e.g., 03/12 vs 12/03)
+                // Month/day transposition (e.g. 03/12 vs 12/03 from a
+                // locale-format mix-up): 0.90.
                 if d1.year() == d2.year() && d1.month() == d2.day() && d1.day() == d2.month() {
                     return 0.90;
                 }
 
-                // Same year and month
+                // Same year and month but day differs by more than 2: a weaker
+                // signal than the day-typo tier above, hence 0.80.
                 if d1.year() == d2.year() && d1.month() == d2.month() {
                     return 0.80;
                 }
 
-                // Same year, different month
+                // Same year only (month and day both differ): coin-flip 0.50.
                 if d1.year() == d2.year() {
                     return 0.50;
                 }
 
-                // Year off by 1 (typo in year)
+                // Year off by 1 with identical month and day (a year typo): the
+                // day/month agreement makes this fairly strong at 0.85. Checked
+                // after the same-year tiers because those are more specific.
                 if (d1.year() - d2.year()).abs() == 1
                     && d1.month() == d2.month()
                     && d1.day() == d2.day()
@@ -247,7 +266,7 @@ pub mod dob_matching {
                     return 0.85;
                 }
 
-                // No significant match
+                // No recognisable relationship between the dates.
                 0.0
             }
         }
@@ -292,6 +311,9 @@ pub mod address_matching {
     /// Scores a single address pair as a weighted sum: postal code 0.3, street
     /// 0.3, city 0.2, state 0.2.
     pub fn match_address(addr1: &Address, addr2: &Address) -> f64 {
+        // Component weights summing to 1.0. Postal code and street line carry
+        // the most signal (0.3 each) as the most discriminating parts of an
+        // address; city and state are coarser and weighted 0.2 each.
         const POSTAL_CODE_WEIGHT: f64 = 0.3;
         const CITY_WEIGHT: f64 = 0.2;
         const STATE_WEIGHT: f64 = 0.2;
@@ -334,14 +356,16 @@ pub mod address_matching {
                     return 1.0;
                 }
 
-                // Match first 5 digits (US ZIP)
+                // Match first 5 characters: a full US 5-digit ZIP (so a ZIP+4
+                // "12345-6789" matches the bare "12345"). Near-certain: 0.95.
                 if z1.len() >= 5 && z2.len() >= 5 {
                     if &z1[0..5] == &z2[0..5] {
                         return 0.95;
                     }
                 }
 
-                // Match first 3 digits (same area)
+                // Match first 3 characters: the US ZIP sectional area (same
+                // region/sorting hub). Coarser, so a weaker 0.70.
                 if z1.len() >= 3 && z2.len() >= 3 {
                     if &z1[0..3] == &z2[0..3] {
                         return 0.70;

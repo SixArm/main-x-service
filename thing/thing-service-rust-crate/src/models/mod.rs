@@ -23,7 +23,7 @@ pub mod consent;
 /// Typed identifiers (DOI, ISBN, GTIN, …) in the schema.org `PropertyValue`
 /// shape.
 pub mod identifier;
-/// The core [`Thing`](crate::models::thing::Thing) entity.
-/// Merge request/response/record types.
+/// Merge request/response/record types for folding duplicate things.
 pub mod merge;
+/// The core [`Thing`](crate::models::thing::Thing) entity.
 pub mod thing;

@@ -153,10 +153,17 @@ pub fn create_router(state: AppState) -> Router {
         .with_state(state);
 
     Router::new()
+        // Mount the JSON API under `/api/v1` and the FHIR surface under `/fhir`
+        // (both already carry the shared `AppState`).
         .nest("/api/v1", api_routes)
         .nest("/fhir", fhir_routes)
+        // Root-level Prometheus scrape endpoint — outside `/api/v1` so a default
+        // scrape config (`metrics_path: /metrics.prom`) finds it.
         .route("/metrics.prom", get(handlers::metrics_prom))
+        // Swagger UI + the served OpenAPI JSON built from `ApiDoc`.
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        // Permissive CORS so browser-based operator UIs on other origins can
+        // call the API; tighten for production deployments.
         .layer(CorsLayer::permissive())
 }
 

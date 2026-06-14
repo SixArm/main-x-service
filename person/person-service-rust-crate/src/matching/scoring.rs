@@ -67,7 +67,10 @@ impl ProbabilisticScorer {
         let document_score =
             document_matching::match_documents(&person.documents, &candidate.documents);
 
-        // Tax ID exact match is a strong deterministic signal — short-circuit
+        // Tax ID exact match is a strong deterministic signal — a shared
+        // tax ID alone identifies the person, so pin the overall score to
+        // `1.0` regardless of the fuzzy components, while still returning
+        // the full breakdown for transparency.
         if tax_id_score >= 1.0 {
             return MatchResult {
                 person: candidate.clone(),
@@ -84,7 +87,10 @@ impl ProbabilisticScorer {
             };
         }
 
-        // Document number exact match is also a strong signal — short-circuit
+        // Document number exact match is also a strong signal, but a
+        // document number is slightly less authoritative than a tax ID
+        // (numbers can be reissued or collide across countries), so cap
+        // at `0.98` rather than `1.0` — still firmly in the definite band.
         if document_score >= 1.0 {
             return MatchResult {
                 person: candidate.clone(),
@@ -108,12 +114,24 @@ impl ProbabilisticScorer {
         // components rather than penalising absent ones. Two records
         // with identical name+DOB+gender (and no address / identifier /
         // tax_id / documents) therefore score 1.0, not 0.65.
+        /// Weight of the name component — the dominant demographic
+        /// signal, hence the largest share (`0.30`).
         const NAME_WEIGHT: f64 = 0.30;
+        /// Weight of the birth-date component (`0.25`), the second
+        /// strongest demographic discriminator.
         const DOB_WEIGHT: f64 = 0.25;
+        /// Weight of the gender component (`0.10`); low-entropy (roughly
+        /// binary), so it contributes little on its own.
         const GENDER_WEIGHT: f64 = 0.10;
+        /// Weight of the address component (`0.10`).
         const ADDRESS_WEIGHT: f64 = 0.10;
+        /// Weight of the identifier component (`0.10`).
         const IDENTIFIER_WEIGHT: f64 = 0.10;
+        /// Weight of the tax-ID component (`0.10`) when it does not
+        /// short-circuit above.
         const TAX_ID_WEIGHT: f64 = 0.10;
+        /// Weight of the document component (`0.05`) when it does not
+        /// short-circuit above.
         const DOCUMENT_WEIGHT: f64 = 0.05;
 
         let mut weighted_sum = 0.0_f64;
@@ -185,6 +203,12 @@ impl ProbabilisticScorer {
     /// `>= 0.95` is definite, `>= threshold` is probable, `>= 0.50` is
     /// possible, anything lower is unlikely.
     pub fn classify_match(&self, score: f64) -> MatchQuality {
+        // `0.95` is the fixed definite/probable cutoff (auto-merge-grade
+        // confidence); below it but at/above the configured threshold is
+        // probable; `0.50` is the floor for a reviewable "possible" match;
+        // anything lower is unlikely. The bands are checked top-down, so
+        // the configured threshold is only consulted for scores under
+        // `0.95`.
         if score >= 0.95 {
             MatchQuality::Definite
         } else if score >= self.config.threshold_score {
@@ -246,6 +270,9 @@ impl DeterministicScorer {
         let identifier_score =
             identifier_matching::match_identifiers(&person.identifiers, &candidate.identifiers);
 
+        // `0.98` is the identifier-matcher's "same value, formatting
+        // differs" floor, so `>= 0.98` accepts both an exact and a
+        // punctuation-only-different identifier as a definite match.
         if identifier_score >= 0.98 {
             return MatchResult {
                 person: candidate.clone(),
@@ -287,16 +314,26 @@ impl DeterministicScorer {
         let dob_score = dob_matching::match_birth_dates(person.birth_date, candidate.birth_date);
         let gender_score = gender_matching::match_gender(person.gender, candidate.gender);
 
+        // Three available points: name, DOB, gender. Each is awarded
+        // all-or-nothing on its own per-field threshold, so the
+        // deterministic scorer is a count of strong agreements rather
+        // than a blended average.
         points_available += 3.0;
 
+        // Name `>= 0.90`: a strong fuzzy name agreement (allows typos /
+        // phonetic / nickname variants but not unrelated names).
         if name_score >= 0.90 {
             total_score += 1.0;
         }
 
+        // DOB `>= 0.95`: exact or single-day typo only — stricter than
+        // the name bar because birth dates should agree closely.
         if dob_score >= 0.95 {
             total_score += 1.0;
         }
 
+        // Gender must agree exactly (`1.0`); an `Unknown`-neutral `0.5`
+        // does not earn the point.
         if gender_score >= 1.0 {
             total_score += 1.0;
         }
@@ -305,6 +342,11 @@ impl DeterministicScorer {
         let address_score =
             address_matching::match_addresses(&person.addresses, &candidate.addresses);
 
+        // Address is only scored when BOTH records have one — otherwise
+        // it neither adds a point nor inflates `points_available`, so
+        // address-less records are not penalized. A present pair adds a
+        // fourth available point, earned on a strong (`>= 0.80`) address
+        // agreement.
         if !person.addresses.is_empty() && !candidate.addresses.is_empty() {
             points_available += 1.0;
             if address_score >= 0.80 {

@@ -20,12 +20,21 @@ pub struct AuditLogRepository {
 }
 
 impl AuditLogRepository {
-    /// Create a new audit log repository
+    /// Create a new audit log repository wrapping the given pooled
+    /// `SeaORM` [`DatabaseConnection`].
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
 
-    /// Log a create action
+    /// Log a CREATE action.
+    ///
+    /// Records the post-create state only: `new_values` is the JSON
+    /// snapshot of the freshly created entity, with no `old_values`.
+    /// Delegates to [`Self::log_action`] with action `"CREATE"`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any database insert error from [`Self::log_action`].
     pub async fn log_create(
         &self,
         entity_type: &str,
@@ -48,7 +57,15 @@ impl AuditLogRepository {
         .await
     }
 
-    /// Log an update action
+    /// Log an UPDATE action.
+    ///
+    /// Captures both before (`old_values`) and after (`new_values`)
+    /// JSON snapshots so the diff is reconstructable from the trail.
+    /// Delegates to [`Self::log_action`] with action `"UPDATE"`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any database insert error from [`Self::log_action`].
     pub async fn log_update(
         &self,
         entity_type: &str,
@@ -72,7 +89,16 @@ impl AuditLogRepository {
         .await
     }
 
-    /// Log a delete action
+    /// Log a DELETE action.
+    ///
+    /// Records the pre-delete state only: `old_values` is the JSON
+    /// snapshot of the entity as it was before the (soft) delete, with
+    /// no `new_values`. Delegates to [`Self::log_action`] with action
+    /// `"DELETE"`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any database insert error from [`Self::log_action`].
     pub async fn log_delete(
         &self,
         entity_type: &str,
@@ -95,7 +121,18 @@ impl AuditLogRepository {
         .await
     }
 
-    /// Log a generic action
+    /// Log a generic action — the shared insert path behind
+    /// [`Self::log_create`] / [`Self::log_update`] / [`Self::log_delete`].
+    ///
+    /// Mints a fresh row `id`, stamps the current UTC instant, and
+    /// inserts one immutable `audit_log` row. The `old_values` /
+    /// `new_values` `Option<JsonValue>`s are stored verbatim into the
+    /// JSONB columns (a `None` becomes SQL `NULL`).
+    ///
+    /// # Errors
+    ///
+    /// Returns the `SeaORM` error if the row insert fails (converted
+    /// into the crate's `Result` via the `?` operator's `From` impl).
     async fn log_action(
         &self,
         action: &str,
@@ -107,6 +144,10 @@ impl AuditLogRepository {
         ip_address: Option<String>,
         user_agent: Option<String>,
     ) -> Result<()> {
+        // Build the immutable audit row: a fresh UUID and a server-side
+        // UTC timestamp from the `time` crate (the column type is
+        // `OffsetDateTime`). `old_values`/`new_values` map straight to
+        // the JSONB columns.
         let new_audit = audit_log::ActiveModel {
             id: Set(Uuid::new_v4()),
             timestamp: Set(time::OffsetDateTime::now_utc()),
@@ -125,7 +166,13 @@ impl AuditLogRepository {
         Ok(())
     }
 
-    /// Get audit logs for a specific entity
+    /// Get up to `limit` audit logs for one specific entity, newest
+    /// first (filtered by `entity_type` + `entity_id`, ordered by
+    /// descending `timestamp`).
+    ///
+    /// # Errors
+    ///
+    /// Returns the `SeaORM` error if the query fails.
     pub async fn get_logs_for_entity(
         &self,
         entity_type: &str,
@@ -143,7 +190,12 @@ impl AuditLogRepository {
         Ok(logs)
     }
 
-    /// Get recent audit logs
+    /// Get the most recent `limit` audit logs system-wide, newest first
+    /// (no entity/user filter; ordered by descending `timestamp`).
+    ///
+    /// # Errors
+    ///
+    /// Returns the `SeaORM` error if the query fails.
     pub async fn get_recent_logs(&self, limit: u64) -> Result<Vec<audit_log::Model>> {
         let logs = audit_log::Entity::find()
             .order_by_desc(audit_log::Column::Timestamp)
@@ -154,7 +206,12 @@ impl AuditLogRepository {
         Ok(logs)
     }
 
-    /// Get audit logs by user
+    /// Get up to `limit` audit logs attributed to one `user_id`, newest
+    /// first (ordered by descending `timestamp`).
+    ///
+    /// # Errors
+    ///
+    /// Returns the `SeaORM` error if the query fails.
     pub async fn get_logs_by_user(
         &self,
         user_id: &str,

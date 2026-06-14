@@ -211,12 +211,21 @@ fn map_address(a: &Address) -> Option<MAddress> {
 /// `hc`) require a longer qualifier (`chi-number`, `hc-number`). An
 /// unrecognised URI falls through to the `IdentifierType` match arm.
 fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
+    // Lower-case the system URI once so every `contains` token below can be
+    // written in lower case; trim the value so an all-whitespace identifier is
+    // dropped rather than filling a slot with blanks.
     let sys = id.system.to_ascii_lowercase();
     let val = id.value.trim();
     if val.is_empty() {
         return b;
     }
 
+    // Routing precedence: (1) this primary system-URI block, (2)
+    // `route_additional_scheme` for the remaining national schemes, (3) the
+    // generic `IdentifierType` fallback. The system URI wins over the enum
+    // because it is more specific (a typed `Other` identifier with an NHS URI
+    // should still land in `uk_nhs_number`). Each `contains` token is chosen to
+    // be distinctive enough not to collide with another scheme's token.
     if sys.contains("nhs.uk") || sys.contains("uk-nhs") || sys.contains("nhs-number") {
         return b.uk_nhs_number(val);
     }
@@ -262,12 +271,19 @@ fn route_identifier(b: MBuilder, id: &Identifier) -> MBuilder {
         }
         return b.ie_ihi(val);
     }
+    // Second pass: the expanded national-scheme table. Returns `matched = true`
+    // when it filled a slot, in which case we are done; otherwise fall through
+    // to the generic enum mapping below with the builder untouched.
     let (b, matched) = route_additional_scheme(b, &sys, val);
     if matched {
         return b;
     }
 
+    // Fallback: the system URI carried no recognised scheme token, so route by
+    // the coarse `IdentifierType` enum instead.
     match id.identifier_type {
+        // TAX and SSN both default to the US SSN slot — the most common case
+        // for an untyped tax/social identifier in this dataset.
         IdentifierType::TAX | IdentifierType::SSN => b.us_ssn(val),
         // PPN passports flow via IdentityDocument; MRN / DL / NPI / Other
         // have no per-country matcher slot.

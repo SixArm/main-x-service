@@ -51,17 +51,33 @@ impl SearchEngine {
 
     /// Index a single person, committing and reloading so the new
     /// document is immediately searchable.
+    ///
+    /// Flattens the structured [`Person`] into the flat Tantivy document
+    /// shape declared by [`PersonIndexSchema`]: name parts are
+    /// space-joined into tokenizable text, the first address supplies the
+    /// geographic fields, and each identifier becomes a `type:value`
+    /// token. Commits the single document and reloads the reader so the
+    /// write is visible to a search issued on the next line.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the writer cannot be created,
+    /// the document cannot be added, the commit fails, or the reader
+    /// reload fails.
     pub fn index_person(&self, person: &Person) -> Result<()> {
+        // 50 MiB write buffer for a single-document write; small but
+        // far larger than one document needs.
         let mut writer = self.index.writer(50)?;
         let schema = self.index.schema();
 
-        // Build full name
+        // Build full name ("Given Family") for the tokenized full_name field.
         let full_name = person.full_name();
 
-        // Collect given names
+        // Space-join given names into one tokenized text value.
         let given_names = person.name.given.join(" ");
 
-        // Collect identifiers
+        // Flatten identifiers to `type:value` tokens (e.g. `mrn:12345`)
+        // so the tokenizer indexes both the scheme and the value.
         let identifiers: Vec<String> = person
             .identifiers
             .iter()
@@ -69,7 +85,8 @@ impl SearchEngine {
             .collect();
         let identifiers_str = identifiers.join(" ");
 
-        // Get primary address components
+        // Only the primary (first) address feeds the index; absent
+        // address means empty strings rather than skipping the fields.
         let (postal_code, city, state) = if let Some(addr) = person.addresses.first() {
             (
                 addr.postal_code.clone().unwrap_or_default(),

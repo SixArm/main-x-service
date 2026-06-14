@@ -104,9 +104,35 @@ pub struct CreateEventRequest {
         (status = 500, description = "Internal server error")
     )
 )]
-/// `POST /events` — validate, mint an id if absent, run duplicate
-/// detection (returning `409` with candidates when matches are found),
-/// persist via the repository, index for search, and return `201`.
+/// `POST /events` — create one event.
+///
+/// Serves HTTP `POST /api/v1/events`. The flow is: validate the body,
+/// mint a `Uuid` when the payload's `id` is nil, run duplicate
+/// detection via [`check_duplicates_internal`], persist through the
+/// repository (which also streams a `Created` event and writes an
+/// audit row), index the new event for search, and return `201`.
+///
+/// Why this ordering: validation and duplicate detection are cheap
+/// guards that run *before* the database write, so a bad or duplicate
+/// request never touches persistence. The search index is updated
+/// *after* a successful insert; an index failure is logged but does
+/// not fail the request (the DB row is the source of truth).
+///
+/// # Errors
+///
+/// This handler returns an [`ApiResponse`] error envelope (never a
+/// `Result`) with one of these statuses:
+///
+/// - `422 Unprocessable Entity` — the body failed
+///   [`validate_event`](crate::validation::validate_event); the joined
+///   field errors are in the message. Chosen over `400` because the
+///   JSON parsed fine but its *contents* are semantically invalid.
+/// - `409 Conflict` — duplicate detection found at least one candidate
+///   at/above the configured threshold; the
+///   [`DuplicateCheckResponse`] is attached in `error.details` so the
+///   caller can review before retrying. `409` (not `422`) signals a
+///   conflict with existing state rather than a malformed request.
+/// - `500 Internal Server Error` — the repository `create` failed.
 pub async fn create_event(
     State(state): State<AppState>,
     Json(mut payload): Json<Event>,
@@ -127,12 +153,18 @@ pub async fn create_event(
         payload.id = Uuid::new_v4();
     }
 
+    // Real-time duplicate detection: block by name + start-date day,
+    // score the candidates, keep those at/above the configured
+    // threshold. A non-empty result means the caller is likely
+    // re-creating an existing event.
     let duplicates = check_duplicates_internal(&state, &payload).await;
     if !duplicates.is_empty() {
         let dup_response = DuplicateCheckResponse {
             has_duplicates: true,
             potential_matches: duplicates,
         };
+        // Attach the scored candidates as structured `error.details`
+        // so the client can show them and decide whether to proceed.
         let details = serde_json::to_value(&dup_response).ok();
         let mut err = ApiResponse::<Event>::error(
             "DUPLICATE_DETECTED",
@@ -141,11 +173,15 @@ pub async fn create_event(
         if let Some(ref mut e) = err.error {
             e.details = details;
         }
+        // 409 Conflict: the request conflicts with existing records.
         return (StatusCode::CONFLICT, Json(err));
     }
 
     match state.event_repository.create(&payload).await {
         Ok(event) => {
+            // Index after a successful insert. A search-index failure
+            // is non-fatal: the DB row is authoritative, so we log and
+            // still report 201 rather than rolling back the create.
             if let Err(e) = state.search_engine.index_event(&event) {
                 tracing::warn!("Failed to index event: {}", e);
             }
@@ -171,7 +207,16 @@ pub async fn create_event(
         (status = 404, description = "Event not found")
     )
 )]
-/// `GET /events/{id}` — fetch one non-deleted event, or `404`.
+/// `GET /events/{id}` — fetch one non-deleted event by `id`.
+///
+/// Serves HTTP `GET /api/v1/events/{id}`. Returns the event in a
+/// success envelope on a hit.
+///
+/// # Errors
+///
+/// - `404 Not Found` — no active event has that `id` (the repository
+///   returned `Ok(None)`); chosen so soft-deleted rows read as absent.
+/// - `500 Internal Server Error` — the repository lookup failed.
 pub async fn get_event(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
     match state.event_repository.get_by_id(&id).await {
         Ok(Some(event)) => (StatusCode::OK, Json(ApiResponse::success(event))),
@@ -203,8 +248,23 @@ pub async fn get_event(State(state): State<AppState>, Path(id): Path<Uuid>) -> i
         (status = 422, description = "Validation error")
     )
 )]
-/// `PUT /events/{id}` — validate, force the body's id to the path id,
-/// replace the event (and its child rows), re-index, return `200`.
+/// `PUT /events/{id}` — replace one event.
+///
+/// Serves HTTP `PUT /api/v1/events/{id}`. Validates the body, forces
+/// the payload's `id` to the path `id` (the path is authoritative, so
+/// a mismatched body id cannot retarget the write), replaces the event
+/// and its child rows through the repository, re-indexes for search,
+/// and returns `200`. Unlike create, update does *not* run duplicate
+/// detection — the caller is editing a known record.
+///
+/// # Errors
+///
+/// - `422 Unprocessable Entity` — the body failed
+///   [`validate_event`](crate::validation::validate_event).
+/// - `500 Internal Server Error` — the repository `update` failed.
+///
+/// A search-index failure after a successful update is logged, not
+/// surfaced, for the same source-of-truth reason as create.
 pub async fn update_event(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -249,8 +309,18 @@ pub async fn update_event(
         (status = 500, description = "Internal server error")
     )
 )]
-/// `DELETE /events/{id}` — soft-delete the event and remove it from the
-/// search index; returns `204`.
+/// `DELETE /events/{id}` — soft-delete one event.
+///
+/// Serves HTTP `DELETE /api/v1/events/{id}`. Marks the event inactive
+/// (soft delete — the row is retained for the audit trail) and removes
+/// it from the search index, then returns `204 No Content`. Idempotent
+/// in spirit: deleting an already-deleted id still reports success.
+///
+/// # Errors
+///
+/// - `500 Internal Server Error` — the repository `delete` failed.
+///
+/// A search-index removal failure is logged, not surfaced.
 pub async fn delete_event(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -330,14 +400,34 @@ pub struct SearchResponse {
     params(SearchQuery),
     responses((status = 200, description = "Search results", body = SearchResponse))
 )]
-/// `GET /events/search` — run a full-text or fuzzy search, hydrate the
-/// hit ids from the repository, apply optional status / type / date
-/// filters and optional masking, and return a paginated
-/// [`SearchResponse`].
+/// `GET /events/search` — full-text / fuzzy search over events.
+///
+/// Serves HTTP `GET /api/v1/events/search`. Runs a full-text or (when
+/// `fuzzy`) a fuzzy title search against the Tantivy index for
+/// `offset + limit` hits, hydrates each hit id from the repository,
+/// then applies the optional post-filters in `params`:
+/// `event_status`, `event_type`, and the `date_from` / `date_to`
+/// `start_date` bounds (compared as `yyyy-mm-dd` strings). When
+/// `mask_sensitive` is set, each surviving event is passed through
+/// [`mask_event`](crate::privacy::mask_event) so party emails and
+/// identifier values are redacted before serialization.
+///
+/// Filtering happens after hydration (not in the index query) because
+/// the status/type/date predicates are applied against the
+/// authoritative DB records, not the index's denormalized copy. `limit`
+/// is capped at 100 to bound work per request.
+///
+/// # Errors
+///
+/// - `500 Internal Server Error` — the search-engine query failed.
+///   (Individual unpar-seable hit ids and repository misses are skipped
+///   silently rather than failing the whole request.)
 pub async fn search_events(
     State(state): State<AppState>,
     Query(params): Query<SearchQuery>,
 ) -> impl IntoResponse {
+    // Cap the page size and fetch enough hits to cover the offset; the
+    // skip/take below applies the pagination window after hydration.
     let limit = params.limit.min(100);
     let total_needed = params.offset + limit;
 
@@ -374,6 +464,9 @@ pub async fn search_events(
                     continue;
                 }
             }
+            // Date bounds compare ISO `yyyy-mm-dd` strings, which sort
+            // lexicographically the same as chronologically; keeps only
+            // events whose start-date day is within [date_from, date_to].
             if let Some(from) = params.date_from.as_deref() {
                 if event.start_date.strftime("%Y-%m-%d").to_string().as_str() < from {
                     continue;
@@ -384,6 +477,8 @@ pub async fn search_events(
                     continue;
                 }
             }
+            // Redact PII (party emails, identifier values) on request,
+            // e.g. for lower-trust consumers of the search surface.
             if params.mask_sensitive {
                 events.push(crate::privacy::mask_event(&event));
             } else {
@@ -457,9 +552,24 @@ pub struct MatchResultsResponse {
     request_body = MatchRequest,
     responses((status = 200, description = "Match results", body = MatchResultsResponse))
 )]
-/// `POST /events/match` — gather blocking candidates by name + date,
-/// score them against the probe event, filter by threshold, and return
-/// the top matches.
+/// `POST /events/match` — find candidate matches for a probe event.
+///
+/// Serves HTTP `POST /api/v1/events/match`. Gathers blocking candidates
+/// via [`blocking_candidates`] (search index hits sharing a similar
+/// name on the same `start_date` day), scores each against the probe
+/// with the configured matcher, drops anything below `threshold`
+/// (default `0.5`), and returns the top `limit` as a
+/// [`MatchResultsResponse`].
+///
+/// The name + date blocking keeps scoring to a small candidate set
+/// instead of the whole table: events that don't share a day and a
+/// roughly similar name are extremely unlikely to be the same event,
+/// so they're never scored.
+///
+/// # Errors
+///
+/// - `500 Internal Server Error` — the matcher `find_matches` call
+///   failed.
 pub async fn match_event(
     State(state): State<AppState>,
     Json(payload): Json<MatchRequest>,
@@ -524,10 +634,17 @@ async fn check_duplicates_internal(state: &AppState, event: &Event) -> Vec<Match
         .unwrap_or_default()
 }
 
-/// Build the candidate set for matching: query the search index for
-/// events with a similar name on the same `start_date` day, hydrate
-/// them from the repository, and exclude the probe event's own id.
+/// Build the candidate set for matching ("blocking").
+///
+/// Queries the search index for events with a similar name on the same
+/// `start_date` day, hydrates them from the repository, and excludes
+/// the probe event's own `id`. This name + date blocking is the key
+/// scalability lever: it bounds the number of full record loads and
+/// pairwise scores to a small, plausible set rather than the entire
+/// event table. Up to 100 index hits are considered.
 async fn blocking_candidates(state: &AppState, event: &Event) -> Vec<Event> {
+    // Block on the calendar day of the start date (yyyy-mm-dd); the
+    // matcher's time component still scores sub-day proximity.
     let date = event.start_date.strftime("%Y-%m-%d").to_string();
     let candidate_ids = state
         .search_engine
@@ -576,9 +693,14 @@ fn to_match_response(m: crate::matching::MatchResult) -> MatchResponse {
     request_body = Event,
     responses((status = 200, description = "Duplicate check result", body = DuplicateCheckResponse))
 )]
-/// `POST /events/check-duplicates` — run duplicate detection for a
-/// candidate event without persisting it; returns a
-/// [`DuplicateCheckResponse`].
+/// `POST /events/check-duplicates` — explicit duplicate check.
+///
+/// Serves HTTP `POST /api/v1/events/check-duplicates`. Runs the same
+/// name + date blocking + scoring as `create_event` (via
+/// [`check_duplicates_internal`]) but *without* persisting anything,
+/// so a client can pre-flight a create. Always returns `200` with a
+/// [`DuplicateCheckResponse`]; an empty `potential_matches` with
+/// `has_duplicates = false` means the create would not conflict.
 pub async fn check_duplicates(
     State(state): State<AppState>,
     Json(event): Json<Event>,
@@ -605,11 +727,41 @@ pub async fn check_duplicates(
         (status = 404, description = "Event not found")
     )
 )]
-/// `POST /events/merge` — merge a duplicate into a surviving main
-/// event: union identifiers / alternate names / keywords / locations /
-/// parties / `same_as`, record the duplicate's name as an alternate,
-/// link main → `Replaces` duplicate, soft-delete the duplicate, update
-/// indices, publish a `Merged` event, and return the merge record.
+/// `POST /events/merge` — merge a duplicate event into a surviving one.
+///
+/// Serves HTTP `POST /api/v1/events/merge`. Loads both the `main` and
+/// `duplicate` events, then unions the duplicate's data onto main:
+/// identifiers, alternate names, keywords, `Location` entries
+/// (each `Location` variant compared by value equality), `Party`
+/// entries (organizers / performers / attendees, compared by value),
+/// and `same_as` URLs — appending only items not already present. The
+/// duplicate's primary name is recorded as an alternate name, a
+/// `Replaces` link is added main → duplicate, the duplicate is
+/// soft-deleted, both search-index entries are updated, a `Merged`
+/// event is published, and a [`MergeRecord`](crate::models::MergeRecord)
+/// with a snapshot of transferred data is returned.
+///
+/// Why value-equality unions: locations, parties and offers have no
+/// stable id of their own, so de-duplication is by structural equality
+/// to avoid piling up byte-identical copies on the survivor.
+///
+/// # Errors
+///
+/// - `404 Not Found` — either the `main` or the `duplicate` id has no
+///   active event.
+/// - `500 Internal Server Error` — a repository fetch or the `update`
+///   of the merged main event failed.
+///
+/// The duplicate soft-delete, index updates, and event publish are
+/// best-effort after the main update succeeds: failures there are
+/// logged but do not change the `200` result.
+///
+/// # Panics
+///
+/// The `transferred` map building uses `.as_array_mut().unwrap()` and
+/// `serde_json::to_value(...).unwrap_or_default()`; the `unwrap` is on
+/// an entry just inserted as a JSON array, so it cannot panic in
+/// practice.
 pub async fn merge_events(
     State(state): State<AppState>,
     Json(req): Json<crate::models::MergeRequest>,
@@ -701,7 +853,10 @@ pub async fn merge_events(
         }
     }
 
-    // Append locations, parties, offers, same_as where not already present.
+    // Append locations, parties, offers, same_as where not already
+    // present. Each `Location` is a variant union (Place / address /
+    // virtual / text) and each `Party` carries no own id, so both are
+    // de-duplicated by full structural equality (`l == loc`).
     for loc in &duplicate.location {
         if !merged.location.iter().any(|l| l == loc) {
             merged.location.push(loc.clone());
@@ -744,6 +899,8 @@ pub async fn merge_events(
         );
     }
 
+    // Post-update steps are best-effort: the survivor is already saved,
+    // so failures here are logged but do not fail the merge response.
     if let Err(e) = state.event_repository.delete(&duplicate.id).await {
         tracing::error!("Failed to soft-delete duplicate event: {}", e);
     }
@@ -793,10 +950,22 @@ pub async fn merge_events(
     request_body = crate::models::BatchDeduplicationRequest,
     responses((status = 200, description = "Deduplication results", body = crate::models::BatchDeduplicationResponse))
 )]
-/// `POST /events/deduplicate` — scan up to 1000 active events pairwise,
-/// score each pair, de-dupe symmetric pairs, and emit
-/// [`ReviewQueueItem`](crate::models::ReviewQueueItem)s — `AutoMerged`
-/// above the auto-merge threshold, otherwise `Pending` for review.
+/// `POST /events/deduplicate` — batch duplicate scan.
+///
+/// Serves HTTP `POST /api/v1/events/deduplicate`. Lists up to 1000
+/// active events and scores each against the up-to-`max_candidates`
+/// events that follow it (an upper-triangular pairwise sweep, so each
+/// unordered pair is considered once). A `seen` set keyed on the
+/// id pair sorted low→high additionally guards against emitting a pair
+/// twice. Pairs scoring at/above `threshold` become
+/// [`ReviewQueueItem`](crate::models::ReviewQueueItem)s: `AutoMerged`
+/// when the score also clears `auto_merge_threshold`, otherwise
+/// `Pending` for human review. Always returns `200` with a
+/// [`BatchDeduplicationResponse`] summary.
+///
+/// Unlike the real-time path this does not use name + date blocking —
+/// it is an explicit, bounded full scan, so the 1000-row cap and the
+/// per-row `max_candidates` cap keep it tractable.
 pub async fn batch_deduplicate(
     State(state): State<AppState>,
     Json(req): Json<crate::models::BatchDeduplicationRequest>,
@@ -838,6 +1007,8 @@ pub async fn batch_deduplicate(
             if m.score < req.threshold {
                 continue;
             }
+            // Normalize the pair key (low id first) so a symmetric
+            // re-discovery of the same two events is deduplicated.
             let pair = if event.id < m.event.id {
                 (event.id, m.event.id)
             } else {
@@ -904,8 +1075,18 @@ pub async fn batch_deduplicate(
         (status = 404, description = "Event not found")
     )
 )]
-/// `GET /events/{id}/export` — GDPR right-of-access export of one
-/// event's data as JSON, or `404`.
+/// `GET /events/{id}/export` — GDPR right-of-access export.
+///
+/// Serves HTTP `GET /api/v1/events/{id}/export`. Returns the full,
+/// *unmasked* event data as a JSON document via
+/// [`export_event_data`](crate::privacy::export_event_data) — this is
+/// the data-subject access path, so it intentionally returns complete
+/// data (the masked view is the separate `/masked` endpoint).
+///
+/// # Errors
+///
+/// - `404 Not Found` — no active event has that `id`.
+/// - `500 Internal Server Error` — the repository lookup failed.
 pub async fn export_event_data(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -942,8 +1123,19 @@ pub async fn export_event_data(
         (status = 404, description = "Event not found")
     )
 )]
-/// `GET /events/{id}/masked` — return the event with sensitive fields
-/// (identifier values, party emails) masked, or `404`.
+/// `GET /events/{id}/masked` — privacy-masked view of one event.
+///
+/// Serves HTTP `GET /api/v1/events/{id}/masked`. Returns the event with
+/// sensitive fields redacted by [`mask_event`](crate::privacy::mask_event):
+/// identifier values (which often double as access tokens — only the
+/// last few characters survive), party emails, and external party ids.
+/// Use this for lower-trust display contexts where the full record
+/// should not be exposed.
+///
+/// # Errors
+///
+/// - `404 Not Found` — no active event has that `id`.
+/// - `500 Internal Server Error` — the repository lookup failed.
 pub async fn get_event_masked(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -994,8 +1186,16 @@ fn default_audit_limit() -> i64 {
     params(("id" = Uuid, Path, description = "Event UUID"), AuditLogQuery),
     responses((status = 200, description = "Audit logs retrieved"))
 )]
-/// `GET /events/{id}/audit` — return the audit trail for one event,
-/// newest first.
+/// `GET /events/{id}/audit` — audit trail for one event.
+///
+/// Serves HTTP `GET /api/v1/events/{id}/audit`. Returns the audit-log
+/// rows for the `"Event"` entity with the given `id`, newest first,
+/// capped at 500 rows. An unknown id simply yields an empty list (no
+/// `404`), since absence of audit history is a valid answer.
+///
+/// # Errors
+///
+/// - `500 Internal Server Error` — the audit-log query failed.
 pub async fn get_event_audit_logs(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -1027,8 +1227,14 @@ pub async fn get_event_audit_logs(
     params(AuditLogQuery),
     responses((status = 200, description = "Recent audit logs retrieved"))
 )]
-/// `GET /audit/recent` — return recent system-wide audit activity,
-/// newest first.
+/// `GET /audit/recent` — recent system-wide audit activity.
+///
+/// Serves HTTP `GET /api/v1/audit/recent`. Returns the most recent
+/// audit-log rows across all entities, newest first, capped at 500.
+///
+/// # Errors
+///
+/// - `500 Internal Server Error` — the audit-log query failed.
 pub async fn get_recent_audit_logs(
     State(state): State<AppState>,
     Query(params): Query<AuditLogQuery>,
@@ -1065,8 +1271,15 @@ pub struct UserAuditLogQuery {
     params(UserAuditLogQuery),
     responses((status = 200, description = "User audit logs retrieved"))
 )]
-/// `GET /audit/user` — return the audit trail for one user, newest
-/// first.
+/// `GET /audit/user` — audit trail for one acting user.
+///
+/// Serves HTTP `GET /api/v1/audit/user`. Returns audit-log rows whose
+/// acting `user_id` matches the query parameter, newest first, capped
+/// at 500 rows.
+///
+/// # Errors
+///
+/// - `500 Internal Server Error` — the audit-log query failed.
 pub async fn get_user_audit_logs(
     State(state): State<AppState>,
     Query(params): Query<UserAuditLogQuery>,

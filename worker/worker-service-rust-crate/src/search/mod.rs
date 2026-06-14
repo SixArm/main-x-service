@@ -44,6 +44,11 @@ impl SearchEngine {
     /// Opens the Tantivy index at `index_path`, creating it (and the schema)
     /// if the directory does not yet hold one. Returns an error if the index
     /// cannot be created or opened.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the index directory cannot be
+    /// created, opened, or its reader built.
     pub fn new<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let index = WorkerIndex::create_or_open(index_path)?;
         Ok(Self { index })
@@ -58,6 +63,11 @@ impl SearchEngine {
     /// `type:value` list of identifiers, worker type, and active flag. For
     /// bulk loads prefer [`index_workers`](Self::index_workers), which commits
     /// once for the whole batch.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the writer cannot be created, the
+    /// document cannot be added, or the commit fails.
     pub fn index_worker(&self, worker: &Worker) -> Result<()> {
         // 50 MB writer heap; the writer is dropped at end of scope after commit.
         let mut writer = self.index.writer(50)?;
@@ -90,7 +100,11 @@ impl SearchEngine {
             (String::new(), String::new(), String::new())
         };
 
-        // Assemble the Tantivy document from the schema field handles.
+        // Assemble the Tantivy document from the schema field handles. Every
+        // field is stored as text: birth date as an ISO string, gender as the
+        // lower-cased Debug name, and active as "true"/"false" — Tantivy holds
+        // no native date/bool columns in this schema, so all filters are
+        // exact-match string terms.
         let doc = doc!(
             schema.id => worker.id.to_string(),
             schema.family_name => worker.name.family.clone(),
@@ -121,6 +135,11 @@ impl SearchEngine {
     /// at the end. Preferred over repeated [`index_worker`](Self::index_worker)
     /// calls for initial loads or re-indexing, as a single commit is far
     /// cheaper than one per document.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the writer cannot be created, any
+    /// document cannot be added, or the final commit fails.
     pub fn index_workers(&self, workers: &[Worker]) -> Result<()> {
         // Larger 100 MB heap for batch throughput.
         let mut writer = self.index.writer(100)?;
@@ -180,6 +199,11 @@ impl SearchEngine {
     /// operators, field prefixes, etc.). The caller hydrates full [`Worker`]
     /// records from the repository using the returned IDs. For typo-tolerant
     /// lookups use [`fuzzy_search`](Self::fuzzy_search).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if `query_str` fails to parse, the
+    /// search fails, or a matched document cannot be retrieved.
     pub fn search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
@@ -226,6 +250,11 @@ impl SearchEngine {
     /// Uses a Tantivy [`FuzzyTermQuery`] with a Levenshtein edit distance of
     /// `2` and prefix matching enabled, so "Smyth" matches "Smith". Useful
     /// when the input may contain spelling errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the search fails or a matched
+    /// document cannot be retrieved.
     pub fn fuzzy_search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
@@ -263,6 +292,12 @@ impl SearchEngine {
     /// years rank higher without excluding name-only matches. Returns up to
     /// `limit` worker-ID strings — a reduced candidate set the matcher then
     /// scores precisely.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the combined query search fails or
+    /// a matched document cannot be retrieved. A `birth_year` that fails to
+    /// parse is not an error — the query falls back to name-only.
     pub fn search_by_name_and_year(
         &self,
         family_name: &str,
@@ -320,6 +355,11 @@ impl SearchEngine {
     /// Removes the worker whose `id` field equals `worker_id` from the index,
     /// committing the deletion. Called when a record is soft-deleted or merged
     /// away so it no longer appears in search results.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the writer cannot be created or the
+    /// deletion commit fails.
     pub fn delete_worker(&self, worker_id: &str) -> Result<()> {
         let mut writer = self.index.writer(50)?;
         let schema = self.index.schema();
@@ -337,12 +377,20 @@ impl SearchEngine {
 
     /// Returns index statistics (e.g. the live document count) from the
     /// underlying [`WorkerIndex`].
+    ///
+    /// # Errors
+    ///
+    /// Propagates any [`crate::Error::Search`] from the underlying index.
     pub fn stats(&self) -> Result<IndexStats> {
         self.index.stats()
     }
 
     /// Merges the index segments to reclaim space and improve query speed.
     /// Delegates to the underlying [`WorkerIndex`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the merge cannot be completed.
     pub fn optimize(&self) -> Result<()> {
         self.index.optimize()
     }
@@ -352,6 +400,10 @@ impl SearchEngine {
     /// Tantivy readers are eventually consistent, so a commit is not
     /// immediately visible to searches. Tests call this after indexing to
     /// guarantee the just-written documents are searchable.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the reader fails to reload.
     pub fn reload(&self) -> Result<()> {
         self.index.reload()
     }

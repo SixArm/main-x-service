@@ -77,6 +77,11 @@ impl MatchScoreBreakdown {
     pub fn summary(&self) -> String {
         let mut parts = Vec::new();
 
+        // Each component has its own "strong" cutoff, calibrated to that
+        // field's scale: name/DOB/gender use `0.90`; address is noisier
+        // so a looser `0.80`; identifier/document need a near-exact
+        // `0.95`; tax_id is a deterministic exact signal so `1.0`. Only
+        // components clearing their cutoff are named in the summary.
         if self.name_score >= 0.90 {
             parts.push("name");
         }
@@ -164,7 +169,10 @@ impl PersonMatcher for ProbabilisticMatcher {
             .filter(|result| self.is_match(result.score))
             .collect();
 
-        // Sort by score descending
+        // Sort by score descending (best candidate first). `b` before
+        // `a` gives descending order; `partial_cmp` can be `None` only
+        // for a `NaN` score, which we treat as `Equal` to keep the sort
+        // total and panic-free.
         matches.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)
@@ -206,7 +214,10 @@ impl PersonMatcher for DeterministicMatcher {
             .filter(|result| self.is_match(result.score))
             .collect();
 
-        // Sort by score descending
+        // Sort by score descending (best candidate first). `b` before
+        // `a` gives descending order; `partial_cmp` can be `None` only
+        // for a `NaN` score, which we treat as `Equal` to keep the sort
+        // total and panic-free.
         matches.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)

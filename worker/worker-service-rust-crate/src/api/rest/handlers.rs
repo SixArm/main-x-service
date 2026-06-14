@@ -109,7 +109,9 @@ pub async fn create_worker(
     State(state): State<AppState>,
     Json(mut payload): Json<Worker>,
 ) -> impl IntoResponse {
-    // Validate worker data
+    // Step 1 — validate. Required-field / format failures map to 422
+    // Unprocessable Entity, joining every field error into one message so the
+    // client sees all problems at once rather than one-at-a-time.
     let validation_errors = crate::validation::validate_worker(&payload);
     if !validation_errors.is_empty() {
         let error = ApiResponse::<Worker>::error(
@@ -126,14 +128,20 @@ pub async fn create_worker(
         return (StatusCode::UNPROCESSABLE_ENTITY, Json(error));
     }
 
-    // Ensure worker has a UUID
+    // Step 2 — assign a server-side UUID if the client did not supply one, so
+    // the row (and the self-skip in dedup) has a stable identity.
     if payload.id == Uuid::nil() {
         payload.id = Uuid::new_v4();
     }
 
-    // Real-time duplicate detection before creation
+    // Step 3 — real-time duplicate detection BEFORE the insert. If any
+    // candidate clears the review threshold we refuse the create with 409
+    // Conflict and surface the matches in `error.details` so the operator can
+    // review/merge instead of silently creating a near-duplicate record.
     let duplicates = check_duplicates_internal(&state, &payload).await;
     if !duplicates.is_empty() {
+        // Carry the candidate matches in `error.details` so the client can
+        // render them and decide whether to merge or force-create.
         let dup_response = DuplicateCheckResponse {
             has_duplicates: true,
             potential_matches: duplicates,
@@ -149,17 +157,23 @@ pub async fn create_worker(
         return (StatusCode::CONFLICT, Json(error));
     }
 
-    // Insert into database
+    // Step 4 — persist. The repository INSERT also fans out the event publish
+    // and audit-log write (wired in `AppState::new`), so a successful create
+    // already emitted `WorkerCreated` and an audit row.
     match state.worker_repository.create(&payload).await {
         Ok(worker) => {
-            // Index in search engine
+            // Step 5 — index in the search engine. A failure here is logged but
+            // NOT fatal: the record exists in the DB and can be re-indexed
+            // later, so we still return 201 rather than rolling back.
             if let Err(e) = state.search_engine.index_worker(&worker) {
                 tracing::warn!("Failed to index worker in search engine: {}", e);
             }
 
+            // 201 Created with the stored worker in the success envelope.
             (StatusCode::CREATED, Json(ApiResponse::success(worker)))
         }
         Err(e) => {
+            // Any repository failure surfaces as 500 with a `DATABASE_ERROR` code.
             let error = ApiResponse::<Worker>::error(
                 "DATABASE_ERROR",
                 format!("Failed to create worker: {}", e),
@@ -243,12 +257,14 @@ pub async fn update_worker(
         return (StatusCode::UNPROCESSABLE_ENTITY, Json(error));
     }
 
-    // Ensure ID in path matches payload
+    // Force the body's id to the path id so the URL is authoritative and a
+    // mismatched body id cannot retarget a different record.
     payload.id = id;
 
     match state.worker_repository.update(&payload).await {
         Ok(worker) => {
-            // Update search index
+            // Refresh the search index; index failure is logged, not fatal
+            // (the DB is the source of truth), so we still return 200.
             if let Err(e) = state.search_engine.index_worker(&worker) {
                 tracing::warn!("Failed to update worker in search engine: {}", e);
             }
@@ -283,13 +299,17 @@ pub async fn delete_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
+    // The repository `delete` is a soft delete (marks the row inactive); the
+    // row is retained for the audit trail rather than physically removed.
     match state.worker_repository.delete(&id).await {
         Ok(()) => {
-            // Remove from search index
+            // Drop the worker from the search index so it stops appearing in
+            // results; index failure is logged, not fatal.
             if let Err(e) = state.search_engine.delete_worker(&id.to_string()) {
                 tracing::warn!("Failed to delete worker from search engine: {}", e);
             }
 
+            // 204 No Content — success with an empty body.
             (StatusCode::NO_CONTENT, Json(ApiResponse::<()>::success(())))
         }
         Err(e) => {
@@ -370,11 +390,11 @@ pub async fn search_workers(
     State(state): State<AppState>,
     Query(params): Query<SearchQuery>,
 ) -> impl IntoResponse {
-    // Limit to max 100 results
+    // Cap the page size so a client cannot request an unbounded result set.
     let limit = params.limit.min(100);
 
-    // Perform search using search engine
-    // Request more results to handle pagination offset
+    // Ask the index for `offset + limit` ids: the engine returns ranked ids
+    // from the top, and we apply the offset ourselves below by skip/take.
     let total_needed = params.offset + limit;
     let worker_ids = if params.fuzzy {
         state.search_engine.fuzzy_search(&params.q, total_needed)
@@ -384,10 +404,12 @@ pub async fn search_workers(
 
     match worker_ids {
         Ok(ids) => {
-            // Apply offset and limit
+            // Slice out the requested page from the ranked id list.
             let paginated_ids: Vec<_> = ids.into_iter().skip(params.offset).take(limit).collect();
 
-            // Fetch full worker records from database
+            // Hydrate each id from the repository (the index holds only ids).
+            // Ids present in the index but missing from the DB are skipped
+            // (logged), so a stale index entry never breaks the page.
             let mut workers = Vec::new();
             for worker_id_str in paginated_ids {
                 let worker_id = match Uuid::parse_str(&worker_id_str) {
@@ -504,7 +526,8 @@ pub async fn match_worker(
     State(state): State<AppState>,
     Json(payload): Json<MatchRequest>,
 ) -> impl IntoResponse {
-    // Use search engine to get candidate workers (blocking)
+    // Blocking step: narrow the universe to candidates sharing family name +
+    // birth year so the matcher scores O(candidates) records, not every worker.
     let family_name = &payload.worker.name.family;
     let birth_year = payload.worker.birth_date.map(|d| d.year() as i32);
 
@@ -551,13 +574,16 @@ pub async fn match_worker(
                 }
             };
 
-            // Filter by threshold if provided
+            // Keep only candidates at/above the requested threshold (default
+            // 0.5), cap to `limit`, and label each with a quality bucket so the
+            // caller can triage by confidence band.
             let threshold = payload.threshold.unwrap_or(0.5);
             let matches: Vec<MatchResponse> = match_results
                 .into_iter()
                 .filter(|m| m.score >= threshold)
                 .take(payload.limit)
                 .map(|m| {
+                    // Quality bands: certain ≥0.95, probable ≥0.7, else possible.
                     let quality = if m.score >= 0.95 {
                         "certain"
                     } else if m.score >= 0.7 {
@@ -636,12 +662,15 @@ async fn check_duplicates_internal(state: &AppState, worker: &Worker) -> Vec<Mat
         }
     }
 
+    // On a matcher error, return no duplicates rather than failing the caller:
+    // a detection failure must never block a create.
     let match_results = match state.matcher.find_matches(worker, &candidates) {
         Ok(r) => r,
         Err(_) => return Vec::new(),
     };
 
-    // Return matches above the auto-review threshold (0.7)
+    // Surface only candidates at/above the 0.7 review threshold, best-first,
+    // capped at 10 — these are what `create_worker` returns in its 409 details.
     match_results
         .into_iter()
         .filter(|m| m.score >= 0.7)
@@ -716,7 +745,8 @@ pub async fn merge_workers(
     State(state): State<AppState>,
     Json(req): Json<crate::models::MergeRequest>,
 ) -> impl IntoResponse {
-    // Fetch both workers
+    // Fetch both workers up front; a missing main or duplicate is a 404 (the
+    // merge cannot proceed without both records).
     let main = match state.worker_repository.get_by_id(&req.main_worker_id).await {
         Ok(Some(p)) => p,
         Ok(None) => {
@@ -870,7 +900,8 @@ pub async fn merge_workers(
         tracing::warn!("Failed to update search index for merged worker: {}", e);
     }
 
-    // Publish merge event
+    // Publish a `Merged` event on the stream; `.ok()` ignores publish failure
+    // so a streaming hiccup does not fail an already-committed merge.
     state
         .event_publisher
         .publish(crate::streaming::WorkerEvent::Merged {
@@ -880,6 +911,8 @@ pub async fn merge_workers(
         })
         .ok();
 
+    // Record the merge with a snapshot of the transferred data for audit /
+    // potential reversal, then return it (200) alongside the merged survivor.
     // Create merge record
     let merge_record = crate::models::MergeRecord {
         id: Uuid::new_v4(),
@@ -946,7 +979,8 @@ pub async fn batch_deduplicate(
     let mut seen_pairs: std::collections::HashSet<(Uuid, Uuid)> = std::collections::HashSet::new();
 
     for (i, worker) in workers.iter().enumerate() {
-        // Compare with subsequent workers to avoid duplicate pairs
+        // Compare each worker only with the ones that FOLLOW it, so every
+        // unordered pair {a, b} is considered exactly once.
         let candidates: Vec<_> = workers[i + 1..]
             .iter()
             .take(req.max_candidates)
@@ -967,7 +1001,9 @@ pub async fn batch_deduplicate(
                 continue;
             }
 
-            // Normalize pair order to avoid duplicates
+            // Canonicalize the pair (smaller id first) and dedupe via the
+            // `seen_pairs` set so the same pair is never queued twice even if
+            // it surfaces from both directions of the blocking search.
             let pair = if worker.id < m.worker.id {
                 (worker.id, m.worker.id)
             } else {
@@ -986,6 +1022,9 @@ pub async fn batch_deduplicate(
                 "possible"
             };
 
+            // Pairs that clear `auto_merge_threshold` are flagged AutoMerged
+            // (high enough confidence to merge without a human); the rest are
+            // queued Pending for manual review.
             let status = if m.score >= req.auto_merge_threshold {
                 auto_merged += 1;
                 crate::models::ReviewStatus::AutoMerged
@@ -1143,8 +1182,11 @@ pub async fn get_worker_audit_logs(
     Path(id): Path<Uuid>,
     Query(params): Query<AuditLogQuery>,
 ) -> impl IntoResponse {
+    // Cap the page at 500 so an audit query cannot pull an unbounded history.
     let limit = params.limit.min(500);
 
+    // `"Worker"` is the audit entity-type discriminator; logs are returned
+    // newest-first by the repository.
     match state
         .audit_log
         .get_logs_for_entity("Worker", id, limit as u64)

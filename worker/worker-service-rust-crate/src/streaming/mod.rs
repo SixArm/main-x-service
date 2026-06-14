@@ -114,7 +114,12 @@ impl WorkerEvent {
 /// [`WorkerEvent`] to the configured transport. Must be `Send + Sync` so it
 /// can live in shared application state behind an `Arc`.
 pub trait EventProducer: Send + Sync {
-    /// Publishes a single worker event, returning an error if delivery fails.
+    /// Publishes a single worker event.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying transport fails to deliver the
+    /// event. The in-memory implementation never fails.
     fn publish(&self, event: WorkerEvent) -> Result<()>;
 }
 
@@ -123,8 +128,16 @@ pub use producer::InMemoryEventPublisher;
 /// Consuming side of the event stream (currently a stub interface).
 pub trait EventConsumer {
     /// Begins a subscription to the worker event topic.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the subscription cannot be established.
     fn subscribe(&mut self) -> Result<()>;
 
     /// Returns the next available event, or `None` when none is pending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if polling the transport fails.
     fn next_event(&mut self) -> Result<Option<WorkerEvent>>;
 }

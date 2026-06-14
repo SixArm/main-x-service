@@ -26,23 +26,36 @@ pub mod traces;
 /// `config.log_level`) and a JSON formatting layer. The OTLP exporter and the
 /// OpenTelemetry bridge layer are left commented out pending wiring. Call
 /// once at startup.
+///
+/// # Errors
+///
+/// Returns an [`Err`] of [`crate::Error`] if telemetry initialization
+/// fails. The current implementation never errors, but the contract is
+/// reserved for the OTLP-exporter wiring (which can fail to build the
+/// pipeline).
 pub fn init_telemetry(config: &ObservabilityConfig) -> Result<()> {
-    // Resource attributes (service.name/version) for the future OTLP exporter.
+    // Build the OTLP `Resource`: service.name comes from config, service.version
+    // from the crate version. Held in `_resource` until the exporter is wired.
     let _resource = Resource::new(vec![
         KeyValue::new("service.name", config.service_name.clone()),
         KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
     ]);
 
-    // TODO: Initialize OTLP exporter
+    // TODO: Initialize OTLP exporter — build a batch tracing pipeline on the
+    // Tokio runtime exporting to `config.otlp_endpoint`, then add the
+    // `tracing_opentelemetry` bridge layer below.
     // let tracer = opentelemetry_otlp::new_pipeline()
     //     .tracing()
     //     .with_exporter(...)
     //     .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
-    // Prefer RUST_LOG; fall back to the configured default level.
+    // Log-level filter: prefer the `RUST_LOG` env var; otherwise use the
+    // configured default level (e.g. "info").
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level));
 
+    // Install the global subscriber: env filter + JSON-formatted fmt layer.
+    // The commented OpenTelemetry bridge layer is added once `tracer` exists.
     tracing_subscriber::registry()
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer().json())
@@ -66,29 +79,39 @@ pub fn shutdown_telemetry() {
 pub mod custom_metrics {
     use opentelemetry::metrics::{Counter, Histogram};
 
-    /// Bundle of OpenTelemetry instruments for worker operations.
+    /// Bundle of OpenTelemetry instruments for worker operations. Each field
+    /// is the OpenTelemetry-API analogue of a Prometheus collector in
+    /// [`crate::metrics::Metrics`]; counters are monotonic `u64`, histograms
+    /// record `f64` distributions.
     pub struct MpiMetrics {
-        /// Count of worker records created.
+        /// Monotonic counter of worker records created.
         pub worker_created: Counter<u64>,
-        /// Count of worker records updated.
+        /// Monotonic counter of worker records updated.
         pub worker_updated: Counter<u64>,
-        /// Count of worker records deleted.
+        /// Monotonic counter of worker records deleted.
         pub worker_deleted: Counter<u64>,
-        /// Count of worker match operations.
+        /// Monotonic counter of worker match operations.
         pub worker_matched: Counter<u64>,
-        /// Distribution of match-confidence scores.
+        /// Histogram of match-confidence scores (`0.0`–`1.0`).
         pub match_score: Histogram<f64>,
-        /// Distribution of API request latencies.
+        /// Histogram of API request latencies (seconds).
         pub api_request_duration: Histogram<f64>,
-        /// Distribution of search query latencies.
+        /// Histogram of search query latencies (seconds).
         pub search_query_duration: Histogram<f64>,
     }
 
     impl MpiMetrics {
-        /// Not yet implemented — panics via `todo!`. Construct the
-        /// OpenTelemetry instruments here once the meter is wired up.
+        /// Not yet implemented — construct the OpenTelemetry instruments here
+        /// once the meter is wired up.
+        ///
+        /// # Panics
+        ///
+        /// Always panics via `todo!` because the OpenTelemetry meter pipeline
+        /// is not yet built; use [`crate::metrics::METRICS`] for runtime
+        /// metrics in the meantime.
         pub fn new() -> Self {
-            // TODO: Initialize metrics
+            // TODO: Initialize metrics — obtain a meter from the global
+            // provider and create each counter/histogram instrument.
             todo!("Initialize OpenTelemetry metrics")
         }
     }

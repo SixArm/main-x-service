@@ -131,6 +131,11 @@ pub struct WorkerIndex {
 impl WorkerIndex {
     /// Creates a brand-new index in `index_path` (which must not already hold
     /// one) using the worker schema, and builds a commit-reloading reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the directory already holds an
+    /// index, cannot be written, or the reader cannot be built.
     pub fn create<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let schema_def = WorkerIndexSchema::new();
         let index = Index::create_in_dir(index_path, schema_def.schema.clone())
@@ -151,6 +156,11 @@ impl WorkerIndex {
 
     /// Opens an existing index in `index_path`, reconstructing the field
     /// handles and a commit-reloading reader. Errors if no index is present.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if no index is present at the path or
+    /// the reader cannot be built.
     pub fn open<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let schema_def = WorkerIndexSchema::new();
         let index = Index::open_in_dir(index_path)
@@ -171,6 +181,11 @@ impl WorkerIndex {
 
     /// Opens the index at `index_path` if one exists there, otherwise creates
     /// it. Existence is detected by the presence of Tantivy's `meta.json`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the existing index cannot be opened
+    /// or a new one cannot be created.
     pub fn create_or_open<P: AsRef<Path>>(index_path: P) -> Result<Self> {
         let path = index_path.as_ref();
         // Tantivy writes a meta.json into the index dir; its presence means an
@@ -186,8 +201,13 @@ impl WorkerIndex {
 
     /// Creates a new [`IndexWriter`] with a buffer of `heap_size_mb` megabytes.
     /// Callers are responsible for committing and dropping the writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the writer cannot be allocated (for
+    /// example if another writer already holds the index lock).
     pub fn writer(&self, heap_size_mb: usize) -> Result<IndexWriter> {
-        // Tantivy's writer heap is specified in bytes.
+        // Tantivy's writer heap is specified in bytes (megabytes * 1e6).
         self.index
             .writer(heap_size_mb * 1_000_000)
             .map_err(|e| crate::Error::Search(format!("Failed to create writer: {}", e)))
@@ -211,6 +231,10 @@ impl WorkerIndex {
 
     /// Forces the reader to reload so the latest committed documents become
     /// visible immediately, rather than after the on-commit delay.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the reader fails to reload.
     pub fn reload(&self) -> Result<()> {
         self.reader
             .reload()
@@ -218,8 +242,14 @@ impl WorkerIndex {
     }
 
     /// Returns the live document count and segment count for the index.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Ok` in practice; the [`Result`] is kept for signature
+    /// uniformity with the other index operations.
     pub fn stats(&self) -> Result<IndexStats> {
         let searcher = self.reader.searcher();
+        // `num_docs` counts live (non-deleted) documents across all segments.
         let num_docs = searcher.num_docs() as usize;
         let num_segments = searcher.segment_readers().len();
 
@@ -231,6 +261,11 @@ impl WorkerIndex {
 
     /// Waits for background segment merges to finish, consolidating the index
     /// for faster queries and reclaimed space.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Search`] if the writer cannot be created or the
+    /// merge threads fail to join.
     pub fn optimize(&self) -> Result<()> {
         // Creating then immediately blocking on the writer's merge threads
         // forces pending merges to complete.

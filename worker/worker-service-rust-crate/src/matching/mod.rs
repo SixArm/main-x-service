@@ -120,6 +120,12 @@ impl MatchScoreBreakdown {
     pub fn summary(&self) -> String {
         let mut parts = Vec::new();
 
+        // Per-component "strong enough to mention" bars. They are tuned per
+        // axis rather than shared: identifier/document/tax_id are near-exact
+        // signals so they need a high bar (≥0.95 / ==1.0), while the fuzzier
+        // name/DOB/gender are listed at ≥0.90 and address — the coarsest — at
+        // ≥0.80. These bars are for the human-readable label only; they do not
+        // affect the numeric scoring.
         if self.name_score >= 0.90 {
             parts.push("name");
         }

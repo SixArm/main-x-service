@@ -44,9 +44,16 @@ pub mod name_matching {
     /// assert!(match_names(&a, &b) > 0.99);
     /// ```
     pub fn match_names(name1: &HumanName, name2: &HumanName) -> f64 {
-        // Weight factors for different components
+        // Weight factors for the three name components. Family name
+        // carries the most weight (`0.5`) because it is the strongest
+        // identity signal; given names (`0.4`) are next; prefix/suffix
+        // (`0.1`) are weak honorific/generational hints. The three sum
+        // to `1.0`, so an all-`1.0` match yields exactly `1.0`.
+        /// Weight of the family-name component (strongest identity signal).
         const FAMILY_WEIGHT: f64 = 0.5;
+        /// Weight of the given-name component.
         const GIVEN_WEIGHT: f64 = 0.4;
+        /// Weight of the combined prefix/suffix component (weak hint).
         const PREFIX_SUFFIX_WEIGHT: f64 = 0.1;
 
         let family_score = match_family_names(&name1.family, &name2.family);
@@ -89,18 +96,27 @@ pub mod name_matching {
             return 1.0;
         }
 
-        // Use Jaro-Winkler (good for name matching)
+        // Jaro-Winkler: case-insensitive edit similarity with a prefix
+        // bonus, which works well for names that agree on their opening
+        // characters (the common typo/transcription pattern).
         let jw_score = jaro_winkler(&f1, &f2);
 
-        // Use normalized Levenshtein distance
+        // Normalized Levenshtein: edit distance divided by the longer
+        // length, giving a second `[0.0, 1.0]` opinion that is less
+        // prefix-biased than Jaro-Winkler.
         let lev_score = normalized_levenshtein(&f1, &f2);
 
-        // Phonetic matching (Soundex)
+        // Phonetic matching (Soundex): catches names that sound alike but
+        // spell differently (e.g. `Smith`/`Smyth`).
         let phonetic_score = crate::matching::phonetic::phonetic_similarity(&f1, &f2);
-        // Phonetic match provides a floor — if names sound alike, score at least 0.85
+        // A perfect Soundex agreement (`1.0`) establishes a floor of
+        // `0.85`: even when the literal edit distance is poor, identical
+        // phonetics should keep the family score in the strong band. A
+        // partial Soundex agreement contributes nothing here (`0.0`).
         let phonetic_boost = if phonetic_score >= 1.0 { 0.85 } else { 0.0 };
 
-        // Take the maximum of all methods
+        // Take the best of the three measures so any one strong signal
+        // (edit-similar, phonetically-equal) carries the score.
         f64::max(f64::max(jw_score, lev_score), phonetic_boost)
     }
 
@@ -133,12 +149,16 @@ pub mod name_matching {
             return 1.0;
         }
 
-        // Check for common nicknames/variants
+        // Nickname/variant table catches pairs that no edit-distance
+        // measure would (e.g. `william`/`bill`). A known variant is a
+        // very strong but not perfect signal, hence `0.95` rather than
+        // `1.0`.
         if are_name_variants(&first1, &first2) {
             return 0.95;
         }
 
-        // Fuzzy match
+        // Otherwise fall back to fuzzy edit similarity, taking the best
+        // of Jaro-Winkler and normalized Levenshtein.
         let jw_score = jaro_winkler(&first1, &first2);
         let lev_score = normalized_levenshtein(&first1, &first2);
 
@@ -260,32 +280,42 @@ pub mod dob_matching {
                     return 1.0; // Exact match
                 }
 
-                // Allow for common data entry errors
+                // The remaining branches grade the *kind* of difference,
+                // not just its magnitude, since data-entry errors have
+                // characteristic shapes. Absolute day gap is precomputed
+                // for the day-typo test below.
                 let days_diff = (d1 - d2).get_days().abs();
 
-                // Same month and year, day off by 1-2 (typo)
+                // Same year+month, day off by 1-2: a fat-finger day typo,
+                // still almost certainly the same date — `0.95`.
                 if d1.year() == d2.year() && d1.month() == d2.month() {
                     if days_diff <= 2 {
                         return 0.95;
                     }
                 }
 
-                // Month/day transposition (e.g., 03/12 vs 12/03)
+                // Month/day transposition (e.g. 03/12 vs 12/03): a very
+                // common locale-format swap — `0.90`.
                 if d1.year() == d2.year() && d1.month() == d2.day() && d1.day() == d2.month() {
                     return 0.90;
                 }
 
-                // Same year and month
+                // Same year+month but a larger day gap: probably the same
+                // person, weaker evidence — `0.80`.
                 if d1.year() == d2.year() && d1.month() == d2.month() {
                     return 0.80;
                 }
 
-                // Same year, different month
+                // Same year, different month: coarse agreement only —
+                // `0.50`. NOTE: this returns before the year-off-by-one
+                // check below, so the year-typo branch only fires when
+                // the years actually differ by exactly one.
                 if d1.year() == d2.year() {
                     return 0.50;
                 }
 
-                // Year off by 1 (typo in year)
+                // Year off by 1 with identical month+day: a year-digit
+                // typo (e.g. 1980 vs 1981) — `0.85`.
                 if (d1.year() - d2.year()).abs() == 1
                     && d1.month() == d2.month()
                     && d1.day() == d2.day()
@@ -293,7 +323,7 @@ pub mod dob_matching {
                     return 0.85;
                 }
 
-                // No significant match
+                // No recognizable relationship between the dates.
                 0.0
             }
         }
@@ -358,9 +388,19 @@ pub mod address_matching {
     /// state (0.2), and street line 1 (0.3). Missing components on
     /// either side contribute `0.0`.
     pub fn match_address(addr1: &Address, addr2: &Address) -> f64 {
+        // Component weights summing to `1.0`. Postal code and street
+        // line (`0.3` each) are the most discriminating address parts;
+        // city and state (`0.2` each) are coarser and shared by many
+        // records, so they carry less weight. Note these weights are NOT
+        // renormalized for missing parts, so a record missing (say) its
+        // street line is implicitly penalized.
+        /// Weight of the postal-code component.
         const POSTAL_CODE_WEIGHT: f64 = 0.3;
+        /// Weight of the city component.
         const CITY_WEIGHT: f64 = 0.2;
+        /// Weight of the state/province component.
         const STATE_WEIGHT: f64 = 0.2;
+        /// Weight of the street line-1 component.
         const STREET_WEIGHT: f64 = 0.3;
 
         let postal_score =
@@ -396,14 +436,18 @@ pub mod address_matching {
                     return 1.0;
                 }
 
-                // Match first 5 digits (US ZIP)
+                // Sharing the first 5 chars means the same base US ZIP
+                // (differing only in the `+4` extension), which is almost
+                // as strong as an exact match — hence `0.95`.
                 if z1.len() >= 5 && z2.len() >= 5 {
                     if &z1[0..5] == &z2[0..5] {
                         return 0.95;
                     }
                 }
 
-                // Match first 3 digits (same area)
+                // Sharing the first 3 chars means the same sectional
+                // center / delivery area: same neighborhood, weaker
+                // evidence — hence `0.70`.
                 if z1.len() >= 3 && z2.len() >= 3 {
                     if &z1[0..3] == &z2[0..3] {
                         return 0.70;
@@ -554,9 +598,12 @@ pub mod identifier_matching {
             let v2_clean = v2.replace("-", "").replace(" ", "");
 
             if v1_clean == v2_clean {
-                0.98 // Formatting difference
+                // Same digits, only punctuation differs: treat as a match
+                // but shy of `1.0` to record that the raw strings were
+                // not byte-identical — `0.98`.
+                0.98
             } else {
-                0.0 // Different values
+                0.0 // Genuinely different values: no match.
             }
         }
     }
@@ -653,7 +700,11 @@ pub mod document_matching {
         }
 
         if n1 == n2 {
-            // Boost score if issuing country also matches
+            // Same document number. A document number is only globally
+            // unique within its issuing country, so an agreeing country
+            // makes this a certain match (`1.0`); a differing/absent
+            // country leaves a small chance of a cross-border number
+            // collision, hence the slightly reduced `0.95`.
             if doc1.issuing_country == doc2.issuing_country {
                 1.0
             } else {

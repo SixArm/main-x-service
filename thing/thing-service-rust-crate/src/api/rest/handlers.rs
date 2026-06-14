@@ -21,12 +21,15 @@ use crate::streaming::{EventKind, ThingEvent};
 use crate::validation::{normalize_thing, validate_thing};
 
 /// Map a crate error to the HTTP status the REST layer returns for it.
+///
+/// The three caller-correctable errors get specific 4xx codes; everything
+/// else (DB, search, pool, streaming, config) is an opaque 500.
 fn status_for(err: &crate::Error) -> StatusCode {
     match err {
-        crate::Error::NotFound => StatusCode::NOT_FOUND,
-        crate::Error::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
-        crate::Error::Conflict(_) => StatusCode::CONFLICT,
-        _ => StatusCode::INTERNAL_SERVER_ERROR,
+        crate::Error::NotFound => StatusCode::NOT_FOUND, // 404
+        crate::Error::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY, // 422
+        crate::Error::Conflict(_) => StatusCode::CONFLICT, // 409
+        _ => StatusCode::INTERNAL_SERVER_ERROR,          // 500
     }
 }
 
@@ -72,9 +75,12 @@ pub async fn create_thing(
     State(state): State<AppState>,
     Json(mut thing): Json<Thing>,
 ) -> impl IntoResponse {
+    // Normalize first (scheme-lowercase URLs, dedupe lists) so validation and
+    // duplicate detection operate on the canonical form the record is stored in.
     normalize_thing(&mut thing);
     let errors = validate_thing(&thing);
     if !errors.is_empty() {
+        // 422: well-formed JSON, but the record violates data-quality rules.
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
             Json(ApiResponse::error_with_details(
@@ -85,12 +91,15 @@ pub async fn create_thing(
         );
     }
 
+    // Real-time duplicate detection: score against existing records and reject
+    // if any candidate meets the configured match threshold.
     let candidates = find_candidates(&state, &thing).await;
     let dups: Vec<ScoredCandidate> = candidates
         .into_iter()
         .filter(|c| c.score >= state.matcher.threshold())
         .collect();
     if !dups.is_empty() {
+        // 409: caller should resolve/merge rather than create a second record.
         return (
             StatusCode::CONFLICT,
             Json(ApiResponse::error_with_details(
@@ -103,6 +112,10 @@ pub async fn create_thing(
 
     match state.thing_repository.create(&thing).await {
         Ok(stored) => {
+            // Post-write side effects are fire-and-forget: a failed index
+            // update, event publish, or audit write must not fail the create
+            // (the record is already durably persisted), so errors are dropped
+            // with `let _ =`.
             let _ = state.search_engine.index_thing(&stored);
             let _ = state
                 .event_publisher
@@ -112,12 +125,14 @@ pub async fn create_thing(
                     serde_json::json!({ "name": stored.name }),
                 ))
                 .await;
+            // Audit the post-image; only the new values exist on a create.
             if let Ok(v) = serde_json::to_value(&stored) {
                 let _ = state
                     .audit_log
                     .log_create("thing", stored.id, v, &AuditContext::default())
                     .await;
             }
+            // 201 Created with the stored (hydrated) record.
             (StatusCode::CREATED, Json(ApiResponse::success(stored)))
         }
         Err(e) => (
@@ -254,8 +269,12 @@ pub async fn search_things(
     State(state): State<AppState>,
     Query(q): Query<SearchQuery>,
 ) -> impl IntoResponse {
+    // Clamp the caller-supplied limit (default 10) to a hard ceiling of 100
+    // so a single request can never ask the index for an unbounded page.
     let limit = q.limit.unwrap_or(10).min(100);
     let query = q.q.unwrap_or_default();
+    // Tantivy returns id strings; a failed query degrades to an empty page
+    // rather than an error so search stays best-effort.
     let ids = if q.fuzzy.unwrap_or(false) {
         state.search_engine.fuzzy_search(&query, limit)
     } else {
@@ -263,6 +282,8 @@ pub async fn search_things(
     }
     .unwrap_or_default();
 
+    // Hydrate each hit from the DB (the index holds only ids), skipping any
+    // that no longer resolve (e.g. soft-deleted between index and read).
     let mut results = Vec::new();
     for id in ids {
         if let Ok(uuid) = Uuid::parse_str(&id) {
@@ -295,6 +316,9 @@ pub struct ScoredCandidate {
 
 /// Score a request thing against existing records, sorted descending.
 async fn find_candidates(state: &AppState, thing: &Thing) -> Vec<ScoredCandidate> {
+    // Blocking step: use the name index to fetch up to 50 likely candidates
+    // rather than scoring the whole table. This bounds the O(candidates) scoring
+    // loop below.
     let ids = state
         .search_engine
         .search_by_name(&thing.name, 50)
@@ -304,6 +328,7 @@ async fn find_candidates(state: &AppState, thing: &Thing) -> Vec<ScoredCandidate
         let Ok(uuid) = Uuid::parse_str(&id) else {
             continue;
         };
+        // Never score a record against itself (matters on update/dedup paths).
         if uuid == thing.id {
             continue;
         }
@@ -316,6 +341,7 @@ async fn find_candidates(state: &AppState, thing: &Thing) -> Vec<ScoredCandidate
             });
         }
     }
+    // Highest score first; treat NaN/incomparable as equal so the sort is total.
     out.sort_by(|a, b| {
         b.score
             .partial_cmp(&a.score)
@@ -480,6 +506,9 @@ pub async fn deduplicate(
     State(state): State<AppState>,
     Json(req): Json<BatchDeduplicationRequest>,
 ) -> impl IntoResponse {
+    // Scan at most `max_candidates` active records (default 100), then compare
+    // every unordered pair. The cost is O(n^2) in the scanned set, so the cap
+    // bounds the work; the threshold defaults to the matcher's configured one.
     let limit = req.max_candidates.unwrap_or(100);
     let threshold = req.threshold.unwrap_or_else(|| state.matcher.threshold());
     let things = state
@@ -488,6 +517,8 @@ pub async fn deduplicate(
         .await
         .unwrap_or_default();
     let mut duplicates_found = 0usize;
+    // Upper-triangular pair iteration: j starts at i+1 so each pair is scored
+    // once and no record is compared with itself.
     for i in 0..things.len() {
         for j in (i + 1)..things.len() {
             if state.matcher.score(&things[i], &things[j]).score >= threshold {

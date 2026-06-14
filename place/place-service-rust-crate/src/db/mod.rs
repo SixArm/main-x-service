@@ -34,30 +34,69 @@ use models::{
     place_opening_hours, places,
 };
 
-/// Open a connection pool from a [`DatabaseConfig`].
+/// Open a SeaORM connection pool from a [`DatabaseConfig`].
+///
+/// Applies the configured `max`/`min` pool bounds so the service caps its
+/// concurrent database connections (PostgreSQL has a finite backend slot
+/// budget) while keeping a warm minimum to avoid cold-connect latency on
+/// the first request after idle.
+///
+/// # Errors
+/// Returns [`crate::Error::Pool`] if SeaORM cannot establish the pool
+/// (bad URL, unreachable server, auth failure, …).
 pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {
+    // SeaORM's connect options carry the pool sizing knobs.
     let mut opt = sea_orm::ConnectOptions::new(&config.url);
     opt.max_connections(config.max_connections)
         .min_connections(config.min_connections);
     Database::connect(opt)
         .await
+        // Normalise the SeaORM error into the crate's pool-error variant.
         .map_err(|e| crate::Error::Pool(e.to_string()))
 }
 
 /// Storage-agnostic CRUD interface for [`Place`] records.
+///
+/// Abstracting persistence behind a trait lets `AppState` carry an
+/// `Arc<dyn PlaceRepository>` so handlers depend on the contract, not the
+/// SeaORM implementation — easing testing and any future storage swap.
+/// `Send + Sync` is required because the repository is shared across Axum's
+/// worker tasks.
 #[async_trait::async_trait]
 pub trait PlaceRepository: Send + Sync {
-    /// Insert a new place; returns the stored form.
+    /// Insert a new place; returns the stored form (re-read after insert).
+    ///
+    /// # Errors
+    /// Propagates any database error from the insert or the read-back.
     async fn create(&self, place: &Place) -> Result<Place>;
     /// Fetch a place by id, returning `None` if absent or soft-deleted.
+    ///
+    /// Soft-deleted rows are treated as absent so callers never see tombstones.
+    ///
+    /// # Errors
+    /// Propagates any database error from the lookup or child-row hydration.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Place>>;
-    /// Replace an existing place.
+    /// Replace an existing place (scalar row + child collections).
+    ///
+    /// # Errors
+    /// Returns [`crate::Error::NotFound`] if no row matches, or a database
+    /// error from the update transaction.
     async fn update(&self, place: &Place) -> Result<Place>;
-    /// Soft-delete a place (sets `is_deleted`/`deleted_at`).
+    /// Soft-delete a place (sets `is_deleted`/`deleted_at`); the row is kept
+    /// for audit/compliance rather than physically removed.
+    ///
+    /// # Errors
+    /// Returns [`crate::Error::NotFound`] if no row matches, or a database error.
     async fn soft_delete(&self, id: &Uuid) -> Result<()>;
     /// List non-deleted places, newest first, with limit/offset paging.
+    ///
+    /// # Errors
+    /// Propagates any database error from the query or hydration.
     async fn list(&self, limit: u64, offset: u64) -> Result<Vec<Place>>;
-    /// Record a merge of `duplicate` into `main`.
+    /// Record a merge of `duplicate` into `main` in the merge-history table.
+    ///
+    /// # Errors
+    /// Propagates any database error from the insert.
     async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord>;
 }
 
@@ -68,15 +107,26 @@ pub struct SeaOrmPlaceRepository {
 }
 
 impl SeaOrmPlaceRepository {
-    /// Wrap an existing connection pool in a repository.
+    /// Wrap an existing connection pool in a repository. Cheap: the pool
+    /// (a `DatabaseConnection`) is itself a clonable handle.
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
 
     /// Load child collections and assemble a domain [`Place`].
+    ///
+    /// Reverses the normalization done on write: the flattened address/geo
+    /// columns are rebuilt into their nested objects, and each child table
+    /// (keywords, identifiers, amenity features, opening hours) is queried
+    /// separately and ordered by `position` so the original list order is
+    /// preserved across the round-trip.
+    ///
+    /// # Errors
+    /// Propagates any database error from the four child-table queries.
     async fn hydrate(&self, row: places::Model) -> Result<Place> {
         let id = row.id;
 
+        // Keywords: ordered by stored position to keep list order stable.
         let kw_rows = place_keywords::Entity::find()
             .filter(place_keywords::Column::PlaceId.eq(id))
             .order_by_asc(place_keywords::Column::Position)
@@ -85,6 +135,8 @@ impl SeaOrmPlaceRepository {
             .map_err(map_db)?;
         let keywords = kw_rows.into_iter().map(|r| r.keyword).collect();
 
+        // Identifiers: the stored `(type tag, custom_label)` pair is decoded
+        // back into the rich `IdentifierType` enum.
         let id_rows = place_identifiers::Entity::find()
             .filter(place_identifiers::Column::PlaceId.eq(id))
             .order_by_asc(place_identifiers::Column::Position)

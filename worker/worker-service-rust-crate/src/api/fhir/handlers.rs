@@ -257,6 +257,8 @@ pub async fn search_fhir_workers(
                 }
             }
 
+            // FHIR search results are wrapped in a `searchset` Bundle: each
+            // hit is an entry with its `fullUrl` and the converted resource.
             let bundle = serde_json::json!({
                 "resourceType": "Bundle",
                 "type": "searchset",

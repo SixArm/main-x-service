@@ -171,7 +171,18 @@ pub fn map_identifier_scheme(t: &IdentifierType) -> MScheme {
     }
 }
 
+/// Project the service `PostalAddress` (schema.org English field names) onto
+/// the matcher's `Address` (British English field names).
+///
+/// Returns `None` when the source address is entirely empty, so the caller
+/// can skip attaching an address slot rather than send a hollow one (which
+/// would otherwise pull the matcher's address component toward a spurious
+/// score). The field renames are: `street_address` → `line1`,
+/// `address_locality` → `city`, `address_region` → `county`, `postal_code`
+/// → `postcode`, `address_country` → `country`.
 fn map_address(a: &PostalAddress) -> Option<MAddress> {
+    // Bail out unless at least one source field is populated; an all-`None`
+    // address carries no matching signal and must not become an empty slot.
     let any = a.street_address.is_some()
         || a.address_locality.is_some()
         || a.address_region.is_some()
@@ -188,7 +199,9 @@ fn map_address(a: &PostalAddress) -> Option<MAddress> {
         m = m.with_city(v);
     }
     if let Some(v) = a.address_region.as_deref() {
-        m = m.with_county(v); // matcher uses "county"; service uses "address_region"
+        // Field rename: the matcher's `county` slot holds the service's
+        // `address_region` (state/province/region) value verbatim.
+        m = m.with_county(v);
     }
     if let Some(v) = a.postal_code.as_deref() {
         m = m.with_postcode(v);
@@ -204,6 +217,8 @@ mod tests {
     use super::*;
     use crate::models::identifier::PlaceIdentifier;
 
+    /// Pins that `name` carries through verbatim and `geo.latitude` /
+    /// `geo.longitude` route to the matcher's bare `latitude` / `longitude`.
     #[test]
     fn round_trip_basic_name_and_geo() {
         use crate::models::geo::GeoCoordinates;
@@ -219,6 +234,9 @@ mod tests {
         assert_eq!(m.longitude, Some(-73.9654));
     }
 
+    /// Pins the address field renames (`locality`→`city`,
+    /// `region`→`county`, `postal_code`→`postcode`) and that a 2-char
+    /// `address_country` also populates `country_code_as_iso_3166_1_alpha_2`.
     #[test]
     fn address_renames_locality_region_to_city_county() {
         let mut svc = Place::new("Test");
@@ -238,6 +256,8 @@ mod tests {
         assert_eq!(m.country_code_as_iso_3166_1_alpha_2.as_deref(), Some("US"));
     }
 
+    /// Pins that the top-level `global_location_number` field routes to a
+    /// single `PlaceId` under the `Other("GLN")` scheme with its value intact.
     #[test]
     fn gln_routed_to_place_id_with_gln_scheme() {
         let mut svc = Place::new("Test");
@@ -248,6 +268,8 @@ mod tests {
         assert_eq!(m.place_ids[0].value, "0614141999996");
     }
 
+    /// Pins that an `OpenStreetMap` identifier maps to the matcher's
+    /// enumerated `OsmNode` scheme (not a generic `Other`).
     #[test]
     fn place_identifier_osm_to_osm_node() {
         let mut svc = Place::new("Test");
@@ -259,6 +281,8 @@ mod tests {
         assert_eq!(m.place_ids[0].scheme, MScheme::OsmNode);
     }
 
+    /// Pins that a `PlaceType` maps to the corresponding matcher
+    /// `PlaceCategory` variant (here `Museum`).
     #[test]
     fn place_type_maps_to_category() {
         let mut svc = Place::new("Test");

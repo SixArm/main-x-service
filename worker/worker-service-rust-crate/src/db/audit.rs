@@ -26,6 +26,14 @@ impl AuditLogRepository {
     }
 
     /// Records a `CREATE` action, storing `new_values` (no prior state).
+    ///
+    /// The `old_values` column is left null because a created record has no
+    /// before-state; `new_values` is the JSON snapshot of the new record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying audit-row insert fails (e.g. a
+    /// database connectivity or constraint error).
     pub async fn log_create(
         &self,
         entity_type: &str,
@@ -48,7 +56,12 @@ impl AuditLogRepository {
         .await
     }
 
-    /// Records an `UPDATE` action, storing both `old_values` and `new_values`.
+    /// Records an `UPDATE` action, storing both `old_values` and `new_values`
+    /// so the entry captures the full before/after diff.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying audit-row insert fails.
     pub async fn log_update(
         &self,
         entity_type: &str,
@@ -73,6 +86,14 @@ impl AuditLogRepository {
     }
 
     /// Records a `DELETE` action, storing `old_values` (no new state).
+    ///
+    /// The `new_values` column is left null because a deleted record has no
+    /// after-state; `old_values` preserves the record as it was before
+    /// (soft-)deletion.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying audit-row insert fails.
     pub async fn log_delete(
         &self,
         entity_type: &str,
@@ -97,7 +118,11 @@ impl AuditLogRepository {
 
     /// Inserts one audit row. Shared implementation behind the typed
     /// `log_create`/`log_update`/`log_delete` helpers; stamps a fresh UUID and
-    /// the current UTC time.
+    /// the current UTC time so callers never supply identity or timing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the row insert fails.
     async fn log_action(
         &self,
         action: &str,
@@ -109,6 +134,8 @@ impl AuditLogRepository {
         ip_address: Option<String>,
         user_agent: Option<String>,
     ) -> Result<()> {
+        // Build the row: server-assigned UUID + server clock; the JSON
+        // snapshots and actor metadata pass through verbatim.
         let new_audit = audit_log::ActiveModel {
             id: Set(Uuid::new_v4()),
             timestamp: Set(time::OffsetDateTime::now_utc()),
@@ -128,6 +155,13 @@ impl AuditLogRepository {
     }
 
     /// Returns up to `limit` audit entries for one entity, newest first.
+    ///
+    /// Filters by both `entity_type` and `entity_id` so audit IDs are only
+    /// unique within an entity type. Backs the per-record audit endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query fails.
     pub async fn get_logs_for_entity(
         &self,
         entity_type: &str,
@@ -145,7 +179,12 @@ impl AuditLogRepository {
         Ok(logs)
     }
 
-    /// Returns the `limit` most recent audit entries across all entities.
+    /// Returns the `limit` most recent audit entries across all entities,
+    /// newest first. Backs the system-wide recent-activity endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query fails.
     pub async fn get_recent_logs(&self, limit: u64) -> Result<Vec<audit_log::Model>> {
         let logs = audit_log::Entity::find()
             .order_by_desc(audit_log::Column::Timestamp)
@@ -156,7 +195,12 @@ impl AuditLogRepository {
         Ok(logs)
     }
 
-    /// Returns up to `limit` audit entries performed by `user_id`, newest first.
+    /// Returns up to `limit` audit entries performed by `user_id`, newest
+    /// first. Backs the per-user audit endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query fails.
     pub async fn get_logs_by_user(
         &self,
         user_id: &str,

@@ -59,8 +59,10 @@ impl Metrics {
     /// safe because all opts are static and registration of freshly-built
     /// collectors cannot collide.
     fn new() -> Self {
+        // Fresh, isolated registry owned by this `Metrics` instance.
         let registry = Registry::new();
 
+        // Entity-CRUD counters: one monotonic counter per worker mutation kind.
         let worker_created_total = Counter::with_opts(Opts::new(
             "worker_created_total",
             "Total worker records created.",
@@ -82,6 +84,9 @@ impl Metrics {
         ))
         .expect("static counter opts are always valid");
 
+        // HTTP request counter vector, dimensioned by the label set
+        // {method, path, status} (e.g. method="GET", path="/api/workers",
+        // status="200").
         let http_requests_total = IntCounterVec::new(
             Opts::new(
                 "http_requests_total",
@@ -91,6 +96,7 @@ impl Metrics {
         )
         .expect("static counter-vec opts are always valid");
 
+        // Latency histogram: explicit second-scale buckets from 1ms to 10s.
         let http_request_duration_seconds = Histogram::with_opts(
             HistogramOpts::new(
                 "http_request_duration_seconds",
@@ -102,6 +108,8 @@ impl Metrics {
         )
         .expect("static histogram opts are always valid");
 
+        // Score histogram: buckets clustered around the match thresholds
+        // (note the extra 0.85/0.95 edges for the probable/certain cutoffs).
         let worker_match_score = Histogram::with_opts(
             HistogramOpts::new(
                 "worker_match_score",
@@ -113,6 +121,7 @@ impl Metrics {
         )
         .expect("static histogram opts are always valid");
 
+        // Search-latency histogram: second-scale buckets from 1ms to 2.5s.
         let worker_search_duration_seconds = Histogram::with_opts(
             HistogramOpts::new(
                 "worker_search_duration_seconds",
@@ -124,6 +133,9 @@ impl Metrics {
         )
         .expect("static histogram opts are always valid");
 
+        // Register every collector with the registry so it appears in
+        // `render()` output. The four CRUD counters share one type-erased
+        // boxed loop; the remaining collectors are registered individually.
         for c in [
             Box::new(worker_created_total.clone()) as Box<dyn prometheus::core::Collector>,
             Box::new(worker_updated_total.clone()),
@@ -162,6 +174,15 @@ impl Metrics {
 
     /// Render the registry to Prometheus text exposition format
     /// (`text/plain; version=0.0.4`).
+    ///
+    /// Gathers every registered metric family and encodes it with the
+    /// [`TextEncoder`]. Serve the result with the [`CONTENT_TYPE`] header.
+    ///
+    /// # Panics
+    ///
+    /// Panics only on impossible conditions: encoding into an in-memory
+    /// `Vec` cannot fail, and the Prometheus text encoder always emits valid
+    /// UTF-8, so the inner `.expect(...)` calls never fire in practice.
     pub fn render(&self) -> String {
         let encoder = TextEncoder::new();
         let metric_families = self.registry.gather();
@@ -185,11 +206,18 @@ mod tests {
     use super::*;
 
     /// Rendering the registry includes the registered counters and histograms.
+    ///
+    /// Pins that a counter (`worker_created_total`) and a histogram
+    /// (`http_request_duration_seconds`) both appear in the text-exposition
+    /// output, proving registration and rendering wire up end to end.
     #[test]
     fn render_includes_default_counters() {
+        // Touch a counter so a sample exists, then render the whole registry.
         METRICS.worker_created_total.inc();
         let body = METRICS.render();
+        // The CRUD counter must be present in the exposition text.
         assert!(body.contains("worker_created_total"), "got: {body}");
+        // A histogram metric must also be present.
         assert!(
             body.contains("http_request_duration_seconds"),
             "got: {body}"

@@ -29,16 +29,28 @@ impl InMemoryEventPublisher {
     }
 
     /// Returns a clone of all events published so far (test helper).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned (a prior holder panicked).
     pub fn get_events(&self) -> Vec<WorkerEvent> {
         self.events.lock().unwrap().clone()
     }
 
     /// Empties the event buffer (test helper).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     pub fn clear(&self) {
         self.events.lock().unwrap().clear();
     }
 
     /// Returns the number of buffered events.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     pub fn event_count(&self) -> usize {
         self.events.lock().unwrap().len()
     }
@@ -53,8 +65,19 @@ impl Default for InMemoryEventPublisher {
 
 impl EventProducer for InMemoryEventPublisher {
     /// Logs the event at `info` level and appends it to the in-memory buffer.
-    /// Never fails.
+    /// Always returns `Ok` — the in-memory transport cannot fail delivery.
+    ///
+    /// # Errors
+    ///
+    /// Never returns an error; the [`Result`] exists only to satisfy the
+    /// [`EventProducer`] trait shared with fallible transports.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     fn publish(&self, event: WorkerEvent) -> Result<()> {
+        // Resolve the variant to its wire label for the structured log line;
+        // mirrors the serde `event_type` discriminator on `WorkerEvent`.
         tracing::info!(
             "Publishing event: {} for worker {}",
             match &event {
@@ -75,12 +98,20 @@ impl EventProducer for InMemoryEventPublisher {
 
 /// Production [`EventProducer`] backed by Fluvio (not yet implemented).
 pub struct FluvioProducer {
-    // Fluvio producer will be initialized here
+    // Fluvio producer handle will be initialized here once wired up.
 }
 
 impl EventProducer for FluvioProducer {
-    /// Not yet implemented — panics via `todo!`. Wire up the Fluvio client
-    /// before using this producer in production.
+    /// Not yet implemented — wire up the Fluvio client before using this
+    /// producer in production.
+    ///
+    /// # Errors
+    ///
+    /// Will return a delivery error once implemented; today it does not return.
+    ///
+    /// # Panics
+    ///
+    /// Always panics via `todo!` — this transport is a placeholder.
     fn publish(&self, _event: WorkerEvent) -> Result<()> {
         // TODO: Implement Fluvio event publishing
         todo!("Implement Fluvio event publishing")

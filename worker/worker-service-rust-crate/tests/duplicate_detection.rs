@@ -7,6 +7,14 @@
 //! shape) but exercises worker-specific routing: NPI as a typed identifier,
 //! ODS organisation code passthrough, the matcher's shorter `uk_nhs_number`
 //! method name.
+//!
+//! Un-gated: every test runs fully in-process (no database, no network, no
+//! `#[ignore]`). The harness drives `matching::adapter::to_matcher_worker`
+//! through `MatchingEngine::match_workers` and asserts on the returned score /
+//! confidence / per-field breakdown, pinning **both** the adapter's
+//! field-routing rules and the matcher's scoring contract: a regression on
+//! either side fails a test here. All assertions `unwrap`/`assert`, so a
+//! contract violation panics the test rather than returning an error.
 
 use jiff::{Timestamp, civil::Date};
 use uuid::Uuid;
@@ -33,6 +41,11 @@ fn human_name(family: &str, given: &str) -> HumanName {
 
 /// Builds a [`Worker`] with a fresh UUID and timestamps, defaulting to
 /// [`Gender::Female`]; the base used by the other builders.
+///
+/// The id/timestamps are overwritten (rather than relying on `Worker::new`'s
+/// values) so two builder calls never collide on id and so timestamps are
+/// deterministic relative to the test, which matters for any time-sensitive
+/// matcher component.
 fn worker(family: &str, given: &str) -> Worker {
     let mut w = Worker::new(human_name(family, given), Gender::Female);
     w.id = Uuid::new_v4();
@@ -72,6 +85,10 @@ fn address(line1: &str, city: &str, state: &str, postal: &str, country: &str) ->
 
 /// Builds an [`Identifier`] carrying the FHIR NHS-number system URI, used to
 /// pin the adapter's routing into the matcher's `uk_nhs_number` slot.
+///
+/// The system URI is the load-bearing field: the adapter keys off
+/// `https://fhir.nhs.uk/Id/nhs-number` (not the `IdentifierType`) to decide
+/// the matcher slot, so the type is deliberately left as `Other`.
 fn nhs_identifier(value: &str) -> Identifier {
     Identifier::new(
         IdentifierType::Other,
@@ -94,6 +111,10 @@ fn passport(country: &str, number: &str) -> IdentityDocument {
 }
 
 /// The default-config [`MatchingEngine`] shared by most tests.
+///
+/// Default config so the score thresholds the assertions hard-code (0.95 /
+/// 0.90 / 0.85 / 0.80 / 0.70) are the ones being pinned; the strict/lenient
+/// presets are exercised only by `strict_config_matches_subset_of_lenient_config`.
 fn engine() -> MatchingEngine {
     MatchingEngine::default_config()
 }
@@ -102,7 +123,10 @@ fn engine() -> MatchingEngine {
 // Identical / near-duplicate cases
 // =============================================================================
 
-/// Identical records score ≥ 0.95 with High confidence and match.
+/// Pins the identical-clone contract: two byte-identical workers (same name,
+/// DOB, all fields) score ≥ 0.95, classify as [`Confidence::High`], and
+/// `is_match`. Guards against the adapter dropping a field that would otherwise
+/// contribute to a perfect-evidence score.
 #[test]
 fn identical_clones_score_near_one_high_confidence() {
     let dob = jiff::civil::date(1970, 4, 1);
@@ -119,7 +143,10 @@ fn identical_clones_score_near_one_high_confidence() {
     assert!(result.is_match);
 }
 
-/// A one-character given-name typo still fuzzy-matches (≥ 0.85).
+/// Pins the fuzzy-name scoring contract: a single-character given-name
+/// insertion (`Asha` → `Ashaa`), same family name and DOB, still scores ≥ 0.85
+/// and matches. Guards the Jaro-Winkler tolerance — the typo must not drop the
+/// pair below the match band.
 #[test]
 fn typo_in_given_name_still_matches_fuzzy() {
     let dob = jiff::civil::date(1970, 4, 1);
@@ -195,7 +222,11 @@ fn shared_pesel_drives_match_via_pl_pesel_slot() {
     assert_eq!(result.breakdown.pl_pesel_score, Some(1.0));
 }
 
-/// A shared tax id (default-routed to US SSN) drives the score ≥ 0.90.
+/// Pins the default-routing rule for `tax_id`: a service-side `tax_id` with no
+/// country qualifier is routed by the adapter into the matcher's US-SSN slot,
+/// so a shared tax id (here in two formattings — hyphenated vs bare digits)
+/// drives the overall score ≥ 0.90 despite otherwise-identical names. Guards
+/// against the adapter silently dropping an unqualified tax id.
 #[test]
 fn shared_tax_id_default_routes_to_us_ssn() {
     let mut a = worker("Smith", "John");
@@ -211,7 +242,10 @@ fn shared_tax_id_default_routes_to_us_ssn() {
     );
 }
 
-/// A shared passport (type + number) short-circuits to a high score.
+/// Pins the passport-book short-circuit: a shared identity document (same
+/// `DocumentType::Passport` + number, here `US`/`X12345678`) drives the score
+/// ≥ 0.90 even when the given names diverge (`Jonathan` vs `Jon`). Guards the
+/// adapter's document routing and the matcher's document-match scoring.
 #[test]
 fn matching_passport_books_short_circuit() {
     let mut a = worker("Smith", "Jonathan");
@@ -323,7 +357,9 @@ fn shared_ods_code_does_not_make_different_workers_match() {
 // Negative cases
 // =============================================================================
 
-/// Unrelated workers score < 0.70 and are not flagged as a match.
+/// Pins the negative contract: two unrelated workers (different family/given
+/// names and 22-years-apart DOBs) score < 0.70 and do not match. Guards
+/// against the matcher over-scoring on incidental overlap.
 #[test]
 fn completely_different_workers_score_low_and_do_not_match() {
     let a = worker_with_dob("Patel", "Asha", jiff::civil::date(1970, 4, 1));
@@ -338,7 +374,10 @@ fn completely_different_workers_score_low_and_do_not_match() {
     assert!(!result.is_match);
 }
 
-/// Same name but far-apart birth dates stays out of the High band (< 0.90).
+/// Pins the common-name + divergent-demographics contract: an identical name
+/// (`John Smith`) with far-apart DOBs (1960 vs 1995) must stay out of the High
+/// band (< 0.90). Guards against a name-only short-circuit declaring two
+/// different people the same when the DOB evidence contradicts it.
 #[test]
 fn same_name_different_dob_does_not_short_circuit() {
     let a = worker_with_dob("Smith", "John", jiff::civil::date(1960, 1, 1));
@@ -356,7 +395,9 @@ fn same_name_different_dob_does_not_short_circuit() {
 // Field-routing pinning
 // =============================================================================
 
-/// The adapter routes telecom entries to the matcher's `phone`/`email` slots.
+/// Pins the telecom field-routing rule: a `ContactPointSystem::Phone` entry
+/// lands in the matcher's `phone` slot and a `ContactPointSystem::Email` entry
+/// in `email` (verbatim values, no normalization at the adapter boundary).
 #[test]
 fn telecom_phone_email_extraction() {
     let mut a = worker("Smith", "John");
@@ -370,7 +411,10 @@ fn telecom_phone_email_extraction() {
     assert_eq!(m.email.as_deref(), Some("john@example.com"));
 }
 
-/// The first address maps to `address`; the rest become `previous_addresses`.
+/// Pins the address field-routing rule: the adapter maps the worker's first
+/// address to the matcher's single `address` slot and spills every subsequent
+/// address into `previous_addresses` in order (here Boston → `address`,
+/// Cambridge → `previous_addresses[0]`). Guards the one-vs-many address rename.
 #[test]
 fn first_address_becomes_address_rest_become_previous() {
     let mut a = worker("Smith", "John");
@@ -389,8 +433,10 @@ fn first_address_becomes_address_rest_become_previous() {
 // Edge cases & config presets
 // =============================================================================
 
-/// Sparse/empty records score within `[0.0, 1.0]` and do not panic; a gender
-/// mismatch with no overlap does not match.
+/// Pins the sparse-record edge case: empty name strings on one side plus a
+/// gender mismatch and no field overlap must keep the score within the valid
+/// `[0.0, 1.0]` range (no NaN / out-of-band value) and must not match. Guards
+/// the adapter and matcher against panicking on empty/missing fields.
 #[test]
 fn sparse_records_do_not_panic_and_stay_in_range() {
     let mut a = worker("", "");
@@ -406,8 +452,11 @@ fn sparse_records_do_not_panic_and_stay_in_range() {
     );
 }
 
-/// Strict-config matches are a subset of lenient-config matches (same score,
-/// stricter threshold).
+/// Pins the config-preset invariant: strict and lenient presets compute the
+/// *same* raw score (presets change only the match threshold, not the scoring
+/// weights), so any strict match is necessarily also a lenient match — strict
+/// ⊆ lenient. The fixture is a diacritic-only variant (`Maria` → `Mária`) that
+/// the lenient preset must accept.
 #[test]
 fn strict_config_matches_subset_of_lenient_config() {
     let dob = jiff::civil::date(1972, 3, 8);

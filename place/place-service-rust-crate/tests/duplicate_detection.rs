@@ -19,10 +19,17 @@ use place_service::models::{
 
 // -------- builders -----------------------------------------------------------
 
+/// Build a bare service-side `Place` with only its name set — the minimal
+/// fixture for tests that attach exactly one further field (a `PlaceIdentifier`,
+/// a `GeoCoordinates`, etc.) to isolate a single routing or scoring axis.
 fn place(name: &str) -> Place {
     Place::new(name)
 }
 
+/// Build a fully-populated "Central Park" reference fixture: alternate name,
+/// `PlaceType::Park`, a complete NYC `PostalAddress`, and NYC `GeoCoordinates`.
+/// Used as the canonical near-duplicate baseline that other fixtures mutate one
+/// field at a time.
 fn central_park() -> Place {
     let mut p = place("Central Park");
     p.alternate_name = Some("The Central Park".into());
@@ -42,6 +49,8 @@ fn central_park() -> Place {
     p
 }
 
+/// Build a `MatchingEngine` from the matcher's default preset — pins that the
+/// `default_config` config preset is the one exercised by every bridge test.
 fn engine() -> MatchingEngine {
     MatchingEngine::default_config()
 }
