@@ -32,6 +32,8 @@ fn stroke_pathway() -> Value {
     })
 }
 
+/// `POST` create returns `200` with a `{pid, name}` ref whose `pid` is a
+/// UUID and whose `name` echoes the request.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -50,6 +52,7 @@ async fn can_create_care_pathway() {
     .await;
 }
 
+/// A blank `name` on create is rejected `422` (OQ-1 / T-2 family rule).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -65,6 +68,7 @@ async fn blank_name_on_create_returns_422() {
     .await;
 }
 
+/// A malformed `condition_codes` entry on create is rejected `422`.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -83,6 +87,7 @@ async fn malformed_condition_code_on_create_returns_422() {
     .await;
 }
 
+/// A `Uuid`-scheme identifier with a non-UUID value is rejected `422`.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -102,6 +107,7 @@ async fn malformed_identifier_on_create_returns_422() {
     .await;
 }
 
+/// A blank `name` on update (`PUT`) is rejected `422`, same as create.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -122,6 +128,8 @@ async fn blank_name_on_update_returns_422() {
     .await;
 }
 
+/// `GET /{pid}` returns the full stored `CarePathway` (round-tripped from
+/// JSONB), including nested fields like `condition_codes`.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -144,6 +152,7 @@ async fn can_get_care_pathway_by_pid() {
     .await;
 }
 
+/// `GET` of an unknown `pid` is `404`.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -157,6 +166,7 @@ async fn unknown_pid_returns_404() {
     .await;
 }
 
+/// `GET` list returns all active rows created in the test.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -181,6 +191,8 @@ async fn can_list_care_pathways() {
     .await;
 }
 
+/// `GET /search?q=` does a case-insensitive substring match on `name`,
+/// and a blank `q` is a `400`.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -208,6 +220,8 @@ async fn can_search_pathways_by_name() {
     .await;
 }
 
+/// `POST /match` ranks an explicit candidate list; the guideline-id twin
+/// wins with a deterministic `1.0` (no persistence involved).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -236,6 +250,8 @@ async fn can_match_query_against_candidates() {
     .await;
 }
 
+/// `POST /check-duplicates` scans stored rows and detects the near-twin
+/// of a created pathway (same guideline id) with score `1.0`.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -270,6 +286,9 @@ async fn can_check_duplicates_against_stored_pathways() {
     .await;
 }
 
+/// `POST /merge` folds the duplicate into the survivor end to end: title
+/// becomes an alternate name, lists union, the duplicate is soft-deleted
+/// (`404`), a merge-history row is written, and a `Merged` event fires.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -340,6 +359,7 @@ async fn merge_folds_duplicate_into_survivor() {
     .await;
 }
 
+/// `POST /merge` with equal main/duplicate pids is rejected `422`.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -360,6 +380,7 @@ async fn merge_with_equal_pids_is_422() {
     .await;
 }
 
+/// `POST /merge` with an unknown duplicate pid is `404`.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -383,6 +404,8 @@ async fn merge_unknown_pid_is_404() {
     .await;
 }
 
+/// Create → update → delete writes three audit rows (with null actor,
+/// pre-JWT) and publishes three matching events for the pathway.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -446,6 +469,8 @@ async fn crud_writes_audit_log_and_events() {
     .await;
 }
 
+/// `GET /whoami` without a bearer token is `401` (no JWKS configured in
+/// tests). The token-accepted path is pinned un-gated in `auth::tests`.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -460,6 +485,7 @@ async fn whoami_without_token_is_401() {
     .await;
 }
 
+/// `GET /api-docs/openapi.json` serves the hand-written OpenAPI 3 doc.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -474,6 +500,7 @@ async fn openapi_json_is_served() {
     .await;
 }
 
+/// `GET /swagger-ui` serves the UI page wired to the OpenAPI doc.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]

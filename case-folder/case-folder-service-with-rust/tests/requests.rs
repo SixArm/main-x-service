@@ -46,6 +46,9 @@ mod volumes;
 #[path = "requests/workers.rs"]
 mod workers;
 
+/// Lazily create the Main Patient Service stub and register it as the
+/// process-wide test client (once, via `OnceLock`); subsequent calls
+/// return the same handle so tests can seed/inspect it.
 pub fn main_patient_service() -> Arc<PatientStubClient> {
     static STUB: OnceLock<Arc<PatientStubClient>> = OnceLock::new();
     STUB.get_or_init(|| {
@@ -56,6 +59,8 @@ pub fn main_patient_service() -> Arc<PatientStubClient> {
     .clone()
 }
 
+/// Lazily create the Main Place Service stub and register it as the
+/// process-wide test client (once); returns the shared handle.
 pub fn main_place_service() -> Arc<PlaceStubClient> {
     static STUB: OnceLock<Arc<PlaceStubClient>> = OnceLock::new();
     STUB.get_or_init(|| {
@@ -66,6 +71,8 @@ pub fn main_place_service() -> Arc<PlaceStubClient> {
     .clone()
 }
 
+/// Lazily create the Main Worker Service stub and register it as the
+/// process-wide test client (once); returns the shared handle.
 pub fn main_worker_service() -> Arc<WorkerStubClient> {
     static STUB: OnceLock<Arc<WorkerStubClient>> = OnceLock::new();
     STUB.get_or_init(|| {
@@ -76,6 +83,9 @@ pub fn main_worker_service() -> Arc<WorkerStubClient> {
     .clone()
 }
 
+/// Lazily create the Main Thing Service stub (holds folders + volumes)
+/// and register it as the process-wide test client (once); returns the
+/// shared handle.
 pub fn main_thing_service() -> Arc<ThingStubClient> {
     static STUB: OnceLock<Arc<ThingStubClient>> = OnceLock::new();
     STUB.get_or_init(|| {
@@ -86,6 +96,9 @@ pub fn main_thing_service() -> Arc<ThingStubClient> {
     .clone()
 }
 
+/// Lazily create the Main Event Service stub (holds move events) and
+/// register it as the process-wide test client (once); returns the
+/// shared handle.
 pub fn main_event_service() -> Arc<EventStubClient> {
     static STUB: OnceLock<Arc<EventStubClient>> = OnceLock::new();
     STUB.get_or_init(|| {
@@ -120,6 +133,8 @@ pub fn session_token_from_set_cookie(header: &str) -> String {
         .to_string()
 }
 
+/// Inject a top-level building (`HOSPITAL` place, no parent) into the
+/// Place stub and return it.
 pub fn seed_building(name: &str) -> Place {
     let building = Place {
         id: Uuid::new_v4(),
@@ -133,6 +148,8 @@ pub fn seed_building(name: &str) -> Place {
     building
 }
 
+/// Inject a records room (`RECORDS_ROOM` place) contained in
+/// `building_id` into the Place stub and return it.
 pub fn seed_room(building_id: Uuid, name: &str) -> Place {
     let room = Place {
         id: Uuid::new_v4(),
@@ -146,6 +163,8 @@ pub fn seed_room(building_id: Uuid, name: &str) -> Place {
     room
 }
 
+/// Inject a file cabinet (`FILE_CABINET` place, capacity 100) contained
+/// in `room_id` into the Place stub and return it.
 pub fn seed_cabinet(room_id: Uuid, label: &str) -> Place {
     let cabinet = Place {
         id: Uuid::new_v4(),
@@ -159,12 +178,17 @@ pub fn seed_cabinet(room_id: Uuid, label: &str) -> Place {
     cabinet
 }
 
+/// Inject a full building → room → cabinet chain named after
+/// `cabinet_label` and return the leaf cabinet. Convenience for tests
+/// that only care about the cabinet but need a valid containment path.
 pub fn seed_location_chain(cabinet_label: &str) -> Place {
     let b = seed_building(&format!("Building for {cabinet_label}"));
     let r = seed_room(b.id, &format!("Room for {cabinet_label}"));
     seed_cabinet(r.id, cabinet_label)
 }
 
+/// Reconstruct the label path a cabinet seeded by [`seed_location_chain`]
+/// would carry, e.g. `"Building for X — Room for X — X"`.
 pub fn cabinet_path(cabinet: &Place) -> String {
     format!(
         "Building for {label} — Room for {label} — {label}",
@@ -172,6 +196,8 @@ pub fn cabinet_path(cabinet: &Place) -> String {
     )
 }
 
+/// Inject a patient (NHS number normalized via `format_nhs_number`) into
+/// the Patient stub and return it.
 pub fn seed_patient_in_main_patient_service(nhs: &str, name: &str) -> Patient {
     let patient = Patient {
         id: Uuid::new_v4(),
@@ -183,6 +209,7 @@ pub fn seed_patient_in_main_patient_service(nhs: &str, name: &str) -> Patient {
     patient
 }
 
+/// Inject a worker (optional role) into the Worker stub and return it.
 pub fn seed_worker_in_main_worker_service(name: &str, role: Option<&str>) -> Worker {
     let worker = Worker {
         id: Uuid::new_v4(),
@@ -193,6 +220,9 @@ pub fn seed_worker_in_main_worker_service(name: &str, role: Option<&str>) -> Wor
     worker
 }
 
+/// Inject a folder into the Thing stub for `patient`, optionally filed
+/// in `cabinet` (with NHS-number / name / cabinet-path snapshots copied
+/// from the patient and cabinet), and return it.
 pub fn seed_folder(patient: &Patient, title: &str, cabinet: Option<&Place>) -> Folder {
     let folder = Folder {
         id: Uuid::new_v4(),

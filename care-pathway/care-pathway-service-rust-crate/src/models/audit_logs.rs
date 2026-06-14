@@ -4,8 +4,11 @@ use loco_rs::prelude::*;
 use sea_orm::{QueryOrder, QuerySelect};
 use uuid::Uuid;
 
+/// Re-export the generated `audit_logs` entity so callers use
+/// `models::audit_logs::…` rather than reaching into `_entities`.
 pub use super::_entities::audit_logs::{self, ActiveModel, Entity, Model};
 
+/// Default `SeaORM` active-model behaviour — no custom hooks.
 impl ActiveModelBehavior for super::_entities::audit_logs::ActiveModel {}
 
 impl Model {

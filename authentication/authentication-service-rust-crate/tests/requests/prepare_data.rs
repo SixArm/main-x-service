@@ -8,8 +8,12 @@ use loco_rs::{TestServer, app::AppContext};
 const USER_EMAIL: &str = "test@loco.com";
 const USER_NAME: &str = "loco";
 
+/// A signed-in test subject: the persisted `users` row plus the RS256
+/// bearer token minted by redeeming their magic link.
 pub struct LoggedInUser {
+    /// The persisted user record (refetched after redemption).
     pub user: users::Model,
+    /// The RS256 access token to send as `Authorization: Bearer …`.
     pub token: String,
 }
 
@@ -56,6 +60,8 @@ pub async fn init_user_login(request: &TestServer, ctx: &AppContext) -> LoggedIn
     }
 }
 
+/// Build the `Authorization: Bearer <token>` header pair to attach to a
+/// request for the bearer-gated endpoints (`/me`, `/signout`, account…).
 pub fn auth_header(token: &str) -> (HeaderName, HeaderValue) {
     let auth_header_value = HeaderValue::from_str(&format!("Bearer {}", &token)).unwrap();
 

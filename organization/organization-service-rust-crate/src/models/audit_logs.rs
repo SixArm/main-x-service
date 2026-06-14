@@ -4,13 +4,23 @@ use loco_rs::prelude::*;
 use sea_orm::{QueryOrder, QuerySelect};
 use uuid::Uuid;
 
+/// Re-export the generated entity types so callers use a single
+/// `models::audit_logs::*` path for the entity and its helpers.
 pub use super::_entities::audit_logs::{self, ActiveModel, Entity, Model};
 
+/// Default active-model lifecycle hooks (audit rows are plain inserts).
 impl ActiveModelBehavior for super::_entities::audit_logs::ActiveModel {}
 
+/// Recording and query helpers for the audit trail.
 impl Model {
     /// Record one audit entry. Best-effort — callers log but don't fail
     /// the request if auditing errors.
+    ///
+    /// - `entity_pid`: the organization the action concerns.
+    /// - `action`: the verb (`created`/`updated`/`deleted`/`merged`/…).
+    /// - `actor`: verified caller `sub`, or `None` when unauthenticated.
+    /// - `snapshot`: the record's payload after the action (`None` for
+    ///   deletes, where there is nothing to capture).
     ///
     /// # Errors
     ///
@@ -27,6 +37,7 @@ impl Model {
             action: ActiveValue::set(action.to_string()),
             actor: ActiveValue::set(actor.map(ToString::to_string)),
             snapshot: ActiveValue::set(snapshot),
+            // `id`, `created_at`, `updated_at` are DB/SeaORM-managed.
             ..Default::default()
         }
         .insert(db)

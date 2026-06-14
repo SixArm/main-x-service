@@ -4,8 +4,11 @@ use loco_rs::prelude::*;
 use sea_orm::{QueryOrder, QuerySelect};
 use uuid::Uuid;
 
+/// Re-export the generated `merge_records` entity so callers use
+/// `models::merge_records::…` rather than reaching into `_entities`.
 pub use super::_entities::merge_records::{self, ActiveModel, Entity, Model};
 
+/// Default `SeaORM` active-model behaviour — no custom hooks.
 impl ActiveModelBehavior for super::_entities::merge_records::ActiveModel {}
 
 impl Model {

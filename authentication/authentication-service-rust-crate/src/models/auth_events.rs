@@ -20,7 +20,7 @@ impl ActiveModelBehavior for super::_entities::auth_events::ActiveModel {}
 impl Model {
     /// Record one authentication event. **Best-effort**: callers use
     /// [`record`](Self::record) for its side effect and must never fail
-    /// the request on an audit error (see [`record_best_effort`]).
+    /// the request on an audit error (see [`Self::record_best_effort`]).
     ///
     /// `email` is the normalised (trimmed, lowercased) address where
     /// applicable; `user_pid` the subject when known; `detail` an

@@ -26,11 +26,22 @@ use crate::{
     responses::{self, List},
 };
 
+/// Query parameters accepted by `GET /api/workers`.
 #[derive(Debug, Deserialize, Default)]
 pub struct FilterParams {
+    /// Free-text search term forwarded to the Main Worker Service.
     pub q: Option<String>,
 }
 
+/// `GET /api/workers` — list / search workers.
+///
+/// Pure proxy: forwards the trimmed `q` to the Main Worker Service and
+/// returns the worker views. The tracker stores nothing about workers.
+///
+/// Request: query param `q` — see `FilterParams`.
+/// Response: `200 OK` with a `List` of worker views.
+/// Errors: `503 Service Unavailable` if the Main Worker Service is
+/// unreachable.
 #[debug_handler]
 pub async fn index(
     Extension(mws): Extension<Arc<dyn MainWorkerServiceClient>>,
@@ -53,12 +64,31 @@ pub async fn index(
 /// the worker has handled (a superset); `moves` is their move log.
 #[derive(Serialize)]
 pub struct WorkerShow {
+    /// The worker view.
     pub worker: responses::Worker,
+    /// Distinct folders this worker has personally moved.
     pub moved_folders: Vec<responses::Folder>,
+    /// Every folder of any patient the worker has handled (a superset of
+    /// `moved_folders`).
     pub patient_folders: Vec<responses::Folder>,
+    /// This worker's move log.
     pub moves: Vec<responses::Move>,
 }
 
+/// `GET /api/workers/{id}` — derived worker detail view.
+///
+/// Fetches the worker from the Main Worker Service, then derives, from
+/// the global move-event log: the distinct folders the worker moved
+/// (`moved_folders`), every folder of any patient the worker handled
+/// (`patient_folders`, a superset), and the worker's own move log
+/// (`moves`). Folder current-location labels come from each folder's
+/// latest move event.
+///
+/// Request: path param `id` (worker UUID).
+/// Response: `200 OK` with `WorkerShow`.
+/// Errors: `404 Not Found` if no such worker; `503 Service Unavailable`
+/// if the Main Worker Service is unreachable. Event/folder fetches are
+/// best-effort.
 #[debug_handler]
 pub async fn show(
     Extension(mws): Extension<Arc<dyn MainWorkerServiceClient>>,
@@ -80,6 +110,7 @@ pub async fn show(
         .filter(|m| m.worker_id == Some(id))
         .collect();
 
+    // Folders this worker actually touched, and the patients behind them.
     let moved_folder_ids: HashSet<Uuid> = worker_moves.iter().map(|m| m.folder_id).collect();
     let patient_ids: HashSet<Uuid> = worker_moves.iter().map(|m| m.patient_id).collect();
 
@@ -98,6 +129,7 @@ pub async fn show(
         .filter(|f| moved_folder_ids.contains(&f.id))
         .map(&project)
         .collect();
+    // Superset: every folder belonging to any patient the worker handled.
     let patient_folders: Vec<_> = all_folders
         .iter()
         .filter(|f| patient_ids.contains(&f.patient_id))
@@ -118,6 +150,9 @@ pub async fn show(
     .into_response()
 }
 
+/// Route table for the workers controller, mounted under `/api/workers`.
+///
+/// `GET /` (index), `GET /{id}` (show).
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/workers")

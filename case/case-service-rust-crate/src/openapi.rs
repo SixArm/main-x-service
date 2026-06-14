@@ -158,6 +158,8 @@ pub fn spec() -> Value {
 mod tests {
     use super::*;
 
+    /// Pins the document's basic shape: `OpenAPI` version 3.0.3 and the
+    /// presence of the core create path and `Case`/`CaseIdentifier` schemas.
     #[test]
     fn spec_is_wellformed() {
         let s = spec();
@@ -168,6 +170,8 @@ mod tests {
         assert!(s["components"]["schemas"]["CaseIdentifier"]["properties"]["value"].is_object());
     }
 
+    /// Pins that the seven core CRUD + matching operations are all
+    /// documented (keeps the hand-written spec from drifting from routes).
     #[test]
     fn spec_documents_core_endpoints() {
         let s = spec();
@@ -182,6 +186,7 @@ mod tests {
         assert!(paths["/api/cases/{pid}"]["delete"].is_object());
     }
 
+    /// Pins that the audit + event-stream endpoints are documented.
     #[test]
     fn spec_documents_audit_and_event_endpoints() {
         let s = spec();
@@ -191,6 +196,8 @@ mod tests {
         assert!(paths["/api/cases/{pid}/audit"]["get"].is_object());
     }
 
+    /// Pins that the title-search endpoint is documented with its `q`
+    /// query parameter.
     #[test]
     fn spec_documents_search_endpoint() {
         let s = spec();
@@ -199,6 +206,8 @@ mod tests {
         assert_eq!(op["parameters"][0]["name"], "q");
     }
 
+    /// Pins that both merge endpoints and the `MergeRequest` schema are
+    /// documented.
     #[test]
     fn spec_documents_merge_endpoints() {
         let s = spec();
@@ -207,6 +216,8 @@ mod tests {
         assert!(s["components"]["schemas"]["MergeRequest"]["properties"]["main_pid"].is_object());
     }
 
+    /// Pins that `/whoami` carries a bearer security requirement and that
+    /// the `bearer` security scheme is declared.
     #[test]
     fn spec_documents_whoami_with_bearer_security() {
         let s = spec();

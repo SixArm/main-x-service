@@ -101,6 +101,7 @@ mod tests {
     use super::*;
     use case_matcher::{CaseIdentifier, CaseType, IdentifierScheme};
 
+    /// Build a `CaseIdentifier` for the merge tests.
     fn ident(scheme: IdentifierScheme, value: &str) -> CaseIdentifier {
         CaseIdentifier {
             scheme,
@@ -108,6 +109,8 @@ mod tests {
         }
     }
 
+    /// Pins that a differing duplicate title is preserved as an alternate
+    /// title on the survivor (the survivor's own title is unchanged).
     #[test]
     fn duplicate_title_becomes_an_alternate_title() {
         let main = Case::new("Housing benefit appeal");
@@ -121,6 +124,8 @@ mod tests {
         );
     }
 
+    /// Pins that an identical duplicate title is *not* duplicated into
+    /// `alternate_titles` (no redundant alias).
     #[test]
     fn same_title_is_not_added_as_alternate() {
         let main = Case::new("Housing benefit appeal");
@@ -129,6 +134,9 @@ mod tests {
         assert!(out.merged.alternate_titles.is_empty());
     }
 
+    /// Pins the scalar rule: the survivor keeps its own non-empty scalars
+    /// (`case_number`) and only adopts the duplicate's where its own is
+    /// empty (`agency_id`, `case_type`).
     #[test]
     fn scalars_fill_from_duplicate_only_when_main_is_empty() {
         let mut main = Case::new("P");
@@ -143,6 +151,9 @@ mod tests {
         assert_eq!(out.merged.case_type, Some(CaseType::Housing)); // adopted
     }
 
+    /// Pins the list rule: list fields union and drop exact duplicates —
+    /// here an overlapping keyword and an identical identifier are not
+    /// repeated, while new entries are appended.
     #[test]
     fn list_fields_union_without_duplicates() {
         let mut main = Case::new("P");
@@ -159,6 +170,8 @@ mod tests {
         assert_eq!(out.merged.identifiers.len(), 2);
     }
 
+    /// Pins that the `transferred` snapshot is the duplicate's full
+    /// payload (kept in the merge-history record for auditability).
     #[test]
     fn transferred_snapshot_is_the_duplicate() {
         let main = Case::new("P");

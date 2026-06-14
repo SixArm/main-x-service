@@ -70,6 +70,9 @@ pub fn merge_orgs(main: &Organization, duplicate: &Organization) -> MergeOutcome
         a.scheme == b.scheme && a.value == b.value
     });
 
+    // Snapshot the duplicate for the merge history. Serialization of a
+    // plain struct cannot realistically fail; fall back to JSON null
+    // rather than propagate, so a snapshot hiccup never aborts a merge.
     let transferred = serde_json::to_value(duplicate).unwrap_or(Value::Null);
     MergeOutcome {
         merged,
@@ -77,6 +80,9 @@ pub fn merge_orgs(main: &Organization, duplicate: &Organization) -> MergeOutcome
     }
 }
 
+/// Union two string lists, dropping exact duplicates (order-preserving:
+/// `main` first, then unseen entries from `extra`). Thin wrapper over
+/// [`union_by`] with string equality.
 fn union_strings(main: &[String], extra: &[String]) -> Vec<String> {
     union_by(main, extra, |a, b| a == b)
 }
@@ -92,11 +98,14 @@ fn union_by<T: Clone>(main: &[T], extra: &[T], eq: impl Fn(&T, &T) -> bool) -> V
     out
 }
 
+/// Unit pins for the pure merge fold (no DB): name preservation,
+/// scalar fill-from-empty, list union de-dup, and the snapshot.
 #[cfg(test)]
 mod tests {
     use super::*;
     use organization_matcher::{IdentifierScheme, OrgIdentifier};
 
+    /// Construct a test identifier from a scheme + value.
     fn id(scheme: IdentifierScheme, value: &str) -> OrgIdentifier {
         OrgIdentifier {
             scheme,
@@ -104,6 +113,8 @@ mod tests {
         }
     }
 
+    /// The survivor keeps its own `name`, and the duplicate's differing
+    /// name is preserved as an `alternate_names` entry.
     #[test]
     fn duplicate_name_becomes_an_alternate_name() {
         let main = Organization {
@@ -122,6 +133,8 @@ mod tests {
             .contains(&"Acme Incorporated".to_string()));
     }
 
+    /// When the duplicate's name equals main's, it is not duplicated into
+    /// `alternate_names`.
     #[test]
     fn same_name_is_not_added_as_alternate() {
         let main = Organization {
@@ -135,6 +148,8 @@ mod tests {
         assert!(merge_orgs(&main, &dup).merged.alternate_names.is_empty());
     }
 
+    /// Scalars keep main's value when present and adopt the duplicate's
+    /// only where main is empty (`url` kept, `jurisdiction`/`email` filled).
     #[test]
     fn scalars_fill_from_duplicate_only_when_main_is_empty() {
         let main = Organization {
@@ -155,6 +170,8 @@ mod tests {
         assert_eq!(out.merged.email.as_deref(), Some("info@dup.example")); // adopted
     }
 
+    /// List fields union across the pair, dropping exact duplicates
+    /// (overlapping keyword and identical identifier appear once).
     #[test]
     fn list_fields_union_without_duplicates() {
         let main = Organization {
@@ -177,6 +194,7 @@ mod tests {
         assert_eq!(out.merged.identifiers.len(), 2);
     }
 
+    /// The `transferred` snapshot is the duplicate's payload verbatim.
     #[test]
     fn transferred_snapshot_is_the_duplicate() {
         let main = Organization {

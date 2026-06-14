@@ -24,11 +24,26 @@ use crate::{
     responses::{self, List},
 };
 
+/// Query parameters accepted by `GET /api/patients`.
 #[derive(Debug, Deserialize, Default)]
 pub struct FilterParams {
+    /// When empty, the listing is derived from folder snapshots; when
+    /// present, it is treated as an NHS Number lookup against the Main
+    /// Patient Service.
     pub q: Option<String>,
 }
 
+/// `GET /api/patients` — list / search patients.
+///
+/// With no query, derives a distinct patient list from the Main Thing
+/// Service's folder snapshots (cheap, no Patient Service round-trip). A
+/// non-empty `q` is treated as an NHS Number and looked up against the
+/// Main Patient Service. Each entry carries that patient's folder count.
+///
+/// Request: query param `q` — see `FilterParams`.
+/// Response: `200 OK` with a `List` of patient views.
+/// Errors: `503 Service Unavailable` if the Main Patient Service lookup
+/// fails for a non-empty query. The folder fetch is best-effort.
 #[debug_handler]
 pub async fn index(
     Extension(patients): Extension<Arc<dyn MainPatientServiceClient>>,
@@ -76,11 +91,18 @@ pub async fn index(
     Json(List::with_query(items, q)).into_response()
 }
 
+/// Response body for `GET /api/patients/{nhs}`.
 #[derive(Serialize)]
 pub struct PatientShow {
+    /// The patient view, or `None` when the Main Patient Service had no
+    /// record and we fell back to folder snapshots.
     pub patient: Option<responses::Patient>,
+    /// The patient's folders with current-location labels.
     pub folders: Vec<responses::Folder>,
+    /// Merged move history across the patient's folders (empty in
+    /// fallback mode, since history is keyed by patient id).
     pub history: Vec<responses::Move>,
+    /// The NHS Number, formatted for display.
     pub nhs_number: String,
     /// `true` when the Main Patient Service had no record for this NHS
     /// Number and we fell back to the Main Thing Service's folder
@@ -88,6 +110,17 @@ pub struct PatientShow {
     pub patient_service_match: bool,
 }
 
+/// `GET /api/patients/{nhs}` — show one patient by NHS Number.
+///
+/// Looks the patient up in the Main Patient Service. On a hit, attaches
+/// the patient's folders (from the Main Thing Service) and merged move
+/// history (from the Main Event Service). On a miss — or if the Patient
+/// Service is unreachable — falls back to the folder snapshots filed
+/// under that NHS Number and sets `patient_service_match = false`.
+///
+/// Request: path param `nhs` (NHS Number).
+/// Response: `200 OK` with `PatientShow`. Always `200`: an unreachable
+/// Patient Service degrades to snapshot fallback rather than erroring.
 #[debug_handler]
 pub async fn show(
     Extension(patients): Extension<Arc<dyn MainPatientServiceClient>>,
@@ -108,6 +141,7 @@ pub async fn show(
     };
 
     let body = match &patient {
+        // Patient Service hit: enrich with folders + merged history.
         Some(p) => {
             let folders = things.list_for_patient(p.id).await.unwrap_or_default();
             let history = events.list_for_patient(p.id).await.unwrap_or_default();
@@ -131,6 +165,7 @@ pub async fn show(
                 patient_service_match: true,
             }
         }
+        // Fallback: no Patient Service record, use folder snapshots.
         None => {
             let folders = things.list_for_nhs_number(&nhs).await.unwrap_or_default();
             let folder_items: Vec<_> = folders
@@ -156,6 +191,10 @@ pub async fn show(
     Json(body).into_response()
 }
 
+/// Route table for the patients controller, mounted under
+/// `/api/patients`.
+///
+/// `GET /` (index), `GET /{nhs}` (show).
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/patients")

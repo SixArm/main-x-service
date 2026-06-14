@@ -1,3 +1,11 @@
+//! `sea-orm-migration` schema migrations for `case-service`.
+//!
+//! The [`Migrator`] runs the ordered list below at boot (or via
+//! `cargo loco db migrate`): the `cases` table (the registry), then the
+//! `audit_logs` and `merge_records` side tables. Case data is personal
+//! data, so the audit trail these create is the who/what/when record over
+//! every change.
+
 #![allow(elided_lifetimes_in_paths)]
 #![allow(clippy::wildcard_imports)]
 pub use sea_orm_migration::prelude::*;
@@ -5,10 +13,15 @@ mod m20220101_000001_cases;
 mod m20220101_000002_audit_logs;
 mod m20220101_000003_merge_records;
 
+/// The crate's migrator: drives the ordered migration set for the loco
+/// CLI / boot-time migration.
 pub struct Migrator;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
+    /// The ordered migration set. Order matters: `cases` is created first
+    /// because the side tables reference its `pid`, then `audit_logs` and
+    /// `merge_records`.
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
         vec![
             Box::new(m20220101_000001_cases::Migration),

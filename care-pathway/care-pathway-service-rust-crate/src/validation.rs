@@ -312,10 +312,14 @@ fn verhoeff_valid(digits: &str) -> bool {
     c == 0
 }
 
+/// Tests for the format validators: each clinical coding system, the
+/// deterministic identifier shapes, and BCP-47 language tags, plus the
+/// per-index problem reporting. All DB-free.
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Build a [`ConditionCode`] from a system + code (test brevity).
     fn cc(system: CodeSystem, code: &str) -> ConditionCode {
         ConditionCode {
             system,
@@ -323,6 +327,7 @@ mod tests {
         }
     }
 
+    /// Canonical ICD-10 codes (with and without `.` extensions) are accepted.
     #[test]
     fn icd10_accepts_canonical_codes() {
         for c in ["I63", "I63.9", "A00", "Z99", "C7A", "S72.001A", "M1A.0"] {
@@ -330,6 +335,8 @@ mod tests {
         }
     }
 
+    /// Malformed ICD-10 inputs (wrong shape, lowercase, ICD-11 form, …)
+    /// are rejected.
     #[test]
     fn icd10_rejects_malformed_codes() {
         for c in [
@@ -347,6 +354,7 @@ mod tests {
         }
     }
 
+    /// Valid ICD-11 MMS stem codes (second char a letter) are accepted.
     #[test]
     fn icd11_accepts_stem_codes() {
         for c in ["1A00", "BA00", "8B20.0", "ME24", "1C62.0Z"] {
@@ -354,6 +362,7 @@ mod tests {
         }
     }
 
+    /// Malformed ICD-11 inputs are rejected (see inline cases).
     #[test]
     fn icd11_rejects_malformed_codes() {
         // second char not a letter; contains O/I; too short; empty extension.
@@ -362,6 +371,7 @@ mod tests {
         }
     }
 
+    /// Real, Verhoeff-correct SNOMED CT SCTIDs are accepted.
     #[test]
     fn snomed_accepts_valid_sctids() {
         // Real, Verhoeff-correct SNOMED CT identifiers.
@@ -370,6 +380,8 @@ mod tests {
         }
     }
 
+    /// A broken Verhoeff check digit or wrong shape (length / non-digit)
+    /// is rejected.
     #[test]
     fn snomed_rejects_bad_check_digit_and_shape() {
         // 22298006 is valid; flipping the last digit breaks the checksum.
@@ -379,6 +391,7 @@ mod tests {
         }
     }
 
+    /// A `Custom` coding system imposes no format — only non-blankness.
     #[test]
     fn custom_only_requires_non_blank() {
         let p = CarePathway {
@@ -394,6 +407,8 @@ mod tests {
         assert_eq!(problems(&blank).len(), 1);
     }
 
+    /// Every malformed code is reported, each tagged with its array index
+    /// so the operator can locate it.
     #[test]
     fn problems_reports_every_bad_code_with_index() {
         let p = CarePathway {
@@ -410,6 +425,8 @@ mod tests {
         assert!(problems[1].contains("condition_codes[2]"));
     }
 
+    /// `Uuid`-scheme identifiers must be canonical 8-4-4-4-12 hex; wrapped
+    /// or malformed values are rejected.
     #[test]
     fn uuid_identifiers_must_be_canonical() {
         for v in [
@@ -432,6 +449,8 @@ mod tests {
         }
     }
 
+    /// `Doi`-scheme identifiers require the `10.<registrant>/<suffix>`
+    /// shape; the URL form is rejected.
     #[test]
     fn doi_identifiers_must_have_prefix_and_suffix() {
         for v in ["10.1000/xyz123", "10.1038/nphys1170", "10.1000.10/123"] {
@@ -450,6 +469,8 @@ mod tests {
         }
     }
 
+    /// Open-value-space deterministic schemes (e.g. `Uri`, `Wikidata`)
+    /// only require a non-blank value.
     #[test]
     fn open_deterministic_schemes_only_require_non_blank() {
         let ok = PathwayIdentifier {
@@ -464,6 +485,7 @@ mod tests {
         assert!(identifier_problem(0, &blank).is_some());
     }
 
+    /// A malformed identifier is reported tagged with its array index.
     #[test]
     fn malformed_identifier_is_reported_with_index() {
         let p = CarePathway {
@@ -484,6 +506,8 @@ mod tests {
         assert!(problems[0].contains("identifiers[1]"));
     }
 
+    /// Common BCP-47 shapes are accepted and malformed tags rejected
+    /// (see inline cases).
     #[test]
     fn bcp47_language_tags_are_checked() {
         for t in ["en", "en-GB", "zh-Hans", "de-DE-1996", "cy", "yue"] {
@@ -502,6 +526,7 @@ mod tests {
         }
     }
 
+    /// A malformed `in_language` entry is reported tagged with its index.
     #[test]
     fn malformed_language_tag_is_a_problem() {
         let p = CarePathway {
@@ -513,11 +538,14 @@ mod tests {
         assert!(problems[0].contains("in_language[1]"));
     }
 
+    /// A blank `name` yields exactly the `name is required` problem.
     #[test]
     fn blank_name_is_a_problem() {
         assert_eq!(problems(&CarePathway::new("   ")), vec!["name is required"]);
     }
 
+    /// A fully valid payload (good name, codes, identifiers, languages)
+    /// produces no problems.
     #[test]
     fn valid_payload_has_no_problems() {
         let p = CarePathway {

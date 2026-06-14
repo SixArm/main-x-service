@@ -37,11 +37,15 @@ pub fn clear_test_client() {
     *TEST_CLIENT.lock().unwrap() = None;
 }
 
+/// Client that the router always sees. Each call checks the override
+/// slot first and otherwise routes to the HTTP `fallback`.
 struct RoutingClient {
+    /// Real HTTP client used whenever no test override is installed.
     fallback: HttpClient,
 }
 
 impl RoutingClient {
+    /// Return the current test override (cloned `Arc`) if one is set.
     fn pick(&self) -> Option<Arc<dyn Client>> {
         TEST_CLIENT.lock().unwrap().clone()
     }
@@ -49,6 +53,7 @@ impl RoutingClient {
 
 #[async_trait]
 impl Client for RoutingClient {
+    /// Look up a patient by NHS number; override else HTTP fallback.
     async fn find_by_nhs_number(
         &self,
         nhs_number: &str,
@@ -60,6 +65,7 @@ impl Client for RoutingClient {
         }
     }
 
+    /// Look up a patient by id; override else HTTP fallback.
     async fn find_by_id(&self, id: Uuid) -> std::result::Result<Option<Patient>, Error> {
         if let Some(test) = self.pick() {
             test.find_by_id(id).await
@@ -68,6 +74,7 @@ impl Client for RoutingClient {
         }
     }
 
+    /// Create a patient; override else HTTP fallback.
     async fn create(&self, input: CreatePatient) -> std::result::Result<Patient, Error> {
         if let Some(test) = self.pick() {
             test.create(input).await
@@ -77,14 +84,19 @@ impl Client for RoutingClient {
     }
 }
 
+/// Loco initializer that registers the Main Patient Service client.
 pub struct ClientInitializer;
 
 #[async_trait]
 impl LocoInitializer for ClientInitializer {
+    /// Stable identifier for this initializer in Loco's registry.
     fn name(&self) -> String {
         "main-patient-service-client".to_string()
     }
 
+    /// Read `MAIN_PATIENT_SERVICE_BASE_URL` (default `http://localhost:5151`),
+    /// build a [`RoutingClient`] over an HTTP fallback, and layer it as an
+    /// Axum `Extension`.
     async fn after_routes(&self, router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
         let base_url = std::env::var("MAIN_PATIENT_SERVICE_BASE_URL")
             .unwrap_or_else(|_| "http://localhost:5151".to_string());

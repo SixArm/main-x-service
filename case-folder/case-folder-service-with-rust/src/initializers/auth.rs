@@ -23,14 +23,25 @@ use std::sync::Arc;
 
 use crate::auth::{mailer::LogMailer, AuthConfig, AuthState};
 
+/// Loco initializer that wires up authentication: it constructs the
+/// shared [`AuthState`], layers the session-guard middleware, and
+/// injects the state as an Axum extension.
 pub struct AuthInitializer;
 
 #[async_trait]
 impl Initializer for AuthInitializer {
+    /// Stable identifier for this initializer in Loco's registry.
     fn name(&self) -> String {
         "auth".to_string()
     }
 
+    /// Builds [`AuthState`] from the `settings.auth` config block, layers
+    /// the [`guard`] middleware, then injects the state as an extension.
+    ///
+    /// Side effects: warns if the signing secret is empty/insecure, and
+    /// logs an info line when `require_session` is off (guard is a
+    /// pass-through). The guard layer is added *before* the extension so
+    /// both are present on every `/api/*` request.
     async fn after_routes(&self, router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         let auth_value = ctx
             .config
@@ -65,6 +76,16 @@ impl Initializer for AuthInitializer {
     }
 }
 
+/// Session-guard middleware for `/api/*`.
+///
+/// A request is exempt (passes straight through) when any of:
+///   - `require_session` is `false` (e.g. the `test` environment), or
+///   - the path is `/healthz`, or
+///   - the path is not under `/api/`, or
+///   - the path is under `/api/auth/` (login endpoints must stay open).
+///
+/// Otherwise the request must carry a valid session identity in its
+/// headers; if it does not, respond `401` with a JSON error body.
 async fn guard(state: Arc<AuthState>, req: Request, next: Next) -> Response {
     let path = req.uri().path();
     let exempt = !state.require_session()

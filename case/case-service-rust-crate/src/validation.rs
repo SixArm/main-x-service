@@ -115,6 +115,8 @@ mod tests {
     use super::*;
     use case_matcher::{CaseIdentifier, IdentifierScheme};
 
+    /// Build a `Docket`-scheme `CaseIdentifier` with the given value, for
+    /// the validation tests.
     fn ident(value: &str) -> CaseIdentifier {
         CaseIdentifier {
             scheme: IdentifierScheme::Docket,
@@ -122,6 +124,8 @@ mod tests {
         }
     }
 
+    /// Pins the all-valid baseline: a fully populated, well-formed case
+    /// yields zero problems.
     #[test]
     fn valid_case_has_no_problems() {
         let case = Case {
@@ -134,6 +138,7 @@ mod tests {
         assert!(problems(&case).is_empty());
     }
 
+    /// Pins that a bare `YYYY` year is an accepted `opened_date` form.
     #[test]
     fn bare_year_is_a_valid_opened_date() {
         let case = Case {
@@ -143,6 +148,8 @@ mod tests {
         assert!(problems(&case).is_empty());
     }
 
+    /// Pins the required-title rule: a whitespace-only title is the single
+    /// `"title is required"` problem.
     #[test]
     fn blank_title_is_a_problem() {
         assert_eq!(
@@ -151,6 +158,8 @@ mod tests {
         );
     }
 
+    /// Pins the date rejections: out-of-range, wrong-format, impossible
+    /// (`2024-02-30`), non-zero-padded, non-date, and empty all fail.
     #[test]
     fn malformed_opened_dates_are_rejected() {
         for date in [
@@ -173,6 +182,7 @@ mod tests {
         }
     }
 
+    /// Pins the date acceptances, including the leap-day `2024-02-29`.
     #[test]
     fn valid_opened_dates_are_accepted() {
         for date in ["2024", "2024-01-01", "2024-02-29", "2000-12-31"] {
@@ -187,6 +197,8 @@ mod tests {
         }
     }
 
+    /// Pins the per-identifier rule: a blank identifier value is one
+    /// problem, reported with its index.
     #[test]
     fn blank_identifier_value_is_a_problem() {
         let case = Case {
@@ -198,6 +210,8 @@ mod tests {
         assert!(p[0].contains("identifiers[0]"));
     }
 
+    /// Pins the per-subject and per-keyword rules: a blank entry in either
+    /// list is a problem, each reported with its index.
     #[test]
     fn blank_subject_and_keyword_are_problems() {
         let case = Case {
@@ -211,6 +225,9 @@ mod tests {
         assert!(p.iter().any(|m| m.contains("keywords[0]")));
     }
 
+    /// Pins the report-everything contract: multiple problems (bad title,
+    /// bad date, bad identifier) are all collected in one pass so the
+    /// operator fixes them in a single round-trip.
     #[test]
     fn problems_reports_every_issue_with_index() {
         let case = Case {

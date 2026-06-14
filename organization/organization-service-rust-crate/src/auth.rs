@@ -110,6 +110,9 @@ pub fn enforce(
     bearer_claims(headers, verifier).map(|_| ())
 }
 
+/// Read env var `name`, treating unset/blank as absent and falling back
+/// to `default`. Used for the issuer/audience so a blank value doesn't
+/// override the sensible default.
 fn env_or(name: &str, default: &str) -> String {
     std::env::var(name)
         .ok()
@@ -117,6 +120,10 @@ fn env_or(name: &str, default: &str) -> String {
         .unwrap_or_else(|| default.to_string())
 }
 
+/// Build the process-wide [`Verifier`] from the environment: issuer,
+/// audience, and the JWKS document. A missing/blank/unparseable JWKS
+/// yields an empty key set (every token rejected) so the service still
+/// boots without credentials configured.
 fn build_from_env() -> Verifier {
     let issuer = env_or("ORGANIZATION_JWT_ISSUER", DEFAULT_ISSUER);
     let audience = env_or("ORGANIZATION_JWT_AUDIENCE", DEFAULT_AUDIENCE);
@@ -173,6 +180,9 @@ pub fn bearer_claims(
 /// require authentication.
 pub struct AuthUser(pub Claims);
 
+/// Extracting an [`AuthUser`] verifies the request's bearer token against
+/// the process-wide [`verifier`]; a missing/invalid token rejects with
+/// `401` before the handler runs, so the type is the "require auth" gate.
 impl<S: Send + Sync> FromRequestParts<S> for AuthUser {
     type Rejection = (StatusCode, String);
 
@@ -195,6 +205,9 @@ impl MaybeAuthUser {
     }
 }
 
+/// Extracting a [`MaybeAuthUser`] never rejects: a valid token yields
+/// `Some(claims)`, anything else `None`. Handlers use it to opportunistically
+/// stamp the caller identity without requiring authentication.
 impl<S: Send + Sync> FromRequestParts<S> for MaybeAuthUser {
     type Rejection = std::convert::Infallible;
 
@@ -203,6 +216,11 @@ impl<S: Send + Sync> FromRequestParts<S> for MaybeAuthUser {
     }
 }
 
+/// DB-free, fully in-process pins for token verification and the blanket
+/// `enforce` decision. A throwaway RSA key mints tokens and a matching
+/// JWKS, so the whole RS256 path (valid / missing / non-bearer / expired
+/// / tampered / empty-keys) and the on/off/public-path enforcement matrix
+/// are exercised without the auth service or a database.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -211,7 +229,9 @@ mod tests {
     use rsa::pkcs8::DecodePrivateKey;
     use rsa::traits::PublicKeyParts;
 
+    /// Issuer the test tokens and verifier agree on.
     const ISSUER: &str = "authentication-service";
+    /// Audience the test tokens and verifier agree on.
     const AUDIENCE: &str = "main-x-service";
 
     // A throwaway 2048-bit RSA key, used only to mint test tokens and a
@@ -245,6 +265,8 @@ Eq9K7IobXuoSOu4eR1SZoZ29lTRAqMCjFfdFdFgdhvN2nx8XXrYymNsKmT7rOLk3
 cg5Tq5R846wbNyxrso8C988=
 -----END PRIVATE KEY-----";
 
+    /// The URL-safe, unpadded base64 engine JWKS `n`/`e` and the `kid`
+    /// hash are encoded with (matching the JWK spec).
     fn b64() -> base64::engine::general_purpose::GeneralPurpose {
         base64::engine::general_purpose::URL_SAFE_NO_PAD
     }
@@ -267,6 +289,9 @@ cg5Tq5R846wbNyxrso8C988=
         (jwks, kid)
     }
 
+    /// Mint a signed RS256 token for the test identity with `kid` in the
+    /// header and `exp` set `exp_offset_secs` from a fixed `iat` (negative
+    /// offsets produce an already-expired token).
     fn sign(kid: &str, exp_offset_secs: i64) -> String {
         // A fixed `iat` keeps the token deterministic; `exp` is relative.
         let iat: i64 = 1_700_000_000;
@@ -286,12 +311,15 @@ cg5Tq5R846wbNyxrso8C988=
         encode(&header, &claims, &key).expect("sign")
     }
 
+    /// Wrap a token in a `HeaderMap` with `Authorization: Bearer <token>`.
     fn bearer(token: &str) -> HeaderMap {
         let mut h = HeaderMap::new();
         h.insert(AUTHORIZATION, format!("Bearer {token}").parse().unwrap());
         h
     }
 
+    /// A well-formed, in-date, correctly-signed token verifies and yields
+    /// the expected claims.
     #[test]
     fn valid_token_yields_claims() {
         let (jwks, kid) = test_jwks_and_kid();
@@ -303,6 +331,7 @@ cg5Tq5R846wbNyxrso8C988=
         assert_eq!(claims.email, "alice@example.com");
     }
 
+    /// No `Authorization` header ⇒ `401`.
     #[test]
     fn missing_header_is_401() {
         let (jwks, _) = test_jwks_and_kid();
@@ -311,6 +340,7 @@ cg5Tq5R846wbNyxrso8C988=
         assert_eq!(err.0, StatusCode::UNAUTHORIZED);
     }
 
+    /// A non-bearer scheme (e.g. `Basic`) ⇒ `401`.
     #[test]
     fn non_bearer_header_is_401() {
         let (jwks, _) = test_jwks_and_kid();
@@ -323,6 +353,7 @@ cg5Tq5R846wbNyxrso8C988=
         );
     }
 
+    /// A token whose `exp` is in the past ⇒ `401`.
     #[test]
     fn expired_token_is_401() {
         let (jwks, kid) = test_jwks_and_kid();
@@ -335,6 +366,7 @@ cg5Tq5R846wbNyxrso8C988=
         );
     }
 
+    /// Flipping a signature byte breaks RS256 verification ⇒ `401`.
     #[test]
     fn tampered_token_is_401() {
         let (jwks, kid) = test_jwks_and_kid();
@@ -349,6 +381,7 @@ cg5Tq5R846wbNyxrso8C988=
         );
     }
 
+    /// A no-key verifier (the boot fallback) rejects even a valid token.
     #[test]
     fn empty_verifier_rejects_everything() {
         let verifier = empty_verifier(ISSUER, AUDIENCE);
@@ -360,6 +393,8 @@ cg5Tq5R846wbNyxrso8C988=
         );
     }
 
+    /// `parse_bool` accepts the documented truthy set and rejects the
+    /// rest (including empty, `0`, and junk).
     #[test]
     fn parse_bool_truthy_and_falsy() {
         for t in ["1", "true", "TRUE", "Yes", "on", " on ", "ON"] {
@@ -370,6 +405,7 @@ cg5Tq5R846wbNyxrso8C988=
         }
     }
 
+    /// Enforcement off ⇒ a protected path passes with no token.
     #[test]
     fn enforce_off_allows_without_token() {
         let (jwks, _) = test_jwks_and_kid();
@@ -378,6 +414,8 @@ cg5Tq5R846wbNyxrso8C988=
         assert!(enforce(false, "/api/organizations", &HeaderMap::new(), &verifier).is_ok());
     }
 
+    /// Enforcement on ⇒ the public paths (health/ping, `OpenAPI`,
+    /// Swagger UI) still pass without a token.
     #[test]
     fn enforce_on_allows_public_paths() {
         let (jwks, _) = test_jwks_and_kid();
@@ -396,6 +434,7 @@ cg5Tq5R846wbNyxrso8C988=
         }
     }
 
+    /// Enforcement on, protected path, no token ⇒ `401`.
     #[test]
     fn enforce_on_protected_without_token_is_401() {
         let (jwks, _) = test_jwks_and_kid();
@@ -404,6 +443,7 @@ cg5Tq5R846wbNyxrso8C988=
         assert_eq!(err.0, StatusCode::UNAUTHORIZED);
     }
 
+    /// Enforcement on, protected path, valid token ⇒ passes.
     #[test]
     fn enforce_on_protected_with_valid_token_is_ok() {
         let (jwks, kid) = test_jwks_and_kid();
@@ -412,6 +452,7 @@ cg5Tq5R846wbNyxrso8C988=
         assert!(enforce(true, "/api/organizations", &bearer(&token), &verifier).is_ok());
     }
 
+    /// Enforcement on, protected path, expired token ⇒ `401`.
     #[test]
     fn enforce_on_protected_with_expired_token_is_401() {
         let (jwks, kid) = test_jwks_and_kid();
@@ -421,6 +462,7 @@ cg5Tq5R846wbNyxrso8C988=
         assert_eq!(err.0, StatusCode::UNAUTHORIZED);
     }
 
+    /// Enforcement on, protected path, tampered token ⇒ `401`.
     #[test]
     fn enforce_on_protected_with_tampered_token_is_401() {
         let (jwks, kid) = test_jwks_and_kid();

@@ -24,10 +24,12 @@ use crate::main_place_service::{
 };
 use crate::main_thing_service::{self, Client as MainThingServiceClient, NewFolder};
 
+/// The `seed` CLI task. Run with `cargo run -- task seed`.
 pub struct Seed;
 
 #[async_trait]
 impl Task for Seed {
+    /// Task metadata (name + one-line description) for the Loco CLI listing.
     fn task(&self) -> TaskInfo {
         TaskInfo {
             name: "seed".to_string(),
@@ -35,6 +37,9 @@ impl Task for Seed {
         }
     }
 
+    /// Build one HTTP client per external service from its
+    /// `MAIN_*_SERVICE_BASE_URL` env var (defaulting to the conventional
+    /// local ports 5151–5155), then delegate to [`run_seed`].
     async fn run(&self, _ctx: &AppContext, _vars: &task::Vars) -> Result<()> {
         let place_client = main_place_service::http::HttpClient::new(env_or(
             "MAIN_PLACE_SERVICE_BASE_URL",
@@ -70,6 +75,8 @@ pub async fn run_seed(
 ) -> Result<()> {
     let cabs = match seed_places(place_client).await {
         Ok(c) => c,
+        // Placeholder fallback: Place service down — carry on with
+        // synthetic cabinet UUIDs so folder/move seeding still runs.
         Err(e) => {
             tracing::warn!(
                 "Main Place Service unavailable while seeding places: {} — using placeholder UUIDs",
@@ -82,19 +89,30 @@ pub async fn run_seed(
     Ok(())
 }
 
+/// Read env var `key`, or return `fallback` if it is unset.
 fn env_or(key: &str, fallback: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| fallback.to_string())
 }
 
+/// The five seeded cabinets, each as `(cabinet id, full label path)`.
+/// Folders are filed into these by [`seed_folders_and_moves`].
 struct CabinetsSeed {
+    /// Main Hospital — Ward A — Cabinet A1 (active admissions).
     a1: (Uuid, String),
+    /// Main Hospital — Ward A — Cabinet A2.
     a2: (Uuid, String),
+    /// Main Hospital — Ward B — Cabinet B1.
     b1: (Uuid, String),
+    /// Outpatients Wing — Reception — Cabinet C1.
     c1: (Uuid, String),
+    /// Off-site Archive — Basement — Archive Cabinet 1 (long-term storage).
     arc: (Uuid, String),
 }
 
 impl CabinetsSeed {
+    /// Fallback cabinet set used when the Place service is unreachable:
+    /// freshly generated UUIDs plus hard-coded label paths, so folder
+    /// seeding can still proceed with plausible (if unlinked) locations.
     fn placeholders() -> Self {
         let mk = |label: &str| (Uuid::new_v4(), label.to_string());
         Self {
@@ -107,6 +125,14 @@ impl CabinetsSeed {
     }
 }
 
+/// Create the demo place hierarchy (3 buildings, 4 records rooms, 5 file
+/// cabinets) via [`ensure_place`], then return the five cabinets as a
+/// [`CabinetsSeed`] of `(id, label path)` pairs.
+///
+/// # Errors
+///
+/// Propagates any [`main_place_service::Error`] from the underlying
+/// search/create calls (e.g. the Place service being unreachable).
 async fn seed_places(
     client: &dyn MainPlaceServiceClient,
 ) -> std::result::Result<CabinetsSeed, main_place_service::Error> {
@@ -253,6 +279,14 @@ async fn seed_places(
     })
 }
 
+/// Idempotently fetch-or-create a place. Searches for an existing place
+/// with the same `name` and `parent`; if found, returns it, otherwise
+/// creates a new one.
+///
+/// # Errors
+///
+/// Propagates any [`main_place_service::Error`] from the search or create
+/// call.
 async fn ensure_place(
     client: &dyn MainPlaceServiceClient,
     name: &str,
@@ -262,6 +296,7 @@ async fn ensure_place(
     description: Option<&str>,
 ) -> std::result::Result<Place, main_place_service::Error> {
     let matches = client.search(name, Some(place_type)).await?;
+    // Idempotency: reuse an existing place with the same name + parent.
     if let Some(existing) = matches
         .into_iter()
         .find(|p| p.name == name && p.contained_in_place == parent)
@@ -279,12 +314,28 @@ async fn ensure_place(
         .await
 }
 
+/// Seed 6 demo patients, 9 folders (one Thing per folder), and one
+/// synthetic "Folder created" move event per folder.
+///
+/// For each patient: fetch-or-create in the Patient service (falling
+/// back to a local placeholder UUID if it is unreachable), then for each
+/// folder spec create the folder in the Thing service and record its
+/// initial move event in the Event service. All three steps are
+/// idempotent and best-effort: existing folders/events are skipped and
+/// per-service failures log a warning and continue.
+///
+/// # Errors
+///
+/// Returns `Err` only on a hard failure of the overall Loco task; the
+/// per-service calls are best-effort and do not abort seeding.
 async fn seed_folders_and_moves(
     patient_client: &dyn main_patient_service::Client,
     thing_client: &dyn MainThingServiceClient,
     event_client: &dyn main_event_service::Client,
     cabs: &CabinetsSeed,
 ) -> Result<()> {
+    /// One folder to seed: `(title, Some((cabinet id, label path)))`, or
+    /// `None` cabinet for a folder that is currently "in transit".
     type FolderSpec<'a> = (&'a str, Option<(Uuid, String)>);
     let seeds: Vec<(&str, &str, NaiveDate, Vec<FolderSpec>)> = vec![
         (
@@ -440,6 +491,13 @@ async fn seed_folders_and_moves(
     Ok(())
 }
 
+/// Build a [`NaiveDate`] from year / month / day for the static demo
+/// dates of birth.
+///
+/// # Panics
+///
+/// Panics if `y`/`m`/`d` is not a valid calendar date (the inputs are
+/// hard-coded literals, so this is a compile-time-known constant).
 fn date(y: i32, m: u32, d: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(y, m, d).expect("valid date")
 }

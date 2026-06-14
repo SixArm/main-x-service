@@ -11,38 +11,54 @@ use uuid::Uuid;
 
 use super::{Client, CreatePlace, Error, Place};
 
+/// The upstream `{success, data, error}` envelope. We consume `data` and,
+/// on search, `success`.
 #[derive(Debug, Deserialize)]
 struct ApiResponse<T> {
+    /// Payload, present on success.
     data: Option<T>,
+    /// Service-reported success flag (checked on the search path).
     #[serde(default)]
     success: bool,
 }
 
+/// Wire shape of an upstream `Place`, trimmed to what the tracker reads.
 #[derive(Debug, Deserialize)]
 struct PlaceDto {
+    /// Place UUID.
     id: Uuid,
+    /// Place name.
     name: String,
+    /// Raw `place_type`; may be a bare string or `{"Other": "..."}`.
     #[serde(default)]
     place_type: Option<serde_json::Value>,
+    /// Optional free-text description.
     #[serde(default)]
     description: Option<String>,
+    /// Parent place UUID, if nested.
     #[serde(default)]
     contained_in_place: Option<Uuid>,
     /// Some upstream representations carry capacity as
     /// `maximum_attendee_capacity` (schema.org); accept both.
     #[serde(default)]
     maximum_attendee_capacity: Option<i32>,
+    /// Tracker-style capacity field; preferred over `maximum_attendee_capacity`.
     #[serde(default)]
     capacity: Option<i32>,
 }
 
+/// The `data` shape returned by the place search endpoint.
 #[derive(Debug, Deserialize, Default)]
 struct SearchEnvelope {
+    /// Matching places.
     #[serde(default)]
     places: Vec<PlaceDto>,
 }
 
 impl PlaceDto {
+    /// Projects this DTO into the tracker [`Place`], flattening the
+    /// tagged `place_type` enum and choosing `capacity` if present,
+    /// falling back to `maximum_attendee_capacity`.
     fn into_place(self) -> Place {
         // The upstream `PlaceType` is `enum { Landform, …, Other(String) }`.
         // It serialises either as the bare variant ("Hospital") or as
@@ -61,18 +77,28 @@ impl PlaceDto {
             place_type,
             description: self.description,
             contained_in_place: self.contained_in_place,
+            // Prefer the tracker `capacity`; fall back to schema.org's
+            // `maximum_attendee_capacity` when only that is populated.
             capacity: self.capacity.or(self.maximum_attendee_capacity),
         }
     }
 }
 
+/// REST [`Client`] for the Main Place Service.
 #[derive(Clone)]
 pub struct HttpClient {
+    /// Service base URL with any trailing slash trimmed.
     base_url: String,
+    /// Shared `reqwest` client (connection pool + 5s timeout).
     http: reqwest::Client,
 }
 
 impl HttpClient {
+    /// Builds a client for the service at `base_url`. Trims a trailing
+    /// slash and applies a 5-second request timeout.
+    ///
+    /// # Panics
+    /// Panics if the underlying `reqwest` client cannot be built.
     pub fn new(base_url: impl Into<String>) -> Self {
         Self {
             base_url: base_url.into().trim_end_matches('/').to_string(),
@@ -83,6 +109,7 @@ impl HttpClient {
         }
     }
 
+    /// Joins `path` onto the base URL to form an absolute request URL.
     fn url(&self, path: &str) -> String {
         format!("{}{}", self.base_url, path)
     }
@@ -90,6 +117,12 @@ impl HttpClient {
 
 #[async_trait]
 impl Client for HttpClient {
+    /// `GET /api/v1/places/search?q=<query>&limit=100[&place_type=<pt>]` —
+    /// free-text name search, optionally filtered by place type.
+    ///
+    /// # Errors
+    /// Returns [`Error::Transport`] on a non-success status and
+    /// [`Error::BadResponse`] on a parse failure or `success=false`.
     async fn search(&self, query: &str, place_type: Option<&str>) -> Result<Vec<Place>, Error> {
         let mut q = vec![("q", query.to_string()), ("limit", "100".to_string())];
         if let Some(pt) = place_type {
@@ -124,6 +157,12 @@ impl Client for HttpClient {
             .collect())
     }
 
+    /// `GET /api/v1/places/{id}` — look up a place by UUID. A `404` maps
+    /// to `Ok(None)`.
+    ///
+    /// # Errors
+    /// Returns [`Error::Transport`] on other non-success statuses and
+    /// [`Error::BadResponse`] on a parse failure.
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Place>, Error> {
         let response = self
             .http
@@ -147,6 +186,13 @@ impl Client for HttpClient {
         Ok(body.data.map(PlaceDto::into_place))
     }
 
+    /// `POST /api/v1/places` — registers a new place. When `capacity` is
+    /// set it is written to both `maximum_attendee_capacity` and
+    /// `capacity` so either upstream representation round-trips.
+    ///
+    /// # Errors
+    /// Returns [`Error::Transport`] on a non-success status and
+    /// [`Error::BadResponse`] when the response has no usable `data`.
     async fn create(&self, input: CreatePlace) -> Result<Place, Error> {
         let mut payload = json!({
             "id": Uuid::new_v4(),

@@ -7,6 +7,7 @@
 //!
 //! See `spec/auth.md` for the full flow and configuration matrix.
 
+/// Email delivery of magic links (trait + log-only default impl).
 pub mod mailer;
 
 use axum::http::{header, HeaderMap};
@@ -18,17 +19,26 @@ use std::collections::HashMap;
 /// Name of the HttpOnly session cookie.
 pub const SESSION_COOKIE: &str = "cts_session";
 
+/// `aud` claim value for short-lived magic-link (sign-in) tokens.
 const AUD_MAGIC: &str = "magic";
+/// `aud` claim value for longer-lived session tokens. Keeping the two
+/// audiences distinct means a magic token can never be replayed as a
+/// session token, nor vice-versa.
 const AUD_SESSION: &str = "session";
 
 /// A resolved, authenticated person.
 #[derive(Debug, Clone, Serialize)]
 pub struct Identity {
+    /// Canonical email address (the allowlist key, original casing).
     pub email: String,
+    /// Human-readable display name.
     pub name: String,
+    /// Optional role string (e.g. `"admin"`), if assigned in the allowlist.
     pub role: Option<String>,
 }
 
+/// Error returned by the auth layer. Deliberately opaque so failures do
+/// not leak why a token was rejected.
 #[derive(Debug)]
 pub enum AuthError {
     /// The token could not be minted or failed validation (bad
@@ -36,22 +46,34 @@ pub enum AuthError {
     Token,
 }
 
+/// JWT payload. Mixes the standard registered claims (`aud`, `iat`,
+/// `exp`) with our own subject/name/role fields.
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
+    /// Subject — the identity's email address (registered `sub` claim).
     sub: String,
+    /// Display name carried through so headers can resolve an identity
+    /// without a second lookup.
     name: String,
+    /// Optional role; omitted from the JSON when `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     role: Option<String>,
+    /// Audience (registered `aud` claim) — `AUD_MAGIC` or `AUD_SESSION`.
     aud: String,
+    /// Issued-at, Unix seconds (registered `iat` claim).
     iat: usize,
+    /// Expiry, Unix seconds (registered `exp` claim); enforced on decode.
     exp: usize,
 }
 
 /// One allowlist entry, as read from `settings.auth.allowlist`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AllowlistEntry {
+    /// Email that may sign in (matched case-insensitively).
     pub email: String,
+    /// Display name attached to the resolved identity.
     pub name: String,
+    /// Optional role granted to this entry.
     #[serde(default)]
     pub role: Option<String>,
 }
@@ -59,35 +81,50 @@ pub struct AllowlistEntry {
 /// Deserialized from the `settings.auth` block of the Loco config.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuthConfig {
+    /// HS256 signing secret. Empty means insecure (dev only); see
+    /// [`AuthConfig::secret_is_insecure`].
     #[serde(default)]
     pub secret: String,
+    /// Lifetime of a magic-link token, in seconds (default 600 = 10 min).
     #[serde(default = "default_magic_ttl")]
     pub magic_link_ttl_seconds: i64,
+    /// Lifetime of a session token, in seconds (default 86_400 = 1 day).
     #[serde(default = "default_session_ttl")]
     pub session_ttl_seconds: i64,
+    /// When true, protected routes demand a valid session cookie/bearer.
     #[serde(default)]
     pub require_session: bool,
+    /// When true, the magic link is returned in the API response (dev
+    /// convenience; never enable in production).
     #[serde(default)]
     pub expose_magic_link: bool,
+    /// When true, session cookies carry the `Secure` attribute (HTTPS).
     #[serde(default)]
     pub cookie_secure: bool,
+    /// Front-end base URL used to build the magic-link callback.
     #[serde(default = "default_frontend")]
     pub frontend_url: String,
+    /// The set of identities permitted to sign in.
     #[serde(default)]
     pub allowlist: Vec<AllowlistEntry>,
 }
 
+/// Default magic-link TTL: 600 seconds (10 minutes).
 fn default_magic_ttl() -> i64 {
     600
 }
+/// Default session TTL: 86_400 seconds (24 hours).
 fn default_session_ttl() -> i64 {
     86_400
 }
+/// Default front-end origin used when none is configured (Vite dev port).
 fn default_frontend() -> String {
     "http://localhost:5173".to_string()
 }
 
 impl Default for AuthConfig {
+    /// Dev-safe defaults: empty (insecure) secret, standard TTLs,
+    /// session not required, no allowlist.
     fn default() -> Self {
         Self {
             secret: String::new(),
@@ -113,14 +150,28 @@ impl AuthConfig {
 /// Runtime auth state, injected as an Axum `Extension` and captured by
 /// the session-guard middleware.
 pub struct AuthState {
+    /// The deserialized auth configuration (TTLs, flags, secret).
     config: AuthConfig,
+    /// Lower-cased-email -> resolved identity, derived from the allowlist
+    /// for O(1) case-insensitive lookups.
     allowlist: HashMap<String, Identity>,
+    /// HS256 encoding key, built once from the configured secret.
     encoding: EncodingKey,
+    /// HS256 decoding key, built once from the configured secret.
     decoding: DecodingKey,
+    /// Mailer used to deliver magic links (public so handlers can call it).
     pub mailer: Box<dyn Mailer>,
 }
 
 impl AuthState {
+    /// Build runtime auth state from config and a mailer.
+    ///
+    /// Derives the HS256 encoding/decoding keys from `config.secret` and
+    /// pre-indexes the allowlist by lower-cased email for fast lookup.
+    ///
+    /// # Parameters
+    /// - `config`: the deserialized `settings.auth` block.
+    /// - `mailer`: magic-link delivery backend.
     pub fn new(config: AuthConfig, mailer: Box<dyn Mailer>) -> Self {
         let encoding = EncodingKey::from_secret(config.secret.as_bytes());
         let decoding = DecodingKey::from_secret(config.secret.as_bytes());
@@ -147,10 +198,12 @@ impl AuthState {
         }
     }
 
+    /// Whether protected routes require an authenticated session.
     pub fn require_session(&self) -> bool {
         self.config.require_session
     }
 
+    /// Whether the magic link should be echoed in API responses (dev only).
     pub fn expose_magic_link(&self) -> bool {
         self.config.expose_magic_link
     }
@@ -160,10 +213,19 @@ impl AuthState {
         self.allowlist.get(&email.trim().to_lowercase()).cloned()
     }
 
+    /// Current Unix time in seconds, used for `iat`/`exp`.
     fn now() -> i64 {
         chrono::Utc::now().timestamp()
     }
 
+    /// Mint an HS256 JWT for `identity` scoped to `aud`, expiring `ttl`
+    /// seconds from now.
+    ///
+    /// Shared by the magic and session minting helpers; the `aud`
+    /// argument is what keeps the two token kinds non-interchangeable.
+    ///
+    /// # Errors
+    /// Returns [`AuthError::Token`] if the JWT library fails to encode.
     fn encode_token(&self, identity: &Identity, aud: &str, ttl: i64) -> Result<String, AuthError> {
         let iat = Self::now();
         let claims = Claims {
@@ -178,6 +240,12 @@ impl AuthState {
             .map_err(|_| AuthError::Token)
     }
 
+    /// Verify an HS256 JWT, requiring it to carry the expected `aud`
+    /// (and a present, unexpired `exp`), and return the embedded identity.
+    ///
+    /// # Errors
+    /// Returns [`AuthError::Token`] for a bad signature, wrong audience,
+    /// missing required claim, or expired token.
     fn decode_token(&self, token: &str, aud: &str) -> Result<Identity, AuthError> {
         let mut validation = Validation::new(Algorithm::HS256);
         validation.set_audience(&[aud]);
@@ -191,18 +259,36 @@ impl AuthState {
         })
     }
 
+    /// Mint a short-lived magic-link token (`aud = "magic"`).
+    ///
+    /// # Errors
+    /// Returns [`AuthError::Token`] if encoding fails.
     pub fn mint_magic_token(&self, identity: &Identity) -> Result<String, AuthError> {
         self.encode_token(identity, AUD_MAGIC, self.config.magic_link_ttl_seconds)
     }
 
+    /// Verify a magic-link token and resolve its identity.
+    ///
+    /// # Errors
+    /// Returns [`AuthError::Token`] if the token is invalid, expired, or
+    /// not a magic-audience token.
     pub fn verify_magic_token(&self, token: &str) -> Result<Identity, AuthError> {
         self.decode_token(token, AUD_MAGIC)
     }
 
+    /// Mint a longer-lived session token (`aud = "session"`).
+    ///
+    /// # Errors
+    /// Returns [`AuthError::Token`] if encoding fails.
     pub fn mint_session_token(&self, identity: &Identity) -> Result<String, AuthError> {
         self.encode_token(identity, AUD_SESSION, self.config.session_ttl_seconds)
     }
 
+    /// Verify a session token and resolve its identity.
+    ///
+    /// # Errors
+    /// Returns [`AuthError::Token`] if the token is invalid, expired, or
+    /// not a session-audience token.
     pub fn verify_session_token(&self, token: &str) -> Result<Identity, AuthError> {
         self.decode_token(token, AUD_SESSION)
     }
@@ -245,6 +331,11 @@ impl AuthState {
     }
 }
 
+/// Extract a bearer token from the `Authorization` header, if present.
+///
+/// Accepts both `Bearer ` and lower-case `bearer ` prefixes and trims
+/// surrounding whitespace. Returns `None` when the header is absent,
+/// non-ASCII, or not a bearer scheme.
 fn bearer_token(headers: &HeaderMap) -> Option<String> {
     let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
     let token = value
@@ -253,6 +344,11 @@ fn bearer_token(headers: &HeaderMap) -> Option<String> {
     Some(token.trim().to_string())
 }
 
+/// Extract the session token from the `Cookie` header, if present.
+///
+/// Splits the header on `;`, trims each part, and returns the value of
+/// the `SESSION_COOKIE` pair. Returns `None` when the cookie is absent
+/// or the header is non-ASCII.
 fn cookie_token(headers: &HeaderMap) -> Option<String> {
     let cookie = headers.get(header::COOKIE)?.to_str().ok()?;
     let needle = format!("{SESSION_COOKIE}=");

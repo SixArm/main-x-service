@@ -22,6 +22,8 @@ macro_rules! configure_insta {
     };
 }
 
+/// Pins that the `before_save` validator rejects a too-short name and an
+/// invalid email at insert time (snapshot of the resulting error).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
@@ -43,6 +45,8 @@ async fn test_can_validate_model() {
     assert_debug_snapshot!(res);
 }
 
+/// Pins the loco-scaffold password registration path (`create_with_password`)
+/// still works against the schema (snapshot; not used by the live flow).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
@@ -67,6 +71,9 @@ async fn can_create_with_password() {
         assert_debug_snapshot!(res);
     });
 }
+/// Pins that creating a user whose email already exists fails with
+/// `EntityAlreadyExists` (the `UNIQUE(email)` guard the live flow relies
+/// on for its anti-enumeration branch).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
@@ -93,6 +100,8 @@ async fn handle_create_with_password_with_duplicate() {
     assert_debug_snapshot!(new_user);
 }
 
+/// Pins `find_by_email`: a seeded address resolves; an unknown one
+/// returns `EntityNotFound` (both snapshotted).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
@@ -114,6 +123,8 @@ async fn can_find_by_email() {
     assert_debug_snapshot!(non_existing_user_results);
 }
 
+/// Pins `find_by_pid`: a seeded `pid` resolves; an unknown one returns
+/// `EntityNotFound` (both snapshotted). `pid` is the token `sub`.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
@@ -136,6 +147,8 @@ async fn can_find_by_pid() {
     assert_debug_snapshot!(non_existing_user_results);
 }
 
+/// Pins `set_email_verification_sent`: it stamps the sent-at timestamp
+/// and generates a verification token (loco scaffold; not the live flow).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
@@ -183,6 +196,8 @@ async fn can_verification_token() {
     );
 }
 
+/// Pins `set_forgot_password_sent`: it stamps the reset sent-at timestamp
+/// and generates a reset token (loco scaffold; unused by passwordless).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
@@ -227,6 +242,8 @@ async fn can_set_forgot_password_sent() {
     );
 }
 
+/// Pins `verified`: marking the email verified stamps `email_verified_at`
+/// (this is the field magic-link redemption sets on first sign-in).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
@@ -266,6 +283,8 @@ async fn can_verified() {
     );
 }
 
+/// Pins `reset_password`: it re-hashes and replaces the stored password
+/// so the new one verifies (loco scaffold; unused by passwordless).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
@@ -306,6 +325,9 @@ async fn can_reset_password() {
     );
 }
 
+/// Pins the magic-link issuance core (`create_magic_link`): it sets a
+/// token of the configured length and an expiry within
+/// `MAGIC_LINK_EXPIRATION_MIN` minutes — the heart of the live flow.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]

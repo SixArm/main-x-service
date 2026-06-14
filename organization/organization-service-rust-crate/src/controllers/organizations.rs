@@ -18,13 +18,19 @@ use crate::models::merge_records::Model as MergeRecordModel;
 use crate::models::organizations::Model as OrgModel;
 use crate::streaming::{self, EventKind};
 
+/// Lightweight response shape: a stored organization reduced to its
+/// public id and name. Returned by create/update/list/search so callers
+/// get a stable handle without the full payload.
 #[derive(Debug, Serialize)]
 struct OrgRef {
+    /// The organization's public id (UUID, as a string).
     pid: String,
+    /// The organization's denormalised name.
     name: String,
 }
 
 impl OrgRef {
+    /// Project a stored [`OrgModel`] row down to its `{pid, name}` ref.
     fn of(m: &OrgModel) -> Self {
         Self {
             pid: m.pid.to_string(),
@@ -33,12 +39,18 @@ impl OrgRef {
     }
 }
 
+/// Request body for `POST /match`: a query plus an explicit candidate
+/// list to rank it against (stateless — nothing is persisted).
 #[derive(Debug, Deserialize)]
 struct MatchRequest {
+    /// The organization to score against each candidate.
     query: Organization,
+    /// The candidate organizations to rank.
     candidates: Vec<Organization>,
 }
 
+/// Request body for `POST /merge`: which duplicate folds into which
+/// survivor, plus an optional reason.
 #[derive(Debug, Deserialize)]
 struct MergeRequest {
     /// The surviving organization's public id.
@@ -50,12 +62,19 @@ struct MergeRequest {
     reason: Option<String>,
 }
 
+/// A duplicate-check hit: a stored organization that matched the query,
+/// with its score and classification. Returned by `check-duplicates`.
 #[derive(Debug, Serialize)]
 struct ScoredRef {
+    /// The matched organization's public id.
     pid: String,
+    /// The matched organization's name.
     name: String,
+    /// The match score in `[0.0, 1.0]` (higher is more similar).
     score: f64,
+    /// The confidence band (matcher's `Confidence` enum, `Debug`-rendered).
     confidence: String,
+    /// Whether the score cleared the match threshold.
     is_match: bool,
 }
 
@@ -88,6 +107,11 @@ fn http_err(err: ModelError) -> Error {
 }
 
 /// Create an organization.
+///
+/// `POST /api/organizations`. Body: an `Organization`. On success returns
+/// `200` with an `OrgRef` (`{pid, name}`); a blank name is `422`. Writes
+/// an audit row and publishes a `Created` event (both best-effort,
+/// stamped with the caller `actor` when a token was presented).
 #[debug_handler]
 async fn create(
     State(ctx): State<AppContext>,
@@ -114,6 +138,10 @@ async fn create(
 }
 
 /// Fetch an organization by public id.
+///
+/// `GET /api/organizations/{pid}`. Returns `200` with the stored
+/// `Organization` payload, or `404` when the pid is unknown (or
+/// soft-deleted, or malformed — all map to not-found via [`http_err`]).
 #[debug_handler]
 async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
     let model = OrgModel::find_by_pid(&ctx.db, &pid)
@@ -124,6 +152,10 @@ async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Resu
 }
 
 /// Replace an organization's payload.
+///
+/// `PUT /api/organizations/{pid}`. Body: a full `Organization` (replace,
+/// not patch). Returns `200` with an `OrgRef`; `422` for a blank name,
+/// `404` for an unknown pid. Audits and publishes an `Updated` event.
 #[debug_handler]
 async fn update(
     Path(pid): Path<String>,
@@ -154,6 +186,12 @@ async fn update(
 }
 
 /// Soft-delete an organization.
+///
+/// `DELETE /api/organizations/{pid}`. Marks the row inactive and stamps
+/// `deleted_at` (the row is retained for audit). Returns `200` with an
+/// empty JSON body; `404` for an unknown pid. Audits and publishes a
+/// `Deleted` event. The name is captured before delete so the event
+/// still carries a label.
 #[debug_handler]
 async fn remove(
     Path(pid): Path<String>,
@@ -190,6 +228,10 @@ async fn audit(
 }
 
 /// List active organizations (capped at 100).
+///
+/// `GET /api/organizations`. Returns `200` with an array of `OrgRef`,
+/// newest first, soft-deleted rows excluded. The 100 cap is a deliberate
+/// guard against unbounded responses (full listing is out of scope).
 #[debug_handler]
 async fn list(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = OrgModel::list(&ctx.db, 100).await?;
@@ -198,6 +240,10 @@ async fn list(State(ctx): State<AppContext>) -> Result<Response> {
 }
 
 /// Score a query against an explicit candidate list (no persistence).
+///
+/// `POST /api/organizations/match`. Body: a [`MatchRequest`]. Returns
+/// `200` with the engine's ranked results. Stateless: it touches neither
+/// the database nor the index, so it is a pure scoring utility.
 #[debug_handler]
 async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
@@ -220,6 +266,12 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
 pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
 
 /// Find stored organizations that match the query above the threshold.
+///
+/// `POST /api/organizations/check-duplicates`. Body: an `Organization`.
+/// Loads up to [`CHECK_DUPLICATES_SCAN_CAP`] active rows and scores each
+/// against the query, returning `200` with the matching [`ScoredRef`]s
+/// sorted by descending score. An in-memory full scan (no blocking yet),
+/// so it logs a `WARN` when it hits the cap (results may be truncated).
 #[debug_handler]
 async fn check_duplicates(
     State(ctx): State<AppContext>,
@@ -248,6 +300,8 @@ async fn check_duplicates(
             });
         }
     }
+    // Highest score first. `partial_cmp` returns None only on NaN scores;
+    // treat those as equal so the sort stays total and never panics.
     hits.sort_by(|a, b| {
         b.score
             .partial_cmp(&a.score)
@@ -256,12 +310,18 @@ async fn check_duplicates(
     format::json(hits)
 }
 
+/// Query string for the name-search endpoint: the optional `q` term.
 #[derive(Debug, Deserialize)]
 struct SearchParams {
+    /// The case-insensitive substring to search names for.
     q: Option<String>,
 }
 
 /// Case-insensitive name search: `GET /api/organizations/search?q=acme`.
+///
+/// Returns `200` with up to 50 matching `OrgRef`s (`ILIKE '%q%'` over
+/// active rows). A missing or blank `q` is `400` — an empty search would
+/// match everything, which is treated as a malformed request.
 #[debug_handler]
 async fn search(
     axum::extract::Query(params): axum::extract::Query<SearchParams>,
@@ -281,6 +341,11 @@ async fn search(
 /// duplicate's name as an alternate name, soft-delete the duplicate,
 /// record the merge history, and publish a `Merged` event (plus a
 /// `Deleted` for the duplicate).
+///
+/// `POST /api/organizations/merge`. Body: a [`MergeRequest`]. Returns
+/// `200` with `{main_pid, duplicate_pid, main}`; `422` when the two pids
+/// are equal (self-merge); `404` when either pid is unknown. The pure
+/// fold lives in [`merge_orgs`]; this handler does the DB orchestration.
 #[debug_handler]
 async fn merge(
     State(ctx): State<AppContext>,
@@ -351,6 +416,9 @@ async fn merge(
 }
 
 /// Recent merge-history records, newest first.
+///
+/// `GET /api/organizations/merges/recent`. Returns `200` with up to 100
+/// `merge_records` rows (newest first).
 #[debug_handler]
 async fn recent_merges(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = MergeRecordModel::recent(&ctx.db, 100).await?;
@@ -360,12 +428,19 @@ async fn recent_merges(State(ctx): State<AppContext>) -> Result<Response> {
 /// Echo the verified claims of the bearer token — `401` when the token is
 /// missing or fails verification. Proves peer JWT verification against
 /// the auth-service JWKS end to end (spec §13 T-9).
+///
+/// `GET /api/organizations/whoami`. The [`AuthUser`] extractor enforces a
+/// valid token (its rejection is the `401`), so reaching the body means
+/// the caller is authenticated; returns `200` with the claims.
 #[debug_handler]
 async fn whoami(AuthUser(claims): AuthUser) -> Result<Response> {
     format::json(claims)
 }
 
 /// Recent audit-log entries across all organizations.
+///
+/// `GET /api/organizations/audit/recent`. Returns `200` with up to 100
+/// `audit_logs` rows (newest first).
 #[debug_handler]
 async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = AuditModel::recent(&ctx.db, 100).await?;
@@ -373,8 +448,14 @@ async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
 }
 
 /// Audit trail for a single organization.
+///
+/// `GET /api/organizations/{pid}/audit`. Returns `200` with that
+/// organization's audit rows (newest first); `400` when the path `pid`
+/// is not a valid UUID.
 #[debug_handler]
 async fn entity_audit(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+    // Validate the pid shape here so a typo is a clear 400, not an empty
+    // result that looks like "no audit history".
     let Ok(uuid) = uuid::Uuid::parse_str(&pid) else {
         return bad_request("invalid pid");
     };
@@ -383,6 +464,10 @@ async fn entity_audit(Path(pid): Path<String>, State(ctx): State<AppContext>) ->
 }
 
 /// Recent events from the in-memory event stream.
+///
+/// `GET /api/organizations/events/recent`. Returns `200` with up to 100
+/// `EventView`s (`{kind, pid, name, seq}`) from the process-wide ring
+/// buffer — no DB access. The buffer is per-process and not durable.
 #[debug_handler]
 async fn recent_events() -> Result<Response> {
     format::json(streaming::recent(100))
@@ -393,6 +478,9 @@ async fn recent_events() -> Result<Response> {
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/organizations")
+        // Literal sub-paths (`/search`, `/merge`, `/whoami`, …) are added
+        // before the `/{pid}` captures so they are not shadowed by the
+        // dynamic segment.
         .add("/", post(create))
         .add("/", get(list))
         .add("/search", get(search))
@@ -409,6 +497,9 @@ pub fn routes() -> Routes {
         .add("/{pid}/audit", get(entity_audit))
 }
 
+/// DB-free unit pins for the controller's pure helpers (validation +
+/// the scan-cap constant). The request-level behaviour is exercised by
+/// the Postgres-gated suite in `tests/requests/organizations.rs`.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -427,6 +518,7 @@ mod tests {
         }
     }
 
+    /// The companion to the 422 pin: a real name passes validation.
     #[test]
     fn non_blank_name_passes_validation() {
         let org = Organization::new("Acme, Inc.");

@@ -2,8 +2,12 @@ use case_folder_service_with_rust::app::App;
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
+/// A demo email known to the dev user store, so `/api/auth/request`
+/// returns a usable magic link.
 const KNOWN_EMAIL: &str = "tester@example.nhs.uk";
 
+/// Pins: a known email yields `sent: true` plus a dev-exposed
+/// `magic_link` containing the `/auth/callback?token=` path.
 #[tokio::test]
 #[serial]
 async fn request_returns_dev_magic_link_for_known_email() {
@@ -22,6 +26,8 @@ async fn request_returns_dev_magic_link_for_known_email() {
     .await;
 }
 
+/// Pins: an unknown email still returns `200`/`sent: true` but with no
+/// `magic_link`, so the endpoint cannot be used to enumerate valid emails.
 #[tokio::test]
 #[serial]
 async fn request_for_unknown_email_returns_ok_without_link() {
@@ -40,6 +46,8 @@ async fn request_for_unknown_email_returns_ok_without_link() {
     .await;
 }
 
+/// Pins: a blank/whitespace email is rejected `422` with a per-field
+/// `errors.email` message.
 #[tokio::test]
 #[serial]
 async fn request_with_blank_email_returns_422() {
@@ -56,6 +64,7 @@ async fn request_with_blank_email_returns_422() {
     .await;
 }
 
+/// Pins: verifying a bogus magic-link token returns `401`.
 #[tokio::test]
 #[serial]
 async fn verify_with_invalid_token_returns_401() {
@@ -70,6 +79,8 @@ async fn verify_with_invalid_token_returns_401() {
     .await;
 }
 
+/// Pins: `/api/auth/me` without a session returns `401` with the
+/// `"Authentication required"` guard error body.
 #[tokio::test]
 #[serial]
 async fn me_without_session_returns_401() {
@@ -83,6 +94,9 @@ async fn me_without_session_returns_401() {
     .await;
 }
 
+/// Pins the full happy path: request a link, exchange the token for a
+/// session (checks the `cts_session` `HttpOnly` cookie + user payload),
+/// then present the session as a Bearer token to `/api/auth/me`.
 #[tokio::test]
 #[serial]
 async fn request_verify_me_round_trip() {

@@ -1,3 +1,21 @@
+//! `users` model — passwordless magic-link accounts.
+//!
+//! Layers the magic-link domain logic over the generated `users` entity.
+//! This is a **passwordless** service: no login path ever checks a
+//! password. The `password` column exists only to satisfy `NOT NULL`,
+//! and `Model::create_passwordless` fills it with the hash of an
+//! unguessable random value. The loco-scaffold password/reset helpers
+//! (`RegisterParams`, `Model::create_with_password`,
+//! `Model::generate_jwt`, `ActiveModel::reset_password`, …) are kept
+//! for parity with the loco template but are not wired into any route.
+//!
+//! The magic-link surface (`ActiveModel::create_magic_link` /
+//! `Model::find_by_magic_token` / `ActiveModel::clear_magic_link`)
+//! and the GDPR erasure surface (`ActiveModel::erase` +
+//! `Model::find_active_by_pid`) are the parts that matter here. Tokens
+//! are short-lived (`MAGIC_LINK_EXPIRATION_MIN`) and single-use (cleared
+//! on redemption).
+
 use async_trait::async_trait;
 use chrono::{Duration, offset::Local};
 use loco_rs::{auth::jwt, hash, prelude::*};
@@ -5,6 +23,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use uuid::Uuid;
 
+/// Re-export the generated `users` entity (module + `ActiveModel` /
+/// `Entity` / `Model`) so callers use `users::Model` etc. through this
+/// domain module rather than reaching into `_entities`.
 pub use super::_entities::users::{self, ActiveModel, Entity, Model};
 
 /// Length (chars) of a generated magic-link token.
@@ -34,7 +55,7 @@ pub struct LoginParams {
 }
 
 /// Password-registration params (loco scaffold; unused — see
-/// [`Model::create_passwordless`]).
+/// `Model::create_passwordless`).
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RegisterParams {
     /// Account email.
@@ -57,6 +78,8 @@ pub struct Validator {
 }
 
 impl Validatable for ActiveModel {
+    /// Yield the field [`Validator`] for this `ActiveModel`, so loco runs
+    /// name/email validation in `before_save`.
     fn validator(&self) -> Box<dyn Validate> {
         Box::new(Validator {
             name: self.name.as_ref().to_owned(),
@@ -67,6 +90,15 @@ impl Validatable for ActiveModel {
 
 #[async_trait::async_trait]
 impl ActiveModelBehavior for super::_entities::users::ActiveModel {
+    /// `SeaORM` hook run before every insert/update. Always validates the
+    /// fields; on **insert** it also assigns the public id (`pid`, a fresh
+    /// UUID v4 — the stable external identifier, distinct from the
+    /// internal autoincrement `id`) and a random `api_key`. Both are set
+    /// here, not by the caller, so they can never be spoofed via the API.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `DbErr` when validation fails.
     async fn before_save<C>(self, _db: &C, insert: bool) -> Result<Self, DbErr>
     where
         C: ConnectionTrait,
@@ -85,6 +117,14 @@ impl ActiveModelBehavior for super::_entities::users::ActiveModel {
 
 #[async_trait]
 impl Authenticable for Model {
+    /// loco `Authenticable` hook: resolve a user from an api-key bearer.
+    /// Present for loco's middleware; the magic-link surface authenticates
+    /// via RS256 JWTs (see [`crate::auth`]) rather than api keys.
+    ///
+    /// # Errors
+    ///
+    /// [`ModelError::EntityNotFound`] when no user has that api key, plus
+    /// the usual DB errors.
     async fn find_by_api_key(db: &DatabaseConnection, api_key: &str) -> ModelResult<Self> {
         let user = users::Entity::find()
             .filter(
@@ -97,6 +137,14 @@ impl Authenticable for Model {
         user.ok_or_else(|| ModelError::EntityNotFound)
     }
 
+    /// loco `Authenticable` hook: resolve a user from the JWT claims key.
+    /// Our claims key is the `pid`, so this delegates to
+    /// [`Self::find_by_pid`].
+    ///
+    /// # Errors
+    ///
+    /// [`ModelError::EntityNotFound`] when no user matches, plus parse / DB
+    /// errors.
     async fn find_by_claims_key(db: &DatabaseConnection, claims_key: &str) -> ModelResult<Self> {
         Self::find_by_pid(db, claims_key).await
     }
@@ -464,7 +512,7 @@ impl ActiveModel {
     /// magic-link material. The row survives so the `auth_events` audit
     /// trail and any referential history keep their integrity; every read
     /// path treats a `deleted_at` user as gone
-    /// ([`Model::find_active_by_pid`]). Session revocation and the audit
+    /// (`Model::find_active_by_pid`). Session revocation and the audit
     /// row are written by the caller (the controller), which also owns
     /// the transaction boundary.
     ///

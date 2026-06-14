@@ -23,22 +23,54 @@ use crate::{
     responses::{self, List},
 };
 
+/// One geofence-breach alert: a single move that carried a folder
+/// across a building boundary. Serialised as a JSON object in the
+/// `GET /api/alerts` list. All fields are denormalised snapshots taken
+/// from the originating `MoveEvent` plus the resolved building names, so
+/// the alert is self-contained and needs no further joins.
 #[derive(Serialize)]
 pub struct Alert {
+    /// Id of the move that constitutes the breach.
     pub move_id: Uuid,
+    /// Id of the folder that was moved.
     pub folder_id: Uuid,
+    /// Human-readable folder title at the time of the move.
     pub folder_title: String,
+    /// Patient name snapshot for the folder's patient.
     pub patient_name: String,
+    /// Patient's NHS number (snapshot, formatted as stored on the move).
     pub nhs_number: String,
+    /// Name of the building the folder moved **out of** (origin).
     pub from_building: String,
+    /// Name of the building the folder moved **into** (destination) —
+    /// differs from `from_building`, which is what makes this a breach.
     pub to_building: String,
+    /// Label of the origin cabinet.
     pub from_cabinet_label: String,
+    /// Label of the destination cabinet.
     pub to_cabinet_label: String,
+    /// Display name of the worker who performed the move.
     pub moved_by: String,
+    /// Timestamp of the move, RFC 3339 formatted.
     pub moved_at: String,
+    /// Optional free-text reason recorded for the move.
     pub reason: Option<String>,
 }
 
+/// List all geofence-breach alerts.
+///
+/// Route: `GET /api/alerts`. Method: `GET`. Request: none. Response:
+/// `List<Alert>` JSON.
+///
+/// Pulls the place hierarchy (buildings, records rooms, file cabinets)
+/// from the Main Place Service and the full move log from the Main Event
+/// Service, then runs the pure `detect_geofence_breaches` core.
+///
+/// Status codes:
+/// - `200` — alerts (possibly empty) computed successfully.
+/// - `503` — either upstream service is unreachable; no partial result
+///   is returned because a missing place layer or move log would yield
+///   false negatives.
 #[debug_handler]
 pub async fn index(
     Extension(places): Extension<Arc<dyn MainPlaceServiceClient>>,
@@ -137,6 +169,7 @@ fn detect_geofence_breaches(
         .collect()
 }
 
+/// Mount the alerts route under the `/api/alerts` prefix: `GET /`.
 pub fn routes() -> Routes {
     Routes::new().prefix("/api/alerts").add("/", get(index))
 }
@@ -146,6 +179,9 @@ mod tests {
     use super::*;
     use chrono::Utc;
 
+    /// Build a `Place` fixture with just the fields the breach logic
+    /// reads: `id`, `name`, and the `contained_in_place` parent link.
+    /// All other place fields are left empty/`None`.
     fn place(id: Uuid, name: &str, parent: Option<Uuid>) -> Place {
         Place {
             id,
@@ -157,6 +193,10 @@ mod tests {
         }
     }
 
+    /// Build a `MoveEvent` fixture parameterised only by its origin and
+    /// destination cabinet ids (the inputs the breach logic keys on).
+    /// All other fields use fixed placeholder values, since the detector
+    /// merely copies them through to the resulting `Alert`.
     fn move_event(from: Option<Uuid>, to: Option<Uuid>) -> MoveEvent {
         MoveEvent {
             id: Uuid::new_v4(),
@@ -194,6 +234,9 @@ mod tests {
         (buildings, rooms, cabinets, cab_a, cab_b)
     }
 
+    /// Pins the happy path: a move from a cabinet in Hospital A to a
+    /// cabinet in Hospital B yields exactly one alert, with the origin
+    /// and destination building names resolved correctly.
     #[test]
     fn cross_building_move_is_a_breach() {
         let (b, r, c, cab_a, cab_b) = estate();
@@ -203,6 +246,9 @@ mod tests {
         assert_eq!(alerts[0].to_building, "Hospital B");
     }
 
+    /// Pins that a move between two cabinets in the **same** building
+    /// (both under Room A1) raises no alert — only boundary crossings
+    /// count.
     #[test]
     fn same_building_move_is_not_a_breach() {
         // Two cabinets in the same building (both under Room A1).
@@ -223,6 +269,10 @@ mod tests {
         assert!(alerts.is_empty());
     }
 
+    /// Pins that a `None` endpoint cabinet (created-in-place with no
+    /// origin, or sent in-transit with no destination) is ignored:
+    /// there is no boundary to cross, so neither direction yields an
+    /// alert.
     #[test]
     fn move_with_missing_endpoint_cabinet_is_not_a_breach() {
         let (b, r, c, cab_a, _cab_b) = estate();
@@ -234,6 +284,9 @@ mod tests {
         assert!(detect_geofence_breaches(&b, &r, &c, &[none_to]).is_empty());
     }
 
+    /// Pins that an endpoint cabinet id unknown to the place hierarchy
+    /// resolves to no building and is therefore skipped — guarding
+    /// against false alerts from dangling references.
     #[test]
     fn move_via_unresolvable_cabinet_is_not_a_breach() {
         let (b, r, c, cab_a, _cab_b) = estate();
@@ -245,6 +298,11 @@ mod tests {
         assert!(alerts.is_empty());
     }
 
+    /// Pins resolution of an orphaned hierarchy: a cabinet whose room
+    /// exists but whose room points at a missing building resolves to no
+    /// building. Checks both `cabinet_buildings` (the orphan is absent /
+    /// the good cabinet present) and that a move through the orphan
+    /// raises no alert.
     #[test]
     fn cabinet_under_orphan_room_is_unresolved() {
         // Cabinet → Room exists, but the room's building is missing, so
@@ -274,6 +332,9 @@ mod tests {
         assert!(alerts.is_empty());
     }
 
+    /// Pins the filter behaviour over a mixed log: from four moves
+    /// (cross-building, same-cabinet, created-in-place, and a reverse
+    /// cross-building), exactly the two genuine breaches are returned.
     #[test]
     fn only_breaching_moves_are_returned_from_a_mixed_log() {
         let (b, r, c, cab_a, cab_b) = estate();

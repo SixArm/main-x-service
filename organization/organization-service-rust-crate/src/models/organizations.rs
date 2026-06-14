@@ -8,10 +8,16 @@ use sea_orm::sea_query::Expr;
 use sea_orm::{QueryOrder, QuerySelect};
 use uuid::Uuid;
 
+/// Re-export the generated entity types so callers use
+/// `models::organizations::{Model, ActiveModel, Entity}` (and the CRUD
+/// helpers below) from a single path.
 pub use super::_entities::organizations::{self, ActiveModel, Entity, Model};
 
+/// Default active-model lifecycle hooks (no custom create/update logic;
+/// payload serialization and soft-delete are handled explicitly below).
 impl ActiveModelBehavior for super::_entities::organizations::ActiveModel {}
 
+/// Read-side helpers on a fetched `organizations` row.
 impl Model {
     /// Deserialize the stored payload into a matcher `Organization`.
     ///
@@ -30,11 +36,15 @@ impl Model {
     pub async fn create(db: &DatabaseConnection, org: &MatchOrg) -> ModelResult<Self> {
         let data = serde_json::to_value(org).map_err(|e| ModelError::Any(e.into()))?;
         let model = organizations::ActiveModel {
+            // Mint the public id here (not a DB default) so it is known
+            // before the insert and returned to the caller.
             pid: ActiveValue::set(Uuid::new_v4()),
+            // Denormalise the name for fast list/search.
             name: ActiveValue::set(org.name.clone()),
             data: ActiveValue::set(data),
             active: ActiveValue::set(true),
             deleted_at: ActiveValue::set(None),
+            // `id`, `created_at`, `updated_at` are DB/SeaORM-managed.
             ..Default::default()
         }
         .insert(db)
@@ -48,12 +58,16 @@ impl Model {
     ///
     /// When not found or the query fails.
     pub async fn find_by_pid(db: &DatabaseConnection, pid: &str) -> ModelResult<Self> {
+        // Parse defensively: a malformed pid is "not found", surfaced as
+        // a model error the controller maps to 404 (not a 500).
         let uuid = Uuid::parse_str(pid).map_err(|e| ModelError::Any(e.into()))?;
         let org = organizations::Entity::find()
             .filter(organizations::Column::Pid.eq(uuid))
+            // Soft-deleted rows are invisible to lookups.
             .filter(organizations::Column::DeletedAt.is_null())
             .one(db)
             .await?;
+        // `None` row ⇒ EntityNotFound, which the controller maps to 404.
         org.ok_or_else(|| ModelError::EntityNotFound)
     }
 
@@ -90,6 +104,7 @@ impl Model {
     }
 }
 
+/// Write-side helpers on a mutable `organizations` active model.
 impl ActiveModel {
     /// Replace the payload of an existing organization.
     ///
@@ -114,6 +129,9 @@ impl ActiveModel {
     /// When the update fails.
     pub async fn soft_delete(mut self, db: &DatabaseConnection) -> ModelResult<Model> {
         self.active = ActiveValue::set(false);
+        // `chrono` here is `SeaORM`'s timestamp type for this column (the
+        // `with-jiff` migration is tracked separately); this is a
+        // soft-delete stamp, not domain time.
         self.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
         self.update(db).await.map_err(ModelError::from)
     }

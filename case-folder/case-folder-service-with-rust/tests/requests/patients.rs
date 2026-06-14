@@ -2,6 +2,8 @@ use case_folder_service_with_rust::app::App;
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
+/// Pins: `GET /api/patients` derives the patient list from folder
+/// snapshots, reporting source `"Main Patient Service"` and folder count.
 #[tokio::test]
 #[serial]
 async fn list_returns_patients_from_folder_snapshots() {
@@ -24,6 +26,8 @@ async fn list_returns_patients_from_folder_snapshots() {
     .await;
 }
 
+/// Pins: `GET /api/patients/{nhs}` for a known patient sets
+/// `patient_service_match: true` and lists all of their folders.
 #[tokio::test]
 #[serial]
 async fn show_lists_folders_for_main_patient_service_patient() {
@@ -52,6 +56,9 @@ async fn show_lists_folders_for_main_patient_service_patient() {
     .await;
 }
 
+/// Pins: when the Patient service has no record, show falls back to the
+/// folder snapshot — `patient_service_match: false`, null `patient`, but
+/// the snapshot-only folders still listed.
 #[tokio::test]
 #[serial]
 async fn show_falls_back_to_snapshot_when_main_patient_service_has_no_record() {

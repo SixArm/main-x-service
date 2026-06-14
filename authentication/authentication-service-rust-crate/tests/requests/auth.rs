@@ -29,6 +29,8 @@ use super::prepare_data;
 // DB-backed HTTP flow tests (require PostgreSQL; see module docs).
 // ---------------------------------------------------------------------------
 
+/// Pins that signup persists the user and issues a magic-link token with
+/// an expiry, returning 200.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -59,6 +61,8 @@ async fn can_signup_and_issue_magic_link() {
     .await;
 }
 
+/// Pins anti-enumeration on signup: an existing email is indistinguishable
+/// from a fresh one — same 200, and it still receives a fresh link.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -86,6 +90,8 @@ async fn signup_with_existing_email_still_returns_200() {
     .await;
 }
 
+/// Pins that requesting a magic link for a known account issues a token
+/// and returns 200 (the sign-in request path).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -112,6 +118,8 @@ async fn can_request_magic_link_for_existing_account() {
     .await;
 }
 
+/// Pins anti-enumeration on the sign-in request: an unknown email gets
+/// the same 200 as a known one (no account-existence leak).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -129,6 +137,8 @@ async fn magic_link_for_unknown_email_still_returns_200() {
     .await;
 }
 
+/// Pins redemption: a valid token yields a verifying RS256 access token,
+/// marks the email verified, and is single-use (second redeem → 401).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -169,6 +179,8 @@ async fn can_redeem_magic_link_for_access_token() {
     .await;
 }
 
+/// Pins that an unknown/invalid magic-link token is rejected with 401
+/// (same status as expired/consumed — no distinguishing leak).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -186,6 +198,8 @@ async fn invalid_magic_link_token_is_rejected() {
     .await;
 }
 
+/// Pins `/me` with a valid bearer token returns the current user's
+/// public fields (pid / email / name).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -212,6 +226,7 @@ async fn can_get_current_user() {
     .await;
 }
 
+/// Pins that `/me` without a bearer token is 401 (the route is gated).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -223,6 +238,8 @@ async fn me_without_bearer_token_is_unauthorized() {
     .await;
 }
 
+/// Pins local revocation: after signout the JWT still verifies
+/// cryptographically, but `/me` rejects the revoked session with 401.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -252,6 +269,8 @@ async fn signout_revokes_the_session() {
     .await;
 }
 
+/// Pins that the public JWKS endpoint serves the RSA signing key and the
+/// published `kid` matches the one stamped into token headers.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -274,6 +293,9 @@ async fn jwks_endpoint_publishes_the_signing_key() {
     .await;
 }
 
+/// Pins the per-email rate limit end-to-end: the first `MAX_REQUESTS`
+/// issuance calls stay 200, and the next is throttled with 429 — without
+/// leaking account existence.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -312,6 +334,9 @@ async fn magic_link_issuance_is_rate_limited() {
     .await;
 }
 
+/// Pins the audit trail: signup and an unknown-email request both write
+/// `auth_events` rows (the latter with the `unknown_email` outcome), the
+/// rows never carry token-like material, and `/audit/recent` surfaces them.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -386,6 +411,8 @@ async fn auth_events_are_recorded_and_queryable() {
     .await;
 }
 
+/// Pins the GDPR Art. 15 export: it returns the subject's user row,
+/// sessions, and audit events — and never any password / api key / token.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -439,6 +466,8 @@ async fn account_export_returns_the_callers_data() {
     .await;
 }
 
+/// Pins that the GDPR account routes (export / per-subject audit /
+/// erasure) all require a bearer token (401 without one).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -463,6 +492,10 @@ async fn account_export_and_delete_require_a_bearer_token() {
     .await;
 }
 
+/// Pins GDPR Art. 17 erasure end-to-end: the row survives but is
+/// soft-deleted + anonymised (tombstone email/name), the original email
+/// no longer resolves, all sessions are revoked, an `account_erased`
+/// audit row is written, and post-erasure `/me` + export return 401.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -544,6 +577,9 @@ async fn account_erasure_soft_deletes_anonymises_revokes_and_audits() {
 // DB-free contract assertions (always run).
 // ---------------------------------------------------------------------------
 
+/// Pins (DB-free) that the auth route table is mounted under `/api/auth`
+/// and exposes every expected path, and that the JWKS route is mounted
+/// under `/.well-known/jwks.json`.
 #[test]
 fn route_table_covers_the_magic_link_surface() {
     let routes = authentication_service::controllers::auth::routes();
@@ -571,6 +607,8 @@ fn route_table_covers_the_magic_link_surface() {
     assert!(jwks.handlers.iter().any(|h| h.uri == "/jwks.json"));
 }
 
+/// Pins (DB-free) that the docs routes expose the `OpenAPI` JSON and the
+/// Swagger UI page.
 #[test]
 fn route_table_covers_the_api_docs_surface() {
     let docs = authentication_service::controllers::docs::routes();
@@ -583,6 +621,8 @@ fn route_table_covers_the_api_docs_surface() {
     }
 }
 
+/// Pins (DB-free) the `SignupParams` deserialization contract: `name` is
+/// optional, but `email` is required.
 #[test]
 fn signup_params_accept_an_optional_name() {
     use authentication_service::controllers::auth::SignupParams;
@@ -601,6 +641,7 @@ fn signup_params_accept_an_optional_name() {
         .expect_err("email should be required");
 }
 
+/// Pins (DB-free) that `SignupParams` accepts an optional `locale` field.
 #[test]
 fn signup_params_accept_an_optional_locale() {
     use authentication_service::controllers::auth::SignupParams;
@@ -616,6 +657,7 @@ fn signup_params_accept_an_optional_locale() {
     assert!(without_locale.locale.is_none());
 }
 
+/// Pins (DB-free) that `MagicLinkParams` accepts an optional `locale` field.
 #[test]
 fn magic_link_params_accept_an_optional_locale() {
     use authentication_service::controllers::auth::MagicLinkParams;

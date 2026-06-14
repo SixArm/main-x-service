@@ -2,6 +2,8 @@ use case_folder_service_with_rust::app::App;
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
+/// Pins: `GET /api/folders?nhs_number=…` returns every folder whose
+/// snapshot matches that NHS number.
 #[tokio::test]
 #[serial]
 async fn folder_lookup_by_nhs_returns_matching_folders() {
@@ -29,6 +31,8 @@ async fn folder_lookup_by_nhs_returns_matching_folders() {
     .await;
 }
 
+/// Pins: a folder lookup for an unseeded NHS number returns `200` with
+/// an empty `items` list (not a 404).
 #[tokio::test]
 #[serial]
 async fn folder_lookup_by_unknown_nhs_returns_empty_list() {
@@ -44,6 +48,8 @@ async fn folder_lookup_by_unknown_nhs_returns_empty_list() {
     .await;
 }
 
+/// Pins: `GET /api/workers` proxies the Main Worker Service and returns
+/// every seeded worker.
 #[tokio::test]
 #[serial]
 async fn workers_list_returns_workers_from_main_worker_service() {
@@ -67,6 +73,9 @@ async fn workers_list_returns_workers_from_main_worker_service() {
     .await;
 }
 
+/// Pins: a move with a `worker_id` snapshots the worker's name+role
+/// (overriding the free-text `moved_by`), returns `201` with a
+/// `Location` header, records the event, and relocates the folder.
 #[tokio::test]
 #[serial]
 async fn create_move_records_worker_snapshot() {
@@ -124,6 +133,8 @@ async fn create_move_records_worker_snapshot() {
     .await;
 }
 
+/// Pins: a move with no `worker_id` records the free-text `moved_by`
+/// verbatim and leaves the worker id / role snapshot empty.
 #[tokio::test]
 #[serial]
 async fn create_move_falls_back_to_free_text_when_no_worker_id() {
@@ -156,6 +167,8 @@ async fn create_move_falls_back_to_free_text_when_no_worker_id() {
     .await;
 }
 
+/// Pins: a malformed (non-UUID) `folder_id` is rejected `422` with a
+/// per-field `errors.folder_id` message.
 #[tokio::test]
 #[serial]
 async fn create_move_with_invalid_folder_id_returns_422() {
@@ -175,6 +188,7 @@ async fn create_move_with_invalid_folder_id_returns_422() {
     .await;
 }
 
+/// Pins: a well-formed but unknown `folder_id` returns `404`.
 #[tokio::test]
 #[serial]
 async fn create_move_with_unknown_folder_returns_404() {
@@ -192,6 +206,8 @@ async fn create_move_with_unknown_folder_returns_404() {
     .await;
 }
 
+/// Pins: `GET /api/moves` returns the move-event audit log (one entry
+/// per recorded move).
 #[tokio::test]
 #[serial]
 async fn moves_list_returns_audit_log() {
@@ -221,6 +237,8 @@ async fn moves_list_returns_audit_log() {
     .await;
 }
 
+/// Pins: `GET /api/moves/{id}` returns the single move event by id with
+/// its folder title and mover.
 #[tokio::test]
 #[serial]
 async fn show_returns_single_move() {
@@ -253,6 +271,7 @@ async fn show_returns_single_move() {
     .await;
 }
 
+/// Pins: `GET /api/moves/{id}` for an unknown id returns `404`.
 #[tokio::test]
 #[serial]
 async fn show_unknown_move_returns_404() {

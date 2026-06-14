@@ -55,13 +55,20 @@ pub fn validate(pathway: &CarePathway) -> Result<()> {
     ))
 }
 
+/// Lightweight reference to a stored pathway: the public id plus the
+/// denormalised name. Returned by create/update/list/search instead of
+/// the full payload, so callers can render a link without a second fetch.
 #[derive(Debug, Serialize)]
 struct PathwayRef {
+    /// The pathway's public id (UUID), as a string.
     pid: String,
+    /// The pathway's denormalised display name.
     name: String,
 }
 
 impl PathwayRef {
+    /// Project a stored [`PathwayModel`] row down to its `{pid, name}`
+    /// reference. Used wherever a handler returns rows without the body.
     fn of(m: &PathwayModel) -> Self {
         Self {
             pid: m.pid.to_string(),
@@ -70,17 +77,26 @@ impl PathwayRef {
     }
 }
 
+/// Request body for `POST /match`: a query plus the explicit candidate
+/// list to rank it against. Nothing is persisted — this is pure scoring.
 #[derive(Debug, Deserialize)]
 struct MatchRequest {
+    /// The pathway to score against each candidate.
     query: CarePathway,
+    /// The candidate pathways to rank by match score.
     candidates: Vec<CarePathway>,
 }
 
+/// Query string for `GET /search`: the (optional) `q` term. Absent or
+/// blank `q` is rejected by the handler as a `400`.
 #[derive(Debug, Deserialize)]
 struct SearchParams {
+    /// The case-insensitive substring to match against pathway names.
     q: Option<String>,
 }
 
+/// Request body for `POST /merge`: which duplicate folds into which
+/// survivor, with an optional reason recorded in the merge history.
 #[derive(Debug, Deserialize)]
 struct MergeRequest {
     /// The surviving pathway's public id.
@@ -92,16 +108,35 @@ struct MergeRequest {
     reason: Option<String>,
 }
 
+/// A scored `check-duplicates` hit: a stored pathway that matched the
+/// query above the engine threshold, with its score and classification.
 #[derive(Debug, Serialize)]
 struct ScoredRef {
+    /// The matched pathway's public id (UUID), as a string.
     pid: String,
+    /// The matched pathway's display name.
     name: String,
+    /// Overall match score in `[0.0, 1.0]`.
     score: f64,
+    /// Human-readable confidence band (the matcher's `Confidence` debug).
     confidence: String,
+    /// Whether the engine classified this as a match (always `true` here,
+    /// since non-matches are filtered out before this struct is built).
     is_match: bool,
 }
 
 /// Create a care pathway.
+///
+/// `POST /api/care-pathways` — request body is a [`CarePathway`]; response
+/// is a [`PathwayRef`] (`{pid, name}`). Validates first (`422` on blank
+/// name / malformed codes), inserts, audits, and publishes a `Created`
+/// event. `caller` is the optional bearer identity, stamped as the audit
+/// `actor` and event actor when present.
+///
+/// # Errors
+///
+/// `422` on validation failure; otherwise propagates DB/serialization
+/// errors.
 #[debug_handler]
 async fn create(
     State(ctx): State<AppContext>,
@@ -110,6 +145,8 @@ async fn create(
 ) -> Result<Response> {
     validate(&pathway)?;
     let model = PathwayModel::create(&ctx.db, &pathway).await?;
+    // Audit + event are best-effort side channels; the create itself has
+    // already committed by the time we record them.
     audit(
         &ctx,
         model.pid,
@@ -129,6 +166,11 @@ async fn create(
 
 /// Best-effort audit write: log on failure but never fail the request.
 /// `actor` is the verified caller `sub` when a token was presented.
+///
+/// `action` is the verb recorded (`"created"`, `"updated"`, `"deleted"`,
+/// `"merged"`, `"merged_into"`); `snapshot` is the post-change payload
+/// (or `None` for deletes). A failure here is logged at `WARN` and
+/// swallowed — the audit trail is secondary to completing the request.
 async fn audit(
     ctx: &AppContext,
     entity_pid: uuid::Uuid,
@@ -142,6 +184,13 @@ async fn audit(
 }
 
 /// Fetch a care pathway by public id.
+///
+/// `GET /api/care-pathways/{pid}` — response is the full stored
+/// [`CarePathway`]. `404` when `pid` is unknown or soft-deleted.
+///
+/// # Errors
+///
+/// `404` when no active row has that `pid`; otherwise DB/parse errors.
 #[debug_handler]
 async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
     let model = PathwayModel::find_by_pid(&ctx.db, &pid).await?;
@@ -149,6 +198,14 @@ async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Resu
 }
 
 /// Replace a care pathway's payload.
+///
+/// `PUT /api/care-pathways/{pid}` — request body is a [`CarePathway`];
+/// response is a [`PathwayRef`]. Validates, replaces the stored payload,
+/// audits, and publishes an `Updated` event.
+///
+/// # Errors
+///
+/// `422` on validation failure, `404` on unknown `pid`.
 #[debug_handler]
 async fn update(
     Path(pid): Path<String>,
@@ -180,6 +237,14 @@ async fn update(
 }
 
 /// Soft-delete a care pathway.
+///
+/// `DELETE /api/care-pathways/{pid}` — marks the row inactive and stamps
+/// `deleted_at`; the row is retained for audit. Audits with `None`
+/// snapshot and publishes a `Deleted` event. Response is empty JSON.
+///
+/// # Errors
+///
+/// `404` when `pid` is unknown.
 #[debug_handler]
 async fn remove(
     Path(pid): Path<String>,
@@ -187,6 +252,7 @@ async fn remove(
     caller: MaybeAuthUser,
 ) -> Result<Response> {
     let model = PathwayModel::find_by_pid(&ctx.db, &pid).await?;
+    // Capture identity before consuming the model into an active model.
     let (entity_pid, name) = (model.pid, model.name.clone());
     model.into_active_model().soft_delete(&ctx.db).await?;
     audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
@@ -200,6 +266,13 @@ async fn remove(
 }
 
 /// List active care pathways (capped at 100).
+///
+/// `GET /api/care-pathways` — response is a `[PathwayRef]` array, newest
+/// first. The 100 cap is a pragmatic bound until pagination lands.
+///
+/// # Errors
+///
+/// Propagates DB query errors.
 #[debug_handler]
 async fn list(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = PathwayModel::list(&ctx.db, 100).await?;
@@ -209,13 +282,19 @@ async fn list(State(ctx): State<AppContext>) -> Result<Response> {
 
 /// Case-insensitive name search: `GET /api/care-pathways/search?q=stroke`.
 /// Pragmatic Postgres `ILIKE` over the denormalised `name` (cap 50);
-/// full-text / fuzzy search is deferred (spec §13 T-6).
+/// full-text / fuzzy search is deferred (spec §13 T-6). Response is a
+/// `[PathwayRef]` array; a missing or blank `q` is a `400`.
+///
+/// # Errors
+///
+/// `400` when `q` is absent or whitespace-only; otherwise DB errors.
 #[debug_handler]
 async fn search(
     axum::extract::Query(params): axum::extract::Query<SearchParams>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let q = params.q.unwrap_or_default();
+    // Reject an absent/blank term rather than ILIKE-ing on `%%`.
     if q.trim().is_empty() {
         return bad_request("query parameter `q` is required");
     }
@@ -225,6 +304,14 @@ async fn search(
 }
 
 /// Score a query against an explicit candidate list (no persistence).
+///
+/// `POST /api/care-pathways/match` — request body is a [`MatchRequest`];
+/// response is the matcher engine's ranked results (`[index, MatchResult]`
+/// pairs). Stateless: nothing is read from or written to the database.
+///
+/// # Errors
+///
+/// None beyond response serialization (the engine is infallible here).
 #[debug_handler]
 async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
@@ -233,6 +320,16 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
 }
 
 /// Find stored care pathways that match the query above the threshold.
+///
+/// `POST /api/care-pathways/check-duplicates` — request body is a
+/// [`CarePathway`] query; response is a score-sorted `[ScoredRef]` array.
+/// In-memory scan (no search-backed blocking yet): loads up to
+/// [`CHECK_DUPLICATES_SCAN_CAP`] active rows and matches each, logging a
+/// `WARN` if the cap is hit (results may then be incomplete — spec §13 T-6).
+///
+/// # Errors
+///
+/// Propagates DB query and payload-parse errors.
 #[debug_handler]
 async fn check_duplicates(
     State(ctx): State<AppContext>,
@@ -240,6 +337,8 @@ async fn check_duplicates(
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
     let rows = PathwayModel::list(&ctx.db, CHECK_DUPLICATES_SCAN_CAP).await?;
+    // Hitting the cap means the scan was truncated; the result set may
+    // miss matches beyond the first `CAP` rows.
     if rows.len() as u64 == CHECK_DUPLICATES_SCAN_CAP {
         tracing::warn!(
             cap = CHECK_DUPLICATES_SCAN_CAP,
@@ -249,6 +348,8 @@ async fn check_duplicates(
     }
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
+        // Each stored row is parsed back into a `CarePathway` and scored
+        // against the query; only classified matches are surfaced.
         let candidate = row.to_pathway()?;
         let r = engine.match_care_pathways(&query, &candidate);
         if r.is_match {
@@ -261,6 +362,8 @@ async fn check_duplicates(
             });
         }
     }
+    // Best matches first. `f64` is only partially ordered, so NaN scores
+    // (which the engine never emits) fall back to "equal" rather than panic.
     hits.sort_by(|a, b| {
         b.score
             .partial_cmp(&a.score)
@@ -273,18 +376,32 @@ async fn check_duplicates(
 /// union the duplicate's data into main, keep the duplicate's title as an
 /// alternate name, soft-delete the duplicate, record the merge history,
 /// and publish a `Merged` event (plus a `Deleted` for the duplicate).
+///
+/// `POST /api/care-pathways/merge` — request body is a [`MergeRequest`];
+/// response is `{main_pid, duplicate_pid, main}` (the survivor's merged
+/// payload). The pure folding logic lives in [`merge_pathways`]; this
+/// handler does the DB orchestration and side effects.
+///
+/// # Errors
+///
+/// `422` when `main_pid == duplicate_pid`; `404` when either pid is
+/// unknown; otherwise DB/parse errors.
 #[debug_handler]
 async fn merge(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     Json(req): Json<MergeRequest>,
 ) -> Result<Response> {
+    // Reject self-merge up front: folding a record into itself is a no-op
+    // that would still soft-delete the only copy.
     if req.main_pid == req.duplicate_pid {
         return Err(Error::CustomError(
             StatusCode::UNPROCESSABLE_ENTITY,
             ErrorDetail::new("validation", "main_pid and duplicate_pid must differ"),
         ));
     }
+    // Both must exist and be active; either missing is the `find_by_pid`
+    // `404`.
     let main = PathwayModel::find_by_pid(&ctx.db, &req.main_pid).await?;
     let duplicate = PathwayModel::find_by_pid(&ctx.db, &req.duplicate_pid).await?;
 
@@ -308,8 +425,12 @@ async fn merge(
     )
     .await
     {
+        // The merge-history row is best-effort, like the audit log; a
+        // failure here must not roll back the already-committed merge.
         tracing::warn!(error = %err, "failed to write merge record");
     }
+    // Two audit entries: one on the survivor ("merged"), one on the
+    // retired duplicate ("merged_into") so both pids carry the trail.
     audit(
         &ctx,
         merged.pid,
@@ -340,6 +461,12 @@ async fn merge(
 }
 
 /// Recent merge-history records, newest first.
+///
+/// `GET /api/care-pathways/merges/recent` — capped at 100 rows.
+///
+/// # Errors
+///
+/// Propagates DB query errors.
 #[debug_handler]
 async fn recent_merges(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = MergeRecordModel::recent(&ctx.db, 100).await?;
@@ -347,6 +474,13 @@ async fn recent_merges(State(ctx): State<AppContext>) -> Result<Response> {
 }
 
 /// Recent audit-log entries across all care pathways.
+///
+/// `GET /api/care-pathways/audit/recent` — system-wide trail, newest
+/// first, capped at 100 rows.
+///
+/// # Errors
+///
+/// Propagates DB query errors.
 #[debug_handler]
 async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = AuditModel::recent(&ctx.db, 100).await?;
@@ -354,8 +488,17 @@ async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
 }
 
 /// Audit trail for a single care pathway.
+///
+/// `GET /api/care-pathways/{pid}/audit` — every audit row for one pathway,
+/// newest first. A `pid` that is not a UUID is a `400`.
+///
+/// # Errors
+///
+/// `400` when `pid` is not a valid UUID; otherwise DB query errors.
 #[debug_handler]
 async fn entity_audit(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+    // Audit rows key on the UUID `entity_pid`, so a non-UUID path segment
+    // can never match — reject it as a `400` rather than scanning.
     let Ok(uuid) = uuid::Uuid::parse_str(&pid) else {
         return bad_request("invalid pid");
     };
@@ -364,6 +507,14 @@ async fn entity_audit(Path(pid): Path<String>, State(ctx): State<AppContext>) ->
 }
 
 /// Recent events from the in-memory event stream.
+///
+/// `GET /api/care-pathways/events/recent` — the last 100
+/// [`streaming::EventView`]s from the process-local ring buffer (not
+/// durable across restarts).
+///
+/// # Errors
+///
+/// None — reads the in-memory buffer.
 #[debug_handler]
 async fn recent_events() -> Result<Response> {
     format::json(streaming::recent(100))
@@ -372,6 +523,14 @@ async fn recent_events() -> Result<Response> {
 /// Echo the verified claims of the bearer token — `401` when the token is
 /// missing or fails verification. Proves peer JWT verification against
 /// the auth-service JWKS end to end (spec §13 T-7).
+///
+/// `GET /api/care-pathways/whoami` — the [`AuthUser`] extractor performs
+/// the verification, so the handler is reached only with valid [`Claims`];
+/// the `401` is produced by the extractor's rejection before this runs.
+///
+/// # Errors
+///
+/// `401` (via the extractor) when the bearer token is absent or invalid.
 #[debug_handler]
 async fn whoami(AuthUser(claims): AuthUser) -> Result<Response> {
     format::json(claims)
@@ -379,6 +538,10 @@ async fn whoami(AuthUser(claims): AuthUser) -> Result<Response> {
 
 /// Build the `/api/care-pathways` route table (CRUD + match +
 /// check-duplicates + audit / event endpoints).
+///
+/// Loco matches routes most-specific-first, so the fixed sub-paths
+/// (`/search`, `/match`, `/merge`, …) are registered before the `/{pid}`
+/// catch-alls to avoid the parameter route shadowing them.
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/care-pathways")
@@ -398,6 +561,10 @@ pub fn routes() -> Routes {
         .add("/{pid}/audit", get(entity_audit))
 }
 
+/// DB-free controller-level tests. These exercise [`validate`] and the
+/// scan-cap constant directly (no `AppContext`/database), so they run on
+/// the default `cargo test` and pin the validation→status contract that
+/// the DB-gated request tests assert end to end.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,6 +593,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 
+    /// A well-formed payload (non-blank name, no codes) validates `Ok`.
     #[test]
     fn non_blank_name_passes_validation() {
         assert!(validate(&CarePathway::new("Acute Stroke Care Pathway")).is_ok());

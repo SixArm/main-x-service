@@ -7,17 +7,27 @@ use uuid::Uuid;
 use super::{Client, Error, Folder, NewFolder, NewVolume, Volume};
 use crate::nhs::normalise_nhs_number;
 
+/// In-memory test double for the Main Thing Service [`Client`]. Holds
+/// folders and volumes in separate `Mutex`-guarded `Vec`s; no network.
 #[derive(Default)]
 pub struct StubClient {
+    /// Stored folders, in insertion order.
     folders: Mutex<Vec<Folder>>,
+    /// Stored volumes, in insertion order.
     volumes: Mutex<Vec<Volume>>,
 }
 
 impl StubClient {
+    /// Creates an empty stub.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Pre-loads `folders`, skipping any whose `id` is already present
+    /// (dedupe-by-id). Volumes are seeded via the trait `create_volume`.
+    ///
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     pub fn seed(&self, folders: Vec<Folder>) {
         let mut guard = self.folders.lock().unwrap();
         for f in folders {
@@ -27,10 +37,18 @@ impl StubClient {
         }
     }
 
+    /// Returns a clone of all stored folders (test inspection helper).
+    ///
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     pub fn snapshot(&self) -> Vec<Folder> {
         self.folders.lock().unwrap().clone()
     }
 
+    /// Removes all stored folders *and* volumes.
+    ///
+    /// # Panics
+    /// Panics if either internal mutex is poisoned.
     pub fn clear(&self) {
         self.folders.lock().unwrap().clear();
         self.volumes.lock().unwrap().clear();
@@ -39,6 +57,14 @@ impl StubClient {
 
 #[async_trait]
 impl Client for StubClient {
+    /// Matches folders whose title or patient-name contains `query`
+    /// (case-insensitive), or whose NHS Number contains the query digits.
+    /// Empty query matches all.
+    ///
+    /// # Errors
+    /// Infallible; returns `Result` for trait parity.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn search(&self, query: &str) -> Result<Vec<Folder>, Error> {
         let q = query.trim().to_lowercase();
         let q_digits = normalise_nhs_number(query);
@@ -58,11 +84,23 @@ impl Client for StubClient {
             .collect())
     }
 
+    /// Finds a folder by UUID.
+    ///
+    /// # Errors
+    /// Infallible; returns `Result` for trait parity.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Folder>, Error> {
         let guard = self.folders.lock().unwrap();
         Ok(guard.iter().find(|f| f.id == id).cloned())
     }
 
+    /// All folders whose `patient_id` matches.
+    ///
+    /// # Errors
+    /// Infallible; returns `Result` for trait parity.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn list_for_patient(&self, patient_id: Uuid) -> Result<Vec<Folder>, Error> {
         let guard = self.folders.lock().unwrap();
         Ok(guard
@@ -72,6 +110,12 @@ impl Client for StubClient {
             .collect())
     }
 
+    /// All folders whose NHS Number snapshot matches (normalised digits).
+    ///
+    /// # Errors
+    /// Infallible; returns `Result` for trait parity.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn list_for_nhs_number(&self, nhs_number: &str) -> Result<Vec<Folder>, Error> {
         let want = normalise_nhs_number(nhs_number);
         let guard = self.folders.lock().unwrap();
@@ -82,6 +126,14 @@ impl Client for StubClient {
             .collect())
     }
 
+    /// Creates a folder. Returns [`Error::DuplicateTitle`] when one already
+    /// exists with the same `(patient_id, title)`; otherwise stores a new
+    /// folder with a fresh UUID and returns it.
+    ///
+    /// # Errors
+    /// Returns [`Error::DuplicateTitle`] on a `(patient_id, title)` collision.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn create(&self, input: NewFolder) -> Result<Folder, Error> {
         let mut guard = self.folders.lock().unwrap();
         if guard
@@ -106,6 +158,13 @@ impl Client for StubClient {
         Ok(folder)
     }
 
+    /// Moves a folder in place: updates its `cabinet_id` and
+    /// `cabinet_path_snapshot`. Unknown ids yield [`Error::BadResponse`].
+    ///
+    /// # Errors
+    /// Returns [`Error::BadResponse`] when no folder has `id`.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn update_cabinet(
         &self,
         id: Uuid,
@@ -122,6 +181,13 @@ impl Client for StubClient {
         Ok(folder.clone())
     }
 
+    /// Creates a volume. Returns [`Error::DuplicateTitle`] when one already
+    /// exists with the same `(patient_id, title)`.
+    ///
+    /// # Errors
+    /// Returns [`Error::DuplicateTitle`] on a `(patient_id, title)` collision.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn create_volume(&self, input: NewVolume) -> Result<Volume, Error> {
         let mut guard = self.volumes.lock().unwrap();
         if guard
@@ -143,15 +209,33 @@ impl Client for StubClient {
         Ok(volume)
     }
 
+    /// Finds a volume by UUID.
+    ///
+    /// # Errors
+    /// Infallible; returns `Result` for trait parity.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn find_volume_by_id(&self, id: Uuid) -> Result<Option<Volume>, Error> {
         let guard = self.volumes.lock().unwrap();
         Ok(guard.iter().find(|v| v.id == id).cloned())
     }
 
+    /// All stored volumes.
+    ///
+    /// # Errors
+    /// Infallible; returns `Result` for trait parity.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn list_volumes(&self) -> Result<Vec<Volume>, Error> {
         Ok(self.volumes.lock().unwrap().clone())
     }
 
+    /// Renames a volume in place. Unknown ids yield [`Error::BadResponse`].
+    ///
+    /// # Errors
+    /// Returns [`Error::BadResponse`] when no volume has `id`.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn rename_volume(&self, id: Uuid, title: String) -> Result<Volume, Error> {
         let mut guard = self.volumes.lock().unwrap();
         let volume = guard
@@ -162,6 +246,13 @@ impl Client for StubClient {
         Ok(volume.clone())
     }
 
+    /// Moves a volume in place: updates its `cabinet_id` and
+    /// `cabinet_path_snapshot`. Unknown ids yield [`Error::BadResponse`].
+    ///
+    /// # Errors
+    /// Returns [`Error::BadResponse`] when no volume has `id`.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn update_volume_cabinet(
         &self,
         id: Uuid,
@@ -178,6 +269,13 @@ impl Client for StubClient {
         Ok(volume.clone())
     }
 
+    /// Sets or clears a folder's volume membership in place. Unknown ids
+    /// yield [`Error::BadResponse`].
+    ///
+    /// # Errors
+    /// Returns [`Error::BadResponse`] when no folder has `folder_id`.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn set_folder_volume(
         &self,
         folder_id: Uuid,

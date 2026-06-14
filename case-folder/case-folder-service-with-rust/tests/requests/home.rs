@@ -2,6 +2,7 @@ use case_folder_service_with_rust::app::App;
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
+/// Pins: `/healthz` returns `200` with `status: "ok"`.
 #[tokio::test]
 #[serial]
 async fn healthz_returns_ok() {
@@ -15,6 +16,8 @@ async fn healthz_returns_ok() {
     .await;
 }
 
+/// Pins: with no seeded data, `/api/stats` reports zero across every
+/// counter (patients, folder buckets, place kinds, 24h moves).
 #[tokio::test]
 #[serial]
 async fn stats_reports_zeros_on_empty_world() {
@@ -35,6 +38,8 @@ async fn stats_reports_zeros_on_empty_world() {
     .await;
 }
 
+/// Pins: after seeding one patient, one in-cabinet folder, and a
+/// building/room/cabinet chain, `/api/stats` counts each correctly.
 #[tokio::test]
 #[serial]
 async fn stats_counts_folders_and_places() {

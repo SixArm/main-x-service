@@ -28,6 +28,9 @@ const PID: &str = "11111111-1111-1111-1111-111111111111";
 const EMAIL: &str = "alice@example.com";
 const NAME: &str = "Alice";
 
+/// Pins the end-to-end contract: a token signed by this service verifies
+/// through the peer `Verifier` built from the published JWKS, and every
+/// claim round-trips byte-for-byte across the duplicated `Claims` shape.
 #[test]
 fn service_signed_token_verifies_through_the_verifier_crate() {
     let keys = auth::keys();
@@ -53,6 +56,9 @@ fn service_signed_token_verifies_through_the_verifier_crate() {
     assert!(claims.iat <= claims.exp);
 }
 
+/// Pins the `kid` derivation contract: the token-header `kid`, the JWKS
+/// `kid`, and an independently recomputed `base64url(SHA-256(modulus))`
+/// thumbprint all agree (so peers can select the right key).
 #[test]
 fn kid_contract_token_header_jwks_and_thumbprint_agree() {
     let keys = auth::keys();
@@ -81,6 +87,9 @@ fn kid_contract_token_header_jwks_and_thumbprint_agree() {
     assert_eq!(jwk["n"].as_str(), Some(b64.encode(&n_bytes).as_str()));
 }
 
+/// Pins strict key-selection-by-`kid`: republishing the same key under a
+/// different `kid` must make peer verification fail with `UnknownKid`,
+/// proving selection is by `kid` and not by trying every key.
 #[test]
 fn kid_mismatch_fails_peer_side_verification() {
     let keys = auth::keys();
@@ -98,6 +107,9 @@ fn kid_mismatch_fails_peer_side_verification() {
     );
 }
 
+/// Pins the rotation contract (T-5) on the peer side: a multi-key JWKS
+/// still verifies a primary-signed token (selecting the primary by
+/// `kid`) yet rejects a token whose `kid` is absent from the set.
 #[test]
 fn multi_key_jwks_verifies_primary_and_rejects_unknown_kid() {
     // Key rotation (T-5): a peer building a Verifier from a JWKS that
@@ -164,6 +176,9 @@ wwIDAQAB\n\
     );
 }
 
+/// Pins that `iss`/`aud` policy is enforced at the peer: a `Verifier`
+/// built with the wrong audience or wrong issuer rejects an otherwise
+/// valid token (signature alone is not sufficient).
 #[test]
 fn issuer_and_audience_policy_is_enforced_peer_side() {
     let keys = auth::keys();

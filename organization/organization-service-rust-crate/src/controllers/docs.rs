@@ -6,12 +6,20 @@
 use loco_rs::prelude::*;
 
 /// The `OpenAPI` 3 document.
+///
+/// `GET /api-docs/openapi.json`. Returns `200` with the hand-written
+/// spec from [`crate::openapi::spec`] as JSON. Stays public even under
+/// blanket auth enforcement (see `auth::is_public_path`).
 #[debug_handler]
 async fn openapi_json() -> Result<Response> {
     format::json(crate::openapi::spec())
 }
 
 /// A Swagger UI page wired to `/api-docs/openapi.json`.
+///
+/// `GET /swagger-ui`. Returns `200` with a static HTML page that loads
+/// Swagger UI from a CDN and points it at the spec endpoint. Also public
+/// under blanket auth enforcement.
 #[debug_handler]
 async fn swagger_ui() -> Result<Response> {
     let html = r#"<!DOCTYPE html>

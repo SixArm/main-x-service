@@ -17,10 +17,20 @@ use uuid::Uuid;
 
 use super::{Client, Error, Folder, NewFolder, NewVolume, Volume};
 
+// The `KEY_*` constants are keyword-bag prefixes. The upstream Thing
+// service has no typed columns for these tracker fields, so they are
+// packed as `"<prefix><value>"` strings into the Thing's `keywords` array
+// and parsed back out on the way in. Each prefix ends in `=`.
+
+/// Keyword prefix for the owning patient's UUID (e.g. `"patient_id=<uuid>"`).
 const KEY_PATIENT_ID: &str = "patient_id=";
+/// Keyword prefix for the patient-name snapshot.
 const KEY_PATIENT_NAME: &str = "patient_name=";
+/// Keyword prefix for the cabinet path snapshot.
 const KEY_CABINET_PATH: &str = "cabinet_path=";
+/// Keyword prefix for the owning volume's UUID.
 const KEY_VOLUME_ID: &str = "volume_id=";
+/// Keyword prefix for the owning volume's title snapshot.
 const KEY_VOLUME_TITLE: &str = "volume_title=";
 /// NHS Number `propertyID` we register with the Thing service so we
 /// can find folders by patient.
@@ -31,47 +41,70 @@ const CASE_FILE_TYPE: &str = "CaseFile";
 /// Marks the Thing as a volume (a bundle of folders).
 const VOLUME_TYPE: &str = "Volume";
 
+/// The upstream `{success, data, error}` envelope. We only consume `data`.
 #[derive(Debug, Deserialize)]
 struct ApiResponse<T> {
+    /// Payload, present on success.
     data: Option<T>,
+    /// Service-reported success flag. Unused (status is authoritative),
+    /// hence `#[allow(dead_code)]`.
     #[serde(default)]
     #[allow(dead_code)]
     success: bool,
 }
 
+/// The `data` shape returned by the search endpoint: a list of things.
 #[derive(Debug, Deserialize, Default)]
 struct SearchEnvelope {
+    /// Raw thing DTOs; filtered by `thing_type` downstream.
     #[serde(default)]
     things: Vec<ThingDto>,
 }
 
+/// Wire shape of an upstream `Thing`, trimmed to what the tracker reads.
+/// Used for both folders and volumes; `thing_type` disambiguates.
 #[derive(Debug, Deserialize)]
 struct ThingDto {
+    /// Thing UUID.
     id: Uuid,
+    /// Thing name — folder/volume title.
     name: String,
+    /// Thing description — folder notes (volumes ignore it).
     #[serde(default)]
     description: Option<String>,
+    /// Raw `thing_type`; may be a bare string or `{"Other": "..."}`.
     #[serde(default)]
     thing_type: Option<serde_json::Value>,
+    /// Containing thing/place UUID — the cabinet the folder sits in.
     #[serde(default)]
     contained_in_thing: Option<Uuid>,
+    /// Packed tracker fields (see the `KEY_*` prefixes).
     #[serde(default)]
     keywords: Vec<String>,
+    /// Identifiers; the NHS Number is found among these.
     #[serde(default)]
     identifiers: Vec<IdentifierDto>,
 }
 
+/// Wire shape of a single `Thing` identifier (e.g. the NHS Number).
 #[derive(Debug, Serialize, Deserialize)]
 struct IdentifierDto {
+    /// Property ID; may be a bare string or `{"Custom": "..."}`.
     property_id: serde_json::Value,
+    /// Identifier value (the NHS Number digits).
     value: String,
+    /// Optional human-readable identifier name.
     #[serde(default)]
     name: Option<String>,
+    /// Optional identifier system URL.
     #[serde(default)]
     url: Option<String>,
 }
 
 impl ThingDto {
+    /// Projects this DTO into a [`Folder`], or `None` when it is not a
+    /// case-file Thing. Parses the `KEY_*` keywords and picks the NHS
+    /// Number from the identifiers; a missing patient UUID falls back to nil.
     fn into_folder(self) -> Option<Folder> {
         if !is_case_file(&self.thing_type) {
             return None;
@@ -98,6 +131,9 @@ impl ThingDto {
         })
     }
 
+    /// Projects this DTO into a [`Volume`], or `None` when it is not a
+    /// volume Thing. Reuses the keyword parser (ignoring the volume-membership
+    /// keywords, which don't apply to a volume itself).
     fn into_volume(self) -> Option<Volume> {
         if !is_volume(&self.thing_type) {
             return None;
@@ -121,6 +157,9 @@ impl ThingDto {
     }
 }
 
+/// Parses the `KEY_*`-prefixed keyword strings back into typed fields.
+/// Returns `(patient_id, patient_name, cabinet_path, volume_id,
+/// volume_title)`; any field whose keyword is absent stays `None`.
 #[allow(clippy::type_complexity)]
 fn parse_thing_keywords(
     keywords: &[String],
@@ -158,6 +197,9 @@ fn parse_thing_keywords(
     )
 }
 
+/// Returns `true` when `thing_type` marks the Thing as a volume. Handles
+/// both the bare-string (`"Volume"`) and tagged-enum (`{"Other": "Volume"}`)
+/// JSON forms.
 fn is_volume(value: &Option<serde_json::Value>) -> bool {
     match value {
         Some(serde_json::Value::String(s)) => s == VOLUME_TYPE,
@@ -170,6 +212,9 @@ fn is_volume(value: &Option<serde_json::Value>) -> bool {
     }
 }
 
+/// Returns `true` when `thing_type` marks the Thing as a case-file
+/// folder. Handles both the bare-string (`"CaseFile"`) and tagged-enum
+/// (`{"Other": "CaseFile"}`) JSON forms.
 fn is_case_file(value: &Option<serde_json::Value>) -> bool {
     match value {
         Some(serde_json::Value::String(s)) => s == CASE_FILE_TYPE,
@@ -182,6 +227,9 @@ fn is_case_file(value: &Option<serde_json::Value>) -> bool {
     }
 }
 
+/// Returns `true` when an identifier's `property_id` is the NHS Number
+/// property. Handles both the tagged-enum (`{"Custom": "nhs-number"}`)
+/// and bare-string (`"nhs-number"`) JSON forms.
 fn identifier_is_nhs_number(property_id: &serde_json::Value) -> bool {
     match property_id {
         serde_json::Value::Object(map) => map
@@ -194,6 +242,9 @@ fn identifier_is_nhs_number(property_id: &serde_json::Value) -> bool {
     }
 }
 
+/// Packs a [`NewFolder`]'s tracker fields into the `KEY_*`-prefixed
+/// keyword strings. Patient id/name are always present; cabinet path and
+/// volume membership are appended only when set.
 fn build_keywords(input: &NewFolder) -> Vec<String> {
     let mut out = vec![
         format!("{KEY_PATIENT_ID}{}", input.patient_id),
@@ -211,6 +262,9 @@ fn build_keywords(input: &NewFolder) -> Vec<String> {
     out
 }
 
+/// Builds the upstream `POST /api/things` JSON body for a new volume:
+/// `thing_type = Other("Volume")`, the cabinet pointer, packed keywords,
+/// and an NHS Number identifier under [`NHS_PROPERTY_ID`].
 fn build_volume_payload(id: Uuid, input: &NewVolume) -> serde_json::Value {
     let mut keywords = vec![
         format!("{KEY_PATIENT_ID}{}", input.patient_id),
@@ -238,6 +292,9 @@ fn build_volume_payload(id: Uuid, input: &NewVolume) -> serde_json::Value {
     })
 }
 
+/// Builds the upstream `POST /api/things` JSON body for a new folder:
+/// `thing_type = Other("CaseFile")`, notes as description, the cabinet
+/// pointer, packed keywords, and an NHS Number identifier.
 fn build_payload(id: Uuid, input: &NewFolder) -> serde_json::Value {
     json!({
         "id": id,
@@ -260,6 +317,8 @@ fn build_payload(id: Uuid, input: &NewFolder) -> serde_json::Value {
 }
 
 impl NewFolder {
+    /// Renders the folder notes as the JSON value for `Thing.description`:
+    /// a JSON string when notes are present, JSON `null` otherwise.
     fn description_value(&self) -> serde_json::Value {
         match self.notes.as_deref() {
             Some(n) => serde_json::Value::String(n.to_string()),
@@ -268,13 +327,21 @@ impl NewFolder {
     }
 }
 
+/// REST [`Client`] for the Main Thing Service.
 #[derive(Clone)]
 pub struct HttpClient {
+    /// Service base URL with any trailing slash trimmed.
     base_url: String,
+    /// Shared `reqwest` client (connection pool + 5s timeout).
     http: reqwest::Client,
 }
 
 impl HttpClient {
+    /// Builds a client for the service at `base_url`. Trims a trailing
+    /// slash and applies a 5-second request timeout.
+    ///
+    /// # Panics
+    /// Panics if the underlying `reqwest` client cannot be built.
     pub fn new(base_url: impl Into<String>) -> Self {
         Self {
             base_url: base_url.into().trim_end_matches('/').to_string(),
@@ -285,10 +352,17 @@ impl HttpClient {
         }
     }
 
+    /// Joins `path` onto the base URL to form an absolute request URL.
     fn url(&self, path: &str) -> String {
         format!("{}{}", self.base_url, path)
     }
 
+    /// Runs a `GET /api/things/search` with query params `q` and projects
+    /// the results into case-file [`Folder`]s (non-folder things dropped).
+    ///
+    /// # Errors
+    /// Returns [`Error::Transport`] on a non-success status and
+    /// [`Error::BadResponse`] when the body cannot be parsed.
     async fn search_raw(&self, q: &[(&str, String)]) -> Result<Vec<Folder>, Error> {
         let response = self
             .http
@@ -316,6 +390,13 @@ impl HttpClient {
             .collect())
     }
 
+    /// `PATCH /api/things/{id}` with the supplied partial `patch` body,
+    /// projecting the response back into a [`Volume`]. Shared by the
+    /// volume rename/move paths.
+    ///
+    /// # Errors
+    /// Returns [`Error::Transport`] on a non-success status and
+    /// [`Error::BadResponse`] when the response has no usable volume `data`.
     async fn patch_volume(&self, id: Uuid, patch: serde_json::Value) -> Result<Volume, Error> {
         let response = self
             .http
@@ -342,6 +423,11 @@ impl HttpClient {
 
 #[async_trait]
 impl Client for HttpClient {
+    /// `GET /api/things/search?q=<query>&thing_type=CaseFile&limit=100` —
+    /// free-text folder search.
+    ///
+    /// # Errors
+    /// Returns [`Error`] on transport failure or an unparseable response.
     async fn search(&self, query: &str) -> Result<Vec<Folder>, Error> {
         let q = vec![
             ("q", query.to_string()),
@@ -351,6 +437,12 @@ impl Client for HttpClient {
         self.search_raw(&q).await
     }
 
+    /// `GET /api/things/{id}` — look up a folder by UUID. A `404` maps to
+    /// `Ok(None)`; a non-case-file Thing also yields `Ok(None)`.
+    ///
+    /// # Errors
+    /// Returns [`Error::Transport`] on other non-success statuses and
+    /// [`Error::BadResponse`] on a parse failure.
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Folder>, Error> {
         let response = self
             .http
@@ -374,6 +466,11 @@ impl Client for HttpClient {
         Ok(body.data.and_then(ThingDto::into_folder))
     }
 
+    /// `GET /api/things/search` filtered by the `patient_id=` keyword —
+    /// all folders for one patient.
+    ///
+    /// # Errors
+    /// Returns [`Error`] on transport failure or an unparseable response.
     async fn list_for_patient(&self, patient_id: Uuid) -> Result<Vec<Folder>, Error> {
         let q = vec![
             ("keyword", format!("{KEY_PATIENT_ID}{patient_id}")),
@@ -383,6 +480,11 @@ impl Client for HttpClient {
         self.search_raw(&q).await
     }
 
+    /// `GET /api/things/search` filtered by the NHS Number identifier —
+    /// all folders snapshotting a given NHS Number.
+    ///
+    /// # Errors
+    /// Returns [`Error`] on transport failure or an unparseable response.
     async fn list_for_nhs_number(&self, nhs_number: &str) -> Result<Vec<Folder>, Error> {
         let q = vec![
             ("identifier_type", NHS_PROPERTY_ID.to_string()),
@@ -393,6 +495,12 @@ impl Client for HttpClient {
         self.search_raw(&q).await
     }
 
+    /// `POST /api/things` — creates a case-file folder. An upstream
+    /// `409 Conflict` is mapped to [`Error::DuplicateTitle`].
+    ///
+    /// # Errors
+    /// Returns [`Error::DuplicateTitle`] on a `409`, [`Error::Transport`]
+    /// on other non-success statuses, [`Error::BadResponse`] on bad `data`.
     async fn create(&self, input: NewFolder) -> Result<Folder, Error> {
         let id = Uuid::new_v4();
         let payload = build_payload(id, &input);
@@ -421,6 +529,12 @@ impl Client for HttpClient {
             .ok_or_else(|| Error::BadResponse("create returned empty data".into()))
     }
 
+    /// `PATCH /api/things/{id}` — moves a folder by updating its cabinet
+    /// pointer (and the `cabinet_path=` keyword snapshot when supplied).
+    ///
+    /// # Errors
+    /// Returns [`Error::Transport`] on a non-success status and
+    /// [`Error::BadResponse`] on bad `data`.
     async fn update_cabinet(
         &self,
         id: Uuid,
@@ -457,6 +571,12 @@ impl Client for HttpClient {
             .ok_or_else(|| Error::BadResponse("update returned empty data".into()))
     }
 
+    /// `POST /api/things` — creates a volume Thing. An upstream
+    /// `409 Conflict` is mapped to [`Error::DuplicateTitle`].
+    ///
+    /// # Errors
+    /// Returns [`Error::DuplicateTitle`] on a `409`, [`Error::Transport`]
+    /// on other non-success statuses, [`Error::BadResponse`] on bad `data`.
     async fn create_volume(&self, input: NewVolume) -> Result<Volume, Error> {
         let id = Uuid::new_v4();
         let payload = build_volume_payload(id, &input);
@@ -485,6 +605,12 @@ impl Client for HttpClient {
             .ok_or_else(|| Error::BadResponse("create volume returned empty data".into()))
     }
 
+    /// `GET /api/things/{id}` — look up a volume by UUID. A `404` maps to
+    /// `Ok(None)`; a non-volume Thing also yields `Ok(None)`.
+    ///
+    /// # Errors
+    /// Returns [`Error::Transport`] on other non-success statuses and
+    /// [`Error::BadResponse`] on a parse failure.
     async fn find_volume_by_id(&self, id: Uuid) -> Result<Option<Volume>, Error> {
         let response = self
             .http
@@ -508,6 +634,12 @@ impl Client for HttpClient {
         Ok(body.data.and_then(ThingDto::into_volume))
     }
 
+    /// `GET /api/things/search?thing_type=Volume&limit=200` — all volumes.
+    /// Controllers filter by patient client-side.
+    ///
+    /// # Errors
+    /// Returns [`Error::Transport`] on a non-success status and
+    /// [`Error::BadResponse`] on a parse failure.
     async fn list_volumes(&self) -> Result<Vec<Volume>, Error> {
         let response = self
             .http
@@ -535,10 +667,19 @@ impl Client for HttpClient {
             .collect())
     }
 
+    /// `PATCH /api/things/{id}` with a new `name` — renames a volume.
+    ///
+    /// # Errors
+    /// Returns [`Error`] on transport failure or an unparseable response.
     async fn rename_volume(&self, id: Uuid, title: String) -> Result<Volume, Error> {
         self.patch_volume(id, json!({ "name": title })).await
     }
 
+    /// `PATCH /api/things/{id}` — moves a volume's own location pointer
+    /// (and the `cabinet_path=` keyword snapshot when supplied).
+    ///
+    /// # Errors
+    /// Returns [`Error`] on transport failure or an unparseable response.
     async fn update_volume_cabinet(
         &self,
         id: Uuid,
@@ -547,11 +688,20 @@ impl Client for HttpClient {
     ) -> Result<Volume, Error> {
         let mut patch = json!({ "contained_in_thing": cabinet_id });
         if let Some(p) = cabinet_path_snapshot.as_ref() {
+            // The Thing service replaces the full keyword list on PATCH; keep
+            // the cabinet_path keyword so the snapshot stays in sync.
             patch["keywords"] = json!([format!("{KEY_CABINET_PATH}{p}")]);
         }
         self.patch_volume(id, patch).await
     }
 
+    /// `PATCH /api/things/{folder_id}` — assigns (`Some`) or clears
+    /// (`None`) a folder's volume membership by rewriting its `volume_id=`
+    /// / `volume_title=` keywords.
+    ///
+    /// # Errors
+    /// Returns [`Error::Transport`] on a non-success status and
+    /// [`Error::BadResponse`] on bad `data`.
     async fn set_folder_volume(
         &self,
         folder_id: Uuid,

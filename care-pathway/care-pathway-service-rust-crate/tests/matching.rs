@@ -4,6 +4,9 @@
 
 use care_pathway_matcher::{CarePathway, IdentifierScheme, MatchingEngine, PathwayIdentifier};
 
+/// The service really embeds the canonical matcher: two pathways sharing
+/// a guideline id (case-insensitively) deterministically score `1.0`,
+/// proving the R-0 short-circuit reaches through this crate's API DTO.
 #[test]
 fn embeds_the_canonical_matcher() {
     let engine = MatchingEngine::default_config();
@@ -22,6 +25,8 @@ fn embeds_the_canonical_matcher() {
     assert!(r.breakdown.deterministic_match);
 }
 
+/// A `CarePathway` survives the JSON round-trip the service relies on to
+/// store it as JSONB and read it back unchanged.
 #[test]
 fn care_pathway_json_round_trips_for_storage() {
     let mut p = CarePathway::new("Acute Stroke Care Pathway");

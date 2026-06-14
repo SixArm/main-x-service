@@ -19,9 +19,16 @@ pub struct DownloadWorkerArgs {
 
 #[async_trait]
 impl BackgroundWorker<DownloadWorkerArgs> for DownloadWorker {
+    /// Construct the worker from the shared loco context (clones the
+    /// `Arc`-backed context for the worker's lifetime).
     fn build(ctx: &AppContext) -> Self {
         Self { ctx: ctx.clone() }
     }
+    /// Execute one job. No-op stub today; real async work goes here.
+    ///
+    /// # Errors
+    ///
+    /// Returns a loco error if future job logic fails; currently never.
     async fn perform(&self, _args: DownloadWorkerArgs) -> Result<()> {
         // TODO: Some actual work goes here...
 

@@ -2,6 +2,9 @@ use case_folder_service_with_rust::app::App;
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
+/// Pins: `POST /api/volumes` creates an empty volume (`201` + `Location`,
+/// status `in-cabinet`, 0 folders) and `GET /api/volumes/{id}` shows it
+/// with empty folders and history.
 #[tokio::test]
 #[serial]
 async fn create_and_show_volume() {
@@ -41,6 +44,8 @@ async fn create_and_show_volume() {
     .await;
 }
 
+/// Pins: creating a volume for an NHS number with no patient record is
+/// rejected `422` with a per-field `errors.nhs_number` message.
 #[tokio::test]
 #[serial]
 async fn create_volume_for_unknown_patient_returns_422() {
@@ -57,6 +62,9 @@ async fn create_volume_for_unknown_patient_returns_422() {
     .await;
 }
 
+/// Pins volume membership: assigning a same-patient folder succeeds,
+/// assigning a different patient's folder is rejected `422`, and
+/// removing a folder empties the volume again.
 #[tokio::test]
 #[serial]
 async fn assign_and_remove_folder() {
@@ -113,6 +121,7 @@ async fn assign_and_remove_folder() {
     .await;
 }
 
+/// Pins: `PATCH /api/volumes/{id}` renames the volume's title.
 #[tokio::test]
 #[serial]
 async fn rename_volume() {
@@ -143,6 +152,9 @@ async fn rename_volume() {
     .await;
 }
 
+/// Pins: `POST /api/volumes/{id}/move` relocates every member folder to
+/// the target cabinet (verified in the Thing stub) and records one move
+/// event per member folder in the Event stub.
 #[tokio::test]
 #[serial]
 async fn move_volume_relocates_every_member() {
@@ -206,6 +218,7 @@ async fn move_volume_relocates_every_member() {
     .await;
 }
 
+/// Pins: `GET /api/volumes/{id}` for an unknown id returns `404`.
 #[tokio::test]
 #[serial]
 async fn show_unknown_volume_returns_404() {

@@ -98,6 +98,8 @@ pub struct EventView {
     pub seq: u64,
 }
 
+/// Project a full [`Envelope`] down to the frozen [`EventView`] wire
+/// shape, dropping the internal envelope fields the front-end never sees.
 impl From<&Envelope> for EventView {
     fn from(env: &Envelope) -> Self {
         Self {
@@ -123,6 +125,9 @@ pub trait EventPublisher: Send + Sync {
     fn recent(&self, limit: usize) -> Vec<EventView>;
 }
 
+/// Ring-buffer capacity: the most recent `CAPACITY` events are retained;
+/// older ones are evicted from the front. Bounds memory for an in-process
+/// buffer that is not meant to be a durable log (the audit table is).
 const CAPACITY: usize = 1000;
 
 /// The in-memory ring-buffer publisher: today's behaviour, behind the
@@ -130,6 +135,8 @@ const CAPACITY: usize = 1000;
 /// keeps `cargo test` DB-free.
 #[derive(Debug, Default)]
 pub struct InMemoryPublisher {
+    /// The bounded FIFO of recent envelopes, `Mutex`-guarded for the
+    /// cross-thread (multi-request) publish/read access.
     buffer: Mutex<VecDeque<Envelope>>,
 }
 
@@ -145,7 +152,10 @@ impl InMemoryPublisher {
 
 impl EventPublisher for InMemoryPublisher {
     fn publish(&self, env: Envelope) {
+        // A poisoned lock drops the event (the trait contract: never
+        // fail); the audit log remains the durable record.
         if let Ok(mut buf) = self.buffer.lock() {
+            // Enforce the cap by evicting the oldest before pushing.
             if buf.len() == CAPACITY {
                 buf.pop_front();
             }
@@ -154,9 +164,12 @@ impl EventPublisher for InMemoryPublisher {
     }
 
     fn recent(&self, limit: usize) -> Vec<EventView> {
+        // A poisoned lock yields an empty result rather than panicking.
         self.buffer.lock().map_or_else(
             |_| Vec::new(),
             |buf| {
+                // Take the newest `limit` (iterate from the back), then
+                // re-reverse so the result is oldest-to-newest.
                 buf.iter()
                     .rev()
                     .take(limit)
@@ -168,12 +181,17 @@ impl EventPublisher for InMemoryPublisher {
     }
 }
 
-/// The process-wide publisher instance.
+/// The process-wide publisher instance, lazily initialised on first use.
+/// In loco there is no per-request shared state for this, so a global is
+/// the natural home (see the module docs).
 fn publisher() -> &'static InMemoryPublisher {
     static PUBLISHER: OnceLock<InMemoryPublisher> = OnceLock::new();
     PUBLISHER.get_or_init(InMemoryPublisher::new)
 }
 
+/// Hand out the next monotonic per-process sequence number (starting at
+/// 1). `Relaxed` is sufficient: `seq` only needs to be unique and
+/// increasing, not synchronised with other memory.
 fn next_seq() -> u64 {
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQ: AtomicU64 = AtomicU64::new(1);
@@ -216,6 +234,9 @@ pub fn recent(limit: usize) -> Vec<EventView> {
     publisher().recent(limit)
 }
 
+/// DB-free pins for the event stream: global round-trip + monotonic
+/// `seq`, isolated-publisher behaviour, envelope serde, optional actor,
+/// and the frozen `/events/recent` projection shape.
 #[cfg(test)]
 mod tests {
     use super::*;

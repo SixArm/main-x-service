@@ -51,10 +51,13 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
 pub struct App;
 #[async_trait]
 impl Hooks for App {
+    /// The loco application name, taken from the crate name at compile time.
     fn app_name() -> &'static str {
         env!("CARGO_CRATE_NAME")
     }
 
+    /// Human-readable version string: the crate `version` plus the build
+    /// commit SHA (`BUILD_SHA`/`GITHUB_SHA` at compile time, else `dev`).
     fn app_version() -> String {
         format!(
             "{} ({})",
@@ -65,6 +68,12 @@ impl Hooks for App {
         )
     }
 
+    /// Boot the application: delegates to loco's [`create_app`] with this
+    /// crate's [`App`] hooks and the database [`Migrator`].
+    ///
+    /// # Errors
+    ///
+    /// Propagates any loco boot error (config, DB connection, …).
     async fn boot(
         mode: StartMode,
         environment: &Environment,
@@ -73,15 +82,31 @@ impl Hooks for App {
         create_app::<Self, Migrator>(mode, environment, config).await
     }
 
+    /// Register boot-time initializers — none for the MVP.
+    ///
+    /// # Errors
+    ///
+    /// Infallible here; the signature is loco's.
     async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
         Ok(vec![])
     }
 
+    /// Assemble the route table: loco's default routes (`/_health`,
+    /// `/_ping`, …) plus the care-pathway controller and the API-docs
+    /// controller.
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::care_pathways::routes())
             .add_route(controllers::docs::routes())
     }
+    /// Wrap the assembled router in the blanket JWT-enforcement layer.
+    ///
+    /// Layered unconditionally; [`require_auth_mw`] is a near-noop unless
+    /// `CARE_PATHWAY_REQUIRE_AUTH` is on (see [`auth::require_auth`]).
+    ///
+    /// # Errors
+    ///
+    /// Infallible here; the signature is loco's.
     async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
         // Blanket JWT enforcement, off by default and gated per-request by
         // `CARE_PATHWAY_REQUIRE_AUTH` (see `auth::require_auth`). Wired
@@ -89,21 +114,41 @@ impl Hooks for App {
         Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
     }
 
+    /// Register background workers with the queue — currently just the
+    /// placeholder [`DownloadWorker`].
+    ///
+    /// # Errors
+    ///
+    /// Propagates queue-registration errors.
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue.register(DownloadWorker::build(ctx)).await?;
         Ok(())
     }
 
+    /// Register CLI tasks — none for the MVP (the inject marker is kept so
+    /// `cargo loco generate task` can splice new tasks in).
     #[allow(unused_variables)]
     fn register_tasks(tasks: &mut Tasks) {
         // tasks-inject (do not remove)
     }
+    /// Truncate all tables for the loco test harness, in
+    /// foreign-key-safe order: history/audit children first, then the
+    /// `care_pathways` parent.
+    ///
+    /// # Errors
+    ///
+    /// Propagates DB truncation errors.
     async fn truncate(ctx: &AppContext) -> Result<()> {
         truncate_table(&ctx.db, merge_records::Entity).await?;
         truncate_table(&ctx.db, audit_logs::Entity).await?;
         truncate_table(&ctx.db, care_pathways::Entity).await?;
         Ok(())
     }
+    /// Seed reference/fixture data — none for the MVP.
+    ///
+    /// # Errors
+    ///
+    /// Infallible here; the signature is loco's.
     async fn seed(_ctx: &AppContext, _base: &Path) -> Result<()> {
         Ok(())
     }

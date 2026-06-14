@@ -133,6 +133,9 @@ impl ActiveModel {
 mod tests {
     use super::escape_like;
 
+    /// Pins the `LIKE` escaping: literal text is unchanged, `%` and `_`
+    /// are escaped so they match literally, and the backslash is escaped
+    /// first so a user backslash cannot re-enable a wildcard.
     #[test]
     fn escape_like_neutralises_wildcards() {
         assert_eq!(escape_like("housing"), "housing");

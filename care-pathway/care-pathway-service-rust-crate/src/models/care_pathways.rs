@@ -8,8 +8,13 @@ use sea_orm::sea_query::Expr;
 use sea_orm::{QueryOrder, QuerySelect};
 use uuid::Uuid;
 
+/// Re-export the generated `care_pathways` entity (the module plus
+/// `ActiveModel`, `Entity`, and `Model`) so callers use
+/// `models::care_pathways::…` rather than reaching into `_entities`.
 pub use super::_entities::care_pathways::{self, ActiveModel, Entity, Model};
 
+/// Default `SeaORM` active-model behaviour — no custom hooks needed; CRUD
+/// side effects (audit, events) live in the controller, not the model.
 impl ActiveModelBehavior for super::_entities::care_pathways::ActiveModel {}
 
 impl Model {
@@ -130,10 +135,13 @@ impl ActiveModel {
     }
 }
 
+/// Tests for the model's pure helpers (DB-free).
 #[cfg(test)]
 mod tests {
     use super::escape_like;
 
+    /// `escape_like` neutralises `%`, `_`, and `\` so a user query matches
+    /// literally and cannot inject `ILIKE` wildcards.
     #[test]
     fn escape_like_neutralises_wildcards() {
         assert_eq!(escape_like("stroke"), "stroke");

@@ -56,13 +56,20 @@ pub fn validate(case: &Case) -> Result<()> {
     ))
 }
 
+/// A lightweight reference to a stored case: just its public id and
+/// title. Returned by create/update/list/search instead of the full
+/// payload, since case data is personal data and these endpoints only
+/// need to identify the row.
 #[derive(Debug, Serialize)]
 struct CaseRef {
+    /// The case's public id (UUID v4), as a string.
     pid: String,
+    /// The case's denormalised title.
     title: String,
 }
 
 impl CaseRef {
+    /// Project a stored [`CaseModel`] down to its `{pid, title}` reference.
     fn of(m: &CaseModel) -> Self {
         Self {
             pid: m.pid.to_string(),
@@ -71,17 +78,26 @@ impl CaseRef {
     }
 }
 
+/// Body of `POST /api/cases/match`: a query plus the explicit candidate
+/// list to rank it against (no persistence is touched).
 #[derive(Debug, Deserialize)]
 struct MatchRequest {
+    /// The case to score against each candidate.
     query: Case,
+    /// The candidate cases to rank.
     candidates: Vec<Case>,
 }
 
+/// Query string for `GET /api/cases/search`: the `q` title term.
 #[derive(Debug, Deserialize)]
 struct SearchParams {
+    /// The case-insensitive substring to match against `title`. Required
+    /// in practice — a missing/blank `q` is rejected with `400`.
     q: Option<String>,
 }
 
+/// Body of `POST /api/cases/merge`: which duplicate folds into which
+/// survivor, and (optionally) why.
 #[derive(Debug, Deserialize)]
 struct MergeRequest {
     /// The surviving case's public id.
@@ -93,16 +109,35 @@ struct MergeRequest {
     reason: Option<String>,
 }
 
+/// A scored `check-duplicates` hit: a stored case that matched the query,
+/// with its score and confidence. Serialized into the response array.
 #[derive(Debug, Serialize)]
 struct ScoredRef {
+    /// The matched case's public id (UUID v4), as a string.
     pid: String,
+    /// The matched case's denormalised title.
     title: String,
+    /// The match score in `[0.0, 1.0]`.
     score: f64,
+    /// The confidence band (the matcher's `Confidence`, `Debug`-formatted).
     confidence: String,
+    /// Whether the score cleared the match threshold (always `true` for a
+    /// returned hit — only matches are collected).
     is_match: bool,
 }
 
-/// Create a case.
+/// Create a case. `POST /api/cases`.
+///
+/// Request body: a `case_matcher::Case`. Validates the payload (blank
+/// `title` etc. ⇒ `422`), inserts the row, writes a `created` audit entry
+/// stamped with the caller (when a token was presented), and publishes a
+/// `Created` event. Responds `200` with a [`CaseRef`] (`{pid, title}`) —
+/// not the full payload, since case data is personal data.
+///
+/// # Errors
+///
+/// `422` on validation failure; a DB error on insert/audit failure
+/// (auditing itself is best-effort and never fails the request).
 #[debug_handler]
 async fn create(
     State(ctx): State<AppContext>,
@@ -142,14 +177,29 @@ async fn audit(
     }
 }
 
-/// Fetch a case by public id.
+/// Fetch a case by public id. `GET /api/cases/{pid}`.
+///
+/// Responds `200` with the full stored `case_matcher::Case`.
+///
+/// # Errors
+///
+/// `404` when no active case has that `pid` (or `pid` is not a UUID).
 #[debug_handler]
 async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
     let model = CaseModel::find_by_pid(&ctx.db, &pid).await?;
     format::json(model.to_case()?)
 }
 
-/// Replace a case's payload.
+/// Replace a case's payload. `PUT /api/cases/{pid}`.
+///
+/// Request body: a full `case_matcher::Case`. Validates it, replaces the
+/// stored payload (and denormalised title), writes an `updated` audit
+/// entry, and publishes an `Updated` event. Responds `200` with a
+/// [`CaseRef`].
+///
+/// # Errors
+///
+/// `422` on validation failure; `404` when the `pid` is unknown.
 #[debug_handler]
 async fn update(
     Path(pid): Path<String>,
@@ -180,7 +230,16 @@ async fn update(
     format::json(CaseRef::of(&updated))
 }
 
-/// Soft-delete a case.
+/// Soft-delete a case. `DELETE /api/cases/{pid}`.
+///
+/// Marks the row inactive and stamps `deleted_at` (the row is retained
+/// for the audit trail, since case data is personal data). Writes a
+/// `deleted` audit entry and publishes a `Deleted` event. Responds `200`
+/// with an empty JSON body.
+///
+/// # Errors
+///
+/// `404` when the `pid` is unknown.
 #[debug_handler]
 async fn remove(
     Path(pid): Path<String>,
@@ -200,7 +259,15 @@ async fn remove(
     format::empty_json()
 }
 
-/// List active cases (capped at 100).
+/// List active cases (capped at 100). `GET /api/cases`.
+///
+/// Responds `200` with an array of [`CaseRef`] (`{pid, title}`),
+/// most-recent first. The 100 cap is a pragmatic page size; pagination is
+/// not yet modelled.
+///
+/// # Errors
+///
+/// A DB error when the query fails.
 #[debug_handler]
 async fn list(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = CaseModel::list(&ctx.db, 100).await?;
@@ -211,6 +278,13 @@ async fn list(State(ctx): State<AppContext>) -> Result<Response> {
 /// Case-insensitive title search: `GET /api/cases/search?q=housing`.
 /// Pragmatic Postgres `ILIKE` over the denormalised `title` (cap 50);
 /// full-text / fuzzy search is deferred (spec §13 T-6).
+///
+/// Responds `200` with an array of [`CaseRef`]. A missing/blank `q` is a
+/// `400`.
+///
+/// # Errors
+///
+/// `400` when `q` is missing or blank; a DB error when the query fails.
 #[debug_handler]
 async fn search(
     axum::extract::Query(params): axum::extract::Query<SearchParams>,
@@ -226,6 +300,16 @@ async fn search(
 }
 
 /// Score a query against an explicit candidate list (no persistence).
+/// `POST /api/cases/match`.
+///
+/// Request body: a [`MatchRequest`] (`{query, candidates}`). Ranks the
+/// candidates with the default-config `case-matcher` engine and responds
+/// `200` with the ranked `(index, MatchResult)` results. Stateless — it
+/// never touches the database.
+///
+/// # Errors
+///
+/// Propagates a response-serialization error (none expected in practice).
 #[debug_handler]
 async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
@@ -234,6 +318,19 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
 }
 
 /// Find stored cases that match the query above the threshold.
+/// `POST /api/cases/check-duplicates`.
+///
+/// Request body: a `case_matcher::Case` query. Loads up to
+/// [`CHECK_DUPLICATES_SCAN_CAP`] active rows, matches each against the
+/// query in memory, and responds `200` with the matching [`ScoredRef`]s
+/// sorted by descending score. When the scan reaches the cap the result
+/// may be incomplete (no search-backed blocking yet — spec §13 T-6) and
+/// the handler emits a `WARN`.
+///
+/// # Errors
+///
+/// A DB error when the row scan fails; a JSON parse error when a stored
+/// payload cannot be deserialized.
 #[debug_handler]
 async fn check_duplicates(
     State(ctx): State<AppContext>,
@@ -262,6 +359,9 @@ async fn check_duplicates(
             });
         }
     }
+    // Best score first. `partial_cmp` is `None` only on a NaN score
+    // (matcher scores are finite), so treat that as "equal" rather than
+    // panicking on `unwrap`.
     hits.sort_by(|a, b| {
         b.score
             .partial_cmp(&a.score)
@@ -274,6 +374,17 @@ async fn check_duplicates(
 /// union the duplicate's data into main, keep the duplicate's title as an
 /// alternate title, soft-delete the duplicate, record the merge history,
 /// and publish a `Merged` event (plus a `Deleted` for the duplicate).
+/// `POST /api/cases/merge`.
+///
+/// Request body: a [`MergeRequest`] (`{main_pid, duplicate_pid,
+/// reason?}`). The pure fold lives in [`merge_cases`]; this handler does
+/// the DB orchestration and auditing. Responds `200` with
+/// `{main_pid, duplicate_pid, main}` (the survivor's merged payload).
+///
+/// # Errors
+///
+/// `422` when `main_pid == duplicate_pid` (self-merge); `404` when either
+/// pid is unknown; a DB error on the update/soft-delete.
 #[debug_handler]
 async fn merge(
     State(ctx): State<AppContext>,
@@ -340,23 +451,40 @@ async fn merge(
     }))
 }
 
-/// Recent merge-history records, newest first.
+/// Recent merge-history records, newest first (cap 100).
+/// `GET /api/cases/merges/recent`. Responds `200` with the merge rows.
+///
+/// # Errors
+///
+/// A DB error when the query fails.
 #[debug_handler]
 async fn recent_merges(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = MergeRecordModel::recent(&ctx.db, 100).await?;
     format::json(rows)
 }
 
-/// Recent audit-log entries across all cases.
+/// Recent audit-log entries across all cases (cap 100).
+/// `GET /api/cases/audit/recent`. Responds `200` with the audit rows.
+///
+/// # Errors
+///
+/// A DB error when the query fails.
 #[debug_handler]
 async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = AuditModel::recent(&ctx.db, 100).await?;
     format::json(rows)
 }
 
-/// Audit trail for a single case.
+/// Audit trail for a single case. `GET /api/cases/{pid}/audit`.
+/// Responds `200` with the case's audit rows, newest first.
+///
+/// # Errors
+///
+/// `400` when `pid` is not a UUID; a DB error when the query fails.
 #[debug_handler]
 async fn entity_audit(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+    // Parse the path pid up front so a malformed id is a clean 400 rather
+    // than an empty result set.
     let Ok(uuid) = uuid::Uuid::parse_str(&pid) else {
         return bad_request("invalid pid");
     };
@@ -364,22 +492,41 @@ async fn entity_audit(Path(pid): Path<String>, State(ctx): State<AppContext>) ->
     format::json(rows)
 }
 
-/// Recent events from the in-memory event stream.
+/// Recent events from the in-memory event stream (cap 100).
+/// `GET /api/cases/events/recent`. Responds `200` with the flat
+/// `EventView` projection (`{kind, pid, name, seq}`).
+///
+/// # Errors
+///
+/// Propagates a response-serialization error (none expected in practice).
 #[debug_handler]
 async fn recent_events() -> Result<Response> {
     format::json(streaming::recent(100))
 }
 
-/// Echo the verified claims of the bearer token — `401` when the token is
-/// missing or fails verification. Proves peer JWT verification against
-/// the auth-service JWKS end to end (spec §13 T-7).
+/// Echo the verified claims of the bearer token. `GET /api/cases/whoami`.
+/// Responds `200` with the [`Claims`]; `401` when the token is missing or
+/// fails verification. Proves peer JWT verification against the
+/// auth-service JWKS end to end (spec §13 T-7). Taking [`AuthUser`] is
+/// what makes this the one always-protected route.
+///
+/// [`Claims`]: authentication_verifier::Claims
+///
+/// # Errors
+///
+/// `401` when the bearer token is missing or fails verification (returned
+/// by the [`AuthUser`] extractor before this body runs).
 #[debug_handler]
 async fn whoami(AuthUser(claims): AuthUser) -> Result<Response> {
     format::json(claims)
 }
 
 /// Build the `/api/cases` route table (CRUD + match +
-/// check-duplicates + audit / event endpoints).
+/// check-duplicates + merge + audit / event + whoami endpoints).
+///
+/// Order matters: the literal sub-paths (`/search`, `/match`, …,
+/// `/audit/recent`) are registered before the `/{pid}` catch-alls so they
+/// are not shadowed by the path parameter.
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/cases")
@@ -427,6 +574,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 
+    /// The complement: a real title passes validation (no false positives).
     #[test]
     fn non_blank_title_passes_validation() {
         assert!(validate(&Case::new("Housing benefit appeal")).is_ok());

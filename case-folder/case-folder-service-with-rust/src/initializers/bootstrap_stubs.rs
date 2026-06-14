@@ -36,8 +36,13 @@ use crate::main_worker_service::{stub::StubClient as WorkerStub, Worker};
 use crate::tasks::seed::run_seed;
 use uuid::Uuid;
 
+/// Loco initializer that, when enabled, replaces every external-service
+/// client with an in-process stub and seeds demo data.
 pub struct StubsInitializer;
 
+/// Whether offline / e2e stub mode is requested via the
+/// `USE_UPSTREAM_STUBS` env var. Accepted truthy values: `1`, `true`,
+/// `TRUE`, `yes`. Anything else (including unset) means disabled.
 fn enabled() -> bool {
     matches!(
         std::env::var("USE_UPSTREAM_STUBS").as_deref(),
@@ -47,10 +52,16 @@ fn enabled() -> bool {
 
 #[async_trait]
 impl Initializer for StubsInitializer {
+    /// Stable identifier for this initializer in Loco's registry.
     fn name(&self) -> String {
         "bootstrap-stubs".to_string()
     }
 
+    /// No-op unless [`enabled`]. When enabled: build one stub per
+    /// external service, register each as the process-wide test client,
+    /// seed a few demo workers, run the standard [`run_seed`] demo data
+    /// set, then layer on demo worker-attributed moves and a demo volume.
+    /// Returns the router unchanged (it only mutates global client slots).
     async fn after_routes(&self, router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
         if !enabled() {
             return Ok(router);
@@ -74,17 +85,24 @@ impl Initializer for StubsInitializer {
         main_event_service_client::set_test_client(event_stub.clone());
 
         // A handful of demo workers — kept in named variables so the
-        // demo moves below can be attributed to them.
+        // demo moves below can be attributed to them. Attribution is what
+        // makes the worker-detail and cabinet-presence-history views
+        // non-empty in the offline demo.
+        //
+        // `alice_worker`: a nurse (seeded but not used to attribute a
+        // move; she shares a name with the demo patient on purpose).
         let alice_worker = Worker {
             id: Uuid::new_v4(),
             name: "Alice Johnson".into(),
             role: Some("nurse".into()),
         };
+        // `dr_bob`: a doctor used to attribute David Brown's demo move.
         let dr_bob = Worker {
             id: Uuid::new_v4(),
             name: "Dr Bob Carter".into(),
             role: Some("doctor".into()),
         };
+        // `mira`: a records administrator used to attribute Carol's move.
         let mira = Worker {
             id: Uuid::new_v4(),
             name: "Mira (records)".into(),
@@ -201,6 +219,14 @@ async fn seed_demo_worker_moves(
     }
 }
 
+/// Record one worker-attributed demo move and physically relocate the
+/// folder to `target`.
+///
+/// Resolves the target cabinet's full label path (best-effort; falls
+/// back to `"In transit"` when empty), writes a `RecordMove` to the
+/// event stub attributed to `worker` with `reason`, then updates the
+/// folder's cabinet in the thing stub. Errors from either call are
+/// ignored — this is best-effort demo seeding.
 async fn record_demo_move(
     events: &EventStub,
     things: &ThingStub,

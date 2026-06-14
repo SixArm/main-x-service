@@ -21,7 +21,9 @@ use serde_json::{Value, json};
 use serial_test::serial;
 
 /// A minimal valid case payload (the body *is* `case_matcher::Case`; all
-/// fields but `title` default).
+/// fields but `title` default). Shared fixture for the request tests; note
+/// it is realistic personal-data-shaped (an agency case number, a subject
+/// reference, a docket identifier).
 fn housing_case() -> Value {
     json!({
         "title": "Housing benefit appeal",
@@ -36,6 +38,8 @@ fn housing_case() -> Value {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins the create happy path: `POST /api/cases` with a valid body
+// returns 200, echoes the `title`, and mints a UUID `pid`.
 async fn can_create_case() {
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.post("/api/cases").json(&housing_case()).await;
@@ -51,6 +55,9 @@ async fn can_create_case() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins the create-time validation contract end to end: a blank title is
+// rejected with 422 (OQ-1 / T-2: not 400). The status is also pinned
+// un-gated in `src/controllers/cases.rs`.
 async fn blank_title_on_create_returns_422() {
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
@@ -66,6 +73,8 @@ async fn blank_title_on_create_returns_422() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins that opened_date validation runs in the create handler: a
+// non-ISO-8601 date is a 422, same status as a blank title.
 async fn malformed_opened_date_on_create_returns_422() {
     request::<App, _, _>(|request, _ctx| async move {
         let mut payload = housing_case();
@@ -84,6 +93,8 @@ async fn malformed_opened_date_on_create_returns_422() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins that validation also runs on the update path (PUT), not just
+// create: a blank title on update is a 422.
 async fn blank_title_on_update_returns_422() {
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
@@ -104,6 +115,8 @@ async fn blank_title_on_update_returns_422() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins the read-back contract: GET /{pid} returns the full stored Case
+// (title, case_number, nested identifier) exactly as created.
 async fn can_get_case_by_pid() {
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
@@ -126,6 +139,8 @@ async fn can_get_case_by_pid() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins that a well-formed but absent pid is a 404 (not a 500 or empty
+// 200).
 async fn unknown_pid_returns_404() {
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
@@ -139,6 +154,8 @@ async fn unknown_pid_returns_404() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins the list contract: GET /api/cases returns one CaseRef per active
+// case (here both created cases appear).
 async fn can_list_cases() {
     request::<App, _, _>(|request, _ctx| async move {
         for title in ["Housing benefit appeal", "Tax credit overpayment"] {
@@ -163,6 +180,8 @@ async fn can_list_cases() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins the ILIKE title search: `?q=housing` matches only the housing
+// case (case-insensitive substring), and a blank `q` is a 400.
 async fn can_search_cases_by_title() {
     request::<App, _, _>(|request, _ctx| async move {
         for title in ["Housing benefit appeal", "Tax credit overpayment"] {
@@ -190,6 +209,8 @@ async fn can_search_cases_by_title() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins the stateless /match endpoint: the candidate sharing the query's
+// docket (case-insensitively) ranks first with a deterministic 1.0.
 async fn can_match_query_against_candidates() {
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
@@ -218,6 +239,9 @@ async fn can_match_query_against_candidates() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins /check-duplicates against persisted rows: a near-duplicate (same
+// docket, different title) detects the stored twin with score 1.0 and
+// is_match true.
 async fn can_check_duplicates_against_stored_cases() {
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.post("/api/cases").json(&housing_case()).await;
@@ -249,6 +273,10 @@ async fn can_check_duplicates_against_stored_cases() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins the full merge workflow: data unions into the survivor, the
+// duplicate's title becomes an alternate title, the duplicate is
+// soft-deleted (404 afterwards), a merge-history row is written, and a
+// `merged` event is published for the survivor.
 async fn merge_folds_duplicate_into_survivor() {
     request::<App, _, _>(|request, _ctx| async move {
         // Main: housing case with one docket identifier.
@@ -324,6 +352,7 @@ async fn merge_folds_duplicate_into_survivor() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins the self-merge guard: main_pid == duplicate_pid is a 422.
 async fn merge_with_equal_pids_is_422() {
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
@@ -344,6 +373,7 @@ async fn merge_with_equal_pids_is_422() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins that merging into an unknown duplicate pid is a 404.
 async fn merge_unknown_pid_is_404() {
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
@@ -367,6 +397,10 @@ async fn merge_unknown_pid_is_404() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins the auditability contract over a create→update→delete cycle:
+// three audit rows (created/updated/deleted) with null actor (no token),
+// the system-wide audit endpoint is non-empty, and three matching events
+// land on the in-memory stream.
 async fn crud_writes_audit_log_and_events() {
     request::<App, _, _>(|request, _ctx| async move {
         // Create → update → delete one case.
@@ -429,6 +463,7 @@ async fn crud_writes_audit_log_and_events() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins that /whoami is the one always-protected route: no token ⇒ 401.
 async fn whoami_without_token_is_401() {
     // No JWKS is configured in tests, and no bearer header is sent, so the
     // protected endpoint must reject. The token-accepted path is pinned
@@ -443,6 +478,8 @@ async fn whoami_without_token_is_401() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins that the OpenAPI doc is mounted and served (3.0.3, with the
+// create path present).
 async fn openapi_json_is_served() {
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/api-docs/openapi.json").await;
@@ -457,6 +494,7 @@ async fn openapi_json_is_served() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins that the Swagger UI page is served and points at the OpenAPI JSON.
 async fn swagger_ui_is_served() {
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/swagger-ui").await;
@@ -469,6 +507,9 @@ async fn swagger_ui_is_served() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins the blanket-enforcement layer: with CASE_REQUIRE_AUTH on, an
+// un-authed /api/* request is 401 while the public OpenAPI doc still
+// serves 200.
 async fn blanket_enforcement_gates_api_but_not_public_paths() {
     // With `CASE_REQUIRE_AUTH` on and no JWKS configured, an un-authed
     // `/api/*` request must 401, while the public OpenAPI doc still serves.

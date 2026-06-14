@@ -30,12 +30,26 @@ use crate::{
     responses::{self, List},
 };
 
+/// Query parameters accepted by `GET /api/volumes`.
 #[derive(Debug, Deserialize, Default)]
 pub struct FilterParams {
+    /// Free-text filter matched against volume title and patient name.
     pub q: Option<String>,
+    /// NHS Number filter, normalised before comparison.
     pub nhs_number: Option<String>,
 }
 
+/// `GET /api/volumes` — list / search volumes.
+///
+/// Fetches all volumes from the Main Thing Service and filters them
+/// client-side by normalised NHS Number and/or a case-insensitive
+/// free-text term over title and patient name. Member folder counts come
+/// from the folder set.
+///
+/// Request: query params `q`, `nhs_number` — see `FilterParams`.
+/// Response: `200 OK` with a `List` of volume views.
+/// Errors: `503 Service Unavailable` if the Main Thing Service is
+/// unreachable. The folder fetch is best-effort.
 #[debug_handler]
 pub async fn index(
     Extension(things): Extension<Arc<dyn MainThingServiceClient>>,
@@ -79,11 +93,15 @@ pub async fn index(
     Json(List::with_query(items, q)).into_response()
 }
 
+/// Full view of a volume returned by the show / mutation handlers.
 #[derive(Serialize)]
 pub struct VolumeShow {
+    /// The volume view, flattened into the top-level JSON object.
     #[serde(flatten)]
     pub volume: responses::Volume,
+    /// Member folders with current-location labels.
     pub folders: Vec<responses::Folder>,
+    /// Merged move history of the member folders, newest first.
     pub history: Vec<responses::Move>,
 }
 
@@ -136,6 +154,12 @@ async fn volume_show(
     }
 }
 
+/// `GET /api/volumes/{id}` — show one volume with its folders and history.
+///
+/// Request: path param `id` (volume UUID).
+/// Response: `200 OK` with `VolumeShow`.
+/// Errors: `404 Not Found` if no such volume; `503 Service Unavailable`
+/// if the Main Thing Service is unreachable.
 #[debug_handler]
 pub async fn show(
     Extension(things): Extension<Arc<dyn MainThingServiceClient>>,
@@ -152,13 +176,30 @@ pub async fn show(
     Json(volume_show(things.as_ref(), events.as_ref(), &volume).await).into_response()
 }
 
+/// Request body for `POST /api/volumes`.
 #[derive(Debug, Deserialize)]
 pub struct CreateVolumeInput {
+    /// NHS Number of the owning patient, who must already exist in the
+    /// Main Patient Service.
     pub nhs_number: String,
+    /// Volume title. Required.
     pub title: String,
+    /// Optional starting cabinet UUID; empty / unparseable means none.
     pub cabinet_id: Option<String>,
 }
 
+/// `POST /api/volumes` — create an empty volume for an existing patient.
+///
+/// Validates the title, requires the patient to already exist (register
+/// a folder for them first), resolves the optional cabinet's path label,
+/// and creates the volume `Thing` in the Main Thing Service.
+///
+/// Request: JSON `CreateVolumeInput`.
+/// Response: `201 Created` with the volume view and a `Location:
+/// /api/volumes/{id}` header.
+/// Errors: `422 Unprocessable Entity` for a missing title, an unknown
+/// patient, or a Thing Service write error; `503 Service Unavailable`
+/// if the Main Patient Service is unreachable.
 #[debug_handler]
 pub async fn create(
     Extension(patients): Extension<Arc<dyn MainPatientServiceClient>>,
@@ -230,11 +271,19 @@ pub async fn create(
         .into_response()
 }
 
+/// Request body for `PATCH /api/volumes/{id}` (rename).
 #[derive(Debug, Deserialize)]
 pub struct RenameInput {
+    /// New volume title. Required.
     pub title: String,
 }
 
+/// `PATCH /api/volumes/{id}` — rename a volume.
+///
+/// Request: path param `id` (volume UUID) + JSON `RenameInput`.
+/// Response: `200 OK` with the refreshed `VolumeShow`.
+/// Errors: `422 Unprocessable Entity` for an empty title; `404 Not
+/// Found` if the volume does not exist.
 #[debug_handler]
 pub async fn rename(
     Extension(things): Extension<Arc<dyn MainThingServiceClient>>,
@@ -257,11 +306,25 @@ pub async fn rename(
     Json(volume_show(things.as_ref(), events.as_ref(), &volume).await).into_response()
 }
 
+/// Request body for `POST /api/volumes/{id}/folders` (add folder).
 #[derive(Debug, Deserialize)]
 pub struct AddFolderInput {
+    /// UUID of the folder to file into the volume.
     pub folder_id: String,
 }
 
+/// `POST /api/volumes/{id}/folders` — add a folder to a volume.
+///
+/// The folder must belong to the same patient as the volume
+/// (same-patient membership guard). Sets the folder's volume pointer +
+/// title snapshot on the Main Thing Service.
+///
+/// Request: path param `id` (volume UUID) + JSON `AddFolderInput`.
+/// Response: `200 OK` with the refreshed `VolumeShow`.
+/// Errors: `404 Not Found` if the volume or folder is missing; `422
+/// Unprocessable Entity` for an invalid folder UUID or a different-patient
+/// folder; `503 Service Unavailable` if the Main Thing Service is
+/// unreachable or the write fails.
 #[debug_handler]
 pub async fn add_folder(
     Extension(things): Extension<Arc<dyn MainThingServiceClient>>,
@@ -291,6 +354,8 @@ pub async fn add_folder(
             return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"))
         }
     };
+    // Same-patient membership guard: a volume bundles one patient's
+    // folders only.
     if folder.patient_id != volume.patient_id {
         let mut errors = HashMap::new();
         errors.insert(
@@ -308,6 +373,16 @@ pub async fn add_folder(
     Json(volume_show(things.as_ref(), events.as_ref(), &volume).await).into_response()
 }
 
+/// `DELETE /api/volumes/{id}/folders/{folder_id}` — remove a folder from
+/// a volume.
+///
+/// Clears the folder's volume pointer only when it is actually in this
+/// volume; a folder belonging to a different volume is a silent no-op.
+///
+/// Request: path params `id` (volume UUID), `folder_id` (folder UUID).
+/// Response: `200 OK` with the refreshed `VolumeShow`.
+/// Errors: `404 Not Found` if the volume or folder is missing; `503
+/// Service Unavailable` if the Main Thing Service is unreachable.
 #[debug_handler]
 pub async fn remove_folder(
     Extension(things): Extension<Arc<dyn MainThingServiceClient>>,
@@ -322,6 +397,7 @@ pub async fn remove_folder(
         }
     };
     match things.find_by_id(folder_id).await {
+        // In this volume: detach it (best-effort).
         Ok(Some(f)) if f.volume_id == Some(id) => {
             things.set_folder_volume(folder_id, None, None).await.ok();
         }
@@ -334,14 +410,35 @@ pub async fn remove_folder(
     Json(volume_show(things.as_ref(), events.as_ref(), &volume).await).into_response()
 }
 
+/// Request body for `POST /api/volumes/{id}/move`.
 #[derive(Debug, Deserialize)]
 pub struct MoveVolumeInput {
+    /// Destination cabinet UUID; `null`/empty marks the bundle in transit.
     pub to_cabinet_id: Option<String>,
+    /// Optional Main Worker Service UUID. Takes precedence over `moved_by`.
     pub worker_id: Option<String>,
+    /// Free-text fallback mover name when no `worker_id` is supplied.
     pub moved_by: Option<String>,
+    /// Optional free-text reason; defaults per folder to "Moved with
+    /// volume …" when omitted.
     pub reason: Option<String>,
 }
 
+/// `POST /api/volumes/{id}/move` — move a whole volume.
+///
+/// Fans out to the per-folder move machinery: for every member folder it
+/// records a move event (Main Event Service) and updates that folder's
+/// cabinet (Main Thing Service), then updates the volume's own cabinet
+/// pointer. Mover attribution mirrors the single-folder move: a
+/// resolvable `worker_id` wins, else `moved_by`, else `"Unknown porter"`.
+/// A `null`/omitted destination marks everything in transit.
+///
+/// Request: path param `id` (volume UUID) + JSON `MoveVolumeInput`.
+/// Response: `200 OK` with the refreshed `VolumeShow`.
+/// Errors: `404 Not Found` if the volume is missing; `422 Unprocessable
+/// Entity` for an invalid cabinet UUID; `503 Service Unavailable` if the
+/// Main Thing Service is unreachable. Per-folder event/cabinet writes are
+/// best-effort.
 #[debug_handler]
 pub async fn move_volume(
     Extension(workers): Extension<Arc<dyn MainWorkerServiceClient>>,
@@ -403,6 +500,8 @@ pub async fn move_volume(
         .filter(|f| f.volume_id == Some(volume.id))
         .collect();
 
+    // Record a move event + cabinet update for every member folder. The
+    // default per-folder reason references the volume title.
     let base_reason = input.reason.clone().filter(|s| !s.trim().is_empty());
     for f in &members {
         let reason = base_reason
@@ -437,6 +536,8 @@ pub async fn move_volume(
             .ok();
     }
 
+    // Finally update the volume's own cabinet pointer; on failure keep
+    // the pre-move volume so the response still renders.
     let updated = things
         .update_volume_cabinet(volume.id, to_cabinet_id, to_cabinet_label.clone())
         .await
@@ -445,6 +546,10 @@ pub async fn move_volume(
     Json(volume_show(things.as_ref(), events.as_ref(), &updated).await).into_response()
 }
 
+/// Resolve the mover's display name from free text.
+///
+/// Returns the `typed` name, or the `"Unknown porter"` sentinel when it
+/// is empty.
 fn fallback_name(typed: &str) -> String {
     if typed.is_empty() {
         "Unknown porter".into()
@@ -453,6 +558,12 @@ fn fallback_name(typed: &str) -> String {
     }
 }
 
+/// Route table for the volumes controller, mounted under `/api/volumes`.
+///
+/// `GET /` (index), `POST /` (create), `GET /{id}` (show),
+/// `PATCH /{id}` (rename), `POST /{id}/folders` (add folder),
+/// `DELETE /{id}/folders/{folder_id}` (remove folder),
+/// `POST /{id}/move` (move volume).
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/volumes")

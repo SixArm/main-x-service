@@ -1,3 +1,10 @@
+//! Loco application hooks for the organization service.
+//!
+//! The `App` type implements loco's `Hooks`, the seam the CLI drives to boot the
+//! service, register routes (`routes`), layer middleware (`after_routes`),
+//! and truncate tables between tests (`truncate`). It carries no state.
+//! The blanket JWT enforcement layer is wired here via `require_auth_mw`.
+
 use async_trait::async_trait;
 use axum::{
     extract::Request,
@@ -42,10 +49,13 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
 pub struct App;
 #[async_trait]
 impl Hooks for App {
+    /// The app name loco uses in logs and the CLI banner — the crate name.
     fn app_name() -> &'static str {
         env!("CARGO_CRATE_NAME")
     }
 
+    /// Human-readable version: the crate version plus the build SHA when
+    /// available (`BUILD_SHA`/`GITHUB_SHA`), else `dev` for local builds.
     fn app_version() -> String {
         format!(
             "{} ({})",
@@ -56,6 +66,13 @@ impl Hooks for App {
         )
     }
 
+    /// Boot the app: delegate to loco's `create_app`, wiring this `App`'s
+    /// hooks and the migration `Migrator` for the given start mode and
+    /// environment.
+    ///
+    /// # Errors
+    ///
+    /// Propagates loco boot failures (config load, DB connect, migration).
     async fn boot(
         mode: StartMode,
         environment: &Environment,
@@ -64,15 +81,29 @@ impl Hooks for App {
         create_app::<Self, Migrator>(mode, environment, config).await
     }
 
+    /// App initializers run at boot. None are needed here; auth and the
+    /// event publisher are process-wide `OnceLock`s, not loco state.
+    ///
+    /// # Errors
+    ///
+    /// Never (returns `Ok`); the signature is loco's.
     async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
         Ok(vec![])
     }
 
+    /// Register the controller route trees on top of loco's defaults
+    /// (`/_health`, `/_ping`): the organization CRUD/match/audit routes
+    /// and the OpenAPI/Swagger docs routes.
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::organizations::routes())
             .add_route(controllers::docs::routes())
     }
+    /// Wrap the assembled router in the blanket JWT-enforcement layer.
+    ///
+    /// # Errors
+    ///
+    /// Never (returns `Ok`); the signature is loco's.
     async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
         // Blanket JWT enforcement, gated by `ORGANIZATION_REQUIRE_AUTH`
         // (off by default). The layer is added unconditionally; the flag
@@ -80,22 +111,43 @@ impl Hooks for App {
         Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
     }
 
+    /// Register background-queue workers. None are registered.
+    ///
+    /// # Errors
+    ///
+    /// Never (returns `Ok`); the signature is loco's.
     async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {
         // No background workers (the loco scaffold's DownloadWorker stub
         // was removed; see entity spec §13 T-12).
         Ok(())
     }
 
+    /// Register CLI tasks. None are registered; the inject marker is kept
+    /// so the loco generator can splice tasks in later.
     #[allow(unused_variables)]
     fn register_tasks(tasks: &mut Tasks) {
         // tasks-inject (do not remove)
     }
+    /// Truncate all tables between tests (request-suite setup).
+    ///
+    /// Order matters only for FK safety; these tables have no FKs, but
+    /// children-before-parent order is kept by convention: merge/audit
+    /// rows, then the organizations they reference.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any truncate failure.
     async fn truncate(ctx: &AppContext) -> Result<()> {
         truncate_table(&ctx.db, merge_records::Entity).await?;
         truncate_table(&ctx.db, audit_logs::Entity).await?;
         truncate_table(&ctx.db, organizations::Entity).await?;
         Ok(())
     }
+    /// Seed the database. No seed data for this service.
+    ///
+    /// # Errors
+    ///
+    /// Never (returns `Ok`); the signature is loco's.
     async fn seed(_ctx: &AppContext, _base: &Path) -> Result<()> {
         Ok(())
     }

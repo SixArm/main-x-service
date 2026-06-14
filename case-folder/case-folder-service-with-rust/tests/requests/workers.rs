@@ -2,6 +2,8 @@ use case_folder_service_with_rust::app::App;
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
+/// Pins: `GET /api/workers` lists every worker from the Worker service,
+/// including each worker's role.
 #[tokio::test]
 #[serial]
 async fn list_returns_workers_from_stub_service() {
@@ -23,6 +25,7 @@ async fn list_returns_workers_from_stub_service() {
     .await;
 }
 
+/// Pins: `GET /api/workers?q=…` filters the worker list by the query.
 #[tokio::test]
 #[serial]
 async fn list_filters_by_query() {
@@ -41,6 +44,9 @@ async fn list_filters_by_query() {
     .await;
 }
 
+/// Pins: `GET /api/workers/{id}` distinguishes `moved_folders` (just the
+/// folders this worker moved) from `patient_folders` (all folders of the
+/// affected patients, a superset), plus the worker's move list.
 #[tokio::test]
 #[serial]
 async fn show_returns_moved_and_patient_folders() {
@@ -96,6 +102,7 @@ async fn show_returns_moved_and_patient_folders() {
     .await;
 }
 
+/// Pins: `GET /api/workers/{id}` for an unknown id returns `404`.
 #[tokio::test]
 #[serial]
 async fn show_unknown_worker_returns_404() {

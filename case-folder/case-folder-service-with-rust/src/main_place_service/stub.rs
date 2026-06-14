@@ -6,16 +6,25 @@ use uuid::Uuid;
 
 use super::{Client, CreatePlace, Error, Place};
 
+/// In-memory test double for the Main Place Service [`Client`]. Holds
+/// places in a `Mutex`-guarded `Vec`; no network involved.
 #[derive(Default)]
 pub struct StubClient {
+    /// Stored places, in insertion order.
     places: Mutex<Vec<Place>>,
 }
 
 impl StubClient {
+    /// Creates an empty stub.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Pre-loads `places`, skipping any whose `id` is already present
+    /// (dedupe-by-id).
+    ///
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     pub fn seed(&self, places: Vec<Place>) {
         let mut guard = self.places.lock().unwrap();
         for p in places {
@@ -25,10 +34,18 @@ impl StubClient {
         }
     }
 
+    /// Returns a clone of all stored places (test inspection helper).
+    ///
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     pub fn snapshot(&self) -> Vec<Place> {
         self.places.lock().unwrap().clone()
     }
 
+    /// Removes all stored places.
+    ///
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     pub fn clear(&self) {
         self.places.lock().unwrap().clear();
     }
@@ -36,6 +53,13 @@ impl StubClient {
 
 #[async_trait]
 impl Client for StubClient {
+    /// Case-insensitive substring name search, optionally filtered by an
+    /// exact `place_type` match. Empty query matches all places.
+    ///
+    /// # Errors
+    /// Infallible; returns `Result` for trait parity.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn search(&self, query: &str, place_type: Option<&str>) -> Result<Vec<Place>, Error> {
         let q = query.trim().to_lowercase();
         let guard = self.places.lock().unwrap();
@@ -47,11 +71,23 @@ impl Client for StubClient {
             .collect())
     }
 
+    /// Finds a place by UUID.
+    ///
+    /// # Errors
+    /// Infallible; returns `Result` for trait parity.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Place>, Error> {
         let guard = self.places.lock().unwrap();
         Ok(guard.iter().find(|p| p.id == id).cloned())
     }
 
+    /// Stores a new place with a fresh UUID and returns it.
+    ///
+    /// # Errors
+    /// Infallible; returns `Result` for trait parity.
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     async fn create(&self, input: CreatePlace) -> Result<Place, Error> {
         let place = Place {
             id: Uuid::new_v4(),

@@ -2,6 +2,8 @@ use case_folder_service_with_rust::app::App;
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
+/// Pins: `GET /api/places` groups places into buildings / rooms /
+/// cabinets.
 #[tokio::test]
 #[serial]
 async fn index_lists_buildings_rooms_and_cabinets() {
@@ -21,6 +23,8 @@ async fn index_lists_buildings_rooms_and_cabinets() {
     .await;
 }
 
+/// Pins: `?kind=cabinet` returns only the cabinets group; buildings and
+/// rooms come back empty.
 #[tokio::test]
 #[serial]
 async fn index_kind_filter_hides_other_groups() {
@@ -41,6 +45,8 @@ async fn index_kind_filter_hides_other_groups() {
     .await;
 }
 
+/// Pins: `GET /api/places/{id}` for a cabinet returns its details plus
+/// the folders currently filed inside it.
 #[tokio::test]
 #[serial]
 async fn show_returns_place_details_and_folders_inside_cabinet() {
@@ -68,6 +74,7 @@ async fn show_returns_place_details_and_folders_inside_cabinet() {
     .await;
 }
 
+/// Pins: `GET /api/places/{id}` for an unknown id returns `404`.
 #[tokio::test]
 #[serial]
 async fn show_unknown_place_returns_404() {
@@ -81,6 +88,8 @@ async fn show_unknown_place_returns_404() {
     .await;
 }
 
+/// Pins: `POST /api/places` registers a new place in the Main Place
+/// Service, returning `201` + `Location` and persisting it in the stub.
 #[tokio::test]
 #[serial]
 async fn create_registers_a_new_place_in_the_main_place_service() {
@@ -113,6 +122,8 @@ async fn create_registers_a_new_place_in_the_main_place_service() {
     .await;
 }
 
+/// Pins: creating a place with an empty `name` is rejected `422` with a
+/// per-field `errors.name` message.
 #[tokio::test]
 #[serial]
 async fn create_with_missing_name_returns_422() {
@@ -132,6 +143,10 @@ async fn create_with_missing_name_returns_422() {
     .await;
 }
 
+/// Pins the presence-interval logic of `GET /api/places/{id}/history`:
+/// a folder shows an open interval (`left_at == null`) while resident,
+/// the source cabinet's interval closes after a move, the destination
+/// opens a new one, and a building aggregates both cabinets' histories.
 #[tokio::test]
 #[serial]
 async fn cabinet_history_shows_presence_intervals() {
@@ -208,6 +223,7 @@ async fn cabinet_history_shows_presence_intervals() {
     .await;
 }
 
+/// Pins: `GET /api/places/{id}/history` for an unknown id returns `404`.
 #[tokio::test]
 #[serial]
 async fn history_unknown_place_returns_404() {

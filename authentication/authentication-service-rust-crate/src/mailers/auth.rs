@@ -1,4 +1,15 @@
-// auth mailer
+//! Auth mailer: the magic-link sign-in email plus loco's stock
+//! welcome / forgot-password templates.
+//!
+//! The **magic-link** email is the one that matters here: it is rendered
+//! from the dependency-light [`crate::i18n`] catalog (English + Welsh) so
+//! no templating engine or on-disk template is needed on that path. The
+//! `welcome` and `forgot` templates are loco scaffolding kept for
+//! completeness; the passwordless flow never checks a password, so
+//! `forgot_password` is not wired into any route today.
+//!
+//! In development there is no SMTP, so [`crate::controllers::auth`] logs
+//! the link to the tracing console and treats a send failure as benign.
 #![allow(non_upper_case_globals)]
 
 use loco_rs::prelude::*;
@@ -6,7 +17,10 @@ use serde_json::json;
 
 use crate::models::users;
 
+/// Embedded `welcome` email template directory (loco `mail_template`).
 static welcome: Dir<'_> = include_dir!("src/mailers/auth/welcome");
+/// Embedded `forgot`-password email template directory (loco scaffolding;
+/// unused by the passwordless flow).
 static forgot: Dir<'_> = include_dir!("src/mailers/auth/forgot");
 // The magic-link email no longer renders from the on-disk template
 // directory: it is localised via the dependency-light `crate::i18n`
@@ -17,6 +31,8 @@ static forgot: Dir<'_> = include_dir!("src/mailers/auth/forgot");
 /// the magic link is logged rather than sent (no SMTP configured).
 #[allow(clippy::module_name_repetitions)]
 pub struct AuthMailer {}
+// Opt into loco's `Mailer` trait using its default `mail` / `opts` /
+// `mail_template` implementations; no overrides are needed.
 impl Mailer for AuthMailer {}
 impl AuthMailer {
     /// Sending welcome email the the given user

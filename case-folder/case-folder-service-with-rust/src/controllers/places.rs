@@ -27,21 +27,47 @@ use crate::{
     responses::{self, Cabinet, Place},
 };
 
+/// Query parameters accepted by `GET /api/places`.
 #[derive(Debug, Deserialize, Default)]
 pub struct FilterParams {
+    /// Free-text search forwarded to the Main Place Service.
     pub q: Option<String>,
+    /// Restrict the listing to one kind: `"building"`, `"room"`, or
+    /// `"cabinet"`. Any other value (or absence) returns all three.
     pub kind: Option<String>,
 }
 
+/// Response body for `GET /api/places` — places grouped by kind.
 #[derive(Serialize)]
 pub struct PlacesIndex {
+    /// Echoes the effective search term, or `None` when empty.
     pub query: Option<String>,
+    /// Echoes the effective kind filter, or `None` when unset.
     pub kind: Option<String>,
+    /// Matching buildings (`HOSPITAL` place type).
     pub buildings: Vec<Place>,
+    /// Matching rooms (`RECORDS_ROOM` place type).
     pub rooms: Vec<Place>,
+    /// Matching cabinets (`FILE_CABINET` place type), each with its
+    /// current folder count.
     pub cabinets: Vec<Cabinet>,
 }
 
+/// `GET /api/places` — list buildings, rooms, and cabinets grouped by
+/// kind.
+///
+/// Queries the Main Place Service three times (one per kind) and, for
+/// cabinets, joins per-cabinet folder counts from the Main Thing
+/// Service. The `kind` parameter maps `building → HOSPITAL`,
+/// `room → RECORDS_ROOM`, `cabinet → FILE_CABINET`; a recognised kind
+/// blanks out the other two groups. Each place gets a human-readable
+/// container path ("Building — Room") resolved locally from the fetched
+/// sets.
+///
+/// Request: query params `q`, `kind` — see `FilterParams`.
+/// Response: `200 OK` with `PlacesIndex`.
+/// Errors: `503 Service Unavailable` if the Main Place Service is
+/// unreachable. The folder-count fetch is best-effort.
 #[debug_handler]
 pub async fn index(
     Extension(mps): Extension<Arc<dyn MainPlaceServiceClient>>,
@@ -51,6 +77,7 @@ pub async fn index(
     let q = params.q.clone().unwrap_or_default();
     let kind_filter = params.kind.clone().unwrap_or_default();
 
+    // Map the public `kind` string onto the Place Service's place type.
     let place_type_filter = match kind_filter.as_str() {
         "building" => Some(PlaceType::HOSPITAL),
         "room" => Some(PlaceType::RECORDS_ROOM),
@@ -74,6 +101,7 @@ pub async fn index(
     let rooms_by_id: HashMap<Uuid, &crate::main_place_service::Place> =
         rooms.iter().map(|p| (p.id, p)).collect();
 
+    // Pre-tally folders per cabinet so cabinet views avoid a second hop.
     let folders_list = things.search("").await.unwrap_or_default();
     let mut folders_per_cabinet: HashMap<Uuid, usize> = HashMap::new();
     for f in &folders_list {
@@ -82,6 +110,9 @@ pub async fn index(
         }
     }
 
+    // Resolve a place's parent path label from the already-fetched sets:
+    // a cabinet's parent is a room ("Building — Room"); a room's parent
+    // is a building. Returns "" when the parent is unknown.
     let container_path_of = |p: &crate::main_place_service::Place| -> String {
         p.contained_in_place
             .and_then(|cid| {
@@ -150,14 +181,27 @@ pub async fn index(
     .into_response()
 }
 
+/// Response body for `GET /api/places/{id}`.
 #[derive(Serialize)]
 pub struct PlaceShow {
+    /// The place view, flattened into the top-level JSON object.
     #[serde(flatten)]
     pub place: Place,
     /// Folders parked in this cabinet (only populated for cabinets).
     pub folders: Vec<responses::Folder>,
 }
 
+/// `GET /api/places/{id}` — show one place.
+///
+/// Fetches the place from the Main Place Service and resolves its
+/// container path label. For cabinets only, attaches the folders
+/// currently filed there (scanning the Main Thing Service folder set);
+/// buildings and rooms get an empty `folders` list.
+///
+/// Request: path param `id` (place UUID).
+/// Response: `200 OK` with `PlaceShow`.
+/// Errors: `404 Not Found` if no such place; `503 Service Unavailable`
+/// if the Main Place Service is unreachable.
 #[debug_handler]
 pub async fn show(
     Extension(mps): Extension<Arc<dyn MainPlaceServiceClient>>,
@@ -200,15 +244,34 @@ pub async fn show(
     .into_response()
 }
 
+/// Request body for `POST /api/places`.
 #[derive(Debug, Deserialize)]
 pub struct CreatePlaceInput {
+    /// Place name. Required.
     pub name: String,
+    /// Kind: `"building"`, `"room"`, or `"cabinet"`. Any other value is
+    /// a `422`.
     pub kind: String,
+    /// Optional parent place UUID (e.g. the room a cabinet sits in).
     pub contained_in_place: Option<String>,
+    /// Optional free-text description.
     pub description: Option<String>,
+    /// Optional capacity hint (e.g. folder slots).
     pub capacity: Option<i32>,
 }
 
+/// `POST /api/places` — create a building, room, or cabinet.
+///
+/// Validates the name and kind, maps the kind to the Place Service's
+/// place type, and writes the place back to the Main Place Service (the
+/// tracker keeps no local places table). Resolves and returns the new
+/// place's container path label.
+///
+/// Request: JSON `CreatePlaceInput`.
+/// Response: `201 Created` with the place view and a `Location:
+/// /api/places/{id}` header.
+/// Errors: `422 Unprocessable Entity` for a missing name, an
+/// unrecognised kind, or a Place Service write error.
 #[debug_handler]
 pub async fn create(
     Extension(mps): Extension<Arc<dyn MainPlaceServiceClient>>,
@@ -273,26 +336,54 @@ pub async fn create(
 /// next (or `null` if still resident). See root spec D-10.
 #[derive(Serialize)]
 pub struct Presence {
+    /// Folder that was present.
     pub folder_id: Uuid,
+    /// Folder title snapshotted at the entering move.
     pub folder_title: String,
+    /// Patient owning the folder.
     pub patient_id: Uuid,
+    /// Patient NHS Number snapshot.
     pub nhs_number: String,
+    /// Patient name snapshot.
     pub patient_name: String,
+    /// Cabinet the folder was present in.
     pub cabinet_id: Uuid,
+    /// Resolved cabinet path label.
     pub cabinet_label: String,
+    /// RFC 3339 timestamp the folder entered the cabinet.
     pub entered_at: String,
+    /// RFC 3339 timestamp the folder left, or `None` if still resident.
     pub left_at: Option<String>,
+    /// Reason recorded on the entering move, if any.
     pub entered_reason: Option<String>,
+    /// Reason recorded on the leaving move, if any.
     pub left_reason: Option<String>,
 }
 
+/// Response body for `GET /api/places/{id}/history`.
 #[derive(Serialize)]
 pub struct PlaceHistory {
+    /// The place view, flattened into the top-level JSON object.
     #[serde(flatten)]
     pub place: Place,
+    /// Presence intervals across every cabinet this place covers,
+    /// newest first.
     pub presences: Vec<Presence>,
 }
 
+/// `GET /api/places/{id}/history` — presence history for a place.
+///
+/// Computes, for every cabinet the place covers, the intervals during
+/// which folders were resident. Coverage resolution: a cabinet covers
+/// itself; a room covers its cabinets; a building covers all cabinets in
+/// all its rooms. Move events are then paired (enter/leave) into
+/// presence intervals via `build_presences`.
+///
+/// Request: path param `id` (place UUID).
+/// Response: `200 OK` with `PlaceHistory`.
+/// Errors: `404 Not Found` if no such place; `503 Service Unavailable`
+/// if the Main Place Service is unreachable. Event/cabinet/room fetches
+/// are best-effort.
 #[debug_handler]
 pub async fn history(
     Extension(mps): Extension<Arc<dyn MainPlaceServiceClient>>,
@@ -373,6 +464,9 @@ fn build_presences(
     covered: &HashSet<Uuid>,
     labels: &HashMap<Uuid, String>,
 ) -> Vec<Presence> {
+    // Bucket each relevant move under (cabinet, folder). A move counts
+    // as an enter for its destination and a leave for its origin; the
+    // origin == destination case is skipped (no-op self moves).
     let mut grouped: HashMap<(Uuid, Uuid), Vec<&MoveEvent>> = HashMap::new();
     for ev in events {
         if let Some(to) = ev.to_cabinet_id {
@@ -389,6 +483,8 @@ fn build_presences(
 
     let mut out: Vec<Presence> = Vec::new();
     for ((cabinet_id, _folder_id), mut evs) in grouped {
+        // Walk this folder's moves for this cabinet in time order,
+        // pairing each enter with the next leave.
         evs.sort_by_key(|e| e.moved_at);
         let label = labels.get(&cabinet_id).cloned().unwrap_or_default();
         let mut entered: Option<&MoveEvent> = None;
@@ -403,15 +499,23 @@ fn build_presences(
                 }
             }
         }
+        // A dangling enter with no matching leave is an open interval
+        // (folder still resident): `left_at = None`.
         if let Some(en) = entered.take() {
             out.push(presence_from(en, None, cabinet_id, &label));
         }
     }
 
+    // Newest interval first.
     out.sort_by(|a, b| b.entered_at.cmp(&a.entered_at));
     out
 }
 
+/// Build a `Presence` from an entering move and an optional leaving move.
+///
+/// Folder / patient identity and the entering reason come from `enter`;
+/// `left_at` and `left_reason` come from `leave` (`None` ⇒ still
+/// resident). `cabinet_id` / `label` identify the cabinet.
 fn presence_from(
     enter: &MoveEvent,
     leave: Option<&MoveEvent>,
@@ -433,6 +537,10 @@ fn presence_from(
     }
 }
 
+/// Route table for the places controller, mounted under `/api/places`.
+///
+/// `GET /` (index), `POST /` (create), `GET /{id}` (show),
+/// `GET /{id}/history`.
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/places")

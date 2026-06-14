@@ -4,6 +4,9 @@
 
 use case_matcher::{Case, CaseIdentifier, IdentifierScheme, MatchingEngine};
 
+/// Pins that the service uses the canonical `case-matcher` engine, not a
+/// fork: two cases sharing a Docket identifier hit the deterministic
+/// short-circuit and score exactly `1.0` with `deterministic_match` set.
 #[test]
 fn embeds_the_canonical_matcher() {
     let engine = MatchingEngine::default_config();
@@ -22,6 +25,9 @@ fn embeds_the_canonical_matcher() {
     assert!(r.breakdown.deterministic_match);
 }
 
+/// Pins the storage contract: a `Case` survives a JSON round-trip
+/// (`to_value` → `from_value`) unchanged, which is how the row's `data`
+/// column persists and reloads the payload verbatim.
 #[test]
 fn case_json_round_trips_for_storage() {
     let mut c = Case::new("Housing benefit appeal");

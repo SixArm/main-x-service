@@ -216,6 +216,10 @@ pub fn recent(limit: usize) -> Vec<EventView> {
 mod tests {
     use super::*;
 
+    /// Pins the envelope wire contract: schema version is 1, `entity` is
+    /// `"case"`, and a full serialize→deserialize round-trip preserves
+    /// every field (including the `skip_deserializing` `entity`, refilled
+    /// from the constant).
     #[test]
     fn envelope_serde_round_trip_and_schema_version() {
         let env = envelope(
@@ -238,6 +242,9 @@ mod tests {
         assert_eq!(back.name, "Housing benefit appeal");
     }
 
+    /// Pins the frozen operator projection: `EventView` serializes to
+    /// exactly `{kind, pid, name, seq}` — the envelope's internal fields
+    /// (`event_id`, `schema_version`, `entity`, `actor`) are not exposed.
     #[test]
     fn projection_has_exactly_the_frozen_keys() {
         let env = envelope(
@@ -260,6 +267,8 @@ mod tests {
         assert_eq!(value["name"], "Tax credit overpayment");
     }
 
+    /// Pins the in-memory publisher: published envelopes read back newest
+    /// last, projected to `EventView`, with strictly increasing `seq`.
     #[test]
     fn in_memory_publisher_publish_and_read_back() {
         let publisher = InMemoryPublisher::new();
@@ -284,6 +293,8 @@ mod tests {
         assert!(events.windows(2).all(|w| w[0].seq < w[1].seq));
     }
 
+    /// Pins actor capture on the envelope: `Some(actor)` when supplied,
+    /// `None` otherwise.
     #[test]
     fn actor_is_recorded_or_none() {
         let with = envelope(
@@ -297,6 +308,9 @@ mod tests {
         assert_eq!(without.actor, None);
     }
 
+    /// Pins the process-wide free functions (`publish_with_actor` /
+    /// `publish` / `recent`): events for a pid come back in monotonic
+    /// `seq` order via the global publisher.
     #[test]
     fn process_publish_is_monotonic_and_projects() {
         publish_with_actor(EventKind::Created, "proc-pid", "Initial", Some("user-3"));

@@ -78,6 +78,8 @@ pub fn merge_pathways(main: &CarePathway, duplicate: &CarePathway) -> MergeOutco
     }
 }
 
+/// Union two string lists, preserving `main`'s order and appending each
+/// `extra` not already present (exact, case-sensitive equality).
 fn union_strings(main: &[String], extra: &[String]) -> Vec<String> {
     union_by(main, extra, |a, b| a == b)
 }
@@ -93,11 +95,14 @@ fn union_by<T: Clone>(main: &[T], extra: &[T], eq: impl Fn(&T, &T) -> bool) -> V
     out
 }
 
+/// Tests for the pure merge fold: alternate-name handling, scalar
+/// fallback, list unioning, and the transferred snapshot. DB-free.
 #[cfg(test)]
 mod tests {
     use super::*;
     use care_pathway_matcher::{CareSetting, CodeSystem, ConditionCode};
 
+    /// Build a [`ConditionCode`] from a system + code (test brevity).
     fn cc(system: CodeSystem, code: &str) -> ConditionCode {
         ConditionCode {
             system,
@@ -105,6 +110,8 @@ mod tests {
         }
     }
 
+    /// The duplicate's differing title is carried onto the survivor as an
+    /// alternate name, while the survivor keeps its own `name`.
     #[test]
     fn duplicate_name_becomes_an_alternate_name() {
         let main = CarePathway::new("Acute Stroke Care Pathway");
@@ -117,6 +124,8 @@ mod tests {
             .contains(&"Cerebrovascular Accident Pathway".to_string()));
     }
 
+    /// An identical duplicate title is not duplicated into the survivor's
+    /// alternate names.
     #[test]
     fn same_name_is_not_added_as_alternate() {
         let main = CarePathway::new("Stroke");
@@ -125,6 +134,8 @@ mod tests {
         assert!(out.merged.alternate_names.is_empty());
     }
 
+    /// Scalars keep the survivor's value when present and only adopt the
+    /// duplicate's where the survivor's is empty.
     #[test]
     fn scalars_fill_from_duplicate_only_when_main_is_empty() {
         let mut main = CarePathway::new("P");
@@ -139,6 +150,8 @@ mod tests {
         assert_eq!(out.merged.care_setting, Some(CareSetting::Inpatient)); // adopted
     }
 
+    /// List fields union without re-adding overlapping entries (keywords
+    /// and condition codes deduped by their identity).
     #[test]
     fn list_fields_union_without_duplicates() {
         let mut main = CarePathway::new("P");
@@ -155,6 +168,8 @@ mod tests {
         assert_eq!(out.merged.condition_codes.len(), 2);
     }
 
+    /// The `transferred` snapshot is the full serialized duplicate, kept
+    /// in the merge-history record for auditability.
     #[test]
     fn transferred_snapshot_is_the_duplicate() {
         let main = CarePathway::new("P");

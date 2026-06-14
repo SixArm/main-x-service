@@ -18,6 +18,8 @@ pub trait Mailer: Send + Sync {
 pub struct LogMailer;
 
 impl Mailer for LogMailer {
+    /// Logs the recipient email and magic link at `INFO` level instead
+    /// of sending real email, so the sign-in flow works without SMTP.
     fn send_magic_link(&self, to: &Identity, link: &str) {
         tracing::info!(
             email = %to.email,

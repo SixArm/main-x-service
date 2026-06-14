@@ -9,16 +9,27 @@
 use loco_rs::schema::*;
 use sea_orm_migration::prelude::*;
 
+/// The `users.deleted_at`-column migration (name from the module path).
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
+    /// Add the nullable `users.deleted_at` column.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any DDL failure from the schema manager.
     async fn up(&self, m: &SchemaManager) -> Result<(), DbErr> {
         add_column(m, "users", "deleted_at", ColType::TimestampWithTimeZoneNull).await?;
         Ok(())
     }
 
+    /// Remove the `users.deleted_at` column (rollback).
+    ///
+    /// # Errors
+    ///
+    /// Propagates any DDL failure from the schema manager.
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
         remove_column(m, "users", "deleted_at").await?;
         Ok(())

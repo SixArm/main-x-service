@@ -23,7 +23,9 @@ use uuid::Uuid;
 /// into this flatter shape because it's all the tracker needs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Worker {
+    /// Main Worker Service UUID (the worker's stable identifier).
     pub id: Uuid,
+    /// Full display name (`given… family`).
     pub name: String,
     /// Worker classification (`doctor`, `nurse`, `carer`, `staff`,
     /// `employee`, `manager`, `supervisor`, `consultant`, `other`).
@@ -31,16 +33,22 @@ pub struct Worker {
     pub role: Option<String>,
 }
 
+/// Errors raised by the Main Worker Service client.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    /// Network/transport failure, or a non-success HTTP status.
     #[error("Main Worker Service request failed: {0}")]
     Transport(String),
+    /// The service replied but the body could not be parsed/mapped.
     #[error("Main Worker Service returned an unexpected response: {0}")]
     BadResponse(String),
+    /// The service confirmed no matching worker exists.
     #[error("Main Worker Service did not find a worker")]
     NotFound,
 }
 
+/// Flattens our typed [`Error`] into a `loco_rs::Error::Message` for
+/// `?`-propagation in controllers.
 impl From<Error> for loco_rs::Error {
     fn from(value: Error) -> Self {
         loco_rs::Error::Message(value.to_string())
@@ -51,8 +59,14 @@ impl From<Error> for loco_rs::Error {
 pub trait Client: Send + Sync {
     /// Free-text search by name. Returns matching workers (capped by the
     /// upstream service's `limit` query param — we default to 25).
+    ///
+    /// # Errors
+    /// Returns [`Error`] on transport failure or an unparseable response.
     async fn search(&self, query: &str) -> Result<Vec<Worker>, Error>;
 
     /// Look up a single worker by service UUID.
+    ///
+    /// # Errors
+    /// Returns [`Error`] on transport failure or an unparseable response.
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Worker>, Error>;
 }

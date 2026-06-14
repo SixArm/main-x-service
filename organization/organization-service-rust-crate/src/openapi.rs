@@ -157,10 +157,15 @@ pub fn spec() -> Value {
     })
 }
 
+/// Pins on the hand-written spec: that it is well-formed and that the
+/// load-bearing endpoints/schemas/security are present, so edits to the
+/// `json!` literal can't silently drop them.
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// The document advertises `OpenAPI` 3.0.3 and includes the core
+    /// create endpoint and the `Organization.name` schema property.
     #[test]
     fn spec_is_wellformed() {
         let s = spec();
@@ -169,6 +174,7 @@ mod tests {
         assert!(s["components"]["schemas"]["Organization"]["properties"]["name"].is_object());
     }
 
+    /// The merge endpoints and the `MergeRequest` schema are documented.
     #[test]
     fn spec_documents_merge_endpoints() {
         let s = spec();
@@ -177,6 +183,8 @@ mod tests {
         assert!(s["components"]["schemas"]["MergeRequest"]["properties"]["main_pid"].is_object());
     }
 
+    /// `whoami` carries the bearer security requirement and the matching
+    /// `bearer` security scheme is declared.
     #[test]
     fn spec_documents_whoami_with_bearer_security() {
         let s = spec();

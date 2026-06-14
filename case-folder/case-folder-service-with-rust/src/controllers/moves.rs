@@ -33,11 +33,26 @@ use crate::{
     responses::{self, List},
 };
 
+/// Query parameters accepted by `GET /api/moves`.
 #[derive(Debug, Deserialize, Default)]
 pub struct FilterParams {
+    /// Free-text filter applied client-side across patient name, folder
+    /// title, NHS Number, cabinet labels, mover, and worker role. Empty
+    /// or absent returns the whole log.
     pub q: Option<String>,
 }
 
+/// `GET /api/moves` — list every recorded move event (global audit log).
+///
+/// Fetches all move events from the Main Event Service and applies an
+/// optional case-insensitive free-text filter (`q`) across the patient
+/// name, folder title, NHS Number (spaces ignored on both sides),
+/// cabinet labels, mover name, and worker role.
+///
+/// Request: query param `q` — see `FilterParams`.
+/// Response: `200 OK` with a `List` of move-event views.
+/// Errors: `503 Service Unavailable` if the Main Event Service is
+/// unreachable.
 #[debug_handler]
 pub async fn index(
     Extension(events): Extension<Arc<dyn MainEventServiceClient>>,
@@ -78,8 +93,11 @@ pub async fn index(
     Json(List::with_query(items, q)).into_response()
 }
 
+/// Request body for `POST /api/moves`.
 #[derive(Debug, Deserialize)]
 pub struct CreateMoveInput {
+    /// UUID of the folder being moved. Must parse as a UUID and resolve
+    /// to a known folder.
     pub folder_id: String,
     /// Destination cabinet UUID. Pass `null` or omit to mark "in transit".
     pub to_cabinet_id: Option<String>,
@@ -87,9 +105,31 @@ pub struct CreateMoveInput {
     pub worker_id: Option<String>,
     /// Free-text fallback when no `worker_id` is supplied.
     pub moved_by: Option<String>,
+    /// Optional free-text reason for the move.
     pub reason: Option<String>,
 }
 
+/// `POST /api/moves` — record a folder move.
+///
+/// Two steps. Step 1 records a `MoveEvent` on the Main Event Service
+/// (the durable audit log) — if this fails the request fails. Step 2 is
+/// a best-effort PATCH of the folder's `cabinet_id` +
+/// `cabinet_path_snapshot` on the Main Thing Service; a failure there is
+/// logged but the move is still considered recorded (next sync
+/// reconciles).
+///
+/// Mover attribution: a valid `worker_id` resolves the worker's name +
+/// role from the Main Worker Service and takes precedence; otherwise the
+/// free-text `moved_by` is used, falling back to `"Unknown porter"`.
+/// A `null`/omitted `to_cabinet_id` marks the folder "in transit".
+///
+/// Request: JSON `CreateMoveInput`.
+/// Response: `201 Created` with the move-event view and a `Location:
+/// /api/moves/{id}` header.
+/// Errors: `422 Unprocessable Entity` for an invalid folder or cabinet
+/// UUID; `404 Not Found` if the folder does not exist; `503 Service
+/// Unavailable` if the Main Thing Service is unreachable or the Main
+/// Event Service write fails.
 #[debug_handler]
 pub async fn create(
     Extension(workers): Extension<Arc<dyn MainWorkerServiceClient>>,
@@ -106,6 +146,7 @@ pub async fn create(
             return responses::unprocessable(errors);
         }
     };
+    // `null`/empty destination means "in transit"; otherwise parse it.
     let to_cabinet_id = match input.to_cabinet_id.as_deref() {
         None | Some("") => None,
         Some(s) => match Uuid::parse_str(s) {
@@ -141,6 +182,9 @@ pub async fn create(
         None => None,
     };
 
+    // Mover attribution: a resolvable `worker_id` wins (name + role
+    // snapshotted from the Worker Service); otherwise fall back to the
+    // typed `moved_by` name with no worker id/role.
     let typed_name = input.moved_by.as_deref().unwrap_or("").trim().to_string();
     let (final_worker_id, final_name, worker_role) = match worker_id {
         Some(id) => match workers.find_by_id(id).await {
@@ -150,6 +194,7 @@ pub async fn create(
         None => (None, fallback_name(&typed_name), None),
     };
 
+    // Step 1: record the audit-log event. A failure here aborts the move.
     let event = match events
         .record(RecordMove {
             folder_id: folder.id,
@@ -179,6 +224,8 @@ pub async fn create(
         }
     };
 
+    // Step 2: best-effort cabinet update on the Thing Service. A failure
+    // is only logged — the move is already in the audit log.
     if let Err(e) = things
         .update_cabinet(folder.id, to_cabinet_id, to_cabinet_label.clone())
         .await
@@ -187,6 +234,7 @@ pub async fn create(
     }
 
     let body = responses::move_event(&event);
+    // `201 Created` + `Location` header pointing at the new move event.
     let location = format!("/api/moves/{}", event.id);
     (
         StatusCode::CREATED,
@@ -196,6 +244,15 @@ pub async fn create(
         .into_response()
 }
 
+/// `GET /api/moves/{id}` — show a single move event.
+///
+/// The Main Event Service exposes no per-id lookup, so this fetches the
+/// full log and scans for the matching id.
+///
+/// Request: path param `id` (move-event UUID).
+/// Response: `200 OK` with the move-event view.
+/// Errors: `404 Not Found` if no event has that id; `503 Service
+/// Unavailable` if the Main Event Service is unreachable.
 #[debug_handler]
 pub async fn show(
     Extension(events): Extension<Arc<dyn MainEventServiceClient>>,
@@ -214,6 +271,10 @@ pub async fn show(
     }
 }
 
+/// Resolve the mover's display name from free text.
+///
+/// Returns the trimmed `typed` name, or the `"Unknown porter"` sentinel
+/// when it is empty.
 fn fallback_name(typed: &str) -> String {
     if typed.is_empty() {
         "Unknown porter".into()
@@ -222,6 +283,9 @@ fn fallback_name(typed: &str) -> String {
     }
 }
 
+/// Route table for the moves controller, mounted under `/api/moves`.
+///
+/// `GET /` (index), `POST /` (create), `GET /{id}` (show).
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/moves")

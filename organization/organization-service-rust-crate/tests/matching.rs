@@ -4,6 +4,8 @@
 
 use organization_matcher::{IdentifierScheme, MatchingEngine, OrgIdentifier, Organization};
 
+/// The service uses the canonical `organization-matcher`: two orgs sharing
+/// an LEI deterministically match (score 1.0, deterministic short-circuit).
 #[test]
 fn embeds_the_canonical_matcher() {
     let engine = MatchingEngine::default_config();

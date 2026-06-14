@@ -86,6 +86,9 @@ pub struct EventView {
 }
 
 impl From<&Envelope> for EventView {
+    /// Project an [`Envelope`] down to the frozen operator wire shape,
+    /// dropping the internal fields (`event_id`, `schema_version`,
+    /// `entity`, `actor`) that the `/events/recent` view never exposes.
     fn from(env: &Envelope) -> Self {
         Self {
             kind: env.kind,
@@ -110,6 +113,9 @@ pub trait EventPublisher: Send + Sync {
     fn recent(&self, limit: usize) -> Vec<EventView>;
 }
 
+/// Ring-buffer capacity: the most recent 1000 events are retained;
+/// publishing past this evicts the oldest. Bounds memory on a long-lived
+/// process while keeping enough history for the operator view.
 const CAPACITY: usize = 1000;
 
 /// Today's ring buffer behind the [`EventPublisher`] seam. Default for
@@ -141,6 +147,9 @@ impl EventPublisher for InMemoryPublisher {
         }
     }
 
+    /// Return the newest `limit` events in chronological order. Takes the
+    /// last `limit` from the back of the buffer, then re-reverses so the
+    /// result is oldest-to-newest. A poisoned lock yields an empty vec.
     fn recent(&self, limit: usize) -> Vec<EventView> {
         self.buffer.lock().map_or_else(
             |_| Vec::new(),
@@ -149,12 +158,15 @@ impl EventPublisher for InMemoryPublisher {
     }
 }
 
-/// The process-wide publisher global.
+/// The process-wide publisher global, lazily initialised on first use.
 fn publisher() -> &'static InMemoryPublisher {
     static PUBLISHER: OnceLock<InMemoryPublisher> = OnceLock::new();
     PUBLISHER.get_or_init(InMemoryPublisher::new)
 }
 
+/// Allocate the next per-process event sequence number (starts at 1).
+/// `Relaxed` is sufficient: we only need monotonic uniqueness, not
+/// ordering relative to other memory operations.
 fn next_seq() -> u64 {
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQ: AtomicU64 = AtomicU64::new(1);
@@ -197,6 +209,9 @@ pub fn recent(limit: usize) -> Vec<EventView> {
     publisher().recent(limit)
 }
 
+/// Tests for the Phase-1 in-memory event path: publish/read-back,
+/// monotonic sequencing, the envelope's Serde round-trip, and the frozen
+/// `EventView` wire shape. All DB-free.
 #[cfg(test)]
 mod tests {
     use super::*;
