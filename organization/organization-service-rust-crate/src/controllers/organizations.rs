@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::auth::{AuthUser, MaybeAuthUser};
 use crate::merge::merge_orgs;
+use crate::metrics::Metrics;
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::merge_records::Model as MergeRecordModel;
 use crate::models::organizations::Model as OrgModel;
@@ -120,6 +121,7 @@ async fn create(
 ) -> Result<Response> {
     validate(&org)?;
     let model = OrgModel::create(&ctx.db, &org).await?;
+    Metrics::global().organization_created_total.inc();
     audit(
         &ctx,
         model.pid,
@@ -168,6 +170,7 @@ async fn update(
         .await
         .map_err(http_err)?;
     let updated = model.into_active_model().update_data(&ctx.db, &org).await?;
+    Metrics::global().organization_updated_total.inc();
     audit(
         &ctx,
         updated.pid,
@@ -203,6 +206,7 @@ async fn remove(
         .map_err(http_err)?;
     let (entity_pid, name) = (model.pid, model.name.clone());
     model.into_active_model().soft_delete(&ctx.db).await?;
+    Metrics::global().organization_deleted_total.inc();
     audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
     streaming::publish_with_actor(
         EventKind::Deleted,
@@ -373,6 +377,7 @@ async fn merge(
         .await?;
     let (dup_pid, dup_name) = (duplicate.pid, duplicate.name.clone());
     duplicate.into_active_model().soft_delete(&ctx.db).await?;
+    Metrics::global().organization_merged_total.inc();
 
     if let Err(err) = MergeRecordModel::record(
         &ctx.db,

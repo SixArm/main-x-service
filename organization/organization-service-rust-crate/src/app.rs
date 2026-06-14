@@ -92,12 +92,14 @@ impl Hooks for App {
     }
 
     /// Register the controller route trees on top of loco's defaults
-    /// (`/_health`, `/_ping`): the organization CRUD/match/audit routes
-    /// and the OpenAPI/Swagger docs routes.
+    /// (`/_health`, `/_ping`): the organization CRUD/match/audit routes,
+    /// the OpenAPI/Swagger docs routes, and the Prometheus metrics route
+    /// (`/metrics.prom`, mounted at root like the docs).
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::organizations::routes())
             .add_route(controllers::docs::routes())
+            .add_route(controllers::metrics::routes())
     }
     /// Wrap the assembled router in the blanket JWT-enforcement layer.
     ///

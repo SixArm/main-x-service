@@ -2,3 +2,4 @@
 
 pub mod cases;
 pub mod docs;
+pub mod metrics;

@@ -112,14 +112,16 @@ pub fn require_auth() -> bool {
         .get_or_init(|| std::env::var("CARE_PATHWAY_REQUIRE_AUTH").is_ok_and(|v| parse_bool(&v)))
 }
 
-/// Paths that stay public even when enforcement is on: health/ping and
-/// the `OpenAPI` doc + Swagger UI. Everything else under `/api` requires a
-/// valid bearer token.
+/// Paths that stay public even when enforcement is on: health/ping, the
+/// `OpenAPI` doc + Swagger UI, and the Prometheus metrics endpoint (so a
+/// scraper needs no token). Everything else under `/api` requires a valid
+/// bearer token.
 fn is_public_path(path: &str) -> bool {
     path == "/_health"
         || path == "/_ping"
         || path == "/api-docs/openapi.json"
         || path.starts_with("/swagger-ui")
+        || path == "/metrics.prom"
 }
 
 /// The blanket-enforcement decision. `Ok(())` ⇒ let the request through;
@@ -425,12 +427,25 @@ cg5Tq5R846wbNyxrso8C988=
             "/api-docs/openapi.json",
             "/swagger-ui",
             "/swagger-ui/index.html",
+            "/metrics.prom",
         ] {
             assert!(
                 enforce(true, p, &h, &verifier).is_ok(),
                 "{p} should be public"
             );
         }
+    }
+
+    /// Enforcement on ⇒ the Prometheus metrics endpoint stays public so a
+    /// scraper can reach `GET /metrics.prom` without a bearer token.
+    #[test]
+    fn enforce_on_allows_metrics_path_without_token() {
+        let (jwks, _) = test_jwks_and_kid();
+        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).unwrap();
+        assert!(
+            enforce(true, "/metrics.prom", &HeaderMap::new(), &verifier).is_ok(),
+            "/metrics.prom should be public even with enforcement on"
+        );
     }
 
     /// Enforcement on + protected path + no token ⇒ `401`.

@@ -26,6 +26,7 @@ pub mod controllers;
 pub mod data;
 pub mod initializers;
 pub mod merge;
+pub mod metrics;
 pub mod models;
 pub mod openapi;
 pub mod streaming;

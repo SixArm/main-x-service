@@ -29,6 +29,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Prometheus metrics endpoint.** `GET /metrics.prom` (root path, no
+  `/api` prefix, unauthenticated) renders a process-wide
+  `prometheus::Registry` in text-exposition format (`Content-Type:
+  text/plain; version=0.0.4`), for parity with the older Axum services
+  in the family. The metric set is auth-specific (this service has no
+  entity CRUD): `auth_signup_total`, `auth_magic_link_issued_total`,
+  `auth_magic_link_redeemed_total`, `auth_signout_total`,
+  `auth_rate_limited_total` counters plus a `http_requests_total`
+  counter vec (`method` / `path` / `status`). The auth controllers
+  increment them on signup success, magic-link issuance (signup +
+  sign-in), redeem success, signout, and the `429` rate-limited path.
+  Labels never carry a subject identifier (no email/token/pid), so the
+  monitoring system holds no personal data; a DB-free unit test pins
+  both the valid-exposition shape and the no-secret-labels contract.
+  New module `src/metrics.rs` + controller `src/controllers/metrics.rs`;
+  registered in `src/app.rs`; documented in OpenAPI. Adds the
+  `prometheus = "0.13"` dependency.
 - **Zero-downtime key rotation** (entity spec T-5). `auth::AuthKeys` is
   now a **key set**: one *primary* signing key plus zero or more
   *additional* verify-only public keys.

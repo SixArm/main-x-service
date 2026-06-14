@@ -92,12 +92,13 @@ impl Hooks for App {
     }
 
     /// Assemble the route table: loco's default routes (`/_health`,
-    /// `/_ping`, …) plus the care-pathway controller and the API-docs
-    /// controller.
+    /// `/_ping`, …) plus the care-pathway controller, the API-docs
+    /// controller, and the root-level Prometheus `/metrics.prom` endpoint.
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::care_pathways::routes())
             .add_route(controllers::docs::routes())
+            .add_route(controllers::metrics::routes())
     }
     /// Wrap the assembled router in the blanket JWT-enforcement layer.
     ///

@@ -27,6 +27,8 @@ pub mod controllers;
 pub mod initializers;
 /// Pure record-merge logic (fold a duplicate into a survivor).
 pub mod merge;
+/// Process-wide Prometheus metrics, served at `/metrics.prom`.
+pub mod metrics;
 /// `SeaORM` entities plus the CRUD/audit helpers layered over them.
 pub mod models;
 /// Hand-written OpenAPI 3 document served at `/api-docs/openapi.json`.

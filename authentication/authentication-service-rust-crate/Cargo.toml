@@ -53,6 +53,9 @@ jsonwebtoken = { version = "9" }
 rsa = { version = "0.9", features = ["pem"] }
 base64 = { version = "0.22" }
 sha2 = { version = "0.10" }
+# Prometheus text-exposition metrics served at GET /metrics.prom, for
+# parity with the older Axum services in the family.
+prometheus = { version = "0.13" }
 
 # musl release builds use mimalloc as the global allocator (see
 # src/bin/main.rs); gated by target so normal glibc/macOS builds do not

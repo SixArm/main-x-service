@@ -111,6 +111,19 @@ pub fn spec() -> Value {
             "/api/care-pathways/{pid}/audit": {
                 "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
                 "get": { "tags": ["audit"], "summary": "Audit trail for one care pathway", "responses": { "200": { "description": "Audit entries" } } }
+            },
+            "/metrics.prom": {
+                "get": {
+                    "tags": ["observability"],
+                    "summary": "Prometheus metrics (text-exposition format)",
+                    "description": "Process-wide metric registry rendered as Prometheus text (Content-Type: text/plain; version=0.0.4). Mounted at the root (not under /api) and public under blanket JWT enforcement so a scraper needs no token. Configure your scraper with metrics_path: /metrics.prom.",
+                    "responses": {
+                        "200": {
+                            "description": "Prometheus text exposition",
+                            "content": { "text/plain": { "schema": { "type": "string" } } }
+                        }
+                    }
+                }
             }
         },
         "components": {
@@ -207,6 +220,14 @@ mod tests {
         assert!(s["paths"]["/api/care-pathways/merge"]["post"].is_object());
         assert!(s["paths"]["/api/care-pathways/merges/recent"]["get"].is_object());
         assert!(s["components"]["schemas"]["MergeRequest"]["properties"]["main_pid"].is_object());
+    }
+
+    #[test]
+    fn spec_documents_metrics_endpoint() {
+        let s = spec();
+        let op = &s["paths"]["/metrics.prom"]["get"];
+        assert!(op.is_object());
+        assert!(op["responses"]["200"]["content"]["text/plain"].is_object());
     }
 
     #[test]

@@ -27,6 +27,8 @@ pub mod i18n;
 pub mod initializers;
 /// Mailers (magic-link / welcome emails).
 pub mod mailers;
+/// Prometheus metrics registry + `/metrics.prom` rendering.
+pub mod metrics;
 /// Database migrations (`SeaORM` / loco migrator).
 pub mod migration;
 /// Domain models and generated `SeaORM` entities.

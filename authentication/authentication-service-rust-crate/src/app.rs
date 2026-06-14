@@ -2,9 +2,9 @@
 //!
 //! This is the composition root. `Hooks` is where loco asks the
 //! application to register its routes, background workers, CLI tasks,
-//! seed data, and table-truncation logic. The auth service mounts three
-//! controller route groups (magic-link auth, JWKS, docs) and otherwise
-//! keeps the surface minimal.
+//! seed data, and table-truncation logic. The auth service mounts four
+//! controller route groups (magic-link auth, JWKS, docs, Prometheus
+//! metrics) and otherwise keeps the surface minimal.
 
 use crate::migration::Migrator;
 use async_trait::async_trait;
@@ -79,15 +79,16 @@ impl Hooks for App {
         Ok(vec![])
     }
 
-    /// Register the HTTP routes: loco's defaults plus our three
+    /// Register the HTTP routes: loco's defaults plus our four
     /// controller groups — magic-link auth (`/api/auth`), the public
-    /// JWKS (`/.well-known/jwks.json`), and the docs (`/api-docs` +
-    /// `/swagger-ui`).
+    /// JWKS (`/.well-known/jwks.json`), the docs (`/api-docs` +
+    /// `/swagger-ui`), and the Prometheus metrics (`/metrics.prom`).
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::auth::routes())
             .add_route(controllers::jwks::routes())
             .add_route(controllers::docs::routes())
+            .add_route(controllers::metrics::routes())
     }
     /// Register background workers on the Postgres-backed queue. Only the
     /// scaffold [`DownloadWorker`] is wired today.

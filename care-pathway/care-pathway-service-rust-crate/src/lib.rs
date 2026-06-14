@@ -9,7 +9,9 @@
 //! ## Modules
 //!
 //! - [`app`] — loco `Hooks` wiring (routes, workers, truncate/seed).
-//! - [`controllers`] — Axum controllers: CRUD, `match`, `check-duplicates`.
+//! - [`controllers`] — Axum controllers: CRUD, `match`, `check-duplicates`,
+//!   plus the root `/metrics.prom` Prometheus endpoint.
+//! - [`metrics`] — process-wide Prometheus registry + text rendering.
 //! - [`models`] — `SeaORM` entity + CRUD helpers over the stored payload.
 //! - [`workers`] — background workers (loco `BackgroundWorker`).
 //! - [`tasks`], [`initializers`], [`data`] — loco extension points.
@@ -26,6 +28,7 @@ pub mod controllers;
 pub mod data;
 pub mod initializers;
 pub mod merge;
+pub mod metrics;
 pub mod models;
 pub mod openapi;
 pub mod streaming;

@@ -11,6 +11,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Prometheus `/metrics.prom` endpoint.** A root-level
+  `GET /metrics.prom` (Content-Type `text/plain; version=0.0.4`) for
+  parity with the older Axum services. `src/metrics.rs` owns a
+  process-wide `OnceLock<Metrics>` Prometheus `Registry` with four
+  care-pathway counters (`care_pathway_created_total`,
+  `_updated_total`, `_deleted_total`, `_merged_total`) plus an
+  `http_requests_total` `IntCounterVec` (`method`, `path`, `status`);
+  `Metrics::global()` and `Metrics::render()` (TextEncoder →
+  text-exposition). The handler lives in `src/controllers/metrics.rs`
+  and is mounted at the root via `App::routes` (mirroring
+  `controllers/docs.rs`). The path is added to `auth::is_public_path`,
+  so it stays open under blanket JWT enforcement (a scraper needs no
+  token). The CRUD/merge controllers increment one counter per success
+  path (create→created, update→updated, delete→deleted, merge→merged).
+  New dependency `prometheus = "0.13"`. Un-gated tests: a DB-free
+  `metrics` render test (every metric name + `# HELP`/`# TYPE` preamble +
+  content type), an `auth::enforce` public-path test for `/metrics.prom`,
+  and an `openapi` test for the documented `/metrics.prom` path.
+
 - **Durable event bus — Phase 1 (in-memory envelope + `EventPublisher`
   seam).** `src/streaming.rs` now carries the canonical, versioned
   `Envelope` (`event_id` UUID dedup key, `schema_version` 1, `entity`

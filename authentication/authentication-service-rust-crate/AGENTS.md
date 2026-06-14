@@ -54,6 +54,7 @@ template (see root `AGENTS.md`).
 | GET | `/.well-known/jwks.json` | — | Public keys for offline token verification. |
 | GET | `/api-docs/openapi.json` | — | Hand-written OpenAPI 3 document. |
 | GET | `/swagger-ui` | — | Swagger UI page (CDN assets) rendering the doc. |
+| GET | `/metrics.prom` | — | Prometheus metrics (text exposition; root path, no `/api` prefix). |
 
 To avoid account enumeration, `signup` and `magic-link` always return
 `200` regardless of whether the email exists. They are also
@@ -106,7 +107,9 @@ src/
 ├── controllers/
 │   ├── auth.rs            signup / magic-link / verify / me / signout / audit + GDPR account export/audit/erasure
 │   ├── docs.rs            /api-docs/openapi.json + /swagger-ui
-│   └── jwks.rs            /.well-known/jwks.json
+│   ├── jwks.rs            /.well-known/jwks.json
+│   └── metrics.rs         /metrics.prom (Prometheus text exposition)
+├── metrics.rs            Prometheus registry + auth-specific counters
 ├── openapi.rs            hand-written OpenAPI 3 document
 ├── rate_limit.rs         per-email sliding-window magic-link issuance limiter
 ├── models/

@@ -29,8 +29,9 @@
 //! When `ORGANIZATION_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 //! case-insensitive), the [`enforce`] decision — wired as an Axum
 //! middleware layer in `src/app.rs` — requires a valid bearer token on
-//! every route except the public health/ping and OpenAPI/Swagger paths
-//! (see [`is_public_path`]). It is **off by default**: unset/blank/junk
+//! every route except the public health/ping, OpenAPI/Swagger, and
+//! Prometheus metrics paths (see [`is_public_path`]). It is **off by
+//! default**: unset/blank/junk
 //! ⇒ today's behaviour, where the extractor is opt-in per handler and
 //! `GET /api/organizations/whoami` proves end-to-end verification.
 //! Activation is an operations decision once the SSO token flow is live;
@@ -79,14 +80,16 @@ pub fn parse_bool(value: &str) -> bool {
     )
 }
 
-/// Paths that stay public even when enforcement is on: health/ping and
-/// the `OpenAPI` doc + Swagger UI. Everything else requires a valid bearer
+/// Paths that stay public even when enforcement is on: health/ping, the
+/// `OpenAPI` doc + Swagger UI, and the Prometheus metrics endpoint (so a
+/// scraper needs no bearer token). Everything else requires a valid bearer
 /// token.
 fn is_public_path(path: &str) -> bool {
     path == "/_health"
         || path == "/_ping"
         || path == "/api-docs/openapi.json"
         || path.starts_with("/swagger-ui")
+        || path == "/metrics.prom"
 }
 
 /// The blanket-enforcement decision. `Ok(())` ⇒ let the request through;
@@ -415,7 +418,7 @@ cg5Tq5R846wbNyxrso8C988=
     }
 
     /// Enforcement on ⇒ the public paths (health/ping, `OpenAPI`,
-    /// Swagger UI) still pass without a token.
+    /// Swagger UI, Prometheus metrics) still pass without a token.
     #[test]
     fn enforce_on_allows_public_paths() {
         let (jwks, _) = test_jwks_and_kid();
@@ -426,6 +429,7 @@ cg5Tq5R846wbNyxrso8C988=
             "/api-docs/openapi.json",
             "/swagger-ui",
             "/swagger-ui/index.html",
+            "/metrics.prom",
         ] {
             assert!(
                 enforce(true, path, &HeaderMap::new(), &verifier).is_ok(),

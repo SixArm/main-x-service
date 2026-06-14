@@ -30,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     auth::AuthUser,
     mailers::auth::AuthMailer,
+    metrics::Metrics,
     models::{auth_events::Model as AuthEvent, sessions, users},
     rate_limit,
     views::auth::{AccountAuditExport, AccountExport, CurrentResponse, LoginResponse},
@@ -110,6 +111,7 @@ async fn signup(
     // Throttle per email before any work, so abuse cannot email-bomb a
     // victim or probe for accounts. Over the limit → 429, no token issued.
     if rate_limit::check(&ctx.db, &params.email).await.is_err() {
+        Metrics::global().rate_limited_total.inc();
         AuthEvent::record_best_effort(
             &ctx.db,
             "signup",
@@ -173,6 +175,8 @@ async fn signup(
     .await;
     // Locale selection affects only the rendered email language; the
     // response shape is unchanged (anti-enumeration contract holds).
+    Metrics::global().signup_total.inc();
+    Metrics::global().magic_link_issued_total.inc();
     let locale = crate::i18n::select_locale(params.locale.as_deref());
     deliver_magic_link(&ctx, &user, &locale).await;
     format::empty_json()
@@ -187,6 +191,7 @@ async fn request_magic_link(
 ) -> Result<Response> {
     // Throttle per email before any lookup (see `signup`).
     if rate_limit::check(&ctx.db, &params.email).await.is_err() {
+        Metrics::global().rate_limited_total.inc();
         AuthEvent::record_best_effort(
             &ctx.db,
             "magic_link_requested",
@@ -221,6 +226,7 @@ async fn request_magic_link(
         Some("issued"),
     )
     .await;
+    Metrics::global().magic_link_issued_total.inc();
     let locale = crate::i18n::select_locale(params.locale.as_deref());
     deliver_magic_link(&ctx, &user, &locale).await;
     format::empty_json()
@@ -268,6 +274,7 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
         Some("ok"),
     )
     .await;
+    Metrics::global().magic_link_redeemed_total.inc();
     format::json(LoginResponse::new(&user, &access_token))
 }
 
@@ -309,6 +316,7 @@ async fn signout(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Respon
         None,
     )
     .await;
+    Metrics::global().signout_total.inc();
     format::empty_json()
 }
 

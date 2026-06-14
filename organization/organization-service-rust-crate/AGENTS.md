@@ -39,13 +39,15 @@ there is no separate model or adapter to drift.
 | GET | `/api/organizations/audit/recent` · `/{pid}/audit` | Audit trail |
 | GET | `/api/organizations/events/recent` | In-memory event stream (frozen `EventView {kind,pid,name,seq}` projection of the canonical `Envelope`) |
 | GET | `/swagger-ui` · `/api-docs/openapi.json` | API docs |
+| GET | `/metrics.prom` | Prometheus metrics (text-exposition; root path, public) |
 
 Plus loco's default `/_health`, `/_ping`.
 
 ## Scope
 
 CRUD + matching + **name search** + **record merge** + **audit log** +
-**event streaming** + **OpenAPI/Swagger** + **JWT verification**
+**event streaming** + **OpenAPI/Swagger** + **Prometheus metrics**
+(`/metrics.prom`) + **JWT verification**
 (`AuthUser`/`MaybeAuthUser`, `/whoami`, audit/merge `actor`) +
 **request-level tests** (Postgres, `#[ignore]`-gated) are wired. The
 wire format is snake_case (`legal_name`, `same_as`, …) and validation
@@ -71,6 +73,8 @@ src/
 ├── app.rs                 loco Hooks (routes, truncate)
 ├── bin/main.rs            loco CLI entrypoint
 ├── controllers/organizations.rs   CRUD + match + check-duplicates
+├── controllers/metrics.rs  GET /metrics.prom (root, public)
+├── metrics.rs              process-wide Prometheus registry (OnceLock)
 ├── models/
 │   ├── organizations.rs   CRUD helpers over the stored payload
 │   └── _entities/organizations.rs  SeaORM entity

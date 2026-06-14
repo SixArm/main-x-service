@@ -109,6 +109,15 @@ pub fn spec() -> Value {
             "/api/organizations/{pid}/audit": {
                 "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
                 "get": { "tags": ["audit"], "summary": "Audit trail for one organization", "responses": { "200": { "description": "Audit entries" } } }
+            },
+            "/metrics.prom": {
+                "get": {
+                    "tags": ["observability"],
+                    "summary": "Prometheus metrics (text-exposition format)",
+                    "description": "Process-wide metric registry in Prometheus text-exposition format (`text/plain; version=0.0.4`). Mounted at the application root and public even under blanket auth enforcement, so scraping needs no bearer token. Configure your scraper with metrics_path: /metrics.prom.",
+                    "responses": { "200": { "description": "Prometheus metrics",
+                        "content": { "text/plain": { "schema": { "type": "string" } } } } }
+                }
             }
         },
         "components": {
@@ -181,6 +190,13 @@ mod tests {
         assert!(s["paths"]["/api/organizations/merge"]["post"].is_object());
         assert!(s["paths"]["/api/organizations/merges/recent"]["get"].is_object());
         assert!(s["components"]["schemas"]["MergeRequest"]["properties"]["main_pid"].is_object());
+    }
+
+    /// The Prometheus metrics endpoint is documented at the root path.
+    #[test]
+    fn spec_documents_metrics_endpoint() {
+        let s = spec();
+        assert!(s["paths"]["/metrics.prom"]["get"].is_object());
     }
 
     /// `whoami` carries the bearer security requirement and the matching

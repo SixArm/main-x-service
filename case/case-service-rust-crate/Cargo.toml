@@ -44,6 +44,7 @@ validator = { version = "0.20" }
 uuid = { version = "1.23", features = ["v4", "serde"] }
 include_dir = { version = "0.7" }
 mimalloc = { version = "0.1.52" }
+prometheus = { version = "0.13" }
 
 # Canonical matching algorithm — embedded and used directly as the API DTO.
 case-matcher = { path = "../case-matcher-rust-crate" }

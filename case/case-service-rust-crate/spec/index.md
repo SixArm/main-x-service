@@ -72,6 +72,15 @@ PascalCase strings; `Custom` as `{"Custom":"label"}`.
    without a valid token); proves offline RS256 verification.
 11. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3
    document and a Swagger UI page rendering it.
+12. `GET /metrics.prom` — Prometheus metrics in text-exposition format
+   (`text/plain; version=0.0.4`), mounted at the **root** (not under
+   `/api`) and public even under blanket enforcement. Exposes four CRUD
+   counters (`case_created_total`, `case_updated_total`,
+   `case_deleted_total`, `case_merged_total`) incremented on each
+   create / update / delete / merge success, plus an `http_requests_total`
+   counter vec (`method`/`path`/`status`). Registry + render live in
+   [`src/metrics.rs`](../src/metrics.rs); the handler is
+   [`controllers/metrics.rs`](../src/controllers/metrics.rs).
 
 ## 7. Non-functional requirements
 
@@ -107,8 +116,8 @@ problem reported in one body); `400` for a malformed body.
 an Axum `from_fn` middleware wired in `App::after_routes` (delegating to
 the pure `auth::enforce(require_auth, path, headers, verifier)`) rejects
 every non-public request lacking a valid bearer token with `401`;
-`/_health`, `/_ping`, `/api-docs/openapi.json` and `/swagger-ui*` stay
-public. The flag is read once per process and the layer is always wired,
+`/_health`, `/_ping`, `/api-docs/openapi.json`, `/swagger-ui*` and
+`/metrics.prom` stay public. The flag is read once per process and the layer is always wired,
 so it is a near-noop when off. Enforcement is **off by default**;
 because case data is personal data, this blanket gate is the
 access-control boundary in front of the case API once activated (an
@@ -132,12 +141,15 @@ tests (mint a real RS256 token + matching JWKS in-process, then assert
 valid → claims and missing / non-bearer / expired / tampered /
 empty-verifier → `401`; plus the blanket-enforcement decision —
 `parse_bool` truthy/falsey cases and `enforce` off-no-token → `Ok`,
-on-public → `Ok`, on-protected-no-token / expired / tampered → `401`,
+on-public → `Ok` (incl. `/metrics.prom`),
+on-protected-no-token / expired / tampered → `401`,
 on-protected-valid → `Ok`), the `src/merge.rs` unit tests (former-title
 alias, scalar fallback, list union, transferred snapshot), the
 `escape_like` unit test (search wildcard neutralisation), the
 `src/openapi.rs` unit tests (well-formed doc; core + merge + whoami +
-search endpoints), the `src/streaming.rs` unit test (publish/read-back),
+search + metrics endpoints), the `src/metrics.rs` unit tests (`render`
+yields valid Prometheus text + the content-type constant), the
+`src/streaming.rs` unit test (publish/read-back),
 and controller validation unit tests (blank-title and malformed-date →
 `422` pins). Request-level tests (`tests/requests/cases.rs`, loco testing
 harness) cover the CRUD + match endpoints, the audit/event trail,
@@ -170,6 +182,13 @@ added later. Subjects are stored as opaque identifiers, not embedded PII.
   ring buffer; `/events/recent` returns the flat `EventView` projection
   (`{kind, pid, name, seq}`). Phases 2–3 (transactional outbox → Fluvio)
   remain infra-gated roadmap.
+- [x] Prometheus metrics — `GET /metrics.prom` (root-mounted, public
+  under enforcement) renders a process-wide registry
+  (`src/metrics.rs`, `controllers/metrics.rs`) in text-exposition format:
+  four CRUD counters (`case_created`/`updated`/`deleted`/`merged_total`)
+  incremented in the cases controller, plus an `http_requests_total`
+  label vec. Documented in OpenAPI under `observability`. Parity with the
+  older Axum services.
 - [ ] Privacy controls if any restricted fields appear.
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-title alias, soft-delete, `merge_records`
@@ -210,7 +229,9 @@ event streaming on every CRUD/merge (`/audit/recent`, `/{pid}/audit`,
 `/events/recent`, `/merges/recent`); offline RS256 JWT verification
 (`AuthUser`/`MaybeAuthUser`, `/whoami`, audit `actor` from the token);
 OpenAPI 3 doc + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`);
-DB-free tests + gated request-level tests; green build + clippy.
+Prometheus metrics (`/metrics.prom`, root-mounted + public, CRUD counters
++ HTTP request label vec); DB-free tests + gated request-level tests;
+green build + clippy.
 
 ## 15. Roadmap
 

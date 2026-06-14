@@ -112,6 +112,20 @@ single-use (cleared on consumption).
      the bearer token still verifies cryptographically until expiry, but
      `/me` and the export treat the subject as gone (`401`). Idempotent.
 
+10. **Prometheus metrics.** `GET /metrics.prom` (root path, no `/api`
+    prefix, unauthenticated) renders a process-wide registry in
+    Prometheus text-exposition format (`Content-Type:
+    text/plain; version=0.0.4`), for parity with the older Axum services.
+    The metric set is auth-specific (this service has no entity CRUD):
+    `auth_signup_total`, `auth_magic_link_issued_total`,
+    `auth_magic_link_redeemed_total`, `auth_signout_total`,
+    `auth_rate_limited_total` (counters) plus `http_requests_total`
+    (counter vec labelled `method` / `path` / `status`). Labels never
+    carry a subject identifier — no email, token, pid, or magic-link
+    material — so the monitoring system holds no personal data
+    (`src/metrics.rs`; the no-secret-labels contract is unit-tested
+    DB-free).
+
 ## 7. Non-functional requirements
 
 - **RS256, not HS256.** No shared secret; peer services verify offline.
@@ -129,8 +143,8 @@ single-use (cleared on consumption).
 
 ## 8. Architecture
 
-loco.rs `App` (`src/app.rs`) registers the `auth` and `jwks`
-controllers and the Postgres-backed worker queue. Token crypto is a
+loco.rs `App` (`src/app.rs`) registers the `auth`, `jwks`, `docs`, and
+`metrics` controllers and the Postgres-backed worker queue. Token crypto is a
 self-contained module (`src/auth`) using `jsonwebtoken` (RS256) and
 `rsa` (to derive the JWK modulus/exponent). The bearer extractor is a
 plain Axum `FromRequestParts`, so peer services can reuse the same
@@ -165,8 +179,13 @@ every endpoint plus the `SignupParams` / `MagicLinkParams` /
 `AccountSessionExport` / `AccountAuditExport`) schemas, the `429`
 rate-limit responses, and a bearer `securityScheme` applied to the `me`
 + `signout` + `account/export` + `account/audit` + `account` (DELETE)
-endpoints. Un-gated `spec()` unit tests pin its well-formedness, the
-documented paths, the bearer scheme, and the schemas.
+endpoints, and the `GET /metrics.prom` Prometheus endpoint. Un-gated
+`spec()` unit tests pin its well-formedness, the documented paths
+(including `/metrics.prom`), the bearer scheme, and the schemas.
+
+A separate `GET /metrics.prom` (root, unauthenticated) serves the
+Prometheus registry (see §6.10) — not JSON, so it sits outside the
+loco-JSON envelope above.
 
 ## 10. Persistence
 
@@ -215,6 +234,11 @@ development, off in production.
   anonymises + revokes sessions + writes the `account_erased` row;
   post-erasure `/me` + export are `401`; unauthenticated
   export/audit/delete are `401`.
+- **Metrics unit tests (DB-free):** `src/metrics.rs` — `render()` emits
+  valid Prometheus text (every metric name plus its `# HELP` / `# TYPE`
+  header lines after the counters are incremented) and the exposition
+  carries **no secret-ish labels** (`email` / `token` / `magic_link` /
+  `pid` / `jti` / `user_pid`). Run with `cargo test --lib`.
 - **Cross-crate contract test (DB-free):** `tests/sign_verify_contract.rs`
   pins the convention shared with
   [`authentication-verifier`](../../authentication-verifier-rust-crate/index.md):

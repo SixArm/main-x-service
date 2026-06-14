@@ -2,3 +2,4 @@
 
 pub mod care_pathways;
 pub mod docs;
+pub mod metrics;

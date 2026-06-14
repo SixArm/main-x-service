@@ -37,6 +37,7 @@ type, so there is no separate model or adapter to drift.
 | GET | `/api/cases/audit/recent` · `/{pid}/audit` | Audit-log query |
 | GET | `/api/cases/events/recent` | In-memory event stream |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
+| GET | `/metrics.prom` | Prometheus metrics (root-mounted, public, `text/plain; version=0.0.4`) |
 
 Plus loco's default `/_health`, `/_ping`. Every CRUD action writes an
 `audit_logs` row and publishes a `created`/`updated`/`deleted` event.
@@ -78,6 +79,8 @@ src/
 ├── bin/main.rs            loco CLI entrypoint
 ├── controllers/cases.rs   CRUD + match + check-duplicates + merge + audit/events + whoami
 ├── controllers/docs.rs    OpenAPI JSON + Swagger UI
+├── controllers/metrics.rs Prometheus /metrics.prom (root-mounted, public)
+├── metrics.rs             process-wide Prometheus registry (CRUD counters + http_requests_total)
 ├── auth.rs                RS256 JWT verification (AuthUser/MaybeAuthUser) via authentication-verifier
 ├── merge.rs               pure record-merge logic (merge_cases)
 ├── openapi.rs             hand-written OpenAPI 3 document

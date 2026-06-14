@@ -11,6 +11,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Prometheus metrics** at `GET /metrics.prom` (parity with the older
+  Axum services). New `src/metrics.rs` owns a process-wide
+  `OnceLock<Metrics>` (`Metrics::global()`) holding a `prometheus::Registry`
+  with four CRUD counters — `case_created_total`, `case_updated_total`,
+  `case_deleted_total`, `case_merged_total` — plus an `http_requests_total`
+  `IntCounterVec` labeled by `method`/`path`/`status`. `Metrics::render()`
+  encodes the registry to Prometheus text-exposition format
+  (`text/plain; version=0.0.4`). A new root-mounted loco route
+  (`controllers/metrics.rs`, registered in `app.rs` alongside the docs
+  routes — **not** under `/api`) serves it with that content type. The path
+  is added to `auth::is_public_path`, so it stays public even under blanket
+  JWT enforcement. The cases controller increments the matching counter on
+  each create / update / delete / merge success path. The OpenAPI document
+  (`src/openapi.rs`) gains a `/metrics.prom` entry under an `observability`
+  tag. Un-gated unit tests pin: `render()` yields valid Prometheus text
+  (HELP/TYPE lines + a non-zero sample + the label vec), the content-type
+  constant, the new `enforce` public-path case, and the OpenAPI entry.
 - **Durable event bus — Phase 1** (canonical envelope + publisher seam,
   per [`agents/share/event-bus.md`](../../agents/share/event-bus.md)
   §4–§5). `src/streaming.rs` now models a versioned `Envelope`

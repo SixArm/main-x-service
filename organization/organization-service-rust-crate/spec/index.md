@@ -51,6 +51,9 @@ The API DTO is `organization_matcher::Organization`: `name`,
    candidates}` set (no persistence).
 7. `POST /api/organizations/check-duplicates` — match a query against
    stored organizations; return the ones above threshold, ranked.
+8. `GET /metrics.prom` — Prometheus metrics in text-exposition format
+   (`text/plain; version=0.0.4`). Mounted at the application **root**
+   (not under `/api`), public even under blanket auth enforcement.
 
 ## 7. Non-functional requirements
 
@@ -85,9 +88,18 @@ token (the `AuthUser` extractor; `401` otherwise); other handlers take
 `MaybeAuthUser` to stamp the audit/merge `actor` when a token is present.
 When `ORGANIZATION_REQUIRE_AUTH` is on (see §7), an `axum` middleware
 layer (`App::after_routes` → `auth::enforce`) requires a valid bearer
-token on **every** route except the public health/ping + OpenAPI/Swagger
-paths, returning `401` otherwise. The flag is read per request and is
-**off by default**, so default behaviour is unchanged.
+token on **every** route except the public health/ping, OpenAPI/Swagger,
+and `/metrics.prom` paths, returning `401` otherwise. The flag is read
+per request and is **off by default**, so default behaviour is unchanged.
+
+**Observability.** `GET /metrics.prom` (root path, public) serves the
+process-wide Prometheus registry (`src/metrics.rs`) in text-exposition
+format. The metric set: `organization_created_total`,
+`organization_updated_total`, `organization_deleted_total`,
+`organization_merged_total` (counters incremented one per success path
+in the CRUD/merge handlers), plus a labelled `http_requests_total`
+(`path`/`status`) reserved for a future request middleware. Configure
+the scraper with `metrics_path: /metrics.prom`.
 
 ## 10. Persistence
 
@@ -98,7 +110,9 @@ PostgreSQL via SeaORM + `sea-orm-migration`. Migration
 
 DB-free tests: `tests/matching.rs` (matcher embedding + JSON
 round-trip) and unit tests in `src/` (validation → `422` pin, OpenAPI
-shape, streaming, and `auth::tests` — `bearer_claims` plus the pure
+shape incl. the `/metrics.prom` path, the Prometheus registry render +
+counter increment in `metrics::tests`, streaming, and `auth::tests` —
+`bearer_claims` plus the pure
 `enforce`/`parse_bool` decision: off+no-token ⇒ ok, on+public ⇒ ok,
 on+protected without/expired/tampered ⇒ `401`, on+protected+valid ⇒
 ok). Request-level tests (`tests/requests/organizations.rs`): boot the
@@ -132,6 +146,13 @@ personal data — honour GDPR when the privacy layer lands (§13).
   Phases 2–3 (transactional outbox + Fluvio relay) remain infra-gated
   roadmap.
 - [x] Name search (Postgres `ILIKE`) + OpenAPI/Swagger.
+- [x] Prometheus metrics — `GET /metrics.prom` (root, public) serves a
+  process-wide `prometheus::Registry` (`src/metrics.rs`, `OnceLock`)
+  in text-exposition format; CRUD/merge handlers increment
+  `organization_{created,updated,deleted,merged}_total`; a labelled
+  `http_requests_total` is declared for a future request middleware.
+  Brings parity with the older Axum services. DB-free render test +
+  OpenAPI path test; `/metrics.prom` added to `auth::is_public_path`.
 - [ ] Tantivy full-text search + fuzzy/blocking (replacing the `ILIKE`
       search).
 - [ ] Per-field masking + GDPR export endpoint.
@@ -164,7 +185,9 @@ canonical `Envelope` + `EventPublisher` seam, `EventView` projection
 frozen for `/events/recent`); name search (`ILIKE`); record merge
 (`/merge` + `merge_records` history); offline
 RS256 JWT verification (`AuthUser`/`MaybeAuthUser`, `/whoami`, audit +
-merge `actor` from the token); OpenAPI 3 + Swagger UI; DB-free tests;
+merge `actor` from the token); OpenAPI 3 + Swagger UI; Prometheus
+metrics (`/metrics.prom`, root + public, CRUD/merge counters); DB-free
+tests;
 request-level test suite (Postgres, `#[ignore]`-gated); loco scaffolding
 leftovers removed (no workers/tasks/data stubs); green build + clippy.
 

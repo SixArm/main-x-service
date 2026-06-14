@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::auth::{AuthUser, MaybeAuthUser};
 use crate::merge::merge_pathways;
+use crate::metrics::Metrics;
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::care_pathways::Model as PathwayModel;
 use crate::models::merge_records::Model as MergeRecordModel;
@@ -145,6 +146,7 @@ async fn create(
 ) -> Result<Response> {
     validate(&pathway)?;
     let model = PathwayModel::create(&ctx.db, &pathway).await?;
+    Metrics::global().care_pathway_created_total.inc();
     // Audit + event are best-effort side channels; the create itself has
     // already committed by the time we record them.
     audit(
@@ -219,6 +221,7 @@ async fn update(
         .into_active_model()
         .update_data(&ctx.db, &pathway)
         .await?;
+    Metrics::global().care_pathway_updated_total.inc();
     audit(
         &ctx,
         updated.pid,
@@ -255,6 +258,7 @@ async fn remove(
     // Capture identity before consuming the model into an active model.
     let (entity_pid, name) = (model.pid, model.name.clone());
     model.into_active_model().soft_delete(&ctx.db).await?;
+    Metrics::global().care_pathway_deleted_total.inc();
     audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
     streaming::publish_with_actor(
         EventKind::Deleted,
@@ -414,6 +418,7 @@ async fn merge(
         .await?;
     let (dup_pid, dup_name) = (duplicate.pid, duplicate.name.clone());
     duplicate.into_active_model().soft_delete(&ctx.db).await?;
+    Metrics::global().care_pathway_merged_total.inc();
 
     if let Err(err) = MergeRecordModel::record(
         &ctx.db,

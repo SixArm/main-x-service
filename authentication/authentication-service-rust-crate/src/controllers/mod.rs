@@ -11,3 +11,5 @@ pub mod auth;
 pub mod docs;
 /// Public JWKS (`/.well-known/jwks.json`) for offline peer verification.
 pub mod jwks;
+/// Prometheus metrics (`/metrics.prom`), mounted at the root.
+pub mod metrics;

@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::auth::{AuthUser, MaybeAuthUser};
 use crate::merge::merge_cases;
+use crate::metrics::Metrics;
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::cases::Model as CaseModel;
 use crate::models::merge_records::Model as MergeRecordModel;
@@ -160,6 +161,7 @@ async fn create(
         &model.title,
         caller.actor(),
     );
+    Metrics::global().case_created_total.inc();
     format::json(CaseRef::of(&model))
 }
 
@@ -227,6 +229,7 @@ async fn update(
         &updated.title,
         caller.actor(),
     );
+    Metrics::global().case_updated_total.inc();
     format::json(CaseRef::of(&updated))
 }
 
@@ -256,6 +259,7 @@ async fn remove(
         &title,
         caller.actor(),
     );
+    Metrics::global().case_deleted_total.inc();
     format::empty_json()
 }
 
@@ -443,6 +447,7 @@ async fn merge(
         &dup_title,
         caller.actor(),
     );
+    Metrics::global().case_merged_total.inc();
 
     format::json(serde_json::json!({
         "main_pid": merged.pid.to_string(),

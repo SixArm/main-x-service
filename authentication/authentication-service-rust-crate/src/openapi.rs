@@ -138,6 +138,16 @@ pub fn spec() -> Value {
                         "200": { "description": "JWKS document", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Jwks" } } } }
                     }
                 }
+            },
+            "/metrics.prom": {
+                "get": {
+                    "tags": ["metrics"],
+                    "summary": "Prometheus metrics (text exposition)",
+                    "description": "Process-wide auth-specific counters in Prometheus text-exposition format (Content-Type text/plain; version=0.0.4). Mounted at the root for the conventional scrape path (metrics_path: /metrics.prom). Aggregate counts only — signups, magic links issued/redeemed, signouts, rate-limited rejections, and labelled HTTP request totals. Never carries a token, email, or pid.",
+                    "responses": {
+                        "200": { "description": "Prometheus text exposition", "content": { "text/plain": { "schema": { "type": "string" } } } }
+                    }
+                }
             }
         },
         "components": {
@@ -259,6 +269,7 @@ mod tests {
         assert!(paths["/api/auth/account/audit"]["get"].is_object());
         assert!(paths["/api/auth/account"]["delete"].is_object());
         assert!(paths["/.well-known/jwks.json"]["get"].is_object());
+        assert!(paths["/metrics.prom"]["get"].is_object());
     }
 
     #[test]

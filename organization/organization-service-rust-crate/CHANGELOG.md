@@ -11,6 +11,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Prometheus metrics — `GET /metrics.prom`.** A new process-wide
+  `prometheus::Registry` (`src/metrics.rs`, behind a `OnceLock` reached
+  via `Metrics::global()`, mirroring `auth::verifier`) is served at the
+  application **root** path `/metrics.prom` in text-exposition format
+  (`text/plain; version=0.0.4`) by a loco controller
+  (`src/controllers/metrics.rs`, mounted at root like the docs). The
+  metric set: `organization_created_total`, `organization_updated_total`,
+  `organization_deleted_total`, `organization_merged_total` (plain
+  counters, incremented one per success path in the CRUD/merge
+  controller handlers) plus a labelled `http_requests_total`
+  (`path`/`status`) declared for a future request middleware. The path
+  is added to `auth::is_public_path`, so it stays public under blanket
+  JWT enforcement (no bearer token needed to scrape). New DB-free tests:
+  registry render + counter increment (`metrics::tests`), the
+  `/metrics.prom` OpenAPI path (`openapi::tests`), and `/metrics.prom`
+  in the `enforce` public-path matrix (`auth::tests`). Brings parity
+  with the older Axum services, which already expose Prometheus metrics.
 - **Durable event bus — Phase 1 (in-memory envelope + `EventPublisher`
   seam).** `src/streaming.rs` now carries the canonical versioned
   `Envelope` (`event_id` UUID dedup key, `schema_version` = 1,

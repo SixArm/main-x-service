@@ -70,6 +70,14 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    (`401` without a valid token); proves offline RS256 verification.
 11. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3
    document and a Swagger UI page rendering it.
+12. `GET /metrics.prom` — Prometheus metrics in text-exposition format
+   (`Content-Type: text/plain; version=0.0.4`), mounted at the root (not
+   under `/api`) and public under blanket JWT enforcement so a scraper
+   needs no token. Exposes care-pathway CRUD/merge counters
+   (`care_pathway_created_total` / `_updated_total` / `_deleted_total` /
+   `_merged_total`) plus `http_requests_total`. Registry in
+   [`src/metrics.rs`](../src/metrics.rs); handler in
+   [`src/controllers/metrics.rs`](../src/controllers/metrics.rs).
 
 ## 7. Non-functional requirements
 
@@ -99,7 +107,8 @@ is wired (an `after_routes` middleware calling `auth::enforce`) but
 **off by default** — gated by `CARE_PATHWAY_REQUIRE_AUTH`
 (`1`/`true`/`yes`/`on` ⇒ on). When on, any `/api/*` route without a valid
 token is `401`; the public paths `/_health`, `/_ping`,
-`/api-docs/openapi.json`, `/swagger-ui*` stay open. JWKS/issuer/audience
+`/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom` stay open.
+JWKS/issuer/audience
 come from `CARE_PATHWAY_JWKS` / `CARE_PATHWAY_JWT_ISSUER` /
 `CARE_PATHWAY_JWT_AUDIENCE`. See the family contract
 `agents/share/jwt-enforcement.md`.
@@ -124,7 +133,10 @@ plus `parse_bool` cases and `enforce` — off+no-token → `Ok`, on+public →
 `Ok`, on+protected+{no/valid/expired/tampered} token → `401`/`Ok`),
 the `src/merge.rs` unit tests (former-title alias, scalar fallback, list
 union, transferred snapshot), the `escape_like` unit test (search
-wildcard neutralisation), and controller validation unit tests
+wildcard neutralisation), the `src/metrics.rs` unit tests (the rendered
+Prometheus text carries every metric name plus the `# HELP`/`# TYPE`
+preamble, and the content type is `text/plain; version=0.0.4`), and
+controller validation unit tests
 (blank-name and malformed-code → `422` pins). Request-level tests (`tests/requests/care_pathways.rs`,
 loco testing harness) cover the CRUD + match endpoints, the audit/event
 trail, `whoami` (no token → `401`), blanket enforcement (with
@@ -168,6 +180,15 @@ access controls added later.
   dependency-light, so no utoipa, matching the organization service)
   served at `/api-docs/openapi.json` + `/swagger-ui` by
   `controllers/docs.rs`.
+- [x] Prometheus metrics — `GET /metrics.prom` (root path,
+  `text/plain; version=0.0.4`) for parity with the older Axum services.
+  Process-wide `OnceLock` registry in `src/metrics.rs`
+  (`care_pathway_created_total` / `_updated_total` / `_deleted_total` /
+  `_merged_total` counters + `http_requests_total` `IntCounterVec`);
+  handler in `controllers/metrics.rs`, mounted at the root like
+  `controllers/docs.rs` and added to `auth::is_public_path` so it stays
+  open under blanket JWT enforcement. The CRUD/merge controllers
+  increment one counter per success path.
 - [x] Richer validation (ICD/SNOMED code formats, identifier shapes,
   language tags) — `src/validation.rs` format-checks `condition_codes`
   per `system` (ICD-10, ICD-11, SNOMED CT SCTID Verhoeff), `identifiers`
@@ -208,7 +229,9 @@ every CRUD/merge (`/audit/recent`, `/{pid}/audit`, `/events/recent`,
 `Envelope` + `EventPublisher` seam + `InMemoryPublisher`; frozen
 `EventView` projection on `/events/recent`); offline RS256 JWT verification (`AuthUser`/
 `MaybeAuthUser`, `/whoami`, audit `actor` from the token); OpenAPI 3 doc
-+ Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`); blanket `/api/*`
++ Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`); a root-level
+Prometheus `/metrics.prom` endpoint (CRUD/merge counters +
+`http_requests_total`, public under enforcement); blanket `/api/*`
 JWT enforcement middleware (`auth::enforce` + `after_routes` layer,
 off by default via `CARE_PATHWAY_REQUIRE_AUTH`); DB-free tests +
 gated request-level tests; green build + clippy.
