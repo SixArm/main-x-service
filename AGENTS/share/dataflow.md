@@ -15,9 +15,9 @@
 **Merge Flow:**
 
 1. HTTP POST /merge -> REST API Handler
-2. Fetch master and duplicate from database
-3. Transfer data from duplicate to master
-4. Update master in database
+2. Fetch main and duplicate from database
+3. Transfer data from duplicate to main
+4. Update main in database
 5. Soft-delete duplicate
 6. Update search index
 7. Publish Merged event

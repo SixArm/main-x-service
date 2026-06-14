@@ -259,7 +259,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added (batch API)
 - Batch scoring (spec FR-45 / FR-46, §12.6, task T-15).
-  - `MatchingEngine::match_one_to_many(query, candidates) -> Vec<MatchResult>` — scores a single query against many candidates. Output is parallel to the input slice; empty candidates yield an empty `Vec`. The building block for screening one incoming record against a master worker index.
+  - `MatchingEngine::match_one_to_many(query, candidates) -> Vec<MatchResult>` — scores a single query against many candidates. Output is parallel to the input slice; empty candidates yield an empty `Vec`. The building block for screening one incoming record against a main worker index.
   - `MatchingEngine::rank_one_to_many(query, candidates) -> Vec<(usize, MatchResult)>` — same scoring sorted by descending `score`; ties are broken by ascending original index, so the ranking is fully deterministic across calls.
   - The engine remains `Send + Sync`, so consumers can layer their own parallelism (rayon, tokio) without changes to this crate. Blocking (candidate pre-filtering) is a consumer concern; the crate stays a pure scoring library.
 

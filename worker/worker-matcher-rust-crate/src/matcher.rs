@@ -869,7 +869,7 @@ impl MatchingEngine {
     /// fashion. Returns one [`MatchResult`] per candidate, in the same
     /// order as the input slice.
     ///
-    /// This is the building block for a Master Worker Index workflow:
+    /// This is the building block for a Main Worker Index workflow:
     /// given a new record and the existing population, produce a fully
     /// audited score for each potential link. The engine is immutable
     /// and `Send + Sync`, so call-sites that want parallel evaluation
