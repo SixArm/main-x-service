@@ -1,4 +1,19 @@
 <script lang="ts">
+    // Root layout — the app shell wrapping every route.
+    //
+    // Purpose: render the sidebar (brand, nav, session controls) and the
+    // active route via the `children` snippet. On mount it completes the
+    // cross-origin SSO handoff by capturing any `#access_token=` fragment.
+    //
+    // Props ($props): `children: Snippet` — the active page, rendered with
+    // `{@render children()}`.
+    //
+    // State ($state): `draft` — the manual token-paste input value (a dev
+    // convenience alongside the primary SSO "Sign in" redirect). The
+    // signed-in/out UI keys off the reactive `token()` store, not local state.
+    //
+    // Events: nav links are plain anchors; session buttons call the local
+    // signIn/applyToken/signOut handlers below.
     import "../app.css";
     import { onMount } from "svelte";
     import { page } from "$app/state";
@@ -28,10 +43,13 @@
     // `$lib/auth.svelte` + `$lib/api/client`).
     let draft = $state("");
 
+    // Primary sign-in: full-page redirect to the central auth front-end,
+    // which returns the token via the URL fragment (captured on mount).
     function signIn(): void {
         window.location.href = signInUrl();
     }
 
+    // Dev convenience: store a manually pasted token, ignoring blanks.
     function applyToken(): void {
         const trimmed = draft.trim();
         if (trimmed.length > 0) {
@@ -40,6 +58,7 @@
         }
     }
 
+    // Sign out: clear the stored token and reset the paste field.
     function signOut(): void {
         clearToken();
         draft = "";
@@ -56,6 +75,11 @@
                 </a>
             {/each}
         </nav>
+        <!--
+            Session panel. Reactive on `token()`: signed in shows a status
+            badge + Sign out; signed out shows the SSO Sign in button plus a
+            collapsible manual paste field.
+        -->
         <div class="session">
             <div class="session-title">Session</div>
             {#if token()}

@@ -1,3 +1,15 @@
+<!--
+  Case detail route (`/[pid]`).
+
+  Purpose: load one case, render its fields, and offer edit / delete /
+  check-duplicates actions.
+
+  State:
+    - record     : the loaded Case (null until fetched / on error).
+    - loading,error: load-phase UI flags.
+    - duplicates : null until a check runs, then the scored hits (minus self).
+    - checking   : disables the button while a check is in flight.
+-->
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
@@ -6,6 +18,7 @@
   import type { Case, ScoredRef } from "$lib/api/types";
 
   const repo = CaseRepository.withFetch();
+  // Route param; `?? ""` satisfies strict typing (params may be undefined).
   const pid = page.params.pid ?? "";
 
   let record = $state<Case | null>(null);
@@ -14,6 +27,7 @@
   let duplicates = $state<ScoredRef[] | null>(null);
   let checking = $state(false);
 
+  // Fetch the record on mount.
   onMount(async () => {
     try {
       record = await repo.get(pid);
@@ -24,11 +38,14 @@
     }
   });
 
+  // Soft-delete this case, then return to the list.
   async function handleDelete() {
     await repo.remove(pid);
     await goto("/");
   }
 
+  // Score this record against the corpus, excluding the record itself from
+  // the results so it never reports itself as its own duplicate.
   async function handleCheckDuplicates() {
     if (!record) return;
     checking = true;
@@ -115,6 +132,7 @@
     <button onclick={handleDelete}>Delete</button>
   </div>
 
+  <!-- `duplicates` is null before any check; show results only once run. -->
   {#if duplicates}
     <h2>Potential duplicates</h2>
     {#if duplicates.length === 0}

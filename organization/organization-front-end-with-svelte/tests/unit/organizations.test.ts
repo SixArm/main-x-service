@@ -3,6 +3,10 @@ import { ApiClient } from "$lib/api/client";
 import { OrganizationRepository } from "$lib/api/organizations";
 import type { Organization } from "$lib/api/types";
 
+// Pins the repository->HTTP contract: every method maps to the correct
+// verb + path (with pid encoding) and body. The fetch is faked, so these
+// run without the Rust service.
+
 /** Capture the (method, path, body) the repository sends to the client. */
 function spyClient() {
   const calls: Array<{ url: string; init: RequestInit }> = [];

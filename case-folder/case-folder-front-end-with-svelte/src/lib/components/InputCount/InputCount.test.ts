@@ -1,3 +1,6 @@
+// Pins the numeric stepper: increment/decrement adjust the spinbutton
+// value, and the decrement button is disabled once the value reaches `min`.
+
 import { describe, it, expect } from 'vitest';
 import { render, fireEvent } from '@testing-library/svelte';
 import InputCount from './InputCount.svelte';

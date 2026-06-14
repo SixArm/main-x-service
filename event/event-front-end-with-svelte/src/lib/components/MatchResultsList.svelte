@@ -1,3 +1,12 @@
+<!--
+  MatchResultsList — renders a list of match/duplicate candidates, each with
+  its name, quality badge, percentage score, key metadata, and an optional
+  expandable per-component score breakdown.
+
+  Props:
+    - results (MatchResult[]): candidates to display (may be empty).
+    - title (string, default "Match results"): section heading.
+-->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
 
@@ -24,6 +33,7 @@
                         <span class="score">{(r.score * 100).toFixed(0)}%</span>
                     </header>
                     <div class="meta small muted">
+                        <!-- Localized start date, then type, then a short id linking to detail. -->
                         {#if r.event.start_date}{new Date(r.event.start_date).toLocaleString()}{/if}
                         {#if r.event.event_type} · {r.event.event_type}{/if}
                         {#if r.event.id} · <a href={`/events/${r.event.id}`}>{r.event.id.slice(0, 8)}…</a>{/if}
@@ -32,6 +42,7 @@
                         <details>
                             <summary class="small">Score breakdown</summary>
                             <ul class="breakdown small">
+                                <!-- Skip components the matcher left null (not applicable). -->
                                 {#each Object.entries(r.breakdown) as [field, score]}
                                     {#if score != null}
                                         <li>{field}: {(score * 100).toFixed(0)}%</li>

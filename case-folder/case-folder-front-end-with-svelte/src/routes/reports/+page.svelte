@@ -1,4 +1,11 @@
 <script lang="ts">
+    // Reports (`/reports`) — operational metrics, derived live.
+    //
+    // Everything here is computed in the component from the load function's
+    // page data (stats, folders, moves, cabinets, volumes) — there is no
+    // separate reporting store. Covers move throughput (24h / 7d), cabinet
+    // utilisation, the in-transit list, and a per-worker activity tally.
+
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import Icon from '$lib/components/Icon/Icon.svelte';
     import Separator from '$lib/components/Separator/Separator.svelte';
@@ -10,9 +17,12 @@
 
     let { data } = $props();
 
+    // Fixed "now" captured at render; `since(h)` is the epoch-ms cutoff
+    // for the last `h` hours, used by the throughput windows below.
     const now = Date.now();
     const since = (hours: number) => now - hours * 3600_000;
 
+    // Count moves within the trailing 24-hour and 7-day windows.
     const throughput24h = $derived(
         data.moves.filter((m) => new Date(m.movedAt).getTime() >= since(24)).length
     );
@@ -22,7 +32,8 @@
 
     const inTransit = $derived(data.folders.filter((f) => f.status === 'in-transit'));
 
-    // Per-worker activity from the move log.
+    // Per-worker activity from the move log: tally moves by `movedBy`,
+    // then sort busiest-first for the leaderboard table.
     const perWorker = $derived(
         Object.entries(
             data.moves.reduce<Record<string, number>>((acc, m) => {
@@ -34,6 +45,7 @@
             .sort((a, b) => b.count - a.count)
     );
 
+    // Occupancy percentage string; "—" when the cabinet is uncapped.
     function utilisation(folderCount: number, capacity: number | null): string {
         if (!capacity) return '—';
         return `${Math.round((folderCount / capacity) * 100)}%`;

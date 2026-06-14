@@ -1,4 +1,8 @@
 <script lang="ts">
+    // Error boundary (`+error.svelte`) — shown when a load function throws
+    // (e.g. the 503 raised when the Loco API is unreachable). Surfaces the
+    // thrown message and a hint about the `/api` proxy / running the backend.
+
     import { page } from '$app/state';
     import Alert from '$lib/components/Alert/Alert.svelte';
     import BackLink from '$lib/components/BackLink/BackLink.svelte';

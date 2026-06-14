@@ -1,4 +1,13 @@
 <script lang="ts">
+    // Building detail (`/buildings/[id]`) — rooms + add-room + history.
+    //
+    // Lists the building's rooms (with a live cabinet count read from the
+    // cache), an inline "add a room" form that creates under this building
+    // and re-loads, and the aggregated folder presence history across all
+    // the building's cabinets.
+    //
+    // State: the add-room form fields (name/description) + roomError.
+
     import { invalidateAll } from '$app/navigation';
     import { cache } from '$lib/store/cache.svelte';
     import { ApiError } from '$lib/api/client';
@@ -22,6 +31,8 @@
     let newRoomDescription = $state('');
     let roomError = $state('');
 
+    // Create a room under this building, then re-load so the rooms table
+    // and cabinet counts refresh from the server.
     async function addRoom() {
         roomError = '';
         if (!newRoomName.trim()) {

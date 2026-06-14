@@ -10,6 +10,10 @@
 // types because the UI grids/forms treat them differently (e.g. a
 // cabinet has capacity + folder count).
 
+/**
+ * Where a folder / volume physically is: parked in a cabinet, or being
+ * carried between cabinets. Drives the status badge colour throughout the UI.
+ */
 export type FolderStatus = 'in-cabinet' | 'in-transit';
 
 /// The signed-in user, as returned by the auth API.
@@ -19,12 +23,14 @@ export interface User {
     role: string | null;
 }
 
+/** A site (top of the place hierarchy: building → room → cabinet). */
 export interface Building {
     id: string;
     name: string;
     description: string | null;
 }
 
+/** A room within a building; holds cabinets. */
 export interface Room {
     id: string;
     name: string;
@@ -32,6 +38,11 @@ export interface Room {
     description: string | null;
 }
 
+/**
+ * A physical file cabinet within a room — the leaf location where folders
+ * live. `folderCount` / `capacity` drive utilisation reporting;
+ * `containerPath` is the API-supplied "Building — Room" display string.
+ */
 export interface Cabinet {
     id: string;
     label: string;
@@ -42,6 +53,10 @@ export interface Cabinet {
     containerPath: string;
 }
 
+/**
+ * A patient, keyed in the UI by NHS Number. `source` records where the
+ * record came from (e.g. central Patient Service vs. local snapshot).
+ */
 export interface Patient {
     id: string;
     nhsNumber: string;
@@ -51,6 +66,11 @@ export interface Patient {
     source: string;
 }
 
+/**
+ * A paper case-note folder for one patient. Carries denormalised
+ * snapshots (NHS Number, patient name, cabinet label) echoed by the API so
+ * lists render without joins. May belong to a `Volume`.
+ */
 export interface Folder {
     id: string;
     title: string;
@@ -95,6 +115,10 @@ export interface Alert {
     reason: string | null;
 }
 
+/**
+ * One audited folder move (the unit of the move history / audit log).
+ * Records from/to cabinets, who moved it (worker or free-text), and why.
+ */
 export interface MoveEvent {
     id: string;
     folderId: string;
@@ -113,6 +137,7 @@ export interface MoveEvent {
     reason: string | null;
 }
 
+/** A member of staff who moves folders (mirrored from the Worker Service). */
 export interface Worker {
     id: string;
     name: string;
@@ -135,6 +160,7 @@ export interface Presence {
     leftReason: string | null;
 }
 
+/** Dashboard summary counts (patients, folder states, place counts, 24h moves). */
 export interface Stats {
     patients: number;
     folders: { total: number; inCabinet: number; inTransit: number };

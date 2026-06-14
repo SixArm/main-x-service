@@ -33,6 +33,10 @@ async function caughtError(p: Promise<unknown>): Promise<ApiError> {
   }
 }
 
+// Pins the low-level fetch wrapper: JSON parse/resolve, base+path URL
+// joining, POST serialization + content-type, bearer header presence/
+// absence, ApiError on non-2xx (server message vs. status fallback, and
+// the 401/400 getters), empty-body → undefined, and non-JSON error bodies.
 describe("ApiClient", () => {
   it("GET parses a JSON body and resolves it", async () => {
     const f = fakeFetch(200, [{ pid: "p1", name: "Stroke" }]);

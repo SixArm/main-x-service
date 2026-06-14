@@ -1,4 +1,9 @@
 <script lang="ts">
+    // Buildings index (`/buildings`) — list of sites with room counts.
+    //
+    // Render-only. Reads cached buildings + rooms; `rows` joins each
+    // building to its room count for the table.
+
     import { cache } from '$lib/store/cache.svelte';
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import DataTable from '$lib/components/DataTable/DataTable.svelte';
@@ -7,6 +12,7 @@
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
 
+    // Join each building to its room count (counted from the cached rooms).
     const rows = $derived(
         cache.buildings.map((b) => ({
             ...b,

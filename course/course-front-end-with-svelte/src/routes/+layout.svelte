@@ -1,9 +1,22 @@
+<!--
+  Root layout — the app shell wrapping every route: a sidebar with the
+  brand, primary nav, and Lily theme/locale pickers, plus the routed
+  page content rendered via `children`. Imports global app.css.
+
+  $props:
+    - children: Snippet — the active route's rendered output.
+
+  Reactive bits: nav links compare against `page.url.pathname` to set
+  `aria-current="page"` on the active item.
+-->
 <script lang="ts">
     import "../app.css";
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
     import ThemePicker from "lily-design-system-svelte-theme-picker/ThemePicker.svelte";
 
+    // Lily theme catalogue offered in the sidebar theme picker (incl.
+    // NHS England/Scotland/Wales patient & practitioner themes).
     const THEMES = [
         "abyss",
         "acid",
@@ -50,6 +63,7 @@
 
     import LocalePicker from "lily-design-system-svelte-locale-picker/LocalePicker.svelte";
 
+    // Locale codes offered in the sidebar language picker.
     const LOCALES = [
         "ar",
         "cy",
@@ -84,6 +98,7 @@
 
     let { children }: { children: Snippet } = $props();
 
+    // Primary sidebar navigation: href ⇒ active route, label ⇒ link text.
     const navItems = [
         { href: "/", label: "Dashboard" },
         { href: "/courses", label: "Courses" },

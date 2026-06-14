@@ -1,3 +1,17 @@
+<!--
+  Root layout: persistent sidebar (nav + session affordance) wrapping
+  every route's content. Also the place the returning SSO token handoff
+  is captured, before any child route fires an API call.
+
+  $props:
+    - children: Snippet — the active route's rendered output.
+
+  $state:
+    - draft: string — the manual "paste a token" input (dev fallback).
+
+  Session reads `auth.token` reactively, so signing in/out re-renders the
+  panel automatically. See `agents/share/jwt-enforcement.md`.
+-->
 <script lang="ts">
     import "../app.css";
     import { onMount } from "svelte";
@@ -27,13 +41,17 @@
     // default.
     let draft = $state("");
 
+    // Redirect to the central auth front-end; it returns via the URL
+    // fragment, captured by `captureFromLocation` on the next mount.
     function signIn() {
         window.location.href = signInUrl();
     }
+    // Dev fallback: store a hand-pasted token and clear the input.
     function saveToken() {
         auth.setToken(draft);
         draft = "";
     }
+    // Sign out: drop the token (store + localStorage) and clear the draft.
     function signOut() {
         auth.clearToken();
         draft = "";

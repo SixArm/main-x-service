@@ -1,4 +1,12 @@
 <script lang="ts">
+    // New building (`/buildings/new`) — create a top-level place.
+    //
+    // Buildings have no parent (a building contains rooms contain
+    // cabinets). Requires a name; on success routes to the new building's
+    // page (where rooms can be added). 422 maps the `name` error to the field.
+    //
+    // State: name/description fields + nameError + submitError.
+
     import { goto } from '$app/navigation';
     import { cache } from '$lib/store/cache.svelte';
     import { ApiError } from '$lib/api/client';

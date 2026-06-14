@@ -1,3 +1,8 @@
+// Pins the AuthRepository → HTTP contract: that each method targets the
+// correct endpoint path + method, places the token in the path/headers as
+// expected, and serialises the right JSON body (including the
+// undefined-name drop). The fetch layer is a spy, so these assert the
+// request the repository *issues*, not the service behaviour.
 import { describe, it, expect, vi } from "vitest";
 import { ApiClient } from "$lib/api/client";
 import { AuthRepository } from "$lib/api/auth";

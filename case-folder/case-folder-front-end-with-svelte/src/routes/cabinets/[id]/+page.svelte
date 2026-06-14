@@ -1,4 +1,10 @@
 <script lang="ts">
+    // Cabinet detail (`/cabinets/[id]`) — current contents + history.
+    //
+    // Render-only. Shows the folders currently in the cabinet and the
+    // full in/out presence timeline (derived from the move audit log;
+    // a null `leftAt` means the folder is still present).
+
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import Badge from '$lib/components/Badge/Badge.svelte';
     import Separator from '$lib/components/Separator/Separator.svelte';
@@ -10,16 +16,19 @@
 
     let { data } = $props();
 
+    // Folder status → Badge colour (green = located, amber = in transit).
     function badgeType(status: string): 'success' | 'warning' | 'default' {
         if (status === 'in-cabinet') return 'success';
         if (status === 'in-transit') return 'warning';
         return 'default';
     }
 
+    // Format an ISO timestamp in UK locale for the timeline columns.
     function when(iso: string): string {
         return new Date(iso).toLocaleString('en-GB');
     }
 
+    // The patient route is keyed by the bare (spaceless) NHS Number.
     function nhsSlug(nhs: string): string {
         return nhs.replaceAll(' ', '');
     }

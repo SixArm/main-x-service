@@ -1,4 +1,20 @@
 <script lang="ts">
+    // Login (`/login`) — passwordless magic-link sign-in.
+    //
+    // The user enters their email; the API mails a one-time link (and, in
+    // dev/test, returns the link inline so it can be clicked without an
+    // email server). The response is deliberately ambiguous about whether
+    // the email is known, so the success copy never confirms account
+    // existence. A 422 surfaces as a field error; anything else as a banner.
+    //
+    // State:
+    //   email      — the entered address.
+    //   emailError — per-field validation / 422 message.
+    //   submitError— non-validation request failure.
+    //   sent       — true once the request resolved, to swap the form for
+    //                the confirmation message.
+    //   magicLink  — dev-only direct link, when the API provides one.
+
     import { api, ApiError } from '$lib/api/client';
 
     import Alert from '$lib/components/Alert/Alert.svelte';

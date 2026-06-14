@@ -1,9 +1,22 @@
+<!--
+  Root layout — app shell shared by every route: a sidebar with brand,
+  primary navigation, and Lily theme/locale pickers, plus a <main> slot for
+  page content.
+
+  Props:
+    - children (Snippet): the active route's rendered page.
+
+  Notes:
+    - Reads `page.url.pathname` to highlight the active nav link.
+    - Theme/locale selections persist via localStorage (storageKey).
+-->
 <script lang="ts">
     import "../app.css";
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
     import ThemePicker from "lily-design-system-svelte-theme-picker/ThemePicker.svelte";
 
+    // Available Lily/daisyUI theme names offered by the ThemePicker.
     const THEMES = [
         "abyss",
         "acid",
@@ -50,6 +63,7 @@
 
     import LocalePicker from "lily-design-system-svelte-locale-picker/LocalePicker.svelte";
 
+    // Locale codes offered by the LocalePicker (ISO 639-1, some region-tagged).
     const LOCALES = [
         "ar",
         "cy",
@@ -84,6 +98,7 @@
 
     let { children }: { children: Snippet } = $props();
 
+    // Sidebar primary navigation targets.
     const navItems = [
         { href: "/", label: "Dashboard" },
         { href: "/events", label: "Events" },

@@ -1,3 +1,10 @@
+<!--
+  Cases list route (`/`).
+
+  Purpose: fetch and render all case refs as links.
+  State: `cases` (the loaded refs), `loading`, `error` — driving the
+  loading / error / empty / list branches in the markup below.
+-->
 <script lang="ts">
   import { onMount } from "svelte";
   import { CaseRepository } from "$lib/api/cases";
@@ -9,6 +16,7 @@
   let loading = $state(true);
   let error = $state<string | null>(null);
 
+  // Load the collection once on mount; always clear `loading` afterward.
   onMount(async () => {
     try {
       cases = await repo.list();

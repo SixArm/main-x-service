@@ -1,4 +1,21 @@
 <script lang="ts">
+    // Root layout — the chrome wrapped around every route.
+    //
+    // Renders the NHS-themed utility row (locale + theme pickers, the
+    // signed-in identity / sign-out control), the branded header with
+    // primary navigation, the main content slot, and the footer. The
+    // header nav and the auth-status block are hidden while signed out
+    // (`user` is null), so the login / callback pages render bare.
+    //
+    // State:
+    //   user — derived from the cache; set by `+layout.ts` after the
+    //          `/api/auth/me` probe. Reactive, so signing in/out updates
+    //          the chrome without a reload.
+    //
+    // Side effects:
+    //   signOut() — best-effort logout, then clears the cache and routes
+    //               to /login regardless of the API outcome.
+
     import '$lib/css/nhs.css';
     import '$lib/css/app.css';
     import { page } from '$app/state';
@@ -19,6 +36,8 @@
 
     const user = $derived(cache.user);
 
+    // End the session. Clear local auth state and redirect even if the
+    // logout call fails, so a flaky API can never strand a signed-in UI.
     async function signOut() {
         try {
             await api.auth.logout();
@@ -56,6 +75,10 @@
         'nhs-high-contrast': 'High contrast'
     };
 
+    // Mark a nav link as the current page for `aria-current`. The
+    // dashboard link must match exactly (every path starts with '/'),
+    // while section links match any of their sub-paths (e.g. /folders/new
+    // keeps "Folders" highlighted).
     function isCurrent(href: string): boolean {
         if (href === '/') return page.url.pathname === '/';
         return page.url.pathname.startsWith(href);

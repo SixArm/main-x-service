@@ -1,3 +1,8 @@
+// Folder detail (`/folders/[id]`) load function.
+//
+// Loads one folder and its complete move history in parallel. Returned
+// as page data (not cached). 404 if the folder is unknown, else 503.
+
 import { api, ApiError } from '$lib/api/client';
 import { error } from '@sveltejs/kit';
 

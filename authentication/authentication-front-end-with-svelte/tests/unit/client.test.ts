@@ -1,3 +1,8 @@
+// Pins the lean (envelope-free) ApiClient behaviour: JSON parsing of 2xx
+// bodies, base-URL/path joining, body serialisation + content-type, bearer
+// header attach/omit, ApiError mapping on non-2xx (server message,
+// 401/400 classifiers), an empty body resolving to undefined, and the
+// non-JSON-error fallback to a status/text message.
 import { describe, it, expect, vi } from "vitest";
 import { ApiClient, ApiError } from "$lib/api/client";
 

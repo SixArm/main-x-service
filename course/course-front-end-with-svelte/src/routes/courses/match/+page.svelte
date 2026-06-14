@@ -1,3 +1,18 @@
+<!--
+  Match check (route "/courses/match") — ad-hoc probe form that scores a
+  hypothetical course against the index without persisting it. The
+  service returns every blocked candidate sorted by score; the page
+  filters by a client-side display threshold so the slider is
+  responsive without re-querying.
+
+  Reactive state:
+    - name/courseCode/providerId/educationalLevel/keywordsRaw/teachesRaw/
+      sameAsRaw/identifiers — the probe inputs.
+    - threshold — client-side display cutoff.
+    - rawResults — full result set from the service.
+    - results ($derived) — rawResults filtered to score >= threshold.
+    - loading / error — request status.
+-->
 <script lang="ts">
     import MatchResultsList from "$lib/components/MatchResultsList.svelte";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -27,6 +42,8 @@
     // an extra round-trip.
     let results = $derived(rawResults.filter((r) => r.score >= threshold));
 
+    // Build the probe request and run the match; blank optional fields
+    // are sent as undefined (omitted) rather than empty strings/arrays.
     async function runMatch(e: SubmitEvent) {
         e.preventDefault();
         loading = true;

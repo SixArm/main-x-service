@@ -1,3 +1,18 @@
+<!--
+  Home / account dashboard.
+
+  On mount: if a token is held, revalidate it with GET /me and refresh the
+  cached profile; a 401 means the token is stale, so the session is cleared
+  and the signed-out view is shown. Sign-out best-effort-revokes the token
+  server-side, then always clears locally and routes to /signin.
+
+  State:
+  - `loading` ($state) — true while the initial GET /me is in flight;
+  - `error` ($state) — non-fatal load error message, shown in a banner.
+
+  Events:
+  - `handleSignout` — sign-out button click handler.
+-->
 <script lang="ts">
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
@@ -12,11 +27,13 @@
     let error = $state<string | null>(null);
 
     onMount(async () => {
+        // No token: nothing to validate — render the signed-out view.
         if (!session.isAuthenticated || !session.token) {
             loading = false;
             return;
         }
         try {
+            // Revalidate the held token and refresh the cached profile.
             const user = await repo.me(session.token);
             session.setUser(user);
         } catch (err) {
@@ -24,6 +41,7 @@
             if (err instanceof ApiError && err.isUnauthorized) {
                 session.clear();
             } else {
+                // Other failures (network/server): keep session, surface msg.
                 error = err instanceof Error ? err.message : t("account.loadFailed");
             }
         } finally {
@@ -31,6 +49,7 @@
         }
     });
 
+    // Sign out: revoke server-side if possible, then always clear locally.
     async function handleSignout() {
         if (session.token) {
             try {
@@ -39,6 +58,7 @@
                 // Best-effort: clear locally regardless.
             }
         }
+        // Drop the local session (and federation key) and go to sign-in.
         session.clear();
         await goto("/signin");
     }

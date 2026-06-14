@@ -1,3 +1,14 @@
+<!--
+  Dashboard (route "/") — landing page showing a service health badge
+  and a recent system-wide audit feed. Both load client-side on mount
+  (SSR is disabled app-wide), and each surfaces its own error
+  independently so one failing call doesn't blank the whole page.
+
+  Reactive state:
+    - healthStatus — "loading" until the health probe resolves, then "ok"/"down".
+    - healthMessage / recentError — per-section error banners.
+    - recent — the recent audit entries.
+-->
 <script lang="ts">
     import { onMount } from "svelte";
     import { CourseRepository } from "$lib/api/courses.js";

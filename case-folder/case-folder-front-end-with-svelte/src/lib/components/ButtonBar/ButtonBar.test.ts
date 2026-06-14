@@ -1,3 +1,7 @@
+// Pins that the patient-record ButtonBar renders its default actions and
+// emits the corresponding key (e.g. "case-notes") via the `onselect`
+// callback when an action button is clicked.
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/svelte';
 import ButtonBar from './ButtonBar.svelte';

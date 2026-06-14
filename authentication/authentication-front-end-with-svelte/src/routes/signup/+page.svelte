@@ -1,3 +1,20 @@
+<!--
+  Sign-up page: create a NEW passwordless account and trigger a magic link.
+
+  Mirrors the sign-in page, plus an optional name field. On mount it parks
+  any allowlisted `?return_to=` for the post-verify handoff. Submitting posts
+  to POST /api/auth/signup with the email, an optional trimmed name, and the
+  current UI locale, then shows a "sent" confirmation.
+
+  State:
+  - `email` / `name` ($state) — bound form inputs (name is optional);
+  - `submitting` ($state) — disables the button during the request;
+  - `sent` ($state) — switches to the confirmation banner;
+  - `error` ($state) — request error message.
+
+  Events:
+  - `handleSubmit` — form submit handler.
+-->
 <script lang="ts">
     import { onMount } from "svelte";
     import { page } from "$app/state";
@@ -26,11 +43,13 @@
     let sent = $state(false);
     let error = $state<string | null>(null);
 
+    // Create the account; send a trimmed name only if one was entered.
     async function handleSubmit(event: SubmitEvent) {
         event.preventDefault();
         error = null;
         submitting = true;
         try {
+            // Empty/whitespace name ⇒ undefined (dropped from the JSON body).
             await repo.signup(email, name.trim() ? name.trim() : undefined, i18n.locale);
             sent = true;
         } catch (err) {

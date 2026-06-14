@@ -1,4 +1,5 @@
 <script lang="ts" module>
+    /** One selectable row in the print-labels dialog: a volume's id + title. */
     export interface LabelOption {
         id: string;
         title: string;
@@ -46,18 +47,24 @@
         class?: string;
     } = $props();
 
+    // `search` is the live text box; `query` is the applied filter. They are
+    // separate so filtering only happens on "Find" (not on every keystroke).
     let search = $state('');
     let query = $state('');
 
+    // The visible options: case-insensitive title match against the applied
+    // query, or the whole list when no query is set.
     const filtered = $derived(
         query.trim()
             ? volumes.filter((v) => v.title.toLowerCase().includes(query.trim().toLowerCase()))
             : volumes
     );
 
+    // Apply the current search text as the active filter.
     function find() {
         query = search;
     }
+    // Reset search text, the applied filter, and the selection.
     function clear() {
         search = '';
         query = '';

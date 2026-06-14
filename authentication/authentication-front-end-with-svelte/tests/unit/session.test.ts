@@ -1,3 +1,8 @@
+// Pins the federation-token persistence contract: `start()` mirrors the
+// access token to BOTH the legacy `mxi.auth.*` keys and the shared
+// `mxi_access_token` federation key (so same-origin siblings can read it),
+// and `clear()` removes all of them. The setup below forces `browser=true`
+// and polyfills localStorage so the store actually persists under vitest.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Under vitest there is no SvelteKit app context, so `$app/environment`'s

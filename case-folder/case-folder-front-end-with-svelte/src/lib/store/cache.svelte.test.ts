@@ -1,3 +1,10 @@
+// Unit tests for the reactive cache store. They pin its non-trivial
+// contracts in isolation (the API client is mocked): setters replace lists
+// rather than accumulate, `upsertFolder` inserts-or-replaces by id,
+// `cabinetLocation` resolves via containerPath → building/room → "?", and
+// the `recordMove` / `addFolder` / `add{Building,Room,Cabinet}` mutations
+// patch the cache correctly after a (mocked) API round-trip.
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Building, Cabinet, Folder, MoveEvent, Room } from './types';
 

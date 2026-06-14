@@ -1,3 +1,8 @@
+// New volume (`/volumes/new`) load function.
+//
+// Hydrates cabinets so the create form can pick the volume's initial
+// location. 503 on failure.
+
 import { api } from '$lib/api/client';
 import { cache } from '$lib/store/cache.svelte';
 import { error } from '@sveltejs/kit';

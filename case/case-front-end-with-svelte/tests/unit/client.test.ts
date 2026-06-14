@@ -1,3 +1,6 @@
+// Unit tests for ApiClient. These pin the wire behaviour: URL joining, JSON
+// body + content-type, bearer-token resolution (per-call vs session source),
+// and non-2xx -> ApiError mapping (incl. empty and non-JSON bodies).
 import { describe, it, expect, vi } from "vitest";
 import { ApiClient, ApiError } from "$lib/api/client";
 
@@ -34,6 +37,7 @@ async function caughtError(p: Promise<unknown>): Promise<ApiError> {
 }
 
 describe("ApiClient", () => {
+  // Pins: a 2xx JSON body is parsed and resolved as-is.
   it("GET parses a JSON body and resolves it", async () => {
     const f = fakeFetch(200, [{ pid: "p1", title: "Housing benefit appeal" }]);
     const data = await client(f).get<Array<{ pid: string }>>("/api/cases");
@@ -41,12 +45,14 @@ describe("ApiClient", () => {
     expect(f.calls[0]?.init.method).toBe("GET");
   });
 
+  // Pins: relative path is resolved against baseUrl into the full URL.
   it("joins the base URL with leading and non-leading paths", async () => {
     const f = fakeFetch(200, {});
     await client(f).get("/api/cases");
     expect(f.calls[0]?.url).toBe("http://svc.test/api/cases");
   });
 
+  // Pins: POST stringifies the body and sets the JSON content-type header.
   it("POST serialises the body and sets JSON content-type", async () => {
     const f = fakeFetch(200, { pid: "p1", title: "Housing benefit appeal" });
     await client(f).post("/api/cases", {
@@ -60,6 +66,7 @@ describe("ApiClient", () => {
     );
   });
 
+  // Pins: a per-call string token becomes `Authorization: Bearer …`.
   it("attaches a bearer token when supplied per call", async () => {
     const f = fakeFetch(200, {});
     await client(f).get("/api/cases/whoami", { token: "tok-123" });
@@ -67,6 +74,7 @@ describe("ApiClient", () => {
     expect(headers.authorization).toBe("Bearer tok-123");
   });
 
+  // Pins: no per-call token + null session source -> no auth header.
   it("omits the authorization header when no token is available", async () => {
     const f = fakeFetch(200, {});
     // No per-call token and the (default-empty) session source -> no header.
@@ -80,6 +88,7 @@ describe("ApiClient", () => {
     expect(headers.authorization).toBeUndefined();
   });
 
+  // Pins: with no per-call token, the session source supplies the bearer.
   it("attaches the session-store token by default when one is set", async () => {
     const f = fakeFetch(200, {});
     const c = new ApiClient({
@@ -92,6 +101,7 @@ describe("ApiClient", () => {
     expect(headers.authorization).toBe("Bearer store-tok");
   });
 
+  // Pins: an explicit per-call `null` wins over a set session token.
   it("a per-call null token overrides a set session token (omits header)", async () => {
     const f = fakeFetch(200, {});
     const c = new ApiClient({
@@ -104,6 +114,7 @@ describe("ApiClient", () => {
     expect(headers.authorization).toBeUndefined();
   });
 
+  // Pins: a non-2xx JSON body maps to ApiError carrying status + message.
   it("throws ApiError with the server message on non-2xx", async () => {
     const f = fakeFetch(422, { error: "title is required" });
     await expect(
@@ -115,6 +126,7 @@ describe("ApiClient", () => {
     });
   });
 
+  // Pins: the isUnauthorized / isBadRequest convenience getters.
   it("classifies 401 and 400 via the error getters", async () => {
     const unauth = await caughtError(
       client(fakeFetch(401, { error: "nope" })).get("/x"),
@@ -128,12 +140,14 @@ describe("ApiClient", () => {
     expect(bad.isBadRequest).toBe(true);
   });
 
+  // Pins: an empty 2xx body (soft-delete) resolves to undefined.
   it("resolves an empty response body as undefined", async () => {
     // The service's soft-delete returns 200 with an empty body.
     const f = fakeFetch(200, "");
     await expect(client(f).delete("/api/cases/p1")).resolves.toBeUndefined();
   });
 
+  // Pins: a non-JSON error body still yields an ApiError with status + text.
   it("falls back to an HTTP status message when the error body is not JSON", async () => {
     const f = fakeFetch(500, "<html>boom</html>", "text/html");
     const err = await caughtError(client(f).get("/x"));

@@ -1,3 +1,11 @@
+<!--
+  Merge page (route "/events/merge") — merge a duplicate event into a
+  surviving "main" event by id, with an optional pre-merge preview and a
+  confirmation step. The duplicate is soft-deleted on success.
+
+  State ($state): the two ids + reason, an optional preview pair, the merge
+  result, and error/loading flags.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -16,6 +24,8 @@
     let error = $state<string | null>(null);
     let loading = $state(false);
 
+    // Fetch both records (in parallel) so the operator can eyeball them
+    // before merging; either id may be blank (resolves to null).
     async function loadPreview() {
         preview = { main: null, duplicate: null };
         error = null;
@@ -30,6 +40,8 @@
         }
     }
 
+    // Validate ids, confirm, then perform the merge. ApiError is shown as
+    // "code: message"; other errors fall back to their string form.
     async function doMerge() {
         if (!mainId || !duplicateId) { error = "Both IDs required"; return; }
         if (mainId === duplicateId) { error = "Main and duplicate must differ"; return; }
@@ -53,6 +65,7 @@
         }
     }
 
+    // One-line preview label: event name plus its (localized) start date.
     function summary(e: Event | null): string {
         if (!e) return "—";
         const when = e.start_date ? new Date(e.start_date).toLocaleString() : "no date";

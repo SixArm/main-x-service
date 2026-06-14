@@ -1,3 +1,11 @@
+<!--
+  Event detail page (route "/events/[id]") — loads one event by id and
+  renders its identity, locations, parties, identifiers, and offers, with
+  edit/audit/delete actions.
+
+  State ($state): the loaded event, error, and loading flag.
+  Derived ($derived): `id` read from the route param.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
@@ -10,8 +18,10 @@
     let error = $state<string | null>(null);
     let loading = $state(true);
 
+    // Route param identifying which event to display.
     const id = $derived(page.params.id as string);
 
+    // Fetch the event once on mount.
     onMount(async () => {
         try {
             event = await repo.get(id);
@@ -22,6 +32,7 @@
         }
     });
 
+    // Soft-delete after a confirm prompt, then return to the list.
     async function handleDelete() {
         if (!confirm("Soft-delete this event? This cannot be undone via the UI.")) return;
         try {
@@ -32,6 +43,8 @@
         }
     }
 
+    // Render a one-line label for any Location variant by switching on `kind`
+    // (exhaustive over the discriminated union).
     function locationLabel(loc: Location): string {
         switch (loc.kind) {
             case "place": return `Place: ${loc.name}${loc.address?.city ? ` (${loc.address.city})` : ""}`;
@@ -41,6 +54,7 @@
         }
     }
 
+    // Render a one-line label for a Party (name, kind, optional email).
     function partyLabel(p: Party): string {
         return `${p.name} (${p.kind})${p.email ? ` · ${p.email}` : ""}`;
     }

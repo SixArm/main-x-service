@@ -1,3 +1,9 @@
+// Move history (`/history`) load function.
+//
+// Reads the optional `q` filter from the URL (shareable/bookmarkable),
+// fetches the matching move-event log, hydrates the cache, and echoes
+// the query back to the page. 503 on failure.
+
 import { api } from '$lib/api/client';
 import { cache } from '$lib/store/cache.svelte';
 import { error } from '@sveltejs/kit';

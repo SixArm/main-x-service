@@ -1,3 +1,11 @@
+<!--
+  Match-check page (route "/events/match") — an ad-hoc form to score
+  hypothetical event attributes against existing records, showing ranked
+  candidates. Does not create anything.
+
+  State ($state): the form fields (name/start/end/organizer/threshold) and
+  the results/error/loading flags.
+-->
 <script lang="ts">
     import MatchResultsList from "$lib/components/MatchResultsList.svelte";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -17,6 +25,8 @@
     let error = $state<string | null>(null);
     let loading = $state(false);
 
+    // Build the MatchRequest from the form and fetch candidates. Datetime
+    // inputs (local) are converted to ISO/UTC; blank fields are omitted.
     async function runMatch(e: SubmitEvent) {
         e.preventDefault();
         loading = true;

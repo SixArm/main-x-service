@@ -1,3 +1,21 @@
+<!--
+  Sign-in page: request a magic link for an EXISTING account.
+
+  Flow: on mount, park any allowlisted `?return_to=` so /verify can hand
+  the token to the originating operator app after sign-in. Submitting the
+  form posts the email to POST /api/auth/magic-link with the current UI
+  locale (so the email language matches), then shows a "sent" confirmation
+  (deliberately not revealing whether the account exists).
+
+  State:
+  - `email` ($state) — bound to the email input;
+  - `submitting` ($state) — disables the button while the request is in flight;
+  - `sent` ($state) — switches the view to the confirmation banner;
+  - `error` ($state) — request error message.
+
+  Events:
+  - `handleSubmit` — form submit handler.
+-->
 <script lang="ts">
     import { onMount } from "svelte";
     import { page } from "$app/state";
@@ -25,11 +43,13 @@
     let sent = $state(false);
     let error = $state<string | null>(null);
 
+    // Request a magic link for the entered email in the current UI locale.
     async function handleSubmit(event: SubmitEvent) {
         event.preventDefault();
         error = null;
         submitting = true;
         try {
+            // locale ⇒ the magic-link email is sent in the chosen language.
             await repo.requestMagicLink(email, i18n.locale);
             sent = true;
         } catch (err) {

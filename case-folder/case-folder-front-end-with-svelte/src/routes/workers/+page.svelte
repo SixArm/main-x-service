@@ -1,4 +1,9 @@
 <script lang="ts">
+    // Workers index (`/workers`) — staff who move folders.
+    //
+    // Render-only. Lists workers (mirrored from the central Worker
+    // Service) with their role; each links to a per-worker activity page.
+
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import DataTable from '$lib/components/DataTable/DataTable.svelte';
     import DataTableHead from '$lib/components/DataTableHead/DataTableHead.svelte';

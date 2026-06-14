@@ -1,3 +1,8 @@
+// Cabinet detail (`/cabinets/[id]`) load function.
+//
+// Loads one cabinet with its current folders and its in/out presence
+// timeline. Returned as page data (not cached). 404 if unknown, else 503.
+
 import { api, ApiError } from '$lib/api/client';
 import { error } from '@sveltejs/kit';
 

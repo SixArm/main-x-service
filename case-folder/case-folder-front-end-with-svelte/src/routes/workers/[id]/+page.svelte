@@ -1,4 +1,10 @@
 <script lang="ts">
+    // Worker detail (`/workers/[id]`) — one worker's folder activity.
+    //
+    // Shows two folder tables (folders this worker moved, and the wider
+    // set of all their patients' folders) plus the worker's move log. The
+    // `folderTable` snippet is reused for both tables to avoid duplication.
+
     import type { Folder } from '$lib/store/types';
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import Badge from '$lib/components/Badge/Badge.svelte';
@@ -11,17 +17,21 @@
 
     let { data } = $props();
 
+    // Folder status → Badge colour (green = located, amber = in transit).
     function badgeType(status: string): 'success' | 'warning' | 'default' {
         if (status === 'in-cabinet') return 'success';
         if (status === 'in-transit') return 'warning';
         return 'default';
     }
 
+    // The patient route is keyed by the bare (spaceless) NHS Number.
     function nhsSlug(nhs: string): string {
         return nhs.replaceAll(' ', '');
     }
 </script>
 
+<!-- Reusable folder table, rendered for both the moved-folders and
+     patients'-folders sections below. -->
 {#snippet folderTable(folders: Folder[], label: string)}
     <DataTable {label}>
         <DataTableHead>

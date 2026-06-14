@@ -1,4 +1,15 @@
 <script lang="ts">
+    // List route ("/") — the care-pathway index.
+    //
+    // Purpose: load and list all pathways on mount, offer a name search box
+    // (with a Clear that restores the full list), and a lazily-loaded
+    // "Recent activity" panel over the system-wide event stream.
+    //
+    // State ($state): `pathways` (current list, list OR search results),
+    // `loading`/`searching` (separate busy flags for first paint vs.
+    // search), `error`, `query` (search box), plus the `showEvents` /
+    // `events` / `eventsLoading` / `eventsError` group for the activity
+    // panel. No props; no $derived (the markup branches on the flags).
     import { onMount } from "svelte";
     import { CarePathwayRepository } from "$lib/api/care-pathways";
     import type { PathwayEvent, PathwayRef } from "$lib/api/types";
@@ -18,6 +29,7 @@
     let eventsLoading = $state(false);
     let eventsError = $state<string | null>(null);
 
+    // First paint: load the full list.
     onMount(async () => {
         try {
             pathways = await repo.list();
@@ -28,6 +40,8 @@
         }
     });
 
+    // Search submit: an empty query falls back to the full list; otherwise
+    // hit the name-search endpoint. Prevents the native form GET.
     async function runSearch(event: SubmitEvent) {
         event.preventDefault();
         const q = query.trim();
@@ -42,6 +56,7 @@
         }
     }
 
+    // Clear the search box and restore the full list.
     async function clearSearch() {
         query = "";
         error = null;
@@ -58,6 +73,8 @@
     /// Toggle the recent-activity panel; lazy-load the stream on first open.
     async function toggleEvents() {
         showEvents = !showEvents;
+        // Fetch only when opening, and only once (cached in `events`) or
+        // when not already in flight.
         if (!showEvents || events !== null || eventsLoading) return;
         eventsLoading = true;
         eventsError = null;
@@ -79,6 +96,7 @@
 <h1>Care pathways</h1>
 <p><a class="button" href="/new">New care pathway</a></p>
 
+<!-- Name search box; Clear appears only when there is a query to clear. -->
 <form class="row" onsubmit={runSearch} role="search">
     <input
         type="search"
@@ -120,6 +138,8 @@
     </button>
 </div>
 
+<!-- Recent-activity panel: rendered only when toggled open; rows are
+     newest-first by `seq` (sorted in `toggleEvents`). -->
 {#if showEvents}
     <h2>Recent activity</h2>
     {#if eventsLoading}

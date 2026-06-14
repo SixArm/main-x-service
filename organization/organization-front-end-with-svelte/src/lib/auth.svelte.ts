@@ -16,13 +16,25 @@
 /** The shared localStorage key, agreed family-wide. */
 export const TOKEN_KEY = "mxi_access_token";
 
+/**
+ * Read the persisted token from localStorage, or `null` when absent /
+ * empty / running without a DOM (SSR / `vite preview`). Used to seed the
+ * reactive store on construction so a refresh stays signed in.
+ */
 function readStored(): string | null {
     if (typeof localStorage === "undefined") return null;
     const value = localStorage.getItem(TOKEN_KEY);
     return value && value.length > 0 ? value : null;
 }
 
+/**
+ * Reactive holder for the bearer token. A single instance ({@link auth})
+ * is shared process-wide; reading `token` in a component subscribes it,
+ * and `setToken`/`clearToken` both update the rune and mirror the value
+ * to localStorage so it survives reloads.
+ */
 class AuthStore {
+    // Private `$state` rune: the source of truth; localStorage just mirrors it.
     #token = $state<string | null>(readStored());
 
     /** The current access token, or `null` when the SPA is signed out. */

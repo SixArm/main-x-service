@@ -1,3 +1,11 @@
+<!--
+  Per-event audit page (route "/events/[id]/audit") — lists the audit trail
+  for one event (most recent first), each entry expandable to show its
+  JSON payload.
+
+  State ($state): entries, error, loading flag.
+  Derived ($derived): `id` from the route param.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";
@@ -10,6 +18,7 @@
     let loading = $state(true);
     const id = $derived(page.params.id as string);
 
+    // Load up to 100 audit entries for this event on mount.
     onMount(async () => {
         try {
             entries = await repo.audit(id, 100);

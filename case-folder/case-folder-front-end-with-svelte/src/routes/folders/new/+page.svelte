@@ -1,4 +1,15 @@
 <script lang="ts">
+    // New folder (`/folders/new`) — create a folder for a patient.
+    //
+    // Validates the NHS Number client-side (Modulus-11) before submitting
+    // so an obviously-wrong number is caught without a round-trip. On
+    // success, routes to the new folder's detail page. Server-side 422
+    // field errors are mapped back onto the matching form fields.
+    //
+    // State: the form fields (nhsNumber/patientName/dateOfBirth/title/
+    // cabinetId/notes) and a per-field error string for each, plus a
+    // catch-all submitError.
+
     import { goto } from '$app/navigation';
     import { cache } from '$lib/store/cache.svelte';
     import { ApiError } from '$lib/api/client';
@@ -24,6 +35,7 @@
     let titleError = $state('');
     let submitError = $state('');
 
+    // Validate locally, create via the cache, then navigate to the folder.
     async function handleSubmit() {
         nhsError = '';
         nameError = '';
@@ -31,6 +43,7 @@
         titleError = '';
         submitError = '';
 
+        // Client-side Modulus-11 gate before we bother the server.
         const formatted = formatNhsNumber(nhsNumber);
         if (!isValidNhsNumber(formatted)) {
             nhsError = 'Enter a valid 10-digit NHS Number (Modulus 11 check failed).';
@@ -51,6 +64,8 @@
             });
             await goto(`/folders/${folder.id}`);
         } catch (e) {
+            // Map server validation (snake_case keys) onto the form fields;
+            // fall back to a banner if none matched.
             if (e instanceof ApiError && e.status === 422) {
                 const body = e.body as { errors?: Record<string, string> } | null;
                 const errs = body?.errors ?? {};

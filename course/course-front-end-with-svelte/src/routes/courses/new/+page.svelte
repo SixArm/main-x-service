@@ -1,3 +1,13 @@
+<!--
+  New course (route "/courses/new") — wraps CourseForm to create a
+  course, navigating to its detail page on success. If the service
+  rejects with 409 (duplicate), the candidate matches are extracted and
+  shown below the form, and an error is rethrown so the form surfaces a
+  banner instead of navigating away.
+
+  Reactive state:
+    - duplicates — candidate matches from the last 409, rendered below.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import CourseForm from "$lib/components/CourseForm.svelte";
@@ -9,8 +19,10 @@
     const repo = CourseRepository.withFetch();
     let duplicates = $state<MatchResult[]>([]);
 
+    // Empty seed for the create form (only `name` is required).
     const blank: Course = { name: "" };
 
+    // Create the course; on 409 surface duplicate candidates and rethrow.
     async function handleSubmit(value: Course) {
         duplicates = [];
         try {

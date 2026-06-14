@@ -1,3 +1,7 @@
+// Pins the Icon contract: a known name renders an inline <svg>; a `label`
+// exposes it as an accessible image (role="img"); an unknown name renders
+// nothing (no stray svg).
+
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/svelte';
 import Icon from './Icon.svelte';

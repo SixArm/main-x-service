@@ -1,4 +1,8 @@
 <script lang="ts" module>
+    /**
+     * One toolbar action: a stable `key` emitted on click, a visible
+     * `label`, and an `icon` name resolved by the Icon component.
+     */
     export interface BarButton {
         key: string;
         label: string;

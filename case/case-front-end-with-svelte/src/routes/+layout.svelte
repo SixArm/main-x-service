@@ -1,3 +1,22 @@
+<!--
+  Root layout — chrome shared by every route.
+
+  Purpose:
+    Renders the sidebar (brand, nav, session panel) plus the routed page,
+    and runs the one-time SSO handoff capture on mount.
+
+  $props:
+    - children: Snippet — the routed page content (`{@render children()}`).
+
+  State:
+    - draft   : $state<string>  — the manual "paste a token" input.
+    - signedIn: $derived<boolean> — tracks `token()`; flips the session UI
+                between the signed-in and signed-out affordances.
+
+  Session affordance: primary path is "Sign in" -> central auth front-end,
+  which returns the token in the URL fragment (captured by
+  `captureFromLocation` on mount). The paste field is a dev fallback.
+-->
 <script lang="ts">
   import "../app.css";
   import { onMount } from "svelte";
@@ -15,6 +34,7 @@
     captureFromLocation();
   });
 
+  // Sidebar navigation targets; `aria-current` is set per item below.
   const navItems = [
     { href: "/", label: "Cases" },
     { href: "/new", label: "New case" },
@@ -25,12 +45,15 @@
   // URL fragment (captured above). The manual paste field is kept as a dev
   // convenience. Service-side enforcement is off by default.
   let draft = $state("");
+  // Reactive: re-derives whenever the auth store's token changes.
   const signedIn = $derived(token() !== null);
 
+  // Redirect the whole tab to the central auth front-end's sign-in page.
   function signIn(): void {
     window.location.href = signInUrl();
   }
 
+  // Dev fallback: store a manually pasted token, then clear the input.
   function applyToken(): void {
     const value = draft.trim();
     if (value.length > 0) {
@@ -39,6 +62,7 @@
     }
   }
 
+  // Sign out: drop the token from store + storage and clear the draft.
   function signOut(): void {
     clearToken();
     draft = "";

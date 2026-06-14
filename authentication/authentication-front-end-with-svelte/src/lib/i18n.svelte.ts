@@ -12,21 +12,32 @@
 
 import { browser } from "$app/environment";
 
+/**
+ * Locales for which the UI is translated. To add one, extend this tuple
+ * AND add a matching entry to {@link LOCALE_LABELS} and `STRINGS`.
+ */
 /// Locales for which the UI is translated. Extend this + `STRINGS`.
 export const LOCALES = ["en", "cy"] as const;
+/** A supported locale code (one of {@link LOCALES}). */
 export type Locale = (typeof LOCALES)[number];
 
+/** Fallback locale for an unknown key, locale, or missing translation. */
 /// Fallback locale for an unknown key, locale, or missing translation.
 export const DEFAULT_LOCALE: Locale = "en";
 
+/** Human-readable name for the locale switcher, written in that locale. */
 /// Human-readable name for the locale switcher (in that locale).
 export const LOCALE_LABELS: Record<Locale, string> = {
     en: "English",
     cy: "Cymraeg",
 };
 
+// localStorage key under which the chosen UI locale is persisted.
 const LOCALE_KEY = "mxi.auth.locale";
 
+// Every translatable UI string, keyed by a stable dotted key. `en` is the
+// source of truth; every other locale must cover the same key set so a
+// missing translation is a type error (the `StringKey` union below).
 /// Every translatable UI string, keyed by a stable dotted key. `en` is
 /// the source of truth; other locales must cover the same keys.
 const STRINGS = {
@@ -132,49 +143,91 @@ const STRINGS = {
     },
 } as const;
 
+/** The set of valid translation keys (derived from the English catalog). */
 /// The set of valid string keys (derived from the English catalog).
 export type StringKey = keyof (typeof STRINGS)["en"];
 
+// Normalise raw input to a supported locale, or null if unsupported.
+// Accepts a region subtag (cy-GB → cy) and is case-insensitive.
 /// Normalise raw input to a supported locale, or `null` if unsupported.
 /// Accepts a region subtag (`cy-GB` → `cy`) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
     if (!raw) return null;
+    // Take the primary subtag before any `-`/`_`, lowercased.
     const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
     return (LOCALES as readonly string[]).includes(primary) ? (primary as Locale) : null;
 }
 
+// Seed the reactive locale from localStorage (default off the browser).
 function readStoredLocale(): Locale {
     if (!browser) return DEFAULT_LOCALE;
     return normaliseLocale(localStorage.getItem(LOCALE_KEY)) ?? DEFAULT_LOCALE;
 }
 
+// Reactive current-locale state; mutating it re-renders every `t(...)` call.
 let current = $state<Locale>(readStoredLocale());
 
+/**
+ * Reactive current-locale store with persistence.
+ *
+ * Reading `i18n.locale` (or calling {@link t}) inside a component subscribes
+ * that component to locale changes, so switching the locale re-renders the UI.
+ */
 /// Reactive current-locale + persistence. Reading `i18n.locale` in a
 /// component subscribes it to locale changes.
 export const i18n = {
+    /** The currently selected locale. */
     get locale(): Locale {
         return current;
     },
+    /**
+     * Switch the active locale and persist the choice.
+     *
+     * @param next - Desired locale (a region subtag like `cy-GB` is
+     *   accepted); unsupported input falls back to {@link DEFAULT_LOCALE}.
+     */
     /// Switch locale. Unknown input falls back to the default.
     set(next: string): void {
         const locale = normaliseLocale(next) ?? DEFAULT_LOCALE;
         current = locale;
         if (browser) localStorage.setItem(LOCALE_KEY, locale);
     },
+    /** The list of supported locales (for rendering the switcher). */
     get locales(): readonly Locale[] {
         return LOCALES;
     },
 };
 
+/**
+ * Translate `key` in `locale` with graceful fallbacks.
+ *
+ * Falls back to the English translation when the target locale lacks the
+ * key, then to the key string itself if even English lacks it. Pure — safe
+ * to unit-test without a Svelte component (does not read reactive state
+ * unless `locale` is defaulted to the current locale).
+ *
+ * @param key - A valid {@link StringKey}.
+ * @param locale - Target locale; defaults to the current reactive locale.
+ * @returns The translated string (or the key as a last resort).
+ */
 /// Translate `key` in `locale` (defaults to the current locale), falling
 /// back to `en` for a missing translation, then to the key itself for an
 /// unknown key. Pure — safe to unit-test without a component.
 export function translate(key: StringKey, locale: Locale = current): string {
+    // Unknown locale → English table; unknown key → English → the key.
     const table = STRINGS[locale] ?? STRINGS[DEFAULT_LOCALE];
     return table[key] ?? STRINGS[DEFAULT_LOCALE][key] ?? key;
 }
 
+/**
+ * Reactive translation accessor for components: `t("signin.title")`.
+ *
+ * Reads the current reactive locale, so a locale switch re-renders every
+ * string rendered through it.
+ *
+ * @param key - A valid {@link StringKey}.
+ * @returns The translated string in the current locale.
+ */
 /// Reactive accessor for use in components: `t("signin.title")`. Reads
 /// the current locale, so a locale switch re-renders the string.
 export function t(key: StringKey): string {

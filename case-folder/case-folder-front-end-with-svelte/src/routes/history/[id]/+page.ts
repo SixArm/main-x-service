@@ -1,3 +1,9 @@
+// Move-event detail (`/history/[id]`) load function.
+//
+// Loads one move event, then the patient's other folders (looked up by
+// the move's NHS Number) so the detail page can offer cross-links. 404
+// if the move is unknown, else 503.
+
 import { api, ApiError } from '$lib/api/client';
 import { error } from '@sveltejs/kit';
 

@@ -1,3 +1,10 @@
+// Pins the cross-origin token-handoff SECURITY control end to end:
+// allowlist parsing, the origin-exact `isAllowedReturnTo` gate (rejecting
+// foreign hosts/ports/schemes, javascript:/data:, relative + garbage URLs),
+// the `nextDestination` decision (token in the fragment only when allowed,
+// never appended otherwise), and the sessionStorage park/read/clear round
+// trip (a non-allowlisted return_to is never stored). These tests are the
+// guardrail against token exfiltration.
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   isAllowedReturnTo,

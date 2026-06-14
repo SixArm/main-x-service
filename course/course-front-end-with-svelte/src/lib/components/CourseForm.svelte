@@ -1,3 +1,21 @@
+<!--
+  CourseForm — the create/edit form for a Course. Drives a reactive
+  `createForm` controller, validates URL/length/credit fields, and
+  normalises the value before handing it to the parent's submit
+  handler. Shared by the "new course" and "edit course" routes.
+
+  $props:
+    - initial: Course — seed value (blank `{ name: "" }` for create, the
+      fetched course for edit).
+    - submitLabel?: string — primary button text (default "Save").
+    - onsubmit: (course) => Promise<void> — called with the wire-normalised
+      course when validation passes; should create/update and may throw.
+
+  Key reactive state:
+    - form — createForm controller holding value/errors/submitting.
+    - *Joined ($derived) — array fields flattened to textarea/​input strings;
+      the update* helpers parse the edited text back into arrays.
+-->
 <script lang="ts">
     import type { Course } from "$lib/api/types.js";
     import { COURSE_STATUSES, EDUCATIONAL_LEVEL_OPTIONS } from "$lib/api/types.js";
@@ -13,6 +31,8 @@
     } = $props();
     const submitLabel = $derived(props.submitLabel ?? "Save");
 
+    // Coerce all optional array/status fields to concrete defaults so the
+    // form can bind to them without null checks on every input.
     function withDefaults(c: Course): Course {
         return {
             ...c,
@@ -64,9 +84,13 @@
     // svelte-ignore state_referenced_locally
     const form = createForm<Course>({
         initial: withDefaults(props.initial),
+        // Client-side mirror of the service's required/format/range rules,
+        // so obvious errors are caught before the round-trip.
         validate(value) {
             const errors: Record<string, string> = {};
             if (!value.name.trim()) errors.name = "Required";
+            // Each of these fields must be a fully-qualified http(s) URL
+            // if present (the service enforces the same in FR-25).
             const urlFields: [keyof Course, string][] = [
                 ["url", "URL"],
                 ["additional_type", "Additional type"],
@@ -89,12 +113,16 @@
         onSubmit: (value) => props.onsubmit(normalizeForWire(value)),
     });
 
+    // String views of the array fields for binding to text controls.
+    // newline-joined for one-per-line textareas; comma-joined for inline lists.
     let alternateNamesJoined = $derived((form.value.alternate_names ?? []).join("\n"));
     let sameAsJoined = $derived((form.value.same_as ?? []).join("\n"));
     let keywordsJoined = $derived((form.value.keywords ?? []).join(", "));
     let teachesJoined = $derived((form.value.teaches ?? []).join("\n"));
     let availableLangJoined = $derived((form.value.available_language ?? []).join(", "));
 
+    // Inverse of the *Joined deriveds: parse edited text back into the
+    // array fields, trimming and dropping blank entries.
     function updateAlternateNames(value: string) {
         form.value.alternate_names = value.split("\n").map((s) => s.trim()).filter(Boolean);
     }
@@ -102,22 +130,29 @@
         form.value.same_as = value.split("\n").map((s) => s.trim()).filter(Boolean);
     }
     function updateKeywords(value: string) {
+        // Keywords accept either comma or newline as a separator.
         form.value.keywords = value.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
     }
     function updateTeaches(value: string) {
         form.value.teaches = value.split("\n").map((s) => s.trim()).filter(Boolean);
     }
     function updateAvailableLanguage(value: string) {
+        // BCP-47 codes: split on any whitespace/comma and lowercase.
         form.value.available_language = value
             .split(/[,\s]+/)
             .map((s) => s.trim().toLowerCase())
             .filter(Boolean);
     }
 
+    // Type guard: narrows educational_level to its enumerated string
+    // variants (excludes the { Custom } object), so the <select> can
+    // bind a plain string value.
     function isStringLevel(l: Course["educational_level"]): l is Exclude<NonNullable<Course["educational_level"]>, { Custom: string }> {
         return typeof l === "string";
     }
 
+    // Intercept native submit, prevent navigation, and run the form
+    // controller's validate+submit pipeline.
     function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         void form.submit();
@@ -157,6 +192,11 @@
 
     <FieldRow>
         <LabeledField label="Educational level" for="level">
+            <!--
+              Custom-level objects can't be represented in this plain
+              <select>, so they render as the blank "—" option; the
+              empty choice writes back null (cleared level).
+            -->
             <select
                 id="level"
                 value={isStringLevel(form.value.educational_level) ? form.value.educational_level : ""}

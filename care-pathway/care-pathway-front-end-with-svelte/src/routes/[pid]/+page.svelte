@@ -1,4 +1,17 @@
 <script lang="ts">
+    // Detail route ("/[pid]") — view one care pathway plus its actions:
+    // edit (link), delete, check-duplicates, inline two-step merge, and a
+    // lazily-loaded audit trail.
+    //
+    // State ($state):
+    //   - pathway / loading / error — the fetched record + load lifecycle.
+    //   - duplicates — null until "Check duplicates" runs, then the scored
+    //     list (self-row filtered out); checking — its busy flag.
+    //   - confirming — pid of the row whose inline "Confirm merge?" prompt
+    //     is armed (null = none); merging — pid of the merge in flight.
+    //   - mergeMessage — success banner text after a merge.
+    //   - showAudit / audit / auditLoading / auditError — the audit panel.
+    // No props. The detail record is always treated as the merge SURVIVOR.
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
@@ -13,7 +26,9 @@
     let error = $state<string | null>(null);
     let duplicates = $state<ScoredRef[] | null>(null);
     let checking = $state(false);
+    // pid of the merge currently in flight, or null.
     let merging = $state<string | null>(null);
+    // pid of the row with an armed inline confirm prompt, or null.
     let confirming = $state<string | null>(null);
     let mergeMessage = $state<string | null>(null);
 
@@ -24,6 +39,7 @@
     let auditLoading = $state(false);
     let auditError = $state<string | null>(null);
 
+    // Load the record on mount.
     onMount(async () => {
         try {
             pathway = await repo.get(pid);
@@ -34,18 +50,22 @@
         }
     });
 
+    // Soft-delete this record, then return to the list.
     async function handleDelete() {
         await repo.remove(pid);
         await goto("/");
     }
 
+    // Run a duplicate check against this record and show the candidates.
     async function handleCheckDuplicates() {
         if (!pathway) return;
         checking = true;
+        // Reset any prior merge banner / armed confirm before re-checking.
         mergeMessage = null;
         confirming = null;
         try {
             const hits = await repo.checkDuplicates(pathway);
+            // Drop the self-match: a record always matches itself.
             duplicates = hits.filter((h) => h.pid !== pid);
         } catch (err) {
             error = err instanceof Error ? err.message : "Check failed";
@@ -63,6 +83,7 @@
             confirming = null;
             return;
         }
+        // Mark this row's merge in flight (disables its buttons).
         merging = duplicatePid;
         error = null;
         mergeMessage = null;
@@ -73,6 +94,8 @@
             pathway = result.main;
             mergeMessage = `Merged ${duplicatePid} into this record.`;
             confirming = null;
+            // Refresh candidates against the post-merge survivor (the just-
+            // merged duplicate should now be gone).
             const hits = await repo.checkDuplicates(result.main);
             duplicates = hits.filter((h) => h.pid !== pid);
         } catch (err) {
@@ -85,6 +108,7 @@
     /// Toggle the audit panel; lazy-load the trail on first open.
     async function toggleAudit() {
         showAudit = !showAudit;
+        // Fetch only on open, and only once / not while already loading.
         if (!showAudit || audit !== null || auditLoading) return;
         auditLoading = true;
         auditError = null;
@@ -156,6 +180,9 @@
         <p class="banner" role="status">{mergeMessage}</p>
     {/if}
 
+    <!-- Potential-duplicates list (shown after a check). Each row offers a
+         two-step merge: "Merge into this record" arms the inline confirm
+         (`confirming === dup.pid`), then "Confirm merge" folds it in. -->
     {#if duplicates}
         <h2>Potential duplicates</h2>
         {#if duplicates.length === 0}
@@ -200,6 +227,9 @@
         </button>
     </div>
 
+    <!-- Audit-trail panel: rendered only when toggled open; rows are
+         newest-first by created_at (sorted in `toggleAudit`), with "—"
+         shown for a null actor. -->
     {#if showAudit}
         <h2>Audit trail</h2>
         {#if auditLoading}

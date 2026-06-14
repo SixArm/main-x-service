@@ -1,3 +1,13 @@
+<!--
+  MatchResultsList — read-only list of match/duplicate candidates.
+  Shows each hit's name, confidence pill, percentage score, a link to
+  the course, and an expandable per-component score breakdown. Used by
+  the match-check and new-course (duplicate) pages.
+
+  $props:
+    - results: MatchResult[] — candidates to render (sorted upstream).
+    - title?: string — section heading (default "Match results").
+-->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
 
@@ -25,6 +35,7 @@
                     </header>
                     <div class="meta small muted">
                         {#if r.course_code}{r.course_code}{/if}
+                        <!-- Truncate the UUID to 8 chars for a compact, linkable hint. -->
                         {#if r.course_id} · <a href={`/courses/${r.course_id}`}>{r.course_id.slice(0, 8)}…</a>{/if}
                     </div>
                     {#if r.breakdown}

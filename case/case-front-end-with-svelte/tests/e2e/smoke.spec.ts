@@ -4,6 +4,7 @@ import { test, expect, type Page } from "@playwright/test";
 // endpoint contract (wrong path / method) surfaces as an unhandled
 // request and a failing assertion, without needing the Rust service.
 
+// Fixed pid + canned case used by both the route stubs and the assertions.
 const PID = "11111111-1111-4111-8111-111111111111";
 
 const CASE = {
@@ -31,6 +32,8 @@ async function stubApi(page: Page) {
     const method = req.method();
     const path = url.pathname;
 
+    // Dispatch by (path, method) mirroring the real endpoint contract; any
+    // unmatched request falls through to a 404 so contract drift fails loud.
     if (path === "/api/cases" && method === "GET") {
       return route.fulfill({ json: [{ pid: PID, title: CASE.title }] });
     }
@@ -57,17 +60,20 @@ test.beforeEach(async ({ page }) => {
   await stubApi(page);
 });
 
+// Pins: the list route fetches and shows the seeded case title.
 test("list page renders the seeded case", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: "Cases" })).toBeVisible();
   await expect(page.getByText("Housing benefit appeal")).toBeVisible();
 });
 
+// Pins: the create route renders the empty form.
 test("new page shows the create form", async ({ page }) => {
   await page.goto("/new", { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: "New case" })).toBeVisible();
 });
 
+// Pins: the detail route fetches the case and shows its title heading.
 test("detail page renders the fetched case", async ({ page }) => {
   await page.goto(`/${PID}`, { waitUntil: "networkidle" });
   await expect(
@@ -75,6 +81,7 @@ test("detail page renders the fetched case", async ({ page }) => {
   ).toBeVisible();
 });
 
+// Pins: the edit route loads the case and renders the edit form.
 test("edit page renders the edit form", async ({ page }) => {
   await page.goto(`/${PID}/edit`, { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: "Edit case" })).toBeVisible();

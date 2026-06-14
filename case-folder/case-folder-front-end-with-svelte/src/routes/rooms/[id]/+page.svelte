@@ -1,4 +1,9 @@
 <script lang="ts">
+    // Room detail (`/rooms/[id]`) — folder presence history for a room.
+    //
+    // Render-only. Shows the presence timeline aggregated across all of
+    // the room's cabinets (newest first); a null `leftAt` ⇒ still present.
+
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import Badge from '$lib/components/Badge/Badge.svelte';
     import DataTable from '$lib/components/DataTable/DataTable.svelte';
@@ -9,10 +14,12 @@
 
     let { data } = $props();
 
+    // Format an ISO timestamp in UK locale for the timeline columns.
     function when(iso: string): string {
         return new Date(iso).toLocaleString('en-GB');
     }
 
+    // The patient route is keyed by the bare (spaceless) NHS Number.
     function nhsSlug(nhs: string): string {
         return nhs.replaceAll(' ', '');
     }

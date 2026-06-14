@@ -1,3 +1,16 @@
+<!--
+  Detail route (`/[pid]`): shows one organization, with delete and
+  check-duplicates actions.
+
+  $state:
+    - org:        Organization | null — the loaded record.
+    - loading:    boolean             — true until the first fetch settles.
+    - error:      string | null       — fetch/action failure (inline banner).
+    - duplicates: ScoredRef[] | null  — null = not checked; array = results.
+    - checking:   boolean             — disables the button during a check.
+
+  `pid` comes from the route param. Loads on mount (SPA, client-only).
+-->
 <script lang="ts">
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
@@ -6,6 +19,7 @@
     import type { Organization, ScoredRef } from "$lib/api/types";
 
     const repo = OrganizationRepository.withFetch();
+    // Route param; `?? ""` satisfies strict typing (param is always set here).
     const pid = page.params.pid ?? "";
 
     let org = $state<Organization | null>(null);
@@ -14,6 +28,7 @@
     let duplicates = $state<ScoredRef[] | null>(null);
     let checking = $state(false);
 
+    // Fetch this record once on mount; surface a not-found as `error`.
     onMount(async () => {
         try {
             org = await repo.get(pid);
@@ -24,16 +39,22 @@
         }
     });
 
+    /** Soft-delete this record, then return to the list. */
     async function handleDelete() {
         await repo.remove(pid);
         await goto("/");
     }
 
+    /**
+     * Match this record against the registry and show potential
+     * duplicates, excluding the record itself from the results.
+     */
     async function handleCheckDuplicates() {
         if (!org) return;
         checking = true;
         try {
             const hits = await repo.checkDuplicates(org);
+            // Drop the self-match; the record always matches itself.
             duplicates = hits.filter((h) => h.pid !== pid);
         } catch (err) {
             error = err instanceof Error ? err.message : "Check failed";
@@ -60,6 +81,8 @@
             <div>
                 <strong>Identifiers:</strong>
                 <ul>
+                    <!-- Render bare-string schemes directly; unwrap the
+                         `{ Custom: label }` variant as `Custom(label)`. -->
                     {#each org.identifiers as id, i (i)}
                         <li>{typeof id.scheme === "string" ? id.scheme : `Custom(${id.scheme.Custom})`}: <code>{id.value}</code></li>
                     {/each}

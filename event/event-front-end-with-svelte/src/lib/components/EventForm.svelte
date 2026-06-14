@@ -1,3 +1,19 @@
+<!--
+  EventForm — create/edit form for an Event. Wraps the reactive createForm
+  helper with Event-specific validation (required name/start, end ≥ start,
+  door ≤ start) and renders the field controls.
+
+  Props:
+    - initial (Event): starting value (a blank template for create, or the
+      loaded record for edit).
+    - submitLabel (string, default "Save"): primary button caption.
+    - onsubmit ((event) => Promise<void>): persist handler; rejection surfaces
+      via form.submitError.
+
+  State:
+    - form (FormState<Event>): the reactive form controller.
+    - submitLabel / keywordsRaw / languagesRaw ($derived): derived display values.
+-->
 <script lang="ts">
     import type { Event } from "$lib/api/types.js";
     import {
@@ -16,6 +32,7 @@
     } = $props();
     const submitLabel = $derived(props.submitLabel ?? "Save");
 
+    // Normalize nullable array fields to [] so bindings/joins never hit undefined.
     function withDefaults(e: Event): Event {
         return {
             ...e,
@@ -30,13 +47,16 @@
     // svelte-ignore state_referenced_locally
     const form = createForm<Event>({
         initial: withDefaults(props.initial),
+        // Client-side validation mirroring the service's time-window rules.
         validate(value) {
             const errors: Record<string, string> = {};
             if (!value.name.trim()) errors.name = "Required";
             if (!value.start_date) errors.start_date = "Required";
+            // End must not precede start.
             if (value.start_date && value.end_date && Date.parse(value.end_date) < Date.parse(value.start_date)) {
                 errors.end_date = "End must be ≥ start";
             }
+            // Doors must open no later than the event start.
             if (value.door_time && value.start_date && Date.parse(value.door_time) > Date.parse(value.start_date)) {
                 errors.door_time = "Door time must be ≤ start";
             }
@@ -45,16 +65,20 @@
         onSubmit: (value) => props.onsubmit(value),
     });
 
+    // Render the string[] fields as comma-/space-joined text for the inputs.
     let keywordsRaw = $derived((form.value.keywords ?? []).join(", "));
     let languagesRaw = $derived((form.value.in_language ?? []).join(", "));
 
+    // Parse the free-text keyword input back into a trimmed, de-blanked array.
     function updateKeywords(v: string) {
         form.value.keywords = v.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
     }
+    // Languages split on commas/whitespace and are lowercased (ISO 639-1).
     function updateLanguages(v: string) {
         form.value.in_language = v.split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
     }
 
+    // Prevent native navigation and delegate to the form controller's submit.
     function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         void form.submit();

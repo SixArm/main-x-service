@@ -1,3 +1,14 @@
+<!--
+  List route (`/`): fetches and renders all organizations.
+
+  $state:
+    - orgs:    OrgRef[]      — the loaded collection.
+    - loading: boolean       — true until the first fetch settles.
+    - error:   string | null — fetch failure message (inline banner).
+
+  Loads on mount (client-only; the app is SPA). The markup branches
+  loading / error / empty / list.
+-->
 <script lang="ts">
     import { onMount } from "svelte";
     import { OrganizationRepository } from "$lib/api/organizations";
@@ -9,6 +20,7 @@
     let loading = $state(true);
     let error = $state<string | null>(null);
 
+    // Fetch the collection once on mount; always clear `loading` in finally.
     onMount(async () => {
         try {
             orgs = await repo.list();

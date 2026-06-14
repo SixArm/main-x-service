@@ -1,3 +1,9 @@
+// Reports (`/reports`) load function.
+//
+// Fetches stats, places, folders, moves, and volumes in one parallel
+// batch and returns them as page data (the reports page computes derived
+// metrics locally, so nothing is cached). 503 on failure.
+
 import { api } from '$lib/api/client';
 import { error } from '@sveltejs/kit';
 

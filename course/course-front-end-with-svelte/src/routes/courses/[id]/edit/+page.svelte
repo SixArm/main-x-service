@@ -1,3 +1,12 @@
+<!--
+  Edit course (route "/courses/[id]/edit") — loads the existing course
+  client-side, seeds CourseForm with it, and PUTs the update, returning
+  to the detail page on success.
+
+  Reactive state:
+    - id ($derived) — route param.
+    - course / loading / error — fetch result and status.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
@@ -23,6 +32,7 @@
         }
     });
 
+    // Persist the edited course, then navigate back to its detail page.
     async function handleSubmit(value: Course) {
         await repo.update(id, value);
         goto(`/courses/${id}`);

@@ -1,4 +1,11 @@
 <script lang="ts">
+    // Patients index (`/patients`) — searchable patient roster.
+    //
+    // Unlike the folders list, the search here is purely client-side: the
+    // full roster is cached by the load function and `filtered` narrows it
+    // reactively by name or NHS Number (spaces stripped on both sides so
+    // "943 476 5919" and "9434765919" both match).
+
     import { cache } from '$lib/store/cache.svelte';
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import DataTable from '$lib/components/DataTable/DataTable.svelte';
@@ -9,6 +16,7 @@
 
     let query = $state('');
 
+    // Live client-side filter over the cached roster (name / NHS Number).
     const filtered = $derived.by(() => {
         const q = query.trim().toLowerCase();
         if (!q) return cache.patients;
@@ -19,6 +27,7 @@
         );
     });
 
+    // The patient route is keyed by the bare (spaceless) NHS Number.
     function nhsSlug(nhs: string): string {
         return nhs.replaceAll(' ', '');
     }

@@ -1,3 +1,8 @@
+// Worker detail (`/workers/[id]`) load function.
+//
+// Returns the worker plus the folders they moved, all folders of their
+// patients, and their move log. 404 if unknown, else 503.
+
 import { api, ApiError } from '$lib/api/client';
 import { error } from '@sveltejs/kit';
 

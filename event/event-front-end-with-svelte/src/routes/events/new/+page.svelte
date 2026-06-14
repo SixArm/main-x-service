@@ -1,3 +1,11 @@
+<!--
+  New-event page (route "/events/new") — renders a blank EventForm and
+  creates the event on submit. If the service rejects with a 409 conflict,
+  the duplicate candidates are surfaced for review instead of navigating.
+
+  State ($state):
+    - duplicates: candidate matches returned on a 409 conflict.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import EventForm from "$lib/components/EventForm.svelte";
@@ -22,6 +30,9 @@
         start_date: defaultStart(),
     };
 
+    // Create handler passed to the form. On 409 with candidate details,
+    // populate `duplicates` and re-throw a message (so the form shows it)
+    // rather than navigating; other errors propagate unchanged.
     async function handleSubmit(value: Event) {
         duplicates = [];
         try {

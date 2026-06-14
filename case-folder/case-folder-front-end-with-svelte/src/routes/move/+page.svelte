@@ -1,4 +1,19 @@
 <script lang="ts">
+    // Move folder (`/move`) — record a folder placement / hand-off.
+    //
+    // The operator enters a patient's NHS Number; the page debounce-looks
+    // up that patient's folders, they pick one folder plus a destination
+    // (a cabinet, or "in transit" while a porter carries it), optionally a
+    // worker and reason, and submit. The move round-trips through
+    // `cache.recordMove`, which also patches the cached folder location.
+    //
+    // The form can be deep-linked: `?folder=<id>` (from the scan page) or
+    // `?nhs=<number>` pre-fills the relevant fields via the $effect below.
+    //
+    // State: form fields (nhsNumber/folderId/toCabinetId/workerId/movedBy/
+    // reason), per-field error strings, a success message, the live
+    // patientFolders pane, and the debounce timer handle.
+
     import { page } from '$app/state';
     import { cache } from '$lib/store/cache.svelte';
     import { api, ApiError } from '$lib/api/client';
@@ -30,6 +45,9 @@
     let patientFolders = $state<Folder[]>([]);
     let lookupDebounce: ReturnType<typeof setTimeout> | null = null;
 
+    // Fetch this patient's folders into the side pane / folder picker.
+    // Only queries once the NHS Number is a complete 10 digits; otherwise
+    // clears the pane.
     async function lookupFolders(nhs: string) {
         if (normaliseNhsNumber(nhs).length !== 10) {
             patientFolders = [];
@@ -43,6 +61,8 @@
         }
     }
 
+    // Debounce the lookup so we don't hit the API on every keystroke
+    // while the porter types/scans the number.
     function onNhsInput() {
         if (lookupDebounce) clearTimeout(lookupDebounce);
         lookupDebounce = setTimeout(() => lookupFolders(nhsNumber), 300);
@@ -67,12 +87,14 @@
         }
     });
 
+    // Map a folder status to a Badge colour for the side pane.
     function badgeType(status: string): 'success' | 'warning' | 'info' | 'default' {
         if (status === 'in-cabinet') return 'success';
         if (status === 'in-transit') return 'warning';
         return 'default';
     }
 
+    // Validate, record the move, and report success/failure inline.
     async function handleSubmit() {
         nhsError = '';
         folderError = '';
@@ -88,6 +110,8 @@
         }
         if (nhsError || folderError) return;
 
+        // The sentinel "__transit" and the empty option both mean "no
+        // cabinet" (folder in transit); send null in both cases.
         const target = toCabinetId === '__transit' || toCabinetId === '' ? null : toCabinetId;
         try {
             const event = await cache.recordMove({

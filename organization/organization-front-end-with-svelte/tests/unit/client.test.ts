@@ -2,6 +2,10 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { ApiClient, ApiError } from "$lib/api/client";
 import { auth } from "$lib/auth.svelte";
 
+// Pins the ApiClient transport: JSON parsing, URL joining, body
+// serialization, bearer-token precedence (store vs explicit vs null),
+// and ApiError construction across the error paths.
+
 /** A fake `fetch` that records the last call and returns a canned response. */
 function fakeFetch(
   status: number,

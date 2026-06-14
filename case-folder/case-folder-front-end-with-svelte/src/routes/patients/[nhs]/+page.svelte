@@ -1,4 +1,13 @@
 <script lang="ts">
+    // Patient detail (`/patients/[nhs]`) — one patient's record.
+    //
+    // Keyed by NHS Number. Shows the addressograph box, the patient's
+    // folders, and their move history. When the central Patient Service
+    // has no record (`patientServiceMatch` false), a warning explains the
+    // folders are reconstructed from local snapshots. The ButtonBar mimics
+    // a clinical record's action set; only a few actions are live in this
+    // demo (see `onAction`).
+
     import { goto } from '$app/navigation';
 
     import BackLink from '$lib/components/BackLink/BackLink.svelte';

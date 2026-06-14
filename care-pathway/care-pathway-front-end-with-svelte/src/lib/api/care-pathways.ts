@@ -11,17 +11,40 @@ import type {
     ScoredRef,
 } from "./types";
 
+/**
+ * Resource-bound facade over {@link ApiClient} for the care-pathway REST
+ * endpoints. Each method maps to one endpoint, URL-encodes path/query
+ * params, and returns the typed body (throwing {@link ApiError} on non-2xx
+ * via the underlying client).
+ */
 export class CarePathwayRepository {
+    /** @param http - The configured low-level JSON client to delegate to. */
     constructor(private readonly http: ApiClient) {}
 
+    /**
+     * Convenience constructor wiring an {@link ApiClient} to {@link API_BASE_URL}.
+     *
+     * @param fetchFn - Optional `fetch` to inject (e.g. SvelteKit `load`
+     *   fetch or a test fake); defaults to the global `fetch`.
+     * @returns A ready-to-use repository.
+     */
     static withFetch(fetchFn?: typeof fetch): CarePathwayRepository {
         return new CarePathwayRepository(new ApiClient({ baseUrl: API_BASE_URL, fetch: fetchFn }));
     }
 
+    /**
+     * List all care pathways.
+     * @returns `{pid, name}` references for every pathway.
+     */
     list(): Promise<PathwayRef[]> {
         return this.http.get<PathwayRef[]>("/api/care-pathways");
     }
 
+    /**
+     * Case-insensitive name search (server-side `ILIKE`, capped at 50 rows).
+     * @param q - The free-text query; URL-encoded into the `q` param.
+     * @returns Matching `{pid, name}` references.
+     */
     /// Case-insensitive name search (`ILIKE`, cap 50). `q` is URL-encoded.
     search(q: string): Promise<PathwayRef[]> {
         return this.http.get<PathwayRef[]>(
@@ -29,29 +52,66 @@ export class CarePathwayRepository {
         );
     }
 
+    /**
+     * Fetch one full care-pathway record by pid.
+     * @param pid - Persistent identifier; URL-encoded into the path.
+     * @returns The full {@link CarePathway}.
+     */
     get(pid: string): Promise<CarePathway> {
         return this.http.get<CarePathway>(`/api/care-pathways/${encodeURIComponent(pid)}`);
     }
 
+    /**
+     * Create a new care pathway.
+     * @param pathway - The record to create (only `name` is required).
+     * @returns The new record's `{pid, name}` reference.
+     */
     create(pathway: CarePathway): Promise<PathwayRef> {
         return this.http.post<PathwayRef>("/api/care-pathways", { body: pathway });
     }
 
+    /**
+     * Replace an existing care pathway.
+     * @param pid - Persistent identifier; URL-encoded into the path.
+     * @param pathway - The full replacement record.
+     * @returns The updated record's `{pid, name}` reference.
+     */
     update(pid: string, pathway: CarePathway): Promise<PathwayRef> {
         return this.http.put<PathwayRef>(`/api/care-pathways/${encodeURIComponent(pid)}`, {
             body: pathway,
         });
     }
 
+    /**
+     * Soft-delete a care pathway. The service returns an empty body.
+     * @param pid - Persistent identifier; URL-encoded into the path.
+     */
     remove(pid: string): Promise<void> {
         return this.http.delete(`/api/care-pathways/${encodeURIComponent(pid)}`);
     }
 
+    /**
+     * Score a candidate record against the stored pathways for duplicates.
+     * @param query - The record to match (typically the current detail record).
+     * @returns Scored candidate references, ordered by the service.
+     */
     /// Match a query against the stored care pathways.
     checkDuplicates(query: CarePathway): Promise<ScoredRef[]> {
         return this.http.post<ScoredRef[]>("/api/care-pathways/check-duplicates", { body: query });
     }
 
+    /**
+     * Merge a duplicate into a survivor. Both pids travel in the request
+     * body (not the URL); the survivor's refreshed record is returned.
+     *
+     * @param mainPid - The survivor (main) pid that absorbs the duplicate.
+     * @param duplicatePid - The duplicate pid to fold in and soft-delete.
+     * @param reason - Optional free-text reason recorded with the merge;
+     *   omitted from the body entirely when undefined.
+     * @returns The {@link MergeResult} with the survivor's refreshed record.
+     * @throws {ApiError} `422` when the two pids are equal; `404` for an
+     *   unknown pid.
+     */
     /// Merge a duplicate into a survivor. Both pids travel in the body;
     /// returns the survivor's refreshed record. `422` for equal pids,
     /// `404` for an unknown pid.
@@ -60,12 +120,19 @@ export class CarePathwayRepository {
             main_pid: mainPid,
             duplicate_pid: duplicatePid,
         };
+        // Only include `reason` when supplied, so the body is byte-stable
+        // (the unit tests assert the exact serialized shape).
         if (reason !== undefined) {
             body.reason = reason;
         }
         return this.http.post<MergeResult>("/api/care-pathways/merge", { body });
     }
 
+    /**
+     * Fetch the audit trail for one pathway (service orders most-recent first).
+     * @param pid - Persistent identifier; URL-encoded into the path.
+     * @returns The audit-log entries for the pathway.
+     */
     /// Audit trail for one care pathway, most-recent first. `pid` is
     /// URL-encoded.
     audit(pid: string): Promise<AuditEntry[]> {
@@ -74,6 +141,13 @@ export class CarePathwayRepository {
         );
     }
 
+    /**
+     * Fetch recent system-wide CRUD/merge events from the in-memory stream.
+     * The service returns them roughly oldest-first (highest `seq` last);
+     * the caller re-sorts newest-first for display.
+     *
+     * @returns The recent {@link PathwayEvent} rows.
+     */
     /// Recent system-wide CRUD/merge events from the service's in-memory
     /// stream. Returned roughly oldest-first (highest `seq` last); the UI
     /// sorts newest-first.

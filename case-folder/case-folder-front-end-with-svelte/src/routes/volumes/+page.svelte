@@ -1,4 +1,14 @@
 <script lang="ts">
+    // Volumes index (`/volumes`) — list of folder bundles + label printing.
+    //
+    // Lists every volume and opens a labels dialog to queue spine/box
+    // labels for printing. Label printing is a demo stub: `onPrint` just
+    // reports what would have been queued.
+    //
+    // State:
+    //   showLabels — controls the LabelsDialogBox open state.
+    //   printNote  — confirmation copy after a (simulated) print.
+
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import Badge from '$lib/components/Badge/Badge.svelte';
     import Alert from '$lib/components/Alert/Alert.svelte';
@@ -15,8 +25,10 @@
     let showLabels = $state(false);
     let printNote = $state('');
 
+    // Reduce volumes to the {id,title} shape the dialog's checklist needs.
     const labelOptions = $derived(data.volumes.map((v) => ({ id: v.id, title: v.title })));
 
+    // Demo stub: report the queued label/copy count instead of printing.
     function onPrint(detail: { selected: string[]; copies: number }) {
         const n = detail.selected.length;
         const copy = detail.copies === 1 ? 'copy' : 'copies';
@@ -27,12 +39,14 @@
         showLabels = false;
     }
 
+    // Status → Badge colour (green = located, amber = in transit).
     function badgeType(status: string): 'success' | 'warning' | 'default' {
         if (status === 'in-cabinet') return 'success';
         if (status === 'in-transit') return 'warning';
         return 'default';
     }
 
+    // The patient route is keyed by the bare (spaceless) NHS Number.
     function nhsSlug(nhs: string): string {
         return nhs.replaceAll(' ', '');
     }

@@ -1,4 +1,10 @@
 <script lang="ts">
+    // Move-event detail (`/history/[id]`) — one audited folder move.
+    //
+    // Render-only. Shows the move (folder, patient, from/to cabinets,
+    // who moved it, reason) and cross-links to the patient's other
+    // folders supplied by the load function.
+
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import Badge from '$lib/components/Badge/Badge.svelte';
     import Separator from '$lib/components/Separator/Separator.svelte';
@@ -8,12 +14,14 @@
     let { data } = $props();
     const move = $derived(data.move);
 
+    // Folder status → Badge colour (green = located, amber = in transit).
     function badgeType(status: string): 'success' | 'warning' | 'default' {
         if (status === 'in-cabinet') return 'success';
         if (status === 'in-transit') return 'warning';
         return 'default';
     }
 
+    // The patient route is keyed by the bare (spaceless) NHS Number.
     function nhsSlug(nhs: string): string {
         return nhs.replaceAll(' ', '');
     }

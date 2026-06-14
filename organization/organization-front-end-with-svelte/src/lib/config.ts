@@ -30,10 +30,14 @@ export const AUTH_FRONTEND_URL: string =
  * SvelteKit `base`.
  */
 export function signInUrl(origin?: string, basePath?: string): string {
+    // Fall back to the live origin in the browser; "" under SSR/tests.
     const resolvedOrigin =
         origin ?? (typeof location !== "undefined" ? location.origin : "");
     const resolvedBase = basePath ?? base;
+    // Encode the whole origin+base as one query param value so its
+    // scheme/host slashes don't read as URL structure.
     const returnTo = encodeURIComponent(resolvedOrigin + resolvedBase);
+    // Trim any trailing slash so we never emit `//signin`.
     const root = AUTH_FRONTEND_URL.replace(/\/+$/, "");
     return `${root}/signin?return_to=${returnTo}`;
 }

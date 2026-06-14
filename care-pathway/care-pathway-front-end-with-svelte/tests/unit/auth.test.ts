@@ -24,6 +24,8 @@ function client(fetchImpl: { fn: typeof fetch }) {
   return new ApiClient({ baseUrl: "http://svc.test", fetch: fetchImpl.fn });
 }
 
+// Pins the reactive token store's set/clear round-trip via the public
+// token()/setToken()/clearToken() surface.
 describe("auth token store", () => {
   beforeEach(() => clearToken());
 
@@ -40,6 +42,9 @@ describe("auth token store", () => {
   });
 });
 
+// Pins the ApiClient ↔ store integration: header attached from the store
+// by default, omitted when empty, and the per-call token (string overrides;
+// explicit null suppresses) taking precedence over the store.
 describe("ApiClient reads the auth store by default", () => {
   beforeEach(() => clearToken());
 
@@ -75,6 +80,9 @@ describe("ApiClient reads the auth store by default", () => {
   });
 });
 
+// Pins the SSO-handoff fragment parser: extraction (incl. among several
+// params and without a leading '#'), URL-decoding, and the null cases
+// (empty hash, missing/blank access_token, garbage).
 describe("captureTokenFromHash", () => {
   it("extracts the token from a well-formed fragment", () => {
     expect(captureTokenFromHash("#access_token=abc.def.ghi")).toBe(

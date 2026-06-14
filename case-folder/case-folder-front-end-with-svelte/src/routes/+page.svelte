@@ -1,4 +1,11 @@
 <script lang="ts">
+    // Dashboard (`/`) — at-a-glance overview of the folder estate.
+    //
+    // Reads everything reactively from the cache hydrated by `+page.ts`:
+    // headline stats (patients / in-cabinet / in-transit / places /
+    // 24h moves), the full folder register grid, the five most recent
+    // moves, and per-cabinet utilisation. Render-only; no local state.
+
     import { cache } from '$lib/store/cache.svelte';
 
     import Card from '$lib/components/Card/Card.svelte';
@@ -91,10 +98,13 @@
         <h2 id="cabinet-util">Cabinet utilisation</h2>
         <SummaryList label="Cabinet utilisation">
             {#each cabinets as c (c.id)}
+                <!-- Capacity may be null (uncapped); treat as 0 so the
+                     percentage maths is skipped and we show ∞ / — instead. -->
                 {@const cap = c.capacity ?? 0}
                 {@const percent = cap > 0 ? Math.round((c.folderCount / cap) * 100) : 0}
                 <SummaryListItem term={c.label}>
                     <span>{c.folderCount} / {cap || '∞'}</span>
+                    <!-- Traffic-light fill: red >85%, amber >60%, else green. -->
                     <Badge type={percent > 85 ? 'error' : percent > 60 ? 'warning' : 'success'}>
                         {cap > 0 ? `${percent}%` : '—'}
                     </Badge>

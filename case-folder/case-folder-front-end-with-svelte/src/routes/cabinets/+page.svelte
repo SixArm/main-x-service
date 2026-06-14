@@ -1,4 +1,11 @@
 <script lang="ts">
+    // Cabinets index (`/cabinets`) — every cabinet with its location and
+    // occupancy.
+    //
+    // Render-only. `rows` walks the place hierarchy (cabinet → room →
+    // building) via the cache lookups to resolve names, and computes a
+    // utilisation percentage from folderCount / capacity.
+
     import { cache } from '$lib/store/cache.svelte';
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import Badge from '$lib/components/Badge/Badge.svelte';
@@ -8,8 +15,10 @@
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
 
+    // Resolve each cabinet's room/building names and occupancy percentage.
     const rows = $derived(
         cache.cabinets.map((c) => {
+            // null capacity ⇒ uncapped, so skip the percentage maths.
             const cap = c.capacity ?? 0;
             const percent = cap > 0 ? Math.round((c.folderCount / cap) * 100) : 0;
             const room = cache.roomById(c.roomId);
@@ -23,6 +32,7 @@
         })
     );
 
+    // Traffic-light occupancy badge: red >85%, amber >60%, else green.
     function utilType(percent: number): 'success' | 'warning' | 'error' {
         if (percent > 85) return 'error';
         if (percent > 60) return 'warning';

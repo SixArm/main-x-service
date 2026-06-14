@@ -1,3 +1,16 @@
+<!--
+  EventGrid — tabular event list backed by the SVAR (wx-svelte-grid)
+  DataGrid. Maps each Event to a flat display row, and emits the original
+  Event when a row is selected.
+
+  Props:
+    - events (Event[]): events to display.
+    - onselect ((event) => void, optional): fired with the full Event when a
+      row is selected.
+
+  State:
+    - data ($derived): display rows recomputed whenever `events` changes.
+-->
 <script lang="ts">
     import { Grid } from "wx-svelte-grid";
     import type { Event } from "$lib/api/types.js";
@@ -10,6 +23,7 @@
         onselect?: (event: Event) => void;
     } = $props();
 
+    // Static column definitions for the SVAR grid (id matches the row keys below).
     const columns = [
         { id: "id", header: "ID", width: 220 },
         { id: "name", header: "Name", width: 240 },
@@ -19,6 +33,8 @@
         { id: "attendance_mode", header: "Mode", width: 100 },
     ];
 
+    // Flatten/format each Event into a primitive row for the grid; nullable
+    // fields collapse to "" and the start date is localized for display.
     const data = $derived(
         events.map((e) => ({
             id: e.id ?? "",
@@ -30,6 +46,8 @@
         })),
     );
 
+    // Grid init hook: subscribe to row selection and map the selected row id
+    // back to the original Event before invoking the parent callback.
     function initGrid(api: { on(action: string, cb: (ev: { id: string | number }) => void): void }) {
         api.on("select-row", (ev) => {
             const found = events.find((e) => e.id === String(ev.id));

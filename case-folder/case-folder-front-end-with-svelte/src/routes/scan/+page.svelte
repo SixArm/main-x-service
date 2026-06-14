@@ -1,4 +1,19 @@
 <script lang="ts">
+    // Scan (`/scan`) — the Scan4Safety fast path to a folder.
+    //
+    // A keyboard-wedge barcode scanner (or manual typing) feeds the single
+    // input; submitting routes to the matching folder so a move can be
+    // recorded. Accepts either a folder UUID (barcode encodes the id) or
+    // an NHS Number; the input is classified by shape and queried on the
+    // right endpoint. No scanner hardware/integration is required — the
+    // scanner just types digits into the box.
+    //
+    // State:
+    //   term     — the scanned/typed search string.
+    //   results  — matching folders (one for a UUID, possibly many by NHS).
+    //   searched — true once a scan completed, to switch "no results" copy.
+    //   errorMsg — non-404 API failure to surface in an alert.
+
     import { api, ApiError } from '$lib/api/client';
     import { formatNhsNumber } from '$lib/store/nhs';
     import type { Folder } from '$lib/store/types';
@@ -17,6 +32,8 @@
     let searched = $state(false);
     let errorMsg = $state('');
 
+    // Distinguishes a scanned folder id (UUID v4 shape) from an NHS Number
+    // so `scan()` can pick the exact-show vs. NHS-list endpoint.
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     function badgeType(status: string): 'success' | 'warning' | 'default' {
@@ -33,13 +50,16 @@
         if (!raw) return;
         try {
             if (UUID.test(raw)) {
+                // Barcode encoded the folder id — fetch that one folder.
                 results = [await api.folders.show(raw)];
             } else {
+                // Treat the input as an NHS Number; normalise then list.
                 const list = await api.folders.list({ nhsNumber: formatNhsNumber(raw) });
                 results = list.items;
             }
             searched = true;
         } catch (e) {
+            // A 404 is a valid "no match" outcome, not an error to show.
             if (e instanceof ApiError && e.status === 404) {
                 searched = true;
             } else {

@@ -1,3 +1,10 @@
+// Volume detail (`/volumes/[id]`) load function.
+//
+// Loads the volume (with its folders + move history) alongside the
+// cabinet list (move destinations). Then computes the set of folders
+// that could still be ADDED to the volume: this patient's folders that
+// aren't already in it. 404 if the volume is unknown, else 503.
+
 import { api, ApiError } from '$lib/api/client';
 import { cache } from '$lib/store/cache.svelte';
 import { error } from '@sveltejs/kit';

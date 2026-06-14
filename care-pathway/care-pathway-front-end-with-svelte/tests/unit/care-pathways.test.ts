@@ -25,6 +25,10 @@ const pathway: CarePathway = {
   name: "Acute Stroke Care Pathway",
 } as CarePathway;
 
+// Pins every repository method to its exact endpoint contract: HTTP verb,
+// URL (incl. pid/q URL-encoding), and request body shape — notably the
+// check-duplicates path (regression guard against `/duplicates`) and merge
+// carrying main/duplicate/reason in the body (not the URL).
 describe("CarePathwayRepository", () => {
   it("list() GETs the collection", async () => {
     const { repo, calls } = spyClient();

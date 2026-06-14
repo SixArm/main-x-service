@@ -1,4 +1,10 @@
 <script lang="ts">
+    // Folder detail (`/folders/[id]`) — one folder's record and timeline.
+    //
+    // Render-only: shows the folder summary (patient, cabinet, volume,
+    // status, last moved, notes), a "Move this folder" shortcut, and the
+    // full move history. Data comes from the load function's page data.
+
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import Badge from '$lib/components/Badge/Badge.svelte';
     import SummaryList from '$lib/components/SummaryList/SummaryList.svelte';
@@ -10,12 +16,14 @@
     const folder = $derived(data.folder);
     const history = $derived(data.history);
 
+    // Folder status → Badge colour (green = located, amber = in transit).
     function badgeType(status: string): 'success' | 'warning' | 'info' | 'default' {
         if (status === 'in-cabinet') return 'success';
         if (status === 'in-transit') return 'warning';
         return 'default';
     }
 
+    // The patient route is keyed by the bare (spaceless) NHS Number.
     function nhsSlug(nhs: string): string {
         return nhs.replaceAll(' ', '');
     }

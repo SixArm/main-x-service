@@ -1,4 +1,12 @@
 <script lang="ts">
+    // Move history (`/history`) — the full move audit log, filterable.
+    //
+    // Same URL-driven, debounced search pattern as the folders list: the
+    // filter lives in `?q=`, so the load function re-fetches and the
+    // result is shareable and reload-safe. The table reads `cache.moves`.
+    //
+    // State: `query` (mirrors the URL term) + the debounce timer handle.
+
     import { goto } from '$app/navigation';
     import { cache } from '$lib/store/cache.svelte';
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
@@ -11,11 +19,15 @@
     let { data } = $props();
 
     let query = $state('');
+    // Re-sync the box when load data changes (back/forward navigation).
     $effect.pre(() => {
         query = data.query;
     });
     let debounce: ReturnType<typeof setTimeout> | null = null;
 
+    // Push the trimmed filter into the URL after an idle, driving a
+    // refetch. replaceState avoids per-keystroke history; keepFocus holds
+    // the cursor in the box.
     function onSearchInput() {
         if (debounce) clearTimeout(debounce);
         debounce = setTimeout(() => {

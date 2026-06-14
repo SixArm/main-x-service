@@ -1,3 +1,10 @@
+<!--
+  Events list page (route "/events") — search box + facet filters feeding
+  the SVAR EventGrid; selecting a row navigates to the detail page.
+
+  State ($state): query text, results (events/total), loading/error flags,
+  and the date/status/type filter values.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import SearchBox from "$lib/components/SearchBox.svelte";
@@ -16,8 +23,11 @@
     let statusFilter = $state<EventStatus | "">("");
     let typeFilter = $state<EventType | "">("");
 
+    // One repository per page (no global HTTP store, per project rules).
     const repo = EventRepository.withFetch();
 
+    // Run a search with the current filters; empty query becomes "*" (all).
+    // Empty filter strings are sent as undefined so they are omitted.
     async function runSearch(q: string) {
         loading = true;
         error = null;
@@ -41,10 +51,12 @@
         }
     }
 
+    // Grid row selection → navigate to that event's detail page.
     function openEvent(event: Event) {
         if (event.id) goto(`/events/${event.id}`);
     }
 
+    // Run an initial unfiltered search once the component is set up.
     $effect(() => {
         void runSearch("");
     });

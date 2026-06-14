@@ -1,3 +1,14 @@
+<!--
+  Courses list (route "/courses") — search box + checkbox toggles over
+  a CourseGrid. Loads all courses on mount and re-queries on each
+  search submit; selecting a grid row navigates to that course's
+  detail page.
+
+  Reactive state:
+    - query / fuzzy — search inputs.
+    - courses / total — last result set and its count.
+    - loading / error — request status.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import SearchBox from "$lib/components/SearchBox.svelte";
@@ -14,6 +25,7 @@
 
     const repo = CourseRepository.withFetch();
 
+    // Run a search and update state; clears results on error.
     async function runSearch(q: string) {
         loading = true;
         error = null;
@@ -35,10 +47,12 @@
         }
     }
 
+    // Navigate to the detail page for a selected grid row.
     function openCourse(course: Course) {
         if (course.id) goto(`/courses/${course.id}`);
     }
 
+    // Initial load: empty query ⇒ "show all" (see runSearch above).
     $effect(() => {
         void runSearch("");
     });

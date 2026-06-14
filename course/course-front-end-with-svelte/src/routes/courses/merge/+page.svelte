@@ -1,3 +1,15 @@
+<!--
+  Merge courses (route "/courses/merge") — operator enters a main
+  (surviving) and a duplicate course ID, optionally previews both, then
+  merges. The duplicate is soft-deleted into the main; on success a
+  merge record and a link to the surviving course are shown.
+
+  Reactive state:
+    - mainId / duplicateId / reason — merge inputs.
+    - preview — optionally-loaded main/duplicate courses for confirmation.
+    - result — the MergeResponse on success.
+    - loading / error — request status and validation/error messages.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -16,6 +28,7 @@
     let error = $state<string | null>(null);
     let loading = $state(false);
 
+    // Fetch whichever IDs are filled, in parallel, for the preview pane.
     async function loadPreview() {
         preview = { main: null, duplicate: null };
         error = null;
@@ -30,11 +43,13 @@
         }
     }
 
+    // Validate the two IDs, confirm, then run the merge.
     async function doMerge() {
         if (!mainId || !duplicateId) {
             error = "Both IDs required";
             return;
         }
+        // Guard against merging a record into itself.
         if (mainId === duplicateId) {
             error = "Main and duplicate must differ";
             return;
@@ -59,6 +74,7 @@
         }
     }
 
+    // One-line label for a preview course: name plus optional type.
     function summary(p: Course | null): string {
         if (!p) return "—";
         return `${p.name}${p.additional_type ? ` (${p.additional_type})` : ""}`;

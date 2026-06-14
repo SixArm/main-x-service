@@ -1,4 +1,15 @@
 <script lang="ts">
+    // Volume detail (`/volumes/[id]`) — manage one movable bundle.
+    //
+    // A volume groups several of a patient's folders so they move together.
+    // This page supports four mutations: rename, add a candidate folder,
+    // remove a folder, and move the whole volume. Each goes through the
+    // shared `run()` wrapper, which surfaces errors and then calls
+    // `invalidateAll()` so the load function re-fetches the canonical state
+    // (folders list, candidates, history) rather than patching locally.
+    //
+    // State: editable `title`, the add/move form fields, and `pageError`.
+
     import { invalidateAll } from '$app/navigation';
     import { cache } from '$lib/store/cache.svelte';
     import { api, ApiError } from '$lib/api/client';
@@ -21,6 +32,8 @@
     const folders = $derived(data.detail.folders);
     const history = $derived(data.detail.history);
 
+    // Editable rename field, re-seeded from load data on each navigation
+    // / invalidate so it reflects the latest persisted title.
     let title = $state('');
     $effect.pre(() => {
         title = data.detail.volume.title;
@@ -31,16 +44,21 @@
     let moveReason = $state('');
     let pageError = $state('');
 
+    // Folder status → Badge colour (green = located, amber = in transit).
     function badgeType(status: string): 'success' | 'warning' | 'default' {
         if (status === 'in-cabinet') return 'success';
         if (status === 'in-transit') return 'warning';
         return 'default';
     }
 
+    // The patient route is keyed by the bare (spaceless) NHS Number.
     function nhsSlug(nhs: string): string {
         return nhs.replaceAll(' ', '');
     }
 
+    // Shared mutation runner: clear the error, perform the action, then
+    // re-load page data (so the UI shows the server's authoritative state).
+    // Any failure is captured into `pageError` for the alert banner.
     async function run(action: () => Promise<unknown>) {
         pageError = '';
         try {
@@ -51,6 +69,8 @@
         }
     }
 
+    // The four volume mutations, each wrapped by `run()`. Add/move also
+    // reset their form field on success.
     const rename = () => run(() => api.volumes.rename(volume.id, title.trim()));
     const addFolder = () => {
         if (!addFolderId) return;

@@ -1,4 +1,9 @@
 <script lang="ts">
+    // Alerts (`/alerts`) — geofence-breach log.
+    //
+    // Render-only. Lists moves whose origin and destination cabinets sit
+    // in different buildings (a folder leaving its building), newest first.
+
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import Badge from '$lib/components/Badge/Badge.svelte';
     import Icon from '$lib/components/Icon/Icon.svelte';
@@ -10,6 +15,7 @@
 
     let { data } = $props();
 
+    // The patient route is keyed by the bare (spaceless) NHS Number.
     function nhsSlug(nhs: string): string {
         return nhs.replaceAll(' ', '');
     }

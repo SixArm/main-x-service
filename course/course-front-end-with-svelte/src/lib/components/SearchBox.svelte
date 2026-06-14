@@ -1,3 +1,13 @@
+<!--
+  SearchBox — a `role="search"` form with one search input and a submit
+  button. Fires `onsearch` only on submit (not per keystroke), so the
+  parent controls when a query actually runs.
+
+  $props:
+    - value?: string ($bindable) — the current query text.
+    - placeholder?: string — input placeholder + aria-label (default "Search…").
+    - onsearch?: (value) => void — invoked with the query on submit.
+-->
 <script lang="ts">
     let {
         value = $bindable(""),
@@ -9,6 +19,7 @@
         onsearch?: (value: string) => void;
     } = $props();
 
+    // Prevent the native GET navigation; hand the query to the parent.
     function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         onsearch?.(value);

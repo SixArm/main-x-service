@@ -1,3 +1,8 @@
+// Pins the i18n catalog + reactive locale store: en/cy lookups, the
+// fallback chain (unknown locale → en, unknown key → the key itself),
+// that every locale covers the core keys, and that the reactive `i18n`
+// store reflects switches, reduces region subtags (cy-GB → cy), and falls
+// back to the default for an unsupported locale.
 import { describe, it, expect, beforeEach } from "vitest";
 import {
     translate,

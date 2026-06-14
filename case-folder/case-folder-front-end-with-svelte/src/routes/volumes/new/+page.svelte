@@ -1,4 +1,13 @@
 <script lang="ts">
+    // New volume (`/volumes/new`) — create an empty volume for a patient.
+    //
+    // Validates the NHS Number client-side (Modulus-11) and requires a
+    // title. The patient must already exist (folders are added afterwards
+    // on the detail page). On success, routes to the new volume. 422
+    // field errors are mapped back onto the form.
+    //
+    // State: nhsNumber/title/cabinetId fields + per-field + submit errors.
+
     import { goto } from '$app/navigation';
     import { cache } from '$lib/store/cache.svelte';
     import { api, ApiError } from '$lib/api/client';
@@ -24,6 +33,7 @@
         titleError = '';
         submitError = '';
 
+        // Client-side Modulus-11 gate before contacting the server.
         const formatted = formatNhsNumber(nhsNumber);
         if (!isValidNhsNumber(formatted)) {
             nhsError = 'Enter a valid 10-digit NHS Number (Modulus 11 check failed).';

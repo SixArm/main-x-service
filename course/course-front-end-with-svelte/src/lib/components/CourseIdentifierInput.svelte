@@ -1,3 +1,15 @@
+<!--
+  CourseIdentifierInput — editor for the repeating list of course
+  identifiers (scheme + value + optional URL, with a "Custom…" scheme
+  that reveals a free-text label field). The `identifiers` array is
+  $bindable so edits flow straight back to the parent form's model.
+
+  $props:
+    - identifiers: CourseIdentifier[] ($bindable) — the list being edited.
+
+  Note: array entries are replaced (spread into new objects), never
+  mutated in place, so Svelte reactivity reliably re-renders rows.
+-->
 <script lang="ts">
     import type { IdentifierType, CourseIdentifier } from "$lib/api/types.js";
     import { IDENTIFIER_TYPE_OPTIONS, blankCourseIdentifier } from "$lib/api/types.js";
@@ -10,10 +22,13 @@
         identifiers: CourseIdentifier[];
     } = $props();
 
+    // True when this scheme is the { Custom: string } object variant.
     function isCustom(t: IdentifierType): t is { Custom: string } {
         return typeof t !== "string";
     }
 
+    // Change the scheme of row `idx`. The sentinel "Custom" dropdown
+    // value becomes an empty { Custom } object (label entered separately).
     function setType(idx: number, value: string) {
         const current = identifiers[idx];
         if (!current) return;
@@ -24,15 +39,18 @@
         }
     }
 
+    // Update the free-text label of a custom-scheme row.
     function setCustomLabel(idx: number, label: string) {
         const current = identifiers[idx];
         if (!current) return;
         identifiers[idx] = { ...current, property_id: { Custom: label } };
     }
 
+    // Append a fresh blank identifier row.
     function add() {
         identifiers = [...identifiers, blankCourseIdentifier()];
     }
+    // Remove row `idx` (rebuilds the array without that index).
     function remove(idx: number) {
         identifiers = identifiers.filter((_, i) => i !== idx);
     }

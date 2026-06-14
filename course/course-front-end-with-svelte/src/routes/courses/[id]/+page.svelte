@@ -1,3 +1,13 @@
+<!--
+  Course detail (route "/courses/[id]") — read-only view of one course:
+  identity fields, identifiers, teaches/keywords/alternate-names,
+  same-as URLs, and instances. Offers Edit / Audit links and a
+  soft-delete action. Loads the course client-side on mount.
+
+  Reactive state:
+    - id ($derived) — route param.
+    - course / loading / error — fetch result and status.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
@@ -22,6 +32,7 @@
         }
     });
 
+    // Confirm, then soft-delete and return to the list on success.
     async function handleDelete() {
         if (!confirm("Soft-delete this course? This cannot be undone via the UI.")) return;
         try {
@@ -32,18 +43,21 @@
         }
     }
 
+    // Display label for an identifier scheme (handles { Custom }).
     function identifierLabel(i: NonNullable<Course["identifiers"]>[number]): string {
         return typeof i.property_id === "string"
             ? i.property_id
             : `Custom: ${i.property_id.Custom}`;
     }
 
+    // Display label for educational level; "—" when unset.
     function levelLabel(c: Course): string {
         const l = c.educational_level;
         if (!l) return "—";
         return typeof l === "string" ? l : `Custom: ${l.Custom}`;
     }
 
+    // Headline for an instance: prefer its name, else "date · mode".
     function instanceLabel(inst: CourseInstance): string {
         if (inst.name) return inst.name;
         const when = inst.schedule?.start_date ? new Date(inst.schedule.start_date).toLocaleDateString() : "(no date)";

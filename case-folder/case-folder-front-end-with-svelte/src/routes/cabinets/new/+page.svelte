@@ -1,4 +1,13 @@
 <script lang="ts">
+    // New cabinet (`/cabinets/new`) — create a cabinet inside a room.
+    //
+    // A cabinet must sit in a room (which sits in a building); if no rooms
+    // exist yet the form is disabled with guidance. Capacity is optional
+    // (blank ⇒ uncapped). On success routes back to the cabinets list.
+    //
+    // State: label/roomId/capacity/description fields + per-field errors.
+    // roomId defaults to the first cached room for convenience.
+
     import { goto } from '$app/navigation';
     import { cache } from '$lib/store/cache.svelte';
     import { ApiError } from '$lib/api/client';
@@ -18,6 +27,8 @@
     let roomError = $state('');
     let submitError = $state('');
 
+    // Label each room with its building so the picker is unambiguous when
+    // two buildings have similarly-named rooms.
     const roomOptions = $derived(
         cache.rooms.map((r) => ({
             id: r.id,
@@ -36,6 +47,7 @@
             await cache.addCabinet({
                 label: label.trim(),
                 roomId,
+                // Blank ⇒ uncapped (null); otherwise coerce to a sane ≥1 integer.
                 capacity: capacity === '' ? null : Math.max(1, Number(capacity) || 1),
                 description: description.trim() || undefined
             });

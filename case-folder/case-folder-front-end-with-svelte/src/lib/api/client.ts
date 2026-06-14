@@ -29,6 +29,12 @@ import type { components } from './schema';
 
 const DEFAULT_BASE = '';
 
+/**
+ * Resolve the API origin. Reads `VITE_API_BASE_URL` (trailing slash
+ * trimmed); falls back to '' so requests are same-origin and the dev
+ * server proxies `/api` to Loco, keeping the session cookie first-party.
+ * @returns The base URL prefix ('' for same-origin).
+ */
 function baseUrl(): string {
     const fromEnv =
         typeof import.meta !== 'undefined' &&
@@ -36,7 +42,21 @@ function baseUrl(): string {
     return (fromEnv && fromEnv.replace(/\/$/, '')) || DEFAULT_BASE;
 }
 
+/**
+ * Error thrown by every failed API call.
+ *
+ * Carries the HTTP `status` (0 when the request never reached the server,
+ * e.g. a network failure) and the parsed response `body` (when any), so
+ * callers can branch on status (401 / 404 / 422 …) and read structured
+ * field errors out of the body.
+ */
 export class ApiError extends Error {
+    /**
+     * @param message - Human-readable error message (server `error` field
+     *   when present, else a synthesised description).
+     * @param status - HTTP status code, or 0 if the request never completed.
+     * @param body - Parsed JSON response body, or null.
+     */
     constructor(
         message: string,
         public readonly status: number,
@@ -53,6 +73,23 @@ interface RequestOpts {
     fetchImpl?: typeof fetch;
 }
 
+/**
+ * Core fetch wrapper used by every endpoint below.
+ *
+ * Prefixes {@link baseUrl}, JSON-encodes the body (and only sets the
+ * content-type header when there is one), always sends credentials so the
+ * HttpOnly session cookie flows, parses the JSON response, and converts any
+ * transport failure or non-2xx response into an {@link ApiError}.
+ *
+ * In `+page.ts` load functions, pass SvelteKit's `fetch` via
+ * `opts.fetchImpl` so requests participate in SSR/load dedup + relative URLs.
+ *
+ * @typeParam T - The expected (wire-shaped) response type.
+ * @param path - Request path beginning with `/api/...`.
+ * @param opts - Method, JSON body, and optional fetch implementation.
+ * @returns The parsed response body as `T`.
+ * @throws {ApiError} On network failure (status 0) or any non-2xx response.
+ */
 async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
     const f = opts.fetchImpl ?? fetch;
     const init: RequestInit = {
@@ -85,6 +122,11 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
 
 // ---------------------------------------------------------------------------
 // snake_case → camelCase mappers
+//
+// One `toX` function per resource translates the wire (snake_case) shape
+// into the app's camelCase domain type. They are the single boundary where
+// field renaming happens, so the rest of the app never sees snake_case.
+// A subset is re-exported at the bottom of the file for unit testing.
 // ---------------------------------------------------------------------------
 
 // Wire (snake_case) shapes come from the OpenAPI schema — the single
@@ -200,6 +242,7 @@ function toVolume(v: ApiVolume): Volume {
     };
 }
 
+/** A volume plus its current folders and move history (the show/mutate shape). */
 export interface VolumeDetail {
     volume: Volume;
     folders: Folder[];
@@ -297,6 +340,10 @@ function toStats(s: ApiStats): Stats {
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-call options for read endpoints. Pass SvelteKit's `fetch` from a
+ * load function so the request joins SSR/load dedup and uses relative URLs.
+ */
 export interface FetchOpts {
     fetch?: typeof fetch;
 }
@@ -307,6 +354,13 @@ interface ApiUser {
     role: string | null;
 }
 
+/**
+ * The typed API client: one namespace per resource (`auth`, `folders`,
+ * `patients`, `places`, `volumes`, `workers`, `moves`) plus top-level
+ * `stats` / `alerts`. Every method goes through {@link request} and returns
+ * camelCase domain types (mapped from the snake_case wire shapes), throwing
+ * {@link ApiError} on failure.
+ */
 export const api = {
     auth: {
         /// Ask for a magic-link email. Always resolves (the API answers

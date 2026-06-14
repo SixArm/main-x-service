@@ -1,3 +1,9 @@
+// Pins the end-to-end SPA behaviour with the auth API stubbed: the
+// signup/signin forms render and submit, the verify route consumes a token
+// and lands on the dashboard, the signed-in/signed-out home views, and —
+// crucially — the cross-origin handoff: an allowlisted (self-origin)
+// return_to receives the token in the URL fragment, while a foreign origin
+// is ignored and the token is never handed off.
 import { test, expect, type Page } from "@playwright/test";
 
 // Smoke tests over the auth SPA routes. The auth API is stubbed per-test

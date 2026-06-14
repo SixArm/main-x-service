@@ -1,3 +1,13 @@
+<!--
+  Course audit log (route "/courses/[id]/audit") — newest-first list of
+  audit entries for one course, each with action, timestamp, optional
+  actor, and an expandable JSON payload of the new values. Loads up to
+  100 entries client-side on mount.
+
+  Reactive state:
+    - id ($derived) — route param.
+    - entries / loading / error — fetch result and status.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";

@@ -1,3 +1,9 @@
+// Unit tests for the NHS Number helpers (normalise / format / validate).
+// These pin the contracts the create/move forms rely on: digit-stripping,
+// progressive 3-3-4 grouping as the user types, and — most importantly —
+// the Modulus 11 checksum, including its two special cases (check digit 0
+// when the remainder yields 11, and outright rejection when it yields 10).
+
 import { describe, it, expect } from 'vitest';
 import { normaliseNhsNumber, formatNhsNumber, isValidNhsNumber } from './nhs';
 

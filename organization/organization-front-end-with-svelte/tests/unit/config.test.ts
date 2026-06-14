@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { signInUrl, AUTH_FRONTEND_URL } from "$lib/config";
 
+// Pins the SSO sign-in URL builder: encoded `return_to` (origin + base),
+// and no double slash when the configured auth base has a trailing one.
 describe("signInUrl", () => {
   it("builds the auth front-end sign-in URL with an encoded return_to", () => {
     const url = signInUrl("http://localhost:4173", "");

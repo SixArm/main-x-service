@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { signInUrl, AUTH_FRONTEND_URL } from "$lib/config";
 
+// Pins signInUrl's URL construction: encoded return_to (origin + base
+// rides in one query param), base-path inclusion, and trailing-slash
+// trimming so the result never doubles to `//signin`.
 describe("signInUrl", () => {
   it("builds the auth front-end sign-in URL with an encoded return_to", () => {
     const url = signInUrl("http://localhost:4173", "");

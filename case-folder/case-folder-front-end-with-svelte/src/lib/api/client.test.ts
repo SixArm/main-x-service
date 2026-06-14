@@ -1,3 +1,9 @@
+// Unit tests for the API client's pure boundary logic: the snake_case →
+// camelCase mappers (one per resource, including the tricky nested stats
+// and the volume-bearing folder shape) and the ApiError carrier. These pin
+// the field-renaming contract the rest of the app depends on; the HTTP
+// `request` wrapper itself is exercised indirectly elsewhere.
+
 import { describe, it, expect } from 'vitest';
 import {
     ApiError,

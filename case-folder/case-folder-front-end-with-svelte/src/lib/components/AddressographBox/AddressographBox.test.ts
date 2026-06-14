@@ -1,3 +1,7 @@
+// Pins that the addressograph renders the patient's name, NHS Number and
+// date of birth inside a properly-labelled ARIA region (so it reads like
+// the physical patient-ID sticker it mimics).
+
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/svelte';
 import AddressographBox from './AddressographBox.svelte';

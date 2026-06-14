@@ -1,3 +1,12 @@
+<!--
+  SearchBox — a single-input search form that emits the query on submit.
+
+  Props:
+    - value (string, $bindable, default ""): the current query text; two-way
+      bindable so a parent can read/seed it.
+    - placeholder (string, default "Search…"): input placeholder + aria-label.
+    - onsearch ((value) => void, optional): callback fired on submit.
+-->
 <script lang="ts">
     let {
         value = $bindable(""),
@@ -9,6 +18,7 @@
         onsearch?: (value: string) => void;
     } = $props();
 
+    // Intercept native submit (no page reload) and forward the query upward.
     function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         onsearch?.(value);

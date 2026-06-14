@@ -1,10 +1,15 @@
+// Unit tests for ApiClient: envelope unwrapping, error mapping, query
+// building, and 204 handling. All HTTP is stubbed via an injected fetch.
 import { describe, expect, it } from "vitest";
 import { ApiClient, ApiError } from "../../src/lib/api/client";
 
+// Cast a plain async function to the `fetch` type so it can be injected
+// as the client's fetch implementation (no real network involved).
 function mockFetch(impl: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
     return impl as unknown as typeof fetch;
 }
 
+// Build a JSON Response with the given body/status for the stubbed fetch.
 function jsonResponse(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), {
         status,
@@ -13,6 +18,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe("ApiClient", () => {
+    // Pins: a 2xx success envelope is unwrapped to its `data` payload.
     it("unwraps ApiResponse.data on success", async () => {
         const client = new ApiClient({
             baseUrl: "http://localhost:8080",
@@ -24,6 +30,8 @@ describe("ApiClient", () => {
         expect(data).toEqual({ id: "abc" });
     });
 
+    // Pins: a non-2xx response throws an ApiError carrying the envelope's
+    // status, code, and message.
     it("throws ApiError with parsed envelope on non-2xx", async () => {
         const client = new ApiClient({
             baseUrl: "http://localhost:8080",
@@ -42,6 +50,8 @@ describe("ApiClient", () => {
         });
     });
 
+    // Pins: a 409 maps to ApiError.isConflict === true and preserves
+    // `details` (used to surface duplicate candidates on create).
     it("exposes ApiError.isConflict for 409 duplicate detection", async () => {
         const client = new ApiClient({
             baseUrl: "http://localhost:8080",
@@ -62,6 +72,8 @@ describe("ApiClient", () => {
         }
     });
 
+    // Pins: defined query params are serialized; undefined/null ones are
+    // omitted from the URL.
     it("appends query string parameters and skips nullish values", async () => {
         let capturedUrl = "";
         const client = new ApiClient({
@@ -80,6 +92,7 @@ describe("ApiClient", () => {
         expect(capturedUrl).not.toContain("mask_sensitive");
     });
 
+    // Pins: a 204 response resolves to undefined (no body parsing).
     it("returns undefined for 204 No Content", async () => {
         const client = new ApiClient({
             baseUrl: "http://localhost:8080",

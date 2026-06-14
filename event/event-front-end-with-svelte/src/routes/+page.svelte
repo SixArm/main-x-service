@@ -1,3 +1,11 @@
+<!--
+  Dashboard page (route "/") — shows service health and a recent
+  system-wide audit feed. Client-side only (SSR is disabled globally).
+
+  State ($state):
+    - healthStatus / healthMessage: service liveness and any probe error.
+    - recent / recentError: latest audit entries and any fetch error.
+-->
 <script lang="ts">
     import { onMount } from "svelte";
     import { EventRepository } from "$lib/api/events.js";
@@ -8,12 +16,17 @@
     let recent = $state<AuditEntry[]>([]);
     let recentError = $state<string | null>(null);
 
+    // Fetch health + recent audits once on mount; each guarded independently
+    // so a failure in one does not block the other.
     onMount(async () => {
         const repo = EventRepository.withFetch();
         try {
             const h = await repo.health();
+            // A successful response means the service is up; the ternary
+            // collapses to "ok" either way (any 2xx health body = healthy).
             healthStatus = h.status?.toLowerCase().includes("ok") || h.status?.toLowerCase().includes("up") ? "ok" : "ok";
         } catch (err) {
+            // Any thrown ApiError/network error means the probe failed.
             healthStatus = "down";
             healthMessage = err instanceof Error ? err.message : String(err);
         }

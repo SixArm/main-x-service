@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { auth, captureTokenFromHash } from "$lib/auth.svelte";
 
+// Pins the token store's set/clear/trim semantics and the pure
+// fragment-parsing helper behind the SSO handoff.
 describe("auth store", () => {
+  // Reset to signed-out before each case so tests don't leak token state.
   beforeEach(() => auth.clearToken());
 
   it("starts signed out", () => {
@@ -25,6 +28,8 @@ describe("auth store", () => {
   });
 });
 
+// Pins fragment parsing: extraction, decoding, and every null/empty case
+// so a malformed handoff can never store a bogus token.
 describe("captureTokenFromHash", () => {
   it("extracts the token from a well-formed fragment", () => {
     expect(captureTokenFromHash("#access_token=abc.def.ghi")).toBe(

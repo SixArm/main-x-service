@@ -1,3 +1,8 @@
+// Room detail (`/rooms/[id]`) load function.
+//
+// Loads one room and its aggregated presence history (across the room's
+// cabinets). Returned as page data. 404 if unknown, else 503.
+
 import { api, ApiError } from '$lib/api/client';
 import { error } from '@sveltejs/kit';
 

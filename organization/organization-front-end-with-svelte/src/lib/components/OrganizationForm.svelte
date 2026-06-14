@@ -1,3 +1,22 @@
+<!--
+  OrganizationForm — shared create/edit form for an Organization.
+
+  Decomposes the flat `Organization` payload into editable `$state`
+  fields (scalars, comma-separated lists, an identifiers array, and an
+  address group), then reassembles it in `build()` on submit. Used by
+  both `/new` (empty initial) and `/[pid]/edit` (loaded record).
+
+  $props:
+    - initial:     Organization — seed values; read once, untracked.
+    - submitLabel: string        — submit button text (default "Save").
+    - onsubmit:    (org) => Promise<void> — callback prop (runes events);
+                   the parent persists and navigates. Thrown errors are
+                   caught and shown inline.
+
+  $state: every editable field, plus `submitting` (button disable) and
+  `error` (inline banner). No `$derived` — the payload is built lazily
+  in `build()` rather than tracked.
+-->
 <script lang="ts">
     import { untrack } from "svelte";
     import { ALL_SCHEMES } from "$lib/api/types";
@@ -28,7 +47,8 @@
     let alternateNames = $state((seed.alternate_names ?? []).join(", "));
     let keywords = $state((seed.keywords ?? []).join(", "));
     let sameAs = $state((seed.same_as ?? []).join(", "));
-    // Identifiers (unit-variant schemes only).
+    // Identifiers (unit-variant schemes only). Drop any `Custom` ({...})
+    // schemes, which this form's dropdown cannot represent.
     let identifiers = $state<OrgIdentifier[]>(
         (seed.identifiers ?? []).filter((i) => typeof i.scheme === "string"),
     );
@@ -42,6 +62,7 @@
     let submitting = $state(false);
     let error = $state<string | null>(null);
 
+    /** Split a comma-separated input into a trimmed, non-empty list. */
     function splitList(s: string): string[] {
         return s
             .split(",")
@@ -49,19 +70,30 @@
             .filter((x) => x.length > 0);
     }
 
+    /** Trim a scalar input; collapse a blank one to `undefined`. */
     function blankToUndef(s: string): string | undefined {
         const t = s.trim();
         return t.length > 0 ? t : undefined;
     }
 
+    /** Append a blank identifier row (default scheme `Lei`). */
     function addIdentifier() {
+        // Reassign (not mutate) so the `$state` array triggers reactivity.
         identifiers = [...identifiers, { scheme: "Lei", value: "" }];
     }
+    /** Remove the identifier row at index `i`. */
     function removeIdentifier(i: number) {
         identifiers = identifiers.filter((_, idx) => idx !== i);
     }
 
+    /**
+     * Reassemble the editable fields into an `Organization` payload.
+     * Blank scalars become `null` (explicit clear); list inputs become
+     * arrays; the address group is emitted only if at least one part is
+     * present; identifier rows with empty values are dropped.
+     */
     function build(): Organization {
+        // Address is all-or-nothing: only attach it if some part is filled.
         const addrFields = [street, locality, region, postalCode, country].map(blankToUndef);
         const hasAddress = addrFields.some((x) => x !== undefined);
         const org: Organization = { name: name.trim() };
@@ -89,9 +121,17 @@
         return org;
     }
 
+    /**
+     * Form submit handler: validates `name`, builds the payload, and
+     * delegates persistence to the `onsubmit` prop. Keeps `submitting`
+     * true for the round-trip to disable the button, and surfaces any
+     * thrown error inline.
+     */
     async function handleSubmit(event: SubmitEvent) {
+        // SPA: never let the browser navigate/POST.
         event.preventDefault();
         error = null;
+        // Client-side guard mirroring the server's required-name rule.
         if (name.trim().length === 0) {
             error = "Name is required.";
             return;
@@ -132,6 +172,8 @@
 
     <fieldset class="stack">
         <legend>Identifiers</legend>
+        <!-- Keyed by index `i`: rows have no stable id and are only
+             appended/removed at the end, so positional keys are fine. -->
         {#each identifiers as identifier, i (i)}
             <div class="row">
                 <select bind:value={identifier.scheme}>

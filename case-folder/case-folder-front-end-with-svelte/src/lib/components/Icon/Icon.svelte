@@ -35,6 +35,7 @@
         minus: faMinus
     };
 
+    /** The set of valid icon `name` props — the keys of {@link ICONS}. */
     export type IconName = keyof typeof ICONS;
 </script>
 
@@ -63,6 +64,8 @@
 </script>
 
 {#if def}
+    <!-- FontAwesome packs each glyph as [width, height, ligatures, unicode,
+         pathData]; pull out the viewBox dimensions and the path string. -->
     {@const width = def.icon[0]}
     {@const height = def.icon[1]}
     {@const path = def.icon[4]}

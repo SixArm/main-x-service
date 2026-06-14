@@ -1,4 +1,15 @@
 <script lang="ts">
+    // Folders index (`/folders`) — searchable register of every folder.
+    //
+    // The search box is wired to the URL `?q=` param (the load function
+    // re-runs and re-hydrates the cache), so searches are debounced,
+    // shareable, and survive reload. The table reads `cache.folders`.
+    //
+    // State:
+    //   query    — mirrors the URL term; seeded from `data.query` and
+    //              re-synced via $effect.pre on navigation.
+    //   debounce — timer handle for the search input.
+
     import { goto } from '$app/navigation';
     import { cache } from '$lib/store/cache.svelte';
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
@@ -12,11 +23,16 @@
     let { data } = $props();
 
     let query = $state('');
+    // Keep the box in sync when the load data changes (e.g. back/forward
+    // navigation rewrites `?q=`). `$effect.pre` runs before DOM update.
     $effect.pre(() => {
         query = data.query;
     });
     let debounce: ReturnType<typeof setTimeout> | null = null;
 
+    // Push the trimmed term into the URL after a short idle, driving the
+    // load function to refetch. `replaceState` avoids a history entry per
+    // keystroke; `keepFocus` keeps the cursor in the search box.
     function onSearchInput() {
         if (debounce) clearTimeout(debounce);
         debounce = setTimeout(() => {
@@ -32,6 +48,7 @@
         return 'default';
     }
 
+    // The patient route is keyed by the bare (spaceless) NHS Number.
     function nhsSlug(nhs: string): string {
         return nhs.replaceAll(' ', '');
     }

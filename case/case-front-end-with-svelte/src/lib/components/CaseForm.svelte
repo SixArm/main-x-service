@@ -1,3 +1,24 @@
+<!--
+  CaseForm — the shared create/edit form for a Case.
+
+  Purpose:
+    A single controlled form bound to local `$state`, used by both
+    `new/+page.svelte` (create) and `[pid]/edit/+page.svelte` (edit). It
+    keeps array/optional fields as flat editable strings and assembles a
+    clean `Case` on submit, delegating the actual API call to its parent.
+
+  $props:
+    - initial    : Case   — seed values (empty `{title:""}` for create).
+    - submitLabel: string — button text (default "Save").
+    - onsubmit   : (record: Case) => Promise<void> — callback the parent
+                   supplies to persist; errors thrown here are caught and
+                   shown in the inline banner.
+
+  Local $state: every editable field (title, caseNumber, …), the
+    comma-joined list fields, the identifiers array, plus `submitting`
+    and `error` UI flags. No `$derived` — the `Case` is built imperatively
+    in `build()` on submit.
+-->
 <script lang="ts">
   import { untrack } from "svelte";
   import {
@@ -25,13 +46,18 @@
     onsubmit: (record: Case) => Promise<void>;
   } = $props();
 
-  // Seed the form once from `initial` (read without tracking).
+  // Seed the form once from `initial` (read without tracking) so later
+  // parent re-renders of `initial` don't clobber in-progress edits.
   const seed = untrack(() => initial);
 
+  // Scalar fields mirror the record's optional values as plain strings
+  // (empty string standing in for null/absent).
   let title = $state(seed.title ?? "");
   let caseNumber = $state(seed.case_number ?? "");
   let agencyId = $state(seed.agency_id ?? "");
   let agencyName = $state(seed.agency_name ?? "");
+  // Enum selects use "" for the unselected ("—") option. `Custom` variants
+  // are objects, so only seed the select when the value is a bare string.
   let caseType = $state<CaseType | "">(
     typeof seed.case_type === "string" ? seed.case_type : "",
   );
@@ -42,36 +68,48 @@
     typeof seed.priority === "string" ? seed.priority : "",
   );
   let openedDate = $state(seed.opened_date ?? "");
+  // List fields are edited as a single comma-separated text input; joined
+  // here, split back in `splitList` on submit.
   let alternateTitles = $state((seed.alternate_titles ?? []).join(", "));
   let subjects = $state((seed.subjects ?? []).join(", "));
   let keywords = $state((seed.keywords ?? []).join(", "));
   let sameAs = $state((seed.same_as ?? []).join(", "));
   let inLanguage = $state((seed.in_language ?? []).join(", "));
+  // Identifiers stay structured; drop any seeded `Custom`-scheme rows since
+  // the scheme `<select>` only offers the unit schemes.
   let identifiers = $state<CaseIdentifier[]>(
     (seed.identifiers ?? []).filter((i) => typeof i.scheme === "string"),
   );
 
+  // UI flags: `submitting` disables the button; `error` drives the banner.
   let submitting = $state(false);
   let error = $state<string | null>(null);
 
+  // Split a comma-separated input into trimmed, non-empty tokens.
   function splitList(s: string): string[] {
     return s
       .split(",")
       .map((x) => x.trim())
       .filter((x) => x.length > 0);
   }
+  // Collapse a blank/whitespace input to `null` (the wire shape for absent).
   function blankToNull(s: string): string | null {
     const t = s.trim();
     return t.length > 0 ? t : null;
   }
 
+  // Append a fresh identifier row (immutable reassignment so `$state` reacts).
   function addIdentifier() {
     identifiers = [...identifiers, { scheme: "Docket", value: "" }];
   }
+  // Drop the identifier row at index `i`.
   function removeIdentifier(i: number) {
     identifiers = identifiers.filter((_, idx) => idx !== i);
   }
 
+  // Assemble the wire `Case` from the flat form state: trim title, collapse
+  // blanks to null, split list fields, map "" enum back to null, and drop
+  // empty identifier rows.
   function build(): Case {
     const record: Case = { title: title.trim() };
     record.case_number = blankToNull(caseNumber);
@@ -92,6 +130,9 @@
     return record;
   }
 
+  // Submit handler: block the native navigation, client-validate the
+  // required title, then hand the built record to the parent's `onsubmit`,
+  // surfacing any thrown error in the banner.
   async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
     error = null;
@@ -109,6 +150,10 @@
     }
   }
 </script>
+
+<!-- Controlled form: each field two-way binds to a `$state` variable above;
+     `onsubmit` is intercepted by `handleSubmit`. -->
+
 
 <form class="stack" onsubmit={handleSubmit}>
   <label>Title<input type="text" bind:value={title} required /></label>
