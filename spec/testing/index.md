@@ -267,7 +267,7 @@ formatting, lint, and binary-conformance gates. These are enforced in CI
 | Gate | Command | Enforces |
 | ---- | ------- | -------- |
 | Formatting | `cargo fmt --all -- --check` | Canonical rustfmt formatting (no diffs) |
-| Lints | `cargo clippy --all-targets -- -D warnings` (with `#![warn(clippy::pedantic)]` at each crate root) | Clippy clean across **every** crate — services, matchers, the verifier, migrations, and case-folder all produce zero output; `-D warnings` makes any warning fatal (CI also adds `clippy::nursery` + `rust-2018-idioms`) |
+| Lints | `cargo clippy --all-targets --all-features -- -D warnings` (with `#![warn(clippy::pedantic)]` at each crate root) | Clippy clean across **every** crate — services, matchers, the verifier, migrations, and case-folder all produce zero output; `-D warnings` makes any warning fatal. `--all-targets` lints tests/examples/benches too, so the no-allow invariant covers the harness. This is the single, identical clippy command in every service CI workflow |
 | Binary conformance | (compile-time) | `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`, and the `target_env = "musl"` MiMalloc global allocator block at the top of `lib.rs` / `main.rs` |
 | Doc examples | `cargo test --doc` | `///` examples compile and pass |
 | Markdown links | link check | Cross-doc relative links in `spec/**` and `AGENTS/**` resolve on disk |
@@ -341,7 +341,7 @@ three jobs:
 | Job | Step | Maps to |
 | --- | ---- | ------- |
 | `rustfmt` | `cargo fmt --all -- --check` | §4 formatting |
-| `clippy` | `cargo clippy --all-features -- -D warnings -W clippy::pedantic -W clippy::nursery -W rust-2018-idioms` | §4 lints |
+| `clippy` | `cargo clippy --all-targets --all-features -- -D warnings` | §4 lints |
 | `test` | `cargo test --all-features --all`, with a `postgres` **service container** and `DATABASE_URL` in the job env | §1–§2 (un-gated + DB-gated together) |
 
 The `test` job is where the gating pays off: because CI provisions a
