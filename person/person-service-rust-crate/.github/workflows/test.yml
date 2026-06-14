@@ -56,7 +56,7 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_DB: mpi_test
+          POSTGRES_DB: person_service_test
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
         options: >-
