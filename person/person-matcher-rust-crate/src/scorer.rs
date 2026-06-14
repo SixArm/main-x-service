@@ -219,32 +219,44 @@ mod tests {
 
     // ---------- jaro_winkler ----------
 
+    /// Identical strings score `> 0.99` (effectively `1.0`) — the upper
+    /// anchor of the Jaro-Winkler range.
     #[test]
     fn jaro_winkler_identical() {
         assert!(Scorer::jaro_winkler_similarity("smith", "smith") > 0.99);
     }
 
+    /// A single-character typo (`smith`/`smyth`) still scores `> 0.85` —
+    /// the property that lets fuzzy name matching survive data-entry slips.
     #[test]
     fn jaro_winkler_close_typo() {
         assert!(Scorer::jaro_winkler_similarity("smith", "smyth") > 0.85);
     }
 
+    /// Unrelated names (`jones`/`james`) score `< 0.8` — pins that the
+    /// metric separates genuine variants from coincidental overlap.
     #[test]
     fn jaro_winkler_distant() {
         assert!(Scorer::jaro_winkler_similarity("jones", "james") < 0.8);
     }
 
+    /// Two empty strings are treated as identical (`1.0`) — the explicit
+    /// edge case the wrapper adds on top of `strsim`.
     #[test]
     fn jaro_winkler_empty_pair_is_one() {
         assert_eq!(Scorer::jaro_winkler_similarity("", ""), 1.0);
     }
 
+    /// Exactly one empty side scores `0.0` (asymmetric data → no match),
+    /// in both argument orders — pins symmetry of the empty-handling.
     #[test]
     fn jaro_winkler_single_empty_is_zero() {
         assert_eq!(Scorer::jaro_winkler_similarity("smith", ""), 0.0);
         assert_eq!(Scorer::jaro_winkler_similarity("", "smith"), 0.0);
     }
 
+    /// For several inputs the score stays within `[0.0, 1.0]` — the core
+    /// invariant downstream weighting relies on.
     #[test]
     fn jaro_winkler_in_unit_interval() {
         for (a, b) in [("a", "b"), ("smith", "smyth"), ("abc", "xyz")] {
@@ -255,11 +267,15 @@ mod tests {
 
     // ---------- levenshtein ----------
 
+    /// Identical strings yield exactly `1.0` (zero edit distance) — the
+    /// upper anchor of normalised Levenshtein.
     #[test]
     fn levenshtein_identical() {
         assert_eq!(Scorer::levenshtein_similarity("smith", "smith"), 1.0);
     }
 
+    /// One substitution over five characters gives exactly `0.8`
+    /// (`1 - 1/5`) — pins the normalisation-by-`max_len` formula.
     #[test]
     fn levenshtein_one_edit() {
         // 1 substitution over 5 chars: 1 - 1/5 = 0.8
@@ -267,16 +283,22 @@ mod tests {
         assert!((s - 0.8).abs() < 1e-9, "got {s}");
     }
 
+    /// Fully different short strings (`abc`/`xyz`) score `< 0.5` — pins
+    /// that maximal edit distance drives the score toward zero.
     #[test]
     fn levenshtein_completely_different() {
         assert!(Scorer::levenshtein_similarity("abc", "xyz") < 0.5);
     }
 
+    /// Two empty strings score `1.0` — the explicit edge case guarding the
+    /// `max_len == 0` division.
     #[test]
     fn levenshtein_empty_pair_is_one() {
         assert_eq!(Scorer::levenshtein_similarity("", ""), 1.0);
     }
 
+    /// One empty side scores `0.0` in both orders — pins symmetric
+    /// asymmetric-data handling.
     #[test]
     fn levenshtein_single_empty_is_zero() {
         assert_eq!(Scorer::levenshtein_similarity("smith", ""), 0.0);
@@ -285,6 +307,8 @@ mod tests {
 
     // ---------- exact ----------
 
+    /// `exact_match` is binary and case-sensitive: equal → `1.0`,
+    /// case-differing or unequal → `0.0`, empty pair → `1.0`.
     #[test]
     fn exact_match_basic() {
         assert_eq!(Scorer::exact_match("test", "test"), 1.0);
@@ -295,17 +319,23 @@ mod tests {
 
     // ---------- combined ----------
 
+    /// Identical strings score `1.0` under the combined metric — both the
+    /// `0.7` Jaro-Winkler and `0.3` Levenshtein terms hit their maxima.
     #[test]
     fn combined_identical_is_one() {
         assert!((Scorer::combined_similarity("smith", "smith") - 1.0).abs() < 1e-9);
     }
 
+    /// A close variant (`Stephen`/`Steven`) scores `> 0.80` — confirms the
+    /// blend still rewards near-matches that name dedup depends on.
     #[test]
     fn combined_close_typo_is_high() {
         let s = Scorer::combined_similarity("Stephen", "Steven");
         assert!(s > 0.80, "got {s}");
     }
 
+    /// Unrelated names (`alice`/`zachary`) score `< 0.5` — pins that the
+    /// blend does not inflate coincidental similarity.
     #[test]
     fn combined_distant_is_low() {
         assert!(Scorer::combined_similarity("alice", "zachary") < 0.5);
@@ -313,6 +343,8 @@ mod tests {
 
     // ---------- optional_field_score ----------
 
+    /// Both sides `None` → `1.0` (both absent is trivially a match) under
+    /// `optional_field_score`.
     #[test]
     fn optional_field_both_none_is_one() {
         let n: Option<String> = None;
@@ -322,6 +354,8 @@ mod tests {
         );
     }
 
+    /// Exactly one side `None` → `0.0` in both orders — pins the
+    /// present-vs-absent policy of `optional_field_score`.
     #[test]
     fn optional_field_asymmetric_is_zero() {
         let n: Option<String> = None;
@@ -336,6 +370,8 @@ mod tests {
         );
     }
 
+    /// When both sides are `Some`, the selected `SimilarityAlgorithm` drives
+    /// the result — pins that each variant routes to its own scorer.
     #[test]
     fn optional_field_some_some_uses_algorithm() {
         let a = Some("smith".to_string());

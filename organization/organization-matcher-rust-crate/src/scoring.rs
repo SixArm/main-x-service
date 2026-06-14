@@ -92,6 +92,9 @@ pub fn weighted_average(components: &[(Option<f64>, f64)]) -> f64 {
     let mut weighted_sum = 0.0_f64;
     let mut weight_sum = 0.0_f64;
     for (score, weight) in components {
+        // Accumulate weight into the divisor only for present components,
+        // so absent ones neither add to the numerator nor inflate the
+        // denominator — this is the renormalisation.
         if let Some(s) = score {
             weighted_sum += s * weight;
             weight_sum += weight;
@@ -100,14 +103,18 @@ pub fn weighted_average(components: &[(Option<f64>, f64)]) -> f64 {
     if weight_sum > 0.0 {
         weighted_sum / weight_sum
     } else {
+        // No component contributed → no evidence either way → 0.0.
         0.0
     }
 }
 
+/// Unit tests for confidence banding and the renormalised weighted sum.
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Pins that `None` components are excluded from both numerator and
+    /// denominator (two present 1.0s average to 1.0 despite two absent).
     #[test]
     fn weighted_average_ignores_none() {
         let score = weighted_average(&[
@@ -119,11 +126,13 @@ mod tests {
         assert!((score - 1.0).abs() < 1e-9);
     }
 
+    /// Pins the empty-input contract: no components → 0.0 (no panic).
     #[test]
     fn weighted_average_empty_is_zero() {
         assert!(weighted_average(&[]).abs() < 1e-9);
     }
 
+    /// Pins representative points inside each confidence band.
     #[test]
     fn confidence_thresholds() {
         assert_eq!(Confidence::classify(0.99), Confidence::High);
@@ -131,6 +140,8 @@ mod tests {
         assert_eq!(Confidence::classify(0.50), Confidence::Low);
     }
 
+    /// Pins that band boundaries are inclusive lower bounds: exactly
+    /// 0.95/0.70 land in the higher band; a hair below drops down.
     #[test]
     fn confidence_boundaries_are_inclusive_lower_bounds() {
         // Exactly on a boundary classifies into the higher band.
@@ -141,12 +152,15 @@ mod tests {
         assert_eq!(Confidence::classify(0.699_999), Confidence::Low);
     }
 
+    /// Pins the extremes: 0.0 → Low, 1.0 → High.
     #[test]
     fn confidence_extremes() {
         assert_eq!(Confidence::classify(0.0), Confidence::Low);
         assert_eq!(Confidence::classify(1.0), Confidence::High);
     }
 
+    /// Pins the renormalisation arithmetic: a perfect + a zero component
+    /// over present weights 0.35/0.15 average to 0.7, not 0.35.
     #[test]
     fn weighted_average_renormalises_over_present_weights() {
         // name 1.0 @ 0.35 and provider 0.0 @ 0.15; others absent.
@@ -155,12 +169,16 @@ mod tests {
         assert!((score - 0.7).abs() < 1e-9, "got {score}");
     }
 
+    /// Pins that all-absent components (weights present but scores None)
+    /// still produce 0.0, never a divide-by-zero.
     #[test]
     fn weighted_average_all_none_is_zero() {
         let score = weighted_average(&[(None, 0.35), (None, 0.15)]);
         assert!(score.abs() < 1e-9);
     }
 
+    /// Pins the `MatchResult::default`: 0.0 score, not a match, Low band,
+    /// no deterministic flag — the safe "nothing matched" baseline.
     #[test]
     fn default_match_result_is_low_non_match() {
         let r = MatchResult::default();
@@ -170,6 +188,8 @@ mod tests {
         assert!(!r.breakdown.deterministic_match);
     }
 
+    /// Pins that the derived `Default` for `Confidence` is the cautious
+    /// `Low` band (matches the `#[default]` variant).
     #[test]
     fn confidence_default_is_low() {
         assert_eq!(Confidence::default(), Confidence::Low);

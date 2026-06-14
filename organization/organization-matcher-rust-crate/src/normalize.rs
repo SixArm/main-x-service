@@ -7,6 +7,13 @@ use unicode_normalization::UnicodeNormalization;
 /// Common legal-form suffixes/markers stripped when comparing
 /// organization names. Lower-cased, punctuation already removed by the
 /// caller. Order does not matter; all are removed as whole tokens.
+///
+/// Spans multiple jurisdictions (US `inc`/`llc`, UK `ltd`/`plc`,
+/// German `gmbh`/`ag`, French `sa`/`sarl`, Italian `srl`/`spa`, …) plus
+/// the noise words `the`/`and`/`&`, so that legal-form decoration does
+/// not dominate the name similarity. Matched as whole whitespace tokens
+/// only, so a legitimate name fragment that merely *contains* one of
+/// these strings is never clipped.
 const LEGAL_SUFFIXES: &[&str] = &[
     "inc",
     "incorporated",
@@ -50,6 +57,9 @@ const LEGAL_SUFFIXES: &[&str] = &[
 /// empty string (never `None`).
 #[must_use]
 pub fn fold(s: &str) -> String {
+    // NFKC before lower-casing so compatibility variants (e.g. full-width
+    // forms, ligatures) collapse to a canonical form. Diacritics are
+    // deliberately preserved — `Müller` must not fold to `Muller`.
     s.trim().nfkc().collect::<String>().to_lowercase()
 }
 
@@ -61,17 +71,22 @@ pub fn fold(s: &str) -> String {
 #[must_use]
 pub fn legal_name(s: &str) -> String {
     let folded = fold(s);
+    // Replace every non-alphanumeric char with a space so punctuation
+    // (commas, periods, hyphens) becomes a token boundary rather than
+    // sticking to an adjacent word.
     let cleaned: String = folded
         .chars()
         .map(|c| if c.is_alphanumeric() { c } else { ' ' })
         .collect();
+    // Keep only tokens that are not legal-form suffixes / noise words.
     let kept: Vec<&str> = cleaned
         .split_whitespace()
         .filter(|tok| !LEGAL_SUFFIXES.contains(tok))
         .collect();
     if kept.is_empty() {
         // All tokens were legal suffixes (e.g. "The Co"); fall back to
-        // the cleaned form so we never return an empty key.
+        // the cleaned form so we never return an empty key (an empty
+        // key would spuriously match other empties at Jaro-Winkler 1.0).
         cleaned.split_whitespace().collect::<Vec<_>>().join(" ")
     } else {
         kept.join(" ")
@@ -95,7 +110,10 @@ pub fn domain(s: &str) -> String {
     host.strip_prefix("www.").unwrap_or(host).to_string()
 }
 
-/// Lower-case + trim + dedupe a `Vec<String>`, dropping empty entries.
+/// Fold (lower-case + trim + NFKC) every entry, drop blanks, then sort
+/// and de-duplicate — producing a canonical set for Jaccard comparison.
+/// Sorting before `dedup` is required because `Vec::dedup` only removes
+/// *consecutive* duplicates.
 #[must_use]
 pub fn fold_set(items: &[String]) -> Vec<String> {
     let mut out: Vec<String> = items
@@ -103,20 +121,25 @@ pub fn fold_set(items: &[String]) -> Vec<String> {
         .map(|s| fold(s))
         .filter(|s| !s.is_empty())
         .collect();
+    // Sort so that equal values become adjacent, then collapse them.
     out.sort();
     out.dedup();
     out
 }
 
+/// Unit tests for the normalisation helpers.
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Pins the basic fold: surrounding whitespace trimmed, case lowered.
     #[test]
     fn fold_lowercases_and_trims() {
         assert_eq!(fold("  Hello WORLD  "), "hello world");
     }
 
+    /// Pins suffix/punctuation stripping AND diacritic preservation
+    /// (`Müller` stays `müller`, not `muller`) and noise-word removal.
     #[test]
     fn legal_name_strips_suffixes_and_punctuation() {
         assert_eq!(legal_name("Acme, Inc."), "acme");
@@ -126,12 +149,16 @@ mod tests {
         assert_eq!(legal_name("The Boring Company"), "boring");
     }
 
+    /// Pins the empty-key guard: a name made entirely of suffix tokens
+    /// falls back to the cleaned form instead of yielding "".
     #[test]
     fn legal_name_never_empty() {
         // All tokens are suffixes — fall back to the cleaned form.
         assert_eq!(legal_name("The Co"), "the co");
     }
 
+    /// Pins domain extraction across scheme, `www.`, path, userinfo,
+    /// port, and a multi-label host (`sub.acme.co.uk` is kept intact).
     #[test]
     fn domain_extracts_registered_host() {
         assert_eq!(domain("https://www.Acme.com/about"), "acme.com");
@@ -141,6 +168,8 @@ mod tests {
         assert_eq!(domain("https://sub.acme.co.uk/"), "sub.acme.co.uk");
     }
 
+    /// Pins that `fold_set` folds, drops the blank, sorts, and dedupes
+    /// (`"a"` and `" A "` collapse to a single `"a"`).
     #[test]
     fn fold_set_dedupes_and_sorts() {
         let v = vec!["B".into(), "a".into(), " A ".into(), String::new()];

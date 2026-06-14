@@ -81,8 +81,11 @@ impl MatchConfig {
     }
 
     /// Sum of every per-component weight. The renormalised weighted
-    /// average doesn't require this to equal 1.0, but the documented
-    /// default weights do — see `weights_sum_to_one`.
+    /// average doesn't require this to equal 1.0 (it divides by the
+    /// weights that actually contributed), but the documented default
+    /// weights do — see the `default_weights_sum_to_one` test. Exists
+    /// only under `cfg(test)` because nothing in the runtime path needs
+    /// the raw total.
     #[cfg(test)]
     fn weight_total(&self) -> f64 {
         self.name_weight
@@ -94,10 +97,14 @@ impl MatchConfig {
     }
 }
 
+/// Unit tests for the weight/threshold defaults and the presets.
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // Pins the invariant that the canonical default weights form a
+    // partition of unity (sum to 1.0). Not strictly required by the
+    // renormaliser, but documented and relied on by readers.
     #[test]
     fn default_weights_sum_to_one() {
         let total = MatchConfig::default().weight_total();
@@ -107,6 +114,8 @@ mod tests {
         );
     }
 
+    // Pins every default weight + the threshold to the exact values in
+    // the spec, so any unreviewed retuning of the algorithm fails CI.
     #[test]
     fn default_threshold_and_weights_match_spec() {
         let c = MatchConfig::default();
@@ -119,6 +128,8 @@ mod tests {
         assert!((c.teaches_weight - 0.15).abs() < 1e-9);
     }
 
+    // Pins that the `strict` preset moves ONLY the threshold (to 0.95)
+    // and leaves the component weights untouched.
     #[test]
     fn strict_only_raises_the_threshold() {
         let d = MatchConfig::default();
@@ -129,6 +140,8 @@ mod tests {
         assert!((s.name_weight - d.name_weight).abs() < 1e-9);
     }
 
+    // Pins that the `lenient` preset moves ONLY the threshold (to 0.70)
+    // and leaves the component weights untouched.
     #[test]
     fn lenient_only_lowers_the_threshold() {
         let d = MatchConfig::default();
@@ -138,6 +151,8 @@ mod tests {
         assert!((l.teaches_weight - d.teaches_weight).abs() < 1e-9);
     }
 
+    // Pins that the config survives a JSON serialise → deserialise
+    // round-trip unchanged — it is part of the service API surface.
     #[test]
     fn config_serde_round_trips() {
         let c = MatchConfig::strict();

@@ -11,6 +11,9 @@ use thing_matcher::{Confidence, Identifier, MatchConfig, MatchingEngine, Thing, 
 // 1. ThingBuilder surface
 // =============================================================================
 
+/// Pins the full `ThingBuilder` setter surface that downstream
+/// `thing-service` calls through its `to_matcher_thing` adapter: every
+/// setter (singular and plural) must remain present and chainable.
 #[test]
 fn thing_builder_full_surface() {
     let isbn = Identifier::new("isbn", "9780141439518").unwrap();
@@ -47,6 +50,8 @@ fn thing_builder_full_surface() {
 // 2. Identifier::new validation surface
 // =============================================================================
 
+/// Pins the `Identifier::new` validation contract the adapter relies on:
+/// empty/whitespace value → `None`; non-empty → `Some` with trimmed fields.
 #[test]
 fn identifier_constructor_surface() {
     // Empty value → None (trimmed).
@@ -62,6 +67,8 @@ fn identifier_constructor_surface() {
 // 3. MatchingEngine entry points
 // =============================================================================
 
+/// Pins that all four engine constructors (`default_config`, `new` with
+/// default / strict / lenient configs) remain in the public surface.
 #[test]
 fn matching_engine_constructor_surface() {
     let _: MatchingEngine = MatchingEngine::default_config();
@@ -70,6 +77,9 @@ fn matching_engine_constructor_surface() {
     let _: MatchingEngine = MatchingEngine::new(MatchConfig::lenient());
 }
 
+/// Pins the shape of `MatchResult` / `MatchBreakdown`: every public field
+/// the adapter reads (`score`, `is_match`, `confidence`, all per-field
+/// scores) must remain accessible with its expected type.
 #[test]
 fn matching_engine_match_things_returns_match_result() {
     let a = Thing::builder().name("X").build();
@@ -90,6 +100,8 @@ fn matching_engine_match_things_returns_match_result() {
     let _ = result.breakdown.additional_types_score;
 }
 
+/// Pins that `deterministic_match` returns a plain `bool` and fires on a
+/// shared identifier.
 #[test]
 fn matching_engine_deterministic_match_returns_bool() {
     let id = Identifier::new("isbn", "9780141439518").unwrap();
@@ -102,6 +114,8 @@ fn matching_engine_deterministic_match_returns_bool() {
     assert!(res, "shared identifier must trigger deterministic match");
 }
 
+/// Pins that `match_one_to_many` returns a `Vec` with one entry per
+/// candidate.
 #[test]
 fn matching_engine_match_one_to_many_returns_vec() {
     let query = Thing::builder().name("Q").build();
@@ -114,11 +128,14 @@ fn matching_engine_match_one_to_many_returns_vec() {
 // 4. Confidence + config + round-trip
 // =============================================================================
 
+/// Pins that all three `Confidence` variants remain part of the public API.
 #[test]
 fn confidence_variants_exist() {
     let _ = [Confidence::High, Confidence::Medium, Confidence::Low];
 }
 
+/// Pins the threshold ordering across presets: strict >= default >= lenient,
+/// so the three presets form a monotonic strictness ladder.
 #[test]
 fn match_config_preset_scores_form_monotonic_threshold_ladder() {
     let strict = MatchConfig::strict().match_threshold;
@@ -127,6 +144,8 @@ fn match_config_preset_scores_form_monotonic_threshold_ladder() {
     assert!(strict >= default && default >= lenient);
 }
 
+/// Pins that `MatchResult` is serde-serialisable and round-trips through
+/// JSON, the contract the service uses to persist / transmit results.
 #[test]
 fn match_result_round_trips_through_json() {
     let a = Thing::builder().name("X").build();
@@ -135,6 +154,8 @@ fn match_result_round_trips_through_json() {
     let _: thing_matcher::MatchResult = serde_json::from_str(&json).expect("deserialize");
 }
 
+/// Pins that `ThingBuilder` is a by-value (owned-self) builder: each setter
+/// consumes and returns `Self`, so the adapter can chain or move it freely.
 #[test]
 fn thing_builder_is_value_type() {
     fn _check(b: ThingBuilder) -> ThingBuilder {

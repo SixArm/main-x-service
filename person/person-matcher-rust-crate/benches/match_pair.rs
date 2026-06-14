@@ -13,10 +13,14 @@ use person_matcher::{
     Address, Gender, MatchConfig, MatchingEngine, NicknameTable, Person, SimilarityAlgorithm,
 };
 
+/// Shorthand for a `jiff` civil date, keeping the fixture builders terse.
 fn dob(y: i16, m: i8, d: i8) -> Date {
     jiff::civil::date(y, m, d)
 }
 
+/// The "reference" person: a fully populated record (identifier, names,
+/// DOB, gender, two addresses, phone, email) so benchmarks exercise every
+/// scoring sub-path rather than just the cheap early-outs.
 fn build_alice() -> Person {
     Person::builder()
         .united_kingdom_national_health_service_number("943 476 5919")
@@ -37,6 +41,10 @@ fn build_alice() -> Person {
         .build()
 }
 
+/// A near-duplicate of `seed`: same identifier and DOB, but with a fuzzy
+/// given name (`Alyce`), an abbreviated address line, and a re-formatted
+/// phone number — i.e. the realistic "same person, different system" case
+/// that drives the full probabilistic pipeline plus normalisation.
 fn build_alyce_fuzzy(seed: &Person) -> Person {
     Person::builder()
         .united_kingdom_national_health_service_number("943 476 5919")
@@ -57,6 +65,8 @@ fn build_alyce_fuzzy(seed: &Person) -> Person {
         .build()
 }
 
+/// A clearly different person (different identifier, name, DOB, location)
+/// to benchmark the common "no match" path where most sub-scores are low.
 fn build_unrelated() -> Person {
     Person::builder()
         .united_kingdom_national_health_service_number("400 000 0004")
@@ -73,6 +83,10 @@ fn build_unrelated() -> Person {
         .build()
 }
 
+/// Deterministically synthesise the `idx`-th candidate for the batch-ranking
+/// benchmark. Fields are derived from `idx` (round-robin surnames/cities,
+/// every 7th record carries the matching `Alyce` given name) so a candidate
+/// list of any size is reproducible without randomness.
 fn make_candidate(idx: usize) -> Person {
     let last = ["Smith", "Jones", "Brown", "Taylor", "Williams", "Davies"];
     let cities = ["London", "Cardiff", "Edinburgh", "Belfast", "Manchester"];
@@ -99,6 +113,9 @@ fn make_candidate(idx: usize) -> Person {
         .build()
 }
 
+/// Benchmark single-pair probabilistic matching across three regimes:
+/// an identical clone (best case), a fuzzy near-match (full pipeline),
+/// and an unrelated pair (mostly-zero sub-scores).
 fn bench_match_pair(c: &mut Criterion) {
     let mut group = c.benchmark_group("match_pair");
     let alice = build_alice();
@@ -119,6 +136,8 @@ fn bench_match_pair(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark the deterministic path where a shared national identifier
+/// short-circuits to a hit — the cheapest match decision the engine makes.
 fn bench_deterministic_match(c: &mut Criterion) {
     let alice = build_alice();
     let alyce = build_alyce_fuzzy(&alice);
@@ -128,6 +147,9 @@ fn bench_deterministic_match(c: &mut Criterion) {
     });
 }
 
+/// Benchmark `rank_one_to_many` at 10/100/1000 candidates with
+/// `Throughput::Elements` set, so Criterion reports per-candidate cost and
+/// any super-linear scaling shows up directly.
 fn bench_batch_ranking(c: &mut Criterion) {
     let mut group = c.benchmark_group("rank_one_to_many");
     let engine = MatchingEngine::default_config();
@@ -143,6 +165,9 @@ fn bench_batch_ranking(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark the same fuzzy pair under three configs (default, strict,
+/// and an English nickname table) to expose the per-call cost the chosen
+/// preset adds — notably the extra nickname-table lookup.
 fn bench_engine_configurations(c: &mut Criterion) {
     let mut group = c.benchmark_group("config_variants");
     let alice = build_alice();

@@ -1,10 +1,13 @@
 //! Demo binary — a runnable walkthrough of the `case-matcher` public
 //! API. Not part of the public API's `SemVer` surface.
 
-#![forbid(unsafe_code)]
+#![forbid(unsafe_code)] // demo binary needs no `unsafe` either.
 #![deny(missing_docs)]
 #![warn(clippy::pedantic)]
 
+/// Use mimalloc as the global allocator on MUSL static builds, where it
+/// noticeably outperforms the default allocator. Gated to `musl` so glibc
+/// builds keep the system allocator.
 #[cfg(target_env = "musl")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -13,6 +16,10 @@ use case_matcher::{
     Case, CaseIdentifier, CaseStatus, CaseType, IdentifierScheme, MatchConfig, MatchingEngine,
 };
 
+/// Demo entry point: prints four representative scenarios (fuzzy title +
+/// subject, deterministic docket short-circuit, same-agency case number,
+/// and an unrelated pair) so the public API can be exercised by running
+/// `cargo run`. Side effects: writes to stdout only.
 fn main() {
     let engine = MatchingEngine::new(MatchConfig::default());
 

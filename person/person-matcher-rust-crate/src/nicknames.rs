@@ -309,6 +309,8 @@ impl NicknameTable {
 mod tests {
     use super::*;
 
+    /// An `empty()` table never makes two distinct names equivalent — pins
+    /// that nicknames are strictly opt-in (no built-in behaviour leaks in).
     #[test]
     fn empty_table_treats_distinct_strings_as_inequivalent() {
         let t = NicknameTable::empty();
@@ -316,6 +318,9 @@ mod tests {
         assert!(!t.are_equivalent("Liz", "Elizabeth"));
     }
 
+    /// Strings that normalise to the same value are equivalent even on an
+    /// `empty()` table — pins the trivial-equality short-circuit before any
+    /// class lookup.
     #[test]
     fn identical_normalised_strings_are_trivially_equivalent_even_when_empty() {
         let t = NicknameTable::empty();
@@ -324,6 +329,8 @@ mod tests {
         assert!(t.are_equivalent("", ""));
     }
 
+    /// `with_class` normalises entries on insertion, so a class added with
+    /// mixed case/spelling still matches normalised lookups.
     #[test]
     fn with_class_normalises_entries_at_insertion() {
         let t = NicknameTable::empty().with_class(["Robert", "Bob", "Rob"]);
@@ -331,6 +338,8 @@ mod tests {
         assert!(t.are_equivalent("Rob", "Robert"));
     }
 
+    /// Entries that collapse to one normalised value (`mike`/`MIKE`/`Mike`)
+    /// leave the class with `< 2` distinct members, so it is dropped.
     #[test]
     fn with_class_dedupes_after_normalisation() {
         let t = NicknameTable::empty().with_class(["mike", "MIKE", "Mike"]);
@@ -339,12 +348,16 @@ mod tests {
         assert_eq!(t.len(), 0);
     }
 
+    /// A single-name class is useless (nothing to be equivalent to) and is
+    /// dropped — pins the `>= 2` gate in `with_class`.
     #[test]
     fn with_class_drops_classes_with_fewer_than_two_distinct_entries() {
         let t = NicknameTable::empty().with_class(["Mike"]);
         assert!(t.is_empty());
     }
 
+    /// Empty strings are dropped before the size check, so `["", "Mike", ""]`
+    /// yields no usable class — guards against empty-name pollution.
     #[test]
     fn with_class_drops_empty_strings_silently() {
         let t = NicknameTable::empty().with_class(["", "Mike", ""]);
@@ -352,6 +365,9 @@ mod tests {
         assert!(t.is_empty());
     }
 
+    /// The built-in `english()` table resolves the canonical acceptance
+    /// pairs (`Mike`/`Michael`, `Liz`/`Elizabeth`, …) — pins the dictionary
+    /// actually ships the headline nicknames.
     #[test]
     fn english_table_covers_acceptance_criterion() {
         let t = NicknameTable::english();
@@ -366,6 +382,8 @@ mod tests {
         }
     }
 
+    /// Names in different classes (`Mike`/`Robert`) stay inequivalent —
+    /// guards against over-broad classes merging unrelated people.
     #[test]
     fn english_table_treats_unrelated_names_as_inequivalent() {
         let t = NicknameTable::english();
@@ -373,6 +391,9 @@ mod tests {
         assert!(!t.are_equivalent("Liz", "Tom"));
     }
 
+    /// A nickname shared by two canonicals (`Sandy` → `Alexandra`/`Sandra`,
+    /// `Steve` → `Stephen`/`Steven`) matches either — pins the
+    /// any-shared-class lookup rule.
     #[test]
     fn english_table_handles_shared_nicknames_across_classes() {
         let t = NicknameTable::english();
@@ -386,6 +407,8 @@ mod tests {
         assert!(t.are_equivalent("Steve", "Steven"));
     }
 
+    /// A custom class layered on `english()` works while the built-in
+    /// entries still resolve — pins additive composition of tables.
     #[test]
     fn with_class_composes_on_top_of_english() {
         let t = NicknameTable::english().with_class(["Reginald", "Reggie"]);
@@ -394,6 +417,8 @@ mod tests {
         assert!(t.are_equivalent("Mike", "Michael"));
     }
 
+    /// Lookups ignore case and surrounding whitespace (`"  Mike  "`),
+    /// because both sides pass through `normalize_name` first.
     #[test]
     fn lookup_is_case_and_punctuation_insensitive() {
         let t = NicknameTable::english();
@@ -401,6 +426,8 @@ mod tests {
         assert!(t.are_equivalent("  Mike  ", "Michael"));
     }
 
+    /// `Default::default()` produces an empty table — pins that the derived
+    /// default matches `empty()` so configs start with nicknames off.
     #[test]
     fn default_is_empty() {
         let t = NicknameTable::default();

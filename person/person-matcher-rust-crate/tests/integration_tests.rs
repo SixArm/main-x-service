@@ -8,6 +8,37 @@
 //!
 //! Naming follows the AGENTS guide: `test_<thing>_<expected>`.
 //!
+//! ## What this suite pins
+//!
+//! - **Perfect / near-perfect matches** — self-clones and fully-populated
+//!   records clearing `0.95` with every component at or near `1.0`.
+//! - **National-identifier behaviour** — the `UK NHS Number` and the full
+//!   multinational scheme set (`FR NIR`, `ES TSI`, `IE IHI`, `US SSN`,
+//!   `DE KVNR`, `IT CF`, `NL BSN`, `SE Personnummer`, the T-27 / T-28 / T-17.1
+//!   batches, …): layout-variant canonicalisation, deterministic match on the
+//!   identifier alone, `Some(0.0)` on a real mismatch versus `None` on an
+//!   unparseable / one-sided value, and strict scheme-local isolation (no
+//!   cross-scheme matching, e.g. `UK NHS Number` vs `UK H&C Number` vs
+//!   `UK CHI Number`).
+//! - **Name handling** — typos, diacritics, apostrophes, double-barrelled
+//!   surnames, case folding, middle-name blending, and phonetic lift.
+//! - **Address comparison** — abbreviation expansion, parsed house numbers,
+//!   best-of current/previous addresses, and the OQ-4 weighted-average
+//!   sub-score arithmetic.
+//! - **Phone normalisation** — E.164 across many jurisdictions plus the legacy
+//!   national-significant fallback, driven by `phone_default_country`.
+//! - **Email scoring** — case/whitespace normalisation and opt-in Gmail
+//!   dot / `+tag` folding.
+//! - **Deterministic vs probabilistic matching**, `MatchConfig` presets
+//!   (`strict` / `lenient`), custom weights, `SimilarityAlgorithm` choice,
+//!   confidence bands, and the DOB / DOD day-month transposition heuristic.
+//! - **Newer FHIR-aligned signals** — `PassportBook`s, `BloodType`,
+//!   birth place, multiple-birth indicator, death date / death place.
+//! - **The nickname dictionary**, the batch API
+//!   (`match_one_to_many` / `rank_one_to_many`), serde round-trips
+//!   (including legacy-payload back-compat), score-shape invariants, and
+//!   `Send + Sync` / cross-thread usability.
+//!
 //! All fixtures use synthetic, drama-reserved, or self-consistent United
 //! Kingdom National Health Service Number-format values; no real PII appears
 //! here.
@@ -20,6 +51,7 @@ use person_matcher::{
 
 // ---------- helpers ----------
 
+/// Builds a `jiff` civil `Date` from year/month/day, keeping the fixtures terse.
 fn dob(y: i16, m: i8, d: i8) -> Date {
     jiff::civil::date(y, m, d)
 }
@@ -37,6 +69,7 @@ const UNITED_KINGDOM_NATIONAL_HEALTH_SERVICE_NUMBER_B: &str = "9434765870";
 // §1. Perfect / near-perfect matches
 // ============================================================
 
+/// Pins the happy-path: two identical fully-populated records score `> 0.95`, `is_match`, with every component sub-score at or near `1.0`.
 #[test]
 fn test_perfect_match_all_fields() {
     let mut address = Address::new();
@@ -73,6 +106,7 @@ fn test_perfect_match_all_fields() {
     assert_eq!(result.breakdown.gender_score, Some(1.0));
 }
 
+/// A name-only record matched against its clone must score `> 0.99` and `is_match` — the floor case for self-identity.
 #[test]
 fn test_identical_minimal_record_scores_one() {
     let p = Person::builder()
@@ -88,6 +122,7 @@ fn test_identical_minimal_record_scores_one() {
 // §2. United Kingdom National Health Service Number behaviour
 // ============================================================
 
+/// A differing `UK NHS Number` scores `0.0` on that component but does not veto the overall match; aligned demographics keep the score in the mid range (`0.5`–`0.9`).
 #[test]
 fn test_united_kingdom_national_health_service_number_mismatch_does_not_immediately_disqualify() {
     let p1 = Person::builder()
@@ -118,6 +153,7 @@ fn test_united_kingdom_national_health_service_number_mismatch_does_not_immediat
     assert!(r.score < 0.9);
 }
 
+/// Unparseable `UK NHS Number` values must score `None` (skipped), never a `0.0` penalty, so garbage identifiers don't suppress a genuine demographic match.
 #[test]
 fn test_unparseable_united_kingdom_national_health_service_numbers_score_none_not_zero() {
     let p1 = Person::builder()
@@ -143,6 +179,7 @@ fn test_unparseable_united_kingdom_national_health_service_numbers_score_none_no
     assert!(r.is_match, "demographics fully align");
 }
 
+/// Asymmetric `UK NHS Number` data (present on one side only) is skipped (`None`), not penalised.
 #[test]
 fn test_one_sided_united_kingdom_national_health_service_number_scores_none() {
     // Asymmetric United Kingdom National Health Service Number data: scorer
@@ -166,6 +203,7 @@ fn test_one_sided_united_kingdom_national_health_service_number_scores_none() {
     );
 }
 
+/// `"943 476 5919"` and `"9434765919"` canonicalise equal, so `deterministic_match` fires across whitespace layouts.
 #[test]
 fn test_united_kingdom_national_health_service_number_whitespace_variants_match_deterministically()
 {
@@ -184,6 +222,7 @@ fn test_united_kingdom_national_health_service_number_whitespace_variants_match_
 // §3. Name handling: typos, diacritics, punctuation, phonetics
 // ============================================================
 
+/// Under `MatchConfig::lenient`, a `"Catherine"`/`"Katherine"` typo with matching DOB+gender still scores `> 0.75`.
 #[test]
 fn test_common_name_typo_under_lenient_config() {
     let p1 = Person::builder()
@@ -202,6 +241,7 @@ fn test_common_name_typo_under_lenient_config() {
     assert!(r.score > 0.75);
 }
 
+/// `"Stephen"`/`"Steven"` are a phonetic pair; the breakdown surfaces a `phonetic_name_score` and the records match.
 #[test]
 fn test_phonetic_name_match_lifts_score() {
     let p1 = Person::builder()
@@ -219,6 +259,7 @@ fn test_phonetic_name_match_lifts_score() {
     assert!(r.breakdown.phonetic_name_score.is_some());
 }
 
+/// `"Siân"`/`"Sian"` and `"O'Connor"`/`"OConnor"` normalise together (diacritics + apostrophes stripped), scoring `> 0.85`.
 #[test]
 fn test_diacritic_names_with_apostrophes_normalise_together() {
     let p1 = Person::builder()
@@ -236,6 +277,7 @@ fn test_diacritic_names_with_apostrophes_normalise_together() {
     assert!(r.score > 0.85);
 }
 
+/// `"Lloyd-Webber"` vs `"Lloyd Webber"` still score `> 0.85` on family name even though their normalised forms differ slightly.
 #[test]
 fn test_double_barrelled_surnames_normalise_to_a_single_word() {
     // "Lloyd-Webber" → "lloydwebber"; documented in AGENTS/normalization.md.
@@ -253,6 +295,7 @@ fn test_double_barrelled_surnames_normalise_to_a_single_word() {
     assert!(r.breakdown.family_name_score.unwrap() > 0.85);
 }
 
+/// A matching middle name blends into the given-name component (95% given + 5% middle), keeping a perfect pair at `~1.0`.
 #[test]
 fn test_middle_name_matching_blends_into_given_name_component() {
     // Same given name on both sides → 1.0 contribution. Matching
@@ -269,6 +312,7 @@ fn test_middle_name_matching_blends_into_given_name_component() {
     assert!(g > 0.99, "perfect given+middle should round to ~1.0: {g}");
 }
 
+/// A middle-name mismatch dips the blended given-name score below `1.0` but stays `> 0.93` (only 5% weight).
 #[test]
 fn test_middle_name_mismatch_only_marginally_lowers_given_name() {
     // Same given name; very different middle names. The blended
@@ -290,6 +334,7 @@ fn test_middle_name_mismatch_only_marginally_lowers_given_name() {
     assert!(g > 0.93, "drop must be modest (5% weight): {g}");
 }
 
+/// A one-sided middle name does not fire the middle-name path; the given-name score stays `> 0.99`.
 #[test]
 fn test_middle_name_one_sided_does_not_affect_score() {
     // Only one side records a middle name → the middle-name path
@@ -309,6 +354,7 @@ fn test_middle_name_one_sided_does_not_affect_score() {
     assert!(g > 0.99, "one-sided middle name must not change score: {g}");
 }
 
+/// Identical middle names lift the given-name component when the given names (`"Jon"`/`"John"`) are close but not equal.
 #[test]
 fn test_middle_name_lifts_score_when_given_names_differ() {
     // Identical middle names provide a small lift when the given
@@ -342,6 +388,7 @@ fn test_middle_name_lifts_score_when_given_names_differ() {
     );
 }
 
+/// Case folding: `"JOHN SMITH"` matches `"john smith"`.
 #[test]
 fn test_case_difference_is_irrelevant() {
     let p1 = Person::builder()
@@ -360,6 +407,7 @@ fn test_case_difference_is_irrelevant() {
 // §4. Address comparison
 // ============================================================
 
+/// `"High Street"` vs `"High St"` with matching city+postcode still matches; an `address_score` is produced.
 #[test]
 fn test_address_matching_with_abbreviated_street() {
     let mut a1 = Address::new();
@@ -390,6 +438,7 @@ fn test_address_matching_with_abbreviated_street() {
     assert!(r.breakdown.address_score.is_some());
 }
 
+/// Postcode-only addresses differing only in formatting (`"CF10 1AA"` vs `"cf10  1aa"`) still contribute a non-zero `address_score`.
 #[test]
 fn test_address_postcode_only_records_still_contribute() {
     let mut a1 = Address::new();
@@ -411,6 +460,7 @@ fn test_address_postcode_only_records_still_contribute() {
     assert!(r.breakdown.address_score.unwrap() > 0.0);
 }
 
+/// Two empty addresses score the neutral `0.5` — neither evidence for nor against a match.
 #[test]
 fn test_address_completely_empty_is_neutral() {
     let p1 = Person::builder()
@@ -431,6 +481,7 @@ fn test_address_completely_empty_is_neutral() {
     );
 }
 
+/// Best-of address matching: when currents differ, a matching historical address (`p2`'s previous vs `p1`'s current) surfaces, scoring `> 0.3`.
 #[test]
 fn test_previous_addresses_used_when_current_differs() {
     // p1's current address is on Downing Street; p2's current address
@@ -471,6 +522,7 @@ fn test_previous_addresses_used_when_current_differs() {
     );
 }
 
+/// With no current address on either side, a matching historical address still yields a non-zero score.
 #[test]
 fn test_previous_addresses_scored_when_currents_missing() {
     // Neither person has a `current` address; both record a historical
@@ -493,6 +545,7 @@ fn test_previous_addresses_scored_when_currents_missing() {
     assert!(s > 0.0);
 }
 
+/// When one side has neither current nor previous address, the `address_score` is `None`.
 #[test]
 fn test_previous_addresses_unused_when_one_side_has_no_address_data() {
     // No current and no previous on one side → `None`, unchanged.
@@ -508,6 +561,7 @@ fn test_previous_addresses_unused_when_one_side_has_no_address_data() {
     assert_eq!(r.breakdown.address_score, None);
 }
 
+/// Non-regression: an unrelated historical address must not drag down an already-strong current-vs-current match.
 #[test]
 fn test_previous_addresses_does_not_lower_a_strong_current_match() {
     // If the current-vs-current pair already scores well, an
@@ -555,6 +609,7 @@ fn test_previous_addresses_does_not_lower_a_strong_current_match() {
     );
 }
 
+/// An address present on only one side is skipped (`address_score` is `None`).
 #[test]
 fn test_address_absent_on_one_side_skips_scoring() {
     let mut a1 = Address::new();
@@ -573,6 +628,7 @@ fn test_address_absent_on_one_side_skips_scoring() {
 // §5. Phone number normalisation and fallback
 // ============================================================
 
+/// `"+44 7700 900123"` and `"07700 900123"` canonicalise to the same E.164 number, scoring `phone_score` `1.0`.
 #[test]
 fn test_phone_normalisation_across_uk_formats() {
     let p1 = Person::builder()
@@ -592,6 +648,7 @@ fn test_phone_normalisation_across_uk_formats() {
     assert_eq!(r.breakdown.phone_score, Some(1.0));
 }
 
+/// The phone comparison falls back to the `mobile` field when `phone` is absent on one side, matching `07700 900456` against `+44 7700 900456`.
 #[test]
 fn test_phone_falls_back_to_mobile() {
     let p1 = Person::builder()
@@ -608,6 +665,7 @@ fn test_phone_falls_back_to_mobile() {
     assert_eq!(r.breakdown.phone_score, Some(1.0));
 }
 
+/// A phone on only one side scores `None` (skipped).
 #[test]
 fn test_phone_absent_on_one_side_skips() {
     let p1 = Person::builder()
@@ -620,6 +678,7 @@ fn test_phone_absent_on_one_side_skips() {
     assert_eq!(r.breakdown.phone_score, None);
 }
 
+/// Two distinct phone numbers score `phone_score` `0.0`.
 #[test]
 fn test_phone_different_numbers_score_zero() {
     let p1 = Person::builder()
@@ -640,6 +699,7 @@ fn test_phone_different_numbers_score_zero() {
 // §6. Deterministic matching
 // ============================================================
 
+/// A shared `UK NHS Number` forces a `deterministic_match` even when given names differ (`"Robert"`/`"Bob"`).
 #[test]
 fn test_deterministic_united_kingdom_national_health_service_number_match_overrides_demographics() {
     let p1 = Person::builder()
@@ -657,6 +717,7 @@ fn test_deterministic_united_kingdom_national_health_service_number_match_overri
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `deterministic_match` fires on a full demographic tuple (name + DOB + gender) when a record is compared to its clone.
 #[test]
 fn test_deterministic_demographics_match() {
     let p = Person::builder()
@@ -668,6 +729,7 @@ fn test_deterministic_demographics_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p, &p.clone()));
 }
 
+/// A day/month DOB swap is rejected by `deterministic_match` (exact equality required), though the probabilistic path gives `0.5` partial credit.
 #[test]
 fn test_deterministic_rejects_dob_swap() {
     // Day/month swap is a notorious data-entry failure mode. The
@@ -692,6 +754,7 @@ fn test_deterministic_rejects_dob_swap() {
     assert_eq!(r.breakdown.date_of_birth_score, Some(0.5));
 }
 
+/// `deterministic_match` requires names: a DOB+gender-only record (no names) does not deterministically match even itself.
 #[test]
 fn test_deterministic_rejects_when_names_missing() {
     let p1 = Person::builder()
@@ -701,6 +764,7 @@ fn test_deterministic_rejects_when_names_missing() {
     assert!(!MatchingEngine::default_config().deterministic_match(&p1, &p1.clone()));
 }
 
+/// `deterministic_match` tolerates a missing `gender` on one side when names + DOB agree.
 #[test]
 fn test_deterministic_tolerates_missing_gender_on_one_side() {
     let p1 = Person::builder()
@@ -721,6 +785,7 @@ fn test_deterministic_tolerates_missing_gender_on_one_side() {
 // §7. Configuration presets and thresholds
 // ============================================================
 
+/// Strict mode rejects a fuzzy-only near-match (`"Jon"`/`"John"`) that clears the threshold but has no deterministic backing.
 #[test]
 fn test_strict_mode_rejects_fuzzy_only_match_above_threshold() {
     // Strict mode lowers the false-positive surface by also requiring
@@ -750,6 +815,7 @@ fn test_strict_mode_rejects_fuzzy_only_match_above_threshold() {
     assert!(!r.is_match);
 }
 
+/// Strict mode accepts a self-clone (deterministic match holds + score above threshold), reporting `Confidence::High`.
 #[test]
 fn test_strict_mode_accepts_deterministic_match() {
     // Same person on both sides — deterministic match holds AND the
@@ -768,6 +834,7 @@ fn test_strict_mode_accepts_deterministic_match() {
     assert_eq!(r.confidence, Confidence::High);
 }
 
+/// Strict mode rejects a nickname pair (`"Michael"`/`"Mike"`) absent a deterministic match.
 #[test]
 fn test_strict_mode_rejects_nickname() {
     let p1 = Person::builder()
@@ -784,6 +851,7 @@ fn test_strict_mode_rejects_nickname() {
     assert!(!r.is_match);
 }
 
+/// Strict and lenient yield the same underlying score; only the threshold differs, so lenient may match where strict does not.
 #[test]
 fn test_lenient_mode_more_forgiving_than_strict() {
     let p1 = Person::builder()
@@ -807,6 +875,7 @@ fn test_lenient_mode_more_forgiving_than_strict() {
     }
 }
 
+/// Custom weights (de-emphasise given name, emphasise DOB + family name) raise the score for a `"Robert"`/`"Bob"` pair above the default config's.
 #[test]
 fn test_custom_weights_can_swing_outcome() {
     let p1 = Person::builder()
@@ -893,6 +962,7 @@ fn test_custom_weights_can_swing_outcome() {
     assert!(custom.score >= default.score);
 }
 
+/// `SimilarityAlgorithm::Exact` scores a `"John"`/`"Jon"` typo as `0.0` and an exact `"Smith"` as `1.0` — no fuzzy credit.
 #[test]
 fn test_exact_algorithm_treats_typos_as_no_match() {
     let p1 = Person::builder()
@@ -912,6 +982,7 @@ fn test_exact_algorithm_treats_typos_as_no_match() {
     assert_eq!(r.breakdown.family_name_score, Some(1.0));
 }
 
+/// `SimilarityAlgorithm::JaroWinkler` gives a `"John"`/`"Jon"` given-name score `> 0.8`.
 #[test]
 fn test_jaro_winkler_algorithm_pure() {
     let p1 = Person::builder()
@@ -930,6 +1001,7 @@ fn test_jaro_winkler_algorithm_pure() {
     assert!(r.breakdown.given_name_score.unwrap() > 0.8);
 }
 
+/// `SimilarityAlgorithm::Levenshtein` scores `"Anne"`/`"Anna"` strictly between `0.5` and `1.0` (one substitution).
 #[test]
 fn test_levenshtein_algorithm_pure() {
     let p1 = Person::builder()
@@ -953,6 +1025,7 @@ fn test_levenshtein_algorithm_pure() {
 // §8. Negative cases and edge handling
 // ============================================================
 
+/// A DD/MM transposition scores `0.5` on DOB but name + half-DOB alone cannot clear the default threshold.
 #[test]
 fn test_date_of_birth_transposition_gets_partial_credit_but_still_blocks_default_match() {
     // Day/month transposition (DD/MM vs MM/DD data-entry bug) yields
@@ -974,6 +1047,7 @@ fn test_date_of_birth_transposition_gets_partial_credit_but_still_blocks_default
     assert!(!r.is_match);
 }
 
+/// A genuinely different (non-transposed) DOB scores `0.0` and blocks the match.
 #[test]
 fn test_date_of_birth_unrelated_mismatch_scores_zero() {
     // A genuinely different DOB (not a transposition) still scores 0.0.
@@ -992,6 +1066,7 @@ fn test_date_of_birth_unrelated_mismatch_scores_zero() {
     assert!(!r.is_match);
 }
 
+/// The composite uses only fields present on both sides: a one-sided DOB scores `None` while names still contribute.
 #[test]
 fn test_missing_fields_calc_uses_only_available() {
     let p1 = Person::builder()
@@ -1010,6 +1085,7 @@ fn test_missing_fields_calc_uses_only_available() {
     assert_eq!(r.breakdown.date_of_birth_score, None);
 }
 
+/// Two wholly different people (different identifier, name, DOB, gender) score `< 0.3` and do not match, with each disagreeing component at `0.0`.
 #[test]
 fn test_completely_different_persons() {
     let p1 = Person::builder()
@@ -1042,6 +1118,7 @@ fn test_completely_different_persons() {
     assert_eq!(r.breakdown.gender_score, Some(0.0));
 }
 
+/// With no field populated on both sides (given-only vs family-only), the score is exactly `0.0` and not a match.
 #[test]
 fn test_no_overlapping_fields_returns_zero_score() {
     let p1 = Person::builder().given_name("Solo").build();
@@ -1051,6 +1128,7 @@ fn test_no_overlapping_fields_returns_zero_score() {
     assert!(!r.is_match);
 }
 
+/// `match_persons(a, b)` and `match_persons(b, a)` yield identical score and `is_match` — the matcher is symmetric.
 #[test]
 fn test_engine_is_symmetric() {
     let p1 = Person::builder()
@@ -1073,6 +1151,7 @@ fn test_engine_is_symmetric() {
     assert_eq!(r1.is_match, r2.is_match);
 }
 
+/// Repeated calls on the same inputs return byte-identical score and `is_match` — no hidden state.
 #[test]
 fn test_engine_is_deterministic_across_calls() {
     let p1 = Person::builder()
@@ -1092,6 +1171,7 @@ fn test_engine_is_deterministic_across_calls() {
     assert_eq!(a.is_match, b.is_match);
 }
 
+/// `Person::validate` accepts a name-only or identifier-only record but rejects a wholly empty one.
 #[test]
 fn test_validation_accepts_minimum_fields() {
     assert!(
@@ -1118,6 +1198,7 @@ fn test_validation_accepts_minimum_fields() {
 // §9. Serialization round-trips
 // ============================================================
 
+/// A populated `Person` survives a JSON serialize/deserialize round-trip unchanged.
 #[test]
 fn test_person_serialization_round_trip() {
     let p = Person::builder()
@@ -1134,6 +1215,7 @@ fn test_person_serialization_round_trip() {
     assert_eq!(p, back);
 }
 
+/// A `MatchResult` survives a JSON round-trip with score, `is_match`, and the `UK NHS Number` sub-score preserved.
 #[test]
 fn test_match_result_serialization_round_trip() {
     let p = Person::builder()
@@ -1153,6 +1235,7 @@ fn test_match_result_serialization_round_trip() {
     );
 }
 
+/// An `Address` survives a JSON round-trip unchanged.
 #[test]
 fn test_address_serialization_round_trip() {
     let mut a = Address::new();
@@ -1168,6 +1251,7 @@ fn test_address_serialization_round_trip() {
 // §10. Threading / Send + Sync
 // ============================================================
 
+/// Compile-time guard: every public type stays `Send + Sync` so consumers can share the engine across threads.
 #[test]
 fn test_public_types_are_send_and_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
@@ -1184,6 +1268,7 @@ fn test_public_types_are_send_and_sync() {
     assert_send_sync::<person_matcher::ParsedAddressLine>();
 }
 
+/// A shared `MatchingEngine` behind an `Arc` produces correct scores when invoked concurrently from four threads.
 #[test]
 fn test_engine_usable_across_threads() {
     use std::sync::Arc;
@@ -1216,6 +1301,7 @@ fn test_engine_usable_across_threads() {
 // §11. Score-shape invariants
 // ============================================================
 
+/// Invariant sweep: across a grid of record pairs every score stays within `[0.0, 1.0]`.
 #[test]
 fn test_score_is_in_unit_interval() {
     // Generate a small grid of comparisons and check every score is in [0, 1].
@@ -1265,6 +1351,7 @@ fn test_score_is_in_unit_interval() {
 const NIR_A_FR: &str = "180127512345642";
 const NIR_B_FR: &str = "180127512345741";
 
+/// Two textual layouts of the same `FR NIR` canonicalise to equal parse results.
 #[test]
 fn test_fr_nir_two_layouts_canonicalise_equally() {
     assert_eq!(
@@ -1273,6 +1360,7 @@ fn test_fr_nir_two_layouts_canonicalise_equally() {
     );
 }
 
+/// A shared `FR NIR` forces a `deterministic_match` despite different demographics.
 #[test]
 fn test_fr_nir_deterministic_match_overrides_demographics() {
     let p1 = Person::builder()
@@ -1288,6 +1376,7 @@ fn test_fr_nir_deterministic_match_overrides_demographics() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// The `fr_nir_score` reports `1.0` for a shared `FR NIR` and `0.0` for two distinct valid ones.
 #[test]
 fn test_fr_nir_probabilistic_score_breakdown() {
     let same1 = Person::builder()
@@ -1318,6 +1407,7 @@ fn test_fr_nir_probabilistic_score_breakdown() {
 const TSI_A_ES: &str = "ABCD123456XY1234";
 const TSI_B_ES: &str = "WXYZ654321AB9876";
 
+/// `ES TSI` normalisation strips whitespace and hyphens so layout variants deterministically match.
 #[test]
 fn test_es_tsi_normalises_whitespace_and_hyphens() {
     let p1 = Person::builder()
@@ -1331,6 +1421,7 @@ fn test_es_tsi_normalises_whitespace_and_hyphens() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Two distinct valid `ES TSI` values score `0.0`, not `None`.
 #[test]
 fn test_es_tsi_mismatch_scores_zero_not_none() {
     let p1 = Person::builder()
@@ -1352,6 +1443,7 @@ fn test_es_tsi_mismatch_scores_zero_not_none() {
 const IHI_A_IE: &str = "1234567";
 const IHI_B_IE: &str = "7654321";
 
+/// `IE IHI` whitespace layouts (`"123 4567"` vs `"1234567"`) deterministically match.
 #[test]
 fn test_ie_ihi_whitespace_layouts_match_deterministically() {
     let p1 = Person::builder().ie_ihi("123 4567").build();
@@ -1359,6 +1451,7 @@ fn test_ie_ihi_whitespace_layouts_match_deterministically() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Two distinct `IE IHI` values score `0.0` on that component.
 #[test]
 fn test_ie_ihi_probabilistic_breakdown_distinguishes_two_individuals() {
     let p1 = Person::builder()
@@ -1375,6 +1468,7 @@ fn test_ie_ihi_probabilistic_breakdown_distinguishes_two_individuals() {
     assert_eq!(r.breakdown.ie_ihi_score, Some(0.0));
 }
 
+/// Unparseable `IE IHI` values score `None`, not `0.0`; demographics still carry the match.
 #[test]
 fn test_ie_ihi_unparseable_yields_none_not_zero() {
     let p1 = Person::builder()
@@ -1394,6 +1488,7 @@ fn test_ie_ihi_unparseable_yields_none_not_zero() {
 
 // ---- Northern Ireland H&C Number ----
 
+/// A shared Northern Ireland `UK H&C Number` drives a `deterministic_match` despite different names.
 #[test]
 fn test_uk_hc_number_deterministic_match() {
     let p1 = Person::builder()
@@ -1407,6 +1502,7 @@ fn test_uk_hc_number_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// The same 10-digit value recorded as a `UK NHS Number` on one side and a `UK H&C Number` on the other does not cross-match — schemes are scheme-local.
 #[test]
 fn test_uk_hc_number_does_not_cross_match_with_united_kingdom_national_health_service_number() {
     // Same 10-digit value, but one is recorded as a United Kingdom National
@@ -1429,6 +1525,7 @@ fn test_uk_hc_number_does_not_cross_match_with_united_kingdom_national_health_se
 const SSN_A_US: &str = "123-45-6789";
 const SSN_B_US: &str = "987-65-4320"; // 987 area is invalid; see test below
 
+/// Hyphenated (`"123-45-6789"`) and compact (`"123456789"`) `US SSN` forms canonicalise to equal parse results.
 #[test]
 fn test_us_ssn_hyphenated_and_compact_canonicalise_equally() {
     assert_eq!(
@@ -1437,6 +1534,7 @@ fn test_us_ssn_hyphenated_and_compact_canonicalise_equally() {
     );
 }
 
+/// A shared `US SSN` (across layouts) forces a `deterministic_match` despite different names.
 #[test]
 fn test_us_ssn_deterministic_match_overrides_demographics() {
     let p1 = Person::builder()
@@ -1452,6 +1550,7 @@ fn test_us_ssn_deterministic_match_overrides_demographics() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// A shared `US SSN` reports `us_ssn_score` `1.0` independently in the breakdown.
 #[test]
 fn test_us_ssn_probabilistic_breakdown_reports_independent_score() {
     let p1 = Person::builder()
@@ -1469,6 +1568,7 @@ fn test_us_ssn_probabilistic_breakdown_reports_independent_score() {
     assert!(r.is_match);
 }
 
+/// Two distinct structurally-valid `US SSN` values score `0.0`.
 #[test]
 fn test_us_ssn_mismatch_scores_zero_not_none() {
     // Use two structurally-valid SSNs that differ.
@@ -1486,6 +1586,7 @@ fn test_us_ssn_mismatch_scores_zero_not_none() {
     assert_eq!(r.breakdown.us_ssn_score, Some(0.0));
 }
 
+/// Structurally-invalid `US SSN` values (area `987`/`900` in the never-issued range) parse to `None`, so the component scores `None` and demographics carry the match.
 #[test]
 fn test_us_ssn_structurally_invalid_yields_none_not_zero() {
     // Area 987 is in the never-issued 900..=999 range; parse returns None.
@@ -1505,6 +1606,7 @@ fn test_us_ssn_structurally_invalid_yields_none_not_zero() {
     assert!(r.is_match, "demographics align");
 }
 
+/// `Person::validate` accepts a record whose only identifying field is a `US SSN`.
 #[test]
 fn test_us_ssn_validate_accepts_solo_ssn() {
     assert!(
@@ -1521,6 +1623,7 @@ fn test_us_ssn_validate_accepts_solo_ssn() {
 const KVNR_A_DE: &str = "A123456780";
 const KVNR_B_DE: &str = "B987654320";
 
+/// A shared `DE KVNR` (whitespace + lowercase tolerated) forces a `deterministic_match` despite different names.
 #[test]
 fn test_de_kvnr_deterministic_match_overrides_demographics() {
     let p1 = Person::builder()
@@ -1536,6 +1639,7 @@ fn test_de_kvnr_deterministic_match_overrides_demographics() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Two distinct valid `DE KVNR` values score `0.0`.
 #[test]
 fn test_de_kvnr_mismatch_scores_zero_not_none() {
     let p1 = Person::builder()
@@ -1552,6 +1656,7 @@ fn test_de_kvnr_mismatch_scores_zero_not_none() {
     assert_eq!(r.breakdown.de_kvnr_score, Some(0.0));
 }
 
+/// Unparseable `DE KVNR` values score `None`; demographics carry the match.
 #[test]
 fn test_de_kvnr_unparseable_yields_none_not_zero() {
     let p1 = Person::builder()
@@ -1574,6 +1679,7 @@ fn test_de_kvnr_unparseable_yields_none_not_zero() {
 const CF_A_IT: &str = "RSSMRA85T10A562S";
 const CF_B_IT: &str = "MNRMRC75H17H501I";
 
+/// A shared Italian `Codice Fiscale` (mixed case + whitespace) drives a `deterministic_match` despite different names.
 #[test]
 fn test_it_cf_deterministic_match() {
     let p1 = Person::builder()
@@ -1589,6 +1695,7 @@ fn test_it_cf_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Two distinct `IT CF` values score `0.0`.
 #[test]
 fn test_it_cf_mismatch_scores_zero() {
     let p1 = Person::builder()
@@ -1610,6 +1717,7 @@ fn test_it_cf_mismatch_scores_zero() {
 const BSN_A_NL: &str = "111222333";
 const BSN_B_NL: &str = "123456782";
 
+/// A shared `NL BSN` (whitespace tolerated) drives a `deterministic_match` despite different names.
 #[test]
 fn test_nl_bsn_deterministic_match() {
     let p1 = Person::builder()
@@ -1625,6 +1733,7 @@ fn test_nl_bsn_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Two distinct valid `NL BSN` values score `0.0`.
 #[test]
 fn test_nl_bsn_mismatch_scores_zero() {
     let p1 = Person::builder()
@@ -1646,6 +1755,7 @@ fn test_nl_bsn_mismatch_scores_zero() {
 const PNR_A_SE: &str = "4603243850";
 const PNR_B_SE: &str = "8112310092";
 
+/// `SE Personnummer` separator variants (`"460324-3850"` vs `"4603243850"`) deterministically match.
 #[test]
 fn test_se_personnummer_separator_variants_match_deterministically() {
     let p1 = Person::builder().se_personnummer("460324-3850").build();
@@ -1653,6 +1763,7 @@ fn test_se_personnummer_separator_variants_match_deterministically() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// The 10-digit and 12-digit `SE Personnummer` forms canonicalise differently and do not cross-match (`0.0`); callers must normalise upstream.
 #[test]
 fn test_se_personnummer_ten_and_twelve_digit_forms_do_not_cross_match() {
     // The 10-digit form `460324-3850` and the 12-digit form
@@ -1665,6 +1776,7 @@ fn test_se_personnummer_ten_and_twelve_digit_forms_do_not_cross_match() {
     assert_eq!(r.breakdown.se_personnummer_score, Some(0.0));
 }
 
+/// Two distinct `SE Personnummer` values score `0.0`.
 #[test]
 fn test_se_personnummer_mismatch_scores_zero() {
     let p1 = Person::builder()
@@ -1686,6 +1798,7 @@ fn test_se_personnummer_mismatch_scores_zero() {
 const IHI_A_AU: &str = "8003601234567894";
 const IHI_B_AU: &str = "8003619876543213";
 
+/// `AU IHI` whitespace variants canonicalise equal and deterministically match.
 #[test]
 fn test_au_ihi_whitespace_variants_match_deterministically() {
     let p1 = Person::builder().au_ihi("8003 6012 3456 7894").build();
@@ -1693,6 +1806,7 @@ fn test_au_ihi_whitespace_variants_match_deterministically() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Two distinct `AU IHI` values score `0.0`.
 #[test]
 fn test_au_ihi_mismatch_scores_zero() {
     let p1 = Person::builder()
@@ -1709,6 +1823,7 @@ fn test_au_ihi_mismatch_scores_zero() {
     assert_eq!(r.breakdown.au_ihi_score, Some(0.0));
 }
 
+/// `AU IHI` (16 digits) and `IE IHI` (7 digits) never cross-match — same acronym, scheme-local fields.
 #[test]
 fn test_au_ihi_does_not_cross_match_ie_ihi() {
     // Australia and Ireland both have an "IHI" identifier, but they
@@ -1724,6 +1839,7 @@ fn test_au_ihi_does_not_cross_match_ie_ihi() {
 const CHI_A_UK: &str = "0101701233";
 const CHI_B_UK: &str = "0101701241";
 
+/// A shared Scotland `UK CHI Number` drives a `deterministic_match` despite different names.
 #[test]
 fn test_uk_chi_number_deterministic_match() {
     let p1 = Person::builder()
@@ -1739,6 +1855,7 @@ fn test_uk_chi_number_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Two distinct `UK CHI Number` values score `0.0`.
 #[test]
 fn test_uk_chi_number_mismatch_scores_zero() {
     let p1 = Person::builder()
@@ -1755,6 +1872,7 @@ fn test_uk_chi_number_mismatch_scores_zero() {
     assert_eq!(r.breakdown.uk_chi_number_score, Some(0.0));
 }
 
+/// A value recorded as a `UK CHI Number` vs a `UK NHS Number` does not cross-match despite sharing the Mod-11 algorithm.
 #[test]
 fn test_uk_chi_number_does_not_cross_match_united_kingdom_national_health_service_number() {
     // Same Mod-11 algorithm, but the schemes are local: a value
@@ -1768,6 +1886,7 @@ fn test_uk_chi_number_does_not_cross_match_united_kingdom_national_health_servic
     assert!(!MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `UK CHI Number` and `UK H&C Number` never cross-match — provenance lives on the field name, not the digits.
 #[test]
 fn test_uk_chi_number_does_not_cross_match_uk_hc_number() {
     // Three UK schemes share the same Mod-11 algorithm
@@ -1780,6 +1899,7 @@ fn test_uk_chi_number_does_not_cross_match_uk_hc_number() {
 
 // ---- Cross-scheme guarantees ----
 
+/// A polyglot record cloned against itself reports `1.0` independently for every one of the multinational identifier sub-scores.
 #[test]
 fn test_breakdown_carries_independent_score_per_scheme() {
     let p1 = Person::builder()
@@ -1821,6 +1941,7 @@ fn test_breakdown_carries_independent_score_per_scheme() {
     assert!(r.is_match);
 }
 
+/// `Person::validate` accepts a record whose only identifying field is any single supported national identifier.
 #[test]
 fn test_validate_accepts_any_single_national_identifier() {
     // Each identifier on its own is sufficient for Person::validate.
@@ -1899,6 +2020,7 @@ fn test_validate_accepts_any_single_national_identifier() {
 // cannot be parsed against the supported country table. These tests pin the
 // observable matcher behaviour for the most common multinational scenarios.
 
+/// `UK` `+44` and trunk (`07700...`) phone layouts canonicalise to the same E.164 number (`phone_score` `1.0`).
 #[test]
 fn test_international_phone_uk_plus_and_trunk_layouts_match() {
     let p1 = Person::builder()
@@ -1915,6 +2037,7 @@ fn test_international_phone_uk_plus_and_trunk_layouts_match() {
     assert_eq!(r.breakdown.phone_score, Some(1.0));
 }
 
+/// With `phone_default_country` `"FR"`, French national and `+33` layouts match.
 #[test]
 fn test_international_phone_french_layouts_match_under_fr_default() {
     let cfg = MatchConfig {
@@ -1935,6 +2058,7 @@ fn test_international_phone_french_layouts_match_under_fr_default() {
     assert_eq!(r.breakdown.phone_score, Some(1.0));
 }
 
+/// The same 10-digit string read as a `UK` (`+44...`) vs a `US` (`+1...`) number must not collide (`phone_score` `0.0`).
 #[test]
 fn test_international_phone_distinguishes_uk_from_us_with_overlapping_digits() {
     // The same 10-digit national-significant string interpreted as a UK
@@ -1954,6 +2078,7 @@ fn test_international_phone_distinguishes_uk_from_us_with_overlapping_digits() {
     assert_eq!(r.breakdown.phone_score, Some(0.0));
 }
 
+/// `ES` numbers have no trunk `0`; national and `+34` layouts canonicalise equal under an `"ES"` default.
 #[test]
 fn test_international_phone_spain_no_trunk_prefix() {
     // Spain's national format has no leading 0; both layouts must
@@ -1976,6 +2101,7 @@ fn test_international_phone_spain_no_trunk_prefix() {
     assert_eq!(r.breakdown.phone_score, Some(1.0));
 }
 
+/// `IE` national and `+353` layouts match under an `"IE"` default (three-digit dial code).
 #[test]
 fn test_international_phone_ireland_three_digit_dial_code() {
     let cfg = MatchConfig {
@@ -1996,6 +2122,7 @@ fn test_international_phone_ireland_three_digit_dial_code() {
     assert_eq!(r.breakdown.phone_score, Some(1.0));
 }
 
+/// The `"00"` international-access prefix (`0049...`) is treated as equivalent to `+` (`+49...`).
 #[test]
 fn test_international_phone_germany_via_00_access_prefix() {
     // "00" international-access form should be treated as equivalent to "+".
@@ -2013,6 +2140,7 @@ fn test_international_phone_germany_via_00_access_prefix() {
     assert_eq!(r.breakdown.phone_score, Some(1.0));
 }
 
+/// When E.164 parsing fails on both sides (no default country, no `+`/`00`), the legacy national-significant comparison still matches equal strings.
 #[test]
 fn test_international_phone_falls_back_to_legacy_when_unparseable() {
     // When neither side carries an international marker and the default
@@ -2040,6 +2168,7 @@ fn test_international_phone_falls_back_to_legacy_when_unparseable() {
     assert_eq!(r.breakdown.phone_score, Some(1.0));
 }
 
+/// Mixed-path regression: when one side parses to E.164 and the other does not, the matcher must not panic and the score stays in `[0.0, 1.0]`.
 #[test]
 fn test_international_phone_does_not_collide_with_legacy_uk_fallback() {
     // Regression: when one side parses to E.164 and the other does not,
@@ -2062,6 +2191,7 @@ fn test_international_phone_does_not_collide_with_legacy_uk_fallback() {
     assert!((0.0..=1.0).contains(&s));
 }
 
+/// A phone already stored in E.164 still matches its round-tripped trunk equivalent.
 #[test]
 fn test_international_phone_idempotent_under_round_trip() {
     // A phone stored already in E.164 must continue to match its
@@ -2082,6 +2212,7 @@ fn test_international_phone_idempotent_under_round_trip() {
     assert_eq!(r.breakdown.phone_score, Some(1.0));
 }
 
+/// With `phone_default_country` `None`, an explicit `+44` form still matches a legacy `0...` form via the national-significant fallback.
 #[test]
 fn test_international_phone_config_default_country_none_disables_assumption() {
     // With phone_default_country=None, a UK trunk-format number on one
@@ -2115,6 +2246,7 @@ fn test_international_phone_config_default_country_none_disables_assumption() {
 // comparison. Mismatching house numbers penalise the address sub-score
 // even when the street name is similar; matching house numbers lift it.
 
+/// The address normaliser expands street-type abbreviations, so `"High Street"` vs `"High St"` scores `> 0.15`.
 #[test]
 fn test_address_parsing_recognises_abbreviated_street_type() {
     // "High Street" vs "High St" should score essentially identically
@@ -2139,6 +2271,7 @@ fn test_address_parsing_recognises_abbreviated_street_type() {
     assert!(s > 0.15, "abbreviation-aware score should be high: {s}");
 }
 
+/// Same street, different house number scores strictly lower than matching house numbers — the parsed house number penalises.
 #[test]
 fn test_address_parsing_penalises_different_house_numbers() {
     // Same street, different house number — score should drop noticeably.
@@ -2170,6 +2303,7 @@ fn test_address_parsing_penalises_different_house_numbers() {
     );
 }
 
+/// Directional abbreviations expand (`"N Park Ave"` vs `"North Park Avenue"`), so the lines normalise to the same string and score `> 0.15`.
 #[test]
 fn test_address_parsing_directional_abbreviation() {
     let mut a1 = Address::new();
@@ -2195,6 +2329,7 @@ fn test_address_parsing_directional_abbreviation() {
     );
 }
 
+/// A unit prefix (`"Flat 2A, 10 Downing Street"`) on one side must not block the shared house-number + street match (`> 0.15`).
 #[test]
 fn test_address_parsing_unit_prefix_does_not_block_house_number_match() {
     // "Flat 2A, 10 Downing Street" and "10 Downing Street" share a
@@ -2222,6 +2357,7 @@ fn test_address_parsing_unit_prefix_does_not_block_house_number_match() {
     );
 }
 
+/// `ParsedAddressLine` is publicly re-exported; `parse_address_line` splits `"123 High St"` into house number `"123"` and normalised street `"high street"`.
 #[test]
 fn test_parsed_address_line_is_publicly_re_exported() {
     let p: person_matcher::ParsedAddressLine = Normalizer::parse_address_line("123 High St");
@@ -2238,6 +2374,7 @@ fn test_parsed_address_line_is_publicly_re_exported() {
 // matcher lifts the given-name (and family-name) similarity score to at
 // least 0.9 for any pair the table considers equivalent.
 
+/// With the default empty nickname table, `"Michael"`/`"Mike"` stays below `0.85` — adding the feature is a no-op for existing callers.
 #[test]
 fn test_nicknames_default_config_does_not_change_existing_scores() {
     // No nickname table → behaviour matches the pre-feature baseline.
@@ -2257,6 +2394,7 @@ fn test_nicknames_default_config_does_not_change_existing_scores() {
     assert!(baseline.breakdown.given_name_score.unwrap() < 0.85);
 }
 
+/// `NicknameTable::english` lifts known nickname pairs (Mike/Michael, Liz/Elizabeth, ...) to a given-name score `>= 0.9`.
 #[test]
 fn test_nicknames_english_table_lifts_given_name_to_at_least_0_9() {
     let cfg = MatchConfig {
@@ -2281,6 +2419,7 @@ fn test_nicknames_english_table_lifts_given_name_to_at_least_0_9() {
     }
 }
 
+/// The nickname boost is a one-way lift: an identical-name pair stays at `1.0`, never dragged down.
 #[test]
 fn test_nicknames_boost_is_one_way_lift_never_drop() {
     // Identical names already score 1.0; the nickname check must not
@@ -2297,6 +2436,7 @@ fn test_nicknames_boost_is_one_way_lift_never_drop() {
     assert_eq!(r.breakdown.given_name_score, Some(1.0));
 }
 
+/// Names not in the same nickname class (`"Mike"`/`"Bob"`) get no lift and stay at their base similarity (`< 0.6`).
 #[test]
 fn test_nicknames_unrelated_names_are_untouched() {
     let cfg = MatchConfig {
@@ -2313,6 +2453,7 @@ fn test_nicknames_unrelated_names_are_untouched() {
     assert!(r.breakdown.given_name_score.unwrap() < 0.6);
 }
 
+/// `with_class` extends the English table with a custom equivalence class (`"Reginald"`/`"Reggie"`), lifting it to `>= 0.9`.
 #[test]
 fn test_nicknames_custom_class_extends_english_default() {
     let cfg = MatchConfig {
@@ -2331,6 +2472,7 @@ fn test_nicknames_custom_class_extends_english_default() {
     assert!(r.breakdown.given_name_score.unwrap() >= 0.9);
 }
 
+/// With strong supporting evidence, the nickname boost lifts the overall score above the no-nickname baseline.
 #[test]
 fn test_nicknames_promote_overall_match_from_under_to_over_threshold() {
     // With strong supporting evidence (family + DOB + gender), the
@@ -2371,6 +2513,7 @@ fn test_nicknames_promote_overall_match_from_under_to_over_threshold() {
 // dot-folding, so `j.smith@gmail.com` and `jsmith@gmail.com` differ by
 // default but match when `gmail_dot_folding = true`.
 
+/// Email comparison normalises case and surrounding whitespace, scoring `1.0` for `"  Alice@Example.ORG  "` vs `"alice@example.org"`.
 #[test]
 fn test_email_exact_match_after_case_and_whitespace_normalisation() {
     let p1 = Person::builder()
@@ -2387,6 +2530,7 @@ fn test_email_exact_match_after_case_and_whitespace_normalisation() {
     assert_eq!(r.breakdown.email_score, Some(1.0));
 }
 
+/// Two distinct email addresses score `0.0`.
 #[test]
 fn test_email_mismatch_scores_zero() {
     let p1 = Person::builder()
@@ -2403,6 +2547,7 @@ fn test_email_mismatch_scores_zero() {
     assert_eq!(r.breakdown.email_score, Some(0.0));
 }
 
+/// An email on only one side scores `None`, not `0.0`.
 #[test]
 fn test_email_missing_on_one_side_scores_none_not_zero() {
     let p1 = Person::builder()
@@ -2415,6 +2560,7 @@ fn test_email_missing_on_one_side_scores_none_not_zero() {
     assert_eq!(r.breakdown.email_score, None);
 }
 
+/// Unparseable email strings score `None`; demographics carry the match.
 #[test]
 fn test_email_unparseable_yields_none_not_zero() {
     let p1 = Person::builder()
@@ -2432,6 +2578,7 @@ fn test_email_unparseable_yields_none_not_zero() {
     assert!(r.is_match, "demographics carry the match");
 }
 
+/// Gmail dot-folding is opt-in: dotted/undotted Gmail addresses differ by default (`0.0`) but match (`1.0`) when `gmail_dot_folding` is enabled.
 #[test]
 fn test_email_gmail_dot_folding_opt_in() {
     // Default behaviour: dotted and undotted Gmail addresses differ.
@@ -2457,6 +2604,7 @@ fn test_email_gmail_dot_folding_opt_in() {
     assert_eq!(folded.breakdown.email_score, Some(1.0));
 }
 
+/// With `gmail_dot_folding`, a Gmail `+tag` suffix is folded away (`jsmith+work@` matches `jsmith@`).
 #[test]
 fn test_email_gmail_plus_tag_folding() {
     let cfg = MatchConfig {
@@ -2477,6 +2625,7 @@ fn test_email_gmail_plus_tag_folding() {
     assert_eq!(r.breakdown.email_score, Some(1.0));
 }
 
+/// Dot-folding is Gmail-specific: `example.org` localparts compare verbatim even when `gmail_dot_folding` is on (`0.0`).
 #[test]
 fn test_email_dot_folding_does_not_affect_non_gmail_domains() {
     let cfg = MatchConfig {
@@ -2502,6 +2651,7 @@ fn test_email_dot_folding_does_not_affect_non_gmail_domains() {
 // §17. Confidence band
 // ============================================================
 
+/// An exact clone reports `Confidence::High` with score `>= 0.90`.
 #[test]
 fn test_confidence_high_for_exact_clone() {
     let p = Person::builder()
@@ -2515,6 +2665,7 @@ fn test_confidence_high_for_exact_clone() {
     assert!(r.score >= 0.90);
 }
 
+/// Two completely different people report `Confidence::Low` with score `< 0.75`.
 #[test]
 fn test_confidence_low_for_completely_different_persons() {
     let p1 = Person::builder()
@@ -2534,6 +2685,7 @@ fn test_confidence_low_for_completely_different_persons() {
     assert!(r.score < 0.75);
 }
 
+/// Confidence bands are score-based, not threshold-based: strict and lenient presets yield the same band and identical score.
 #[test]
 fn test_confidence_bands_are_independent_of_match_threshold() {
     // Same input, different threshold presets → same band, different is_match.
@@ -2563,6 +2715,7 @@ fn test_confidence_bands_are_independent_of_match_threshold() {
     );
 }
 
+/// `Confidence` survives a JSON round-trip in `MatchResult`.
 #[test]
 fn test_confidence_round_trips_via_json() {
     let p = Person::builder()
@@ -2575,6 +2728,7 @@ fn test_confidence_round_trips_via_json() {
     assert_eq!(r.confidence, back.confidence);
 }
 
+/// A legacy `MatchResult` JSON lacking the `confidence` field deserialises cleanly and defaults to `Low`, avoiding a misread high-confidence match.
 #[test]
 fn test_confidence_legacy_json_payload_without_field_defaults_to_low() {
     // A pre-feature JSON payload lacking the `confidence` field must
@@ -2607,6 +2761,7 @@ fn test_confidence_legacy_json_payload_without_field_defaults_to_low() {
 // §18. MatchConfig and SimilarityAlgorithm serde round-trip
 // ============================================================
 
+/// A customised `MatchConfig` (threshold, gmail folding, nickname table, default country) survives a JSON round-trip.
 #[test]
 fn test_match_config_round_trips_through_json() {
     let cfg = MatchConfig {
@@ -2624,6 +2779,7 @@ fn test_match_config_round_trips_through_json() {
     assert_eq!(cfg.phone_default_country, back.phone_default_country);
 }
 
+/// A partial JSON config overrides only the named fields; `#[serde(default)]` fills the rest from `MatchConfig::default`.
 #[test]
 fn test_match_config_loaded_from_partial_json_uses_defaults() {
     // Production deployments often want to override one or two fields
@@ -2639,6 +2795,7 @@ fn test_match_config_loaded_from_partial_json_uses_defaults() {
     assert!(cfg.use_phonetic_matching);
 }
 
+/// `SimilarityAlgorithm` serialises as its bare variant name (`"JaroWinkler"`) and round-trips.
 #[test]
 fn test_similarity_algorithm_serializes_as_simple_name() {
     let json = serde_json::to_string(&SimilarityAlgorithm::JaroWinkler).unwrap();
@@ -2648,6 +2805,7 @@ fn test_similarity_algorithm_serializes_as_simple_name() {
     assert_eq!(SimilarityAlgorithm::JaroWinkler, back);
 }
 
+/// A `NicknameTable` (English + custom class) survives a JSON round-trip with equivalences preserved.
 #[test]
 fn test_nickname_table_round_trips_through_json() {
     let t = NicknameTable::english().with_class(["Reginald", "Reggie"]);
@@ -2658,6 +2816,7 @@ fn test_nickname_table_round_trips_through_json() {
     assert!(back.are_equivalent("Mike", "Michael"));
 }
 
+/// End-to-end: a config serialised then deserialised drives identical engine outcomes (score, `is_match`, confidence).
 #[test]
 fn test_config_loaded_from_json_drives_engine_behaviour_unchanged() {
     // End-to-end: build a config in code, serialise it, deserialise it,
@@ -2698,6 +2857,7 @@ fn test_config_loaded_from_json_drives_engine_behaviour_unchanged() {
 // `deterministic_match` is unaffected — it still requires exact DOB
 // equality on the demographic-tuple branch.
 
+/// The classic DD/MM data-entry swap scores `0.5` on DOB via the transposition heuristic.
 #[test]
 fn test_dob_transposition_scores_half_on_classic_dd_mm_bug() {
     let p1 = Person::builder()
@@ -2714,6 +2874,7 @@ fn test_dob_transposition_scores_half_on_classic_dd_mm_bug() {
     assert_eq!(r.breakdown.date_of_birth_score, Some(0.5));
 }
 
+/// The DOB transposition heuristic does not fire when the years also differ — it scores `0.0`.
 #[test]
 fn test_dob_transposition_does_not_fire_across_years() {
     let p1 = Person::builder()
@@ -2730,6 +2891,7 @@ fn test_dob_transposition_does_not_fire_across_years() {
     assert_eq!(r.breakdown.date_of_birth_score, Some(0.0));
 }
 
+/// Transposition partial credit (`0.5`) plus supporting evidence lifts the overall score above an unrelated (`0.0`) DOB.
 #[test]
 fn test_dob_transposition_lifts_overall_score_relative_to_zero_dob() {
     // Stack the transposition heuristic with strong supporting
@@ -2767,6 +2929,7 @@ fn test_dob_transposition_lifts_overall_score_relative_to_zero_dob() {
     );
 }
 
+/// Name + transposed DOB alone cannot clear the default threshold despite the `0.5` partial credit.
 #[test]
 fn test_dob_transposition_alone_is_not_enough_for_default_threshold() {
     // Just name + transposed DOB — under the default 0.85 threshold,
@@ -2786,6 +2949,7 @@ fn test_dob_transposition_alone_is_not_enough_for_default_threshold() {
     assert!(!r.is_match);
 }
 
+/// The transposition heuristic does not relax `deterministic_match`, which still requires exact DOB equality.
 #[test]
 fn test_dob_transposition_does_not_short_circuit_deterministic_match() {
     let a = Person::builder()
@@ -2807,6 +2971,7 @@ fn test_dob_transposition_does_not_short_circuit_deterministic_match() {
 // §20. Batch API (match_one_to_many / rank_one_to_many)
 // ============================================================
 
+/// `match_one_to_many` returns one result per candidate in input order; only the query's clone matches.
 #[test]
 fn test_batch_match_one_to_many_returns_parallel_results() {
     let engine = MatchingEngine::default_config();
@@ -2833,6 +2998,7 @@ fn test_batch_match_one_to_many_returns_parallel_results() {
     assert!(!r[2].is_match);
 }
 
+/// The batch API returns everything; the caller filters for `is_match`. Two candidates (shared `UK NHS Number` + clone) pass.
 #[test]
 fn test_batch_match_one_to_many_filtered_for_is_match() {
     // Caller-side filtering is the recommended pattern; the batch API
@@ -2867,6 +3033,7 @@ fn test_batch_match_one_to_many_filtered_for_is_match() {
     assert!(positives.len() >= 2);
 }
 
+/// `rank_one_to_many` ranks the query's clone first and returns results in strictly non-increasing score order with original indices.
 #[test]
 fn test_batch_rank_one_to_many_orders_clone_first() {
     let engine = MatchingEngine::default_config();
@@ -2895,6 +3062,7 @@ fn test_batch_rank_one_to_many_orders_clone_first() {
     }
 }
 
+/// `rank_one_to_many` over an empty candidate slice returns an empty ranking.
 #[test]
 fn test_batch_rank_one_to_many_with_empty_candidates() {
     let engine = MatchingEngine::default_config();
@@ -2903,6 +3071,7 @@ fn test_batch_rank_one_to_many_with_empty_candidates() {
     assert!(ranked.is_empty());
 }
 
+/// Each batch result carries its own `Confidence` (`High` for the clone, `Low` for the unrelated record).
 #[test]
 fn test_batch_match_one_to_many_carries_confidence_per_result() {
     let engine = MatchingEngine::default_config();
@@ -2923,6 +3092,7 @@ fn test_batch_match_one_to_many_carries_confidence_per_result() {
     assert_eq!(r[1].confidence, Confidence::Low);
 }
 
+/// The batch API is thread-safe behind an `Arc`: concurrent runs match the single-threaded baseline scores.
 #[test]
 fn test_batch_match_one_to_many_threadsafe_under_arc() {
     // The engine is Send + Sync; a batch can be scattered across
@@ -2971,6 +3141,7 @@ fn test_batch_match_one_to_many_threadsafe_under_arc() {
 // produces a 0.0 component score, and Person::validate accepts a
 // person whose only identifying field is the new identifier.
 
+/// `BE NN` layout variants deterministically match and a solo `BE NN` passes `validate`.
 #[test]
 fn test_be_nn_deterministic_match() {
     let p1 = Person::builder().be_nn("80010100107").build();
@@ -2985,6 +3156,7 @@ fn test_be_nn_deterministic_match() {
     );
 }
 
+/// `BG EGN` deterministically matches itself; an invalid second `BG EGN` scores `None` (not `0.0`).
 #[test]
 fn test_bg_egn_deterministic_match() {
     let p1 = Person::builder().bg_egn("8001010013").build();
@@ -3005,6 +3177,7 @@ fn test_bg_egn_deterministic_match() {
     assert_eq!(r.breakdown.bg_egn_score, None);
 }
 
+/// `CZ RČ` deterministically matches itself.
 #[test]
 fn test_cz_rc_deterministic_match() {
     let p1 = Person::builder().cz_rc("8001150014").build();
@@ -3012,6 +3185,7 @@ fn test_cz_rc_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `DK CPR` is format-only: separator variants (`"1501801234"` vs `"150180-1234"`) deterministically match.
 #[test]
 fn test_dk_cpr_format_only_match() {
     let p1 = Person::builder().dk_cpr("1501801234").build();
@@ -3019,6 +3193,7 @@ fn test_dk_cpr_format_only_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `EE IK` deterministically matches itself.
 #[test]
 fn test_ee_ik_deterministic_match() {
     let p1 = Person::builder().ee_ik("48001150011").build();
@@ -3026,6 +3201,7 @@ fn test_ee_ik_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `ES DNI` deterministically matches across case/separator variants (`"12345678Z"` vs `"12345678-z"`).
 #[test]
 fn test_es_dni_deterministic_match() {
     let p1 = Person::builder().es_dni("12345678Z").build();
@@ -3033,6 +3209,7 @@ fn test_es_dni_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `FI HETU` deterministically matches itself.
 #[test]
 fn test_fi_hetu_deterministic_match() {
     let p1 = Person::builder().fi_hetu("150180-999B").build();
@@ -3040,6 +3217,7 @@ fn test_fi_hetu_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `HR OIB` deterministically matches itself.
 #[test]
 fn test_hr_oib_deterministic_match() {
     let p1 = Person::builder().hr_oib("12345678903").build();
@@ -3047,6 +3225,7 @@ fn test_hr_oib_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `IS KT` deterministically matches itself.
 #[test]
 fn test_is_kt_deterministic_match() {
     let p1 = Person::builder().is_kt("1501802529").build();
@@ -3054,6 +3233,7 @@ fn test_is_kt_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `LT AK` deterministically matches itself.
 #[test]
 fn test_lt_ak_deterministic_match() {
     let p1 = Person::builder().lt_ak("48001150011").build();
@@ -3061,6 +3241,7 @@ fn test_lt_ak_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `LV PK` deterministically matches itself.
 #[test]
 fn test_lv_pk_deterministic_match() {
     let p1 = Person::builder().lv_pk("15018010007").build();
@@ -3068,6 +3249,7 @@ fn test_lv_pk_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `MT ID` deterministically matches across case variants (`"1234567M"` vs `"1234567m"`).
 #[test]
 fn test_mt_id_deterministic_match() {
     let p1 = Person::builder().mt_id("1234567M").build();
@@ -3075,6 +3257,7 @@ fn test_mt_id_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `NO FNR` deterministically matches itself.
 #[test]
 fn test_no_fnr_deterministic_match() {
     let p1 = Person::builder().no_fnr("15018012399").build();
@@ -3082,6 +3265,7 @@ fn test_no_fnr_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `PL PESEL` deterministically matches itself.
 #[test]
 fn test_pl_pesel_deterministic_match() {
     let p1 = Person::builder().pl_pesel("80011500014").build();
@@ -3089,6 +3273,7 @@ fn test_pl_pesel_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `RO CNP` deterministically matches itself.
 #[test]
 fn test_ro_cnp_deterministic_match() {
     let p1 = Person::builder().ro_cnp("1800115400012").build();
@@ -3096,6 +3281,7 @@ fn test_ro_cnp_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `SI EMŠO` deterministically matches itself.
 #[test]
 fn test_si_emso_deterministic_match() {
     let p1 = Person::builder().si_emso("1501980500015").build();
@@ -3103,6 +3289,7 @@ fn test_si_emso_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `SK RČ` deterministically matches itself.
 #[test]
 fn test_sk_rc_deterministic_match() {
     let p1 = Person::builder().sk_rc("8051150019").build();
@@ -3110,6 +3297,7 @@ fn test_sk_rc_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `UK NINO` deterministically matches across spacing/case variants (`"AB123456A"` vs `"ab 12 34 56 a"`).
 #[test]
 fn test_uk_nino_deterministic_match() {
     let p1 = Person::builder().uk_nino("AB123456A").build();
@@ -3117,6 +3305,7 @@ fn test_uk_nino_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Each of the eighteen T-27 schemes is sufficient on its own to pass `Person::validate`.
 #[test]
 fn test_eighteen_new_schemes_each_validate_solo() {
     assert!(
@@ -3251,6 +3440,7 @@ fn test_eighteen_new_schemes_each_validate_solo() {
 // §21b. Five additional personal identifiers (T-28)
 // ============================================================
 
+/// `GR DSS` deterministically matches across separator variants and a solo `GR DSS` passes `validate`.
 #[test]
 fn test_gr_dss_deterministic_match() {
     let p1 = Person::builder().gr_dss("1234567890").build();
@@ -3265,6 +3455,7 @@ fn test_gr_dss_deterministic_match() {
     );
 }
 
+/// Two distinct `GR DSS` values score `0.0`.
 #[test]
 fn test_gr_dss_mismatch_scores_zero() {
     let p1 = Person::builder()
@@ -3281,6 +3472,7 @@ fn test_gr_dss_mismatch_scores_zero() {
     assert_eq!(r.breakdown.gr_dss_score, Some(0.0));
 }
 
+/// `LI ID` deterministically matches across spacing variants of the 8-digit form.
 #[test]
 fn test_li_id_deterministic_match_with_8_digit_form() {
     let p1 = Person::builder().li_id("ID12345678").build();
@@ -3288,6 +3480,7 @@ fn test_li_id_deterministic_match_with_8_digit_form() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `LI ID` deterministically matches itself in the 9-trailing-digit form from the spec example.
 #[test]
 fn test_li_id_deterministic_match_with_9_digit_form() {
     // Spec example uses 9 trailing digits.
@@ -3296,6 +3489,7 @@ fn test_li_id_deterministic_match_with_9_digit_form() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `NL ID` deterministically matches across case/spacing variants and a solo `NL ID` passes `validate`.
 #[test]
 fn test_nl_id_deterministic_match() {
     let p1 = Person::builder().nl_id("AB1234567").build();
@@ -3310,6 +3504,7 @@ fn test_nl_id_deterministic_match() {
     );
 }
 
+/// `NL ID` and `NL BSN` are scheme-local: the same digits against different schemes do not cross-match.
 #[test]
 fn test_nl_id_distinct_from_nl_bsn() {
     // The two NL fields are scheme-local: same digits recorded against
@@ -3319,6 +3514,7 @@ fn test_nl_id_distinct_from_nl_bsn() {
     assert!(!MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `PL NIP` deterministically matches across separator variants.
 #[test]
 fn test_pl_nip_deterministic_match() {
     let p1 = Person::builder().pl_nip("1234567802").build();
@@ -3326,6 +3522,7 @@ fn test_pl_nip_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `PL NIP` (tax) and `PL PESEL` (national ID) are scheme-local even within Poland — no cross-match.
 #[test]
 fn test_pl_nip_distinct_from_pl_pesel() {
     // NIP (tax) and PESEL (national ID) are scheme-local even within Poland.
@@ -3334,6 +3531,7 @@ fn test_pl_nip_distinct_from_pl_pesel() {
     assert!(!MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `PT NIF` deterministically matches across whitespace variants.
 #[test]
 fn test_pt_nif_deterministic_match() {
     let p1 = Person::builder().pt_nif("123456789").build();
@@ -3341,6 +3539,7 @@ fn test_pt_nif_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Each of the five T-28 schemes is sufficient on its own to pass `Person::validate`.
 #[test]
 fn test_five_new_schemes_each_validate_solo() {
     assert!(
@@ -3387,6 +3586,7 @@ fn test_five_new_schemes_each_validate_solo() {
 // One deterministic-match test + one cross-scheme isolation test per
 // scheme, plus a solo-validate sweep and a polyglot round-trip.
 
+/// `BR CPF` deterministically matches across separator variants (`"12345678909"` vs `"123.456.789-09"`).
 #[test]
 fn test_br_cpf_deterministic_match() {
     let p1 = Person::builder().br_cpf("12345678909").build();
@@ -3394,6 +3594,7 @@ fn test_br_cpf_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Two distinct valid `BR CPF` values do not deterministically match.
 #[test]
 fn test_br_cpf_rejects_mismatch() {
     let p1 = Person::builder().br_cpf("12345678909").build();
@@ -3401,6 +3602,7 @@ fn test_br_cpf_rejects_mismatch() {
     assert!(!MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `CN RRN` deterministically matches across case of the trailing `X` check character.
 #[test]
 fn test_cn_rrn_deterministic_match() {
     let p1 = Person::builder().cn_rrn("11010519491231002X").build();
@@ -3408,6 +3610,7 @@ fn test_cn_rrn_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `IN Aadhaar` deterministically matches across spacing variants.
 #[test]
 fn test_in_aadhaar_deterministic_match() {
     let p1 = Person::builder().in_aadhaar("234123412346").build();
@@ -3415,6 +3618,7 @@ fn test_in_aadhaar_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `JP My Number` deterministically matches across separator variants.
 #[test]
 fn test_jp_my_number_deterministic_match() {
     let p1 = Person::builder().jp_my_number("123456789018").build();
@@ -3422,6 +3626,7 @@ fn test_jp_my_number_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `MX CURP` deterministically matches across case variants.
 #[test]
 fn test_mx_curp_deterministic_match() {
     let p1 = Person::builder().mx_curp("HEGG560427MVZRRL04").build();
@@ -3429,6 +3634,7 @@ fn test_mx_curp_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `NZ NHI` deterministically matches across case variants.
 #[test]
 fn test_nz_nhi_deterministic_match() {
     let p1 = Person::builder().nz_nhi("ZAA0083").build();
@@ -3436,6 +3642,7 @@ fn test_nz_nhi_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `ZA ID` deterministically matches across spacing variants.
 #[test]
 fn test_za_id_deterministic_match() {
     let p1 = Person::builder().za_id("8001015009087").build();
@@ -3443,6 +3650,7 @@ fn test_za_id_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// T-17.1 schemes are scheme-local: a `BR CPF` and a `US SSN` with overlapping digits must not cross-match.
 #[test]
 fn test_t17_1_scheme_local_isolation() {
     // Two records with the *same digit-string* across two different
@@ -3455,6 +3663,7 @@ fn test_t17_1_scheme_local_isolation() {
     assert!(!MatchingEngine::default_config().deterministic_match(&cpf_record, &ssn_record));
 }
 
+/// Each of the seven T-17.1 schemes is sufficient on its own to pass `Person::validate`.
 #[test]
 fn test_t17_1_schemes_each_validate_solo() {
     for builder in [
@@ -3473,6 +3682,7 @@ fn test_t17_1_schemes_each_validate_solo() {
     }
 }
 
+/// A polyglot T-17.1 record cloned against itself reports `1.0` for each of the seven new identifier sub-scores.
 #[test]
 fn test_t17_1_breakdown_carries_each_score() {
     let p1 = Person::builder()
@@ -3496,6 +3706,7 @@ fn test_t17_1_breakdown_carries_each_score() {
     assert_eq!(r.breakdown.za_id_score, Some(1.0));
 }
 
+/// An unparseable `BR CPF` scores `None`, not `0.0`.
 #[test]
 fn test_t17_1_unparseable_yields_none_not_zero() {
     let p1 = Person::builder()
@@ -3512,6 +3723,7 @@ fn test_t17_1_unparseable_yields_none_not_zero() {
     assert_eq!(r.breakdown.br_cpf_score, None);
 }
 
+/// A `Person` carrying all seven T-17.1 identifiers survives a JSON round-trip.
 #[test]
 fn test_t17_1_serde_round_trip_all_seven() {
     let p = Person::builder()
@@ -3530,6 +3742,7 @@ fn test_t17_1_serde_round_trip_all_seven() {
     assert_eq!(p, back);
 }
 
+/// A legacy `Person` JSON lacking the seven T-17.1 fields deserialises with each of them `None`.
 #[test]
 fn test_t17_1_legacy_payload_deserialises_to_none() {
     // Legacy JSON without the new fields must round-trip with None.
@@ -3564,6 +3777,7 @@ fn test_t17_1_legacy_payload_deserialises_to_none() {
 // via PassportBook. The tests just verify the parsers accept canonical
 // inputs and reject obviously-wrong ones.
 
+/// The per-country passport-number format validators accept canonical inputs and echo the canonical form.
 #[test]
 fn test_country_passport_format_validators_round_trip() {
     use person_matcher::identifiers as id;
@@ -3579,6 +3793,7 @@ fn test_country_passport_format_validators_round_trip() {
     assert_eq!(id::parse_sk_passport("AB1234567"), Some("AB1234567".into()));
 }
 
+/// Typical ingestion flow: validate format with a per-country parser, then build a `PassportBook` from the canonical number; country provenance lives on the book.
 #[test]
 fn test_country_passport_validators_compose_with_passport_book() {
     use person_matcher::PassportBook;
@@ -3594,6 +3809,7 @@ fn test_country_passport_validators_compose_with_passport_book() {
     assert_eq!(book.number, "AB123456");
 }
 
+/// The three 10-digit UK schemes (`CHI`, `UK NHS Number`, `H&C`) never cross-match each other, and `UK NINO` (different format) crosses with none.
 #[test]
 fn test_uk_chi_does_not_cross_match_uk_nino_or_united_kingdom_national_health_service_number_or_uk_hc()
  {
@@ -3625,6 +3841,7 @@ fn test_uk_chi_does_not_cross_match_uk_nino_or_united_kingdom_national_health_se
 // (country, number) pair across the two persons' lists as a match,
 // regardless of issue date.
 
+/// A shared `(country, number)` passport pair (case/whitespace tolerated) drives a `deterministic_match` despite different names.
 #[test]
 fn test_passport_book_single_pair_deterministic_match() {
     let p1 = Person::builder()
@@ -3640,6 +3857,7 @@ fn test_passport_book_single_pair_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// With multiple books per person, any one shared `(country, number)` pair (here US) triggers the match.
 #[test]
 fn test_passport_book_multi_country_any_pair_matches() {
     // p1 holds GB and US passports; p2 holds FR and US passports.
@@ -3659,6 +3877,7 @@ fn test_passport_book_multi_country_any_pair_matches() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Same passport number under different countries (`GB` vs `US`) are different identifiers: no deterministic match, sub-score `0.0`.
 #[test]
 fn test_passport_book_same_number_different_country_does_not_match() {
     // A UK book "AB123456" and a US book "AB123456" are different
@@ -3675,6 +3894,7 @@ fn test_passport_book_same_number_different_country_does_not_match() {
     assert_eq!(r.breakdown.passport_book_score, Some(0.0));
 }
 
+/// A shared historical (renewed-away) book on the same country still drives a deterministic match.
 #[test]
 fn test_passport_book_historical_pair_still_matches() {
     // A renewed passport: p1 carries only the current book; p2 carries
@@ -3690,6 +3910,7 @@ fn test_passport_book_historical_pair_still_matches() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Disjoint passport books (same country, different numbers) score `passport_book_score` `0.0`.
 #[test]
 fn test_passport_book_score_zero_when_disjoint() {
     let p1 = Person::builder()
@@ -3706,6 +3927,7 @@ fn test_passport_book_score_zero_when_disjoint() {
     assert_eq!(r.breakdown.passport_book_score, Some(0.0));
 }
 
+/// When one side carries no passport books, the sub-score is `None`.
 #[test]
 fn test_passport_book_score_none_when_either_side_empty() {
     let p1 = Person::builder()
@@ -3718,6 +3940,7 @@ fn test_passport_book_score_none_when_either_side_empty() {
     assert_eq!(r.breakdown.passport_book_score, None);
 }
 
+/// Issue/expiry dates are metadata only: a shared `(country, number)` matches regardless of differing effective dates.
 #[test]
 fn test_passport_book_dates_are_metadata_not_used_in_matching() {
     // Same (country, number) but very different effective dates:
@@ -3741,6 +3964,7 @@ fn test_passport_book_dates_are_metadata_not_used_in_matching() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// A `Person` carrying multiple `PassportBook`s (with dates) survives a JSON round-trip.
 #[test]
 fn test_passport_book_serde_round_trip_with_person() {
     let p = Person::builder()
@@ -3758,6 +3982,7 @@ fn test_passport_book_serde_round_trip_with_person() {
     assert_eq!(p, back);
 }
 
+/// A legacy `Person` JSON lacking `passport_books` deserialises to an empty list and the matcher accepts it (sub-score `None`).
 #[test]
 fn test_passport_book_legacy_person_json_without_books_deserialises() {
     // Pre-feature JSON payload lacking `passport_books` must
@@ -3791,6 +4016,7 @@ fn test_passport_book_legacy_person_json_without_books_deserialises() {
 // gender: Some(1.0) for equal, Some(0.0) for different, None if either
 // side is missing. NOT consulted by deterministic_match (too weak alone).
 
+/// Matching `BloodType` scores `1.0`.
 #[test]
 fn test_blood_type_match_scores_one() {
     let p1 = Person::builder()
@@ -3807,6 +4033,7 @@ fn test_blood_type_match_scores_one() {
     assert_eq!(r.breakdown.blood_type_score, Some(1.0));
 }
 
+/// Disagreeing `BloodType` scores `0.0` in the breakdown even when the overall score stays high (small weight) — surfaced for clinical review.
 #[test]
 fn test_blood_type_mismatch_scores_zero() {
     // Same name + DOB, but disagreeing blood type. The probabilistic
@@ -3828,6 +4055,7 @@ fn test_blood_type_mismatch_scores_zero() {
     assert_eq!(r.breakdown.blood_type_score, Some(0.0));
 }
 
+/// A blood type on only one side scores `None`.
 #[test]
 fn test_blood_type_missing_on_one_side_scores_none() {
     let p1 = Person::builder()
@@ -3840,6 +4068,7 @@ fn test_blood_type_missing_on_one_side_scores_none() {
     assert_eq!(r.breakdown.blood_type_score, None);
 }
 
+/// Matching blood type alone is too weak to drive a `deterministic_match`.
 #[test]
 fn test_blood_type_is_not_part_of_deterministic_match() {
     // Two records with matching blood type but no other identifying
@@ -3858,6 +4087,7 @@ fn test_blood_type_is_not_part_of_deterministic_match() {
     assert!(!MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `BloodType::parse` accepts free-text (`"O Positive"`) and round-trips through the builder to `OPositive`.
 #[test]
 fn test_blood_type_parses_through_builder() {
     // Common ingestion pattern: parse a free-text blood-type column.
@@ -3870,6 +4100,7 @@ fn test_blood_type_parses_through_builder() {
     assert_eq!(p.blood_type, Some(BloodType::OPositive));
 }
 
+/// `BloodType` serialises to its canonical short form (`"AB-"`) and survives a `Person` JSON round-trip.
 #[test]
 fn test_blood_type_round_trips_via_person_serde() {
     let p = Person::builder()
@@ -3886,6 +4117,7 @@ fn test_blood_type_round_trips_via_person_serde() {
     assert_eq!(p, back);
 }
 
+/// A legacy `Person` JSON lacking `blood_type` deserialises with it `None`.
 #[test]
 fn test_blood_type_legacy_person_json_without_field_deserialises() {
     // Pre-feature JSON payload lacking `blood_type` must deserialise
@@ -3911,6 +4143,7 @@ fn test_blood_type_legacy_person_json_without_field_deserialises() {
 // §23. Place of birth (FHIR Patient.birthPlace)
 // ============================================================
 
+/// Identical birth place (city + country) scores `~1.0`.
 #[test]
 fn test_birth_place_matcher_city_and_country_scores_high() {
     let bp = Address::new().with_city("Cardiff").with_country("Wales");
@@ -3929,6 +4162,7 @@ fn test_birth_place_matcher_city_and_country_scores_high() {
     assert!(s > 0.99, "identical birth place should score ~1.0: {s}");
 }
 
+/// Wildly different birth places score `< 0.5`.
 #[test]
 fn test_birth_place_different_city_lowers_score() {
     let p1 = Person::builder()
@@ -3953,6 +4187,7 @@ fn test_birth_place_different_city_lowers_score() {
     );
 }
 
+/// Same city, different country weights to `0.7` (0.7 city + 0.3 country arithmetic).
 #[test]
 fn test_birth_place_same_city_different_country_is_partial() {
     // Same city name but different country → 0.7 × 1.0 + 0.3 × 0.0 = 0.7
@@ -3974,6 +4209,7 @@ fn test_birth_place_same_city_different_country_is_partial() {
     );
 }
 
+/// A birth place on only one side scores `None`.
 #[test]
 fn test_birth_place_missing_on_one_side_scores_none() {
     let p1 = Person::builder()
@@ -3986,6 +4222,7 @@ fn test_birth_place_missing_on_one_side_scores_none() {
     assert_eq!(r.breakdown.birth_place_score, None);
 }
 
+/// With no city on either side, matching country alone scores `1.0`.
 #[test]
 fn test_birth_place_only_country_populated_falls_back_to_country() {
     // No city on either side, but country present and matching.
@@ -4003,6 +4240,7 @@ fn test_birth_place_only_country_populated_falls_back_to_country() {
     assert_eq!(r.breakdown.birth_place_score, Some(1.0));
 }
 
+/// Two empty birth-place addresses (no city, no country) have no signal and score `None`.
 #[test]
 fn test_birth_place_empty_subfields_score_none() {
     // Both sides have a birth_place but neither city nor country
@@ -4021,6 +4259,7 @@ fn test_birth_place_empty_subfields_score_none() {
     assert_eq!(r.breakdown.birth_place_score, None);
 }
 
+/// Matching birth place alone is too weak to drive a `deterministic_match`.
 #[test]
 fn test_birth_place_is_not_part_of_deterministic_match() {
     // Matching birth place but no other identifying overlap → not a
@@ -4038,6 +4277,7 @@ fn test_birth_place_is_not_part_of_deterministic_match() {
     assert!(!MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Birth-place city matching is diacritic-tolerant (`"Zürich"` matches `"Zurich"`), scoring `~1.0`.
 #[test]
 fn test_birth_place_diacritic_normalisation() {
     // City names with diacritics canonicalise the same as their
@@ -4066,6 +4306,7 @@ fn test_birth_place_diacritic_normalisation() {
     assert!(s > 0.99, "diacritic-stripped match should score ~1.0: {s}");
 }
 
+/// Birth place survives a `Person` JSON round-trip.
 #[test]
 fn test_birth_place_round_trips_via_person_serde() {
     let p = Person::builder()
@@ -4078,6 +4319,7 @@ fn test_birth_place_round_trips_via_person_serde() {
     assert_eq!(p, back);
 }
 
+/// A legacy `Person` JSON lacking `birth_place` deserialises with it `None`.
 #[test]
 fn test_birth_place_legacy_payload_deserialises_to_none() {
     let legacy = r#"{
@@ -4101,6 +4343,7 @@ fn test_birth_place_legacy_payload_deserialises_to_none() {
 // §24. Multiple-birth indicator (FHIR Patient.multipleBirth)
 // ============================================================
 
+/// Matching `multiple_birth` order scores `1.0`.
 #[test]
 fn test_multiple_birth_match_scores_one() {
     let p1 = Person::builder()
@@ -4119,6 +4362,7 @@ fn test_multiple_birth_match_scores_one() {
     assert_eq!(r.breakdown.multiple_birth_score, Some(1.0));
 }
 
+/// The canonical use case: identical twins with the same name + DOB are disambiguated by differing `multiple_birth` order (`0.0`), preventing an erroneous merge.
 #[test]
 fn test_multiple_birth_disambiguates_identical_twins() {
     // The canonical failure mode: two records with identical name, DOB,
@@ -4144,6 +4388,7 @@ fn test_multiple_birth_disambiguates_identical_twins() {
     assert_eq!(r.breakdown.multiple_birth_score, Some(0.0));
 }
 
+/// A `multiple_birth` value on only one side scores `None`.
 #[test]
 fn test_multiple_birth_missing_on_one_side_scores_none() {
     let p1 = Person::builder()
@@ -4156,6 +4401,7 @@ fn test_multiple_birth_missing_on_one_side_scores_none() {
     assert_eq!(r.breakdown.multiple_birth_score, None);
 }
 
+/// A `multiple_birth` value does not by itself drive a `deterministic_match`.
 #[test]
 fn test_multiple_birth_is_not_part_of_deterministic_match() {
     // Even with all other demographic signals aligning, a multiple_birth
@@ -4175,6 +4421,7 @@ fn test_multiple_birth_is_not_part_of_deterministic_match() {
     assert!(!MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// `multiple_birth` serialises and survives a `Person` JSON round-trip.
 #[test]
 fn test_multiple_birth_round_trips_via_person_serde() {
     let p = Person::builder()
@@ -4191,6 +4438,7 @@ fn test_multiple_birth_round_trips_via_person_serde() {
     assert_eq!(p, back);
 }
 
+/// A legacy `Person` JSON lacking `multiple_birth` deserialises with it `None`.
 #[test]
 fn test_multiple_birth_legacy_payload_deserialises_to_none() {
     let legacy = r#"{
@@ -4210,6 +4458,7 @@ fn test_multiple_birth_legacy_payload_deserialises_to_none() {
     assert!(p.multiple_birth.is_none());
 }
 
+/// A polyglot `Person` carrying all the core multinational identifiers survives a JSON round-trip unchanged.
 #[test]
 fn test_serialization_round_trip_carries_all_identifiers() {
     let p = Person::builder()
@@ -4239,6 +4488,7 @@ fn test_serialization_round_trip_carries_all_identifiers() {
 // §25. Death date and death place (FHIR Patient.deceasedDateTime)
 // ============================================================
 
+/// An exact `death_date` match scores `1.0`.
 #[test]
 fn test_death_date_exact_match_scores_one() {
     let p1 = Person::builder()
@@ -4255,6 +4505,7 @@ fn test_death_date_exact_match_scores_one() {
     assert_eq!(r.breakdown.death_date_score, Some(1.0));
 }
 
+/// `death_date` reuses the DOB transposition heuristic: a day/month swap scores `0.5`.
 #[test]
 fn test_death_date_day_month_swap_scores_half() {
     // The same transposition heuristic as date_of_birth: 07/06 vs 06/07.
@@ -4272,6 +4523,7 @@ fn test_death_date_day_month_swap_scores_half() {
     assert_eq!(r.breakdown.death_date_score, Some(0.5));
 }
 
+/// Unrelated death dates score `0.0`.
 #[test]
 fn test_death_date_unrelated_dates_score_zero() {
     let p1 = Person::builder()
@@ -4288,6 +4540,7 @@ fn test_death_date_unrelated_dates_score_zero() {
     assert_eq!(r.breakdown.death_date_score, Some(0.0));
 }
 
+/// A death date on only one side scores `None`.
 #[test]
 fn test_death_date_missing_on_one_side_scores_none() {
     let p1 = Person::builder()
@@ -4300,6 +4553,7 @@ fn test_death_date_missing_on_one_side_scores_none() {
     assert_eq!(r.breakdown.death_date_score, None);
 }
 
+/// `death_date` and `date_of_birth` score independently: a matching DOB does not mask a disagreeing DOD.
 #[test]
 fn test_death_date_is_independent_from_date_of_birth() {
     // A matching DOB but different DOD must not be hidden by the
@@ -4322,6 +4576,7 @@ fn test_death_date_is_independent_from_date_of_birth() {
     assert_eq!(r.breakdown.death_date_score, Some(0.0));
 }
 
+/// Identical death place (city + country) scores `~1.0`.
 #[test]
 fn test_death_place_matcher_city_and_country_scores_high() {
     let dp = Address::new().with_city("Wilmslow").with_country("England");
@@ -4340,6 +4595,7 @@ fn test_death_place_matcher_city_and_country_scores_high() {
     assert!(s > 0.99, "identical death place should score ~1.0: {s}");
 }
 
+/// Different death places score `< 0.5`.
 #[test]
 fn test_death_place_different_city_lowers_score() {
     let p1 = Person::builder()
@@ -4357,6 +4613,7 @@ fn test_death_place_different_city_lowers_score() {
     assert!(s < 0.5, "different death places should score low: {s}");
 }
 
+/// Same city, different country weights to `0.7` — symmetrical to the birth-place case.
 #[test]
 fn test_death_place_same_city_different_country_is_partial() {
     // Symmetrical to the birth_place case: city-only agreement → 0.7.
@@ -4378,6 +4635,7 @@ fn test_death_place_same_city_different_country_is_partial() {
     );
 }
 
+/// A death place on only one side scores `None`.
 #[test]
 fn test_death_place_missing_on_one_side_scores_none() {
     let p1 = Person::builder()
@@ -4390,6 +4648,7 @@ fn test_death_place_missing_on_one_side_scores_none() {
     assert_eq!(r.breakdown.death_place_score, None);
 }
 
+/// Birth place and death place score independently — a person may be born and die in different places.
 #[test]
 fn test_death_place_is_independent_from_birth_place() {
     // A person may be born in one country and die in another. The
@@ -4413,6 +4672,7 @@ fn test_death_place_is_independent_from_birth_place() {
     assert!(dp > 0.99);
 }
 
+/// Matching death place alone is too weak to drive a `deterministic_match`.
 #[test]
 fn test_death_place_is_not_part_of_deterministic_match() {
     // Matching death place alone is not enough for a deterministic
@@ -4430,6 +4690,7 @@ fn test_death_place_is_not_part_of_deterministic_match() {
     assert!(!MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
+/// Death date and death place survive a `Person` JSON round-trip.
 #[test]
 fn test_death_date_round_trips_via_person_serde() {
     let p = Person::builder()
@@ -4443,6 +4704,7 @@ fn test_death_date_round_trips_via_person_serde() {
     assert_eq!(p, back);
 }
 
+/// A legacy `Person` JSON lacking the death fields deserialises with `death_date` and `death_place` both `None`.
 #[test]
 fn test_death_fields_legacy_payload_deserialises_to_none() {
     let legacy = r#"{
@@ -4463,6 +4725,7 @@ fn test_death_fields_legacy_payload_deserialises_to_none() {
     assert!(p.death_place.is_none());
 }
 
+/// A matching death date contributes its weight, lifting the composite above an otherwise-weak no-DOD baseline.
 #[test]
 fn test_death_date_weight_contributes_to_composite_score() {
     // With a strongly matching death date the composite confidence
@@ -4501,6 +4764,7 @@ fn test_death_date_weight_contributes_to_composite_score() {
 // §26. Address sub-score arithmetic (T-3 / OQ-4)
 // ============================================================
 
+/// OQ-4 / FR-7 acceptance: an exact postcode plus a slight street typo clears `0.7` because postcode carries the dominant `0.5` weight in the weighted average.
 #[test]
 fn test_address_subscore_postcode_dominates_via_weighted_average() {
     // OQ-4 / FR-7 acceptance: an exact postcode match plus a
@@ -4533,6 +4797,7 @@ fn test_address_subscore_postcode_dominates_via_weighted_average() {
     );
 }
 
+/// A postcode-only address matching exactly collapses to `address_score` `1.0`.
 #[test]
 fn test_address_subscore_postcode_only_match_collapses_to_one() {
     let p1 = Person::builder()

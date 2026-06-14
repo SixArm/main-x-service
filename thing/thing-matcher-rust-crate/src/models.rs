@@ -276,18 +276,37 @@ impl Thing {
 /// ```
 #[derive(Default)]
 pub struct ThingBuilder {
+    // Each field mirrors the matching [`Thing`] field it will populate in
+    // [`ThingBuilder::build`]. All default to `None` / empty (via
+    // `#[derive(Default)]`) so an unset field never appears as data on the
+    // built thing.
+    /// Pending primary canonical name; populates [`Thing::name`].
     name: Option<String>,
+    /// Pending alternate names; populates [`Thing::alternate_names`].
     alternate_names: Vec<String>,
+    /// Pending free-form description; populates [`Thing::description`].
     description: Option<String>,
+    /// Pending disambiguating description; populates
+    /// [`Thing::disambiguating_description`].
     disambiguating_description: Option<String>,
+    /// Pending external identifiers; populates [`Thing::identifiers`].
     identifiers: Vec<Identifier>,
+    /// Pending canonical URL; populates [`Thing::url`].
     url: Option<String>,
+    /// Pending representative image URL; populates [`Thing::image`].
     image: Option<String>,
+    /// Pending `sameAs` reference URLs; populates [`Thing::same_as`].
     same_as: Vec<String>,
+    /// Pending `mainEntityOfPage` URL; populates
+    /// [`Thing::main_entity_of_page`].
     main_entity_of_page: Option<String>,
+    /// Pending `additionalType` URIs; populates [`Thing::additional_types`].
     additional_types: Vec<String>,
+    /// Pending `subjectOf` URLs; populates [`Thing::subject_of`].
     subject_of: Vec<String>,
+    /// Pending owner string; populates [`Thing::owner`].
     owner: Option<String>,
+    /// Pending originating-system local id; populates [`Thing::local_id`].
     local_id: Option<String>,
 }
 
@@ -569,6 +588,8 @@ impl ThingBuilder {
 mod tests {
     use super::*;
 
+    /// Pins that a freshly built thing carries no data: every optional
+    /// field is `None` and every collection field is empty.
     #[test]
     fn thing_builder_starts_empty() {
         let t = Thing::builder().build();
@@ -587,6 +608,8 @@ mod tests {
         assert!(t.local_id.is_none());
     }
 
+    /// Pins the `impl Into<String>` ergonomics: setters accept both `&str`
+    /// and owned `String` without explicit conversion at the call site.
     #[test]
     fn thing_builder_accepts_str_and_string() {
         let t = Thing::builder()
@@ -597,6 +620,8 @@ mod tests {
         assert_eq!(t.alternate_names, vec!["La Tour Eiffel".to_string()]);
     }
 
+    /// Pins the single validation rule: `validate()` succeeds when a name
+    /// is present and returns `MissingField` when it is absent.
     #[test]
     fn thing_validate_requires_a_name() {
         assert!(
@@ -613,6 +638,8 @@ mod tests {
         assert!(matches!(err, crate::MatchingError::MissingField(_)));
     }
 
+    /// Pins that a fully-populated `Thing` survives a serde JSON round-trip
+    /// unchanged — the data model is a faithful serialisation contract.
     #[test]
     fn thing_round_trips_through_serde() {
         let t = Thing::builder()
@@ -629,6 +656,8 @@ mod tests {
         assert_eq!(t, back);
     }
 
+    /// Pins that the plural `alternate_names` setter *replaces* the whole
+    /// vec (as opposed to `add_alternate_name`, which appends).
     #[test]
     fn alternate_names_setter_replaces_vec() {
         let t = Thing::builder()
@@ -637,6 +666,8 @@ mod tests {
         assert_eq!(t.alternate_names, vec!["X".to_string(), "Y".to_string()]);
     }
 
+    /// Pins the only normalisation `Identifier::new` performs: surrounding
+    /// whitespace is trimmed off both the property id and the value.
     #[test]
     fn identifier_trims_value_and_property_id() {
         let id = Identifier::new("  wikidata  ", "   Q243 ").unwrap();
@@ -644,6 +675,9 @@ mod tests {
         assert_eq!(id.value, "Q243");
     }
 
+    /// Pins the rejection rule: a component that is empty or
+    /// whitespace-only (after trimming) makes `Identifier::new` return
+    /// `None` — there is no such thing as an empty identifier.
     #[test]
     fn identifier_rejects_empty_components() {
         assert!(Identifier::new("wikidata", "").is_none());
@@ -652,6 +686,9 @@ mod tests {
         assert!(Identifier::new("   ", "Q243").is_none());
     }
 
+    /// Pins that identifier equality is scheme-scoped: the same value under
+    /// different `property_id`s is NOT equal, preventing cross-scheme
+    /// collisions (e.g. an `isbn` value matching a `wikidata` value).
     #[test]
     fn identifier_equality_is_property_scoped() {
         let g = Identifier::new("google", "X").unwrap();
@@ -659,6 +696,7 @@ mod tests {
         assert_ne!(g, w);
     }
 
+    /// Pins that an `Identifier` survives a serde JSON round-trip unchanged.
     #[test]
     fn identifier_round_trips_through_serde() {
         let id = Identifier::new("custom", "abc-123").unwrap();

@@ -147,6 +147,9 @@ fn person_builder_passport_book_surface() {
 // 2. Address builder surface — service adapter renames service fields here.
 // =============================================================================
 
+/// Pins every `Address` builder method the service adapter calls, including
+/// the field-rename routes (`with_county` ← service `state`, `with_postcode`
+/// ← service `postal_code`). A rename here breaks the adapter at compile time.
 #[test]
 fn address_builder_surface() {
     let a = Address::new()
@@ -167,6 +170,8 @@ fn address_builder_surface() {
 // 3. MatchingEngine entry points — every constructor / match method.
 // =============================================================================
 
+/// Pins the four `MatchingEngine` construction paths the service relies on:
+/// `default_config` plus `new` with the `default`/`strict`/`lenient` presets.
 #[test]
 fn matching_engine_constructor_surface() {
     let _: MatchingEngine = MatchingEngine::default_config();
@@ -175,6 +180,9 @@ fn matching_engine_constructor_surface() {
     let _: MatchingEngine = MatchingEngine::new(MatchConfig::lenient());
 }
 
+/// Pins the `MatchResult` / `MatchBreakdown` shape the adapter reads:
+/// `score` (`f64`), `is_match` (`bool`), `confidence` (`Confidence`), and the
+/// per-field `Option<f64>` breakdown fields it surfaces to callers.
 #[test]
 fn matching_engine_match_persons_returns_match_result() {
     let a = Person::builder().given_name("A").family_name("X").build();
@@ -198,6 +206,8 @@ fn matching_engine_match_persons_returns_match_result() {
     let _ = result.breakdown.passport_book_score;
 }
 
+/// Pins that `deterministic_match` returns `bool` and that a shared `US SSN`
+/// across two textual layouts triggers a deterministic hit.
 #[test]
 fn matching_engine_deterministic_match_returns_bool() {
     let a = Person::builder().us_ssn("111-22-3333").build();
@@ -206,6 +216,8 @@ fn matching_engine_deterministic_match_returns_bool() {
     assert!(res, "shared US SSN must trigger deterministic match");
 }
 
+/// Pins the batch entry point `match_one_to_many`: returns one `MatchResult`
+/// per candidate (length-preserving) with `f64` scores the adapter ranks on.
 #[test]
 fn matching_engine_match_one_to_many_returns_vec() {
     let query = Person::builder().given_name("Q").build();
@@ -219,6 +231,9 @@ fn matching_engine_match_one_to_many_returns_vec() {
 // 4. Enum + config-preset variants — Confidence + MatchConfig presets.
 // =============================================================================
 
+/// Pins the `Confidence` variant set (`High`/`Medium`/`Low`) and the
+/// `from_score` band boundaries (`0.95` → `High`, `0.80` → `Medium`,
+/// `0.10` → `Low`) the adapter maps onto its own labels.
 #[test]
 fn confidence_variants_exist() {
     let _ = Confidence::High;
@@ -229,12 +244,17 @@ fn confidence_variants_exist() {
     assert_eq!(Confidence::from_score(0.10), Confidence::Low);
 }
 
+/// Pins the full `Gender` variant set (`Male`/`Female`/`Other`/`Unknown`)
+/// the adapter constructs — adding/removing a variant must be deliberate.
 #[test]
 fn gender_variants_exist() {
     // Adapter constructs all four; this pins the variant set.
     let _ = [Gender::Male, Gender::Female, Gender::Other, Gender::Unknown];
 }
 
+/// Pins that the preset thresholds form a monotonic ladder
+/// (`strict >= default >= lenient`) — the service's strict-⊆-lenient
+/// invariant test depends on this ordering.
 #[test]
 fn match_config_preset_scores_form_monotonic_threshold_ladder() {
     // Strict threshold ≥ default ≥ lenient. The adapter's strict-⊆-lenient
@@ -253,6 +273,9 @@ fn match_config_preset_scores_form_monotonic_threshold_ladder() {
 // 5. Round-trip: MatchResult must serialize + deserialize (services persist).
 // =============================================================================
 
+/// Pins that `MatchResult` survives a serde JSON round-trip without value
+/// drift — services persist results as JSON, so the serialised shape is
+/// part of the contract.
 #[test]
 fn match_result_round_trips_through_json() {
     let a = Person::builder().given_name("A").family_name("B").build();
@@ -269,6 +292,8 @@ fn match_result_round_trips_through_json() {
 // 6. Compile-time guard: PersonBuilder is `Sized` and returnable by value.
 // =============================================================================
 
+/// Compile-time guard that `PersonBuilder` stays a `Sized` value type the
+/// adapter can move through `let mut b = b.method(...)` and return by value.
 #[test]
 fn person_builder_is_value_type() {
     // The adapter passes builders through `let mut b = b.method(...);` and

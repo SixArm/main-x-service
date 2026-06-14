@@ -346,12 +346,37 @@ impl Scorer {
     }
 }
 
+/// Shared Gaussian (bell-curve) decay kernel backing both
+/// [`Scorer::coordinates_score`] and [`Scorer::start_date_score`].
+///
+/// Computes `exp(-(distance/scale)^2)`, a smooth similarity that equals
+/// `1.0` at `distance == 0`, `1/e ~= 0.368` at `distance == scale`, and
+/// tends rapidly to `0.0` as the distance grows past a few multiples of
+/// `scale`. The squared ratio (versus a plain exponential `exp(-d/s)`) is
+/// chosen so that small differences are penalised very gently while large
+/// ones are penalised sharply — the desired shape for "near enough is a
+/// match, far apart is plainly not".
+///
+/// `distance` and `scale` are unitless here; callers supply metres (geo)
+/// or seconds (temporal) for both, so the ratio is dimensionless.
+///
+/// Pathological inputs are treated as **missing** rather than allowed to
+/// produce a misleading score: a non-finite `distance` or `scale`, a
+/// non-positive `scale` (division by zero / sign flip), or a negative
+/// `distance` (distances are absolute by construction) all return `0.0`.
+/// The final [`f64::clamp`] guards against any floating-point excursion
+/// outside `[0.0, 1.0]`.
 fn gaussian_decay(distance: f64, scale: f64) -> f64 {
+    // Reject inputs that cannot yield a meaningful similarity. Returning
+    // 0.0 (not NaN, not a panic) keeps the crate's panic-free contract.
     if !distance.is_finite() || !scale.is_finite() || scale <= 0.0 || distance < 0.0 {
         return 0.0;
     }
     let ratio = distance / scale;
+    // Square the ratio so the curve is the Gaussian bell, not a sharp spike.
     let s = (-(ratio * ratio)).exp();
+    // Defensive clamp: exp() of a finite negative is already in (0, 1], but
+    // pin the bounds so the contract holds even under rounding.
     s.clamp(0.0, 1.0)
 }
 

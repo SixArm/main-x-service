@@ -18,6 +18,15 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use person_matcher::{Address, Gender, MatchConfig, MatchingEngine, Person};
 
+/// Entry point for the demo binary.
+///
+/// Runs six scripted scenarios — exact match, fuzzy given name, diacritic
+/// equivalence, abbreviated address, a clear non-match, and a strict-vs-lenient
+/// nickname comparison — printing each result to stdout. The scenarios are
+/// chosen to exercise the distinct scoring paths (identifier short-circuit,
+/// Jaro-Winkler, Unicode normalisation, address sub-scoring, threshold
+/// behaviour) so a human can eyeball that the library is wired up correctly.
+/// It is a smoke test, not an automated assertion harness.
 fn main() {
     println!("Person matcher");
     println!("================\n");

@@ -178,24 +178,48 @@ impl MatchingEngine {
 
 // ─── Deterministic rules ─────────────────────────────────────────
 
+/// Decide whether the two courses share a globally-unique identity
+/// signal that pins the score to `1.0` without scoring.
+///
+/// Returns `true` if any of three rules fire:
+///
+/// - **R-0** — both carry the same value under the same *deterministic*
+///   identifier scheme (DOI / Wikidata / LOM / OER / URI / UUID). These
+///   schemes are unique by construction, so an equal value is identity.
+/// - **R-1** — both share a non-empty `provider_id` AND a normalised
+///   `course_code`. Course codes are only unique *within* a provider,
+///   so the provider must match too (CS101 differs between schools).
+/// - **R-2** — their `same_as` URL sets overlap after folding. A shared
+///   cross-system URL (Wikidata page, OER entry) is an asserted identity.
+///
+/// Empty / blank values are skipped throughout so two absent
+/// identifiers never collide into a false positive — the worst-case
+/// bug for a rule that pins to `1.0`.
 fn deterministic_match(a: &Course, b: &Course) -> bool {
     // R-0 — any pair of deterministic identifiers shares a value.
     for ai in &a.identifiers {
+        // Provider-scoped schemes (CourseCode, LmsCourseId, …) are not
+        // globally unique, so they never trigger R-0.
         if !ai.scheme.is_deterministic() {
             continue;
         }
         let av = normalize::fold(&ai.value);
+        // A blank value is not an identity — skip it so "" != "" here.
         if av.is_empty() {
             continue;
         }
         for bi in &b.identifiers {
+            // Same scheme AND same folded value ⇒ deterministic identity.
             if ai.scheme == bi.scheme && av == normalize::fold(&bi.value) {
                 return true;
             }
         }
     }
 
-    // R-1 — same provider + same normalised course_code.
+    // R-1 — same provider + same normalised course_code. The `let …
+    // && …` chain requires all four fields present before comparing;
+    // `!ap.is_empty()` guards against two records that both carry a
+    // blank provider id accidentally matching.
     if let (Some(ap), Some(bp), Some(ac), Some(bc)) = (
         a.provider_id.as_deref(),
         b.provider_id.as_deref(),
@@ -211,6 +235,7 @@ fn deterministic_match(a: &Course, b: &Course) -> bool {
     // R-2 — any same_as URL overlaps (case-folded host+path).
     for au in &a.same_as {
         let an = normalize::fold(au);
+        // Skip blanks so two empty same_as entries don't "overlap".
         if an.is_empty() {
             continue;
         }
@@ -226,15 +251,35 @@ fn deterministic_match(a: &Course, b: &Course) -> bool {
 
 // ─── Probabilistic components ────────────────────────────────────
 
+/// Best name similarity in `[0.0, 1.0]` across primary + alternate
+/// names, with an optional Soundex bonus.
+///
+/// Why "best across alternates": a course can be catalogued under
+/// several titles (`schema.org/alternateName`), and a hit on any of
+/// them is evidence of the same course. We therefore take the maximum
+/// Jaro-Winkler over the primary-vs-primary pair plus each side's
+/// alternates against the other's primary.
+///
+/// The phonetic bonus (`PHONETIC_BONUS`) is added only when the two
+/// primary names share a Soundex code and the score is still below
+/// `PHONETIC_CEILING`, so a homophone (`Smyth`/`Smith`) is nudged up
+/// but a phonetic coincidence can never single-handedly mint a
+/// High-confidence match.
+///
+/// Always returns a value (name is the one component both records
+/// always carry), so the caller wraps it in `Some` unconditionally.
 fn name_score(a: &Course, b: &Course) -> f64 {
     let an = normalize::fold(&a.name);
     let bn = normalize::fold(&b.name);
+    // Baseline: folded primary names compared via Jaro-Winkler.
     let mut best = jaro_winkler(&an, &bn);
-    // Try alternate names from both sides too.
+    // Each of a's alternate titles gets a shot against b's primary;
+    // keep the best score seen so far.
     for alt in &a.alternate_names {
         let alt_n = normalize::fold(alt);
         best = best.max(jaro_winkler(&alt_n, &bn));
     }
+    // Symmetric: each of b's alternates against a's primary.
     for alt in &b.alternate_names {
         let alt_n = normalize::fold(alt);
         best = best.max(jaro_winkler(&an, &alt_n));
@@ -248,10 +293,21 @@ fn name_score(a: &Course, b: &Course) -> f64 {
     best
 }
 
+/// Same-provider course-code similarity, or `None` when the component
+/// can't be scored.
+///
+/// Returns:
+/// - `None` when either side lacks a (non-empty) course code, or when
+///   the two records don't share a provider — across providers a code
+///   like `CS101` is noise, so it is *skipped* (not scored zero) to
+///   avoid diluting the weighted average with a meaningless signal.
+/// - `Some(1.0)` when same provider and the normalised codes are equal.
+/// - `Some(0.0)` when same provider but the codes differ.
 fn course_code_score(a: &Course, b: &Course) -> Option<f64> {
     let (ac, bc) = (a.course_code.as_deref(), b.course_code.as_deref());
     let (ap, bp) = (a.provider_id.as_deref(), b.provider_id.as_deref());
 
+    // Need a non-empty course code on both sides, else skip the component.
     let (ac, bc) = match (ac, bc) {
         (Some(ac), Some(bc)) if !ac.is_empty() && !bc.is_empty() => (ac, bc),
         _ => return None,
@@ -271,12 +327,22 @@ fn course_code_score(a: &Course, b: &Course) -> Option<f64> {
     }
 }
 
+/// Provider similarity, or `None` when neither record names a provider.
+///
+/// Prefers the structured `provider_id`: when both carry a non-empty
+/// id the result is a crisp `1.0` (equal) or `0.0` (differ). When no
+/// usable id is present it falls back to fuzzy Jaro-Winkler on the
+/// free-text `provider_name` (so "Stanford University" ≈ "stanford
+/// university"). Returns `None` only when there is no provider signal
+/// at all, so the component is skipped rather than scored zero.
 fn provider_score(a: &Course, b: &Course) -> Option<f64> {
+    // Structured id is authoritative: exact equality decides 1.0 / 0.0.
     if let (Some(ap), Some(bp)) = (a.provider_id.as_deref(), b.provider_id.as_deref())
         && !ap.is_empty()
     {
         return Some(if ap == bp { 1.0 } else { 0.0 });
     }
+    // No id ⇒ fall back to fuzzy matching on the provider's display name.
     match (a.provider_name.as_deref(), b.provider_name.as_deref()) {
         (Some(an), Some(bn)) if !an.is_empty() && !bn.is_empty() => {
             Some(jaro_winkler(&normalize::fold(an), &normalize::fold(bn)))
@@ -285,19 +351,38 @@ fn provider_score(a: &Course, b: &Course) -> Option<f64> {
     }
 }
 
+/// Educational-level similarity, or `None` when either side is unset.
+///
+/// Levels rarely match exactly across catalogues, so adjacency earns
+/// partial credit: identical levels score `1.0`, levels one rung apart
+/// on the same ladder (e.g. Beginner↔Intermediate) score `0.5`, and
+/// everything else scores `0.0`. The half-credit reflects that an
+/// "Intermediate" and "Beginner" listing of the same subject are
+/// plausibly the same offering re-graded, whereas two rungs apart is
+/// most likely a genuinely different course.
 fn educational_level_score(a: &Course, b: &Course) -> Option<f64> {
+    // Both sides must declare a level; otherwise skip the component.
     let (Some(al), Some(bl)) = (&a.educational_level, &b.educational_level) else {
         return None;
     };
     Some(if al == bl {
         1.0
     } else if educational_level_one_off(al, bl) {
+        // Adjacent on a ladder ⇒ half credit.
         0.5
     } else {
         0.0
     })
 }
 
+/// `true` when `a` and `b` sit exactly one rung apart on the same
+/// educational ladder.
+///
+/// Three independent ladders are recognised — a generic skill ladder,
+/// a schooling-stage ladder, and a degree-level ladder. A pair counts
+/// as "one off" only when both levels appear on the *same* ladder and
+/// their indices differ by 1. Levels on different ladders (or two-plus
+/// rungs apart) are not adjacent, so the caller scores them `0.0`.
 fn educational_level_one_off(a: &EducationalLevel, b: &EducationalLevel) -> bool {
     use EducationalLevel::{
         Advanced, Beginner, Expert, Graduate, HigherEducation, Intermediate, Postgraduate,
@@ -321,19 +406,34 @@ fn educational_level_one_off(a: &EducationalLevel, b: &EducationalLevel) -> bool
     })
 }
 
+/// Jaccard similarity of two string sets (used for keywords and
+/// teaches), or `None` when neither side has any items.
+///
+/// Jaccard = |intersection| / |union| after folding/deduping both
+/// sides. Semantics of the edge cases:
+/// - both empty (before or after folding) ⇒ `None`, so the component
+///   is skipped, not scored — there is simply no evidence.
+/// - exactly one side empty ⇒ `Some(0.0)`: one course tags keywords,
+///   the other doesn't; that is weak negative evidence, scored zero.
+/// - otherwise the true Jaccard ratio in `[0.0, 1.0]`.
 fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
+    // Cheap pre-check before allocating the folded sets.
     if a.is_empty() && b.is_empty() {
         return None;
     }
     let a_set = normalize::fold_set(a);
     let b_set = normalize::fold_set(b);
+    // After folding both could collapse to empty (all blanks) ⇒ skip.
     if a_set.is_empty() && b_set.is_empty() {
         return None;
     }
+    // Exactly one side has tags ⇒ zero overlap is meaningful evidence.
     if a_set.is_empty() || b_set.is_empty() {
         return Some(0.0);
     }
+    // Sets are sorted+deduped, so `contains` counts each shared item once.
     let inter: usize = a_set.iter().filter(|x| b_set.contains(x)).count();
+    // |A ∪ B| = |A| + |B| − |A ∩ B|.
     let union: usize = a_set.len() + b_set.len() - inter;
     if union == 0 {
         Some(0.0)
@@ -344,18 +444,23 @@ fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
     }
 }
 
-// Re-export so the `course_matcher::CourseIdentifier` path resolves
-// from inside other modules without re-naming.
+// Anonymous (`as _`) import of `CourseIdentifier`: it keeps the type
+// in scope for trait/path resolution without binding a usable name,
+// so it cannot collide with anything. `#[allow(unused_imports)]`
+// silences the lint since the binding is intentionally name-less.
 #[allow(unused_imports)]
 use CourseIdentifier as _;
 
 // ─── Tests ───────────────────────────────────────────────────────
 
+/// Unit tests for the engine surface, deterministic short-circuits,
+/// and each probabilistic component function.
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::course::IdentifierScheme;
 
+    /// Test helper: build a `CourseIdentifier` from a scheme + value.
     fn ident(scheme: IdentifierScheme, value: &str) -> crate::CourseIdentifier {
         crate::CourseIdentifier {
             scheme,
@@ -363,6 +468,7 @@ mod tests {
         }
     }
 
+    // Pins that two byte-identical courses score ≈1.0 and match.
     #[test]
     fn identical_courses_score_1() {
         let engine = MatchingEngine::default_config();
@@ -373,6 +479,7 @@ mod tests {
         assert!(r.is_match);
     }
 
+    // Pins R-0: a shared DOI pins to 1.0 even when names are unrelated.
     #[test]
     fn doi_match_short_circuits() {
         let engine = MatchingEngine::default_config();
@@ -387,6 +494,8 @@ mod tests {
         assert!(r.breakdown.deterministic_match);
     }
 
+    // Pins R-1: same provider + normalised course codes (`cs101` vs
+    // `CS 101`) pin to 1.0 despite differing titles.
     #[test]
     fn same_provider_course_code_short_circuits() {
         let engine = MatchingEngine::default_config();
@@ -400,6 +509,7 @@ mod tests {
         assert!((r.score - 1.0).abs() < 1e-9);
     }
 
+    // Pins that two unrelated titles score well below 0.5 and don't match.
     #[test]
     fn unrelated_courses_score_low() {
         let engine = MatchingEngine::default_config();
@@ -463,6 +573,7 @@ mod tests {
         assert!(with <= 0.95 + f64::EPSILON);
     }
 
+    // Pins that one-to-many returns results in candidate order (no sort).
     #[test]
     fn match_one_to_many_preserves_input_order() {
         let engine = MatchingEngine::default_config();
@@ -479,6 +590,7 @@ mod tests {
         assert!(out[1].score >= out[0].score);
     }
 
+    // Pins the empty-candidate edge case for one-to-many.
     #[test]
     fn match_one_to_many_empty_input_returns_empty() {
         let engine = MatchingEngine::default_config();
@@ -486,6 +598,7 @@ mod tests {
         assert!(engine.match_one_to_many(&query, &[]).is_empty());
     }
 
+    // Pins that `rank` sorts by descending score (exact match first).
     #[test]
     fn rank_orders_by_score() {
         let engine = MatchingEngine::default_config();

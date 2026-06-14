@@ -17,28 +17,49 @@ use crate::organization::{IdentifierScheme, Organization};
 use crate::phonetic;
 use crate::scoring::{Confidence, MatchBreakdown, MatchResult, weighted_average};
 
+/// Additive Soundex reward applied to the name component when the two
+/// primary names share a phonetic code but their literal Jaro-Winkler
+/// similarity is still below the High band. Deliberately small (+0.05):
+/// a phonetic agreement is corroborating evidence, never a substitute
+/// for an actual spelling match.
 const PHONETIC_BONUS: f64 = 0.05;
+/// Upper bound the Soundex bonus may lift the name score to. Kept below
+/// a perfect `1.0` (0.95 = the High threshold) so a purely phonetic
+/// agreement can never masquerade as an exact-name match.
 const PHONETIC_CEILING: f64 = 0.95;
 
 /// The organization matcher: holds a [`MatchConfig`] and scores pairs.
+///
+/// Construct one with [`MatchingEngine::new`] (or
+/// [`MatchingEngine::default_config`]) and reuse it across many pairs —
+/// the engine is immutable and carries no per-call state, so it is
+/// cheap to clone the borrow and safe to share.
 pub struct MatchingEngine {
+    /// Per-component weights and the probable-match threshold applied to
+    /// every probabilistic comparison this engine performs.
     config: MatchConfig,
 }
 
 impl MatchingEngine {
     /// Build a matcher with the given configuration.
+    ///
+    /// `config` supplies the per-component weights and the
+    /// probable-match threshold; it is stored verbatim and used for
+    /// every subsequent call.
     #[must_use]
     pub fn new(config: MatchConfig) -> Self {
         Self { config }
     }
 
-    /// Build with `MatchConfig::default()`. Convenience for the common path.
+    /// Build with [`MatchConfig::default`]. Convenience for the common
+    /// path where the caller wants the canonical weights/threshold.
     #[must_use]
     pub fn default_config() -> Self {
         Self::new(MatchConfig::default())
     }
 
-    /// Borrow the engine's configuration.
+    /// Borrow the engine's configuration, e.g. to read the active
+    /// `threshold` back when interpreting `is_match`.
     #[must_use]
     pub fn config(&self) -> &MatchConfig {
         &self.config
@@ -59,18 +80,29 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_organizations(&self, a: &Organization, b: &Organization) -> MatchResult {
+        // Phase 1 — deterministic short-circuit. A shared globally-unique
+        // identifier (or same-jurisdiction tax id, or `same_as` overlap)
+        // is conclusive on its own, so we return a perfect score without
+        // computing — or being diluted by — any fuzzy components.
         if deterministic_match(a, b) {
             return MatchResult {
                 score: 1.0,
                 is_match: true,
                 confidence: Confidence::High,
                 breakdown: MatchBreakdown {
+                    // Flag the short-circuit so callers can tell a rule
+                    // hit apart from a fuzzy 1.0; the per-component
+                    // scores stay `None` because none were evaluated.
                     deterministic_match: true,
                     ..Default::default()
                 },
             };
         }
 
+        // Phase 2 — probabilistic scoring. Name is always present (it is
+        // a required field), hence the unconditional `Some`; every other
+        // component returns `None` when the data is absent on either side
+        // so it can be skipped during renormalisation.
         let name_score = Some(name_score(a, b));
         let address_score = address_score(a, b);
         let url_score = url_score(a, b);
@@ -78,6 +110,9 @@ impl MatchingEngine {
         let founding_date_score = founding_date_score(a, b);
         let keywords_score = set_jaccard(&a.keywords, &b.keywords);
 
+        // Renormalised weighted average: absent components drop out of
+        // both numerator and denominator, so missing data neither helps
+        // nor hurts the overall score.
         let score = weighted_average(&[
             (name_score, self.config.name_weight),
             (address_score, self.config.address_weight),
@@ -87,6 +122,8 @@ impl MatchingEngine {
             (keywords_score, self.config.keywords_weight),
         ]);
 
+        // A match is declared when the renormalised score clears the
+        // configured probable-match threshold (default 0.85).
         let is_match = score >= self.config.threshold;
         MatchResult {
             score,
@@ -104,8 +141,10 @@ impl MatchingEngine {
         }
     }
 
-    /// One-to-many: score `query` against each candidate, results in
-    /// input order.
+    /// One-to-many: score `query` against each candidate, returning the
+    /// results in candidate input order (the result at position `i`
+    /// corresponds to `candidates[i]`). An empty `candidates` slice
+    /// yields an empty vector.
     #[must_use]
     pub fn match_one_to_many(
         &self,
@@ -118,7 +157,11 @@ impl MatchingEngine {
             .collect()
     }
 
-    /// One-to-many: `(index, result)` sorted by descending score.
+    /// One-to-many ranked: `(original_index, result)` pairs sorted by
+    /// descending score, so the best candidate is first. The index is
+    /// the candidate's position in the input slice, preserved through
+    /// the sort so callers can recover which candidate each result came
+    /// from.
     #[must_use]
     pub fn rank(
         &self,
@@ -130,6 +173,9 @@ impl MatchingEngine {
             .enumerate()
             .map(|(i, c)| (i, self.match_organizations(query, c)))
             .collect();
+        // Descending by score. `partial_cmp` can only be `None` for NaN,
+        // which scores never are; treating that as `Equal` keeps the
+        // sort total without a panic, satisfying the no-panic rule.
         ranked.sort_by(|a, b| {
             b.1.score
                 .partial_cmp(&a.1.score)
@@ -138,7 +184,10 @@ impl MatchingEngine {
         ranked
     }
 
-    /// Rank then drop everything below `MatchConfig::threshold`.
+    /// Rank, then drop every candidate whose score falls below the
+    /// configured [`MatchConfig::threshold`] (i.e. keep only the entries
+    /// flagged `is_match`). Returns the surviving `(index, result)`
+    /// pairs in descending-score order.
     #[must_use]
     pub fn find_matches(
         &self,
@@ -154,24 +203,46 @@ impl MatchingEngine {
 
 // ─── Deterministic rules ─────────────────────────────────────────
 
+/// True when any deterministic rule fires, making the pair a certain
+/// match regardless of fuzzy similarity. Three rules, checked in order;
+/// the first hit short-circuits:
+///
+/// - **R-0** — both records publish the *same value* under the *same*
+///   globally-unique scheme (LEI/DUNS/ISO 6523/GLN/Wikidata/ROR/ISNI/VAT).
+/// - **R-1** — both records sit in the *same jurisdiction* and share a
+///   `TaxId` value; a tax id is only unique within its issuing country,
+///   hence the jurisdiction guard.
+/// - **R-2** — their `same_as` URL sets overlap (a shared canonical
+///   identity URL such as a Wikidata or ROR page).
+///
+/// All comparisons are case-folded so trivial casing/whitespace
+/// differences do not defeat the rule. Empty values are ignored so two
+/// records that both merely *lack* an identifier never match on it.
 fn deterministic_match(a: &Organization, b: &Organization) -> bool {
     // R-0 — any pair of deterministic identifiers shares a value.
     for ai in &a.identifiers {
+        // Only globally-unique schemes qualify; classification codes
+        // (NAICS/SIC/…) and `Custom` are skipped here.
         if !ai.scheme.is_deterministic() {
             continue;
         }
         let av = normalize::fold(&ai.value);
+        // An empty (or whitespace-only) value carries no identity.
         if av.is_empty() {
             continue;
         }
         for bi in &b.identifiers {
+            // Same scheme AND same folded value → conclusive.
             if ai.scheme == bi.scheme && av == normalize::fold(&bi.value) {
                 return true;
             }
         }
     }
 
-    // R-1 — same jurisdiction + same tax id.
+    // R-1 — same jurisdiction + same tax id. The outer guard requires a
+    // non-empty, matching jurisdiction on both sides before any tax id
+    // is even considered, because the same number can be reused across
+    // countries.
     if let (Some(aj), Some(bj)) = (a.jurisdiction.as_deref(), b.jurisdiction.as_deref())
         && !aj.is_empty()
         && normalize::fold(aj) == normalize::fold(bj)
@@ -192,7 +263,8 @@ fn deterministic_match(a: &Organization, b: &Organization) -> bool {
         }
     }
 
-    // R-2 — any same_as URL overlaps (case-folded).
+    // R-2 — any same_as URL overlaps (case-folded). A shared canonical
+    // identity URL is treated as conclusive on its own.
     for au in &a.same_as {
         let an = normalize::fold(au);
         if an.is_empty() {
@@ -210,8 +282,11 @@ fn deterministic_match(a: &Organization, b: &Organization) -> bool {
 
 // ─── Probabilistic components ────────────────────────────────────
 
-/// Names contributing to the name score: `name`, `legal_name`, and
-/// `alternate_names`, each compared in legal-suffix-normalised form.
+/// Collect every name that should contribute to the name score —
+/// `name`, then `legal_name`, then each `alternate_names` entry — each
+/// reduced to its legal-suffix-stripped comparison form. Empty keys are
+/// dropped. The primary `name` is kept first so callers (e.g. the
+/// Soundex bonus) can address the canonical name via `first()`.
 fn name_keys(o: &Organization) -> Vec<String> {
     let mut keys = vec![normalize::legal_name(&o.name)];
     if let Some(ln) = &o.legal_name {
@@ -220,20 +295,31 @@ fn name_keys(o: &Organization) -> Vec<String> {
     for alt in &o.alternate_names {
         keys.push(normalize::legal_name(alt));
     }
+    // Drop any key that normalised to empty so they cannot spuriously
+    // match each other (two empties score 1.0 under Jaro-Winkler).
     keys.retain(|k| !k.is_empty());
     keys
 }
 
+/// Name component score in `[0.0, 1.0]`: the best Jaro-Winkler
+/// similarity across the full cross-product of both records' name keys
+/// (so an alias on one side can match the primary name on the other),
+/// with a capped Soundex bonus on the primary names. Always returns a
+/// value because `name` is required.
 fn name_score(a: &Organization, b: &Organization) -> f64 {
     let a_keys = name_keys(a);
     let b_keys = name_keys(b);
+    // Take the strongest pairing: any name on `a` against any on `b`.
     let mut best = 0.0_f64;
     for ak in &a_keys {
         for bk in &b_keys {
             best = best.max(jaro_winkler(ak, bk));
         }
     }
-    // Soundex bonus on the primary normalised names, capped.
+    // Soundex bonus on the primary normalised names, capped. Applied
+    // only when the literal similarity has not already reached the
+    // ceiling, so it lifts near-misses (typos, transliteration) without
+    // ever forging an exact-name match.
     let ap = a_keys.first().map_or("", String::as_str);
     let bp = b_keys.first().map_or("", String::as_str);
     if best < PHONETIC_CEILING && phonetic::same(ap, bp) {
@@ -242,12 +328,19 @@ fn name_score(a: &Organization, b: &Organization) -> f64 {
     best
 }
 
+/// Postal-address component score, or `None` when either record has no
+/// address (or no field is populated on both sides). Computes a
+/// weighted, field-by-field Jaro-Winkler average, renormalised over the
+/// fields actually shared so a partially-filled address is not
+/// penalised for its blanks.
 fn address_score(a: &Organization, b: &Organization) -> Option<f64> {
+    // Both records must carry an address at all.
     let (Some(aa), Some(ba)) = (&a.address, &b.address) else {
         return None;
     };
-    // Weighted field-by-field Jaro-Winkler; only fields present on both
-    // sides contribute.
+    // Per-field weights: street and postal code carry the most signal
+    // (most discriminating), country the least (coarse / often shared).
+    // Sum = 1.00 but the divisor below is the present-field subset.
     let pairs: [(Option<&String>, Option<&String>, f64); 5] = [
         (aa.street_address.as_ref(), ba.street_address.as_ref(), 0.30),
         (aa.locality.as_ref(), ba.locality.as_ref(), 0.25),
@@ -258,8 +351,10 @@ fn address_score(a: &Organization, b: &Organization) -> Option<f64> {
     let mut sum = 0.0_f64;
     let mut wsum = 0.0_f64;
     for (x, y, w) in pairs {
+        // Only fields present on both sides contribute.
         if let (Some(x), Some(y)) = (x, y) {
             let (xf, yf) = (normalize::fold(x), normalize::fold(y));
+            // Skip a field that is blank on both sides after folding.
             if xf.is_empty() && yf.is_empty() {
                 continue;
             }
@@ -267,14 +362,20 @@ fn address_score(a: &Organization, b: &Organization) -> Option<f64> {
             wsum += w;
         }
     }
+    // Renormalise over the contributing weights; `None` if none shared.
     if wsum > 0.0 { Some(sum / wsum) } else { None }
 }
 
+/// URL component score, comparing the two registered domains (scheme /
+/// `www.` / path stripped). Equal domains score a perfect `1.0`;
+/// otherwise the domains' Jaro-Winkler similarity (catches typos and
+/// suffix variants). `None` when either side has no usable URL/domain.
 fn url_score(a: &Organization, b: &Organization) -> Option<f64> {
     let (Some(au), Some(bu)) = (a.url.as_deref(), b.url.as_deref()) else {
         return None;
     };
     let (ad, bd) = (normalize::domain(au), normalize::domain(bu));
+    // A URL that normalises to an empty host carries no signal.
     if ad.is_empty() || bd.is_empty() {
         return None;
     }
@@ -285,6 +386,10 @@ fn url_score(a: &Organization, b: &Organization) -> Option<f64> {
     })
 }
 
+/// Jurisdiction component score: a binary `1.0` (case-folded equal) or
+/// `0.0` (differing). `None` when either side omits a jurisdiction —
+/// jurisdiction is a coarse, categorical signal with no useful
+/// in-between, so no fuzzy similarity is computed.
 fn jurisdiction_score(a: &Organization, b: &Organization) -> Option<f64> {
     match (a.jurisdiction.as_deref(), b.jurisdiction.as_deref()) {
         (Some(aj), Some(bj)) if !aj.is_empty() && !bj.is_empty() => {
@@ -298,11 +403,21 @@ fn jurisdiction_score(a: &Organization, b: &Organization) -> Option<f64> {
     }
 }
 
+/// Parse the four-character year prefix of an ISO-8601 date string into
+/// an `i32`. Only the leading `YYYY` is read, so `"1998-09-04"` and
+/// `"1998"` both yield `1998`. `None` if those characters are not a
+/// valid integer.
 fn founding_year(s: &str) -> Option<i32> {
+    // Compare on year only; founding dates are frequently recorded to
+    // year precision, so day/month would add noise, not signal.
     let head: String = s.trim().chars().take(4).collect();
     head.parse::<i32>().ok()
 }
 
+/// Founding-date component score by year proximity: exact year `1.0`,
+/// one-year-off `0.5` (tolerates fiscal-vs-calendar / off-by-one
+/// recording error), otherwise `0.0`. `None` when either date is
+/// missing or unparseable.
 fn founding_date_score(a: &Organization, b: &Organization) -> Option<f64> {
     let (Some(af), Some(bf)) = (a.founding_date.as_deref(), b.founding_date.as_deref()) else {
         return None;
@@ -317,23 +432,36 @@ fn founding_date_score(a: &Organization, b: &Organization) -> Option<f64> {
     })
 }
 
+/// Jaccard similarity (`|intersection| / |union|`) of two case-folded,
+/// de-duplicated string sets — used for the keywords component.
+///
+/// Returns `None` only when *neither* side has any keyword (so the
+/// component is skipped entirely). When one side is empty but the other
+/// is not, returns `Some(0.0)` — a present-vs-absent disagreement,
+/// which is signal worth counting against the match.
 fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
+    // Fast path: both raw inputs empty → nothing to compare.
     if a.is_empty() && b.is_empty() {
         return None;
     }
     let a_set = normalize::fold_set(a);
     let b_set = normalize::fold_set(b);
+    // Both empty after folding (e.g. only blank strings) → skip.
     if a_set.is_empty() && b_set.is_empty() {
         return None;
     }
+    // Exactly one side empty → maximal disagreement.
     if a_set.is_empty() || b_set.is_empty() {
         return Some(0.0);
     }
     let inter: usize = a_set.iter().filter(|x| b_set.contains(x)).count();
+    // Inclusion-exclusion: |A ∪ B| = |A| + |B| − |A ∩ B|.
     let union: usize = a_set.len() + b_set.len() - inter;
     if union == 0 {
         Some(0.0)
     } else {
+        // `usize`→`f64` cast: keyword counts are tiny, never near the
+        // f64 mantissa limit, so the precision loss is immaterial.
         #[allow(clippy::cast_precision_loss)]
         Some(inter as f64 / union as f64)
     }
@@ -341,11 +469,13 @@ fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
 
 // ─── Tests ───────────────────────────────────────────────────────
 
+/// Unit tests for the matching engine and its per-component scorers.
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::organization::{IdentifierScheme, OrgIdentifier, PostalAddress};
 
+    /// Test helper: build an `OrgIdentifier` from a scheme + string value.
     fn ident(scheme: IdentifierScheme, value: &str) -> OrgIdentifier {
         OrgIdentifier {
             scheme,
@@ -353,6 +483,7 @@ mod tests {
         }
     }
 
+    /// Two byte-identical names must score essentially perfectly and match.
     #[test]
     fn identical_orgs_score_high() {
         let engine = MatchingEngine::default_config();
@@ -363,6 +494,8 @@ mod tests {
         assert!(r.is_match);
     }
 
+    /// Pins that legal-suffix stripping makes `"Acme, Inc."` and
+    /// `"ACME Corporation"` equivalent for name scoring.
     #[test]
     fn legal_suffix_variants_match() {
         let engine = MatchingEngine::default_config();
@@ -373,6 +506,8 @@ mod tests {
         assert!(r.score >= 0.99, "expected ~1.0, got {}", r.score);
     }
 
+    /// Pins R-0: a shared LEI forces score 1.0 and sets the
+    /// `deterministic_match` flag even when the names are unrelated.
     #[test]
     fn lei_match_short_circuits() {
         let engine = MatchingEngine::default_config();
@@ -387,6 +522,8 @@ mod tests {
         assert!(r.breakdown.deterministic_match);
     }
 
+    /// Pins that classification codes (NAICS) describe a sector, not an
+    /// entity, so a shared code must NOT short-circuit or force a match.
     #[test]
     fn classification_code_does_not_short_circuit() {
         let engine = MatchingEngine::default_config();
@@ -399,6 +536,9 @@ mod tests {
         assert!(!r.is_match);
     }
 
+    /// Pins R-1's jurisdiction guard: a shared tax id only short-circuits
+    /// when both records share a (case-folded) jurisdiction — never with
+    /// no jurisdiction, never across differing ones.
     #[test]
     fn tax_id_short_circuits_only_within_jurisdiction() {
         let mut a = Organization::new("A");
@@ -418,6 +558,8 @@ mod tests {
         assert!(!deterministic_match(&a, &b));
     }
 
+    /// Pins R-2: overlapping `same_as` URLs short-circuit, and that the
+    /// comparison is whitespace-tolerant (one side is padded with spaces).
     #[test]
     fn same_as_overlap_short_circuits() {
         let engine = MatchingEngine::default_config();
@@ -430,6 +572,7 @@ mod tests {
         assert!(r.breakdown.deterministic_match);
     }
 
+    /// Pins that two clearly unrelated names score below 0.5 and don't match.
     #[test]
     fn unrelated_orgs_score_low() {
         let engine = MatchingEngine::default_config();
@@ -440,6 +583,8 @@ mod tests {
         assert!(!r.is_match);
     }
 
+    /// Pins domain normalisation: differing scheme / `www.` / path all
+    /// strip away, so the two URLs share a domain and score 1.0.
     #[test]
     fn url_domain_equality_scores_one() {
         let mut a = Organization::new("A");
@@ -449,6 +594,7 @@ mod tests {
         assert_eq!(url_score(&a, &b), Some(1.0));
     }
 
+    /// Pins that a one-sided URL yields `None` (component skipped), not 0.0.
     #[test]
     fn url_none_when_one_side_missing() {
         let mut a = Organization::new("A");
@@ -457,6 +603,8 @@ mod tests {
         assert_eq!(url_score(&a, &b), None);
     }
 
+    /// Pins the binary jurisdiction score: case-folded equal → 1.0,
+    /// different country → 0.0.
     #[test]
     fn jurisdiction_exact_and_mismatch() {
         let mut a = Organization::new("A");
@@ -468,6 +616,8 @@ mod tests {
         assert_eq!(jurisdiction_score(&a, &b), Some(0.0));
     }
 
+    /// Pins the year-proximity bands: same year 1.0 (despite differing
+    /// precision), one year off 0.5, far apart 0.0.
     #[test]
     fn founding_date_year_proximity() {
         let mut a = Organization::new("A");
@@ -481,6 +631,9 @@ mod tests {
         assert_eq!(founding_date_score(&a, &b), Some(0.0));
     }
 
+    /// Pins field-by-field address scoring with renormalisation: only
+    /// `locality` + `postal_code` are present, both agree (case-folded),
+    /// so the score is ~1.0 despite the other three fields being absent.
     #[test]
     fn address_field_by_field() {
         let mut a = Organization::new("A");
@@ -496,6 +649,7 @@ mod tests {
         assert!(s >= 0.99, "expected ~1.0, got {s}");
     }
 
+    /// Pins that a one-sided address yields `None`, so it is skipped.
     #[test]
     fn address_none_when_one_side_missing() {
         let mut a = Organization::new("A");
@@ -507,6 +661,8 @@ mod tests {
         assert_eq!(address_score(&a, &b), None);
     }
 
+    /// Pins Jaccard: one shared tag of three distinct → 1/3, and that
+    /// two empty inputs yield `None` (component skipped).
     #[test]
     fn keywords_jaccard() {
         let a = vec!["software".to_string(), "ai".to_string()];
@@ -516,6 +672,9 @@ mod tests {
         assert_eq!(set_jaccard(&[], &[]), None);
     }
 
+    /// Pins that `rank` orders candidates by descending score (best
+    /// first, Globex never first) and `find_matches` keeps only the
+    /// above-threshold entries.
     #[test]
     fn rank_orders_by_score_and_find_matches_filters() {
         let engine = MatchingEngine::default_config();
@@ -536,6 +695,8 @@ mod tests {
         assert!(matches.iter().all(|(i, _)| *i != 0));
     }
 
+    /// Pins that `match_one_to_many` returns results in candidate order
+    /// (no sorting) and handles an empty candidate slice.
     #[test]
     fn match_one_to_many_preserves_order_and_handles_empty() {
         let engine = MatchingEngine::default_config();

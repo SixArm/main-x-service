@@ -231,6 +231,13 @@ impl BloodType {
 }
 
 impl std::fmt::Display for BloodType {
+    /// Write the canonical short form (e.g. `"O-"`), delegating to
+    /// [`BloodType::as_str`] so `Display` and `as_str` never diverge.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any [`std::fmt::Error`] returned by the underlying
+    /// formatter's `write_str`.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
@@ -992,7 +999,14 @@ impl Person {
     /// assert!(Person::builder().build().validate().is_err());
     /// ```
     pub fn validate(&self) -> crate::Result<()> {
+        // A name on either side counts; a middle name alone is intentionally
+        // NOT sufficient, since it is not scored (see Person::middle_name).
         let has_name = self.given_name.is_some() || self.family_name.is_some();
+        // Any single populated national-identifier scheme OR a passport book
+        // satisfies the "has identifier" requirement. The schemes are
+        // OR-ed (not weighted) here because validate() only checks for the
+        // *presence* of an identifying anchor, not its quality — scheme-local
+        // matching strength is decided later by the matcher, not here.
         let has_identifier = self.united_kingdom_national_health_service_number.is_some()
             || self.fr_nir.is_some()
             || self.es_tsi.is_some()
@@ -1036,6 +1050,9 @@ impl Person {
             || self.nz_nhi.is_some()
             || self.za_id.is_some()
             || !self.passport_books.is_empty();
+        // Reject only the truly anonymous record: no name AND no identifier.
+        // Note blood_type, gender, dates, and address are deliberately
+        // excluded — none of them is an identifying anchor on its own.
         if !has_name && !has_identifier {
             return Err(crate::MatchingError::MissingField(
                 "At least one of: a name, a national identifier (any of 30 supported schemes), or at least one passport book is required"
@@ -1908,8 +1925,23 @@ impl PersonBuilder {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for the logic-free model layer: they pin the
+    //! construction, canonicalisation, validation, and serde round-trip
+    //! contracts that the matcher relies on. Coverage spans `Address`
+    //! (constructors + fluent setters + serde), `Person` / `PersonBuilder`
+    //! (empty defaults, identifier carry-through, `Into<String>`
+    //! ergonomics, the "at least one identifying anchor" validate rule,
+    //! serde), `BloodType` (canonical / word / separator / zero-as-O / VE
+    //! parsing, rejection of bad input, `as_str` ↔ `Display` ↔ serde
+    //! agreement), `Gender` (`Copy` + equality), and `PassportBook`
+    //! (country/number canonicalisation, separator stripping, rejection
+    //! rules, optional date metadata, serde with defaulted dates).
+
     use super::*;
 
+    /// A freshly constructed `Address` must leave every field `None`, so
+    /// partial addresses start from a clean slate and never carry stray
+    /// defaults into matching.
     #[test]
     fn address_new_is_all_none() {
         let a = Address::new();
@@ -1921,11 +1953,16 @@ mod tests {
         assert!(a.country.is_none());
     }
 
+    /// `Default` must be byte-for-byte identical to `new`, pinning the
+    /// documented promise that the two constructors are interchangeable.
     #[test]
     fn address_default_matches_new() {
         assert_eq!(Address::default(), Address::new());
     }
 
+    /// The fluent `with_*` setters must chain and set exactly the fields
+    /// named — and leave the un-set fields (`line2`, `county`) `None`.
+    /// This guards against a copy-paste setter writing the wrong field.
     #[test]
     fn address_fluent_builders_chain() {
         let a = Address::new()
@@ -1941,6 +1978,9 @@ mod tests {
         assert!(a.county.is_none());
     }
 
+    /// `Address` must survive a JSON encode/decode unchanged; the model
+    /// is shared across services over the wire, so serde fidelity is a
+    /// hard contract.
     #[test]
     fn address_round_trips_through_serde() {
         let mut a = Address::new();
@@ -1951,6 +1991,10 @@ mod tests {
         assert_eq!(a, back);
     }
 
+    /// A builder with no setters called must produce an all-absent
+    /// `Person`: every identifier `None`, every collection empty. This is
+    /// the baseline the matcher assumes — a `None` field must never
+    /// penalise, so it must never silently default to a populated value.
     #[test]
     fn person_builder_starts_empty() {
         let p = Person::builder().build();
@@ -1979,6 +2023,10 @@ mod tests {
         assert!(p.local_id.is_none());
     }
 
+    /// Each national-identifier setter must land in its own field with no
+    /// cross-wiring. Because the schemes are scheme-local and must never
+    /// cross-match, a setter writing the wrong field would be a silent
+    /// correctness bug; this pins all twelve to their distinct slots.
     #[test]
     fn person_builder_carries_all_national_identifiers() {
         let p = Person::builder()
@@ -2012,16 +2060,23 @@ mod tests {
         assert_eq!(p.uk_chi_number.as_deref(), Some("0101701233"));
     }
 
+    /// The `impl Into<String>` setters must accept both `&str` and owned
+    /// `String` at the same call site, confirming the documented
+    /// ergonomic contract that callers need no explicit conversion.
     #[test]
     fn person_builder_accepts_str_and_string() {
         let p = Person::builder()
-            .given_name("Owen") // &str
-            .family_name(String::from("Jones")) // String
+            .given_name("Owen") // borrowed &str
+            .family_name(String::from("Jones")) // owned String
             .build();
         assert_eq!(p.given_name.as_deref(), Some("Owen"));
         assert_eq!(p.family_name.as_deref(), Some("Jones"));
     }
 
+    /// `validate` must accept a record anchored by a given name, a family
+    /// name, OR a national identifier, and must reject a wholly empty
+    /// record with `MissingField`. This pins the boundary-ingest rule that
+    /// keeps anonymous (un-matchable) records out of the index.
     #[test]
     fn person_validate_requires_one_of_three_fields() {
         assert!(Person::builder().given_name("a").build().validate().is_ok());
@@ -2046,6 +2101,10 @@ mod tests {
         assert!(matches!(err, crate::MatchingError::MissingField(_)));
     }
 
+    /// A populated `Person` must round-trip through JSON unchanged,
+    /// including its `Date` and `Gender` fields. Person records cross
+    /// service boundaries as JSON, so any serde drift would silently
+    /// corrupt identity data.
     #[test]
     fn person_round_trips_through_serde() {
         let p = Person::builder()
@@ -2062,6 +2121,9 @@ mod tests {
 
     // ---------- BloodType ----------
 
+    /// Every one of the eight canonical short forms must parse to its
+    /// matching variant. This is the baseline the looser textual-form
+    /// parsing builds on.
     #[test]
     fn blood_type_parses_canonical_short_forms() {
         for (s, want) in [
@@ -2078,12 +2140,18 @@ mod tests {
         }
     }
 
+    /// Parsing must be case-insensitive and tolerate surrounding
+    /// whitespace, since real EMR exports are inconsistently cased and
+    /// padded.
     #[test]
     fn blood_type_parses_lowercase_and_whitespace() {
         assert_eq!(BloodType::parse("  a+ "), Some(BloodType::APositive));
         assert_eq!(BloodType::parse("ab-"), Some(BloodType::ABNegative));
     }
 
+    /// Word-form Rhesus signs (`positive`/`pos`, `negative`/`neg`, in any
+    /// case) must parse, covering the common free-text layouts found in
+    /// clinical data alongside the symbolic `+`/`-` forms.
     #[test]
     fn blood_type_parses_word_forms() {
         assert_eq!(BloodType::parse("A positive"), Some(BloodType::APositive));
@@ -2094,35 +2162,53 @@ mod tests {
         assert_eq!(BloodType::parse("o NEG"), Some(BloodType::ONegative));
     }
 
+    /// The digit `0` must be read as the letter `O`, recovering the
+    /// extremely common zero/O transcription confusion for the O blood
+    /// group rather than rejecting it as unparseable.
     #[test]
     fn blood_type_parses_zero_as_o() {
-        assert_eq!(BloodType::parse("0+"), Some(BloodType::OPositive));
+        assert_eq!(BloodType::parse("0+"), Some(BloodType::OPositive)); // '0' -> 'O'
         assert_eq!(BloodType::parse("0-"), Some(BloodType::ONegative));
     }
 
+    /// A single separator (`_`, `-`, or space) between the ABO group and
+    /// the sign must be tolerated. Note `A-neg` parses as A negative: the
+    /// leading `-` is consumed as a separator because the word `neg`
+    /// disambiguates the sign.
     #[test]
     fn blood_type_parses_with_separator() {
         assert_eq!(BloodType::parse("A_pos"), Some(BloodType::APositive));
-        assert_eq!(BloodType::parse("A-neg"), Some(BloodType::ANegative));
+        assert_eq!(BloodType::parse("A-neg"), Some(BloodType::ANegative)); // '-' is separator, 'neg' is sign
         assert_eq!(BloodType::parse("AB +"), Some(BloodType::ABPositive));
     }
 
+    /// The British `+VE` / `-VE` shorthand (e.g. `A+VE`) must parse. The
+    /// trailing `VE` is stripped after the sign so it does not look like
+    /// unparseable trailing junk.
     #[test]
     fn blood_type_parses_ve_suffix() {
         assert_eq!(BloodType::parse("A+VE"), Some(BloodType::APositive));
         assert_eq!(BloodType::parse("a-ve"), Some(BloodType::ANegative));
     }
 
+    /// Unparseable input must yield `None`, never a wrong guess. Covers
+    /// empty / whitespace-only, an unknown group letter, a group with no
+    /// sign, a rare phenotype name, and a doubled sign — returning `None`
+    /// lets callers preserve the raw value rather than mis-record it.
     #[test]
     fn blood_type_rejects_unparseable() {
         assert_eq!(BloodType::parse(""), None);
         assert_eq!(BloodType::parse("   "), None);
-        assert_eq!(BloodType::parse("Z+"), None);
-        assert_eq!(BloodType::parse("A"), None); // no sign
-        assert_eq!(BloodType::parse("Bombay"), None);
-        assert_eq!(BloodType::parse("A++"), None);
+        assert_eq!(BloodType::parse("Z+"), None); // 'Z' is not an ABO group
+        assert_eq!(BloodType::parse("A"), None); // group present but no sign
+        assert_eq!(BloodType::parse("Bombay"), None); // rare phenotype, unsupported
+        assert_eq!(BloodType::parse("A++"), None); // doubled sign is invalid
     }
 
+    /// For every variant, `as_str`, `Display`, and `parse` must agree:
+    /// the string `as_str` emits must format identically via `Display`
+    /// and parse back to the same variant. This pins the three surfaces
+    /// as one canonical form and catches any future divergence.
     #[test]
     fn blood_type_as_str_and_display_round_trip() {
         for bt in [
@@ -2141,6 +2227,10 @@ mod tests {
         }
     }
 
+    /// The serde representation must be the canonical short form
+    /// (`"A+"`, not the Rust variant name), and must deserialise back to
+    /// the same variant. This is the on-the-wire contract other services
+    /// depend on.
     #[test]
     fn blood_type_serde_uses_short_form() {
         for (bt, json) in [
@@ -2154,35 +2244,52 @@ mod tests {
         }
     }
 
+    /// The `blood_type` setter must store the value on the built person,
+    /// confirming the optional supporting-evidence field is wired through
+    /// the builder.
     #[test]
     fn person_builder_sets_blood_type() {
         let p = Person::builder().blood_type(BloodType::OPositive).build();
         assert_eq!(p.blood_type, Some(BloodType::OPositive));
     }
 
+    /// Blood type must default to `None`, never a populated value —
+    /// since blood-type *disagreement* is a strong negative signal, an
+    /// accidental default would manufacture spurious mismatches.
     #[test]
     fn person_default_has_no_blood_type() {
         let p = Person::builder().build();
         assert!(p.blood_type.is_none());
     }
 
+    /// `Gender` must be `Copy` (assigning `h = g` leaves `g` usable) and
+    /// compare by value. Cheap by-value passing is the documented
+    /// ergonomic the matcher relies on.
     #[test]
     fn gender_is_copy_and_eq() {
         let g = Gender::Female;
-        let h = g; // Copy
+        let h = g; // Copy: g is still usable below
         assert_eq!(g, h);
         assert_ne!(g, Gender::Male);
     }
 
     // ---------- PassportBook ----------
 
+    /// Construction must canonicalise the country (trim + uppercase) and
+    /// the number (strip whitespace + uppercase) so two records carrying
+    /// different textual layouts of the same book collapse to one
+    /// `(country, number)` matching key.
     #[test]
     fn passport_book_new_canonicalises_country_and_number() {
         let b = PassportBook::new("  gb  ", " 123 ABC 789 ").unwrap();
-        assert_eq!(b.country, "GB");
-        assert_eq!(b.number, "123ABC789");
+        assert_eq!(b.country, "GB"); // trimmed + uppercased
+        assert_eq!(b.number, "123ABC789"); // inner whitespace stripped
     }
 
+    /// The common data-entry separators (hyphen, period, slash, plus
+    /// whitespace) must all be stripped from the number, matching the
+    /// canonicalisation used by the national-identifier parsers so the
+    /// same book entered in different layouts keys identically.
     #[test]
     fn passport_book_new_strips_common_separators() {
         // Hyphens, periods, slashes and whitespace all stripped.
@@ -2192,6 +2299,10 @@ mod tests {
         assert_eq!(c.number, "AB1234567");
     }
 
+    /// The country code must be exactly two ASCII letters (ISO 3166-1
+    /// alpha-2). Anything longer, shorter, non-alphabetic, or empty is
+    /// rejected, since provenance correctness is what stops cross-country
+    /// books with the same number from cross-matching.
     #[test]
     fn passport_book_new_rejects_bad_country() {
         assert!(PassportBook::new("GBR", "123").is_none()); // 3 letters
@@ -2200,13 +2311,19 @@ mod tests {
         assert!(PassportBook::new("", "123").is_none()); // empty
     }
 
+    /// A number that canonicalises to an empty string (truly empty, or
+    /// only whitespace) must be rejected — an empty key would match
+    /// indiscriminately, so it must never be constructible.
     #[test]
     fn passport_book_new_rejects_empty_number() {
         assert!(PassportBook::new("GB", "").is_none());
         assert!(PassportBook::new("GB", "   ").is_none());
-        assert!(PassportBook::new("GB", "\t\n").is_none());
+        assert!(PassportBook::new("GB", "\t\n").is_none()); // whitespace-only
     }
 
+    /// The `with_issued` / `with_expires` setters must attach the
+    /// optional dates. These are display/audit metadata only (not used in
+    /// matching), but the builders must still store them.
     #[test]
     fn passport_book_with_dates_sets_metadata() {
         let b = PassportBook::new("GB", "123")
@@ -2217,6 +2334,9 @@ mod tests {
         assert!(b.expires.is_some());
     }
 
+    /// A `PassportBook` with a populated date must round-trip through
+    /// JSON unchanged, confirming serde fidelity for the date-carrying
+    /// shape.
     #[test]
     fn passport_book_round_trips_through_serde() {
         let b = PassportBook::new("US", "AB1234567")
@@ -2227,6 +2347,9 @@ mod tests {
         assert_eq!(b, back);
     }
 
+    /// Payloads written before the optional `issued` / `expires` fields
+    /// existed must still deserialise, with the missing dates defaulting
+    /// to `None`. This pins backward compatibility of the wire format.
     #[test]
     fn passport_book_serde_default_dates() {
         // Legacy payloads lacking the optional date fields must
@@ -2239,6 +2362,9 @@ mod tests {
         assert!(b.expires.is_none());
     }
 
+    /// Repeated `add_passport_book` calls must accumulate in order,
+    /// supporting the multi-country / multi-book model (a person may hold
+    /// several passports at once and across renewals).
     #[test]
     fn person_builder_carries_passport_books() {
         let p = Person::builder()
@@ -2250,6 +2376,9 @@ mod tests {
         assert_eq!(p.passport_books[1].country, "US");
     }
 
+    /// A single passport book, with no name and no national identifier,
+    /// must satisfy `validate` — a passport is an identifying anchor in
+    /// its own right.
     #[test]
     fn person_validate_accepts_solo_passport_book() {
         let p = Person::builder()
@@ -2258,6 +2387,9 @@ mod tests {
         assert!(p.validate().is_ok());
     }
 
+    /// The `previous_addresses` setter must *replace* (not append to) the
+    /// list, matching its documented contract and distinguishing it from
+    /// the additive `add_passport_book`.
     #[test]
     fn previous_addresses_setter_replaces_vec() {
         let mut a = Address::new();

@@ -33,6 +33,8 @@ fn date_strategy() -> impl Strategy<Value = Date> {
     (1900i16..=2100, 1i8..=12, 1i8..=28).prop_map(|(y, m, d)| date(y, m, d))
 }
 
+/// One of the four [`Gender`] variants, chosen uniformly. Kept explicit
+/// (rather than deriving) so adding a variant forces a conscious update here.
 fn gender_strategy() -> impl Strategy<Value = Gender> {
     prop_oneof![
         Just(Gender::Male),

@@ -13,6 +13,9 @@ use event_matcher::{
     SimilarityAlgorithm,
 };
 
+/// Build a richly-populated reference event (Glastonbury 2024) used as the
+/// "query" side in most benchmarks. Exercises every scored field so the
+/// timings reflect a realistic, fully-loaded record.
 fn build_glasto() -> Event {
     Event::builder()
         .name("Glastonbury Festival 2024")
@@ -40,6 +43,11 @@ fn build_glasto() -> Event {
         .build()
 }
 
+/// Build a near-duplicate of [`build_glasto`] with small perturbations
+/// (alias-swapped name, 15-minute time shift, jittered coordinates,
+/// "Ltd" vs "Limited") — the worst case for the scorer, since every fuzzy
+/// path runs rather than short-circuiting. `_seed` is unused but kept so
+/// call-sites read as "fuzzy variant of this event".
 fn build_glasto_fuzzy(_seed: &Event) -> Event {
     Event::builder()
         .name("Glasto 2024")
@@ -66,6 +74,8 @@ fn build_glasto_fuzzy(_seed: &Event) -> Event {
         .build()
 }
 
+/// Build an event that shares nothing with [`build_glasto`], to time the
+/// "clearly not a match" path (most fields differ or are absent).
 fn build_unrelated() -> Event {
     Event::builder()
         .name("Sydney Opera House Gala")
@@ -75,6 +85,9 @@ fn build_unrelated() -> Event {
         .build()
 }
 
+/// Build the `idx`-th synthetic candidate for the batch-ranking benchmark.
+/// `idx` is folded into the city, name, day, category, and house number so
+/// the generated set is varied yet fully deterministic across runs.
 fn make_candidate(idx: usize) -> Event {
     let cities = ["London", "Cardiff", "Edinburgh", "Belfast", "Manchester"];
     let names = [
@@ -103,6 +116,8 @@ fn make_candidate(idx: usize) -> Event {
         .build()
 }
 
+/// Benchmark single-pair probabilistic matching across three regimes:
+/// identical clone, fuzzy near-match, and unrelated pair.
 fn bench_match_pair(c: &mut Criterion) {
     let mut group = c.benchmark_group("match_pair");
     let glasto = build_glasto();
@@ -123,6 +138,8 @@ fn bench_match_pair(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark the fast deterministic-match path on an identical pair (the
+/// case that short-circuits on a shared event id).
 fn bench_deterministic_match(c: &mut Criterion) {
     let glasto = build_glasto();
     let clone = glasto.clone();
@@ -132,6 +149,8 @@ fn bench_deterministic_match(c: &mut Criterion) {
     });
 }
 
+/// Benchmark [`MatchingEngine::rank_one_to_many`] at 10 / 100 / 1000
+/// candidates, reporting per-element throughput to expose scaling.
 fn bench_batch_ranking(c: &mut Criterion) {
     let mut group = c.benchmark_group("rank_one_to_many");
     let engine = MatchingEngine::default_config();
@@ -147,6 +166,8 @@ fn bench_batch_ranking(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark the same fuzzy pair under different engine configurations
+/// (default, strict, Jaro-Winkler-only) to expose any per-config cost.
 fn bench_engine_configurations(c: &mut Criterion) {
     let mut group = c.benchmark_group("config_variants");
     let glasto = build_glasto();

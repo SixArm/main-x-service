@@ -390,6 +390,10 @@ pub struct MatchBreakdown {
 /// # let _ = (engine_a, engine_b);
 /// ```
 pub struct MatchingEngine {
+    /// The immutable scoring configuration: weights, threshold, scale,
+    /// algorithm, and feature toggles. Set once at construction and never
+    /// mutated, which is what makes the engine `Send + Sync` and safe to
+    /// share across threads.
     config: MatchConfig,
 }
 
@@ -565,6 +569,14 @@ impl MatchingEngine {
         name_and_postcode_match(place1, place2)
     }
 
+    /// Score every field of the two places and assemble the per-field
+    /// [`MatchBreakdown`].
+    ///
+    /// Each component is scored independently; a `None` means the field was
+    /// absent on at least one side and so does not participate in the
+    /// weighted sum. The phonetic sub-score is only computed when
+    /// `use_phonetic_matching` is enabled — otherwise it is `None` and never
+    /// contributes its bonus.
     fn calculate_breakdown(&self, place1: &Place, place2: &Place) -> MatchBreakdown {
         MatchBreakdown {
             name_score: self.score_name(place1, place2),
@@ -583,6 +595,20 @@ impl MatchingEngine {
         }
     }
 
+    /// Collapse a [`MatchBreakdown`] into a single overall score in
+    /// `[0.0, 1.0]`.
+    ///
+    /// The score is a **weight-renormalised** sum: each field that scored
+    /// (`Some`) contributes `score * weight`, and the running total is
+    /// divided by the sum of the weights that actually participated. This
+    /// is why missing fields neither help nor hurt — they contribute neither
+    /// to `weighted_sum` nor to `total_weight`.
+    ///
+    /// The phonetic name score is a **bonus only**: it is added (with a small
+    /// fixed `0.05` weight) only when it exceeds `0.9`, so it can lift a
+    /// borderline match but never drags a score down. When no field scored at
+    /// all, `total_weight` is zero and the function returns `0.0` rather than
+    /// dividing by zero.
     fn calculate_weighted_score(&self, breakdown: &MatchBreakdown) -> f64 {
         let mut total_weight = 0.0;
         let mut weighted_sum = 0.0;
@@ -635,6 +661,16 @@ impl MatchingEngine {
         }
     }
 
+    /// Score name similarity as the **best** pairwise score over the
+    /// cartesian product of both places' name sets.
+    ///
+    /// Each place contributes its primary `name` plus every entry in
+    /// `alternate_names` (see [`collect_names`]). Every name on the left is
+    /// compared against every name on the right, and the single highest
+    /// pairwise score wins. This is what lets an alias on one side match a
+    /// primary name on the other (e.g. "Big Ben" vs "Elizabeth Tower" +
+    /// alternate "Big Ben"). Returns `None` if either side has no usable
+    /// names.
     fn score_name(&self, place1: &Place, place2: &Place) -> Option<f64> {
         let names1 = collect_names(place1);
         let names2 = collect_names(place2);
@@ -653,6 +689,12 @@ impl MatchingEngine {
         Some(best)
     }
 
+    /// Score a single pair of raw names.
+    ///
+    /// Both names are first normalised via
+    /// [`Normalizer::normalize_name`] (case-folded, diacritics and ASCII
+    /// punctuation stripped, whitespace collapsed) and then compared with
+    /// the configured `name_algorithm`. Returns a value in `[0.0, 1.0]`.
     fn score_name_pair(&self, name1: &str, name2: &str) -> f64 {
         let norm1 = Normalizer::normalize_name(name1);
         let norm2 = Normalizer::normalize_name(name2);
@@ -664,6 +706,17 @@ impl MatchingEngine {
         }
     }
 
+    /// Score phonetic name similarity: `1.0` if any Soundex code shared
+    /// across the two name sets, else `0.0`.
+    ///
+    /// Each name on both sides is reduced to its Soundex code via
+    /// [`Normalizer::phonetic_code`]; if any non-empty code appears on both
+    /// sides the names "sound alike" and the score is `1.0`. This catches
+    /// spelling variants (Smith/Smyth, Stephen/Steven) that the literal
+    /// string scorer might rate lower. Empty codes are ignored so two
+    /// unnameable inputs do not spuriously match. Returns `None` if either
+    /// side has no usable names. This is an associated (no `self`) function
+    /// because the phonetic encoder is fixed and not config-dependent.
     fn score_phonetic_names(place1: &Place, place2: &Place) -> Option<f64> {
         let names1 = collect_names(place1);
         let names2 = collect_names(place2);
@@ -689,6 +742,16 @@ impl MatchingEngine {
         Some(best)
     }
 
+    /// Score geographic proximity via Gaussian decay over Haversine
+    /// distance.
+    ///
+    /// Both places' coordinates are first validated by [`valid_coords`]
+    /// (finite and within the conventional lat/lon ranges); if either side
+    /// fails, returns `None` so the field is skipped rather than penalised.
+    /// Otherwise the great-circle distance is computed with
+    /// [`Scorer::haversine_metres`] and converted to a `[0.0, 1.0]` score by
+    /// [`Scorer::coordinates_score`] using the configured
+    /// `coordinates_scale_metres`.
     fn score_coordinates(&self, place1: &Place, place2: &Place) -> Option<f64> {
         let (lat1, lon1) = valid_coords(place1.latitude, place1.longitude)?;
         let (lat2, lon2) = valid_coords(place2.latitude, place2.longitude)?;
@@ -699,6 +762,12 @@ impl MatchingEngine {
         ))
     }
 
+    /// Score address similarity, or `None` if either place lacks an
+    /// address.
+    ///
+    /// When both addresses are present, delegates to
+    /// [`Self::compare_addresses`] for the weighted sub-component comparison.
+    /// Associated (no `self`) because address comparison consults no config.
     fn score_address(place1: &Place, place2: &Place) -> Option<f64> {
         match (place1.address.as_ref(), place2.address.as_ref()) {
             (Some(a1), Some(a2)) => Some(Self::compare_addresses(a1, a2)),
@@ -706,6 +775,20 @@ impl MatchingEngine {
         }
     }
 
+    /// Compare two addresses as a weight-renormalised blend of postcode,
+    /// city, and street-line similarity.
+    ///
+    /// The three sub-components carry fixed weights — postcode `0.5`, city
+    /// `0.3`, line 1 `0.2` — but only the components present on *both* sides
+    /// participate, and the result is renormalised by the participating
+    /// weight so a postcode-only comparison still spans the full `[0.0, 1.0]`
+    /// range. Postcode is compared as exact equality after
+    /// whitespace/case normalisation; city via Jaro-Winkler on normalised
+    /// names; line 1 via a 0.6 street-similarity / 0.4 house-number-equality
+    /// blend (falling back to street-only when a house number is absent on
+    /// either side). When no sub-component fires, returns the neutral `0.5`
+    /// rather than `0.0`, so an empty-vs-empty address is treated as "no
+    /// signal" rather than "mismatch".
     fn compare_addresses(addr1: &Address, addr2: &Address) -> f64 {
         // Each sub-component contributes its own raw score in `[0.0, 1.0]`
         // and a weight. The final sub-score is the weight-renormalised
@@ -753,6 +836,16 @@ impl MatchingEngine {
         }
     }
 
+    /// Score phone-number equality: `1.0` if the two numbers canonicalise
+    /// to the same value, `0.0` otherwise. `None` if either is absent.
+    ///
+    /// Prefers the international-aware E.164 form
+    /// ([`Normalizer::normalize_phone_e164`], using the configured
+    /// `phone_default_country` as the fallback jurisdiction) so numbers from
+    /// different countries that share national-significant digits do not
+    /// collide. Falls back to the legacy national-significant form
+    /// ([`Normalizer::normalize_phone`]) only when either side cannot be
+    /// parsed to E.164, preserving behaviour for single-country deployments.
     fn score_phone(&self, place1: &Place, place2: &Place) -> Option<f64> {
         let phone1 = place1.phone.as_ref()?;
         let phone2 = place2.phone.as_ref()?;
@@ -774,6 +867,14 @@ impl MatchingEngine {
         Some(f64::from(norm1 == norm2))
     }
 
+    /// Score email-address equality: `1.0` if both addresses canonicalise
+    /// to the same value, `0.0` otherwise.
+    ///
+    /// Both sides are normalised via [`Normalizer::normalize_email`] (trim,
+    /// lowercase, optional Gmail dot/`+tag` folding driven by the config's
+    /// `gmail_dot_folding`). Returns `None` if either side is absent or
+    /// fails to parse as a valid email — an unparseable address is treated
+    /// as missing data, not as a mismatch.
     fn score_email(&self, place1: &Place, place2: &Place) -> Option<f64> {
         let email1 = place1.email.as_ref()?;
         let email2 = place2.email.as_ref()?;
@@ -810,6 +911,10 @@ fn valid_coords(lat: Option<f64>, lon: Option<f64>) -> Option<(f64, f64)> {
     Some((lat, lon))
 }
 
+/// Score category equality: `Some(1.0)` if both categories are set and
+/// structurally equal, `Some(0.0)` if both set but differ, `None` if either
+/// is absent. Categories are matched by `PartialEq`, so two `Other(_)`
+/// variants only match when their carried strings are equal.
 fn score_category(p1: &Place, p2: &Place) -> Option<f64> {
     match (&p1.category, &p2.category) {
         (Some(a), Some(b)) => Some(if a == b { 1.0 } else { 0.0 }),
@@ -817,6 +922,11 @@ fn score_category(p1: &Place, p2: &Place) -> Option<f64> {
     }
 }
 
+/// Score ISO 3166-1 alpha-2 country-code equality: `Some(1.0)` if both
+/// codes are set and equal after trimming whitespace and ASCII-lowercasing,
+/// `Some(0.0)` if both set but differ, `None` if either is absent. The
+/// case-insensitive trim absorbs the common `"GB"` vs `"gb"` /
+/// `" gb "` representation drift between source systems.
 fn score_country_code(p1: &Place, p2: &Place) -> Option<f64> {
     let a = p1.country_code_as_iso_3166_1_alpha_2.as_ref()?;
     let b = p2.country_code_as_iso_3166_1_alpha_2.as_ref()?;
@@ -825,6 +935,11 @@ fn score_country_code(p1: &Place, p2: &Place) -> Option<f64> {
     Some(if na == nb { 1.0 } else { 0.0 })
 }
 
+/// Return `true` if the two places share any identical `(scheme, value)`
+/// external ID. Empty-on-either-side short-circuits to `false`. Equality is
+/// scheme-scoped via [`PlaceId`](crate::models::PlaceId)'s `PartialEq`, so a
+/// `(Google, "X")` never matches an `(OsmNode, "X")`. The nested loop is
+/// `O(n*m)`, which is fine because `place_ids` lists are tiny in practice.
 fn shares_place_id(p1: &Place, p2: &Place) -> bool {
     if p1.place_ids.is_empty() || p2.place_ids.is_empty() {
         return false;
@@ -839,6 +954,10 @@ fn shares_place_id(p1: &Place, p2: &Place) -> bool {
     false
 }
 
+/// Score external-ID overlap for the probabilistic breakdown: `Some(1.0)`
+/// if the places share any `(scheme, value)` pair, `Some(0.0)` if both
+/// have IDs but none overlap, `None` if either side has no IDs at all (so
+/// the field is skipped rather than penalised). Wraps [`shares_place_id`].
 fn score_place_ids(p1: &Place, p2: &Place) -> Option<f64> {
     if p1.place_ids.is_empty() || p2.place_ids.is_empty() {
         return None;
@@ -846,6 +965,13 @@ fn score_place_ids(p1: &Place, p2: &Place) -> Option<f64> {
     Some(if shares_place_id(p1, p2) { 1.0 } else { 0.0 })
 }
 
+/// Return `true` iff both places have a primary `name` that normalises to
+/// the same value AND an `address.postcode` that normalises to the same
+/// value. This is the second deterministic-match rule (the first being a
+/// shared external ID). Any missing name or postcode short-circuits to
+/// `false`. Names are compared via [`Normalizer::normalize_name`] and
+/// postcodes via [`Normalizer::normalize_postcode`], so cosmetic
+/// differences (case, punctuation, internal spacing) do not block a match.
 fn name_and_postcode_match(p1: &Place, p2: &Place) -> bool {
     let (Some(n1), Some(n2)) = (&p1.name, &p2.name) else {
         return false;

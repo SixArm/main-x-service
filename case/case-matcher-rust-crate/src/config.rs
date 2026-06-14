@@ -26,14 +26,27 @@ pub struct MatchConfig {
 }
 
 impl Default for MatchConfig {
+    /// The canonical configuration. The six weights sum to `1.0` (so the
+    /// renormalised average lands in `[0.0, 1.0]` even when every
+    /// component is present) and are ordered by identity strength: title
+    /// and subjects dominate; status is the weakest standalone signal.
     fn default() -> Self {
         Self {
+            // Probable-match cutoff. 0.85 is deliberately demanding: a
+            // strong title alone (~0.9) can clear it, but a weak title
+            // needs corroboration from other components.
             threshold: 0.85,
+            // Title is the primary identity signal → heaviest weight.
             title_weight: 0.30,
+            // Shared subjects (involved parties) strongly corroborate.
             subjects_weight: 0.25,
+            // Agency-scoped case number: precise but only when present.
             case_number_weight: 0.15,
+            // Categorical type: useful but coarse.
             case_type_weight: 0.10,
+            // Status: weakest — the same matter changes status over time.
             status_weight: 0.05,
+            // Free-form keywords/tags: moderate corroboration.
             keywords_weight: 0.15,
         }
     }
@@ -75,8 +88,12 @@ impl MatchConfig {
         }
     }
 
-    /// Sum of every per-component weight (1.0 for the documented
+    /// Sum of every per-component weight (`1.0` for the documented
     /// defaults).
+    ///
+    /// Test-only invariant check: confirms the presets keep the weights
+    /// summing to one and only move the threshold. Returns the total of
+    /// all six component weights.
     #[cfg(test)]
     fn weight_total(&self) -> f64 {
         self.title_weight
@@ -92,6 +109,8 @@ impl MatchConfig {
 mod tests {
     use super::*;
 
+    // Pins the core invariant: the default weights sum to exactly 1.0
+    // (within float tolerance), which the renormalised average relies on.
     #[test]
     fn default_weights_sum_to_one() {
         let total = MatchConfig::default().weight_total();
@@ -101,6 +120,8 @@ mod tests {
         );
     }
 
+    // Pins that `strict`/`lenient` only move the threshold (to 0.95 /
+    // 0.70) and leave every component weight identical to the default.
     #[test]
     fn presets_change_only_threshold() {
         let d = MatchConfig::default();

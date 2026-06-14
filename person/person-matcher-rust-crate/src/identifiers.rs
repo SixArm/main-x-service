@@ -220,6 +220,11 @@ pub fn parse_fr_nir(s: &str) -> Option<String> {
         return None;
     }
 
+    // Positions 5..7 hold the 2-char département. Corsica is the only
+    // alphabetic case: "2A"/"2B" are not digits, so they are remapped to
+    // "19"/"18" purely to make the 13-char body numeric for the Mod-97
+    // key. The remap touches ONLY the value fed to the checksum; the
+    // canonical string returned still carries the original "2A"/"2B".
     let dept = &cleaned[5..7];
     let numeric_body = match dept {
         "2A" => format!("{}19{}", &cleaned[0..5], &cleaned[7..13]),
@@ -238,6 +243,10 @@ pub fn parse_fr_nir(s: &str) -> Option<String> {
     let n: u64 = numeric_body.parse().ok()?;
     let key: u64 = key_str.parse().ok()?;
 
+    // Mod-97 key: the trailing 2-digit key K equals 97 − (body mod 97).
+    // Because (body mod 97) is in 0..=96, the key is in 1..=97; the value
+    // 97 is encoded as the literal "00" by convention, but real bodies
+    // rarely hit it, so we compare the raw arithmetic for exact equality.
     if 97 - (n % 97) == key {
         Some(cleaned)
     } else {
@@ -509,17 +518,25 @@ pub fn parse_de_kvnr(s: &str) -> Option<String> {
     if !digit_chars.iter().all(char::is_ascii_digit) {
         return None;
     }
+    // Map the leading letter to a 2-digit ordinal (A=01 … Z=26) and split
+    // it into its tens/units digits so the whole identifier becomes a flat
+    // 10-digit run for the alternating-weight Mod-10 pass.
     let letter_ord = (first as u32) - ('A' as u32) + 1;
     let mut combined: Vec<u32> = vec![letter_ord / 10, letter_ord % 10];
     for c in &digit_chars[..8] {
         combined.push(c.to_digit(10)?);
     }
+    // Alternating weights 1,2,1,2,… across the 10 digits. A product ≥ 10
+    // is digit-summed; since the max product is 9×2=18, the digit sum is
+    // always product−9 (e.g. 18 → 1+8 = 9 = 18−9), avoiding a second loop.
     let mut total: u32 = 0;
     for (i, d) in combined.iter().enumerate() {
         let weight = if i % 2 == 0 { 1 } else { 2 };
         let product = d * weight;
         total += if product >= 10 { product - 9 } else { product };
     }
+    // The 9th supplied digit (index 8) is the check digit; it must equal
+    // the running total reduced mod 10.
     let expected = digit_chars[8].to_digit(10)?;
     if total % 10 == expected {
         Some(cleaned)
@@ -724,6 +741,10 @@ pub fn parse_nl_bsn(s: &str) -> Option<String> {
     if digits.chars().all(|c| c == '0') {
         return None;
     }
+    // The "11-test": descending weights 9..2 on the first 8 digits, then
+    // the final (check) digit carries weight −1 so the whole weighted sum
+    // must be ≡ 0 (mod 11). Folding the check digit into the sum with a
+    // negative weight lets one congruence test cover the whole number.
     let weights: [i32; 9] = [9, 8, 7, 6, 5, 4, 3, 2, -1];
     let mut sum: i32 = 0;
     for (i, c) in digits.chars().enumerate() {
@@ -916,6 +937,11 @@ pub fn parse_uk_chi_number(s: &str) -> Option<String> {
         return None;
     }
     let chars: Vec<u32> = digits.chars().filter_map(|c| c.to_digit(10)).collect();
+    // Mod-11 (United Kingdom National Health Service / CHI algorithm):
+    // weight the first 9 digits by 10,9,…,2, sum, and take mod 11. The
+    // check digit is (11 − (sum mod 11)) mod 11; the outer mod 11 maps a
+    // raw 11 down to 0. A computed value of 10 cannot be a single decimal
+    // digit, so such identifiers are structurally invalid and rejected.
     let weights = [10u32, 9, 8, 7, 6, 5, 4, 3, 2];
     let sum: u32 = chars
         .iter()
@@ -962,6 +988,12 @@ pub fn parse_be_nn(s: &str) -> Option<String> {
     if digits.len() != 11 {
         return None;
     }
+    // First 9 digits are the body (birth date + daily serial); last 2 are
+    // the Mod-97 check. The body cannot tell us the century on its own, so
+    // we test both interpretations: pre-2000 births check 97 − (body mod
+    // 97); 2000-and-later births prepend a literal "2" before the modulo
+    // (turning the 9-digit body into a 10-digit number) and check that.
+    // Accepting either keeps us century-agnostic without a birth year.
     let body: u64 = digits[..9].parse().ok()?;
     let check: u64 = digits[9..11].parse().ok()?;
     let pre2000 = 97 - body % 97;
@@ -991,6 +1023,10 @@ pub fn parse_bg_egn(s: &str) -> Option<String> {
     if digits.len() != 10 {
         return None;
     }
+    // EGN Mod-11: weight the first 9 digits by the fixed (non-monotonic)
+    // pattern [2,4,8,5,10,9,7,3,6], sum, take mod 11. A remainder of 10 is
+    // not a decimal digit, so by EGN convention it collapses to 0;
+    // otherwise the remainder is itself the expected check digit.
     let weights: [u32; 9] = [2, 4, 8, 5, 10, 9, 7, 3, 6];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(9).enumerate() {
@@ -1060,8 +1096,19 @@ pub fn parse_dk_cpr(s: &str) -> Option<String> {
     }
 }
 
-/// Cascading Mod-11 check used by Estonia and Lithuania.
+/// Cascading Mod-11 check used by Estonia (*isikukood*) and Lithuania
+/// (*asmens kodas*).
+///
+/// Returns the expected check digit for the 10-digit body, or `None` if
+/// fewer than 10 digits are present. The "cascade" is the two-pass rule
+/// that keeps the check digit a single decimal digit: the first weight
+/// vector is tried, and only when it yields the un-encodable remainder 10
+/// is the second (rotated) vector applied; if that also yields 10 the
+/// check digit is defined to be 0.
 fn baltic_cascade_check(digits: &str) -> Option<u32> {
+    // PASS1 weights 1..9 then wrap to 1 for the 10th digit; PASS2 is the
+    // same ring rotated by two (3..9,1,2,3). Rotating the weights on the
+    // retry de-correlates the two sums so the fallback rarely also hits 10.
     const PASS1: [u32; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 1];
     const PASS2: [u32; 10] = [3, 4, 5, 6, 7, 8, 9, 1, 2, 3];
     let body: Vec<u32> = digits
@@ -1072,11 +1119,14 @@ fn baltic_cascade_check(digits: &str) -> Option<u32> {
     if body.len() != 10 {
         return None;
     }
+    // First pass: weighted sum mod 11. A remainder 0..=9 is the answer.
     let s1: u32 = body.iter().zip(PASS1.iter()).map(|(d, w)| d * w).sum();
     let r1 = s1 % 11;
     if r1 < 10 {
         return Some(r1);
     }
+    // Remainder was 10 → retry with the rotated weights. If that is still
+    // 10 the check digit is defined as 0.
     let s2: u32 = body.iter().zip(PASS2.iter()).map(|(d, w)| d * w).sum();
     let r2 = s2 % 11;
     if r2 < 10 { Some(r2) } else { Some(0) }
@@ -1131,6 +1181,9 @@ pub fn parse_es_dni(s: &str) -> Option<String> {
     if !last.is_ascii_alphabetic() {
         return None;
     }
+    // The body is everything except the trailing control letter. For a
+    // foreigner's NIE the leading letter X/Y/Z is replaced by 0/1/2 so the
+    // body becomes a pure number; a DNI body is already numeric.
     let body = &cleaned[..cleaned.len() - 1];
     let n: u64 = match body.chars().next()? {
         'X' => format!("0{}", &body[1..]).parse().ok()?,
@@ -1139,6 +1192,10 @@ pub fn parse_es_dni(s: &str) -> Option<String> {
         d if d.is_ascii_digit() => body.parse().ok()?,
         _ => return None,
     };
+    // Control letter = LETTERS[n mod 23]. The 23-letter string deliberately
+    // omits I, O, U, Ñ (to avoid confusion with digits/each other), and its
+    // scrambled order means a single-digit error almost always changes the
+    // letter.
     const LETTERS: &[u8; 23] = b"TRWAGMYFPDXBNJZSQVHLCKE";
     let expected = LETTERS[(n % 23) as usize] as char;
     if last == expected {
@@ -1187,6 +1244,11 @@ pub fn parse_fi_hetu(s: &str) -> Option<String> {
     ) {
         return None;
     }
+    // Check character = TABLE[DDMMYYZZZ mod 31]. The date and the 3-digit
+    // serial are concatenated into a 9-digit number (the century sign is
+    // NOT part of the checksum input), then reduced mod 31. The 31-symbol
+    // table skips vowel-like / confusable letters (G,I,O,Q,…) so the code
+    // stays unambiguous.
     let n: u64 = format!("{date}{serial}").parse().ok()?;
     const TABLE: &[u8; 31] = b"0123456789ABCDEFHJKLMNPRSTUVWXY";
     let expected = TABLE[(n % 31) as usize] as char;
@@ -1212,6 +1274,11 @@ pub fn parse_hr_oib(s: &str) -> Option<String> {
     if digits.len() != 11 {
         return None;
     }
+    // ISO 7064 MOD 11,10: a running accumulator seeded at 10. For each of
+    // the first 10 digits, x = ((digit + acc) mod 10), with 0 mapped to 10
+    // (the "10" keeps the accumulator non-zero), then acc = (x·2) mod 11.
+    // The expected check digit is (11 − acc) mod 10. This recurrence makes
+    // every position depend on all earlier ones, catching transpositions.
     let mut acc: u32 = 10;
     for c in digits.chars().take(10) {
         let d = c.to_digit(10)?;
@@ -1245,6 +1312,10 @@ pub fn parse_is_kt(s: &str) -> Option<String> {
     if digits.len() != 10 {
         return None;
     }
+    // Kennitala Mod-11: weight the first 8 digits by [3,2,7,6,5,4,3,2],
+    // sum, take mod 11. Remainder 10 has no single-digit encoding → the
+    // identifier is invalid. Otherwise the check digit is (11 − r) mod 11
+    // (the mod 11 folds r==0 back to a check of 0).
     const WEIGHTS: [u32; 8] = [3, 2, 7, 6, 5, 4, 3, 2];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(8).enumerate() {
@@ -1301,6 +1372,11 @@ pub fn parse_lv_pk(s: &str) -> Option<String> {
     if digits.len() != 11 {
         return None;
     }
+    // Latvian PK: weight the first 10 digits by [1,6,3,7,9,10,5,8,4,2].
+    // check = ((1101 − Σ) mod 11) mod 10. The constant 1101 is a multiple
+    // of 11 large enough to keep (1101 − Σ) non-negative; rem_euclid keeps
+    // the result in 0..=10 even though Σ can exceed 1101, and the final
+    // mod 10 forces the check into a single decimal digit.
     const WEIGHTS: [i32; 10] = [1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
     let mut sum: i32 = 0;
     for (i, c) in digits.chars().take(10).enumerate() {
@@ -1368,6 +1444,11 @@ pub fn parse_no_fnr(s: &str) -> Option<String> {
     if body.len() != 11 {
         return None;
     }
+    // Two cascaded Mod-11 checks. Check 1 (digit at index 9) is computed
+    // over the first 9 digits with weights W1; check 2 (digit at index 10)
+    // is computed over the first 10 digits — i.e. it INCLUDES check 1 —
+    // with weights W2. In both, a remainder of 10 has no single-digit
+    // encoding and rejects; otherwise the check digit is (11 − r) mod 11.
     let s1: u32 = body.iter().take(9).zip(W1.iter()).map(|(d, w)| d * w).sum();
     let r1 = s1 % 11;
     if r1 == 10 {
@@ -1411,6 +1492,9 @@ pub fn parse_pl_pesel(s: &str) -> Option<String> {
     if digits.len() != 11 {
         return None;
     }
+    // PESEL Mod-10: repeating weights 1,3,7,9 over the first 10 digits.
+    // The check digit is (10 − (Σ mod 10)) mod 10; the outer mod 10 maps a
+    // raw 10 (when Σ mod 10 == 0) back to 0 so it stays a single digit.
     const WEIGHTS: [u32; 10] = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(10).enumerate() {
@@ -1441,6 +1525,10 @@ pub fn parse_ro_cnp(s: &str) -> Option<String> {
     if digits.len() != 13 {
         return None;
     }
+    // CNP Mod-11: the fixed "279146358279" weight string over the first 12
+    // digits. r = Σ mod 11. The Romanian rule is unusual: a remainder of
+    // 10 maps to a check digit of 1 (not rejection); every other remainder
+    // is the check digit itself.
     const WEIGHTS: [u32; 12] = [2, 7, 9, 1, 4, 6, 3, 5, 8, 2, 7, 9];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(12).enumerate() {
@@ -1472,6 +1560,9 @@ pub fn parse_si_emso(s: &str) -> Option<String> {
     if digits.len() != 13 {
         return None;
     }
+    // EMŠO Mod-11 (the ex-Yugoslav JMBG algorithm): two descending 7..2
+    // runs over the first 12 digits. r = Σ mod 11. r==0 → check 0; else
+    // check is 11 − r. A check of 10 (r==1) is un-encodable, so reject.
     const WEIGHTS: [u32; 12] = [7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(12).enumerate() {
@@ -1678,6 +1769,9 @@ pub fn parse_pl_nip(s: &str) -> Option<String> {
     if digits.len() != 10 {
         return None;
     }
+    // NIP Mod-11: weights [6,5,7,2,3,4,5,6,7] over the first 9 digits.
+    // r = Σ mod 11 IS the check digit directly (no 11 − r step). A
+    // remainder of 10 cannot be a decimal digit, so the NIP is invalid.
     const WEIGHTS: [u32; 9] = [6, 5, 7, 2, 3, 4, 5, 6, 7];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(9).enumerate() {
@@ -1712,6 +1806,10 @@ pub fn parse_pt_nif(s: &str) -> Option<String> {
     if digits.len() != 9 {
         return None;
     }
+    // NIF Mod-11: descending weights 9..2 over the first 8 digits.
+    // r = Σ mod 11. Both r==0 and r==1 would give a check of 11 or 10
+    // (un-encodable), so r < 2 collapses the check to 0; otherwise it is
+    // 11 − r.
     const WEIGHTS: [u32; 8] = [9, 8, 7, 6, 5, 4, 3, 2];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(8).enumerate() {
@@ -1756,10 +1854,14 @@ pub fn parse_br_cpf(s: &str) -> Option<String> {
         return None;
     }
     let bytes = digits.as_bytes();
+    // Repdigits (000…0, 111…1, …) pass the arithmetic but are reserved
+    // sentinels/test vectors that a real CPF never takes, so reject early.
     if bytes.iter().all(|&b| b == bytes[0]) {
         return None;
     }
     let d = |i: usize| u32::from(bytes[i] - b'0');
+    // First check digit (index 9): weight the first 9 digits by descending
+    // 10..2, take mod 11; r < 2 → 0, else 11 − r.
     let mut sum1: u32 = 0;
     for i in 0..9 {
         sum1 += d(i) * (10 - i as u32);
@@ -1769,6 +1871,8 @@ pub fn parse_br_cpf(s: &str) -> Option<String> {
     if d(9) != exp1 {
         return None;
     }
+    // Second check digit (index 10): same rule but over the first 10
+    // digits (so it INCLUDES the first check digit) with weights 11..2.
     let mut sum2: u32 = 0;
     for i in 0..10 {
         sum2 += d(i) * (11 - i as u32);
@@ -1832,6 +1936,11 @@ pub fn parse_cn_rrn(s: &str) -> Option<String> {
     let mm: u32 = cleaned[10..12].parse().ok()?;
     let dd: u32 = cleaned[12..14].parse().ok()?;
     jiff::civil::Date::new(yyyy as i16, mm as i8, dd as i8).ok()?;
+    // ISO 7064 MOD 11-2: the weights are the powers of 2 mod 11 for each
+    // position (2^17 down to 2^1), precomputed as this fixed array. Sum the
+    // 17 weighted digits, take mod 11, and look up the check character in
+    // CHECK — note index 2 is 'X', which is how the value 10 is written so
+    // the check stays a single character.
     const WEIGHTS: [u32; 17] = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
     const CHECK: [u8; 11] = [
         b'1', b'0', b'X', b'9', b'8', b'7', b'6', b'5', b'4', b'3', b'2',
@@ -1901,6 +2010,13 @@ pub fn parse_in_aadhaar(s: &str) -> Option<String> {
     if bytes[0] == b'0' || bytes[0] == b'1' {
         return None;
     }
+    // Verhoeff: walk the digits right-to-left (i = 0 is the rightmost,
+    // i.e. the check digit itself). At each step permute the digit by
+    // P[i mod 8] (the permutation table cycles with period 8), then fold
+    // it into the accumulator via the dihedral-group D5 multiplication
+    // table D. A valid number leaves the accumulator at 0 — Verhoeff
+    // catches all single-digit errors and all adjacent transpositions,
+    // which a plain weighted sum does not.
     let mut c: u8 = 0;
     for i in 0..12 {
         let d = bytes[11 - i] - b'0';
@@ -1931,6 +2047,10 @@ pub fn parse_jp_my_number(s: &str) -> Option<String> {
         return None;
     }
     let bytes = digits.as_bytes();
+    // My Number Mod-11 (Cabinet Order weights): two descending runs
+    // [6,5,4,3,2] then [7,6,5,4,3,2] over the first 11 digits. r = Σ mod
+    // 11. r < 2 collapses the check to 0 (covering the un-encodable 11/10);
+    // otherwise the check digit is 11 − r.
     const WEIGHTS: [u32; 11] = [6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
     let mut sum: u32 = 0;
     for i in 0..11 {
@@ -2009,6 +2129,9 @@ pub fn parse_mx_curp(s: &str) -> Option<String> {
     let dd: u32 = cleaned[8..10].parse().ok()?;
     let yyyy = if yy <= 29 { 2000 + yy } else { 1900 + yy };
     jiff::civil::Date::new(yyyy as i16, mm as i8, dd as i8).ok()?;
+    // CURP value table: digits map to themselves; letters A..N → 10..23,
+    // Ñ → 24, O..Z → 25..36. Ñ sits between N and O so the alphabet stays
+    // contiguous despite the extra Spanish letter.
     let value = |c: char| -> Option<u32> {
         Some(match c {
             '0'..='9' => (c as u32) - ('0' as u32),
@@ -2018,6 +2141,10 @@ pub fn parse_mx_curp(s: &str) -> Option<String> {
             _ => return None,
         })
     };
+    // Mod-10 weighted sum: position i (0-based) carries weight (18 − i), so
+    // the leftmost char has weight 18 and the 17th has weight 2. The check
+    // digit is (10 − (Σ mod 10)) mod 10; the outer mod 10 maps a raw 10
+    // back to 0.
     let mut sum: u32 = 0;
     for (i, &c) in chars.iter().enumerate().take(17) {
         sum += value(c)? * (18 - i as u32);
@@ -2077,6 +2204,10 @@ pub fn parse_nz_nhi(s: &str) -> Option<String> {
             return None;
         }
     }
+    // Letter values are A=1.. with I and O skipped (they are excluded from
+    // the alphabet because they look like 1 and 0). The natural 1-based
+    // index is shifted down by 1 once past I and by 2 once past O to close
+    // those two gaps.
     let letter_value = |b: u8| -> u32 {
         let idx = u32::from(b - b'A') + 1;
         if b > b'O' {
@@ -2087,6 +2218,9 @@ pub fn parse_nz_nhi(s: &str) -> Option<String> {
             idx
         }
     };
+    // Mod-11 over the 6 leading positions (3 letter values + 3 digits) with
+    // weights 7..2. r = Σ mod 11. A remainder of 1 would give a check of 10
+    // (un-encodable) → reject. r==0 → check 0; otherwise check is 11 − r.
     const WEIGHTS: [u32; 6] = [7, 6, 5, 4, 3, 2];
     let mut sum: u32 = 0;
     for i in 0..3 {
@@ -2379,10 +2513,25 @@ pub fn parse_sk_passport(s: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    //! Per-scheme parser tests.
+    //!
+    //! Every `parse_*` function gets, at minimum, a "valid canonical value
+    //! round-trips", a "tolerates whitespace / punctuation / case", a
+    //! "rejects a wrong check digit / character", and a "rejects a wrong
+    //! length" test; schemes with embedded dates, banned-letter sets, or
+    //! repdigit sentinels get extra cases pinning those edges. Each magic
+    //! example is a *synthetic* (never real) identifier whose check
+    //! digit/character has been verified to pass or fail as the test name
+    //! claims — the inline notes record why a given value is valid or bad.
+    //! Together these tests lock the canonical form so two textual layouts
+    //! of the same identifier always compare byte-equal in the matcher.
+
     use super::*;
 
     // ---------- parse_united_kingdom_national_health_service_number ----------
 
+    /// Compact 10-digit United Kingdom National Health Service Number
+    /// round-trips unchanged — pins the canonical (no-separator) form.
     #[test]
     fn united_kingdom_national_health_service_number_compact_form_parses() {
         assert_eq!(
@@ -2391,6 +2540,8 @@ mod tests {
         );
     }
 
+    /// Spaced `"943 476 5919"` layout canonicalises to the same string as
+    /// the compact form, so the two never miss each other in the matcher.
     #[test]
     fn united_kingdom_national_health_service_number_spaced_form_parses_to_same_canonical() {
         assert_eq!(
@@ -2399,6 +2550,8 @@ mod tests {
         );
     }
 
+    /// Letters and too-short input are rejected — guards the structural
+    /// 10-digit gate before the Mod-11 check runs.
     #[test]
     fn united_kingdom_national_health_service_number_rejects_letters_and_short_input() {
         assert_eq!(
@@ -2417,6 +2570,8 @@ mod tests {
 
     // ---------- parse_fr_nir ----------
 
+    /// A constructed valid `FR NIR` round-trips — pins the Mod-97 key
+    /// acceptance path for a normal (non-Corsica) département.
     #[test]
     fn fr_nir_round_trip_for_a_constructed_valid_value() {
         // Body 1801275123456 → key = 97 - (N mod 97) = 42. Verified by parse.
@@ -2424,6 +2579,8 @@ mod tests {
         assert_eq!(parse_fr_nir(valid), Some(valid.into()));
     }
 
+    /// The spaced administrative layout strips to the same 15-char form,
+    /// so paper-form and database renderings match.
     #[test]
     fn fr_nir_whitespace_is_tolerated() {
         assert_eq!(
@@ -2432,11 +2589,14 @@ mod tests {
         );
     }
 
+    /// A body with the wrong 2-digit Mod-97 key (`99` instead of `42`) is
+    /// rejected — the core integrity guarantee of the NIR.
     #[test]
     fn fr_nir_rejects_wrong_check_key() {
         assert_eq!(parse_fr_nir("180127512345699"), None);
     }
 
+    /// Anything not exactly 15 characters rejects before checksum work.
     #[test]
     fn fr_nir_rejects_wrong_length() {
         assert_eq!(parse_fr_nir("12345"), None);
@@ -2444,11 +2604,15 @@ mod tests {
         assert_eq!(parse_fr_nir(""), None);
     }
 
+    /// A letter in a position that must be numeric (other than the Corsica
+    /// département slot) rejects — only `2A`/`2B` may be alphabetic.
     #[test]
     fn fr_nir_rejects_letters_in_digit_positions() {
         assert_eq!(parse_fr_nir("A80127512345642"), None);
     }
 
+    /// Corsica `2A` département: the body is remapped to "…19…" only for
+    /// the checksum, and the canonical output keeps the literal `2A`.
     #[test]
     fn fr_nir_handles_corsica_2a() {
         let body = "184032A001234";
@@ -2458,6 +2622,8 @@ mod tests {
         assert_eq!(parse_fr_nir(&nir), Some(nir.clone()));
     }
 
+    /// Corsica `2B` département: remapped to "…18…" for the checksum;
+    /// pins the second Corsica branch distinct from `2A`.
     #[test]
     fn fr_nir_handles_corsica_2b() {
         let body = "184032B001234";
@@ -2467,6 +2633,8 @@ mod tests {
         assert_eq!(parse_fr_nir(&nir), Some(nir.clone()));
     }
 
+    /// A lowercase Corsica letter (`2a`) is uppercased in the canonical
+    /// form, so case never splits two records on the same NIR.
     #[test]
     fn fr_nir_canonical_form_is_uppercased() {
         let body = "184032a001234";
@@ -2479,6 +2647,7 @@ mod tests {
 
     // ---------- parse_es_tsi ----------
 
+    /// A canonical 16-character ES TSI `CIP-SNS` round-trips unchanged — pins the accepted form.
     #[test]
     fn es_tsi_canonical_cip_sns_parses() {
         assert_eq!(
@@ -2487,6 +2656,7 @@ mod tests {
         );
     }
 
+    /// Lowercase, spaces and hyphens are stripped and uppercased so formatting never splits one ES TSI.
     #[test]
     fn es_tsi_whitespace_and_hyphens_stripped() {
         assert_eq!(
@@ -2495,17 +2665,20 @@ mod tests {
         );
     }
 
+    /// Anything other than the fixed 16-character length rejects — guards the ES TSI length invariant.
     #[test]
     fn es_tsi_rejects_too_short_or_too_long() {
         assert_eq!(parse_es_tsi("ABC123"), None);
         assert_eq!(parse_es_tsi("ABCDEF123456XY12345678"), None);
     }
 
+    /// Embedded punctuation (`@`, `!`) rejects — an ES TSI is alphanumeric only.
     #[test]
     fn es_tsi_rejects_non_alphanumerics() {
         assert_eq!(parse_es_tsi("ABC@123!XYZ"), None);
     }
 
+    /// A non-ASCII letter (`Ñ`) rejects — the ES TSI alphabet is ASCII-only.
     #[test]
     fn es_tsi_rejects_non_ascii() {
         assert_eq!(parse_es_tsi("ABCDÑ12345XYZ"), None);
@@ -2513,17 +2686,20 @@ mod tests {
 
     // ---------- parse_ie_ihi ----------
 
+    /// A compact 7-digit IE IHI round-trips unchanged — pins the canonical form.
     #[test]
     fn ie_ihi_seven_digits_parses() {
         assert_eq!(parse_ie_ihi("1234567"), Some("1234567".into()));
     }
 
+    /// Spaces and hyphens are stripped to the 7-digit canonical form so formatting never splits one IE IHI.
     #[test]
     fn ie_ihi_punctuation_and_spaces_stripped() {
         assert_eq!(parse_ie_ihi("123 4567"), Some("1234567".into()));
         assert_eq!(parse_ie_ihi("123-45-67"), Some("1234567".into()));
     }
 
+    /// Anything other than exactly 7 digits rejects — guards the IE IHI length invariant.
     #[test]
     fn ie_ihi_rejects_wrong_digit_count() {
         assert_eq!(parse_ie_ihi("123456"), None);
@@ -2531,6 +2707,7 @@ mod tests {
         assert_eq!(parse_ie_ihi(""), None);
     }
 
+    /// An all-letter input rejects — an IE IHI is digits only.
     #[test]
     fn ie_ihi_rejects_when_no_digits_present() {
         assert_eq!(parse_ie_ihi("ABCDEFG"), None);
@@ -2538,6 +2715,7 @@ mod tests {
 
     // ---------- parse_uk_hc_number ----------
 
+    /// `parse_uk_hc_number` delegates to `parse_united_kingdom_national_health_service_number` — pins the two as one alias.
     #[test]
     fn uk_hc_number_matches_united_kingdom_national_health_service_number_semantics() {
         assert_eq!(
@@ -2550,6 +2728,7 @@ mod tests {
         );
     }
 
+    /// An all-letter input rejects — the UK H&C number is digits only.
     #[test]
     fn uk_hc_number_rejects_letters() {
         assert_eq!(parse_uk_hc_number("ABCDEFGHIJ"), None);
@@ -2557,22 +2736,26 @@ mod tests {
 
     // ---------- parse_us_ssn ----------
 
+    /// A compact 9-digit US SSN round-trips unchanged — pins the canonical (no-separator) form.
     #[test]
     fn us_ssn_canonical_compact_form_parses() {
         assert_eq!(parse_us_ssn("123456789"), Some("123456789".into()));
     }
 
+    /// The hyphenated `123-45-6789` canonicalises to the same value as the compact form — formatting never splits one US SSN.
     #[test]
     fn us_ssn_hyphenated_form_parses_to_same_canonical() {
         assert_eq!(parse_us_ssn("123-45-6789"), parse_us_ssn("123456789"),);
     }
 
+    /// Internal and surrounding whitespace is stripped to the same canonical US SSN — spacing never splits a record.
     #[test]
     fn us_ssn_whitespace_variants_canonicalise_identically() {
         assert_eq!(parse_us_ssn("123 45 6789"), Some("123456789".into()),);
         assert_eq!(parse_us_ssn(" 123  45 6789 "), Some("123456789".into()),);
     }
 
+    /// The reserved area numbers (`000`, `666`, and the `900..=999` range) reject — a core US SSN allocation rule.
     #[test]
     fn us_ssn_rejects_invalid_area_numbers() {
         assert_eq!(parse_us_ssn("000-12-3456"), None);
@@ -2582,6 +2765,7 @@ mod tests {
         assert_eq!(parse_us_ssn("999-99-9999"), None);
     }
 
+    /// The boundary area numbers (`001`, `899`, and `665`/`667` around the `666` carve-out) are accepted — pins the off-by-one edges of the US SSN area rule.
     #[test]
     fn us_ssn_accepts_boundary_areas() {
         // 001 and 899 are the lowest and highest valid area numbers.
@@ -2592,16 +2776,19 @@ mod tests {
         assert_eq!(parse_us_ssn("667-23-4567"), Some("667234567".into()));
     }
 
+    /// A `00` group number rejects — the US SSN group field is never all zeros.
     #[test]
     fn us_ssn_rejects_zero_group() {
         assert_eq!(parse_us_ssn("123-00-4567"), None);
     }
 
+    /// A `0000` serial number rejects — the US SSN serial field is never all zeros.
     #[test]
     fn us_ssn_rejects_zero_serial() {
         assert_eq!(parse_us_ssn("123-45-0000"), None);
     }
 
+    /// Anything other than 9 digits rejects — guards the US SSN length invariant.
     #[test]
     fn us_ssn_rejects_wrong_length() {
         assert_eq!(parse_us_ssn("12345"), None);
@@ -2609,12 +2796,14 @@ mod tests {
         assert_eq!(parse_us_ssn(""), None);
     }
 
+    /// Letters in either the formatted or compact shape reject — a US SSN is digits only.
     #[test]
     fn us_ssn_rejects_letters() {
         assert_eq!(parse_us_ssn("ABC-DE-FGHI"), None);
         assert_eq!(parse_us_ssn("ABCDEFGHI"), None);
     }
 
+    /// Arbitrary punctuation (`(`, `)`, `.`) is stripped to the canonical US SSN — any separator style normalises identically.
     #[test]
     fn us_ssn_strips_arbitrary_punctuation() {
         assert_eq!(parse_us_ssn("(123).45.6789"), Some("123456789".into()),);
@@ -2622,36 +2811,43 @@ mod tests {
 
     // ---------- parse_de_kvnr ----------
 
+    /// A canonical DE KVNR (letter plus 9-digit body with valid check digit) round-trips unchanged.
     #[test]
     fn de_kvnr_canonical_form_parses() {
         assert_eq!(parse_de_kvnr("A123456780"), Some("A123456780".into()));
     }
 
+    /// A lowercase leading letter is uppercased so case never splits two records on the same DE KVNR.
     #[test]
     fn de_kvnr_accepts_lowercase_letter_canonicalises_to_upper() {
         assert_eq!(parse_de_kvnr("a123456780"), Some("A123456780".into()));
     }
 
+    /// Internal whitespace is stripped to the canonical DE KVNR — spacing never splits a record.
     #[test]
     fn de_kvnr_accepts_internal_whitespace() {
         assert_eq!(parse_de_kvnr("A 123 456 780"), Some("A123456780".into()));
     }
 
+    /// A second independent valid vector parses — guards against over-fitting the DE KVNR check to one example.
     #[test]
     fn de_kvnr_second_valid_vector() {
         assert_eq!(parse_de_kvnr("B987654320"), Some("B987654320".into()));
     }
 
+    /// A body with the wrong check digit is rejected — the core integrity guarantee of the DE KVNR.
     #[test]
     fn de_kvnr_rejects_wrong_check_digit() {
         assert_eq!(parse_de_kvnr("A123456789"), None);
     }
 
+    /// An all-digit input rejects — a DE KVNR must begin with a letter.
     #[test]
     fn de_kvnr_rejects_missing_letter() {
         assert_eq!(parse_de_kvnr("1234567890"), None);
     }
 
+    /// Anything other than the fixed 10-character length rejects — guards the DE KVNR length invariant.
     #[test]
     fn de_kvnr_rejects_wrong_length() {
         assert_eq!(parse_de_kvnr("A12345"), None);
@@ -2659,6 +2855,7 @@ mod tests {
         assert_eq!(parse_de_kvnr(""), None);
     }
 
+    /// A letter inside the numeric body rejects — only the leading character of a DE KVNR may be a letter.
     #[test]
     fn de_kvnr_rejects_non_digit_in_body() {
         assert_eq!(parse_de_kvnr("A12345A780"), None);
@@ -2666,6 +2863,7 @@ mod tests {
 
     // ---------- parse_it_cf ----------
 
+    /// A canonical 16-character IT CF (Codice Fiscale) with a valid check character round-trips unchanged.
     #[test]
     fn it_cf_canonical_form_parses() {
         assert_eq!(
@@ -2674,6 +2872,7 @@ mod tests {
         );
     }
 
+    /// Lowercase and internal whitespace canonicalise to the same IT CF so formatting never splits a record.
     #[test]
     fn it_cf_accepts_lowercase_and_whitespace() {
         assert_eq!(
@@ -2682,6 +2881,7 @@ mod tests {
         );
     }
 
+    /// A second independent valid vector parses — guards against over-fitting the IT CF check to one example.
     #[test]
     fn it_cf_second_valid_vector() {
         assert_eq!(
@@ -2690,11 +2890,13 @@ mod tests {
         );
     }
 
+    /// A wrong trailing check character is rejected — the core integrity guarantee of the IT CF.
     #[test]
     fn it_cf_rejects_wrong_check_character() {
         assert_eq!(parse_it_cf("RSSMRA85T10A562X"), None);
     }
 
+    /// Anything other than the fixed 16-character length rejects — guards the IT CF length invariant.
     #[test]
     fn it_cf_rejects_wrong_length() {
         assert_eq!(parse_it_cf("RSSMRA85T10A562"), None);
@@ -2702,6 +2904,7 @@ mod tests {
         assert_eq!(parse_it_cf(""), None);
     }
 
+    /// Embedded punctuation (`!`, `-`) rejects — an IT CF is alphanumeric only.
     #[test]
     fn it_cf_rejects_non_alphanumeric() {
         assert_eq!(parse_it_cf("RSSMRA85T10A562!"), None);
@@ -2710,32 +2913,38 @@ mod tests {
 
     // ---------- parse_nl_bsn ----------
 
+    /// A canonical 9-digit NL BSN passing the eleven-test round-trips unchanged.
     #[test]
     fn nl_bsn_canonical_form_parses() {
         assert_eq!(parse_nl_bsn("111222333"), Some("111222333".into()));
     }
 
+    /// A second independent valid vector parses — guards against over-fitting the NL BSN eleven-test to one example.
     #[test]
     fn nl_bsn_second_valid_vector() {
         assert_eq!(parse_nl_bsn("123456782"), Some("123456782".into()));
     }
 
+    /// Spaces and hyphens are stripped to the same canonical NL BSN — formatting never splits a record.
     #[test]
     fn nl_bsn_strips_separators() {
         assert_eq!(parse_nl_bsn("111 222 333"), Some("111222333".into()));
         assert_eq!(parse_nl_bsn("111-222-333"), Some("111222333".into()));
     }
 
+    /// A body failing the eleven-test is rejected — the core integrity guarantee of the NL BSN.
     #[test]
     fn nl_bsn_rejects_wrong_eleven_test() {
         assert_eq!(parse_nl_bsn("111222334"), None);
     }
 
+    /// An all-zeros input rejects — `000000000` is not a valid NL BSN even though it passes the arithmetic.
     #[test]
     fn nl_bsn_rejects_all_zeros() {
         assert_eq!(parse_nl_bsn("000000000"), None);
     }
 
+    /// Anything other than 9 digits rejects — guards the NL BSN length invariant.
     #[test]
     fn nl_bsn_rejects_wrong_length() {
         assert_eq!(parse_nl_bsn("12345"), None);
@@ -2743,6 +2952,7 @@ mod tests {
         assert_eq!(parse_nl_bsn(""), None);
     }
 
+    /// An all-letter input rejects — an NL BSN is digits only.
     #[test]
     fn nl_bsn_rejects_letters() {
         assert_eq!(parse_nl_bsn("ABCDEFGHI"), None);
@@ -2750,6 +2960,7 @@ mod tests {
 
     // ---------- parse_se_personnummer ----------
 
+    /// A 10-digit SE Personnummer passing `Luhn` round-trips unchanged — pins the canonical short form.
     #[test]
     fn se_pnr_ten_digit_form_parses() {
         assert_eq!(
@@ -2758,6 +2969,7 @@ mod tests {
         );
     }
 
+    /// Both the `-` and `+` century separators canonicalise to the same 10-digit SE Personnummer — formatting never splits a record.
     #[test]
     fn se_pnr_with_separator_canonicalises_to_ten_digit() {
         assert_eq!(
@@ -2770,6 +2982,7 @@ mod tests {
         );
     }
 
+    /// The 12-digit form keeps its 4-digit year so the century is preserved in the canonical SE Personnummer.
     #[test]
     fn se_pnr_twelve_digit_form_preserves_century() {
         assert_eq!(
@@ -2782,6 +2995,7 @@ mod tests {
         );
     }
 
+    /// A second independent valid vector parses — guards against over-fitting the SE Personnummer `Luhn` check to one example.
     #[test]
     fn se_pnr_second_valid_vector() {
         assert_eq!(
@@ -2790,11 +3004,13 @@ mod tests {
         );
     }
 
+    /// A wrong `Luhn` check digit is rejected — the core integrity guarantee of the SE Personnummer.
     #[test]
     fn se_pnr_rejects_wrong_luhn() {
         assert_eq!(parse_se_personnummer("4603243851"), None);
     }
 
+    /// Lengths other than 10 or 12 digits reject — guards the SE Personnummer length invariant.
     #[test]
     fn se_pnr_rejects_wrong_length() {
         assert_eq!(parse_se_personnummer("12345"), None);
@@ -2802,6 +3018,7 @@ mod tests {
         assert_eq!(parse_se_personnummer(""), None);
     }
 
+    /// An all-letter input rejects — a SE Personnummer is digits only.
     #[test]
     fn se_pnr_rejects_letters() {
         assert_eq!(parse_se_personnummer("ABCDEFGHIJ"), None);
@@ -2809,6 +3026,7 @@ mod tests {
 
     // ---------- parse_au_ihi ----------
 
+    /// A canonical 16-digit AU IHI passing `Luhn` round-trips unchanged — pins the accepted form.
     #[test]
     fn au_ihi_canonical_form_parses() {
         assert_eq!(
@@ -2817,6 +3035,7 @@ mod tests {
         );
     }
 
+    /// Internal whitespace is stripped to the canonical AU IHI — spacing never splits a record.
     #[test]
     fn au_ihi_strips_whitespace() {
         assert_eq!(
@@ -2825,6 +3044,7 @@ mod tests {
         );
     }
 
+    /// A second independent valid vector parses — guards against over-fitting the AU IHI `Luhn` check to one example.
     #[test]
     fn au_ihi_second_valid_vector() {
         assert_eq!(
@@ -2833,11 +3053,13 @@ mod tests {
         );
     }
 
+    /// A wrong `Luhn` check digit is rejected — the core integrity guarantee of the AU IHI.
     #[test]
     fn au_ihi_rejects_wrong_luhn() {
         assert_eq!(parse_au_ihi("8003601234567890"), None);
     }
 
+    /// Anything other than 16 digits rejects — guards the AU IHI length invariant.
     #[test]
     fn au_ihi_rejects_wrong_length() {
         assert_eq!(parse_au_ihi("12345"), None);
@@ -2845,6 +3067,7 @@ mod tests {
         assert_eq!(parse_au_ihi(""), None);
     }
 
+    /// An all-letter input rejects — an AU IHI is digits only.
     #[test]
     fn au_ihi_rejects_letters() {
         assert_eq!(parse_au_ihi("ABCDEFGHIJKLMNOP"), None);
@@ -2852,11 +3075,13 @@ mod tests {
 
     // ---------- parse_uk_chi_number ----------
 
+    /// A canonical 10-digit UK Scotland CHI with a valid check digit round-trips unchanged.
     #[test]
     fn uk_chi_canonical_form_parses() {
         assert_eq!(parse_uk_chi_number("0101701233"), Some("0101701233".into()),);
     }
 
+    /// Internal whitespace is stripped to the canonical UK Scotland CHI — spacing never splits a record.
     #[test]
     fn uk_chi_strips_whitespace() {
         assert_eq!(
@@ -2865,16 +3090,19 @@ mod tests {
         );
     }
 
+    /// A second independent valid vector parses — guards against over-fitting the UK Scotland CHI check to one example.
     #[test]
     fn uk_chi_second_valid_vector() {
         assert_eq!(parse_uk_chi_number("0101701241"), Some("0101701241".into()),);
     }
 
+    /// A wrong check digit is rejected — the core integrity guarantee of the UK Scotland CHI.
     #[test]
     fn uk_chi_rejects_wrong_check_digit() {
         assert_eq!(parse_uk_chi_number("0101701234"), None);
     }
 
+    /// Anything other than 10 digits rejects — guards the UK Scotland CHI length invariant.
     #[test]
     fn uk_chi_rejects_wrong_length() {
         assert_eq!(parse_uk_chi_number("12345"), None);
@@ -2882,6 +3110,7 @@ mod tests {
         assert_eq!(parse_uk_chi_number(""), None);
     }
 
+    /// An all-letter input rejects — a UK Scotland CHI is digits only.
     #[test]
     fn uk_chi_rejects_letters() {
         assert_eq!(parse_uk_chi_number("ABCDEFGHIJ"), None);
@@ -2893,18 +3122,22 @@ mod tests {
 
     // ---------- parse_be_nn ----------
 
+    /// A canonical 11-digit BE NN passing the `Mod-97` check round-trips unchanged.
     #[test]
     fn be_nn_canonical_form_parses() {
         assert_eq!(parse_be_nn("80010100107"), Some("80010100107".into()));
     }
+    /// Dots and hyphens are stripped to the canonical BE NN — formatting never splits a record.
     #[test]
     fn be_nn_strips_punctuation() {
         assert_eq!(parse_be_nn("80.01.01-001.07"), Some("80010100107".into()),);
     }
+    /// A wrong `Mod-97` check is rejected — the core integrity guarantee of the BE NN.
     #[test]
     fn be_nn_rejects_wrong_check() {
         assert_eq!(parse_be_nn("80010100100"), None);
     }
+    /// Anything other than 11 digits rejects — guards the BE NN length invariant.
     #[test]
     fn be_nn_rejects_wrong_length() {
         assert_eq!(parse_be_nn("12345"), None);
@@ -2913,14 +3146,17 @@ mod tests {
 
     // ---------- parse_bg_egn ----------
 
+    /// A canonical 10-digit BG EGN with a valid weighted check digit round-trips unchanged.
     #[test]
     fn bg_egn_canonical_form_parses() {
         assert_eq!(parse_bg_egn("8001010013"), Some("8001010013".into()));
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the BG EGN.
     #[test]
     fn bg_egn_rejects_wrong_check() {
         assert_eq!(parse_bg_egn("8001010014"), None);
     }
+    /// Anything other than 10 digits rejects — guards the BG EGN length invariant.
     #[test]
     fn bg_egn_rejects_wrong_length() {
         assert_eq!(parse_bg_egn("80010100"), None);
@@ -2929,18 +3165,22 @@ mod tests {
 
     // ---------- parse_cz_rc ----------
 
+    /// A modern 10-digit CZ RČ whose value is divisible by eleven round-trips unchanged.
     #[test]
     fn cz_rc_ten_digit_divisible_by_eleven() {
         assert_eq!(parse_cz_rc("8001150014"), Some("8001150014".into()));
     }
+    /// A 9-digit pre-1954 CZ RČ is accepted without a check digit — that era had no eleven-check.
     #[test]
     fn cz_rc_nine_digit_pre_1954_accepted_as_is() {
         assert_eq!(parse_cz_rc("800115001"), Some("800115001".into()));
     }
+    /// A 10-digit value not divisible by eleven is rejected — the core integrity guarantee of the modern CZ RČ.
     #[test]
     fn cz_rc_rejects_wrong_check() {
         assert_eq!(parse_cz_rc("8001150015"), None);
     }
+    /// Lengths other than 9 or 10 digits reject — guards the CZ RČ length invariant.
     #[test]
     fn cz_rc_rejects_bad_length() {
         assert_eq!(parse_cz_rc("12345"), None);
@@ -2949,14 +3189,17 @@ mod tests {
 
     // ---------- parse_dk_cpr ----------
 
+    /// A canonical 10-digit DK CPR round-trips unchanged — pins the accepted form.
     #[test]
     fn dk_cpr_canonical_parses() {
         assert_eq!(parse_dk_cpr("1501801234"), Some("1501801234".into()));
     }
+    /// The `-` date separator is stripped to the canonical DK CPR — formatting never splits a record.
     #[test]
     fn dk_cpr_strips_separator() {
         assert_eq!(parse_dk_cpr("150180-1234"), Some("1501801234".into()));
     }
+    /// Anything other than 10 digits rejects — guards the DK CPR length invariant.
     #[test]
     fn dk_cpr_rejects_bad_length() {
         assert_eq!(parse_dk_cpr("12345"), None);
@@ -2965,14 +3208,17 @@ mod tests {
 
     // ---------- parse_ee_ik ----------
 
+    /// A canonical 11-digit EE IK with a valid check digit round-trips unchanged.
     #[test]
     fn ee_ik_canonical_form_parses() {
         assert_eq!(parse_ee_ik("48001150011"), Some("48001150011".into()));
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the EE IK.
     #[test]
     fn ee_ik_rejects_wrong_check() {
         assert_eq!(parse_ee_ik("48001150012"), None);
     }
+    /// Anything other than 11 digits rejects — guards the EE IK length invariant.
     #[test]
     fn ee_ik_rejects_bad_length() {
         assert_eq!(parse_ee_ik("4800115001"), None);
@@ -2980,18 +3226,22 @@ mod tests {
 
     // ---------- parse_es_dni ----------
 
+    /// A canonical ES DNI (8 digits plus the correct `Mod-23` letter) round-trips unchanged.
     #[test]
     fn es_dni_canonical_form_parses() {
         assert_eq!(parse_es_dni("12345678Z"), Some("12345678Z".into()));
     }
+    /// A wrong `Mod-23` check letter is rejected — the core integrity guarantee of the ES DNI.
     #[test]
     fn es_dni_rejects_wrong_letter() {
         assert_eq!(parse_es_dni("12345678A"), None);
     }
+    /// A lowercase check letter is uppercased so case never splits two records on the same ES DNI.
     #[test]
     fn es_dni_lowercase_letter_canonicalises_upper() {
         assert_eq!(parse_es_dni("12345678z"), Some("12345678Z".into()));
     }
+    /// An NIE foreigner number with an `X` prefix is mapped to its numeric value before the `Mod-23` check, so valid NIEs parse.
     #[test]
     fn es_dni_handles_nie_prefix_x() {
         // NIE X1234567L → number is "01234567" mod 23 = (01234567 % 23).
@@ -3002,14 +3252,17 @@ mod tests {
 
     // ---------- parse_fi_hetu ----------
 
+    /// A canonical FI HETU with a valid `Mod-31` check character round-trips unchanged.
     #[test]
     fn fi_hetu_canonical_form_parses() {
         assert_eq!(parse_fi_hetu("150180-999B"), Some("150180-999B".into()));
     }
+    /// A wrong `Mod-31` check character is rejected — the core integrity guarantee of the FI HETU.
     #[test]
     fn fi_hetu_rejects_wrong_check() {
         assert_eq!(parse_fi_hetu("150180-999C"), None);
     }
+    /// A too-short input rejects — guards the FI HETU length invariant.
     #[test]
     fn fi_hetu_rejects_bad_length() {
         assert_eq!(parse_fi_hetu("12345"), None);
@@ -3017,14 +3270,17 @@ mod tests {
 
     // ---------- parse_hr_oib ----------
 
+    /// A canonical 11-digit HR OIB passing the `Mod-11,10` (ISO 7064) check round-trips unchanged.
     #[test]
     fn hr_oib_canonical_form_parses() {
         assert_eq!(parse_hr_oib("12345678903"), Some("12345678903".into()));
     }
+    /// A wrong `Mod-11,10` check digit is rejected — the core integrity guarantee of the HR OIB.
     #[test]
     fn hr_oib_rejects_wrong_check() {
         assert_eq!(parse_hr_oib("12345678901"), None);
     }
+    /// Anything other than 11 digits rejects — guards the HR OIB length invariant.
     #[test]
     fn hr_oib_rejects_bad_length() {
         assert_eq!(parse_hr_oib("123456789"), None);
@@ -3032,14 +3288,17 @@ mod tests {
 
     // ---------- parse_is_kt ----------
 
+    /// A canonical 10-digit IS Kennitala with a valid weighted check digit round-trips unchanged.
     #[test]
     fn is_kt_canonical_form_parses() {
         assert_eq!(parse_is_kt("1501802529"), Some("1501802529".into()));
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the IS Kennitala.
     #[test]
     fn is_kt_rejects_wrong_check() {
         assert_eq!(parse_is_kt("1501802539"), None);
     }
+    /// Anything other than 10 digits rejects — guards the IS Kennitala length invariant.
     #[test]
     fn is_kt_rejects_bad_length() {
         assert_eq!(parse_is_kt("12345"), None);
@@ -3047,10 +3306,12 @@ mod tests {
 
     // ---------- parse_lt_ak ----------
 
+    /// A canonical 11-digit LT AK with a valid check digit round-trips unchanged.
     #[test]
     fn lt_ak_canonical_form_parses() {
         assert_eq!(parse_lt_ak("48001150011"), Some("48001150011".into()));
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the LT AK.
     #[test]
     fn lt_ak_rejects_wrong_check() {
         assert_eq!(parse_lt_ak("48001150012"), None);
@@ -3058,14 +3319,17 @@ mod tests {
 
     // ---------- parse_lv_pk ----------
 
+    /// A canonical 11-digit LV PK with a valid check digit round-trips unchanged.
     #[test]
     fn lv_pk_canonical_form_parses() {
         assert_eq!(parse_lv_pk("15018010007"), Some("15018010007".into()));
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the LV PK.
     #[test]
     fn lv_pk_rejects_wrong_check() {
         assert_eq!(parse_lv_pk("15018010008"), None);
     }
+    /// Anything other than 11 digits rejects — guards the LV PK length invariant.
     #[test]
     fn lv_pk_rejects_bad_length() {
         assert_eq!(parse_lv_pk("1501801000"), None);
@@ -3073,10 +3337,12 @@ mod tests {
 
     // ---------- parse_mt_id ----------
 
+    /// A canonical MT ID (7 digits plus a valid suffix letter) round-trips unchanged.
     #[test]
     fn mt_id_canonical_form_parses() {
         assert_eq!(parse_mt_id("1234567M"), Some("1234567M".into()));
     }
+    /// Every letter in the MT ID suffix set (`M`, `G`, `A`, `P`, `L`, `H`, `B`, `Z`) is accepted — pins the full allowed alphabet.
     #[test]
     fn mt_id_accepts_all_valid_letters() {
         for letter in ['M', 'G', 'A', 'P', 'L', 'H', 'B', 'Z'] {
@@ -3084,11 +3350,13 @@ mod tests {
             assert!(parse_mt_id(&s).is_some(), "letter {letter} should be valid");
         }
     }
+    /// A suffix letter outside the allowed MT ID set (`X`, `K`) is rejected.
     #[test]
     fn mt_id_rejects_invalid_letter() {
         assert_eq!(parse_mt_id("1234567X"), None);
         assert_eq!(parse_mt_id("1234567K"), None);
     }
+    /// A too-short digit body rejects — guards the MT ID length invariant.
     #[test]
     fn mt_id_rejects_bad_length() {
         assert_eq!(parse_mt_id("12345M"), None);
@@ -3096,15 +3364,18 @@ mod tests {
 
     // ---------- parse_no_fnr ----------
 
+    /// A canonical 11-digit NO FNR passing both control digits round-trips unchanged.
     #[test]
     fn no_fnr_canonical_form_parses() {
         assert_eq!(parse_no_fnr("15018012399"), Some("15018012399".into()));
     }
+    /// A wrong value at either control digit is rejected — the core integrity guarantee of the NO FNR.
     #[test]
     fn no_fnr_rejects_wrong_check() {
         assert_eq!(parse_no_fnr("15018012390"), None);
         assert_eq!(parse_no_fnr("15018012398"), None);
     }
+    /// Anything other than 11 digits rejects — guards the NO FNR length invariant.
     #[test]
     fn no_fnr_rejects_bad_length() {
         assert_eq!(parse_no_fnr("12345"), None);
@@ -3112,14 +3383,17 @@ mod tests {
 
     // ---------- parse_pl_pesel ----------
 
+    /// A canonical 11-digit PL PESEL with a valid weighted check digit round-trips unchanged.
     #[test]
     fn pl_pesel_canonical_form_parses() {
         assert_eq!(parse_pl_pesel("80011500014"), Some("80011500014".into()));
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the PL PESEL.
     #[test]
     fn pl_pesel_rejects_wrong_check() {
         assert_eq!(parse_pl_pesel("80011500015"), None);
     }
+    /// A too-short input rejects — guards the PL PESEL length invariant.
     #[test]
     fn pl_pesel_rejects_bad_length() {
         assert_eq!(parse_pl_pesel("1234"), None);
@@ -3127,14 +3401,17 @@ mod tests {
 
     // ---------- parse_ro_cnp ----------
 
+    /// A canonical 13-digit RO CNP with a valid weighted check digit round-trips unchanged.
     #[test]
     fn ro_cnp_canonical_form_parses() {
         assert_eq!(parse_ro_cnp("1800115400012"), Some("1800115400012".into()));
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the RO CNP.
     #[test]
     fn ro_cnp_rejects_wrong_check() {
         assert_eq!(parse_ro_cnp("1800115400015"), None);
     }
+    /// Anything other than 13 digits rejects — guards the RO CNP length invariant.
     #[test]
     fn ro_cnp_rejects_bad_length() {
         assert_eq!(parse_ro_cnp("180011540001"), None);
@@ -3142,10 +3419,12 @@ mod tests {
 
     // ---------- parse_si_emso ----------
 
+    /// A canonical 13-digit SI EMŠO with a valid weighted check digit round-trips unchanged.
     #[test]
     fn si_emso_canonical_form_parses() {
         assert_eq!(parse_si_emso("1501980500015"), Some("1501980500015".into()));
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the SI EMŠO.
     #[test]
     fn si_emso_rejects_wrong_check() {
         assert_eq!(parse_si_emso("1501980500014"), None);
@@ -3153,10 +3432,12 @@ mod tests {
 
     // ---------- parse_sk_rc ----------
 
+    /// A canonical 10-digit SK RČ divisible by eleven round-trips unchanged.
     #[test]
     fn sk_rc_canonical_form_parses() {
         assert_eq!(parse_sk_rc("8051150019"), Some("8051150019".into()));
     }
+    /// A value not divisible by eleven is rejected — the core integrity guarantee of the SK RČ.
     #[test]
     fn sk_rc_rejects_wrong_check() {
         assert_eq!(parse_sk_rc("8051150010"), None);
@@ -3164,14 +3445,17 @@ mod tests {
 
     // ---------- parse_uk_nino ----------
 
+    /// A canonical UK NINO (two prefix letters, six digits, suffix letter) round-trips unchanged.
     #[test]
     fn uk_nino_canonical_form_parses() {
         assert_eq!(parse_uk_nino("AB123456A"), Some("AB123456A".into()));
     }
+    /// Lowercase and internal whitespace canonicalise to the same UK NINO so formatting never splits a record.
     #[test]
     fn uk_nino_accepts_lowercase_and_whitespace() {
         assert_eq!(parse_uk_nino("ab 12 34 56 a"), Some("AB123456A".into()),);
     }
+    /// A banned first prefix letter (`D`, `F`, `I`, `Q`, `U`, `V`) is rejected — these are never issued in a UK NINO.
     #[test]
     fn uk_nino_rejects_banned_first_letter() {
         for ch in ['D', 'F', 'I', 'Q', 'U', 'V'] {
@@ -3179,6 +3463,7 @@ mod tests {
             assert!(parse_uk_nino(&s).is_none(), "letter {ch} should be banned");
         }
     }
+    /// The reserved administrative prefixes (`OO`, `CR`, `FY`, `MW`, `NC`, `PP`, `PZ`, `TN`) are rejected — none denote a real UK NINO.
     #[test]
     fn uk_nino_rejects_banned_admin_prefix() {
         for prefix in ["OO", "CR", "FY", "MW", "NC", "PP", "PZ", "TN"] {
@@ -3189,6 +3474,7 @@ mod tests {
             );
         }
     }
+    /// A suffix letter outside `A`–`D` is rejected — only those four suffixes are valid on a UK NINO.
     #[test]
     fn uk_nino_rejects_bad_suffix() {
         for ch in ['E', 'F', 'X', 'Z'] {
@@ -3196,6 +3482,7 @@ mod tests {
             assert!(parse_uk_nino(&s).is_none(), "suffix {ch} should be invalid");
         }
     }
+    /// A too-short body (only five digits) rejects — guards the UK NINO length invariant.
     #[test]
     fn uk_nino_rejects_bad_length() {
         assert_eq!(parse_uk_nino("AB12345A"), None);
@@ -3207,20 +3494,24 @@ mod tests {
 
     // ---------- parse_gr_dss ----------
 
+    /// A canonical 10-digit GR DSS (AMKA) round-trips unchanged — pins the accepted form.
     #[test]
     fn gr_dss_canonical_form_parses() {
         assert_eq!(parse_gr_dss("1234567890"), Some("1234567890".into()));
     }
+    /// Spaces and hyphens are stripped to the canonical GR DSS — formatting never splits a record.
     #[test]
     fn gr_dss_strips_punctuation() {
         assert_eq!(parse_gr_dss("12 34-56 78 90"), Some("1234567890".into()));
     }
+    /// Anything other than 10 digits rejects — guards the GR DSS length invariant.
     #[test]
     fn gr_dss_rejects_bad_length() {
         assert_eq!(parse_gr_dss("12345"), None);
         assert_eq!(parse_gr_dss("12345678901"), None);
         assert_eq!(parse_gr_dss(""), None);
     }
+    /// An all-letter input rejects — a GR DSS is digits only.
     #[test]
     fn gr_dss_rejects_letters() {
         assert_eq!(parse_gr_dss("ABCDEFGHIJ"), None);
@@ -3228,23 +3519,28 @@ mod tests {
 
     // ---------- parse_li_id ----------
 
+    /// An `ID`-prefixed 8-digit LI ID round-trips unchanged — pins the short accepted form.
     #[test]
     fn li_id_eight_digit_form_parses() {
         assert_eq!(parse_li_id("ID12345678"), Some("ID12345678".into()));
     }
+    /// The 9-digit LI ID example from the spec parses — pins the longer accepted form.
     #[test]
     fn li_id_nine_digit_example_from_spec_parses() {
         assert_eq!(parse_li_id("ID022143586"), Some("ID022143586".into()));
     }
+    /// A lowercase `id` prefix is uppercased so case never splits two records on the same LI ID.
     #[test]
     fn li_id_lowercase_letters_uppercased() {
         assert_eq!(parse_li_id("id12345678"), Some("ID12345678".into()));
     }
+    /// Missing or partial `ID` prefix rejects — a LI ID requires two leading letters.
     #[test]
     fn li_id_rejects_missing_letters() {
         assert_eq!(parse_li_id("1234567890"), None);
         assert_eq!(parse_li_id("I12345678"), None); // only one leading letter
     }
+    /// Digit bodies outside the accepted range reject — guards the LI ID length invariant.
     #[test]
     fn li_id_rejects_bad_length() {
         assert_eq!(parse_li_id(""), None);
@@ -3254,24 +3550,29 @@ mod tests {
 
     // ---------- parse_nl_id ----------
 
+    /// A canonical NL ID (two letters plus seven digits) round-trips unchanged — pins the accepted shape.
     #[test]
     fn nl_id_canonical_form_parses() {
         assert_eq!(parse_nl_id("AB1234567"), Some("AB1234567".into()));
     }
+    /// Lowercase and internal whitespace canonicalise to the same NL ID so formatting never splits a record.
     #[test]
     fn nl_id_lowercase_and_whitespace_canonicalise() {
         assert_eq!(parse_nl_id("ab 12 34 567"), Some("AB1234567".into()));
     }
+    /// The letter `O` in any of its disallowed positions rejects — the NL ID bans it to avoid confusion with the digit zero.
     #[test]
     fn nl_id_rejects_letter_o_in_disallowed_positions() {
         assert_eq!(parse_nl_id("AO1234567"), None);
         assert_eq!(parse_nl_id("OB1234567"), None);
         assert_eq!(parse_nl_id("ABO234567"), None);
     }
+    /// The digit `0` is allowed in the body even though the letter `O` is banned — distinguishes the two in an NL ID.
     #[test]
     fn nl_id_allows_digit_zero() {
         assert_eq!(parse_nl_id("AB0234567"), Some("AB0234567".into()));
     }
+    /// Inputs not matching the two-letters-then-seven-digits shape reject — guards the NL ID layout invariant.
     #[test]
     fn nl_id_rejects_bad_shape() {
         assert_eq!(parse_nl_id("12345AB67"), None);
@@ -3281,24 +3582,29 @@ mod tests {
 
     // ---------- parse_pl_nip ----------
 
+    /// A canonical 10-digit PL NIP with a valid weighted check digit round-trips unchanged.
     #[test]
     fn pl_nip_canonical_form_parses() {
         assert_eq!(parse_pl_nip("1234567802"), Some("1234567802".into()));
     }
+    /// Hyphen separators are stripped to the canonical PL NIP — formatting never splits a record.
     #[test]
     fn pl_nip_strips_separators() {
         assert_eq!(parse_pl_nip("123-456-78-02"), Some("1234567802".into()));
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the PL NIP.
     #[test]
     fn pl_nip_rejects_wrong_check() {
         assert_eq!(parse_pl_nip("1234567803"), None);
     }
+    /// A body whose weighted sum mod 11 is 10 is rejected — the PL NIP spec defines that residue as invalid.
     #[test]
     fn pl_nip_rejects_check_value_ten_per_spec() {
         // For "123456789" body the weighted sum mod 11 is 10, which the
         // Polish NIP spec defines as invalid.
         assert_eq!(parse_pl_nip("1234567890"), None);
     }
+    /// A too-short input rejects — guards the PL NIP length invariant.
     #[test]
     fn pl_nip_rejects_bad_length() {
         assert_eq!(parse_pl_nip("12345"), None);
@@ -3306,14 +3612,17 @@ mod tests {
 
     // ---------- parse_pt_nif ----------
 
+    /// A canonical 9-digit PT NIF with a valid `Mod-11` check digit round-trips unchanged.
     #[test]
     fn pt_nif_canonical_form_parses() {
         assert_eq!(parse_pt_nif("123456789"), Some("123456789".into()));
     }
+    /// A wrong `Mod-11` check digit is rejected — the core integrity guarantee of the PT NIF.
     #[test]
     fn pt_nif_rejects_wrong_check() {
         assert_eq!(parse_pt_nif("123456780"), None);
     }
+    /// Anything other than 9 digits rejects — guards the PT NIF length invariant.
     #[test]
     fn pt_nif_rejects_bad_length() {
         assert_eq!(parse_pt_nif("12345"), None);
@@ -3325,18 +3634,22 @@ mod tests {
     // ----------------------------------------------------------------------
 
     // ---------- parse_br_cpf ----------
+    /// A canonical 11-digit BR CPF with valid twin check digits round-trips unchanged.
     #[test]
     fn br_cpf_canonical_form_parses() {
         assert_eq!(parse_br_cpf("12345678909"), Some("12345678909".into()));
     }
+    /// Dots and the `-` separator are stripped to the canonical BR CPF — formatting never splits a record.
     #[test]
     fn br_cpf_formatted_input_strips_punctuation() {
         assert_eq!(parse_br_cpf("123.456.789-09"), Some("12345678909".into()));
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the BR CPF.
     #[test]
     fn br_cpf_rejects_wrong_check() {
         assert_eq!(parse_br_cpf("12345678900"), None);
     }
+    /// Every repeated-digit sequence (`00000000000`…`99999999999`) is rejected even though it passes the check arithmetic — a known BR CPF guard.
     #[test]
     fn br_cpf_rejects_all_equal_sequences() {
         for d in '0'..='9' {
@@ -3344,17 +3657,20 @@ mod tests {
             assert_eq!(parse_br_cpf(&s), None, "{s}");
         }
     }
+    /// Anything other than 11 digits rejects — guards the BR CPF length invariant.
     #[test]
     fn br_cpf_rejects_bad_length() {
         assert_eq!(parse_br_cpf("1234567890"), None);
         assert_eq!(parse_br_cpf("123456789090"), None);
     }
+    /// An all-letter input rejects — a BR CPF is digits only.
     #[test]
     fn br_cpf_rejects_non_digit_only_input() {
         assert_eq!(parse_br_cpf("abcdefghijk"), None);
     }
 
     // ---------- parse_cn_rrn ----------
+    /// A canonical 18-character CN RRN with an `X` check character round-trips unchanged.
     #[test]
     fn cn_rrn_canonical_form_parses() {
         assert_eq!(
@@ -3362,6 +3678,7 @@ mod tests {
             Some("11010519491231002X".into()),
         );
     }
+    /// A lowercase `x` check character is uppercased so case never splits two records on the same CN RRN.
     #[test]
     fn cn_rrn_uppercases_lowercase_x() {
         assert_eq!(
@@ -3369,21 +3686,25 @@ mod tests {
             Some("11010519491231002X".into()),
         );
     }
+    /// A wrong `Mod-11` check character (a letter or the wrong digit) is rejected — the core integrity guarantee of the CN RRN.
     #[test]
     fn cn_rrn_rejects_wrong_check_char() {
         assert_eq!(parse_cn_rrn("11010519491231002Y"), None);
         assert_eq!(parse_cn_rrn("110105194912310020"), None);
     }
+    /// An impossible birth-date substring is rejected — the CN RRN embeds a real `YYYYMMDD`.
     #[test]
     fn cn_rrn_rejects_invalid_date_substring() {
         assert_eq!(parse_cn_rrn("11010513491231002X"), None);
         assert_eq!(parse_cn_rrn("110105194913320002X"), None);
     }
+    /// Anything other than 18 characters rejects — guards the CN RRN length invariant.
     #[test]
     fn cn_rrn_rejects_bad_length() {
         assert_eq!(parse_cn_rrn("11010519491231"), None);
         assert_eq!(parse_cn_rrn("11010519491231002XY"), None);
     }
+    /// A non-`X` letter at the check position is rejected — only `X` or a digit is valid there in a CN RRN.
     #[test]
     fn cn_rrn_rejects_non_alnum_letters() {
         // A non-X non-digit at the check position is rejected.
@@ -3391,6 +3712,7 @@ mod tests {
     }
 
     // ---------- parse_in_aadhaar ----------
+    /// A canonical 12-digit IN Aadhaar passing the `Verhoeff` check round-trips unchanged.
     #[test]
     fn in_aadhaar_canonical_form_parses() {
         assert_eq!(
@@ -3398,6 +3720,7 @@ mod tests {
             Some("234123412346".into())
         );
     }
+    /// Internal whitespace is stripped to the canonical IN Aadhaar — spacing never splits a record.
     #[test]
     fn in_aadhaar_strips_whitespace() {
         assert_eq!(
@@ -3405,11 +3728,13 @@ mod tests {
             Some("234123412346".into()),
         );
     }
+    /// A wrong `Verhoeff` check digit is rejected — the core integrity guarantee of the IN Aadhaar.
     #[test]
     fn in_aadhaar_rejects_wrong_verhoeff_check() {
         assert_eq!(parse_in_aadhaar("234123412347"), None);
         assert_eq!(parse_in_aadhaar("234123412345"), None);
     }
+    /// Every repeated-digit sequence (`2`…`9`) is rejected — a known IN Aadhaar guard against trivial numbers.
     #[test]
     fn in_aadhaar_rejects_all_equal_sequences() {
         for d in '2'..='9' {
@@ -3417,12 +3742,14 @@ mod tests {
             assert_eq!(parse_in_aadhaar(&s), None, "{s}");
         }
     }
+    /// A leading `0` or `1` is rejected — UIDAI never issues an IN Aadhaar starting with those digits.
     #[test]
     fn in_aadhaar_rejects_reserved_prefixes() {
         // UIDAI never issues numbers starting with 0 or 1.
         assert_eq!(parse_in_aadhaar("034123412346"), None);
         assert_eq!(parse_in_aadhaar("134123412346"), None);
     }
+    /// Anything other than 12 digits rejects — guards the IN Aadhaar length invariant.
     #[test]
     fn in_aadhaar_rejects_bad_length() {
         assert_eq!(parse_in_aadhaar("234123412"), None);
@@ -3430,6 +3757,7 @@ mod tests {
     }
 
     // ---------- parse_jp_my_number ----------
+    /// A canonical 12-digit JP My Number with a valid check digit round-trips unchanged.
     #[test]
     fn jp_my_number_canonical_form_parses() {
         assert_eq!(
@@ -3437,6 +3765,7 @@ mod tests {
             Some("123456789018".into()),
         );
     }
+    /// Internal whitespace is stripped to the canonical JP My Number — spacing never splits a record.
     #[test]
     fn jp_my_number_strips_whitespace() {
         assert_eq!(
@@ -3444,22 +3773,26 @@ mod tests {
             Some("123456789018".into()),
         );
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the JP My Number.
     #[test]
     fn jp_my_number_rejects_wrong_check() {
         assert_eq!(parse_jp_my_number("123456789010"), None);
         assert_eq!(parse_jp_my_number("123456789019"), None);
     }
+    /// Anything other than 12 digits rejects — guards the JP My Number length invariant.
     #[test]
     fn jp_my_number_rejects_bad_length() {
         assert_eq!(parse_jp_my_number("12345678901"), None);
         assert_eq!(parse_jp_my_number("1234567890123"), None);
     }
+    /// An all-letter input rejects — a JP My Number is digits only.
     #[test]
     fn jp_my_number_rejects_non_digit_only_input() {
         assert_eq!(parse_jp_my_number("abcdefghijkl"), None);
     }
 
     // ---------- parse_mx_curp ----------
+    /// A canonical 18-character MX CURP with a valid check character round-trips unchanged.
     #[test]
     fn mx_curp_canonical_form_parses() {
         assert_eq!(
@@ -3467,6 +3800,7 @@ mod tests {
             Some("HEGG560427MVZRRL04".into()),
         );
     }
+    /// Lowercase input is uppercased so case never splits two records on the same MX CURP.
     #[test]
     fn mx_curp_uppercases_input() {
         assert_eq!(
@@ -3474,19 +3808,23 @@ mod tests {
             Some("HEGG560427MVZRRL04".into()),
         );
     }
+    /// A wrong final check character is rejected — the core integrity guarantee of the MX CURP.
     #[test]
     fn mx_curp_rejects_wrong_check() {
         assert_eq!(parse_mx_curp("HEGG560427MVZRRL05"), None);
     }
+    /// An impossible birth-date substring is rejected — the MX CURP embeds a real `YYMMDD`.
     #[test]
     fn mx_curp_rejects_invalid_date_substring() {
         assert_eq!(parse_mx_curp("HEGG561327MVZRRL04"), None);
         assert_eq!(parse_mx_curp("HEGG569927MVZRRL04"), None);
     }
+    /// A sex character other than `H` or `M` is rejected — the MX CURP only encodes those two.
     #[test]
     fn mx_curp_rejects_bad_sex_char() {
         assert_eq!(parse_mx_curp("HEGG560427XVZRRL04"), None);
     }
+    /// Anything other than 18 characters rejects — guards the MX CURP length invariant.
     #[test]
     fn mx_curp_rejects_bad_length() {
         assert_eq!(parse_mx_curp("HEGG560427"), None);
@@ -3494,53 +3832,64 @@ mod tests {
     }
 
     // ---------- parse_nz_nhi ----------
+    /// A canonical 7-character NZ NHI passing the weighted check round-trips unchanged.
     #[test]
     fn nz_nhi_canonical_form_parses() {
         assert_eq!(parse_nz_nhi("ZAA0083"), Some("ZAA0083".into()));
     }
+    /// Lowercase input is uppercased so case never splits two records on the same NZ NHI.
     #[test]
     fn nz_nhi_uppercases_input() {
         assert_eq!(parse_nz_nhi("zaa0083"), Some("ZAA0083".into()));
     }
+    /// A wrong check digit is rejected — the core integrity guarantee of the NZ NHI.
     #[test]
     fn nz_nhi_rejects_wrong_check() {
         assert_eq!(parse_nz_nhi("ZAA0082"), None);
     }
+    /// The excluded letters `I` and `O` in any alpha position reject — the NZ NHI bans them to avoid digit confusion.
     #[test]
     fn nz_nhi_rejects_excluded_letters_i_and_o() {
         assert_eq!(parse_nz_nhi("ZAI0083"), None);
         assert_eq!(parse_nz_nhi("ZAO0083"), None);
         assert_eq!(parse_nz_nhi("IZA0083"), None);
     }
+    /// Anything other than 7 characters rejects — guards the NZ NHI length invariant.
     #[test]
     fn nz_nhi_rejects_bad_length() {
         assert_eq!(parse_nz_nhi("ZAA008"), None);
         assert_eq!(parse_nz_nhi("ZAA00830"), None);
     }
+    /// A digit where a prefix letter belongs rejects — the NZ NHI starts with three letters.
     #[test]
     fn nz_nhi_rejects_non_letter_prefix() {
         assert_eq!(parse_nz_nhi("Z1A0083"), None);
     }
 
     // ---------- parse_za_id ----------
+    /// A canonical 13-digit ZA ID passing `Luhn` round-trips unchanged — pins the accepted form.
     #[test]
     fn za_id_canonical_form_parses() {
         assert_eq!(parse_za_id("8001015009087"), Some("8001015009087".into()));
     }
+    /// Internal whitespace is stripped to the canonical ZA ID — spacing never splits a record.
     #[test]
     fn za_id_strips_whitespace() {
         assert_eq!(parse_za_id("800101 5009 087"), Some("8001015009087".into()),);
     }
+    /// A wrong `Luhn` check digit is rejected — the core integrity guarantee of the ZA ID.
     #[test]
     fn za_id_rejects_wrong_luhn() {
         assert_eq!(parse_za_id("8001015009088"), None);
         assert_eq!(parse_za_id("8001015009086"), None);
     }
+    /// An impossible birth-date substring is rejected — the ZA ID embeds a real `YYMMDD`.
     #[test]
     fn za_id_rejects_invalid_date_substring() {
         assert_eq!(parse_za_id("8013015009087"), None);
         assert_eq!(parse_za_id("8002305009087"), None);
     }
+    /// Anything other than 13 digits rejects — guards the ZA ID length invariant.
     #[test]
     fn za_id_rejects_bad_length() {
         assert_eq!(parse_za_id("80010150090"), None);
@@ -3551,29 +3900,35 @@ mod tests {
     // T-28: Nine per-country passport-number format validators.
     // ----------------------------------------------------------------------
 
+    /// A pre-2010 CY passport (single letter plus six digits) round-trips unchanged — pins the older accepted shape.
     #[test]
     fn cy_passport_pre_2010_form_parses() {
         assert_eq!(parse_cy_passport("E123456"), Some("E123456".into()));
     }
+    /// A biometric CY passport (`K` plus eight digits) round-trips unchanged — pins the newer accepted shape.
     #[test]
     fn cy_passport_biometric_form_parses() {
         assert_eq!(parse_cy_passport("K12345678"), Some("K12345678".into()));
     }
+    /// A prefix letter outside the allowed CY passport set is rejected.
     #[test]
     fn cy_passport_rejects_wrong_prefix() {
         assert_eq!(parse_cy_passport("A123456"), None);
         assert_eq!(parse_cy_passport("Z12345678"), None);
     }
+    /// A wrong digit count after either prefix rejects — guards both CY passport length variants.
     #[test]
     fn cy_passport_rejects_bad_length() {
         assert_eq!(parse_cy_passport("E12345"), None);
         assert_eq!(parse_cy_passport("K1234567"), None);
     }
 
+    /// An 8-digit CZ passport round-trips unchanged — pins the minimum accepted form.
     #[test]
     fn cz_passport_eight_digit_form_parses() {
         assert_eq!(parse_cz_passport("12345678"), Some("12345678".into()));
     }
+    /// A longer all-digit CZ passport is accepted — pins that the validator allows more than eight digits.
     #[test]
     fn cz_passport_accepts_longer_forms() {
         assert_eq!(
@@ -3581,75 +3936,90 @@ mod tests {
             Some("123456789012".into())
         );
     }
+    /// Fewer than eight digits (and the empty string) reject — guards the CZ passport minimum length.
     #[test]
     fn cz_passport_rejects_short_forms() {
         assert_eq!(parse_cz_passport("1234567"), None);
         assert_eq!(parse_cz_passport(""), None);
     }
 
+    /// A canonical LI passport (single letter plus five digits) round-trips unchanged.
     #[test]
     fn li_passport_canonical_form_parses() {
         assert_eq!(parse_li_passport("R00536"), Some("R00536".into()));
     }
+    /// A lowercase prefix letter is uppercased so case never splits two records on the same LI passport.
     #[test]
     fn li_passport_lowercases_to_upper() {
         assert_eq!(parse_li_passport("r00536"), Some("R00536".into()));
     }
+    /// Two leading letters or an all-digit input reject — guards the LI passport one-letter-plus-digits shape.
     #[test]
     fn li_passport_rejects_bad_format() {
         assert_eq!(parse_li_passport("RR0536"), None);
         assert_eq!(parse_li_passport("123456"), None);
     }
 
+    /// An 8-digit LT passport round-trips unchanged — pins the accepted form.
     #[test]
     fn lt_passport_eight_digit_parses() {
         assert_eq!(parse_lt_passport("12345678"), Some("12345678".into()));
     }
+    /// Anything other than 8 digits rejects — guards the LT passport length invariant.
     #[test]
     fn lt_passport_rejects_wrong_length() {
         assert_eq!(parse_lt_passport("1234567"), None);
         assert_eq!(parse_lt_passport("123456789"), None);
     }
 
+    /// A 7-digit MT passport round-trips unchanged — pins the accepted form.
     #[test]
     fn mt_passport_seven_digit_parses() {
         assert_eq!(parse_mt_passport("1234567"), Some("1234567".into()));
     }
+    /// A letter in the body rejects — an MT passport is digits only.
     #[test]
     fn mt_passport_rejects_letters() {
         assert_eq!(parse_mt_passport("123456M"), None);
     }
 
+    /// The NL passport validator reuses the NL ID format — a valid shape parses and a banned `O` rejects.
     #[test]
     fn nl_passport_uses_nl_id_format() {
         assert_eq!(parse_nl_passport("AB1234567"), Some("AB1234567".into()));
         assert_eq!(parse_nl_passport("AO1234567"), None);
     }
 
+    /// A canonical PT passport (single letter plus six digits) round-trips unchanged.
     #[test]
     fn pt_passport_canonical_form_parses() {
         assert_eq!(parse_pt_passport("A123456"), Some("A123456".into()));
     }
+    /// Two leading letters or an all-digit input reject — guards the PT passport one-letter-plus-six-digits shape.
     #[test]
     fn pt_passport_rejects_bad_shape() {
         assert_eq!(parse_pt_passport("AA12345"), None);
         assert_eq!(parse_pt_passport("1234567"), None);
     }
 
+    /// A canonical RO passport (two letters plus six digits) round-trips unchanged.
     #[test]
     fn ro_passport_canonical_form_parses() {
         assert_eq!(parse_ro_passport("AB123456"), Some("AB123456".into()));
     }
+    /// A single leading letter or three leading letters reject — guards the RO passport two-letters-plus-six-digits shape.
     #[test]
     fn ro_passport_rejects_bad_shape() {
         assert_eq!(parse_ro_passport("A1234567"), None);
         assert_eq!(parse_ro_passport("ABC12345"), None);
     }
 
+    /// A canonical SK passport (two letters plus seven digits) round-trips unchanged.
     #[test]
     fn sk_passport_canonical_form_parses() {
         assert_eq!(parse_sk_passport("AB1234567"), Some("AB1234567".into()));
     }
+    /// Three leading letters or a short digit body reject — guards the SK passport two-letters-plus-seven-digits shape.
     #[test]
     fn sk_passport_rejects_bad_shape() {
         assert_eq!(parse_sk_passport("ABC123456"), None);

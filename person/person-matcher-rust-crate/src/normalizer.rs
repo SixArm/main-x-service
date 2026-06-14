@@ -128,11 +128,21 @@ impl Normalizer {
     /// ```
     #[must_use]
     pub fn normalize_name(name: &str) -> String {
+        // NFKD decomposes a precomposed glyph (e.g. `é`) into a base letter
+        // plus a separate combining mark, so the diacritic can be dropped
+        // independently of the letter it sits on.
         name.nfkd()
+            // Drop the combining marks left behind by decomposition — this is
+            // the diacritic-stripping step (`é` + acute → `e`).
             .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
+            // Remove ASCII punctuation so `O'Brien`/`Mary-Jane` lose their
+            // apostrophes/hyphens and compare equal to the bare letters.
             .filter(|c| !c.is_ascii_punctuation())
             .collect::<String>()
+            // Case-fold after stripping so `MARY` and `mary` collapse together.
             .to_lowercase()
+            // `split_whitespace` + `join(" ")` collapses any run of internal
+            // whitespace to a single ASCII space and trims both ends.
             .split_whitespace()
             .collect::<Vec<_>>()
             .join(" ")
@@ -173,8 +183,11 @@ impl Normalizer {
     pub fn normalize_postcode(postcode: &str) -> String {
         postcode
             .chars()
+            // Drop every whitespace character so the conventional space in a
+            // UK postcode (`CF10 1AA`) does not split otherwise-equal values.
             .filter(|c| !c.is_whitespace())
             .collect::<String>()
+            // Postcodes are conventionally uppercase; fold so `cf101aa` matches.
             .to_uppercase()
     }
 
@@ -220,20 +233,31 @@ impl Normalizer {
     /// ```
     #[must_use]
     pub fn normalize_phone(phone: &str) -> String {
+        // Strip every non-digit (spaces, brackets, hyphens, leading `+`, …)
+        // so only the dialable digits remain.
         let digits: String = phone.chars().filter(char::is_ascii_digit).collect();
 
+        // `0044` is the UK international access form (`00` access code + `44`
+        // dial code); drop all four. The `len > 4` guard keeps a bare `0044`
+        // from yielding an empty string.
         if digits.starts_with("0044") && digits.len() > 4 {
             return digits[4..].to_string();
         }
 
+        // `44…` is the bare UK dial code. Require at least 12 digits (44 + a
+        // plausible 10-digit national number) so we don't mistake a domestic
+        // number that merely happens to start `44` for an international one.
         if digits.starts_with("44") && digits.len() >= 12 {
             return digits[2..].to_string();
         }
 
+        // A single leading `0` is the UK national trunk prefix; drop it. The
+        // `len > 1` guard preserves a lone `0` (see `normalize_phone_keeps_lone_zero`).
         if digits.starts_with('0') && digits.len() > 1 {
             return digits[1..].to_string();
         }
 
+        // No recognised prefix: foreign / already-bare numbers pass through.
         digits
     }
 
@@ -338,33 +362,50 @@ impl Normalizer {
     /// ```
     #[must_use]
     pub fn normalize_phone_e164(phone: &str, default_country: Option<&str>) -> Option<String> {
+        // A literal `+` anywhere is the unambiguous international marker; we
+        // detect it before discarding non-digits below.
         let has_plus = phone.chars().any(|c| c == '+');
+        // Reduce to bare digits; the textual layout (spaces, brackets) is noise.
         let digits: String = phone.chars().filter(char::is_ascii_digit).collect();
         if digits.is_empty() {
             return None;
         }
 
+        // Dispatch on the three input shapes, each yielding the matched country
+        // plus the national-significant number (NSN) with any trunk prefix gone.
         let (info, nsn): (&CountryPhoneInfo, String) = if has_plus {
+            // Explicit `+CC…`: the country is encoded in the leading dial code.
             let info = lookup_by_dial_code_prefix(&digits)?;
+            // Everything after the dial code is the national portion …
             let rest = &digits[info.dial_code.len()..];
+            // … minus the national trunk prefix if the entry system left it in
+            // (e.g. the stray `0` in `+44 0 7700 900123`).
             let rest = strip_trunk_prefix(info, rest);
             (info, rest.to_string())
         } else if let Some(stripped) = digits.strip_prefix("00") {
+            // `00CC…`: the `00` is the international access code (common in
+            // Europe); after stripping it the tail behaves like the `+` case.
             let info = lookup_by_dial_code_prefix(stripped)?;
             let rest = &stripped[info.dial_code.len()..];
             let rest = strip_trunk_prefix(info, rest);
             (info, rest.to_string())
         } else {
+            // Bare national format: with no marker we must be told which
+            // country to assume; refuse (`None`) if the caller passed none.
             let iso = default_country?;
             let info = lookup_by_iso(iso)?;
+            // National input carries the trunk prefix; strip it to reach the NSN.
             let nsn = strip_trunk_prefix(info, &digits);
             (info, nsn.to_string())
         };
 
+        // Length-bound the NSN against the country's plan: too short / too long
+        // means the parse was not confident, so reject rather than emit junk.
         if nsn.len() < info.min_nsn || nsn.len() > info.max_nsn {
             return None;
         }
 
+        // Reassemble canonical E.164: `+` then dial code then trunk-free NSN.
         Some(format!("+{}{}", info.dial_code, nsn))
     }
 
@@ -770,16 +811,22 @@ const UNIT_PREFIXES: &[&str] = &[
 /// the comparison is ASCII case-insensitive. Tokens that contain non-ASCII
 /// characters short-circuit to the original input unchanged.
 fn expand_one_token(tok: &str) -> String {
+    // Drop a trailing `.`/`,` so `St.` and `St` both match the table key `st`.
     let stripped = tok.trim_end_matches(['.', ',']);
+    // The abbreviation table is ASCII-only; a non-ASCII token cannot be a key,
+    // so return it verbatim (and avoid touching multi-byte characters).
     if !stripped.is_ascii() {
         return tok.to_string();
     }
     let lower = stripped.to_ascii_lowercase();
+    // Linear scan: the table is short and constant, so this is fine.
     for (abbrev, full) in STREET_ABBREVIATIONS {
         if lower == *abbrev {
             return (*full).to_string();
         }
     }
+    // Not an abbreviation: preserve the original token, including its casing
+    // and any trailing punctuation we only stripped for the comparison.
     tok.to_string()
 }
 
@@ -794,29 +841,37 @@ fn extract_unit_prefix(s: &str) -> (Option<String>, &str) {
     let kw_end = trimmed
         .find(|c: char| c.is_whitespace())
         .unwrap_or(trimmed.len());
+    // No leading token (string was empty/all-whitespace): nothing to match.
     if kw_end == 0 {
         return (None, s);
     }
     let kw_raw = &trimmed[..kw_end];
+    // Tolerate a trailing `.`/`,` on the keyword (`Apt.`, `Flat,`).
     let kw_stripped = kw_raw.trim_end_matches(['.', ',']);
+    // The keyword table is ASCII; bail on non-ASCII candidates.
     if !kw_stripped.is_ascii() {
         return (None, s);
     }
     let kw_lower = kw_stripped.to_ascii_lowercase();
+    // Only proceed if the first token is a recognised unit keyword; otherwise
+    // leave the input untouched so the house-number stage can run on it.
     if !UNIT_PREFIXES.iter().any(|p| *p == kw_lower) {
         return (None, s);
     }
-    // Skip whitespace and `#` after the keyword.
+    // Skip whitespace and `#` after the keyword (`Apt #5` → identifier `5`).
     let after_kw = trimmed[kw_end..].trim_start_matches([' ', '\t', '#']);
-    // Read alphanumerics as the identifier.
+    // The identifier is the leading alphanumeric run (`2A`, `5`, `12`).
     let id_end = after_kw
         .find(|c: char| !c.is_ascii_alphanumeric())
         .unwrap_or(after_kw.len());
+    // A keyword with no following identifier is not a real unit prefix.
     if id_end == 0 {
         return (None, s);
     }
     let id = &after_kw[..id_end];
+    // The remainder (after the identifier) is handed back for further parsing.
     let rest = &after_kw[id_end..];
+    // Canonical unit string: lowercase keyword + space + lowercase identifier.
     let unit = format!("{} {}", kw_lower, id.to_ascii_lowercase());
     (Some(unit), rest)
 }
@@ -829,14 +884,17 @@ fn extract_unit_prefix(s: &str) -> (Option<String>, &str) {
 /// `"Buckingham Palace"` → `(None, "Buckingham Palace")`.
 fn extract_house_number(s: &str) -> (Option<String>, &str) {
     let trimmed = s.trim_start();
+    // Walk the leading digit run; `digits_end` is the byte index just past it.
     let mut digits_end = 0;
     for (i, c) in trimmed.char_indices() {
         if c.is_ascii_digit() {
             digits_end = i + c.len_utf8();
         } else {
+            // First non-digit ends the number.
             break;
         }
     }
+    // No leading digits means there is no house number (e.g. "Buckingham Palace").
     if digits_end == 0 {
         return (None, s);
     }
@@ -1172,9 +1230,11 @@ const COUNTRY_PHONE_TABLE: &[CountryPhoneInfo] = &[
 /// (US/CA) which share dial code `1`, this disambiguates by the caller's
 /// chosen default; the canonical E.164 output is identical for both.
 fn lookup_by_iso(iso: &str) -> Option<&'static CountryPhoneInfo> {
+    // ISO 3166-1 alpha-2 codes are ASCII letters; anything else cannot match.
     if !iso.is_ascii() {
         return None;
     }
+    // Fold to uppercase so callers may pass `"gb"` or `"GB"` interchangeably.
     let upper = iso.to_ascii_uppercase();
     COUNTRY_PHONE_TABLE.iter().find(|c| c.iso_alpha2 == upper)
 }
@@ -1186,6 +1246,8 @@ fn lookup_by_iso(iso: &str) -> Option<&'static CountryPhoneInfo> {
 /// is returned; the canonical E.164 form is the same whether the caller
 /// later interprets the country as US or CA.
 fn lookup_by_dial_code_prefix(digits: &str) -> Option<&'static CountryPhoneInfo> {
+    // Try longest prefix first (3 → 2 → 1) so a 3-digit code like `353` (IE)
+    // is not shadowed by a shorter code that happens to be a prefix of it.
     for len in [3usize, 2, 1] {
         if digits.len() >= len {
             let prefix = &digits[..len];
@@ -1194,33 +1256,54 @@ fn lookup_by_dial_code_prefix(digits: &str) -> Option<&'static CountryPhoneInfo>
             }
         }
     }
+    // No table entry matched any prefix length: unknown dial code.
     None
 }
 
 /// Strip a single occurrence of the country's national trunk prefix
 /// from `nsn` if one is configured and present.
 fn strip_trunk_prefix<'a>(info: &CountryPhoneInfo, nsn: &'a str) -> &'a str {
+    // Only strip when the country has a trunk prefix, the NSN actually starts
+    // with it, and stripping leaves a non-empty remainder (don't reduce a bare
+    // trunk digit to the empty string).
     if let Some(tp) = info.trunk_prefix
         && let Some(rest) = nsn.strip_prefix(tp)
         && !rest.is_empty()
     {
         rest
     } else {
+        // No trunk prefix configured, or it isn't present: leave the NSN as-is
+        // (NANP/Spain/Portugal have no trunk `0`, so nothing to remove).
         nsn
     }
 }
 
 #[cfg(test)]
 mod tests {
+    //! Unit coverage for the text normalisers in this module.
+    //!
+    //! The suite pins, per function: the canonical happy-path transform, the
+    //! tricky edge cases the prose docs promise (diacritic round-trips,
+    //! punctuation stripping, trunk/international phone prefixes, per-country
+    //! E.164 dispatch, address-line tokenisation, Gmail dot-folding), the
+    //! degenerate empty/whitespace inputs, and — crucially — **idempotence**
+    //! (`f(f(x)) == f(x)`), since the matching engine may normalise an
+    //! already-normalised value. Many assertions use deliberately well-known
+    //! example numbers (UK Ofcom reserved `7700 900xxx`, US `555` exchange)
+    //! so no real PII appears in tests.
     use super::*;
 
     // ---------- normalize_name ----------
 
+    /// Pins that internal whitespace collapses to a single space and the ends
+    /// are trimmed — the layout-insensitivity the matcher relies on.
     #[test]
     fn normalize_name_collapses_whitespace_and_trims() {
         assert_eq!(Normalizer::normalize_name("  John  Smith  "), "john smith");
     }
 
+    /// Pins that apostrophes, hyphens and full stops are removed, so spelling
+    /// variants like `O'Brien`/`OBrien` and `Mary-Jane`/`MaryJane` unify.
     #[test]
     fn normalize_name_strips_ascii_punctuation() {
         assert_eq!(Normalizer::normalize_name("O'Brien"), "obrien");
@@ -1228,17 +1311,22 @@ mod tests {
         assert_eq!(Normalizer::normalize_name("Dr. Who"), "dr who");
     }
 
+    /// Pins the diacritic-stripping round-trip: accented Latin letters fold to
+    /// their base form, and letters with no NFKD decomposition (`ł`) survive.
     #[test]
     fn normalize_name_strips_diacritics() {
         assert_eq!(Normalizer::normalize_name("José"), "jose");
         assert_eq!(Normalizer::normalize_name("Siân"), "sian");
-        // common test cases
+        // Round-trip of common accented forms to their plain ASCII base.
         assert_eq!(Normalizer::normalize_name("naïve"), "naive");
         assert_eq!(Normalizer::normalize_name("crème"), "creme");
-        // ŷ and ŵ decompose; ł has no NFKD decomposition and survives lowercased.
+        // ŷ and ŵ decompose to base + combining mark; ł has no NFKD
+        // decomposition, so it is only lowercased and survives intact.
         assert_eq!(Normalizer::normalize_name("Łŷŵ"), "ływ");
     }
 
+    /// Pins that empty and whitespace-only inputs round-trip to the empty
+    /// string rather than panicking or producing stray spaces.
     #[test]
     fn normalize_name_handles_empty_and_whitespace() {
         assert_eq!(Normalizer::normalize_name(""), "");
@@ -1246,12 +1334,15 @@ mod tests {
         assert_eq!(Normalizer::normalize_name("\t\n"), "");
     }
 
+    /// Pins case-folding, including mixed-case surnames like `McDONALD`.
     #[test]
     fn normalize_name_lowercases() {
         assert_eq!(Normalizer::normalize_name("MARY"), "mary");
         assert_eq!(Normalizer::normalize_name("McDONALD"), "mcdonald");
     }
 
+    /// Pins idempotence over a spread of tricky inputs: feeding the output
+    /// back in must be a fixed point, because the matcher may re-normalise.
     #[test]
     fn normalize_name_is_idempotent() {
         for input in [
@@ -1263,11 +1354,14 @@ mod tests {
             "Siân",
         ] {
             let once = Normalizer::normalize_name(input);
+            // Second pass must equal the first — the fixed-point guarantee.
             let twice = Normalizer::normalize_name(&once);
             assert_eq!(once, twice, "not idempotent for {input:?}");
         }
     }
 
+    /// Pins the documented limitation that only ASCII punctuation is stripped:
+    /// a curly apostrophe (U+2019) survives, so upstream must ASCII-fold first.
     #[test]
     fn normalize_name_does_not_normalise_unicode_punctuation() {
         // Curly apostrophe (U+2019) is intentionally not stripped.
@@ -1278,11 +1372,14 @@ mod tests {
 
     // ---------- normalize_postcode ----------
 
+    /// Pins that postcodes are uppercased for case-insensitive comparison.
     #[test]
     fn normalize_postcode_uppercases() {
         assert_eq!(Normalizer::normalize_postcode("cf10 1aa"), "CF101AA");
     }
 
+    /// Pins that all whitespace (including tabs and the conventional UK space)
+    /// is removed, so spaced and unspaced postcodes compare equal.
     #[test]
     fn normalize_postcode_strips_all_whitespace() {
         assert_eq!(Normalizer::normalize_postcode("CF10 1AA"), "CF101AA");
@@ -1290,12 +1387,14 @@ mod tests {
         assert_eq!(Normalizer::normalize_postcode("CF10\t1AA"), "CF101AA");
     }
 
+    /// Pins that empty / whitespace-only postcodes normalise to the empty string.
     #[test]
     fn normalize_postcode_handles_empty() {
         assert_eq!(Normalizer::normalize_postcode(""), "");
         assert_eq!(Normalizer::normalize_postcode("   "), "");
     }
 
+    /// Pins postcode idempotence across spaced, unspaced and padded inputs.
     #[test]
     fn normalize_postcode_is_idempotent() {
         for input in ["cf10 1aa", "SW1A 2AA", "  EH8 9YL  ", ""] {
@@ -1307,16 +1406,20 @@ mod tests {
 
     // ---------- normalize_phone ----------
 
+    /// Pins that the UK national trunk `0` is dropped from a domestic mobile.
     #[test]
     fn normalize_phone_strips_uk_trunk_prefix() {
         assert_eq!(Normalizer::normalize_phone("07700 900123"), "7700900123");
     }
 
+    /// Pins that the `+44` international form reduces to the same bare NSN as
+    /// the national form above.
     #[test]
     fn normalize_phone_strips_plus_44_international() {
         assert_eq!(Normalizer::normalize_phone("+44 7700 900123"), "7700900123");
     }
 
+    /// Pins that the `0044` international access form also reduces to the NSN.
     #[test]
     fn normalize_phone_strips_0044_international() {
         assert_eq!(
@@ -1325,23 +1428,29 @@ mod tests {
         );
     }
 
+    /// Pins that brackets and spaces (a UK landline written `(029) 2034 5678`)
+    /// are discarded down to digits, with the trunk `0` removed.
     #[test]
     fn normalize_phone_handles_brackets_and_spaces() {
         assert_eq!(Normalizer::normalize_phone("(029) 2034 5678"), "2920345678");
     }
 
+    /// Pins that input with no digits (empty or punctuation-only) yields "".
     #[test]
     fn normalize_phone_handles_empty() {
         assert_eq!(Normalizer::normalize_phone(""), "");
         assert_eq!(Normalizer::normalize_phone("---"), "");
     }
 
+    /// Pins the length guard on the `44` rule: a short `44…` number is treated
+    /// as domestic digits, not an international prefix, so `44` is kept.
     #[test]
     fn normalize_phone_does_not_strip_44_if_too_short() {
         // 44 followed by fewer than 10 more digits: keep the 44 (not international prefix).
         assert_eq!(Normalizer::normalize_phone("4412345"), "4412345");
     }
 
+    /// Pins idempotence of the legacy normaliser across all input layouts.
     #[test]
     fn normalize_phone_is_idempotent() {
         for input in [
@@ -1357,6 +1466,8 @@ mod tests {
         }
     }
 
+    /// Pins the `len > 1` guard: a lone `0` is preserved rather than stripped
+    /// to the empty string.
     #[test]
     fn normalize_phone_keeps_lone_zero() {
         // A bare "0" is not stripped (guard: len > 1).
@@ -1365,6 +1476,8 @@ mod tests {
 
     // ---------- phonetic_code ----------
 
+    /// Pins the core Soundex purpose: `Smith` and `Smyth` share a code so the
+    /// matcher can catch spelling variants.
     #[test]
     fn phonetic_code_groups_smith_and_smyth() {
         assert_eq!(
@@ -1373,6 +1486,7 @@ mod tests {
         );
     }
 
+    /// Pins that `Stephen`/`Steven` (ph vs v) collapse to the same code.
     #[test]
     fn phonetic_code_groups_stephen_and_steven() {
         assert_eq!(
@@ -1381,6 +1495,8 @@ mod tests {
         );
     }
 
+    /// Pins that unrelated surnames produce distinct codes, so Soundex does
+    /// not over-collapse and create false matches.
     #[test]
     fn phonetic_code_distinguishes_different_families() {
         assert_ne!(
@@ -1393,6 +1509,8 @@ mod tests {
         );
     }
 
+    /// Regression net pinning exact Soundex codes from the underlying crate,
+    /// so an accidental algorithm change is caught immediately.
     #[test]
     fn phonetic_code_specific_values() {
         // Pinned values from the underlying soundex crate; act as a regression net.
@@ -1402,12 +1520,15 @@ mod tests {
         assert_eq!(Normalizer::phonetic_code("Johnson"), "J525");
     }
 
+    /// Pins that empty / whitespace-only names yield "" rather than a default
+    /// Soundex value (which would falsely group all blank names).
     #[test]
     fn phonetic_code_handles_empty() {
         assert_eq!(Normalizer::phonetic_code(""), "");
         assert_eq!(Normalizer::phonetic_code("   "), "");
     }
 
+    /// Pins that coding is case-insensitive (normalisation lowercases first).
     #[test]
     fn phonetic_code_is_case_insensitive() {
         assert_eq!(
@@ -1418,8 +1539,12 @@ mod tests {
 
     // ---------- normalize_phone_e164 ----------
 
+    /// Pins that the three UK input layouts (`+44`, `0044`, national `0…`)
+    /// plus a punctuated variant all converge on one E.164 string — the whole
+    /// point of the international-aware normaliser.
     #[test]
     fn e164_uk_layouts_canonicalise_identically() {
+        // Ofcom reserved drama number; never a real subscriber.
         let canonical = Some("+447700900123".to_string());
         assert_eq!(
             Normalizer::normalize_phone_e164("+44 7700 900123", Some("GB")),
@@ -1439,6 +1564,8 @@ mod tests {
         );
     }
 
+    /// Pins France (dial code 33, trunk `0`): `+33`, `0033` and national
+    /// `01…` layouts all canonicalise identically.
     #[test]
     fn e164_french_layouts_canonicalise_identically() {
         let canonical = Some("+33123456789".to_string());
@@ -1456,6 +1583,8 @@ mod tests {
         );
     }
 
+    /// Pins the `trunk_prefix: None` case (Spain): the leading digit of a
+    /// national number must be preserved, not mistaken for a trunk `0`.
     #[test]
     fn e164_spain_has_no_national_trunk_prefix() {
         // Spain switched to no trunk-0 in 1998; a bare 9-digit national
@@ -1470,6 +1599,8 @@ mod tests {
         );
     }
 
+    /// Pins the 3-digit dial code path (Ireland, 353): longest-prefix lookup
+    /// must select `353`, not a shorter code that is a prefix of it.
     #[test]
     fn e164_ireland_three_digit_dial_code() {
         assert_eq!(
@@ -1482,6 +1613,8 @@ mod tests {
         );
     }
 
+    /// Pins the shared-dial-code NANP case: US and Canada both use `1`, have
+    /// no trunk prefix, and the `555` exchange keeps the example non-routable.
     #[test]
     fn e164_nanp_handles_us_and_canada() {
         assert_eq!(
@@ -1492,7 +1625,8 @@ mod tests {
             Normalizer::normalize_phone_e164("+1 415 555 1234", None),
             Some("+14155551234".to_string()),
         );
-        // Canada uses the same dial code; canonical form is identical.
+        // Canada uses the same dial code (1); the canonical E.164 form is
+        // identical regardless of whether the caller said US or CA.
         assert_eq!(
             Normalizer::normalize_phone_e164("(416) 555-1234", Some("CA")),
             Some("+14165551234".to_string()),
@@ -1501,6 +1635,8 @@ mod tests {
 
     // ---------- T-19: 35-scheme jurisdiction coverage ----------
 
+    /// Pins the non-`0` trunk-prefix branch: Lithuania uses `8`, so a national
+    /// `8…` mobile must canonicalise to the same E.164 form as `+370…`.
     #[test]
     fn e164_lithuania_uses_eight_as_trunk_prefix() {
         // Lithuania's national trunk prefix is `8`, not `0`. National
@@ -1516,6 +1652,8 @@ mod tests {
         );
     }
 
+    /// Pins Greece (`trunk_prefix: None`): the leading area-code digit is part
+    /// of the NSN and must not be stripped.
     #[test]
     fn e164_greece_has_no_national_trunk_prefix() {
         // GR national-significant numbers begin with the area code (the
@@ -1530,6 +1668,7 @@ mod tests {
         );
     }
 
+    /// Pins Romania (dial 40, trunk `0`): the national trunk zero is removed.
     #[test]
     fn e164_romania_strips_trunk_zero() {
         assert_eq!(
@@ -1542,6 +1681,8 @@ mod tests {
         );
     }
 
+    /// Pins Czechia (3-digit dial 420, no trunk): national and international
+    /// forms agree.
     #[test]
     fn e164_czech_no_trunk_prefix() {
         assert_eq!(
@@ -1554,6 +1695,7 @@ mod tests {
         );
     }
 
+    /// Pins Iceland's short 7-digit NSN against its `min_nsn`/`max_nsn` bounds.
     #[test]
     fn e164_iceland_seven_digit_nsn() {
         assert_eq!(
@@ -1562,6 +1704,8 @@ mod tests {
         );
     }
 
+    /// Pins that adjacent 3-digit dial codes (Croatia 385 vs Slovenia 386)
+    /// resolve to distinct countries and distinct E.164 strings.
     #[test]
     fn e164_distinguishes_overlapping_three_digit_dial_codes() {
         // Croatia (385) vs Slovenia (386): adjacent dial codes, both
@@ -1573,6 +1717,8 @@ mod tests {
         assert_ne!(hr, si);
     }
 
+    /// Pins the core multinational win: the same national-format digits under
+    /// two different default countries must not collide in E.164 form.
     #[test]
     fn e164_distinguishes_countries_with_overlapping_national_digits() {
         // The "same" national-format digits in two countries must yield
@@ -1585,17 +1731,21 @@ mod tests {
         assert_ne!(uk, fr);
     }
 
+    /// Pins the `None` contract for ambiguity: national-format input with no
+    /// default country cannot be resolved, so the function refuses to guess.
     #[test]
     fn e164_returns_none_when_default_country_missing_and_no_marker() {
         // Ambiguous national-format input with no default country.
         assert_eq!(Normalizer::normalize_phone_e164("07700 900123", None), None);
     }
 
+    /// Pins `None` for a dial code (`+999`) that is not in the country table.
     #[test]
     fn e164_returns_none_for_unknown_dial_code() {
         assert_eq!(Normalizer::normalize_phone_e164("+999 1234567", None), None);
     }
 
+    /// Pins `None` for inputs with no usable digits (empty, lone `+`, punctuation).
     #[test]
     fn e164_returns_none_for_empty_or_punctuation_only() {
         assert_eq!(Normalizer::normalize_phone_e164("", Some("GB")), None);
@@ -1603,6 +1753,8 @@ mod tests {
         assert_eq!(Normalizer::normalize_phone_e164("()-", Some("GB")), None);
     }
 
+    /// Pins the NSN length bounds: a number too short or too long for the
+    /// country's plan fails confidently rather than emitting a bad E.164.
     #[test]
     fn e164_returns_none_for_too_short_or_too_long_nsn() {
         // GB NSN must be 7..=11 digits.
@@ -1613,6 +1765,7 @@ mod tests {
         );
     }
 
+    /// Pins `None` when the default-country ISO code is not in the table.
     #[test]
     fn e164_rejects_unknown_default_country() {
         // "XX" is not in the table; without an explicit international
@@ -1623,6 +1776,9 @@ mod tests {
         );
     }
 
+    /// Pins idempotence of E.164: feeding a canonical `+CC…` string back in
+    /// (even with a mismatched default country) returns the same string,
+    /// because the explicit `+` marker overrides the default.
     #[test]
     fn e164_is_idempotent_on_canonical_form() {
         for input in [
@@ -1633,11 +1789,13 @@ mod tests {
             "+34 912 345 678",
         ] {
             let once = Normalizer::normalize_phone_e164(input, Some("GB")).expect("parses");
+            // Re-normalising the canonical output is a fixed point.
             let twice = Normalizer::normalize_phone_e164(&once, Some("GB")).expect("idempotent");
             assert_eq!(once, twice, "not idempotent for {input:?}");
         }
     }
 
+    /// Pins that the default-country ISO lookup is case-insensitive (`gb` == `GB`).
     #[test]
     fn e164_default_country_lookup_is_case_insensitive() {
         let lower = Normalizer::normalize_phone_e164("07700 900123", Some("gb"));
@@ -1646,6 +1804,8 @@ mod tests {
         assert!(lower.is_some());
     }
 
+    /// Pins the `00CC…` international-access path: `00` is consumed and the
+    /// remainder is parsed like an explicit `+` number, with no default needed.
     #[test]
     fn e164_handles_double_zero_international_access_form() {
         assert_eq!(
@@ -1656,6 +1816,8 @@ mod tests {
 
     // ---------- expand_street_abbreviations ----------
 
+    /// Pins the street-type expansion table for the common abbreviations
+    /// (St→street, Rd→road, Blvd→boulevard, Ave→avenue, Ln→lane).
     #[test]
     fn expand_street_replaces_common_abbreviations() {
         assert_eq!(
@@ -1680,6 +1842,8 @@ mod tests {
         );
     }
 
+    /// Pins directional abbreviation expansion (N→north, SW→southwest), which
+    /// shares the table with street types.
     #[test]
     fn expand_street_replaces_directionals() {
         assert_eq!(
@@ -1692,6 +1856,8 @@ mod tests {
         );
     }
 
+    /// Pins that a single trailing `.` or `,` on a token is stripped before
+    /// table lookup (`St.` and `Blvd,` still expand).
     #[test]
     fn expand_street_strips_trailing_period_or_comma() {
         assert_eq!(
@@ -1704,6 +1870,8 @@ mod tests {
         );
     }
 
+    /// Pins that non-abbreviation tokens pass through verbatim, preserving
+    /// their original casing.
     #[test]
     fn expand_street_passes_unknown_tokens_through() {
         assert_eq!(
@@ -1712,6 +1880,7 @@ mod tests {
         );
     }
 
+    /// Pins idempotence: long forms are not re-expanded, so re-running is safe.
     #[test]
     fn expand_street_is_idempotent_on_already_expanded_input() {
         for input in [
@@ -1726,6 +1895,7 @@ mod tests {
         }
     }
 
+    /// Pins empty / whitespace-only input to "".
     #[test]
     fn expand_street_handles_empty_and_whitespace_only() {
         assert_eq!(Normalizer::expand_street_abbreviations(""), "");
@@ -1734,6 +1904,8 @@ mod tests {
 
     // ---------- normalize_address_line ----------
 
+    /// Pins that the full address pipeline makes abbreviated and spelled-out
+    /// forms (`High St` vs `High Street`) compare equal.
     #[test]
     fn normalize_address_line_unifies_abbreviated_and_full_forms() {
         assert_eq!(
@@ -1746,6 +1918,8 @@ mod tests {
         );
     }
 
+    /// Pins that the name-normalisation tail (punctuation, case, whitespace)
+    /// is applied after abbreviation expansion.
     #[test]
     fn normalize_address_line_handles_punctuation_and_case() {
         assert_eq!(
@@ -1754,6 +1928,7 @@ mod tests {
         );
     }
 
+    /// Pins address-line idempotence across the combined pipeline.
     #[test]
     fn normalize_address_line_is_idempotent() {
         for input in [
@@ -1770,6 +1945,8 @@ mod tests {
 
     // ---------- parse_address_line ----------
 
+    /// Pins the simplest decomposition: leading number → `house_number`, rest
+    /// → normalised `street`, no `unit`.
     #[test]
     fn parse_address_extracts_simple_house_number() {
         let p = Normalizer::parse_address_line("123 High Street");
@@ -1778,6 +1955,7 @@ mod tests {
         assert_eq!(p.street, "high street");
     }
 
+    /// Pins the single-letter house-number suffix (`10A`), uppercased.
     #[test]
     fn parse_address_handles_alphanumeric_house_number() {
         let p = Normalizer::parse_address_line("10A Downing St");
@@ -1785,6 +1963,8 @@ mod tests {
         assert_eq!(p.street, "downing street");
     }
 
+    /// Pins the look-ahead guard that stops the suffix rule from eating a
+    /// street-name word: `10 Apple…` keeps `10` and leaves `Apple` in `street`.
     #[test]
     fn parse_address_does_not_greedily_consume_street_name() {
         // "10 Apple Tree Lane" — `Apple` must not be absorbed into the
@@ -1795,6 +1975,8 @@ mod tests {
         assert_eq!(p.street, "apple tree lane");
     }
 
+    /// Pins the UK `Flat` unit prefix: keyword + identifier extracted and
+    /// lowercased, then `house_number` and `street` parsed from the remainder.
     #[test]
     fn parse_address_recognises_flat_prefix() {
         let p = Normalizer::parse_address_line("Flat 2A, 10 Downing Street");
@@ -1803,6 +1985,7 @@ mod tests {
         assert_eq!(p.street, "downing street");
     }
 
+    /// Pins the US `Apt` unit prefix on a typical US address.
     #[test]
     fn parse_address_recognises_apt_prefix() {
         let p = Normalizer::parse_address_line("Apt 5, 1600 Pennsylvania Ave");
@@ -1811,6 +1994,8 @@ mod tests {
         assert_eq!(p.street, "pennsylvania avenue");
     }
 
+    /// Pins the remaining recognised unit keywords (Suite/Ste/Unit/Room) all
+    /// take the same extraction path.
     #[test]
     fn parse_address_recognises_suite_and_ste_and_unit_and_room() {
         for input in [
@@ -1826,6 +2011,8 @@ mod tests {
         }
     }
 
+    /// Pins graceful degradation: an input with no leading number and no unit
+    /// keyword puts everything in `street`.
     #[test]
     fn parse_address_no_leading_number_falls_back_to_street_only() {
         let p = Normalizer::parse_address_line("Buckingham Palace");
@@ -1834,6 +2021,7 @@ mod tests {
         assert_eq!(p.street, "buckingham palace");
     }
 
+    /// Pins that empty input yields all-`None` fields and an empty `street`.
     #[test]
     fn parse_address_empty_input_yields_empty_street() {
         let p = Normalizer::parse_address_line("");
@@ -1842,14 +2030,18 @@ mod tests {
         assert_eq!(p.street, "");
     }
 
+    /// Pins the `Serialize`/`Deserialize` contract: a parsed line round-trips
+    /// through JSON unchanged, so it can be embedded in downstream models.
     #[test]
     fn parse_address_round_trips_through_serde() {
         let p = Normalizer::parse_address_line("Flat 2A, 10A Downing Street");
         let json = serde_json::to_string(&p).unwrap();
+        // Deserialising the JSON must reproduce the exact same struct.
         let back: ParsedAddressLine = serde_json::from_str(&json).unwrap();
         assert_eq!(p, back);
     }
 
+    /// Pins that a lowercase house-number suffix (`10a`) is uppercased to `10A`.
     #[test]
     fn parse_address_uppercases_house_number_suffix() {
         let p = Normalizer::parse_address_line("10a Downing St");
@@ -1858,6 +2050,9 @@ mod tests {
 
     // ---------- normalize_email ----------
 
+    /// Pins the baseline email canonicalisation: surrounding whitespace is
+    /// trimmed and the whole address is lowercased so two records that
+    /// differ only in case/padding compare equal.
     #[test]
     fn normalize_email_lowercases_and_trims() {
         assert_eq!(
@@ -1866,6 +2061,8 @@ mod tests {
         );
     }
 
+    /// Pins idempotence on already-canonical input: a well-formed,
+    /// lowercase address must pass through unchanged (no spurious mangling).
     #[test]
     fn normalize_email_preserves_well_formed_input() {
         assert_eq!(
@@ -1874,28 +2071,41 @@ mod tests {
         );
     }
 
+    /// Pins the structural-validity gate: a string with no `@` is not an
+    /// address and must return `None` rather than a bogus canonical value.
     #[test]
     fn normalize_email_rejects_missing_at_sign() {
         assert_eq!(Normalizer::normalize_email("no-at-sign", false), None);
     }
 
+    /// Pins that both halves of the address are required: an empty
+    /// localpart (`@example.org`) or empty domain (`alice@`) is rejected,
+    /// since neither can identify a mailbox.
     #[test]
     fn normalize_email_rejects_empty_localpart_or_domain() {
         assert_eq!(Normalizer::normalize_email("@example.org", false), None);
         assert_eq!(Normalizer::normalize_email("alice@", false), None);
     }
 
+    /// Pins that exactly one `@` is required: an ambiguous `a@b@c` cannot
+    /// be split into a single localpart/domain pair, so it is rejected.
     #[test]
     fn normalize_email_rejects_multiple_at_signs() {
         assert_eq!(Normalizer::normalize_email("a@b@c", false), None);
     }
 
+    /// Pins that empty and whitespace-only input yield `None`: trimming
+    /// must not turn blank input into a spurious empty address.
     #[test]
     fn normalize_email_rejects_empty_and_whitespace() {
         assert_eq!(Normalizer::normalize_email("", false), None);
         assert_eq!(Normalizer::normalize_email("   ", false), None);
     }
 
+    /// Pins Gmail-specific dot folding: Gmail ignores dots in the
+    /// localpart, so `j.smith` and `jsmith` are the same mailbox. With
+    /// folding enabled the normaliser strips localpart dots so the two
+    /// forms compare equal.
     #[test]
     fn normalize_email_gmail_dot_folding_strips_dots_in_localpart() {
         assert_eq!(
@@ -1908,6 +2118,9 @@ mod tests {
         );
     }
 
+    /// Pins Gmail `+tag` sub-addressing folding: everything from the `+`
+    /// to the `@` is a delivery tag, not part of the mailbox, so it is
+    /// dropped under folding. Also covers the `googlemail.com` alias domain.
     #[test]
     fn normalize_email_gmail_dot_folding_strips_plus_tag() {
         assert_eq!(
@@ -1920,6 +2133,9 @@ mod tests {
         );
     }
 
+    /// Pins that dot/plus folding is Gmail-only: non-Gmail domains keep
+    /// their localpart verbatim, because dots and `+` tags are significant
+    /// elsewhere and folding them would merge distinct mailboxes.
     #[test]
     fn normalize_email_gmail_dot_folding_does_not_touch_other_domains() {
         assert_eq!(
@@ -1932,6 +2148,9 @@ mod tests {
         );
     }
 
+    /// Pins that folding is opt-in: with the flag off, even a Gmail
+    /// address keeps its localpart dots, so callers who do not want the
+    /// Gmail special-case get conservative, literal behaviour.
     #[test]
     fn normalize_email_dot_folding_off_preserves_localpart_dots() {
         assert_eq!(
@@ -1940,6 +2159,10 @@ mod tests {
         );
     }
 
+    /// Pins idempotence (`f(f(x)) == f(x)`) across the matrix of
+    /// folding on/off and Gmail/non-Gmail: re-normalising an already
+    /// canonical address must be a no-op, which is what lets the matcher
+    /// compare canonical forms safely.
     #[test]
     fn normalize_email_is_idempotent_on_canonical_form() {
         for (input, fold) in [
@@ -1954,6 +2177,9 @@ mod tests {
         }
     }
 
+    /// Pins a folding edge case: if stripping dots leaves an empty
+    /// localpart (input was all dots), the result is not a valid address
+    /// and must be `None` rather than `@gmail.com`.
     #[test]
     fn normalize_email_gmail_dot_folding_rejects_empty_localpart_after_folding() {
         // A localpart that is entirely dots (or all stripped to empty) is
@@ -1961,6 +2187,9 @@ mod tests {
         assert_eq!(Normalizer::normalize_email("...@gmail.com", true), None);
     }
 
+    /// Pins a tokeniser ambiguity guard: the street-type abbreviation
+    /// `St` (Street/Saint) must not be mistaken for the unit prefix `Ste`
+    /// (Suite). Only a literal `ste` token sets `unit`.
     #[test]
     fn parse_address_does_not_treat_st_as_unit_prefix() {
         // The "St" street-type abbreviation must not be confused with the
@@ -1970,6 +2199,9 @@ mod tests {
         assert_eq!(p.unit, None);
     }
 
+    /// Pins tolerance for a common data-entry error: a leftover national
+    /// trunk `0` immediately after the country code (`+44 0 7700 …`) is
+    /// dropped so the number still canonicalises to valid E.164.
     #[test]
     fn e164_strips_trunk_zero_after_country_code() {
         // Some entry systems mistakenly keep the national trunk 0 after

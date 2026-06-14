@@ -7,6 +7,7 @@ use organization_matcher::{
     PostalAddress,
 };
 
+/// Test helper: build an `OrgIdentifier` from a scheme + string value.
 fn ident(scheme: IdentifierScheme, value: &str) -> OrgIdentifier {
     OrgIdentifier {
         scheme,
@@ -16,6 +17,8 @@ fn ident(scheme: IdentifierScheme, value: &str) -> OrgIdentifier {
 
 // ─── Deterministic short-circuits ────────────────────────────────────
 
+/// Pins that EVERY scheme flagged deterministic short-circuits to a
+/// score-1.0 High match when its value is shared, regardless of name.
 #[test]
 fn r0_fires_for_every_deterministic_scheme() {
     let engine = MatchingEngine::default_config();
@@ -45,6 +48,8 @@ fn r0_fires_for_every_deterministic_scheme() {
     }
 }
 
+/// Pins the negative side: classification codes, `Custom`, and an
+/// unscoped `TaxId` must NOT short-circuit even when the value matches.
 #[test]
 fn classification_and_custom_schemes_do_not_short_circuit() {
     let engine = MatchingEngine::default_config();
@@ -67,6 +72,7 @@ fn classification_and_custom_schemes_do_not_short_circuit() {
     }
 }
 
+/// Pins R-1 on the public surface: same jurisdiction + same tax id → 1.0.
 #[test]
 fn tax_id_short_circuits_within_jurisdiction() {
     let engine = MatchingEngine::default_config();
@@ -81,6 +87,7 @@ fn tax_id_short_circuits_within_jurisdiction() {
     assert!(r.breakdown.deterministic_match);
 }
 
+/// Pins R-2 on the public surface: a shared `same_as` (ROR) URL → 1.0.
 #[test]
 fn same_as_url_overlap_short_circuits() {
     let engine = MatchingEngine::default_config();
@@ -95,6 +102,8 @@ fn same_as_url_overlap_short_circuits() {
 
 // ─── Probabilistic path ──────────────────────────────────────────────
 
+/// Pins the end-to-end legal-suffix case: differing suffixes still
+/// reach the High band and `is_match`.
 #[test]
 fn legal_suffix_variants_are_high_confidence() {
     let engine = MatchingEngine::default_config();
@@ -106,6 +115,9 @@ fn legal_suffix_variants_are_high_confidence() {
     assert!(r.is_match);
 }
 
+/// Pins renormalisation end-to-end: with only name/url/jurisdiction
+/// present and all agreeing, the score is ~1.0 and the breakdown shows
+/// the absent components as `None`.
 #[test]
 fn renormalisation_over_present_components() {
     // name + url + jurisdiction present; all agree → ~1.0, not diluted
@@ -126,6 +138,7 @@ fn renormalisation_over_present_components() {
     assert!(r.breakdown.keywords_score.is_none());
 }
 
+/// Pins that unrelated orgs are Low-band non-matches with no rule fired.
 #[test]
 fn unrelated_orgs_are_low_confidence_non_matches() {
     let engine = MatchingEngine::default_config();
@@ -137,6 +150,8 @@ fn unrelated_orgs_are_low_confidence_non_matches() {
     assert!(!r.breakdown.deterministic_match);
 }
 
+/// Pins that corroborating address + domain evidence pushes a near-name
+/// match over the threshold into `is_match`.
 #[test]
 fn address_and_domain_corroborate_a_name_match() {
     let engine = MatchingEngine::default_config();
@@ -157,6 +172,8 @@ fn address_and_domain_corroborate_a_name_match() {
 
 // ─── Threshold presets + one-to-many ─────────────────────────────────
 
+/// Pins that the presets only move `is_match` (via the threshold), never
+/// the raw `score`, and that strict ⊆ default ⊆ lenient for matching.
 #[test]
 fn strict_and_lenient_change_is_match_not_score() {
     let a = Organization::new("Acme Corporation");
@@ -171,6 +188,8 @@ fn strict_and_lenient_change_is_match_not_score() {
     }
 }
 
+/// Pins the one-to-many surface: `match_one_to_many` preserves order,
+/// `rank` sorts best-first, and both handle empty candidate slices.
 #[test]
 fn one_to_many_surface() {
     let engine = MatchingEngine::default_config();
@@ -190,6 +209,8 @@ fn one_to_many_surface() {
     assert!(engine.find_matches(&query, &[]).is_empty());
 }
 
+/// Pins that `MatchResult` (and its nested breakdown) serialises to
+/// JSON via serde — the wire contract for service callers.
 #[test]
 fn match_result_serialises_to_json() {
     let engine = MatchingEngine::default_config();

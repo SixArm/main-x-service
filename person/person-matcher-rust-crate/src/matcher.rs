@@ -1185,8 +1185,15 @@ impl MatchingEngine {
             return true;
         }
 
+        // No identifier scheme fired. Fall back to the demographic tuple:
+        // normalised given AND family name must both be present and agree.
+        // A missing name on either side is a hard `false` — we never treat
+        // absent demographics as agreement (unlike gender below), because a
+        // name is the minimum evidence required for a demographic match.
         let name_match = match (&person1.given_name, &person2.given_name) {
             (Some(f1), Some(f2)) => {
+                // Normalise both sides (case, accents, whitespace) before
+                // exact comparison — this is an equality test, not fuzzy.
                 Normalizer::normalize_name(f1) == Normalizer::normalize_name(f2)
             }
             _ => false,
@@ -1197,16 +1204,24 @@ impl MatchingEngine {
             _ => false,
         };
 
+        // DOB must be present on both sides and exactly equal. The
+        // probabilistic transposition heuristic (`score_dob_pair`) is
+        // deliberately NOT applied here — deterministic matching demands an
+        // exact date so a day/month swap cannot pin a false positive.
         let dob_match = match (person1.date_of_birth, person2.date_of_birth) {
             (Some(d1), Some(d2)) => d1 == d2,
             _ => false,
         };
 
+        // Gender is permissive: it only ever vetoes a match when BOTH sides
+        // record a gender and they disagree. A missing gender on either side
+        // yields `true` so sparse records still match on name + DOB alone.
         let gender_match = match (person1.gender, person2.gender) {
             (Some(g1), Some(g2)) => g1 == g2,
             _ => true,
         };
 
+        // All three demographic conditions must hold simultaneously.
         name_match && dob_match && gender_match
     }
 
@@ -2051,30 +2066,62 @@ fn score_named_place(a: &Address, b: &Address) -> Option<f64> {
 /// The transposition allowance absorbs a common data-entry error and is
 /// shared by date-of-birth and date-of-death scoring.
 fn score_dob_pair(dob1: Date, dob2: Date) -> f64 {
+    // Fast path: identical dates are full credit.
     if dob1 == dob2 {
         return 1.0;
     }
+    // Transposition path: only fires within the same year, and only when
+    // re-reading `dob1`'s day as a month and its month as a day produces a
+    // valid calendar date equal to `dob2`. `Date::new` is the validity gate
+    // — it rejects e.g. day 25 used as a month, so the heuristic cannot fire
+    // on impossible swaps. Half credit (`0.5`) reflects that a DD/MM↔MM/DD
+    // mix-up is plausible but not certain evidence of the same person.
     if dob1.year() == dob2.year()
         && let Ok(swapped) = Date::new(dob1.year(), dob1.day(), dob1.month())
         && swapped == dob2
     {
         return 0.5;
     }
+    // Any other difference is treated as a non-match for this component.
     0.0
 }
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for the matching engine.
+    //!
+    //! Coverage is grouped by concern (see the section banners below):
+    //! `MatchConfig` presets and serde round-tripping; probabilistic
+    //! [`MatchingEngine::match_persons`] behaviour (fuzzy names, missing
+    //! fields, phonetic bonus, address blending); deterministic matching
+    //! and its scheme-local / demographic-tuple rules; `strict_mode`
+    //! enforcement; the batch / ranking API; the [`score_dob_pair`]
+    //! day/month transposition heuristic; [`Confidence`] banding; and
+    //! [`score_named_place`] plus the death-date / death-place wiring.
+    //!
+    //! Tests pin observable behaviour (scores, bands, booleans) rather
+    //! than internals, and all fixtures are synthetic per the no-PII rule.
     #![allow(clippy::float_cmp)] // scores are exact constants in assertions
     use super::*;
     use crate::models::Gender;
 
+    /// Build a [`Date`] from year / month / day for test fixtures, keeping
+    /// the call sites terse. Thin wrapper over [`jiff::civil::date`].
+    ///
+    /// # Panics
+    ///
+    /// Panics (via `jiff::civil::date`) if the components do not form a
+    /// valid calendar date. Tests pass only valid dates.
     fn dob(y: i16, m: i8, d: i8) -> Date {
         jiff::civil::date(y, m, d)
     }
 
     // ---------- MatchConfig presets ----------
 
+    /// Pins the production-tuned defaults: `match_threshold == 0.85`, the
+    /// per-identifier weight of `0.30`, phonetic matching on, and
+    /// `strict_mode` off. Guards against accidental drift of the shipped
+    /// configuration baseline.
     #[test]
     fn config_default_values() {
         let c = MatchConfig::default();
@@ -2084,6 +2131,9 @@ mod tests {
         assert!(!c.strict_mode);
     }
 
+    /// Confirms the `strict` preset raises the threshold to `0.95` and
+    /// turns on `strict_mode` — the two changes that make the preset
+    /// favour false negatives over false positives.
     #[test]
     fn config_strict_raises_threshold_and_sets_flag() {
         let c = MatchConfig::strict();
@@ -2093,6 +2143,9 @@ mod tests {
 
     // ---------- MatchConfig serde ----------
 
+    /// Pins that the default config survives a JSON serialise/deserialise
+    /// cycle unchanged — the config is part of the API surface and may be
+    /// persisted, so a lossy round-trip would silently change scoring.
     #[test]
     fn config_default_round_trips_through_json() {
         let cfg = MatchConfig::default();
@@ -2113,6 +2166,9 @@ mod tests {
         assert_eq!(cfg.phone_default_country, back.phone_default_country);
     }
 
+    /// Same round-trip guarantee as the default, but for the `strict`
+    /// preset: the raised threshold and `strict_mode` flag must survive
+    /// serde unchanged.
     #[test]
     fn config_strict_round_trips_through_json() {
         let cfg = MatchConfig::strict();
@@ -2122,6 +2178,8 @@ mod tests {
         assert!(back.strict_mode);
     }
 
+    /// Round-trip guarantee for the `lenient` preset: its lowered `0.75`
+    /// threshold must survive serde unchanged.
     #[test]
     fn config_lenient_round_trips_through_json() {
         let cfg = MatchConfig::lenient();
@@ -2130,6 +2188,10 @@ mod tests {
         assert!((back.match_threshold - 0.75).abs() < 1e-12);
     }
 
+    /// Verifies the `#[serde(default)]` contract: a JSON document that
+    /// names only a couple of fields deserialises with every other field
+    /// filled from `MatchConfig::default()`. This lets callers send sparse
+    /// overrides without restating the whole config.
     #[test]
     fn config_partial_json_fills_missing_fields_from_default() {
         // `#[serde(default)]` on the struct: a JSON document carrying
@@ -2145,6 +2207,9 @@ mod tests {
         assert_eq!(cfg.phone_default_country.as_deref(), Some("GB"));
     }
 
+    /// Each [`SimilarityAlgorithm`] variant must serialise and deserialise
+    /// back to itself, since the chosen algorithm is part of the persisted
+    /// config and a mis-mapped variant would silently change name scoring.
     #[test]
     fn similarity_algorithm_round_trips_through_json() {
         for alg in [
@@ -2159,6 +2224,9 @@ mod tests {
         }
     }
 
+    /// Confirms the `lenient` preset lowers the threshold to `0.75` while
+    /// keeping phonetic matching on — the opposite trade-off to `strict`,
+    /// favouring recall for candidate triage.
     #[test]
     fn config_lenient_lowers_threshold() {
         let c = MatchConfig::lenient();
@@ -2168,6 +2236,10 @@ mod tests {
 
     // ---------- probabilistic match ----------
 
+    /// Baseline sanity: a person matched against an exact clone must be a
+    /// match with a near-perfect score. If this fails the whole pipeline
+    /// is broken. Score is asserted `> 0.95` because every present field
+    /// scores `1.0`, so the renormalised average is `1.0`.
     #[test]
     fn exact_clone_is_a_match() {
         let p = Person::builder()
@@ -2182,6 +2254,10 @@ mod tests {
         assert!(result.score > 0.95);
     }
 
+    /// "John" vs "Jon" is a one-character given-name typo; with the family
+    /// name, DOB, and gender all identical the fuzzy name similarity must
+    /// still carry the pair over the `0.85` default threshold. Pins that
+    /// minor data-entry noise does not break otherwise-strong matches.
     #[test]
     fn fuzzy_given_name_still_matches() {
         let a = Person::builder()
@@ -2191,16 +2267,22 @@ mod tests {
             .gender(Gender::Male)
             .build();
         let b = Person::builder()
-            .given_name("Jon")
+            .given_name("Jon") // single-character typo
             .family_name("Smith")
             .date_of_birth(dob(1980, 5, 15))
             .gender(Gender::Male)
             .build();
         let r = MatchingEngine::default_config().match_persons(&a, &b);
         assert!(r.is_match);
+        // High Jaro-Winkler on "john"/"jon" plus three exact components
+        // keeps the renormalised score above the default 0.85 threshold.
         assert!(r.score > 0.85);
     }
 
+    /// Two records that disagree on every field (name, DOB, gender) must
+    /// fall well below the threshold. The `< 0.5` assertion pins that
+    /// total demographic disagreement lands in the `Low` confidence band,
+    /// guarding against a regression that over-scores unrelated people.
     #[test]
     fn completely_different_patients_do_not_match() {
         let a = Person::builder()
@@ -2220,6 +2302,10 @@ mod tests {
         assert!(r.score < 0.5);
     }
 
+    /// When no single field is present on *both* records there is nothing
+    /// to score, so `total_weight` stays zero and the engine returns the
+    /// `0.0` sentinel rather than dividing by zero. Pins the empty-overlap
+    /// edge case.
     #[test]
     fn no_overlapping_fields_returns_zero_score() {
         // Neither side has any scoreable field on both records.
@@ -2230,6 +2316,11 @@ mod tests {
         assert!(!r.is_match);
     }
 
+    /// Critical missing-data invariant: an identifier that fails to parse
+    /// must score `None` (excluded from the weighted sum), NOT `0.0` (a
+    /// penalty). Two records with garbage identifiers but matching
+    /// demographics must still match — a bad NHS number must not drag down
+    /// an otherwise-strong demographic match.
     #[test]
     fn unparseable_united_kingdom_national_health_service_number_is_none_not_zero() {
         let a = Person::builder()
@@ -2254,6 +2345,10 @@ mod tests {
         assert!(r.is_match, "should still match on demographics");
     }
 
+    /// A field present on one side but absent on the other yields `None`
+    /// for that component in the breakdown, while a field present on both
+    /// yields `Some`. Pins the per-field "scored vs skipped" distinction
+    /// that downstream auditors rely on.
     #[test]
     fn missing_field_yields_none_in_breakdown() {
         let a = Person::builder().given_name("Ada").build();
@@ -2266,6 +2361,10 @@ mod tests {
         assert!(r.breakdown.family_name_score.is_none());
     }
 
+    /// The phonetic component is additive-only: enabling it must never
+    /// lower a score. Pins that for identical names the phonetic-on score
+    /// is `>=` the phonetic-off score, protecting the "bonus, never
+    /// penalty" rule in `calculate_weighted_score`.
     #[test]
     fn phonetic_match_is_a_bonus_not_a_penalty() {
         // Identical names should not be hurt when phonetic matching is on.
@@ -2286,6 +2385,10 @@ mod tests {
         assert!(with_phon.score >= without_phon.score);
     }
 
+    /// When `use_phonetic_matching` is off the breakdown's
+    /// `phonetic_name_score` must be `None` even for names that sound
+    /// alike ("Steven"/"Stephen", "Smith"/"Smyth"). Pins that the config
+    /// flag fully gates the component, not just its weight.
     #[test]
     fn phonetic_score_disabled_when_config_off() {
         let p = Person::builder()
@@ -2304,6 +2407,10 @@ mod tests {
         assert_eq!(r.breakdown.phonetic_name_score, None);
     }
 
+    /// Two empty addresses share no comparable sub-field, so
+    /// `compare_addresses` returns the neutral `0.5` fallback rather than
+    /// `0.0` (false penalty) or `1.0` (false agreement). Pins the
+    /// "nothing to compare" branch (spec §12.3 / OQ-4).
     #[test]
     fn address_with_no_subfields_is_neutral_half() {
         let a = Address::new();
@@ -2316,6 +2423,9 @@ mod tests {
         );
     }
 
+    /// A matching postcode (the highest-weighted sub-field at `0.5`) must
+    /// drive the address sub-score above the neutral baseline. A smoke
+    /// test that postcode agreement is treated as positive evidence.
     #[test]
     fn address_postcode_dominates() {
         let mut a = Address::new();
@@ -2328,6 +2438,10 @@ mod tests {
 
     // ---------- deterministic match ----------
 
+    /// A shared NHS number (modulo formatting whitespace) is sufficient on
+    /// its own for a deterministic match, even when given names differ
+    /// ("Bob" vs "Alice"). Pins that an identifier short-circuit overrides
+    /// demographic disagreement — the identifier is the strongest signal.
     #[test]
     fn deterministic_united_kingdom_national_health_service_number_match_overrides_demographics() {
         let a = Person::builder()
@@ -2341,6 +2455,9 @@ mod tests {
         assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
+    /// With no identifier present, the demographic-tuple branch fires:
+    /// matching name + DOB + gender on a clone is a deterministic match.
+    /// Pins the fallback path used when records carry no national ID.
     #[test]
     fn deterministic_demographics_match_when_all_align() {
         let p = Person::builder()
@@ -2352,6 +2469,9 @@ mod tests {
         assert!(MatchingEngine::default_config().deterministic_match(&p, &p.clone()));
     }
 
+    /// Gender is permissive in the demographic tuple: when one side omits
+    /// gender, the match still succeeds on name + DOB alone. Pins the
+    /// `_ => true` arm of the gender check (absence is not disagreement).
     #[test]
     fn deterministic_demographics_tolerates_missing_gender() {
         let a = Person::builder()
@@ -2368,6 +2488,10 @@ mod tests {
         assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
+    /// DOB must match exactly for the demographic branch: a one-day
+    /// difference (15th vs 16th) rejects the match. Pins that the
+    /// deterministic path demands exact date equality — no fuzzy or
+    /// transposition allowance applies here.
     #[test]
     fn deterministic_rejects_when_dob_differs() {
         let a = Person::builder()
@@ -2385,6 +2509,9 @@ mod tests {
         assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
+    /// Counterpart to the missing-gender tolerance: when *both* sides
+    /// record a gender and they disagree, the demographic match is
+    /// rejected even though name + DOB align. Pins the `g1 == g2` veto.
     #[test]
     fn deterministic_rejects_when_gender_differs() {
         let a = Person::builder()
@@ -2404,6 +2531,12 @@ mod tests {
 
     // ---------- strict_mode enforcement ----------
 
+    /// The core `strict_mode` invariant: clearing the probabilistic
+    /// threshold is necessary but not sufficient. A fuzzy-only match
+    /// (normalised "john" vs "jon" differ, so no deterministic match)
+    /// scores above the lowered threshold yet must yield `is_match =
+    /// false` because strict mode ANDs in `deterministic_match`. This is
+    /// the false-positive guard for clinical workflows (FR-47 / OQ-5).
     #[test]
     fn strict_mode_requires_deterministic_for_is_match() {
         // A fuzzy match that lifts the score above the strict threshold
@@ -2442,6 +2575,10 @@ mod tests {
         );
     }
 
+    /// The complement: when a deterministic match DOES hold (here via a
+    /// shared NHS number on a clone), strict mode accepts it. Pins that
+    /// strict mode narrows but does not block — a genuine identifier match
+    /// still passes.
     #[test]
     fn strict_mode_accepts_when_deterministic_holds() {
         // An identifier-driven deterministic match also clears any
@@ -2459,6 +2596,10 @@ mod tests {
         assert!(r.is_match);
     }
 
+    /// Control case: the same fuzzy-only "John"/"Jon" pair that strict
+    /// mode rejects IS accepted under the default (non-strict) config.
+    /// Pins that the extra deterministic requirement activates only when
+    /// `strict_mode` is explicitly set.
     #[test]
     fn non_strict_mode_accepts_fuzzy_match_above_threshold() {
         // Sanity: in default (non-strict) config, a fuzzy match above
@@ -2482,6 +2623,8 @@ mod tests {
 
     // ---------- batch API: match_one_to_many / rank_one_to_many ----------
 
+    /// Empty candidate slice produces an empty result vec — the
+    /// degenerate input must not panic or fabricate entries.
     #[test]
     fn match_one_to_many_empty_candidates_yields_empty_vec() {
         let engine = MatchingEngine::default_config();
@@ -2489,6 +2632,10 @@ mod tests {
         assert!(engine.match_one_to_many(&q, &[]).is_empty());
     }
 
+    /// `match_one_to_many` returns one result per candidate in input
+    /// order (no sorting). The perfect clone at index 1 must out-score its
+    /// neighbours while staying at index 1. Pins the order-preserving
+    /// contract that lets callers zip results back to their candidates.
     #[test]
     fn match_one_to_many_preserves_order() {
         let engine = MatchingEngine::default_config();
@@ -2515,6 +2662,10 @@ mod tests {
         assert!(r[1].is_match);
     }
 
+    /// The batch API must be a pure fan-out of `match_persons`: each
+    /// batch entry's score, `is_match`, and confidence must equal the
+    /// result of scoring that candidate individually. Pins that batching
+    /// is an optimisation, never a behaviour change.
     #[test]
     fn match_one_to_many_matches_individual_scoring() {
         // Calling match_one_to_many must produce the same per-candidate
@@ -2543,6 +2694,10 @@ mod tests {
         }
     }
 
+    /// `rank_one_to_many` returns `(original_index, result)` tuples sorted
+    /// by descending score. Pins that the best match (the clone at
+    /// index 1) lands first while its original index is preserved, and
+    /// that the sequence is monotonically non-increasing in score.
     #[test]
     fn rank_one_to_many_sorts_by_score_descending() {
         let engine = MatchingEngine::default_config();
@@ -2571,6 +2726,10 @@ mod tests {
         }
     }
 
+    /// Determinism guarantee for ties: three identical candidates all
+    /// score equally, so the secondary sort key (ascending original index)
+    /// must keep them in order 0, 1, 2. Pins that ranking is reproducible
+    /// even when scores collide — important for stable audit output.
     #[test]
     fn rank_one_to_many_breaks_ties_by_ascending_original_index() {
         // Two candidates that produce the same score: ranking must keep
@@ -2590,6 +2749,9 @@ mod tests {
         assert_eq!(ranked[2].0, 2);
     }
 
+    /// Two identical calls produce identical scores — the engine is pure
+    /// (no clocks, RNG, or env reads), so repeated evaluation is
+    /// reproducible. Pins the determinism golden rule at the API level.
     #[test]
     fn match_one_to_many_is_deterministic_across_calls() {
         let engine = MatchingEngine::default_config();
@@ -2607,11 +2769,17 @@ mod tests {
 
     // ---------- score_dob_pair (transposition heuristic) ----------
 
+    /// Exact-equality fast path of the transposition heuristic scores the
+    /// full `1.0`.
     #[test]
     fn dob_pair_exact_equal_scores_one() {
         assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1995, 1, 10)), 1.0);
     }
 
+    /// The day/month transposition (DD/MM vs MM/DD, e.g. 1995-01-10 vs
+    /// 1995-10-01) scores the half-credit `0.5`, and the scoring is
+    /// symmetric regardless of argument order. Pins the central
+    /// data-entry-error allowance.
     #[test]
     fn dob_pair_day_month_swap_scores_half() {
         // 1995-01-10 vs 1995-10-01 — classic DD/MM ↔ MM/DD bug.
@@ -2620,12 +2788,21 @@ mod tests {
         assert_eq!(score_dob_pair(dob(1995, 10, 1), dob(1995, 1, 10)), 0.5);
     }
 
+    /// The transposition allowance is gated on the year matching: a
+    /// day/month swap across different years is NOT treated as a
+    /// transposition and scores `0.0`. Pins the conservative `year ==
+    /// year` guard that keeps the heuristic from over-firing.
     #[test]
     fn dob_pair_swap_requires_year_to_match() {
         // Same day/month layout but different year — not a transposition.
         assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1996, 10, 1)), 0.0);
     }
 
+    /// When the original day exceeds 12 the swapped form (day-as-month) is
+    /// not a valid calendar date, so `Date::new` rejects it and the
+    /// heuristic cannot fire. Pins that such pairs fall through to `0.0`
+    /// rather than spuriously earning half credit — the validity gate is
+    /// what makes the heuristic safe.
     #[test]
     fn dob_pair_swap_skipped_when_day_exceeds_12() {
         // 1995-01-25: the swap target (1995, month=25, day=1) is not a
@@ -2637,12 +2814,18 @@ mod tests {
         assert_eq!(score_dob_pair(dob(1995, 1, 25), dob(1995, 2, 25)), 0.0);
     }
 
+    /// Genuinely unrelated dates, and near-misses that are not a
+    /// transposition (e.g. off by one day), score `0.0`. Pins that only
+    /// exact or transposed pairs earn credit.
     #[test]
     fn dob_pair_unrelated_dates_score_zero() {
         assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1980, 6, 30)), 0.0);
         assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1995, 1, 11)), 0.0);
     }
 
+    /// Edge case where day equals month (e.g. 1995-05-05): the swap is a
+    /// no-op, so the exact-equality branch decides — equal dates score
+    /// `1.0`, an off-by-one neighbour scores `0.0` (not a transposition).
     #[test]
     fn dob_pair_day_equals_month_collapses_to_exact() {
         // 1995-05-05: swap is a no-op; exact-match branch wins.
@@ -2651,6 +2834,10 @@ mod tests {
         assert_eq!(score_dob_pair(dob(1995, 5, 5), dob(1995, 5, 6)), 0.0);
     }
 
+    /// Robustness near leap-day and other awkward dates: the helper never
+    /// panics on valid inputs (an invalid swap target is rejected by
+    /// `Date::new`, not unwrapped). Leap-day equality scores `1.0`, and a
+    /// genuine valid swap (Feb 12 vs Dec 02) still scores `0.5`.
     #[test]
     fn dob_pair_invalid_swap_target_does_not_panic() {
         // 2003-02-30 is never constructed (jiff rejects it), so the
@@ -2661,6 +2848,11 @@ mod tests {
         assert_eq!(score_dob_pair(dob(2000, 2, 12), dob(2000, 12, 2)), 0.5);
     }
 
+    /// Boundary between the two strategies: the transposition heuristic is
+    /// probabilistic-only. A day/month-swapped DOB must NOT produce a
+    /// deterministic match, since deterministic matching requires exact
+    /// date equality. Pins that the leniency does not leak into the
+    /// binary path.
     #[test]
     fn deterministic_match_still_rejects_transposed_dob() {
         // The transposition heuristic only lifts the probabilistic
@@ -2681,6 +2873,11 @@ mod tests {
         assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
+    /// The flip side of the previous test: in the probabilistic pipeline
+    /// the transposed DOB contributes `0.5` partial credit to the
+    /// breakdown, lifting the overall score above what a `0.0` DOB would
+    /// have yielded (`> 0.6` here, with name + gender also agreeing). Pins
+    /// that the heuristic measurably rescues swapped-date records.
     #[test]
     fn transposed_dob_lifts_probabilistic_score_above_zero() {
         let a = Person::builder()
@@ -2705,6 +2902,10 @@ mod tests {
 
     // ---------- Confidence ----------
 
+    /// Pins the exact band cut-points: `0.90` is `High` (inclusive), just
+    /// below is `Medium`; `0.75` is `Medium` (inclusive), just below is
+    /// `Low`. The inclusivity direction matters because it decides which
+    /// band a score exactly on a boundary lands in.
     #[test]
     fn confidence_band_boundaries_are_inclusive_on_the_low_side() {
         assert_eq!(Confidence::from_score(0.90), Confidence::High);
@@ -2713,6 +2914,10 @@ mod tests {
         assert_eq!(Confidence::from_score(0.74), Confidence::Low);
     }
 
+    /// `from_score` is total over `f64`: NaN and negative scores degrade
+    /// to `Low` (NaN comparisons are false, falling through to the `else`),
+    /// and out-of-range `> 1.0` clamps to `High`. Pins that no input
+    /// panics or produces an undefined band.
     #[test]
     fn confidence_handles_degenerate_inputs_gracefully() {
         assert_eq!(Confidence::from_score(f64::NAN), Confidence::Low);
@@ -2720,6 +2925,10 @@ mod tests {
         assert_eq!(Confidence::from_score(2.0), Confidence::High);
     }
 
+    /// Confidence bands are fixed and do NOT follow `match_threshold`:
+    /// strict (0.95) and lenient (0.75) engines produce the same band for
+    /// the same score. Pins the separation of concerns — `is_match`
+    /// tracks the threshold, `confidence` is an absolute summary.
     #[test]
     fn confidence_is_independent_of_match_threshold() {
         // Strict (threshold 0.95) and lenient (threshold 0.75) produce
@@ -2736,6 +2945,9 @@ mod tests {
         assert_eq!(strict.confidence, Confidence::High);
     }
 
+    /// A `MatchResult` carries a populated `confidence` band; an exact
+    /// clone lands in `High`. Pins that the field is wired through
+    /// `match_persons`, not left at a default.
     #[test]
     fn match_result_carries_confidence() {
         let p = Person::builder()
@@ -2746,6 +2958,8 @@ mod tests {
         assert_eq!(r.confidence, Confidence::High);
     }
 
+    /// The `confidence` band survives a `MatchResult` JSON round-trip, so
+    /// persisted or API-returned results report the same band on reload.
     #[test]
     fn match_result_confidence_round_trips_via_serde() {
         let p = Person::builder()
@@ -2758,6 +2972,10 @@ mod tests {
         assert_eq!(r.confidence, back.confidence);
     }
 
+    /// The demographic branch requires names: two records with matching
+    /// DOB + gender but no names at all are NOT a deterministic match,
+    /// because a name is the minimum demographic evidence. Pins the hard
+    /// `false` on missing names even when other fields agree.
     #[test]
     fn deterministic_rejects_when_names_missing() {
         let a = Person::builder()
@@ -2770,6 +2988,9 @@ mod tests {
 
     // ---------- score_named_place ----------
 
+    /// When both city and country match, the `0.7 × city + 0.3 ×
+    /// country` blend collapses to `1.0`. Pins the both-present blend
+    /// weighting used by birth-place and death-place scoring.
     #[test]
     fn score_named_place_both_subfields_blend_seven_three() {
         let a = Address::new().with_city("Paris").with_country("France");
@@ -2777,6 +2998,8 @@ mod tests {
         assert_eq!(score_named_place(&a, &b), Some(1.0));
     }
 
+    /// With only city populated on both sides, the result is the city
+    /// score alone (no country dilution). Pins the single-signal branch.
     #[test]
     fn score_named_place_city_only_matches_returns_city_score() {
         let a = Address::new().with_city("Cardiff");
@@ -2784,6 +3007,9 @@ mod tests {
         assert_eq!(score_named_place(&a, &b), Some(1.0));
     }
 
+    /// Symmetric to the city-only case: with only country populated, the
+    /// result is the country score alone. Pins the other single-signal
+    /// branch.
     #[test]
     fn score_named_place_country_only_matches_returns_country_score() {
         let a = Address::new().with_country("Wales");
@@ -2791,6 +3017,8 @@ mod tests {
         assert_eq!(score_named_place(&a, &b), Some(1.0));
     }
 
+    /// Two empty places have no comparable sub-field on both sides, so the
+    /// helper returns `None` (the component is skipped, not scored `0.0`).
     #[test]
     fn score_named_place_empty_returns_none() {
         let a = Address::new();
@@ -2798,6 +3026,9 @@ mod tests {
         assert_eq!(score_named_place(&a, &b), None);
     }
 
+    /// Matching city but mismatched country: `0.7 × 1.0 + 0.3 × 0.0 =
+    /// 0.7`. Pins that a country disagreement only deducts its `0.3`
+    /// share rather than zeroing the whole place score.
     #[test]
     fn score_named_place_city_partial_country_mismatch_blends() {
         let a = Address::new().with_city("Paris").with_country("France");
@@ -2808,6 +3039,10 @@ mod tests {
 
     // ---------- death_date / death_place wiring ----------
 
+    /// Pins the default death-related weights: `death_date_weight ==
+    /// 0.10` (stronger, an exact death date is good evidence) and
+    /// `death_place_weight == 0.05` (weaker, like birth place). Guards
+    /// against drift of these less-obvious defaults.
     #[test]
     fn match_config_default_carries_death_weights() {
         let c = MatchConfig::default();
@@ -2815,6 +3050,10 @@ mod tests {
         assert!((c.death_place_weight - 0.05).abs() < 1e-9);
     }
 
+    /// Wiring check: when both records carry an equal death date, the
+    /// breakdown's `death_date_score` is `Some(1.0)`. Pins that the
+    /// death-date component is plumbed through `calculate_breakdown` and
+    /// uses the same exact-equality scoring as DOB.
     #[test]
     fn breakdown_carries_death_date_score_when_both_sides_present() {
         let p1 = Person::builder()
@@ -2833,6 +3072,11 @@ mod tests {
 
     // ---------- T-3 / OQ-4 address sub-score arithmetic ----------
 
+    /// OQ-4 acceptance: an exact postcode plus a slightly different street
+    /// must score `>= 0.7`. Under the old `sum / count` averaging this
+    /// would have been ~0.33; the weight-renormalised formula lets the
+    /// high-weight postcode (`0.5`) dominate. Pins the fix to the address
+    /// sub-score arithmetic.
     #[test]
     fn address_subscore_exact_postcode_plus_slightly_different_street_clears_seven_tenths() {
         // OQ-4 acceptance: an identical postcode plus a slightly
@@ -2859,6 +3103,9 @@ mod tests {
         );
     }
 
+    /// With only postcode populated, the renormalised average is the
+    /// postcode score alone, so a matching postcode yields exactly `1.0`.
+    /// Pins that a single populated sub-field collapses cleanly.
     #[test]
     fn address_subscore_postcode_only_match_returns_one() {
         // Only postcode populated on both sides → weighted average
@@ -2876,6 +3123,10 @@ mod tests {
         assert!((s - 1.0).abs() < 1e-9, "postcode-only match: {s}");
     }
 
+    /// No sub-field populated on both sides → the neutral `0.5` fallback
+    /// (no evidence either way). Duplicate-angle guard alongside
+    /// `address_with_no_subfields_is_neutral_half`, asserted directly on
+    /// `compare_addresses`.
     #[test]
     fn address_subscore_no_comparable_fields_returns_neutral_half() {
         // Neither side populated on any sub-field — neutral 0.5.
@@ -2884,6 +3135,10 @@ mod tests {
         assert!((s - 0.5).abs() < 1e-9, "neutral fallback: {s}");
     }
 
+    /// A matching postcode (`0.5`) paired with a fully mismatched line 1
+    /// (`0.2`) still scores `>= 0.5` — the postcode weight dominates
+    /// (`0.5 / 0.7 ≈ 0.714`). Pins that a street typo cannot sink a
+    /// confirmed-postcode address match.
     #[test]
     fn address_subscore_postcode_match_plus_street_mismatch_dominated_by_postcode() {
         // Postcode (0.5) match + line1 (0.2) mismatch → 0.5/0.7 ≈ 0.714.
@@ -2902,6 +3157,9 @@ mod tests {
         assert!(s >= 0.5, "postcode should still dominate: {s}");
     }
 
+    /// When only one record has a death place, the breakdown's
+    /// `death_place_score` is `None` (skipped, not penalised). Pins the
+    /// missing-data contract for the death-place component.
     #[test]
     fn breakdown_omits_death_place_score_when_one_side_absent() {
         let p1 = Person::builder()

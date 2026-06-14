@@ -411,15 +411,22 @@ impl MatchingEngine {
     /// assert!(result.score > 0.99);
     /// ```
     pub fn match_things(&self, thing1: &Thing, thing2: &Thing) -> MatchResult {
+        // 1. Score every field independently into a breakdown.
         let breakdown = self.calculate_breakdown(thing1, thing2);
+        // 2. Fold the breakdown into one renormalised weighted score.
         let score = self.calculate_weighted_score(&breakdown);
         let above_threshold = score >= self.config.match_threshold;
         // Under strict mode, `is_match` ALSO requires a deterministic match.
+        // This makes strict mode a conjunction: a high fuzzy score alone is
+        // never enough, there must be a hard identity signal (shared id /
+        // sameAs / url) to back it up.
         let is_match = if self.config.strict_mode {
             above_threshold && self.deterministic_match(thing1, thing2)
         } else {
             above_threshold
         };
+        // Confidence is a coarse band on the raw score, independent of the
+        // configured threshold (see [`Confidence`]).
         let confidence = Confidence::from_score(score);
 
         MatchResult {
@@ -538,9 +545,18 @@ impl MatchingEngine {
         same_canonical_url(thing1, thing2)
     }
 
+    /// Score every field of the two things into a [`MatchBreakdown`].
+    ///
+    /// Each field is scored by a dedicated helper that returns `None` when
+    /// the field is absent on one or both sides; those `None`s are what let
+    /// [`Self::calculate_weighted_score`] skip non-participating fields. The
+    /// phonetic score is computed only when `use_phonetic_matching` is on,
+    /// because it is purely an additive bonus.
     fn calculate_breakdown(&self, thing1: &Thing, thing2: &Thing) -> MatchBreakdown {
         MatchBreakdown {
             name_score: self.score_name(thing1, thing2),
+            // Skip the phonetic pass entirely unless the config opts in —
+            // it only ever adds a small bonus, never removes signal.
             name_phonetic_score: if self.config.use_phonetic_matching {
                 score_phonetic_names(thing1, thing2)
             } else {
@@ -566,10 +582,20 @@ impl MatchingEngine {
         }
     }
 
+    /// Fold a [`MatchBreakdown`] into a single score in `[0.0, 1.0]`.
+    ///
+    /// The score is a *weight-renormalised* sum: each participating field
+    /// contributes `score * weight`, and the running total is divided by the
+    /// sum of *participating* weights. Fields that scored `None` (absent on
+    /// one side) contribute neither to the numerator nor the denominator, so
+    /// missing data neither rewards nor penalises — it is simply ignored.
+    /// When no field participates at all, the score is `0.0`.
     fn calculate_weighted_score(&self, breakdown: &MatchBreakdown) -> f64 {
         let mut total_weight = 0.0;
         let mut weighted_sum = 0.0;
 
+        // Closure that accumulates one optional component. A `None` score is
+        // skipped so it does not enter the renormalisation denominator.
         let mut add = |score: Option<f64>, weight: f64| {
             if let Some(s) = score {
                 weighted_sum += s * weight;
@@ -596,7 +622,12 @@ impl MatchingEngine {
             self.config.additional_types_weight,
         );
 
-        // Phonetic match is a bonus only — never lowers the score.
+        // Phonetic match is a bonus only — never lowers the score. The
+        // `> 0.9` gate means it fires only on a near-certain Soundex match
+        // (in practice the phonetic helper returns exactly `1.0` or `0.0`).
+        // The bonus weight is a deliberately small `0.05`: it nudges
+        // homophone pairs (e.g. "Stephen"/"Steven") up without ever
+        // dominating the name / identifier / url signals.
         if let Some(score) = breakdown.name_phonetic_score
             && score > 0.9
         {
@@ -604,6 +635,9 @@ impl MatchingEngine {
             total_weight += 0.05;
         }
 
+        // Renormalise. Guard against divide-by-zero when no field
+        // participated (e.g. two things with no overlapping populated
+        // fields) by returning `0.0`.
         if total_weight > 0.0 {
             weighted_sum / total_weight
         } else {
@@ -611,12 +645,20 @@ impl MatchingEngine {
         }
     }
 
+    /// Best name similarity across the cartesian product of both things'
+    /// names (primary `name` plus `alternate_names`).
+    ///
+    /// Taking the *best* pair lets a primary name on one side match an
+    /// alternate name on the other (e.g. "Big Ben" vs the alternate of
+    /// "Elizabeth Tower"). Returns `None` when either side has no usable
+    /// name, so the field is skipped rather than scored zero.
     fn score_name(&self, thing1: &Thing, thing2: &Thing) -> Option<f64> {
         let names1 = collect_names(thing1);
         let names2 = collect_names(thing2);
         if names1.is_empty() || names2.is_empty() {
             return None;
         }
+        // Seed with -inf so the first real pair always wins the `>` test.
         let mut best = f64::NEG_INFINITY;
         for n1 in &names1 {
             for n2 in &names2 {
@@ -629,6 +671,12 @@ impl MatchingEngine {
         Some(best)
     }
 
+    /// Score one name against another using the configured algorithm,
+    /// after normalising both with [`Normalizer::normalize_name`].
+    ///
+    /// Normalising first means the similarity is computed on diacritic- and
+    /// punctuation-stripped, lowercased forms, so cosmetic differences do
+    /// not depress the score.
     fn score_name_pair(&self, name1: &str, name2: &str) -> f64 {
         let norm1 = Normalizer::normalize_name(name1);
         let norm2 = Normalizer::normalize_name(name2);
@@ -722,6 +770,12 @@ fn score_identifiers(thing1: &Thing, thing2: &Thing) -> Option<f64> {
     })
 }
 
+/// `true` iff the two things share at least one identical `Identifier`.
+///
+/// Identifier equality is scheme-scoped (both `property_id` and `value`
+/// must match), so this never produces a cross-scheme false positive. Uses
+/// nested loops rather than a set because identifier lists are tiny in
+/// practice. Empty on either side trivially returns `false`.
 fn shares_identifier(thing1: &Thing, thing2: &Thing) -> bool {
     if thing1.identifiers.is_empty() || thing2.identifiers.is_empty() {
         return false;
@@ -736,6 +790,12 @@ fn shares_identifier(thing1: &Thing, thing2: &Thing) -> bool {
     false
 }
 
+/// `true` iff the two things share at least one `sameAs` URL after URL
+/// normalisation.
+///
+/// One side is collected into a `BTreeSet` of normalised URLs so the other
+/// side can be probed in `O(log n)` lookups; the set is deterministic.
+/// Empty on either side trivially returns `false`.
 fn shares_same_as(thing1: &Thing, thing2: &Thing) -> bool {
     if thing1.same_as.is_empty() || thing2.same_as.is_empty() {
         return false;
@@ -753,7 +813,10 @@ fn shares_same_as(thing1: &Thing, thing2: &Thing) -> bool {
     false
 }
 
+/// `true` iff both things have a `url` and the two normalise to the same
+/// canonical string. A thing missing its `url` can never canonical-URL-match.
 fn same_canonical_url(thing1: &Thing, thing2: &Thing) -> bool {
+    // Both URLs must be present; otherwise there is nothing to compare.
     let (Some(u1), Some(u2)) = (thing1.url.as_ref(), thing2.url.as_ref()) else {
         return false;
     };
@@ -767,6 +830,7 @@ mod tests {
 
     // ---------- MatchConfig presets ----------
 
+    /// Pins the default preset: threshold `0.80` and strict mode off.
     #[test]
     fn config_default_values() {
         let c = MatchConfig::default();
@@ -774,6 +838,8 @@ mod tests {
         assert!(!c.strict_mode);
     }
 
+    /// Pins the strict preset: threshold raised to `0.95` and the
+    /// deterministic-enforcement flag set.
     #[test]
     fn config_strict_raises_threshold_and_sets_flag() {
         let c = MatchConfig::strict();
@@ -781,6 +847,8 @@ mod tests {
         assert!(c.strict_mode);
     }
 
+    /// Pins the lenient preset: threshold lowered to `0.65` and phonetic
+    /// matching enabled.
     #[test]
     fn config_lenient_lowers_threshold() {
         let c = MatchConfig::lenient();
@@ -790,6 +858,8 @@ mod tests {
 
     // ---------- MatchConfig serde ----------
 
+    /// Pins that a default `MatchConfig` survives a JSON round-trip without
+    /// value drift on the key weights / algorithm / flag.
     #[test]
     fn config_default_round_trips_through_json() {
         let cfg = MatchConfig::default();
@@ -802,6 +872,8 @@ mod tests {
         assert_eq!(cfg.strict_mode, back.strict_mode);
     }
 
+    /// Pins the `#[serde(default)]` behaviour: a partial JSON config fills
+    /// every omitted field from `Default` (here the name algorithm).
     #[test]
     fn config_partial_json_fills_missing_fields_from_default() {
         let partial = r#"{"match_threshold": 0.80, "name_weight": 0.5}"#;
@@ -813,6 +885,8 @@ mod tests {
 
     // ---------- probabilistic match ----------
 
+    /// Pins that a thing matched against its own clone is a high-scoring
+    /// match (the trivial perfect case).
     #[test]
     fn exact_clone_is_a_match() {
         let t = Thing::builder()
@@ -824,6 +898,8 @@ mod tests {
         assert!(result.score > 0.95);
     }
 
+    /// Pins the best-of-cartesian-product rule: a primary name on one side
+    /// matching an alternate name on the other yields a near-`1.0` score.
     #[test]
     fn name_match_takes_best_of_cartesian_product() {
         let t1 = Thing::builder().name("Eiffel Tower").build();
@@ -839,6 +915,8 @@ mod tests {
         );
     }
 
+    /// Pins that two clearly different things fall below the threshold and
+    /// score low.
     #[test]
     fn unrelated_things_do_not_match() {
         let a = Thing::builder().name("Eiffel Tower").build();
@@ -848,6 +926,8 @@ mod tests {
         assert!(r.score < 0.5);
     }
 
+    /// Pins the no-participating-field case: when the two things populate
+    /// disjoint fields, `total_weight` is zero and the score is `0.0`.
     #[test]
     fn no_overlapping_fields_returns_zero_score() {
         let a = Thing::builder().description("foo").build();
@@ -860,6 +940,7 @@ mod tests {
 
     // ---------- description / disambiguating_description ----------
 
+    /// Pins that identical descriptions score near `1.0`.
     #[test]
     fn description_identical_scores_one() {
         let t1 = Thing::builder()
@@ -874,6 +955,8 @@ mod tests {
         assert!(r.breakdown.description_score.unwrap() > 0.99);
     }
 
+    /// Pins that an absent description on one side yields `None` (skipped),
+    /// not a zero penalty.
     #[test]
     fn description_score_none_when_either_missing() {
         let t1 = Thing::builder()
@@ -887,6 +970,7 @@ mod tests {
 
     // ---------- identifiers ----------
 
+    /// Pins that a shared `(property_id, value)` identifier scores `1.0`.
     #[test]
     fn identifiers_shared_scores_one() {
         let id = Identifier::new("wikidata", "Q243").unwrap();
@@ -899,6 +983,8 @@ mod tests {
         assert_eq!(r.breakdown.identifiers_score, Some(1.0));
     }
 
+    /// Pins that the same value under different schemes does NOT match
+    /// (`google:X` vs `wikidata:X` → `0.0`) — no cross-scheme collision.
     #[test]
     fn identifiers_property_scoped_no_cross_match() {
         let a = Thing::builder()
@@ -913,6 +999,8 @@ mod tests {
         assert_eq!(r.breakdown.identifiers_score, Some(0.0));
     }
 
+    /// Pins that an empty identifier list on one side yields `None`, so the
+    /// identifier field is skipped rather than scored zero.
     #[test]
     fn identifiers_none_when_either_side_empty() {
         let a = Thing::builder().name("X").build();
@@ -926,6 +1014,8 @@ mod tests {
 
     // ---------- url ----------
 
+    /// Pins that two URLs equal only after normalisation (case, trailing
+    /// slash) still score `1.0`.
     #[test]
     fn url_normalised_equality_scores_one() {
         let a = Thing::builder()
@@ -940,6 +1030,7 @@ mod tests {
         assert_eq!(r.breakdown.url_score, Some(1.0));
     }
 
+    /// Pins that distinct hosts score `0.0` (URLs are exact-match scored).
     #[test]
     fn url_mismatch_scores_zero() {
         let a = Thing::builder().name("X").url("https://a.org").build();
@@ -948,6 +1039,7 @@ mod tests {
         assert_eq!(r.breakdown.url_score, Some(0.0));
     }
 
+    /// Pins that a missing URL on one side yields `None` (skipped).
     #[test]
     fn url_none_when_either_side_missing() {
         let a = Thing::builder().name("X").url("https://a.org").build();
@@ -958,6 +1050,8 @@ mod tests {
 
     // ---------- sameAs / additional_types ----------
 
+    /// Pins the Jaccard formula on `sameAs` sets: one shared URL out of
+    /// three distinct → `1/3`.
     #[test]
     fn same_as_jaccard_partial_overlap() {
         let a = Thing::builder()
@@ -976,6 +1070,8 @@ mod tests {
         assert!((s - 1.0_f64 / 3.0).abs() < 1e-9, "got {s}");
     }
 
+    /// Pins that two empty `sameAs` lists yield `None` (both-empty set
+    /// comparison is skipped, not scored `1.0`).
     #[test]
     fn same_as_none_when_both_empty() {
         let a = Thing::builder().name("X").build();
@@ -984,6 +1080,7 @@ mod tests {
         assert!(r.breakdown.same_as_score.is_none());
     }
 
+    /// Pins that fully overlapping `additionalType` sets score `1.0`.
     #[test]
     fn additional_types_jaccard_full_overlap() {
         let a = Thing::builder()
@@ -1000,6 +1097,8 @@ mod tests {
 
     // ---------- deterministic match ----------
 
+    /// Pins that a shared identifier alone triggers a deterministic match,
+    /// even when the names are completely different.
     #[test]
     fn deterministic_via_shared_identifier() {
         let id = Identifier::new("wikidata", "Q243").unwrap();
@@ -1014,6 +1113,7 @@ mod tests {
         assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
+    /// Pins that a shared `sameAs` URL alone triggers a deterministic match.
     #[test]
     fn deterministic_via_shared_same_as() {
         let a = Thing::builder()
@@ -1027,6 +1127,8 @@ mod tests {
         assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
+    /// Pins that equal canonical URLs (after normalisation) alone trigger a
+    /// deterministic match, even with different names.
     #[test]
     fn deterministic_via_shared_url() {
         let a = Thing::builder()
@@ -1040,6 +1142,8 @@ mod tests {
         assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
+    /// Pins that identical names with no shared identifier / sameAs / url do
+    /// NOT count as a deterministic match — name alone is never a hard signal.
     #[test]
     fn deterministic_rejects_when_no_shared_identity_signal() {
         let a = Thing::builder().name("X").build();
@@ -1049,6 +1153,9 @@ mod tests {
 
     // ---------- strict_mode enforcement ----------
 
+    /// Pins the strict-mode conjunction: even with a low threshold that the
+    /// fuzzy score clears, `is_match` stays `false` without a deterministic
+    /// signal. This is the core strict-mode safety property.
     #[test]
     fn strict_mode_requires_deterministic_for_is_match() {
         let cfg = MatchConfig {
@@ -1068,6 +1175,8 @@ mod tests {
 
     // ---------- batch APIs ----------
 
+    /// Pins that scoring against an empty candidate slice returns an empty
+    /// result vec (no panic, no spurious entry).
     #[test]
     fn match_one_to_many_empty_candidates_yields_empty_vec() {
         let engine = MatchingEngine::default_config();
@@ -1075,6 +1184,9 @@ mod tests {
         assert!(engine.match_one_to_many(&q, &[]).is_empty());
     }
 
+    /// Pins that ranking returns candidates sorted by descending score, with
+    /// the original index preserved (here the exact clone at index 1 ranks
+    /// first).
     #[test]
     fn rank_one_to_many_sorts_by_score_descending() {
         let engine = MatchingEngine::default_config();
@@ -1093,6 +1205,8 @@ mod tests {
 
     // ---------- Confidence ----------
 
+    /// Pins the `Confidence` band boundaries: `0.90` and `0.75` are
+    /// inclusive lower edges of High and Medium respectively.
     #[test]
     fn confidence_band_boundaries_are_inclusive_on_the_low_side() {
         assert_eq!(Confidence::from_score(0.90), Confidence::High);
@@ -1103,6 +1217,8 @@ mod tests {
 
     // ---------- phonetic ----------
 
+    /// Pins that with `use_phonetic_matching` off, the phonetic sub-score is
+    /// `None` (the phonetic pass is skipped entirely).
     #[test]
     fn phonetic_score_none_when_off() {
         let t = Thing::builder().name("Stephen").build();
@@ -1115,6 +1231,8 @@ mod tests {
         assert!(r.breakdown.name_phonetic_score.is_none());
     }
 
+    /// Pins that with `use_phonetic_matching` on, the phonetic sub-score is
+    /// populated (`Some`) for a homophone pair.
     #[test]
     fn phonetic_score_some_when_on() {
         let t = Thing::builder().name("Stephen").build();

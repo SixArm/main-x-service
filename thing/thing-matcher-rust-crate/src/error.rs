@@ -65,12 +65,16 @@ pub enum MatchingError {
 mod tests {
     use super::*;
 
+    /// Pins the `thiserror`-generated `Display` text for `MissingField`,
+    /// including the interpolated field name.
     #[test]
     fn missing_field_display() {
         let e = MatchingError::MissingField("name".into());
         assert_eq!(e.to_string(), "Missing required field: name");
     }
 
+    /// Pins that the [`Result`] type alias resolves and can carry an `Ok`
+    /// value — a compile-plus-runtime check on the alias itself.
     #[test]
     fn result_alias_resolves() {
         // Deliberately wraps an infallible value to exercise the alias.
@@ -81,6 +85,10 @@ mod tests {
         assert_eq!(make().unwrap(), 42);
     }
 
+    /// Pins the `Send + Sync` bound on `MatchingError` via a compile-time
+    /// trait assertion, so the error can cross thread boundaries (e.g. be
+    /// returned from a worker thread). Regressions here would surface as a
+    /// build failure rather than a runtime one.
     #[test]
     fn errors_are_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>() {}

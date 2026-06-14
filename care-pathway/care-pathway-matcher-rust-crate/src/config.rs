@@ -26,9 +26,16 @@ pub struct MatchConfig {
 }
 
 impl Default for MatchConfig {
+    /// Canonical configuration. Weights are chosen to sum to `1.0` so the
+    /// raw weighted average sits in `[0.0, 1.0]` when every component is
+    /// present; the renormalisation in `weighted_average` keeps that range
+    /// even when some are absent. Relative magnitudes encode evidence
+    /// strength: name (0.30) and condition codes (0.25) carry the most
+    /// identity signal, pathway code (0.15) next, with setting /
+    /// interventions / keywords (0.10 each) as corroboration.
     fn default() -> Self {
         Self {
-            threshold: 0.85,
+            threshold: 0.85, // probable-match cutoff for `is_match`
             name_weight: 0.30,
             condition_weight: 0.25,
             pathway_code_weight: 0.15,
@@ -92,6 +99,9 @@ impl MatchConfig {
 mod tests {
     use super::*;
 
+    // Pins the load-bearing invariant that the default weights sum to
+    // exactly 1.0 (within float tolerance), so the documented range and
+    // weighting story hold.
     #[test]
     fn default_weights_sum_to_one() {
         let total = MatchConfig::default().weight_total();
@@ -101,6 +111,9 @@ mod tests {
         );
     }
 
+    // Pins that `strict`/`lenient` move only the threshold (to 0.95/0.70)
+    // and leave every weight identical to the default — they change the
+    // match cutoff, never the score.
     #[test]
     fn presets_change_only_threshold() {
         let d = MatchConfig::default();

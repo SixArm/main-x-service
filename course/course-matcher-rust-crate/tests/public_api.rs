@@ -10,6 +10,8 @@ use course_matcher::{
     MatchConfig, MatchingEngine,
 };
 
+/// Test helper: build a `CourseIdentifier` from a scheme + value,
+/// exercising only the public re-exported types.
 fn ident(scheme: IdentifierScheme, value: &str) -> CourseIdentifier {
     CourseIdentifier {
         scheme,
@@ -40,6 +42,7 @@ fn worked_example_r1_same_provider_course_code() {
     assert!(r.is_match);
 }
 
+// Pins R-0 via the public API: a shared DOI wins over unrelated names.
 #[test]
 fn r0_doi_identifier_short_circuit_beats_unrelated_names() {
     let engine = MatchingEngine::default_config();
@@ -54,6 +57,8 @@ fn r0_doi_identifier_short_circuit_beats_unrelated_names() {
     assert!(r.breakdown.deterministic_match);
 }
 
+// Pins that EVERY deterministic scheme short-circuits to 1.0 — guards
+// against one being accidentally dropped from `is_deterministic`.
 #[test]
 fn r0_fires_for_every_deterministic_scheme() {
     let engine = MatchingEngine::default_config();
@@ -80,6 +85,8 @@ fn r0_fires_for_every_deterministic_scheme() {
     }
 }
 
+// Pins the inverse: provider-scoped schemes must NOT short-circuit —
+// a false 1.0 here is the worst-case bug.
 #[test]
 fn provider_scoped_identifier_does_not_short_circuit() {
     let engine = MatchingEngine::default_config();
@@ -104,6 +111,7 @@ fn provider_scoped_identifier_does_not_short_circuit() {
     }
 }
 
+// Pins R-2 via the public API: overlapping same_as URLs pin to 1.0.
 #[test]
 fn r2_same_as_url_overlap_short_circuits() {
     let engine = MatchingEngine::default_config();
@@ -118,6 +126,7 @@ fn r2_same_as_url_overlap_short_circuits() {
 
 // ─── Probabilistic path ──────────────────────────────────────────────
 
+// Pins that a fully-populated clone is High confidence (here via R-1).
 #[test]
 fn identical_fully_populated_courses_are_high_confidence() {
     let engine = MatchingEngine::default_config();
@@ -155,6 +164,8 @@ fn renormalisation_name_and_provider_only() {
     assert!(r.breakdown.educational_level_score.is_none());
 }
 
+// Pins the negative path: unrelated courses are Low, non-match,
+// non-deterministic, and still in-range.
 #[test]
 fn unrelated_courses_are_low_confidence_non_matches() {
     let engine = MatchingEngine::default_config();
@@ -167,6 +178,7 @@ fn unrelated_courses_are_low_confidence_non_matches() {
     assert!((0.0..=1.0).contains(&r.score));
 }
 
+// Pins that a small singular/plural typo still clears the 0.85 default.
 #[test]
 fn typo_variant_clears_default_threshold() {
     let engine = MatchingEngine::default_config();
@@ -179,6 +191,8 @@ fn typo_variant_clears_default_threshold() {
 
 // ─── Threshold presets ───────────────────────────────────────────────
 
+// Pins that presets move only `is_match` (via the threshold), never
+// the underlying score, and that strict ⊆ default ⊆ lenient.
 #[test]
 fn strict_and_lenient_change_is_match_not_score() {
     let a = Course::new("Introduction to Computer Science");
@@ -201,6 +215,8 @@ fn strict_and_lenient_change_is_match_not_score() {
 
 // ─── One-to-many surface ─────────────────────────────────────────────
 
+// Pins that one-to-many keeps candidate order (the exact match stays
+// at its original index, not floated to the top).
 #[test]
 fn match_one_to_many_preserves_order() {
     let engine = MatchingEngine::default_config();
@@ -217,6 +233,8 @@ fn match_one_to_many_preserves_order() {
     assert!(out[1].score > out[2].score);
 }
 
+// Pins that `rank` sorts descending while keeping original indices in
+// the returned tuples.
 #[test]
 fn rank_sorts_descending_and_preserves_indices() {
     let engine = MatchingEngine::default_config();
@@ -234,6 +252,7 @@ fn rank_sorts_descending_and_preserves_indices() {
     assert!(ranked[1].1.score >= ranked[2].1.score);
 }
 
+// Pins that `find_matches` drops below-threshold candidates entirely.
 #[test]
 fn find_matches_returns_only_passing_candidates() {
     let engine = MatchingEngine::default_config();
@@ -249,6 +268,7 @@ fn find_matches_returns_only_passing_candidates() {
     assert!(matches[0].1.is_match);
 }
 
+// Pins that all three one-to-many entry points handle an empty slice.
 #[test]
 fn one_to_many_handles_empty_candidates() {
     let engine = MatchingEngine::default_config();
@@ -260,6 +280,8 @@ fn one_to_many_handles_empty_candidates() {
 
 // ─── Result serialisation ────────────────────────────────────────────
 
+// Pins that a `MatchResult` serialises with its key fields present —
+// the service layer relies on this JSON shape.
 #[test]
 fn match_result_serialises_to_json() {
     let engine = MatchingEngine::default_config();

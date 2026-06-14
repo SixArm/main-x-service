@@ -38,17 +38,32 @@
 //!   [`MatchBreakdown`], [`Confidence`].
 
 // Always start with high quality coding conventions.
-#![forbid(unsafe_code)]
-#![deny(missing_docs)]
-#![warn(clippy::pedantic)]
+#![forbid(unsafe_code)] // pure library: no `unsafe` is ever needed.
+#![deny(missing_docs)] // every public item must carry a doc comment.
+#![warn(clippy::pedantic)] // opt in to Clippy's stricter lint set.
 
+// ─── Modules ─────────────────────────────────────────────────────────
+// The crate is split one concern per module; `lib.rs` re-exports the
+// stable surface below so callers never depend on module paths.
+
+/// Domain model: the [`Case`] record and its categorical enums.
 pub mod case;
+/// Tunable weights + threshold for the probabilistic strategy.
 pub mod config;
+/// Crate error type and its [`Result`] alias.
 pub mod error;
+/// The [`MatchingEngine`] entry point and the matching algorithm.
 pub mod matcher;
+/// Input normalisation helpers (fold / case-number / URL / set).
 pub mod normalize;
+/// Soundex phonetic encoder backing the title-component bonus.
 pub mod phonetic;
+/// Match-result shape and the renormalised weighted-average helper.
 pub mod scoring;
+
+// ─── Public re-exports ───────────────────────────────────────────────
+// The flat, stable API surface. These are the only paths downstream
+// crates should name; the module layout above is free to evolve.
 
 pub use case::{Case, CaseIdentifier, CaseStatus, CaseType, IdentifierScheme, Priority};
 pub use config::MatchConfig;

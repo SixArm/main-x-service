@@ -293,6 +293,12 @@ pub struct MatchResult {
     pub breakdown: MatchBreakdown,
 }
 
+/// Serde default for [`MatchResult::confidence`].
+///
+/// Used by `#[serde(default = "default_confidence")]` so that JSON
+/// payloads written before the `confidence` field existed deserialise
+/// to the most conservative band ([`Confidence::Low`]) instead of
+/// failing. New results always carry a freshly-computed band.
 fn default_confidence() -> Confidence {
     Confidence::Low
 }
@@ -484,6 +490,14 @@ impl MatchingEngine {
         name_and_start_date_match(event1, event2)
     }
 
+    /// Score every field of the two events and assemble the per-field
+    /// [`MatchBreakdown`].
+    ///
+    /// Each component scorer returns `Some(score)` when both sides supplied
+    /// the field, or `None` when either side is missing (so the field is
+    /// later skipped by [`MatchingEngine::calculate_weighted_score`] rather
+    /// than counted as a zero). The phonetic name score is only computed
+    /// when `use_phonetic_matching` is enabled, since it is a pure bonus.
     fn calculate_breakdown(&self, event1: &Event, event2: &Event) -> MatchBreakdown {
         MatchBreakdown {
             name_score: self.score_name(event1, event2),
@@ -504,10 +518,24 @@ impl MatchingEngine {
         }
     }
 
+    /// Collapse a [`MatchBreakdown`] into a single overall score in
+    /// `[0.0, 1.0]`.
+    ///
+    /// The score is a **weight-renormalised** average: each field that was
+    /// actually scored (`Some`) contributes `score * weight` to the
+    /// numerator and `weight` to the denominator; fields that were missing
+    /// (`None`) contribute nothing to either. Dividing by the sum of
+    /// *participating* weights — rather than the sum of all configured
+    /// weights — is what lets missing data neither reward nor penalise the
+    /// pair. When no field participated (the denominator is zero) the score
+    /// is `0.0`.
     fn calculate_weighted_score(&self, breakdown: &MatchBreakdown) -> f64 {
         let mut total_weight = 0.0;
         let mut weighted_sum = 0.0;
 
+        // Fold one optional component into the running numerator/denominator.
+        // A `None` component is silently skipped so it does not dilute the
+        // average toward zero.
         let mut accumulate = |opt: Option<f64>, weight: f64| {
             if let Some(score) = opt {
                 weighted_sum += score * weight;
@@ -529,7 +557,11 @@ impl MatchingEngine {
         accumulate(breakdown.performers_score, self.config.performers_weight);
         accumulate(breakdown.url_score, self.config.url_weight);
 
-        // Phonetic match is a bonus only — never lowers the score.
+        // Phonetic match is a bonus only — never lowers the score. It is
+        // added with a deliberately small weight (`0.05`) so a phonetic
+        // agreement nudges a borderline pair upward without dominating the
+        // primary fields. The `> 0.9` gate means only a near-perfect
+        // Soundex agreement counts; weak phonetic signals are ignored.
         if let Some(score) = breakdown.name_phonetic_score
             && score > 0.9
         {
@@ -544,12 +576,22 @@ impl MatchingEngine {
         }
     }
 
+    /// Score the two events' names as the **best-of cartesian product**
+    /// across `name` + `alternate_names` on each side.
+    ///
+    /// Comparing every name on side one against every name on side two and
+    /// keeping the maximum means an alias on either record can rescue a
+    /// match (e.g. `"Glasto 2024"` vs the alternate name
+    /// `"Glastonbury Festival 2024"`). Returns `None` when either side has
+    /// no usable (non-blank) names, so the field is skipped entirely.
     fn score_name(&self, e1: &Event, e2: &Event) -> Option<f64> {
         let names1 = collect_names(e1);
         let names2 = collect_names(e2);
         if names1.is_empty() || names2.is_empty() {
             return None;
         }
+        // Seed with negative infinity so the first real comparison always
+        // wins; every produced similarity is in [0.0, 1.0].
         let mut best = f64::NEG_INFINITY;
         for n1 in &names1 {
             for n2 in &names2 {
@@ -562,6 +604,12 @@ impl MatchingEngine {
         Some(best)
     }
 
+    /// Score a single pair of raw name strings.
+    ///
+    /// Both names are first run through [`Normalizer::normalize_name`]
+    /// (case-fold, drop diacritics and punctuation, collapse whitespace)
+    /// so the comparison is robust to cosmetic differences, then scored
+    /// with whichever [`SimilarityAlgorithm`] the config selects.
     fn score_name_pair(&self, name1: &str, name2: &str) -> f64 {
         let norm1 = Normalizer::normalize_name(name1);
         let norm2 = Normalizer::normalize_name(name2);
@@ -573,12 +621,25 @@ impl MatchingEngine {
         }
     }
 
+    /// Phonetic (Soundex) agreement across the name cartesian product.
+    ///
+    /// Returns `Some(1.0)` if any name on side one shares a non-empty
+    /// Soundex code with any name on side two, otherwise `Some(0.0)`;
+    /// `None` when either side has no usable names. This is a binary
+    /// signal — it catches "sounds-alike" spelling variants (Stephen /
+    /// Steven) that string similarity alone might rate too low — and is
+    /// only consumed as a small bonus in
+    /// [`MatchingEngine::calculate_weighted_score`].
+    ///
+    /// Empty codes are skipped so two unrelated names that both encode to
+    /// the empty string do not spuriously "match".
     fn score_phonetic_names(e1: &Event, e2: &Event) -> Option<f64> {
         let names1 = collect_names(e1);
         let names2 = collect_names(e2);
         if names1.is_empty() || names2.is_empty() {
             return None;
         }
+        // Pre-encode each side once, then cross-compare the codes.
         let codes1: Vec<String> = names1
             .iter()
             .map(|n| Normalizer::phonetic_code(n))
@@ -590,6 +651,8 @@ impl MatchingEngine {
         let mut best = 0.0_f64;
         for c1 in &codes1 {
             for c2 in &codes2 {
+                // Require a non-empty code so two name-less / unencodable
+                // inputs do not collide on the empty string.
                 if !c1.is_empty() && c1 == c2 {
                     best = 1.0;
                 }
@@ -598,9 +661,16 @@ impl MatchingEngine {
         Some(best)
     }
 
-    // A signed second-delta between two event timestamps. The magnitude is
-    // tiny relative to f64's 52-bit mantissa, so the lossy i64->f64 cast is
-    // harmless here.
+    /// Score the two `start_date` values by Gaussian decay over their
+    /// absolute difference in seconds.
+    ///
+    /// Returns `None` if either date is absent or unparseable (the `?`
+    /// short-circuits), so an event with no start date neither helps nor
+    /// hurts. The decay scale comes from `start_date_scale_seconds`
+    /// (default one hour), so events starting within an hour of each other
+    /// still score high while events days apart score near zero.
+    // The second-delta magnitude is tiny relative to f64's 52-bit mantissa,
+    // so the lossy i64->f64 cast is harmless here.
     #[allow(clippy::cast_precision_loss)]
     fn score_start_date(&self, e1: &Event, e2: &Event) -> Option<f64> {
         let d = Scorer::seconds_between(e1.start_date.as_deref()?, e2.start_date.as_deref()?)?;
@@ -610,6 +680,15 @@ impl MatchingEngine {
         ))
     }
 
+    /// Score the two `end_date` values by Gaussian decay over their
+    /// absolute difference in seconds.
+    ///
+    /// Identical in shape to [`MatchingEngine::score_start_date`] and
+    /// deliberately reuses the same `start_date_scale_seconds` scale and
+    /// the [`Scorer::start_date_score`] kernel, since the end of an event
+    /// is just another point on the same timeline. Returns `None` when
+    /// either end date is missing or unparseable.
+    // Same harmless i64->f64 cast as `score_start_date`.
     #[allow(clippy::cast_precision_loss)]
     fn score_end_date(&self, e1: &Event, e2: &Event) -> Option<f64> {
         let d = Scorer::seconds_between(e1.end_date.as_deref()?, e2.end_date.as_deref()?)?;
@@ -619,6 +698,10 @@ impl MatchingEngine {
         ))
     }
 
+    /// Score the two events' locations, or `None` if either lacks one.
+    ///
+    /// Delegates to [`MatchingEngine::compare_locations`] only when both
+    /// sides carry a [`Location`]; otherwise the field is skipped.
     fn score_location(&self, e1: &Event, e2: &Event) -> Option<f64> {
         match (e1.location.as_ref(), e2.location.as_ref()) {
             (Some(l1), Some(l2)) => Some(self.compare_locations(l1, l2)),
@@ -626,6 +709,16 @@ impl MatchingEngine {
         }
     }
 
+    /// Compare two [`Location`] values into a single `[0.0, 1.0]` score.
+    ///
+    /// The score is a weight-renormalised blend over whichever sub-fields
+    /// both locations share: coordinates (weight `0.5`), postal address
+    /// (`0.3`), venue name (`0.15`), and virtual join URL (`0.05`).
+    /// Coordinates dominate because exact geo agreement is the strongest
+    /// "same place" evidence; the virtual URL contributes least because it
+    /// is an exact string equality that rarely disambiguates. When the two
+    /// locations share no comparable sub-field the function returns the
+    /// neutral `0.5` (neither evidence for nor against).
     fn compare_locations(&self, l1: &Location, l2: &Location) -> f64 {
         // Each sub-component contributes a raw score in `[0.0, 1.0]` and a
         // weight. Final score is the weight-renormalised average across
@@ -672,6 +765,11 @@ impl MatchingEngine {
         }
     }
 
+    /// Score the two organiser names with [`Scorer::combined_similarity`]
+    /// after name normalisation, or `None` if either organiser is absent.
+    ///
+    /// Organiser is a single string (not a list), so this is a plain
+    /// pairwise comparison rather than a cartesian product.
     fn score_organizer(e1: &Event, e2: &Event) -> Option<f64> {
         let o1 = e1.organizer.as_deref()?;
         let o2 = e2.organizer.as_deref()?;
@@ -680,6 +778,13 @@ impl MatchingEngine {
         Some(Scorer::combined_similarity(&n1, &n2))
     }
 
+    /// Score the two performer lists as the best-of cartesian product of
+    /// normalised, [`Scorer::combined_similarity`]-compared names.
+    ///
+    /// Returns `None` when either list is empty. Taking the maximum over
+    /// all pairs means a single shared headliner (in any list position) is
+    /// enough to score the field high, which suits line-ups that overlap
+    /// only partially or are listed in a different order.
     fn score_performers(e1: &Event, e2: &Event) -> Option<f64> {
         if e1.performers.is_empty() || e2.performers.is_empty() {
             return None;
@@ -725,6 +830,12 @@ fn valid_coords(lat: Option<f64>, lon: Option<f64>) -> Option<(f64, f64)> {
     Some((lat, lon))
 }
 
+/// Binary category equality: `Some(1.0)` if both categories are set and
+/// structurally equal, `Some(0.0)` if both are set but differ, `None` if
+/// either is absent.
+///
+/// Category is a coarse, controlled-vocabulary field, so fuzzy matching
+/// would add noise; exact equality is the right comparison here.
 fn score_category(e1: &Event, e2: &Event) -> Option<f64> {
     match (&e1.category, &e2.category) {
         (Some(a), Some(b)) => Some(if a == b { 1.0 } else { 0.0 }),
@@ -732,6 +843,12 @@ fn score_category(e1: &Event, e2: &Event) -> Option<f64> {
     }
 }
 
+/// Binary country-code equality after trimming and ASCII-lowercasing both
+/// sides; `None` if either code is absent.
+///
+/// ISO 3166-1 alpha-2 codes are a fixed two-letter vocabulary, so a
+/// case-insensitive exact match (e.g. `"gb"` == `"GB"`) is appropriate
+/// rather than string similarity.
 fn score_country_code(e1: &Event, e2: &Event) -> Option<f64> {
     let a = e1.country_code_as_iso_3166_1_alpha_2.as_ref()?;
     let b = e2.country_code_as_iso_3166_1_alpha_2.as_ref()?;
@@ -740,10 +857,17 @@ fn score_country_code(e1: &Event, e2: &Event) -> Option<f64> {
     Some(if na == nb { 1.0 } else { 0.0 })
 }
 
+/// Return `true` if the two events share any identical `(scheme, value)`
+/// [`EventId`](crate::models::EventId) pair.
+///
+/// [`EventId`](crate::models::EventId) equality is scheme-scoped, so an
+/// Eventbrite id and a Meetup id with the same string value never collide.
+/// Returns `false` immediately if either list is empty (nothing to share).
 fn shares_event_id(e1: &Event, e2: &Event) -> bool {
     if e1.event_ids.is_empty() || e2.event_ids.is_empty() {
         return false;
     }
+    // Nested loops are fine: external-id lists are tiny in practice.
     for id1 in &e1.event_ids {
         for id2 in &e2.event_ids {
             if id1 == id2 {
@@ -754,6 +878,9 @@ fn shares_event_id(e1: &Event, e2: &Event) -> bool {
     false
 }
 
+/// Probabilistic-pipeline view of [`shares_event_id`]: `Some(1.0)` when a
+/// pair is shared, `Some(0.0)` when both lists are non-empty but disjoint,
+/// `None` when either list is empty (so the field is skipped).
 fn score_event_ids(e1: &Event, e2: &Event) -> Option<f64> {
     if e1.event_ids.is_empty() || e2.event_ids.is_empty() {
         return None;
@@ -761,12 +888,27 @@ fn score_event_ids(e1: &Event, e2: &Event) -> Option<f64> {
     Some(if shares_event_id(e1, e2) { 1.0 } else { 0.0 })
 }
 
+/// Binary URL equality after trimming surrounding whitespace; `None` if
+/// either URL is absent.
+///
+/// URLs are compared exactly (no scheme/host canonicalisation): two
+/// differently-written URLs for the same page score `0.0`, which is the
+/// conservative choice for an explainable matcher.
 fn score_url(e1: &Event, e2: &Event) -> Option<f64> {
     let u1 = e1.url.as_deref()?;
     let u2 = e2.url.as_deref()?;
     Some(f64::from(u1.trim() == u2.trim()))
 }
 
+/// Deterministic rule: do both events share an identical normalised
+/// primary `name` **and** a `start_date` that parses to the same Unix
+/// instant?
+///
+/// Both conditions are required. Names are compared after
+/// [`Normalizer::normalize_name`]; start dates are compared as parsed Unix
+/// seconds so that differently-offset ISO 8601 strings denoting the same
+/// instant (e.g. `…T09:00:00Z` and `…T11:00:00+02:00`) count as equal.
+/// Any missing or unparseable component yields `false`.
 fn name_and_start_date_match(e1: &Event, e2: &Event) -> bool {
     let (Some(n1), Some(n2)) = (&e1.name, &e2.name) else {
         return false;

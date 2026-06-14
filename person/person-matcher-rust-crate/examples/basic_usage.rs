@@ -1,12 +1,26 @@
 #![warn(clippy::pedantic)]
 
-//! Basic usage example for person matcher
+//! Basic usage example for person matcher.
+//!
+//! Run with `cargo run --example basic_usage`. It is a guided tour of the
+//! library's feature surface, printing one labelled section per capability:
+//! overall scoring + per-field breakdown, deterministic matching, JSON
+//! export, E.164 phone normalisation, the DOB day/month transposition
+//! heuristic, email canonicalisation (including opt-in Gmail dot/plus
+//! folding), the nickname dictionary, US SSN exact match, blood-type
+//! signalling, twin disambiguation via the multiple-birth indicator, birth
+//! place / death date / death place sub-scores, multi-country passport
+//! books, the `rank_one_to_many` batch API, a sweep of national-identifier
+//! parsers (the original six plus the T-17.1 batch of seven), and address
+//! line parsing. It is illustrative output, not an assertion harness.
 
 use person_matcher::{
     Address, BloodType, Gender, MatchConfig, MatchingEngine, NicknameTable, Normalizer,
     PassportBook, Person,
 };
 
+/// Entry point: run every demonstration section in turn, printing results
+/// to stdout. See the module docs for the list of features exercised.
 fn main() {
     println!("=== Basic Person matcher Example ===\n");
 

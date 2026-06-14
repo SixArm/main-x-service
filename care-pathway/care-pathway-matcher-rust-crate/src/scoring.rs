@@ -53,6 +53,9 @@ impl Confidence {
     /// ```
     #[must_use]
     pub fn classify(score: f64) -> Self {
+        // Bands are independent of the configurable `is_match` threshold;
+        // they are fixed reporting buckets. Boundaries are inclusive lower
+        // bounds, so a score exactly on 0.95 / 0.70 lands in the higher band.
         if score >= 0.95 {
             Confidence::High
         } else if score >= 0.70 {
@@ -89,9 +92,12 @@ pub struct MatchBreakdown {
 /// no component is present.
 #[must_use]
 pub fn weighted_average(components: &[(Option<f64>, f64)]) -> f64 {
-    let mut weighted_sum = 0.0_f64;
-    let mut weight_sum = 0.0_f64;
+    let mut weighted_sum = 0.0_f64; // Σ (score · weight) over present components
+    let mut weight_sum = 0.0_f64; // Σ weight over present components (the divisor)
     for (score, weight) in components {
+        // Only present (`Some`) components contribute to BOTH sums; this
+        // is the renormalisation — a skipped component never inflates the
+        // divisor, so absent data neither helps nor hurts the score.
         if let Some(s) = score {
             weighted_sum += s * weight;
             weight_sum += weight;
@@ -100,6 +106,7 @@ pub fn weighted_average(components: &[(Option<f64>, f64)]) -> f64 {
     if weight_sum > 0.0 {
         weighted_sum / weight_sum
     } else {
+        // No component was present ⇒ nothing to average; define as 0.0.
         0.0
     }
 }
@@ -108,6 +115,8 @@ pub fn weighted_average(components: &[(Option<f64>, f64)]) -> f64 {
 mod tests {
     use super::*;
 
+    // Two perfect components and two absent ones average to 1.0 — pins
+    // that `None` entries are excluded from the divisor (renormalisation).
     #[test]
     fn weighted_average_ignores_none() {
         let score = weighted_average(&[
@@ -119,11 +128,13 @@ mod tests {
         assert!((score - 1.0).abs() < 1e-9);
     }
 
+    // No components at all ⇒ defined as 0.0 (divisor would be zero).
     #[test]
     fn weighted_average_empty_is_zero() {
         assert!(weighted_average(&[]).abs() < 1e-9);
     }
 
+    // Spot-checks one score in each band well clear of the boundaries.
     #[test]
     fn confidence_thresholds() {
         assert_eq!(Confidence::classify(0.99), Confidence::High);
@@ -131,6 +142,8 @@ mod tests {
         assert_eq!(Confidence::classify(0.50), Confidence::Low);
     }
 
+    // Pins that boundaries are inclusive lower bounds: exactly-on lands in
+    // the higher band, a hair below drops to the lower band.
     #[test]
     fn confidence_boundaries_are_inclusive_lower_bounds() {
         // Exactly on a boundary classifies into the higher band.
@@ -141,12 +154,15 @@ mod tests {
         assert_eq!(Confidence::classify(0.699_999), Confidence::Low);
     }
 
+    // The endpoints of the score range map to the outer bands.
     #[test]
     fn confidence_extremes() {
         assert_eq!(Confidence::classify(0.0), Confidence::Low);
         assert_eq!(Confidence::classify(1.0), Confidence::High);
     }
 
+    // Worked renormalisation example: a present 0.0 component DOES count
+    // against the score (unlike an absent one), giving 0.7 here.
     #[test]
     fn weighted_average_renormalises_over_present_weights() {
         // name 1.0 @ 0.35 and provider 0.0 @ 0.15; others absent.
@@ -155,12 +171,15 @@ mod tests {
         assert!((score - 0.7).abs() < 1e-9, "got {score}");
     }
 
+    // All-absent components ⇒ 0.0 (the zero-divisor guard path).
     #[test]
     fn weighted_average_all_none_is_zero() {
         let score = weighted_average(&[(None, 0.35), (None, 0.15)]);
         assert!(score.abs() < 1e-9);
     }
 
+    // The `Default` impl yields a Low, non-match, non-deterministic,
+    // zero-score result — the neutral baseline reused by the engine.
     #[test]
     fn default_match_result_is_low_non_match() {
         let r = MatchResult::default();
@@ -170,6 +189,7 @@ mod tests {
         assert!(!r.breakdown.deterministic_match);
     }
 
+    // Pins the derived `Default` for `Confidence` (the `#[default]` variant).
     #[test]
     fn confidence_default_is_low() {
         assert_eq!(Confidence::default(), Confidence::Low);

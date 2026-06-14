@@ -15,6 +15,7 @@ use organization_matcher::{
     IdentifierScheme, MatchConfig, MatchingEngine, OrgIdentifier, Organization, PostalAddress,
 };
 
+/// Demo helper: build an `OrgIdentifier` from a scheme + string value.
 fn ident(scheme: IdentifierScheme, value: &str) -> OrgIdentifier {
     OrgIdentifier {
         scheme,
@@ -22,6 +23,9 @@ fn ident(scheme: IdentifierScheme, value: &str) -> OrgIdentifier {
     }
 }
 
+/// Run five illustrative scenarios — name variants, the LEI and tax-id
+/// deterministic short-circuits, a multi-component probabilistic match,
+/// and an unrelated pair — printing each score/confidence to stdout.
 fn main() {
     let engine = MatchingEngine::new(MatchConfig::default());
 

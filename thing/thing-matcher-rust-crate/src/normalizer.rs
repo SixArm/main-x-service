@@ -98,19 +98,29 @@ impl Normalizer {
     /// assert_eq!(Normalizer::normalize_name("Łódź"),    "łodz");
     /// ```
     pub fn normalize_name(name: &str) -> String {
+        // Pre-size for the common case where output length ≈ input length.
         let mut out = String::with_capacity(name.len());
+        // Iterate the NFKD decomposition so that pre-composed characters
+        // such as `é` arrive as a base letter followed by a combining mark.
         for ch in name.nfkd() {
-            // Skip combining marks (Unicode categories Mn / Mc / Me).
+            // Skip combining marks (Unicode categories Mn / Mc / Me). This
+            // is the diacritic-stripping step: with `é` already split into
+            // `e` + acute, dropping the acute yields a plain `e`.
             if is_combining_mark(ch) {
                 continue;
             }
+            // Names: drop ASCII punctuation so `O'Brien` and `OBrien`, or
+            // `Mary-Jane` and `MaryJane`, collapse to the same key.
             if ch.is_ascii_punctuation() {
                 continue;
             }
+            // Lowercase. `to_lowercase` can yield multiple chars (e.g. the
+            // German ß) so push each one.
             for lc in ch.to_lowercase() {
                 out.push(lc);
             }
         }
+        // Final whitespace pass: collapse runs to single spaces and trim.
         collapse_whitespace(&out)
     }
 
@@ -143,9 +153,12 @@ impl Normalizer {
     pub fn normalize_text(text: &str) -> String {
         let mut out = String::with_capacity(text.len());
         for ch in text.nfkd() {
+            // Strip diacritics, same as `normalize_name`.
             if is_combining_mark(ch) {
                 continue;
             }
+            // NOTE: unlike `normalize_name`, ASCII punctuation is *kept* —
+            // sentence structure carries meaning in free-form descriptions.
             for lc in ch.to_lowercase() {
                 out.push(lc);
             }
@@ -207,30 +220,41 @@ impl Normalizer {
             None => trimmed,
         };
 
-        // Locate scheme delimiter.
+        // Locate the `://` scheme delimiter that separates a hierarchical
+        // URL (`https://host/path`) from an opaque URI (`urn:isbn:...`).
         let (scheme, after_scheme) = match no_frag.find("://") {
+            // `idx + 3` skips past the three-byte `://` literal.
             Some(idx) => (&no_frag[..idx], Some(&no_frag[idx + 3..])),
             None => (no_frag, None),
         };
 
         // No scheme — fall back to a trimmed lowercase opaque form. Useful
-        // for `urn:` / `mailto:` / `tel:` style identifiers.
+        // for `urn:` / `mailto:` / `tel:` style identifiers. We lowercase
+        // the whole thing because opaque schemes have no case-sensitive
+        // path component to preserve.
         let Some(rest) = after_scheme else {
             return no_frag.to_ascii_lowercase();
         };
 
-        // Split host from path.
+        // Split the authority (host) from the path at the first `/`. When
+        // there is no `/`, the whole remainder is the host and the path is
+        // empty.
         let (host, path) = match rest.find('/') {
             Some(idx) => (&rest[..idx], &rest[idx..]),
             None => (rest, ""),
         };
 
         let mut out = String::with_capacity(no_frag.len());
+        // Scheme and host are case-insensitive per RFC 3986, so lowercase
+        // them; the path is left as-is because many servers treat it as
+        // case-sensitive.
         out.push_str(&scheme.to_ascii_lowercase());
         out.push_str("://");
         out.push_str(&host.to_ascii_lowercase());
 
-        // Drop a trailing slash only when the path *is* the root.
+        // Drop a trailing slash only when the path *is* the root (empty or
+        // a lone `/`). A trailing slash on a deeper path (`/foo/`) is kept
+        // because `/foo` and `/foo/` can legitimately differ.
         if !(path.is_empty() || path == "/") {
             out.push_str(path);
         }
@@ -254,12 +278,16 @@ impl Normalizer {
     /// assert_eq!(a, b);
     /// ```
     pub fn phonetic_code(name: &str) -> String {
+        // Normalise first so diacritics / punctuation / case do not perturb
+        // the phonetic code: `José` and `Jose` must produce the same code.
         let normalised = Self::normalize_name(name);
         if normalised.is_empty() {
             return String::new();
         }
         // The `soundex` crate's `american_soundex` is infallible for any
-        // ASCII input. Strip non-ASCII bytes before handing it over.
+        // ASCII input but can misbehave on non-ASCII. Strip non-ASCII chars
+        // before handing it over; if nothing ASCII remains, there is no
+        // meaningful Soundex code to compute.
         let ascii: String = normalised.chars().filter(char::is_ascii).collect();
         if ascii.is_empty() {
             return String::new();
@@ -269,11 +297,21 @@ impl Normalizer {
 }
 
 /// Collapse consecutive whitespace into single ASCII spaces and trim ends.
+///
+/// Any run of one or more whitespace characters (of any kind — tabs,
+/// newlines, Unicode spaces) becomes exactly one ASCII space, and leading /
+/// trailing whitespace is removed. This is the shared final step of
+/// [`Normalizer::normalize_name`] and [`Normalizer::normalize_text`].
 fn collapse_whitespace(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
+    // `prev_space` tracks whether the previous emitted position was a space
+    // boundary. Seeding it to `true` suppresses any leading whitespace:
+    // the start of the string is treated as if a space had just been seen.
     let mut prev_space = true; // start of string = no leading spaces
     for ch in s.chars() {
         if ch.is_whitespace() {
+            // Emit at most one space per run: only the first whitespace
+            // char of a run pushes a space; subsequent ones are swallowed.
             if !prev_space {
                 out.push(' ');
                 prev_space = true;
@@ -283,6 +321,8 @@ fn collapse_whitespace(s: &str) -> String {
             prev_space = false;
         }
     }
+    // A run of trailing whitespace will have pushed exactly one space; pop
+    // it so the result is trimmed on the right.
     if out.ends_with(' ') {
         out.pop();
     }
@@ -295,22 +335,29 @@ mod tests {
 
     // ---------- normalize_name ----------
 
+    /// Pins lowercasing and end-trimming on names.
     #[test]
     fn normalize_name_lowercases_and_trims() {
         assert_eq!(Normalizer::normalize_name("  HELLO  "), "hello");
     }
 
+    /// Pins that mixed internal whitespace (spaces, tabs, newlines)
+    /// collapses to single ASCII spaces.
     #[test]
     fn normalize_name_collapses_internal_whitespace() {
         assert_eq!(Normalizer::normalize_name("a  \t  b\nc"), "a b c");
     }
 
+    /// Pins ASCII-punctuation removal for names — apostrophes, hyphens, and
+    /// exclamation marks all vanish.
     #[test]
     fn normalize_name_drops_punctuation() {
         assert_eq!(Normalizer::normalize_name("O'Brien"), "obrien");
         assert_eq!(Normalizer::normalize_name("Mary-Jane!"), "maryjane");
     }
 
+    /// Pins diacritic stripping via NFKD decomposition (`â`→`a`, `é`→`e`,
+    /// `ë`→`e`).
     #[test]
     fn normalize_name_drops_diacritics() {
         assert_eq!(Normalizer::normalize_name("Siân"), "sian");
@@ -318,6 +365,8 @@ mod tests {
         assert_eq!(Normalizer::normalize_name("Zoë"), "zoe");
     }
 
+    /// Pins the idempotence invariant for names: normalising an already
+    /// normalised string is a no-op.
     #[test]
     fn normalize_name_is_idempotent() {
         let cases = ["hello", "O'Brien", " café au lait ", "JOSÉ-MARÍA"];
@@ -328,6 +377,8 @@ mod tests {
         }
     }
 
+    /// Pins that empty and whitespace-only inputs normalise to the empty
+    /// string (used downstream to skip a thing with no usable name).
     #[test]
     fn normalize_name_empty_returns_empty() {
         assert!(Normalizer::normalize_name("").is_empty());
@@ -336,16 +387,21 @@ mod tests {
 
     // ---------- normalize_text ----------
 
+    /// Pins the key difference from `normalize_name`: free-form text *keeps*
+    /// punctuation (comma, exclamation mark) while still lowercasing.
     #[test]
     fn normalize_text_preserves_punctuation() {
         assert_eq!(Normalizer::normalize_text("Hello, World!"), "hello, world!");
     }
 
+    /// Pins that free-form text still strips diacritics even though it keeps
+    /// punctuation.
     #[test]
     fn normalize_text_drops_diacritics() {
         assert_eq!(Normalizer::normalize_text("Café au lait."), "cafe au lait.");
     }
 
+    /// Pins the idempotence invariant for free-form text.
     #[test]
     fn normalize_text_is_idempotent() {
         let cases = [
@@ -362,6 +418,7 @@ mod tests {
 
     // ---------- normalize_url ----------
 
+    /// Pins that scheme and host lowercase while the path keeps its case.
     #[test]
     fn normalize_url_lowercases_scheme_and_host() {
         assert_eq!(
@@ -370,6 +427,7 @@ mod tests {
         );
     }
 
+    /// Pins that a trailing slash on the *root* path is dropped.
     #[test]
     fn normalize_url_drops_root_trailing_slash() {
         assert_eq!(
@@ -378,6 +436,8 @@ mod tests {
         );
     }
 
+    /// Pins the counterpart rule: a trailing slash on a *sub*-path is
+    /// preserved, because `/foo` and `/foo/` can differ on real servers.
     #[test]
     fn normalize_url_keeps_subpath_trailing_slash() {
         assert_eq!(
@@ -386,6 +446,7 @@ mod tests {
         );
     }
 
+    /// Pins fragment removal — the `#bar` suffix is dropped.
     #[test]
     fn normalize_url_drops_fragment() {
         assert_eq!(
@@ -394,6 +455,8 @@ mod tests {
         );
     }
 
+    /// Pins the opaque-URI fallback: a scheme without `://` (here a URN) is
+    /// returned trimmed and fully lowercased.
     #[test]
     fn normalize_url_handles_opaque_uri() {
         assert_eq!(
@@ -402,6 +465,8 @@ mod tests {
         );
     }
 
+    /// Pins the idempotence invariant for URLs, including the tricky
+    /// whitespace-before-fragment regression cases.
     #[test]
     fn normalize_url_is_idempotent() {
         let cases = [
@@ -420,6 +485,10 @@ mod tests {
         }
     }
 
+    /// Pins the subtle re-trim step: removing a `#fragment` can expose
+    /// whitespace that sat just before the `#` (and that the initial `trim`
+    /// could not reach). The `trim_end` after the cut is what keeps
+    /// `normalize_url` idempotent on these inputs.
     #[test]
     fn normalize_url_retrims_after_fragment_removal() {
         assert_eq!(Normalizer::normalize_url("http://h/p \u{2000}#x"), "http://h/p");
@@ -428,6 +497,8 @@ mod tests {
 
     // ---------- phonetic_code ----------
 
+    /// Pins that homophones (`Stephen` / `Steven`) share a Soundex code —
+    /// the basis for the matcher's optional phonetic bonus.
     #[test]
     fn phonetic_code_matches_homophones() {
         assert_eq!(
@@ -436,6 +507,8 @@ mod tests {
         );
     }
 
+    /// Pins that phonetically unrelated names get distinct codes, so the
+    /// bonus does not fire for arbitrary pairs.
     #[test]
     fn phonetic_code_distinct_for_unrelated_names() {
         assert_ne!(
@@ -444,6 +517,7 @@ mod tests {
         );
     }
 
+    /// Pins the empty-input contract: no name → empty code (never a panic).
     #[test]
     fn phonetic_code_empty_for_empty_input() {
         assert!(Normalizer::phonetic_code("").is_empty());

@@ -62,6 +62,9 @@ impl Scorer {
     /// assert_eq!(Scorer::jaro_winkler_similarity("smith", ""), 0.0);
     /// ```
     pub fn jaro_winkler_similarity(s1: &str, s2: &str) -> f64 {
+        // Two empties are "identical"; one empty is maximally dissimilar.
+        // These guards also dodge any divide-by-zero in the underlying
+        // algorithm for zero-length inputs.
         if s1.is_empty() && s2.is_empty() {
             return 1.0;
         }
@@ -99,6 +102,9 @@ impl Scorer {
         }
 
         let distance = levenshtein(s1, s2);
+        // Normalise the edit distance by the longer string's byte length so
+        // the result lands in `[0.0, 1.0]`. `max_len` is non-zero here
+        // because the empty-input cases were handled above.
         let max_len = s1.len().max(s2.len());
         1.0 - (distance as f64 / max_len as f64)
     }
@@ -137,6 +143,10 @@ impl Scorer {
     pub fn combined_similarity(s1: &str, s2: &str) -> f64 {
         let jw = Self::jaro_winkler_similarity(s1, s2);
         let lev = Self::levenshtein_similarity(s1, s2);
+        // Fixed 0.7 / 0.3 blend: Jaro-Winkler leads (it handles short-name
+        // prefix matches well), Levenshtein moderates (it is steadier on
+        // longer or rearranged strings). The weights sum to 1.0 so the
+        // result stays in `[0.0, 1.0]`.
         0.7 * jw + 0.3 * lev
     }
 
@@ -169,10 +179,16 @@ impl Scorer {
         if a.is_empty() || b.is_empty() {
             return 0.0;
         }
+        // Deduplicate each side into a set, so repeated elements do not
+        // skew the cardinalities. `BTreeSet` (rather than `HashSet`) keeps
+        // the computation fully deterministic.
         let a_set: std::collections::BTreeSet<&str> = a.iter().map(AsRef::as_ref).collect();
         let b_set: std::collections::BTreeSet<&str> = b.iter().map(AsRef::as_ref).collect();
         let intersection = a_set.intersection(&b_set).count();
         let union = a_set.union(&b_set).count();
+        // Defensive: `union` can only be zero if both sets are empty, which
+        // the guards above already returned for — but keep the check so the
+        // division below can never be `0/0`.
         if union == 0 {
             return 0.0;
         }
@@ -252,32 +268,38 @@ mod tests {
 
     // ---------- jaro_winkler ----------
 
+    /// Pins that identical strings score near `1.0`.
     #[test]
     fn jaro_winkler_identical() {
         assert!(Scorer::jaro_winkler_similarity("smith", "smith") > 0.99);
     }
 
+    /// Pins that a single-letter typo still scores high (prefix bonus).
     #[test]
     fn jaro_winkler_close_typo() {
         assert!(Scorer::jaro_winkler_similarity("smith", "smyth") > 0.85);
     }
 
+    /// Pins that unrelated short strings score well below the match band.
     #[test]
     fn jaro_winkler_distant() {
         assert!(Scorer::jaro_winkler_similarity("jones", "james") < 0.8);
     }
 
+    /// Pins the both-empty edge case → `1.0`.
     #[test]
     fn jaro_winkler_empty_pair_is_one() {
         assert_eq!(Scorer::jaro_winkler_similarity("", ""), 1.0);
     }
 
+    /// Pins the asymmetric-empty edge case (one side empty) → `0.0`.
     #[test]
     fn jaro_winkler_single_empty_is_zero() {
         assert_eq!(Scorer::jaro_winkler_similarity("smith", ""), 0.0);
         assert_eq!(Scorer::jaro_winkler_similarity("", "smith"), 0.0);
     }
 
+    /// Pins the range invariant: every output is within `[0.0, 1.0]`.
     #[test]
     fn jaro_winkler_in_unit_interval() {
         for (a, b) in [("a", "b"), ("smith", "smyth"), ("abc", "xyz")] {
@@ -288,11 +310,14 @@ mod tests {
 
     // ---------- levenshtein ----------
 
+    /// Pins that identical strings score exactly `1.0`.
     #[test]
     fn levenshtein_identical() {
         assert_eq!(Scorer::levenshtein_similarity("smith", "smith"), 1.0);
     }
 
+    /// Pins the exact normalisation formula `1 - distance/max_len` on a
+    /// known case (one substitution over five characters → `0.8`).
     #[test]
     fn levenshtein_one_edit() {
         // 1 substitution over 5 chars: 1 - 1/5 = 0.8
@@ -300,16 +325,19 @@ mod tests {
         assert!((s - 0.8).abs() < 1e-9, "got {s}");
     }
 
+    /// Pins that fully distinct equal-length strings score below `0.5`.
     #[test]
     fn levenshtein_completely_different() {
         assert!(Scorer::levenshtein_similarity("abc", "xyz") < 0.5);
     }
 
+    /// Pins the both-empty edge case → `1.0`.
     #[test]
     fn levenshtein_empty_pair_is_one() {
         assert_eq!(Scorer::levenshtein_similarity("", ""), 1.0);
     }
 
+    /// Pins the asymmetric-empty edge case → `0.0`.
     #[test]
     fn levenshtein_single_empty_is_zero() {
         assert_eq!(Scorer::levenshtein_similarity("smith", ""), 0.0);
@@ -318,6 +346,8 @@ mod tests {
 
     // ---------- exact ----------
 
+    /// Pins exact-match semantics: binary `1.0` / `0.0`, case-sensitive,
+    /// with both-empty counting as a match.
     #[test]
     fn exact_match_basic() {
         assert_eq!(Scorer::exact_match("test", "test"), 1.0);
@@ -328,17 +358,21 @@ mod tests {
 
     // ---------- combined ----------
 
+    /// Pins that the 0.7/0.3 blend yields `1.0` for identical inputs (both
+    /// components are `1.0`).
     #[test]
     fn combined_identical_is_one() {
         assert!((Scorer::combined_similarity("smith", "smith") - 1.0).abs() < 1e-9);
     }
 
+    /// Pins that the blend keeps a near-homophone pair above `0.80`.
     #[test]
     fn combined_close_typo_is_high() {
         let s = Scorer::combined_similarity("Stephen", "Steven");
         assert!(s > 0.80, "got {s}");
     }
 
+    /// Pins that the blend keeps an unrelated pair below `0.5`.
     #[test]
     fn combined_distant_is_low() {
         assert!(Scorer::combined_similarity("alice", "zachary") < 0.5);
@@ -346,6 +380,7 @@ mod tests {
 
     // ---------- jaccard ----------
 
+    /// Pins that identical sets (order-independent) score `1.0`.
     #[test]
     fn jaccard_identical_sets_is_one() {
         let a = ["x", "y"];
@@ -353,6 +388,7 @@ mod tests {
         assert!((Scorer::jaccard_set_similarity(&a, &b) - 1.0).abs() < 1e-9);
     }
 
+    /// Pins that disjoint sets score `0.0`.
     #[test]
     fn jaccard_disjoint_sets_is_zero() {
         let a = ["x", "y"];
@@ -360,6 +396,7 @@ mod tests {
         assert!(Scorer::jaccard_set_similarity(&a, &b) < 1e-9);
     }
 
+    /// Pins the both-empty edge case → `1.0`.
     #[test]
     fn jaccard_both_empty_is_one() {
         let a: [&str; 0] = [];
@@ -367,6 +404,7 @@ mod tests {
         assert_eq!(Scorer::jaccard_set_similarity(&a, &b), 1.0);
     }
 
+    /// Pins the asymmetric-empty edge case → `0.0`, in both argument orders.
     #[test]
     fn jaccard_one_empty_is_zero() {
         let a = ["x"];
@@ -375,6 +413,8 @@ mod tests {
         assert_eq!(Scorer::jaccard_set_similarity(&b, &a), 0.0);
     }
 
+    /// Pins the core formula on a worked example: intersection {y,z} over
+    /// union {x,y,z,w} = `0.5`.
     #[test]
     fn jaccard_partial_overlap_is_intersection_over_union() {
         let a = ["x", "y", "z"];
@@ -385,6 +425,7 @@ mod tests {
 
     // ---------- optional_field_score ----------
 
+    /// Pins the both-`None` policy of `optional_field_score` → `1.0`.
     #[test]
     fn optional_field_both_none_is_one() {
         let n: Option<String> = None;
@@ -394,6 +435,7 @@ mod tests {
         );
     }
 
+    /// Pins the one-`None` policy → `0.0`, in both argument orders.
     #[test]
     fn optional_field_asymmetric_is_zero() {
         let n: Option<String> = None;
@@ -408,6 +450,8 @@ mod tests {
         );
     }
 
+    /// Pins that when both sides are `Some`, the selected `SimilarityAlgorithm`
+    /// is the one actually applied (each variant gives its expected result).
     #[test]
     fn optional_field_some_some_uses_algorithm() {
         let a = Some("smith".to_string());

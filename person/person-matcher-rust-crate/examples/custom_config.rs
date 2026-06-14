@@ -1,11 +1,31 @@
 #![warn(clippy::pedantic)]
 
-//! Example showing custom matching configuration
+//! Example showing custom matching configuration.
+//!
+//! Run with `cargo run --example custom_config`. It scores the same pair
+//! (`Robert Jones` vs the nickname `Bob Jones`, same DOB and gender) under
+//! five configurations to show how weights and thresholds change the
+//! outcome:
+//!
+//! - **default / strict / lenient** — the three built-in presets, which
+//!   differ only in `match_threshold` (and a couple of weights).
+//! - **demographics-prioritised** — national-identifier weights dialled
+//!   down and name/DOB weights up, for sources where identifiers are
+//!   sparse or unreliable.
+//! - **identifier-focused** — the inverse: identifiers dominate, names are
+//!   near-irrelevant, exact name matching, nicknames disabled.
+//!
+//! Because neither person carries a national identifier here, the last
+//! config's score still falls back to the (now heavily down-weighted)
+//! demographic fields — a deliberate illustration of how weighting a field
+//! that is absent on both records contributes nothing.
 
 use person_matcher::{
     Gender, MatchConfig, MatchingEngine, NicknameTable, Person, SimilarityAlgorithm,
 };
 
+/// Entry point: build the two test persons and print the match score under
+/// each of the five configurations described in the module docs.
 fn main() {
     println!("=== Custom Configuration Example ===\n");
 

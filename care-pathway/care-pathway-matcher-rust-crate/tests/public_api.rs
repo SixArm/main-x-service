@@ -6,6 +6,7 @@ use care_pathway_matcher::{
     MatchingEngine, PathwayIdentifier,
 };
 
+/// Terse constructor for a [`PathwayIdentifier`] in these tests.
 fn ident(scheme: IdentifierScheme, value: &str) -> PathwayIdentifier {
     PathwayIdentifier {
         scheme,
@@ -13,6 +14,7 @@ fn ident(scheme: IdentifierScheme, value: &str) -> PathwayIdentifier {
     }
 }
 
+/// Terse constructor for a [`ConditionCode`] in these tests.
 fn cond(system: CodeSystem, code: &str) -> ConditionCode {
     ConditionCode {
         system,
@@ -20,6 +22,8 @@ fn cond(system: CodeSystem, code: &str) -> ConditionCode {
     }
 }
 
+// Pins R-0 for the full set of deterministic schemes: each one, with a
+// shared value, must short-circuit to score 1.0 / High regardless of name.
 #[test]
 fn r0_fires_for_every_deterministic_scheme() {
     let engine = MatchingEngine::default_config();
@@ -44,6 +48,9 @@ fn r0_fires_for_every_deterministic_scheme() {
     }
 }
 
+// The complement of the above: provider-scoped (`PathwayCode`, `LocalId`)
+// and `Custom` schemes are NOT globally unique, so a shared value must
+// never short-circuit.
 #[test]
 fn provider_scoped_and_custom_schemes_do_not_short_circuit() {
     let engine = MatchingEngine::default_config();
@@ -64,6 +71,8 @@ fn provider_scoped_and_custom_schemes_do_not_short_circuit() {
     }
 }
 
+// R-1 via the public API: same provider + codes that normalise equal
+// ("STROKE-01" / "stroke 01") short-circuit despite differing names.
 #[test]
 fn same_provider_pathway_code_short_circuits() {
     let engine = MatchingEngine::default_config();
@@ -78,6 +87,7 @@ fn same_provider_pathway_code_short_circuits() {
     assert!(r.breakdown.deterministic_match);
 }
 
+// R-2 via the public API: identical `same_as` identity URLs short-circuit.
 #[test]
 fn same_as_url_overlap_short_circuits() {
     let engine = MatchingEngine::default_config();
@@ -90,6 +100,8 @@ fn same_as_url_overlap_short_circuits() {
     assert!(r.breakdown.deterministic_match);
 }
 
+// Probabilistic path: a strong name plus matching condition code and
+// care setting (both scoring 1.0) push the pair over the threshold.
 #[test]
 fn condition_and_setting_corroborate_name() {
     let engine = MatchingEngine::default_config();
@@ -105,6 +117,9 @@ fn condition_and_setting_corroborate_name() {
     assert!(r.is_match, "got {}", r.score);
 }
 
+// End-to-end renormalisation: identical names + shared SNOMED code score
+// near-perfect, and the absent components (pathway code, keywords) report
+// `None` in the breakdown rather than dragging the score down.
 #[test]
 fn renormalisation_ignores_absent_components() {
     let engine = MatchingEngine::default_config();
@@ -120,6 +135,8 @@ fn renormalisation_ignores_absent_components() {
     assert!(r.breakdown.keywords_score.is_none());
 }
 
+// Negative control through the public surface: unrelated pathways are
+// neither probabilistic nor deterministic matches.
 #[test]
 fn unrelated_pathways_are_non_matches() {
     let engine = MatchingEngine::default_config();
@@ -130,6 +147,9 @@ fn unrelated_pathways_are_non_matches() {
     assert!(!r.breakdown.deterministic_match);
 }
 
+// Pins that presets shift only the `is_match` decision, never the score:
+// all three configs produce the same score, and a strict match implies a
+// default and lenient match (thresholds are monotonically ordered).
 #[test]
 fn strict_and_lenient_change_is_match_not_score() {
     let mut a = CarePathway::new("Heart Failure Pathway");
@@ -146,6 +166,9 @@ fn strict_and_lenient_change_is_match_not_score() {
     }
 }
 
+// Exercises the batch surface: `match_one_to_many` preserves order and
+// length, `rank` puts the exact match first, and empty candidates yield
+// empty results from both `match_one_to_many` and `find_matches`.
 #[test]
 fn one_to_many_surface() {
     let engine = MatchingEngine::default_config();
@@ -163,6 +186,8 @@ fn one_to_many_surface() {
     assert!(engine.find_matches(&query, &[]).is_empty());
 }
 
+// Pins that `MatchResult` (and its nested `breakdown`) serialise to JSON,
+// the contract the service layer relies on for API responses.
 #[test]
 fn match_result_serialises_to_json() {
     let engine = MatchingEngine::default_config();

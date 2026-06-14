@@ -16,6 +16,10 @@ pub struct MatchResult {
 }
 
 impl Default for MatchResult {
+    /// The "no-match" zero value: score `0.0`, `is_match` false,
+    /// `Confidence::Low`, and an all-`None` breakdown. Used as the base
+    /// for the deterministic short-circuit result (which then flips only
+    /// the fields it owns) and anywhere a neutral starting point helps.
     fn default() -> Self {
         Self {
             score: 0.0,
@@ -53,6 +57,10 @@ impl Confidence {
     /// ```
     #[must_use]
     pub fn classify(score: f64) -> Self {
+        // Bands are lower-bound-inclusive. 0.95 is the "Definite" cutoff
+        // shared with the deterministic short-circuit (a phonetic bonus
+        // is capped just below it so it cannot mint a High alone). 0.70
+        // is the "likely duplicate, worth a human look" floor.
         if score >= 0.95 {
             Confidence::High
         } else if score >= 0.70 {
@@ -84,14 +92,28 @@ pub struct MatchBreakdown {
 }
 
 /// Compute a renormalised weighted average over `Some` components only.
+///
 /// Skipped (`None`) components don't pull the score down: the divisor is
-/// the sum of the weights that actually contributed. Returns `0.0` when
-/// no component is present.
+/// the sum of the weights that *actually contributed*, not the sum of
+/// all configured weights. This is what lets a pair sharing only a name
+/// and a provider still score `1.0` — absent data is treated as "no
+/// evidence", never as "negative evidence".
+///
+/// `components` is a slice of `(optional score, weight)` pairs; each
+/// score, when present, must already lie in `[0.0, 1.0]`.
+///
+/// # Returns
+///
+/// The renormalised weighted average in `[0.0, 1.0]`, or `0.0` when no
+/// component is present (every entry is `None`, so the divisor would be
+/// zero).
 #[must_use]
 pub fn weighted_average(components: &[(Option<f64>, f64)]) -> f64 {
     let mut weighted_sum = 0.0_f64;
     let mut weight_sum = 0.0_f64;
     for (score, weight) in components {
+        // Only present components accumulate into BOTH numerator and
+        // denominator — that is the renormalisation.
         if let Some(s) = score {
             weighted_sum += s * weight;
             weight_sum += weight;
@@ -100,14 +122,19 @@ pub fn weighted_average(components: &[(Option<f64>, f64)]) -> f64 {
     if weight_sum > 0.0 {
         weighted_sum / weight_sum
     } else {
+        // No component contributed; avoid a divide-by-zero and report
+        // "no evidence" as the neutral 0.0.
         0.0
     }
 }
 
+/// Unit tests for the confidence bands and the renormalising average.
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // Pins that `None` components are excluded from both numerator and
+    // denominator, so two perfect present components yield exactly 1.0.
     #[test]
     fn weighted_average_ignores_none() {
         let score = weighted_average(&[
@@ -119,11 +146,13 @@ mod tests {
         assert!((score - 1.0).abs() < 1e-9);
     }
 
+    // Pins the empty-slice base case: no components ⇒ 0.0 (no divide-by-zero).
     #[test]
     fn weighted_average_empty_is_zero() {
         assert!(weighted_average(&[]).abs() < 1e-9);
     }
 
+    // Pins representative points in each confidence band.
     #[test]
     fn confidence_thresholds() {
         assert_eq!(Confidence::classify(0.99), Confidence::High);
@@ -141,6 +170,7 @@ mod tests {
         assert_eq!(Confidence::classify(0.699_999), Confidence::Low);
     }
 
+    // Pins the endpoints of the score range: 0.0 ⇒ Low, 1.0 ⇒ High.
     #[test]
     fn confidence_extremes() {
         assert_eq!(Confidence::classify(0.0), Confidence::Low);
@@ -155,12 +185,16 @@ mod tests {
         assert!((score - 0.7).abs() < 1e-9, "got {score}");
     }
 
+    // Pins that an all-`None` slice (every component skipped) is 0.0,
+    // not NaN from a 0/0 division.
     #[test]
     fn weighted_average_all_none_is_zero() {
         let score = weighted_average(&[(None, 0.35), (None, 0.15)]);
         assert!(score.abs() < 1e-9);
     }
 
+    // Pins the neutral default: zero score, non-match, Low, no
+    // deterministic flag.
     #[test]
     fn default_match_result_is_low_non_match() {
         let r = MatchResult::default();
@@ -170,6 +204,8 @@ mod tests {
         assert!(!r.breakdown.deterministic_match);
     }
 
+    // Pins the derived `Default` for `Confidence` to `Low` (the
+    // `#[default]` variant), the safe fallback for an absent score.
     #[test]
     fn confidence_default_is_low() {
         assert_eq!(Confidence::default(), Confidence::Low);

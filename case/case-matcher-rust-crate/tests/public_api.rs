@@ -6,6 +6,7 @@ use case_matcher::{
     MatchingEngine,
 };
 
+/// Test helper: build a `CaseIdentifier` from a scheme + value.
 fn ident(scheme: IdentifierScheme, value: &str) -> CaseIdentifier {
     CaseIdentifier {
         scheme,
@@ -13,6 +14,8 @@ fn ident(scheme: IdentifierScheme, value: &str) -> CaseIdentifier {
     }
 }
 
+// Pins R-0 across the whole deterministic scheme set: each of Docket /
+// ExternalCaseId / Uri / Uuid short-circuits to 1.0 / High.
 #[test]
 fn r0_fires_for_every_deterministic_scheme() {
     let engine = MatchingEngine::default_config();
@@ -36,6 +39,9 @@ fn r0_fires_for_every_deterministic_scheme() {
     }
 }
 
+// Pins the converse of R-0: agency-scoped (AgencyCaseNumber / LocalId)
+// and Custom schemes are NOT globally unique, so a shared value must not
+// short-circuit.
 #[test]
 fn agency_scoped_and_custom_schemes_do_not_short_circuit() {
     let engine = MatchingEngine::default_config();
@@ -56,6 +62,8 @@ fn agency_scoped_and_custom_schemes_do_not_short_circuit() {
     }
 }
 
+// Pins R-1: same agency_id + equal (after normalisation) case numbers
+// short-circuit to 1.0, despite differing titles.
 #[test]
 fn same_agency_case_number_short_circuits() {
     let engine = MatchingEngine::default_config();
@@ -70,6 +78,8 @@ fn same_agency_case_number_short_circuits() {
     assert!(r.breakdown.deterministic_match);
 }
 
+// Pins the agency gate: identical case numbers under different agencies
+// neither short-circuit nor contribute a component score (`None`).
 #[test]
 fn case_number_does_not_cross_match_across_agencies() {
     let engine = MatchingEngine::default_config();
@@ -84,6 +94,7 @@ fn case_number_does_not_cross_match_across_agencies() {
     assert!(r.breakdown.case_number_score.is_none());
 }
 
+// Pins R-2: an overlapping same_as identity URL short-circuits to 1.0.
 #[test]
 fn same_as_url_overlap_short_circuits() {
     let engine = MatchingEngine::default_config();
@@ -96,6 +107,8 @@ fn same_as_url_overlap_short_circuits() {
     assert!(r.breakdown.deterministic_match);
 }
 
+// Pins probabilistic corroboration: a fuzzy title plus a shared subject
+// and matching case type clear the default threshold (no deterministic).
 #[test]
 fn subjects_and_type_corroborate_title() {
     let engine = MatchingEngine::default_config();
@@ -111,6 +124,9 @@ fn subjects_and_type_corroborate_title() {
     assert!(r.is_match, "got {}", r.score);
 }
 
+// Pins renormalisation end-to-end: only title + subjects are present,
+// both perfect, so the score stays ~1.0 and the absent components report
+// `None` in the breakdown.
 #[test]
 fn renormalisation_ignores_absent_components() {
     let engine = MatchingEngine::default_config();
@@ -127,6 +143,8 @@ fn renormalisation_ignores_absent_components() {
     assert!(r.breakdown.status_score.is_none());
 }
 
+// Pins the negative path through the public API: unrelated titles with
+// no corroboration are non-matches and trigger no deterministic rule.
 #[test]
 fn unrelated_cases_are_non_matches() {
     let engine = MatchingEngine::default_config();
@@ -137,6 +155,8 @@ fn unrelated_cases_are_non_matches() {
     assert!(!r.breakdown.deterministic_match);
 }
 
+// Pins status as a distinguishing signal: identical titles but
+// Open-vs-Closed yields a status_score of 0.0.
 #[test]
 fn status_distinguishes_otherwise_similar_cases() {
     let engine = MatchingEngine::default_config();
@@ -148,6 +168,8 @@ fn status_distinguishes_otherwise_similar_cases() {
     assert_eq!(r.breakdown.status_score, Some(0.0));
 }
 
+// Pins the threshold contract: presets change only `is_match`, never
+// `score` — and a strict match implies a default and lenient match.
 #[test]
 fn strict_and_lenient_change_is_match_not_score() {
     let mut a = Case::new("Disability benefit appeal");
@@ -164,6 +186,8 @@ fn strict_and_lenient_change_is_match_not_score() {
     }
 }
 
+// Pins the batch API: match_one_to_many preserves order/length, rank
+// sorts best-first with original indices, and both handle empty input.
 #[test]
 fn one_to_many_surface() {
     let engine = MatchingEngine::default_config();
@@ -181,6 +205,8 @@ fn one_to_many_surface() {
     assert!(engine.find_matches(&query, &[]).is_empty());
 }
 
+// Pins serde support: a MatchResult round-trips to JSON containing the
+// `score` and `breakdown` fields (the public wire shape).
 #[test]
 fn match_result_serialises_to_json() {
     let engine = MatchingEngine::default_config();

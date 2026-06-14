@@ -198,6 +198,10 @@ impl IdentifierScheme {
     /// ```
     #[must_use]
     pub fn is_deterministic(&self) -> bool {
+        // Only globally-unique schemes are listed. Agency-scoped schemes
+        // (AgencyCaseNumber / LocalId) and Custom are intentionally
+        // excluded — their values collide across organisations, so a bare
+        // value match cannot prove identity.
         matches!(
             self,
             IdentifierScheme::Docket

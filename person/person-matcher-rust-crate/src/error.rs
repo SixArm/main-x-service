@@ -68,6 +68,9 @@ mod tests {
     #![allow(clippy::unnecessary_wraps)] // demonstrates the `Result` alias
     use super::*;
 
+    /// Pins the `Display` text of `MissingField` — the `thiserror` format
+    /// string `"Missing required field: {0}"` is a stable, user-visible
+    /// contract, so a wording change must be a conscious edit.
     #[test]
     fn missing_field_display() {
         let e = MatchingError::MissingField("united_kingdom_national_health_service_number".into());
@@ -77,6 +80,8 @@ mod tests {
         );
     }
 
+    /// Confirms the `Result<T>` alias resolves and is usable as a return
+    /// type — a compile-plus-runtime smoke test of the crate's public alias.
     #[test]
     fn result_alias_resolves() {
         fn make() -> Result<i32> {
@@ -85,6 +90,8 @@ mod tests {
         assert_eq!(make().unwrap(), 42);
     }
 
+    /// Pins that `MatchingError` is `Send + Sync` so it can cross threads
+    /// and be stored in `anyhow`/`Box<dyn Error + Send + Sync>` by callers.
     #[test]
     fn errors_are_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>() {}

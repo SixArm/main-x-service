@@ -79,7 +79,7 @@ impl MatchConfig {
     }
 
     /// Sum of every per-component weight (1.0 for the documented
-    /// defaults).
+    /// defaults). Test-only invariant check; not part of the public API.
     #[cfg(test)]
     fn weight_total(&self) -> f64 {
         self.name_weight
@@ -91,10 +91,13 @@ impl MatchConfig {
     }
 }
 
+/// Unit tests for the configuration presets and weight invariants.
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Pins the key invariant: the default weights sum to exactly 1.0,
+    /// so a fully-populated record scores on the documented scale.
     #[test]
     fn default_weights_sum_to_one() {
         let total = MatchConfig::default().weight_total();
@@ -104,6 +107,8 @@ mod tests {
         );
     }
 
+    /// Pins the documented default threshold and the headline weights
+    /// (name/address/url) against the spec, guarding silent drift.
     #[test]
     fn default_threshold_and_weights_match_spec() {
         let c = MatchConfig::default();
@@ -113,6 +118,8 @@ mod tests {
         assert!((c.url_weight - 0.15).abs() < 1e-9);
     }
 
+    /// Pins that `strict`/`lenient` move ONLY the threshold (to 0.95 /
+    /// 0.70) and leave every component weight untouched.
     #[test]
     fn strict_and_lenient_change_only_threshold() {
         let d = MatchConfig::default();

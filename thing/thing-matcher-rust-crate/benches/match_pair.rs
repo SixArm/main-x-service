@@ -10,6 +10,9 @@
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use thing_matcher::{Identifier, MatchConfig, MatchingEngine, SimilarityAlgorithm, Thing};
 
+/// Build a richly-populated reference `Thing` (the Eiffel Tower) used as the
+/// query / left-hand side across the benchmarks. Every field is set so the
+/// scorer exercises every code path.
 fn build_eiffel() -> Thing {
     Thing::builder()
         .name("Eiffel Tower")
@@ -26,6 +29,10 @@ fn build_eiffel() -> Thing {
         .build()
 }
 
+/// Build a *near-match* variant of the Eiffel Tower — same identity but with
+/// reordered names and a shortened description — to benchmark the realistic
+/// "fuzzy candidate" path. The `_seed` argument is unused; it documents the
+/// intent that this thing is derived from [`build_eiffel`].
 fn build_eiffel_fuzzy(_seed: &Thing) -> Thing {
     Thing::builder()
         .name("Tour Eiffel")
@@ -38,6 +45,8 @@ fn build_eiffel_fuzzy(_seed: &Thing) -> Thing {
         .build()
 }
 
+/// Build a clearly unrelated `Thing` (the Sydney Opera House) to benchmark
+/// the common no-match path, where most fields score low or zero.
 fn build_unrelated() -> Thing {
     Thing::builder()
         .name("Sydney Opera House")
@@ -48,6 +57,9 @@ fn build_unrelated() -> Thing {
         .build()
 }
 
+/// Build the `idx`-th synthetic candidate for the batch-ranking benchmark.
+/// Names cycle through a fixed list and the `sameAs` ref deliberately repeats
+/// every 50 to create some inter-candidate overlap.
 fn make_candidate(idx: usize) -> Thing {
     let names = ["Cafe Central", "Hotel Royal", "The Park", "City Library"];
     Thing::builder()
@@ -58,6 +70,8 @@ fn make_candidate(idx: usize) -> Thing {
         .build()
 }
 
+/// Benchmark single-pair probabilistic matching across three regimes:
+/// identical clone, fuzzy near-match, and unrelated pair.
 fn bench_match_pair(c: &mut Criterion) {
     let mut group = c.benchmark_group("match_pair");
     let eiffel = build_eiffel();
@@ -78,6 +92,8 @@ fn bench_match_pair(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark the fast deterministic-match path on an identical clone (the
+/// hot path: shared identifier short-circuits immediately).
 fn bench_deterministic_match(c: &mut Criterion) {
     let eiffel = build_eiffel();
     let clone = eiffel.clone();
@@ -87,6 +103,8 @@ fn bench_deterministic_match(c: &mut Criterion) {
     });
 }
 
+/// Benchmark `rank_one_to_many` at 10 / 100 / 1000 candidates to surface how
+/// throughput scales with candidate-set size.
 fn bench_batch_ranking(c: &mut Criterion) {
     let mut group = c.benchmark_group("rank_one_to_many");
     let engine = MatchingEngine::default_config();
@@ -102,6 +120,8 @@ fn bench_batch_ranking(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark the same fuzzy pair under three engine configurations (default,
+/// strict, Jaro-Winkler name algorithm) to expose any per-config overhead.
 fn bench_engine_configurations(c: &mut Criterion) {
     let mut group = c.benchmark_group("config_variants");
     let eiffel = build_eiffel();
