@@ -2,10 +2,7 @@
 
 //! Basic usage example for worker matcher
 
-// Demo code: a single linear walkthrough; the late `use` keeps the
-// identifier-parsing snippet self-contained next to where it is shown.
-#![allow(clippy::too_many_lines, clippy::items_after_statements)]
-
+use worker_matcher::identifiers;
 use worker_matcher::{
     Address, BloodType, Gender, MatchConfig, MatchingEngine, NicknameTable, Normalizer,
     PassportBook, Worker,
@@ -14,6 +11,30 @@ use worker_matcher::{
 fn main() {
     println!("=== Basic Worker matcher Example ===\n");
 
+    let engine = MatchingEngine::default_config();
+
+    demo_basic_match(&engine);
+    demo_international_phone();
+    demo_phone_match_fr_default();
+    demo_dob_transposition(&engine);
+    demo_email_matching();
+    demo_nickname_dictionary();
+    demo_us_ssn(&engine);
+    demo_blood_type(&engine);
+    demo_multiple_birth(&engine);
+    demo_birth_place(&engine);
+    demo_death_date_and_place(&engine);
+    demo_passport_books(&engine);
+    demo_batch_ranking(&engine);
+    demo_six_additional_identifiers();
+    demo_next_batch_identifiers();
+    demo_address_parsing();
+}
+
+/// Core walkthrough: build two near-duplicate workers, match them, print the
+/// overall score, the per-field breakdown, the deterministic verdict, and the
+/// JSON export.
+fn demo_basic_match(engine: &MatchingEngine) {
     // Create two worker records with similar information
     let worker1 = Worker::builder()
         .uk_nhs_number("123 456 7890")
@@ -32,9 +53,6 @@ fn main() {
         .gender(Gender::Female)
         .phone("+44 7700 900123") // Same phone, different format
         .build();
-
-    // Create matching engine
-    let engine = MatchingEngine::default_config();
 
     // Match the workers
     let result = engine.match_workers(&worker1, &worker2);
@@ -90,8 +108,10 @@ fn main() {
     println!("\n=== JSON Export ===");
     let json = serde_json::to_string_pretty(&result).unwrap();
     println!("{json}");
+}
 
-    // International phone-number normalisation (E.164).
+/// International phone-number normalisation (E.164).
+fn demo_international_phone() {
     println!("\n=== International Phone Numbers (E.164) ===");
     for (label, input, default_country) in [
         ("UK   +44", "+44 7700 900123", Some("GB")),
@@ -107,10 +127,11 @@ fn main() {
         let canonical = Normalizer::normalize_phone_e164(input, default_country);
         println!("  {label}: {input:<20} (default={default_country:?}) -> {canonical:?}");
     }
+}
 
-    // International matching: a French national-format number compared
-    // against its +33 international form, with the engine configured for
-    // France as the default jurisdiction.
+/// International matching: a French national-format number compared against its
+/// +33 international form, with the engine configured for France as default.
+fn demo_phone_match_fr_default() {
     println!("\n=== International Phone Match (FR default) ===");
     let fr_engine = MatchingEngine::new(MatchConfig {
         phone_default_country: Some("FR".into()),
@@ -131,8 +152,10 @@ fn main() {
         "  Phone score (FR national vs +33 form): {:?}",
         fr_result.breakdown.phone_score
     );
+}
 
-    // DOB transposition heuristic — DD/MM ↔ MM/DD data-entry bug catch.
+/// DOB transposition heuristic — DD/MM ↔ MM/DD data-entry bug catch.
+fn demo_dob_transposition(engine: &MatchingEngine) {
     println!("\n=== DOB Transposition Heuristic ===");
     let p_jan_10 = Worker::builder()
         .given_name("Thomas")
@@ -159,8 +182,10 @@ fn main() {
         "  1995-01-10 vs 1980-06-30 (unrelated):   dob_score = {:?}",
         unrelated.breakdown.date_of_birth_score,
     );
+}
 
-    // Email matching — exact match on canonical form, opt-in Gmail folding.
+/// Email matching — exact match on canonical form, opt-in Gmail folding.
+fn demo_email_matching() {
     println!("\n=== Email Matching ===");
     let default_engine = MatchingEngine::default_config();
     let gmail_engine = MatchingEngine::new(MatchConfig {
@@ -207,8 +232,10 @@ fn main() {
             r.breakdown.email_score,
         );
     }
+}
 
-    // Nickname dictionary — opt-in lift for given-name equivalents.
+/// Nickname dictionary — opt-in lift for given-name equivalents.
+fn demo_nickname_dictionary() {
     println!("\n=== Nickname Dictionary ===");
     let nick_engine = MatchingEngine::new(MatchConfig {
         nickname_table: NicknameTable::english(),
@@ -228,8 +255,10 @@ fn main() {
             r.breakdown.given_name_score.unwrap(),
         );
     }
+}
 
-    // United States SSN — exact match across textual layouts.
+/// United States SSN — exact match across textual layouts.
+fn demo_us_ssn(engine: &MatchingEngine) {
     println!("\n=== United States SSN ===");
     let ssn_a = Worker::builder()
         .us_ssn("123-45-6789")
@@ -248,13 +277,14 @@ fn main() {
         engine.deterministic_match(&ssn_a, &ssn_b),
     );
     // Structurally-invalid SSNs return None on parse:
-    use worker_matcher::identifiers;
     println!(
         "  parse_us_ssn(\"900-00-0000\"): {:?}",
         identifiers::parse_us_ssn("900-00-0000"),
     );
+}
 
-    // Blood type — weak positive signal, strong negative signal.
+/// Blood type — weak positive signal, strong negative signal.
+fn demo_blood_type(engine: &MatchingEngine) {
     println!("\n=== Blood Type ===");
     for input in ["A+", "a positive", "AB neg", "0-", "0 negative", "Bombay"] {
         let parsed = BloodType::parse(input);
@@ -277,8 +307,10 @@ fn main() {
         "  same name+DOB, O+ vs A-  ->  blood_type_score = {:?}, overall = {:.2}",
         r.breakdown.blood_type_score, r.score,
     );
+}
 
-    // Multiple-birth indicator — identical-twin disambiguation.
+/// Multiple-birth indicator — identical-twin disambiguation.
+fn demo_multiple_birth(engine: &MatchingEngine) {
     println!("\n=== Multiple Birth (Twin Disambiguation) ===");
     let twin1 = Worker::builder()
         .given_name("Alex")
@@ -299,8 +331,10 @@ fn main() {
         "  same name+DOB+gender, twin 1 vs twin 2  ->  multiple_birth_score = {:?}, overall = {:.2}",
         r.breakdown.multiple_birth_score, r.score,
     );
+}
 
-    // Place of birth — FHIR Patient.birthPlace; city + country sub-score.
+/// Place of birth — FHIR Patient.birthPlace; city + country sub-score.
+fn demo_birth_place(engine: &MatchingEngine) {
     println!("\n=== Place of Birth ===");
     for (label, b1, b2) in [
         (
@@ -344,9 +378,11 @@ fn main() {
             r.breakdown.birth_place_score,
         );
     }
+}
 
-    // Death date and place — FHIR Patient.deceasedDateTime; transposition
-    // heuristic on the date, city+country sub-score on the place.
+/// Death date and place — FHIR Patient.deceasedDateTime; transposition
+/// heuristic on the date, city+country sub-score on the place.
+fn demo_death_date_and_place(engine: &MatchingEngine) {
     println!("\n=== Death Date and Place ===");
     let alan_a = Worker::builder()
         .given_name("Alan")
@@ -377,8 +413,10 @@ fn main() {
         "  same year, day/month swap        -> death_date = {:?}",
         r.breakdown.death_date_score,
     );
+}
 
-    // Passport books — multi-country, multi-book, time-varying matching.
+/// Passport books — multi-country, multi-book, time-varying matching.
+fn demo_passport_books(engine: &MatchingEngine) {
     println!("\n=== Passport Books ===");
     let dual_citizen = Worker::builder()
         .given_name("Alice")
@@ -426,8 +464,10 @@ fn main() {
         "  same digits, different country (FR vs GB) -> passport_book_score = {:?}",
         r.breakdown.passport_book_score,
     );
+}
 
-    // Batch API — screen one query against many candidates.
+/// Batch API — screen one query against many candidates.
+fn demo_batch_ranking(engine: &MatchingEngine) {
     println!("\n=== Batch API: rank_one_to_many ===");
     let query = Worker::builder()
         .given_name("Ada")
@@ -462,8 +502,10 @@ fn main() {
             result.is_match,
         );
     }
+}
 
-    // Six additional national identifiers — verify each parser canonicalises.
+/// Six additional national identifiers — verify each parser canonicalises.
+fn demo_six_additional_identifiers() {
     println!("\n=== Six Additional National Identifiers ===");
     for (label, raw, canonical) in [
         ("AU IHI", "8003 6012 3456 7894", "8003601234567894"),
@@ -484,8 +526,10 @@ fn main() {
         };
         println!("  {label:<18} {raw:<24} -> {parsed:?} (expected {canonical:?})");
     }
+}
 
-    // Seven next-batch national identifiers (T-17.1).
+/// Seven next-batch national identifiers (T-17.1).
+fn demo_next_batch_identifiers() {
     println!("\n=== T-17.1: Seven Next-Batch National Identifiers ===");
     for (label, raw, canonical) in [
         ("BR CPF", "123.456.789-09", "12345678909"),
@@ -508,8 +552,10 @@ fn main() {
         };
         println!("  {label:<14} {raw:<24} -> {parsed:?} (expected {canonical:?})");
     }
+}
 
-    // Sophisticated address parsing.
+/// Sophisticated address parsing.
+fn demo_address_parsing() {
     println!("\n=== Address Parsing ===");
     for input in [
         "123 High Street",

@@ -11,11 +11,6 @@
 //! All fixtures use synthetic, drama-reserved, or self-consistent NHS-format
 //! values; no real PII appears here.
 
-// Test code: exact-score `==` comparisons are valid (the engine is
-// deterministic), `worker1`/`worker2`-style names are intentionally parallel,
-// and end-to-end scenario tests are long by nature.
-#![allow(clippy::float_cmp, clippy::similar_names, clippy::too_many_lines)]
-
 use chrono::NaiveDate;
 use worker_matcher::{
     Address, BloodType, Confidence, Gender, MatchConfig, MatchingEngine, NicknameTable, Normalizer,
@@ -1006,7 +1001,7 @@ fn test_no_overlapping_fields_returns_zero_score() {
     let p1 = Worker::builder().given_name("Solo").build();
     let p2 = Worker::builder().family_name("Only").build();
     let r = MatchingEngine::default_config().match_workers(&p1, &p2);
-    assert_eq!(r.score, 0.0);
+    assert!(r.score.abs() < f64::EPSILON);
     assert!(!r.is_match);
 }
 
@@ -1047,7 +1042,7 @@ fn test_engine_is_deterministic_across_calls() {
     let engine = MatchingEngine::default_config();
     let a = engine.match_workers(&p1, &p2);
     let b = engine.match_workers(&p1, &p2);
-    assert_eq!(a.score, b.score);
+    assert!((a.score - b.score).abs() < f64::EPSILON);
     assert_eq!(a.is_match, b.is_match);
 }
 
@@ -1098,7 +1093,7 @@ fn test_match_result_serialization_round_trip() {
     let r = MatchingEngine::default_config().match_workers(&p, &p.clone());
     let json = serde_json::to_string(&r).unwrap();
     let back: worker_matcher::MatchResult = serde_json::from_str(&json).unwrap();
-    assert_eq!(r.score, back.score);
+    assert!((r.score - back.score).abs() < f64::EPSILON);
     assert_eq!(r.is_match, back.is_match);
     assert_eq!(
         r.breakdown.uk_nhs_number_score,
@@ -1871,17 +1866,17 @@ fn test_international_phone_distinguishes_uk_from_us_with_overlapping_digits() {
     // The same 10-digit national-significant string interpreted as a UK
     // number (`+442025551234`) and as a US number (`+12025551234`) must
     // not collide in the matcher.
-    let p_uk = Worker::builder()
+    let british = Worker::builder()
         .given_name("X")
         .family_name("Y")
         .phone("2025551234") // GB default → +442025551234
         .build();
-    let p_us = Worker::builder()
+    let american = Worker::builder()
         .given_name("X")
         .family_name("Y")
         .phone("+1 202 555 1234")
         .build();
-    let r = MatchingEngine::default_config().match_workers(&p_uk, &p_us);
+    let r = MatchingEngine::default_config().match_workers(&british, &american);
     assert_eq!(r.breakdown.phone_score, Some(0.0));
 }
 
@@ -3137,8 +3132,7 @@ fn test_uk_nino_deterministic_match() {
     assert!(MatchingEngine::default_config().deterministic_match(&p1, &p2));
 }
 
-#[test]
-fn test_eighteen_new_schemes_each_validate_solo() {
+fn assert_first_six_new_schemes_validate_solo() {
     assert!(
         Worker::builder()
             .be_nn("80010100107")
@@ -3181,6 +3175,9 @@ fn test_eighteen_new_schemes_each_validate_solo() {
             .validate()
             .is_ok()
     );
+}
+
+fn assert_middle_six_new_schemes_validate_solo() {
     assert!(
         Worker::builder()
             .fi_hetu("150180-999B")
@@ -3223,6 +3220,9 @@ fn test_eighteen_new_schemes_each_validate_solo() {
             .validate()
             .is_ok()
     );
+}
+
+fn assert_last_six_new_schemes_validate_solo() {
     assert!(
         Worker::builder()
             .no_fnr("15018012399")
@@ -3265,6 +3265,13 @@ fn test_eighteen_new_schemes_each_validate_solo() {
             .validate()
             .is_ok()
     );
+}
+
+#[test]
+fn test_eighteen_new_schemes_each_validate_solo() {
+    assert_first_six_new_schemes_validate_solo();
+    assert_middle_six_new_schemes_validate_solo();
+    assert_last_six_new_schemes_validate_solo();
 }
 
 // ============================================================

@@ -457,8 +457,8 @@ async fn seed_folders_and_moves(
                 .list_for_folder(folder.id)
                 .await
                 .unwrap_or_default();
-            if prior.is_empty() {
-                if let Err(e) = event_client
+            if prior.is_empty()
+                && let Err(e) = event_client
                     .record(RecordMove {
                         folder_id: folder.id,
                         patient_id: folder.patient_id,
@@ -477,13 +477,12 @@ async fn seed_folders_and_moves(
                         reason: Some("Folder created".to_string()),
                     })
                     .await
-                {
-                    tracing::warn!(
-                        "Main Event Service unavailable while seeding move for {}: {}",
-                        folder.title,
-                        e
-                    );
-                }
+            {
+                tracing::warn!(
+                    "Main Event Service unavailable while seeding move for {}: {}",
+                    folder.title,
+                    e
+                );
             }
         }
     }

@@ -67,10 +67,11 @@ fn build_unrelated() -> Place {
 fn make_candidate(idx: usize) -> Place {
     let cities = ["London", "Cardiff", "Edinburgh", "Belfast", "Manchester"];
     let names = ["Cafe Central", "Hotel Royal", "The Park", "City Library"];
+    let offset = f64::from(u32::try_from(idx).unwrap_or(u32::MAX)) * 1e-4;
     Place::builder()
         .name(names[idx % names.len()])
-        .latitude(48.858_222 + (idx as f64) * 1e-4)
-        .longitude(2.294_500 + (idx as f64) * 1e-4)
+        .latitude(48.858_222 + offset)
+        .longitude(2.294_500 + offset)
         .category(if idx.is_multiple_of(2) {
             PlaceCategory::Cafe
         } else {

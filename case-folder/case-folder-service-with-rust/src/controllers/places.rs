@@ -8,11 +8,10 @@
 //! tracker keeps no local places table.
 
 use axum::{
-    debug_handler,
+    Extension, Json, debug_handler,
     extract::{Path, Query},
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
-    Extension, Json,
 };
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -22,7 +21,7 @@ use uuid::Uuid;
 
 use crate::{
     main_event_service::{Client as MainEventServiceClient, MoveEvent},
-    main_place_service::{label_path, Client as MainPlaceServiceClient, CreatePlace, PlaceType},
+    main_place_service::{Client as MainPlaceServiceClient, CreatePlace, PlaceType, label_path},
     main_thing_service::Client as MainThingServiceClient,
     responses::{self, Cabinet, Place},
 };
@@ -394,7 +393,7 @@ pub async fn history(
         Ok(Some(p)) => p,
         Ok(None) => return responses::not_found("Place not found"),
         Err(e) => {
-            return responses::service_unavailable(format!("Main Place Service unreachable: {e}"))
+            return responses::service_unavailable(format!("Main Place Service unreachable: {e}"));
         }
     };
 
@@ -469,15 +468,16 @@ fn build_presences(
     // origin == destination case is skipped (no-op self moves).
     let mut grouped: HashMap<(Uuid, Uuid), Vec<&MoveEvent>> = HashMap::new();
     for ev in events {
-        if let Some(to) = ev.to_cabinet_id {
-            if covered.contains(&to) {
-                grouped.entry((to, ev.folder_id)).or_default().push(ev);
-            }
+        if let Some(to) = ev.to_cabinet_id
+            && covered.contains(&to)
+        {
+            grouped.entry((to, ev.folder_id)).or_default().push(ev);
         }
-        if let Some(from) = ev.from_cabinet_id {
-            if covered.contains(&from) && Some(from) != ev.to_cabinet_id {
-                grouped.entry((from, ev.folder_id)).or_default().push(ev);
-            }
+        if let Some(from) = ev.from_cabinet_id
+            && covered.contains(&from)
+            && Some(from) != ev.to_cabinet_id
+        {
+            grouped.entry((from, ev.folder_id)).or_default().push(ev);
         }
     }
 
@@ -493,10 +493,8 @@ fn build_presences(
             let is_leave = ev.from_cabinet_id == Some(cabinet_id);
             if is_enter && entered.is_none() {
                 entered = Some(ev);
-            } else if is_leave {
-                if let Some(en) = entered.take() {
-                    out.push(presence_from(en, Some(ev), cabinet_id, &label));
-                }
+            } else if is_leave && let Some(en) = entered.take() {
+                out.push(presence_from(en, Some(ev), cabinet_id, &label));
             }
         }
         // A dangling enter with no matching leave is an open interval

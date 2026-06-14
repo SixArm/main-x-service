@@ -15,13 +15,13 @@
 use async_trait::async_trait;
 use axum::Router as AxumRouter;
 use loco_rs::{
-    app::{AppContext, Initializer as LocoInitializer},
     Result,
+    app::{AppContext, Initializer as LocoInitializer},
 };
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-use crate::main_patient_service::{http::HttpClient, Client, CreatePatient, Error, Patient};
+use crate::main_patient_service::{Client, CreatePatient, Error, Patient, http::HttpClient};
 
 static TEST_CLIENT: Mutex<Option<Arc<dyn Client>>> = Mutex::new(None);
 

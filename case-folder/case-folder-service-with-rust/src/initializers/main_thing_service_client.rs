@@ -5,14 +5,14 @@
 use async_trait::async_trait;
 use axum::Router as AxumRouter;
 use loco_rs::{
-    app::{AppContext, Initializer as LocoInitializer},
     Result,
+    app::{AppContext, Initializer as LocoInitializer},
 };
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 use crate::main_thing_service::{
-    http::HttpClient, Client, Error, Folder, NewFolder, NewVolume, Volume,
+    Client, Error, Folder, NewFolder, NewVolume, Volume, http::HttpClient,
 };
 
 /// Process-wide override slot. When `Some`, the [`RoutingClient`]

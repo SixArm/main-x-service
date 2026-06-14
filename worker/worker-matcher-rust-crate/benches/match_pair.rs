@@ -7,10 +7,6 @@
 //! deterministic matching, and the batch ranking entry point. Numbers
 //! are reported in absolute time per call.
 
-// Bench code: `worker1`/`worker2`-style names are intentionally parallel, and
-// the loop-counter cast operates on small, bounded benchmark sizes.
-#![allow(clippy::similar_names, clippy::cast_possible_truncation)]
-
 use chrono::NaiveDate;
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use worker_matcher::{
@@ -88,7 +84,11 @@ fn make_candidate(idx: usize) -> Worker {
             "Other"
         })
         .family_name(last[idx % last.len()])
-        .date_of_birth(dob(1980, 5, (idx % 28 + 1) as u32))
+        .date_of_birth(dob(
+            1980,
+            5,
+            u32::try_from(idx % 28 + 1).unwrap_or(u32::MAX),
+        ))
         .gender(if idx.is_multiple_of(2) {
             Gender::Female
         } else {
@@ -106,7 +106,7 @@ fn make_candidate(idx: usize) -> Worker {
 fn bench_match_pair(c: &mut Criterion) {
     let mut group = c.benchmark_group("match_pair");
     let alice = build_alice();
-    let alyce = build_alyce_fuzzy(&alice);
+    let fuzzy_variant = build_alyce_fuzzy(&alice);
     let unrelated = build_unrelated();
     let engine = MatchingEngine::default_config();
 
@@ -115,7 +115,7 @@ fn bench_match_pair(c: &mut Criterion) {
         b.iter(|| engine.match_workers(black_box(&alice), black_box(&clone)));
     });
     group.bench_function("fuzzy_near_match", |b| {
-        b.iter(|| engine.match_workers(black_box(&alice), black_box(&alyce)));
+        b.iter(|| engine.match_workers(black_box(&alice), black_box(&fuzzy_variant)));
     });
     group.bench_function("unrelated_pair", |b| {
         b.iter(|| engine.match_workers(black_box(&alice), black_box(&unrelated)));
@@ -125,10 +125,10 @@ fn bench_match_pair(c: &mut Criterion) {
 
 fn bench_deterministic_match(c: &mut Criterion) {
     let alice = build_alice();
-    let alyce = build_alyce_fuzzy(&alice);
+    let fuzzy_variant = build_alyce_fuzzy(&alice);
     let engine = MatchingEngine::default_config();
     c.bench_function("deterministic_match_identifier_hit", |b| {
-        b.iter(|| engine.deterministic_match(black_box(&alice), black_box(&alyce)));
+        b.iter(|| engine.deterministic_match(black_box(&alice), black_box(&fuzzy_variant)));
     });
 }
 
@@ -150,7 +150,7 @@ fn bench_batch_ranking(c: &mut Criterion) {
 fn bench_engine_configurations(c: &mut Criterion) {
     let mut group = c.benchmark_group("config_variants");
     let alice = build_alice();
-    let alyce = build_alyce_fuzzy(&alice);
+    let fuzzy_variant = build_alyce_fuzzy(&alice);
 
     let default = MatchingEngine::default_config();
     let strict = MatchingEngine::new(MatchConfig::strict());
@@ -161,13 +161,13 @@ fn bench_engine_configurations(c: &mut Criterion) {
     });
 
     group.bench_function("default", |b| {
-        b.iter(|| default.match_workers(black_box(&alice), black_box(&alyce)));
+        b.iter(|| default.match_workers(black_box(&alice), black_box(&fuzzy_variant)));
     });
     group.bench_function("strict", |b| {
-        b.iter(|| strict.match_workers(black_box(&alice), black_box(&alyce)));
+        b.iter(|| strict.match_workers(black_box(&alice), black_box(&fuzzy_variant)));
     });
     group.bench_function("nickname_table_english", |b| {
-        b.iter(|| with_nicknames.match_workers(black_box(&alice), black_box(&alyce)));
+        b.iter(|| with_nicknames.match_workers(black_box(&alice), black_box(&fuzzy_variant)));
     });
     group.finish();
 }

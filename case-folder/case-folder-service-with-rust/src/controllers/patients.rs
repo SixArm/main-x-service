@@ -5,10 +5,9 @@
 //! the **Main Event Service**. This controller proxies the three.
 
 use axum::{
-    debug_handler,
+    Extension, Json, debug_handler,
     extract::{Path, Query},
     response::{IntoResponse, Response},
-    Extension, Json,
 };
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};

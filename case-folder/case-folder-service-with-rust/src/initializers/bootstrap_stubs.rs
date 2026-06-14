@@ -15,8 +15,8 @@
 use async_trait::async_trait;
 use axum::Router as AxumRouter;
 use loco_rs::{
-    app::{AppContext, Initializer},
     Result,
+    app::{AppContext, Initializer},
 };
 use std::sync::Arc;
 
@@ -24,15 +24,15 @@ use crate::initializers::{
     main_event_service_client, main_patient_service_client, main_place_service_client,
     main_thing_service_client, main_worker_service_client,
 };
-use crate::main_event_service::{stub::StubClient as EventStub, Client as EventClient, RecordMove};
+use crate::main_event_service::{Client as EventClient, RecordMove, stub::StubClient as EventStub};
 use crate::main_patient_service::stub::StubClient as PatientStub;
 use crate::main_place_service::{
-    label_path, stub::StubClient as PlaceStub, Client as PlaceClient, Place, PlaceType,
+    Client as PlaceClient, Place, PlaceType, label_path, stub::StubClient as PlaceStub,
 };
 use crate::main_thing_service::{
-    stub::StubClient as ThingStub, Client as ThingClient, Folder, NewVolume,
+    Client as ThingClient, Folder, NewVolume, stub::StubClient as ThingStub,
 };
-use crate::main_worker_service::{stub::StubClient as WorkerStub, Worker};
+use crate::main_worker_service::{Worker, stub::StubClient as WorkerStub};
 use crate::tasks::seed::run_seed;
 use uuid::Uuid;
 

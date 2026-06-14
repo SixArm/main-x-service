@@ -9,19 +9,19 @@
 
 use async_trait::async_trait;
 use axum::{
+    Json, Router as AxumRouter,
     extract::Request,
     http::StatusCode,
-    middleware::{from_fn, Next},
+    middleware::{Next, from_fn},
     response::{IntoResponse, Response},
-    Json, Router as AxumRouter,
 };
 use loco_rs::{
-    app::{AppContext, Initializer},
     Result,
+    app::{AppContext, Initializer},
 };
 use std::sync::Arc;
 
-use crate::auth::{mailer::LogMailer, AuthConfig, AuthState};
+use crate::auth::{AuthConfig, AuthState, mailer::LogMailer};
 
 /// Loco initializer that wires up authentication: it constructs the
 /// shared [`AuthState`], layers the session-guard middleware, and

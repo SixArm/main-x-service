@@ -49,9 +49,16 @@ fn main() {
     println!("Person 2: Bob Jones (nickname)");
     println!();
 
+    demo_builtin_presets(&person1, &person2);
+    demo_demographics_prioritized(&person1, &person2);
+    demo_identifier_focused(&person1, &person2);
+}
+
+/// Score the pair under the three built-in presets (default, strict, lenient).
+fn demo_builtin_presets(person1: &Person, person2: &Person) {
     // Default configuration
     let default_engine = MatchingEngine::default_config();
-    let default_result = default_engine.match_persons(&person1, &person2);
+    let default_result = default_engine.match_persons(person1, person2);
     println!("Default Config:");
     println!("  Score: {:.2}%", default_result.score * 100.0);
     println!("  Match: {}", default_result.is_match);
@@ -59,7 +66,7 @@ fn main() {
 
     // Strict configuration
     let strict_engine = MatchingEngine::new(MatchConfig::strict());
-    let strict_result = strict_engine.match_persons(&person1, &person2);
+    let strict_result = strict_engine.match_persons(person1, person2);
     println!("Strict Config (threshold: 0.95):");
     println!("  Score: {:.2}%", strict_result.score * 100.0);
     println!("  Match: {}", strict_result.is_match);
@@ -67,14 +74,41 @@ fn main() {
 
     // Lenient configuration
     let lenient_engine = MatchingEngine::new(MatchConfig::lenient());
-    let lenient_result = lenient_engine.match_persons(&person1, &person2);
+    let lenient_result = lenient_engine.match_persons(person1, person2);
     println!("Lenient Config (threshold: 0.75):");
     println!("  Score: {:.2}%", lenient_result.score * 100.0);
     println!("  Match: {}", lenient_result.is_match);
     println!();
+}
 
-    // Custom configuration - prioritize demographic data over national identifiers
-    let custom_config = MatchConfig {
+/// Score the pair under a config that down-weights national identifiers and
+/// up-weights demographic fields (name / DOB).
+fn demo_demographics_prioritized(person1: &Person, person2: &Person) {
+    let custom_engine = MatchingEngine::new(build_demographics_config());
+    let custom_result = custom_engine.match_persons(person1, person2);
+    println!("Custom Config (demographics prioritized):");
+    println!("  Score: {:.2}%", custom_result.score * 100.0);
+    println!("  Match: {}", custom_result.is_match);
+    println!();
+}
+
+/// Score the pair under a config where national identifiers dominate and
+/// names are near-irrelevant (exact matching, nicknames disabled).
+fn demo_identifier_focused(person1: &Person, person2: &Person) {
+    let uknhsn_engine = MatchingEngine::new(build_identifier_config());
+    let uknhsn_result = uknhsn_engine.match_persons(person1, person2);
+    println!("United Kingdom National Health Service Number-Focused Config:");
+    println!("  Score: {:.2}%", uknhsn_result.score * 100.0);
+    println!("  Match: {}", uknhsn_result.is_match);
+    println!(
+        "  Note: No United Kingdom National Health Service Numbers provided, so match relies on names/DOB"
+    );
+}
+
+/// Build the demographics-prioritised config: national-identifier weights
+/// dialled down, name/DOB weights up.
+fn build_demographics_config() -> MatchConfig {
+    MatchConfig {
         match_threshold: 0.80,
         united_kingdom_national_health_service_number_weight: 0.10, // Reduced weight
         fr_nir_weight: 0.10,
@@ -137,17 +171,13 @@ fn main() {
         nickname_table: NicknameTable::english(),
         gmail_dot_folding: false,
         phone_default_country: Some("GB".into()),
-    };
+    }
+}
 
-    let custom_engine = MatchingEngine::new(custom_config);
-    let custom_result = custom_engine.match_persons(&person1, &person2);
-    println!("Custom Config (demographics prioritized):");
-    println!("  Score: {:.2}%", custom_result.score * 100.0);
-    println!("  Match: {}", custom_result.is_match);
-    println!();
-
-    // National-identifier-focused configuration
-    let uknhsn_config = MatchConfig {
+/// Build the national-identifier-focused config: identifiers dominate, names
+/// are near-irrelevant, exact name matching, nicknames disabled.
+fn build_identifier_config() -> MatchConfig {
+    MatchConfig {
         match_threshold: 0.90,
         united_kingdom_national_health_service_number_weight: 0.60, // Very high weight
         fr_nir_weight: 0.60,
@@ -210,14 +240,5 @@ fn main() {
         nickname_table: NicknameTable::empty(),
         gmail_dot_folding: false,
         phone_default_country: Some("GB".into()),
-    };
-
-    let uknhsn_engine = MatchingEngine::new(uknhsn_config);
-    let uknhsn_result = uknhsn_engine.match_persons(&person1, &person2);
-    println!("United Kingdom National Health Service Number-Focused Config:");
-    println!("  Score: {:.2}%", uknhsn_result.score * 100.0);
-    println!("  Match: {}", uknhsn_result.is_match);
-    println!(
-        "  Note: No United Kingdom National Health Service Numbers provided, so match relies on names/DOB"
-    );
+    }
 }

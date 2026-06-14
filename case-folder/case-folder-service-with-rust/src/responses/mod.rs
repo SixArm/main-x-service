@@ -412,9 +412,9 @@ impl<T: Serialize> List<T> {
 // Errors
 // ---------------------------------------------------------------------------
 
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use std::collections::HashMap;
 
 /// Single-message error body: `{ "error": "..." }`.

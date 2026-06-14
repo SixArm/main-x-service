@@ -10,8 +10,8 @@
 /// Email delivery of magic links (trait + log-only default impl).
 pub mod mailer;
 
-use axum::http::{header, HeaderMap};
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use axum::http::{HeaderMap, header};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use mailer::Mailer;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

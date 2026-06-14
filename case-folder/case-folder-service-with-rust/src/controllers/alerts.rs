@@ -7,9 +7,8 @@
 //! stored data.
 
 use axum::{
-    debug_handler,
+    Extension, Json, debug_handler,
     response::{IntoResponse, Response},
-    Extension, Json,
 };
 use loco_rs::prelude::*;
 use serde::Serialize;
@@ -88,7 +87,7 @@ pub async fn index(
     let moves = match events.list_all().await {
         Ok(m) => m,
         Err(e) => {
-            return responses::service_unavailable(format!("Main Event Service unreachable: {e}"))
+            return responses::service_unavailable(format!("Main Event Service unreachable: {e}"));
         }
     };
 

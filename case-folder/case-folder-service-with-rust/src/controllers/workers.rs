@@ -7,10 +7,9 @@
 //! workers itself.
 
 use axum::{
-    debug_handler,
+    Extension, Json, debug_handler,
     extract::{Path, Query},
     response::{IntoResponse, Response},
-    Extension, Json,
 };
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -100,7 +99,7 @@ pub async fn show(
         Ok(Some(w)) => w,
         Ok(None) => return responses::not_found("Worker not found"),
         Err(e) => {
-            return responses::service_unavailable(format!("Main Worker Service unreachable: {e}"))
+            return responses::service_unavailable(format!("Main Worker Service unreachable: {e}"));
         }
     };
 

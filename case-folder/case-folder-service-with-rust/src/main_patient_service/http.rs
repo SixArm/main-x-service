@@ -10,7 +10,7 @@ use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
-use super::{Client, CreatePatient, Error, Patient, NHS_NUMBER_SYSTEM};
+use super::{Client, CreatePatient, Error, NHS_NUMBER_SYSTEM, Patient};
 use crate::nhs::{format_nhs_number, normalise_nhs_number};
 
 /// Wraps the service's `{success,data,error}` envelope. We only consume `data`.

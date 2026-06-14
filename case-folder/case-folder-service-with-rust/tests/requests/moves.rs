@@ -109,10 +109,12 @@ async fn create_move_records_worker_snapshot() {
         let body: serde_json::Value = response.json();
         assert_eq!(body["moved_by"], "Alice Johnson");
         assert_eq!(body["worker_role"], "nurse");
-        assert!(body["to_cabinet_label"]
-            .as_str()
-            .unwrap()
-            .contains("Cabinet M2-to"));
+        assert!(
+            body["to_cabinet_label"]
+                .as_str()
+                .unwrap()
+                .contains("Cabinet M2-to")
+        );
 
         let events = super::main_event_service().snapshot();
         let event = events

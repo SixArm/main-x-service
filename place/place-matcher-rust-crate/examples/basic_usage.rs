@@ -7,8 +7,20 @@ use place_matcher::{Address, MatchingEngine, Place, PlaceCategory, PlaceId, Plac
 fn main() {
     println!("=== Basic Place matcher Example ===\n");
 
-    // Two records describing the same monument in two languages, with
-    // slightly different coordinates.
+    let engine = MatchingEngine::default_config();
+    let result = demo_probabilistic_breakdown(&engine);
+    demo_aliases(&engine);
+    demo_chain_stores(&engine);
+    demo_same_coordinates(&engine);
+    demo_deterministic_place_id(&engine);
+    demo_deterministic_name_postcode(&engine);
+    demo_json_export(&result);
+}
+
+/// Two records describing the same monument in two languages, with
+/// slightly different coordinates. Returns the match result so the
+/// caller can reuse it for the JSON export demo.
+fn demo_probabilistic_breakdown(engine: &MatchingEngine) -> place_matcher::MatchResult {
     let p1 = Place::builder()
         .name("Eiffel Tower")
         .latitude(48.858_222)
@@ -26,7 +38,6 @@ fn main() {
         .country_code_as_iso_3166_1_alpha_2("FR")
         .build();
 
-    let engine = MatchingEngine::default_config();
     let result = engine.match_places(&p1, &p2);
 
     println!("Overall Score: {:.2}%", result.score * 100.0);
@@ -59,9 +70,13 @@ fn main() {
     }
     println!();
 
-    // Big Ben / Elizabeth Tower — primary canonical name on one side,
-    // alternate-name match on the other. The best-of cartesian product
-    // picks the matching pair.
+    result
+}
+
+/// Big Ben / Elizabeth Tower — primary canonical name on one side,
+/// alternate-name match on the other. The best-of cartesian product
+/// picks the matching pair.
+fn demo_aliases(engine: &MatchingEngine) {
     println!("=== Aliases (Big Ben / Elizabeth Tower) ===");
     let b1 = Place::builder()
         .name("Big Ben")
@@ -76,8 +91,10 @@ fn main() {
         .build();
     let r = engine.match_places(&b1, &b2);
     println!("Score: {:.2}   is_match: {}", r.score, r.is_match);
+}
 
-    // Chain stores: same name, different cities — should NOT match.
+/// Chain stores: same name, different cities — should NOT match.
+fn demo_chain_stores(engine: &MatchingEngine) {
     println!("\n=== Chain Stores: Same Name, Different Cities ===");
     let s1 = Place::builder()
         .name("Starbucks")
@@ -96,9 +113,11 @@ fn main() {
     let r = engine.match_places(&s1, &s2);
     println!("Score: {:.2}   is_match: {}", r.score, r.is_match);
     println!("Coordinates: {:?}", r.breakdown.coordinates_score);
+}
 
-    // Same coordinates but different names (a venue rebrand, perhaps) —
-    // the geographic signal pulls the score up even though the names differ.
+/// Same coordinates but different names (a venue rebrand, perhaps) —
+/// the geographic signal pulls the score up even though the names differ.
+fn demo_same_coordinates(engine: &MatchingEngine) {
     println!("\n=== Same Coordinates, Different Names ===");
     let v1 = Place::builder()
         .name("Old Cafe Name")
@@ -112,8 +131,10 @@ fn main() {
         .build();
     let r = engine.match_places(&v1, &v2);
     println!("Score: {:.2}   is_match: {}", r.score, r.is_match);
+}
 
-    // Deterministic match via shared Wikidata ID.
+/// Deterministic match via shared Wikidata ID.
+fn demo_deterministic_place_id(engine: &MatchingEngine) {
     println!("\n=== Deterministic Match via Place ID ===");
     let id = PlaceId::new(PlaceIdScheme::Wikidata, "Q243").unwrap();
     let d1 = Place::builder()
@@ -125,8 +146,10 @@ fn main() {
         .add_place_id(id)
         .build();
     println!("Deterministic: {}", engine.deterministic_match(&d1, &d2));
+}
 
-    // Deterministic match via identical name + postcode.
+/// Deterministic match via identical name + postcode.
+fn demo_deterministic_name_postcode(engine: &MatchingEngine) {
     println!("\n=== Deterministic Match via Name + Postcode ===");
     let addr = Address::new()
         .with_line1("10 Downing Street")
@@ -140,9 +163,11 @@ fn main() {
         .address(addr)
         .build();
     println!("Deterministic: {}", engine.deterministic_match(&pm1, &pm2));
+}
 
-    // JSON serialisation.
+/// JSON serialisation of a match result.
+fn demo_json_export(result: &place_matcher::MatchResult) {
     println!("\n=== JSON Export ===");
-    let json = serde_json::to_string_pretty(&result).unwrap();
+    let json = serde_json::to_string_pretty(result).unwrap();
     println!("{json}");
 }

@@ -7,11 +7,10 @@
 //! updates the volume's own cabinet pointer.
 
 use axum::{
-    debug_handler,
+    Extension, Json, debug_handler,
     extract::{Path, Query},
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
-    Extension, Json,
 };
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -23,7 +22,7 @@ use crate::{
     controllers::stats::latest_move_per_folder,
     main_event_service::{Client as MainEventServiceClient, RecordMove},
     main_patient_service::Client as MainPatientServiceClient,
-    main_place_service::{label_path, Client as MainPlaceServiceClient},
+    main_place_service::{Client as MainPlaceServiceClient, label_path},
     main_thing_service::{Client as MainThingServiceClient, NewVolume, Volume},
     main_worker_service::Client as MainWorkerServiceClient,
     nhs::{format_nhs_number, normalise_nhs_number},
@@ -58,7 +57,7 @@ pub async fn index(
     let volumes = match things.list_volumes().await {
         Ok(v) => v,
         Err(e) => {
-            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"))
+            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"));
         }
     };
     let folders = things.search("").await.unwrap_or_default();
@@ -170,7 +169,7 @@ pub async fn show(
         Ok(Some(v)) => v,
         Ok(None) => return responses::not_found("Volume not found"),
         Err(e) => {
-            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"))
+            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"));
         }
     };
     Json(volume_show(things.as_ref(), events.as_ref(), &volume).await).into_response()
@@ -225,7 +224,9 @@ pub async fn create(
             return responses::unprocessable(errors);
         }
         Err(e) => {
-            return responses::service_unavailable(format!("Main Patient Service unreachable: {e}"))
+            return responses::service_unavailable(format!(
+                "Main Patient Service unreachable: {e}"
+            ));
         }
     };
 
@@ -336,7 +337,7 @@ pub async fn add_folder(
         Ok(Some(v)) => v,
         Ok(None) => return responses::not_found("Volume not found"),
         Err(e) => {
-            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"))
+            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"));
         }
     };
     let folder_id = match Uuid::parse_str(&input.folder_id) {
@@ -351,7 +352,7 @@ pub async fn add_folder(
         Ok(Some(f)) => f,
         Ok(None) => return responses::not_found("Folder not found"),
         Err(e) => {
-            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"))
+            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"));
         }
     };
     // Same-patient membership guard: a volume bundles one patient's
@@ -393,7 +394,7 @@ pub async fn remove_folder(
         Ok(Some(v)) => v,
         Ok(None) => return responses::not_found("Volume not found"),
         Err(e) => {
-            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"))
+            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"));
         }
     };
     match things.find_by_id(folder_id).await {
@@ -404,7 +405,7 @@ pub async fn remove_folder(
         Ok(Some(_)) => {} // not in this volume — no-op
         Ok(None) => return responses::not_found("Folder not found"),
         Err(e) => {
-            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"))
+            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"));
         }
     }
     Json(volume_show(things.as_ref(), events.as_ref(), &volume).await).into_response()
@@ -452,7 +453,7 @@ pub async fn move_volume(
         Ok(Some(v)) => v,
         Ok(None) => return responses::not_found("Volume not found"),
         Err(e) => {
-            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"))
+            return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"));
         }
     };
 

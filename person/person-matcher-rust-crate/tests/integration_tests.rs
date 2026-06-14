@@ -1124,7 +1124,7 @@ fn test_no_overlapping_fields_returns_zero_score() {
     let p1 = Person::builder().given_name("Solo").build();
     let p2 = Person::builder().family_name("Only").build();
     let r = MatchingEngine::default_config().match_persons(&p1, &p2);
-    assert_eq!(r.score, 0.0);
+    assert!((r.score - 0.0).abs() < f64::EPSILON);
     assert!(!r.is_match);
 }
 
@@ -1167,7 +1167,7 @@ fn test_engine_is_deterministic_across_calls() {
     let engine = MatchingEngine::default_config();
     let a = engine.match_persons(&p1, &p2);
     let b = engine.match_persons(&p1, &p2);
-    assert_eq!(a.score, b.score);
+    assert!((a.score - b.score).abs() < f64::EPSILON);
     assert_eq!(a.is_match, b.is_match);
 }
 
@@ -1225,7 +1225,7 @@ fn test_match_result_serialization_round_trip() {
     let r = MatchingEngine::default_config().match_persons(&p, &p.clone());
     let json = serde_json::to_string(&r).unwrap();
     let back: person_matcher::MatchResult = serde_json::from_str(&json).unwrap();
-    assert_eq!(r.score, back.score);
+    assert!((r.score - back.score).abs() < f64::EPSILON);
     assert_eq!(r.is_match, back.is_match);
     assert_eq!(
         r.breakdown
@@ -2064,17 +2064,17 @@ fn test_international_phone_distinguishes_uk_from_us_with_overlapping_digits() {
     // The same 10-digit national-significant string interpreted as a UK
     // number (`+442025551234`) and as a US number (`+12025551234`) must
     // not collide in the matcher.
-    let p_uk = Person::builder()
+    let british = Person::builder()
         .given_name("X")
         .family_name("Y")
         .phone("2025551234") // GB default → +442025551234
         .build();
-    let p_us = Person::builder()
+    let american = Person::builder()
         .given_name("X")
         .family_name("Y")
         .phone("+1 202 555 1234")
         .build();
-    let r = MatchingEngine::default_config().match_persons(&p_uk, &p_us);
+    let r = MatchingEngine::default_config().match_persons(&british, &american);
     assert_eq!(r.breakdown.phone_score, Some(0.0));
 }
 
@@ -3308,6 +3308,12 @@ fn test_uk_nino_deterministic_match() {
 /// Each of the eighteen T-27 schemes is sufficient on its own to pass `Person::validate`.
 #[test]
 fn test_eighteen_new_schemes_each_validate_solo() {
+    assert_eighteen_schemes_validate_solo_be_to_is();
+    assert_eighteen_schemes_validate_solo_lt_to_uk();
+}
+
+/// First half of the T-27 solo-validation sweep: `BE` through `IS`.
+fn assert_eighteen_schemes_validate_solo_be_to_is() {
     assert!(
         Person::builder()
             .be_nn("80010100107")
@@ -3371,6 +3377,10 @@ fn test_eighteen_new_schemes_each_validate_solo() {
             .validate()
             .is_ok()
     );
+}
+
+/// Second half of the T-27 solo-validation sweep: `LT` through `UK`.
+fn assert_eighteen_schemes_validate_solo_lt_to_uk() {
     assert!(
         Person::builder()
             .lt_ak("48001150011")

@@ -151,10 +151,12 @@ async fn create_folder_with_invalid_nhs_returns_422() {
             .await;
         assert_eq!(response.status_code(), 422);
         let body: serde_json::Value = response.json();
-        assert!(body["errors"]["nhs_number"]
-            .as_str()
-            .unwrap()
-            .contains("Modulus 11"));
+        assert!(
+            body["errors"]["nhs_number"]
+                .as_str()
+                .unwrap()
+                .contains("Modulus 11")
+        );
     })
     .await;
 }

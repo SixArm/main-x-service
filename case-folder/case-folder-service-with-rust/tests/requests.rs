@@ -17,10 +17,10 @@ use case_folder_service_with_rust::{
         main_thing_service_client, main_worker_service_client,
     },
     main_event_service::stub::StubClient as EventStubClient,
-    main_patient_service::{stub::StubClient as PatientStubClient, Patient},
-    main_place_service::{stub::StubClient as PlaceStubClient, Place, PlaceType},
-    main_thing_service::{stub::StubClient as ThingStubClient, Folder},
-    main_worker_service::{stub::StubClient as WorkerStubClient, Worker},
+    main_patient_service::{Patient, stub::StubClient as PatientStubClient},
+    main_place_service::{Place, PlaceType, stub::StubClient as PlaceStubClient},
+    main_thing_service::{Folder, stub::StubClient as ThingStubClient},
+    main_worker_service::{Worker, stub::StubClient as WorkerStubClient},
     nhs::format_nhs_number,
 };
 use loco_rs::prelude::*;

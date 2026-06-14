@@ -2,13 +2,27 @@
 
 //! Basic usage example for Event matcher.
 
-use event_matcher::{Event, EventCategory, EventId, EventIdScheme, Location, MatchingEngine};
+use event_matcher::{
+    Event, EventCategory, EventId, EventIdScheme, Location, MatchResult, MatchingEngine,
+};
 
 fn main() {
     println!("=== Basic Event matcher Example ===\n");
 
-    // Two records describing the same festival in two different naming
-    // conventions, with a slight start-time drift.
+    let engine = MatchingEngine::default_config();
+    let result = demo_festival_breakdown(&engine);
+    demo_aliases(&engine);
+    demo_same_name_different_years(&engine);
+    demo_same_date_and_venue(&engine);
+    demo_deterministic_event_id(&engine);
+    demo_deterministic_name_and_start_date(&engine);
+    demo_json_export(&result);
+}
+
+/// Two records describing the same festival in two different naming
+/// conventions, with a slight start-time drift. Returns the result so the
+/// JSON-export section can reuse it.
+fn demo_festival_breakdown(engine: &MatchingEngine) -> MatchResult {
     let p1 = Event::builder()
         .name("Glastonbury Festival 2024")
         .start_date("2024-06-26T09:00:00Z")
@@ -26,7 +40,6 @@ fn main() {
         .country_code_as_iso_3166_1_alpha_2("GB")
         .build();
 
-    let engine = MatchingEngine::default_config();
     let result = engine.match_events(&p1, &p2);
 
     println!("Overall Score: {:.2}%", result.score * 100.0);
@@ -62,8 +75,12 @@ fn main() {
     }
     println!();
 
-    // Big Ben Concert: primary canonical name on one side, alternate-name
-    // match on the other. The best-of cartesian product picks the matching pair.
+    result
+}
+
+/// Big Ben Concert: primary canonical name on one side, alternate-name
+/// match on the other. The best-of cartesian product picks the matching pair.
+fn demo_aliases(engine: &MatchingEngine) {
     println!("=== Aliases (Big Ben / Elizabeth Tower Concert) ===");
     let b1 = Event::builder()
         .name("Big Ben Anniversary Concert")
@@ -76,8 +93,10 @@ fn main() {
         .build();
     let r = engine.match_events(&b1, &b2);
     println!("Score: {:.2}   is_match: {}", r.score, r.is_match);
+}
 
-    // Conference series: same conference name in different years — should NOT match.
+/// Conference series: same conference name in different years — should NOT match.
+fn demo_same_name_different_years(engine: &MatchingEngine) {
     println!("\n=== Same Conference Name, Different Years ===");
     let s1 = Event::builder()
         .name("RustConf")
@@ -94,9 +113,11 @@ fn main() {
     let r = engine.match_events(&s1, &s2);
     println!("Score: {:.2}   is_match: {}", r.score, r.is_match);
     println!("Start date: {:?}", r.breakdown.start_date_score);
+}
 
-    // Same date and venue, different names (a rebranded event) — the
-    // schedule signal pulls the score up even though the names differ.
+/// Same date and venue, different names (a rebranded event) — the
+/// schedule signal pulls the score up even though the names differ.
+fn demo_same_date_and_venue(engine: &MatchingEngine) {
     println!("\n=== Same Date and Venue, Different Names ===");
     let venue = Location::new()
         .with_venue_name("Worthy Farm")
@@ -114,8 +135,10 @@ fn main() {
         .build();
     let r = engine.match_events(&v1, &v2);
     println!("Score: {:.2}   is_match: {}", r.score, r.is_match);
+}
 
-    // Deterministic match via shared Eventbrite ID.
+/// Deterministic match via shared Eventbrite ID.
+fn demo_deterministic_event_id(engine: &MatchingEngine) {
     println!("\n=== Deterministic Match via Event ID ===");
     let id = EventId::new(EventIdScheme::Eventbrite, "123456789").unwrap();
     let d1 = Event::builder()
@@ -127,9 +150,11 @@ fn main() {
         .add_event_id(id)
         .build();
     println!("Deterministic: {}", engine.deterministic_match(&d1, &d2));
+}
 
-    // Deterministic match via identical name + start_date (even with
-    // different but equivalent timezone offsets).
+/// Deterministic match via identical name + `start_date` (even with
+/// different but equivalent timezone offsets).
+fn demo_deterministic_name_and_start_date(engine: &MatchingEngine) {
     println!("\n=== Deterministic Match via Name + Start Date ===");
     let pm1 = Event::builder()
         .name("RustConf 2024")
@@ -140,9 +165,11 @@ fn main() {
         .start_date("2024-09-10T11:00:00+02:00")
         .build();
     println!("Deterministic: {}", engine.deterministic_match(&pm1, &pm2));
+}
 
-    // JSON serialisation.
+/// JSON serialisation of the festival-breakdown result.
+fn demo_json_export(result: &MatchResult) {
     println!("\n=== JSON Export ===");
-    let json = serde_json::to_string_pretty(&result).unwrap();
+    let json = serde_json::to_string_pretty(result).unwrap();
     println!("{json}");
 }

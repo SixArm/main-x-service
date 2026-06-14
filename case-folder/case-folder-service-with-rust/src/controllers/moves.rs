@@ -13,11 +13,10 @@
 //! reconciles.
 
 use axum::{
-    debug_handler,
+    Extension, Json, debug_handler,
     extract::{Path, Query},
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
-    Extension, Json,
 };
 use loco_rs::prelude::*;
 use serde::Deserialize;
@@ -27,7 +26,7 @@ use uuid::Uuid;
 
 use crate::{
     main_event_service::{Client as MainEventServiceClient, RecordMove},
-    main_place_service::{label_path, Client as MainPlaceServiceClient},
+    main_place_service::{Client as MainPlaceServiceClient, label_path},
     main_thing_service::Client as MainThingServiceClient,
     main_worker_service::Client as MainWorkerServiceClient,
     responses::{self, List},

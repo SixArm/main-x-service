@@ -6,13 +6,13 @@
 use async_trait::async_trait;
 use axum::Router as AxumRouter;
 use loco_rs::{
-    app::{AppContext, Initializer as LocoInitializer},
     Result,
+    app::{AppContext, Initializer as LocoInitializer},
 };
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-use crate::main_worker_service::{http::HttpClient, Client, Error, Worker};
+use crate::main_worker_service::{Client, Error, Worker, http::HttpClient};
 
 /// Process-wide override slot. When `Some`, the [`RoutingClient`]
 /// delegates to it instead of the HTTP fallback. Read at request time.

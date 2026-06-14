@@ -2,61 +2,34 @@
 
 //! Example showing custom matching configuration
 
-// Demo code: a single linear walkthrough, long by nature.
-#![allow(clippy::too_many_lines)]
-
 use worker_matcher::{
     Gender, MatchConfig, MatchingEngine, NicknameTable, SimilarityAlgorithm, Worker,
 };
 
-fn main() {
-    println!("=== Custom Configuration Example ===\n");
-
-    let worker1 = Worker::builder()
+/// The two sample workers compared by every configuration below:
+/// "Robert Jones" against "Bob Jones" (a nickname), same DOB and gender.
+fn build_sample_pair() -> (Worker, Worker) {
+    let robert = Worker::builder()
         .given_name("Robert")
         .family_name("Jones")
         .date_of_birth(chrono::NaiveDate::from_ymd_opt(1975, 6, 20).unwrap())
         .gender(Gender::Male)
         .build();
 
-    let worker2 = Worker::builder()
+    let bob = Worker::builder()
         .given_name("Bob") // Nickname
         .family_name("Jones")
         .date_of_birth(chrono::NaiveDate::from_ymd_opt(1975, 6, 20).unwrap())
         .gender(Gender::Male)
         .build();
 
-    // Test with different configurations
-    println!("Worker 1: Robert Jones");
-    println!("Worker 2: Bob Jones (nickname)");
-    println!();
+    (robert, bob)
+}
 
-    // Default configuration
-    let default_engine = MatchingEngine::default_config();
-    let default_result = default_engine.match_workers(&worker1, &worker2);
-    println!("Default Config:");
-    println!("  Score: {:.2}%", default_result.score * 100.0);
-    println!("  Match: {}", default_result.is_match);
-    println!();
-
-    // Strict configuration
-    let strict_engine = MatchingEngine::new(MatchConfig::strict());
-    let strict_result = strict_engine.match_workers(&worker1, &worker2);
-    println!("Strict Config (threshold: 0.95):");
-    println!("  Score: {:.2}%", strict_result.score * 100.0);
-    println!("  Match: {}", strict_result.is_match);
-    println!();
-
-    // Lenient configuration
-    let lenient_engine = MatchingEngine::new(MatchConfig::lenient());
-    let lenient_result = lenient_engine.match_workers(&worker1, &worker2);
-    println!("Lenient Config (threshold: 0.75):");
-    println!("  Score: {:.2}%", lenient_result.score * 100.0);
-    println!("  Match: {}", lenient_result.is_match);
-    println!();
-
-    // Custom configuration - prioritize demographic data over national identifiers
-    let custom_config = MatchConfig {
+/// Custom configuration that prioritises demographic data over national
+/// identifiers (all identifier weights reduced; name + DOB weights raised).
+fn build_custom_config() -> MatchConfig {
+    MatchConfig {
         match_threshold: 0.80,
         uk_nhs_number_weight: 0.10, // Reduced weight
         fr_nir_weight: 0.10,
@@ -119,17 +92,13 @@ fn main() {
         nickname_table: NicknameTable::english(),
         gmail_dot_folding: false,
         phone_default_country: Some("GB".into()),
-    };
+    }
+}
 
-    let custom_engine = MatchingEngine::new(custom_config);
-    let custom_result = custom_engine.match_workers(&worker1, &worker2);
-    println!("Custom Config (demographics prioritized):");
-    println!("  Score: {:.2}%", custom_result.score * 100.0);
-    println!("  Match: {}", custom_result.is_match);
-    println!();
-
-    // National-identifier-focused configuration
-    let nhs_config = MatchConfig {
+/// National-identifier-focused configuration (all identifier weights very
+/// high; demographic weights minimal; strict, exact-name matching).
+fn build_nhs_config() -> MatchConfig {
+    MatchConfig {
         match_threshold: 0.90,
         uk_nhs_number_weight: 0.60, // Very high weight
         fr_nir_weight: 0.60,
@@ -192,9 +161,54 @@ fn main() {
         nickname_table: NicknameTable::empty(),
         gmail_dot_folding: false,
         phone_default_country: Some("GB".into()),
-    };
+    }
+}
 
-    let nhs_engine = MatchingEngine::new(nhs_config);
+/// Print the score + match outcome for one named configuration.
+fn report(label: &str, engine: &MatchingEngine, worker1: &Worker, worker2: &Worker) {
+    let result = engine.match_workers(worker1, worker2);
+    println!("{label}");
+    println!("  Score: {:.2}%", result.score * 100.0);
+    println!("  Match: {}", result.is_match);
+    println!();
+}
+
+fn main() {
+    println!("=== Custom Configuration Example ===\n");
+
+    let (worker1, worker2) = build_sample_pair();
+
+    println!("Worker 1: Robert Jones");
+    println!("Worker 2: Bob Jones (nickname)");
+    println!();
+
+    report(
+        "Default Config:",
+        &MatchingEngine::default_config(),
+        &worker1,
+        &worker2,
+    );
+    report(
+        "Strict Config (threshold: 0.95):",
+        &MatchingEngine::new(MatchConfig::strict()),
+        &worker1,
+        &worker2,
+    );
+    report(
+        "Lenient Config (threshold: 0.75):",
+        &MatchingEngine::new(MatchConfig::lenient()),
+        &worker1,
+        &worker2,
+    );
+    report(
+        "Custom Config (demographics prioritized):",
+        &MatchingEngine::new(build_custom_config()),
+        &worker1,
+        &worker2,
+    );
+
+    // National-identifier-focused configuration.
+    let nhs_engine = MatchingEngine::new(build_nhs_config());
     let nhs_result = nhs_engine.match_workers(&worker1, &worker2);
     println!("NHS-Focused Config:");
     println!("  Score: {:.2}%", nhs_result.score * 100.0);

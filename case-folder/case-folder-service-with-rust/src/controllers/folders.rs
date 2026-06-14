@@ -7,11 +7,10 @@
 //! the folder first landed.
 
 use axum::{
-    debug_handler,
+    Extension, Json, debug_handler,
     extract::{Path, Query},
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
-    Extension, Json,
 };
 use loco_rs::prelude::*;
 use serde::Deserialize;
@@ -23,7 +22,7 @@ use crate::{
     controllers::stats::latest_move_per_folder,
     main_event_service::{Client as MainEventServiceClient, RecordMove},
     main_patient_service::{self, Client as MainPatientServiceClient, CreatePatient},
-    main_place_service::{label_path, Client as MainPlaceServiceClient},
+    main_place_service::{Client as MainPlaceServiceClient, label_path},
     main_thing_service::{Client as MainThingServiceClient, NewFolder},
     nhs::{format_nhs_number, is_valid_nhs_number},
     responses::{self, List},

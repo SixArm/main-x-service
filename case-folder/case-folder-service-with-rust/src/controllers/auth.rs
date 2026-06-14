@@ -9,10 +9,9 @@
 //! - `POST /api/auth/logout`  — clear the session cookie.
 
 use axum::{
-    debug_handler,
-    http::{header::SET_COOKIE, HeaderMap, HeaderValue, StatusCode},
+    Extension, Json, debug_handler,
+    http::{HeaderMap, HeaderValue, StatusCode, header::SET_COOKIE},
     response::{IntoResponse, Response},
-    Extension, Json,
 };
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -120,13 +119,13 @@ pub async fn request_link(
     // endpoint can't be used to enumerate valid addresses. A token is
     // only minted + emailed when the email matches the allowlist.
     let mut magic_link = None;
-    if let Some(identity) = auth.identity_for_email(email) {
-        if let Ok(token) = auth.mint_magic_token(&identity) {
-            let link = auth.magic_link(&token);
-            auth.mailer.send_magic_link(&identity, &link);
-            if auth.expose_magic_link() {
-                magic_link = Some(link);
-            }
+    if let Some(identity) = auth.identity_for_email(email)
+        && let Ok(token) = auth.mint_magic_token(&identity)
+    {
+        let link = auth.magic_link(&token);
+        auth.mailer.send_magic_link(&identity, &link);
+        if auth.expose_magic_link() {
+            magic_link = Some(link);
         }
     }
 

@@ -387,7 +387,7 @@ fn test_scorer_combined_similarity_in_unit_interval() {
 #[test]
 fn test_normalizer_parse_iso8601_round_trips_through_seconds() {
     let s = Normalizer::parse_iso8601_unix_seconds("2024-06-26T09:00:00Z").unwrap();
-    assert_eq!(s, 1719392400);
+    assert_eq!(s, 1_719_392_400);
 }
 
 #[test]
