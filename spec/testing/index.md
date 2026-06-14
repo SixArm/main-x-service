@@ -267,7 +267,7 @@ formatting, lint, and binary-conformance gates. These are enforced in CI
 | Gate | Command | Enforces |
 | ---- | ------- | -------- |
 | Formatting | `cargo fmt --all -- --check` | Canonical rustfmt formatting (no diffs) |
-| Lints | `cargo clippy --all-features -- -D warnings -W clippy::pedantic` | Clippy clean with the pedantic baseline; `-D warnings` makes any warning fatal (CI also adds `clippy::nursery` + `rust-2018-idioms`) |
+| Lints | `cargo clippy --all-targets -- -D warnings` (with `#![warn(clippy::pedantic)]` at each crate root) | Clippy clean across **every** crate — services, matchers, the verifier, migrations, and case-folder all produce zero output; `-D warnings` makes any warning fatal (CI also adds `clippy::nursery` + `rust-2018-idioms`) |
 | Binary conformance | (compile-time) | `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`, and the `target_env = "musl"` MiMalloc global allocator block at the top of `lib.rs` / `main.rs` |
 | Doc examples | `cargo test --doc` | `///` examples compile and pass |
 | Markdown links | link check | Cross-doc relative links in `spec/**` and `AGENTS/**` resolve on disk |
@@ -279,6 +279,18 @@ documentation drift cannot merge. The `musl`-gated MiMalloc allocator
 keeps the static-build conformance from the stack convention. Markdown
 link integrity is part of the doc discipline: this very document was
 written only after confirming each cross-link target exists on disk.
+
+**No-suppression invariant.** The clippy gate is met by *fixing* lints,
+not silencing them: there is **no `#[allow(clippy::…)]` / `#![allow(clippy::…)]`
+anywhere in the tree** (verified by `grep -rn 'allow(clippy' --include='*.rs'`
+returning nothing), and the gate may not be relaxed by relocating an
+allow to a `Cargo.toml [lints]` table or to `#[expect]`. Pedantic lints
+are resolved at the source — `doc_markdown` backticks, `#[must_use]`,
+`# Errors`/`# Panics` docs, `TryFrom` instead of `as`, `Option<&T>`
+params, `f64::EPSILON` comparisons in tests, and helper extraction for
+`too_many_lines`. Test, example, and benchmark harness files are held to
+the same bar (no harness-local allows). This keeps the lint signal
+honest: a new pedantic finding must be fixed, never annotated away.
 
 ---
 
