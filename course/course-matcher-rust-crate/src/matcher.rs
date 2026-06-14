@@ -438,9 +438,11 @@ fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
     if union == 0 {
         Some(0.0)
     } else {
-        // Set sizes are small bounded counts; the cast to f64 is exact.
-        #[allow(clippy::cast_precision_loss)]
-        Some(inter as f64 / union as f64)
+        // Set sizes are small bounded counts; convert losslessly via u32
+        // (saturating at u32::MAX, which these counts never approach).
+        let inter_f64 = f64::from(u32::try_from(inter).unwrap_or(u32::MAX));
+        let union_f64 = f64::from(u32::try_from(union).unwrap_or(u32::MAX));
+        Some(inter_f64 / union_f64)
     }
 }
 

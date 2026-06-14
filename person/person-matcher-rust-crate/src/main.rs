@@ -8,8 +8,6 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![warn(clippy::pedantic)]
-// The demo `main` is one long sequence of illustrative examples by design.
-#![allow(clippy::too_many_lines)]
 
 // When we build for MUSL static, use faster memory allocator.
 #[cfg(target_env = "musl")]
@@ -32,7 +30,17 @@ fn main() {
     println!("Person matcher");
     println!("================\n");
 
-    // Example 1: Perfect match
+    let engine = MatchingEngine::default_config();
+    demo_perfect_match(&engine);
+    demo_fuzzy_name(&engine);
+    demo_diacritics(&engine);
+    demo_address(&engine);
+    demo_no_match(&engine);
+    demo_strict_vs_lenient();
+}
+
+/// Example 1: two identical records short-circuit on the shared identifier.
+fn demo_perfect_match(engine: &MatchingEngine) {
     println!("Example 1: Perfect Match");
     let person1 = Person::builder()
         .united_kingdom_national_health_service_number("1234567890")
@@ -44,13 +52,14 @@ fn main() {
 
     let person2 = person1.clone();
 
-    let engine = MatchingEngine::default_config();
     let result = engine.match_persons(&person1, &person2);
 
     println!("Match Score: {:.2}", result.score);
     println!("Is Match: {}", result.is_match);
+}
 
-    // Example 2: Fuzzy name match
+/// Example 2: a spelling variant of the given name (`Stephen`/`Steven`).
+fn demo_fuzzy_name(engine: &MatchingEngine) {
     println!("Example 2: Fuzzy Name Match (Stephen vs Steven)");
     let patient3 = Person::builder()
         .given_name("Stephen")
@@ -77,8 +86,10 @@ fn main() {
         "Phonetic Match: {:?}\n",
         result2.breakdown.phonetic_name_score
     );
+}
 
-    // Example 3: name with diacritics
+/// Example 3: Unicode diacritic equivalence (`Siân`/`Sian`).
+fn demo_diacritics(engine: &MatchingEngine) {
     println!("Example 3: Name with Diacritics");
     let patient5 = Person::builder()
         .given_name("Siân") // With diacritic
@@ -98,8 +109,10 @@ fn main() {
     println!("Match Score: {:.2}", result3.score);
     println!("Is Match: {}", result3.is_match);
     println!();
+}
 
-    // Example 4: Address matching
+/// Example 4: abbreviated-street address sub-scoring.
+fn demo_address(engine: &MatchingEngine) {
     println!("Example 4: Address Matching");
     let mut address1 = Address::new();
     address1.line1 = Some("10 Downing Street".to_string());
@@ -132,8 +145,10 @@ fn main() {
         result4.breakdown.address_score.unwrap()
     );
     println!();
+}
 
-    // Example 5: No match
+/// Example 5: two clearly distinct records that fall below threshold.
+fn demo_no_match(engine: &MatchingEngine) {
     println!("Example 5: Different Patients (No Match)");
     let patient9 = Person::builder()
         .given_name("Alice")
@@ -153,8 +168,10 @@ fn main() {
     println!("Match Score: {:.2}", result5.score);
     println!("Is Match: {}", result5.is_match);
     println!();
+}
 
-    // Example 6: Strict vs Lenient mode
+/// Example 6: nickname handling differs between strict and lenient configs.
+fn demo_strict_vs_lenient() {
     println!("Example 6: Strict vs Lenient Matching");
     let patient11 = Person::builder()
         .given_name("Michael") // Formal name (not nickname)

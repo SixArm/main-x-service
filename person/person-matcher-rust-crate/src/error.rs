@@ -65,7 +65,6 @@ pub enum MatchingError {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unnecessary_wraps)] // demonstrates the `Result` alias
     use super::*;
 
     /// Pins the `Display` text of `MissingField` — the `thiserror` format
@@ -84,8 +83,17 @@ mod tests {
     /// type — a compile-plus-runtime smoke test of the crate's public alias.
     #[test]
     fn result_alias_resolves() {
+        // A genuinely fallible step (here, infallible at runtime but typed
+        // as `Result`) threaded through the alias with `?`, proving the
+        // alias composes in the `?`-operator position as well as a return
+        // type.
+        fn parse_answer(s: &str) -> Result<i32> {
+            s.parse::<i32>()
+                .map_err(|_| MatchingError::MissingField("answer".into()))
+        }
         fn make() -> Result<i32> {
-            Ok(42)
+            let n = parse_answer("42")?;
+            Ok(n)
         }
         assert_eq!(make().unwrap(), 42);
     }

@@ -97,6 +97,7 @@ impl Normalizer {
     /// // and `ź` is stripped:
     /// assert_eq!(Normalizer::normalize_name("Łódź"),    "łodz");
     /// ```
+    #[must_use]
     pub fn normalize_name(name: &str) -> String {
         // Pre-size for the common case where output length ≈ input length.
         let mut out = String::with_capacity(name.len());
@@ -150,6 +151,7 @@ impl Normalizer {
     ///     "cafe au lait",
     /// );
     /// ```
+    #[must_use]
     pub fn normalize_text(text: &str) -> String {
         let mut out = String::with_capacity(text.len());
         for ch in text.nfkd() {
@@ -208,6 +210,7 @@ impl Normalizer {
     /// # use thing_matcher::Normalizer;
     /// assert_eq!(Normalizer::normalize_url("  URN:ISBN:0451450523  "), "urn:isbn:0451450523");
     /// ```
+    #[must_use]
     pub fn normalize_url(url: &str) -> String {
         let trimmed = url.trim();
         // Drop fragment, if present. Re-trim the trailing end: removing the
@@ -491,8 +494,14 @@ mod tests {
     /// `normalize_url` idempotent on these inputs.
     #[test]
     fn normalize_url_retrims_after_fragment_removal() {
-        assert_eq!(Normalizer::normalize_url("http://h/p \u{2000}#x"), "http://h/p");
-        assert_eq!(Normalizer::normalize_url("\u{1F300}\u{2000}#frag"), "\u{1F300}");
+        assert_eq!(
+            Normalizer::normalize_url("http://h/p \u{2000}#x"),
+            "http://h/p"
+        );
+        assert_eq!(
+            Normalizer::normalize_url("\u{1F300}\u{2000}#frag"),
+            "\u{1F300}"
+        );
     }
 
     // ---------- phonetic_code ----------

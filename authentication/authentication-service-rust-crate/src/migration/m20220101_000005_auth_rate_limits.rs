@@ -13,7 +13,7 @@
 //! audit columns; the limiter ignores them and uses `requested_at`, which it
 //! sets explicitly so tests can inject a synthetic "now".)
 
-use loco_rs::schema::*;
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `auth_rate_limits`-table migration (name derived from the module path).

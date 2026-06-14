@@ -1008,177 +1008,301 @@ impl MatchingEngine {
     /// ```
     pub fn deterministic_match(&self, person1: &Person, person2: &Person) -> bool {
         if identifier_equal(
-            &person1.united_kingdom_national_health_service_number,
-            &person2.united_kingdom_national_health_service_number,
+            person1
+                .united_kingdom_national_health_service_number
+                .as_deref(),
+            person2
+                .united_kingdom_national_health_service_number
+                .as_deref(),
             identifiers::parse_united_kingdom_national_health_service_number,
         ) {
             return true;
         }
-        if identifier_equal(&person1.fr_nir, &person2.fr_nir, identifiers::parse_fr_nir) {
-            return true;
-        }
-        if identifier_equal(&person1.es_tsi, &person2.es_tsi, identifiers::parse_es_tsi) {
-            return true;
-        }
-        if identifier_equal(&person1.ie_ihi, &person2.ie_ihi, identifiers::parse_ie_ihi) {
+        if identifier_equal(
+            person1.fr_nir.as_deref(),
+            person2.fr_nir.as_deref(),
+            identifiers::parse_fr_nir,
+        ) {
             return true;
         }
         if identifier_equal(
-            &person1.uk_hc_number,
-            &person2.uk_hc_number,
+            person1.es_tsi.as_deref(),
+            person2.es_tsi.as_deref(),
+            identifiers::parse_es_tsi,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.ie_ihi.as_deref(),
+            person2.ie_ihi.as_deref(),
+            identifiers::parse_ie_ihi,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.uk_hc_number.as_deref(),
+            person2.uk_hc_number.as_deref(),
             identifiers::parse_uk_hc_number,
         ) {
             return true;
         }
-        if identifier_equal(&person1.us_ssn, &person2.us_ssn, identifiers::parse_us_ssn) {
-            return true;
-        }
-        if identifier_equal(&person1.au_ihi, &person2.au_ihi, identifiers::parse_au_ihi) {
+        if identifier_equal(
+            person1.us_ssn.as_deref(),
+            person2.us_ssn.as_deref(),
+            identifiers::parse_us_ssn,
+        ) {
             return true;
         }
         if identifier_equal(
-            &person1.de_kvnr,
-            &person2.de_kvnr,
+            person1.au_ihi.as_deref(),
+            person2.au_ihi.as_deref(),
+            identifiers::parse_au_ihi,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.de_kvnr.as_deref(),
+            person2.de_kvnr.as_deref(),
             identifiers::parse_de_kvnr,
         ) {
             return true;
         }
-        if identifier_equal(&person1.it_cf, &person2.it_cf, identifiers::parse_it_cf) {
-            return true;
-        }
-        if identifier_equal(&person1.nl_bsn, &person2.nl_bsn, identifiers::parse_nl_bsn) {
+        if identifier_equal(
+            person1.it_cf.as_deref(),
+            person2.it_cf.as_deref(),
+            identifiers::parse_it_cf,
+        ) {
             return true;
         }
         if identifier_equal(
-            &person1.se_personnummer,
-            &person2.se_personnummer,
+            person1.nl_bsn.as_deref(),
+            person2.nl_bsn.as_deref(),
+            identifiers::parse_nl_bsn,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.se_personnummer.as_deref(),
+            person2.se_personnummer.as_deref(),
             identifiers::parse_se_personnummer,
         ) {
             return true;
         }
         if identifier_equal(
-            &person1.uk_chi_number,
-            &person2.uk_chi_number,
+            person1.uk_chi_number.as_deref(),
+            person2.uk_chi_number.as_deref(),
             identifiers::parse_uk_chi_number,
         ) {
             return true;
         }
-        if identifier_equal(&person1.be_nn, &person2.be_nn, identifiers::parse_be_nn) {
-            return true;
-        }
-        if identifier_equal(&person1.bg_egn, &person2.bg_egn, identifiers::parse_bg_egn) {
-            return true;
-        }
-        if identifier_equal(&person1.cz_rc, &person2.cz_rc, identifiers::parse_cz_rc) {
-            return true;
-        }
-        if identifier_equal(&person1.dk_cpr, &person2.dk_cpr, identifiers::parse_dk_cpr) {
-            return true;
-        }
-        if identifier_equal(&person1.ee_ik, &person2.ee_ik, identifiers::parse_ee_ik) {
-            return true;
-        }
-        if identifier_equal(&person1.es_dni, &person2.es_dni, identifiers::parse_es_dni) {
+        if identifier_equal(
+            person1.be_nn.as_deref(),
+            person2.be_nn.as_deref(),
+            identifiers::parse_be_nn,
+        ) {
             return true;
         }
         if identifier_equal(
-            &person1.fi_hetu,
-            &person2.fi_hetu,
+            person1.bg_egn.as_deref(),
+            person2.bg_egn.as_deref(),
+            identifiers::parse_bg_egn,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.cz_rc.as_deref(),
+            person2.cz_rc.as_deref(),
+            identifiers::parse_cz_rc,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.dk_cpr.as_deref(),
+            person2.dk_cpr.as_deref(),
+            identifiers::parse_dk_cpr,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.ee_ik.as_deref(),
+            person2.ee_ik.as_deref(),
+            identifiers::parse_ee_ik,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.es_dni.as_deref(),
+            person2.es_dni.as_deref(),
+            identifiers::parse_es_dni,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.fi_hetu.as_deref(),
+            person2.fi_hetu.as_deref(),
             identifiers::parse_fi_hetu,
         ) {
             return true;
         }
-        if identifier_equal(&person1.hr_oib, &person2.hr_oib, identifiers::parse_hr_oib) {
-            return true;
-        }
-        if identifier_equal(&person1.is_kt, &person2.is_kt, identifiers::parse_is_kt) {
-            return true;
-        }
-        if identifier_equal(&person1.lt_ak, &person2.lt_ak, identifiers::parse_lt_ak) {
-            return true;
-        }
-        if identifier_equal(&person1.lv_pk, &person2.lv_pk, identifiers::parse_lv_pk) {
-            return true;
-        }
-        if identifier_equal(&person1.mt_id, &person2.mt_id, identifiers::parse_mt_id) {
-            return true;
-        }
-        if identifier_equal(&person1.no_fnr, &person2.no_fnr, identifiers::parse_no_fnr) {
+        if identifier_equal(
+            person1.hr_oib.as_deref(),
+            person2.hr_oib.as_deref(),
+            identifiers::parse_hr_oib,
+        ) {
             return true;
         }
         if identifier_equal(
-            &person1.pl_pesel,
-            &person2.pl_pesel,
+            person1.is_kt.as_deref(),
+            person2.is_kt.as_deref(),
+            identifiers::parse_is_kt,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.lt_ak.as_deref(),
+            person2.lt_ak.as_deref(),
+            identifiers::parse_lt_ak,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.lv_pk.as_deref(),
+            person2.lv_pk.as_deref(),
+            identifiers::parse_lv_pk,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.mt_id.as_deref(),
+            person2.mt_id.as_deref(),
+            identifiers::parse_mt_id,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.no_fnr.as_deref(),
+            person2.no_fnr.as_deref(),
+            identifiers::parse_no_fnr,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.pl_pesel.as_deref(),
+            person2.pl_pesel.as_deref(),
             identifiers::parse_pl_pesel,
         ) {
             return true;
         }
-        if identifier_equal(&person1.ro_cnp, &person2.ro_cnp, identifiers::parse_ro_cnp) {
+        if identifier_equal(
+            person1.ro_cnp.as_deref(),
+            person2.ro_cnp.as_deref(),
+            identifiers::parse_ro_cnp,
+        ) {
             return true;
         }
         if identifier_equal(
-            &person1.si_emso,
-            &person2.si_emso,
+            person1.si_emso.as_deref(),
+            person2.si_emso.as_deref(),
             identifiers::parse_si_emso,
         ) {
             return true;
         }
-        if identifier_equal(&person1.sk_rc, &person2.sk_rc, identifiers::parse_sk_rc) {
+        if identifier_equal(
+            person1.sk_rc.as_deref(),
+            person2.sk_rc.as_deref(),
+            identifiers::parse_sk_rc,
+        ) {
             return true;
         }
         if identifier_equal(
-            &person1.uk_nino,
-            &person2.uk_nino,
+            person1.uk_nino.as_deref(),
+            person2.uk_nino.as_deref(),
             identifiers::parse_uk_nino,
         ) {
             return true;
         }
-        if identifier_equal(&person1.gr_dss, &person2.gr_dss, identifiers::parse_gr_dss) {
-            return true;
-        }
-        if identifier_equal(&person1.li_id, &person2.li_id, identifiers::parse_li_id) {
-            return true;
-        }
-        if identifier_equal(&person1.nl_id, &person2.nl_id, identifiers::parse_nl_id) {
-            return true;
-        }
-        if identifier_equal(&person1.pl_nip, &person2.pl_nip, identifiers::parse_pl_nip) {
-            return true;
-        }
-        if identifier_equal(&person1.pt_nif, &person2.pt_nif, identifiers::parse_pt_nif) {
-            return true;
-        }
-        if identifier_equal(&person1.br_cpf, &person2.br_cpf, identifiers::parse_br_cpf) {
-            return true;
-        }
-        if identifier_equal(&person1.cn_rrn, &person2.cn_rrn, identifiers::parse_cn_rrn) {
+        if identifier_equal(
+            person1.gr_dss.as_deref(),
+            person2.gr_dss.as_deref(),
+            identifiers::parse_gr_dss,
+        ) {
             return true;
         }
         if identifier_equal(
-            &person1.in_aadhaar,
-            &person2.in_aadhaar,
+            person1.li_id.as_deref(),
+            person2.li_id.as_deref(),
+            identifiers::parse_li_id,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.nl_id.as_deref(),
+            person2.nl_id.as_deref(),
+            identifiers::parse_nl_id,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.pl_nip.as_deref(),
+            person2.pl_nip.as_deref(),
+            identifiers::parse_pl_nip,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.pt_nif.as_deref(),
+            person2.pt_nif.as_deref(),
+            identifiers::parse_pt_nif,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.br_cpf.as_deref(),
+            person2.br_cpf.as_deref(),
+            identifiers::parse_br_cpf,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.cn_rrn.as_deref(),
+            person2.cn_rrn.as_deref(),
+            identifiers::parse_cn_rrn,
+        ) {
+            return true;
+        }
+        if identifier_equal(
+            person1.in_aadhaar.as_deref(),
+            person2.in_aadhaar.as_deref(),
             identifiers::parse_in_aadhaar,
         ) {
             return true;
         }
         if identifier_equal(
-            &person1.jp_my_number,
-            &person2.jp_my_number,
+            person1.jp_my_number.as_deref(),
+            person2.jp_my_number.as_deref(),
             identifiers::parse_jp_my_number,
         ) {
             return true;
         }
         if identifier_equal(
-            &person1.mx_curp,
-            &person2.mx_curp,
+            person1.mx_curp.as_deref(),
+            person2.mx_curp.as_deref(),
             identifiers::parse_mx_curp,
         ) {
             return true;
         }
-        if identifier_equal(&person1.nz_nhi, &person2.nz_nhi, identifiers::parse_nz_nhi) {
+        if identifier_equal(
+            person1.nz_nhi.as_deref(),
+            person2.nz_nhi.as_deref(),
+            identifiers::parse_nz_nhi,
+        ) {
             return true;
         }
-        if identifier_equal(&person1.za_id, &person2.za_id, identifiers::parse_za_id) {
+        if identifier_equal(
+            person1.za_id.as_deref(),
+            person2.za_id.as_deref(),
+            identifiers::parse_za_id,
+        ) {
             return true;
         }
         if passport_books_share_pair(&person1.passport_books, &person2.passport_books) {
@@ -1233,167 +1357,219 @@ impl MatchingEngine {
     fn calculate_breakdown(&self, person1: &Person, person2: &Person) -> MatchBreakdown {
         MatchBreakdown {
             united_kingdom_national_health_service_number_score: identifier_score(
-                &person1.united_kingdom_national_health_service_number,
-                &person2.united_kingdom_national_health_service_number,
+                person1
+                    .united_kingdom_national_health_service_number
+                    .as_deref(),
+                person2
+                    .united_kingdom_national_health_service_number
+                    .as_deref(),
                 identifiers::parse_united_kingdom_national_health_service_number,
             ),
             fr_nir_score: identifier_score(
-                &person1.fr_nir,
-                &person2.fr_nir,
+                person1.fr_nir.as_deref(),
+                person2.fr_nir.as_deref(),
                 identifiers::parse_fr_nir,
             ),
             es_tsi_score: identifier_score(
-                &person1.es_tsi,
-                &person2.es_tsi,
+                person1.es_tsi.as_deref(),
+                person2.es_tsi.as_deref(),
                 identifiers::parse_es_tsi,
             ),
             ie_ihi_score: identifier_score(
-                &person1.ie_ihi,
-                &person2.ie_ihi,
+                person1.ie_ihi.as_deref(),
+                person2.ie_ihi.as_deref(),
                 identifiers::parse_ie_ihi,
             ),
             uk_hc_number_score: identifier_score(
-                &person1.uk_hc_number,
-                &person2.uk_hc_number,
+                person1.uk_hc_number.as_deref(),
+                person2.uk_hc_number.as_deref(),
                 identifiers::parse_uk_hc_number,
             ),
             us_ssn_score: identifier_score(
-                &person1.us_ssn,
-                &person2.us_ssn,
+                person1.us_ssn.as_deref(),
+                person2.us_ssn.as_deref(),
                 identifiers::parse_us_ssn,
             ),
             au_ihi_score: identifier_score(
-                &person1.au_ihi,
-                &person2.au_ihi,
+                person1.au_ihi.as_deref(),
+                person2.au_ihi.as_deref(),
                 identifiers::parse_au_ihi,
             ),
             de_kvnr_score: identifier_score(
-                &person1.de_kvnr,
-                &person2.de_kvnr,
+                person1.de_kvnr.as_deref(),
+                person2.de_kvnr.as_deref(),
                 identifiers::parse_de_kvnr,
             ),
-            it_cf_score: identifier_score(&person1.it_cf, &person2.it_cf, identifiers::parse_it_cf),
+            it_cf_score: identifier_score(
+                person1.it_cf.as_deref(),
+                person2.it_cf.as_deref(),
+                identifiers::parse_it_cf,
+            ),
             nl_bsn_score: identifier_score(
-                &person1.nl_bsn,
-                &person2.nl_bsn,
+                person1.nl_bsn.as_deref(),
+                person2.nl_bsn.as_deref(),
                 identifiers::parse_nl_bsn,
             ),
             se_personnummer_score: identifier_score(
-                &person1.se_personnummer,
-                &person2.se_personnummer,
+                person1.se_personnummer.as_deref(),
+                person2.se_personnummer.as_deref(),
                 identifiers::parse_se_personnummer,
             ),
             uk_chi_number_score: identifier_score(
-                &person1.uk_chi_number,
-                &person2.uk_chi_number,
+                person1.uk_chi_number.as_deref(),
+                person2.uk_chi_number.as_deref(),
                 identifiers::parse_uk_chi_number,
             ),
-            be_nn_score: identifier_score(&person1.be_nn, &person2.be_nn, identifiers::parse_be_nn),
+            be_nn_score: identifier_score(
+                person1.be_nn.as_deref(),
+                person2.be_nn.as_deref(),
+                identifiers::parse_be_nn,
+            ),
             bg_egn_score: identifier_score(
-                &person1.bg_egn,
-                &person2.bg_egn,
+                person1.bg_egn.as_deref(),
+                person2.bg_egn.as_deref(),
                 identifiers::parse_bg_egn,
             ),
-            cz_rc_score: identifier_score(&person1.cz_rc, &person2.cz_rc, identifiers::parse_cz_rc),
+            cz_rc_score: identifier_score(
+                person1.cz_rc.as_deref(),
+                person2.cz_rc.as_deref(),
+                identifiers::parse_cz_rc,
+            ),
             dk_cpr_score: identifier_score(
-                &person1.dk_cpr,
-                &person2.dk_cpr,
+                person1.dk_cpr.as_deref(),
+                person2.dk_cpr.as_deref(),
                 identifiers::parse_dk_cpr,
             ),
-            ee_ik_score: identifier_score(&person1.ee_ik, &person2.ee_ik, identifiers::parse_ee_ik),
+            ee_ik_score: identifier_score(
+                person1.ee_ik.as_deref(),
+                person2.ee_ik.as_deref(),
+                identifiers::parse_ee_ik,
+            ),
             es_dni_score: identifier_score(
-                &person1.es_dni,
-                &person2.es_dni,
+                person1.es_dni.as_deref(),
+                person2.es_dni.as_deref(),
                 identifiers::parse_es_dni,
             ),
             fi_hetu_score: identifier_score(
-                &person1.fi_hetu,
-                &person2.fi_hetu,
+                person1.fi_hetu.as_deref(),
+                person2.fi_hetu.as_deref(),
                 identifiers::parse_fi_hetu,
             ),
             hr_oib_score: identifier_score(
-                &person1.hr_oib,
-                &person2.hr_oib,
+                person1.hr_oib.as_deref(),
+                person2.hr_oib.as_deref(),
                 identifiers::parse_hr_oib,
             ),
-            is_kt_score: identifier_score(&person1.is_kt, &person2.is_kt, identifiers::parse_is_kt),
-            lt_ak_score: identifier_score(&person1.lt_ak, &person2.lt_ak, identifiers::parse_lt_ak),
-            lv_pk_score: identifier_score(&person1.lv_pk, &person2.lv_pk, identifiers::parse_lv_pk),
-            mt_id_score: identifier_score(&person1.mt_id, &person2.mt_id, identifiers::parse_mt_id),
+            is_kt_score: identifier_score(
+                person1.is_kt.as_deref(),
+                person2.is_kt.as_deref(),
+                identifiers::parse_is_kt,
+            ),
+            lt_ak_score: identifier_score(
+                person1.lt_ak.as_deref(),
+                person2.lt_ak.as_deref(),
+                identifiers::parse_lt_ak,
+            ),
+            lv_pk_score: identifier_score(
+                person1.lv_pk.as_deref(),
+                person2.lv_pk.as_deref(),
+                identifiers::parse_lv_pk,
+            ),
+            mt_id_score: identifier_score(
+                person1.mt_id.as_deref(),
+                person2.mt_id.as_deref(),
+                identifiers::parse_mt_id,
+            ),
             no_fnr_score: identifier_score(
-                &person1.no_fnr,
-                &person2.no_fnr,
+                person1.no_fnr.as_deref(),
+                person2.no_fnr.as_deref(),
                 identifiers::parse_no_fnr,
             ),
             pl_pesel_score: identifier_score(
-                &person1.pl_pesel,
-                &person2.pl_pesel,
+                person1.pl_pesel.as_deref(),
+                person2.pl_pesel.as_deref(),
                 identifiers::parse_pl_pesel,
             ),
             ro_cnp_score: identifier_score(
-                &person1.ro_cnp,
-                &person2.ro_cnp,
+                person1.ro_cnp.as_deref(),
+                person2.ro_cnp.as_deref(),
                 identifiers::parse_ro_cnp,
             ),
             si_emso_score: identifier_score(
-                &person1.si_emso,
-                &person2.si_emso,
+                person1.si_emso.as_deref(),
+                person2.si_emso.as_deref(),
                 identifiers::parse_si_emso,
             ),
-            sk_rc_score: identifier_score(&person1.sk_rc, &person2.sk_rc, identifiers::parse_sk_rc),
+            sk_rc_score: identifier_score(
+                person1.sk_rc.as_deref(),
+                person2.sk_rc.as_deref(),
+                identifiers::parse_sk_rc,
+            ),
             uk_nino_score: identifier_score(
-                &person1.uk_nino,
-                &person2.uk_nino,
+                person1.uk_nino.as_deref(),
+                person2.uk_nino.as_deref(),
                 identifiers::parse_uk_nino,
             ),
             gr_dss_score: identifier_score(
-                &person1.gr_dss,
-                &person2.gr_dss,
+                person1.gr_dss.as_deref(),
+                person2.gr_dss.as_deref(),
                 identifiers::parse_gr_dss,
             ),
-            li_id_score: identifier_score(&person1.li_id, &person2.li_id, identifiers::parse_li_id),
-            nl_id_score: identifier_score(&person1.nl_id, &person2.nl_id, identifiers::parse_nl_id),
+            li_id_score: identifier_score(
+                person1.li_id.as_deref(),
+                person2.li_id.as_deref(),
+                identifiers::parse_li_id,
+            ),
+            nl_id_score: identifier_score(
+                person1.nl_id.as_deref(),
+                person2.nl_id.as_deref(),
+                identifiers::parse_nl_id,
+            ),
             pl_nip_score: identifier_score(
-                &person1.pl_nip,
-                &person2.pl_nip,
+                person1.pl_nip.as_deref(),
+                person2.pl_nip.as_deref(),
                 identifiers::parse_pl_nip,
             ),
             pt_nif_score: identifier_score(
-                &person1.pt_nif,
-                &person2.pt_nif,
+                person1.pt_nif.as_deref(),
+                person2.pt_nif.as_deref(),
                 identifiers::parse_pt_nif,
             ),
             br_cpf_score: identifier_score(
-                &person1.br_cpf,
-                &person2.br_cpf,
+                person1.br_cpf.as_deref(),
+                person2.br_cpf.as_deref(),
                 identifiers::parse_br_cpf,
             ),
             cn_rrn_score: identifier_score(
-                &person1.cn_rrn,
-                &person2.cn_rrn,
+                person1.cn_rrn.as_deref(),
+                person2.cn_rrn.as_deref(),
                 identifiers::parse_cn_rrn,
             ),
             in_aadhaar_score: identifier_score(
-                &person1.in_aadhaar,
-                &person2.in_aadhaar,
+                person1.in_aadhaar.as_deref(),
+                person2.in_aadhaar.as_deref(),
                 identifiers::parse_in_aadhaar,
             ),
             jp_my_number_score: identifier_score(
-                &person1.jp_my_number,
-                &person2.jp_my_number,
+                person1.jp_my_number.as_deref(),
+                person2.jp_my_number.as_deref(),
                 identifiers::parse_jp_my_number,
             ),
             mx_curp_score: identifier_score(
-                &person1.mx_curp,
-                &person2.mx_curp,
+                person1.mx_curp.as_deref(),
+                person2.mx_curp.as_deref(),
                 identifiers::parse_mx_curp,
             ),
             nz_nhi_score: identifier_score(
-                &person1.nz_nhi,
-                &person2.nz_nhi,
+                person1.nz_nhi.as_deref(),
+                person2.nz_nhi.as_deref(),
                 identifiers::parse_nz_nhi,
             ),
-            za_id_score: identifier_score(&person1.za_id, &person2.za_id, identifiers::parse_za_id),
+            za_id_score: identifier_score(
+                person1.za_id.as_deref(),
+                person2.za_id.as_deref(),
+                identifiers::parse_za_id,
+            ),
             passport_book_score: score_passport_books(
                 &person1.passport_books,
                 &person2.passport_books,
@@ -1953,8 +2129,7 @@ impl MatchingEngine {
 /// Return `true` iff both raw identifier strings parse via `parser` to the
 /// same canonical form. Both `None` or a parse failure on either side
 /// yields `false` — this helper backs deterministic identifier matching.
-#[allow(clippy::ref_option)] // called on `&person.field` across ~40 schemes
-fn identifier_equal<F>(a: &Option<String>, b: &Option<String>, parser: F) -> bool
+fn identifier_equal<F>(a: Option<&str>, b: Option<&str>, parser: F) -> bool
 where
     F: Fn(&str) -> Option<String>,
 {
@@ -1970,8 +2145,7 @@ where
 /// Return `Some(1.0)` if both inputs parse and are equal, `Some(0.0)` if
 /// both parse but differ, or `None` if either input is absent or fails to
 /// parse — mirroring the existing per-field scoring contract.
-#[allow(clippy::ref_option)] // called on `&person.field` across ~40 schemes
-fn identifier_score<F>(a: &Option<String>, b: &Option<String>, parser: F) -> Option<f64>
+fn identifier_score<F>(a: Option<&str>, b: Option<&str>, parser: F) -> Option<f64>
 where
     F: Fn(&str) -> Option<String>,
 {
@@ -2101,7 +2275,6 @@ mod tests {
     //!
     //! Tests pin observable behaviour (scores, bands, booleans) rather
     //! than internals, and all fixtures are synthetic per the no-PII rule.
-    #![allow(clippy::float_cmp)] // scores are exact constants in assertions
     use super::*;
     use crate::models::Gender;
 
@@ -2114,6 +2287,13 @@ mod tests {
     /// valid calendar date. Tests pass only valid dates.
     fn dob(y: i32, m: u32, d: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
+
+    /// Exact-constant float comparison for assertions: the scoring helpers
+    /// return exact `f64` constants (`0.0`, `0.5`, `1.0`), so a tolerance of
+    /// one ULP is the right test of "did we get exactly this constant?".
+    fn approx_eq(actual: f64, expected: f64) -> bool {
+        (actual - expected).abs() < f64::EPSILON
     }
 
     // ---------- MatchConfig presets ----------
@@ -2312,7 +2492,7 @@ mod tests {
         let a = Person::builder().given_name("Solo").build();
         let b = Person::builder().family_name("Only").build();
         let r = MatchingEngine::default_config().match_persons(&a, &b);
-        assert_eq!(r.score, 0.0);
+        assert!(approx_eq(r.score, 0.0));
         assert!(!r.is_match);
     }
 
@@ -2773,7 +2953,10 @@ mod tests {
     /// full `1.0`.
     #[test]
     fn dob_pair_exact_equal_scores_one() {
-        assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1995, 1, 10)), 1.0);
+        assert!(approx_eq(
+            score_dob_pair(dob(1995, 1, 10), dob(1995, 1, 10)),
+            1.0
+        ));
     }
 
     /// The day/month transposition (DD/MM vs MM/DD, e.g. 1995-01-10 vs
@@ -2783,9 +2966,15 @@ mod tests {
     #[test]
     fn dob_pair_day_month_swap_scores_half() {
         // 1995-01-10 vs 1995-10-01 — classic DD/MM ↔ MM/DD bug.
-        assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1995, 10, 1)), 0.5);
+        assert!(approx_eq(
+            score_dob_pair(dob(1995, 1, 10), dob(1995, 10, 1)),
+            0.5
+        ));
         // Symmetric.
-        assert_eq!(score_dob_pair(dob(1995, 10, 1), dob(1995, 1, 10)), 0.5);
+        assert!(approx_eq(
+            score_dob_pair(dob(1995, 10, 1), dob(1995, 1, 10)),
+            0.5
+        ));
     }
 
     /// The transposition allowance is gated on the year matching: a
@@ -2795,7 +2984,10 @@ mod tests {
     #[test]
     fn dob_pair_swap_requires_year_to_match() {
         // Same day/month layout but different year — not a transposition.
-        assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1996, 10, 1)), 0.0);
+        assert!(approx_eq(
+            score_dob_pair(dob(1995, 1, 10), dob(1996, 10, 1)),
+            0.0
+        ));
     }
 
     /// When the original day exceeds 12 the swapped form (day-as-month) is
@@ -2810,8 +3002,14 @@ mod tests {
         // and the heuristic does not fire. Compared against any other
         // valid date — including the same month with a different day —
         // the score must be 0.0.
-        assert_eq!(score_dob_pair(dob(1995, 1, 25), dob(1995, 1, 26)), 0.0);
-        assert_eq!(score_dob_pair(dob(1995, 1, 25), dob(1995, 2, 25)), 0.0);
+        assert!(approx_eq(
+            score_dob_pair(dob(1995, 1, 25), dob(1995, 1, 26)),
+            0.0
+        ));
+        assert!(approx_eq(
+            score_dob_pair(dob(1995, 1, 25), dob(1995, 2, 25)),
+            0.0
+        ));
     }
 
     /// Genuinely unrelated dates, and near-misses that are not a
@@ -2819,8 +3017,14 @@ mod tests {
     /// exact or transposed pairs earn credit.
     #[test]
     fn dob_pair_unrelated_dates_score_zero() {
-        assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1980, 6, 30)), 0.0);
-        assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1995, 1, 11)), 0.0);
+        assert!(approx_eq(
+            score_dob_pair(dob(1995, 1, 10), dob(1980, 6, 30)),
+            0.0
+        ));
+        assert!(approx_eq(
+            score_dob_pair(dob(1995, 1, 10), dob(1995, 1, 11)),
+            0.0
+        ));
     }
 
     /// Edge case where day equals month (e.g. 1995-05-05): the swap is a
@@ -2829,9 +3033,15 @@ mod tests {
     #[test]
     fn dob_pair_day_equals_month_collapses_to_exact() {
         // 1995-05-05: swap is a no-op; exact-match branch wins.
-        assert_eq!(score_dob_pair(dob(1995, 5, 5), dob(1995, 5, 5)), 1.0);
+        assert!(approx_eq(
+            score_dob_pair(dob(1995, 5, 5), dob(1995, 5, 5)),
+            1.0
+        ));
         // 1995-05-05 vs 1995-05-06: not a transposition; 0.0.
-        assert_eq!(score_dob_pair(dob(1995, 5, 5), dob(1995, 5, 6)), 0.0);
+        assert!(approx_eq(
+            score_dob_pair(dob(1995, 5, 5), dob(1995, 5, 6)),
+            0.0
+        ));
     }
 
     /// Robustness near leap-day and other awkward dates: the helper never
@@ -2843,9 +3053,15 @@ mod tests {
         // 2003-02-30 is never constructed (chrono rejects it), so the
         // helper only ever receives valid dates. But test a near-edge:
         // swap of Feb 29 (leap) vs swap target.
-        assert_eq!(score_dob_pair(dob(2000, 2, 29), dob(2000, 2, 29)), 1.0);
+        assert!(approx_eq(
+            score_dob_pair(dob(2000, 2, 29), dob(2000, 2, 29)),
+            1.0
+        ));
         // 2000-02-12 swap = 2000-12-02, valid.
-        assert_eq!(score_dob_pair(dob(2000, 2, 12), dob(2000, 12, 2)), 0.5);
+        assert!(approx_eq(
+            score_dob_pair(dob(2000, 2, 12), dob(2000, 12, 2)),
+            0.5
+        ));
     }
 
     /// Boundary between the two strategies: the transposition heuristic is

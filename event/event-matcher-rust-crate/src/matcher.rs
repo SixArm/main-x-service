@@ -669,13 +669,14 @@ impl MatchingEngine {
     /// hurts. The decay scale comes from `start_date_scale_seconds`
     /// (default one hour), so events starting within an hour of each other
     /// still score high while events days apart score near zero.
-    // The second-delta magnitude is tiny relative to f64's 52-bit mantissa,
-    // so the lossy i64->f64 cast is harmless here.
-    #[allow(clippy::cast_precision_loss)]
     fn score_start_date(&self, e1: &Event, e2: &Event) -> Option<f64> {
         let d = Scorer::seconds_between(e1.start_date.as_deref()?, e2.start_date.as_deref()?)?;
+        // `d` is a non-negative seconds magnitude. `u32::MAX` seconds is
+        // ~136 years, exact through the conversion for every realistic
+        // event gap; absurd gaps saturate and already score ~0.
+        let d = f64::from(u32::try_from(d).unwrap_or(u32::MAX));
         Some(Scorer::start_date_score(
-            d as f64,
+            d,
             self.config.start_date_scale_seconds,
         ))
     }
@@ -688,12 +689,13 @@ impl MatchingEngine {
     /// the [`Scorer::start_date_score`] kernel, since the end of an event
     /// is just another point on the same timeline. Returns `None` when
     /// either end date is missing or unparseable.
-    // Same harmless i64->f64 cast as `score_start_date`.
-    #[allow(clippy::cast_precision_loss)]
     fn score_end_date(&self, e1: &Event, e2: &Event) -> Option<f64> {
         let d = Scorer::seconds_between(e1.end_date.as_deref()?, e2.end_date.as_deref()?)?;
+        // Same saturating-lossless seconds magnitude conversion as
+        // `score_start_date`.
+        let d = f64::from(u32::try_from(d).unwrap_or(u32::MAX));
         Some(Scorer::start_date_score(
-            d as f64,
+            d,
             self.config.start_date_scale_seconds,
         ))
     }
@@ -973,12 +975,14 @@ fn compare_addresses(addr1: &Address, addr2: &Address) -> f64 {
 }
 
 #[cfg(test)]
-// Some assertions check exact sentinel scores (`0.0` / `1.0`), where exact
-// float comparison is the intended behaviour.
-#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
     use crate::models::{EventCategory, EventId, EventIdScheme};
+
+    /// Approximate float equality for assertions on sentinel scores.
+    fn approx_eq(a: f64, b: f64) -> bool {
+        (a - b).abs() < f64::EPSILON
+    }
 
     // ---------- MatchConfig presets ----------
 
@@ -1070,7 +1074,7 @@ mod tests {
         let a = Event::builder().url("https://example.org/a").build();
         let b = Event::builder().url("https://example.org/b").build();
         let r = MatchingEngine::default_config().match_events(&a, &b);
-        assert_eq!(r.score, 0.0);
+        assert!(approx_eq(r.score, 0.0));
     }
 
     // ---------- start_date ----------
@@ -1133,14 +1137,22 @@ mod tests {
             .category(EventCategory::ComedyEvent)
             .build();
         let engine = MatchingEngine::default_config();
-        assert_eq!(
-            engine.match_events(&a, &b).breakdown.category_score,
-            Some(1.0)
-        );
-        assert_eq!(
-            engine.match_events(&a, &c).breakdown.category_score,
-            Some(0.0)
-        );
+        assert!(approx_eq(
+            engine
+                .match_events(&a, &b)
+                .breakdown
+                .category_score
+                .unwrap(),
+            1.0
+        ));
+        assert!(approx_eq(
+            engine
+                .match_events(&a, &c)
+                .breakdown
+                .category_score
+                .unwrap(),
+            0.0
+        ));
     }
 
     #[test]
@@ -1167,7 +1179,7 @@ mod tests {
             .country_code_as_iso_3166_1_alpha_2("GB")
             .build();
         let r = MatchingEngine::default_config().match_events(&a, &b);
-        assert_eq!(r.breakdown.country_code_score, Some(1.0));
+        assert!(approx_eq(r.breakdown.country_code_score.unwrap(), 1.0));
     }
 
     #[test]
@@ -1181,7 +1193,7 @@ mod tests {
             .country_code_as_iso_3166_1_alpha_2("FR")
             .build();
         let r = MatchingEngine::default_config().match_events(&a, &b);
-        assert_eq!(r.breakdown.country_code_score, Some(0.0));
+        assert!(approx_eq(r.breakdown.country_code_score.unwrap(), 0.0));
     }
 
     // ---------- event_ids ----------
@@ -1192,7 +1204,7 @@ mod tests {
         let a = Event::builder().name("X").add_event_id(id.clone()).build();
         let b = Event::builder().name("X").add_event_id(id).build();
         let r = MatchingEngine::default_config().match_events(&a, &b);
-        assert_eq!(r.breakdown.event_ids_score, Some(1.0));
+        assert!(approx_eq(r.breakdown.event_ids_score.unwrap(), 1.0));
     }
 
     #[test]
@@ -1206,7 +1218,7 @@ mod tests {
             .add_event_id(EventId::new(EventIdScheme::Meetup, "X").unwrap())
             .build();
         let r = MatchingEngine::default_config().match_events(&a, &b);
-        assert_eq!(r.breakdown.event_ids_score, Some(0.0));
+        assert!(approx_eq(r.breakdown.event_ids_score.unwrap(), 0.0));
     }
 
     #[test]
@@ -1405,7 +1417,7 @@ mod tests {
             .url("  https://rustconf.com  ")
             .build();
         let r = MatchingEngine::default_config().match_events(&a, &b);
-        assert_eq!(r.breakdown.url_score, Some(1.0));
+        assert!(approx_eq(r.breakdown.url_score.unwrap(), 1.0));
     }
 
     // ---------- phonetic ----------

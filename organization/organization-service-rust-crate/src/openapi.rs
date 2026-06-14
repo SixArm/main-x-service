@@ -9,9 +9,6 @@
 use serde_json::{Value, json};
 
 /// The full `OpenAPI` document, served at `/api-docs/openapi.json`.
-// One contiguous `json!` literal: splitting it into helpers would
-// scatter the document and hurt readability, so the length is allowed.
-#[allow(clippy::too_many_lines)]
 #[must_use]
 pub fn spec() -> Value {
     json!({
@@ -21,7 +18,34 @@ pub fn spec() -> Value {
             "version": env!("CARGO_PKG_VERSION"),
             "description": "Registry of organization identities (schema.org/Organization): CRUD + matching. The request/response body for an organization is the organization-matcher Organization shape."
         },
-        "paths": {
+        "paths": paths(),
+        "components": components(),
+    })
+}
+
+/// The `paths` object of the `OpenAPI` document, composed from the
+/// CRUD/matching paths and the auxiliary (auth/audit/events/metrics)
+/// paths.
+fn paths() -> Value {
+    let mut paths = crud_paths();
+    merge_object(&mut paths, aux_paths());
+    paths
+}
+
+/// Shallow-merge the top-level keys of `src` into `dst`. Both are JSON
+/// objects; this keeps the composed document byte-identical to the
+/// single literal it was split from.
+fn merge_object(dst: &mut Value, src: Value) {
+    if let (Some(dst), Value::Object(src)) = (dst.as_object_mut(), src) {
+        for (k, v) in src {
+            dst.insert(k, v);
+        }
+    }
+}
+
+/// The CRUD + matching + merge paths.
+fn crud_paths() -> Value {
+    json!({
             "/api/organizations": {
                 "get": {
                     "tags": ["organizations"],
@@ -79,7 +103,13 @@ pub fn spec() -> Value {
             },
             "/api/organizations/merges/recent": {
                 "get": { "tags": ["matching"], "summary": "Recent merge-history records", "responses": { "200": { "description": "Merge records" } } }
-            },
+            }
+    })
+}
+
+/// The auth / audit / events / single-record / metrics paths.
+fn aux_paths() -> Value {
+    json!({
             "/api/organizations/whoami": {
                 "get": {
                     "tags": ["auth"],
@@ -119,8 +149,12 @@ pub fn spec() -> Value {
                         "content": { "text/plain": { "schema": { "type": "string" } } } } }
                 }
             }
-        },
-        "components": {
+    })
+}
+
+/// The `components` object of the `OpenAPI` document.
+fn components() -> Value {
+    json!({
             "securitySchemes": {
                 "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT",
                     "description": "RS256 access token from the authentication-service, verified offline against its JWKS." }
@@ -162,7 +196,6 @@ pub fn spec() -> Value {
                     "email": { "type": "string", "nullable": true },
                     "keywords": { "type": "array", "items": { "type": "string" } } } }
             }
-        }
     })
 }
 

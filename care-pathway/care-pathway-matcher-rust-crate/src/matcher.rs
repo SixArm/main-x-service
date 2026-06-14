@@ -402,11 +402,12 @@ fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
         // defensive divide-by-zero guard.
         Some(0.0)
     } else {
-        // `inter`/`union` are small set cardinalities; the f64 cast cannot
-        // lose precision at these magnitudes, so the pedantic lint is
-        // intentionally allowed here.
-        #[allow(clippy::cast_precision_loss)]
-        Some(inter as f64 / union as f64)
+        // `inter`/`union` are small set cardinalities; convert losslessly
+        // via `u32` so the ratio is exact (only absurd counts saturate).
+        Some(
+            f64::from(u32::try_from(inter).unwrap_or(u32::MAX))
+                / f64::from(u32::try_from(union).unwrap_or(u32::MAX)),
+        )
     }
 }
 

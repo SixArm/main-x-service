@@ -10,9 +10,10 @@
 use serde_json::{Value, json};
 
 /// The full `OpenAPI` document, served at `/api-docs/openapi.json`.
-// One contiguous `json!` literal: splitting it into helpers would scatter
-// the document and hurt readability, so the length is allowed.
-#[allow(clippy::too_many_lines)]
+///
+/// Assembled from cohesive helpers (`paths`, `components`) so each part
+/// stays readable; the produced JSON is identical to one contiguous
+/// literal.
 #[must_use]
 pub fn spec() -> Value {
     json!({
@@ -22,7 +23,26 @@ pub fn spec() -> Value {
             "version": env!("CARGO_PKG_VERSION"),
             "description": "Central single sign-on provider for the Main X Index family. Passwordless email magic-link authentication; issues RS256 JWT access tokens verifiable offline against the JWKS at /.well-known/jwks.json. The unauthenticated issuance endpoints (signup, magic-link) always return 200 to avoid account enumeration, and are rate-limited per email (429 when exceeded). me and signout require a bearer token."
         },
-        "paths": {
+        "paths": paths(),
+        "components": components()
+    })
+}
+
+/// The `paths` object of the `OpenAPI` document, assembled from the
+/// per-area path groups (merged into a single object).
+fn paths() -> Value {
+    let mut paths = serde_json::Map::new();
+    for group in [auth_paths(), account_paths(), infra_paths()] {
+        if let Value::Object(map) = group {
+            paths.extend(map);
+        }
+    }
+    Value::Object(paths)
+}
+
+/// Magic-link sign-up / sign-in and the system-wide audit trail.
+fn auth_paths() -> Value {
+    json!({
             "/api/auth/signup": {
                 "post": {
                     "tags": ["auth"],
@@ -92,7 +112,13 @@ pub fn spec() -> Value {
                         "200": { "description": "Recent auth events", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AuthEvent" } } } } }
                     }
                 }
-            },
+            }
+    })
+}
+
+/// GDPR account endpoints: export, per-subject audit, and erasure.
+fn account_paths() -> Value {
+    json!({
             "/api/auth/account/export": {
                 "get": {
                     "tags": ["account"],
@@ -128,7 +154,13 @@ pub fn spec() -> Value {
                         "401": { "description": "Missing/invalid bearer token, or the account is already erased" }
                     }
                 }
-            },
+            }
+    })
+}
+
+/// Infrastructure endpoints: the public JWKS and Prometheus metrics.
+fn infra_paths() -> Value {
+    json!({
             "/.well-known/jwks.json": {
                 "get": {
                     "tags": ["jwks"],
@@ -149,8 +181,12 @@ pub fn spec() -> Value {
                     }
                 }
             }
-        },
-        "components": {
+    })
+}
+
+/// The `components` object of the `OpenAPI` document.
+fn components() -> Value {
+    json!({
             "securitySchemes": {
                 "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT",
                     "description": "RS256 access token issued by this service, verified offline against its JWKS." }
@@ -238,7 +274,6 @@ pub fn spec() -> Value {
                     "error": { "type": "string", "description": "Machine-readable error code, e.g. rate_limited." },
                     "description": { "type": "string" } } }
             }
-        }
     })
 }
 

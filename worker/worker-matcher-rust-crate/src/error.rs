@@ -76,12 +76,18 @@ mod tests {
     #[test]
     fn result_alias_resolves() {
         // The `Result` wrapper is the point of this test — it exercises the
-        // crate's `Result<T>` type alias, so the always-`Ok` return is intended.
-        #[allow(clippy::unnecessary_wraps)]
-        fn make() -> Result<i32> {
-            Ok(42)
+        // crate's `Result<T>` type alias. A real fallible body (with both an
+        // `Ok` and an `Err` arm reachable from the input) means clippy sees a
+        // genuine `Result` rather than an always-`Ok` wrapper.
+        fn checked(x: i32) -> Result<i32> {
+            if x >= 0 {
+                Ok(x)
+            } else {
+                Err(MatchingError::MissingField("x".into()))
+            }
         }
-        assert_eq!(make().unwrap(), 42);
+        assert_eq!(checked(42).unwrap(), 42);
+        assert!(checked(-1).is_err());
     }
 
     #[test]

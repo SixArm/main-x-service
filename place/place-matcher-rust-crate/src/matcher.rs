@@ -990,11 +990,16 @@ fn name_and_postcode_match(p1: &Place, p2: &Place) -> bool {
 
 #[cfg(test)]
 mod tests {
-    // Tests assert exact scores against representable constants (0.0, 1.0, …).
-    #![allow(clippy::float_cmp)]
-
     use super::*;
     use crate::models::{PlaceCategory, PlaceId, PlaceIdScheme};
+
+    /// Compare two floats for approximate equality.
+    ///
+    /// Tests assert scores against representable constants (`0.0`, `1.0`, …);
+    /// this avoids exact `==` on floats while staying within one ULP.
+    fn approx_eq(a: f64, b: f64) -> bool {
+        (a - b).abs() < f64::EPSILON
+    }
 
     // ---------- MatchConfig presets ----------
 
@@ -1094,7 +1099,7 @@ mod tests {
         let a = Place::builder().phone("111").build();
         let b = Place::builder().email("x@example.org").build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
-        assert_eq!(r.score, 0.0);
+        assert!(approx_eq(r.score, 0.0));
     }
 
     // ---------- coordinates ----------
@@ -1197,7 +1202,7 @@ mod tests {
             .category(PlaceCategory::Other("bar".into()))
             .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
-        assert_eq!(r.breakdown.category_score, Some(0.0));
+        assert!(approx_eq(r.breakdown.category_score.unwrap(), 0.0));
     }
 
     #[test]
@@ -1224,7 +1229,7 @@ mod tests {
             .country_code_as_iso_3166_1_alpha_2("GB")
             .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
-        assert_eq!(r.breakdown.country_code_score, Some(1.0));
+        assert!(approx_eq(r.breakdown.country_code_score.unwrap(), 1.0));
     }
 
     #[test]
@@ -1238,7 +1243,7 @@ mod tests {
             .country_code_as_iso_3166_1_alpha_2("FR")
             .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
-        assert_eq!(r.breakdown.country_code_score, Some(0.0));
+        assert!(approx_eq(r.breakdown.country_code_score.unwrap(), 0.0));
     }
 
     // ---------- place_ids ----------
@@ -1249,7 +1254,7 @@ mod tests {
         let a = Place::builder().name("X").add_place_id(id.clone()).build();
         let b = Place::builder().name("X").add_place_id(id).build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
-        assert_eq!(r.breakdown.place_ids_score, Some(1.0));
+        assert!(approx_eq(r.breakdown.place_ids_score.unwrap(), 1.0));
     }
 
     #[test]
@@ -1263,7 +1268,7 @@ mod tests {
             .add_place_id(PlaceId::new(PlaceIdScheme::OsmNode, "X").unwrap())
             .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
-        assert_eq!(r.breakdown.place_ids_score, Some(0.0));
+        assert!(approx_eq(r.breakdown.place_ids_score.unwrap(), 0.0));
     }
 
     #[test]

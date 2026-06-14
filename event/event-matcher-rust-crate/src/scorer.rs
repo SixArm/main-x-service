@@ -104,9 +104,6 @@ impl Scorer {
     /// assert_eq!(Scorer::levenshtein_similarity("", ""), 1.0);
     /// ```
     #[must_use]
-    // `distance` and `max_len` are string-length counts, far below f64's
-    // 52-bit mantissa limit, so the usize->f64 casts are effectively exact.
-    #[allow(clippy::cast_precision_loss)]
     pub fn levenshtein_similarity(s1: &str, s2: &str) -> f64 {
         if s1.is_empty() && s2.is_empty() {
             return 1.0;
@@ -117,7 +114,12 @@ impl Scorer {
 
         let distance = levenshtein(s1, s2);
         let max_len = s1.len().max(s2.len());
-        1.0 - (distance as f64 / max_len as f64)
+        // `distance` and `max_len` are string-length counts. A length of
+        // `u32::MAX` is a 4 GiB string; saturating there keeps the cast
+        // lossless for every realistic input while avoiding precision loss.
+        let distance = f64::from(u32::try_from(distance).unwrap_or(u32::MAX));
+        let max_len = f64::from(u32::try_from(max_len).unwrap_or(u32::MAX));
+        1.0 - (distance / max_len)
     }
 
     /// Binary exact-match score: `1.0` if `s1 == s2`, else `0.0`.
@@ -404,11 +406,13 @@ pub enum SimilarityAlgorithm {
 }
 
 #[cfg(test)]
-// Scorers return exact `0.0` / `1.0` sentinels at their boundaries; these
-// tests assert those literal values, where exact comparison is correct.
-#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
+
+    /// Approximate float equality for assertions on sentinel scores.
+    fn approx_eq(a: f64, b: f64) -> bool {
+        (a - b).abs() < f64::EPSILON
+    }
 
     #[test]
     fn jaro_winkler_identical() {
@@ -427,18 +431,21 @@ mod tests {
 
     #[test]
     fn jaro_winkler_empty_pair_is_one() {
-        assert_eq!(Scorer::jaro_winkler_similarity("", ""), 1.0);
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("", ""), 1.0));
     }
 
     #[test]
     fn jaro_winkler_single_empty_is_zero() {
-        assert_eq!(Scorer::jaro_winkler_similarity("smith", ""), 0.0);
-        assert_eq!(Scorer::jaro_winkler_similarity("", "smith"), 0.0);
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("smith", ""), 0.0));
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("", "smith"), 0.0));
     }
 
     #[test]
     fn levenshtein_identical() {
-        assert_eq!(Scorer::levenshtein_similarity("smith", "smith"), 1.0);
+        assert!(approx_eq(
+            Scorer::levenshtein_similarity("smith", "smith"),
+            1.0
+        ));
     }
 
     #[test]
@@ -449,15 +456,15 @@ mod tests {
 
     #[test]
     fn levenshtein_empty_pair_is_one() {
-        assert_eq!(Scorer::levenshtein_similarity("", ""), 1.0);
+        assert!(approx_eq(Scorer::levenshtein_similarity("", ""), 1.0));
     }
 
     #[test]
     fn exact_match_basic() {
-        assert_eq!(Scorer::exact_match("test", "test"), 1.0);
-        assert_eq!(Scorer::exact_match("test", "Test"), 0.0);
-        assert_eq!(Scorer::exact_match("test", "other"), 0.0);
-        assert_eq!(Scorer::exact_match("", ""), 1.0);
+        assert!(approx_eq(Scorer::exact_match("test", "test"), 1.0));
+        assert!(approx_eq(Scorer::exact_match("test", "Test"), 0.0));
+        assert!(approx_eq(Scorer::exact_match("test", "other"), 0.0));
+        assert!(approx_eq(Scorer::exact_match("", ""), 1.0));
     }
 
     #[test]
@@ -495,9 +502,9 @@ mod tests {
 
     #[test]
     fn coordinates_score_rejects_pathological_inputs() {
-        assert_eq!(Scorer::coordinates_score(f64::NAN, 50.0), 0.0);
-        assert_eq!(Scorer::coordinates_score(10.0, 0.0), 0.0);
-        assert_eq!(Scorer::coordinates_score(-1.0, 50.0), 0.0);
+        assert!(approx_eq(Scorer::coordinates_score(f64::NAN, 50.0), 0.0));
+        assert!(approx_eq(Scorer::coordinates_score(10.0, 0.0), 0.0));
+        assert!(approx_eq(Scorer::coordinates_score(-1.0, 50.0), 0.0));
     }
 
     #[test]
@@ -543,27 +550,27 @@ mod tests {
 
     #[test]
     fn start_date_score_rejects_pathological_inputs() {
-        assert_eq!(Scorer::start_date_score(f64::NAN, 3600.0), 0.0);
-        assert_eq!(Scorer::start_date_score(10.0, 0.0), 0.0);
-        assert_eq!(Scorer::start_date_score(-1.0, 3600.0), 0.0);
+        assert!(approx_eq(Scorer::start_date_score(f64::NAN, 3600.0), 0.0));
+        assert!(approx_eq(Scorer::start_date_score(10.0, 0.0), 0.0));
+        assert!(approx_eq(Scorer::start_date_score(-1.0, 3600.0), 0.0));
     }
 
     #[test]
     fn optional_field_both_none_is_one() {
         let n: Option<String> = None;
-        assert_eq!(
+        assert!(approx_eq(
             Scorer::optional_field_score(&n, &n, SimilarityAlgorithm::Exact),
             1.0
-        );
+        ));
     }
 
     #[test]
     fn optional_field_asymmetric_is_zero() {
         let n: Option<String> = None;
         let s = Some("x".to_string());
-        assert_eq!(
+        assert!(approx_eq(
             Scorer::optional_field_score(&s, &n, SimilarityAlgorithm::Exact),
             0.0
-        );
+        ));
     }
 }

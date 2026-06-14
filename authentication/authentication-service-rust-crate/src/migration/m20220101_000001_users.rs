@@ -6,7 +6,7 @@
 //! single-use). The GDPR `deleted_at` column is added later by
 //! `m20220101_000004_users_deleted_at`.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `users`-table migration (name derived from the module path).

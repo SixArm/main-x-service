@@ -162,6 +162,7 @@ impl MatchConfig {
     /// assert!((c.match_threshold - 0.95).abs() < 1e-9);
     /// assert!(c.strict_mode);
     /// ```
+    #[must_use]
     pub fn strict() -> Self {
         Self {
             match_threshold: 0.95,
@@ -181,6 +182,7 @@ impl MatchConfig {
     /// assert!((c.match_threshold - 0.65).abs() < 1e-9);
     /// assert!(c.use_phonetic_matching);
     /// ```
+    #[must_use]
     pub fn lenient() -> Self {
         Self {
             match_threshold: 0.65,
@@ -248,6 +250,7 @@ impl Confidence {
     /// assert_eq!(Confidence::from_score(-0.5),     Confidence::Low);
     /// assert_eq!(Confidence::from_score(2.0),      Confidence::High);
     /// ```
+    #[must_use]
     pub fn from_score(score: f64) -> Self {
         if score >= 0.90 {
             Confidence::High
@@ -378,6 +381,7 @@ impl MatchingEngine {
     /// let engine = MatchingEngine::new(MatchConfig::lenient());
     /// # let _ = engine;
     /// ```
+    #[must_use]
     pub fn new(config: MatchConfig) -> Self {
         Self { config }
     }
@@ -389,6 +393,7 @@ impl MatchingEngine {
     /// let engine = MatchingEngine::default_config();
     /// # let _ = engine;
     /// ```
+    #[must_use]
     pub fn default_config() -> Self {
         Self::new(MatchConfig::default())
     }
@@ -410,6 +415,7 @@ impl MatchingEngine {
     /// assert!(result.is_match);
     /// assert!(result.score > 0.99);
     /// ```
+    #[must_use]
     pub fn match_things(&self, thing1: &Thing, thing2: &Thing) -> MatchResult {
         // 1. Score every field independently into a breakdown.
         let breakdown = self.calculate_breakdown(thing1, thing2);
@@ -470,6 +476,7 @@ impl MatchingEngine {
     /// let r = MatchingEngine::default_config().match_one_to_many(&q, &[]);
     /// assert!(r.is_empty());
     /// ```
+    #[must_use]
     pub fn match_one_to_many(&self, query: &Thing, candidates: &[Thing]) -> Vec<MatchResult> {
         candidates
             .iter()
@@ -499,6 +506,7 @@ impl MatchingEngine {
     /// assert!(ranked[0].1.score >= ranked[1].1.score);
     /// assert!(ranked[1].1.score >= ranked[2].1.score);
     /// ```
+    #[must_use]
     pub fn rank_one_to_many(
         &self,
         query: &Thing,
@@ -535,6 +543,7 @@ impl MatchingEngine {
     /// let b = Thing::builder().name("Tour Eiffel").add_identifier(id).build();
     /// assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     /// ```
+    #[must_use]
     pub fn deterministic_match(&self, thing1: &Thing, thing2: &Thing) -> bool {
         if shares_identifier(thing1, thing2) {
             return true;
@@ -828,6 +837,13 @@ mod tests {
     use super::*;
     use crate::models::Identifier;
 
+    /// Exact float equality is brittle, so tests compare against an epsilon.
+    /// Scores here are deterministic sentinels (e.g. `0.0`); `f64::EPSILON`
+    /// is tight enough to pin them.
+    fn approx_eq(a: f64, b: f64) -> bool {
+        (a - b).abs() < f64::EPSILON
+    }
+
     // ---------- MatchConfig presets ----------
 
     /// Pins the default preset: threshold `0.80` and strict mode off.
@@ -935,7 +951,7 @@ mod tests {
             .add_same_as("https://example.org/x")
             .build();
         let r = MatchingEngine::default_config().match_things(&a, &b);
-        assert_eq!(r.score, 0.0);
+        assert!(approx_eq(r.score, 0.0));
     }
 
     // ---------- description / disambiguating_description ----------

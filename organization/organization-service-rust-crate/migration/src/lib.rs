@@ -5,7 +5,6 @@
 //! CLI (`db migrate`) and the request-test harness run in order.
 
 #![allow(elided_lifetimes_in_paths)]
-#![allow(clippy::wildcard_imports)]
 pub use sea_orm_migration::prelude::*;
 mod m20220101_000001_organizations;
 mod m20220101_000002_audit_logs;

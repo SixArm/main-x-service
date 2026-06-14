@@ -6,7 +6,7 @@
 //! anonymises `email` + `name` to a tombstone (see
 //! [`crate::models::users`]); this column records *when* that happened.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{ColType, add_column, remove_column};
 use sea_orm_migration::prelude::*;
 
 /// The `users.deleted_at`-column migration (name from the module path).

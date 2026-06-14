@@ -102,10 +102,11 @@ impl Scorer {
 
         let distance = levenshtein(s1, s2);
         let max_len = s1.len().max(s2.len());
-        // String lengths never approach 2^53, so the usize->f64 casts
-        // cannot lose precision.
-        #[allow(clippy::cast_precision_loss)]
-        let ratio = distance as f64 / max_len as f64;
+        // String lengths never approach `u32::MAX`, so these saturating,
+        // lossless `usize -> u32 -> f64` conversions are exact in practice.
+        let distance_f = f64::from(u32::try_from(distance).unwrap_or(u32::MAX));
+        let max_len_f = f64::from(u32::try_from(max_len).unwrap_or(u32::MAX));
+        let ratio = distance_f / max_len_f;
         1.0 - ratio
     }
 
@@ -322,10 +323,15 @@ pub enum SimilarityAlgorithm {
 
 #[cfg(test)]
 mod tests {
-    // Tests assert exact scores against representable constants (0.0, 1.0, …).
-    #![allow(clippy::float_cmp)]
-
     use super::*;
+
+    /// Compare two floats for approximate equality.
+    ///
+    /// Tests assert scores against representable constants (`0.0`, `1.0`, …);
+    /// this avoids exact `==` on floats while staying within one ULP.
+    fn approx_eq(a: f64, b: f64) -> bool {
+        (a - b).abs() < f64::EPSILON
+    }
 
     // ---------- jaro_winkler ----------
 
@@ -346,13 +352,13 @@ mod tests {
 
     #[test]
     fn jaro_winkler_empty_pair_is_one() {
-        assert_eq!(Scorer::jaro_winkler_similarity("", ""), 1.0);
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("", ""), 1.0));
     }
 
     #[test]
     fn jaro_winkler_single_empty_is_zero() {
-        assert_eq!(Scorer::jaro_winkler_similarity("smith", ""), 0.0);
-        assert_eq!(Scorer::jaro_winkler_similarity("", "smith"), 0.0);
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("smith", ""), 0.0));
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("", "smith"), 0.0));
     }
 
     #[test]
@@ -367,7 +373,10 @@ mod tests {
 
     #[test]
     fn levenshtein_identical() {
-        assert_eq!(Scorer::levenshtein_similarity("smith", "smith"), 1.0);
+        assert!(approx_eq(
+            Scorer::levenshtein_similarity("smith", "smith"),
+            1.0
+        ));
     }
 
     #[test]
@@ -384,23 +393,23 @@ mod tests {
 
     #[test]
     fn levenshtein_empty_pair_is_one() {
-        assert_eq!(Scorer::levenshtein_similarity("", ""), 1.0);
+        assert!(approx_eq(Scorer::levenshtein_similarity("", ""), 1.0));
     }
 
     #[test]
     fn levenshtein_single_empty_is_zero() {
-        assert_eq!(Scorer::levenshtein_similarity("smith", ""), 0.0);
-        assert_eq!(Scorer::levenshtein_similarity("", "smith"), 0.0);
+        assert!(approx_eq(Scorer::levenshtein_similarity("smith", ""), 0.0));
+        assert!(approx_eq(Scorer::levenshtein_similarity("", "smith"), 0.0));
     }
 
     // ---------- exact ----------
 
     #[test]
     fn exact_match_basic() {
-        assert_eq!(Scorer::exact_match("test", "test"), 1.0);
-        assert_eq!(Scorer::exact_match("test", "Test"), 0.0);
-        assert_eq!(Scorer::exact_match("test", "other"), 0.0);
-        assert_eq!(Scorer::exact_match("", ""), 1.0);
+        assert!(approx_eq(Scorer::exact_match("test", "test"), 1.0));
+        assert!(approx_eq(Scorer::exact_match("test", "Test"), 0.0));
+        assert!(approx_eq(Scorer::exact_match("test", "other"), 0.0));
+        assert!(approx_eq(Scorer::exact_match("", ""), 1.0));
     }
 
     // ---------- combined ----------
@@ -426,24 +435,24 @@ mod tests {
     #[test]
     fn optional_field_both_none_is_one() {
         let n: Option<String> = None;
-        assert_eq!(
+        assert!(approx_eq(
             Scorer::optional_field_score(&n, &n, SimilarityAlgorithm::Exact),
             1.0
-        );
+        ));
     }
 
     #[test]
     fn optional_field_asymmetric_is_zero() {
         let n: Option<String> = None;
         let s = Some("x".to_string());
-        assert_eq!(
+        assert!(approx_eq(
             Scorer::optional_field_score(&s, &n, SimilarityAlgorithm::Exact),
             0.0
-        );
-        assert_eq!(
+        ));
+        assert!(approx_eq(
             Scorer::optional_field_score(&n, &s, SimilarityAlgorithm::Exact),
             0.0
-        );
+        ));
     }
 
     // ---------- haversine ----------
@@ -486,9 +495,9 @@ mod tests {
 
     #[test]
     fn coordinates_score_rejects_pathological_inputs() {
-        assert_eq!(Scorer::coordinates_score(f64::NAN, 50.0), 0.0);
-        assert_eq!(Scorer::coordinates_score(10.0, 0.0), 0.0);
-        assert_eq!(Scorer::coordinates_score(-1.0, 50.0), 0.0);
+        assert!(approx_eq(Scorer::coordinates_score(f64::NAN, 50.0), 0.0));
+        assert!(approx_eq(Scorer::coordinates_score(10.0, 0.0), 0.0));
+        assert!(approx_eq(Scorer::coordinates_score(-1.0, 50.0), 0.0));
     }
 
     #[test]
@@ -501,7 +510,7 @@ mod tests {
         let cb = Scorer::optional_field_score(&a, &b, SimilarityAlgorithm::Combined);
         assert!(jw > 0.85);
         assert!(lv >= 0.79);
-        assert_eq!(ex, 0.0);
+        assert!(approx_eq(ex, 0.0));
         assert!(cb > 0.8);
     }
 }

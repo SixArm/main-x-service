@@ -157,19 +157,19 @@ impl ThingDto {
     }
 }
 
+/// Parsed `KEY_*` keyword fields: `(patient_id, patient_name,
+/// cabinet_path, volume_id, volume_title)`; any field whose keyword is
+/// absent stays `None`.
+type ParsedThingKeywords = (
+    Option<Uuid>,
+    Option<String>,
+    Option<String>,
+    Option<Uuid>,
+    Option<String>,
+);
+
 /// Parses the `KEY_*`-prefixed keyword strings back into typed fields.
-/// Returns `(patient_id, patient_name, cabinet_path, volume_id,
-/// volume_title)`; any field whose keyword is absent stays `None`.
-#[allow(clippy::type_complexity)]
-fn parse_thing_keywords(
-    keywords: &[String],
-) -> (
-    Option<Uuid>,
-    Option<String>,
-    Option<String>,
-    Option<Uuid>,
-    Option<String>,
-) {
+fn parse_thing_keywords(keywords: &[String]) -> ParsedThingKeywords {
     let mut patient_id = None;
     let mut patient_name = None;
     let mut cabinet_path = None;

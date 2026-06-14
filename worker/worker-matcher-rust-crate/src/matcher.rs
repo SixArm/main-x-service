@@ -593,7 +593,7 @@ fn default_confidence() -> Confidence {
 ///
 /// The breakdown exists so a clinician or auditor can see *why* a match was
 /// flagged. Do not throw it away in downstream services.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MatchBreakdown {
     /// Score for UK NHS Number equality (`1.0` or `0.0`), or `None` if either side did not parse.
     #[serde(default)]
@@ -791,11 +791,6 @@ pub struct MatchingEngine {
     config: MatchConfig,
 }
 
-// The per-field `score_*` methods share a uniform `&self` signature so the
-// scoring pipeline can dispatch them consistently and so any of them can read
-// `self.config` as the matching rules evolve. A few currently ignore `self`;
-// keeping the signature uniform is deliberate, so `unused_self` is allowed here.
-#[allow(clippy::unused_self)]
 impl MatchingEngine {
     /// Construct an engine with the given configuration.
     ///
@@ -1004,183 +999,9 @@ impl MatchingEngine {
     /// let b = Worker::builder().uk_nhs_number("9434765919").build();
     /// assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
     /// ```
-    // Long by nature: one explicit short-circuit per supported identifier
-    // scheme. The list is flat and linear; splitting it would scatter the
-    // scheme enumeration and reduce auditability.
-    #[allow(clippy::too_many_lines)]
+    #[must_use]
     pub fn deterministic_match(&self, worker1: &Worker, worker2: &Worker) -> bool {
-        if identifier_equal(
-            &worker1.uk_nhs_number,
-            &worker2.uk_nhs_number,
-            identifiers::parse_uk_nhs_number,
-        ) {
-            return true;
-        }
-        if identifier_equal(&worker1.fr_nir, &worker2.fr_nir, identifiers::parse_fr_nir) {
-            return true;
-        }
-        if identifier_equal(&worker1.es_tsi, &worker2.es_tsi, identifiers::parse_es_tsi) {
-            return true;
-        }
-        if identifier_equal(&worker1.ie_ihi, &worker2.ie_ihi, identifiers::parse_ie_ihi) {
-            return true;
-        }
-        if identifier_equal(
-            &worker1.uk_hc_number,
-            &worker2.uk_hc_number,
-            identifiers::parse_uk_hc_number,
-        ) {
-            return true;
-        }
-        if identifier_equal(&worker1.us_ssn, &worker2.us_ssn, identifiers::parse_us_ssn) {
-            return true;
-        }
-        if identifier_equal(&worker1.au_ihi, &worker2.au_ihi, identifiers::parse_au_ihi) {
-            return true;
-        }
-        if identifier_equal(
-            &worker1.de_kvnr,
-            &worker2.de_kvnr,
-            identifiers::parse_de_kvnr,
-        ) {
-            return true;
-        }
-        if identifier_equal(&worker1.it_cf, &worker2.it_cf, identifiers::parse_it_cf) {
-            return true;
-        }
-        if identifier_equal(&worker1.nl_bsn, &worker2.nl_bsn, identifiers::parse_nl_bsn) {
-            return true;
-        }
-        if identifier_equal(
-            &worker1.se_personnummer,
-            &worker2.se_personnummer,
-            identifiers::parse_se_personnummer,
-        ) {
-            return true;
-        }
-        if identifier_equal(
-            &worker1.uk_chi_number,
-            &worker2.uk_chi_number,
-            identifiers::parse_uk_chi_number,
-        ) {
-            return true;
-        }
-        if identifier_equal(&worker1.be_nn, &worker2.be_nn, identifiers::parse_be_nn) {
-            return true;
-        }
-        if identifier_equal(&worker1.bg_egn, &worker2.bg_egn, identifiers::parse_bg_egn) {
-            return true;
-        }
-        if identifier_equal(&worker1.cz_rc, &worker2.cz_rc, identifiers::parse_cz_rc) {
-            return true;
-        }
-        if identifier_equal(&worker1.dk_cpr, &worker2.dk_cpr, identifiers::parse_dk_cpr) {
-            return true;
-        }
-        if identifier_equal(&worker1.ee_ik, &worker2.ee_ik, identifiers::parse_ee_ik) {
-            return true;
-        }
-        if identifier_equal(&worker1.es_dni, &worker2.es_dni, identifiers::parse_es_dni) {
-            return true;
-        }
-        if identifier_equal(
-            &worker1.fi_hetu,
-            &worker2.fi_hetu,
-            identifiers::parse_fi_hetu,
-        ) {
-            return true;
-        }
-        if identifier_equal(&worker1.hr_oib, &worker2.hr_oib, identifiers::parse_hr_oib) {
-            return true;
-        }
-        if identifier_equal(&worker1.is_kt, &worker2.is_kt, identifiers::parse_is_kt) {
-            return true;
-        }
-        if identifier_equal(&worker1.lt_ak, &worker2.lt_ak, identifiers::parse_lt_ak) {
-            return true;
-        }
-        if identifier_equal(&worker1.lv_pk, &worker2.lv_pk, identifiers::parse_lv_pk) {
-            return true;
-        }
-        if identifier_equal(&worker1.mt_id, &worker2.mt_id, identifiers::parse_mt_id) {
-            return true;
-        }
-        if identifier_equal(&worker1.no_fnr, &worker2.no_fnr, identifiers::parse_no_fnr) {
-            return true;
-        }
-        if identifier_equal(
-            &worker1.pl_pesel,
-            &worker2.pl_pesel,
-            identifiers::parse_pl_pesel,
-        ) {
-            return true;
-        }
-        if identifier_equal(&worker1.ro_cnp, &worker2.ro_cnp, identifiers::parse_ro_cnp) {
-            return true;
-        }
-        if identifier_equal(
-            &worker1.si_emso,
-            &worker2.si_emso,
-            identifiers::parse_si_emso,
-        ) {
-            return true;
-        }
-        if identifier_equal(&worker1.sk_rc, &worker2.sk_rc, identifiers::parse_sk_rc) {
-            return true;
-        }
-        if identifier_equal(
-            &worker1.uk_nino,
-            &worker2.uk_nino,
-            identifiers::parse_uk_nino,
-        ) {
-            return true;
-        }
-        if identifier_equal(&worker1.gr_dss, &worker2.gr_dss, identifiers::parse_gr_dss) {
-            return true;
-        }
-        if identifier_equal(&worker1.li_id, &worker2.li_id, identifiers::parse_li_id) {
-            return true;
-        }
-        if identifier_equal(&worker1.nl_id, &worker2.nl_id, identifiers::parse_nl_id) {
-            return true;
-        }
-        if identifier_equal(&worker1.pl_nip, &worker2.pl_nip, identifiers::parse_pl_nip) {
-            return true;
-        }
-        if identifier_equal(&worker1.pt_nif, &worker2.pt_nif, identifiers::parse_pt_nif) {
-            return true;
-        }
-        if identifier_equal(&worker1.br_cpf, &worker2.br_cpf, identifiers::parse_br_cpf) {
-            return true;
-        }
-        if identifier_equal(&worker1.cn_rrn, &worker2.cn_rrn, identifiers::parse_cn_rrn) {
-            return true;
-        }
-        if identifier_equal(
-            &worker1.in_aadhaar,
-            &worker2.in_aadhaar,
-            identifiers::parse_in_aadhaar,
-        ) {
-            return true;
-        }
-        if identifier_equal(
-            &worker1.jp_my_number,
-            &worker2.jp_my_number,
-            identifiers::parse_jp_my_number,
-        ) {
-            return true;
-        }
-        if identifier_equal(
-            &worker1.mx_curp,
-            &worker2.mx_curp,
-            identifiers::parse_mx_curp,
-        ) {
-            return true;
-        }
-        if identifier_equal(&worker1.nz_nhi, &worker2.nz_nhi, identifiers::parse_nz_nhi) {
-            return true;
-        }
-        if identifier_equal(&worker1.za_id, &worker2.za_id, identifiers::parse_za_id) {
+        if Self::deterministic_identifier_match(worker1, worker2) {
             return true;
         }
         if passport_books_share_pair(&worker1.passport_books, &worker2.passport_books) {
@@ -1212,424 +1033,394 @@ impl MatchingEngine {
         name_match && dob_match && gender_match
     }
 
-    // Long by nature: one explicit per-field score assignment. Splitting it
-    // would scatter the field enumeration and reduce auditability.
-    #[allow(clippy::too_many_lines)]
-    fn calculate_breakdown(&self, worker1: &Worker, worker2: &Worker) -> MatchBreakdown {
-        MatchBreakdown {
-            uk_nhs_number_score: identifier_score(
+    /// `true` iff any supported national-identifier scheme matches between
+    /// the two workers. National identifiers never cross-match across
+    /// schemes: each `(field1, field2, parser)` triple is compared only
+    /// against its own scheme. The first matching scheme short-circuits.
+    fn deterministic_identifier_match(worker1: &Worker, worker2: &Worker) -> bool {
+        // Each entry: the same scheme field on each worker plus the parser
+        // that canonicalises it. The parser is the source of truth on
+        // validity; mismatched or unparseable values simply do not match.
+        let schemes: &[SchemePair<'_>] = &[
+            (
                 &worker1.uk_nhs_number,
                 &worker2.uk_nhs_number,
                 identifiers::parse_uk_nhs_number,
             ),
-            fr_nir_score: identifier_score(
-                &worker1.fr_nir,
-                &worker2.fr_nir,
-                identifiers::parse_fr_nir,
-            ),
-            es_tsi_score: identifier_score(
-                &worker1.es_tsi,
-                &worker2.es_tsi,
-                identifiers::parse_es_tsi,
-            ),
-            ie_ihi_score: identifier_score(
-                &worker1.ie_ihi,
-                &worker2.ie_ihi,
-                identifiers::parse_ie_ihi,
-            ),
-            uk_hc_number_score: identifier_score(
+            (&worker1.fr_nir, &worker2.fr_nir, identifiers::parse_fr_nir),
+            (&worker1.es_tsi, &worker2.es_tsi, identifiers::parse_es_tsi),
+            (&worker1.ie_ihi, &worker2.ie_ihi, identifiers::parse_ie_ihi),
+            (
                 &worker1.uk_hc_number,
                 &worker2.uk_hc_number,
                 identifiers::parse_uk_hc_number,
             ),
-            us_ssn_score: identifier_score(
-                &worker1.us_ssn,
-                &worker2.us_ssn,
-                identifiers::parse_us_ssn,
-            ),
-            au_ihi_score: identifier_score(
-                &worker1.au_ihi,
-                &worker2.au_ihi,
-                identifiers::parse_au_ihi,
-            ),
-            de_kvnr_score: identifier_score(
+            (&worker1.us_ssn, &worker2.us_ssn, identifiers::parse_us_ssn),
+            (&worker1.au_ihi, &worker2.au_ihi, identifiers::parse_au_ihi),
+            (
                 &worker1.de_kvnr,
                 &worker2.de_kvnr,
                 identifiers::parse_de_kvnr,
             ),
-            it_cf_score: identifier_score(&worker1.it_cf, &worker2.it_cf, identifiers::parse_it_cf),
-            nl_bsn_score: identifier_score(
-                &worker1.nl_bsn,
-                &worker2.nl_bsn,
-                identifiers::parse_nl_bsn,
-            ),
-            se_personnummer_score: identifier_score(
+            (&worker1.it_cf, &worker2.it_cf, identifiers::parse_it_cf),
+            (&worker1.nl_bsn, &worker2.nl_bsn, identifiers::parse_nl_bsn),
+            (
                 &worker1.se_personnummer,
                 &worker2.se_personnummer,
                 identifiers::parse_se_personnummer,
             ),
-            uk_chi_number_score: identifier_score(
+            (
                 &worker1.uk_chi_number,
                 &worker2.uk_chi_number,
                 identifiers::parse_uk_chi_number,
             ),
-            be_nn_score: identifier_score(&worker1.be_nn, &worker2.be_nn, identifiers::parse_be_nn),
-            bg_egn_score: identifier_score(
-                &worker1.bg_egn,
-                &worker2.bg_egn,
-                identifiers::parse_bg_egn,
-            ),
-            cz_rc_score: identifier_score(&worker1.cz_rc, &worker2.cz_rc, identifiers::parse_cz_rc),
-            dk_cpr_score: identifier_score(
-                &worker1.dk_cpr,
-                &worker2.dk_cpr,
-                identifiers::parse_dk_cpr,
-            ),
-            ee_ik_score: identifier_score(&worker1.ee_ik, &worker2.ee_ik, identifiers::parse_ee_ik),
-            es_dni_score: identifier_score(
-                &worker1.es_dni,
-                &worker2.es_dni,
-                identifiers::parse_es_dni,
-            ),
-            fi_hetu_score: identifier_score(
+            (&worker1.be_nn, &worker2.be_nn, identifiers::parse_be_nn),
+            (&worker1.bg_egn, &worker2.bg_egn, identifiers::parse_bg_egn),
+            (&worker1.cz_rc, &worker2.cz_rc, identifiers::parse_cz_rc),
+            (&worker1.dk_cpr, &worker2.dk_cpr, identifiers::parse_dk_cpr),
+            (&worker1.ee_ik, &worker2.ee_ik, identifiers::parse_ee_ik),
+            (&worker1.es_dni, &worker2.es_dni, identifiers::parse_es_dni),
+            (
                 &worker1.fi_hetu,
                 &worker2.fi_hetu,
                 identifiers::parse_fi_hetu,
             ),
-            hr_oib_score: identifier_score(
-                &worker1.hr_oib,
-                &worker2.hr_oib,
-                identifiers::parse_hr_oib,
-            ),
-            is_kt_score: identifier_score(&worker1.is_kt, &worker2.is_kt, identifiers::parse_is_kt),
-            lt_ak_score: identifier_score(&worker1.lt_ak, &worker2.lt_ak, identifiers::parse_lt_ak),
-            lv_pk_score: identifier_score(&worker1.lv_pk, &worker2.lv_pk, identifiers::parse_lv_pk),
-            mt_id_score: identifier_score(&worker1.mt_id, &worker2.mt_id, identifiers::parse_mt_id),
-            no_fnr_score: identifier_score(
-                &worker1.no_fnr,
-                &worker2.no_fnr,
-                identifiers::parse_no_fnr,
-            ),
-            pl_pesel_score: identifier_score(
+            (&worker1.hr_oib, &worker2.hr_oib, identifiers::parse_hr_oib),
+            (&worker1.is_kt, &worker2.is_kt, identifiers::parse_is_kt),
+            (&worker1.lt_ak, &worker2.lt_ak, identifiers::parse_lt_ak),
+            (&worker1.lv_pk, &worker2.lv_pk, identifiers::parse_lv_pk),
+            (&worker1.mt_id, &worker2.mt_id, identifiers::parse_mt_id),
+            (&worker1.no_fnr, &worker2.no_fnr, identifiers::parse_no_fnr),
+            (
                 &worker1.pl_pesel,
                 &worker2.pl_pesel,
                 identifiers::parse_pl_pesel,
             ),
-            ro_cnp_score: identifier_score(
-                &worker1.ro_cnp,
-                &worker2.ro_cnp,
-                identifiers::parse_ro_cnp,
-            ),
-            si_emso_score: identifier_score(
+            (&worker1.ro_cnp, &worker2.ro_cnp, identifiers::parse_ro_cnp),
+            (
                 &worker1.si_emso,
                 &worker2.si_emso,
                 identifiers::parse_si_emso,
             ),
-            sk_rc_score: identifier_score(&worker1.sk_rc, &worker2.sk_rc, identifiers::parse_sk_rc),
-            uk_nino_score: identifier_score(
+            (&worker1.sk_rc, &worker2.sk_rc, identifiers::parse_sk_rc),
+            (
                 &worker1.uk_nino,
                 &worker2.uk_nino,
                 identifiers::parse_uk_nino,
             ),
-            gr_dss_score: identifier_score(
-                &worker1.gr_dss,
-                &worker2.gr_dss,
-                identifiers::parse_gr_dss,
-            ),
-            li_id_score: identifier_score(&worker1.li_id, &worker2.li_id, identifiers::parse_li_id),
-            nl_id_score: identifier_score(&worker1.nl_id, &worker2.nl_id, identifiers::parse_nl_id),
-            pl_nip_score: identifier_score(
-                &worker1.pl_nip,
-                &worker2.pl_nip,
-                identifiers::parse_pl_nip,
-            ),
-            pt_nif_score: identifier_score(
-                &worker1.pt_nif,
-                &worker2.pt_nif,
-                identifiers::parse_pt_nif,
-            ),
-            br_cpf_score: identifier_score(
-                &worker1.br_cpf,
-                &worker2.br_cpf,
-                identifiers::parse_br_cpf,
-            ),
-            cn_rrn_score: identifier_score(
-                &worker1.cn_rrn,
-                &worker2.cn_rrn,
-                identifiers::parse_cn_rrn,
-            ),
-            in_aadhaar_score: identifier_score(
+            (&worker1.gr_dss, &worker2.gr_dss, identifiers::parse_gr_dss),
+            (&worker1.li_id, &worker2.li_id, identifiers::parse_li_id),
+            (&worker1.nl_id, &worker2.nl_id, identifiers::parse_nl_id),
+            (&worker1.pl_nip, &worker2.pl_nip, identifiers::parse_pl_nip),
+            (&worker1.pt_nif, &worker2.pt_nif, identifiers::parse_pt_nif),
+            (&worker1.br_cpf, &worker2.br_cpf, identifiers::parse_br_cpf),
+            (&worker1.cn_rrn, &worker2.cn_rrn, identifiers::parse_cn_rrn),
+            (
                 &worker1.in_aadhaar,
                 &worker2.in_aadhaar,
                 identifiers::parse_in_aadhaar,
             ),
-            jp_my_number_score: identifier_score(
+            (
                 &worker1.jp_my_number,
                 &worker2.jp_my_number,
                 identifiers::parse_jp_my_number,
             ),
-            mx_curp_score: identifier_score(
+            (
                 &worker1.mx_curp,
                 &worker2.mx_curp,
                 identifiers::parse_mx_curp,
             ),
-            nz_nhi_score: identifier_score(
-                &worker1.nz_nhi,
-                &worker2.nz_nhi,
-                identifiers::parse_nz_nhi,
-            ),
-            za_id_score: identifier_score(&worker1.za_id, &worker2.za_id, identifiers::parse_za_id),
+            (&worker1.nz_nhi, &worker2.nz_nhi, identifiers::parse_nz_nhi),
+            (&worker1.za_id, &worker2.za_id, identifiers::parse_za_id),
+        ];
+        schemes
+            .iter()
+            .any(|(a, b, parser)| identifier_equal(a.as_ref(), b.as_ref(), parser))
+    }
+
+    /// Build the full per-field [`MatchBreakdown`]. The national-identifier
+    /// scores are computed by [`Self::identifier_breakdown`]; this method adds
+    /// the passport, name, demographic, and contact scores on top via struct
+    /// update so the field enumeration stays auditable but no single function
+    /// grows unwieldy.
+    fn calculate_breakdown(&self, worker1: &Worker, worker2: &Worker) -> MatchBreakdown {
+        MatchBreakdown {
             passport_book_score: score_passport_books(
                 &worker1.passport_books,
                 &worker2.passport_books,
             ),
             given_name_score: self.score_given_name(worker1, worker2),
             family_name_score: self.score_family_name(worker1, worker2),
-            date_of_birth_score: self.score_date_of_birth(worker1, worker2),
-            gender_score: self.score_gender(worker1, worker2),
-            blood_type_score: self.score_blood_type(worker1, worker2),
-            multiple_birth_score: self.score_multiple_birth(worker1, worker2),
-            address_score: self.score_address(worker1, worker2),
-            birth_place_score: self.score_birth_place(worker1, worker2),
-            death_date_score: self.score_death_date(worker1, worker2),
-            death_place_score: self.score_death_place(worker1, worker2),
+            date_of_birth_score: Self::score_date_of_birth(worker1, worker2),
+            gender_score: Self::score_gender(worker1, worker2),
+            blood_type_score: Self::score_blood_type(worker1, worker2),
+            multiple_birth_score: Self::score_multiple_birth(worker1, worker2),
+            address_score: Self::score_address(worker1, worker2),
+            birth_place_score: Self::score_birth_place(worker1, worker2),
+            death_date_score: Self::score_death_date(worker1, worker2),
+            death_place_score: Self::score_death_place(worker1, worker2),
             phone_score: self.score_phone(worker1, worker2),
             email_score: self.score_email(worker1, worker2),
             phonetic_name_score: if self.config.use_phonetic_matching {
-                self.score_phonetic_names(worker1, worker2)
+                Self::score_phonetic_names(worker1, worker2)
             } else {
                 None
             },
+            ..Self::identifier_breakdown(worker1, worker2)
         }
     }
 
-    // Long by nature: one explicit weight application per scored field.
-    // Splitting it would scatter the per-field weighting and reduce auditability.
-    #[allow(clippy::too_many_lines)]
-    fn calculate_weighted_score(&self, breakdown: &MatchBreakdown) -> f64 {
-        let mut total_weight = 0.0;
-        let mut weighted_sum = 0.0;
+    /// Score every national-identifier scheme into a [`MatchBreakdown`] whose
+    /// non-identifier fields are left at their `Default` (`None`). Scheme
+    /// scores never cross-match: each field is parsed only with its own
+    /// scheme's parser.
+    fn identifier_breakdown(worker1: &Worker, worker2: &Worker) -> MatchBreakdown {
+        MatchBreakdown {
+            uk_nhs_number_score: identifier_score(
+                worker1.uk_nhs_number.as_ref(),
+                worker2.uk_nhs_number.as_ref(),
+                identifiers::parse_uk_nhs_number,
+            ),
+            fr_nir_score: identifier_score(
+                worker1.fr_nir.as_ref(),
+                worker2.fr_nir.as_ref(),
+                identifiers::parse_fr_nir,
+            ),
+            es_tsi_score: identifier_score(
+                worker1.es_tsi.as_ref(),
+                worker2.es_tsi.as_ref(),
+                identifiers::parse_es_tsi,
+            ),
+            ie_ihi_score: identifier_score(
+                worker1.ie_ihi.as_ref(),
+                worker2.ie_ihi.as_ref(),
+                identifiers::parse_ie_ihi,
+            ),
+            uk_hc_number_score: identifier_score(
+                worker1.uk_hc_number.as_ref(),
+                worker2.uk_hc_number.as_ref(),
+                identifiers::parse_uk_hc_number,
+            ),
+            us_ssn_score: identifier_score(
+                worker1.us_ssn.as_ref(),
+                worker2.us_ssn.as_ref(),
+                identifiers::parse_us_ssn,
+            ),
+            au_ihi_score: identifier_score(
+                worker1.au_ihi.as_ref(),
+                worker2.au_ihi.as_ref(),
+                identifiers::parse_au_ihi,
+            ),
+            de_kvnr_score: identifier_score(
+                worker1.de_kvnr.as_ref(),
+                worker2.de_kvnr.as_ref(),
+                identifiers::parse_de_kvnr,
+            ),
+            it_cf_score: identifier_score(
+                worker1.it_cf.as_ref(),
+                worker2.it_cf.as_ref(),
+                identifiers::parse_it_cf,
+            ),
+            nl_bsn_score: identifier_score(
+                worker1.nl_bsn.as_ref(),
+                worker2.nl_bsn.as_ref(),
+                identifiers::parse_nl_bsn,
+            ),
+            se_personnummer_score: identifier_score(
+                worker1.se_personnummer.as_ref(),
+                worker2.se_personnummer.as_ref(),
+                identifiers::parse_se_personnummer,
+            ),
+            uk_chi_number_score: identifier_score(
+                worker1.uk_chi_number.as_ref(),
+                worker2.uk_chi_number.as_ref(),
+                identifiers::parse_uk_chi_number,
+            ),
+            be_nn_score: identifier_score(
+                worker1.be_nn.as_ref(),
+                worker2.be_nn.as_ref(),
+                identifiers::parse_be_nn,
+            ),
+            bg_egn_score: identifier_score(
+                worker1.bg_egn.as_ref(),
+                worker2.bg_egn.as_ref(),
+                identifiers::parse_bg_egn,
+            ),
+            cz_rc_score: identifier_score(
+                worker1.cz_rc.as_ref(),
+                worker2.cz_rc.as_ref(),
+                identifiers::parse_cz_rc,
+            ),
+            dk_cpr_score: identifier_score(
+                worker1.dk_cpr.as_ref(),
+                worker2.dk_cpr.as_ref(),
+                identifiers::parse_dk_cpr,
+            ),
+            ee_ik_score: identifier_score(
+                worker1.ee_ik.as_ref(),
+                worker2.ee_ik.as_ref(),
+                identifiers::parse_ee_ik,
+            ),
+            es_dni_score: identifier_score(
+                worker1.es_dni.as_ref(),
+                worker2.es_dni.as_ref(),
+                identifiers::parse_es_dni,
+            ),
+            fi_hetu_score: identifier_score(
+                worker1.fi_hetu.as_ref(),
+                worker2.fi_hetu.as_ref(),
+                identifiers::parse_fi_hetu,
+            ),
+            ..Self::identifier_breakdown_2(worker1, worker2)
+        }
+    }
 
-        if let Some(score) = breakdown.uk_nhs_number_score {
-            weighted_sum += score * self.config.uk_nhs_number_weight;
-            total_weight += self.config.uk_nhs_number_weight;
+    /// Continuation of [`Self::identifier_breakdown`]: scores the remaining
+    /// national-identifier schemes (Croatia onward) and leaves all other
+    /// fields at their `Default` (`None`).
+    fn identifier_breakdown_2(worker1: &Worker, worker2: &Worker) -> MatchBreakdown {
+        MatchBreakdown {
+            hr_oib_score: identifier_score(
+                worker1.hr_oib.as_ref(),
+                worker2.hr_oib.as_ref(),
+                identifiers::parse_hr_oib,
+            ),
+            is_kt_score: identifier_score(
+                worker1.is_kt.as_ref(),
+                worker2.is_kt.as_ref(),
+                identifiers::parse_is_kt,
+            ),
+            lt_ak_score: identifier_score(
+                worker1.lt_ak.as_ref(),
+                worker2.lt_ak.as_ref(),
+                identifiers::parse_lt_ak,
+            ),
+            lv_pk_score: identifier_score(
+                worker1.lv_pk.as_ref(),
+                worker2.lv_pk.as_ref(),
+                identifiers::parse_lv_pk,
+            ),
+            mt_id_score: identifier_score(
+                worker1.mt_id.as_ref(),
+                worker2.mt_id.as_ref(),
+                identifiers::parse_mt_id,
+            ),
+            no_fnr_score: identifier_score(
+                worker1.no_fnr.as_ref(),
+                worker2.no_fnr.as_ref(),
+                identifiers::parse_no_fnr,
+            ),
+            pl_pesel_score: identifier_score(
+                worker1.pl_pesel.as_ref(),
+                worker2.pl_pesel.as_ref(),
+                identifiers::parse_pl_pesel,
+            ),
+            ..Self::identifier_breakdown_3(worker1, worker2)
         }
-        if let Some(score) = breakdown.fr_nir_score {
-            weighted_sum += score * self.config.fr_nir_weight;
-            total_weight += self.config.fr_nir_weight;
+    }
+
+    /// Continuation of [`Self::identifier_breakdown_2`]: scores the final
+    /// national-identifier schemes (Romania onward) and leaves all other
+    /// fields at their `Default` (`None`).
+    fn identifier_breakdown_3(worker1: &Worker, worker2: &Worker) -> MatchBreakdown {
+        MatchBreakdown {
+            ro_cnp_score: identifier_score(
+                worker1.ro_cnp.as_ref(),
+                worker2.ro_cnp.as_ref(),
+                identifiers::parse_ro_cnp,
+            ),
+            si_emso_score: identifier_score(
+                worker1.si_emso.as_ref(),
+                worker2.si_emso.as_ref(),
+                identifiers::parse_si_emso,
+            ),
+            sk_rc_score: identifier_score(
+                worker1.sk_rc.as_ref(),
+                worker2.sk_rc.as_ref(),
+                identifiers::parse_sk_rc,
+            ),
+            uk_nino_score: identifier_score(
+                worker1.uk_nino.as_ref(),
+                worker2.uk_nino.as_ref(),
+                identifiers::parse_uk_nino,
+            ),
+            gr_dss_score: identifier_score(
+                worker1.gr_dss.as_ref(),
+                worker2.gr_dss.as_ref(),
+                identifiers::parse_gr_dss,
+            ),
+            li_id_score: identifier_score(
+                worker1.li_id.as_ref(),
+                worker2.li_id.as_ref(),
+                identifiers::parse_li_id,
+            ),
+            nl_id_score: identifier_score(
+                worker1.nl_id.as_ref(),
+                worker2.nl_id.as_ref(),
+                identifiers::parse_nl_id,
+            ),
+            pl_nip_score: identifier_score(
+                worker1.pl_nip.as_ref(),
+                worker2.pl_nip.as_ref(),
+                identifiers::parse_pl_nip,
+            ),
+            pt_nif_score: identifier_score(
+                worker1.pt_nif.as_ref(),
+                worker2.pt_nif.as_ref(),
+                identifiers::parse_pt_nif,
+            ),
+            br_cpf_score: identifier_score(
+                worker1.br_cpf.as_ref(),
+                worker2.br_cpf.as_ref(),
+                identifiers::parse_br_cpf,
+            ),
+            cn_rrn_score: identifier_score(
+                worker1.cn_rrn.as_ref(),
+                worker2.cn_rrn.as_ref(),
+                identifiers::parse_cn_rrn,
+            ),
+            in_aadhaar_score: identifier_score(
+                worker1.in_aadhaar.as_ref(),
+                worker2.in_aadhaar.as_ref(),
+                identifiers::parse_in_aadhaar,
+            ),
+            jp_my_number_score: identifier_score(
+                worker1.jp_my_number.as_ref(),
+                worker2.jp_my_number.as_ref(),
+                identifiers::parse_jp_my_number,
+            ),
+            mx_curp_score: identifier_score(
+                worker1.mx_curp.as_ref(),
+                worker2.mx_curp.as_ref(),
+                identifiers::parse_mx_curp,
+            ),
+            nz_nhi_score: identifier_score(
+                worker1.nz_nhi.as_ref(),
+                worker2.nz_nhi.as_ref(),
+                identifiers::parse_nz_nhi,
+            ),
+            za_id_score: identifier_score(
+                worker1.za_id.as_ref(),
+                worker2.za_id.as_ref(),
+                identifiers::parse_za_id,
+            ),
+            ..MatchBreakdown::default()
         }
-        if let Some(score) = breakdown.es_tsi_score {
-            weighted_sum += score * self.config.es_tsi_weight;
-            total_weight += self.config.es_tsi_weight;
-        }
-        if let Some(score) = breakdown.ie_ihi_score {
-            weighted_sum += score * self.config.ie_ihi_weight;
-            total_weight += self.config.ie_ihi_weight;
-        }
-        if let Some(score) = breakdown.uk_hc_number_score {
-            weighted_sum += score * self.config.uk_hc_number_weight;
-            total_weight += self.config.uk_hc_number_weight;
-        }
-        if let Some(score) = breakdown.us_ssn_score {
-            weighted_sum += score * self.config.us_ssn_weight;
-            total_weight += self.config.us_ssn_weight;
-        }
-        if let Some(score) = breakdown.au_ihi_score {
-            weighted_sum += score * self.config.au_ihi_weight;
-            total_weight += self.config.au_ihi_weight;
-        }
-        if let Some(score) = breakdown.de_kvnr_score {
-            weighted_sum += score * self.config.de_kvnr_weight;
-            total_weight += self.config.de_kvnr_weight;
-        }
-        if let Some(score) = breakdown.it_cf_score {
-            weighted_sum += score * self.config.it_cf_weight;
-            total_weight += self.config.it_cf_weight;
-        }
-        if let Some(score) = breakdown.nl_bsn_score {
-            weighted_sum += score * self.config.nl_bsn_weight;
-            total_weight += self.config.nl_bsn_weight;
-        }
-        if let Some(score) = breakdown.se_personnummer_score {
-            weighted_sum += score * self.config.se_personnummer_weight;
-            total_weight += self.config.se_personnummer_weight;
-        }
-        if let Some(score) = breakdown.uk_chi_number_score {
-            weighted_sum += score * self.config.uk_chi_number_weight;
-            total_weight += self.config.uk_chi_number_weight;
-        }
-        if let Some(score) = breakdown.be_nn_score {
-            weighted_sum += score * self.config.be_nn_weight;
-            total_weight += self.config.be_nn_weight;
-        }
-        if let Some(score) = breakdown.bg_egn_score {
-            weighted_sum += score * self.config.bg_egn_weight;
-            total_weight += self.config.bg_egn_weight;
-        }
-        if let Some(score) = breakdown.cz_rc_score {
-            weighted_sum += score * self.config.cz_rc_weight;
-            total_weight += self.config.cz_rc_weight;
-        }
-        if let Some(score) = breakdown.dk_cpr_score {
-            weighted_sum += score * self.config.dk_cpr_weight;
-            total_weight += self.config.dk_cpr_weight;
-        }
-        if let Some(score) = breakdown.ee_ik_score {
-            weighted_sum += score * self.config.ee_ik_weight;
-            total_weight += self.config.ee_ik_weight;
-        }
-        if let Some(score) = breakdown.es_dni_score {
-            weighted_sum += score * self.config.es_dni_weight;
-            total_weight += self.config.es_dni_weight;
-        }
-        if let Some(score) = breakdown.fi_hetu_score {
-            weighted_sum += score * self.config.fi_hetu_weight;
-            total_weight += self.config.fi_hetu_weight;
-        }
-        if let Some(score) = breakdown.hr_oib_score {
-            weighted_sum += score * self.config.hr_oib_weight;
-            total_weight += self.config.hr_oib_weight;
-        }
-        if let Some(score) = breakdown.is_kt_score {
-            weighted_sum += score * self.config.is_kt_weight;
-            total_weight += self.config.is_kt_weight;
-        }
-        if let Some(score) = breakdown.lt_ak_score {
-            weighted_sum += score * self.config.lt_ak_weight;
-            total_weight += self.config.lt_ak_weight;
-        }
-        if let Some(score) = breakdown.lv_pk_score {
-            weighted_sum += score * self.config.lv_pk_weight;
-            total_weight += self.config.lv_pk_weight;
-        }
-        if let Some(score) = breakdown.mt_id_score {
-            weighted_sum += score * self.config.mt_id_weight;
-            total_weight += self.config.mt_id_weight;
-        }
-        if let Some(score) = breakdown.no_fnr_score {
-            weighted_sum += score * self.config.no_fnr_weight;
-            total_weight += self.config.no_fnr_weight;
-        }
-        if let Some(score) = breakdown.pl_pesel_score {
-            weighted_sum += score * self.config.pl_pesel_weight;
-            total_weight += self.config.pl_pesel_weight;
-        }
-        if let Some(score) = breakdown.ro_cnp_score {
-            weighted_sum += score * self.config.ro_cnp_weight;
-            total_weight += self.config.ro_cnp_weight;
-        }
-        if let Some(score) = breakdown.si_emso_score {
-            weighted_sum += score * self.config.si_emso_weight;
-            total_weight += self.config.si_emso_weight;
-        }
-        if let Some(score) = breakdown.sk_rc_score {
-            weighted_sum += score * self.config.sk_rc_weight;
-            total_weight += self.config.sk_rc_weight;
-        }
-        if let Some(score) = breakdown.uk_nino_score {
-            weighted_sum += score * self.config.uk_nino_weight;
-            total_weight += self.config.uk_nino_weight;
-        }
-        if let Some(score) = breakdown.gr_dss_score {
-            weighted_sum += score * self.config.gr_dss_weight;
-            total_weight += self.config.gr_dss_weight;
-        }
-        if let Some(score) = breakdown.li_id_score {
-            weighted_sum += score * self.config.li_id_weight;
-            total_weight += self.config.li_id_weight;
-        }
-        if let Some(score) = breakdown.nl_id_score {
-            weighted_sum += score * self.config.nl_id_weight;
-            total_weight += self.config.nl_id_weight;
-        }
-        if let Some(score) = breakdown.pl_nip_score {
-            weighted_sum += score * self.config.pl_nip_weight;
-            total_weight += self.config.pl_nip_weight;
-        }
-        if let Some(score) = breakdown.pt_nif_score {
-            weighted_sum += score * self.config.pt_nif_weight;
-            total_weight += self.config.pt_nif_weight;
-        }
-        if let Some(score) = breakdown.br_cpf_score {
-            weighted_sum += score * self.config.br_cpf_weight;
-            total_weight += self.config.br_cpf_weight;
-        }
-        if let Some(score) = breakdown.cn_rrn_score {
-            weighted_sum += score * self.config.cn_rrn_weight;
-            total_weight += self.config.cn_rrn_weight;
-        }
-        if let Some(score) = breakdown.in_aadhaar_score {
-            weighted_sum += score * self.config.in_aadhaar_weight;
-            total_weight += self.config.in_aadhaar_weight;
-        }
-        if let Some(score) = breakdown.jp_my_number_score {
-            weighted_sum += score * self.config.jp_my_number_weight;
-            total_weight += self.config.jp_my_number_weight;
-        }
-        if let Some(score) = breakdown.mx_curp_score {
-            weighted_sum += score * self.config.mx_curp_weight;
-            total_weight += self.config.mx_curp_weight;
-        }
-        if let Some(score) = breakdown.nz_nhi_score {
-            weighted_sum += score * self.config.nz_nhi_weight;
-            total_weight += self.config.nz_nhi_weight;
-        }
-        if let Some(score) = breakdown.za_id_score {
-            weighted_sum += score * self.config.za_id_weight;
-            total_weight += self.config.za_id_weight;
-        }
-        if let Some(score) = breakdown.passport_book_score {
-            weighted_sum += score * self.config.passport_book_weight;
-            total_weight += self.config.passport_book_weight;
-        }
-        if let Some(score) = breakdown.given_name_score {
-            weighted_sum += score * self.config.given_name_weight;
-            total_weight += self.config.given_name_weight;
-        }
-        if let Some(score) = breakdown.family_name_score {
-            weighted_sum += score * self.config.family_name_weight;
-            total_weight += self.config.family_name_weight;
-        }
-        if let Some(score) = breakdown.date_of_birth_score {
-            weighted_sum += score * self.config.date_of_birth_weight;
-            total_weight += self.config.date_of_birth_weight;
-        }
-        if let Some(score) = breakdown.gender_score {
-            weighted_sum += score * self.config.gender_weight;
-            total_weight += self.config.gender_weight;
-        }
-        if let Some(score) = breakdown.blood_type_score {
-            weighted_sum += score * self.config.blood_type_weight;
-            total_weight += self.config.blood_type_weight;
-        }
-        if let Some(score) = breakdown.multiple_birth_score {
-            weighted_sum += score * self.config.multiple_birth_weight;
-            total_weight += self.config.multiple_birth_weight;
-        }
-        if let Some(score) = breakdown.address_score {
-            weighted_sum += score * self.config.address_weight;
-            total_weight += self.config.address_weight;
-        }
-        if let Some(score) = breakdown.birth_place_score {
-            weighted_sum += score * self.config.birth_place_weight;
-            total_weight += self.config.birth_place_weight;
-        }
-        if let Some(score) = breakdown.death_date_score {
-            weighted_sum += score * self.config.death_date_weight;
-            total_weight += self.config.death_date_weight;
-        }
-        if let Some(score) = breakdown.death_place_score {
-            weighted_sum += score * self.config.death_place_weight;
-            total_weight += self.config.death_place_weight;
-        }
-        if let Some(score) = breakdown.phone_score {
-            weighted_sum += score * self.config.phone_weight;
-            total_weight += self.config.phone_weight;
-        }
-        if let Some(score) = breakdown.email_score {
-            weighted_sum += score * self.config.email_weight;
-            total_weight += self.config.email_weight;
-        }
+    }
+
+    /// Weight-renormalised probabilistic score in `[0.0, 1.0]`.
+    ///
+    /// Every component that scored on both records contributes
+    /// `score × weight` to the numerator and `weight` to the denominator;
+    /// the phonetic-name component is a bonus that only ever raises the
+    /// score. The per-field weighting is gathered by two cohesive helpers
+    /// ([`Self::accumulate_identifier_weights`] and
+    /// [`Self::accumulate_field_weights`]) so the field enumeration stays
+    /// auditable without any single function growing unwieldy.
+    fn calculate_weighted_score(&self, breakdown: &MatchBreakdown) -> f64 {
+        let (mut weighted_sum, mut total_weight) = (0.0_f64, 0.0_f64);
+        self.accumulate_identifier_weights(breakdown, &mut weighted_sum, &mut total_weight);
+        self.accumulate_field_weights(breakdown, &mut weighted_sum, &mut total_weight);
 
         // Phonetic match is a bonus only — never lowers the score.
         if let Some(score) = breakdown.phonetic_name_score
@@ -1644,6 +1435,96 @@ impl MatchingEngine {
         } else {
             0.0
         }
+    }
+
+    /// Fold every national-identifier component of `breakdown` into the
+    /// running `(weighted_sum, total_weight)` accumulators.
+    fn accumulate_identifier_weights(
+        &self,
+        breakdown: &MatchBreakdown,
+        weighted_sum: &mut f64,
+        total_weight: &mut f64,
+    ) {
+        let mut add = |score: Option<f64>, weight: f64| {
+            if let Some(score) = score {
+                *weighted_sum += score * weight;
+                *total_weight += weight;
+            }
+        };
+        let c = &self.config;
+        add(breakdown.uk_nhs_number_score, c.uk_nhs_number_weight);
+        add(breakdown.fr_nir_score, c.fr_nir_weight);
+        add(breakdown.es_tsi_score, c.es_tsi_weight);
+        add(breakdown.ie_ihi_score, c.ie_ihi_weight);
+        add(breakdown.uk_hc_number_score, c.uk_hc_number_weight);
+        add(breakdown.us_ssn_score, c.us_ssn_weight);
+        add(breakdown.au_ihi_score, c.au_ihi_weight);
+        add(breakdown.de_kvnr_score, c.de_kvnr_weight);
+        add(breakdown.it_cf_score, c.it_cf_weight);
+        add(breakdown.nl_bsn_score, c.nl_bsn_weight);
+        add(breakdown.se_personnummer_score, c.se_personnummer_weight);
+        add(breakdown.uk_chi_number_score, c.uk_chi_number_weight);
+        add(breakdown.be_nn_score, c.be_nn_weight);
+        add(breakdown.bg_egn_score, c.bg_egn_weight);
+        add(breakdown.cz_rc_score, c.cz_rc_weight);
+        add(breakdown.dk_cpr_score, c.dk_cpr_weight);
+        add(breakdown.ee_ik_score, c.ee_ik_weight);
+        add(breakdown.es_dni_score, c.es_dni_weight);
+        add(breakdown.fi_hetu_score, c.fi_hetu_weight);
+        add(breakdown.hr_oib_score, c.hr_oib_weight);
+        add(breakdown.is_kt_score, c.is_kt_weight);
+        add(breakdown.lt_ak_score, c.lt_ak_weight);
+        add(breakdown.lv_pk_score, c.lv_pk_weight);
+        add(breakdown.mt_id_score, c.mt_id_weight);
+        add(breakdown.no_fnr_score, c.no_fnr_weight);
+        add(breakdown.pl_pesel_score, c.pl_pesel_weight);
+        add(breakdown.ro_cnp_score, c.ro_cnp_weight);
+        add(breakdown.si_emso_score, c.si_emso_weight);
+        add(breakdown.sk_rc_score, c.sk_rc_weight);
+        add(breakdown.uk_nino_score, c.uk_nino_weight);
+        add(breakdown.gr_dss_score, c.gr_dss_weight);
+        add(breakdown.li_id_score, c.li_id_weight);
+        add(breakdown.nl_id_score, c.nl_id_weight);
+        add(breakdown.pl_nip_score, c.pl_nip_weight);
+        add(breakdown.pt_nif_score, c.pt_nif_weight);
+        add(breakdown.br_cpf_score, c.br_cpf_weight);
+        add(breakdown.cn_rrn_score, c.cn_rrn_weight);
+        add(breakdown.in_aadhaar_score, c.in_aadhaar_weight);
+        add(breakdown.jp_my_number_score, c.jp_my_number_weight);
+        add(breakdown.mx_curp_score, c.mx_curp_weight);
+        add(breakdown.nz_nhi_score, c.nz_nhi_weight);
+        add(breakdown.za_id_score, c.za_id_weight);
+    }
+
+    /// Fold the passport, name, demographic, and contact components of
+    /// `breakdown` (everything except the phonetic bonus) into the running
+    /// `(weighted_sum, total_weight)` accumulators.
+    fn accumulate_field_weights(
+        &self,
+        breakdown: &MatchBreakdown,
+        weighted_sum: &mut f64,
+        total_weight: &mut f64,
+    ) {
+        let mut add = |score: Option<f64>, weight: f64| {
+            if let Some(score) = score {
+                *weighted_sum += score * weight;
+                *total_weight += weight;
+            }
+        };
+        let c = &self.config;
+        add(breakdown.passport_book_score, c.passport_book_weight);
+        add(breakdown.given_name_score, c.given_name_weight);
+        add(breakdown.family_name_score, c.family_name_weight);
+        add(breakdown.date_of_birth_score, c.date_of_birth_weight);
+        add(breakdown.gender_score, c.gender_weight);
+        add(breakdown.blood_type_score, c.blood_type_weight);
+        add(breakdown.multiple_birth_score, c.multiple_birth_weight);
+        add(breakdown.address_score, c.address_weight);
+        add(breakdown.birth_place_score, c.birth_place_weight);
+        add(breakdown.death_date_score, c.death_date_weight);
+        add(breakdown.death_place_score, c.death_place_weight);
+        add(breakdown.phone_score, c.phone_weight);
+        add(breakdown.email_score, c.email_weight);
     }
 
     fn score_given_name(&self, worker1: &Worker, worker2: &Worker) -> Option<f64> {
@@ -1698,35 +1579,35 @@ impl MatchingEngine {
         }
     }
 
-    fn score_date_of_birth(&self, worker1: &Worker, worker2: &Worker) -> Option<f64> {
+    fn score_date_of_birth(worker1: &Worker, worker2: &Worker) -> Option<f64> {
         match (worker1.date_of_birth, worker2.date_of_birth) {
             (Some(dob1), Some(dob2)) => Some(score_dob_pair(dob1, dob2)),
             _ => None,
         }
     }
 
-    fn score_gender(&self, worker1: &Worker, worker2: &Worker) -> Option<f64> {
+    fn score_gender(worker1: &Worker, worker2: &Worker) -> Option<f64> {
         match (worker1.gender, worker2.gender) {
             (Some(g1), Some(g2)) => Some(if g1 == g2 { 1.0 } else { 0.0 }),
             _ => None,
         }
     }
 
-    fn score_blood_type(&self, worker1: &Worker, worker2: &Worker) -> Option<f64> {
+    fn score_blood_type(worker1: &Worker, worker2: &Worker) -> Option<f64> {
         match (worker1.blood_type, worker2.blood_type) {
             (Some(b1), Some(b2)) => Some(if b1 == b2 { 1.0 } else { 0.0 }),
             _ => None,
         }
     }
 
-    fn score_multiple_birth(&self, worker1: &Worker, worker2: &Worker) -> Option<f64> {
+    fn score_multiple_birth(worker1: &Worker, worker2: &Worker) -> Option<f64> {
         match (worker1.multiple_birth, worker2.multiple_birth) {
             (Some(m1), Some(m2)) => Some(f64::from(m1 == m2)),
             _ => None,
         }
     }
 
-    fn score_address(&self, worker1: &Worker, worker2: &Worker) -> Option<f64> {
+    fn score_address(worker1: &Worker, worker2: &Worker) -> Option<f64> {
         // Consider the current address plus any historical addresses
         // recorded on each worker. The reported `address_score` is the
         // best (highest) score across the cartesian product of the two
@@ -1752,7 +1633,7 @@ impl MatchingEngine {
         let mut best = f64::NEG_INFINITY;
         for a1 in &all_p1 {
             for a2 in &all_p2 {
-                let s = self.compare_addresses(a1, a2);
+                let s = Self::compare_addresses(a1, a2);
                 if s > best {
                     best = s;
                 }
@@ -1766,7 +1647,7 @@ impl MatchingEngine {
     /// Delegates to [`score_named_place`], which scores city via
     /// Jaro-Winkler and country via exact equality on the normalised
     /// string, blending them as `0.7 × city + 0.3 × country`.
-    fn score_birth_place(&self, worker1: &Worker, worker2: &Worker) -> Option<f64> {
+    fn score_birth_place(worker1: &Worker, worker2: &Worker) -> Option<f64> {
         score_named_place(worker1.birth_place.as_ref()?, worker2.birth_place.as_ref()?)
     }
 
@@ -1775,7 +1656,7 @@ impl MatchingEngine {
     /// Symmetrical to [`Self::score_birth_place`] — death-place data
     /// in practice carries `city` and `country` only; we reuse the
     /// shared [`score_named_place`] helper.
-    fn score_death_place(&self, worker1: &Worker, worker2: &Worker) -> Option<f64> {
+    fn score_death_place(worker1: &Worker, worker2: &Worker) -> Option<f64> {
         score_named_place(worker1.death_place.as_ref()?, worker2.death_place.as_ref()?)
     }
 
@@ -1784,11 +1665,11 @@ impl MatchingEngine {
     /// — exact equality scores `1.0`, day/month swap scores `0.5`,
     /// otherwise `0.0`. Day-month swaps are just as common a
     /// data-entry mistake on death certificates as on birth records.
-    fn score_death_date(&self, worker1: &Worker, worker2: &Worker) -> Option<f64> {
+    fn score_death_date(worker1: &Worker, worker2: &Worker) -> Option<f64> {
         Some(score_dob_pair(worker1.death_date?, worker2.death_date?))
     }
 
-    fn compare_addresses(&self, addr1: &Address, addr2: &Address) -> f64 {
+    fn compare_addresses(addr1: &Address, addr2: &Address) -> f64 {
         // Each sub-component contributes its own raw score in `[0.0, 1.0]`
         // and a weight. The final sub-score is the weight-renormalised
         // average — `Σ(score × weight) / Σ(weight)` — over the
@@ -1867,7 +1748,7 @@ impl MatchingEngine {
         Some(f64::from(canonical1 == canonical2))
     }
 
-    fn score_phonetic_names(&self, worker1: &Worker, worker2: &Worker) -> Option<f64> {
+    fn score_phonetic_names(worker1: &Worker, worker2: &Worker) -> Option<f64> {
         let p1_given_name = worker1.given_name.as_ref()?;
         let p1_given_name_phonetic = Normalizer::phonetic_code(p1_given_name);
         let p1_family_name = worker1.family_name.as_ref()?;
@@ -1884,13 +1765,18 @@ impl MatchingEngine {
     }
 }
 
+/// One national-identifier scheme to compare between two workers: the same
+/// scheme field on each worker plus the parser that canonicalises raw values.
+type SchemePair<'a> = (
+    &'a Option<String>,
+    &'a Option<String>,
+    fn(&str) -> Option<String>,
+);
+
 /// Return `true` iff both raw identifier strings parse via `parser` to the
 /// same canonical form. Both `None` or a parse failure on either side
 /// yields `false` — this helper backs deterministic identifier matching.
-// Takes `&Option<String>` so the ~40 per-scheme call sites can pass a worker
-// field directly without an `.as_ref()` dance; the reference is internal only.
-#[allow(clippy::ref_option)]
-fn identifier_equal<F>(a: &Option<String>, b: &Option<String>, parser: F) -> bool
+fn identifier_equal<F>(a: Option<&String>, b: Option<&String>, parser: F) -> bool
 where
     F: Fn(&str) -> Option<String>,
 {
@@ -1906,10 +1792,7 @@ where
 /// Return `Some(1.0)` if both inputs parse and are equal, `Some(0.0)` if
 /// both parse but differ, or `None` if either input is absent or fails to
 /// parse — mirroring the existing per-field scoring contract.
-// Takes `&Option<String>` so the ~40 per-scheme call sites can pass a worker
-// field directly without an `.as_ref()` dance; the reference is internal only.
-#[allow(clippy::ref_option)]
-fn identifier_score<F>(a: &Option<String>, b: &Option<String>, parser: F) -> Option<f64>
+fn identifier_score<F>(a: Option<&String>, b: Option<&String>, parser: F) -> Option<f64>
 where
     F: Fn(&str) -> Option<String>,
 {
@@ -2018,14 +1901,16 @@ fn score_dob_pair(dob1: NaiveDate, dob2: NaiveDate) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    // The engine is deterministic and returns exact constants (0.0, 0.5, 1.0)
-    // for the cases asserted here, so comparing the results with `==` is correct.
-    #![allow(clippy::float_cmp)]
     use super::*;
     use crate::models::Gender;
 
     fn dob(y: i32, m: u32, d: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(y, m, d).expect("valid date")
+    }
+
+    /// Assert two `f64` values are equal within floating-point tolerance.
+    fn approx(a: f64, b: f64) {
+        assert!((a - b).abs() < f64::EPSILON, "{a} != {b}");
     }
 
     // ---------- MatchConfig presets ----------
@@ -2176,7 +2061,7 @@ mod tests {
         let a = Worker::builder().given_name("Solo").build();
         let b = Worker::builder().family_name("Only").build();
         let r = MatchingEngine::default_config().match_workers(&a, &b);
-        assert_eq!(r.score, 0.0);
+        approx(r.score, 0.0);
         assert!(!r.is_match);
     }
 
@@ -2256,8 +2141,7 @@ mod tests {
     fn address_with_no_subfields_is_neutral_half() {
         let a = Address::new();
         let b = Address::new();
-        let engine = MatchingEngine::default_config();
-        let score = engine.compare_addresses(&a, &b);
+        let score = MatchingEngine::compare_addresses(&a, &b);
         assert!(
             (score - 0.5).abs() < 1e-9,
             "empty addresses must be neutral (0.5), got {score}"
@@ -2270,7 +2154,7 @@ mod tests {
         a.postcode = Some("CF10 1AA".into());
         let mut b = Address::new();
         b.postcode = Some("CF10 1AA".into());
-        let s = MatchingEngine::default_config().compare_addresses(&a, &b);
+        let s = MatchingEngine::compare_addresses(&a, &b);
         assert!(s > 0.0);
     }
 
@@ -2557,21 +2441,21 @@ mod tests {
 
     #[test]
     fn dob_pair_exact_equal_scores_one() {
-        assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1995, 1, 10)), 1.0);
+        approx(score_dob_pair(dob(1995, 1, 10), dob(1995, 1, 10)), 1.0);
     }
 
     #[test]
     fn dob_pair_day_month_swap_scores_half() {
         // 1995-01-10 vs 1995-10-01 — classic DD/MM ↔ MM/DD bug.
-        assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1995, 10, 1)), 0.5);
+        approx(score_dob_pair(dob(1995, 1, 10), dob(1995, 10, 1)), 0.5);
         // Symmetric.
-        assert_eq!(score_dob_pair(dob(1995, 10, 1), dob(1995, 1, 10)), 0.5);
+        approx(score_dob_pair(dob(1995, 10, 1), dob(1995, 1, 10)), 0.5);
     }
 
     #[test]
     fn dob_pair_swap_requires_year_to_match() {
         // Same day/month layout but different year — not a transposition.
-        assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1996, 10, 1)), 0.0);
+        approx(score_dob_pair(dob(1995, 1, 10), dob(1996, 10, 1)), 0.0);
     }
 
     #[test]
@@ -2581,22 +2465,22 @@ mod tests {
         // and the heuristic does not fire. Compared against any other
         // valid date — including the same month with a different day —
         // the score must be 0.0.
-        assert_eq!(score_dob_pair(dob(1995, 1, 25), dob(1995, 1, 26)), 0.0);
-        assert_eq!(score_dob_pair(dob(1995, 1, 25), dob(1995, 2, 25)), 0.0);
+        approx(score_dob_pair(dob(1995, 1, 25), dob(1995, 1, 26)), 0.0);
+        approx(score_dob_pair(dob(1995, 1, 25), dob(1995, 2, 25)), 0.0);
     }
 
     #[test]
     fn dob_pair_unrelated_dates_score_zero() {
-        assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1980, 6, 30)), 0.0);
-        assert_eq!(score_dob_pair(dob(1995, 1, 10), dob(1995, 1, 11)), 0.0);
+        approx(score_dob_pair(dob(1995, 1, 10), dob(1980, 6, 30)), 0.0);
+        approx(score_dob_pair(dob(1995, 1, 10), dob(1995, 1, 11)), 0.0);
     }
 
     #[test]
     fn dob_pair_day_equals_month_collapses_to_exact() {
         // 1995-05-05: swap is a no-op; exact-match branch wins.
-        assert_eq!(score_dob_pair(dob(1995, 5, 5), dob(1995, 5, 5)), 1.0);
+        approx(score_dob_pair(dob(1995, 5, 5), dob(1995, 5, 5)), 1.0);
         // 1995-05-05 vs 1995-05-06: not a transposition; 0.0.
-        assert_eq!(score_dob_pair(dob(1995, 5, 5), dob(1995, 5, 6)), 0.0);
+        approx(score_dob_pair(dob(1995, 5, 5), dob(1995, 5, 6)), 0.0);
     }
 
     #[test]
@@ -2604,9 +2488,9 @@ mod tests {
         // 2003-02-30 is never constructed (chrono rejects it), so the
         // helper only ever receives valid dates. But test a near-edge:
         // swap of Feb 29 (leap) vs swap target.
-        assert_eq!(score_dob_pair(dob(2000, 2, 29), dob(2000, 2, 29)), 1.0);
+        approx(score_dob_pair(dob(2000, 2, 29), dob(2000, 2, 29)), 1.0);
         // 2000-02-12 swap = 2000-12-02, valid.
-        assert_eq!(score_dob_pair(dob(2000, 2, 12), dob(2000, 12, 2)), 0.5);
+        approx(score_dob_pair(dob(2000, 2, 12), dob(2000, 12, 2)), 0.5);
     }
 
     #[test]
@@ -2786,7 +2670,6 @@ mod tests {
         // OQ-4 acceptance: an identical postcode plus a slightly
         // different street MUST score ≥ 0.7. Under the old
         // `sum / count` formula this would have scored ~ 0.33.
-        let engine = MatchingEngine::default_config();
         let a = Address::new();
         let a = Address {
             line1: Some("10 High Street".into()),
@@ -2800,7 +2683,7 @@ mod tests {
             city: Some("Cardiff".into()),
             ..Address::new()
         };
-        let s = engine.compare_addresses(&a, &b);
+        let s = MatchingEngine::compare_addresses(&a, &b);
         assert!(
             s >= 0.7,
             "exact postcode + slight street typo should score ≥ 0.7: {s}"
@@ -2811,7 +2694,6 @@ mod tests {
     fn address_subscore_postcode_only_match_returns_one() {
         // Only postcode populated on both sides → weighted average
         // collapses to the postcode score alone.
-        let engine = MatchingEngine::default_config();
         let a = Address {
             postcode: Some("CF10 1AA".into()),
             ..Address::new()
@@ -2820,22 +2702,20 @@ mod tests {
             postcode: Some("CF10 1AA".into()),
             ..Address::new()
         };
-        let s = engine.compare_addresses(&a, &b);
+        let s = MatchingEngine::compare_addresses(&a, &b);
         assert!((s - 1.0).abs() < 1e-9, "postcode-only match: {s}");
     }
 
     #[test]
     fn address_subscore_no_comparable_fields_returns_neutral_half() {
         // Neither side populated on any sub-field — neutral 0.5.
-        let engine = MatchingEngine::default_config();
-        let s = engine.compare_addresses(&Address::new(), &Address::new());
+        let s = MatchingEngine::compare_addresses(&Address::new(), &Address::new());
         assert!((s - 0.5).abs() < 1e-9, "neutral fallback: {s}");
     }
 
     #[test]
     fn address_subscore_postcode_match_plus_street_mismatch_dominated_by_postcode() {
         // Postcode (0.5) match + line1 (0.2) mismatch → 0.5/0.7 ≈ 0.714.
-        let engine = MatchingEngine::default_config();
         let a = Address {
             postcode: Some("CF10 1AA".into()),
             line1: Some("Wholly Different".into()),
@@ -2846,7 +2726,7 @@ mod tests {
             line1: Some("Completely Other".into()),
             ..Address::new()
         };
-        let s = engine.compare_addresses(&a, &b);
+        let s = MatchingEngine::compare_addresses(&a, &b);
         assert!(s >= 0.5, "postcode should still dominate: {s}");
     }
 

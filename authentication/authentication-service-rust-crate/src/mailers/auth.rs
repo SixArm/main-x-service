@@ -29,12 +29,11 @@ static forgot: Dir<'_> = include_dir!("src/mailers/auth/forgot");
 
 /// Mailer for auth emails (magic-link, welcome, forgot). In development
 /// the magic link is logged rather than sent (no SMTP configured).
-#[allow(clippy::module_name_repetitions)]
-pub struct AuthMailer {}
+pub struct Emailer {}
 // Opt into loco's `Mailer` trait using its default `mail` / `opts` /
 // `mail_template` implementations; no overrides are needed.
-impl Mailer for AuthMailer {}
-impl AuthMailer {
+impl Mailer for Emailer {}
+impl Emailer {
     /// Sending welcome email the the given user
     ///
     /// # Errors

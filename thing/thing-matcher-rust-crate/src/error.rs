@@ -77,12 +77,19 @@ mod tests {
     /// value — a compile-plus-runtime check on the alias itself.
     #[test]
     fn result_alias_resolves() {
-        // Deliberately wraps an infallible value to exercise the alias.
-        #[allow(clippy::unnecessary_wraps)]
-        fn make() -> Result<i32> {
-            Ok(42)
+        // Exercises both arms of the alias: a genuinely fallible function
+        // that threads `?` through an `Ok` and surfaces an `Err`.
+        fn checked(n: i32) -> Result<i32> {
+            if n < 0 {
+                return Err(MatchingError::MissingField("n".into()));
+            }
+            Ok(n)
         }
-        assert_eq!(make().unwrap(), 42);
+        fn doubled(n: i32) -> Result<i32> {
+            Ok(checked(n)? * 2)
+        }
+        assert_eq!(doubled(21).unwrap(), 42);
+        assert!(doubled(-1).is_err());
     }
 
     /// Pins the `Send + Sync` bound on `MatchingError` via a compile-time

@@ -5,7 +5,6 @@
 //! all live in one compilation unit. The [`Migrator`] is handed to
 //! `create_app` / `cli::main` in [`crate::app`] and `src/bin/main.rs`.
 #![allow(elided_lifetimes_in_paths)]
-#![allow(clippy::wildcard_imports)]
 pub use sea_orm_migration::prelude::*;
 /// `users` table — passwordless magic-link accounts.
 mod m20220101_000001_users;

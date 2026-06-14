@@ -218,6 +218,7 @@ impl Thing {
     ///
     /// assert_eq!(t.name.as_deref(), Some("Big Ben"));
     /// ```
+    #[must_use]
     pub fn builder() -> ThingBuilder {
         ThingBuilder::default()
     }
@@ -318,6 +319,7 @@ impl ThingBuilder {
     /// let t = Thing::builder().name("Eiffel Tower").build();
     /// assert_eq!(t.name.as_deref(), Some("Eiffel Tower"));
     /// ```
+    #[must_use]
     pub fn name<S: Into<String>>(mut self, value: S) -> Self {
         self.name = Some(value.into());
         self
@@ -332,6 +334,7 @@ impl ThingBuilder {
     ///     .build();
     /// assert_eq!(t.alternate_names.len(), 2);
     /// ```
+    #[must_use]
     pub fn alternate_names(mut self, value: Vec<String>) -> Self {
         self.alternate_names = value;
         self
@@ -347,6 +350,7 @@ impl ThingBuilder {
     ///     .build();
     /// assert_eq!(t.alternate_names.len(), 2);
     /// ```
+    #[must_use]
     pub fn add_alternate_name<S: Into<String>>(mut self, value: S) -> Self {
         self.alternate_names.push(value.into());
         self
@@ -359,6 +363,7 @@ impl ThingBuilder {
     /// let t = Thing::builder().description("A landmark in Paris.").build();
     /// assert_eq!(t.description.as_deref(), Some("A landmark in Paris."));
     /// ```
+    #[must_use]
     pub fn description<S: Into<String>>(mut self, value: S) -> Self {
         self.description = Some(value.into());
         self
@@ -371,6 +376,7 @@ impl ThingBuilder {
     /// let t = Thing::builder().disambiguating_description("The Paris one.").build();
     /// assert_eq!(t.disambiguating_description.as_deref(), Some("The Paris one."));
     /// ```
+    #[must_use]
     pub fn disambiguating_description<S: Into<String>>(mut self, value: S) -> Self {
         self.disambiguating_description = Some(value.into());
         self
@@ -384,6 +390,7 @@ impl ThingBuilder {
     /// let t = Thing::builder().identifiers(vec![id.clone()]).build();
     /// assert_eq!(t.identifiers, vec![id]);
     /// ```
+    #[must_use]
     pub fn identifiers(mut self, value: Vec<Identifier>) -> Self {
         self.identifiers = value;
         self
@@ -398,6 +405,7 @@ impl ThingBuilder {
     ///     .build();
     /// assert_eq!(t.identifiers.len(), 1);
     /// ```
+    #[must_use]
     pub fn add_identifier(mut self, value: Identifier) -> Self {
         self.identifiers.push(value);
         self
@@ -410,6 +418,7 @@ impl ThingBuilder {
     /// let t = Thing::builder().url("https://www.toureiffel.paris/").build();
     /// assert_eq!(t.url.as_deref(), Some("https://www.toureiffel.paris/"));
     /// ```
+    #[must_use]
     pub fn url<S: Into<String>>(mut self, value: S) -> Self {
         self.url = Some(value.into());
         self
@@ -422,6 +431,7 @@ impl ThingBuilder {
     /// let t = Thing::builder().image("https://example.org/eiffel.jpg").build();
     /// assert_eq!(t.image.as_deref(), Some("https://example.org/eiffel.jpg"));
     /// ```
+    #[must_use]
     pub fn image<S: Into<String>>(mut self, value: S) -> Self {
         self.image = Some(value.into());
         self
@@ -439,6 +449,7 @@ impl ThingBuilder {
     ///     .build();
     /// assert_eq!(t.same_as.len(), 2);
     /// ```
+    #[must_use]
     pub fn same_as(mut self, value: Vec<String>) -> Self {
         self.same_as = value;
         self
@@ -453,6 +464,7 @@ impl ThingBuilder {
     ///     .build();
     /// assert_eq!(t.same_as.len(), 1);
     /// ```
+    #[must_use]
     pub fn add_same_as<S: Into<String>>(mut self, value: S) -> Self {
         self.same_as.push(value.into());
         self
@@ -470,6 +482,7 @@ impl ThingBuilder {
     ///     Some("https://en.wikipedia.org/wiki/Eiffel_Tower"),
     /// );
     /// ```
+    #[must_use]
     pub fn main_entity_of_page<S: Into<String>>(mut self, value: S) -> Self {
         self.main_entity_of_page = Some(value.into());
         self
@@ -484,6 +497,7 @@ impl ThingBuilder {
     ///     .build();
     /// assert_eq!(t.additional_types.len(), 1);
     /// ```
+    #[must_use]
     pub fn additional_types(mut self, value: Vec<String>) -> Self {
         self.additional_types = value;
         self
@@ -498,6 +512,7 @@ impl ThingBuilder {
     ///     .build();
     /// assert_eq!(t.additional_types.len(), 1);
     /// ```
+    #[must_use]
     pub fn add_additional_type<S: Into<String>>(mut self, value: S) -> Self {
         self.additional_types.push(value.into());
         self
@@ -512,6 +527,7 @@ impl ThingBuilder {
     ///     .build();
     /// assert_eq!(t.subject_of.len(), 1);
     /// ```
+    #[must_use]
     pub fn subject_of(mut self, value: Vec<String>) -> Self {
         self.subject_of = value;
         self
@@ -526,6 +542,7 @@ impl ThingBuilder {
     ///     .build();
     /// assert_eq!(t.subject_of.len(), 1);
     /// ```
+    #[must_use]
     pub fn add_subject_of<S: Into<String>>(mut self, value: S) -> Self {
         self.subject_of.push(value.into());
         self
@@ -541,6 +558,7 @@ impl ThingBuilder {
     /// let t = Thing::builder().owner("City of Paris").build();
     /// assert_eq!(t.owner.as_deref(), Some("City of Paris"));
     /// ```
+    #[must_use]
     pub fn owner<S: Into<String>>(mut self, value: S) -> Self {
         self.owner = Some(value.into());
         self
@@ -553,6 +571,7 @@ impl ThingBuilder {
     /// let t = Thing::builder().local_id("REF-12345").build();
     /// assert_eq!(t.local_id.as_deref(), Some("REF-12345"));
     /// ```
+    #[must_use]
     pub fn local_id<S: Into<String>>(mut self, value: S) -> Self {
         self.local_id = Some(value.into());
         self
@@ -565,6 +584,7 @@ impl ThingBuilder {
     /// let t = Thing::builder().name("Big Ben").build();
     /// assert!(t.url.is_none());
     /// ```
+    #[must_use]
     pub fn build(self) -> Thing {
         Thing {
             name: self.name,

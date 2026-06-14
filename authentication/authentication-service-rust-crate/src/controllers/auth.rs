@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     auth::AuthUser,
-    mailers::auth::AuthMailer,
+    mailers::auth::Emailer,
     metrics::Metrics,
     models::{auth_events::Model as AuthEvent, sessions, users},
     rate_limit,
@@ -95,7 +95,7 @@ async fn deliver_magic_link(ctx: &AppContext, user: &users::Model, locale: &str)
         magic_link = %link,
         "magic link issued (dev: open the link, or GET /api/auth/magic-link/{{token}})"
     );
-    if let Err(err) = AuthMailer::send_magic_link(ctx, user, locale).await {
+    if let Err(err) = Emailer::send_magic_link(ctx, user, locale).await {
         tracing::debug!(error = %err, "magic link email not sent; console log above is authoritative");
     }
 }

@@ -244,25 +244,18 @@ fn additional_public_pems() -> Result<Vec<String>, AuthError> {
 /// # Errors
 ///
 /// Returns [`AuthError::Keys`] when a key is missing or not valid RSA.
-// The inline-PEM-or-file `match` arms read clearer than `if let … else`
-// for this security-critical key resolution; keep the explicit shape.
-#[allow(clippy::single_match_else)]
 pub fn load_keys() -> Result<AuthKeys, AuthError> {
-    let private_pem = match std::env::var("JWT_PRIVATE_KEY_PEM") {
-        Ok(pem) => pem,
-        Err(_) => {
-            let path = env_or("JWT_PRIVATE_KEY_FILE", "config/keys/jwt_private_dev.pem");
-            std::fs::read_to_string(&path)
-                .map_err(|e| AuthError::Keys(format!("read {path}: {e}")))?
-        }
+    let private_pem = if let Ok(pem) = std::env::var("JWT_PRIVATE_KEY_PEM") {
+        pem
+    } else {
+        let path = env_or("JWT_PRIVATE_KEY_FILE", "config/keys/jwt_private_dev.pem");
+        std::fs::read_to_string(&path).map_err(|e| AuthError::Keys(format!("read {path}: {e}")))?
     };
-    let public_pem = match std::env::var("JWT_PUBLIC_KEY_PEM") {
-        Ok(pem) => pem,
-        Err(_) => {
-            let path = env_or("JWT_PUBLIC_KEY_FILE", "config/keys/jwt_public_dev.pem");
-            std::fs::read_to_string(&path)
-                .map_err(|e| AuthError::Keys(format!("read {path}: {e}")))?
-        }
+    let public_pem = if let Ok(pem) = std::env::var("JWT_PUBLIC_KEY_PEM") {
+        pem
+    } else {
+        let path = env_or("JWT_PUBLIC_KEY_FILE", "config/keys/jwt_public_dev.pem");
+        std::fs::read_to_string(&path).map_err(|e| AuthError::Keys(format!("read {path}: {e}")))?
     };
 
     let additional = additional_public_pems()?;

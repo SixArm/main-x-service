@@ -6,7 +6,6 @@
 //! `Migrator` it can run (`auto_migrate`, `cargo loco db migrate`).
 
 #![allow(elided_lifetimes_in_paths)]
-#![allow(clippy::wildcard_imports)]
 pub use sea_orm_migration::prelude::*;
 
 mod m20241228_000001_create_organizations;

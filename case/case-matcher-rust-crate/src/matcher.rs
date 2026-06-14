@@ -447,10 +447,12 @@ fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
     if union == 0 {
         Some(0.0)
     } else {
-        // Both sets are non-empty here, so `union > 0`; the cast is exact
-        // for any realistic set size and the precision-loss lint is moot.
-        #[allow(clippy::cast_precision_loss)]
-        Some(inter as f64 / union as f64)
+        // Both sets are non-empty here, so `union > 0`; convert losslessly
+        // via `u32` so the ratio is exact (only absurd counts saturate).
+        Some(
+            f64::from(u32::try_from(inter).unwrap_or(u32::MAX))
+                / f64::from(u32::try_from(union).unwrap_or(u32::MAX)),
+        )
     }
 }
 

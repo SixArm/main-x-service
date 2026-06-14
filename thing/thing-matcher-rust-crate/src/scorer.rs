@@ -61,6 +61,7 @@ impl Scorer {
     /// assert_eq!(Scorer::jaro_winkler_similarity("", ""), 1.0);
     /// assert_eq!(Scorer::jaro_winkler_similarity("smith", ""), 0.0);
     /// ```
+    #[must_use]
     pub fn jaro_winkler_similarity(s1: &str, s2: &str) -> f64 {
         // Two empties are "identical"; one empty is maximally dissimilar.
         // These guards also dodge any divide-by-zero in the underlying
@@ -93,6 +94,7 @@ impl Scorer {
     /// assert!(Scorer::levenshtein_similarity("abc", "xyz") < 0.5);
     /// assert_eq!(Scorer::levenshtein_similarity("", ""), 1.0);
     /// ```
+    #[must_use]
     pub fn levenshtein_similarity(s1: &str, s2: &str) -> f64 {
         if s1.is_empty() && s2.is_empty() {
             return 1.0;
@@ -106,7 +108,12 @@ impl Scorer {
         // the result lands in `[0.0, 1.0]`. `max_len` is non-zero here
         // because the empty-input cases were handled above.
         let max_len = s1.len().max(s2.len());
-        1.0 - (distance as f64 / max_len as f64)
+        // `distance` and `max_len` are byte counts; convert losslessly via
+        // `u32` (saturating at `u32::MAX`) so the ratio stays exact for any
+        // realistic string length without an `as` precision-losing cast.
+        let distance_f = u32::try_from(distance).map_or(f64::from(u32::MAX), f64::from);
+        let max_len_f = u32::try_from(max_len).map_or(f64::from(u32::MAX), f64::from);
+        1.0 - (distance_f / max_len_f)
     }
 
     /// Binary exact-match score: `1.0` if `s1 == s2`, else `0.0`.
@@ -122,6 +129,7 @@ impl Scorer {
     /// assert_eq!(Scorer::exact_match("Test", "test"), 0.0);  // case-sensitive
     /// assert_eq!(Scorer::exact_match("a", "b"),       0.0);
     /// ```
+    #[must_use]
     pub fn exact_match(s1: &str, s2: &str) -> f64 {
         if s1 == s2 { 1.0 } else { 0.0 }
     }
@@ -140,6 +148,7 @@ impl Scorer {
     /// let s = Scorer::combined_similarity("Stephen", "Steven");
     /// assert!(s > 0.80, "combined score for Stephen/Steven was {s}");
     /// ```
+    #[must_use]
     pub fn combined_similarity(s1: &str, s2: &str) -> f64 {
         let jw = Self::jaro_winkler_similarity(s1, s2);
         let lev = Self::levenshtein_similarity(s1, s2);
@@ -192,7 +201,12 @@ impl Scorer {
         if union == 0 {
             return 0.0;
         }
-        intersection as f64 / union as f64
+        // Set cardinalities; convert losslessly via `u32` (saturating at
+        // `u32::MAX`) so the Jaccard ratio is exact for any realistic set
+        // size without an `as` precision-losing cast.
+        let intersection_f = u32::try_from(intersection).map_or(f64::from(u32::MAX), f64::from);
+        let union_f = u32::try_from(union).map_or(f64::from(u32::MAX), f64::from);
+        intersection_f / union_f
     }
 
     /// Score two `Option<String>` fields using the chosen algorithm.
@@ -221,6 +235,7 @@ impl Scorer {
     /// assert_eq!(Scorer::optional_field_score(&a,    &none, SimilarityAlgorithm::Exact), 0.0);
     /// assert_eq!(Scorer::optional_field_score(&a,    &b,    SimilarityAlgorithm::Exact), 1.0);
     /// ```
+    #[must_use]
     pub fn optional_field_score(
         field1: &Option<String>,
         field2: &Option<String>,
@@ -266,6 +281,13 @@ pub enum SimilarityAlgorithm {
 mod tests {
     use super::*;
 
+    /// Exact float equality is brittle, so tests compare against an epsilon.
+    /// The scorer returns deterministic sentinels (`0.0` / `1.0`) and small
+    /// computed ratios; `f64::EPSILON` is tight enough to pin them.
+    fn approx_eq(a: f64, b: f64) -> bool {
+        (a - b).abs() < f64::EPSILON
+    }
+
     // ---------- jaro_winkler ----------
 
     /// Pins that identical strings score near `1.0`.
@@ -289,14 +311,14 @@ mod tests {
     /// Pins the both-empty edge case → `1.0`.
     #[test]
     fn jaro_winkler_empty_pair_is_one() {
-        assert_eq!(Scorer::jaro_winkler_similarity("", ""), 1.0);
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("", ""), 1.0));
     }
 
     /// Pins the asymmetric-empty edge case (one side empty) → `0.0`.
     #[test]
     fn jaro_winkler_single_empty_is_zero() {
-        assert_eq!(Scorer::jaro_winkler_similarity("smith", ""), 0.0);
-        assert_eq!(Scorer::jaro_winkler_similarity("", "smith"), 0.0);
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("smith", ""), 0.0));
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("", "smith"), 0.0));
     }
 
     /// Pins the range invariant: every output is within `[0.0, 1.0]`.
@@ -313,7 +335,10 @@ mod tests {
     /// Pins that identical strings score exactly `1.0`.
     #[test]
     fn levenshtein_identical() {
-        assert_eq!(Scorer::levenshtein_similarity("smith", "smith"), 1.0);
+        assert!(approx_eq(
+            Scorer::levenshtein_similarity("smith", "smith"),
+            1.0
+        ));
     }
 
     /// Pins the exact normalisation formula `1 - distance/max_len` on a
@@ -334,14 +359,14 @@ mod tests {
     /// Pins the both-empty edge case → `1.0`.
     #[test]
     fn levenshtein_empty_pair_is_one() {
-        assert_eq!(Scorer::levenshtein_similarity("", ""), 1.0);
+        assert!(approx_eq(Scorer::levenshtein_similarity("", ""), 1.0));
     }
 
     /// Pins the asymmetric-empty edge case → `0.0`.
     #[test]
     fn levenshtein_single_empty_is_zero() {
-        assert_eq!(Scorer::levenshtein_similarity("smith", ""), 0.0);
-        assert_eq!(Scorer::levenshtein_similarity("", "smith"), 0.0);
+        assert!(approx_eq(Scorer::levenshtein_similarity("smith", ""), 0.0));
+        assert!(approx_eq(Scorer::levenshtein_similarity("", "smith"), 0.0));
     }
 
     // ---------- exact ----------
@@ -350,10 +375,10 @@ mod tests {
     /// with both-empty counting as a match.
     #[test]
     fn exact_match_basic() {
-        assert_eq!(Scorer::exact_match("test", "test"), 1.0);
-        assert_eq!(Scorer::exact_match("test", "Test"), 0.0);
-        assert_eq!(Scorer::exact_match("test", "other"), 0.0);
-        assert_eq!(Scorer::exact_match("", ""), 1.0);
+        assert!(approx_eq(Scorer::exact_match("test", "test"), 1.0));
+        assert!(approx_eq(Scorer::exact_match("test", "Test"), 0.0));
+        assert!(approx_eq(Scorer::exact_match("test", "other"), 0.0));
+        assert!(approx_eq(Scorer::exact_match("", ""), 1.0));
     }
 
     // ---------- combined ----------
@@ -401,7 +426,7 @@ mod tests {
     fn jaccard_both_empty_is_one() {
         let a: [&str; 0] = [];
         let b: [&str; 0] = [];
-        assert_eq!(Scorer::jaccard_set_similarity(&a, &b), 1.0);
+        assert!(approx_eq(Scorer::jaccard_set_similarity(&a, &b), 1.0));
     }
 
     /// Pins the asymmetric-empty edge case → `0.0`, in both argument orders.
@@ -409,8 +434,8 @@ mod tests {
     fn jaccard_one_empty_is_zero() {
         let a = ["x"];
         let b: [&str; 0] = [];
-        assert_eq!(Scorer::jaccard_set_similarity(&a, &b), 0.0);
-        assert_eq!(Scorer::jaccard_set_similarity(&b, &a), 0.0);
+        assert!(approx_eq(Scorer::jaccard_set_similarity(&a, &b), 0.0));
+        assert!(approx_eq(Scorer::jaccard_set_similarity(&b, &a), 0.0));
     }
 
     /// Pins the core formula on a worked example: intersection {y,z} over
@@ -429,10 +454,10 @@ mod tests {
     #[test]
     fn optional_field_both_none_is_one() {
         let n: Option<String> = None;
-        assert_eq!(
+        assert!(approx_eq(
             Scorer::optional_field_score(&n, &n, SimilarityAlgorithm::Exact),
             1.0
-        );
+        ));
     }
 
     /// Pins the one-`None` policy → `0.0`, in both argument orders.
@@ -440,14 +465,14 @@ mod tests {
     fn optional_field_asymmetric_is_zero() {
         let n: Option<String> = None;
         let s = Some("x".to_string());
-        assert_eq!(
+        assert!(approx_eq(
             Scorer::optional_field_score(&s, &n, SimilarityAlgorithm::Exact),
             0.0
-        );
-        assert_eq!(
+        ));
+        assert!(approx_eq(
             Scorer::optional_field_score(&n, &s, SimilarityAlgorithm::Exact),
             0.0
-        );
+        ));
     }
 
     /// Pins that when both sides are `Some`, the selected `SimilarityAlgorithm`
@@ -462,7 +487,7 @@ mod tests {
         let cb = Scorer::optional_field_score(&a, &b, SimilarityAlgorithm::Combined);
         assert!(jw > 0.85);
         assert!(lv >= 0.79);
-        assert_eq!(ex, 0.0);
+        assert!(approx_eq(ex, 0.0));
         assert!(cb > 0.8);
     }
 }

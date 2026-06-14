@@ -214,8 +214,14 @@ pub enum SimilarityAlgorithm {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::float_cmp)] // scores are exact constants in assertions
     use super::*;
+
+    /// Exact-constant float comparison for assertions: the scorers return
+    /// exact `f64` constants (`0.0`, `0.5`, `1.0`, …), so a tolerance of
+    /// one ULP is the right test of "did we get exactly this constant?".
+    fn approx_eq(actual: f64, expected: f64) -> bool {
+        (actual - expected).abs() < f64::EPSILON
+    }
 
     // ---------- jaro_winkler ----------
 
@@ -244,15 +250,15 @@ mod tests {
     /// edge case the wrapper adds on top of `strsim`.
     #[test]
     fn jaro_winkler_empty_pair_is_one() {
-        assert_eq!(Scorer::jaro_winkler_similarity("", ""), 1.0);
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("", ""), 1.0));
     }
 
     /// Exactly one empty side scores `0.0` (asymmetric data → no match),
     /// in both argument orders — pins symmetry of the empty-handling.
     #[test]
     fn jaro_winkler_single_empty_is_zero() {
-        assert_eq!(Scorer::jaro_winkler_similarity("smith", ""), 0.0);
-        assert_eq!(Scorer::jaro_winkler_similarity("", "smith"), 0.0);
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("smith", ""), 0.0));
+        assert!(approx_eq(Scorer::jaro_winkler_similarity("", "smith"), 0.0));
     }
 
     /// For several inputs the score stays within `[0.0, 1.0]` — the core
@@ -271,7 +277,10 @@ mod tests {
     /// upper anchor of normalised Levenshtein.
     #[test]
     fn levenshtein_identical() {
-        assert_eq!(Scorer::levenshtein_similarity("smith", "smith"), 1.0);
+        assert!(approx_eq(
+            Scorer::levenshtein_similarity("smith", "smith"),
+            1.0
+        ));
     }
 
     /// One substitution over five characters gives exactly `0.8`
@@ -294,15 +303,15 @@ mod tests {
     /// `max_len == 0` division.
     #[test]
     fn levenshtein_empty_pair_is_one() {
-        assert_eq!(Scorer::levenshtein_similarity("", ""), 1.0);
+        assert!(approx_eq(Scorer::levenshtein_similarity("", ""), 1.0));
     }
 
     /// One empty side scores `0.0` in both orders — pins symmetric
     /// asymmetric-data handling.
     #[test]
     fn levenshtein_single_empty_is_zero() {
-        assert_eq!(Scorer::levenshtein_similarity("smith", ""), 0.0);
-        assert_eq!(Scorer::levenshtein_similarity("", "smith"), 0.0);
+        assert!(approx_eq(Scorer::levenshtein_similarity("smith", ""), 0.0));
+        assert!(approx_eq(Scorer::levenshtein_similarity("", "smith"), 0.0));
     }
 
     // ---------- exact ----------
@@ -311,10 +320,10 @@ mod tests {
     /// case-differing or unequal → `0.0`, empty pair → `1.0`.
     #[test]
     fn exact_match_basic() {
-        assert_eq!(Scorer::exact_match("test", "test"), 1.0);
-        assert_eq!(Scorer::exact_match("test", "Test"), 0.0);
-        assert_eq!(Scorer::exact_match("test", "other"), 0.0);
-        assert_eq!(Scorer::exact_match("", ""), 1.0);
+        assert!(approx_eq(Scorer::exact_match("test", "test"), 1.0));
+        assert!(approx_eq(Scorer::exact_match("test", "Test"), 0.0));
+        assert!(approx_eq(Scorer::exact_match("test", "other"), 0.0));
+        assert!(approx_eq(Scorer::exact_match("", ""), 1.0));
     }
 
     // ---------- combined ----------
@@ -348,10 +357,10 @@ mod tests {
     #[test]
     fn optional_field_both_none_is_one() {
         let n: Option<String> = None;
-        assert_eq!(
+        assert!(approx_eq(
             Scorer::optional_field_score(&n, &n, SimilarityAlgorithm::Exact),
             1.0
-        );
+        ));
     }
 
     /// Exactly one side `None` → `0.0` in both orders — pins the
@@ -360,14 +369,14 @@ mod tests {
     fn optional_field_asymmetric_is_zero() {
         let n: Option<String> = None;
         let s = Some("x".to_string());
-        assert_eq!(
+        assert!(approx_eq(
             Scorer::optional_field_score(&s, &n, SimilarityAlgorithm::Exact),
             0.0
-        );
-        assert_eq!(
+        ));
+        assert!(approx_eq(
             Scorer::optional_field_score(&n, &s, SimilarityAlgorithm::Exact),
             0.0
-        );
+        ));
     }
 
     /// When both sides are `Some`, the selected `SimilarityAlgorithm` drives
@@ -382,7 +391,7 @@ mod tests {
         let cb = Scorer::optional_field_score(&a, &b, SimilarityAlgorithm::Combined);
         assert!(jw > 0.85);
         assert!(lv >= 0.79);
-        assert_eq!(ex, 0.0);
+        assert!(approx_eq(ex, 0.0));
         assert!(cb > 0.8);
     }
 }

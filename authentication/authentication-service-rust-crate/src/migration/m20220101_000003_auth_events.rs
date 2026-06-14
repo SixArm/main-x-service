@@ -3,7 +3,7 @@
 //! / me). Columns capture *what happened*, the *subject* (email / pid)
 //! when known, and an *outcome* `detail`; never a token or secret.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `auth_events`-table migration (name derived from the module path).

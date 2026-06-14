@@ -73,12 +73,18 @@ mod tests {
 
     #[test]
     fn result_alias_resolves() {
-        // The wrap is the point: this exercises the crate `Result` alias.
-        #[allow(clippy::unnecessary_wraps)]
-        fn make() -> Result<i32> {
-            Ok(42)
+        // The wrap is the point: this exercises the crate `Result` alias by
+        // returning both the `Ok` and `Err` arms so the wrap is genuinely
+        // needed.
+        fn make(ok: bool) -> Result<i32> {
+            if ok {
+                Ok(42)
+            } else {
+                Err(MatchingError::MissingField("x".into()))
+            }
         }
-        assert_eq!(make().unwrap(), 42);
+        assert_eq!(make(true).unwrap(), 42);
+        assert!(make(false).is_err());
     }
 
     #[test]

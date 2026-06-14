@@ -124,11 +124,6 @@
     clippy::cast_possible_wrap,
     clippy::cast_sign_loss
 )]
-// Several parsers declare a `const` lookup table (checksum weights, valid
-// letters) immediately above the statement that uses it. Keeping the table
-// adjacent to its use aids readability of the checksum logic.
-#![allow(clippy::items_after_statements)]
-
 use nhs_number::NHSNumber;
 use std::str::FromStr;
 
@@ -1127,6 +1122,7 @@ pub fn parse_ee_ik(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_es_dni(s: &str) -> Option<String> {
+    const LETTERS: &[u8; 23] = b"TRWAGMYFPDXBNJZSQVHLCKE";
     let cleaned: String = s
         .chars()
         .filter(char::is_ascii_alphanumeric)
@@ -1147,7 +1143,6 @@ pub fn parse_es_dni(s: &str) -> Option<String> {
         d if d.is_ascii_digit() => body.parse().ok()?,
         _ => return None,
     };
-    const LETTERS: &[u8; 23] = b"TRWAGMYFPDXBNJZSQVHLCKE";
     let expected = LETTERS[(n % 23) as usize] as char;
     if last == expected {
         Some(cleaned)
@@ -1170,6 +1165,7 @@ pub fn parse_es_dni(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_fi_hetu(s: &str) -> Option<String> {
+    const TABLE: &[u8; 31] = b"0123456789ABCDEFHJKLMNPRSTUVWXY";
     let cleaned: String = s
         .chars()
         .filter(|c| !c.is_whitespace())
@@ -1196,7 +1192,6 @@ pub fn parse_fi_hetu(s: &str) -> Option<String> {
         return None;
     }
     let n: u64 = format!("{date}{serial}").parse().ok()?;
-    const TABLE: &[u8; 31] = b"0123456789ABCDEFHJKLMNPRSTUVWXY";
     let expected = TABLE[(n % 31) as usize] as char;
     if check == expected {
         Some(cleaned)
@@ -1249,11 +1244,11 @@ pub fn parse_hr_oib(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_is_kt(s: &str) -> Option<String> {
+    const WEIGHTS: [u32; 8] = [3, 2, 7, 6, 5, 4, 3, 2];
     let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 10 {
         return None;
     }
-    const WEIGHTS: [u32; 8] = [3, 2, 7, 6, 5, 4, 3, 2];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(8).enumerate() {
         sum += c.to_digit(10)? * WEIGHTS[i];
@@ -1305,11 +1300,11 @@ pub fn parse_lt_ak(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_lv_pk(s: &str) -> Option<String> {
+    const WEIGHTS: [i32; 10] = [1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
     let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 11 {
         return None;
     }
-    const WEIGHTS: [i32; 10] = [1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
     let mut sum: i32 = 0;
     for (i, c) in digits.chars().take(10).enumerate() {
         sum += (c.to_digit(10)? as i32) * WEIGHTS[i];
@@ -1366,12 +1361,12 @@ pub fn parse_mt_id(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_no_fnr(s: &str) -> Option<String> {
+    const W1: [u32; 9] = [3, 7, 6, 1, 8, 9, 4, 5, 2];
+    const W2: [u32; 10] = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
     let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 11 {
         return None;
     }
-    const W1: [u32; 9] = [3, 7, 6, 1, 8, 9, 4, 5, 2];
-    const W2: [u32; 10] = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
     let body: Vec<u32> = digits.chars().filter_map(|c| c.to_digit(10)).collect();
     if body.len() != 11 {
         return None;
@@ -1415,11 +1410,11 @@ pub fn parse_no_fnr(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_pl_pesel(s: &str) -> Option<String> {
+    const WEIGHTS: [u32; 10] = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
     let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 11 {
         return None;
     }
-    const WEIGHTS: [u32; 10] = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(10).enumerate() {
         sum += c.to_digit(10)? * WEIGHTS[i];
@@ -1445,11 +1440,11 @@ pub fn parse_pl_pesel(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_ro_cnp(s: &str) -> Option<String> {
+    const WEIGHTS: [u32; 12] = [2, 7, 9, 1, 4, 6, 3, 5, 8, 2, 7, 9];
     let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 13 {
         return None;
     }
-    const WEIGHTS: [u32; 12] = [2, 7, 9, 1, 4, 6, 3, 5, 8, 2, 7, 9];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(12).enumerate() {
         sum += c.to_digit(10)? * WEIGHTS[i];
@@ -1476,11 +1471,11 @@ pub fn parse_ro_cnp(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_si_emso(s: &str) -> Option<String> {
+    const WEIGHTS: [u32; 12] = [7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
     let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 13 {
         return None;
     }
-    const WEIGHTS: [u32; 12] = [7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(12).enumerate() {
         sum += c.to_digit(10)? * WEIGHTS[i];
@@ -1682,11 +1677,11 @@ pub fn parse_nl_id(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_pl_nip(s: &str) -> Option<String> {
+    const WEIGHTS: [u32; 9] = [6, 5, 7, 2, 3, 4, 5, 6, 7];
     let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 10 {
         return None;
     }
-    const WEIGHTS: [u32; 9] = [6, 5, 7, 2, 3, 4, 5, 6, 7];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(9).enumerate() {
         sum += c.to_digit(10)? * WEIGHTS[i];
@@ -1716,11 +1711,11 @@ pub fn parse_pl_nip(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_pt_nif(s: &str) -> Option<String> {
+    const WEIGHTS: [u32; 8] = [9, 8, 7, 6, 5, 4, 3, 2];
     let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 9 {
         return None;
     }
-    const WEIGHTS: [u32; 8] = [9, 8, 7, 6, 5, 4, 3, 2];
     let mut sum: u32 = 0;
     for (i, c) in digits.chars().take(8).enumerate() {
         sum += c.to_digit(10)? * WEIGHTS[i];
@@ -1819,6 +1814,10 @@ pub fn parse_br_cpf(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_cn_rrn(s: &str) -> Option<String> {
+    const WEIGHTS: [u32; 17] = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
+    const CHECK: [u8; 11] = [
+        b'1', b'0', b'X', b'9', b'8', b'7', b'6', b'5', b'4', b'3', b'2',
+    ];
     let cleaned: String = s
         .chars()
         .filter(char::is_ascii_alphanumeric)
@@ -1840,10 +1839,6 @@ pub fn parse_cn_rrn(s: &str) -> Option<String> {
     let mm: u32 = cleaned[10..12].parse().ok()?;
     let dd: u32 = cleaned[12..14].parse().ok()?;
     chrono::NaiveDate::from_ymd_opt(yyyy, mm, dd)?;
-    const WEIGHTS: [u32; 17] = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
-    const CHECK: [u8; 11] = [
-        b'1', b'0', b'X', b'9', b'8', b'7', b'6', b'5', b'4', b'3', b'2',
-    ];
     let mut sum: u32 = 0;
     for i in 0..17 {
         sum += u32::from(bytes[i] - b'0') * WEIGHTS[i];
@@ -1934,12 +1929,12 @@ pub fn parse_in_aadhaar(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_jp_my_number(s: &str) -> Option<String> {
+    const WEIGHTS: [u32; 11] = [6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
     let digits: String = s.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 12 {
         return None;
     }
     let bytes = digits.as_bytes();
-    const WEIGHTS: [u32; 11] = [6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
     let mut sum: u32 = 0;
     for i in 0..11 {
         sum += u32::from(bytes[i] - b'0') * WEIGHTS[i];
@@ -2066,6 +2061,7 @@ pub fn parse_mx_curp(s: &str) -> Option<String> {
 /// ```
 #[must_use]
 pub fn parse_nz_nhi(s: &str) -> Option<String> {
+    const WEIGHTS: [u32; 6] = [7, 6, 5, 4, 3, 2];
     let cleaned: String = s
         .chars()
         .filter(char::is_ascii_alphanumeric)
@@ -2095,7 +2091,6 @@ pub fn parse_nz_nhi(s: &str) -> Option<String> {
             idx
         }
     };
-    const WEIGHTS: [u32; 6] = [7, 6, 5, 4, 3, 2];
     let mut sum: u32 = 0;
     for i in 0..3 {
         sum += letter_value(bytes[i]) * WEIGHTS[i];

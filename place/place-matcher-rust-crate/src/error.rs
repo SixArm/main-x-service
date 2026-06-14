@@ -74,9 +74,15 @@ mod tests {
     #[test]
     fn result_alias_resolves() {
         // The wrap is the point: this exercises the `Result` type alias.
-        #[allow(clippy::unnecessary_wraps)]
+        // Thread `?` through a genuine fallible step so the function is not
+        // an unconditional `Ok(_)` wrapper.
+        fn parse() -> Result<i32> {
+            "42".parse::<i32>()
+                .map_err(|e| MatchingError::MissingField(e.to_string()))
+        }
         fn make() -> Result<i32> {
-            Ok(42)
+            let n = parse()?;
+            Ok(n)
         }
         assert_eq!(make().unwrap(), 42);
     }
