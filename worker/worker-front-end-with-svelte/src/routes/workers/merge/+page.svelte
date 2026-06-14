@@ -1,3 +1,15 @@
+<!--
+  Merge workers (route "/workers/merge") — operator enters a surviving
+  ("main") id and a duplicate id, optionally previews both, then merges.
+  The duplicate is soft-deleted; on success a link to the merged main
+  record is shown.
+
+  $state:
+    - mainId / duplicateId / reason — merge inputs.
+    - preview — the two fetched records for side-by-side confirmation.
+    - result — the MergeResponse after a successful merge.
+    - error / loading — request status.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -16,6 +28,8 @@
     let error = $state<string | null>(null);
     let loading = $state(false);
 
+    // Fetch whichever ids are filled in (in parallel) for the preview panel;
+    // a blank id resolves to null rather than erroring.
     async function loadPreview() {
         preview = { main: null, duplicate: null };
         error = null;
@@ -30,6 +44,8 @@
         }
     }
 
+    // Validate, confirm, then perform the merge. Both ids are required and
+    // must differ; the confirm spells out the destructive soft-delete.
     async function doMerge() {
         if (!mainId || !duplicateId) {
             error = "Both IDs required";
@@ -49,6 +65,7 @@
                 merge_reason: reason || null,
             });
         } catch (err) {
+            // Show the service's error code alongside the message for ApiErrors.
             if (err instanceof ApiError) {
                 error = `${err.code}: ${err.message}`;
             } else {
@@ -59,6 +76,7 @@
         }
     }
 
+    // One-line label for a previewed worker (or em dash when absent).
     function summary(p: Worker | null): string {
         if (!p) return "—";
         return `${p.name.given.join(" ")} ${p.name.family} (${p.birth_date ?? "no DOB"}, ${p.gender})`;

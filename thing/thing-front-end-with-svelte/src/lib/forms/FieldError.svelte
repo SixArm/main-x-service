@@ -1,3 +1,16 @@
+<!--
+  FieldError — renders a single inline validation message for a form field.
+
+  Purpose: a tiny, reusable error slot used by LabeledField and bespoke
+  forms so error styling/ARIA stay consistent.
+
+  $props:
+    - error (string | null, default null): the message to show; when
+      null/empty nothing is rendered.
+
+  Accessibility: uses role="alert" so assistive tech announces the message
+  when it appears.
+-->
 <script lang="ts">
     let { error = null }: { error?: string | null } = $props();
 </script>

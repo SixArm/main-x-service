@@ -1,3 +1,12 @@
+<!--
+  Place audit log (route "/places/[id]/audit") — lists this place's audit
+  entries (newest first, up to 100), each with an expandable JSON payload.
+
+  Local $state:
+    - entries / error / loading — fetched audit entries and request status.
+  Derived:
+    - id — the route's place id.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";

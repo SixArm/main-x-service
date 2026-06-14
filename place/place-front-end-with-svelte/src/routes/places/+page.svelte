@@ -1,3 +1,14 @@
+<!--
+  Places index (route "/places") — searchable, paginated grid of places.
+
+  Local $state:
+    - query           — current search text (bound to SearchBox).
+    - places / total  — current result page and its total count.
+    - loading / error — request status surfaced in the UI.
+    - fuzzy / phonetic — search toggles forwarded to the search endpoint.
+
+  Selecting a grid row navigates to that place's detail page.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import SearchBox from "$lib/components/SearchBox.svelte";
@@ -13,8 +24,10 @@
     let fuzzy = $state(true);
     let phonetic = $state(false);
 
+    // One repository instance for this page (no global HTTP store).
     const repo = PlaceRepository.withFetch();
 
+    // Fetch a page of results; `*` is the "match all" query for empty input.
     async function runSearch(q: string) {
         loading = true;
         error = null;
@@ -31,10 +44,13 @@
         }
     }
 
+    // Row-select handler: navigate to the place detail page.
     function openPlace(place: Place) {
         if (place.id) goto(`/places/${place.id}`);
     }
 
+    // Initial load: list everything once on mount. The effect has no
+    // reactive deps inside the call, so it runs a single time.
     $effect(() => {
         void runSearch("");
     });

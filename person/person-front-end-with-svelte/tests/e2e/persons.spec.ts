@@ -7,6 +7,7 @@ import { expect, test } from "@playwright/test";
 // for full coverage of the API-driven paths.
 
 test.describe("Person front-end smoke", () => {
+    // Pins: the dashboard shell renders with the primary nav links present.
     test("dashboard renders nav and heading", async ({ page }) => {
         await page.goto("/");
         await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
@@ -15,6 +16,7 @@ test.describe("Person front-end smoke", () => {
         await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
     });
 
+    // Pins: the list page renders the search box and the "New person" CTA.
     test("persons list renders search box and grid", async ({ page }) => {
         await page.goto("/persons");
         await expect(page.getByRole("heading", { name: "Persons" })).toBeVisible();
@@ -22,6 +24,7 @@ test.describe("Person front-end smoke", () => {
         await expect(page.getByRole("main").getByRole("link", { name: "New person" })).toBeVisible();
     });
 
+    // Pins: the create form exposes the required name fields and submit button.
     test("new person form renders required fields", async ({ page }) => {
         await page.goto("/persons/new");
         await expect(page.getByRole("heading", { name: "New person" })).toBeVisible();
@@ -30,6 +33,8 @@ test.describe("Person front-end smoke", () => {
         await expect(page.getByRole("button", { name: "Create" })).toBeVisible();
     });
 
+    // Pins: client-side validation stops submit and focuses the empty
+    // required family field (HTML required attribute behaviour).
     test("client-side validation blocks submission with empty family name", async ({ page }) => {
         await page.goto("/persons/new");
         const family = page.getByLabel(/Family name/);
@@ -40,12 +45,14 @@ test.describe("Person front-end smoke", () => {
         await expect(family).toBeFocused();
     });
 
+    // Pins: the match-check page renders with its submit button.
     test("match check form renders", async ({ page }) => {
         await page.goto("/persons/match");
         await expect(page.getByRole("heading", { name: "Match check" })).toBeVisible();
         await expect(page.getByRole("button", { name: /Find matches/ })).toBeVisible();
     });
 
+    // Pins: the merge page renders both the main and duplicate id inputs.
     test("merge form renders both ID inputs", async ({ page }) => {
         await page.goto("/persons/merge");
         await expect(page.getByRole("heading", { name: "Merge persons" })).toBeVisible();

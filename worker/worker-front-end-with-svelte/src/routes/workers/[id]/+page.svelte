@@ -1,3 +1,16 @@
+<!--
+  Worker detail (route "/workers/[id]") — read-only view of one worker with
+  links to edit/audit and a soft-delete action. Sections render only when
+  their data is present.
+
+  $state:
+    - worker — the loaded record, or null until/if loaded.
+    - error — fetch/delete failure message.
+    - loading — true until the initial fetch settles.
+
+  $derived:
+    - id — the worker id from the route params.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
@@ -10,8 +23,10 @@
     let error = $state<string | null>(null);
     let loading = $state(true);
 
+    // Route param `id`; cast since SvelteKit types params as string|undefined.
     const id = $derived(page.params.id as string);
 
+    // Load the worker on mount.
     onMount(async () => {
         try {
             worker = await repo.get(id);
@@ -22,6 +37,7 @@
         }
     });
 
+    // Soft-delete after a confirm prompt, then return to the list.
     async function handleDelete() {
         if (!confirm("Soft-delete this worker? This cannot be undone via the UI.")) return;
         try {

@@ -1,3 +1,24 @@
+<!--
+  ThingForm — create/edit form for a Thing.
+
+  Purpose: the shared editor used by both the "New thing" and "Edit thing"
+  pages. Wraps the reactive `createForm` helper, validates name + URL-shaped
+  fields, edits identifiers via ThingIdentifierInput, and calls back with the
+  assembled Thing on submit.
+
+  $props:
+    - initial (Thing): starting value (blank for create, loaded for edit).
+    - submitLabel (string, optional, default "Save"): primary button text.
+    - onsubmit ((thing: Thing) => Promise<void>): submit handler; rejections
+      surface as the form's submit-level error banner.
+
+  Reactive notes:
+    - submitLabel is $derived from props.
+    - alternateNamesJoined / sameAsJoined are $derived textarea projections
+      of the underlying string[] fields (one entry per line).
+    - The `state_referenced_locally` ignore is intentional: props.initial is
+      read once to seed the form, not tracked reactively thereafter.
+-->
 <script lang="ts">
     import type { Thing } from "$lib/api/types.js";
     import { createForm } from "$lib/forms/form.svelte.js";
@@ -12,6 +33,8 @@
     } = $props();
     const submitLabel = $derived(props.submitLabel ?? "Save");
 
+    // Ensure array fields are concrete (not undefined) so the editor and its
+    // bindings can push/splice without null checks everywhere.
     function withDefaults(t: Thing): Thing {
         return {
             ...t,
@@ -27,7 +50,9 @@
         initial: withDefaults(props.initial),
         validate(value) {
             const errors: Record<string, string> = {};
+            // Name is the only hard-required Thing field.
             if (!value.name.trim()) errors.name = "Required";
+            // These fields must be absolute http(s) URLs when present.
             const urlFields: [keyof Thing, string][] = [
                 ["url", "URL"],
                 ["additional_type", "Additional type"],
@@ -45,9 +70,11 @@
         onSubmit: (value) => props.onsubmit(value),
     });
 
+    // Textarea ↔ string[] adapters: join with newlines for display…
     let alternateNamesJoined = $derived((form.value.alternate_names ?? []).join("\n"));
     let sameAsJoined = $derived((form.value.same_as ?? []).join("\n"));
 
+    // …and split on input, trimming and dropping blank lines on write-back.
     function updateAlternateNames(value: string) {
         form.value.alternate_names = value.split("\n").map((s) => s.trim()).filter(Boolean);
     }
@@ -55,6 +82,7 @@
         form.value.same_as = value.split("\n").map((s) => s.trim()).filter(Boolean);
     }
 
+    // Suppress native navigation and delegate to the form controller's submit.
     function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         void form.submit();
@@ -108,6 +136,7 @@
 
     <section class="stack">
         <h2 class="small">Identifiers</h2>
+        <!-- `!` asserts non-null: withDefaults() guarantees identifiers is set. -->
         <ThingIdentifierInput bind:identifiers={form.value.identifiers!} />
     </section>
 

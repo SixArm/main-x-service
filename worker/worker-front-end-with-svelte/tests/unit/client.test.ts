@@ -1,10 +1,15 @@
+// Unit tests for ApiClient's envelope handling: success unwrapping, error
+// mapping to ApiError, query-string building, and 204 handling. All use an
+// injected fetch, so no network or running service is required.
 import { describe, expect, it } from "vitest";
 import { ApiClient, ApiError } from "../../src/lib/api/client";
 
+// Cast a plain async impl to the structural `fetch` type for injection.
 function mockFetch(impl: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
     return impl as unknown as typeof fetch;
 }
 
+// Build a JSON Response with the given body and status for the mock fetch.
 function jsonResponse(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), {
         status,
@@ -13,6 +18,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe("ApiClient", () => {
+    // Pins: a 2xx { success, data } envelope yields just `data` to the caller.
     it("unwraps ApiResponse.data on success", async () => {
         const client = new ApiClient({
             baseUrl: "http://localhost:8080",
@@ -24,6 +30,8 @@ describe("ApiClient", () => {
         expect(data).toEqual({ id: "abc" });
     });
 
+    // Pins: a non-2xx response maps the envelope's error onto ApiError's
+    // status/code/message.
     it("throws ApiError with parsed envelope on non-2xx", async () => {
         const client = new ApiClient({
             baseUrl: "http://localhost:8080",
@@ -42,6 +50,8 @@ describe("ApiClient", () => {
         });
     });
 
+    // Pins: a 409 sets isConflict and carries `details` (the duplicate
+    // candidates) through — the basis of the new-worker dedup flow.
     it("exposes ApiError.isConflict for 409 duplicate detection", async () => {
         const client = new ApiClient({
             baseUrl: "http://localhost:8080",
@@ -62,6 +72,8 @@ describe("ApiClient", () => {
         }
     });
 
+    // Pins: query params are appended, and undefined/null values are omitted
+    // rather than serialized as the literal string "undefined".
     it("appends query string parameters and skips nullish values", async () => {
         let capturedUrl = "";
         const client = new ApiClient({
@@ -80,6 +92,8 @@ describe("ApiClient", () => {
         expect(capturedUrl).not.toContain("mask_sensitive");
     });
 
+    // Pins: a 204 (e.g. DELETE) resolves to undefined without trying to parse
+    // an empty body.
     it("returns undefined for 204 No Content", async () => {
         const client = new ApiClient({
             baseUrl: "http://localhost:8080",

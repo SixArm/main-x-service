@@ -16,9 +16,13 @@
 use crate::Result;
 use crate::models::{Address, ContactPoint, Identifier, Worker};
 
+/// FHIR `Bundle` handling for search responses.
 pub mod bundle;
+/// Axum handlers for the FHIR R5 `Worker` endpoints.
 pub mod handlers;
+/// FHIR resource structs and converters.
 pub mod resources;
+/// FHIR search-parameter parsing.
 pub mod search_parameters;
 
 pub use resources::{FhirOperationOutcome, FhirWorker};

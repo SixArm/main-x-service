@@ -1,3 +1,13 @@
+<!--
+  Match check (route "/places/match") — ad-hoc matching tool: enter a
+  partial place (name, address, optional geo, threshold) and see ranked
+  candidate matches without creating anything.
+
+  Local $state:
+    - name / threshold / address / geo — the MatchRequest fields.
+    - useGeo                           — whether geo is included in the request.
+    - results / error / loading        — response and request status.
+-->
 <script lang="ts">
     import MatchResultsList from "$lib/components/MatchResultsList.svelte";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -20,6 +30,7 @@
     let error = $state<string | null>(null);
     let loading = $state(false);
 
+    // Build and send the match request; geo is only included when opted in.
     async function runMatch(e: SubmitEvent) {
         e.preventDefault();
         loading = true;

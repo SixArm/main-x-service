@@ -1,3 +1,18 @@
+<!--
+  HumanNameInput — edits a HumanName's family + given names.
+
+  Two-way binds `name` so edits flow straight back to the parent's model.
+  Given names are stored as a string[] but edited as one space-separated
+  text field for ergonomics.
+
+  Props:
+    - name (bindable): HumanName — the name object being edited.
+    - errors?: Record<string,string> — per-field messages keyed `family`/`given`.
+    - prefix?: string — id prefix so multiple instances get unique input ids.
+
+  State:
+    - givenJoined ($derived) — the given[] array rendered as a single string.
+-->
 <script lang="ts">
     import type { HumanName } from "$lib/api/types.js";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -13,8 +28,12 @@
         prefix?: string;
     } = $props();
 
+    // Display the given-name array as one space-separated value for editing.
     let givenJoined = $derived(name.given.join(" "));
 
+    // Parse the space-separated input back into a clean string[]:
+    // split on whitespace, trim, and drop empties (so trailing spaces and
+    // double spaces don't create blank given names).
     function updateGiven(value: string) {
         name.given = value
             .split(/\s+/)

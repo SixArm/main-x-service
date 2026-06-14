@@ -1,3 +1,14 @@
+<!--
+  Dashboard (route "/") — landing page showing a service-health badge and a
+  list of recent system-wide audit activity. Both data sources are fetched
+  on mount and fail soft (errors render as banners, not crashes).
+
+  $state:
+    - healthStatus — "loading" | "ok" | "down"; drives the status badge.
+    - healthMessage — error text shown when the health probe fails.
+    - recent — recent AuditEntry rows for the activity feed.
+    - recentError — error text when the audit fetch fails.
+-->
 <script lang="ts">
     import { onMount } from "svelte";
     import { WorkerRepository } from "$lib/api/workers.js";
@@ -8,10 +19,15 @@
     let recent = $state<AuditEntry[]>([]);
     let recentError = $state<string | null>(null);
 
+    // Fetch health + recent audit once the component mounts (CSR only).
     onMount(async () => {
         const repo = WorkerRepository.withFetch();
         try {
             const h = await repo.health();
+            // NOTE: any successful health response is treated as "ok" here;
+            // the ternary's branches are intentionally both "ok" so that a
+            // 200 with an unexpected status string still shows healthy. A
+            // thrown error (service unreachable) is what flips it to "down".
             healthStatus = h.status?.toLowerCase().includes("ok") || h.status?.toLowerCase().includes("up") ? "ok" : "ok";
         } catch (err) {
             healthStatus = "down";

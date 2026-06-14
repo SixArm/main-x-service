@@ -1,3 +1,13 @@
+<!--
+  MatchResultsList — renders a list of scored match/duplicate candidates.
+  Each row shows the worker's name, a colour-coded quality badge, the score
+  as a percentage, light identity metadata, and an expandable per-component
+  score breakdown.
+
+  $props:
+    - results: MatchResult[] — candidates to display (may be empty).
+    - title?: string — section heading (default "Match results").
+-->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
 
@@ -22,7 +32,9 @@
                         <strong>
                             {r.worker.name.given.join(" ")} {r.worker.name.family}
                         </strong>
+                        <!-- data-quality drives the badge colour via CSS. -->
                         <span class="quality" data-quality={r.quality}>{r.quality}</span>
+                        <!-- Score is 0–1; render as a whole-number percentage. -->
                         <span class="score">{(r.score * 100).toFixed(0)}%</span>
                     </header>
                     <div class="meta small muted">
@@ -35,6 +47,7 @@
                             <summary class="small">Score breakdown</summary>
                             <ul class="breakdown small">
                                 {#each Object.entries(r.breakdown) as [field, score]}
+                                    <!-- Skip components that didn't contribute (null). -->
                                     {#if score != null}
                                         <li>{field}: {(score * 100).toFixed(0)}%</li>
                                     {/if}

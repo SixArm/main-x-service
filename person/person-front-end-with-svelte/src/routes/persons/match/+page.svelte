@@ -1,3 +1,15 @@
+<!--
+  Match check (/persons/match) — ad-hoc probabilistic match query.
+
+  An operator enters demographic fields and a threshold; submitting runs a
+  match against the index and renders the scored candidates. Does not create
+  anything — it's a read-only "who might this be?" tool.
+
+  State:
+    - family/given/birthDate/gender/taxId/threshold — the query inputs.
+    - results — the scored candidates from the last query.
+    - error / loading — request lifecycle.
+-->
 <script lang="ts">
     import MatchResultsList from "$lib/components/MatchResultsList.svelte";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -20,6 +32,8 @@
 
     const genders: Gender[] = ["male", "female", "other", "unknown"];
 
+    // Build the MatchRequest from the form and run it. Empty optional fields
+    // are sent as null; given names are split on whitespace into an array.
     async function runMatch(e: SubmitEvent) {
         e.preventDefault();
         loading = true;

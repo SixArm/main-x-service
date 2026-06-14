@@ -1,3 +1,13 @@
+<!--
+  Edit place (route "/places/[id]/edit") — loads the record, hands it to
+  PlaceForm as the initial value, and PUTs the result on submit, then
+  returns to the detail page.
+
+  Local $state:
+    - place / error / loading — fetched record and request status.
+  Derived:
+    - id — the route's place id.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
@@ -23,6 +33,8 @@
         }
     });
 
+    // PlaceForm.onsubmit: persist the edit, then navigate to the detail view.
+    // Thrown errors bubble back into the form's submitError banner.
     async function handleSubmit(value: Place) {
         await repo.update(id, value);
         goto(`/places/${id}`);

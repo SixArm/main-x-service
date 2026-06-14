@@ -1,9 +1,24 @@
+<!--
+  Root layout — the app shell wrapping every route: a sidebar (brand, nav,
+  theme picker, locale picker) plus a <main> that renders the active page.
+
+  $props:
+    - children: Snippet — the active route's rendered content.
+
+  Notable bits:
+    - Imports global CSS once here.
+    - `page` (from $app/state) is read to set aria-current on the active
+      nav link.
+    - THEMES / LOCALES feed the Lily theme + locale pickers.
+-->
 <script lang="ts">
     import "../app.css";
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
     import ThemePicker from "lily-design-system-svelte-theme-picker/ThemePicker.svelte";
 
+    // Full set of selectable Lily/DaisyUI-style themes shown in the picker,
+    // including NHS-specific themes for healthcare deployments.
     const THEMES = [
         "abyss",
         "acid",
@@ -50,6 +65,7 @@
 
     import LocalePicker from "lily-design-system-svelte-locale-picker/LocalePicker.svelte";
 
+    // Locales offered by the language picker (BCP-47-ish codes).
     const LOCALES = [
         "ar",
         "cy",
@@ -84,6 +100,8 @@
 
     let { children }: { children: Snippet } = $props();
 
+    // Sidebar navigation entries; `href` is compared to the current path to
+    // mark the active link.
     const navItems = [
         { href: "/", label: "Dashboard" },
         { href: "/workers", label: "Workers" },
@@ -100,6 +118,7 @@
             <ul>
                 {#each navItems as item}
                     <li>
+                        <!-- Mark the link for the current path as the active page. -->
                         <a
                             href={item.href}
                             aria-current={page.url.pathname === item.href ? "page" : null}

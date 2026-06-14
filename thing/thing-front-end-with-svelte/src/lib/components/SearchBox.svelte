@@ -1,3 +1,15 @@
+<!--
+  SearchBox — a single-input search form.
+
+  Purpose: reusable search field that emits the query on submit (Enter or
+  the button) rather than on every keystroke, so callers control when a
+  request fires.
+
+  $props:
+    - value ($bindable string, default ""): the current query text.
+    - placeholder (string, default "Search…"): placeholder + aria-label.
+    - onsearch ((value: string) => void, optional): invoked on submit.
+-->
 <script lang="ts">
     let {
         value = $bindable(""),
@@ -9,6 +21,7 @@
         onsearch?: (value: string) => void;
     } = $props();
 
+    // Prevent native form navigation; hand the query to the parent instead.
     function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         onsearch?.(value);

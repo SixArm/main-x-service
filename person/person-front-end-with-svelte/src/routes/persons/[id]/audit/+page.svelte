@@ -1,3 +1,15 @@
+<!--
+  Person audit log (/persons/[id]/audit) — chronological audit trail for
+  one person.
+
+  Loads up to 100 audit entries on mount and lists each action with its
+  timestamp, actor, and an expandable JSON payload of the new values.
+
+  State:
+    - entries — the audit entries (newest first from the API).
+    - error / loading — request lifecycle.
+    - id ($derived) — the person id from the route params.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";
@@ -10,6 +22,7 @@
     let loading = $state(true);
     const id = $derived(page.params.id as string);
 
+    // Load this person's audit history on mount (SSR disabled).
     onMount(async () => {
         try {
             entries = await repo.audit(id, 100);

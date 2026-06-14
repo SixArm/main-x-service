@@ -1,7 +1,21 @@
+<!--
+  LabeledField — wraps a form control with an accessible <label>, an
+  optional required marker, an optional hint, and a FieldError. The hint is
+  hidden once an error is present so the two never compete for the slot.
+
+  Props:
+    - label: string — visible label text.
+    - for: string — id of the control the label points at (bound to htmlFor).
+    - required?: boolean — show the "*" required marker.
+    - error?: string | null — validation message (toggles .has-error).
+    - hint?: string — helper text shown only when there is no error.
+    - children: Snippet — the actual input/select/control.
+-->
 <script lang="ts">
     import type { Snippet } from "svelte";
     import FieldError from "./FieldError.svelte";
 
+    // `for` is a reserved word, so the prop is renamed to `htmlFor` locally.
     let {
         label,
         for: htmlFor,

@@ -1,3 +1,17 @@
+<!--
+  Person detail (/persons/[id]) — read-only view of one person plus edit /
+  audit links and a soft-delete action.
+
+  Loads the record on mount from the route param and renders identity,
+  identifiers, addresses, telecom, and emergency contacts (each section
+  shown only when populated). Delete confirms, soft-deletes, then returns
+  to the list.
+
+  State:
+    - person — the loaded record (null until loaded / on error).
+    - error / loading — request lifecycle.
+    - id ($derived) — the person id from the route params.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
@@ -10,8 +24,10 @@
     let error = $state<string | null>(null);
     let loading = $state(true);
 
+    // Reactive route param; stays current if the user navigates between ids.
     const id = $derived(page.params.id as string);
 
+    // Load the record on mount (SSR is disabled, so no +page.ts load).
     onMount(async () => {
         try {
             person = await repo.get(id);
@@ -22,6 +38,7 @@
         }
     });
 
+    // Confirm, then soft-delete and return to the list. Errors stay on-page.
     async function handleDelete() {
         if (!confirm("Soft-delete this person? This cannot be undone via the UI.")) return;
         try {

@@ -1,3 +1,15 @@
+<!--
+  +page.svelte (/things/[id]/edit) — edit an existing Thing.
+
+  Purpose: loads the Thing by route id and seeds ThingForm with it; on submit
+  saves via update() and navigates back to the detail page.
+
+  $state:
+    - thing: loaded record used as the form's initial value.
+    - error / loading: request status.
+
+  Reactive notes: `id` is $derived from page.params; record loads in onMount.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
@@ -23,6 +35,7 @@
         }
     });
 
+    // Persist the edited Thing, then return to its detail view.
     async function handleSubmit(value: Thing) {
         await repo.update(id, value);
         goto(`/things/${id}`);

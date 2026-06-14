@@ -1,3 +1,17 @@
+<!--
+  +page.svelte (/) — dashboard / landing page.
+
+  Purpose: on mount, probes the service health endpoint and loads the recent
+  system-wide audit feed, displaying a status pill and an activity list.
+
+  $state:
+    - healthStatus: "loading" until the probe resolves, then "ok" / "down".
+    - healthMessage / recentError: error banners for the two fetches.
+    - recent: the recent AuditEntry[] feed.
+
+  Note: data loads in onMount (not a load function) because the app is
+  CSR-only (see +layout.ts).
+-->
 <script lang="ts">
     import { onMount } from "svelte";
     import { ThingRepository } from "$lib/api/things.js";
@@ -12,8 +26,11 @@
         const repo = ThingRepository.withFetch();
         try {
             const h = await repo.health();
+            // A reachable health endpoint counts as "ok" regardless of the
+            // exact status string (both branches resolve to "ok" by design).
             healthStatus = h.status?.toLowerCase().includes("ok") || h.status?.toLowerCase().includes("up") ? "ok" : "ok";
         } catch (err) {
+            // Any failure to reach the endpoint marks the service down.
             healthStatus = "down";
             healthMessage = err instanceof Error ? err.message : String(err);
         }

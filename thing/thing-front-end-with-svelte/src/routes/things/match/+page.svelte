@@ -1,3 +1,18 @@
+<!--
+  +page.svelte (/things/match) — ad-hoc match / duplicate check.
+
+  Purpose: lets the user describe a candidate Thing (name, description, URL,
+  identifiers, same-as URLs, threshold) and run a match against the index
+  without persisting anything; results render in MatchResultsList.
+
+  $state:
+    - name / description / url / threshold / sameAsRaw: bound form fields.
+    - identifiers: edited via ThingIdentifierInput.
+    - results / error / loading: outcome and request status.
+
+  Reactive notes: runMatch assembles a MatchRequest, sending optional fields
+  as undefined when blank so they're omitted from the query.
+-->
 <script lang="ts">
     import MatchResultsList from "$lib/components/MatchResultsList.svelte";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -24,6 +39,8 @@
         loading = true;
         error = null;
         try {
+            // Build the request; empty optionals become undefined (omitted),
+            // and identifiers are sent only when at least one row exists.
             const req: MatchRequest = {
                 name,
                 description: description || undefined,

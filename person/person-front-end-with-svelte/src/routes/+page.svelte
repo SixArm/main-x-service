@@ -1,3 +1,16 @@
+<!--
+  Dashboard (/) — landing page showing service health plus a recent
+  system-wide audit feed.
+
+  On mount it probes /health and loads the 20 latest audit entries,
+  independently so one failure doesn't hide the other.
+
+  State:
+    - healthStatus — ok/down/loading badge state.
+    - healthMessage — health error text, if the probe threw.
+    - recent — recent audit entries.
+    - recentError — audit-load error text, if that call threw.
+-->
 <script lang="ts">
     import { onMount } from "svelte";
     import { PersonRepository } from "$lib/api/persons.js";
@@ -8,15 +21,20 @@
     let recent = $state<AuditEntry[]>([]);
     let recentError = $state<string | null>(null);
 
+    // Load on mount (not in a +page.ts load) because the app is SSR-disabled.
     onMount(async () => {
         const repo = PersonRepository.withFetch();
         try {
             const h = await repo.health();
+            // A successful health response is treated as "ok" regardless of
+            // the exact status string; only a thrown error marks it "down".
             healthStatus = h.status?.toLowerCase().includes("ok") || h.status?.toLowerCase().includes("up") ? "ok" : "ok";
         } catch (err) {
             healthStatus = "down";
             healthMessage = err instanceof Error ? err.message : String(err);
         }
+        // Independent try/catch: an audit failure must not hide health, and
+        // vice versa.
         try {
             recent = await repo.recentAudit(20);
         } catch (err) {

@@ -1,3 +1,15 @@
+<!--
+  GeoCoordinatesInput — three numeric inputs (lat / lon / elevation) bound
+  to a GeoCoordinates object. Editing the inputs mutates the parent's `geo`
+  in place via `$bindable`, so no events are emitted.
+
+  $props:
+    - geo (GeoCoordinates, $bindable) — the coordinates being edited.
+    - errors (Record<string,string>) — keyed by `latitude`/`longitude`;
+      surfaced under the matching field.
+    - prefix (string) — id prefix so multiple instances keep unique
+      label/input ids on the page. Default "geo".
+-->
 <script lang="ts">
     import type { GeoCoordinates } from "$lib/api/types.js";
     import LabeledField from "$lib/forms/LabeledField.svelte";

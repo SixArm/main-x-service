@@ -1,3 +1,14 @@
+<!--
+  Merge places (route "/places/merge") — operator tool to merge a duplicate
+  place into a surviving main place by id, with an optional preview step and
+  a confirm() guard (the merge soft-deletes the duplicate).
+
+  Local $state:
+    - mainId / duplicateId / reason — merge request inputs.
+    - preview  — optional fetched main/duplicate records for review.
+    - result   — successful MergeResponse, rendered as a confirmation.
+    - error / loading — request status.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -16,6 +27,8 @@
     let error = $state<string | null>(null);
     let loading = $state(false);
 
+    // Fetch both records in parallel for the preview; each id is optional,
+    // so a missing id resolves to null rather than firing a request.
     async function loadPreview() {
         preview = { main: null, duplicate: null };
         error = null;
@@ -30,6 +43,8 @@
         }
     }
 
+    // Validate, confirm, then perform the merge. Guards prevent empty ids
+    // and self-merge; confirm() is the last chance before the destructive op.
     async function doMerge() {
         if (!mainId || !duplicateId) { error = "Both IDs required"; return; }
         if (mainId === duplicateId) { error = "Main and duplicate must differ"; return; }
@@ -40,9 +55,10 @@
             result = await repo.merge({
                 main_place_id: mainId,
                 duplicate_place_id: duplicateId,
-                merge_reason: reason || null,
+                merge_reason: reason || null, // empty string → null (omit reason)
             });
         } catch (err) {
+            // Prefer the structured "code: message" for ApiErrors.
             if (err instanceof ApiError) {
                 error = `${err.code}: ${err.message}`;
             } else {
@@ -53,6 +69,7 @@
         }
     }
 
+    // One-line "name (city)" label for the preview rows.
     function summary(p: Place | null): string {
         if (!p) return "—";
         const city = p.address?.address_locality ?? "";

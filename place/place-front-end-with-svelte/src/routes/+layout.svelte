@@ -1,9 +1,21 @@
+<!--
+  Root layout — the app shell wrapping every route: a sidebar with the
+  brand, primary nav, theme picker, and locale picker, plus a main content
+  area that renders the active page.
+
+  $props:
+    - children (Snippet) — the active route's content.
+
+  Notes: nav active state is derived from `page.url.pathname`; THEMES and
+  LOCALES are static lists feeding the Lily design-system pickers.
+-->
 <script lang="ts">
     import "../app.css";
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
     import ThemePicker from "lily-design-system-svelte-theme-picker/ThemePicker.svelte";
 
+    // Full set of Lily/daisyUI theme ids offered by the ThemePicker.
     const THEMES = [
         "abyss",
         "acid",
@@ -50,6 +62,7 @@
 
     import LocalePicker from "lily-design-system-svelte-locale-picker/LocalePicker.svelte";
 
+    // Locale ids offered by the LocalePicker (BCP-47-ish tags).
     const LOCALES = [
         "ar",
         "cy",
@@ -84,6 +97,7 @@
 
     let { children }: { children: Snippet } = $props();
 
+    // Primary navigation entries, rendered in order in the sidebar.
     const navItems = [
         { href: "/", label: "Dashboard" },
         { href: "/places", label: "Places" },
@@ -100,6 +114,7 @@
             <ul>
                 {#each navItems as item}
                     <li>
+                        <!-- Mark the current route for a11y + active styling. -->
                         <a
                             href={item.href}
                             aria-current={page.url.pathname === item.href ? "page" : null}

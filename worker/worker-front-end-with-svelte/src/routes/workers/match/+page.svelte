@@ -1,3 +1,14 @@
+<!--
+  Match check (route "/workers/match") — ad-hoc duplicate/match lookup. The
+  operator enters identity criteria and a threshold; results render via
+  MatchResultsList. Non-mutating: this never creates a record.
+
+  $state:
+    - family / given / birthDate / gender / taxId — match criteria inputs.
+    - threshold — minimum score (0–1) for a candidate to be returned.
+    - results — returned candidates.
+    - error / loading — request status.
+-->
 <script lang="ts">
     import MatchResultsList from "$lib/components/MatchResultsList.svelte";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -20,6 +31,8 @@
 
     const genders: Gender[] = ["male", "female", "other", "unknown"];
 
+    // Build the MatchRequest from the form and run the match. Empty strings
+    // are normalized to null so they aren't treated as match criteria.
     async function runMatch(e: SubmitEvent) {
         e.preventDefault();
         loading = true;

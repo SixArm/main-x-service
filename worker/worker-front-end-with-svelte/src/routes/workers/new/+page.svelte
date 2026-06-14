@@ -1,3 +1,12 @@
+<!--
+  New worker (route "/workers/new") — renders WorkerForm and creates the
+  record. Handles the service's real-time duplicate detection: a 409 with a
+  candidate list is shown below the form instead of navigating away.
+
+  $state:
+    - duplicates — candidate MatchResults from a 409 conflict, rendered as
+      a "Possible duplicates" list.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import WorkerForm from "$lib/components/WorkerForm.svelte";
@@ -9,22 +18,28 @@
     const repo = WorkerRepository.withFetch();
     let duplicates = $state<MatchResult[]>([]);
 
+    // Empty starting record satisfying Worker's required fields.
     const blank: Worker = {
         name: { family: "", given: [] },
         gender: "unknown",
         active: true,
     };
 
+    // WorkerForm submit handler: create, then navigate to the new record.
     async function handleSubmit(value: Worker) {
         duplicates = [];
         try {
             const created = await repo.create(value);
             if (created.id) goto(`/workers/${created.id}`);
         } catch (err) {
+            // 409 + array details = duplicate candidates. Show them and
+            // rethrow so WorkerForm displays the banner and stays put,
+            // letting the operator review before resubmitting.
             if (err instanceof ApiError && err.isConflict && Array.isArray(err.details)) {
                 duplicates = err.details as MatchResult[];
                 throw new Error(`Duplicates detected (${duplicates.length}) — review below before resubmitting.`);
             }
+            // Any other error bubbles to the form banner.
             throw err;
         }
     }

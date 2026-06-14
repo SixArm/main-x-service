@@ -1,3 +1,14 @@
+<!--
+  MatchResultsList — read-only list of scored match candidates.
+
+  Purpose: renders match / duplicate-check results with a coloured quality
+  pill, a percentage score, a link to the matched thing, and an expandable
+  per-component score breakdown. Shows an empty-state when there are none.
+
+  $props:
+    - results (MatchResult[]): the candidates to display, in service order.
+    - title (string, default "Match results"): section heading text.
+-->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
 
@@ -20,13 +31,18 @@
                 <li class="result">
                     <header>
                         <strong>{r.thing.name}</strong>
+                        <!-- data-quality drives the per-bucket pill colour in CSS. -->
                         <span class="quality" data-quality={r.confidence}>{r.confidence}</span>
+                        <!-- Score is 0..1 from the API; show as a whole percentage. -->
                         <span class="score">{(r.score * 100).toFixed(0)}%</span>
                     </header>
                     <div class="meta small muted">
                         {#if r.thing.additional_type}{r.thing.additional_type}{/if}
+                        <!-- Link to the candidate, abbreviating its UUID for readability. -->
                         {#if r.thing.id} · <a href={`/things/${r.thing.id}`}>{r.thing.id.slice(0, 8)}…</a>{/if}
                     </div>
+                    <!-- Optional per-component breakdown; each line only shows
+                         when that component actually contributed (non-null). -->
                     {#if r.breakdown}
                         <details>
                             <summary class="small">Score breakdown</summary>

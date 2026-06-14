@@ -1,3 +1,17 @@
+<!--
+  +page.svelte (/things/[id]) — Thing detail view.
+
+  Purpose: loads one Thing by route id and renders its identity, identifiers,
+  alternate names, same-as URLs, and images, with Edit / Audit / Delete
+  actions. Delete is a soft delete and asks for confirmation.
+
+  $state:
+    - thing: the loaded record (null until fetched).
+    - error / loading: request status.
+
+  Reactive notes: `id` is $derived from page.params; the record loads in
+  onMount. handleDelete navigates back to the list on success.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
@@ -10,6 +24,7 @@
     let error = $state<string | null>(null);
     let loading = $state(true);
 
+    // Route param; cast since SvelteKit types params as possibly-undefined.
     const id = $derived(page.params.id as string);
 
     onMount(async () => {
@@ -22,6 +37,7 @@
         }
     });
 
+    // Soft-delete the Thing after explicit confirmation, then return to list.
     async function handleDelete() {
         if (!confirm("Soft-delete this thing? This cannot be undone via the UI.")) return;
         try {
@@ -32,6 +48,8 @@
         }
     }
 
+    // Render an identifier's scheme as a label, handling the Custom variant.
+    // The conditional type extracts the element type of the identifiers array.
     function identifierLabel(t: Thing["identifiers"] extends (infer U)[] | undefined ? U : never): string {
         return typeof t.property_id === "string" ? t.property_id : `Custom: ${t.property_id.Custom}`;
     }

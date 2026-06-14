@@ -1,3 +1,12 @@
+<!--
+  MatchResultsList — read-only list of match/duplicate candidates with a
+  confidence pill, a percentage score, light metadata, and an expandable
+  per-component score breakdown. Pure presentation; emits no events.
+
+  $props:
+    - results (MatchResult[]) — candidates to render (already ranked).
+    - title (string) — heading text. Default "Match results".
+-->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
 
@@ -9,6 +18,8 @@
         title?: string;
     } = $props();
 
+    // Render a PlaceType for display: known variants print as-is; the open
+    // `{ Other }` variant is shown as "Other: <value>".
     function typeLabel(t: MatchResult["place"]["place_type"]): string {
         if (!t) return "";
         return typeof t === "string" ? t : `Other: ${t.Other}`;
@@ -25,14 +36,18 @@
                 <li class="result">
                     <header>
                         <strong>{r.place.name}</strong>
+                        <!-- data-quality drives the colour of the confidence pill (see <style>). -->
                         <span class="quality" data-quality={r.confidence}>{r.confidence}</span>
+                        <!-- Scores are 0–1; render as a whole-number percentage. -->
                         <span class="score">{(r.score * 100).toFixed(0)}%</span>
                     </header>
                     <div class="meta small muted">
                         {#if r.place.place_type}{typeLabel(r.place.place_type)}{/if}
                         {#if r.place.address?.address_locality} · {r.place.address.address_locality}{/if}
+                        <!-- Link to the candidate's detail page, showing a short id prefix. -->
                         {#if r.place.id} · <a href={`/places/${r.place.id}`}>{r.place.id.slice(0, 8)}…</a>{/if}
                     </div>
+                    <!-- Optional per-component breakdown, collapsed by default. -->
                     {#if r.breakdown}
                         <details>
                             <summary class="small">Score breakdown</summary>

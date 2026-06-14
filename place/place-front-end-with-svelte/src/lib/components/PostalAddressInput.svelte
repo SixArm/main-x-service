@@ -1,3 +1,13 @@
+<!--
+  PostalAddressInput — labelled inputs for the five PostalAddress parts,
+  laid out as two responsive rows. Each input two-way binds into the
+  parent's `address` via `$bindable` (no events emitted).
+
+  $props:
+    - address (PostalAddress, $bindable) — the address being edited.
+    - prefix (string) — id prefix to keep label/input ids unique when more
+      than one address form is on the page. Default "addr".
+-->
 <script lang="ts">
     import type { PostalAddress } from "$lib/api/types.js";
     import LabeledField from "$lib/forms/LabeledField.svelte";

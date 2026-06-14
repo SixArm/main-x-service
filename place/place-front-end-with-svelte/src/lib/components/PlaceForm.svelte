@@ -1,3 +1,22 @@
+<!--
+  PlaceForm — the create/edit form for a Place. Wraps the reactive
+  `createForm` helper, performs client-side validation, and renders the
+  Place fields plus optional Address and Geo sub-forms. On submit it hands
+  the validated value back to the parent via `onsubmit`; the parent owns
+  the actual API call.
+
+  $props:
+    - initial (Place)       — seed value (blank place for create, fetched
+                              record for edit).
+    - submitLabel (string?) — primary button text. Default "Save".
+    - onsubmit ((place) => Promise<void>) — async persist callback; thrown
+                              errors surface as `form.submitError`.
+
+  Local $state:
+    - form         — createForm controller holding value/errors/submitting.
+    - hasAddress   — whether the Address section is included (toggles null).
+    - hasGeo       — whether the Geo section is included (toggles null).
+-->
 <script lang="ts">
     import type { Place, PlaceType } from "$lib/api/types.js";
     import { PLACE_TYPES, blankPostalAddress } from "$lib/api/types.js";
@@ -14,16 +33,22 @@
     } = $props();
     const submitLabel = $derived(props.submitLabel ?? "Save");
 
+    // createForm reads props.initial once at setup; the ignore silences the
+    // "state referenced locally" hint since this is an intentional snapshot.
     // svelte-ignore state_referenced_locally
     const form = createForm<Place>({
         initial: props.initial,
+        // Client-side validation mirroring the service's rules so the
+        // operator gets immediate feedback before a 422 round-trip.
         validate(value) {
             const errors: Record<string, string> = {};
             if (!value.name.trim()) errors.name = "Required";
             if (value.geo) {
+                // Only validate coords when the Geo section is present.
                 if (value.geo.latitude < -90 || value.geo.latitude > 90) errors.latitude = "-90 to 90";
                 if (value.geo.longitude < -180 || value.geo.longitude > 180) errors.longitude = "-180 to 180";
             }
+            // GLN, when supplied, must be exactly 13 digits (GS1).
             if (value.global_location_number && !/^\d{13}$/.test(value.global_location_number)) {
                 errors.gln = "GLN must be 13 digits";
             }
@@ -32,9 +57,12 @@
         onSubmit: (value) => props.onsubmit(value),
     });
 
+    // Section toggles seeded from whether the initial record had the data.
     let hasGeo = $state(Boolean(form.value.geo));
     let hasAddress = $state(Boolean(form.value.address));
 
+    // Map the PlaceType union to the `<select>`'s string value. The open
+    // `{ Other }` variant has no option, so it collapses to "" (— / none).
     function selectedType(): PlaceType | "" {
         const t = form.value.place_type;
         if (!t) return "";
@@ -42,20 +70,26 @@
         return "";
     }
 
+    // Write the selected option back, treating the empty option as null.
     function setType(value: string) {
         form.value.place_type = value ? (value as PlaceType) : null;
     }
 
+    // Toggling the Address section swaps between a blank address and null
+    // so an unchecked section sends `address: null` (not stale data).
     function toggleAddress(on: boolean) {
         hasAddress = on;
         form.value.address = on ? blankPostalAddress() : null;
     }
 
+    // Same pattern for Geo: zeroed coords when on, null when off.
     function toggleGeo(on: boolean) {
         hasGeo = on;
         form.value.geo = on ? { latitude: 0, longitude: 0, elevation: null } : null;
     }
 
+    // Suppress native submit and delegate to the form controller (which
+    // validates, then calls onsubmit).
     function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         void form.submit();

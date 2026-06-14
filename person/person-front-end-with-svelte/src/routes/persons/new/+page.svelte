@@ -1,3 +1,14 @@
+<!--
+  New person (/persons/new) — create form with inline duplicate handling.
+
+  Renders PersonForm over a blank Person. On submit it creates the record
+  and navigates to its detail page; if the service responds 409 Conflict
+  (duplicate detected) it extracts the candidate matches, shows them below,
+  and rethrows so the form surfaces a "review before resubmitting" message.
+
+  State:
+    - duplicates — candidate matches from the most recent 409, if any.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import PersonForm from "$lib/components/PersonForm.svelte";
@@ -9,18 +20,22 @@
     const repo = PersonRepository.withFetch();
     let duplicates = $state<MatchResult[]>([]);
 
+    // Empty starting record for the create form.
     const blank: Person = {
         name: { family: "", given: [] },
         gender: "unknown",
         active: true,
     };
 
+    // Submit handler passed to PersonForm; runs inside the form's submit
+    // pipeline, so a thrown error becomes the form's submitError.
     async function handleSubmit(value: Person) {
         duplicates = [];
         try {
             const created = await repo.create(value);
             if (created.id) goto(`/persons/${created.id}`);
         } catch (err) {
+            // 409 Conflict means the service detected potential duplicates.
             if (err instanceof ApiError && err.isConflict) {
                 // Service emits one of:
                 //   • `MatchResult[]` directly                 (legacy)

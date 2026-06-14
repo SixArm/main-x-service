@@ -1,3 +1,22 @@
+<!--
+  PersonForm — create/edit form for a Person's core demographics (name,
+  birth date, gender, tax id). Shared by the "new" and "edit" routes.
+
+  Owns a createForm() controller that holds the editable value, validation
+  errors, the in-flight flag, and any submit-level error. Client-side
+  validation here is a fast first pass; the service re-validates and may
+  still return 422.
+
+  Props:
+    - initial: Person — the starting value (blank for create, loaded for edit).
+    - submitLabel?: string — primary button text (default "Save").
+    - onsubmit: (person) => Promise<void> — persistence callback; its thrown
+      error surfaces as the form's submitError.
+
+  State:
+    - submitLabel ($derived) — resolves the optional prop to its default.
+    - form — the reactive form controller (see createForm).
+-->
 <script lang="ts">
     import type { Gender, Person } from "$lib/api/types.js";
     import { createForm } from "$lib/forms/form.svelte.js";
@@ -12,9 +31,13 @@
     } = $props();
     const submitLabel = $derived(props.submitLabel ?? "Save");
 
+    // createForm clones `props.initial` internally, so reading it here once
+    // for setup is intentional — hence the lint suppression below.
     // svelte-ignore state_referenced_locally
     const form = createForm<Person>({
         initial: props.initial,
+        // Client-side validation mirroring the service's required-field and
+        // no-future-birth-date rules for instant feedback.
         validate(value) {
             const errors: Record<string, string> = {};
             if (!value.name.family.trim()) errors.family = "Required";
@@ -27,8 +50,11 @@
         onSubmit: (value) => props.onsubmit(value),
     });
 
+    // Options for the gender select, in the API's enum order.
     const genders: Gender[] = ["male", "female", "other", "unknown"];
 
+    // Stop the native submit and delegate to the form controller (which
+    // validates first). `void` discards the returned promise deliberately.
     function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         void form.submit();

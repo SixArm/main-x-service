@@ -1,3 +1,16 @@
+<!--
+  Worker audit log (route "/workers/[id]/audit") — ordered list of audit
+  entries for one worker, each with an expandable JSON payload of the new
+  values.
+
+  $state:
+    - entries — the AuditEntry rows (up to 100).
+    - error — fetch failure message.
+    - loading — true until the fetch settles.
+
+  $derived:
+    - id — the worker id from the route params.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";
@@ -10,6 +23,7 @@
     let loading = $state(true);
     const id = $derived(page.params.id as string);
 
+    // Fetch up to 100 audit entries for this worker on mount.
     onMount(async () => {
         try {
             entries = await repo.audit(id, 100);

@@ -1,3 +1,13 @@
+<!--
+  Workers list (route "/workers") — search box + result grid. Runs a search
+  on load and on every submit; selecting a grid row navigates to detail.
+
+  $state:
+    - query — bound search text.
+    - workers / total — current results and count.
+    - loading / error — request status and failure message.
+    - fuzzy / phonetic — search-mode toggles passed to the API.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import SearchBox from "$lib/components/SearchBox.svelte";
@@ -15,6 +25,8 @@
 
     const repo = WorkerRepository.withFetch();
 
+    // Run a search; an empty query becomes "*" to list everything. Resets
+    // results on failure so stale rows aren't shown alongside an error.
     async function runSearch(q: string) {
         loading = true;
         error = null;
@@ -31,10 +43,13 @@
         }
     }
 
+    // Grid row selected → navigate to that worker's detail page.
     function openWorker(worker: Worker) {
         if (worker.id) goto(`/workers/${worker.id}`);
     }
 
+    // Initial load: list all workers once the component is set up. (Uses a
+    // bare query so it doesn't re-run when fuzzy/phonetic toggles change.)
     $effect(() => {
         void runSearch("");
     });

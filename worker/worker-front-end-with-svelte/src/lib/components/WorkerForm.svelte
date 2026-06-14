@@ -1,3 +1,20 @@
+<!--
+  WorkerForm — create/edit form for a Worker. Shared by the "new worker"
+  and "edit worker" pages; the caller decides what submit does.
+
+  $props:
+    - initial: Worker — the starting value (blank for create, loaded for
+      edit). Cloned by createForm, so it isn't mutated.
+    - submitLabel?: string — primary button text (default "Save").
+    - onsubmit: (worker) => Promise<void> — persistence callback; throwing
+      surfaces the error as a submit banner (the new-worker page throws on
+      409 to show duplicates).
+
+  $derived:
+    - submitLabel — resolved button label with its default.
+
+  State: `form` is a createForm() handle holding value/errors/submitting.
+-->
 <script lang="ts">
     import type { Gender, Worker } from "$lib/api/types.js";
     import { createForm } from "$lib/forms/form.svelte.js";
@@ -13,8 +30,12 @@
     const submitLabel = $derived(props.submitLabel ?? "Save");
 
     // svelte-ignore state_referenced_locally
+    // Reading props.initial once at setup is intentional — createForm clones
+    // it, so we don't need it to stay reactive after the form is created.
     const form = createForm<Worker>({
         initial: props.initial,
+        // Client-side validation mirroring the service's required-field and
+        // birth-date rules, to fail fast before the network round-trip.
         validate(value) {
             const errors: Record<string, string> = {};
             if (!value.name.family.trim()) errors.family = "Required";
@@ -29,6 +50,7 @@
 
     const genders: Gender[] = ["male", "female", "other", "unknown"];
 
+    // Suppress native submit; delegate to the reactive form handle.
     function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         void form.submit();
@@ -36,6 +58,7 @@
 </script>
 
 <form onsubmit={handleSubmit} class="stack">
+    <!-- Two-way bind the name so edits flow back into form.value. -->
     <HumanNameInput bind:name={form.value.name} errors={form.errors} />
 
     <FieldRow>

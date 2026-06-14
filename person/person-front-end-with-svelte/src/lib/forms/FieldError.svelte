@@ -1,3 +1,13 @@
+<!--
+  FieldError — inline validation message for a single form field.
+
+  Renders nothing when `error` is empty, so callers can pass an optional
+  error straight through. Uses role="alert" so assistive tech announces
+  the message when it appears.
+
+  Props:
+    - error?: string | null — the message to show; null/empty renders nothing.
+-->
 <script lang="ts">
     let { error = null }: { error?: string | null } = $props();
 </script>

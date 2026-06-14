@@ -1,3 +1,15 @@
+<!--
+  MatchResultsList — renders a list of scored match/dedup candidates.
+
+  Read-only presentation: shows each candidate's name, quality badge,
+  percentage score, demographics, a deep link to the record, and an
+  expandable per-component score breakdown. Shows an empty-state line when
+  there are no results.
+
+  Props:
+    - results: MatchResult[] — the candidates to display (already scored).
+    - title?: string — section heading; count is appended automatically.
+-->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
 
@@ -22,7 +34,9 @@
                         <strong>
                             {r.person.name.given.join(" ")} {r.person.name.family}
                         </strong>
+                        <!-- data-quality drives the badge colour via CSS. -->
                         <span class="quality" data-quality={r.quality}>{r.quality}</span>
+                        <!-- Score is 0..1; render as a whole-number percent. -->
                         <span class="score">{(r.score * 100).toFixed(0)}%</span>
                     </header>
                     <div class="meta small muted">
@@ -35,6 +49,7 @@
                             <summary class="small">Score breakdown</summary>
                             <ul class="breakdown small">
                                 {#each Object.entries(r.breakdown) as [field, score]}
+                                    <!-- Skip components the matcher didn't score (null). -->
                                     {#if score != null}
                                         <li>{field}: {(score * 100).toFixed(0)}%</li>
                                     {/if}

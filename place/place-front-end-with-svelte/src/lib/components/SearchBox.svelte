@@ -1,3 +1,12 @@
+<!--
+  SearchBox — a small search `<form>` with a text input and submit button.
+
+  $props:
+    - value (string, $bindable) — the current query; two-way bound so the
+      parent can read/seed it. Default "".
+    - placeholder (string) — input placeholder, also used as the aria-label.
+    - onsearch ((value) => void) — callback fired on submit with the query.
+-->
 <script lang="ts">
     let {
         value = $bindable(""),
@@ -9,6 +18,7 @@
         onsearch?: (value: string) => void;
     } = $props();
 
+    // Submit handler: suppress native navigation, then notify the parent.
     function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         onsearch?.(value);

@@ -1,3 +1,17 @@
+<!--
+  +page.svelte (/things/new) — create a new Thing.
+
+  Purpose: renders ThingForm; on submit creates the Thing and navigates to
+  its detail page. If the service reports duplicates (HTTP 409), shows the
+  candidate list and blocks creation until the user resubmits.
+
+  $state:
+    - duplicates: candidate MatchResult[] surfaced from a 409 conflict.
+
+  Reactive notes: handleSubmit re-throws so ThingForm's submit-error banner
+  reflects the duplicate warning; clearing/repopulating `duplicates` drives
+  the MatchResultsList below the form.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import ThingForm from "$lib/components/ThingForm.svelte";
@@ -9,6 +23,7 @@
     const repo = ThingRepository.withFetch();
     let duplicates = $state<MatchResult[]>([]);
 
+    // A new Thing starts with just an empty name (the only required field).
     const blank: Thing = { name: "" };
 
     async function handleSubmit(value: Thing) {
@@ -17,10 +32,13 @@
             const created = await repo.create(value);
             if (created.id) goto(`/things/${created.id}`);
         } catch (err) {
+            // 409 with array details = duplicate candidates: surface them and
+            // re-throw a friendly message so the form shows the warning banner.
             if (err instanceof ApiError && err.isConflict && Array.isArray(err.details)) {
                 duplicates = err.details as MatchResult[];
                 throw new Error(`Duplicates detected (${duplicates.length}) — review below before resubmitting.`);
             }
+            // Any other error bubbles up to the form's submit-error handling.
             throw err;
         }
     }

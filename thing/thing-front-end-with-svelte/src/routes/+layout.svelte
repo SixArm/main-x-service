@@ -1,9 +1,26 @@
+<!--
+  +layout.svelte — root application shell wrapping every route.
+
+  Purpose: renders the persistent sidebar (brand, primary navigation, theme
+  picker, locale picker) and a <main> region into which the active page is
+  rendered via the `children` snippet.
+
+  $props:
+    - children (Snippet): the active route's content.
+
+  Reactive notes: nav items compare against `page.url.pathname` to set
+  aria-current="page" on the active link.
+
+  Lists THEMES / LOCALES feed the Lily theme/locale pickers; they are static
+  config arrays, not reactive state.
+-->
 <script lang="ts">
     import "../app.css";
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
     import ThemePicker from "lily-design-system-svelte-theme-picker/ThemePicker.svelte";
 
+    // Theme ids offered by the Lily ThemePicker (loaded from /assets/themes/).
     const THEMES = [
         "abyss",
         "acid",
@@ -50,6 +67,7 @@
 
     import LocalePicker from "lily-design-system-svelte-locale-picker/LocalePicker.svelte";
 
+    // BCP-47-ish locale codes offered by the Lily LocalePicker.
     const LOCALES = [
         "ar",
         "cy",
@@ -84,6 +102,7 @@
 
     let { children }: { children: Snippet } = $props();
 
+    // Primary sidebar navigation (href + visible label).
     const navItems = [
         { href: "/", label: "Dashboard" },
         { href: "/things", label: "Things" },
@@ -100,6 +119,7 @@
             <ul>
                 {#each navItems as item}
                     <li>
+                        <!-- Mark the link for the current path as the active page. -->
                         <a
                             href={item.href}
                             aria-current={page.url.pathname === item.href ? "page" : null}

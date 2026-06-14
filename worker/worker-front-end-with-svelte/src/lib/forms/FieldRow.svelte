@@ -1,3 +1,10 @@
+<!--
+  FieldRow — responsive layout wrapper that arranges its child fields in a
+  CSS grid (auto-fit columns, min 180px). Purely presentational.
+
+  $props:
+    - children: Snippet — the fields (typically LabeledFields) to lay out.
+-->
 <script lang="ts">
     import type { Snippet } from "svelte";
     let { children }: { children: Snippet } = $props();

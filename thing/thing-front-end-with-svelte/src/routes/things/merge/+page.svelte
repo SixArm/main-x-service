@@ -1,3 +1,20 @@
+<!--
+  +page.svelte (/things/merge) — merge two Things.
+
+  Purpose: collects a surviving main id and a duplicate id (plus a reason),
+  optionally previews both records, then merges the duplicate into the main
+  after confirmation. On success shows the merge record and a link to the
+  merged main Thing.
+
+  $state:
+    - mainId / duplicateId / reason: bound form fields.
+    - preview: the two loaded Things for side-by-side confirmation.
+    - result: the MergeResponse after a successful merge.
+    - error / loading: validation/request status.
+
+  Reactive notes: doMerge validates locally (both ids present and distinct)
+  before confirming and calling the API; ApiError codes are shown verbatim.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -16,6 +33,7 @@
     let error = $state<string | null>(null);
     let loading = $state(false);
 
+    // Fetch both records (whichever ids are filled) in parallel for preview.
     async function loadPreview() {
         preview = { main: null, duplicate: null };
         error = null;
@@ -31,6 +49,7 @@
     }
 
     async function doMerge() {
+        // Guard: both ids required and they must differ (can't merge into self).
         if (!mainId || !duplicateId) {
             error = "Both IDs required";
             return;
@@ -39,6 +58,7 @@
             error = "Main and duplicate must differ";
             return;
         }
+        // Destructive (soft-deletes the duplicate) — confirm before proceeding.
         if (!confirm(`Merge ${duplicateId.slice(0, 8)}… into ${mainId.slice(0, 8)}…?\nThis soft-deletes the duplicate.`)) return;
         loading = true;
         error = null;
@@ -49,6 +69,7 @@
                 merge_reason: reason || null,
             });
         } catch (err) {
+            // Prefer the service's structured "CODE: message" for API errors.
             if (err instanceof ApiError) {
                 error = `${err.code}: ${err.message}`;
             } else {
@@ -59,6 +80,7 @@
         }
     }
 
+    // One-line preview summary "Name (additional_type)" for the preview table.
     function summary(p: Thing | null): string {
         if (!p) return "—";
         return `${p.name}${p.additional_type ? ` (${p.additional_type})` : ""}`;
@@ -104,6 +126,7 @@
     <section class="surface stack">
         <h2>Merge completed</h2>
         <p>Merge record <code>{result.merge_record.id}</code> created at {new Date(result.merge_record.merged_at).toLocaleString()}.</p>
+        <!-- SPA navigation to the surviving main thing's detail page. -->
         <a href={`/things/${result.main_thing.id}`} class="button primary"
            onclick={() => result?.main_thing.id && goto(`/things/${result.main_thing.id}`)}>
             View merged main thing

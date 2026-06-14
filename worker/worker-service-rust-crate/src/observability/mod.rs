@@ -16,7 +16,9 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 use crate::Result;
 use crate::config::ObservabilityConfig;
 
+/// Placeholder for OpenTelemetry-exported metrics (runtime metrics live in [`crate::metrics`]).
 pub mod metrics;
+/// Placeholder for OpenTelemetry distributed-tracing span-exporter wiring.
 pub mod traces;
 
 /// Initializes process-wide tracing/logging from `config`.

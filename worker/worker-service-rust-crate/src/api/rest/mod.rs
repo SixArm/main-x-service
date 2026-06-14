@@ -14,8 +14,11 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+/// REST endpoint handler implementations.
 pub mod handlers;
+/// Loco route-group registration (`workers_routes`, `fhir_routes`, `metrics_routes`).
 pub mod routes;
+/// Shared [`AppState`] carried by every handler.
 pub mod state;
 
 pub use state::AppState;

@@ -1,3 +1,15 @@
+<!--
+  Persons list (/persons) — searchable, paginated grid of persons.
+
+  Wraps SearchBox (query + fuzzy/phonetic toggles) over PersonGrid.
+  Selecting a row navigates to that person's detail page.
+
+  State:
+    - query — current search text (bound to SearchBox).
+    - persons / total — current result page and hit count.
+    - loading / error — request lifecycle.
+    - fuzzy / phonetic — search-mode toggles passed to the API.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import SearchBox from "$lib/components/SearchBox.svelte";
@@ -15,10 +27,13 @@
 
     const repo = PersonRepository.withFetch();
 
+    // Run a search and fold the result into the grid state. On error, clear
+    // the grid so stale results aren't shown alongside the error banner.
     async function runSearch(q: string) {
         loading = true;
         error = null;
         try {
+            // Empty query becomes "*" so the initial load lists everything.
             const res = await repo.search({ q: q || "*", limit: 50, fuzzy, phonetic });
             persons = res.items;
             total = res.total;
@@ -31,10 +46,13 @@
         }
     }
 
+    // Navigate to the detail page for the selected row (ignore unsaved rows).
     function openPerson(person: Person) {
         if (person.id) goto(`/persons/${person.id}`);
     }
 
+    // Initial load: list all persons once on mount (SSR is disabled, so no
+    // +page.ts load function). Runs once because it reads no reactive deps.
     $effect(() => {
         void runSearch("");
     });

@@ -1,3 +1,16 @@
+<!--
+  Dashboard (route "/") — landing page showing a service-health pill and a
+  short recent-activity feed pulled from the system-wide audit log.
+
+  Local $state:
+    - healthStatus  — "loading" | "ok" | "down" (drives the status pill).
+    - healthMessage — error text shown when the health probe throws.
+    - recent        — latest audit entries (capped at 20).
+    - recentError   — error text shown when the audit fetch fails.
+
+  Both fetches run on mount and fail independently (one can error without
+  blocking the other).
+-->
 <script lang="ts">
     import { onMount } from "svelte";
     import { PlaceRepository } from "$lib/api/places.js";
@@ -12,6 +25,8 @@
         const repo = PlaceRepository.withFetch();
         try {
             const h = await repo.health();
+            // NOTE: any successful health response is treated as "ok"; both
+            // branches resolve to "ok" so a 2xx with any status string passes.
             healthStatus = h.status?.toLowerCase().includes("ok") || h.status?.toLowerCase().includes("up") ? "ok" : "ok";
         } catch (err) {
             healthStatus = "down";

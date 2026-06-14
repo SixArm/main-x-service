@@ -1,3 +1,18 @@
+<!--
+  +page.svelte (/things) — Things list / search page.
+
+  Purpose: search the index (with fuzzy / phonetic toggles) and show results
+  in the SVAR ThingGrid; selecting a row navigates to that Thing's detail.
+
+  $state:
+    - query: bound search text.
+    - things / total: current result set and count.
+    - loading / error: request status.
+    - fuzzy / phonetic: search-mode toggles passed to the API.
+
+  Reactive notes: an $effect runs the initial unfiltered search once on mount
+  ("*" wildcard); subsequent searches are user-triggered via runSearch.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import SearchBox from "$lib/components/SearchBox.svelte";
@@ -15,6 +30,7 @@
 
     const repo = ThingRepository.withFetch();
 
+    // Execute a search; empty input falls back to "*" to list everything.
     async function runSearch(q: string) {
         loading = true;
         error = null;
@@ -31,10 +47,12 @@
         }
     }
 
+    // Navigate to the detail page for a grid-selected Thing.
     function openThing(thing: Thing) {
         if (thing.id) goto(`/things/${thing.id}`);
     }
 
+    // Populate the grid with an initial wildcard search on first render.
     $effect(() => {
         void runSearch("");
     });

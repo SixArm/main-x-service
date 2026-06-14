@@ -57,16 +57,27 @@ use serde::{Deserialize, Serialize};
 
 // Submodules: one file per cluster of related model types.
 
+/// NHS ODS CodeSystem lookup types (role / relationship / record-class names).
 pub mod codesystem;
+/// Consent records (type, status, validity dates) for privacy gating.
 pub mod consent;
+/// Identity documents (passport, national ID, driver's license, …).
 pub mod document;
+/// Emergency-contact records (name, relationship, telecom, address).
 pub mod emergency_contact;
+/// ONS/NHS geography reference types (postcode-to-area mappings).
 pub mod geography;
+/// External identifiers (MRN, SSN, DL, NPI, PPN, TAX, …) and their types.
 pub mod identifier;
+/// Merge request / response / record types for the dedup merge workflow.
 pub mod merge;
+/// NHS ODS organisation-data types (roles, relationships, successions, periods).
 pub mod ods;
+/// Organization aggregate (with NHS ODS alignment).
 pub mod organization;
+/// Deduplication review-queue items and batch-dedup request/response types.
 pub mod review_queue;
+/// The central [`Worker`](worker::Worker) aggregate and its name/link types.
 pub mod worker;
 
 pub use codesystem::{

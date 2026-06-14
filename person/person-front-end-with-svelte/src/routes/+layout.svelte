@@ -1,9 +1,21 @@
+<!--
+  Root layout — the app shell wrapping every route.
+
+  Renders the persistent sidebar (brand, primary nav, Lily theme/locale
+  pickers) and a <main> slot for the active page. The nav highlights the
+  current route via aria-current. Pure shell: no data fetching here.
+
+  Props:
+    - children: Snippet — the active route's content, rendered in <main>.
+-->
 <script lang="ts">
     import "../app.css";
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
     import ThemePicker from "lily-design-system-svelte-theme-picker/ThemePicker.svelte";
 
+    // Theme ids offered by the Lily ThemePicker (DaisyUI themes plus the
+    // bespoke NHS England/Scotland/Wales patient & practitioner themes).
     const THEMES = [
         "abyss",
         "acid",
@@ -50,6 +62,8 @@
 
     import LocalePicker from "lily-design-system-svelte-locale-picker/LocalePicker.svelte";
 
+    // Locale codes offered by the Lily LocalePicker (ISO 639-1, with a few
+    // region variants like en_GB / pt_BR).
     const LOCALES = [
         "ar",
         "cy",
@@ -84,6 +98,7 @@
 
     let { children }: { children: Snippet } = $props();
 
+    // Primary sidebar navigation; order is the operator workflow order.
     const navItems = [
         { href: "/", label: "Dashboard" },
         { href: "/persons", label: "Persons" },

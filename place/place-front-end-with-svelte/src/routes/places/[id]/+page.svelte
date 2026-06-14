@@ -1,3 +1,14 @@
+<!--
+  Place detail (route "/places/[id]") — read-only view of one place with
+  Edit / Audit links and a soft-delete action. Sections (address, geo,
+  identifiers, opening hours, amenities) render only when present.
+
+  Local $state:
+    - place             — the fetched record (null until loaded).
+    - error / loading   — request status.
+  Derived:
+    - id                — route param `[id]` (the place id).
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
@@ -10,6 +21,7 @@
     let error = $state<string | null>(null);
     let loading = $state(true);
 
+    // Route param; `as string` because SvelteKit types params as optional.
     const id = $derived(page.params.id as string);
 
     onMount(async () => {
@@ -22,6 +34,7 @@
         }
     });
 
+    // Soft-delete behind a confirm() guard, then return to the list.
     async function handleDelete() {
         if (!confirm("Soft-delete this place? This cannot be undone via the UI.")) return;
         try {
@@ -32,6 +45,7 @@
         }
     }
 
+    // Display label for the place type; `{ Other }` → "Other: <value>".
     function typeLabel(p: Place): string {
         if (!p.place_type) return "—";
         return typeof p.place_type === "string" ? p.place_type : `Other: ${p.place_type.Other}`;
@@ -72,6 +86,7 @@
         <section class="surface stack">
             <h2>Address</h2>
             <p>
+                <!-- Join only the populated address parts with commas. -->
                 {[place.address.street_address, place.address.address_locality, place.address.address_region, place.address.postal_code, place.address.address_country]
                     .filter(Boolean)
                     .join(", ")}

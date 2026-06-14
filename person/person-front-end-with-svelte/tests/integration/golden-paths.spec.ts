@@ -54,6 +54,9 @@ function uniqueDob(): string {
     return d.toISOString().slice(0, 10);
 }
 
+// Create a person directly via the REST API (bypassing the UI) to seed
+// fixtures. Defaults to a unique DOB unless one is supplied; asserts a 2xx
+// and a success envelope before returning the created record's id + inputs.
 async function apiCreatePerson(
     request: APIRequestContext,
     family: string,
@@ -77,12 +80,15 @@ async function apiCreatePerson(
     return { id: body.data.id, family, given, birth_date };
 }
 
+// Soft-delete a seeded person via the API during cleanup.
 async function apiSoftDelete(request: APIRequestContext, id: string): Promise<void> {
     const res = await request.delete(`${API_BASE}/api/persons/${id}`);
     // 204 or 200 both indicate success; ignore 404 (already gone).
     expect([200, 204, 404]).toContain(res.status());
 }
 
+// Build a family name that is unique per run/record so concurrent runs and
+// repeated runs don't collide on search/match assertions.
 function uniqueFamily(tag: string): string {
     return `E2E_${tag}_${Date.now()}_${Math.floor(Math.random() * 1e4)}`;
 }

@@ -48,9 +48,13 @@ use crate::Result;
 use crate::config::MatchingConfig;
 use crate::models::Worker;
 
+/// Bridge from service-side [`Worker`] records into the canonical `worker-matcher` crate.
 pub mod adapter;
+/// Per-component matching algorithms (name, DOB, gender, address, identifier, tax id, document).
 pub mod algorithms;
+/// Soundex phonetic encoding used as a name-matching bonus.
 pub mod phonetic;
+/// Probabilistic and deterministic scorers combining the component algorithms.
 pub mod scoring;
 
 pub use scoring::{DeterministicScorer, MatchQuality, ProbabilisticScorer};

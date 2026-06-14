@@ -1,3 +1,18 @@
+<!--
+  PersonGrid — tabular person list backed by the SVAR (wx-svelte-grid)
+  DataGrid.
+
+  Flattens each Person into the flat row shape the grid expects, then maps
+  the grid's row-select event back to the originating Person object so the
+  parent receives a domain type, not a row record.
+
+  Props:
+    - persons: Person[] — records to display.
+    - onselect?: (person) => void — called when a row is selected.
+
+  State:
+    - data ($derived) — persons flattened into grid rows (recomputes on change).
+-->
 <script lang="ts">
     import { Grid } from "wx-svelte-grid";
     import type { Person } from "$lib/api/types.js";
@@ -10,6 +25,7 @@
         onselect?: (person: Person) => void;
     } = $props();
 
+    // Column definitions for the SVAR grid (id/header/width per column).
     const columns = [
         { id: "id", header: "ID", width: 280 },
         { id: "family", header: "Family", width: 160 },

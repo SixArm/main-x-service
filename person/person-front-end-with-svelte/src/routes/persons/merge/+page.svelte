@@ -1,3 +1,18 @@
+<!--
+  Merge persons (/persons/merge) — manually merge a duplicate record into a
+  surviving main record by id.
+
+  The operator enters both ids (+ optional reason), optionally loads a
+  side-by-side preview, then merges with a confirmation. The merge
+  soft-deletes the duplicate; on success a link to the surviving record is
+  shown.
+
+  State:
+    - mainId/duplicateId/reason — the merge inputs.
+    - preview — loaded main/duplicate records for the side-by-side view.
+    - result — the MergeResponse after a successful merge.
+    - error / loading — request lifecycle.
+-->
 <script lang="ts">
     import { goto } from "$app/navigation";
     import LabeledField from "$lib/forms/LabeledField.svelte";
@@ -16,6 +31,8 @@
     let error = $state<string | null>(null);
     let loading = $state(false);
 
+    // Fetch both records in parallel for the side-by-side preview. A blank id
+    // resolves to null so a partial preview still works.
     async function loadPreview() {
         preview = { main: null, duplicate: null };
         error = null;
@@ -30,7 +47,10 @@
         }
     }
 
+    // Validate locally, confirm the destructive action, then merge.
     async function doMerge() {
+        // Guard: both ids required and they must differ (can't merge a record
+        // into itself).
         if (!mainId || !duplicateId) {
             error = "Both IDs required";
             return;
@@ -49,6 +69,7 @@
                 merge_reason: reason || null,
             });
         } catch (err) {
+            // Prefer the structured "CODE: message" form for ApiError.
             if (err instanceof ApiError) {
                 error = `${err.code}: ${err.message}`;
             } else {
@@ -59,6 +80,7 @@
         }
     }
 
+    // One-line human summary of a person for the preview table.
     function summary(p: Person | null): string {
         if (!p) return "—";
         return `${p.name.given.join(" ")} ${p.name.family} (${p.birth_date ?? "no DOB"}, ${p.gender})`;

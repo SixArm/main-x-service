@@ -1,3 +1,16 @@
+<!--
+  +page.svelte (/things/[id]/audit) — per-Thing audit log.
+
+  Purpose: loads up to 100 audit entries for one Thing and renders them as an
+  ordered list, each with action, timestamp, optional user, and an
+  expandable JSON payload of the new values.
+
+  $state:
+    - entries: the loaded AuditEntry[].
+    - error / loading: request status.
+
+  Reactive notes: `id` is $derived from page.params; entries load in onMount.
+-->
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";
