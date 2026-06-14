@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the PostgreSQL database schema for the Worker Service (MPI) system. The schema is designed to support millions of worker records with high performance, HIPAA compliance, and full audit trail capabilities.
+This document describes the PostgreSQL database schema for the Worker Service. The schema is designed to support millions of worker records with high performance, HIPAA compliance, and full audit trail capabilities.
 
 ## Design Principles
 

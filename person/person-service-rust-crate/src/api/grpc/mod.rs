@@ -11,11 +11,11 @@ use crate::config::ServerConfig;
 
 /// Generated Protobuf types (reserved).
 ///
-/// Will hold `tonic::include_proto!("mpi")` output once the `.proto`
+/// Will hold `tonic::include_proto!("person")` output once the `.proto`
 /// service definition exists; empty for now.
 pub mod proto {
     // Protocol buffer generated code will go here
-    // tonic::include_proto!("mpi");
+    // tonic::include_proto!("person");
 }
 
 /// Start the gRPC server (currently a no-op stub).

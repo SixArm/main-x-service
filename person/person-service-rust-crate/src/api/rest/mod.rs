@@ -35,7 +35,7 @@ pub use state::AppState;
         version = "0.1.0",
         description = "RESTful API for person identification, matching, deduplication, and privacy",
         contact(
-            name = "MPI Development Team",
+            name = "Person Service Development Team",
             email = "support@example.com"
         )
     ),

@@ -1,4 +1,4 @@
-//! Person Service (MPI)
+//! Person Service
 //!
 //! A healthcare person identification and matching system built with Rust.
 //!

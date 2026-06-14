@@ -2,7 +2,7 @@
 
 ## Overview
 
-The MPI uses a multi-layer testing strategy: unit tests, integration tests, and benchmark tests.
+The service uses a multi-layer testing strategy: unit tests, integration tests, and benchmark tests.
 
 ## Unit Tests
 
@@ -58,7 +58,7 @@ Integration tests are in `tests/` and test full HTTP request/response cycles aga
 podman compose -f docker-compose.test.yml up
 
 # Locally (requires running PostgreSQL)
-DATABASE_URL=postgres://user:pass@localhost/mpi_test cargo test --test api_integration_test
+DATABASE_URL=postgres://user:pass@localhost/person_service_test cargo test --test api_integration_test
 ```
 
 ## Benchmark Tests

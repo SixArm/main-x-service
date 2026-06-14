@@ -16,7 +16,7 @@ Person Service - A person identity-registry system built with Rust. Production-r
 | ----- | -------------------------- | -------- | ----- |
 | 1     | Project Setup & Foundation | Complete | -     |
 | 2     | Database Schema & Models   | Complete | -     |
-| 3     | Core MPI Logic             | Complete | 16    |
+| 3     | Core Matching Logic        | Complete | 16    |
 | 4     | Search Engine Integration  | Complete | 5     |
 | 5     | RESTful API (Axum)         | Complete | -     |
 | 6     | FHIR R5 Support            | Partial  | -     |
@@ -26,7 +26,7 @@ Person Service - A person identity-registry system built with Rust. Production-r
 | 10    | Integration Testing        | Partial  | 7     |
 | 11    | Docker & Deployment        | Complete | -     |
 | 12    | Documentation              | Complete | -     |
-| 13    | Advanced MPI Features      | Complete | 9     |
+| 13    | Advanced Matching Features | Complete | 9     |
 | 14-20 | Future phases              | Planned  | -     |
 
 **Total: 34 unit tests passing, 7 integration tests (require PostgreSQL)**
@@ -46,7 +46,7 @@ Initialized Rust project with 40+ dependencies:
 - 40+ strategic indexes, HIPAA-compliant audit triggers
 - Capacity: 10M persons ~ 40-60 GB with indexes and audit
 
-## Phase 3: Core MPI Logic
+## Phase 3: Core Matching Logic
 
 Matching algorithms:
 
@@ -115,7 +115,7 @@ Tantivy full-text search:
 - Multi-stage Dockerfile, Docker Compose dev/test
 - DEPLOY.md, README.md, architecture docs
 
-## Phase 13: Advanced MPI Features
+## Phase 13: Advanced Matching Features
 
 **Person Identity Management:**
 

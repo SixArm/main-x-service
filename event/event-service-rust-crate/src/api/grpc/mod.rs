@@ -13,7 +13,7 @@ use crate::config::ServerConfig;
 /// until the `.proto` schema is wired in via `tonic::include_proto!`).
 pub mod proto {
     // Protocol buffer generated code will go here
-    // tonic::include_proto!("mpi");
+    // tonic::include_proto!("event");
 }
 
 /// Start the gRPC server. Currently a no-op stub that returns `Ok(())`

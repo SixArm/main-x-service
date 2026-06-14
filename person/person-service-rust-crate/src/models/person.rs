@@ -1,4 +1,4 @@
-//! The [`Person`] domain model — the central identity record of the MPI.
+//! The [`Person`] domain model — the central identity record of the service.
 //!
 //! A [`Person`] aggregates demographics, names, identifiers, contact
 //! points, addresses, documents, and links to other records. It is the

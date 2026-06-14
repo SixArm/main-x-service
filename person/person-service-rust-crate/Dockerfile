@@ -49,21 +49,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Non-root user. Podman maps host UID 1000 to the container UID 1000
 # by default when running rootless, so the bind-mounted volumes stay
 # accessible without `:Z` relabel headaches.
-RUN useradd --create-home --uid 1000 --shell /bin/bash mpi
+RUN useradd --create-home --uid 1000 --shell /bin/bash person
 
-RUN mkdir -p /app/data/search_index && chown -R mpi:mpi /app
+RUN mkdir -p /app/data/search_index && chown -R person:person /app
 
-USER mpi
+USER person
 WORKDIR /app
 
 # Copy the binary that `cargo build --bin person-service` produces.
 # The output name comes from the Cargo package name (`person-service`).
-COPY --from=builder --chown=mpi:mpi /app/target/release/person-service /app/person-service
+COPY --from=builder --chown=person:person /app/target/release/person-service /app/person-service
 
 # Migrations are NOT auto-applied on boot; document the manual step in
 # README. Keep them in the image so an operator can shell in and run
 # them against the configured `DATABASE_URL` without re-mounting.
-COPY --chown=mpi:mpi migrations ./migrations
+COPY --chown=person:person migrations ./migrations
 
 EXPOSE 8080
 

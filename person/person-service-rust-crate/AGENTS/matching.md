@@ -2,7 +2,7 @@
 
 ## Overview
 
-The MPI matching system compares two person records and produces a confidence score (0.00–1.00). Two strategies are available: probabilistic (weighted fuzzy) and deterministic (rule-based exact).
+The matching system compares two person records and produces a confidence score (0.00–1.00). Two strategies are available: probabilistic (weighted fuzzy) and deterministic (rule-based exact).
 
 ## Probabilistic Matching
 

@@ -16,7 +16,7 @@ Two implementations exist today, both **process-local and volatile**:
   ring buffer in `src/streaming.rs` with free functions `publish(kind,
   pid, name)` / `recent(limit)` and a flat `…Event { kind, pid, name, seq }`
   (cap 1000). `seq` is per-process.
-- **MPI services** (person, worker, place) — an `EventProducer` /
+- **Legacy Axum services** (person, worker, place) — an `EventProducer` /
   `EventConsumer` trait pair in `src/streaming/`, an internally-tagged
   enum event carrying the full record, and `InMemoryEventPublisher`.
 
@@ -137,7 +137,7 @@ Rules:
   land on one partition → per-record total order. Cross-record order is
   not guaranteed (and not needed).
 - **`data`** carries the post-change snapshot so consumers need no
-  follow-up fetch (matches today's MPI `PersonEvent`). `deleted` carries
+  follow-up fetch (matches today's legacy `PersonEvent`). `deleted` carries
   only `{pid}`. Large payloads MAY be truncated to a reference — decide
   per entity; default is full snapshot.
 - **`schema_version`** is bumped on any breaking envelope change;
@@ -224,7 +224,7 @@ don't know the transport.
 
 1. **Land the envelope + trait seam**, with `InMemoryPublisher` wired as
    today. Pure refactor; behaviour identical; tests stay DB-free. (The
-   loco free functions become a thin `InMemoryPublisher`; the MPI
+   loco free functions become a thin `InMemoryPublisher`; the legacy
    `EventProducer` is renamed/adapted to `EventPublisher`.)
 2. **Add `event_outbox`** migration + `OutboxPublisher`; switch handlers
    to write the outbox row on their existing transaction. DB-gated tests

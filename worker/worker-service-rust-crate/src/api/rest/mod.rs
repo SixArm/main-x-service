@@ -32,7 +32,7 @@ pub use state::AppState;
         version = "0.1.0",
         description = "RESTful API for worker identification, matching, deduplication, and privacy",
         contact(
-            name = "MPI Development Team",
+            name = "Worker Service Development Team",
             email = "support@example.com"
         )
     ),

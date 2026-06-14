@@ -4,12 +4,12 @@ services:
   # PostgreSQL database
   postgres:
     image: postgres:18-alpine
-    container_name: mpi-postgres
+    container_name: person-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-mpi}
-      POSTGRES_USER: ${POSTGRES_USER:-mpi_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mpi_password}
+      POSTGRES_DB: ${POSTGRES_DB:-person_service}
+      POSTGRES_USER: ${POSTGRES_USER:-person_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-person_password}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -19,27 +19,27 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-mpi_user} -d ${POSTGRES_DB:-mpi}",
+          "pg_isready -U ${POSTGRES_USER:-person_user} -d ${POSTGRES_DB:-person_service}",
         ]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - mpi-network
+      - person-network
 
   # Person Service application
-  mpi-server:
+  person-server:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mpi-server
+    container_name: person-server
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       # Database configuration
-      DATABASE_URL: postgresql://${POSTGRES_USER:-mpi_user}:${POSTGRES_PASSWORD:-mpi_password}@postgres:5432/${POSTGRES_DB:-mpi}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-person_user}:${POSTGRES_PASSWORD:-person_password}@postgres:5432/${POSTGRES_DB:-person_service}
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-10}
       DATABASE_MIN_CONNECTIONS: ${DATABASE_MIN_CONNECTIONS:-2}
 
@@ -61,7 +61,7 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       RUST_BACKTRACE: ${RUST_BACKTRACE:-0}
     ports:
-      - "${MPI_PORT:-8080}:8080"
+      - "${PERSON_PORT:-8080}:8080"
     volumes:
       - search_index:/app/data/search_index
     healthcheck:
@@ -71,15 +71,15 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - mpi-network
+      - person-network
 
   # pgAdmin for database management (optional)
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: mpi-pgadmin
+    container_name: person-pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@mpi.local}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@person.local}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       PGADMIN_LISTEN_PORT: 80
     ports:
@@ -87,7 +87,7 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     networks:
-      - mpi-network
+      - person-network
     profiles:
       - tools # Only start with --profile tools
 
@@ -100,5 +100,5 @@ volumes:
     driver: local
 
 networks:
-  mpi-network:
+  person-network:
     driver: bridge

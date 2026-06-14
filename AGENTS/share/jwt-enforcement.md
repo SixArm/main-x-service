@@ -9,7 +9,7 @@ sibling front-end implement it identically. It supersedes the per-crate
 Applies to the loco services that already embed
 [`authentication-verifier`](../../authentication/authentication-verifier-rust-crate)
 via `src/auth.rs`: **organization**, **care-pathway**, **case**. The
-older Axum MPI services (person / worker / place) carry their own
+older Axum services (person / worker / place) carry their own
 middleware story and are a separate follow-up.
 
 ## Why a flag, not a flip

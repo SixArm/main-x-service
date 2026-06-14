@@ -132,11 +132,11 @@ cd worker-service-rust-crate
 # Copy environment configuration
 cp .env.example .env
 
-# Start all services (PostgreSQL + MPI)
+# Start all services (PostgreSQL + Worker Service)
 podman compose up -d
 
 # View logs
-podman compose logs -f mpi-server
+podman compose logs -f worker-server
 
 # Access the API
 curl http://localhost:8080/api/health
@@ -167,7 +167,7 @@ git clone https://github.com/sixarm/worker-service-rust-crate.git
 cd worker-service-rust-crate
 
 # Set up database
-createdb mpi
+createdb worker_service
 cp .env.example .env
 # Edit .env and set DATABASE_URL
 
@@ -186,7 +186,7 @@ cargo loco start            # or: cargo run -- start
 podman compose up -d
 
 # Run migrations (first time)
-podman compose exec mpi-server sea-orm-cli migrate up
+podman compose exec worker-server sea-orm-cli migrate up
 
 # View logs
 podman compose logs -f
@@ -215,10 +215,10 @@ podman compose -f docker-compose.test.yml down -v
 cp .env.production.example .env.production
 
 # Build production image
-podman build -t mpi-server:v1.0.0 .
+podman build -t worker-server:v1.0.0 .
 
 # Run with production config
-podman run -p 8080:8080 --env-file .env.production mpi-server:v1.0.0
+podman run -p 8080:8080 --env-file .env.production worker-server:v1.0.0
 ```
 
 See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
@@ -510,7 +510,7 @@ podman compose up -d
 podman compose -f docker-compose.test.yml up
 
 # Production build
-podman build -t mpi-server:v1.0.0 .
+podman build -t worker-server:v1.0.0 .
 ```
 
 ### Manual Deployment

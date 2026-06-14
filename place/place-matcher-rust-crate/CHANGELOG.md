@@ -162,7 +162,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tests/property_tests.proptest-regressions` is checked in so historical shrunk failure seeds are re-tried on every `cargo test` run (one seed persisted from initial development; passes against the corrected `confidence_is_monotonic` property).
 
 ### Added (criterion benchmarks, T-5)
-- New `benches/match_pair.rs` exercising the hot paths a downstream MPI integrator will care about: single-pair `match_places` (identical / fuzzy / unrelated), `deterministic_match`, `rank_one_to_many` (`n ∈ {10, 100, 1000}` with criterion throughput reporting), and a config-variant sweep (default vs strict vs nickname-table-loaded).
+- New `benches/match_pair.rs` exercising the hot paths a downstream integrator will care about: single-pair `match_places` (identical / fuzzy / unrelated), `deterministic_match`, `rank_one_to_many` (`n ∈ {10, 100, 1000}` with criterion throughput reporting), and a config-variant sweep (default vs strict vs nickname-table-loaded).
 - New `[[bench]]` entry in `Cargo.toml` with `harness = false`; `criterion 0.5` added as a dev-dependency with `html_reports`.
 - Indicative numbers on a 2024 Apple Silicon machine (`cargo bench --quick`): single-pair fuzzy match ~4 µs, deterministic identifier hit ~160 ns, batch ranking ~3 µs per candidate. All comfortably under the spec §17 budget of `< 50 µs` per pair.
 

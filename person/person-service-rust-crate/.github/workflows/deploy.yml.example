@@ -51,7 +51,7 @@ jobs:
         run: |
           echo "Deploying to production..."
           # Example: Kubernetes deployment
-          # kubectl set image deployment/main_patient_index-server mpi-server=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          # kubectl set image deployment/person-server person-server=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
 
       - name: Verify deployment
         run: |
@@ -68,7 +68,7 @@ jobs:
         if: failure()
         run: |
           echo "Deployment failed, rolling back..."
-          # kubectl rollout undo deployment/main_patient_index-server
+          # kubectl rollout undo deployment/person-server
 
 # Alternative deployment examples:
 
@@ -82,12 +82,12 @@ jobs:
 #
 # - name: Deploy to ECS
 #   run: |
-#     aws ecs update-service --cluster mpi-cluster --service mpi-service --force-new-deployment
+#     aws ecs update-service --cluster person-cluster --service person-service --force-new-deployment
 
 # Docker Swarm Deployment:
 # - name: Deploy to Swarm
 #   run: |
-#     docker stack deploy -c docker-compose.production.yml mpi
+#     docker stack deploy -c docker-compose.production.yml person
 
 # Ansible Deployment:
 # - name: Run Ansible playbook

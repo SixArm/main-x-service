@@ -1,4 +1,4 @@
-//! Data models for the MPI (Master Patient Index) system.
+//! Data models for the Person Service.
 //!
 //! This module is the canonical home for the service's domain types —
 //! the plain-data Rust structs and enums that flow through every layer

@@ -1,4 +1,4 @@
-# Person Service (MPI)
+# Person Service
 
 The Person Service is an identity-registry system that maintains a
 centralized registry of person identities across source systems.
@@ -90,11 +90,11 @@ cd person-service-rust-crate
 # Copy environment configuration
 cp .env.example .env
 
-# Start all services (PostgreSQL + MPI)
+# Start all services (PostgreSQL + Person Server)
 podman compose up -d
 
 # View logs
-podman compose logs -f mpi-server
+podman compose logs -f person-server
 
 # Access the API
 curl http://localhost:8080/api/health
@@ -125,7 +125,7 @@ git clone https://github.com/sixarm/person-service-rust-crate.git
 cd person-service-rust-crate
 
 # Set up database
-createdb mpi
+createdb person_service
 cp .env.example .env
 # Edit .env and set DATABASE_URL
 
@@ -401,7 +401,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment guide.
 ```bash
 podman compose up -d                                    # Development
 podman compose -f docker-compose.test.yml up            # Testing
-podman build -t mpi-server:v1.0.0 . && podman run ...  # Production
+podman build -t person-server:v1.0.0 . && podman run ...  # Production
 ```
 
 ## Security & Compliance
@@ -445,7 +445,7 @@ This project was developed in 14 comprehensive phases:
 5. **Phase 10**: Integration Testing
 6. **Phase 11**: Docker & Deployment
 7. **Phase 12**: Documentation
-8. **Phase 13**: Advanced MPI Features (duplicate detection, merging, deduplication, validation, privacy, emergency contacts, identity documents, phonetic matching)
+8. **Phase 13**: Advanced identity-matching features (duplicate detection, merging, deduplication, validation, privacy, emergency contacts, identity documents, phonetic matching)
 9. **Phase 14**: Compilation Fixes, Test Expansion & Documentation Update (99 unit tests, 3 benchmark suites, comprehensive AGENTS docs)
 
 See [spec.md §13](spec/13-tasks.md) for the live task queue and [spec.md §14](spec/14-implementation-status.md) for implementation status.

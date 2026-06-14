@@ -1,6 +1,6 @@
 # Worker Service - Deployment Guide
 
-This guide covers deploying the Worker Service (MPI) system using Docker and Docker Compose.
+This guide covers deploying the Worker Service using Docker and Docker Compose.
 
 ## Table of Contents
 
@@ -49,21 +49,21 @@ nano .env
 ### 3. Build and Start Services
 
 ```bash
-# Build the MPI server image
+# Build the Worker Service server image
 podman compose build
 
-# Start all services (PostgreSQL + MPI Server)
+# Start all services (PostgreSQL + Worker Server)
 podman compose up -d
 
 # View logs
-podman compose logs -f mpi-server
+podman compose logs -f worker-server
 ```
 
 ### 4. Run Database Migrations
 
 ```bash
-# Access the MPI server container
-podman compose exec mpi-server bash
+# Access the Worker Service server container
+podman compose exec worker-server bash
 
 # Inside the container, run migrations
 sea-orm-cli migrate up --database-url=$DATABASE_URL
@@ -88,7 +88,7 @@ curl http://localhost:8080/api/health
 
 ### 6. Access Services
 
-- **MPI API**: http://localhost:8080/api
+- **API**: http://localhost:8080/api
 - **Swagger UI**: http://localhost:8080/swagger-ui
 - **pgAdmin** (optional): http://localhost:5050
 
@@ -120,10 +120,10 @@ nano .env.production
 
 ```bash
 # Build with production optimizations
-podman build -t mpi-server:latest .
+podman build -t worker-server:latest .
 
 # Tag for registry
-docker tag mpi-server:latest your-registry.com/worker_service-server:v1.0.0
+docker tag worker-server:latest your-registry.com/worker_service-server:v1.0.0
 ```
 
 ### 3. Push to Container Registry
@@ -235,7 +235,7 @@ RUST_BACKTRACE=0
 
 #### Default Profile
 
-Starts only essential services (PostgreSQL + MPI Server):
+Starts only essential services (PostgreSQL + Worker Server):
 
 ```bash
 podman compose up -d
@@ -256,7 +256,7 @@ podman compose --profile tools up -d
 #### Method 1: Inside Container
 
 ```bash
-podman compose exec mpi-server bash
+podman compose exec worker-server bash
 sea-orm-cli migrate up
 exit
 ```
@@ -266,8 +266,8 @@ exit
 Add to `docker-compose.yml`:
 
 ```yaml
-mpi-migrations:
-  image: mpi-server:latest
+worker-migrations:
+  image: worker-server:latest
   depends_on:
     postgres:
       condition: service_healthy
@@ -275,13 +275,13 @@ mpi-migrations:
     DATABASE_URL: ${DATABASE_URL}
   command: sea-orm-cli migrate up
   networks:
-    - mpi-network
+    - worker-network
 ```
 
 Then:
 
 ```bash
-podman compose up mpi-migrations
+podman compose up worker-migrations
 ```
 
 ### Creating New Migrations
@@ -300,7 +300,7 @@ sea-orm-cli migrate refresh
 
 ### Health Checks
 
-The MPI server includes a health check endpoint:
+The server includes a health check endpoint:
 
 ```bash
 curl http://localhost:8080/api/health
@@ -315,7 +315,7 @@ Health checks are configured in `docker-compose.yml`:
 podman compose ps
 
 # View health check logs
-docker inspect mpi-server --format='{{json .State.Health}}'
+docker inspect worker-server --format='{{json .State.Health}}'
 ```
 
 ### Logs
@@ -328,11 +328,11 @@ podman compose logs
 podman compose logs -f
 
 # View specific service logs
-podman compose logs mpi-server
+podman compose logs worker-server
 podman compose logs postgres
 
 # View last 100 lines
-podman compose logs --tail=100 mpi-server
+podman compose logs --tail=100 worker-server
 ```
 
 ### Metrics
@@ -346,7 +346,7 @@ TODO: Implement Prometheus metrics endpoint
 docker stats
 
 # View resource usage for specific container
-docker stats mpi-server
+docker stats worker-server
 ```
 
 ## Troubleshooting
@@ -356,21 +356,21 @@ docker stats mpi-server
 **Check logs**:
 
 ```bash
-podman compose logs mpi-server
+podman compose logs worker-server
 ```
 
 **Common issues**:
 
 - Database not ready: Wait for PostgreSQL health check
 - Missing environment variables: Check `.env` file
-- Port already in use: Change `MPI_PORT` in `.env`
+- Port already in use: Change `WORKER_PORT` in `.env`
 
 ### Database Connection Issues
 
 **Test database connectivity**:
 
 ```bash
-podman compose exec postgres psql -U mpi_user -d mpi -c "SELECT 1;"
+podman compose exec postgres psql -U worker_user -d worker_service -c "SELECT 1;"
 ```
 
 **Common issues**:
@@ -387,13 +387,13 @@ podman compose exec postgres psql -U mpi_user -d mpi -c "SELECT 1;"
 podman compose down -v
 podman compose up -d postgres
 # Wait for PostgreSQL to be ready
-podman compose exec postgres psql -U mpi_user -d mpi
+podman compose exec postgres psql -U worker_user -d worker_service
 # Inside psql:
 DROP SCHEMA public CASCADE;
 CREATE SCHEMA public;
 \q
 # Run migrations
-podman compose exec mpi-server sea-orm-cli migrate up
+podman compose exec worker-server sea-orm-cli migrate up
 ```
 
 ### Search Index Issues
@@ -401,8 +401,8 @@ podman compose exec mpi-server sea-orm-cli migrate up
 **Reset search index**:
 
 ```bash
-podman compose exec mpi-server rm -rf /app/data/search_index/*
-podman compose restart mpi-server
+podman compose exec worker-server rm -rf /app/data/search_index/*
+podman compose restart worker-server
 ```
 
 ### High Memory Usage
@@ -420,7 +420,7 @@ DATABASE_MIN_CONNECTIONS=1
 ```yaml
 # In docker-compose.yml
 services:
-  mpi-server:
+  worker-server:
     deploy:
       resources:
         limits:
@@ -433,7 +433,7 @@ services:
 
 ```bash
 # In .env
-MPI_PORT=8081
+WORKER_PORT=8081
 POSTGRES_PORT=5433
 PGADMIN_PORT=5051
 ```
@@ -444,21 +444,21 @@ PGADMIN_PORT=5051
 
 ```bash
 # Create backup
-podman compose exec postgres pg_dump -U mpi_user mpi > backup-$(date +%Y%m%d).sql
+podman compose exec postgres pg_dump -U worker_user worker_service > backup-$(date +%Y%m%d).sql
 
 # Restore from backup
-podman compose exec -T postgres psql -U mpi_user mpi < backup-20231228.sql
+podman compose exec -T postgres psql -U worker_user worker_service < backup-20231228.sql
 ```
 
 ### Search Index Backup
 
 ```bash
 # Backup search index
-docker cp mpi-server:/app/data/search_index ./search_index_backup
+docker cp worker-server:/app/data/search_index ./search_index_backup
 
 # Restore search index
-docker cp ./search_index_backup mpi-server:/app/data/search_index
-podman compose restart mpi-server
+docker cp ./search_index_backup worker-server:/app/data/search_index
+podman compose restart worker-server
 ```
 
 ## Security Best Practices
@@ -468,7 +468,7 @@ podman compose restart mpi-server
 3. **Limit Network Exposure**: Only expose necessary ports
 4. **Regular Updates**: Keep Docker images and dependencies updated
 5. **Secrets Management**: Use Docker secrets or environment variable injection
-6. **Run as Non-Root**: Container runs as `mpi` user (UID 1000)
+6. **Run as Non-Root**: Container runs as `worker` user (UID 1000)
 7. **Resource Limits**: Set memory and CPU limits in production
 8. **Log Management**: Rotate logs and avoid logging sensitive data
 
@@ -493,7 +493,7 @@ SEARCH_CACHE_SIZE_MB=2048
 
 ```yaml
 services:
-  mpi-server:
+  worker-server:
     deploy:
       resources:
         limits:
@@ -510,15 +510,15 @@ services:
 
 For high-availability deployments:
 
-1. **Load Balancer**: Use nginx or HAProxy in front of multiple MPI instances
+1. **Load Balancer**: Use nginx or HAProxy in front of multiple server instances
 2. **Shared Database**: All instances connect to same PostgreSQL
 3. **Shared Search Index**: Use network-mounted search index or separate search service
-4. **Stateless Design**: MPI server is stateless, scales horizontally
+4. **Stateless Design**: the server is stateless, scales horizontally
 
 Example:
 
 ```bash
-podman compose up -d --scale mpi-server=3
+podman compose up -d --scale worker-server=3
 ```
 
 ### Vertical Scaling
@@ -527,7 +527,7 @@ Increase resources for single instance:
 
 ```yaml
 services:
-  mpi-server:
+  worker-server:
     deploy:
       resources:
         limits:

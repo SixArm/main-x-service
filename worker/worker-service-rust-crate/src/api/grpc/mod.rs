@@ -10,7 +10,7 @@ use crate::config::ServerConfig;
 /// Generated Protocol Buffers code (Tonic/prost) will live here.
 pub mod proto {
     // Protocol buffer generated code will go here
-    // tonic::include_proto!("mpi");
+    // tonic::include_proto!("worker_service");
 }
 
 /// Starts the gRPC server (not yet implemented — returns `Ok(())` without

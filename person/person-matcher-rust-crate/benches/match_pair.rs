@@ -3,7 +3,7 @@
 //! Criterion benchmarks for the `person-matcher` crate.
 //!
 //! Run with `cargo bench`. The harness covers the hot paths a downstream
-//! MPI integrator will exercise: single-pair probabilistic matching,
+//! integrator will exercise: single-pair probabilistic matching,
 //! deterministic matching, and the batch ranking entry point. Numbers
 //! are reported in absolute time per call.
 

@@ -39,21 +39,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user for security (don't run as root)
-RUN useradd -m -u 1000 -s /bin/bash mpi
+RUN useradd -m -u 1000 -s /bin/bash event
 
 # Create necessary directories
 RUN mkdir -p /app/data/search_index && \
-    chown -R mpi:mpi /app
+    chown -R event:event /app
 
 # Switch to app user
-USER mpi
+USER event
 WORKDIR /app
 
 # Copy binary from builder stage
 COPY --from=builder /app/target/release/event_service /app/event_service-server
 
 # Copy migrations for runtime schema management
-COPY --chown=mpi:mpi migrations ./migrations
+COPY --chown=event:event migrations ./migrations
 
 # Expose API port
 EXPOSE 8080

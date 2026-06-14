@@ -447,11 +447,11 @@ fn main() {
 
     // Batch API — screen one query against many candidates.
     println!("\n=== Batch API: rank_one_to_many ===");
-    let mpi_query = Person::builder()
+    let query = Person::builder()
         .given_name("Ada")
         .family_name("Lovelace")
         .build();
-    let mpi_candidates = vec![
+    let candidates = vec![
         Person::builder()
             .given_name("Grace")
             .family_name("Hopper")
@@ -469,9 +469,9 @@ fn main() {
             .family_name("Lovelace")
             .build(),
     ];
-    let ranked = engine.rank_one_to_many(&mpi_query, &mpi_candidates);
+    let ranked = engine.rank_one_to_many(&query, &candidates);
     for (rank, (idx, result)) in ranked.iter().enumerate() {
-        let c = &mpi_candidates[*idx];
+        let c = &candidates[*idx];
         println!(
             "  #{rank}: candidate[{idx}] {:<10} {:<10} score={:.2} match={}",
             c.given_name.as_deref().unwrap_or(""),

@@ -4,7 +4,7 @@
 //! `RUST_LOG` (falling back to the configured `log_level`) and is the
 //! single place process-wide logging is set up; call it once at startup.
 //! [`shutdown_telemetry`](crate::observability::shutdown_telemetry) flushes the tracer provider on exit. The OTLP
-//! exporter and the [`custom_metrics::MpiMetrics`](crate::observability::custom_metrics::MpiMetrics) instrument set are
+//! exporter and the [`custom_metrics::PersonMetrics`](crate::observability::custom_metrics::PersonMetrics) instrument set are
 //! stubbed (`todo!`) pending the OTLP pipeline. Submodules: [`traces`](crate::observability::traces)
 //! and [`metrics`](crate::observability::metrics).
 
@@ -61,7 +61,7 @@ pub fn shutdown_telemetry() {
     global::shutdown_tracer_provider();
 }
 
-/// OpenTelemetry instrument definitions for the MPI system.
+/// OpenTelemetry instrument definitions for the Person Service.
 pub mod custom_metrics {
     use opentelemetry::metrics::{Counter, Histogram};
 
@@ -69,8 +69,8 @@ pub mod custom_metrics {
     ///
     /// Counters track lifecycle volume (creates/updates/deletes/matches);
     /// histograms track match scores and operation latencies. Construct
-    /// via [`MpiMetrics::new`] (currently stubbed).
-    pub struct MpiMetrics {
+    /// via [`PersonMetrics::new`] (currently stubbed).
+    pub struct PersonMetrics {
         /// Count of person records created.
         pub person_created: Counter<u64>,
         /// Count of person records updated.
@@ -87,7 +87,7 @@ pub mod custom_metrics {
         pub search_query_duration: Histogram<f64>,
     }
 
-    impl MpiMetrics {
+    impl PersonMetrics {
         /// Build and register the instrument set (not yet implemented).
         pub fn new() -> Self {
             // TODO: Initialize metrics

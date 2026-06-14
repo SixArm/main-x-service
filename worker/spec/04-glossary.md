@@ -23,5 +23,4 @@ Entity-level terms. Per-crate glossaries:
 | **Merge** | Combining a confirmed duplicate into a surviving main record: transfer, alias, `Replaces` link, soft delete, snapshot, `Merged` event. |
 | **Soft delete** | Records are marked inactive, never physically deleted — required by the audit posture. |
 | **SSO** | Single sign-on via the [authentication entity](../../authentication/): passwordless magic-link, RS256 JWT, JWKS for offline verification. |
-| **MPI** | Master Person/Professional Index — the registry pattern all Main X Index services implement. |
 | **SDD** | Spec-driven development: spec is canonical; three-part PRs (spec + code + test). |

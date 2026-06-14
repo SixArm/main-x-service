@@ -61,7 +61,7 @@ pub mod custom_metrics {
     use opentelemetry::metrics::{Counter, Histogram};
 
     /// Bundle of OpenTelemetry instruments for service operations.
-    pub struct MpiMetrics {
+    pub struct EventMetrics {
         /// Count of events created.
         pub event_created: Counter<u64>,
         /// Count of events updated.
@@ -78,7 +78,7 @@ pub mod custom_metrics {
         pub search_query_duration: Histogram<f64>,
     }
 
-    impl MpiMetrics {
+    impl EventMetrics {
         /// Build the instrument set. Currently unimplemented (`todo!`).
         pub fn new() -> Self {
             // TODO: Initialize metrics

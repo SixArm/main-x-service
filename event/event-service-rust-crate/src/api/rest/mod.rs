@@ -45,7 +45,7 @@ pub use state::AppState;
         version = "0.1.0",
         description = "RESTful API for events (schema.org/Event): CRUD, matching, deduplication, search, and privacy",
         contact(
-            name = "MPI Development Team",
+            name = "Event Service Development Team",
             email = "support@example.com"
         )
     ),

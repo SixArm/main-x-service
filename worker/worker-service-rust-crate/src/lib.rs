@@ -1,4 +1,4 @@
-//! Worker Service (MPI) — a federated worker-identity index.
+//! Worker Service — a federated worker-identity index.
 //!
 //! This crate is one member of the **Main X Index** family of identity
 //! registries (person, worker, place, thing, event, course). It maintains a

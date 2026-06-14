@@ -1,4 +1,4 @@
-//! Configuration management for the MPI system.
+//! Configuration management for the Person Service.
 //!
 //! [`Config`](crate::config::Config) is the single, fully-populated settings tree consumed at
 //! startup (`main`). Each subsection ([`ServerConfig`](crate::config::ServerConfig),

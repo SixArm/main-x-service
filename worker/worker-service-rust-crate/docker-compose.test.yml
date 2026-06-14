@@ -4,7 +4,7 @@ services:
   # PostgreSQL test database
   postgres-test:
     image: postgres:18-alpine
-    container_name: mpi-postgres-test
+    container_name: worker-postgres-test
     environment:
       POSTGRES_DB: worker_service_test
       POSTGRES_USER: test_user
@@ -17,7 +17,7 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - mpi-test-network
+      - worker-test-network
     tmpfs:
       - /var/lib/postgresql/data # Use tmpfs for faster tests
 
@@ -26,7 +26,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
-    container_name: mpi-test-runner
+    container_name: worker-test-runner
     depends_on:
       postgres-test:
         condition: service_healthy
@@ -39,7 +39,7 @@ services:
       RUST_LOG: info
       RUST_BACKTRACE: 1
     networks:
-      - mpi-test-network
+      - worker-test-network
     command: >
       sh -c "
         echo 'Waiting for database to be ready...' &&
@@ -53,5 +53,5 @@ services:
       "
 
 networks:
-  mpi-test-network:
+  worker-test-network:
     driver: bridge

@@ -1,4 +1,4 @@
-//! Configuration management for the Worker Service (MPI).
+//! Configuration management for the Worker Service.
 //!
 //! Defines the [`Config`](crate::config::Config) tree and its sub-structs
 //! (server, database, search, matching, observability, streaming).

@@ -1,4 +1,4 @@
-# Place Service (MPI)
+# Place Service
 
 The Place Service is a critical enterprise system that maintains a
 centralized registry of place identities across multiple areas.
@@ -90,11 +90,11 @@ cd place-service-rust-crate
 # Copy environment configuration
 cp .env.example .env
 
-# Start all services (PostgreSQL + MPI)
+# Start all services (PostgreSQL + Place Server)
 podman compose up -d
 
 # View logs
-podman compose logs -f mpi-server
+podman compose logs -f place-server
 
 # Access the API
 curl http://localhost:8080/api/health
@@ -123,7 +123,7 @@ git clone https://github.com/sixarm/place-service-rust-crate.git
 cd place-service-rust-crate
 
 # Set up database
-createdb mpi
+createdb place_service
 cp .env.example .env
 # Edit .env and set DATABASE_URL
 
@@ -492,7 +492,7 @@ cargo bench -- name_similarity                # Specific benchmark
 ```bash
 podman compose up -d                                    # Development
 podman compose -f docker-compose.test.yml up            # Testing
-podman build -t mpi-server:v1.0.0 . && podman run ...  # Production
+podman build -t place-server:v1.0.0 . && podman run ...  # Production
 ```
 
 ## Security & Compliance
@@ -536,7 +536,7 @@ This project was developed in 15 comprehensive phases:
 5. **Phase 10**: Integration Testing
 6. **Phase 11**: Docker & Deployment
 7. **Phase 12**: Documentation
-8. **Phase 13**: Advanced MPI Features (duplicate detection, merging, deduplication, validation, privacy, geo matching, place hierarchy)
+8. **Phase 13**: Advanced identity-matching features (duplicate detection, merging, deduplication, validation, privacy, geo matching, place hierarchy)
 9. **Phase 14**: Core Library & Tests (104 unit tests, 14 integration tests, 12 benchmarks)
 10. **Phase 15**: Update & Expand Tests (171 tests + 16 benchmarks, comprehensive edge case coverage)
 

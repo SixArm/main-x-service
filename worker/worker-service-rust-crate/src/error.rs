@@ -1,4 +1,4 @@
-//! Error types for the Worker Service (MPI).
+//! Error types for the Worker Service.
 //!
 //! Defines the crate-wide [`Error`] enum and the [`Result`] alias used as the
 //! return type throughout the service. Each variant maps to a layer of the

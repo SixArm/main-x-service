@@ -197,7 +197,7 @@ cargo test --test property_tests
 
 ### Benchmarks
 
-Criterion benchmarks live in `benches/match_pair.rs` and exercise the hot paths a downstream MPI integrator will care about:
+Criterion benchmarks live in `benches/match_pair.rs` and exercise the hot paths a downstream integrator will care about:
 
 ```bash
 # Run all benches (HTML reports → target/criterion/)

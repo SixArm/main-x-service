@@ -73,7 +73,7 @@ pub fn shutdown_telemetry() {
     global::shutdown_tracer_provider();
 }
 
-/// OpenTelemetry instrument definitions for the MPI system (scaffold).
+/// OpenTelemetry instrument definitions for the service (scaffold).
 ///
 /// These mirror the runtime Prometheus counters/histograms in
 /// [`crate::metrics`] but target the OpenTelemetry metrics API; construction
@@ -85,7 +85,7 @@ pub mod custom_metrics {
     /// is the OpenTelemetry-API analogue of a Prometheus collector in
     /// [`crate::metrics::Metrics`]; counters are monotonic `u64`, histograms
     /// record `f64` distributions.
-    pub struct MpiMetrics {
+    pub struct WorkerMetrics {
         /// Monotonic counter of worker records created.
         pub worker_created: Counter<u64>,
         /// Monotonic counter of worker records updated.
@@ -102,7 +102,7 @@ pub mod custom_metrics {
         pub search_query_duration: Histogram<f64>,
     }
 
-    impl MpiMetrics {
+    impl WorkerMetrics {
         /// Not yet implemented — construct the OpenTelemetry instruments here
         /// once the meter is wired up.
         ///
