@@ -336,13 +336,25 @@ algorithms.
 Each service crate ships a GitHub Actions workflow (the reference is
 [care-pathway-service `.github/workflows/ci.yaml`](../../care-pathway/care-pathway-service-rust-crate/.github/workflows/ci.yaml)),
 triggered on push to the default branch and on every pull request. It is
-three jobs:
+four jobs:
 
 | Job | Step | Maps to |
 | --- | ---- | ------- |
 | `rustfmt` | `cargo fmt --all -- --check` | §4 formatting |
-| `clippy` | `cargo clippy --all-targets --all-features -- -D warnings` | §4 lints |
+| `clippy` | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | §4 lints |
+| `migration` | `cargo clippy --manifest-path migration/Cargo.toml --all-targets --all-features -- -D warnings` | §4 lints, migration crate |
 | `test` | `cargo test --all-features --all`, with a `postgres` **service container** and `DATABASE_URL` in the job env | §1–§2 (un-gated + DB-gated together) |
+
+The `clippy` job uses `--workspace` so workspace members are linted in
+one shot; on the loco services that already pulls in the `migration`
+member, but the six older services keep `migration` as a *separate*
+crate (no workspace table), so the dedicated `migration` job —
+`--manifest-path migration/Cargo.toml` — is what guarantees every
+migration crate is gated regardless of layout. (The authentication
+service embeds its migrations under `src/`, so they are covered by its
+main `clippy` job and it has no separate `migration` job.) The
+matcher/verifier libraries ship a lighter `quality.yml` with just the
+`formatting` + `clippy` jobs (no DB, no migration crate).
 
 The `test` job is where the gating pays off: because CI provisions a
 Postgres service (with a `pg_isready` health check) and exports
