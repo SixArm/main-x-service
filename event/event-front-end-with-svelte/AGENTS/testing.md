@@ -17,7 +17,7 @@ pnpm test
 pnpm test:e2e
 
 # Type check
-pnpm svelte-check
+pnpm check
 
 # Lint (if configured)
 pnpm lint
@@ -60,7 +60,7 @@ describe("ApiClient", () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ success: true, data: { id: 1 } })),
     );
-    const client = new ApiClient("http://test", fetchMock);
+    const client = new ApiClient({ baseUrl: "http://test", fetch: fetchMock });
     const result = await client.get("/health");
     expect(result).toEqual({ id: 1 });
   });
@@ -80,7 +80,7 @@ test("dashboard renders health badge", async ({ page }) => {
 
 ## CI expectations
 
-- `svelte-check` must report 0 errors, 0 warnings.
+- `pnpm check` (svelte-check) must report 0 errors, 0 warnings.
 - `pnpm test` (vitest) must pass.
 - `pnpm test:e2e` (smoke) must pass without a backing service.
 

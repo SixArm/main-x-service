@@ -11,6 +11,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Tags match component (spec).** `tags` is now a routed, weighted
+  **supporting** match signal: plain set Jaccard over the
+  case-insensitively normalised tag sets (identical to `keywords`;
+  `None` when either side empty), weighted `tags_weight` (default 0.05,
+  supporting-signal cluster), renormalised over the present components.
+  Specced in §5 / §5.2 / §6 / §6.2 / §7 / §13a; code follow-up tracked
+  as §23 T-12 (add `Course::tags`, `tags_score`, `MatchConfig::tags_weight`,
+  `MatchBreakdown::tags_score`). The course-entity domain model (§5.1 /
+  §5.3 / §5.5) flips tags from registry-only to a routed match signal.
+- **Doc harmonisation pass.** Pinned the deliberately-unscored fields
+  with explicit tests (`learning_resource_type` + `in_language` carry
+  no scoring weight; off-ladder `EducationalLevel` variants
+  `Vocational` / `ProfessionalDevelopment` / `Custom` earn no adjacency
+  credit and score `1.0` only when identical, `0.0` otherwise) — 4 new
+  unit tests in `matcher` and 1 new public-surface integration test, so
+  the suite is now 76 unit + 16 integration. Added a worked
+  probabilistic-partial-match example (with per-component breakdown) to
+  `index.md`. Fixed the documented `MatchResult` shape in `AGENTS.md`
+  (now includes `is_match`) and the file-layout block (`spec/` directory
+  with §1–§25 section files, not a single `spec.md`). Corrected stale
+  test counts (was "21 unit tests") across `index.md` / `README.md` and
+  `AGENTS/testing.md`; recorded the unscored-field invariant in
+  `spec.md §24`.
 - **Expanded test coverage** (72 embedded unit tests, up from 21,
   plus a new 15-test integration suite). Filled the
   previously-undocumented gaps: `src/course.rs` now pins
@@ -87,7 +110,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `matcher`. Benchmarks section claimed "Out of MVP scope. Once
   criterion is wired in..." though benches live in the embedding
   course-service crate at
-  [`benches/matching_bench.rs`](../course-service-rust-crate/benches/matching_bench.rs).
+  [`benches/matching_bench.rs`](../course-service-with-loco/benches/matching_bench.rs).
   Updated both, and added two new symptom-decoder rows ("Phonetic
   bonus suddenly stops firing" / "...never caps") so future
   failures decode straight to the underlying invariant.
@@ -168,7 +191,7 @@ Tracked in `spec.md §23`:
 
 - T-6: Soundex phonetic bonus on the `name` component.
 - T-7: Service-side adapter + bridge test in
-  [`course-service-rust-crate/tests/duplicate_detection.rs`](../course-service-rust-crate/tests/duplicate_detection.rs).
+  [`course-service-with-loco/tests/duplicate_detection.rs`](../course-service-with-loco/tests/duplicate_detection.rs).
 - T-8: Criterion benchmarks (name match, full match, rank-of-100).
 - T-10: Expose `MatchingEngine::match_one_to_many` for parity with
   sibling matcher crates.
@@ -182,4 +205,4 @@ Tracked in `spec.md §23`:
   [`thing-matcher-rust-crate`](../../thing/thing-matcher-rust-crate/),
   [`worker-matcher-rust-crate`](../../worker/worker-matcher-rust-crate/).
 - Embedding service:
-  [`course-service-rust-crate`](../course-service-rust-crate/).
+  [`course-service-with-loco`](../course-service-with-loco/).

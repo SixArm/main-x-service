@@ -7,7 +7,7 @@ service crate. Family conventions:
 ### 10.1 Tables
 
 The `cases` table, created by migration
-[`m20220101_000001_cases`](../case-service-rust-crate/migration/src/m20220101_000001_cases.rs):
+[`m20220101_000001_cases`](../case-service-with-loco/migration/src/m20220101_000001_cases.rs):
 
 | Column | Type | Notes |
 |---|---|---|
@@ -19,7 +19,7 @@ The `cases` table, created by migration
 | `deleted_at` | `TimestampWithTimeZoneNull` | Soft delete |
 
 The `audit_logs` table, created by migration
-[`m20220101_000002_audit_logs`](../case-service-rust-crate/migration/src/m20220101_000002_audit_logs.rs)
+[`m20220101_000002_audit_logs`](../case-service-with-loco/migration/src/m20220101_000002_audit_logs.rs)
 — one row per CRUD / merge action:
 
 | Column | Type | Notes |
@@ -31,7 +31,7 @@ The `audit_logs` table, created by migration
 | `snapshot` | `JsonBinaryNull` | The record's `data` at the time of the action |
 
 The `merge_records` table, created by migration
-[`m20220101_000003_merge_records`](../case-service-rust-crate/migration/src/m20220101_000003_merge_records.rs)
+[`m20220101_000003_merge_records`](../case-service-with-loco/migration/src/m20220101_000003_merge_records.rs)
 — one row per record-merge:
 
 | Column | Type | Notes |

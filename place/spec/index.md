@@ -16,7 +16,7 @@ Subproject specs:
 
 | Subproject | Spec |
 |---|---|
-| [place-service-rust-crate](../place-service-rust-crate/) | [spec](../place-service-rust-crate/spec/index.md) (§1–§18) |
+| [place-service-with-loco](../place-service-with-loco/) | [spec](../place-service-with-loco/spec/index.md) (§1–§18) |
 | [place-matcher-rust-crate](../place-matcher-rust-crate/) | [spec](../place-matcher-rust-crate/spec/index.md) (library shape, §1–§13) |
 | [place-front-end-with-svelte](../place-front-end-with-svelte/) | [spec](../place-front-end-with-svelte/spec/index.md) (§1–§18) |
 
@@ -45,3 +45,7 @@ For entity-level agent reference detail, see [`AGENTS/`](../AGENTS/).
 16. [Open Questions](16-open-questions.md)
 17. [References](17-references.md)
 18. [Change Control](18-change-control.md)
+
+## Supplementary topics
+
+- [Kinds of Place](kinds.md) — catalogue of place kinds across scales (shelf on a rack, filing cabinet drawer, room, library, floor / wing of a building, building, campus, town, city, county, province) and how they map to the classification and containment hierarchy.

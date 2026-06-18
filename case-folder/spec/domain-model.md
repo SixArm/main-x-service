@@ -31,8 +31,8 @@ upstream renames, deletes, or outages.
 | **Room**      | Place Service    | `id`, `name`, `buildingId`, `description`                                       |
 | **Cabinet**   | Place Service    | `id`, `label`, `roomId`, `capacity`, `description`                              |
 | **Worker**    | Worker Service   | `id`, `name`, `role`                                                            |
-| **Volume**    | Thing Service    | `id`, `title`, `patientId`, `nhsNumber`, `cabinetId`, `status`, `folderCount`   |
-| **Folder**    | Thing Service    | `id`, `title`, `patientId`, `nhsNumber`, `cabinetId`, `status`, `lastMovedAt`, `volumeId` |
+| **Volume**    | Thing Service    | `id`, `title`, `patientId`, `nhsNumber`, `cabinetId`, `status`, `folderCount`, `tags`   |
+| **Folder**    | Thing Service    | `id`, `title`, `patientId`, `nhsNumber`, `cabinetId`, `status`, `lastMovedAt`, `volumeId`, `tags` |
 | **MoveEvent** | Event Service    | `id`, `folderId`, `from/toCabinet`, `worker`, `movedAt`, `reason` (append-only) |
 
 ### Relationships
@@ -48,7 +48,10 @@ Patient ──< Volume ──> Cabinet ──> Room ──> Building
 
 A patient has many folders; a folder lives in at most one cabinet; a
 cabinet sits in a room; a room in a building. Each folder accrues an
-ordered, append-only sequence of move events.
+ordered, append-only sequence of move events. The full physical place
+hierarchy (campus → building → floor → room → cabinet/shelf, where a
+folder's leaf container may be a cabinet **or** a shelf) is specified in
+[places.md](places.md).
 
 A **volume** is a *movable bundle of a single patient's folders* — the
 classic multi-volume paper case file. A folder belongs to **at most one**
@@ -57,6 +60,32 @@ and is moved as a unit: moving a volume relocates every member folder and
 records one move event per folder, so the per-folder audit trail stays
 complete. Membership is independent of location — a folder keeps its own
 `cabinetId`; the volume move is what re-colocates members.
+
+### Tags
+
+**Any main concept can carry tags** — `tags: Vec<String>`. A tag is a
+short, free-text label that operators attach to a record for grouping,
+filtering, triage, or workflow (e.g. `"vip"`, `"review"`,
+`"archived-2026"`, `"fast-track"`). The primary tracker records — the
+**Folder** and its sibling bundle the **Volume** — carry tags.
+
+This domain has no `keywords` field; tags are the labelling mechanism.
+They are **user-applied operational labels** for grouping and workflow,
+not descriptive discovery terms about what the record *is*.
+
+Each tag is a short, trimmed, non-empty string. The list is unordered,
+de-duplicated case-insensitively, and defaults to empty. Tags are a
+registry attribute, **not** a match or move signal — they do not affect
+folder status, location, or the move audit trail. (Adding tag-aware
+scoring or filtering to any matcher is a deferred option for a separate
+task; do not assume it here.)
+
+Tags are a snapshot/registry attribute of the tracker's own record, so
+they follow the canonical model downstream in the same change cycle: the
+[loco domain-model](../case-folder-service-with-rust/spec/domain-model.md)
+wire shape and the
+[svelte domain-model](../case-folder-front-end-with-svelte/spec/domain-model.md)
+camelCase client types pick up `tags` from here.
 
 ## Invariants
 
@@ -82,6 +111,9 @@ complete. Membership is independent of location — a folder keeps its own
 8. **Moving a volume is the only operation that moves a group of folders
    at once.** It updates the volume's cabinet and each member folder's
    cabinet, and appends one move event per member folder.
+9. **Tags are short, trimmed, non-empty strings.** The `tags` list on any
+   main concept (Folder, Volume) is unordered, de-duplicated
+   case-insensitively, and defaults to empty.
 
 ## Status vocabulary
 

@@ -9,15 +9,20 @@
     - onsearch?: (value) => void — invoked with the current value on submit.
 -->
 <script lang="ts">
+    import { t } from "$lib/i18n.svelte.js";
+
     let {
         value = $bindable(""),
-        placeholder = "Search…",
+        placeholder,
         onsearch,
     }: {
         value?: string;
         placeholder?: string;
         onsearch?: (value: string) => void;
     } = $props();
+
+    // Fall back to the translated default placeholder when none is given.
+    const resolvedPlaceholder = $derived(placeholder ?? t("search.defaultPlaceholder"));
 
     // Prevent the native form navigation; hand the query to the parent.
     function handleSubmit(e: SubmitEvent) {
@@ -30,10 +35,10 @@
     <input
         type="search"
         bind:value
-        {placeholder}
-        aria-label={placeholder}
+        placeholder={resolvedPlaceholder}
+        aria-label={resolvedPlaceholder}
     />
-    <button type="submit" class="button primary">Search</button>
+    <button type="submit" class="button primary">{t("search.submit")}</button>
 </form>
 
 <style>

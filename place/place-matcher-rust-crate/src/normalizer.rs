@@ -1,4 +1,4 @@
-//! Text normalisation for place demographic data.
+//! Text normalisation for place data.
 //!
 //! Research on place identification (see `spec.md` §5) is unanimous: most
 //! accuracy gains come from **standardising the input** before scoring, not
@@ -249,11 +249,11 @@ impl Normalizer {
     ///
     /// Returns `Some(canonical)` if the input parses against a country in
     /// the supported table; otherwise `None`. The supported countries are
-    /// the five jurisdictions for which the crate exposes a national
-    /// healthcare identifier (United Kingdom, France, Spain, Ireland, and
-    /// — sharing the GB dial code — UK Northern Ireland), plus the most
-    /// common place-mobility partners (US, CA, DE, IT, NL, BE, PT, CH,
-    /// AT, SE, NO, DK, FI, PL, AU, NZ, JP, CN, IN, BR, MX, ZA). `default_country` is the
+    /// those listed in the in-code `COUNTRY_PHONE_TABLE` (see spec §4.3.2):
+    /// the common place-data-source jurisdictions — GB, FR, DE, ES, IE, IT,
+    /// NL, BE, PT, CH, AT, SE, NO, DK, FI, PL, AU, NZ, US, CA, JP, CN, IN,
+    /// BR, MX, ZA, BG, CZ, EE, GR, HR, IS, LI, LT, LV, MT, RO, SI, SK.
+    /// `default_country` is the
     /// **ISO 3166-1 alpha-2 code** (e.g. `"GB"`, `"FR"`, `"US"`) of the
     /// jurisdiction whose national format applies when the input lacks an
     /// explicit international marker. Pass `None` to refuse to assume a
@@ -583,7 +583,7 @@ impl Normalizer {
     /// 2. Lowercase the entire address (RFC 5321 makes the domain
     ///    case-insensitive and most real-world deployments treat the
     ///    localpart case-insensitively too; case-sensitive localparts
-    ///    are technically legal but vanishingly rare in healthcare data).
+    ///    are technically legal but vanishingly rare in place contact data).
     /// 3. Reject inputs that lack exactly one `@` or that have an empty
     ///    localpart or domain by returning `None`.
     /// 4. If `gmail_dot_folding` is `true` and the domain is `gmail.com`
@@ -877,11 +877,11 @@ struct CountryPhoneInfo {
 /// Phone-numbering metadata for countries supported by
 /// [`Normalizer::normalize_phone_e164`].
 ///
-/// Coverage: all five jurisdictions for which the crate exposes a national
-/// healthcare identifier (GB England/Wales/IoM, FR, ES, IE, plus UK NI via
-/// the GB dial code), plus the most common place-mobility partners. New
-/// entries SHOULD follow the ISO 3166-1 alpha-2 convention and document the
-/// trunk-prefix rule explicitly.
+/// Coverage: the common place-data-source jurisdictions enumerated in
+/// spec §4.3.2 (GB, FR, DE, ES, IE, IT, NL, BE, PT, CH, AT, SE, NO, DK, FI,
+/// PL, AU, NZ, US, CA, JP, CN, IN, BR, MX, ZA, BG, CZ, EE, GR, HR, IS, LI,
+/// LT, LV, MT, RO, SI, SK). New entries SHOULD follow the ISO 3166-1
+/// alpha-2 convention and document the trunk-prefix rule explicitly.
 const COUNTRY_PHONE_TABLE: &[CountryPhoneInfo] = &[
     CountryPhoneInfo {
         iso_alpha2: "GB",

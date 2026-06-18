@@ -86,3 +86,45 @@ test("edit page renders the edit form", async ({ page }) => {
   await page.goto(`/${PID}/edit`, { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: "Edit case" })).toBeVisible();
 });
+
+// Pins: spec §6.6 — check-duplicates excludes the record itself. The stub
+// returns the current record (same pid) plus one other hit; only the other
+// must surface in the "Potential duplicates" list.
+test("detail check-duplicates hides the record itself (self-exclusion)", async ({
+  page,
+}) => {
+  const OTHER = "22222222-2222-4222-8222-222222222222";
+  await page.route("**/api/cases/check-duplicates", async (route) =>
+    route.fulfill({
+      json: [
+        // The record itself — must be filtered out (h.pid === pid).
+        {
+          pid: PID,
+          title: CASE.title,
+          score: 1.0,
+          confidence: "Certain",
+          is_match: true,
+        },
+        // A genuine other candidate — must remain.
+        {
+          pid: OTHER,
+          title: "Housing benefit review",
+          score: 0.91,
+          confidence: "Probable",
+          is_match: true,
+        },
+      ],
+    }),
+  );
+  await page.goto(`/${PID}`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Check duplicates" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Potential duplicates" }),
+  ).toBeVisible();
+  // The other candidate is listed.
+  await expect(page.getByText("Housing benefit review")).toBeVisible();
+  // The record itself is not echoed back as its own duplicate. Scope to the
+  // duplicates list so the page's own <h1> title is not matched.
+  await expect(page.locator("h2 ~ ul a")).toHaveCount(1);
+  await expect(page.locator("h2 ~ ul a")).toHaveText("Housing benefit review");
+});

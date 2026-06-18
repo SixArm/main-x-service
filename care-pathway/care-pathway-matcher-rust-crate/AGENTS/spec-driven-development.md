@@ -1,7 +1,7 @@
 # Spec-Driven Development — Agent Guide
 
 This crate practises **spec-driven development**: the specification
-([`../spec.md`](../spec/index.md)) is the canonical artefact. Code conforms
+([`../spec/index.md`](../spec/index.md)) is the canonical artefact. Code conforms
 to the spec; not the other way around.
 
 ## What That Means In Practice
@@ -18,7 +18,7 @@ to the spec; not the other way around.
   `lib.rs`, `MatchConfig` fields, `MatchResult` / `MatchBreakdown`
   shape, deterministic-identifier scheme list), update the bridge
   test in
-  [`../care-pathway-service-rust-crate/tests/matching.rs`](../../care-pathway-service-rust-crate/tests/matching.rs)
+  [`../care-pathway-service-with-loco/tests/matching.rs`](../../care-pathway-service-with-loco/tests/matching.rs)
   in the same PR.
 
 ## When To Update Which Section
@@ -35,14 +35,14 @@ from the §1–§18 shape used by the service crates).
 | The list of `Care Pathway` fields | §6 Domain model |
 | Default weights or threshold | §7 Configuration |
 | Normalisation behaviour | §8 Normalisation |
-| Name-similarity algorithm | §9 |
-| Care Pathway-code rule (same-provider gate, shape) | §10 |
-| Provider score | §11 |
-| Educational-level score | §12 |
-| Keywords / Jaccard | §13 |
-| Teaches / competencies | §14 |
-| Identifier short-circuit scheme list | §15 |
-| Same-as URL short-circuit | §16 |
+| Name-similarity algorithm | §9 Name similarity |
+| Condition-code overlap (Jaccard) | §10 Condition codes |
+| Pathway-code rule (same-provider gate, shape) | §11 Pathway code |
+| Care-setting score | §12 Care setting |
+| Interventions / keywords Jaccard | §13 Interventions & keywords |
+| (reserved) | §14 |
+| Identifier short-circuit scheme list | §15 Deterministic identifier short-circuits |
+| Provider+code (R-1) / same_as (R-2) short-circuit | §16 Provider+code, same_as, open questions |
 | Renormalisation arithmetic | §17 |
 | Confidence-band thresholds | §18 |
 | Quality goals (precision / recall targets) | §19 |
@@ -85,13 +85,13 @@ bigger, split it (`T-12a`, `T-12b`).
 | Spec section | Corresponds to |
 |---|---|
 | §1 Purpose / §2 Scope | repo-level positioning (also `AGENTS.md`) |
-| §3 Glossary | `src/care-pathway.rs` types, `src/scoring.rs` enums |
+| §3 Glossary | `src/care_pathway.rs` types, `src/scoring.rs` enums |
 | §4 Research basis | `AGENTS/matching-algorithm.md` |
 | §5 Algorithm overview | `src/matcher.rs` |
-| §6 Domain model | `src/care-pathway.rs` |
+| §6 Domain model | `src/care_pathway.rs` |
 | §7 Configuration | `src/config.rs` (`MatchConfig`) |
 | §8 Normalisation | `src/normalize.rs`, `AGENTS/normalization.md` |
-| §9–§14 per-component scoring | `src/matcher.rs` component fns |
+| §9–§13 per-component scoring | `src/matcher.rs` component fns |
 | §15–§16 short-circuits | `src/matcher.rs` deterministic gate |
 | §17 Renormalisation | `src/scoring.rs` weighted-sum helper |
 | §18 Confidence classification | `src/scoring.rs` `Confidence` |
@@ -128,9 +128,9 @@ When you finish a task:
   into `normalize::` and document the rule under §8.
 - **Using `unwrap` / `expect` in library code.** Total functions
   only.
-- **Scoring `care-pathway_code` across providers.** Per §10–§11, the
-  care-pathway-code component MUST be gated on `provider_id` equality
-  (CS101 at one school != CS101 at another).
+- **Scoring a `pathway_code` across providers.** Per §11, the
+  pathway-code component MUST be gated on `provider_id` equality
+  (STROKE-01 at one trust != STROKE-01 at another).
 - **Adding behaviour gated by a flag that the spec doesn't mention.**
 - **"It's only a refactor" used to justify a behavioural shift.**
 

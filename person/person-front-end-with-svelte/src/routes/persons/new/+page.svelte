@@ -15,6 +15,7 @@
     import MatchResultsList from "$lib/components/MatchResultsList.svelte";
     import { PersonRepository } from "$lib/api/persons.js";
     import { ApiError } from "$lib/api/client.js";
+    import { t } from "$lib/i18n.svelte.js";
     import type { MatchResult, Person } from "$lib/api/types.js";
 
     const repo = PersonRepository.withFetch();
@@ -49,21 +50,23 @@
                     ? details
                     : (details?.potential_matches ?? []);
                 duplicates = extracted;
-                throw new Error(`Duplicates detected (${duplicates.length}) — review below before resubmitting.`);
+                throw new Error(
+                    `${t("new.duplicatesDetected.prefix")}${duplicates.length}${t("new.duplicatesDetected.suffix")}`,
+                );
             }
             throw err;
         }
     }
 </script>
 
-<svelte:head><title>New person · Person Service</title></svelte:head>
+<svelte:head><title>{t("new.head.title")}</title></svelte:head>
 
-<header><h1>New person</h1></header>
+<header><h1>{t("new.title")}</h1></header>
 
 <section class="surface stack">
-    <PersonForm initial={blank} submitLabel="Create" onsubmit={handleSubmit} />
+    <PersonForm initial={blank} submitLabel={t("new.create")} onsubmit={handleSubmit} />
 </section>
 
 {#if duplicates.length > 0}
-    <MatchResultsList results={duplicates} title="Possible duplicates" />
+    <MatchResultsList results={duplicates} title={t("new.possibleDuplicates")} />
 {/if}

@@ -28,6 +28,7 @@
     import TextInput from '$lib/components/TextInput/TextInput.svelte';
     import Button from '$lib/components/Button/Button.svelte';
     import InputCount from '$lib/components/InputCount/InputCount.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let {
         open = $bindable(true),
@@ -87,15 +88,15 @@
             aria-modal="true"
             aria-labelledby="labels-dialog-title"
         >
-            <h2 id="labels-dialog-title">Labels</h2>
+            <h2 id="labels-dialog-title">{t('labels.title')}</h2>
 
             <div class="labels-dialog-search">
-                <TextInput label="Search labels" placeholder="Enter text to search..." bind:value={search} />
-                <Button type="button" onclick={find}>Find</Button>
-                <Button type="button" onclick={clear}>Clear</Button>
+                <TextInput label={t('labels.searchLabel')} placeholder={t('labels.searchPlaceholder')} bind:value={search} />
+                <Button type="button" onclick={find}>{t('labels.find')}</Button>
+                <Button type="button" onclick={clear}>{t('labels.clear')}</Button>
             </div>
 
-            <ul class="labels-dialog-list" role="listbox" aria-multiselectable="true" aria-label="Volume titles">
+            <ul class="labels-dialog-list" role="listbox" aria-multiselectable="true" aria-label={t('labels.volumeTitles')}>
                 {#each filtered as option (option.id)}
                     <li role="option" aria-selected={selected.includes(option.id)}>
                         <label>
@@ -105,18 +106,18 @@
                     </li>
                 {/each}
                 {#if filtered.length === 0}
-                    <li class="labels-dialog-empty">No matching volumes.</li>
+                    <li class="labels-dialog-empty">{t('labels.noMatching')}</li>
                 {/if}
             </ul>
 
             <footer class="labels-dialog-footer">
                 <label class="labels-dialog-copies">
-                    Number of Copies:
-                    <InputCount label="Number of copies" bind:value={copies} />
+                    {t('labels.numberOfCopies')}
+                    <InputCount label={t('labels.copiesLabel')} bind:value={copies} />
                 </label>
                 <div class="labels-dialog-actions">
-                    <Button type="button" onclick={print}>Print</Button>
-                    <Button type="button" onclick={close}>Close</Button>
+                    <Button type="button" onclick={print}>{t('labels.print')}</Button>
+                    <Button type="button" onclick={close}>{t('labels.close')}</Button>
                 </div>
             </footer>
         </div>

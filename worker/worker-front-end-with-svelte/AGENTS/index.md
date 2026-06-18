@@ -23,10 +23,10 @@ Detailed reference documentation for the Worker Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../worker-service-rust-crate/spec.md](../../worker-service-rust-crate/spec/index.md) | Service spec — system of record |
-| [../../worker-service-rust-crate/AGENTS/restful.md](../../worker-service-rust-crate/AGENTS/restful.md) | REST API surface |
-| [../../worker-service-rust-crate/AGENTS/models.md](../../worker-service-rust-crate/AGENTS/models.md) | Wire-format domain types |
-| [../../worker-service-rust-crate/AGENTS/matching.md](../../worker-service-rust-crate/AGENTS/matching.md) | Matching algorithm reference |
+| [../../worker-service-with-loco/spec.md](../../worker-service-with-loco/spec/index.md) | Service spec — system of record |
+| [../../worker-service-with-loco/AGENTS/restful.md](../../worker-service-with-loco/AGENTS/restful.md) | REST API surface |
+| [../../worker-service-with-loco/AGENTS/models.md](../../worker-service-with-loco/AGENTS/models.md) | Wire-format domain types |
+| [../../worker-service-with-loco/AGENTS/matching.md](../../worker-service-with-loco/AGENTS/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

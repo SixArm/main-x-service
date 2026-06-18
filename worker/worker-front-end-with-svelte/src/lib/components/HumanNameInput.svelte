@@ -18,6 +18,7 @@
     import type { HumanName } from "$lib/api/types.js";
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
+    import { t } from "$lib/i18n.svelte.js";
 
     let {
         name = $bindable(),
@@ -42,10 +43,10 @@
 </script>
 
 <FieldRow>
-    <LabeledField label="Family name" for={`${prefix}-family`} required error={errors.family}>
+    <LabeledField label={t("name.family")} for={`${prefix}-family`} required error={errors.family}>
         <input id={`${prefix}-family`} bind:value={name.family} required />
     </LabeledField>
-    <LabeledField label="Given names" for={`${prefix}-given`} required error={errors.given} hint="Space-separated">
+    <LabeledField label={t("name.given")} for={`${prefix}-given`} required error={errors.given} hint={t("name.givenHint")}>
         <!-- Controlled input: display the joined string, re-parse on every
              keystroke so name.given stays a clean token array. -->
         <input

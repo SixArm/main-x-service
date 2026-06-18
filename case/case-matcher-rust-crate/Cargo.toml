@@ -5,7 +5,7 @@ edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Case matcher — pairwise governmental case-management record matching with weighted fuzzy + deterministic strategies"
 license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
-repository = "https://github.com/sixarm/main-x-service/case-matcher-rust-crate"
+repository = "https://github.com/sixarm/main-x-service/tree/main/case/case-matcher-rust-crate"
 keywords = ["case", "case-management", "matching", "identity"]
 categories = ["algorithms", "text-processing"]
 

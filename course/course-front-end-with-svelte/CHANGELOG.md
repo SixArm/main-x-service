@@ -9,6 +9,77 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Documentation
+
+- **Harmonization pass: propagated the v0.2.0 phonetic-search removal
+  into the spec and docs.** FR-2 and §2 (Scope) still required /
+  listed a `phonetic` toggle that the code removed in v0.2.0 (the
+  service documents `phonetic` as a no-op). FR-2 now requires only the
+  `fuzzy` toggle and records the omission; §2.1 drops `phonetic` and
+  §2.2 lists it as out of scope; README + `index.md` route maps no
+  longer advertise phonetic search. New §13 T-22 tracks re-adding the
+  toggle once the service grows a real Soundex search path.
+- **Relaxed FR-9 to match the merge code.** FR-9 said the merge page
+  MUST issue a preview GET *before* POST `/api/courses/merge`,
+  implying preview is a precondition. The code makes preview an
+  optional "Load preview" action; `doMerge()` validates both IDs are
+  present and differ, `confirm()`s, then merges without requiring a
+  preview. FR-9 reworded to "MUST offer a per-ID GET preview"; §13
+  T-23 captures the alternative (gate Merge on a successful preview)
+  if that policy is ever wanted.
+- **Rewrote `AGENTS/testing.md` to match reality.** It documented a
+  third "Integration" layer with a `tests/integration/` directory and
+  a `pnpm test:integration` script (neither exists), named unit files
+  `apiClient.test.ts` / `coursesRepository.test.ts` /
+  `createForm.test.ts` (actual: `client.test.ts` / `courses.test.ts`),
+  showed the `ApiClient` constructor with positional args
+  (`new ApiClient("http://test", fetchMock)` — it takes an options
+  object), pinned the duplicate-check endpoint as `/duplicates`
+  (actual: `/check-duplicates`), and referenced `pnpm svelte-check`
+  (actual: `pnpm check`). All corrected; the Integration section is
+  now the manual live-integration pass that spec §11 already records.
+- **`index.md` worked-example drift.** The match-check flow described
+  a "display threshold slider"; the page uses a numeric input
+  (`<input type="number">`), not a slider. Corrected, and the
+  search worked-flow now notes the single Fuzzy toggle (no phonetic).
+- **`README.md` Project-layout block carried sibling copy-adapt
+  artefacts.** It listed a `types.ts` exporting `HumanName` and a
+  `HumanNameInput.svelte` component — neither exists. Replaced with
+  `CourseIdentifier` and `CourseIdentifierInput.svelte`; dropped
+  "phonetic" from the `/courses` row.
+- **v0.1.0 entry asserted Person/Thing domain shapes.** Added a note
+  (below) clarifying the real Course identifier schemes,
+  `DETERMINISTIC_TYPES`, `MatchBreakdown` components, and the
+  `/check-duplicates` endpoint, since the original entry was copied
+  from a sibling project before the Course types were finalised.
+
+### Added
+
+- **Extracted `CourseForm` validation + wire-normalisation into a pure
+  module** (`src/lib/components/courseFormValidate.ts`, exporting
+  `validateCourse` + `normalizeForWire`). `CourseForm.svelte` now
+  imports them instead of defining them inline. No behaviour change —
+  the move makes the FR-4 rules unit-testable without a DOM mount.
+
+### Tests
+
+- Added unit coverage for previously-untested spec'd behaviour (9 → 27
+  vitest tests):
+  - `courseFormValidate.test.ts` — `CourseForm` validation rules
+    (FR-4: required name, http(s) URL fields on `url` /
+    `additional_type` / `license`, `course_code` ≤ 100,
+    `number_of_credits` ≥ 0) and the `normalizeForWire` blank→undefined
+    sweep (incl. nested identifier `url`/`name`).
+  - `form.test.ts` — the `createForm` controller: deep-clone of
+    `initial`, validate-blocks-submit, onSubmit-runs-on-valid,
+    submit-error capture + `submitting` reset, per-field error
+    set/clear, `update`/`setValue`, and `reset`.
+  - `courses.test.ts` — two new cases pinning
+    `CourseRepository.search` query-param wiring (FR-1/FR-2:
+    `q` / `fuzzy` / `limit` / `offset` / `phonetic` forwarded; unset
+    params omitted). `phonetic` is still accepted by the client type
+    for service parity (the list-page toggle stays removed — §13 T-22).
+
 ### Fixed
 
 - **`API_BASE_URL` default pointed at the wrong service.** The
@@ -136,11 +207,30 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 Initial scaffold for the Course Service front-end. SvelteKit 2 + Svelte 5 runes + SVAR Svelte DataGrid + Lily Design System Svelte Headless. Domain types follow [schema.org/Course](https://schema.org/Course).
 
+> **Correction (Unreleased harmonization pass).** Several "Added"
+> entries below were copied from a sibling (Person/Thing) project
+> before the Course domain types were finalised, and describe the
+> wrong shapes. The authoritative shapes in `src/lib/api/types.ts`
+> are: **`IdentifierType`** = `LmsCourseId` / `CourseCode` /
+> `PlatformSlug` / `Oer` / `Doi` / `Lom` / `Wikidata` / `Isced` /
+> `Ror` / `Uri` / `Uuid` / `{ Custom: string }` (NOT
+> Isbn/Issn/Gtin/Sku/Mpn/SerialNumber); **`DETERMINISTIC_TYPES`** =
+> `Doi` / `Wikidata` / `Lom` / `Oer` / `Uri` / `Uuid`;
+> **`MatchBreakdown`** components = `name_score` / `course_code_score`
+> / `provider_score` / `educational_level_score` / `keywords_score` /
+> `teaches_score` / `deterministic_match` (NOT
+> identifier/description/url/same_as); the `Course` aggregate carries
+> the schema.org/Course education fields (teaches, keywords,
+> educational_level, course_code, credits, instances, …), not the
+> generic `main_entity_of_page` / `owner` / `subject_of` /
+> `potential_action` set; and the duplicate-check endpoint is
+> **`POST /api/courses/check-duplicates`**, not `/duplicates`.
+
 ### Added
 
 - **Routes (MVP).** Dashboard with service-health + recent-audit feed; courses list with name / identifier / additional-type search and SVAR DataGrid (columns: ID, Name, schema.org Type, Primary identifier, URL); create with real-time 409 duplicate detection inline; detail view (identity, additional-type as schema.org URL, identifiers with deep links, alternate names, same-as URLs, images); edit; soft-delete with confirm; per-record audit log; match check (name + description + URL + identifiers + same-as); merge with two-ID preview.
-- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError`; `CourseRepository` binding the [Course Service REST surface](../course-service-rust-crate/AGENTS/restful.md). **Note:** Course Service uses `POST /api/courses/duplicates` (not `/check-duplicates`).
-- **TypeScript types.** Snake-case domain types mirroring [`course-service-rust-crate/AGENTS/models.md`](../course-service-rust-crate/AGENTS/models.md): `Course` with all 13 schema.org/Course canonical properties (`name`, `alternate_names`, `description`, `disambiguating_description`, `additional_type`, `url`, `identifiers`, `images`, `main_entity_of_page`, `owner`, `same_as`, `subject_of`, `potential_action`); `CourseIdentifier` with schema.org [`PropertyValue`](https://schema.org/PropertyValue) shape (`property_id`, `value`, optional `name`/`url`); `IdentifierType` (Doi/Isbn/Issn/Gtin/Sku/Mpn/SerialNumber/Uri/Uuid/`{Custom: string}`); `DETERMINISTIC_TYPES` constant lists identifier types that short-circuit matching to score 1.0 (Doi/Isbn/Issn/Gtin/Mpn/SerialNumber/Uuid — Sku/Uri/Custom excluded); `MatchResult` + `MatchConfidence` + `MatchBreakdown` (per-component: name / identifier / description / url / same_as / phonetic flag / deterministic flag); `MergeRequest`/`Record`/`Response`; `BatchDeduplicationRequest`/`Response`; `AuditEntry`.
+- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError`; `CourseRepository` binding the [Course Service REST surface](../course-service-with-loco/AGENTS/restful.md). **Note:** Course Service uses `POST /api/courses/duplicates` (not `/check-duplicates`).
+- **TypeScript types.** Snake-case domain types mirroring [`course-service-with-loco/AGENTS/models.md`](../course-service-with-loco/AGENTS/models.md): `Course` with all 13 schema.org/Course canonical properties (`name`, `alternate_names`, `description`, `disambiguating_description`, `additional_type`, `url`, `identifiers`, `images`, `main_entity_of_page`, `owner`, `same_as`, `subject_of`, `potential_action`); `CourseIdentifier` with schema.org [`PropertyValue`](https://schema.org/PropertyValue) shape (`property_id`, `value`, optional `name`/`url`); `IdentifierType` (Doi/Isbn/Issn/Gtin/Sku/Mpn/SerialNumber/Uri/Uuid/`{Custom: string}`); `DETERMINISTIC_TYPES` constant lists identifier types that short-circuit matching to score 1.0 (Doi/Isbn/Issn/Gtin/Mpn/SerialNumber/Uuid — Sku/Uri/Custom excluded); `MatchResult` + `MatchConfidence` + `MatchBreakdown` (per-component: name / identifier / description / url / same_as / phonetic flag / deterministic flag); `MergeRequest`/`Record`/`Response`; `BatchDeduplicationRequest`/`Response`; `AuditEntry`.
 - **Form primitives.** `LabeledField`, `FieldError`, `FieldRow`, `createForm` Svelte 5 rune-based store.
 - **Components.** `SearchBox`, `CourseGrid` (SVAR `Grid` with `select` + `init`/`select-row`), `CourseIdentifierInput` (dynamic add/remove, Custom-type label sub-field, optional per-identifier URL), `CourseForm` (name + additional_type URL + description + disambiguating description + URL + owner + multi-line alternate names + multi-line same_as URLs + identifier list; client-side validation of HTTP(S) URL fields), `MatchResultsList` with breakdown surfacing name / identifier / description / URL / same-as / phonetic / deterministic short-circuit.
 - **Tests.** 5 Vitest unit tests for `ApiClient`, 3 unit tests for `CourseRepository` (pins `/duplicates` not `/check-duplicates`), 5 Playwright smoke tests covering every MVP route shell.
@@ -153,7 +243,7 @@ Initial scaffold for the Course Service front-end. SvelteKit 2 + Svelte 5 runes 
 
 ### Cross-references
 
-- Service spec: [`../course-service-rust-crate/spec.md`](../course-service-rust-crate/spec/index.md).
-- Service REST contract: [`../course-service-rust-crate/AGENTS/restful.md`](../course-service-rust-crate/AGENTS/restful.md).
-- Service model types: [`../course-service-rust-crate/AGENTS/models.md`](../course-service-rust-crate/AGENTS/models.md).
-- Service matching reference: [`../course-service-rust-crate/AGENTS/matching.md`](../course-service-rust-crate/AGENTS/matching.md).
+- Service spec: [`../course-service-with-loco/spec.md`](../course-service-with-loco/spec/index.md).
+- Service REST contract: [`../course-service-with-loco/AGENTS/restful.md`](../course-service-with-loco/AGENTS/restful.md).
+- Service model types: [`../course-service-with-loco/AGENTS/models.md`](../course-service-with-loco/AGENTS/models.md).
+- Service matching reference: [`../course-service-with-loco/AGENTS/matching.md`](../course-service-with-loco/AGENTS/matching.md).

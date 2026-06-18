@@ -1,23 +1,31 @@
 # authentication-front-end-with-svelte
 
-Operator UI for the [Authentication Service](../authentication-service-rust-crate):
+Operator UI for the [Authentication Service](../authentication-service-with-loco):
 passwordless email magic-link **sign up / sign in / sign out**.
 
-SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
+SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · **BFF** (server-side
+session) · bilingual (English + Welsh / Cymraeg).
+
+> **Session model.** Login establishes a **server-side session**; the
+> browser holds only the httpOnly `__Host-mxi_session` cookie — no token in
+> JS. See the canonical design doc
+> [`AGENTS/share/authentication-sessions.md`](../../AGENTS/share/authentication-sessions.md).
+> This **supersedes the prior bearer-token / `localStorage` SPA model**
+> (and its `#access_token=` cross-origin handoff).
 
 ## Routes
 
 | Route | Purpose |
 |---|---|
-| `/` | Account dashboard (current user, sign out) |
+| `/` | Account dashboard (current user, sign out) — server load reads the session cookie |
 | `/signup` | Create an account → emailed a magic link |
 | `/signin` | Request a magic link for an existing account |
-| `/verify?token=…` | Consume the magic link → store the access token → redirect home |
+| `/verify?token=…` | Consume the magic link server-side → session cookie set → redirect home |
 
 ## Prerequisites
 
 - Node 20+ and pnpm
-- A running [Authentication Service](../authentication-service-rust-crate)
+- A running [Authentication Service](../authentication-service-with-loco)
 
 ## Quick start
 
@@ -29,44 +37,65 @@ pnpm dev                 # http://localhost:5173
 
 Sign up, then look at the **auth service console** — in development the
 magic link is logged there (no SMTP). Open it to land on `/verify`, which
-stores your token and signs you in.
+exchanges the token server-side; the auth service sets the
+`__Host-mxi_session` cookie and you are signed in.
+
+## Language (i18n)
+
+The UI is bilingual: **English** (`en`) and **Welsh / Cymraeg** (`cy`) —
+the latter a deliberate UK public-sector Welsh-language-duty choice. Pick
+a language from the sidebar `<select>`; the choice persists to
+`localStorage["mxi.auth.locale"]` and re-renders every string live. It is
+also sent as a `locale` hint on sign-up / sign-in so the **magic-link
+email** arrives in the same language. There is no i18n library — just a
+small per-locale catalog and a reactive store in
+`src/lib/i18n.svelte.ts`.
 
 ## Configuration
 
 | Var | Default | Purpose |
 |---|---|---|
-| `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Auth service REST base URL (no trailing slash). |
-| `VITE_RETURN_TO_ALLOWLIST` | _(empty)_ | Comma-separated operator-app origins (exact `scheme://host[:port]`) the access token may be handed to via the cross-origin SSO handoff. Unset/empty ⇒ same-origin only. |
+| `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Auth service REST base URL (no trailing slash). Called **server-side** by the BFF. |
+| `VITE_RETURN_TO_ALLOWLIST` | _(empty)_ | Comma-separated operator-app origins (exact `scheme://host[:port]`) the post-verify redirect may target. Unset/empty ⇒ same-origin only. An **open-redirect** control — no credential travels in the redirect. |
 
 ## How it works
 
-The access token returned by `/verify` is an RS256 JWT — the federation's
-bearer credential. It is kept in `localStorage` (`src/lib/auth/session.svelte.ts`)
-under both the back-compat `mxi.auth.token` key and the shared federation
-key `mxi_access_token` (so a same-origin sibling SPA can read it without a
-handoff). It is sent as `Authorization: Bearer <jwt>` to protected
-endpoints. Other Main X services accept the same token by verifying it
-offline against the auth service's JWKS.
+This front-end is a **Backend-For-Frontend (BFF)**: its SvelteKit
+**server** (`hooks.server.ts` / `+page.server.ts` / `+server.ts`) is the
+only party that talks to the auth service, and the **session** lives in an
+httpOnly cookie the browser cannot read.
 
-### Cross-origin SSO handoff
+- Verifying a magic link is handled server-side; the auth service
+  establishes a server-side session and returns
+  `Set-Cookie: __Host-mxi_session=…` (HttpOnly · Secure · `SameSite=Lax` ·
+  `__Host-` prefix), which the BFF relays to the browser.
+- The dashboard load and sign-out run on the server, reading the cookie
+  and calling `GET /me` / `POST /signout` (the latter revokes the session
+  and clears the cookie).
+- **No token in browser JS.** The `localStorage` access token,
+  `mxi_access_token` federation key, and `Authorization: Bearer` from the
+  browser are all gone.
+- **CSRF**: browser→BFF mutating requests carry a per-session CSRF token,
+  validated server-side.
 
-An operator SPA on a different origin cannot read our `localStorage`, so
-this front-end is the **issuer** in a first-party, OAuth-implicit-shaped
-token handoff (see `AGENTS/share/jwt-enforcement.md`):
+Full design (session table, cookie attributes, CSRF, cross-service PASETO,
+rollout): [`AGENTS/share/authentication-sessions.md`](../../AGENTS/share/authentication-sessions.md).
 
-1. The operator SPA links here as
+### Cross-origin `return_to`
+
+An operator app on a different origin links here to sign in and is sent
+back afterwards — but **no credential is handed off** (each origin is
+signed in via its own session cookie):
+
+1. The operator app links here as
    `/signin?return_to=<absolute operator-app URL>` (or `/signup?...`).
 2. If `origin(return_to)` is allowlisted (`VITE_RETURN_TO_ALLOWLIST`, or
-   our own origin), it is parked in `sessionStorage["mxi_return_to"]`
-   across the magic-link email round-trip. A non-allowlisted value is
-   ignored — never parked, never handed the token.
+   our own origin), it is preserved across the magic-link email
+   round-trip. A non-allowlisted value is ignored.
 3. After `/verify` signs the user in, the browser is redirected to
-   `return_to#access_token=<jwt>` (token in the URL **fragment**, which
-   browsers never send to servers). The operator SPA reads it from
-   `location.hash` and `history.replaceState`s it away.
+   `return_to` — a plain navigation, **no `#access_token=` fragment**.
 
-The allowlist (`src/lib/auth/return-to.ts`) is the security control that
-stops token exfiltration via a crafted `return_to`.
+The allowlist (`src/lib/auth/return-to.ts`) is the open-redirect control.
 
 ## Testing
 

@@ -94,6 +94,75 @@ curl http://localhost:5150/api/folders
 `GET /api/stats` and `GET /api/patients/{nhs}` are the documented
 soft-fail exceptions — see [api-contract.md](api-contract.md).
 
+## Move a whole volume (all member folders together)
+
+```bash
+# Create a volume, then move every folder it contains in one call.
+curl -X POST http://localhost:5150/api/volumes \
+  -H 'content-type: application/json' \
+  -d '{
+    "nhs_number": "943 476 5919",
+    "title": "Alice Johnson — Vol 1",
+    "cabinet_id": "7b6e…"
+  }'
+
+curl -X POST http://localhost:5150/api/volumes/{id}/move \
+  -H 'content-type: application/json' \
+  -d '{
+    "to_cabinet_id": "9f12…",
+    "worker_id": "a8c4…",
+    "reason": "Archive room reorganisation"
+  }'
+```
+
+`200 OK` with the updated `VolumeShow` (new cabinet label + the
+relocated member folders). One move event is recorded per member folder,
+each snapshotting the worker name + role. A bad/unknown `to_cabinet_id`
+returns `422`; an upstream outage returns `503`.
+
+The companion volume routes follow the same conventions:
+
+```bash
+# Assign an existing folder to a volume (same patient only)
+curl -X POST http://localhost:5150/api/volumes/{id}/folders \
+  -H 'content-type: application/json' -d '{ "folder_id": "0e2a…" }'
+
+# Remove a folder from a volume
+curl -X DELETE http://localhost:5150/api/volumes/{id}/folders/{fid}
+
+# Rename a volume
+curl -X PATCH http://localhost:5150/api/volumes/{id} \
+  -H 'content-type: application/json' -d '{ "title": "Alice Johnson — Vol 2" }'
+```
+
+## List geofence-breach alerts
+
+```bash
+curl http://localhost:5150/api/alerts
+```
+
+```json
+{
+  "items": [
+    {
+      "move_id": "c1d2…",
+      "folder_id": "0e2a…",
+      "folder_title": "Volume 1",
+      "nhs_number": "943 476 5919",
+      "from_building": "Main Hospital",
+      "to_building": "Annexe Building",
+      "moved_by": "Joe Porter",
+      "moved_at": "2026-06-01T10:15:32+00:00"
+    }
+  ]
+}
+```
+
+Only **cross-building** moves are reported: a folder that moves between
+two cabinets in the same building is not a breach, and a move with a
+missing endpoint cabinet (in-transit / created-in-place) is suppressed.
+`503` if the Place or Event service is unreachable.
+
 ## Add a new controller route
 
 ```rust

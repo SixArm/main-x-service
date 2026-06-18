@@ -15,7 +15,17 @@ export default defineConfig({
         setupFiles: ['./vitest-setup.ts']
     },
     resolve: {
-        alias: { $lib: fileURLToPath(new URL('./src/lib', import.meta.url)) },
+        alias: {
+            $lib: fileURLToPath(new URL('./src/lib', import.meta.url)),
+            // The plain svelte plugin resolves neither SvelteKit's `$app/*`
+            // virtual modules nor the Lily helper packages, so point them at
+            // test stubs (used only when a test imports a route/layout).
+            '$app/state': fileURLToPath(new URL('./src/lib/test-support/app-state.ts', import.meta.url)),
+            '$app/navigation': fileURLToPath(new URL('./src/lib/test-support/app-navigation.ts', import.meta.url)),
+            '$app/environment': fileURLToPath(new URL('./src/lib/test-support/app-environment.ts', import.meta.url)),
+            'lily-design-system-svelte-theme-select': fileURLToPath(new URL('./src/lib/test-support/StubComponent.svelte', import.meta.url)),
+            'lily-design-system-svelte-locale-select': fileURLToPath(new URL('./src/lib/test-support/StubComponent.svelte', import.meta.url))
+        },
         ...(process.env.VITEST ? { conditions: ['browser'] } : {})
     }
 });

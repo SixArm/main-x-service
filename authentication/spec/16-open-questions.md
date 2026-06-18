@@ -11,11 +11,11 @@ internals.
   may tip the balance — re-authenticating via email every hour is
   hostile at that scale.
 - **OQ-2 — Should revocation propagate to peers?** (Service spec §16.)
-  Today signout is local; peers honour cached tokens until `exp`. A
-  short-TTL deny-list endpoint (or pushed revocation events) would
-  close the window at the cost of reintroducing a runtime dependency
-  on the auth service — the thing offline verification exists to
-  avoid. Governmental compliance review may force a decision.
+  Today signout sets `sessions.revoked_at`; peers honour already-minted
+  PASETO tokens until `exp` (~5 min). The shorter PASETO TTL (vs. the
+  old 1 h JWT) narrows the window substantially. Lean (shared §10):
+  rely on expiry; add an optional `sid` deny-list peers poll only if a
+  hard-revoke SLA appears.
 - **OQ-3 — Audience model when peers need distinct audiences.**
   (Service spec §16.) Today every token carries the single audience
   `main-x-service`. Per-service audiences (`aud: person-service`)
@@ -28,8 +28,11 @@ internals.
   the crate grow its own §1–§25 library-style spec like the matcher
   crates?
 - **OQ-5 — `localStorage` vs in-memory token storage in front-ends.**
-  (Front-end spec §16.) XSS posture vs. refresh/UX. Whatever is
-  decided here becomes the convention every sibling front-end copies.
+  **Resolved (2026-06-17) by the §13 T-12 pivot:** front-ends store
+  **no** credential in browser JS — the browser holds only the
+  `__Host-mxi_session` httpOnly cookie and the SvelteKit-server BFF
+  holds the session + mints PASETO server-side (shared §6). This
+  becomes the convention every sibling front-end copies.
 
 Open questions resolve into §13 tasks or §5–§9 amendments when
 decisions are made.

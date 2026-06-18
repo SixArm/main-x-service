@@ -14,6 +14,7 @@
     import CourseForm from "$lib/components/CourseForm.svelte";
     import { CourseRepository } from "$lib/api/courses.js";
     import type { Course } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     const repo = CourseRepository.withFetch();
     let course = $state<Course | null>(null);
@@ -42,16 +43,16 @@
 <svelte:head><title>Edit course · {id}</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Edit course</h1>
-    <a href={`/courses/${id}`} class="button">Cancel</a>
+    <h1>{t("edit.title")}</h1>
+    <a href={`/courses/${id}`} class="button">{t("edit.cancel")}</a>
 </header>
 
 {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{t("edit.loading")}</p>
 {:else if error}
     <div class="banner error">{error}</div>
 {:else if course}
     <section class="surface stack">
-        <CourseForm initial={course} submitLabel="Save changes" onsubmit={handleSubmit} />
+        <CourseForm initial={course} submitLabel={t("edit.saveChanges")} onsubmit={handleSubmit} />
     </section>
 {/if}

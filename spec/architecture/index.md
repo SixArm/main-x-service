@@ -43,7 +43,7 @@ Each entity directory holds these parts:
 | ---- | ----- | ------- |
 | Front-end | SvelteKit 2 SPA (Svelte 5 runes, SVAR DataGrid, Lily) calling the sibling service's REST API | `person/person-front-end-with-svelte/` |
 | Library crate | A **matcher** (dependency-light pairwise comparison lib) — except `authentication`, whose library is the **verifier** | `person/person-matcher-rust-crate/`, `authentication/authentication-verifier-rust-crate/` |
-| Service crate | The HTTP API service over PostgreSQL | `person/person-service-rust-crate/` |
+| Service crate | The HTTP API service over PostgreSQL | `person/person-service-with-loco/` |
 | Entity `spec/` | Entity-level umbrella spec (§1–§18 SDD shape; §13 live task queue) | `person/spec/index.md` |
 | Entity `AGENTS/` | Entity-level agent guide index | `person/AGENTS/index.md` |
 
@@ -53,10 +53,14 @@ standalone **and** embedded in the sibling service's matching layer, so
 the scoring algorithm has one canonical implementation per entity.
 
 `authentication` is the odd one out by design: it is the central
-single-sign-on provider (passwordless magic-link, RS256 JWT issuance,
-JWKS for offline verification). Its library crate is the
-`authentication-verifier` that the other services embed to verify
-bearer tokens offline. See [../../authentication/spec/index.md](../../authentication/spec/index.md).
+single-sign-on provider (passwordless magic-link login establishing a
+server-side **Postgres cookie session**; short-lived **PASETO v4.public**
+tokens for cross-service auth, with the Ed25519 verification key published
+at `/.well-known/paseto-keys`). Its library crate is the
+`authentication-verifier` (now a PASETO verifier) that the other services
+embed to verify cross-service tokens offline. See
+[../../authentication/spec/index.md](../../authentication/spec/index.md)
+and [../../agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md).
 
 ---
 
@@ -75,7 +79,7 @@ under the hood). Characteristics:
 - An `App` type implements loco's `Hooks` (`boot`, `routes`,
   `after_routes`, `connect_workers`, `truncate`, `seed`). It carries no
   state; the framework supplies `AppContext` (DB handle, config) per
-  request. See `organization/organization-service-rust-crate/src/app.rs`.
+  request. See `organization/organization-service-with-loco/src/app.rs`.
 - Endpoints are **loco controllers** (`src/controllers/*.rs`) registered
   via `AppRoutes::with_default_routes().add_route(...)`. loco supplies
   default `/_health` and `/_ping`.
@@ -85,11 +89,13 @@ under the hood). Characteristics:
   handles (`pid`, `name`, `active`, soft-delete). The service matches with
   the exact same type it stores, so there is no separate model or adapter
   to drift. (e.g. `organizations` table: `pid`, `name`, `data` JSONB,
-  `active`.) See `organization/organization-service-rust-crate/AGENTS.md`.
-- JWT verification is wired here: `src/auth.rs` (`AuthUser` /
-  `MaybeAuthUser` extractors, `/whoami`) using the embedded
-  `authentication-verifier`. Blanket `/api/*` enforcement is an
-  `after_routes` middleware layer gated by an env flag (off by default).
+  `active`.) See `organization/organization-service-with-loco/AGENTS.md`.
+- Cross-service token verification is wired here: `src/auth.rs`
+  (`AuthUser` / `MaybeAuthUser` extractors, `/whoami`) using the embedded
+  `authentication-verifier` (target: PASETO v4.public; RS256/JWKS
+  decommissioned — code follow-up pending). Blanket `/api/*` enforcement
+  is an `after_routes` middleware layer gated by an env flag (off by
+  default).
 
 ### 2b. Older Axum "MPI-style" services
 
@@ -97,7 +103,7 @@ Entities: **person, worker, place, thing, event, course.**
 
 These predate the loco conversion and follow a hand-rolled,
 master-patient-index-style layout with explicit layered modules. From
-`person/person-service-rust-crate/src/lib.rs`:
+`person/person-service-with-loco/src/lib.rs`:
 
 ```
 src/
@@ -196,12 +202,16 @@ no shared in-process state across entities.
 - **Integration is over HTTP.** A service that needs another entity
   calls its REST API (e.g. the `case-folder` consumer app calls the
   person / place / worker services).
-- **Trust is via RS256 JWT.** `authentication-service` is the single
-  issuer; every other service verifies bearer tokens **offline** using
-  the embedded `authentication-verifier` (fetches/holds the issuer's
-  JWKS; checks `kid` / `iss` / `aud` / `exp`). No shared secret, no
-  introspection round-trip. See
-  [../../authentication/spec/index.md](../../authentication/spec/index.md)
+- **Trust is via short-lived PASETO v4.public tokens.**
+  `authentication-service` is the single issuer; every other service
+  verifies cross-service bearer tokens **offline** using the embedded
+  `authentication-verifier` (fetches/holds the issuer's published Ed25519
+  key from `/.well-known/paseto-keys`; checks `kid` / `iss` / `aud` /
+  `exp`). The human session itself is a server-side Postgres cookie
+  session. No shared secret, no introspection round-trip. This replaces
+  the prior RS256 JWT + JWKS model 1:1. See
+  [../../authentication/spec/index.md](../../authentication/spec/index.md),
+  [../../agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md),
   and [../../agents/share/jwt-enforcement.md](../../agents/share/jwt-enforcement.md).
 - **Stateless services** scale horizontally; state lives in PostgreSQL.
   See [../../agents/share/availability.md](../../agents/share/availability.md).
@@ -277,8 +287,9 @@ services).
 
 **Implemented vs planned (loco services):** CRUD, matching, name search
 (`ILIKE`), merge, audit, in-memory event streaming, OpenAPI/Swagger, and
-offline JWT verification are wired. **Deferred:** Tantivy full-text,
-per-field privacy / GDPR export, durable event bus, blanket `/api/*` JWT
+offline cross-service token verification are wired (target: PASETO
+v4.public; RS256/JWKS decommissioned). **Deferred:** Tantivy full-text,
+per-field privacy / GDPR export, durable event bus, blanket `/api/*`
 enforcement. The MPI services additionally ship Tantivy search, FHIR R5,
 privacy/GDPR endpoints, and batch deduplication today; the gRPC API is a
 stub in both styles.

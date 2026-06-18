@@ -13,7 +13,7 @@ Weights (all renormalised against participating fields):
 - `0.20` — `family_name_weight`, `date_of_birth_weight`.
 - `0.15` — `given_name_weight`.
 - `0.10` — `death_date_weight`.
-- `0.05` — `gender_weight`, `blood_type_weight`, `multiple_birth_weight`, `address_weight`, `birth_place_weight`, `death_place_weight`, `phone_weight`, `email_weight`.
+- `0.05` — `gender_weight`, `blood_type_weight`, `multiple_birth_weight`, `address_weight`, `birth_place_weight`, `death_place_weight`, `phone_weight`, `email_weight`, `relationships_weight`, `tags_weight`.
 
 Other defaults: `use_phonetic_matching = true`; `name_algorithm = Combined`; `nickname_table = NicknameTable::empty()`; `gmail_dot_folding = false`; `phone_default_country = Some("GB")`.
 

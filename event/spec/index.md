@@ -16,7 +16,7 @@
 
 Subproject specs:
 
-- [event-service-rust-crate/spec](../event-service-rust-crate/spec/index.md) — registry service (§1–§18)
+- [event-service-with-loco/spec](../event-service-with-loco/spec/index.md) — registry service (§1–§18)
 - [event-matcher-rust-crate/spec](../event-matcher-rust-crate/spec/index.md) — matching library (§1–§13; partially superseded, see §13 ET-1)
 - [event-front-end-with-svelte/spec](../event-front-end-with-svelte/spec/index.md) — operator UI (§1–§18)
 

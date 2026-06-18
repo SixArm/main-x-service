@@ -19,6 +19,7 @@
     import ThingGrid from "$lib/components/ThingGrid.svelte";
     import { ThingRepository } from "$lib/api/things.js";
     import type { Thing } from "$lib/api/types.js";
+    import { t, translate } from "$lib/i18n.svelte.js";
 
     let query = $state("");
     let things = $state<Thing[]>([]);
@@ -61,17 +62,19 @@
 <svelte:head><title>Things · Thing Service</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Things</h1>
-    <a href="/things/new" class="button primary">New thing</a>
+    <h1>{t("things.title")}</h1>
+    <a href="/things/new" class="button primary">{t("things.new")}</a>
 </header>
 
 <section class="surface stack">
-    <SearchBox bind:value={query} placeholder="Search by name, identifier…" onsearch={runSearch} />
+    <SearchBox bind:value={query} placeholder={t("things.searchPlaceholder")} onsearch={runSearch} />
     <div class="row small">
-        <label><input type="checkbox" bind:checked={fuzzy} /> Fuzzy</label>
-        <label><input type="checkbox" bind:checked={phonetic} /> Phonetic (Soundex)</label>
+        <label><input type="checkbox" bind:checked={fuzzy} /> {t("things.fuzzy")}</label>
+        <label><input type="checkbox" bind:checked={phonetic} /> {t("things.phonetic")}</label>
         <span class="muted" style="margin-left: auto">
-            {loading ? "Loading…" : `${total} record${total === 1 ? "" : "s"}`}
+            {loading
+                ? t("things.loading")
+                : translate(total === 1 ? "things.recordCount" : "things.recordCountPlural").replace("{count}", String(total))}
         </span>
     </div>
     {#if error}

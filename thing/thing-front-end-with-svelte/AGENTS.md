@@ -1,10 +1,10 @@
 # Agent guide — thing-front-end-with-svelte
 
-Sibling to [`thing-service-rust-crate/`](../thing-service-rust-crate/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
+Sibling to [`thing-service-with-loco/`](../thing-service-with-loco/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
 
 ## Single source of truth
 
-- The service's [`spec.md`](../thing-service-rust-crate/spec/index.md) and [`AGENTS/`](../thing-service-rust-crate/AGENTS/) describe the API contract. If a field disappears from `Thing` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
+- The service's [`spec.md`](../thing-service-with-loco/spec/index.md) and [`AGENTS/`](../thing-service-with-loco/AGENTS/) describe the API contract. If a field disappears from `Thing` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
 - This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
 
 ## Three-part change rule

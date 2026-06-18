@@ -5,7 +5,7 @@
 This spec owns the **integration contract**; each subproject owns its
 internals.
 
-**thing-service-rust-crate** (system of record) owns:
+**thing-service-with-loco** (system of record) owns:
 
 - Thing identity CRUD with soft delete and full audit trail.
 - schema.org/Thing canonical properties + `PropertyValue` identifiers.

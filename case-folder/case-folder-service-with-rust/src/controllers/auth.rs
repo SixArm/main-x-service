@@ -143,13 +143,13 @@ pub async fn request_link(
 /// (`{"user": {...}}`) plus a `Set-Cookie` header carrying the session.
 ///
 /// Status codes:
-/// - `200` — token valid; a **session-audience** token is minted and
-///   attached as the session cookie, and the signed-in user is returned.
-/// - `401` — the magic token is missing, invalid, or expired, or a
-///   session could not be established.
+/// - `200` — magic token valid; an **opaque server-side session** is
+///   established and its id attached as the HttpOnly session cookie, and
+///   the signed-in user is returned.
+/// - `401` — the magic token is missing, invalid, or expired.
 ///
-/// This is where the **magic** audience (single-use sign-in link) is
-/// traded for the longer-lived **session** audience held in the cookie.
+/// This is where the single-use **magic** link is traded for a server-side
+/// session (an opaque id in the cookie, per `agents/share/jwt.md`).
 #[debug_handler]
 pub async fn verify(
     Extension(auth): Extension<Arc<AuthState>>,
@@ -160,16 +160,15 @@ pub async fn verify(
         Ok(identity) => identity,
         Err(_) => return responses::unauthorized("Invalid or expired sign-in link."),
     };
-    let session = match auth.mint_session_token(&identity) {
-        Ok(session) => session,
-        Err(_) => return responses::unauthorized("Could not establish a session."),
-    };
+    // Establish an opaque server-side session (not a token) and carry its
+    // id in the HttpOnly cookie.
+    let sid = auth.create_session(&identity);
 
     let mut response = Json(UserBody {
         user: identity.into(),
     })
     .into_response();
-    set_cookie(&mut response, &auth.session_cookie(&session));
+    set_cookie(&mut response, &auth.session_cookie(&sid));
     response
 }
 
@@ -202,7 +201,10 @@ pub async fn me(Extension(auth): Extension<Arc<AuthState>>, headers: HeaderMap) 
 /// - `204` — always; logout is idempotent (clearing an absent session
 ///   is a no-op).
 #[debug_handler]
-pub async fn logout(Extension(auth): Extension<Arc<AuthState>>) -> Response {
+pub async fn logout(Extension(auth): Extension<Arc<AuthState>>, headers: HeaderMap) -> Response {
+    // Revoke the server-side session (not just the cookie) so the opaque id
+    // can never be replayed, then clear the cookie.
+    auth.revoke_from_headers(&headers);
     let mut response = StatusCode::NO_CONTENT.into_response();
     set_cookie(&mut response, &auth.clear_cookie());
     response

@@ -23,10 +23,10 @@ Detailed reference documentation for the Person Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../person-service-rust-crate/spec.md](../../person-service-rust-crate/spec/index.md) | Service spec — system of record |
-| [../../person-service-rust-crate/AGENTS/restful.md](../../person-service-rust-crate/AGENTS/restful.md) | REST API surface |
-| [../../person-service-rust-crate/AGENTS/models.md](../../person-service-rust-crate/AGENTS/models.md) | Wire-format domain types |
-| [../../person-service-rust-crate/AGENTS/matching.md](../../person-service-rust-crate/AGENTS/matching.md) | Matching algorithm reference |
+| [../../person-service-with-loco/spec.md](../../person-service-with-loco/spec/index.md) | Service spec — system of record |
+| [../../person-service-with-loco/AGENTS/restful.md](../../person-service-with-loco/AGENTS/restful.md) | REST API surface |
+| [../../person-service-with-loco/AGENTS/models.md](../../person-service-with-loco/AGENTS/models.md) | Wire-format domain types |
+| [../../person-service-with-loco/AGENTS/matching.md](../../person-service-with-loco/AGENTS/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

@@ -21,6 +21,7 @@
     import Field from '$lib/components/Field/Field.svelte';
     import Button from '$lib/components/Button/Button.svelte';
     import UnitedKingdomNationalHealthServiceNumberInput from '$lib/components/UnitedKingdomNationalHealthServiceNumberInput/UnitedKingdomNationalHealthServiceNumberInput.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let nhsNumber = $state('');
     let patientName = $state('');
@@ -46,10 +47,10 @@
         // Client-side Modulus-11 gate before we bother the server.
         const formatted = formatNhsNumber(nhsNumber);
         if (!isValidNhsNumber(formatted)) {
-            nhsError = 'Enter a valid 10-digit NHS Number (Modulus 11 check failed).';
+            nhsError = t('folderNew.invalidNhs');
         }
         if (!title.trim()) {
-            titleError = 'Folder title is required.';
+            titleError = t('folderNew.titleRequired');
         }
         if (nhsError || titleError) return;
 
@@ -83,51 +84,47 @@
     }
 </script>
 
-<BackLink href="/folders">Back to folders</BackLink>
+<BackLink href="/folders">{t('folderNew.backToFolders')}</BackLink>
 
-<h2>Add a new folder</h2>
-<p>
-    A folder belongs to one patient. If the patient is not yet registered with
-    the Main Patient Service, we'll create them; otherwise the new folder is
-    attached to the existing patient record.
-</p>
+<h2>{t('folderNew.heading')}</h2>
+<p>{t('folderNew.intro')}</p>
 
 {#if submitError}
-    <Alert type="error" heading="Cannot save folder">{submitError}</Alert>
+    <Alert type="error" heading={t('folderNew.cannotSave')}>{submitError}</Alert>
 {/if}
 
-<Form label="Add folder" onsubmit={handleSubmit}>
-    <Field label="NHS Number" required error={nhsError} description="10 digits, formatted XXX XXX XXXX.">
+<Form label={t('folderNew.formLabel')} onsubmit={handleSubmit}>
+    <Field label={t('common.nhsNumber')} required error={nhsError} description={t('folderNew.nhsDescription')}>
         <UnitedKingdomNationalHealthServiceNumberInput
-            label="NHS Number"
+            label={t('common.nhsNumber')}
             bind:value={nhsNumber}
             required
         />
     </Field>
-    <Field label="Folder title" required error={titleError} description="e.g. Volume 1, Cardiology 2023">
+    <Field label={t('folderNew.titleLabel')} required error={titleError} description={t('folderNew.titleDescription')}>
         <input bind:value={title} required />
     </Field>
 
-    <Field label="Patient name" error={nameError} description="Only needed for a new patient.">
+    <Field label={t('folderNew.patientName')} error={nameError} description={t('folderNew.patientNameDescription')}>
         <input bind:value={patientName} />
     </Field>
-    <Field label="Date of birth" error={dobError} description="Only needed for a new patient.">
+    <Field label={t('common.dateOfBirth')} error={dobError} description={t('folderNew.dobDescription')}>
         <input type="date" bind:value={dateOfBirth} />
     </Field>
 
-    <Field label="Initial cabinet" description="Leave blank if the folder is in transit.">
+    <Field label={t('folderNew.initialCabinet')} description={t('folderNew.initialCabinetDescription')}>
         <select bind:value={cabinetId}>
-            <option value="">— In transit —</option>
+            <option value="">{t('common.inTransitOption')}</option>
             {#each cache.cabinets as c (c.id)}
                 <option value={c.id}>{c.label} ({c.containerPath})</option>
             {/each}
         </select>
     </Field>
-    <Field label="Notes">
+    <Field label={t('common.notes')}>
         <textarea bind:value={notes} rows="2"></textarea>
     </Field>
     <div class="actions">
-        <a href="/folders" class="button secondary">Cancel</a>
-        <Button type="submit">Save folder</Button>
+        <a href="/folders" class="button secondary">{t('common.cancel')}</a>
+        <Button type="submit">{t('folderNew.saveFolder')}</Button>
     </div>
 </Form>

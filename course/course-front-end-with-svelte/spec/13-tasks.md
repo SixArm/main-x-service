@@ -1,7 +1,7 @@
 ## 13. Tasks
 
 - [x] T-1: Scaffold SvelteKit project (config, app shell, CSS).
-- [x] T-2: Wire TypeScript types matching `course-service-rust-crate/AGENTS/models.md`.
+- [x] T-2: Wire TypeScript types matching `course-service-with-loco/AGENTS/models.md`.
 - [x] T-3: `ApiClient` + `CourseRepository`.
 - [x] T-4: Form primitives (`LabeledField`, `FieldError`, `FieldRow`, `createForm`).
 - [x] T-5: List route with SVAR DataGrid + search box.
@@ -21,4 +21,7 @@
 - [ ] T-19: Masked-view toggle on detail page.
 - [ ] T-20: GDPR-export download button.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.
+- [ ] T-22: Re-add the list-page `phonetic` toggle once the Course Service grows a real Soundex search path (currently a documented no-op; checkbox removed in CHANGELOG v0.2.0; FR-2 + §2 record the omission).
+- [ ] T-23: Decide FR-9 preview policy. Today preview is optional ("Load preview" button) and `doMerge()` can run without a preview GET; FR-9 now matches that. If preview should be a hard precondition, gate the Merge button on a successful preview load (code + test change).
+- [ ] T-24: Auth — adopt BFF + httpOnly cookie + CSRF; the browser holds only `__Host-mxi_session`, the SvelteKit server attaches a short-lived PASETO server-side; no `mxi_access_token`/`localStorage` bearer, no fragment handoff (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 

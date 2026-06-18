@@ -1,14 +1,19 @@
 :root {
-    --mxi-color-bg: #fafafa;
-    --mxi-color-fg: #111827;
-    --mxi-color-muted: #6b7280;
-    --mxi-color-border: #e5e7eb;
-    --mxi-color-primary: #2563eb;
-    --mxi-color-primary-fg: #ffffff;
-    --mxi-color-danger: #b91c1c;
-    --mxi-color-success: #15803d;
-    --mxi-color-surface: #ffffff;
-    --mxi-radius: 6px;
+    /* Design tokens, mapped onto the Lily theme tokens (`--color-*`) that the
+       active theme stylesheet defines, with the original values as fallbacks
+       for first paint (before a theme loads). This bridge is what makes
+       selecting a theme in ThemeSelect restyle the whole app, not just Lily
+       components. */
+    --mxi-color-bg: var(--color-base-100, #fafafa);
+    --mxi-color-fg: var(--color-base-content, #111827);
+    --mxi-color-muted: color-mix(in oklch, var(--color-base-content, #6b7280) 55%, var(--color-base-100, #fafafa));
+    --mxi-color-border: var(--color-base-300, #e5e7eb);
+    --mxi-color-primary: var(--color-primary, #2563eb);
+    --mxi-color-primary-fg: var(--color-primary-content, #ffffff);
+    --mxi-color-danger: var(--color-error, #b91c1c);
+    --mxi-color-success: var(--color-success, #15803d);
+    --mxi-color-surface: var(--color-base-200, #ffffff);
+    --mxi-radius: var(--radius-field, 6px);
     --mxi-spacing: 1rem;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     color: var(--mxi-color-fg);

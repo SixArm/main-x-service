@@ -4,11 +4,23 @@ Roadmap items become §13 tasks when they are concrete enough to size
 and accept. Ordered roughly by the path from today's MVP to a
 worldwide governmental deployment with millions of users.
 
-- **JWT enforcement rollout across peer services.** Embed
-  `authentication-verifier` in every entity service (the loco
-  conversion's next step), reject unauthenticated `/api/*` requests,
-  and have sibling front-ends send the stored bearer token. The
-  verifier crate exists precisely to make this a per-crate one-liner.
+- **Session + PASETO pivot (now the lead item — §13 T-12).** Move the
+  human session off JWT to a server-side `__Host-mxi_session` cookie
+  session, and the cross-service credential to **PASETO v4.public**
+  (Ed25519) minted by `POST /token` and published at
+  `/.well-known/paseto-keys`; add CSRF; move front-ends to the BFF
+  pattern; decommission RS256 + `/.well-known/jwks.json`. Per
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
+  This **supersedes** the previous JWT model and reframes the
+  enforcement rollout below.
+- **PASETO enforcement rollout across peer services.** Embed the
+  PASETO-mode `authentication-verifier` in every entity service (the
+  loco conversion's next step), reject unauthenticated `/api/*`
+  requests (valid session or valid PASETO per
+  [`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md)),
+  and have sibling front-ends call entity services server-side (BFF)
+  with a minted PASETO. The verifier crate exists precisely to make
+  this a per-crate one-liner.
 - **Key rotation automation.** Multi-key JWKS with a grace window
   (§13 T-5), scheduled rotation, secrets-manager integration, and a
   documented emergency-revocation runbook (key compromise = rotate +

@@ -10,6 +10,7 @@
   import CaseForm from "$lib/components/CaseForm.svelte";
   import { CaseRepository } from "$lib/api/cases";
   import type { Case } from "$lib/api/types";
+  import { t } from "$lib/i18n.svelte";
 
   const repo = CaseRepository.withFetch();
   // Empty seed — only the required title, blank.
@@ -24,5 +25,5 @@
 
 <svelte:head><title>New case — Main X</title></svelte:head>
 
-<h1>New case</h1>
-<CaseForm {initial} submitLabel="Create" onsubmit={handleSubmit} />
+<h1>{t("new.title")}</h1>
+<CaseForm {initial} submitLabel={t("new.create")} onsubmit={handleSubmit} />

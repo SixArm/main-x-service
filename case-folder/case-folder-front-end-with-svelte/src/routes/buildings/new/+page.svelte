@@ -16,6 +16,7 @@
     import Form from '$lib/components/Form/Form.svelte';
     import Field from '$lib/components/Field/Field.svelte';
     import Button from '$lib/components/Button/Button.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let name = $state('');
     let description = $state('');
@@ -26,7 +27,7 @@
         nameError = '';
         submitError = '';
         if (!name.trim()) {
-            nameError = 'Building name is required.';
+            nameError = t('buildingNew.nameRequired');
             return;
         }
         try {
@@ -47,24 +48,24 @@
     }
 </script>
 
-<BackLink href="/buildings">Back to buildings</BackLink>
+<BackLink href="/buildings">{t('buildingNew.backToBuildings')}</BackLink>
 
-<h2>Add a building</h2>
-<p>One building can have many rooms; each room can hold many cabinets.</p>
+<h2>{t('buildingNew.heading')}</h2>
+<p>{t('buildingNew.intro')}</p>
 
 {#if submitError}
-    <Alert type="error" heading="Cannot save building">{submitError}</Alert>
+    <Alert type="error" heading={t('buildingNew.cannotSave')}>{submitError}</Alert>
 {/if}
 
-<Form label="Add building" onsubmit={handleSubmit}>
-    <Field label="Building name" required error={nameError}>
+<Form label={t('buildingNew.formLabel')} onsubmit={handleSubmit}>
+    <Field label={t('buildingNew.nameLabel')} required error={nameError}>
         <input bind:value={name} required />
     </Field>
-    <Field label="Description">
+    <Field label={t('common.description')}>
         <textarea bind:value={description} rows="2"></textarea>
     </Field>
     <div class="actions">
-        <a href="/buildings" class="button secondary">Cancel</a>
-        <Button type="submit">Save building</Button>
+        <a href="/buildings" class="button secondary">{t('common.cancel')}</a>
+        <Button type="submit">{t('buildingNew.saveBuilding')}</Button>
     </div>
 </Form>

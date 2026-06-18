@@ -1,26 +1,30 @@
 <script lang="ts" module>
+    import type { StringKey } from '$lib/i18n.svelte';
+
     /**
-     * One toolbar action: a stable `key` emitted on click, a visible
-     * `label`, and an `icon` name resolved by the Icon component.
+     * One toolbar action: a stable `key` emitted on click, an i18n
+     * `labelKey` resolved reactively to the visible label, and an `icon`
+     * name resolved by the Icon component.
      */
     export interface BarButton {
         key: string;
-        label: string;
+        labelKey: StringKey;
         icon: string;
     }
 
-    // The default action set from spec/button-bar.md.
+    // The default action set from spec/button-bar.md. Labels are i18n keys
+    // resolved at render time (so the bar relabels on a locale switch).
     export const DEFAULT_BUTTONS: BarButton[] = [
-        { key: 'patient', label: 'Patient', icon: 'person' },
-        { key: 'referrals', label: 'Referrals', icon: 'envelope-open' },
-        { key: 'activate', label: 'Activate', icon: 'hospital' },
-        { key: 'case-notes', label: 'Case Notes', icon: 'folder' },
-        { key: 'pathways', label: 'Pathways', icon: 'footprints' },
-        { key: 'legal-status', label: 'Legal Status', icon: 'scales' },
-        { key: 'documents', label: 'Documents', icon: 'clipboard' },
-        { key: 'wrapper', label: 'Wrapper', icon: 'box' },
-        { key: 'audit', label: 'Audit', icon: 'magnifying-glass' },
-        { key: 'quick-reports', label: 'Quick Reports', icon: 'printer' }
+        { key: 'patient', labelKey: 'buttonBar.patient', icon: 'person' },
+        { key: 'referrals', labelKey: 'buttonBar.referrals', icon: 'envelope-open' },
+        { key: 'activate', labelKey: 'buttonBar.activate', icon: 'hospital' },
+        { key: 'case-notes', labelKey: 'buttonBar.caseNotes', icon: 'folder' },
+        { key: 'pathways', labelKey: 'buttonBar.pathways', icon: 'footprints' },
+        { key: 'legal-status', labelKey: 'buttonBar.legalStatus', icon: 'scales' },
+        { key: 'documents', labelKey: 'buttonBar.documents', icon: 'clipboard' },
+        { key: 'wrapper', labelKey: 'buttonBar.wrapper', icon: 'box' },
+        { key: 'audit', labelKey: 'buttonBar.audit', icon: 'magnifying-glass' },
+        { key: 'quick-reports', labelKey: 'buttonBar.quickReports', icon: 'printer' }
     ];
 </script>
 
@@ -39,12 +43,13 @@
 
     import Button from '$lib/components/Button/Button.svelte';
     import Icon from '$lib/components/Icon/Icon.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let {
         buttons = DEFAULT_BUTTONS,
         active = undefined,
         onselect = undefined,
-        label = 'Actions',
+        label = undefined,
         class: className = ''
     }: {
         buttons?: BarButton[];
@@ -53,9 +58,12 @@
         label?: string;
         class?: string;
     } = $props();
+
+    // Default the accessible toolbar name to the translated "Actions".
+    const toolbarLabel = $derived(label ?? t('buttonBar.label'));
 </script>
 
-<div class={`button-bar ${className}`} role="toolbar" aria-label={label}>
+<div class={`button-bar ${className}`} role="toolbar" aria-label={toolbarLabel}>
     {#each buttons as button (button.key)}
         <Button
             class="button-bar-button"
@@ -64,7 +72,7 @@
             onclick={() => onselect?.(button.key)}
         >
             <Icon name={button.icon} />
-            <span class="button-bar-label">{button.label}</span>
+            <span class="button-bar-label">{t(button.labelKey)}</span>
         </Button>
     {/each}
 </div>

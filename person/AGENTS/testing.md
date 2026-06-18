@@ -7,14 +7,14 @@ Normative strategy: entity [spec §11](../spec/11-testing-strategy.md).
 
 | Subproject | Run | Shape | Guide |
 |---|---|---|---|
-| person-service | `cargo test --lib` · `cargo test --test api_integration_test` (needs PostgreSQL) · `cargo bench` | ~100 unit + 7 HTTP integration + 3 Criterion suites | [service AGENTS/testing.md](../person-service-rust-crate/AGENTS/testing.md) |
+| person-service | `cargo test --lib` · `cargo test --test api_integration_test` (needs PostgreSQL) · `cargo bench` | ~100 unit + 7 HTTP integration + 3 Criterion suites | [service AGENTS/testing.md](../person-service-with-loco/AGENTS/testing.md) |
 | person-matcher | `cargo test` (fresh checkout, no env vars) | Pure-library suite + doctests; clippy `-D warnings` clean; **no PII in fixtures** | [matcher AGENTS/testing.md](../person-matcher-rust-crate/AGENTS/testing.md) |
 | person-front-end | `pnpm test` (vitest) · `pnpm test:e2e` (smoke, no service) · `bin/e2e` (integration, live service) | 8 unit + 6 smoke + 9 golden-path integration | [front-end README — Testing](../person-front-end-with-svelte/README.md) |
 
 ## Seam 1 — service ↔ matcher (bridge suite)
 
 ```bash
-cd person-service-rust-crate
+cd person-service-with-loco
 cargo test --test duplicate_detection
 ```
 
@@ -29,7 +29,7 @@ component.
 ## Seam 2 — front-end ↔ service (golden paths)
 
 ```bash
-cd person-service-rust-crate && podman compose up -d   # service at :8080
+cd person-service-with-loco && podman compose up -d   # service at :8080
 cd ../person-front-end-with-svelte && bin/e2e          # health-checks, then playwright
 ```
 

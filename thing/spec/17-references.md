@@ -2,10 +2,10 @@
 
 ### Subproject documentation
 
-- Service: [spec](../thing-service-rust-crate/spec/index.md) ·
-  [AGENTS](../thing-service-rust-crate/AGENTS/index.md) ·
-  [README](../thing-service-rust-crate/README.md) ·
-  [index](../thing-service-rust-crate/index.md)
+- Service: [spec](../thing-service-with-loco/spec/index.md) ·
+  [AGENTS](../thing-service-with-loco/AGENTS/index.md) ·
+  [README](../thing-service-with-loco/README.md) ·
+  [index](../thing-service-with-loco/index.md)
 - Matcher: [spec](../thing-matcher-rust-crate/spec/index.md) ·
   [AGENTS.md](../thing-matcher-rust-crate/AGENTS.md) ·
   [README](../thing-matcher-rust-crate/README.md) ·
@@ -19,8 +19,8 @@
 
 - Agent reference set: [`../AGENTS/index.md`](../AGENTS/index.md)
 - Reference schema: [`../thing-service-schema.sql`](../thing-service-schema.sql)
-- DTO contract code: [`adapter.rs`](../thing-service-rust-crate/src/matching/adapter.rs)
-  and [`duplicate_detection.rs`](../thing-service-rust-crate/tests/duplicate_detection.rs)
+- DTO contract code: [`adapter.rs`](../thing-service-with-loco/src/matching/adapter.rs)
+  and [`duplicate_detection.rs`](../thing-service-with-loco/tests/duplicate_detection.rs)
 
 ### Project-wide
 

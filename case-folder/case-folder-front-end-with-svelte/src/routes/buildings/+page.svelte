@@ -5,6 +5,7 @@
     // building to its room count for the table.
 
     import { cache } from '$lib/store/cache.svelte';
+    import { t } from '$lib/i18n.svelte';
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import DataTable from '$lib/components/DataTable/DataTable.svelte';
     import DataTableHead from '$lib/components/DataTableHead/DataTableHead.svelte';
@@ -21,20 +22,20 @@
     );
 </script>
 
-<BackLink href="/">Back to dashboard</BackLink>
+<BackLink href="/">{t('common.backToDashboard')}</BackLink>
 
 <div class="toolbar">
-    <h2>Buildings</h2>
-    <a href="/buildings/new" class="button">Add building</a>
+    <h2>{t('buildings.heading')}</h2>
+    <a href="/buildings/new" class="button">{t('buildings.addBuilding')}</a>
 </div>
 
 <div class="panel">
-    <DataTable label="Buildings" caption="Physical sites holding records rooms">
+    <DataTable label={t('buildings.tableLabel')} caption={t('buildings.tableCaption')}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">Name</th>
-                <th scope="col">Rooms</th>
-                <th scope="col">Description</th>
+                <th scope="col">{t('common.name')}</th>
+                <th scope="col">{t('buildings.colRooms')}</th>
+                <th scope="col">{t('common.description')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>
@@ -46,7 +47,7 @@
                 </DataTableRow>
             {/each}
             {#if rows.length === 0}
-                <DataTableRow><DataTableTD colspan={3}>No buildings yet.</DataTableTD></DataTableRow>
+                <DataTableRow><DataTableTD colspan={3}>{t('buildings.noBuildings')}</DataTableTD></DataTableRow>
             {/if}
         </DataTableBody>
     </DataTable>

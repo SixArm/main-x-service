@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 // Smoke tests that assert the page shell renders. They do NOT require a
 // running Person Service — failures from the API call are swallowed by
 // the page and shown as banners, but the layout still renders. Run with
-// the service started (`docker-compose up` in person-service-rust-crate)
+// the service started (`docker-compose up` in person-service-with-loco)
 // for full coverage of the API-driven paths.
 
 test.describe("Person front-end smoke", () => {

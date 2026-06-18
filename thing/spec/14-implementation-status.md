@@ -3,7 +3,7 @@
 Honest snapshot per subproject. Aspirational items live in
 [§15 Roadmap](15-roadmap.md), not here.
 
-### 14.1 thing-service-rust-crate
+### 14.1 thing-service-with-loco
 
 | Capability | Status |
 |---|---|

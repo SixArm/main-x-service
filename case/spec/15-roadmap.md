@@ -12,6 +12,16 @@ is personal data.
   applicable. See
   [`agents/share/privacy.md`](../../agents/share/privacy.md). (Seed:
   T-10.)
+- **Bulk import / export.** *(governance-heavy — §12.)* Async,
+  job-based bulk load and extract per the family contract
+  [`agents/share/bulk-import-export.md`](../../agents/share/bulk-import-export.md);
+  the case-specific stable keys, CSV columns, and (prominently) the
+  export sensitivity posture are declared in
+  [case-service §8.7](../case-service-with-loco/spec/index.md). Because
+  case data is personal/sensitive, export is masked by default, full /
+  unmasked or soft-deleted export requires case-read authorisation, and
+  every export is audited — a bulk extract must never reveal more than
+  reading cases one at a time. (Seed: case-service §13 bulk task.)
 - **Family parity — match / search / merge.** Bring the entity to the
   mature-sibling baseline
   ([`agents/share/match-search-merge.md`](../../agents/share/match-search-merge.md)):
@@ -23,11 +33,15 @@ is personal data.
   streaming on every CRUD/merge are delivered (in-process). Next: a
   **durable event bus** (replacing in-process publishing) so peer
   registries and analytics can subscribe across replicas. (Seed: T-12.)
-- **Security — blanket SSO enforcement.** JWT verification against the
-  central auth-service JWKS is delivered for `whoami` + `actor`
-  stamping; extend to **blanket `/api/*` enforcement**, role split
-  between read-side integrators and caseworkers, JWKS-over-HTTP fetch at
-  boot, and rate limiting. (Seed: T-7 follow-up.)
+- **Security — blanket SSO enforcement.** Offline token verification
+  against the central auth-service's published key is delivered for
+  `whoami` + `actor` stamping; switch the credential to **PASETO v4
+  public** (Ed25519) per
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  (source of truth; supersedes the RS256-JWT + JWKS model), then extend
+  to **blanket `/api/*` enforcement**, role split between read-side
+  integrators and caseworkers, paseto-keys-over-HTTP fetch at boot, and
+  rate limiting. (Seed: T-7 follow-up.)
 - **Front-end depth.** Search box, audit / event views, and a merge
   action from the duplicates list. (Seeds: T-11, T-8 follow-up.)
 - **Cross-system case linkage.** Import/export of docket / external

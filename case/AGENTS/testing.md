@@ -59,7 +59,12 @@ its test edit in the same PR.
 - Service: prefer DB-free tests where the behaviour allows; the
   request-level tests are `#[ignore]`-gated (need Postgres — run with
   `cargo test -- --ignored` and a `DATABASE_URL`). Auth/crypto tests
-  mint a token + matching JWKS in-process, so they stay DB-free.
+  mint a token + matching public key in-process, so they stay DB-free.
+  (Auth pivot: the target is a PASETO v4.public token + published Ed25519
+  key, replacing RS256 JWT + JWKS — see
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md);
+  the current fixtures still mint the old credential, code follow-up
+  tracked in the service spec §13.)
 - Construct minimal records with `Case::new("…")` and set only the
   fields under test — renormalisation means absent components simply
   drop out of the score.

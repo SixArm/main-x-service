@@ -12,12 +12,12 @@ crate.
 |---|---|
 | What does the crate do? | Pairwise governmental case-management record matching, deterministic + probabilistic. |
 | Canonical spec? | [`spec/index.md`](./spec/index.md). |
-| Build / test / lint / fmt | `cargo build` · `cargo test` · `cargo clippy --all-targets -- -D warnings` · `cargo fmt` |
+| Build / test / lint / fmt | `cargo build` · `cargo test` · `cargo clippy --all-targets --all-features -- -D warnings` · `cargo fmt` |
 | Run the demo | `cargo run` (`src/main.rs`; not SemVer surface). |
 | Public types | `src/lib.rs` re-exports from `src/{case,matcher,scoring,config,normalize,phonetic,error}.rs`. |
 | Deterministic schemes (→ 1.0) | `Docket`, `ExternalCaseId`, URI, UUID; plus same-agency case-number (R-1) and `same_as` URL overlap (R-2). |
 | Probabilistic components | title (Jaro-Winkler + Soundex), subjects (Jaccard), agency-scoped case number, case type, status, keywords (Jaccard). |
-| Never scored | `priority`, `opened_date` (carried as data only). |
+| Never scored | `priority`, `opened_date`, `in_language` (carried as data only). |
 | Public API shape | `MatchingEngine::new(MatchConfig::default()).match_cases(&a, &b) -> MatchResult`. |
 
 ## Golden rules
@@ -35,7 +35,8 @@ crate.
 - Do not short-circuit on agency-scoped (`AgencyCaseNumber`/`LocalId`)
   or `Custom` schemes — they are not globally unique.
 - Do not score a `case_number` across differing agencies.
-- Do not score `priority` or `opened_date` — they are data only.
+- Do not score `priority`, `opened_date`, or `in_language` — they are
+  data only.
 - Do not change default weights/threshold without updating
   `spec/index.md §7` and `CHANGELOG.md`.
 

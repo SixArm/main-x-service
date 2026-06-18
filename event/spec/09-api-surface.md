@@ -1,7 +1,7 @@
 ## 9. API Surface
 
 Complete endpoint reference:
-[`event-service-rust-crate/AGENTS/restful.md`](../event-service-rust-crate/AGENTS/restful.md).
+[`event-service-with-loco/AGENTS/restful.md`](../event-service-with-loco/AGENTS/restful.md).
 Front-end consumption map:
 [front-end spec §9](../event-front-end-with-svelte/spec/09-api-consumption.md).
 

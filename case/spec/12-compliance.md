@@ -58,9 +58,12 @@ facets:
   [`agents/share/auditability.md`](../../agents/share/auditability.md).
   The remaining gap is a durable cross-replica event bus (roadmap §15).
 - **Access control.** Production deployments MUST sit behind SSO
-  (central authentication entity, RS256 JWT verification — delivered
-  for `whoami` / `actor`; *blanket `/api/*` enforcement is roadmap*)
-  and TLS; writes are restricted to caseworkers / registry operators.
+  (central authentication entity, PASETO v4 public token verification —
+  delivered for `whoami` / `actor`; *blanket `/api/*` enforcement is
+  roadmap*; see
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md),
+  supersedes RS256 JWT) and TLS; writes are restricted to caseworkers /
+  registry operators.
 - **Explainability for accountability.** Per-component match breakdowns
   give auditors a replayable rationale for every duplicate / merge
   decision — keep this property (NFR-9).

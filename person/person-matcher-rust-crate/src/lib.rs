@@ -3,7 +3,7 @@
 //! A Rust library for matching person records in healthcare information
 //! exchanges. The crate implements both **deterministic** and **probabilistic**
 //! matching algorithms grounded in peer-reviewed research on person
-//! identification (see [`spec.md`](https://github.com/sixarm/person-matcher/blob/main/spec.md) §5).
+//! identification (see [`spec/index.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/spec/index.md) §5).
 //!
 //! The library is **deterministic**, **stateless**, **panic-free** in library
 //! code, and **`Send + Sync`** so it can be used freely across threads.
@@ -20,14 +20,15 @@
 //!
 //! | Module | Purpose |
 //! |---|---|
-//! | [`models`]       | Data structures: [`Person`], [`PersonBuilder`], [`Address`], [`Gender`]. |
-//! | [`identifiers`]  | National healthcare identifier parsers — UK United Kingdom National Health Service Number, FR NIR, ES TSI, IE IHI, UK H&C. |
+//! | [`models`]       | Data structures: [`Person`], [`PersonBuilder`], [`Address`], [`BloodType`], [`Gender`], [`PassportBook`]. |
+//! | [`identifiers`]  | 42 national personal-identifier parsers + 9 passport-format validators (one parser per scheme; never cross-matched). |
+//! | [`nicknames`]    | Opt-in [`NicknameTable`] that lifts the given-name score for known nickname classes (Michael ↔ Mike, …). |
 //! | [`normalizer`]   | Text normalisation: names, postcodes, phone numbers, phonetic codes. |
 //! | [`scorer`]       | String-similarity primitives: Jaro-Winkler, Levenshtein, exact, combined. |
 //! | [`matcher`]      | Orchestration: [`MatchingEngine`], [`MatchConfig`], [`MatchResult`]. |
 //! | [`error`]        | Error enum [`MatchingError`] and [`Result`] alias. |
 //!
-//! See [`AGENTS/architecture.md`](https://github.com/sixarm/person-matcher/blob/main/AGENTS/architecture.md)
+//! See [`AGENTS/architecture.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/AGENTS/architecture.md)
 //! for the layering rules.
 //!
 //! ## Quick start — probabilistic match
@@ -128,9 +129,9 @@
 //!
 //! ## Further reading
 //!
-//! - [`spec.md`](https://github.com/sixarm/person-matcher/blob/main/spec.md) — the living specification.
-//! - [`AGENTS/matching-algorithm.md`](https://github.com/sixarm/person-matcher/blob/main/AGENTS/matching-algorithm.md) — practitioner's view of the algorithm.
-//! - [`AGENTS/normalization.md`](https://github.com/sixarm/person-matcher/blob/main/AGENTS/normalization.md) — text normalisation rules.
+//! - [`spec/index.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/spec/index.md) — the living specification.
+//! - [`AGENTS/matching-algorithm.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/AGENTS/matching-algorithm.md) — practitioner's view of the algorithm.
+//! - [`AGENTS/normalization.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/AGENTS/normalization.md) — text normalisation rules.
 
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)]

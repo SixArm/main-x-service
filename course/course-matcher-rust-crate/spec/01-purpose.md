@@ -8,5 +8,5 @@ Modelled loosely on [schema.org/Course](https://schema.org/Course),
 re-using only the properties that carry signal for identity
 matching. The full Course model (Syllabus, EducationalCredential,
 CourseInstance, …) lives in the consuming
-[`course-service`](../../course-service-rust-crate/) crate.
+[`course-service`](../../course-service-with-loco/) crate.
 

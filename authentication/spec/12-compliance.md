@@ -9,8 +9,8 @@ healthcare contexts add
 | Standard | Mechanism |
 |---|---|
 | GDPR / UK GDPR / UK DPA 2018 | Email addresses and names are personal data: data minimisation (the account holds only `email` + `name`), no tokens logged alongside avoidable PII in production, purpose limitation (sign-in only — identity attributes live in the person entity). **Right of access** (Art. 15) via `GET /api/auth/account/export`; **right to erasure** (Art. 17) via `DELETE /api/auth/account` — soft-delete + anonymise (§13 T-9, done). See "GDPR subject rights" below. |
-| GDPR Art. 32 (security of processing) | Passwordless (no password database to breach); RS256 asymmetric keys (no shared secret distribution); short token TTL; TLS at the edge. |
-| ISO/IEC 27001 (ISMS) | Access control alignment: single sign-on chokepoint, per-token sessions with issuance + revocation timestamps, key custody via environment injection (A.9 / A.10-style controls); operational controls are deployment-side. |
+| GDPR Art. 32 (security of processing) | Passwordless (no password database to breach); **server-side cookie sessions** (opaque `sid` in an `HttpOnly`/`Secure`/`__Host-` cookie — no token in browser JS, killing the `localStorage` exfiltration class); **CSRF protection** on cookie-authenticated mutating requests; Ed25519 asymmetric PASETO keys (no shared secret); short ~5-min token TTL; TLS at the edge. |
+| ISO/IEC 27001 (ISMS) | Access control alignment: single sign-on chokepoint, server-side sessions with login + revocation timestamps and idle+absolute TTLs, key custody via environment injection (A.9 / A.10-style controls); operational controls are deployment-side. |
 | ISO/IEC 42001:2023 (AIMS) | Not applicable today — no ML in the auth path; applies family-wide where matcher tuning is ML-driven. |
 | Welsh Language (Wales) Measure 2011 / public-sector Welsh-language duty | The user-facing surfaces (magic-link email + front-end UI) ship in **Welsh (`cy`)** alongside English (T-7), so a Welsh-speaking citizen can sign in in Welsh — treating Welsh no less favourably than English. Locale catalogs (`src/i18n.rs`, `src/lib/i18n.svelte.ts`) are structured so further national languages are added by extension. |
 
@@ -18,8 +18,9 @@ healthcare contexts add
 
 Two complementary trails:
 
-1. **`sessions`** is the issuance/revocation trail: every token issuance
-   writes `(jid, user_pid, expires_at, user_agent)`; every signout
+1. **`sessions`** is the login/revocation trail: every magic-link
+   redemption writes a session row `(sid, user_pid, created_at,
+   idle_expires_at, absolute_expires_at)`; every signout / admin revoke
    stamps `revoked_at`; `email_verified_at` records first verification.
 2. **`auth_events`** (T-10, done) is the durable security/compliance
    audit trail of authentication *events*. Each row is
@@ -53,11 +54,12 @@ with the email field).
 ### GDPR subject rights (T-9, done)
 
 - **Right of access (Art. 15)** — `GET /api/auth/account/export`
-  (bearer) returns the subject's `users` row + `sessions` +
+  (session cookie) returns the subject's `users` row + `sessions` +
   `auth_events`. The export never includes a token, key material, the
   password hash, or the api key.
-- **Right to erasure (Art. 17)** — `DELETE /api/auth/account` (bearer)
-  is **soft-delete + anonymise**, chosen over a hard delete so the
+- **Right to erasure (Art. 17)** — `DELETE /api/auth/account` (session
+  cookie, CSRF-protected) is **soft-delete + anonymise**, chosen over a
+  hard delete so the
   `auth_events` audit trail and any referential history keep their
   integrity: a new `users.deleted_at` column is stamped, `email` becomes
   a `pid`-keyed unroutable tombstone (`deleted+<pid>@invalid`, RFC 2606
@@ -66,14 +68,22 @@ with the email field).
   subject's sessions are revoked, and an `account_erased` audit row is
   written. Erasure is irreversible (the tombstone cannot reconstruct the
   original address). Every read path (`/me`, export) treats a
-  `deleted_at` user as gone (`401`); the already-issued bearer token
-  still verifies cryptographically until `exp`, bounded by the short TTL
-  (the same offline-revocation tradeoff as signout, FR-8).
+  `deleted_at` user as gone (`401`); revoking the sessions stops new
+  PASETO minting, and any already-minted cross-service token expires
+  within its ~5-min TTL (the same offline-revocation tradeoff as
+  signout, FR-8).
 
-### Token handling rules
+### Credential handling rules
 
-- The JWT is the bearer credential for the entire family: never log
-  it; the front-end keeps it in `localStorage` only, clears it on sign
-  out and on `401`.
+- The **session cookie** (`__Host-mxi_session`) is the human
+  credential: `HttpOnly` (never reachable from browser JS), `Secure`,
+  `__Host-` host-locked, `SameSite`; never logged. The browser holds
+  **no token** — `localStorage` is not used for credentials.
+- The **PASETO v4.public** token is the cross-service bearer credential:
+  short-lived (~5 min), minted only by exchanging a session at
+  `POST /token`, held server-side at the BFF, never logged, never placed
+  in browser JS.
 - Magic-link tokens MUST NOT appear in production logs (the dev
   console log is a development affordance only).
+- **Decommissioned:** the RS256 JWT bearer credential and its
+  `localStorage` storage are removed by this pivot (§1; shared §9).

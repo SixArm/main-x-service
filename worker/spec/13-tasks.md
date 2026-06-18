@@ -2,7 +2,7 @@
 
 Entity-level work queue: items that span subprojects or police the
 seams. Crate-internal work belongs in the owning subproject's queue
-([service §13](../worker-service-rust-crate/spec/13-tasks.md),
+([service §13](../worker-service-with-loco/spec/13-tasks.md),
 [matcher §23](../worker-matcher-rust-crate/spec/23-tasks-and-acceptance-criteria.md),
 [front-end §13](../worker-front-end-with-svelte/spec/13-tasks.md)).
 Tick the box when an automated test or clearly described manual check
@@ -10,16 +10,16 @@ confirms the acceptance criterion.
 
 - [x] **T-1 — Reconcile the FHIR resource path discrepancy.** *(Done
   2026-06-13.)*
-  - [x] Service [spec §6.8 / §9](../worker-service-rust-crate/spec/09-api-surface.md)
+  - [x] Service [spec §6.8 / §9](../worker-service-with-loco/spec/09-api-surface.md)
     say `/fhir/Practitioner`; service
-    [`AGENTS/restful.md`](../worker-service-rust-crate/AGENTS/restful.md)
+    [`AGENTS/restful.md`](../worker-service-with-loco/AGENTS/restful.md)
     documents `/fhir/Worker/{id}`. Determine which the code serves,
     fix the loser. *(Done 2026-06-13: the code's handlers and wire
     `resourceType` are `Worker` / `/fhir/Worker` — the spec was the
     loser; §2/§6.8/§8/§9/§12/§13/§14 now say `/fhir/Worker`.)*
   - [x] Pin with a route test. *(Done 2026-06-13: the previously
     unmounted FHIR handlers are now registered via `fhir_routes()` in
-    `App::routes` — service [§13 T-9](../worker-service-rust-crate/spec/13-tasks.md)
+    `App::routes` — service [§13 T-9](../worker-service-with-loco/spec/13-tasks.md)
     — and pinned by `tests/api_integration_test.rs::test_fhir_worker_route_is_mounted`
     (un-gated) plus `::test_fhir_worker_not_found_returns_operation_outcome`
     (DB-gated).)*
@@ -77,7 +77,7 @@ confirms the acceptance criterion.
     declare colleagues the same person); the matcher's `local_id` is
     deliberately never scored. The fall-through is recorded with
     rationale in service
-    [spec §6.2](../worker-service-rust-crate/spec/06-functional-requirements.md)
+    [spec §6.2](../worker-service-with-loco/spec/06-functional-requirements.md)
     and the adapter's routing comment, and pinned by two bridge tests
     (`ods_organisation_code_falls_through_unmapped`,
     `shared_ods_code_does_not_make_different_workers_match`).

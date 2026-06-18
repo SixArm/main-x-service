@@ -25,10 +25,14 @@ tracked in §15.
   deterministic identifiers.)*
 - **NFR-5 — Security.** TLS at the edge; SSO via the central
   [authentication entity](../../authentication/) — the service verifies
-  RS256 JWTs offline against the auth-service JWKS (delivered for
-  `whoami` + `actor` stamping; *blanket `/api/*` enforcement is
-  roadmap*); no secrets in code or images (JWKS/issuer/audience injected
-  via env: `CASE_JWKS` / `CASE_JWT_ISSUER` / `CASE_JWT_AUDIENCE`).
+  PASETO v4 public tokens (Ed25519) offline against the auth-service's
+  published key (delivered for `whoami` + `actor` stamping; *blanket
+  `/api/*` enforcement is roadmap*); no secrets in code or images
+  (keys/issuer/audience injected via env: `CASE_PASETO_KEYS` /
+  `CASE_TOKEN_ISSUER` / `CASE_TOKEN_AUDIENCE`). Auth model source of
+  truth:
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  (supersedes the RS256-JWT + JWKS model).
 - **NFR-6 — Auditability.** Soft delete + a durable `audit_logs` row
   per create/update/delete/merge (who/what/when, JSON snapshot) +
   in-memory event streaming today, per

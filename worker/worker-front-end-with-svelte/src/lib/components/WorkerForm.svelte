@@ -21,13 +21,14 @@
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import HumanNameInput from "./HumanNameInput.svelte";
+    import { t } from "$lib/i18n.svelte.js";
 
     let props: {
         initial: Worker;
         submitLabel?: string;
         onsubmit: (worker: Worker) => Promise<void>;
     } = $props();
-    const submitLabel = $derived(props.submitLabel ?? "Save");
+    const submitLabel = $derived(props.submitLabel ?? t("form.save"));
 
     // svelte-ignore state_referenced_locally
     // Reading props.initial once at setup is intentional — createForm clones
@@ -38,10 +39,10 @@
         // birth-date rules, to fail fast before the network round-trip.
         validate(value) {
             const errors: Record<string, string> = {};
-            if (!value.name.family.trim()) errors.family = "Required";
-            if (!value.name.given.length) errors.given = "At least one given name";
+            if (!value.name.family.trim()) errors.family = t("form.errFamilyRequired");
+            if (!value.name.given.length) errors.given = t("form.errGivenRequired");
             if (value.birth_date && Date.parse(value.birth_date) > Date.now()) {
-                errors.birth_date = "Birth date cannot be in the future";
+                errors.birth_date = t("form.errBirthFuture");
             }
             return errors;
         },
@@ -62,17 +63,17 @@
     <HumanNameInput bind:name={form.value.name} errors={form.errors} />
 
     <FieldRow>
-        <LabeledField label="Birth date" for="dob" error={form.errors.birth_date}>
+        <LabeledField label={t("form.birthDate")} for="dob" error={form.errors.birth_date}>
             <input id="dob" type="date" bind:value={form.value.birth_date} />
         </LabeledField>
-        <LabeledField label="Gender" for="gender">
+        <LabeledField label={t("form.gender")} for="gender">
             <select id="gender" bind:value={form.value.gender}>
                 {#each genders as g}
                     <option value={g}>{g}</option>
                 {/each}
             </select>
         </LabeledField>
-        <LabeledField label="Tax ID" for="tax_id" hint="SSN, CPF, TIN">
+        <LabeledField label={t("form.taxId")} for="tax_id" hint={t("form.taxIdHint")}>
             <input id="tax_id" bind:value={form.value.tax_id} />
         </LabeledField>
     </FieldRow>
@@ -83,10 +84,10 @@
 
     <div class="row">
         <button type="submit" class="button primary" disabled={form.submitting}>
-            {form.submitting ? "Saving…" : submitLabel}
+            {form.submitting ? t("form.saving") : submitLabel}
         </button>
         <button type="button" class="button" onclick={() => form.reset()} disabled={form.submitting}>
-            Reset
+            {t("form.reset")}
         </button>
     </div>
 </form>

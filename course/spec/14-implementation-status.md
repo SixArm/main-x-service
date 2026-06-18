@@ -3,7 +3,7 @@
 Honest status per subproject, rolled up from each crate's own §14.
 Aspirational items live in §15, not here.
 
-### course-service-rust-crate
+### course-service-with-loco
 
 | Area | Status |
 |---|---|

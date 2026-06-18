@@ -2,7 +2,7 @@
 
 > Canonical SDD specification for the `person-matcher` Rust crate; the single source of truth. Consolidates what an SDD workflow would split across `spec.md` / `plan.md` / `tasks.md` (see §9–§13 for plan content, §23 plus `AGENTS/delivered-tasks.md` for tasks). When something changes in the codebase, this document changes first.
 >
-> Version 0.3.0 · Maintainer Joel Parker Henderson (`joel@joelparkerhenderson.com`) · Crate `person-matcher` (Cargo) · Edition Rust 2024 · Licence MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause · Repository https://github.com/sixarm/person-matcher-rust-crate · See also [index.md](../index.md), [AGENTS.md](../AGENTS.md), [README.md](../README.md), [CHANGELOG.md](../CHANGELOG.md).
+> Version 0.6.1 · Maintainer Joel Parker Henderson (`joel@joelparkerhenderson.com`) · Crate `person-matcher` (Cargo) · Edition Rust 2024 · Licence MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause · Repository https://github.com/sixarm/person-matcher-rust-crate · See also [index.md](../index.md), [AGENTS.md](../AGENTS.md), [README.md](../README.md), [CHANGELOG.md](../CHANGELOG.md).
 
 ---
 

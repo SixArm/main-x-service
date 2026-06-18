@@ -3,7 +3,7 @@
 The entity's API is the **service's HTTP surface**; the front-end is
 its first-party consumer. Full endpoint reference (payloads,
 parameters, status codes, response envelope):
-[service AGENTS/restful.md](../person-service-rust-crate/AGENTS/restful.md).
+[service AGENTS/restful.md](../person-service-with-loco/AGENTS/restful.md).
 Normative summary: entity [spec §9](../spec/09-api-surface.md).
 
 ## Shape of the surface
@@ -18,7 +18,10 @@ Normative summary: entity [spec §9](../spec/09-api-surface.md).
 
 Envelope everywhere: `{ "success": bool, "data": …, "error": … }`.
 Status idioms: `409` = duplicate candidates on create, `422` =
-validation failure, `401` = (future) missing/invalid JWT.
+validation failure, `401` = (future) missing/invalid session or
+PASETO token. See
+[`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+for the cookie-session + offline PASETO model.
 
 ## Front-end consumption
 

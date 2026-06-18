@@ -3,7 +3,7 @@
 Orientation only. The full property tables live with their owners:
 
 - Service field-by-field schema.org → Rust mapping:
-  [`course-service/AGENTS/models.md`](../course-service-rust-crate/AGENTS/models.md)
+  [`course-service/AGENTS/models.md`](../course-service-with-loco/AGENTS/models.md)
 - Matcher slim shape: [matcher spec §6](../course-matcher-rust-crate/spec/06-domain-model.md)
 - Front-end mirror: `course-front-end/src/lib/api/types.ts`
 
@@ -29,7 +29,7 @@ Orientation only. The full property tables live with their owners:
 
 ## The adapter (the contract that matters)
 
-[`course-service/src/matching/adapter.rs`](../course-service-rust-crate/src/matching/adapter.rs)
+[`course-service/src/matching/adapter.rs`](../course-service-with-loco/src/matching/adapter.rs)
 projects the canonical model down to the matcher shape
 (`to_matcher_course`). The projection is lossy by design (registry
 plumbing dropped); the routing rules are normative in entity spec

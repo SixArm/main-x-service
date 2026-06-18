@@ -1,9 +1,9 @@
 # RESTful API Reference — Organization Entity
 
 Entity-level endpoint map. Source of truth for behaviour:
-[`src/controllers/organizations.rs`](../organization-service-rust-crate/src/controllers/organizations.rs);
+[`src/controllers/organizations.rs`](../organization-service-with-loco/src/controllers/organizations.rs);
 machine-readable: `GET /api-docs/openapi.json`
-([`src/openapi.rs`](../organization-service-rust-crate/src/openapi.rs));
+([`src/openapi.rs`](../organization-service-with-loco/src/openapi.rs));
 contract summary: entity [spec §9](../spec/09-api-surface.md).
 
 Default base URL: `http://localhost:5150` (loco default port).
@@ -16,8 +16,13 @@ Default base URL: `http://localhost:5150` (loco default port).
   `founding_date`, …).
 - The organization request/response body **is** the
   `organization_matcher::Organization` shape.
-- No authentication yet (JWT via the auth-service JWKS is queued —
-  entity spec §13 T-9).
+- Auth via the central auth-service: offline **PASETO v4.public**
+  verification against the published Ed25519 key (replaces the
+  decommissioned RS256 JWT + JWKS); blanket `/api/*` enforcement is
+  default-off via `ORGANIZATION_REQUIRE_AUTH`. Auth pivot in progress —
+  source of truth
+  [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md);
+  code follow-up tracked in entity spec §13.
 
 ## Endpoints
 

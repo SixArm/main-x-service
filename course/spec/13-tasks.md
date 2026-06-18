@@ -3,7 +3,7 @@
 Live work queue for the **entity level** — cross-subproject work, or
 single-subproject work with cross-subproject consequences. Work that
 is purely internal to one crate belongs in that crate's queue
-(service [§13](../course-service-rust-crate/spec/13-tasks.md),
+(service [§13](../course-service-with-loco/spec/13-tasks.md),
 matcher [§23](../course-matcher-rust-crate/spec/23-tasks.md),
 front-end [§13](../course-front-end-with-svelte/spec/13-tasks.md)).
 
@@ -59,3 +59,11 @@ front-end [§13](../course-front-end-with-svelte/spec/13-tasks.md)).
 - [ ] T-11: Bulk catalogue import path (national curriculum / OER
       feeds) with batch dedup — entity-level design needed before
       crate tasks can be cut (§15).
+- [ ] T-12: Implement the **Lesson** sub-resource (§5.1) — a course
+      contains 0..many ordered lessons (schema.org `LearningResource`,
+      `hasPart`). Service: model + persistence + nested CRUD under
+      `/api/courses/{id}/lessons` (mirror the `instances` sub-resource);
+      front-end: list/edit lessons on the course detail page; matcher:
+      no change (lessons are registry-only, dropped by the adapter §5.3).
+      Spec-first: this entry tracks the code + test work for the concept
+      now defined in §5.

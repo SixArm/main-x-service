@@ -38,7 +38,7 @@ clinic encounter or a political hearing.
 
 - **Service** — enforcement point for masking, export, consent,
   audit. All compliance-relevant behaviour is specified in
-  [service spec §12](../event-service-rust-crate/spec/12-compliance.md).
+  [service spec §12](../event-service-with-loco/spec/12-compliance.md).
 - **Matcher** — by construction cannot leak: no IO, no logging, no
   network. Test fixtures use synthetic personal data only.
 - **Front-end** — must not cache or persist personal data

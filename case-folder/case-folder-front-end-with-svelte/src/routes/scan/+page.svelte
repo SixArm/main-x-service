@@ -26,6 +26,7 @@
     import Field from '$lib/components/Field/Field.svelte';
     import Button from '$lib/components/Button/Button.svelte';
     import TextInput from '$lib/components/TextInput/TextInput.svelte';
+    import { t, tf, statusLabel } from '$lib/i18n.svelte';
 
     let term = $state('');
     let results = $state<Folder[]>([]);
@@ -69,44 +70,40 @@
     }
 </script>
 
-<BackLink href="/">Back to dashboard</BackLink>
+<BackLink href="/">{t('common.backToDashboard')}</BackLink>
 
-<h2><Icon name="magnifying-glass" /> Scan a folder</h2>
-<p>
-    Scan a barcode or type an NHS Number (or folder id) to jump straight to a
-    folder and record its move — the Scan4Safety fast path. No hardware scanner
-    needed; a keyboard-wedge scanner types into the box below.
-</p>
+<h2><Icon name="magnifying-glass" /> {t('scan.heading')}</h2>
+<p>{t('scan.intro')}</p>
 
 {#if errorMsg}
-    <Alert type="error" heading="Scan failed">{errorMsg}</Alert>
+    <Alert type="error" heading={t('scan.failed')}>{errorMsg}</Alert>
 {/if}
 
-<Form label="Scan" onsubmit={scan}>
-    <Field label="Scan or search" description="NHS Number (e.g. 943 476 5919) or a folder id.">
-        <TextInput label="Scan or search" bind:value={term} placeholder="Scan or type…" />
+<Form label={t('scan.formLabel')} onsubmit={scan}>
+    <Field label={t('scan.fieldLabel')} description={t('scan.fieldDescription')}>
+        <TextInput label={t('scan.fieldLabel')} bind:value={term} placeholder={t('scan.placeholder')} />
     </Field>
     <div class="actions">
-        <Button type="submit">Scan</Button>
+        <Button type="submit">{t('scan.formLabel')}</Button>
     </div>
 </Form>
 
 {#if searched}
     <div class="panel">
         {#if results.length > 0}
-            <h3>Matches ({results.length})</h3>
+            <h3>{tf('scan.matches', { n: results.length })}</h3>
             <ul class="report-list">
                 {#each results as folder (folder.id)}
                     <li>
                         <a href="/folders/{folder.id}">{folder.title}</a>
                         — {folder.patientName}
-                        <Badge type={badgeType(folder.status)}>{folder.status}</Badge>
-                        <a href="/move?folder={folder.id}" class="button">Move this folder</a>
+                        <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
+                        <a href="/move?folder={folder.id}" class="button">{t('scan.moveThisFolder')}</a>
                     </li>
                 {/each}
             </ul>
         {:else}
-            <p>No folder found for “{term}”.</p>
+            <p>{tf('scan.noFolderFound', { term })}</p>
         {/if}
     </div>
 {/if}

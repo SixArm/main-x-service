@@ -1,10 +1,10 @@
 # Agent guide — place-front-end-with-svelte
 
-Sibling to [`place-service-rust-crate/`](../place-service-rust-crate/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
+Sibling to [`place-service-with-loco/`](../place-service-with-loco/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
 
 ## Single source of truth
 
-- The service's [`spec.md`](../place-service-rust-crate/spec/index.md) and [`AGENTS/`](../place-service-rust-crate/AGENTS/) describe the API contract. If a field disappears from `Place` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
+- The service's [`spec.md`](../place-service-with-loco/spec/index.md) and [`AGENTS/`](../place-service-with-loco/AGENTS/) describe the API contract. If a field disappears from `Place` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
 - This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
 
 ## Three-part change rule

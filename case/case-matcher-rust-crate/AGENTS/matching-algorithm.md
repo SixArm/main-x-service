@@ -30,8 +30,8 @@ Deterministic schemes (`IdentifierScheme::is_deterministic`): `Docket`,
 | Keywords | 0.15 | Jaccard on `fold_set(keywords)`. |
 
 Weights sum to 1.0; the weighted average is renormalised over the
-`Some` components only. `priority` and `opened_date` are **never
-scored** — they are carried for downstream consumers.
+`Some` components only. `priority`, `opened_date`, and `in_language`
+are **never scored** — they are carried for downstream consumers.
 
 ## Confidence band
 
@@ -51,4 +51,51 @@ b.identifiers.push(CaseIdentifier { scheme: IdentifierScheme::Docket, value: "cv
 let r = engine.match_cases(&a, &b);
 assert_eq!(r.score, 1.0);                       // R-0 fires
 assert!(r.breakdown.deterministic_match);
+```
+
+### Soundex phonetic title bonus (§9)
+
+When two primary titles are spelled differently but sound alike, the
+literal Jaro-Winkler score is lifted by `+0.05` (capped at `0.95`) if
+the two share a Soundex code:
+
+```rust
+use case_matcher::{Case, MatchingEngine};
+
+let engine = MatchingEngine::default_config();
+// "Smith" and "Smyth" both encode to Soundex S530.
+let a = Case::new("Smith");
+let b = Case::new("Smyth");
+let r = engine.match_cases(&a, &b);
+// The phonetic bonus nudges the title score upward, but the cap keeps
+// the phonetic-only path strictly below a "certain" (≥0.95) title match.
+let title = r.breakdown.title_score.expect("title always present");
+assert!(title <= 0.95);
+```
+
+### Renormalisation + threshold presets (§17, §7)
+
+Absent components drop out of the average entirely (they neither add to
+the numerator nor the denominator); the presets shift only the
+`is_match` threshold, never the `score`:
+
+```rust
+use case_matcher::{Case, MatchConfig, MatchingEngine};
+
+// Only title + subjects are present; case_number / type / status /
+// keywords are all None and renormalise away.
+let mut a = Case::new("Disability benefit appeal");
+let mut b = Case::new("Disability benefit review appeal");
+a.subjects = vec!["person:7".into()];
+b.subjects = vec!["person:7".into()];
+
+let default = MatchingEngine::new(MatchConfig::default()).match_cases(&a, &b);
+let strict = MatchingEngine::new(MatchConfig::strict()).match_cases(&a, &b);
+let lenient = MatchingEngine::new(MatchConfig::lenient()).match_cases(&a, &b);
+
+// Same score under every preset — only the threshold (and therefore
+// is_match) differs.
+assert!((default.score - strict.score).abs() < 1e-9);
+assert!((default.score - lenient.score).abs() < 1e-9);
+assert!(default.breakdown.case_number_score.is_none());   // renormalised away
 ```

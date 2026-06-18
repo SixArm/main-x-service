@@ -13,11 +13,11 @@ artefact**. Code conforms to the spec; not the other way around.
 
 Per-crate `spec.md`:
 
-- [person-service/spec.md](../../person/person-service-rust-crate/spec/index.md)
-- [event-service/spec.md](../../event/event-service-rust-crate/spec/index.md)
-- [worker-service/spec.md](../../worker/worker-service-rust-crate/spec/index.md)
-- [place-service/spec.md](../../place/place-service-rust-crate/spec/index.md)
-- [thing-service/spec.md](../../thing/thing-service-rust-crate/spec/index.md)
+- [person-service/spec.md](../../person/person-service-with-loco/spec/index.md)
+- [event-service/spec.md](../../event/event-service-with-loco/spec/index.md)
+- [worker-service/spec.md](../../worker/worker-service-with-loco/spec/index.md)
+- [place-service/spec.md](../../place/place-service-with-loco/spec/index.md)
+- [thing-service/spec.md](../../thing/thing-service-with-loco/spec/index.md)
 
 ## Overview
 
@@ -47,6 +47,8 @@ Per-crate `spec.md`:
 | [architecture.md](architecture.md)                               | Architecture                                           |
 | [auditability.md](auditability.md)                               | Audit logging and event streaming                      |
 | [event-bus.md](event-bus.md)                                     | Durable event bus design (outbox → Fluvio)             |
+| [cross-service-linking.md](cross-service-linking.md)             | Cross-service entity linking (hybrid write-local + read-model aggregator) |
+| [bulk-import-export.md](bulk-import-export.md)                   | Bulk import / export (async `bg_pg` jobs; JSONL/CSV/Parquet) |
 | [availability.md](availability.md)                               | Availability, scaling, health checks                   |
 | [dataflow.md](dataflow.md)                                       | Create / match / merge / search data flows             |
 | [match.md](match.md)                                             | Matching algorithms                                    |
@@ -61,6 +63,8 @@ Per-crate `spec.md`:
 | [postgresql.md](postgresql.md)                                   | PostgreSQL database, extensions                        |
 | [privacy.md](privacy.md)                                         | Data masking, GDPR, consent                            |
 | [restful.md](restful.md)                                         | RESTful API guidance                                   |
-| [jwt-enforcement.md](jwt-enforcement.md)                         | Blanket `/api/*` JWT enforcement (coordinated)         |
+| [jwt.md](jwt.md)                                                 | Why JWTs must not be used for sessions (principle)     |
+| [authentication-sessions.md](authentication-sessions.md)         | Cookie sessions (Postgres) + PASETO v4 cross-service tokens + BFF front-end (supersedes the RS256-JWT model) |
+| [jwt-enforcement.md](jwt-enforcement.md)                         | Blanket `/api/*` auth enforcement (coordinated; credential now PASETO/session) |
 | [rust-loco-stack.md](rust-loco-stack.md)                         | Stack for Rust, Loco (database, search, …)             |
 | [loco.md](loco.md)                                               | Loco framework (backend-only conventions)              |

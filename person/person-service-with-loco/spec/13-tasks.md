@@ -1,0 +1,96 @@
+## 13. Tasks
+
+Spec-driven work breakdown. Each task has an acceptance criterion;
+tick the box when an automated test or clearly described manual check
+confirms the criterion is met. Tasks small enough to land in a single
+PR; split larger tasks (`T-12a`, `T-12b`).
+
+- [ ] **T-1 — Wire JWT middleware on `/api/*`.**
+  - [ ] Add `jsonwebtoken` validator extractor.
+  - [ ] Reject unauthenticated requests with `401`.
+  - **Acceptance:** integration test posts without a token → `401`;
+    posts with a valid signed token → `2xx`.
+- [ ] **T-2 — Production Fluvio publisher.**
+  - [ ] Implement `FluvioEventPublisher : EventProducer` behind
+    feature flag `fluvio`.
+  - [ ] Document failover behaviour when the broker is unreachable.
+  - **Acceptance:** integration test against a local Fluvio broker
+    publishes a `PersonCreated` event end-to-end.
+- [ ] **T-3 — Complete FHIR bundle handling.**
+  - [ ] `Bundle` GET / POST / search wrapping.
+  - [ ] OperationOutcome on malformed bundles.
+  - **Acceptance:** Touchstone FHIR validator passes on a sample
+    bundle round-trip.
+- [ ] **T-4 — FHIR capability statement endpoint.**
+  - [ ] `GET /fhir/metadata` returns a CapabilityStatement listing
+    supported resources + interactions.
+  - **Acceptance:** schema check against R5 CapabilityStatement.
+- [ ] **T-5 — Dedup / merge / privacy integration tests.**
+  - [ ] Real-time dedup on create.
+  - [ ] Batch dedup + auto-merge.
+  - [ ] Mask + export round-trip.
+  - **Acceptance:** `cargo test --test api_integration_test` covers
+    all three workflows.
+- [ ] **T-6 — gRPC implementation.**
+  - [ ] Promote stub to a working Tonic server mirroring REST CRUD.
+  - **Acceptance:** `grpcurl` against `PersonService.GetPerson`
+    round-trips a record.
+- [ ] **T-7 — Spec-drift CI check.**
+  - [ ] Fail PR if `src/matching/**` or `src/models/person.rs`
+    changes without a `spec.md` edit (allowlist in `.spec-allow`).
+  - **Acceptance:** `bash scripts/spec-drift-check.sh main HEAD`
+    exits non-zero on a code-only PR.
+- [x] **T-8 — `db::audit` rename clean-up.** *(done 2026-06-15)*
+  - [x] Verify no -era symbols remain in `src/db/audit.rs`.
+  - **Acceptance:** `cargo check --lib` passes clean; legacy
+    domain-specific symbols (e.g. `patient`, `mpi`) absent from
+    `src/db/`. Met: a grep of `src/db/` finds zero `patient` / `mpi`
+    symbols and `cargo check --lib` is clean.
+- [ ] **T-9 — Cross-service entity links (write side).**
+  See §5.4, §8.6, §9.1, §10.4 and
+  [cross-service linking](../../../agents/share/cross-service-linking.md).
+  - [ ] Migration creating the `entity_links` table (§10.4 schema, with
+    the `UNIQUE (from_pid, kind, to_ref, valid_from)` upsert key).
+  - [ ] `EntityRef` value type (parse / `Display` + `entity_type → service`
+    map), copied per project (drift-accepted).
+  - [ ] Link endpoints: `POST` / `GET` / `DELETE`
+    `/api/v1/persons/{pid}/links`; create/upsert is optimistic (no
+    cross-service call) and supports `same_identity` (person ↔ worker)
+    and `works_at` / `member_of` (person → organization, temporal).
+  - [ ] Emit `linked` / `unlinked` events on the existing event
+    envelope via `EventProducer` (edge detail in `data`; no new transport).
+  - [ ] Partition guard in `src/matching/adapter.rs`: `entity_links` are
+    never projected into the matcher input.
+  - **Acceptance:** integration test creates a `works_at` link
+    (`2xx`, `linked` event published, row in `entity_links`), lists it
+    via `GET`, deletes it (`unlinked` event, `deleted_at` set); a matcher
+    unit test asserts an `entity_links` row never alters a match score.
+- [ ] **T-10 — Bulk import / export.**
+  See §9.2, §10.5 and
+  [bulk import/export](../../../agents/share/bulk-import-export.md).
+  - [ ] Migration creating the `bulk_jobs` table (shared doc §3 schema,
+    with the `UNIQUE (entity, kind, idempotency_key)` key).
+  - [ ] The five endpoints (§9.2): `POST`/`GET` `/api/v1/persons/import`,
+    `POST`/`GET` `/api/v1/persons/export`, `GET /api/v1/persons/bulk-jobs`.
+  - [ ] `bg_pg` worker draining jobs `queued → running →
+    completed | completed_with_errors | failed`, with progress updates.
+  - [ ] JSONL (lossless reference) + CSV (flattening per §9.2: dotted
+    single-nested, JSON-in-cell arrays) codecs; Parquet **export-only**,
+    feature-gated.
+  - [ ] Per-row pipeline reusing the single-create validators + matcher +
+    review queue: upsert by stable key (national/health identifier or
+    `pid`, §9.2); keyless / unmatched rows → duplicate detection →
+    review queue with `provenance = import`; events + audit not bypassed.
+  - [ ] Downloadable per-row error report
+    (`row_number, source_line, field, code, message`); one bad row never
+    aborts the load; counts reconcile
+    (`rows_total = created + upserted + to_review + errored`).
+  - [ ] Export masking + audit: `masking_profile` (masked default, full
+    gated), `include_soft_deleted` gated, every export audited (even
+    zero-row); single-record GDPR export becomes the `filter = one pid`
+    special case.
+  - **Acceptance:** integration tests cover idempotent re-import (same
+    file re-upserts to the same state), the per-row error report, a
+    keyless dedupe-to-review row (`provenance = import`), masked vs full
+    export, and that a zero-row export still writes an audit record.
+

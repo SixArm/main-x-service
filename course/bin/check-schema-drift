@@ -24,7 +24,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 COURSE_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 
 SCHEMA_SQL="$COURSE_DIR/course-service-schema.sql"
-MIGRATIONS_DIR="$COURSE_DIR/course-service-rust-crate/migrations"
+MIGRATIONS_DIR="$COURSE_DIR/course-service-with-loco/migrations"
 
 if [ ! -f "$SCHEMA_SQL" ]; then
     echo "error: schema file not found: $SCHEMA_SQL" >&2

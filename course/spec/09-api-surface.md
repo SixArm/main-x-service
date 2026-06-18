@@ -4,7 +4,7 @@ The entity exposes one public machine surface — the service's REST
 API under `/api` (note: **not** `/api/v1`; the event entity uses the
 versioned prefix, course does not) — and one human surface, the
 front-end routes. Complete endpoint reference:
-[`course-service-rust-crate/AGENTS/restful.md`](../course-service-rust-crate/AGENTS/restful.md);
+[`course-service-with-loco/AGENTS/restful.md`](../course-service-with-loco/AGENTS/restful.md);
 entity-level orientation: [`AGENTS/restful.md`](../AGENTS/restful.md).
 
 ### 9.1 REST API (service, :8084)

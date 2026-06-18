@@ -1,7 +1,7 @@
 # Spec-Driven Development — Agent Guide
 
 This crate practises **spec-driven development**: the specification
-([`../spec.md`](../spec/index.md)) is the canonical artefact. Code conforms
+([`../spec/index.md`](../spec/index.md)) is the canonical artefact. Code conforms
 to the spec; not the other way around.
 
 ## What That Means In Practice
@@ -18,7 +18,7 @@ to the spec; not the other way around.
   `lib.rs`, `MatchConfig` fields, `MatchResult` / `MatchBreakdown`
   shape, deterministic-identifier scheme list), update the bridge
   test in
-  [`../organization-service-rust-crate/tests/matching.rs`](../../organization-service-rust-crate/tests/matching.rs)
+  [`../organization-service-with-loco/tests/matching.rs`](../../organization-service-with-loco/tests/matching.rs)
   in the same PR.
 
 ## When To Update Which Section
@@ -36,11 +36,11 @@ from the §1–§18 shape used by the service crates).
 | Default weights or threshold | §7 Configuration |
 | Normalisation behaviour | §8 Normalisation |
 | Name-similarity algorithm | §9 |
-| Organization-code rule (same-provider gate, shape) | §10 |
-| Provider score | §11 |
-| Educational-level score | §12 |
-| Keywords / Jaccard | §13 |
-| Teaches / competencies | §14 |
+| Address similarity | §10 |
+| URL / domain score | §11 |
+| Jurisdiction score | §12 |
+| Founding-date score | §13 |
+| Keywords / Jaccard | §14 |
 | Identifier short-circuit scheme list | §15 |
 | Same-as URL short-circuit | §16 |
 | Renormalisation arithmetic | §17 |
@@ -97,7 +97,7 @@ bigger, split it (`T-12a`, `T-12b`).
 | §18 Confidence classification | `src/scoring.rs` `Confidence` |
 | §19–§21 quality / consumption / compat | top-level docs, integration with `organization-service` |
 | §22 Anti-patterns | this file + AGENTS.md |
-| §23 Tasks | spec.md only — the live work queue |
+| §23 Tasks | spec/index.md only — the live work queue |
 | §24 Testing | `AGENTS/testing.md` |
 | §25 Change control | this file |
 
@@ -128,16 +128,16 @@ When you finish a task:
   into `normalize::` and document the rule under §8.
 - **Using `unwrap` / `expect` in library code.** Total functions
   only.
-- **Scoring `organization_code` across providers.** Per §10–§11, the
-  organization-code component MUST be gated on `provider_id` equality
-  (CS101 at one school != CS101 at another).
+- **Scoring a `TaxId` across differing jurisdictions.** Per §15–§16,
+  the R-1 tax-id short-circuit MUST be gated on a shared, non-empty
+  `jurisdiction` (the same number can be reused across countries).
 - **Adding behaviour gated by a flag that the spec doesn't mention.**
 - **"It's only a refactor" used to justify a behavioural shift.**
 
 ## Document Hierarchy
 
 ```
-spec.md            ← what the library is, how it is built, and what
+spec/index.md      ← what the library is, how it is built, and what
                      is queued (§1–§25; live tasks in §23)
 README.md          ← user-facing intro (must stay consistent with spec)
 CHANGELOG.md       ← what changed when (history)
@@ -149,14 +149,14 @@ index.md           ← navigation aid
 
 There is intentionally **no** `plan.md` and **no** `tasks.md`. SDD
 artefacts that some projects split across multiple files are
-consolidated into the numbered sections of `spec.md`:
+consolidated into the numbered sections of `spec/index.md`:
 
 - "Plan" content (architecture, design, contracts) lives in
-  `spec.md` §1–§22.
+  `spec/index.md` §1–§22.
 - "Tasks" content (work breakdown, acceptance criteria, status)
-  lives in `spec.md` §23.
-- Testing strategy lives in `spec.md` §24.
-- Change-control / release lives in `spec.md` §25.
+  lives in `spec/index.md` §23.
+- Testing strategy lives in `spec/index.md` §24.
+- Change-control / release lives in `spec/index.md` §25.
 
 If you find disagreement between any of these, file it as an issue
 and fix it in a follow-up PR.

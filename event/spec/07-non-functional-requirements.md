@@ -26,7 +26,7 @@ and marked as such.
 ### 7.1 Benchmarks
 
 Single-node Criterion benches exist in the service
-([`AGENTS/testing.md`](../event-service-rust-crate/AGENTS/testing.md)):
+([`AGENTS/testing.md`](../event-service-with-loco/AGENTS/testing.md)):
 matching (incl. probabilistic match against 50 candidates), search
 (full-text + fuzzy over 500 docs), validation. The matcher crate
 carries its own `benches/`. No load test at realistic governmental

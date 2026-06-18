@@ -3,7 +3,7 @@
 One HTTP surface, owned by the service, versioned under **`/api/v1`**,
 consumed by the front-end (and any agency integrator). Full endpoint
 reference with request/response shapes:
-[`event-service-rust-crate/AGENTS/restful.md`](../event-service-rust-crate/AGENTS/restful.md).
+[`event-service-with-loco/AGENTS/restful.md`](../event-service-with-loco/AGENTS/restful.md).
 Front-end endpoint-to-route map:
 [front-end spec §9](../event-front-end-with-svelte/spec/09-api-consumption.md).
 
@@ -33,9 +33,12 @@ reference.
   `EventRepository` — no other transport, no direct DB access.
 - **No auth yet** (entity ET-5): every endpoint is currently
   unauthenticated; deploy only behind trusted networks. When SSO
-  lands, RS256 JWTs from the
+  lands, short-lived PASETO v4.public tokens from the
   [authentication entity](../../authentication/) will be verified
-  against its JWKS.
+  offline against its published Ed25519 key; browsers carry an
+  httpOnly cookie session via the front-end BFF (no browser token).
+  See
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
 - **409 is a feature.** Duplicate-detected create returns the
   candidate list; the operator UI surfaces it inline and offers the
   merge route. Treat 409 handling as part of the contract, not an

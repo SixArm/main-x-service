@@ -1,13 +1,13 @@
 # course-front-end-with-svelte
 
-SvelteKit front-end for the **[Course Service](../course-service-rust-crate/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
+SvelteKit front-end for the **[Course Service](../course-service-with-loco/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
 
 ## What's here
 
 | Route | Purpose |
 | --- | --- |
 | `/` | Dashboard — service health + recent audit activity |
-| `/courses` | List & search (full-text, fuzzy, phonetic) with SVAR DataGrid |
+| `/courses` | List & search (full-text, fuzzy) with SVAR DataGrid |
 | `/courses/new` | Create course; surfaces 409 duplicate candidates |
 | `/courses/[id]` | Detail view — identity (course code, status, educational level, credits, time required), identifiers, teaches, keywords, alternate names, same-as links, instances (read-only) |
 | `/courses/[id]/edit` | Edit |
@@ -27,7 +27,7 @@ SvelteKit front-end for the **[Course Service](../course-service-rust-crate/)** 
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Course Service — see [`../course-service-rust-crate/README.md`](../course-service-rust-crate/README.md). Default: `http://localhost:8084` (the family allocates `8080` to person-service).
+- A running Course Service — see [`../course-service-with-loco/README.md`](../course-service-with-loco/README.md). Default: `http://localhost:8084` (the family allocates `8080` to person-service).
 
 ## Quick start
 
@@ -67,7 +67,7 @@ src/
   lib/
     config.ts              - PUBLIC_API_BASE_URL
     api/
-      types.ts             - Course, HumanName, MatchResult, … (mirrors the Rust models)
+      types.ts             - Course, CourseIdentifier, MatchResult, … (mirrors the Rust models)
       client.ts            - ApiClient + ApiError (envelope-aware fetch)
       courses.ts           - CourseRepository (CRUD + search + match + merge + audit)
     forms/
@@ -78,8 +78,9 @@ src/
     components/
       SearchBox.svelte
       CourseGrid.svelte    - SVAR DataGrid binding
-      HumanNameInput.svelte
+      CourseIdentifierInput.svelte
       CourseForm.svelte
+      courseFormValidate.ts   - pure validate + normalizeForWire (FR-4; unit-tested)
       MatchResultsList.svelte
   routes/
     +layout.svelte         - sidebar nav
@@ -95,8 +96,10 @@ src/
         audit/+page.svelte
 tests/
   unit/
-    client.test.ts         - ApiClient envelope + error tests
-    courses.test.ts        - CourseRepository wrapping tests
+    client.test.ts            - ApiClient envelope + error tests
+    courses.test.ts           - CourseRepository wrapping + search params
+    form.test.ts              - createForm rune controller
+    courseFormValidate.test.ts - FR-4 validation + normalizeForWire
   e2e/
     courses.spec.ts        - smoke tests
 ```
@@ -120,5 +123,5 @@ See the commented example in `src/routes/+layout.svelte`. The MVP currently uses
 MVP wired against the now-real Course Service surface. Routes for
 list / new / detail / edit / delete / match / merge / audit are
 live; instance and syllabus-section edit UI are the remaining
-gaps tracked in [`spec.md §13`](spec/13-tasks.md). 9 vitest + 5
+gaps tracked in [`spec.md §13`](spec/13-tasks.md). 27 vitest + 5
 Playwright smoke tests.

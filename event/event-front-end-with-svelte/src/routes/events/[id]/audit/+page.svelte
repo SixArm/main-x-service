@@ -10,6 +10,7 @@
     import { page } from "$app/state";
     import { onMount } from "svelte";
     import { EventRepository } from "$lib/api/events.js";
+    import { t } from "$lib/i18n.svelte.js";
     import type { AuditEntry } from "$lib/api/types.js";
 
     const repo = EventRepository.withFetch();
@@ -33,17 +34,17 @@
 <svelte:head><title>Audit · {id}</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Audit log</h1>
-    <a href={`/events/${id}`} class="button">Back to event</a>
+    <h1>{t("audit.title")}</h1>
+    <a href={`/events/${id}`} class="button">{t("audit.back")}</a>
 </header>
 
 <section class="surface stack">
     {#if loading}
-        <p class="muted">Loading…</p>
+        <p class="muted">{t("audit.loading")}</p>
     {:else if error}
         <div class="banner error">{error}</div>
     {:else if entries.length === 0}
-        <p class="muted">No audit entries.</p>
+        <p class="muted">{t("audit.none")}</p>
     {:else}
         <ol class="entries">
             {#each entries as entry}
@@ -51,11 +52,11 @@
                     <header class="row">
                         <code>{entry.action}</code>
                         <span class="muted small">{new Date(entry.created_at).toLocaleString()}</span>
-                        {#if entry.user_id}<span class="muted small">by {entry.user_id}</span>{/if}
+                        {#if entry.user_id}<span class="muted small">{t("audit.by")} {entry.user_id}</span>{/if}
                     </header>
                     {#if entry.new_values}
                         <details>
-                            <summary class="small">Payload</summary>
+                            <summary class="small">{t("audit.payload")}</summary>
                             <pre class="small">{JSON.stringify(entry.new_values, null, 2)}</pre>
                         </details>
                     {/if}

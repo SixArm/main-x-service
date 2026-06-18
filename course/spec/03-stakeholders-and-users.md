@@ -18,7 +18,7 @@ programmes. Stakeholders span the trio:
 | Other Main X Index entities | Cross-references: instances may eventually reference [event](../../event/) records; providers may link to the [organization](../../organization/) registry (§16) | Service REST API |
 
 Per-subproject stakeholder detail: service
-[spec §3](../course-service-rust-crate/spec/03-stakeholders-and-users.md),
+[spec §3](../course-service-with-loco/spec/03-stakeholders-and-users.md),
 matcher
 [spec §3](../course-matcher-rust-crate/spec/03-glossary.md) (the
 matcher's §1–§25 shape folds users into §1–§2),

@@ -13,7 +13,7 @@ delivered as a trio of subprojects that compose into one capability:
 
 | Subproject | Role |
 |---|---|
-| [course-service-rust-crate](../course-service-rust-crate/) | Registry service — CRUD (course + instance sub-resource), search, matching, merge, audit, privacy over REST. Boots through loco.rs; the **reference implementation** for the family's idiomatic-loco controller conversion. |
+| [course-service-with-loco](../course-service-with-loco/) | Registry service — CRUD (course + instance sub-resource), search, matching, merge, audit, privacy over REST. Boots through loco.rs; the **reference implementation** for the family's idiomatic-loco controller conversion. |
 | [course-matcher-rust-crate](../course-matcher-rust-crate/) | Canonical pairwise matching library — deterministic + probabilistic, embedded by the service |
 | [course-front-end-with-svelte](../course-front-end-with-svelte/) | Operator UI — SvelteKit SPA over the service's REST API |
 

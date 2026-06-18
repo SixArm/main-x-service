@@ -1,5 +1,13 @@
 ## 14. Implementation Status
 
+> **Pivot pending (2026-06-17).** The "Delivered" table below records
+> the **RS256 JWT + JWKS** model, which is **superseded** by the cookie
+> session + PASETO v4.public design
+> ([`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md);
+> §1, §5, §9, §13 T-12). Until T-12 lands, the JWT model is still the
+> code reality; the rows below describe that code, and the gap table
+> (§14.2) tracks the pivot.
+
 ### 14.1 Delivered
 
 | Capability | Subproject | Notes |
@@ -32,5 +40,6 @@ Open gaps drive tasks in §13. Live gap list:
 | No OpenAPI / Swagger for the service | T-8 |
 | No audit log or event streaming for auth events (sessions table only) | T-10 |
 | No front-end unit / e2e tests | T-11 |
+| **JWT-for-sessions pivot** — cookie sessions + PASETO v4.public, remove RS256/JWKS, BFF front-end, CSRF | **T-12** (supersedes the JWT model; shared design doc) |
 | Refresh tokens, revocation propagation, audience model | §16 open questions |
-| OIDC, WebAuthn/passkeys, multi-region, JWT enforcement at peers | §15 roadmap |
+| OIDC, WebAuthn/passkeys, multi-region, PASETO enforcement at peers | §15 roadmap |

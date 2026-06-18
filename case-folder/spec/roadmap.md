@@ -13,12 +13,13 @@ Priorities are shared across both editions unless noted.
 | P0       | Same-origin deployment + re-enable SSR                                     | svelte        |
 | P1       | OpenAPI / JSON Schema document for every endpoint; codegen client types     | both          |
 | P1       | Server-Sent Events on `/api/moves` so clients see new moves live           | both          |
-| P1       | Barcode / RFID scan capture for moves                                      | svelte        |
+| P1       | Barcode / QR / RFID / NFC scan capture for moves ([scanners.md](scanners.md)) | svelte        |
 | P2       | Soft-delete cabinets (refuse while occupied)                               | loco          |
 | P2       | Per-cabinet QR code that opens the move workflow pre-filled                | svelte        |
 | P2       | CSV / FHIR export of the audit log                                         | loco          |
 | P3       | NHS Spine PDS lookup on folder registration                                | loco          |
 | P3       | Service-worker offline mode for porters in basement archives               | svelte        |
+| P3       | BLE / RFID proximity & bulk reads — zone presence + batch reads ([scanners.md](scanners.md)) | both |
 
 See [requirements.md](requirements.md) for the requirements these items
 would satisfy and [tasks.md](tasks.md) for active delivery.

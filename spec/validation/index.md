@@ -12,10 +12,10 @@ code. The reference implementations are:
 
 | Service | Module | Entry point |
 | ------- | ------ | ----------- |
-| person | [`person-service-rust-crate/src/validation/mod.rs`](../../person/person-service-rust-crate/src/validation/mod.rs) | `validate_person(&Person) -> Vec<ValidationError>` |
-| place | [`place-service-rust-crate/src/validation/mod.rs`](../../place/place-service-rust-crate/src/validation/mod.rs) | `validate_place(&Place) -> Vec<ValidationError>` |
-| care-pathway | [`care-pathway-service-rust-crate/src/validation.rs`](../../care-pathway/care-pathway-service-rust-crate/src/validation.rs) | `problems(&CarePathway) -> Vec<String>` |
-| case | [`case-service-rust-crate/src/validation.rs`](../../case/case-service-rust-crate/src/validation.rs) | `problems(&Case) -> Vec<String>` |
+| person | [`person-service-with-loco/src/validation/mod.rs`](../../person/person-service-with-loco/src/validation/mod.rs) | `validate_person(&Person) -> Vec<ValidationError>` |
+| place | [`place-service-with-loco/src/validation/mod.rs`](../../place/place-service-with-loco/src/validation/mod.rs) | `validate_place(&Place) -> Vec<ValidationError>` |
+| care-pathway | [`care-pathway-service-with-loco/src/validation.rs`](../../care-pathway/care-pathway-service-with-loco/src/validation.rs) | `problems(&CarePathway) -> Vec<String>` |
+| case | [`case-service-with-loco/src/validation.rs`](../../case/case-service-with-loco/src/validation.rs) | `problems(&Case) -> Vec<String>` |
 | case-folder | [`case-folder-service-with-rust/src/nhs.rs`](../../case-folder/case-folder-service-with-rust/src/nhs.rs) | `is_valid_nhs_number(&str) -> bool` |
 
 Related sibling topics: [REST conventions](../restful/index.md) ·

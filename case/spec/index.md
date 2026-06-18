@@ -17,7 +17,7 @@
 
 Subproject specs:
 
-- [case-service-rust-crate/spec](../case-service-rust-crate/spec/index.md) — registry service (§1–§18)
+- [case-service-with-loco/spec](../case-service-with-loco/spec/index.md) — registry service (§1–§18)
 - [case-matcher-rust-crate/spec](../case-matcher-rust-crate/spec/index.md) — matching library (§1–§25)
 - [case-front-end-with-svelte/spec](../case-front-end-with-svelte/spec/index.md) — operator UI (§1–§18)
 

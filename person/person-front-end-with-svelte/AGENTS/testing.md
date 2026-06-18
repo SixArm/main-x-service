@@ -55,16 +55,18 @@ Conventions:
 
 Conventions:
 
-- Require a live `person-service-rust-crate` at `PUBLIC_API_BASE_URL`.
+- Require a live `person-service-with-loco` at `PUBLIC_API_BASE_URL`.
 - The `playwright.config.ts` `webServer` command bakes
   `PUBLIC_API_BASE_URL` into the preview build so the front-end talks
   to the configured service.
 - Each test is **idempotent**: creates its own records, cleans up via
   the service's soft-delete endpoint. Do not assume a pristine
   database.
-- Cover one spec §6 FR each: search-finds-record, create-lands-on-detail,
-  inline-409, edit-PUT, soft-delete-hides, match-renders-score,
-  merge-soft-deletes-duplicate, audit-log-presence.
+- 9 tests total = 8 FR-mapped + 1 non-FR audit-presence test:
+  search-finds-record (FR-1), create-lands-on-detail (FR-3),
+  inline-409 (FR-3), detail-nested-fields (FR-5), edit-PUT (FR-6),
+  soft-delete-hides (FR-7), match-renders-score (FR-8),
+  merge-soft-deletes-duplicate (FR-9), and audit-log-presence (no FR).
 
 ## Writing new tests
 

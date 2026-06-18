@@ -19,11 +19,11 @@ is [`spec.md`](spec/index.md); deep references live in [`AGENTS/`](AGENTS/).
 |---|---|
 | [AGENTS/index.md](AGENTS/index.md) | This directory's index |
 | [AGENTS/spec-driven-development.md](AGENTS/spec-driven-development.md) | SDD discipline (three-part PRs, front-end specifics) |
-| [AGENTS/testing.md](AGENTS/testing.md) | Vitest unit + Playwright smoke + integration |
+| [AGENTS/testing.md](AGENTS/testing.md) | Vitest unit + Playwright smoke (live integration is manual) |
 
 ## Sibling service
 
-- [`../course-service-rust-crate/`](../course-service-rust-crate/) — the system of record this UI calls. Its [`spec.md`](../course-service-rust-crate/spec/index.md) and [`AGENTS/restful.md`](../course-service-rust-crate/AGENTS/restful.md) are the API contract.
+- [`../course-service-with-loco/`](../course-service-with-loco/) — the system of record this UI calls. Its [`spec.md`](../course-service-with-loco/spec/index.md) and [`AGENTS/restful.md`](../course-service-with-loco/AGENTS/restful.md) are the API contract.
 
 ## Route map
 
@@ -32,7 +32,7 @@ The SPA mounts at `/`. All operator workflows live under `/courses`.
 | Path | Purpose |
 |---|---|
 | `/` | Dashboard — service health + recent audit feed |
-| `/courses` | List + search (SVAR DataGrid; name / identifier / additional_type filters) |
+| `/courses` | List + search (SVAR DataGrid; name / identifier / additional_type filters; full-text + `fuzzy` toggle — no phonetic toggle, see FR-2) |
 | `/courses/new` | Create form with real-time 409 duplicate detection inline |
 | `/courses/[id]` | Detail view (identity, identifiers, teaches, keywords, alternate names, same-as links, instances read-only) |
 | `/courses/[id]/edit` | Edit form |
@@ -45,6 +45,10 @@ The SPA mounts at `/`. All operator workflows live under `/courses`.
 ### Search → create with duplicate inline
 
 1. Operator hits `/courses`, searches `"Intro to CS"` in the SearchBox.
+   A single **Fuzzy** checkbox (default on) toggles edit-distance
+   tolerance; there is no phonetic checkbox (the service param is a
+   no-op — see FR-2). An empty query lists all (`q.trim()` → the
+   service's `list` fallback).
 2. Grid renders SVAR DataGrid with matching rows.
 3. Operator clicks **New course** → `/courses/new`.
 4. Form submits to `POST /api/courses`. Service returns 409 with a
@@ -58,9 +62,10 @@ The SPA mounts at `/`. All operator workflows live under `/courses`.
 1. `/courses/match` posts a partial Course body to
    `POST /api/courses/match`.
 2. Service returns blocked candidates sorted by descending score.
-3. The page applies a client-side "display threshold" slider — the
-   server-side threshold is fixed (see CHANGELOG v0.2.0 note for
-   why the slider is display-only).
+3. The page applies a client-side "Display threshold" numeric input
+   (`<input type="number" step="0.05" min="0" max="1">`) — the
+   server-side threshold is fixed, so this cutoff is display-only
+   (see CHANGELOG v0.2.0 for why).
 
 ### Merge workflow
 

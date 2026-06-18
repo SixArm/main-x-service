@@ -1,7 +1,7 @@
 ## 4. Glossary
 
 Entity-level terms. Per-crate glossaries:
-[service §4](../worker-service-rust-crate/spec/04-glossary.md),
+[service §4](../worker-service-with-loco/spec/04-glossary.md),
 [matcher §4](../worker-matcher-rust-crate/spec/04-glossary.md),
 [front-end §4](../worker-front-end-with-svelte/spec/04-glossary.md).
 

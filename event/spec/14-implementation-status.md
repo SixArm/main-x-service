@@ -3,7 +3,7 @@
 Honest per-subproject status as of 2026-06. Aspirational items live
 in [§15 Roadmap](15-roadmap.md), not here.
 
-### 14.1 event-service-rust-crate
+### 14.1 event-service-with-loco
 
 | Capability | Status |
 |---|---|

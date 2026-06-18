@@ -118,7 +118,7 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 ├── examples/
 ├── help/                     ← source research papers
 ├── index.md                  ← documentation entry point
-├── spec.md                   ← LIVING SPECIFICATION (read this)
+├── spec/                      ← LIVING SPECIFICATION (read this): index.md + 01..25 section files
 ├── src/
 └── tests/
 ```

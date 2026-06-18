@@ -1,5 +1,27 @@
 # Authentication & Authorization — monorepo-wide spec
 
+> **SUPERSEDED MODEL — read first.** The session/credential model below
+> has moved off RS256 JWT + JWKS. The **source of truth** is now
+> [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)
+> (with the principle in [agents/share/jwt.md](../../agents/share/jwt.md)).
+> The new model, in brief:
+> - The **human session** is a server-side **Postgres-backed cookie
+>   session** (opaque `sid` in an httpOnly cookie) — *not* a token. The
+>   browser holds **no token** and uses **no `localStorage`**.
+> - **Cross-service** auth is a short-lived (~5 min) **PASETO v4.public**
+>   token (Ed25519), verified **offline** against the issuer's published
+>   Ed25519 key at **`/.well-known/paseto-keys`**. This **replaces the
+>   RS256 JWT + JWKS access-token model 1:1** (`/.well-known/jwks.json`,
+>   `Authorization: Bearer <jwt>` → PASETO bearer).
+> - Front-ends use a **BFF** (their own SvelteKit server holds the
+>   session and mints/attaches the PASETO server-side).
+> - `authentication-verifier` is now a **PASETO verifier**
+>   (`from_paseto_keys_value` / `_url`), same `Claims` shape.
+>
+> The text below still describes the prior RS256/JWKS implementation as
+> shipped; **code follow-up is pending**. Where it says JWT / JWKS /
+> RS256 / `localStorage`, read it as superseded per the design doc above.
+
 > **Scope.** This is the family-wide specification for **authentication
 > and authorization** across the Main X Index. It is the single place
 > that describes how operators sign in once, how a token is minted, how
@@ -7,8 +29,8 @@
 > coordinated with the front-ends. It sits *above* the per-crate specs:
 >
 > - The **issuing service** behaviour lives in
->   [authentication-service-rust-crate/spec](../../authentication/authentication-service-rust-crate/spec/index.md)
->   (and its [AGENTS](../../authentication/authentication-service-rust-crate/AGENTS.md)).
+>   [authentication-service-with-loco/spec](../../authentication/authentication-service-with-loco/spec/index.md)
+>   (and its [AGENTS](../../authentication/authentication-service-with-loco/AGENTS.md)).
 > - The **peer-side verification library** lives in
 >   [authentication-verifier-rust-crate/spec](../../authentication/authentication-verifier-rust-crate/spec/index.md).
 > - The **blanket enforcement + SSO token-handoff contract** lives in
@@ -29,8 +51,9 @@ mints credentials: the **authentication-service**. Everything else
 | Property | Decision | Why |
 |---|---|---|
 | Sign-in | **Passwordless email magic-link**. No passwords are ever set, stored, or checked. | Removes the entire password-handling attack surface (no hashing oracle, no credential stuffing, no reset flow). |
-| Credential | **RS256 JWT** access token (asymmetric). | Peers verify with the *public* key only; the private signing key never leaves the auth service. |
-| Verification | **Offline** against the published JWKS. No shared secret, no per-request introspection hop. | Peers stay available and fast even if the auth service is briefly down; no token ever transits to a third party. |
+| Session | Server-side **Postgres-backed cookie session** (opaque `sid` in an httpOnly cookie). | The session is state on the server, not a token in the browser; immediately revocable; no `localStorage` exfiltration surface. |
+| Cross-service credential | Short-lived **PASETO v4.public** token (Ed25519, asymmetric, ~5 min), minted from a valid session. | Peers verify with the *public* key only; the private signing key never leaves the auth service. Replaces RS256 JWT 1:1. |
+| Verification | **Offline** against the published Ed25519 key at `/.well-known/paseto-keys`. No shared secret, no per-request introspection hop. | Peers stay available and fast even if the auth service is briefly down; no token ever transits to a third party. |
 | Authorization | Each service authorizes **locally** from claims. The auth service issues identity, not roles. | Keeps the SSO minimal; per-entity policy stays in the entity service. |
 
 The auth service is also the family's **reference loco.rs application**;
@@ -38,28 +61,31 @@ the loco conversion of the peer services adopts its `src/auth.rs`
 verification approach via the verifier library.
 
 ```
-            magic-link (passwordless)            RS256 JWT (Bearer)
-operator ─────────────────────────▶ auth-service ─────────────────▶ operator SPA
-                                        │  signs with PRIVATE key       │
-                                        │  publishes PUBLIC keys        │ attaches token
-                                        ▼  /.well-known/jwks.json       ▼
-                                     JWKS ──── fetched/held by ───▶ peer service
-                                                                   verifies OFFLINE
-                                                                   (kid/iss/aud/exp)
+        magic-link (passwordless)        cookie session (httpOnly)
+operator ───────────────────────▶ auth-service ──────────────────▶ front-end BFF
+                                      │  PASETO v4.public (Bearer)      │  (SvelteKit server
+                                      │  signs with PRIVATE ed25519 key │   holds the session,
+                                      ▼  publishes PUBLIC ed25519 key   ▼   mints + attaches PASETO)
+                                  /.well-known/paseto-keys              │
+                                      └──── fetched/held by ───▶ peer service
+                                                                 verifies OFFLINE
+                                                                 (kid/iss/aud/exp)
 ```
 
 ### 1.1 Implemented vs follow-up (family-wide)
 
 | Area | Status |
 |---|---|
-| Passwordless magic-link sign-in, RS256 issuance, JWKS publication | **Implemented** (auth service v0.1). |
-| `authentication-verifier` library (offline RS256, `from_jwks_value`) | **Implemented**, published as `authentication-verifier` 0.1. |
+| Cookie sessions + PASETO v4.public issuance + `/.well-known/paseto-keys` publication (the new model) | **Pending** — design fixed in [authentication-sessions.md](../../agents/share/authentication-sessions.md); code follow-up. Supersedes the RS256/JWKS rows below. |
+| Passwordless magic-link sign-in, RS256 issuance, JWKS publication | **Implemented (being decommissioned)** (auth service v0.1). |
+| `authentication-verifier` library (offline RS256, `from_jwks_value`) → **PASETO verifier** (`from_paseto_keys_value`) | **Implemented (RS256)**, published as `authentication-verifier` 0.1; PASETO migration pending. |
 | Sessions + local revocation; GDPR account export/audit/erasure | **Implemented** (auth service). |
 | Per-email Postgres-backed rate limiter | **Implemented** (auth service). |
 | Multi-key set + zero-downtime key rotation | **Implemented** (operator-driven; no auto-rotation scheduler). |
 | Blanket `/api/*` enforcement middleware (organization, care-pathway, case) | **Implemented, default-off**; activation is an ops decision. |
-| Front-end token attachment + cross-origin SSO handoff | **Implemented** in the operator SPAs (per [jwt-enforcement.md](../../agents/share/jwt-enforcement.md)). |
-| JWKS-over-HTTP fetch (`from_jwks_url`, `fetch` feature) wired into peer boot | **Follow-up** — peers currently hold a JWKS value; HTTP fetch + refetch-on-`UnknownKid` is the next step. |
+| Front-end **BFF** (browser holds only the httpOnly cookie; BFF mints/attaches PASETO server-side) | **Pending** — replaces the prior SPA token-attachment + `localStorage` handoff (per [authentication-sessions.md §6](../../agents/share/authentication-sessions.md)). |
+| Prior front-end token attachment + cross-origin SSO handoff (RS256, `localStorage`) | **Implemented (being decommissioned)** in the operator SPAs (per [jwt-enforcement.md](../../agents/share/jwt-enforcement.md)). |
+| Published-key-over-HTTP fetch (`from_paseto_keys_url`, `fetch` feature) wired into peer boot | **Follow-up** — peers will fetch `/.well-known/paseto-keys`; HTTP fetch + refetch-on-`UnknownKid` is the next step. |
 | OAuth auth-code + PKCE hardening of the handoff | **Follow-up** — acceptable as implicit-style fragment delivery for a first-party MVP with short TTLs + allowlist. |
 | Auto-rotation scheduler; refresh tokens; revocation propagation to peers | **Open** (auth service §16). |
 
@@ -109,7 +135,7 @@ cross-crate contract test (§4).
 
 The signing/verification material is a **key set**, modelled by
 `auth::AuthKeys` in
-[`src/auth/mod.rs`](../../authentication/authentication-service-rust-crate/src/auth/mod.rs):
+[`src/auth/mod.rs`](../../authentication/authentication-service-with-loco/src/auth/mod.rs):
 one **primary** signing key plus zero or more **additional** verify-only
 public keys.
 
@@ -136,7 +162,7 @@ still verifies until it expires, rotation is downtime-free:
    from the additional set.
 
 Full operator procedure:
-[`config/keys/README.md`](../../authentication/authentication-service-rust-crate/config/keys/README.md)
+[`config/keys/README.md`](../../authentication/authentication-service-with-loco/config/keys/README.md)
 (auth service spec §8.4). There is no auto-rotation scheduler yet
 (follow-up).
 
@@ -162,10 +188,15 @@ Production keys come from the env edges.
 
 ## 4. Offline verification (the verifier library)
 
-Peers do **not** re-implement RS256 verification. They embed the
+Peers do **not** re-implement token verification. They embed the
 published
 [`authentication-verifier`](../../authentication/authentication-verifier-rust-crate/spec/index.md)
-crate in their `src/auth.rs`.
+crate in their `src/auth.rs`. **Target:** PASETO v4.public verification
+(`from_paseto_keys_value` / `from_paseto_keys_url`) against
+`/.well-known/paseto-keys`, same `Claims` shape. The RS256/JWKS API
+described below (`from_jwks_value` / `from_jwks_url`) is **being
+decommissioned** — see
+[authentication-sessions.md §5](../../agents/share/authentication-sessions.md).
 
 | API | Behaviour |
 |---|---|
@@ -185,7 +216,7 @@ crate in their `src/auth.rs`.
 | `jti` | JWT id — equals `sessions.jid`, the unit of local revocation |
 
 The auth service's
-[`tests/sign_verify_contract.rs`](../../authentication/authentication-service-rust-crate/spec/index.md)
+[`tests/sign_verify_contract.rs`](../../authentication/authentication-service-with-loco/spec/index.md)
 **pins this contract**: a token signed by `auth::sign_access_token`
 verifies through a `Verifier` built from the service's published JWKS,
 all eight claims round-trip, `kid = base64url(SHA-256(modulus))` holds,
@@ -211,7 +242,7 @@ Stateless JWTs cannot be un-issued, so the auth service keeps a
 | `user_agent` | captured at issuance (audit). |
 
 Mechanics (see
-[`src/models/sessions.rs`](../../authentication/authentication-service-rust-crate/src/models/sessions.rs)):
+[`src/models/sessions.rs`](../../authentication/authentication-service-with-loco/src/models/sessions.rs)):
 
 - **Issue** — `Model::issue` inserts a row at redeem time.
 - **Sign out** — `POST /api/auth/signout` looks up the session by `jti`
@@ -248,7 +279,7 @@ request *volume*, never on whether the account exists).
 | Failure mode | **Fail-open**: a limiter DB error allows the request (logged WARN) — the surrounding handler needs the DB anyway, so failing closed would only lock out legitimate sign-ins on a blip. |
 
 Implementation:
-[`src/rate_limit.rs`](../../authentication/authentication-service-rust-crate/src/rate_limit.rs)
+[`src/rate_limit.rs`](../../authentication/authentication-service-with-loco/src/rate_limit.rs)
 (`check` / clock-injectable `check_at(db, key, now)` / `reset` test
 helper). The advisory-lock pattern is the canonical example documented
 in [postgresql §9](../postgresql/index.md) (concurrency: transactions &
@@ -256,10 +287,11 @@ advisory locks).
 
 ---
 
-## 7. Blanket `/api/*` JWT enforcement (the coordinated contract)
+## 7. Blanket `/api/*` enforcement (the coordinated contract)
 
-Mandatory bearer-token auth on every `/api/*` route is a **family-wide
-contract** — the full text is
+Mandatory auth on every `/api/*` route is a **family-wide contract** —
+the guard now requires a valid **PASETO** token (service-to-service) or a
+valid **session** (BFF/browser), not a JWT. The full text is
 [agents/share/jwt-enforcement.md](../../agents/share/jwt-enforcement.md);
 this section summarises it and is subordinate to it.
 
@@ -304,6 +336,15 @@ including unset, ⇒ disabled). `src/auth.rs` exposes
 | `MaybeAuthUser` | Token optional; populates the audit **actor** when present, `None` otherwise. Handlers keep taking this so behaviour is identical whether or not enforcement is on. When enforcement *is* on, a request that reaches a handler is guaranteed to carry a valid token, so the actor is always populated. |
 
 ### 7.3 Cross-origin SSO token handoff (front-end side)
+
+> **Superseded by the BFF pattern.** Under the new model the browser
+> holds only the httpOnly `__Host-mxi_session` cookie and never a token;
+> each front-end's own SvelteKit server (BFF) holds the session and mints
+> the PASETO server-side. There is **no** `localStorage`, no
+> `#access_token` fragment, and no `mxi_access_token` key. See
+> [authentication-sessions.md §6](../../agents/share/authentication-sessions.md).
+> The flow below is the **decommissioned** RS256 handoff, kept for
+> reference until the code follow-up lands.
 
 Each operator SPA is its own origin, so `localStorage` is **not** shared
 across them — the token is handed across explicitly via an
@@ -375,7 +416,7 @@ posture.
 
 | Control | Statement |
 |---|---|
-| **RS256, not HS256** | Asymmetric signing: peers hold only the public key and verify offline. There is no shared secret to leak, and a peer compromise cannot mint tokens. Do **not** reintroduce loco's symmetric HS256 helper for access tokens. |
+| **Asymmetric signing (PASETO v4.public / Ed25519)** | Peers hold only the public key and verify offline. There is no shared secret to leak, and a peer compromise cannot mint tokens. Do **not** reintroduce loco's symmetric HS256 helper, and do **not** reintroduce RS256 JWT (decommissioned per [authentication-sessions.md](../../agents/share/authentication-sessions.md)). |
 | **No secrets in audit/logs** | `auth_events`, `sessions`, audit rows, and the GDPR export carry **no** tokens, key material, password hash, or api key. Magic-link tokens are never logged (dev links are logged as the full URL only because there is no SMTP in dev). |
 | **Short TTL bounds revocation staleness** | The 1 h default access-token lifetime bounds how long a revoked or erased subject's token remains honoured at offline-verifying peers (§5). |
 | **Passwordless** | No password is set, stored, or checked; the `users.password` column holds an unusable random hash purely to satisfy `NOT NULL`. |
@@ -397,8 +438,10 @@ and the privacy posture in
 
 | Topic | Where |
 |---|---|
+| **Auth & sessions design (SOURCE OF TRUTH — cookie sessions + PASETO v4.public)** | [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md) |
+| Principle: JWT must not keep users logged in | [agents/share/jwt.md](../../agents/share/jwt.md) |
 | Coordinated enforcement + SSO handoff contract | [agents/share/jwt-enforcement.md](../../agents/share/jwt-enforcement.md) |
-| Issuing service (behaviour, endpoints, tests) | [authentication-service-rust-crate/spec](../../authentication/authentication-service-rust-crate/spec/index.md) · [AGENTS](../../authentication/authentication-service-rust-crate/AGENTS.md) |
+| Issuing service (behaviour, endpoints, tests) | [authentication-service-with-loco/spec](../../authentication/authentication-service-with-loco/spec/index.md) · [AGENTS](../../authentication/authentication-service-with-loco/AGENTS.md) |
 | Peer-side verification library | [authentication-verifier-rust-crate/spec](../../authentication/authentication-verifier-rust-crate/spec/index.md) |
 | Advisory locks / transactions (rate limiter) | [spec/postgresql](../postgresql/index.md) §9 |
 | Audit + event streaming posture | [agents/share/auditability.md](../../agents/share/auditability.md) |

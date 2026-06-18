@@ -23,10 +23,10 @@ Detailed reference documentation for the Place Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../place-service-rust-crate/spec.md](../../place-service-rust-crate/spec/index.md) | Service spec — system of record |
-| [../../place-service-rust-crate/AGENTS/restful.md](../../place-service-rust-crate/AGENTS/restful.md) | REST API surface |
-| [../../place-service-rust-crate/AGENTS/models.md](../../place-service-rust-crate/AGENTS/models.md) | Wire-format domain types |
-| [../../place-service-rust-crate/AGENTS/matching.md](../../place-service-rust-crate/AGENTS/matching.md) | Matching algorithm reference |
+| [../../place-service-with-loco/spec.md](../../place-service-with-loco/spec/index.md) | Service spec — system of record |
+| [../../place-service-with-loco/AGENTS/restful.md](../../place-service-with-loco/AGENTS/restful.md) | REST API surface |
+| [../../place-service-with-loco/AGENTS/models.md](../../place-service-with-loco/AGENTS/models.md) | Wire-format domain types |
+| [../../place-service-with-loco/AGENTS/matching.md](../../place-service-with-loco/AGENTS/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

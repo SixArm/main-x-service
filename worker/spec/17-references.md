@@ -4,7 +4,7 @@
 
 | Subproject | Spec | AGENTS | Intro |
 |---|---|---|---|
-| worker-service-rust-crate | [spec](../worker-service-rust-crate/spec/index.md) (§1–§18) | [AGENTS/](../worker-service-rust-crate/AGENTS/index.md) | [README](../worker-service-rust-crate/README.md) · [index](../worker-service-rust-crate/index.md) |
+| worker-service-with-loco | [spec](../worker-service-with-loco/spec/index.md) (§1–§18) | [AGENTS/](../worker-service-with-loco/AGENTS/index.md) | [README](../worker-service-with-loco/README.md) · [index](../worker-service-with-loco/index.md) |
 | worker-matcher-rust-crate | [spec](../worker-matcher-rust-crate/spec/index.md) (§1–§25) | [AGENTS.md](../worker-matcher-rust-crate/AGENTS.md) | [README](../worker-matcher-rust-crate/README.md) · [index](../worker-matcher-rust-crate/index.md) |
 | worker-front-end-with-svelte | [spec](../worker-front-end-with-svelte/spec/index.md) (§1–§18) | [AGENTS.md](../worker-front-end-with-svelte/AGENTS.md) | [README](../worker-front-end-with-svelte/README.md) |
 

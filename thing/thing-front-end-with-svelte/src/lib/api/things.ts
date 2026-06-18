@@ -132,7 +132,7 @@ export class ThingRepository {
      * without creating it. Accepts a partial Thing.
      */
     checkDuplicates(candidate: Partial<Thing>): Promise<MatchResult[]> {
-        return this.http.post<MatchResult[]>("/api/things/duplicates", { body: candidate });
+        return this.http.post<MatchResult[]>("/api/things/check-duplicates", { body: candidate });
     }
 
     /**

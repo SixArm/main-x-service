@@ -59,17 +59,38 @@ Input: Case A, Case B, MatchConfig
   ├─ case_type_score    (both set)    exact enum (1.0/0.0)
   ├─ status_score       (both set)    exact enum (1.0/0.0)
   ├─ keywords_score     (≥1 set)      Jaccard
+  ├─ tags_score         (both set)    Jaccard over folded tags  (§13b)
+  ├─ relationships_score(≥1 set)      typed-set Jaccard over (relation, case_id)  (§13a)
   └─ renormalised weighted average over present components
 ```
 
-`priority` and `opened_date` are carried on `Case` but never scored.
+`priority`, `opened_date`, and `in_language` are carried on `Case`
+but never scored.
 
 ## 6. Domain model
 
 `Case`: `title` (required), `alternate_titles`, `case_number`,
 `agency_id`, `agency_name`, `case_type`, `status`, `priority` (data
-only), `opened_date` (data only), `subjects`, `keywords`, `identifiers`
-(`CaseIdentifier { scheme, value }`), `same_as`, `in_language`.
+only), `opened_date` (data only), `subjects`, `keywords`, `tags`,
+`identifiers` (`CaseIdentifier { scheme, value }`), `same_as`,
+`in_language`, `relationships` (`Vec<RelationshipRef>`).
+
+`tags` (default empty) are user-applied operational labels for grouping
+/ filtering / triage / workflow (e.g. `"vip"`, `"review"`,
+`"fast-track"`), distinct from `keywords` (subject-matter discovery
+terms). The matcher scores `tags` by case-insensitive set Jaccard
+(§13b); a supporting signal, not an identifying field on its own.
+
+`relationships` holds typed case-to-case references —
+`RelationshipRef { relation: RelationKind, case_id: String }` where
+`RelationKind` is a `#[non_exhaustive]` enum mirroring the service:
+`RelatedTo` and `ConsolidatedWith` (symmetric), `ParentCase` / `SubCase`
+(inverses — consolidation hierarchy), and `Supersedes` / `SupersededBy`
+(inverses — replacement). `case_id` is an opaque registry id
+(whitespace-trimmed, non-empty); the matcher does not resolve, invert,
+or transitively close the references — it compares the two cases'
+relationship **sets** (§13a). A supporting signal, not an identifying
+field on its own.
 
 `CaseType`: `Benefit`, `Legal`, `SocialServices`, `Healthcare`,
 `Housing`, `Immigration`, `Licensing`, `Complaint`, `Appeal`,
@@ -87,16 +108,24 @@ serialises as `{"Custom":"label"}`.
 
 ## 7. Configuration
 
-`MatchConfig` weights (default, sum 1.0): title 0.30, subjects 0.25,
-case_number 0.15, case_type 0.10, status 0.05, keywords 0.15.
-Threshold 0.85. Presets: `strict()` 0.95, `lenient()` 0.70.
+`MatchConfig` weights (default): title 0.30, subjects 0.25,
+case_number 0.15, case_type 0.10, status 0.05, keywords 0.15,
+`tags_weight` 0.05 (a supporting signal — §13b), `relationships_weight`
+0.05 (a supporting signal — §13a). The eight weights are renormalised
+over the participating components per match (§17), so they need not sum
+to exactly 1.0. Threshold 0.85. Presets: `strict()` 0.95, `lenient()`
+0.70.
+
+Changing any default weight is a three-part change: edit this section,
+the `MatchConfig` defaults, and `CHANGELOG.md`.
 
 ## 8. Normalisation
 
 `fold` (trim + NFKC + lowercase, diacritic-preserving); `case_number`
 (alphanumeric-only, uppercased — so `"CV-2024-001234"` ≡
 `"cv 2024 001234"`); `url` (fold + drop trailing slash); `fold_set`
-(sort + dedupe). Subjects and keywords compare via `fold_set` Jaccard.
+(sort + dedupe). Subjects, keywords, and tags compare via `fold_set`
+Jaccard.
 
 ## 9. Title similarity
 
@@ -126,10 +155,35 @@ Case type weight 0.10, status weight 0.05.
 Jaccard over `fold_set`. Skipped when both empty; `0.0` when exactly one
 side is populated.
 
+## 13a. Relationships
+
+Typed-set **Jaccard** over the `(relation, case_id)` pairs:
+`score = |A ∩ B| / |A ∪ B|`, where each side's set is
+`{ (r.relation, r.case_id) for r in relationships }`. So a `ParentCase`
+reference only agrees with a `ParentCase` reference to the **same**
+case id — the relation kind is part of the key; `SubCase`, `RelatedTo`,
+`ConsolidatedWith`, `Supersedes`, and `SupersededBy` are compared as
+opaque, distinct kinds (no inversion or transitive closure). `None`
+(does not participate) when **either** side has no relationships;
+otherwise a value in `[0.0, 1.0]`. A **supporting** signal weighted
+`relationships_weight` (§7, default `0.05`); shared references never
+single-handedly establish a match.
+
+## 13b. Tags
+
+Plain set **Jaccard** over the case-insensitively normalised tag sets:
+`tags_score = |A ∩ B| / |A ∪ B|` over each side's `fold_set` of tags —
+identical to how `keywords` (§13) and `subjects` (§10) are scored.
+`None` (does not participate) when **either** side has an empty tag set;
+otherwise a value in `[0.0, 1.0]`. `tags` are user-applied operational
+labels (grouping / triage / workflow), not subject-matter terms, so they
+are a **supporting** signal weighted `tags_weight` (§7, default `0.05`);
+shared tags never single-handedly establish a match.
+
 ## 14. Data-only fields
 
-`priority` and `opened_date` are carried for downstream consumers and
-MUST NOT contribute to the score.
+`priority`, `opened_date`, and `in_language` are carried for
+downstream consumers and MUST NOT contribute to the score.
 
 ## 15. Deterministic identifier short-circuits
 
@@ -171,18 +225,33 @@ contract.
 
 Semantic versioning. Re-exports from `lib.rs` are the contract:
 `Case`, `CaseIdentifier`, `IdentifierScheme`, `CaseType`, `CaseStatus`,
-`Priority`, `MatchingEngine`, `MatchConfig`, `MatchResult`,
-`MatchBreakdown`, `Confidence`, `Error`, `Result`.
+`Priority`, `RelationshipRef`, `RelationKind`, `MatchingEngine`,
+`MatchConfig`, `MatchResult`, `MatchBreakdown`, `Confidence`, `Error`,
+`Result`.
 
 ## 22. Anti-patterns
 
 Do not short-circuit on agency-scoped or `Custom` schemes. Do not score
-a `case_number` across agencies. Do not score `priority` or
-`opened_date`. Do not strip diacritics. Do not add IO, async, or panics
-to library code.
+a `case_number` across agencies. Do not score `priority`,
+`opened_date`, or `in_language`. Do not strip diacritics. Do not add
+IO, async, or panics to library code.
 
 ## 23. Tasks (live work queue)
 
+- [ ] Implement the `relationships` component in code: add
+      `relationships: Vec<RelationshipRef>` to `Case`, the
+      `RelationshipRef { relation, case_id }` + `#[non_exhaustive]`
+      `RelationKind` (`RelatedTo`, `ParentCase`, `SubCase`, `Supersedes`,
+      `SupersededBy`, `ConsolidatedWith`) types, the typed-set Jaccard
+      `relationships_score` (§13a), `relationships_weight` (default
+      `0.05`, §7) on `MatchConfig`, and `relationships_score` on
+      `MatchBreakdown`; re-export the new types (§21); update
+      `CHANGELOG.md`.
+- [ ] Implement the `tags` component in code: add `tags: Vec<String>`
+      (default empty) to `Case`, the plain set-Jaccard `tags_score`
+      (§13b, `None` when either side empty), `tags_weight` (default
+      `0.05`, §7) on `MatchConfig`, and `tags_score` on `MatchBreakdown`;
+      update `CHANGELOG.md`.
 - [ ] Optional year-only `opened_date` proximity component.
 - [ ] Optional case-type taxonomy (related types score partial).
 - [ ] Split this single `spec/index.md` into the numbered §-per-file
@@ -192,8 +261,8 @@ to library code.
 
 Unit tests embedded per module; an integration suite
 (`tests/public_api.rs`) over the re-exported surface; rustdoc examples
-run as doctests. Gate: `cargo test`, `cargo clippy --all-targets -- -D
-warnings`, `cargo fmt --check`.
+run as doctests. Gate: `cargo test`, `cargo clippy --all-targets
+--all-features -- -D warnings`, `cargo fmt --check`.
 
 ## 25. Change control
 

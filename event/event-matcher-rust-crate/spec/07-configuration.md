@@ -17,6 +17,8 @@ pub struct MatchConfig {
     pub organizer_weight: f64,
     pub performers_weight: f64,
     pub url_weight: f64,
+    pub relationships_weight: f64,
+    pub tags_weight: f64,
     pub use_phonetic_matching: bool,
     pub name_algorithm: SimilarityAlgorithm,
     pub strict_mode: bool,
@@ -42,6 +44,8 @@ pub struct MatchConfig {
 | `organizer_weight` | `0.04` | Weight of the organizer component (§6.8). |
 | `performers_weight` | `0.02` | Weight of the performers component (§6.9). |
 | `url_weight` | `0.02` | Weight of the URL component (§6.10). |
+| `relationships_weight` | `0.05` | Weight of the relationships component (§6.11); a supporting signal, renormalised over participating weights. |
+| `tags_weight` | `0.05` | Weight of the tags component (§6.12); a supporting signal, renormalised over participating weights. |
 | `use_phonetic_matching` | `false` | Compute Soundex-bonus (§6.2). |
 | `name_algorithm` | `SimilarityAlgorithm::Combined` | Algorithm used by `name_score`. |
 | `strict_mode` | `false` | Tighten `is_match` to also require `deterministic_match` (§5.2.3). |

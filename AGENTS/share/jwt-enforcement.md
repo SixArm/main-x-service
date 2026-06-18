@@ -1,15 +1,29 @@
-# Blanket JWT enforcement (coordinated)
+# Blanket auth enforcement (coordinated)
 
-How the Main X Index family turns on **mandatory** bearer-token auth for
-every `/api/*` route, coordinated with the front-ends attaching the
-token. This is the family-wide contract; each loco service and its
-sibling front-end implement it identically. It supersedes the per-crate
+> **Superseded credential — read [authentication-sessions.md](authentication-sessions.md) first.**
+> The family has moved **off JWT** (per [jwt.md](jwt.md)). The blanket
+> `/api/*` guard, the `*_REQUIRE_AUTH` flag, and the rollout semantics
+> below are **unchanged**, but the credential the guard checks is now a
+> short-lived **PASETO v4 public token** (service-to-service) or a valid
+> **cookie session** (browser via the BFF), **not a JWT**. Concretely:
+> the service-side `enforce(...)` / middleware shape below is reused
+> verbatim except `bearer_claims` verifies a **PASETO** token via the
+> PASETO `Verifier`; and the entire **"Front-end side"** section below
+> (the `mxi_access_token` / `localStorage` bearer + cross-origin fragment
+> handoff) is **superseded** by the **BFF + httpOnly-cookie** model in
+> [authentication-sessions.md §6](authentication-sessions.md) — browsers
+> hold no token, so there is nothing to attach in JS. Treat the front-end
+> mechanics here as historical.
+
+How the Main X Index family turns on **mandatory** auth for every
+`/api/*` route. This is the family-wide contract; each loco service
+implements the service side identically. It supersedes the per-crate
 "follow-up: blanket enforcement" notes in the service specs §13.
 
-Applies to the loco services that already embed
+Applies to the loco services that embed
 [`authentication-verifier`](../../authentication/authentication-verifier-rust-crate)
-via `src/auth.rs`: **organization**, **care-pathway**, **case**. The
-older Axum services (person / worker / place) carry their own
+via `src/auth.rs`: **organization**, **care-pathway**, **case**, **plan**.
+The older Axum services (person / worker / place) carry their own
 middleware story and are a separate follow-up.
 
 ## Why a flag, not a flip
@@ -108,7 +122,16 @@ is exactly as today.
   public `GET /api-docs/openapi.json` still returns `200`. These set the
   env var inside the test; keep them `#[serial]`.
 
-## Front-end side (SvelteKit SPA)
+## Front-end side (SvelteKit SPA) — SUPERSEDED
+
+> **This whole section is superseded by [authentication-sessions.md §6](authentication-sessions.md)
+> (the BFF + httpOnly-cookie model).** Under the new model the browser
+> holds **no token** (no `mxi_access_token`, no `localStorage`), so there
+> is no `Authorization: Bearer` to attach in JS and no cross-origin
+> fragment handoff: the SvelteKit **server** holds the session cookie and
+> attaches a short-lived PASETO server-side when calling an entity
+> service. The text below is retained only as a record of the prior
+> JWT-bearer design and MUST NOT be implemented.
 
 Each operator front-end attaches `Authorization: Bearer <token>` to every
 API request when a token is present.

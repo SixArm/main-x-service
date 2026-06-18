@@ -4,7 +4,7 @@
 
 | Subproject | Spec | AGENTS | Index |
 |---|---|---|---|
-| place-service-rust-crate | [spec](../place-service-rust-crate/spec/index.md) | [AGENTS/](../place-service-rust-crate/AGENTS/index.md) | [index](../place-service-rust-crate/index.md) |
+| place-service-with-loco | [spec](../place-service-with-loco/spec/index.md) | [AGENTS/](../place-service-with-loco/AGENTS/index.md) | [index](../place-service-with-loco/index.md) |
 | place-matcher-rust-crate | [spec](../place-matcher-rust-crate/spec/index.md) | [AGENTS.md](../place-matcher-rust-crate/AGENTS.md) | [index](../place-matcher-rust-crate/index.md) |
 | place-front-end-with-svelte | [spec](../place-front-end-with-svelte/spec/index.md) | [AGENTS.md](../place-front-end-with-svelte/AGENTS.md) | [index](../place-front-end-with-svelte/index.md) |
 

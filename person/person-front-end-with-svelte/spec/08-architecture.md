@@ -23,7 +23,7 @@
                               | HTTP JSON
                               v
                 +-----------------------------+
-                |   person-service-rust-crate |
+                |   person-service-with-loco |
                 |   Axum + SeaORM + Tantivy   |
                 +-----------------------------+
 ```

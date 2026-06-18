@@ -15,6 +15,7 @@
     import SearchBox from "$lib/components/SearchBox.svelte";
     import PersonGrid from "$lib/components/PersonGrid.svelte";
     import { PersonRepository } from "$lib/api/persons.js";
+    import { t } from "$lib/i18n.svelte.js";
     import type { Person } from "$lib/api/types.js";
 
     let query = $state("");
@@ -58,20 +59,22 @@
     });
 </script>
 
-<svelte:head><title>Persons · Person Service</title></svelte:head>
+<svelte:head><title>{t("persons.head.title")}</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Persons</h1>
-    <a href="/persons/new" class="button primary">New person</a>
+    <h1>{t("persons.title")}</h1>
+    <a href="/persons/new" class="button primary">{t("persons.new")}</a>
 </header>
 
 <section class="surface stack">
-    <SearchBox bind:value={query} placeholder="Search by name, identifier…" onsearch={runSearch} />
+    <SearchBox bind:value={query} placeholder={t("persons.searchPlaceholder")} onsearch={runSearch} />
     <div class="row small">
-        <label><input type="checkbox" bind:checked={fuzzy} /> Fuzzy</label>
-        <label><input type="checkbox" bind:checked={phonetic} /> Phonetic (Soundex)</label>
+        <label><input type="checkbox" bind:checked={fuzzy} /> {t("persons.fuzzy")}</label>
+        <label><input type="checkbox" bind:checked={phonetic} /> {t("persons.phonetic")}</label>
         <span class="muted" style="margin-left: auto">
-            {loading ? "Loading…" : `${total} record${total === 1 ? "" : "s"}`}
+            {loading
+                ? t("persons.loading")
+                : `${total} ${total === 1 ? t("persons.recordCount.one") : t("persons.recordCount.other")}`}
         </span>
     </div>
     {#if error}

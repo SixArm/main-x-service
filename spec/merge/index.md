@@ -59,10 +59,10 @@ is retired. Choosing which record is main is the caller's decision
 
 The loco services factor the merge into a **pure, DB-free fold** in
 `src/merge.rs` (e.g.
-[`care-pathway-service/src/merge.rs`](../../care-pathway/care-pathway-service-rust-crate/src/merge.rs)
+[`care-pathway-service/src/merge.rs`](../../care-pathway/care-pathway-service-with-loco/src/merge.rs)
 `merge_pathways`,
-[`organization-service/src/merge.rs`](../../organization/organization-service-rust-crate/src/merge.rs),
-[`case-service/src/merge.rs`](../../case/case-service-rust-crate/src/merge.rs)).
+[`organization-service/src/merge.rs`](../../organization/organization-service-with-loco/src/merge.rs),
+[`case-service/src/merge.rs`](../../case/case-service-with-loco/src/merge.rs)).
 The fold takes `(main, duplicate)` and returns a `MergeOutcome { merged,
 transferred }`. It is unit-testable without a database; the DB
 orchestration and side effects live in the controller (see §3).
@@ -172,7 +172,7 @@ search-blocked candidate generation and the batch deduplicate scan are
 ### Loco lineage — `merge_records` table
 
 One row per merge, written by `MergeRecordModel::record(...)`. Migration:
-[`m20220101_000003_merge_records.rs`](../../care-pathway/care-pathway-service-rust-crate/migration/src/m20220101_000003_merge_records.rs).
+[`m20220101_000003_merge_records.rs`](../../care-pathway/care-pathway-service-with-loco/migration/src/m20220101_000003_merge_records.rs).
 
 | Column | Type | Purpose |
 | --- | --- | --- |
@@ -247,7 +247,7 @@ across the family.
 - **No automated un-merge endpoint.** The loco lineage exposes no
   reverse operation; restoring is a manual data task. The MPI-lineage
   `MergeStatus` enum models a `Reversed` state
-  ([`person-service/src/models/merge.rs`](../../person/person-service-rust-crate/src/models/merge.rs)),
+  ([`person-service/src/models/merge.rs`](../../person/person-service-with-loco/src/models/merge.rs)),
   but a reverse endpoint is not implemented.
 - **Best-effort side effects.** History, audit, and event writes are
   logged-but-non-fatal; the primary update + soft-delete is the

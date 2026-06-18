@@ -2,11 +2,11 @@
 
 ### Subprojects (this entity)
 
-- Service: [spec](../organization-service-rust-crate/spec/index.md) ·
-  [README](../organization-service-rust-crate/README.md) ·
-  [AGENTS.md](../organization-service-rust-crate/AGENTS.md) ·
-  [index](../organization-service-rust-crate/index.md) ·
-  [CHANGELOG](../organization-service-rust-crate/CHANGELOG.md)
+- Service: [spec](../organization-service-with-loco/spec/index.md) ·
+  [README](../organization-service-with-loco/README.md) ·
+  [AGENTS.md](../organization-service-with-loco/AGENTS.md) ·
+  [index](../organization-service-with-loco/index.md) ·
+  [CHANGELOG](../organization-service-with-loco/CHANGELOG.md)
 - Matcher: [spec](../organization-matcher-rust-crate/spec/index.md) ·
   [README](../organization-matcher-rust-crate/README.md) ·
   [AGENTS.md](../organization-matcher-rust-crate/AGENTS.md) ·
@@ -23,7 +23,11 @@
   exemplar; its service is the mature feature reference
   (match-search-merge, privacy, FHIR).
 - [Authentication entity](../../authentication/) — the central SSO
-  provider this entity will verify JWTs against (§15).
+  provider whose short-lived PASETO v4.public tokens this entity will
+  verify offline (§15).
+- [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  — source of truth for the session + cross-service token model
+  (PASETO v4.public, supersedes RS256-JWT + JWKS).
 - Care-pathway entity — the other trio built on the same
   matcher-type-as-DTO recipe.
 

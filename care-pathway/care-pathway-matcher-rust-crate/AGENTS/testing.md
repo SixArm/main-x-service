@@ -25,6 +25,7 @@ renormalisation, threshold presets, the one-to-many surface, and
 
 ## Gate
 
-`cargo test` (all green), `cargo clippy --all-targets -- -D warnings`
-(clean), `cargo fmt --check` (clean). No `unwrap`/`expect`/`panic` in
-library code.
+`cargo test` (all green), `cargo clippy --all-targets --all-features --
+-D warnings` (clean — mirrors CI), `cargo fmt --check` (clean). No
+`unwrap`/`expect`/`panic` and no `#[allow(clippy::…)]` in library code
+(clippy-clean without suppressions).

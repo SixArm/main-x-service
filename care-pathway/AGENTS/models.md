@@ -41,8 +41,8 @@ provider-scoped schemes never do (see [matching.md](matching.md)).
 ## Service persistence model
 
 **Files:**
-[`src/models/care_pathways.rs`](../care-pathway-service-rust-crate/src/models/care_pathways.rs),
-[`migration/src/m20220101_000001_care_pathways.rs`](../care-pathway-service-rust-crate/migration/src/m20220101_000001_care_pathways.rs)
+[`src/models/care_pathways.rs`](../care-pathway-service-with-loco/src/models/care_pathways.rs),
+[`migration/src/m20220101_000001_care_pathways.rs`](../care-pathway-service-with-loco/migration/src/m20220101_000001_care_pathways.rs)
 
 One `care_pathways` table: `id` (PK), `pid` (public UUID), `name`
 (denormalised from `data.name`), `data` (JSONB `CarePathway`),
@@ -52,7 +52,7 @@ One `care_pathways` table: `id` (PK), `pid` (public UUID), `name`
 
 ## Wire DTOs (service controller)
 
-**File:** [`src/controllers/care_pathways.rs`](../care-pathway-service-rust-crate/src/controllers/care_pathways.rs)
+**File:** [`src/controllers/care_pathways.rs`](../care-pathway-service-with-loco/src/controllers/care_pathways.rs)
 
 | Type | Shape | Used by |
 |---|---|---|

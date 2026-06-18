@@ -12,7 +12,7 @@
                                | REST (raw loco JSON, no envelope)
                                | PUBLIC_API_BASE_URL (default :5150)
 +------------------------------v-------------------------------+
-|            care-pathway-service-rust-crate                    |
+|            care-pathway-service-with-loco                    |
 |  loco.rs 0.16 (Axum 0.8) · port 5150                          |
 |  controllers/care_pathways.rs                                  |
 |    CRUD + /match + /check-duplicates                          |
@@ -37,7 +37,7 @@ is no adapter layer (contrast with the person entity).
 ### 8.2 Service layout (loco.rs)
 
 ```
-care-pathway-service-rust-crate/
+care-pathway-service-with-loco/
 ├── src/
 │   ├── app.rs                       loco Hooks (routes, truncate)
 │   ├── bin/main.rs                  loco CLI entrypoint
@@ -74,8 +74,11 @@ and [`agents/share/availability.md`](../../agents/share/availability.md):
 
 - N stateless service replicas behind a load balancer; PostgreSQL
   primary + replicas; connection pooling.
-- JWT verification at the service edge against the central
-  auth-service JWKS (offline, no per-request auth-service call).
+- PASETO v4 public token verification at the service edge against the
+  central auth-service's published Ed25519 key (offline, no per-request
+  auth-service call) — see
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md),
+  which supersedes the prior RS256-JWT + JWKS model.
 - Durable event bus for CRUD events; OTLP observability pipeline.
 - Per-nation deployment with cross-registry linkage through
   deterministic identifiers rather than shared databases.

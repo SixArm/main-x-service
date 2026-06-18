@@ -74,6 +74,48 @@ describe("CourseRepository", () => {
         expect(result.total).toBe(1);
     });
 
+    // Pins FR-1/FR-2: search() forwards q / fuzzy / limit / offset as
+    // query params, and phonetic (still accepted by the client type for
+    // service parity) is forwarded when set.
+    it("forwards search query params (fuzzy/limit/offset/phonetic)", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({ success: true, data: [], error: null });
+            }),
+        });
+        const repo = new CourseRepository(client);
+        await repo.search({ q: "CS", fuzzy: true, limit: 25, offset: 50, phonetic: true });
+        const url = new URL(capturedUrl);
+        expect(url.pathname).toBe("/api/courses/search");
+        expect(url.searchParams.get("q")).toBe("CS");
+        expect(url.searchParams.get("fuzzy")).toBe("true");
+        expect(url.searchParams.get("limit")).toBe("25");
+        expect(url.searchParams.get("offset")).toBe("50");
+        expect(url.searchParams.get("phonetic")).toBe("true");
+    });
+
+    // Pins: unset optional search params are omitted from the query string.
+    it("omits unset search params", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({ success: true, data: [], error: null });
+            }),
+        });
+        const repo = new CourseRepository(client);
+        await repo.search({ q: "" });
+        const url = new URL(capturedUrl);
+        expect(url.searchParams.has("fuzzy")).toBe(false);
+        expect(url.searchParams.has("limit")).toBe(false);
+        expect(url.searchParams.has("offset")).toBe(false);
+        expect(url.searchParams.has("phonetic")).toBe(false);
+    });
+
     // Pins: the service's {courses, total} shape maps to {items, total}, preserving the server total.
     it("normalises {courses, total} search responses (service shape)", async () => {
         const client = new ApiClient({

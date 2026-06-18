@@ -1,76 +1,68 @@
-//! Offline RS256 JWT verification against the authentication-service JWKS.
+//! Offline PASETO v4.public token verification against the
+//! authentication-service's published Ed25519 keys.
 //!
 //! # The offline verification model
 //!
 //! The [`authentication-service`] is the federation's single auth
-//! provider. It signs RS256 access tokens and publishes its public keys
-//! at `/.well-known/jwks.json`. Every other service verifies those
-//! tokens *offline*: fetch the JWKS once at boot, build a [`Verifier`],
-//! then call [`Verifier::verify`] per request. There is no shared secret
-//! and no per-request introspection call.
+//! provider. A user session lives server-side (a Postgres-backed cookie
+//! session); from that session the service mints short-lived **PASETO
+//! v4.public** access tokens and publishes its **Ed25519 public keys** at
+//! `/.well-known/paseto-keys`. Every other service verifies those tokens
+//! *offline*: fetch the key set once at boot, build a [`Verifier`], then
+//! call [`Verifier::verify`] per request. There is no shared secret and
+//! no per-request introspection call.
 //!
 //! "Offline" is the key property and the reason this crate exists.
-//! Because RS256 is *asymmetric*, the signer (auth-service) holds the
-//! private key and the verifiers (every peer service) hold only the
-//! public key. A peer can therefore confirm a token's authenticity with
-//! no network round-trip back to the auth-service on the hot path, no
-//! shared symmetric secret to distribute and rotate, and no token
-//! introspection endpoint to depend on for availability. The only
-//! network interaction is the one-time (or rare) JWKS fetch, which can
-//! be done out of band or via the optional [`fetch`](crate#features)
-//! feature.
+//! Because v4.public is *asymmetric* (Ed25519), the signer (auth-service)
+//! holds the private key and the verifiers (every peer service) hold only
+//! the public key. A peer can therefore confirm a token's authenticity
+//! with no network round-trip on the hot path, no shared symmetric secret
+//! to distribute, and no introspection endpoint to depend on for
+//! availability. The only network interaction is the one-time (or rare)
+//! key fetch, available out of band or via the optional
+//! [`fetch`](crate#features) feature.
+//!
+//! This replaces the crate's previous RS256-JWT + JWKS design (≤ 0.1.x):
+//! PASETO is a versioned, misuse-resistant token format with no algorithm
+//! agility, so the "alg confusion" / `alg=none` class of JWT attacks does
+//! not exist. See [`agents/share/authentication-sessions.md`] in the
+//! monorepo for the family-wide design.
 //!
 //! # Security properties
 //!
-//! - **Asymmetric trust.** Verifiers never possess signing material, so
-//!   a compromised peer cannot mint tokens — it can only verify them.
-//! - **No shared secret.** Nothing symmetric is shared across the
-//!   federation, so there is no single secret whose leak forges tokens
-//!   everywhere.
-//! - **Algorithm pinning.** Verification is hard-pinned to
-//!   [`Algorithm::RS256`]; an attacker cannot downgrade to `none` or
-//!   trick the verifier into treating the RSA public key as an HMAC
-//!   secret (the classic "alg confusion" attack), because the
-//!   [`Validation`] only accepts RS256.
+//! - **Asymmetric trust.** Verifiers never possess signing material, so a
+//!   compromised peer cannot mint tokens — it can only verify them.
+//! - **No algorithm agility.** The token header is the literal string
+//!   `v4.public`; there is no `alg` field to downgrade and no `none`.
 //! - **Key selection by `kid`.** The verifying key is chosen by the
-//!   token header's `kid`, which the auth-service derives
-//!   deterministically from the key material itself (see [`Verifier`]),
-//!   so a forged or stale `kid` simply fails to match any known key.
-//! - **Issuer / audience / expiry enforcement.** Every token must also
-//!   carry the expected `iss`, the expected `aud`, and an unexpired
-//!   `exp`; a structurally valid signature alone is not sufficient.
-//!
-//! # This crate vs. the auth-service
-//!
-//! This crate is the peer-side mirror of the auth-service's own
-//! `auth::verify_token`: same RS256 algorithm, same [`Claims`] shape,
-//! same `kid` selection — but keyed off the *published* JWKS rather than
-//! a locally held private key, so any service can embed it. The
-//! [`Claims`] struct is duplicated by convention (not via a shared
-//! type) and the service's contract test pins the round-trip, so the
-//! two stay byte-compatible.
+//!   token's (authenticated) footer `kid`; a forged or stale `kid` simply
+//!   matches no known key.
+//! - **Issuer / audience / expiry enforcement.** Beyond a valid
+//!   signature, every token must carry the expected `iss`, the expected
+//!   `aud`, an unexpired `exp`, and (if present) a satisfied `nbf`.
 //!
 //! # Features
 //!
-//! - `fetch` (off by default) — adds [`Verifier::from_jwks_url`], which
-//!   pulls the JWKS over HTTPS via `reqwest` (rustls). With the feature
-//!   off the crate does no I/O at all and the caller supplies the JWKS
+//! - `fetch` (off by default) — adds [`Verifier::from_paseto_keys_url`],
+//!   which pulls the key set over HTTPS via `reqwest` (rustls). With the
+//!   feature off the crate does no I/O and the caller supplies the key set
 //!   as a [`serde_json::Value`].
 //!
 //! # Example
 //!
 //! ```no_run
 //! # use authentication_verifier::Verifier;
-//! // Normally the JWKS comes from the auth-service; an empty set here
+//! // Normally the keys come from the auth-service; an empty set here
 //! // keeps the doctest offline and dependency-free.
-//! let jwks: serde_json::Value = serde_json::json!({ "keys": [] });
-//! let verifier = Verifier::from_jwks_value(&jwks, "authentication-service", "main-x-service")?;
-//! let claims = verifier.verify("eyJhbGci...")?;
+//! let keys: serde_json::Value = serde_json::json!({ "keys": [] });
+//! let verifier = Verifier::from_paseto_keys_value(&keys, "authentication-service", "main-x-service")?;
+//! let claims = verifier.verify("v4.public...")?;
 //! println!("authenticated subject: {}", claims.sub);
 //! # Ok::<(), authentication_verifier::VerifyError>(())
 //! ```
 //!
-//! [`authentication-service`]: https://github.com/sixarm/authentication-service-rust-crate
+//! [`authentication-service`]: https://github.com/sixarm/authentication-service-with-loco
+//! [`agents/share/authentication-sessions.md`]: https://github.com/sixarm/main-x-service
 
 // Reject `unsafe` outright: this crate touches only safe, allocation-light
 // code paths and a security library has no business reaching for `unsafe`.
@@ -81,256 +73,317 @@
 // any item lacks a doc comment.
 #![deny(missing_docs)]
 
-// `HashMap` indexes the loaded RSA keys by their `kid` for O(1) lookup
-// during verification.
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-// `jsonwebtoken` supplies the actual RS256 decode/verify primitives and the
-// header parser used to read the `kid` before a key is selected.
-use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
-// `serde` derives let `Claims` deserialize from the JWT payload (and
-// serialize again, which the tests rely on to sign tokens).
+// base64url (no padding) decodes the published key's `x` component.
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+// The PASETO v4.public verify primitive plus the key / footer wrapper
+// types. `UntrustedToken` lets us read the (authenticated) footer to
+// select a key *before* verifying the signature.
+use rusty_paseto::core::{
+    Footer, ImplicitAssertion, Key, Paseto, PasetoAsymmetricPublicKey, Public, UntrustedToken, V4,
+};
+// `serde` derives let `Claims` deserialize from the token payload (and
+// serialize again, which the tests rely on to mint tokens).
 use serde::{Deserialize, Serialize};
 
 /// Verified token claims. Mirrors the auth-service `Claims` exactly so a
 /// token signed there round-trips here. `sub` carries the user `pid`.
 ///
-/// The field set and order are a contract with the auth-service: the
-/// service defines an identical struct, and changing one without the
-/// other breaks token round-tripping. `Deserialize` is what
-/// [`Verifier::verify`] uses to reconstruct this struct from a verified
-/// JWT payload; `Serialize` exists so callers (and the crate's own
-/// tests) can re-encode claims.
+/// The field set is a contract with the auth-service: the service defines
+/// an identical struct, and changing one without the other breaks token
+/// round-tripping. `exp` / `iat` / `nbf` are unix seconds.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    /// Subject — the user `pid` (UUID string). This is the stable
-    /// identifier a peer service keys its own authorization on.
+    /// Subject — the user `pid` (UUID string); the stable identifier a
+    /// peer service keys its authorization on.
     pub sub: String,
-    /// User email, surfaced for convenience at the edge so callers need
-    /// not look it up separately; not used for authorization decisions.
+    /// User email, surfaced for convenience at the edge; not used for
+    /// authorization decisions.
     pub email: String,
     /// Human-readable display name carried alongside the subject.
     pub name: String,
-    /// Issuer (`iss`) — the name of the auth-service that minted the
-    /// token. Checked against the verifier's configured issuer.
+    /// Issuer (`iss`) — the auth-service that minted the token. Checked
+    /// against the verifier's configured issuer.
     pub iss: String,
-    /// Audience (`aud`) — the intended recipient service. Checked
-    /// against the verifier's configured audience so a token issued for
-    /// one peer cannot be replayed against another.
+    /// Audience (`aud`) — the intended recipient service. Checked against
+    /// the verifier's configured audience so a token issued for one peer
+    /// cannot be replayed against another.
     pub aud: String,
-    /// Expiry (`exp`), unix seconds. Tokens past this instant are
-    /// rejected during verification.
+    /// Expiry (`exp`), unix seconds. Tokens at or past this instant are
+    /// rejected. Issued ~5 minutes out (the session is the durable thing).
     pub exp: i64,
     /// Issued-at (`iat`), unix seconds — when the token was minted.
     pub iat: i64,
-    /// JWT id (`jti`) — also the auth-service `sessions.jid`, so a token
-    /// can be correlated back to its server-side session.
-    pub jti: String,
+    /// Not-before (`nbf`), unix seconds. When present, tokens before this
+    /// instant are rejected. Omitted from the wire form when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nbf: Option<i64>,
+    /// Session id (`sid`) — the originating server-side session, so a
+    /// token can be correlated back to (and revoked with) its session.
+    pub sid: String,
+    /// Granted scopes, if any. Empty when the token carries none.
+    #[serde(default)]
+    pub scope: Vec<String>,
+    /// Granted roles, if any. Empty when the token carries none.
+    #[serde(default)]
+    pub roles: Vec<String>,
 }
 
-/// Failure modes for JWKS loading and token verification.
+/// Failure modes for key-set loading and token verification.
 ///
-/// Every fallible entry point in this crate returns this type, and every
-/// variant is a *handled* outcome — the crate never panics on bad input,
-/// so an empty or malformed JWKS and a forged token are both ordinary
-/// `Err` values. Variants split into load-time failures ([`Jwks`](Self::Jwks),
-/// [`Fetch`](Self::Fetch)) and per-token verification failures
-/// ([`MissingKid`](Self::MissingKid), [`UnknownKid`](Self::UnknownKid),
-/// [`Jwt`](Self::Jwt)).
+/// Every fallible entry point returns this type, and every variant is a
+/// *handled* outcome — the crate never panics on bad input, so a malformed
+/// key set and a forged token are both ordinary `Err` values.
 #[derive(Debug, thiserror::Error)]
 pub enum VerifyError {
-    /// The JWKS document was missing or structurally invalid (no `keys`
-    /// array, a key missing `kid` / `n` / `e`, or unparsable RSA
-    /// components). Raised at load time, not per token.
-    #[error("malformed jwks: {0}")]
-    Jwks(String),
-    /// The token header carried no `kid`, so no key could be selected.
-    /// All auth-service tokens stamp a `kid`, so this indicates a
+    /// The key-set document was missing or structurally invalid (no `keys`
+    /// array, a key missing `kid` / `x`, or an `x` that is not a 32-byte
+    /// base64url Ed25519 public key). Raised at load time, not per token.
+    #[error("malformed key set: {0}")]
+    Keys(String),
+    /// The token was not a structurally valid `v4.public` token, or its
+    /// footer could not be decoded as `{ "kid": ... }`. Distinct from a
+    /// signature failure ([`Paseto`](Self::Paseto)).
+    #[error("malformed token: {0}")]
+    Malformed(String),
+    /// The token footer carried no `kid`, so no key could be selected.
+    /// All auth-service tokens stamp a footer `kid`, so this indicates a
     /// hand-built or non-conforming token.
-    #[error("token header has no kid")]
+    #[error("token footer has no kid")]
     MissingKid,
-    /// No verification key matched the token's `kid`. The signer is
-    /// unknown to this JWKS (stale cache, wrong issuer, or forgery). The
-    /// wrapped `String` is the unmatched `kid`. On a legitimate stale
-    /// cache, a caller may refetch the JWKS and retry.
+    /// No verification key matched the token's footer `kid` (stale cache,
+    /// wrong issuer, or forgery). The wrapped `String` is the unmatched
+    /// `kid`; on a legitimate stale cache a caller may refetch and retry.
     #[error("no verification key for kid {0:?}")]
     UnknownKid(String),
-    /// Signature, issuer, audience, or expiry validation failed. Wraps
-    /// the underlying `jsonwebtoken` error, which distinguishes the
-    /// specific cause (bad signature vs. wrong `iss` / `aud` vs. expired
-    /// `exp`). This is the catch-all for a key matched but the token
-    /// itself did not validate.
+    /// PASETO parsing or Ed25519 signature verification failed. Carries the
+    /// stringified underlying `rusty_paseto` error.
     #[error("token verification failed: {0}")]
-    Jwt(#[from] jsonwebtoken::errors::Error),
-    /// Fetching the JWKS over HTTP failed (only with the `fetch` feature):
-    /// transport error, non-2xx status, or undecodable body. The wrapped
-    /// `String` is the stringified transport error.
+    Paseto(String),
+    /// The signature was valid but a registered claim did not satisfy the
+    /// policy: wrong `iss`, wrong `aud`, expired `exp`, or unmet `nbf`.
+    #[error("claim rejected: {0}")]
+    Claim(String),
+    /// Fetching the key set over HTTP failed (only with the `fetch`
+    /// feature): transport error, non-2xx status, or undecodable body.
     #[cfg(feature = "fetch")]
-    #[error("jwks fetch failed: {0}")]
+    #[error("key set fetch failed: {0}")]
     Fetch(String),
 }
 
-/// A set of RSA verification keys (indexed by `kid`) plus the issuer /
+/// A set of Ed25519 verification keys (indexed by `kid`) plus the issuer /
 /// audience policy applied to every token. Construct once at boot, then
 /// share behind an `Arc` and call [`verify`](Verifier::verify) per
 /// request — verification is read-only and allocation-light.
 ///
-/// The `kid` derivation is a contract with the auth-service: `kid` is
-/// the base64url (no padding) encoding of `SHA-256(big-endian RSA
-/// modulus bytes)`, which the service stamps into every token header.
-/// Because the verifier indexes its keys by exactly that `kid`, key
-/// selection at verify time is a direct map lookup with no ambiguity.
+/// `kid` is an opaque string assigned by the auth-service and carried in
+/// each token's footer; the verifier indexes its keys by exactly that
+/// `kid`, so key selection at verify time is a direct map lookup.
 pub struct Verifier {
-    /// RSA verifying keys keyed by their `kid`. Populated at construction
-    /// from the JWKS; never mutated afterwards, which is why a `Verifier`
-    /// is safe to share immutably across threads.
-    keys: HashMap<String, DecodingKey>,
-    /// The shared validation policy applied to every token: algorithm
-    /// pinned to RS256, plus the expected issuer and audience. `exp`
-    /// checking is on by `jsonwebtoken`'s default.
-    validation: Validation,
+    /// Ed25519 public keys (raw 32 bytes) keyed by their `kid`. Populated
+    /// at construction; never mutated, so a `Verifier` is safe to share
+    /// immutably across threads.
+    keys: HashMap<String, [u8; 32]>,
+    /// Expected issuer (`iss`) enforced on every token.
+    issuer: String,
+    /// Expected audience (`aud`) enforced on every token.
+    audience: String,
 }
 
 impl Verifier {
-    /// Build a verifier from an in-memory JWKS document, validating
+    /// Build a verifier from an in-memory key-set document, validating
     /// tokens against `issuer` (`iss`) and `audience` (`aud`).
     ///
-    /// Only RSA signing keys are loaded; entries with a non-`RSA` `kty`
-    /// are skipped (the auth-service publishes RS256 only). An empty key
-    /// set is permitted — it yields a verifier that rejects every token
-    /// with [`VerifyError::UnknownKid`], which lets a service boot before
-    /// its JWKS source is reachable without panicking.
+    /// The document mirrors a JWK set restricted to Ed25519:
+    /// `{ "keys": [ { "kty": "OKP", "crv": "Ed25519", "kid": "...",
+    /// "x": "<base64url 32-byte public key>" }, ... ] }`. Entries whose
+    /// `kty`/`crv` are not `OKP`/`Ed25519` are skipped. An empty key set is
+    /// permitted — it yields a verifier that rejects every token with
+    /// [`VerifyError::UnknownKid`], so a service can boot before its key
+    /// source is reachable without panicking.
     ///
     /// # Errors
     ///
-    /// [`VerifyError::Jwks`] when the document lacks a `keys` array, a key
-    /// is missing `kid` / `n` / `e`, or the modulus/exponent are not
-    /// valid RSA components.
+    /// [`VerifyError::Keys`] when the document lacks a `keys` array, an
+    /// Ed25519 key is missing `kid` / `x`, or `x` is not a 32-byte
+    /// base64url value.
     ///
     /// # Examples
     ///
     /// ```
     /// # use authentication_verifier::Verifier;
-    /// // An empty key set still builds a usable verifier (it just
-    /// // rejects every token with `UnknownKid`).
-    /// let jwks = serde_json::json!({ "keys": [] });
-    /// let verifier = Verifier::from_jwks_value(&jwks, "authentication-service", "main-x-service")?;
+    /// let keys = serde_json::json!({ "keys": [] });
+    /// let verifier = Verifier::from_paseto_keys_value(&keys, "authentication-service", "main-x-service")?;
     /// assert_eq!(verifier.key_count(), 0);
     /// # Ok::<(), authentication_verifier::VerifyError>(())
     /// ```
-    pub fn from_jwks_value(
-        jwks: &serde_json::Value,
+    pub fn from_paseto_keys_value(
+        keys_doc: &serde_json::Value,
         issuer: &str,
         audience: &str,
     ) -> Result<Self, VerifyError> {
-        // A JWKS is `{ "keys": [ ... ] }`; the top-level `keys` array is
-        // mandatory. Its absence is a structural error, not an empty set.
-        let entries = jwks
+        let entries = keys_doc
             .get("keys")
             .and_then(serde_json::Value::as_array)
-            .ok_or_else(|| VerifyError::Jwks("missing \"keys\" array".to_string()))?;
+            .ok_or_else(|| VerifyError::Keys("missing \"keys\" array".to_string()))?;
 
         let mut keys = HashMap::new();
         for jwk in entries {
-            // RS256 only: silently skip any non-RSA key (e.g. EC) rather
-            // than erroring, since a JWKS may legitimately advertise other
-            // key types this verifier does not use.
+            // Ed25519 only: silently skip any other key type so a key set
+            // may legitimately advertise keys this verifier does not use.
             let kty = jwk.get("kty").and_then(serde_json::Value::as_str);
-            if kty != Some("RSA") {
+            let crv = jwk.get("crv").and_then(serde_json::Value::as_str);
+            if kty != Some("OKP") || crv != Some("Ed25519") {
                 continue;
             }
-            // For an RSA key the three fields below are all required: the
-            // `kid` is the lookup key, and `n` (modulus) + `e` (exponent)
-            // are the public key components. Any missing field is a
-            // malformed JWKS rather than a skippable entry.
+            // For an Ed25519 key the `kid` (lookup key) and `x` (the
+            // 32-byte public key, base64url) are both required; a missing
+            // field is a malformed key set, not a skippable entry.
             let kid = jwk
                 .get("kid")
                 .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| VerifyError::Jwks("rsa jwk missing \"kid\"".to_string()))?;
-            let n = jwk
-                .get("n")
+                .ok_or_else(|| VerifyError::Keys("ed25519 jwk missing \"kid\"".to_string()))?;
+            let x = jwk
+                .get("x")
                 .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| VerifyError::Jwks(format!("jwk {kid} missing \"n\"")))?;
-            let e = jwk
-                .get("e")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| VerifyError::Jwks(format!("jwk {kid} missing \"e\"")))?;
-            // Build the decoding key from the base64url modulus/exponent.
-            // A parse failure here means the components are not valid RSA.
-            let key = DecodingKey::from_rsa_components(n, e)
-                .map_err(|err| VerifyError::Jwks(format!("jwk {kid}: {err}")))?;
-            // Index by `kid`; a later key with the same `kid` overwrites.
+                .ok_or_else(|| VerifyError::Keys(format!("jwk {kid} missing \"x\"")))?;
+            let bytes = URL_SAFE_NO_PAD
+                .decode(x)
+                .map_err(|err| VerifyError::Keys(format!("jwk {kid}: bad base64url x: {err}")))?;
+            let key: [u8; 32] = bytes
+                .as_slice()
+                .try_into()
+                .map_err(|_| VerifyError::Keys(format!("jwk {kid}: x is not 32 bytes")))?;
             keys.insert(kid.to_string(), key);
         }
 
-        // Pin the validation policy once. Hard-coding RS256 here is the
-        // algorithm-confusion defense: a token claiming any other `alg`
-        // (including `none`) is rejected before signature checking.
-        let mut validation = Validation::new(Algorithm::RS256);
-        // Require the configured issuer and audience on every token; these
-        // are enforced by `decode` alongside the signature and expiry.
-        validation.set_issuer(&[issuer]);
-        validation.set_audience(&[audience]);
-        Ok(Self { keys, validation })
+        Ok(Self {
+            keys,
+            issuer: issuer.to_string(),
+            audience: audience.to_string(),
+        })
     }
 
-    /// Number of RSA verification keys loaded from the JWKS.
+    /// Number of Ed25519 verification keys loaded.
     ///
-    /// Useful as a boot-time sanity check: a count of zero means no token
-    /// can ever verify (every [`verify`](Self::verify) call will return
-    /// [`VerifyError::UnknownKid`]), which usually signals a JWKS that
-    /// failed to load or advertised no RSA keys.
+    /// A count of zero means no token can ever verify (every
+    /// [`verify`](Self::verify) call returns [`VerifyError::UnknownKid`]),
+    /// which usually signals a key set that failed to load.
     #[must_use]
     pub fn key_count(&self) -> usize {
         self.keys.len()
     }
 
-    /// Verify an RS256 bearer token: select the key by the header `kid`,
-    /// check the signature, then enforce issuer, audience, and expiry.
+    /// Verify a PASETO `v4.public` bearer token: select the key by the
+    /// footer `kid`, check the Ed25519 signature, then enforce issuer,
+    /// audience, expiry, and not-before.
     ///
-    /// The steps run in a deliberate order so the cheapest, most specific
-    /// rejection happens first: parse the header (no crypto), select the
-    /// key by `kid`, and only then perform the RSA signature check and
-    /// claim validation.
+    /// Steps run cheapest-rejection-first: confirm the `v4.public` header,
+    /// read the (authenticated) footer for its `kid`, select the key, then
+    /// perform the signature check and finally the claim policy.
     ///
     /// # Errors
     ///
-    /// - [`VerifyError::Jwt`] if the token header itself is unparsable
-    ///   (the leading [`decode_header`] step).
-    /// - [`VerifyError::MissingKid`] if the header carries no `kid`.
-    /// - [`VerifyError::UnknownKid`] if the `kid` matches none of the
-    ///   loaded keys (stale JWKS cache, wrong issuer, or forgery).
-    /// - [`VerifyError::Jwt`] if the matched key's signature check fails,
-    ///   or the `iss` / `aud` / `exp` claims do not satisfy the policy.
+    /// - [`VerifyError::Malformed`] if the token is not a structurally
+    ///   valid `v4.public` token or its footer is not `{ "kid": ... }`.
+    /// - [`VerifyError::MissingKid`] if the footer carries no `kid`.
+    /// - [`VerifyError::UnknownKid`] if the `kid` matches no loaded key.
+    /// - [`VerifyError::Paseto`] if the Ed25519 signature check fails.
+    /// - [`VerifyError::Claim`] if `iss` / `aud` / `exp` / `nbf` do not
+    ///   satisfy the policy.
     ///
     /// # Examples
     ///
     /// ```
     /// # use authentication_verifier::{Verifier, VerifyError};
-    /// // With no keys loaded, verification fails fast on `kid` lookup.
-    /// let jwks = serde_json::json!({ "keys": [] });
-    /// let verifier = Verifier::from_jwks_value(&jwks, "authentication-service", "main-x-service")?;
-    /// assert!(verifier.verify("not.a.jwt").is_err());
+    /// let keys = serde_json::json!({ "keys": [] });
+    /// let verifier = Verifier::from_paseto_keys_value(&keys, "authentication-service", "main-x-service")?;
+    /// assert!(verifier.verify("not.a.paseto").is_err());
     /// # Ok::<(), VerifyError>(())
     /// ```
     pub fn verify(&self, token: &str) -> Result<Claims, VerifyError> {
-        // 1. Parse the header without verifying anything — this is just
-        //    base64 decoding of the first JWT segment, so it is safe to do
-        //    before a key is chosen and cannot be trusted yet.
-        let header = decode_header(token)?;
-        // 2. The `kid` tells us which published key signed this token. A
-        //    missing `kid` is a distinct, more actionable error than an
-        //    unknown one.
-        let kid = header.kid.ok_or(VerifyError::MissingKid)?;
-        // 3. Look up the key. A miss means we hold no key for this signer:
-        //    stale cache, wrong issuer, or an outright forged `kid`.
-        let key = self.keys.get(&kid).ok_or(VerifyError::UnknownKid(kid))?;
-        // 4. Now do the real work: RSA signature verification plus the
-        //    issuer/audience/expiry checks baked into `self.validation`.
-        //    Only a token that passes all of these yields claims.
-        let data = decode::<Claims>(token, key, &self.validation)?;
-        Ok(data.claims)
+        // 1. Pin the version + purpose by the literal header. PASETO has no
+        //    algorithm field, so this is the whole "alg" decision.
+        if !token.starts_with("v4.public.") {
+            return Err(VerifyError::Malformed("not a v4.public token".to_string()));
+        }
+        // 2. Parse the token without trusting it, and read its footer. The
+        //    footer is authenticated (covered by the signature), so reading
+        //    the `kid` here and feeding the same footer back to `try_verify`
+        //    is safe: tampering with it fails the signature check in step 4.
+        let untrusted = UntrustedToken::try_parse(token)
+            .map_err(|err| VerifyError::Paseto(err.to_string()))?;
+        let footer = untrusted
+            .footer_str()
+            .map_err(|err| VerifyError::Paseto(err.to_string()))?
+            .ok_or(VerifyError::MissingKid)?;
+        let footer_json: serde_json::Value = serde_json::from_str(&footer)
+            .map_err(|err| VerifyError::Malformed(format!("footer is not json: {err}")))?;
+        let kid = footer_json
+            .get("kid")
+            .and_then(serde_json::Value::as_str)
+            .ok_or(VerifyError::MissingKid)?;
+        // 3. Select the published key for this `kid`. A miss means we hold
+        //    no key for this signer (stale cache, wrong issuer, or forgery).
+        let key_bytes = self
+            .keys
+            .get(kid)
+            .ok_or_else(|| VerifyError::UnknownKid(kid.to_string()))?;
+        let key = Key::<32>::from(key_bytes);
+        let public_key = PasetoAsymmetricPublicKey::<V4, Public>::from(&key);
+        // 4. Verify the Ed25519 signature over (header, payload, footer).
+        let payload = Paseto::<V4, Public>::try_verify(
+            token,
+            &public_key,
+            Footer::from(footer.as_str()),
+            Option::<ImplicitAssertion>::None,
+        )
+        .map_err(|err| VerifyError::Paseto(err.to_string()))?;
+        // 5. Reconstruct claims and apply the issuer/audience/expiry policy.
+        let claims: Claims = serde_json::from_str(&payload)
+            .map_err(|err| VerifyError::Malformed(format!("payload is not claims json: {err}")))?;
+        self.check_claims(&claims)?;
+        Ok(claims)
     }
+
+    /// Apply the registered-claim policy: `iss`, `aud`, `exp`, and `nbf`.
+    fn check_claims(&self, claims: &Claims) -> Result<(), VerifyError> {
+        if claims.iss != self.issuer {
+            return Err(VerifyError::Claim(format!(
+                "issuer mismatch: expected {:?}, got {:?}",
+                self.issuer, claims.iss
+            )));
+        }
+        if claims.aud != self.audience {
+            return Err(VerifyError::Claim(format!(
+                "audience mismatch: expected {:?}, got {:?}",
+                self.audience, claims.aud
+            )));
+        }
+        let now = now_unix();
+        if let Some(nbf) = claims.nbf
+            && now < nbf
+        {
+            return Err(VerifyError::Claim("token not yet valid (nbf)".to_string()));
+        }
+        if now >= claims.exp {
+            return Err(VerifyError::Claim("token expired (exp)".to_string()));
+        }
+        Ok(())
+    }
+}
+
+/// Current unix time in seconds, saturating to `i64::MAX` if the clock is
+/// before the epoch (which would make every token "expired").
+fn now_unix() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|d| i64::try_from(d.as_secs()).ok())
+        .unwrap_or(i64::MAX)
 }
 
 /// HTTP-loading constructor, available only with the `fetch` feature.
@@ -339,27 +392,23 @@ impl Verifier {
 /// HTTP stack and does no I/O whatsoever.
 #[cfg(feature = "fetch")]
 impl Verifier {
-    /// Fetch the JWKS from `url` over HTTPS and build a verifier. Call
-    /// once at boot; the auth-service rotates keys rarely, so a process
-    /// can cache the result for its lifetime (or refetch on
+    /// Fetch the key set from `url` over HTTPS and build a verifier. Call
+    /// once at boot; the auth-service rotates keys rarely, so a process can
+    /// cache the result for its lifetime (or refetch on
     /// [`VerifyError::UnknownKid`] to pick up a rotation).
-    ///
-    /// This is a convenience over [`from_jwks_value`](Self::from_jwks_value):
-    /// it performs the network fetch and then delegates parsing and key
-    /// loading to that method, so the validation policy is identical.
     ///
     /// # Errors
     ///
-    /// [`VerifyError::Fetch`] on any transport / non-2xx / decode error,
-    /// or [`VerifyError::Jwks`] when the fetched body is not a valid JWKS.
+    /// [`VerifyError::Fetch`] on any transport / non-2xx / decode error, or
+    /// [`VerifyError::Keys`] when the fetched body is not a valid key set.
     ///
     /// # Examples
     ///
     /// ```no_run
     /// # use authentication_verifier::Verifier;
     /// # async fn run() -> Result<(), authentication_verifier::VerifyError> {
-    /// let verifier = Verifier::from_jwks_url(
-    ///     "https://auth.example.com/.well-known/jwks.json",
+    /// let verifier = Verifier::from_paseto_keys_url(
+    ///     "https://auth.example.com/.well-known/paseto-keys",
     ///     "authentication-service",
     ///     "main-x-service",
     /// )
@@ -368,142 +417,78 @@ impl Verifier {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn from_jwks_url(
+    pub async fn from_paseto_keys_url(
         url: &str,
         issuer: &str,
         audience: &str,
     ) -> Result<Self, VerifyError> {
-        // Each stage maps its transport-layer error into `Fetch` so the
-        // caller sees one uniform "could not obtain the JWKS" variant:
         let body = reqwest::get(url)
             .await
-            // ...the GET itself (DNS, TLS, connection) failed,
             .map_err(|e| VerifyError::Fetch(e.to_string()))?
-            // ...the server answered with a non-2xx status,
             .error_for_status()
             .map_err(|e| VerifyError::Fetch(e.to_string()))?
-            // ...or the body was not decodable JSON.
             .json::<serde_json::Value>()
             .await
             .map_err(|e| VerifyError::Fetch(e.to_string()))?;
-        // Reuse the in-memory constructor so structural validation and the
-        // RS256/issuer/audience policy stay in exactly one place.
-        Self::from_jwks_value(&body, issuer, audience)
+        Self::from_paseto_keys_value(&body, issuer, audience)
     }
 }
 
 /// Offline unit tests.
 ///
-/// The whole suite runs without network access: a throwaway RSA keypair
-/// (below) plays the auth-service's signing role, a JWKS is derived from
-/// its public half exactly as the service would, and tokens are signed
-/// locally so each verification path can be exercised deterministically.
+/// The whole suite runs without network access: a fixed Ed25519 keypair
+/// plays the auth-service's signing role, a key set is derived from its
+/// public half exactly as the service would publish it, and tokens are
+/// minted locally so each verification path is exercised deterministically.
 #[cfg(test)]
 mod tests {
     use super::*;
-    // `Engine` brings the base64 `encode` method into scope for the JWKS
-    // builder. `EncodingKey`/`Header` let the tests sign tokens (the
-    // signing side the library itself never performs). The `rsa`/`sha2`
-    // imports reproduce the auth-service's `kid` derivation.
-    use base64::Engine;
-    use jsonwebtoken::{EncodingKey, Header};
-    use rsa::pkcs8::DecodePublicKey;
-    use rsa::traits::PublicKeyParts;
-    use sha2::{Digest, Sha256};
+    use ed25519_dalek::SigningKey;
+    use rusty_paseto::core::{PasetoAsymmetricPrivateKey, Payload};
 
-    // Throwaway 2048-bit RSA keypair, used only to exercise the
-    // verifier offline (sign here with the private key, verify against a
-    // JWKS built from the public key). Not used anywhere in production.
-    const TEST_PRIVATE_PEM: &str = "-----BEGIN PRIVATE KEY-----\n\
-MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCb8A4bMels7eEL\n\
-TCFMcXyJTMdQ0k2klAxkPjPRHdAtwzV+6uLjKBlI2NTubkUl0BcKLKpX1G9mDjci\n\
-Qiga5frQ/QX9IedKGdU3aLo0BvpewAK2TmRwDe48i3d+uGWPbDcDd9DG0hEz6ugd\n\
-CXeCcXekdcsX8e8bF9E4FYK+2DaI9xiVhMQS8xSY7Mt3Os/T8GBT27/JdKkzoX2Z\n\
-ntYiOOhxwcwztS+W8y1qVD6b39hPCo2vbl+nyFdN6tz00L/qakJMV4AJjXOYhT5N\n\
-XBYII92vmlznYNWNTtBymmaGhes7RbIb9AvgC2PJZdk57Sxl0tP71CsIX2P/RjPD\n\
-AoExpOfDAgMBAAECggEAKwLNGUIslM+OJZwTiS66P3KufUPsh4sQWevwRes3uw+f\n\
-Z0jpWOd8BeRM4xEGQJZDbJqCR6SAL4GXQntF7Zlmk5NevgHGdmFmtphL18Le9xh2\n\
-BwvbVy74ebmsNYct+B/MksfPDa/ub8gIys2MKa4bZoDZCltAbNQmcJY6UGJ5tFAp\n\
-ItKFgoA8wnxJroUGcw1r7B8WRyxBGxSqjYVmwtRyUcbea1gCVfCXGwkkVgv42Miu\n\
-YY6C7y9e0zlwcAXdkZGTgfYlz/hiBWd2xAg+tGV2bwVBRlX3Io1qcNUEphOHDp+l\n\
-iTf/E8DkLvln3J9DsBD6jscWE8lK8HDzLHPpT1EkSQKBgQDQ7KW2so/ZMPMvLo+R\n\
-j61XUqvRW9sJgsQvZsukGt+dbq/YDJho6J0mu2OC8Sag2ZvLezGmGdjMkUHIvza/\n\
-3KpHau4vPG0LByqZv2sF+9XAOLo5YAVPZlZFb8egYH7X2bOmVaupyGKSsmcMUsHa\n\
-x7jZf84vIY033RcLhirjDDg6ywKBgQC/Evw1CXby8WVKBPNB8pr7VKE6oy6DK76d\n\
-TESJiirq1Z8am1WKxOzvo9OlZPibfuZKeY/XiF2fj5YHWc1xR7S7+OPMlwZdVx64\n\
-h7Iv3j9yFS7jwX1AVxmOB/b48ki+QEItTEiQJqEQXiFEGr0MgI6fTj/opKEltv5L\n\
-6cfdqOCP6QKBgQCu4LchQzvnV/Lm1nl0JSi6REfvuYyR3HRtHQVuOtRcig8EsB5P\n\
-Cg6pIgd8znBACYY//8GiQFZZfWjsKSoh1QpvN1FiFplLttbw1Oo3mwHjoVg3uGkZ\n\
-ehbSjmsxkjP6Z47ZtzI2rrXcBxr8lLURdUYEQNeMWfBEB3tHuSli3ZKfmwKBgQCn\n\
-YfdEcuUbz7H+lLWQqPlxgGK5HmhJilGyNDS6FCqii76ULU1Tgk1ZZLesZPaQKSuO\n\
-RE1o71GszLkN+XJKcRl3rYHJIOf3brE/z8edvWDxDHOGG2MgsOx3Cq0kygJFf785\n\
-NWE/vkdMMlmL8qx3vkqybXb40vdENbkxQTvQBvepuQKBgGHKxTj314X4xObeQ5BY\n\
-yteRm758Id7MoieW0dYZC62a05STaiyCB5ulVCijNa66616uxyAMhquKru9xT1Bt\n\
-zGUi4GKlyqqAH7webJPHDR58z5Jj4XqAblYzRFY3nqSAd6lxdjMdIftQi0xrG6+x\n\
-UOsbyJ6S44rLeDtZ9KGxR0gS\n\
------END PRIVATE KEY-----\n";
-
-    // The public half of `TEST_PRIVATE_PEM`. The JWKS the verifier loads
-    // is derived from this key, so tokens signed with the private half
-    // verify and tokens signed with any other key do not.
-    const TEST_PUBLIC_PEM: &str = "-----BEGIN PUBLIC KEY-----\n\
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAm/AOGzHpbO3hC0whTHF8\n\
-iUzHUNJNpJQMZD4z0R3QLcM1furi4ygZSNjU7m5FJdAXCiyqV9RvZg43IkIoGuX6\n\
-0P0F/SHnShnVN2i6NAb6XsACtk5kcA3uPIt3frhlj2w3A3fQxtIRM+roHQl3gnF3\n\
-pHXLF/HvGxfROBWCvtg2iPcYlYTEEvMUmOzLdzrP0/BgU9u/yXSpM6F9mZ7WIjjo\n\
-ccHMM7UvlvMtalQ+m9/YTwqNr25fp8hXTerc9NC/6mpCTFeACY1zmIU+TVwWCCPd\n\
-r5pc52DVjU7QcppmhoXrO0WyG/QL4AtjyWXZOe0sZdLT+9QrCF9j/0YzwwKBMaTn\n\
-wwIDAQAB\n\
------END PUBLIC KEY-----\n";
-
-    // The issuer/audience the verifier is configured with, and the values
-    // stamped into well-formed test tokens. Tests that pass a *different*
-    // issuer/audience to the verifier exercise the policy-mismatch paths.
+    // A fixed 32-byte Ed25519 seed → deterministic keypair, used only to
+    // exercise the verifier offline. Not used anywhere in production.
+    const TEST_SEED: [u8; 32] = [
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7,
+    ];
     const ISSUER: &str = "authentication-service";
     const AUDIENCE: &str = "main-x-service";
+    const KID: &str = "test-key-1";
 
-    // Build a JWKS document from the test public key, mirroring exactly
-    // how the auth-service derives (kid, n, e) in `auth::load_keys`.
-    // Returns the JWKS plus its single `kid` so tokens can be signed to
-    // match. The `kid` is base64url(SHA-256(modulus-bytes)) — the contract
-    // the library relies on for key selection.
-    fn test_jwks() -> (serde_json::Value, String) {
-        let pub_key = rsa::RsaPublicKey::from_public_key_pem(TEST_PUBLIC_PEM).expect("parse pub");
-        // Big-endian modulus and exponent are the raw RSA components a JWK
-        // carries as base64url `n`/`e`.
-        let n_bytes = pub_key.n().to_bytes_be();
-        let e_bytes = pub_key.e().to_bytes_be();
-        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-        let n = b64.encode(&n_bytes);
-        let e = b64.encode(&e_bytes);
-        // `kid` derived from the modulus bytes — must match what the
-        // verifier expects so key lookup succeeds.
-        let kid = b64.encode(Sha256::digest(&n_bytes));
-        let jwks = serde_json::json!({
-            "keys": [{
-                "kty": "RSA", "use": "sig", "alg": "RS256",
-                "kid": kid, "n": n, "e": e,
-            }]
-        });
-        (jwks, kid)
+    fn signing_key() -> SigningKey {
+        SigningKey::from_bytes(&TEST_SEED)
     }
 
-    // Sign `claims` into an RS256 JWT with the given `kid` in the header,
-    // using the test private key — the inverse of what the verifier does.
+    // Build a key-set document from the test public key, mirroring exactly
+    // how the auth-service publishes (kty, crv, kid, x).
+    fn test_keys() -> serde_json::Value {
+        let public = signing_key().verifying_key().to_bytes();
+        let x = URL_SAFE_NO_PAD.encode(public);
+        serde_json::json!({
+            "keys": [{ "kty": "OKP", "crv": "Ed25519", "use": "sig", "kid": KID, "x": x }]
+        })
+    }
+
+    // Mint a v4.public token with the given footer kid and claims, using
+    // the test private key — the inverse of what the verifier does.
     fn sign(kid: &str, claims: &Claims) -> String {
-        let mut header = Header::new(Algorithm::RS256);
-        header.kid = Some(kid.to_string());
-        let key = EncodingKey::from_rsa_pem(TEST_PRIVATE_PEM.as_bytes()).expect("encoding key");
-        jsonwebtoken::encode(&header, claims, &key).expect("encode")
+        let keypair = signing_key().to_keypair_bytes(); // [u8; 64]
+        let key = Key::<64>::from(keypair);
+        let private = PasetoAsymmetricPrivateKey::<V4, Public>::from(&key);
+        let payload = serde_json::to_string(claims).expect("serialize claims");
+        let footer = format!(r#"{{"kid":"{kid}"}}"#);
+        let mut builder = Paseto::<V4, Public>::builder();
+        builder.set_payload(Payload::from(payload.as_str()));
+        builder.set_footer(Footer::from(footer.as_str()));
+        builder.try_sign(&private).expect("sign")
     }
 
-    // Construct a `Claims` whose `exp` is `exp_offset` seconds from a
-    // fixed reference "now". Positive offsets are valid; large negative
-    // offsets produce expired tokens.
+    // Claims whose `exp` is `exp_offset` seconds from a fixed reference
+    // "now" comfortably in the future, so well-formed tokens are unexpired
+    // regardless of the real clock; large negative offsets expire them.
     fn claims(exp_offset: i64) -> Claims {
-        // Fixed iat well in the past; exp relative to a fixed "now" so the
-        // test stays deterministic without reading the clock for the body.
-        let now = 1_900_000_000; // year 2030, comfortably non-expired
+        let now = 1_900_000_000; // year 2030
         Claims {
             sub: "11111111-1111-1111-1111-111111111111".to_string(),
             email: "alice@example.com".to_string(),
@@ -512,140 +497,166 @@ wwIDAQAB\n\
             aud: AUDIENCE.to_string(),
             exp: now + exp_offset,
             iat: now,
-            jti: "22222222-2222-2222-2222-222222222222".to_string(),
+            nbf: None,
+            sid: "22222222-2222-2222-2222-222222222222".to_string(),
+            scope: vec![],
+            roles: vec![],
         }
     }
 
-    // Happy path: a token signed by the matching key with the expected
-    // issuer/audience/expiry verifies, and every claim field survives the
-    // round-trip intact. This pins the `Claims` shape contract.
     #[test]
     fn valid_token_round_trips_claims() {
-        let (jwks, kid) = test_jwks();
-        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).expect("build");
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
         assert_eq!(verifier.key_count(), 1);
-
-        let token = sign(&kid, &claims(3600));
+        let token = sign(KID, &claims(3600));
         let got = verifier.verify(&token).expect("verify");
         assert_eq!(got.sub, "11111111-1111-1111-1111-111111111111");
         assert_eq!(got.email, "alice@example.com");
         assert_eq!(got.iss, ISSUER);
         assert_eq!(got.aud, AUDIENCE);
+        assert_eq!(got.sid, "22222222-2222-2222-2222-222222222222");
     }
 
-    // Pins expiry enforcement: a valid signature with an `exp` in the
-    // past is still rejected, surfacing as a `Jwt` validation error.
     #[test]
     fn expired_token_is_rejected() {
-        let (jwks, kid) = test_jwks();
-        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).expect("build");
-        // exp far in the past relative to the body's "now".
-        let token = sign(&kid, &claims(-10_000_000_000));
-        assert!(matches!(verifier.verify(&token), Err(VerifyError::Jwt(_))));
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
+        let token = sign(KID, &claims(-10_000_000_000));
+        assert!(matches!(verifier.verify(&token), Err(VerifyError::Claim(_))));
     }
 
-    // Pins audience enforcement: a fully valid token is rejected when the
-    // verifier's configured audience differs from the token's `aud`,
-    // preventing cross-service token replay.
+    #[test]
+    fn not_yet_valid_token_is_rejected() {
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
+        let mut c = claims(3600);
+        c.nbf = Some(1_900_000_000); // year 2030, after the real clock
+        let token = sign(KID, &c);
+        assert!(matches!(verifier.verify(&token), Err(VerifyError::Claim(_))));
+    }
+
     #[test]
     fn wrong_audience_is_rejected() {
-        let (jwks, kid) = test_jwks();
         let verifier =
-            Verifier::from_jwks_value(&jwks, ISSUER, "some-other-service").expect("build");
-        let token = sign(&kid, &claims(3600));
-        assert!(matches!(verifier.verify(&token), Err(VerifyError::Jwt(_))));
+            Verifier::from_paseto_keys_value(&test_keys(), ISSUER, "some-other-service").unwrap();
+        let token = sign(KID, &claims(3600));
+        assert!(matches!(verifier.verify(&token), Err(VerifyError::Claim(_))));
     }
 
     #[test]
     fn wrong_issuer_is_rejected() {
-        // The verifier's policy demands `iss == ISSUER`. A token whose
-        // `iss` claim names a different issuer must be rejected even
-        // though the signature, kid, audience, and expiry are all valid.
-        let (jwks, kid) = test_jwks();
         let verifier =
-            Verifier::from_jwks_value(&jwks, "some-other-issuer", AUDIENCE).expect("build");
-        let token = sign(&kid, &claims(3600));
-        assert!(matches!(verifier.verify(&token), Err(VerifyError::Jwt(_))));
+            Verifier::from_paseto_keys_value(&test_keys(), "some-other-issuer", AUDIENCE).unwrap();
+        let token = sign(KID, &claims(3600));
+        assert!(matches!(verifier.verify(&token), Err(VerifyError::Claim(_))));
     }
 
-    // Pins `kid` selection: a token whose header `kid` is not in the JWKS
-    // is rejected with the specific `UnknownKid` variant before any
-    // signature work. The trailing `let _ = kid;` discards the real `kid`,
-    // which this test deliberately does not use.
     #[test]
     fn unknown_kid_is_rejected() {
-        let (jwks, kid) = test_jwks();
-        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).expect("build");
-        // Sign with a kid the JWKS does not contain.
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
         let token = sign("not-a-known-kid", &claims(3600));
         assert!(matches!(
             verifier.verify(&token),
             Err(VerifyError::UnknownKid(_))
         ));
-        let _ = kid;
     }
 
-    // Pins signature integrity: corrupting one byte of an otherwise valid
-    // token makes the RSA signature check fail, so verification errors.
     #[test]
-    fn tampered_signature_is_rejected() {
-        let (jwks, kid) = test_jwks();
-        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).expect("build");
-        let token = sign(&kid, &claims(3600));
-        let mut bytes = token.into_bytes();
-        let last = bytes.len() - 1;
-        // Flip a bit in the final signature char (avoid producing the same char).
-        bytes[last] = if bytes[last] == b'A' { b'B' } else { b'A' };
-        let tampered = String::from_utf8(bytes).unwrap();
+    fn tampered_payload_is_rejected() {
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
+        let token = sign(KID, &claims(3600));
+        // Flip a character in the payload segment (index 2 of v4.public.X.Y).
+        let mut parts: Vec<&str> = token.split('.').collect();
+        let mut payload = parts[2].to_string();
+        let last = payload.len() - 1;
+        let swapped = if &payload[last..] == "A" { "B" } else { "A" };
+        payload.replace_range(last.., swapped);
+        parts[2] = &payload;
+        let tampered = parts.join(".");
         assert!(verifier.verify(&tampered).is_err());
     }
 
-    // Pins robustness against non-JWT input: a malformed string and the
-    // empty string both error rather than panic.
     #[test]
     fn garbage_token_is_rejected() {
-        let (jwks, _) = test_jwks();
-        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).expect("build");
-        assert!(verifier.verify("not.a.jwt").is_err());
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
+        assert!(verifier.verify("not.a.paseto").is_err());
         assert!(verifier.verify("").is_err());
+        // A wrong-version token is rejected on the header check.
+        assert!(matches!(
+            verifier.verify("v2.public.aaaa"),
+            Err(VerifyError::Malformed(_))
+        ));
     }
 
-    // Pins the "boot before JWKS is reachable" guarantee: an empty key set
-    // constructs successfully, reports zero keys, and rejects any token
-    // with `UnknownKid` (never a panic).
     #[test]
-    fn empty_jwks_builds_but_rejects_everything() {
-        let jwks = serde_json::json!({ "keys": [] });
-        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).expect("build");
+    fn empty_key_set_builds_but_rejects_everything() {
+        let keys = serde_json::json!({ "keys": [] });
+        let verifier = Verifier::from_paseto_keys_value(&keys, ISSUER, AUDIENCE).unwrap();
         assert_eq!(verifier.key_count(), 0);
-        let (_, kid) = test_jwks();
-        let token = sign(&kid, &claims(3600));
+        let token = sign(KID, &claims(3600));
         assert!(matches!(
             verifier.verify(&token),
             Err(VerifyError::UnknownKid(_))
         ));
     }
 
-    // Pins the structural-validation boundary: a document with no `keys`
-    // array is a load-time `Jwks` error, distinct from an empty key set.
     #[test]
-    fn jwks_without_keys_array_errors() {
-        let jwks = serde_json::json!({ "not_keys": [] });
+    fn key_set_without_keys_array_errors() {
+        let keys = serde_json::json!({ "not_keys": [] });
         assert!(matches!(
-            Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE),
-            Err(VerifyError::Jwks(_))
+            Verifier::from_paseto_keys_value(&keys, ISSUER, AUDIENCE),
+            Err(VerifyError::Keys(_))
         ));
     }
 
-    // Pins the RS256-only policy: a non-RSA (here EC) key is silently
-    // skipped during loading rather than erroring, leaving zero usable
-    // keys.
     #[test]
-    fn non_rsa_keys_are_skipped() {
-        let jwks = serde_json::json!({
-            "keys": [{ "kty": "EC", "kid": "ec-1", "crv": "P-256", "x": "a", "y": "b" }]
+    fn non_ed25519_keys_are_skipped() {
+        let keys = serde_json::json!({
+            "keys": [{ "kty": "RSA", "kid": "rsa-1", "n": "a", "e": "b" }]
         });
-        let verifier = Verifier::from_jwks_value(&jwks, ISSUER, AUDIENCE).expect("build");
+        let verifier = Verifier::from_paseto_keys_value(&keys, ISSUER, AUDIENCE).unwrap();
         assert_eq!(verifier.key_count(), 0);
+    }
+
+    #[test]
+    fn ed25519_key_missing_kid_errors() {
+        let public = signing_key().verifying_key().to_bytes();
+        let x = URL_SAFE_NO_PAD.encode(public);
+        let keys = serde_json::json!({
+            "keys": [{ "kty": "OKP", "crv": "Ed25519", "x": x }]
+        });
+        assert!(matches!(
+            Verifier::from_paseto_keys_value(&keys, ISSUER, AUDIENCE),
+            Err(VerifyError::Keys(_))
+        ));
+    }
+
+    #[test]
+    fn ed25519_key_with_bad_x_errors() {
+        let keys = serde_json::json!({
+            "keys": [{ "kty": "OKP", "crv": "Ed25519", "kid": "bad-1", "x": "!!!not-base64!!!" }]
+        });
+        assert!(matches!(
+            Verifier::from_paseto_keys_value(&keys, ISSUER, AUDIENCE),
+            Err(VerifyError::Keys(_))
+        ));
+    }
+
+    #[test]
+    fn ed25519_key_with_wrong_length_x_errors() {
+        // Valid base64url, but only 3 bytes — not a 32-byte Ed25519 key.
+        let keys = serde_json::json!({
+            "keys": [{ "kty": "OKP", "crv": "Ed25519", "kid": "short-1", "x": URL_SAFE_NO_PAD.encode([1, 2, 3]) }]
+        });
+        assert!(matches!(
+            Verifier::from_paseto_keys_value(&keys, ISSUER, AUDIENCE),
+            Err(VerifyError::Keys(_))
+        ));
+    }
+
+    #[cfg(feature = "fetch")]
+    #[tokio::test]
+    async fn from_paseto_keys_url_maps_transport_error_to_fetch() {
+        let result =
+            Verifier::from_paseto_keys_url("not-a-url://nowhere", ISSUER, AUDIENCE).await;
+        assert!(matches!(result, Err(VerifyError::Fetch(_))));
     }
 }

@@ -11,7 +11,7 @@
                 |             v               |
                 |  +-----------------------+  |
                 |  |  EventRepository     |  |
-                |  |  (lib/api/v1/events.ts) |  |
+                |  |  (lib/api/events.ts)  |  |
                 |  +----------+------------+  |
                 |             |               |
                 |             v               |
@@ -23,7 +23,7 @@
                               | HTTP JSON
                               v
                 +-----------------------------+
-                |   event-service-rust-crate |
+                |   event-service-with-loco |
                 |   Axum + SeaORM + Tantivy   |
                 +-----------------------------+
 ```

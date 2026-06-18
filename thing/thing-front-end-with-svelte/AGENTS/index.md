@@ -23,10 +23,10 @@ Detailed reference documentation for the Thing Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../thing-service-rust-crate/spec.md](../../thing-service-rust-crate/spec/index.md) | Service spec — system of record |
-| [../../thing-service-rust-crate/AGENTS/restful.md](../../thing-service-rust-crate/AGENTS/restful.md) | REST API surface |
-| [../../thing-service-rust-crate/AGENTS/models.md](../../thing-service-rust-crate/AGENTS/models.md) | Wire-format domain types |
-| [../../thing-service-rust-crate/AGENTS/matching.md](../../thing-service-rust-crate/AGENTS/matching.md) | Matching algorithm reference |
+| [../../thing-service-with-loco/spec.md](../../thing-service-with-loco/spec/index.md) | Service spec — system of record |
+| [../../thing-service-with-loco/AGENTS/restful.md](../../thing-service-with-loco/AGENTS/restful.md) | REST API surface |
+| [../../thing-service-with-loco/AGENTS/models.md](../../thing-service-with-loco/AGENTS/models.md) | Wire-format domain types |
+| [../../thing-service-with-loco/AGENTS/matching.md](../../thing-service-with-loco/AGENTS/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

@@ -1,7 +1,7 @@
 ## 4. Glossary
 
 Entity-level terms. Per-subproject vocabularies:
-service [spec §4](../person-service-rust-crate/spec/04-glossary.md),
+service [spec §4](../person-service-with-loco/spec/04-glossary.md),
 matcher [spec §4](../person-matcher-rust-crate/spec/04-glossary.md),
 front-end [spec §4](../person-front-end-with-svelte/spec/04-glossary.md).
 

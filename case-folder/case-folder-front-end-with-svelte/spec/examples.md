@@ -54,6 +54,44 @@ try {
 }
 ```
 
+## Volume mutations (UC-V1..V4)
+
+Volumes are the one area whose mutations go through `api.volumes.*`
+**directly** rather than a `cache.*` helper (the volume detail page
+holds its own `VolumeDetail` and re-renders from each call's return
+value). All four mutators return the refreshed `VolumeDetail`:
+
+```ts
+import { api, ApiError } from '$lib/api/client';
+
+// UC-V1 — create then rename
+const vol = await api.volumes.create({ nhsNumber, title, cabinetId });
+let detail = await api.volumes.rename(vol.id, 'Cardiology 2024');
+
+// UC-V2 — add / remove a folder (returns the updated VolumeDetail)
+detail = await api.volumes.addFolder(detail.volume.id, folderId);
+detail = await api.volumes.removeFolder(detail.volume.id, folderId);
+
+// UC-V4 — move the whole volume; toCabinetId omitted/null = "In transit"
+try {
+    detail = await api.volumes.move(detail.volume.id, {
+        toCabinetId,
+        workerId,
+        reason: 'Clinic transfer'
+    });
+} catch (e) {
+    if (e instanceof ApiError && e.status === 422) {
+        const { errors } = e.body as { errors: Record<string, string> };
+        // surface errors.title / errors.folder_id / errors.to_cabinet_id
+    }
+}
+```
+
+Because these bypass the cache, a `+page.ts` that lists volumes
+alongside a mutation should call `invalidateAll()` after the mutation so
+the list loader re-runs. See `src/routes/volumes/[id]/+page.svelte` for
+the canonical pattern.
+
 ## Add a new route
 
 To add `/reports`:

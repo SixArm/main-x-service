@@ -10,7 +10,7 @@ beyond transient page state; front-end
 ### 10.1 Service: PostgreSQL
 
 PostgreSQL 18+ via SeaORM. 13 tables (service
-[spec §10](../place-service-rust-crate/spec/10-persistence.md)):
+[spec §10](../place-service-with-loco/spec/10-persistence.md)):
 `places`, `place_addresses`, `place_geo_coordinates`,
 `place_identifiers`, `place_amenities`, `place_opening_hours`,
 `place_same_as`, `place_hierarchy`, `place_links`, `organizations`,
@@ -32,8 +32,8 @@ hand-maintained, fully-normalized reference schema (8 tables:
 `place_opening_hours`, `place_consents`, `place_merge_records`,
 `audit_log`). It follows the same flattened design as the SQL the
 service actually applies — the SeaORM migration crate
-(`place-service-rust-crate/migration/`) `include_str!`s the raw SQL
-in `place-service-rust-crate/migrations/*/up.sql` — but it is **not
+(`place-service-with-loco/migration/`) `include_str!`s the raw SQL
+in `place-service-with-loco/migrations/*/up.sql` — but it is **not
 generated from** the migrations and has drifted: the live migrations
 create 7 tables (no `place_consents`; consents are an in-memory
 model only), omit the artifact's lat/lon CHECK constraints, and

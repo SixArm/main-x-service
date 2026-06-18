@@ -41,7 +41,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-person-matcher = "0.1.0"
+person-matcher = "0.6"
 ```
 
 ## Usage
@@ -249,10 +249,9 @@ This runs example scenarios including:
 
 ## Limitations
 
-1. **No Machine Learning**: This is a rule-based system, not ML/AI
-2. **Single Identifier Scheme**: Optimised for United Kingdom National Health Service Number-format check-digit identifiers; other national identifier schemes are not currently validated
-3. **No Persistent Storage**: In-memory matching only
-4. **No Batch Processing**: Processes pairs of persons
+1. **No Machine Learning**: This is a rule-based system, not ML/AI (declined per spec §21 / §2 "Out of Scope")
+2. **No Persistent Storage**: In-memory matching only; no database, index, or candidate store
+3. **No Blocking / Candidate Generation**: The crate scores supplied pairs (or one-to-many over a caller-supplied candidate slice); it does not generate candidates or block a large index. Pre-filter in your application layer (see "Batch Scoring")
 
 ## International Phone Numbers
 
@@ -291,7 +290,7 @@ let p2 = Person::builder()
 assert_eq!(engine.match_persons(&p1, &p2).breakdown.phone_score, Some(1.0));
 ```
 
-Supported countries: UK, France, Spain, Ireland, UK Northern Ireland (via GB dial code), Germany, Italy, Netherlands, Belgium, Portugal, Switzerland, Austria, Sweden, Norway, Denmark, Finland, Poland, Australia, New Zealand, US, Canada, Japan, China, India, Brazil, Mexico, South Africa. See `spec.md` §14.3.2 for the full table.
+Supported countries: UK, France, Spain, Ireland, UK Northern Ireland (via GB dial code), Germany, Italy, Netherlands, Belgium, Portugal, Switzerland, Austria, Sweden, Norway, Denmark, Finland, Poland, Australia, New Zealand, US, Canada, Japan, China, India, Brazil, Mexico, South Africa. See [`spec.md`](./spec/index.md) §14.3.2 for the full table.
 
 ## Passport Books
 
@@ -462,16 +461,19 @@ assert_eq!(
 );
 ```
 
-The matcher uses this internally so `"123 High St"` and `"123 High Street"` no longer suffer a Jaro-Winkler penalty for the abbreviation. Mismatching house numbers (e.g. `"10 Downing St"` vs `"20 Downing St"`) penalise the address sub-score even when the street name is identical. See `spec.md` §12.4.1 / §14.4a for the algorithm.
+The matcher uses this internally so `"123 High St"` and `"123 High Street"` no longer suffer a Jaro-Winkler penalty for the abbreviation. Mismatching house numbers (e.g. `"10 Downing St"` vs `"20 Downing St"`) penalise the address sub-score even when the street name is identical. See [`spec.md`](./spec/index.md) §12.4.1 / §14.4a for the algorithm.
 
 ## Future Enhancements
 
-- [ ] Support for other national identifiers (SSN, etc.)
-- [ ] Batch matching API for large datasets
-- [ ] Machine learning integration
-- [ ] Performance benchmarks
-- [ ] More sophisticated address parsing
-- [ ] Broader phone-number country coverage and mobile-vs-landline validation
+See [`spec.md`](./spec/index.md) §21 (Roadmap and Future Work) for the
+authoritative roadmap. Headline features that earlier versions listed
+here are already delivered: multinational national identifiers (42
+schemes incl. US SSN), the batch API (`match_one_to_many` /
+`rank_one_to_many`), sophisticated address parsing
+(`parse_address_line`), broader phone-number country coverage
+(39-country E.164 table), and criterion performance benchmarks. Genuinely
+out of scope: machine-learning integration (declined — this is a
+transparent, rule-based, explainable matcher).
 
 ## License
 

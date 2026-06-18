@@ -14,9 +14,9 @@ event, course) where they diverge.
 See also the brief shared note
 [`../../agents/share/restful.md`](../../agents/share/restful.md) and the
 per-entity API references such as
-[`../../person/person-service-rust-crate/AGENTS/restful.md`](../../person/person-service-rust-crate/AGENTS/restful.md)
+[`../../person/person-service-with-loco/AGENTS/restful.md`](../../person/person-service-with-loco/AGENTS/restful.md)
 and
-[`../../organization/organization-service-rust-crate/AGENTS.md`](../../organization/organization-service-rust-crate/AGENTS.md).
+[`../../organization/organization-service-with-loco/AGENTS.md`](../../organization/organization-service-with-loco/AGENTS.md).
 
 ---
 
@@ -65,7 +65,7 @@ Literal sub-paths (`/search`, `/merge`, `/whoami`, `/merges/recent`, …)
 are registered **before** the `/{pid}` captures so the dynamic segment
 does not shadow them. This ordering is a hard convention — see the
 `routes()` function in
-[`organizations.rs`](../../organization/organization-service-rust-crate/src/controllers/organizations.rs).
+[`organizations.rs`](../../organization/organization-service-with-loco/src/controllers/organizations.rs).
 
 ### 1.3 Response envelope: raw loco JSON vs `ApiResponse`
 
@@ -130,11 +130,11 @@ loco services author the spec **by hand** rather than deriving it:
   `organization_matcher::Organization`), which deliberately does not
   depend on `utoipa`. So the OpenAPI document is a hand-written
   `serde_json::Value` in
-  [`src/openapi.rs`](../../organization/organization-service-rust-crate/src/openapi.rs)
+  [`src/openapi.rs`](../../organization/organization-service-with-loco/src/openapi.rs)
   (`spec()`), which also keeps the doc accurate to the snake_case wire
   format.
 - Served by
-  [`src/controllers/docs.rs`](../../organization/organization-service-rust-crate/src/controllers/docs.rs):
+  [`src/controllers/docs.rs`](../../organization/organization-service-with-loco/src/controllers/docs.rs):
   - `GET /api-docs/openapi.json` — the raw OpenAPI 3.0.3 JSON.
   - `GET /swagger-ui` — a static HTML page that loads Swagger UI from
     the `swagger-ui-dist@5` **CDN** (keeps the crate dependency-light)
@@ -155,14 +155,20 @@ OpenAPI and serve Swagger UI at `/swagger-ui`.
 
 ## 4. Authentication on the API
 
-Bearer **RS256 JWT**, issued by the central
-[authentication-service](../../authentication/authentication-service-rust-crate)
+The **human session** is a server-side Postgres **cookie session**
+(opaque id in an httpOnly cookie). **Cross-service** API calls carry a
+short-lived **PASETO v4.public** bearer token (Ed25519-signed), issued by
+the central
+[authentication-service](../../authentication/authentication-service-with-loco)
 and verified **offline** by each peer via the
 [authentication-verifier](../../authentication/authentication-verifier-rust-crate)
-crate against the service's JWKS — no shared secret, no introspection
-hop. See [`../authentication/index.md`](../authentication/index.md) for
-the token flow. The per-service extractor lives in
-[`src/auth.rs`](../../organization/organization-service-rust-crate/src/auth.rs).
+crate against the service's published Ed25519 key at
+`/.well-known/paseto-keys` — no shared secret, no introspection hop. This
+replaces the prior RS256 JWT + JWKS model 1:1. See
+[`../authentication/index.md`](../authentication/index.md) for the token
+flow and [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+for the source-of-truth design. The per-service extractor lives in
+[`src/auth.rs`](../../organization/organization-service-with-loco/src/auth.rs).
 
 Two extractors, two postures:
 
@@ -173,7 +179,8 @@ Two extractors, two postures:
 
 **Blanket enforcement.** A process-wide flag (`<ENTITY>_REQUIRE_AUTH`,
 e.g. `ORGANIZATION_REQUIRE_AUTH`) turns on an Axum middleware layer
-(`enforce`, wired in `src/app.rs`) that requires a valid bearer token on
+(`enforce`, wired in `src/app.rs`) that requires a valid PASETO bearer
+token (service-to-service) or a valid session (BFF/browser) on
 **every route except** the public health/ping and OpenAPI/Swagger paths
 (`is_public_path`: `/_health`, `/_ping`, `/api-docs/openapi.json`,
 `/swagger-ui*`). It is **off by default** (`1`/`true`/`yes`/`on`,
@@ -181,11 +188,14 @@ case-insensitive, are the only truthy values); unset/blank/junk leaves
 today's opt-in-per-handler behaviour. Activation is an operations
 decision once the SSO token flow is live.
 
-JWKS source is environment-driven: `<ENTITY>_JWKS` (the JWKS JSON;
-absent ⇒ empty key set ⇒ every token rejected, but the service still
-boots), `<ENTITY>_JWT_ISSUER` (default `authentication-service`),
-`<ENTITY>_JWT_AUDIENCE` (default `main-x-service`). Boot-time JWKS fetch
-over HTTP is a deferred follow-up; today the JWKS is injected via env.
+The verification key source is environment-driven: `<ENTITY>_PASETO_KEYS`
+(the published Ed25519 public key set; absent ⇒ empty key set ⇒ every
+token rejected, but the service still boots), `<ENTITY>_TOKEN_ISSUER`
+(default `authentication-service`), `<ENTITY>_TOKEN_AUDIENCE` (default
+`main-x-service`). Boot-time key fetch over HTTP from
+`/.well-known/paseto-keys` is a deferred follow-up; today the key set is
+injected via env. (Code follow-up pending; this supersedes the prior
+`<ENTITY>_JWKS` / `_JWT_*` RS256 vars.)
 
 ---
 
@@ -296,7 +306,7 @@ handler in `src/api/rest/handlers.rs`.
 | Match / check-duplicates / merge | Implemented | Implemented |
 | Batch `deduplicate` | Deferred | Implemented |
 | OpenAPI / Swagger | Hand-written, test-pinned | Utoipa-derived |
-| JWT (MaybeAuthUser / AuthUser / whoami) | Implemented | — |
+| Token auth (MaybeAuthUser / AuthUser / whoami) — target PASETO v4.public, RS256/JWKS decommissioned | Implemented (code follow-up pending) | — |
 | Blanket `/api/*` enforcement | Flag, off by default | — |
 | FHIR R5 | No | Implemented (partial) |
 | gRPC (Tonic) | No | Stub |
@@ -316,6 +326,6 @@ handler in `src/api/rest/handlers.rs`.
 - [`../search/index.md`](../search/index.md) — search params + pagination (planned sibling topic)
 - [`../index.md`](../index.md) — monorepo spec index
 - Per-entity API references, e.g.
-  [`../../person/person-service-rust-crate/AGENTS/restful.md`](../../person/person-service-rust-crate/AGENTS/restful.md)
+  [`../../person/person-service-with-loco/AGENTS/restful.md`](../../person/person-service-with-loco/AGENTS/restful.md)
   and
-  [`../../organization/organization-service-rust-crate/AGENTS.md`](../../organization/organization-service-rust-crate/AGENTS.md)
+  [`../../organization/organization-service-with-loco/AGENTS.md`](../../organization/organization-service-with-loco/AGENTS.md)

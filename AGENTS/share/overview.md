@@ -6,16 +6,17 @@ The **Main X Index** family of crates implements a federated identity index — 
 
 | Crate | Entity | Purpose |
 |-------|--------|---------|
-| [person-service](../../person/person-service-rust-crate) | Person | General person identity registry |
-| [worker-service](../../worker/worker-service-rust-crate) | Worker | Workforce / professional identity registry |
-| [place-service](../../place/place-service-rust-crate) | Place | Geographic place registry (schema.org/Place) |
-| [thing-service](../../thing/thing-service-rust-crate) | Thing | Generic thing / asset registry (schema.org/Thing) |
-| [event-service](../../event/event-service-rust-crate) | Event | Time-bounded event registry (schema.org/Event) |
-| [course-service](../../course/course-service-rust-crate) | Course | Course-identity registry (schema.org/Course) — template + `CourseInstance` sub-resource for specific offerings |
-| [authentication-service](../../authentication/authentication-service-rust-crate) | User | Central single sign-on provider — passwordless email magic-link auth, RS256 JWT issuance, JWKS for offline verification by peers. The first real loco.rs crate and the reference for converting the others. |
-| [organization-service](../../organization/organization-service-rust-crate) | Organization | loco.rs registry for schema.org/Organization — CRUD + matching (embeds organization-matcher; API DTO is the matcher's Organization type) + name search + audit log + event streaming + OpenAPI/Swagger + record merge + offline RS256 JWT verification. Deferred: Tantivy full-text, privacy, blanket JWT enforcement. |
-| [care-pathway-service](../../care-pathway/care-pathway-service-rust-crate) | Care pathway | loco.rs registry for clinical care pathways — CRUD + ILIKE name search + matching (embeds care-pathway-matcher; API DTO is the matcher's CarePathway type) + condition-code validation + OpenAPI/Swagger + audit log + in-memory event streaming + offline RS256 JWT verification + record merge. Deferred: Tantivy full-text search, durable event bus, privacy, front-end merge action, blanket JWT enforcement. |
-| [case-service](../../case/case-service-rust-crate) | Case | loco.rs registry for governmental cases (case tracking — benefits, legal, social-services, complaints, appeals, investigations) — CRUD + ILIKE title search + matching (embeds case-matcher; API DTO is the matcher's Case type) + validation + OpenAPI/Swagger + audit log + in-memory event streaming + offline RS256 JWT verification + record merge. Case data is personal data; deferred: per-field privacy masking + GDPR export, Tantivy full-text, durable event bus, blanket JWT enforcement. |
+| [person-service](../../person/person-service-with-loco) | Person | General person identity registry |
+| [worker-service](../../worker/worker-service-with-loco) | Worker | Workforce / professional identity registry |
+| [place-service](../../place/place-service-with-loco) | Place | Geographic place registry (schema.org/Place) |
+| [thing-service](../../thing/thing-service-with-loco) | Thing | Generic thing / asset registry (schema.org/Thing) |
+| [event-service](../../event/event-service-with-loco) | Event | Time-bounded event registry (schema.org/Event) |
+| [course-service](../../course/course-service-with-loco) | Course | Course-identity registry (schema.org/Course) — template + `CourseInstance` sub-resource for specific offerings |
+| [authentication-service](../../authentication/authentication-service-with-loco) | User | Central single sign-on provider — passwordless email magic-link auth, RS256 JWT issuance, JWKS for offline verification by peers. The first real loco.rs crate and the reference for converting the others. |
+| [organization-service](../../organization/organization-service-with-loco) | Organization | loco.rs registry for schema.org/Organization — CRUD + matching (embeds organization-matcher; API DTO is the matcher's Organization type) + name search + audit log + event streaming + OpenAPI/Swagger + record merge + offline RS256 JWT verification. Deferred: Tantivy full-text, privacy, blanket JWT enforcement. |
+| [care-pathway-service](../../care-pathway/care-pathway-service-with-loco) | Care pathway | loco.rs registry for clinical care pathways — CRUD + ILIKE name search + matching (embeds care-pathway-matcher; API DTO is the matcher's CarePathway type) + condition-code validation + OpenAPI/Swagger + audit log + in-memory event streaming + offline RS256 JWT verification + record merge. Deferred: Tantivy full-text search, durable event bus, privacy, front-end merge action, blanket JWT enforcement. |
+| [case-service](../../case/case-service-with-loco) | Case | loco.rs registry for governmental cases (case tracking — benefits, legal, social-services, complaints, appeals, investigations) — CRUD + ILIKE title search + matching (embeds case-matcher; API DTO is the matcher's Case type) + validation + OpenAPI/Swagger + audit log + in-memory event streaming + offline RS256 JWT verification + record merge. Case data is personal data; deferred: per-field privacy masking + GDPR export, Tantivy full-text, durable event bus, blanket JWT enforcement. |
+| [plan-service](../../plan/plan-service-with-loco) | Plan | loco.rs registry for plans (project / product / programme / initiative / portfolio / epic) — CRUD + matching (embeds plan-matcher; API DTO is the matcher's Plan type) + **project-management sub-resources** (goals / tasks / issues / posts / comments / members + derived timeline & burndown views) + ILIKE name search + OpenAPI/Swagger + audit log + event streaming + offline RS256 JWT verification + record merge + cross-service links + bulk import/export. Integrates the central auth (users/SSO), person/worker (people refs), organization (sponsor). |
 
 ### Matcher crates
 
@@ -37,6 +38,7 @@ specifications, …) tailored to library-style work.
 | [organization-matcher](../../organization/organization-matcher-rust-crate) | Organization | Organization matching — legal-suffix-aware name, postal address, url/domain, jurisdiction, founding date, keywords; deterministic short-circuits on LEI / DUNS / ISO 6523 / GLN / Wikidata / ROR / ISNI / VAT, same-jurisdiction tax id, sameAs URL |
 | [care-pathway-matcher](../../care-pathway/care-pathway-matcher-rust-crate) | Care pathway | Clinical care-pathway matching — name (Jaro-Winkler), target condition codes (ICD/SNOMED Jaccard), provider-scoped pathway code, care setting, interventions / keywords Jaccard; deterministic short-circuits on DOI / Wikidata / guideline-id / URI / UUID, same-provider pathway code, sameAs URL |
 | [case-matcher](../../case/case-matcher-rust-crate) | Case | Governmental case matching — title (Jaro-Winkler + Soundex), subjects / keywords Jaccard, agency-scoped case number, case type / status; deterministic short-circuits on Docket / external-case-id / URI / UUID, same-agency case number, sameAs URL |
+| [plan-matcher](../../plan/plan-matcher-rust-crate) | Plan | Plan matching (project / programme / initiative) — name (Jaro-Winkler + Soundex), goal-title & keywords Jaccard, owner-scoped plan code, owner org, plan type, timeframe proximity (Gaussian decay), relationships & tags Jaccard; deterministic short-circuits on Jira / Asana / Trello / MS-Project / GitHub / Linear ids / URI / UUID, same-owner plan code, sameAs URL |
 
 ### Library crates
 
@@ -45,7 +47,16 @@ and published to crates.io for downstream consumers.
 
 | Crate | Entity | Purpose |
 |-------|--------|---------|
-| [authentication-verifier](../../authentication/authentication-verifier-rust-crate) | User | Peer-side **offline RS256 JWT verification** for the [authentication-service](../../authentication/authentication-service-rust-crate). Fetches/holds the service's JWKS (`Verifier::from_jwks_value` / `from_jwks_url` behind the `fetch` feature), mirrors the `Claims` shape, and verifies `kid` / `iss` / `aud` / `exp` with no shared secret and no introspection hop. Published to crates.io as `authentication-verifier` (0.1); embedded by the sibling services' `src/auth.rs`. |
+| [authentication-verifier](../../authentication/authentication-verifier-rust-crate) | User | Peer-side **offline RS256 JWT verification** for the [authentication-service](../../authentication/authentication-service-with-loco). Fetches/holds the service's JWKS (`Verifier::from_jwks_value` / `from_jwks_url` behind the `fetch` feature), mirrors the `Claims` shape, and verifies `kid` / `iss` / `aud` / `exp` with no shared secret and no introspection hop. Published to crates.io as `authentication-verifier` (0.1); embedded by the sibling services' `src/auth.rs`. |
+
+### Cross-cutting services
+
+Infrastructure services that span the entity trios rather than owning one
+matcher-backed entity.
+
+| Service | Purpose |
+|---------|---------|
+| [link-graph-service-with-loco](../../link/link-graph-service-with-loco) | Read-model **aggregator** for cross-service entity linking. Consumes every entity's event stream plus the new `linked`/`unlinked` events and serves the queryable cross-service graph (`neighbors` / `single-view` / freshness). The read side of the hybrid topology in [cross-service-linking.md](cross-service-linking.md); each entity service owns its link **writes** (`entity_links` + events). v1 edges: `same_identity` (person↔worker), `works_at`/`member_of` (person→org), `employed_by` (worker→org), `subject_of` (case→person). Cross-service links are deliberately **not** a matcher signal (separate from within-entity `relationships`). |
 
 ### Front-end projects
 
@@ -67,6 +78,7 @@ shape as the service crates.
 | [organization-front-end-with-svelte](../../organization/organization-front-end-with-svelte) | organization-service | Operator UI for Organization CRUD + duplicate-check (schema.org/Organization: identifiers, address, jurisdiction; dependency-light, no data grid) |
 | [care-pathway-front-end-with-svelte](../../care-pathway/care-pathway-front-end-with-svelte) | care-pathway-service | Operator UI for clinical care-pathway CRUD + duplicate-check (condition codes, care setting, interventions; dependency-light, no data grid) |
 | [case-front-end-with-svelte](../../case/case-front-end-with-svelte) | case-service | Operator UI for governmental case CRUD + duplicate-check (title, agency, case number, type/status/priority, subjects, identifiers; dependency-light, no data grid; vitest + Playwright tests) |
+| [plan-front-end-with-svelte](../../plan/plan-front-end-with-svelte) | plan-service | Operator UI for plan CRUD / search / match / merge / audit **plus project-management views** — Kanban task board, issues, Gantt/timeline, burndown chart, goals, posts + threaded comments, members (SVAR DataGrid + Lily; top-nav hamburger; 13-locale i18n) |
 
 Per-project decision (2026-06-02): drift between front-ends is accepted; there is no shared `mxi-svelte-core` package. Copy-adapt from a sibling when scaffolding a new front-end.
 

@@ -36,6 +36,7 @@
 //!   [`ConditionCode`], [`CodeSystem`], [`CareSetting`].
 //! - [`MatchingEngine`], [`MatchConfig`], [`MatchResult`],
 //!   [`MatchBreakdown`], [`Confidence`].
+//! - [`Error`], [`Result`] — the crate error type and its `Result` alias.
 
 // Always start with high quality coding conventions.
 // `forbid(unsafe_code)` — this is a pure, deterministic library; there

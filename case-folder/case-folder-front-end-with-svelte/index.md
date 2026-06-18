@@ -22,11 +22,16 @@ tracks paper case-note folders across NHS hospital cabinets.
 
 ### "I want to run this locally"
 
-1. Boot the API: from `../case-folder-service-with-rust`,
-   `cargo run -- task seed && cargo run -- start`.
+1. Boot the API in **stub mode** (the easiest path — no upstream
+   Main-X-Services needed): from `../case-folder-service-with-rust`,
+   `USE_UPSTREAM_STUBS=1 cargo run -- start`. For "real" mode against the
+   upstream services, run `cargo run -- task seed && cargo run -- start`.
 2. From this project: `npm install && npm run dev` — opens at
    <http://localhost:5173>.
-3. Override the API URL with `VITE_API_BASE_URL` if needed.
+3. The dev server proxies `/api` to the Loco app (same-origin, cookie
+   preserved). Set `LOCO_API_PROXY` to retarget the proxy, or
+   `VITE_API_BASE_URL` to point the client at a different origin. See
+   [README.md](README.md) ("API URL & the same-origin proxy").
 
 ### "I want to extend the UI"
 

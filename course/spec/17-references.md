@@ -1,11 +1,11 @@
 ## 17. References
 
 - Subproject specs:
-  [course-service](../course-service-rust-crate/spec/index.md) (§1–§18),
+  [course-service](../course-service-with-loco/spec/index.md) (§1–§18),
   [course-matcher](../course-matcher-rust-crate/spec/index.md) (§1–§25),
   [course-front-end-with-svelte](../course-front-end-with-svelte/spec/index.md) (§1–§18).
 - Subproject AGENTS sets:
-  [service](../course-service-rust-crate/AGENTS/index.md),
+  [service](../course-service-with-loco/AGENTS/index.md),
   [matcher](../course-matcher-rust-crate/AGENTS/index.md),
   [front-end](../course-front-end-with-svelte/AGENTS/index.md).
 - Entity-level AGENTS set: [`../AGENTS/index.md`](../AGENTS/index.md).

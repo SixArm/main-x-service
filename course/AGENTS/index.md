@@ -1,7 +1,7 @@
 # AGENTS directory — Course Entity
 
 Entity-level reference documentation for the **course** trio:
-[course-service-rust-crate](../course-service-rust-crate/),
+[course-service-with-loco](../course-service-with-loco/),
 [course-matcher-rust-crate](../course-matcher-rust-crate/),
 [course-front-end-with-svelte](../course-front-end-with-svelte/).
 These docs orient an agent across the trio and point down to the
@@ -23,11 +23,11 @@ per-subproject AGENTS docs for detail.
 - [`../spec/index.md`](../spec/index.md) — entity-level living
   specification (source of truth for the cross-subproject contract)
 - Subproject AGENTS sets:
-  [`../course-service-rust-crate/AGENTS/`](../course-service-rust-crate/AGENTS/index.md),
+  [`../course-service-with-loco/AGENTS/`](../course-service-with-loco/AGENTS/index.md),
   [`../course-matcher-rust-crate/AGENTS/`](../course-matcher-rust-crate/AGENTS/index.md),
   [`../course-front-end-with-svelte/AGENTS/`](../course-front-end-with-svelte/AGENTS/index.md)
 - Subproject specs:
-  [service](../course-service-rust-crate/spec/index.md) (§1–§18),
+  [service](../course-service-with-loco/spec/index.md) (§1–§18),
   [matcher](../course-matcher-rust-crate/spec/index.md) (§1–§25),
   [front-end](../course-front-end-with-svelte/spec/index.md) (§1–§18)
 - Shared project-root docs:

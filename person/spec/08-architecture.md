@@ -14,7 +14,7 @@
 +-------------------------------+--------------------------------+
                                 |  HTTP JSON  { success, data, error }
 +-------------------------------v--------------------------------+
-|               person-service-rust-crate (registry)              |
+|               person-service-with-loco (registry)              |
 |  REST /api/* (15 endpoints)  |  FHIR R5 /fhir/Person  |  gRPC   |
 |                              |                        |  (stub) |
 |  validation -> dup-detect -> repository -> index -> events ->   |
@@ -82,7 +82,7 @@ index on local disk.
 
 ### 8.5 Where the details live
 
-- Service internals: [service spec §8](../person-service-rust-crate/spec/08-architecture.md)
+- Service internals: [service spec §8](../person-service-with-loco/spec/08-architecture.md)
   (module layout, layering rules, `AppState`, data flows).
 - Matcher internals: [matcher spec §9](../person-matcher-rust-crate/spec/09-architecture.md)
   and [§10](../person-matcher-rust-crate/spec/10-component-specifications.md).

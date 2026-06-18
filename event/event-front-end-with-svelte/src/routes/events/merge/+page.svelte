@@ -12,6 +12,7 @@
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import { EventRepository } from "$lib/api/events.js";
     import { ApiError } from "$lib/api/client.js";
+    import { t, translate } from "$lib/i18n.svelte.js";
     import type { Event, MergeResponse } from "$lib/api/types.js";
 
     const repo = EventRepository.withFetch();
@@ -43,9 +44,9 @@
     // Validate ids, confirm, then perform the merge. ApiError is shown as
     // "code: message"; other errors fall back to their string form.
     async function doMerge() {
-        if (!mainId || !duplicateId) { error = "Both IDs required"; return; }
-        if (mainId === duplicateId) { error = "Main and duplicate must differ"; return; }
-        if (!confirm(`Merge ${duplicateId.slice(0, 8)}… into ${mainId.slice(0, 8)}…?\nThis soft-deletes the duplicate.`)) return;
+        if (!mainId || !duplicateId) { error = translate("merge.bothIdsRequired"); return; }
+        if (mainId === duplicateId) { error = translate("merge.idsMustDiffer"); return; }
+        if (!confirm(translate("merge.confirm").replace("{dup}", duplicateId.slice(0, 8)).replace("{main}", mainId.slice(0, 8)))) return;
         loading = true;
         error = null;
         try {
@@ -65,34 +66,41 @@
         }
     }
 
+    // Split the localized "merge completed" template at {id} so the merge
+    // record id renders inside a <code> element while {at} stays inline.
+    function completedParts(): { before: string; after: string } {
+        const [before = "", rest = ""] = translate("merge.completedBody").split("{id}");
+        return { before, after: rest };
+    }
+
     // One-line preview label: event name plus its (localized) start date.
     function summary(e: Event | null): string {
-        if (!e) return "—";
-        const when = e.start_date ? new Date(e.start_date).toLocaleString() : "no date";
+        if (!e) return translate("merge.preview.none");
+        const when = e.start_date ? new Date(e.start_date).toLocaleString() : translate("merge.preview.noDate");
         return `${e.name} (${when})`;
     }
 </script>
 
 <svelte:head><title>Merge events · Event Service</title></svelte:head>
 
-<header><h1>Merge events</h1></header>
+<header><h1>{t("merge.title")}</h1></header>
 
 <section class="surface stack">
     <FieldRow>
-        <LabeledField label="Main event ID" for="merge-main" required hint="The surviving record">
+        <LabeledField label={t("merge.mainId")} for="merge-main" required hint={t("merge.mainIdHint")}>
             <input id="merge-main" bind:value={mainId} />
         </LabeledField>
-        <LabeledField label="Duplicate event ID" for="merge-dup" required hint="Will be soft-deleted">
+        <LabeledField label={t("merge.dupId")} for="merge-dup" required hint={t("merge.dupIdHint")}>
             <input id="merge-dup" bind:value={duplicateId} />
         </LabeledField>
     </FieldRow>
-    <LabeledField label="Reason" for="merge-reason" hint="Recorded in the merge audit trail">
-        <input id="merge-reason" bind:value={reason} placeholder="Confirmed duplicate" />
+    <LabeledField label={t("merge.reason")} for="merge-reason" hint={t("merge.reasonHint")}>
+        <input id="merge-reason" bind:value={reason} placeholder={t("merge.reasonPlaceholder")} />
     </LabeledField>
     <div class="row">
-        <button type="button" class="button" onclick={loadPreview}>Load preview</button>
+        <button type="button" class="button" onclick={loadPreview}>{t("merge.loadPreview")}</button>
         <button type="button" class="button primary" onclick={doMerge} disabled={loading}>
-            {loading ? "Merging…" : "Merge"}
+            {loading ? t("merge.merging") : t("merge.merge")}
         </button>
     </div>
     {#if error}<div class="banner error">{error}</div>{/if}
@@ -100,21 +108,24 @@
 
 {#if preview.main || preview.duplicate}
     <section class="surface stack">
-        <h2>Preview</h2>
+        <h2>{t("merge.previewTitle")}</h2>
         <dl class="kv">
-            <dt>Main</dt><dd>{summary(preview.main)}</dd>
-            <dt>Duplicate</dt><dd>{summary(preview.duplicate)}</dd>
+            <dt>{t("merge.preview.main")}</dt><dd>{summary(preview.main)}</dd>
+            <dt>{t("merge.preview.duplicate")}</dt><dd>{summary(preview.duplicate)}</dd>
         </dl>
     </section>
 {/if}
 
 {#if result}
     <section class="surface stack">
-        <h2>Merge completed</h2>
-        <p>Merge record <code>{result.merge_record.id}</code> created at {new Date(result.merge_record.merged_at).toLocaleString()}.</p>
+        <h2>{t("merge.completedTitle")}</h2>
+        <p>{completedParts().before}<code>{result.merge_record.id}</code>{completedParts().after.replace(
+            "{at}",
+            new Date(result.merge_record.merged_at).toLocaleString(),
+        )}</p>
         <a href={`/events/${result.main_event.id}`} class="button primary"
            onclick={() => result?.main_event.id && goto(`/events/${result.main_event.id}`)}>
-            View merged main event
+            {t("merge.viewMerged")}
         </a>
     </section>
 {/if}

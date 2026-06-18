@@ -63,7 +63,7 @@ The canonical table lives in `spec.md` §3.4. Reproduced here for convenience:
 
 | Component | Default weight | Algorithm |
 |---|---|---|
-| Name | `0.30` | Best-of-cartesian-product across `(name + alternate_names)` on both sides, via `MatchConfig::name_algorithm` (default `Combined` = `0.6 × JaroWinkler + 0.4 × Levenshtein`) after `normalize_name`. |
+| Name | `0.30` | Best-of-cartesian-product across `(name + alternate_names)` on both sides, via `MatchConfig::name_algorithm` (default `Combined` = `0.7 × JaroWinkler + 0.3 × Levenshtein`) after `normalize_name`. |
 | Description | `0.10` | `Scorer::combined_similarity` on `description` after `normalize_text`. |
 | Disambiguating description | `0.05` | `Scorer::combined_similarity` on `disambiguating_description` after `normalize_text`. |
 | Identifiers | `0.25` | `1.0` if both non-empty and any `(property_id, value)` pair is shared; `0.0` if both non-empty but no overlap; `None` if either empty. |

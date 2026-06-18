@@ -18,8 +18,12 @@ in `organization-service`'s matching layer.
 
 In scope: the properties of `schema.org/Organization` that carry
 **identity** signal — names, registration identifiers, postal address,
-website, jurisdiction, founding date, keywords. Out of scope:
-relationship graph traversal (`parentOrganization`/`subOrganization`),
+website, jurisdiction, founding date, keywords, and **typed
+organization-to-organization relationship references**
+(`parentOrganization`/`subOrganization`, successor/predecessor) compared
+as opaque sets (§14a). Out of scope: relationship **graph traversal**
+(the matcher never resolves, inverts, or transitively closes a
+reference — it compares the two records' relationship *sets*),
 employees, brands, and anything requiring IO, a runtime, or network
 access.
 
@@ -58,6 +62,8 @@ Input: Organization A, Organization B, MatchConfig
   ├─ jurisdiction_score  (both set)  exact country (1.0/0.0)
   ├─ founding_date_score (both set)  same year 1.0, ±1yr 0.5, else 0.0
   ├─ keywords_score      (≥1 set)    Jaccard
+  ├─ relationships_score (both set)  typed-set Jaccard over (relation, organization_id)
+  ├─ tags_score          (both set)  Jaccard over normalised tags
   └─ renormalised weighted average over present components
 ```
 
@@ -66,7 +72,23 @@ Input: Organization A, Organization B, MatchConfig
 `Organization`: `name` (required), `legal_name`, `alternate_names`,
 `identifiers` (`OrgIdentifier { scheme, value }`), `url`, `same_as`,
 `address` (`PostalAddress`), `jurisdiction` (ISO 3166), `founding_date`
-(ISO-8601), `telephone`, `email`, `keywords`.
+(ISO-8601), `telephone`, `email`, `keywords`, `tags`,
+`relationships` (`Vec<RelationshipRef>`).
+
+`tags` is a `Vec<String>` of short, operator-applied free-text labels
+(grouping / triage / workflow), distinct from the descriptive `keywords`;
+defaults empty. A **supporting** signal scored by set Jaccard (§14b),
+never identifying on its own.
+
+`RelationshipRef { relation: RelationKind, organization_id: String }`
+holds a typed organization-to-organization reference. `RelationKind` is a
+`#[non_exhaustive]` enum mirroring the service: `SubOrganizationOf` /
+`ParentOrganizationOf` (containment) and `SuccessorOf` / `PredecessorOf`
+(mergers / renames / reorganisations). `organization_id` is an opaque
+registry id (whitespace-trimmed, non-empty); the matcher does **not**
+resolve, invert, or transitively close the references — it compares the
+two records' relationship **sets** (§14a). A supporting signal, not an
+identifying field on its own.
 
 `IdentifierScheme`: deterministic — `Lei`, `Duns`, `Iso6523`, `Gln`,
 `Wikidata`, `Ror`, `Isni`, `Vat`; scoped — `TaxId`; classification —
@@ -78,8 +100,14 @@ contribute.
 
 ## 7. Configuration
 
-`MatchConfig` weights (default, sum 1.0): name 0.35, address 0.20,
-url 0.15, jurisdiction 0.10, founding_date 0.10, keywords 0.10.
+`MatchConfig` weights (default): name 0.35, address 0.20, url 0.15,
+jurisdiction 0.10, founding_date 0.10, keywords 0.10 — these six
+identifying weights sum to 1.0 — plus the **supporting**
+`relationships_weight` 0.05 (§14a) and `tags_weight` 0.05 (§14b). The
+eight weights are never used absolutely: the renormaliser (§17) divides
+by the sum of the weights whose component actually participated, so the
+supporting relationships and tags signals only ever nudge a score that
+the identifying fields already drive.
 Threshold 0.85. Presets: `strict()` 0.95, `lenient()` 0.70.
 
 ## 8. Normalisation
@@ -121,6 +149,30 @@ apart 0.5, else 0.0. `None` when either is absent or unparseable.
 
 Jaccard over `fold_set(keywords)`. Skipped when both are empty; `0.0`
 when exactly one side has keywords.
+
+## 14a. Relationships — `relationships_score`
+
+Typed-set **Jaccard** over the `(relation, organization_id)` pairs:
+`score = |A ∩ B| / |A ∪ B|`, where each side's set is
+`{ (r.relation, r.organization_id) for r in relationships }`. So a
+`SubOrganizationOf` reference only agrees with a `SubOrganizationOf`
+reference to the **same** organization id — the relation kind is part of
+the key; `ParentOrganizationOf` / `SuccessorOf` / `PredecessorOf` are
+compared as opaque, distinct kinds (no inversion or transitive closure).
+`None` (does not participate) when **either** side has no relationships;
+otherwise a value in `[0.0, 1.0]`. A **supporting** signal weighted
+`relationships_weight` (§7, default `0.05`); shared references never
+single-handedly establish a match.
+
+## 14b. Tags — `tags_score`
+
+Plain set **Jaccard** over `fold_set(tags)` (case-insensitively
+normalised tag sets): `score = |A ∩ B| / |A ∪ B|`. Identical to the
+`keywords` component (§14) in mechanism, but over the operator-applied
+`tags` set rather than descriptive keywords. `None` (does not
+participate) when **either** side has an empty tag set; otherwise a value
+in `[0.0, 1.0]`. A **supporting** signal weighted `tags_weight` (§7,
+default `0.05`); shared tags never single-handedly establish a match.
 
 ## 15. Deterministic identifier short-circuits
 
@@ -164,8 +216,9 @@ the contract.
 
 Semantic versioning. Every re-export from `lib.rs` is part of the
 contract: `Organization`, `OrgIdentifier`, `IdentifierScheme`,
-`PostalAddress`, `MatchingEngine`, `MatchConfig`, `MatchResult`,
-`MatchBreakdown`, `Confidence`, `Error`, `Result`.
+`PostalAddress`, `RelationshipRef`, `RelationKind`, `MatchingEngine`,
+`MatchConfig`, `MatchResult`, `MatchBreakdown` (now carrying
+`relationships_score` and `tags_score`), `Confidence`, `Error`, `Result`.
 
 ## 22. Anti-patterns
 
@@ -175,6 +228,21 @@ async, or panics to library code.
 
 ## 23. Tasks (live work queue)
 
+- [ ] Implement the relationships component in code: add
+      `relationships: Vec<RelationshipRef>` to `Organization`, the
+      `RelationshipRef { relation: RelationKind, organization_id }` +
+      `#[non_exhaustive] RelationKind` (`SubOrganizationOf` /
+      `ParentOrganizationOf` / `SuccessorOf` / `PredecessorOf`) types, the
+      typed-set Jaccard `relationships_score` (§14a), the
+      `relationships_weight` (default `0.05`, §7) in `MatchConfig`, and the
+      `relationships_score: Option<f64>` field in `MatchBreakdown`; pin it
+      with a `tests/public_api.rs` case.
+- [ ] Implement the tags component in code: add `tags: Vec<String>`
+      (default empty) to `Organization`, the plain set Jaccard
+      `tags_score` over `fold_set(tags)` (§14b, `None` when either side
+      empty), the `tags_weight` (default `0.05`, §7) in `MatchConfig`, and
+      the `tags_score: Option<f64>` field in `MatchBreakdown`; pin it with
+      a `tests/public_api.rs` case.
 - [ ] Optional `phone`/`email` exact-match component.
 - [ ] Consider a configurable legal-suffix list (currently a const).
 - [ ] Address: postal-code exact-anchor boost.

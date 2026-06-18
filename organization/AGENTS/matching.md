@@ -72,7 +72,7 @@ absent data never drags the score down.
 
 Both matching endpoints construct
 `MatchingEngine::new(MatchConfig::default())` per request
-([`src/controllers/organizations.rs`](../organization-service-rust-crate/src/controllers/organizations.rs)):
+([`src/controllers/organizations.rs`](../organization-service-with-loco/src/controllers/organizations.rs)):
 
 - `POST /api/organizations/match` → `engine.rank(query, candidates)`
   — pure, no DB.

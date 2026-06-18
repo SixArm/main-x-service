@@ -10,8 +10,8 @@ entity-level invariant.
   `worker_addresses`, `worker_contacts`, `worker_links`,
   `worker_match_scores`, organization tables, and the
   `audit_log` trail. Table inventory:
-  [service `AGENTS/models.md`](../worker-service-rust-crate/AGENTS/models.md);
-  detail: [service §10](../worker-service-rust-crate/spec/10-persistence.md).
+  [service `AGENTS/models.md`](../worker-service-with-loco/AGENTS/models.md);
+  detail: [service §10](../worker-service-with-loco/spec/10-persistence.md).
 - **Tantivy search index** on local disk (`SEARCH_INDEX_PATH`),
   synchronised with database writes. Single-node constraint; see
   roadmap §15 for externalisation.

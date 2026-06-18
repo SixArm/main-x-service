@@ -21,16 +21,21 @@
     import { untrack } from "svelte";
     import { ALL_SCHEMES } from "$lib/api/types";
     import type { IdentifierScheme, OrgIdentifier, Organization } from "$lib/api/types";
+    import { buildOrganization } from "$lib/api/build";
+    import { t } from "$lib/i18n.svelte";
 
     let {
         initial,
-        submitLabel = "Save",
+        submitLabel,
         onsubmit,
     }: {
         initial: Organization;
         submitLabel?: string;
         onsubmit: (org: Organization) => Promise<void>;
     } = $props();
+
+    // Submit button text; falls back to the translated generic "Save".
+    const label = $derived(submitLabel ?? t("form.save"));
 
     // Seed the form once from `initial` (read without tracking).
     const seed = untrack(() => initial);
@@ -62,20 +67,6 @@
     let submitting = $state(false);
     let error = $state<string | null>(null);
 
-    /** Split a comma-separated input into a trimmed, non-empty list. */
-    function splitList(s: string): string[] {
-        return s
-            .split(",")
-            .map((x) => x.trim())
-            .filter((x) => x.length > 0);
-    }
-
-    /** Trim a scalar input; collapse a blank one to `undefined`. */
-    function blankToUndef(s: string): string | undefined {
-        const t = s.trim();
-        return t.length > 0 ? t : undefined;
-    }
-
     /** Append a blank identifier row (default scheme `Lei`). */
     function addIdentifier() {
         // Reassign (not mutate) so the `$state` array triggers reactivity.
@@ -87,38 +78,30 @@
     }
 
     /**
-     * Reassemble the editable fields into an `Organization` payload.
-     * Blank scalars become `null` (explicit clear); list inputs become
-     * arrays; the address group is emitted only if at least one part is
-     * present; identifier rows with empty values are dropped.
+     * Reassemble the editable fields into an `Organization` payload via
+     * the shared, unit-tested {@link buildOrganization} (spec §8): blank
+     * scalars -> `null`, comma lists -> arrays, all-or-nothing address,
+     * empty identifier rows dropped.
      */
     function build(): Organization {
-        // Address is all-or-nothing: only attach it if some part is filled.
-        const addrFields = [street, locality, region, postalCode, country].map(blankToUndef);
-        const hasAddress = addrFields.some((x) => x !== undefined);
-        const org: Organization = { name: name.trim() };
-        org.legal_name = blankToUndef(legalName) ?? null;
-        org.url = blankToUndef(url) ?? null;
-        org.jurisdiction = blankToUndef(jurisdiction) ?? null;
-        org.founding_date = blankToUndef(foundingDate) ?? null;
-        org.telephone = blankToUndef(telephone) ?? null;
-        org.email = blankToUndef(email) ?? null;
-        org.alternate_names = splitList(alternateNames);
-        org.keywords = splitList(keywords);
-        org.same_as = splitList(sameAs);
-        org.identifiers = identifiers
-            .filter((i) => i.value.trim().length > 0)
-            .map((i) => ({ scheme: i.scheme, value: i.value.trim() }));
-        if (hasAddress) {
-            org.address = {
-                street_address: addrFields[0] ?? null,
-                locality: addrFields[1] ?? null,
-                region: addrFields[2] ?? null,
-                postal_code: addrFields[3] ?? null,
-                country: addrFields[4] ?? null,
-            };
-        }
-        return org;
+        return buildOrganization({
+            name,
+            legalName,
+            url,
+            jurisdiction,
+            foundingDate,
+            telephone,
+            email,
+            alternateNames,
+            keywords,
+            sameAs,
+            identifiers,
+            street,
+            locality,
+            region,
+            postalCode,
+            country,
+        });
     }
 
     /**
@@ -133,14 +116,14 @@
         error = null;
         // Client-side guard mirroring the server's required-name rule.
         if (name.trim().length === 0) {
-            error = "Name is required.";
+            error = t("form.nameRequired");
             return;
         }
         submitting = true;
         try {
             await onsubmit(build());
         } catch (err) {
-            error = err instanceof Error ? err.message : "Save failed";
+            error = err instanceof Error ? err.message : t("form.saveFailed");
         } finally {
             submitting = false;
         }
@@ -148,30 +131,30 @@
 </script>
 
 <form class="stack" onsubmit={handleSubmit}>
-    <label>Name<input type="text" bind:value={name} required /></label>
-    <label>Legal name<input type="text" bind:value={legalName} /></label>
+    <label>{t("form.name")}<input type="text" bind:value={name} required /></label>
+    <label>{t("form.legalName")}<input type="text" bind:value={legalName} /></label>
     <div class="row">
-        <label>Website URL<input type="url" bind:value={url} /></label>
-        <label>Jurisdiction (ISO 3166)<input type="text" bind:value={jurisdiction} placeholder="US" /></label>
-        <label>Founding date<input type="text" bind:value={foundingDate} placeholder="1971 or 1971-06-30" /></label>
+        <label>{t("form.url")}<input type="url" bind:value={url} /></label>
+        <label>{t("form.jurisdiction")}<input type="text" bind:value={jurisdiction} placeholder="US" /></label>
+        <label>{t("form.foundingDate")}<input type="text" bind:value={foundingDate} placeholder="1971 or 1971-06-30" /></label>
     </div>
-    <label>Alternate names <small>(comma-separated)</small><input type="text" bind:value={alternateNames} /></label>
-    <label>Keywords <small>(comma-separated)</small><input type="text" bind:value={keywords} /></label>
-    <label>Same-as URLs <small>(comma-separated)</small><input type="text" bind:value={sameAs} /></label>
+    <label>{t("form.alternateNames")} <small>{t("form.commaSeparated")}</small><input type="text" bind:value={alternateNames} /></label>
+    <label>{t("form.keywords")} <small>{t("form.commaSeparated")}</small><input type="text" bind:value={keywords} /></label>
+    <label>{t("form.sameAs")} <small>{t("form.commaSeparated")}</small><input type="text" bind:value={sameAs} /></label>
 
     <fieldset class="stack">
-        <legend>Address</legend>
-        <label>Street<input type="text" bind:value={street} /></label>
+        <legend>{t("form.address")}</legend>
+        <label>{t("form.street")}<input type="text" bind:value={street} /></label>
         <div class="row">
-            <label>Locality<input type="text" bind:value={locality} /></label>
-            <label>Region<input type="text" bind:value={region} /></label>
-            <label>Postal code<input type="text" bind:value={postalCode} /></label>
-            <label>Country<input type="text" bind:value={country} /></label>
+            <label>{t("form.locality")}<input type="text" bind:value={locality} /></label>
+            <label>{t("form.region")}<input type="text" bind:value={region} /></label>
+            <label>{t("form.postalCode")}<input type="text" bind:value={postalCode} /></label>
+            <label>{t("form.country")}<input type="text" bind:value={country} /></label>
         </div>
     </fieldset>
 
     <fieldset class="stack">
-        <legend>Identifiers</legend>
+        <legend>{t("form.identifiers")}</legend>
         <!-- Keyed by index `i`: rows have no stable id and are only
              appended/removed at the end, so positional keys are fine. -->
         {#each identifiers as identifier, i (i)}
@@ -181,15 +164,15 @@
                         <option value={scheme as IdentifierScheme}>{scheme}</option>
                     {/each}
                 </select>
-                <input type="text" bind:value={identifier.value} placeholder="value" />
-                <button type="button" onclick={() => removeIdentifier(i)}>Remove</button>
+                <input type="text" bind:value={identifier.value} placeholder={t("form.value")} />
+                <button type="button" onclick={() => removeIdentifier(i)}>{t("form.remove")}</button>
             </div>
         {/each}
-        <button type="button" onclick={addIdentifier}>+ Add identifier</button>
+        <button type="button" onclick={addIdentifier}>{t("form.addIdentifier")}</button>
     </fieldset>
 
     <button class="button" type="submit" disabled={submitting}>
-        {submitting ? "Saving…" : submitLabel}
+        {submitting ? t("form.saving") : label}
     </button>
     {#if error}<p class="banner" role="alert">{error}</p>{/if}
 </form>

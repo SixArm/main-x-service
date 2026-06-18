@@ -3,12 +3,14 @@
 A small, library-friendly Rust crate for pairwise matching of
 course records modelled on [schema.org/Course](https://schema.org/Course).
 
-> **Status.** Stable. Public API + 21 unit tests; Soundex phonetic
+> **Status.** Stable. Public API + 76 unit tests + a 16-test
+> integration suite ([`tests/public_api.rs`](tests/public_api.rs),
+> driving the re-exported surface end-to-end); Soundex phonetic
 > bonus (`+0.05` on the `name` component, capped at `0.95`) ships
 > as T-6. Service-side bridge — 14 contract tests pinning identifier
 > routing + deterministic short-circuits — lives in the embedding
 > `course-service` crate at
-> [`tests/duplicate_detection.rs`](../course-service-rust-crate/tests/duplicate_detection.rs).
+> [`tests/duplicate_detection.rs`](../course-service-with-loco/tests/duplicate_detection.rs).
 
 ## Quick start
 
@@ -30,6 +32,43 @@ let result = engine.match_courses(&a, &b);
 assert!(result.is_match);                 // 1.0 — same provider + same course code
 assert!(result.breakdown.deterministic_match);
 ```
+
+## Worked example — probabilistic partial match
+
+When no deterministic rule fires, the score is a renormalised
+weighted average and every contributing component is reported in the
+`breakdown` — the crate's headline explainability feature. Here two
+courses share a near-identical name and overlapping keywords but no
+provider/identifier signal:
+
+```rust
+use course_matcher::{Course, MatchConfig, MatchingEngine};
+
+let engine = MatchingEngine::new(MatchConfig::default());
+
+let mut a = Course::new("Introduction to Computer Science");
+a.keywords = vec!["programming".into(), "algorithms".into()];
+
+let mut b = Course::new("Intro to Computer Science");
+b.keywords = vec!["programming".into(), "data structures".into()];
+
+let r = engine.match_courses(&a, &b);
+
+assert!(!r.breakdown.deterministic_match); // no R-0/R-1/R-2 fired
+// Components that BOTH records carry are scored; absent ones are None
+// and excluded from the divisor (renormalisation).
+assert!(r.breakdown.name_score.is_some());      // high Jaro-Winkler
+assert_eq!(r.breakdown.keywords_score, Some(1.0 / 3.0)); // 1 shared of 3
+assert!(r.breakdown.course_code_score.is_none());
+assert!(r.breakdown.provider_score.is_none());
+assert!(r.breakdown.educational_level_score.is_none());
+assert!(r.breakdown.teaches_score.is_none());
+// score = (name * 0.35 + keywords * 0.10) / (0.35 + 0.10)
+```
+
+`match_one_to_many` keeps candidate order; `rank` sorts by descending
+score (returning `(index, result)`); `find_matches` is `rank` plus a
+threshold filter — pick the shape that fits the caller.
 
 ## Algorithm
 
@@ -80,19 +119,20 @@ use course_matcher::{
 - `mimalloc` — demo binary only, under a `musl` target gate.
 
 No `axum`, no `tokio`, no `tantivy`. Embedding services (e.g.
-[`course-service`](../course-service-rust-crate/)) bring those
+[`course-service`](../course-service-with-loco/)) bring those
 themselves and adapt their richer Course shape down to ours.
 
 ## Test + build
 
 ```bash
-cargo test --lib       # 21 unit tests (encoder + scoring + normalisation + bonus)
+cargo test --lib       # 76 unit tests (encoder + scoring + normalisation + bonus)
+cargo test --test public_api  # 16 integration tests (public re-exported surface)
 cargo run              # demo binary — worked examples through the public API
 cargo doc --open       # rustdoc
 
 # Benches live in the embedding service crate so they exercise the
 # adapter + facade path that production calls:
-cd ../course-service-rust-crate && cargo bench
+cd ../course-service-with-loco && cargo bench
 ```
 
 The demo binary ([`src/main.rs`](src/main.rs)) is illustrative only and

@@ -5,21 +5,35 @@ Complete reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 ### 9.1 Service REST API
 
 Source:
-[`src/controllers/auth.rs`](../authentication-service-rust-crate/src/controllers/auth.rs),
-[`src/controllers/jwks.rs`](../authentication-service-rust-crate/src/controllers/jwks.rs).
+[`src/controllers/auth.rs`](../authentication-service-with-loco/src/controllers/auth.rs),
+[`src/controllers/token.rs`](../authentication-service-with-loco/src/controllers/token.rs),
+[`src/controllers/paseto_keys.rs`](../authentication-service-with-loco/src/controllers/paseto_keys.rs).
+
+Auth column: **Cookie** = `__Host-mxi_session` session cookie;
+**+CSRF** = also requires a valid CSRF token (§6.4c, FR-8f).
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | POST | `/api/auth/signup` | — | Create account, send magic link (always `200`) |
 | POST | `/api/auth/magic-link` | — | Request magic link, sign in (always `200`) |
-| GET | `/api/auth/magic-link/{token}` | — | Redeem link → RS256 access token + session |
-| GET | `/api/auth/me` | Bearer | Current user; rejects revoked sessions |
-| POST | `/api/auth/signout` | Bearer | Revoke the current session |
+| GET | `/api/auth/magic-link/{token}` | — | Redeem link → **`Set-Cookie: __Host-mxi_session`** + session row (no token in body) |
+| POST | `/token` | Cookie +CSRF | Exchange the session for a short-lived **PASETO v4.public** (`exp` ~5 min) |
+| GET | `/api/auth/me` | Cookie | Current user; resolves + slides the session, rejects expired/revoked |
+| POST | `/api/auth/signout` | Cookie +CSRF | Revoke the session (`revoked_at`) + clear the cookie |
 | GET | `/api/auth/audit/recent` | — | Recent authentication audit events (`AuthEvent[]`, newest 100) |
-| GET | `/api/auth/account/export` | Bearer | GDPR right of access: the subject's `users` + `sessions` + `auth_events` (`AccountExport`) |
-| GET | `/api/auth/account/audit` | Bearer | GDPR right of access: the subject's own audit trail (`AccountAuditExport[]`) |
-| DELETE | `/api/auth/account` | Bearer | GDPR right to erasure: soft-delete + anonymise + revoke sessions + audit |
-| GET | `/.well-known/jwks.json` | — | Public keys for offline verification |
+| GET | `/api/auth/account/export` | Cookie | GDPR right of access: the subject's `users` + `sessions` + `auth_events` (`AccountExport`) |
+| GET | `/api/auth/account/audit` | Cookie | GDPR right of access: the subject's own audit trail (`AccountAuditExport[]`) |
+| DELETE | `/api/auth/account` | Cookie +CSRF | GDPR right to erasure: soft-delete + anonymise + revoke sessions + audit |
+| GET | `/.well-known/paseto-keys` | — | Ed25519 public keys for offline PASETO verification |
+
+> **Decommissioned (this pivot).** `GET /.well-known/jwks.json` and
+> RS256 access-token issuance are removed; the magic-link redemption no
+> longer returns a bearer token. Per
+> [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+> §9, JWKS may be kept transitionally during peer migration, then
+> dropped once no peer or front-end depends on it. Bearer-token auth is
+> superseded by the session cookie (browser↔service) and PASETO
+> (service↔service).
 
 `/api/auth/audit/recent` returns the durable `auth_events` audit trail
 (T-10; see §10 + §12). It is deliberately unauthenticated (operator
@@ -30,7 +44,7 @@ access (T-9) is served instead by the bearer-gated, per-subject
 own data is reachable only by that subject.
 
 Plus loco's default routes (`AppRoutes::with_default_routes()` in
-[`src/app.rs`](../authentication-service-rust-crate/src/app.rs)),
+[`src/app.rs`](../authentication-service-with-loco/src/app.rs)),
 including the framework health/ping endpoints.
 
 Responses are **raw loco JSON** — no `{success, data, error}` envelope
@@ -43,24 +57,30 @@ Source: [`src/lib.rs`](../authentication-verifier-rust-crate/src/lib.rs).
 
 | Item | Signature |
 |---|---|
-| `Verifier::from_jwks_value` | `(&serde_json::Value, issuer: &str, audience: &str) -> Result<Verifier, VerifyError>` |
-| `Verifier::from_jwks_url` | `async (url, issuer, audience) -> Result<Verifier, VerifyError>` — `fetch` feature |
+| `Verifier::from_paseto_keys_value` | `(&serde_json::Value, issuer: &str, audience: &str) -> Result<Verifier, VerifyError>` |
+| `Verifier::from_paseto_keys_url` | `async (url, issuer, audience) -> Result<Verifier, VerifyError>` — `fetch` feature |
 | `Verifier::verify` | `(&self, token: &str) -> Result<Claims, VerifyError>` |
 | `Verifier::key_count` | `(&self) -> usize` |
 | `Claims` | §5.3 claim struct (serde) |
-| `VerifyError` | `Jwks(String)` \| `MissingKid` \| `UnknownKid(String)` \| `Jwt(jsonwebtoken::errors::Error)` \| `Fetch(String)` (feature `fetch`) |
+| `VerifyError` | `Keys(String)` \| `MissingKid` \| `UnknownKid(String)` \| `Paseto(String)` \| `Fetch(String)` (feature `fetch`) |
+
+*(These replace the prior RS256 `from_jwks_value` / `from_jwks_url` /
+`Jwks` / `Jwt` items; see shared §5.)*
 
 ### 9.3 Front-end routes
 
 Source:
 [`src/routes/`](../authentication-front-end-with-svelte/src/routes/).
 
+All calls go through the SvelteKit-server BFF (shared §6); the browser
+carries only the `__Host-mxi_session` cookie.
+
 | Route | Calls |
 |---|---|
-| `/` | `GET /api/auth/me` (bearer); sign out → `POST /api/auth/signout` |
+| `/` | `GET /api/auth/me` (cookie); sign out → `POST /api/auth/signout` (cookie +CSRF) |
 | `/signup` | `POST /api/auth/signup` |
 | `/signin` | `POST /api/auth/magic-link` |
-| `/verify?token=…` | `GET /api/auth/magic-link/{token}` → store session → redirect `/` |
+| `/verify?token=…` | `GET /api/auth/magic-link/{token}` → server receives `Set-Cookie` → redirect `/` |
 
 ### 9.4 Contract gaps
 

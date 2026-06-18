@@ -12,6 +12,7 @@
     import MatchResultsList from "$lib/components/MatchResultsList.svelte";
     import { PlaceRepository } from "$lib/api/places.js";
     import { ApiError } from "$lib/api/client.js";
+    import { t, translate } from "$lib/i18n.svelte.js";
     import type { MatchResult, Place } from "$lib/api/types.js";
 
     const repo = PlaceRepository.withFetch();
@@ -31,7 +32,7 @@
             // for review and convert to a form-level message (not a hard error).
             if (err instanceof ApiError && err.isConflict && Array.isArray(err.details)) {
                 duplicates = err.details as MatchResult[];
-                throw new Error(`Duplicates detected (${duplicates.length}) — review below before resubmitting.`);
+                throw new Error(translate("new.duplicatesDetected").replace("{count}", String(duplicates.length)));
             }
             throw err; // any other error propagates to the form unchanged
         }
@@ -40,12 +41,12 @@
 
 <svelte:head><title>New place · Place Service</title></svelte:head>
 
-<header><h1>New place</h1></header>
+<header><h1>{t("new.title")}</h1></header>
 
 <section class="surface stack">
-    <PlaceForm initial={blank} submitLabel="Create" onsubmit={handleSubmit} />
+    <PlaceForm initial={blank} submitLabel={t("new.create")} onsubmit={handleSubmit} />
 </section>
 
 {#if duplicates.length > 0}
-    <MatchResultsList results={duplicates} title="Possible duplicates" />
+    <MatchResultsList results={duplicates} title={t("new.possibleDuplicates")} />
 {/if}

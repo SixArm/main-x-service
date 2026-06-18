@@ -1,12 +1,18 @@
 # Testing strategy
 
-Three layers, mapped to spec [§11 Testing Strategy](../spec/11-testing-strategy.md).
+Two automated layers plus a manual integration pass, mapped to spec
+[§11 Testing Strategy](../spec/11-testing-strategy.md).
 
 | Layer | Tool | Runs against | Purpose |
 |---|---|---|---|
-| Unit | Vitest | Mocked `fetch` / in-memory | Pin ApiClient envelope, repository wiring, form-store behaviour |
-| Smoke | Playwright (`smoke` project) | Built SvelteKit preview, no service | Pin route shells render, nav, basic form submit (mocked) |
-| Integration | Playwright (`integration` project) | Built preview + a running `course-service` | Pin the actual operator flows end-to-end over real HTTP |
+| Unit | Vitest + jsdom | Mocked `fetch` / in-memory | Pin `ApiClient` envelope handling, `ApiError` mapping, `CourseRepository` wiring, form-store behaviour, `CourseForm` validation |
+| Smoke (e2e) | Playwright | Built SvelteKit preview, no service | Pin route shells render, nav, basic form rendering (mocked) |
+| Live integration | (manual) | `pnpm dev` against a running `course-service-with-loco` | Click through CRUD / match / merge over real HTTP |
+
+There is **no** `tests/integration/` directory and **no**
+`test:integration` script — live integration is the manual pass in the
+table above. Only two automated directories exist: `tests/unit/`
+(Vitest) and `tests/e2e/` (Playwright).
 
 ## Running
 
@@ -17,58 +23,38 @@ pnpm test
 # Smoke (playwright; no service needed)
 pnpm test:e2e
 
-# Integration (playwright; requires PUBLIC_API_BASE_URL service up)
-pnpm test:integration
+# Type check (svelte-kit sync + svelte-check)
+pnpm check
 
-# Type check
-pnpm svelte-check
-
-# Lint (if configured)
+# Lint (prettier --check src)
 pnpm lint
 ```
 
 ## Unit tests (`tests/unit/`)
 
-Conventions:
-
-- One file per source module under test (`apiClient.test.ts`,
-  `coursesRepository.test.ts`, `createForm.test.ts`).
-- Mock `fetch` via `vi.fn()`; assert on URL, method, headers, body.
-- For repository tests: pin the exact route path (e.g.
-  `POST /api/courses/duplicates` — Course Service uses `/duplicates`,
-  not `/check-duplicates`).
-- For envelope tests: assert that `ApiClient` unwraps `{success,
-  data, error}` correctly and surfaces `ApiError` with `isConflict`
-  / `isNotFound` / `isValidation` shortcuts.
-
-## Smoke tests (`tests/e2e/`)
+Real files: `client.test.ts` (ApiClient envelope + error tests),
+`courses.test.ts` (CourseRepository wiring + search query-param
+forwarding), `form.test.ts` (the `createForm` rune controller:
+validate-blocks-submit, submit-error capture, reset, per-field
+set/clear), and `courseFormValidate.test.ts` (FR-4 rules — required
+name, http(s) URL fields, `course_code` ≤ 100, `number_of_credits`
+≥ 0 — plus the `normalizeForWire` blank→undefined sweep). The
+validator/normaliser live in `src/lib/components/courseFormValidate.ts`
+(extracted from `CourseForm.svelte` so they unit-test without a DOM
+mount).
 
 Conventions:
 
-- Cover route shells, nav, form rendering — **not** API behaviour.
-- Use Playwright's `expect(page).toHaveURL(/...)` for route assertions.
-- Mock or stub the API at the browser boundary (`page.route(...)`) so
-  the smoke suite passes without a backing service.
-- Goal: every MVP route renders, primary action is clickable.
+- Mock `fetch` via a cast `vi.fn()`-style handler and assert on URL,
+  method, headers, body.
+- For repository tests: pin the exact route path. The Course Service
+  duplicate-check endpoint is `POST /api/courses/check-duplicates`
+  (not `/duplicates`).
+- For envelope tests: assert that `ApiClient` unwraps `{ success,
+  data, error }` correctly and that `ApiError` exposes the
+  `isConflict` / `isNotFound` / `isValidation` shortcuts.
 
-## Integration tests (`tests/integration/`)
-
-Conventions:
-
-- Require a live `course-service-rust-crate` at `PUBLIC_API_BASE_URL`.
-- The `playwright.config.ts` `webServer` command bakes
-  `PUBLIC_API_BASE_URL` into the preview build so the front-end talks
-  to the configured service.
-- Each test is **idempotent**: creates its own records, cleans up via
-  the service's soft-delete endpoint. Do not assume a pristine
-  database.
-- Cover one spec §6 FR each: search-finds-record, create-lands-on-detail,
-  inline-409, edit-PUT, soft-delete-hides, match-renders-score,
-  merge-soft-deletes-duplicate, audit-log-presence.
-
-## Writing new tests
-
-### Unit test pattern
+`ApiClient` takes an **options object**, not positional args:
 
 ```ts
 import { describe, it, expect, vi } from "vitest";
@@ -77,16 +63,32 @@ import { ApiClient } from "$lib/api/client";
 describe("ApiClient", () => {
   it("unwraps the success envelope", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ success: true, data: { id: 1 } })),
-    );
-    const client = new ApiClient("http://test", fetchMock);
-    const result = await client.get("/health");
+      new Response(JSON.stringify({ success: true, data: { id: 1 }, error: null }), {
+        headers: { "content-type": "application/json" },
+      }),
+    ) as unknown as typeof fetch;
+    const client = new ApiClient({ baseUrl: "http://test", fetch: fetchMock });
+    const result = await client.get("/api/health");
     expect(result).toEqual({ id: 1 });
   });
 });
 ```
 
-### Playwright pattern
+Form-store / validation tests run the rune-backed controller directly.
+`createForm` and `CourseForm`'s `validate` are pure functions of their
+input, so they unit-test without a DOM mount.
+
+## Smoke tests (`tests/e2e/`)
+
+Real file: `courses.spec.ts`.
+
+Conventions:
+
+- Cover route shells, nav, form rendering — **not** API behaviour.
+- Use Playwright's `expect(page).toHaveURL(/.../)` for route assertions.
+- Mock or stub the API at the browser boundary (`page.route(...)`) so
+  the smoke suite passes without a backing service.
+- Goal: every MVP route renders, primary action is clickable.
 
 ```ts
 import { test, expect } from "@playwright/test";
@@ -97,13 +99,21 @@ test("dashboard renders health badge", async ({ page }) => {
 });
 ```
 
+## Manual live integration
+
+No automated tests. Run `pnpm dev` (or a preview build) with
+`PUBLIC_API_BASE_URL` pointed at a running
+`course-service-with-loco`, then click through one flow per spec §6
+FR: search-finds-record, create-lands-on-detail, inline-409, edit-PUT,
+soft-delete-hides, match-renders-score, merge-soft-deletes-duplicate,
+audit-log-presence. Each pass should create its own records and clean
+up via the soft-delete endpoint — do not assume a pristine database.
+
 ## CI expectations
 
-- `svelte-check` must report 0 errors, 0 warnings.
+- `pnpm check` (svelte-check) must report 0 errors, 0 warnings.
 - `pnpm test` (vitest) must pass.
 - `pnpm test:e2e` (smoke) must pass without a backing service.
-- `pnpm test:integration` runs only on PRs that touch
-  `src/lib/api/` or `tests/integration/` (or on demand).
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the validation-status
 table that ships with each release.

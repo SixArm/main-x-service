@@ -9,7 +9,8 @@
 //! Naming follows the AGENTS guide: `test_<thing>_<expected>`.
 
 use thing_matcher::{
-    Confidence, Identifier, MatchConfig, MatchingEngine, Normalizer, SimilarityAlgorithm, Thing,
+    Confidence, Identifier, MatchConfig, MatchingEngine, Normalizer, Scorer, SimilarityAlgorithm,
+    Thing,
 };
 
 // ============================================================
@@ -524,4 +525,73 @@ fn test_rank_one_to_many_orders_by_descending_score() {
     for w in ranked.windows(2) {
         assert!(w[0].1.score >= w[1].1.score);
     }
+}
+
+// ============================================================
+// Combined-blend weighting (locks 0.7 JW + 0.3 Lev)
+// ============================================================
+
+/// Pins the exact `Combined` blend as `0.7·JaroWinkler + 0.3·Levenshtein`
+/// (spec §6.1). This guards against the blend silently drifting back to a
+/// `0.6 / 0.4` weighting: for "Stephen"/"Steven" the two blends differ by
+/// more than `0.01`, so the assertion below fails under `0.6 / 0.4`.
+#[test]
+fn test_combined_blend_is_seventy_thirty() {
+    let jw = Scorer::jaro_winkler_similarity("Stephen", "Steven");
+    let lev = Scorer::levenshtein_similarity("Stephen", "Steven");
+    let combined = Scorer::combined_similarity("Stephen", "Steven");
+
+    let expected_70_30 = 0.7 * jw + 0.3 * lev;
+    let expected_60_40 = 0.6 * jw + 0.3 * lev + 0.1 * lev; // == 0.6·JW + 0.4·Lev
+
+    assert!(
+        (combined - expected_70_30).abs() < 1e-9,
+        "combined {combined} should equal the 0.7/0.3 blend {expected_70_30}"
+    );
+    // The two candidate blends must be distinguishable on this pair, so the
+    // test genuinely discriminates 0.7/0.3 from 0.6/0.4.
+    assert!(
+        (expected_70_30 - expected_60_40).abs() > 0.01,
+        "the chosen pair must separate the two candidate blends"
+    );
+}
+
+// ============================================================
+// Phonetic bonus (must lift the score, not just be Some/None)
+// ============================================================
+
+/// Pins that the Soundex phonetic bonus actually *raises* the overall
+/// `score` (spec §5.7, §5.10): the same name pair scored with phonetic
+/// matching on must score strictly higher than with it off. "Robert" and
+/// "Rupert" share the Soundex code `R163` while their fuzzy name score is
+/// below `1.0`, so the gated `0.05` bonus is observable.
+#[test]
+fn test_phonetic_bonus_raises_score() {
+    assert_eq!(
+        Normalizer::phonetic_code("Robert"),
+        Normalizer::phonetic_code("Rupert"),
+        "test premise: the two names must share a Soundex code"
+    );
+
+    let a = Thing::builder().name("Robert").build();
+    let b = Thing::builder().name("Rupert").build();
+
+    let off = MatchConfig {
+        use_phonetic_matching: false,
+        ..MatchConfig::default()
+    };
+    let on = MatchConfig {
+        use_phonetic_matching: true,
+        ..MatchConfig::default()
+    };
+
+    let score_off = MatchingEngine::new(off).match_things(&a, &b).score;
+    let result_on = MatchingEngine::new(on).match_things(&a, &b);
+
+    assert_eq!(result_on.breakdown.name_phonetic_score, Some(1.0));
+    assert!(
+        result_on.score > score_off,
+        "phonetic-on score {} must exceed phonetic-off score {score_off}",
+        result_on.score
+    );
 }

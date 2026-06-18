@@ -1,0 +1,93 @@
+[package]
+name = "course-service"
+version = "0.3.0"
+edition = "2024"
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Course Service — a course-administration microservice modelled on schema.org/Course; interoperates with the course-matcher crate"
+license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
+repository = "https://github.com/sixarm/main-x-service/course-service-with-loco"
+keywords = ["course-matcher", "education", "microservice"]
+categories = ["database"]
+
+[lib]
+name = "course_service"
+path = "src/lib.rs"
+
+[[bin]]
+name = "course-service"
+path = "src/bin/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.52", features = ["full"] }
+
+# Loco framework (backend-only; the service boots through loco's
+# Hooks/AppContext/CLI and mounts its REST router via after_routes).
+loco-rs = { version = "0.16", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
+migration = { path = "migration" }
+
+# Web framework (axum 0.8 to match loco 0.16)
+axum = { version = "0.8", features = ["macros"] }
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json"] }
+
+# Search
+tantivy = "0.22"
+
+# OpenAPI documentation
+utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
+
+# Common types
+chrono = { version = "0.4", features = ["serde"] }
+time = "0.3"
+uuid = { version = "1.23", features = ["serde", "v4"] }
+
+# Observability
+prometheus = { version = "0.13" }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Error handling
+thiserror = "2.0"
+
+# Env / config
+dotenvy = "0.15"
+
+# Sibling matcher crate (embedded via re-export so the service uses the
+# canonical algorithm rather than maintaining a fork).
+course-matcher = "0.6.1"
+
+# `dyn CourseRepository` needs object-safe async via async_trait.
+async-trait = "0.1"
+mimalloc = "0.1.52"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.27"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "matching_bench"
+harness = false
+
+[[bench]]
+name = "search_bench"
+harness = false
+
+[[bench]]
+name = "validation_bench"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

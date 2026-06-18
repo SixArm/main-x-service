@@ -36,7 +36,7 @@ manual check confirms it. Split tasks too big for one PR
     (migration `m20220101_000002_audit_logs`), `models/audit_logs.rs`
     (`record` / `recent` / `for_entity`); the controller writes a
     best-effort row on each CRUD action (logs on failure, never fails
-    the request — the `actor` column is `NULL` until JWT auth lands,
+    the request — the `actor` column is `NULL` until token auth lands,
     T-7). Read endpoints `GET /api/care-pathways/audit/recent` and
     `GET /api/care-pathways/{pid}/audit`.
   - [x] Event publish per CRUD per
@@ -103,24 +103,34 @@ manual check confirms it. Split tasks too big for one PR
     with search-blocked candidates (NFR-1 / NFR-2; OQ-2).
   - **Acceptance:** `check-duplicates` latency test passes at
     100 000 stored pathways.
-- [x] **T-7 — JWT verification.**
-  - [x] Verify RS256 JWTs against the auth-service JWKS (offline).
-    **Done (2026-06-13):** `src/auth.rs` embeds the
+- [x] **T-7 — Offline token verification.**
+  - [x] Verify offline bearer tokens against the auth-service's published
+    key. **Done (2026-06-13, RS256-JWT/JWKS):** `src/auth.rs` embeds the
     [`authentication-verifier`](../../authentication/authentication-verifier-rust-crate)
     crate behind a process-wide `Verifier` built from `CARE_PATHWAY_JWKS`
     / `CARE_PATHWAY_JWT_ISSUER` / `CARE_PATHWAY_JWT_AUDIENCE`. `AuthUser`
     (required) and `MaybeAuthUser` (optional) extractors; `GET
     /api/care-pathways/whoami` is protected. CRUD now stamps the audit
     `actor` from the token when present (previously always `NULL`).
+  - [ ] *Switch the credential RS256-JWT → **PASETO v4 public** per
+    [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)*
+    (supersedes the RS256-JWT + JWKS model). `Verifier` verifies
+    `Authorization: Bearer v4.public.…` tokens against the auth-service's
+    published Ed25519 key; the embedded `authentication-verifier` switches
+    to PASETO (`from_paseto_keys_value` / `from_paseto_keys_url` replace
+    `from_jwks_*`); same `Claims` shape, verifying `kid`/`iss`/`aud`/`exp`
+    with `kid` carried in the footer. Env vars become
+    `CARE_PATHWAY_PASETO_KEYS` / `CARE_PATHWAY_TOKEN_ISSUER` /
+    `CARE_PATHWAY_TOKEN_AUDIENCE`.
   - **Acceptance:** no token → `401`; valid signed token → `2xx`.
     **Met:** `whoami_without_token_is_401` (DB-gated) + six un-gated
     crypto unit tests in `auth::tests` (valid→claims, missing/non-bearer/
     expired/tampered→401, empty-verifier rejects) minting a real token +
-    matching JWKS in-process.
+    matching key in-process.
   - [ ] *Follow-up:* blanket enforcement on every `/api/*` route (awaits
     the coordinated family SSO rollout; the front-end must attach the
-    bearer token first) and JWKS-over-HTTP fetch from the auth service
-    at boot (currently injected via env).
+    bearer token first) and paseto-keys-over-HTTP fetch from the auth
+    service at boot (currently injected via env).
 - [x] **T-8 — Record merge.**
   - [x] Merge confirmed duplicates: union list fields, keep the
     duplicate's title as an `alternate_names` entry, soft-delete the
@@ -178,3 +188,33 @@ manual check confirms it. Split tasks too big for one PR
     terminology-server existence checks stay deferred.
   - **Acceptance:** Swagger UI serves the seven endpoints; malformed
     code test returns `422`. *(Validation leg met; Swagger leg open.)*
+- [ ] **T-10 — Bulk import / export.**
+  See §9.4, §10.4 and
+  [bulk import/export](../../agents/share/bulk-import-export.md).
+  - [ ] Migration creating the `bulk_jobs` table (shared doc §3 schema,
+    with the `UNIQUE (entity, kind, idempotency_key)` key).
+  - [ ] The five endpoints (§9.4): `POST`/`GET`
+    `/api/v1/care-pathways/import`, `POST`/`GET`
+    `/api/v1/care-pathways/export`, `GET /api/v1/care-pathways/bulk-jobs`.
+  - [ ] `bg_pg` worker draining jobs `queued → running →
+    completed | completed_with_errors | failed`, with progress updates.
+  - [ ] JSONL (lossless reference) + CSV (flattening per §9.4: every
+    repeated / nested field a JSON-in-cell) codecs; Parquet
+    **export-only**, feature-gated.
+  - [ ] Per-row pipeline reusing the single-create validators
+    (`src/validation.rs`: ICD/SNOMED code formats, identifier shapes,
+    BCP-47) + matcher + review queue: upsert by stable key (deterministic
+    scheme-scoped identifier, `(provider_id, pathway_code)`, or `pid`,
+    §9.4); keyless / unmatched rows → duplicate detection → review queue
+    with `provenance = import`; events + audit not bypassed.
+  - [ ] Downloadable per-row error report
+    (`row_number, source_line, field, code, message`); one bad row never
+    aborts the load; counts reconcile
+    (`rows_total = created + upserted + to_review + errored`).
+  - [ ] Export masking + audit: `masking_profile` (masked default, full
+    gated), `include_soft_deleted` gated, every export audited (even
+    zero-row).
+  - **Acceptance:** integration tests cover idempotent re-import (same
+    file re-upserts to the same state), the per-row error report, a
+    keyless dedupe-to-review row (`provenance = import`), masked vs full
+    export, and that a zero-row export still writes an audit record.

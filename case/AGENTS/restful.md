@@ -3,7 +3,7 @@
 The service is loco.rs and returns **raw JSON** — no
 `{success, data, error}` envelope (unlike the pre-loco person service).
 Source:
-[`src/controllers/cases.rs`](../case-service-rust-crate/src/controllers/cases.rs).
+[`src/controllers/cases.rs`](../case-service-with-loco/src/controllers/cases.rs).
 Base URL in development: `http://localhost:5150`.
 
 ## Endpoints
@@ -39,14 +39,22 @@ Base URL in development: `http://localhost:5150`.
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/api/cases/whoami` | verified bearer-token `Claims`; `401` without a valid token |
+| GET | `/api/cases/whoami` | verified PASETO-token `Claims`; `401` without a valid token |
 
-RS256 tokens are verified offline against the auth-service JWKS via the
-embedded `authentication-verifier` (`src/auth.rs`), built from `CASE_JWKS`
-/ `CASE_JWT_ISSUER` / `CASE_JWT_AUDIENCE`. The `AuthUser` extractor
-requires a token; `MaybeAuthUser` is optional and feeds the audit / merge
-`actor`. Blanket `/api/*` enforcement + JWKS-over-HTTP fetch are
-follow-ups.
+Short-lived **PASETO v4.public** tokens are verified offline against the
+auth-service's published **Ed25519 key** via the embedded
+`authentication-verifier` (`src/auth.rs`), built from
+`CASE_JWT_ISSUER` / `CASE_JWT_AUDIENCE` and the published-key source. The
+`AuthUser` extractor requires a token; `MaybeAuthUser` is optional and
+feeds the audit / merge `actor`. Blanket `/api/*` auth enforcement +
+published-key fetch are follow-ups.
+
+> Auth pivot in progress: the family moved from RS256 JWT + JWKS to
+> cookie sessions + offline PASETO v4.public verification — see
+> [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+> (source of truth; RS256/JWKS decommissioned). The current `src/auth.rs`
+> runtime still verifies the old credential; the code follow-up is
+> tracked in the service spec §13.
 
 ### Audit & events
 
@@ -73,7 +81,7 @@ event to the in-memory stream. Durable broker is roadmap.
 |---|---|
 | 200 | Success |
 | 400 | Malformed body (loco JSON rejection) or blank search `q` |
-| 401 | Missing / invalid bearer token on a protected route (`whoami`) |
+| 401 | Missing / invalid PASETO token on a protected route (`whoami`) |
 | 404 | Unknown or soft-deleted `pid` |
 | 422 | Validation failure: blank `title`, malformed `opened_date`, blank identifier value, blank subject/keyword (family convention) |
 | 500 | Internal error |

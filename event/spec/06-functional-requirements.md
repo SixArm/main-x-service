@@ -8,18 +8,18 @@ capital-E **Event**; the CRUD-change records on the stream are
 
 | # | Requirement | Owner | Detail |
 |---|---|---|---|
-| FR-1 | Create / read / update / soft-delete Event records, with `422` on validation failure | Service | [spec §6.1, §6.5](../event-service-rust-crate/spec/06-functional-requirements.md) |
-| FR-2 | Multiple typed, system-qualified identifiers per Event | Service | [AGENTS/models.md](../event-service-rust-crate/AGENTS/models.md) |
-| FR-3 | Time-window handling: required UTC `start_date`, optional `end_date` / `door_time` / `duration`, IANA `time_zone` for display, reschedule tracking via `previous_start_date` | Service | [spec §5](../event-service-rust-crate/spec/05-domain-model.md) |
-| FR-4 | Probabilistic matching with per-component score breakdown, including time-window components (start/end-date decay, window overlap as Jaccard of `[start, end)`) | Service + Matcher | [AGENTS/matching.md](../event-service-rust-crate/AGENTS/matching.md) |
+| FR-1 | Create / read / update / soft-delete Event records, with `422` on validation failure | Service | [spec §6.1, §6.5](../event-service-with-loco/spec/06-functional-requirements.md) |
+| FR-2 | Multiple typed, system-qualified identifiers per Event | Service | [AGENTS/models.md](../event-service-with-loco/AGENTS/models.md) |
+| FR-3 | Time-window handling: required UTC `start_date`, optional `end_date` / `door_time` / `duration`, IANA `time_zone` for display, reschedule tracking via `previous_start_date` | Service | [spec §5](../event-service-with-loco/spec/05-domain-model.md) |
+| FR-4 | Probabilistic matching with per-component score breakdown, including time-window components (start/end-date decay, window overlap as Jaccard of `[start, end)`) | Service + Matcher | [AGENTS/matching.md](../event-service-with-loco/AGENTS/matching.md) |
 | FR-5 | Deterministic matching with short-circuits: strong-identifier exact match (service); shared `(scheme, value)` event ID or same normalised name + same `start_date` instant (matcher) | Service + Matcher | [matcher AGENTS.md](../event-matcher-rust-crate/AGENTS.md) |
 | FR-6 | The service MUST be able to score any persisted pair through the canonical matcher via `to_matcher_event`; the projection rules of §5.3 MUST hold | Service (adapter) | [§5.3](05-domain-model.md) |
-| FR-7 | Full-text + fuzzy search with date-range filter, facets, pagination, optional masking | Service | [spec §6.3](../event-service-rust-crate/spec/06-functional-requirements.md) |
-| FR-8 | Real-time duplicate detection on create (`409` with candidates), explicit check, and batch scan | Service | [spec §6.4](../event-service-rust-crate/spec/06-functional-requirements.md) |
-| FR-9 | Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`) for borderline duplicates | Service | [spec §6.4](../event-service-rust-crate/spec/06-functional-requirements.md) |
-| FR-10 | Merge: survivor + duplicate, data transfer, `alternate_name` alias, `Replaces` link, soft-delete, JSON snapshot, `Merged` index-level event | Service | [spec §6.4](../event-service-rust-crate/spec/06-functional-requirements.md) |
-| FR-11 | Privacy: masking of identifier values + party emails, masked view, GDPR Article 15 export, consent records | Service | [spec §6.6](../event-service-rust-crate/spec/06-functional-requirements.md) |
-| FR-12 | Audit: every CRUD / merge / link writes `audit_log` with old + new JSON, user ID, IP, user agent, timestamp; audit query endpoints | Service | [spec §6.7](../event-service-rust-crate/spec/06-functional-requirements.md) |
+| FR-7 | Full-text + fuzzy search with date-range filter, facets, pagination, optional masking | Service | [spec §6.3](../event-service-with-loco/spec/06-functional-requirements.md) |
+| FR-8 | Real-time duplicate detection on create (`409` with candidates), explicit check, and batch scan | Service | [spec §6.4](../event-service-with-loco/spec/06-functional-requirements.md) |
+| FR-9 | Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`) for borderline duplicates | Service | [spec §6.4](../event-service-with-loco/spec/06-functional-requirements.md) |
+| FR-10 | Merge: survivor + duplicate, data transfer, `alternate_name` alias, `Replaces` link, soft-delete, JSON snapshot, `Merged` index-level event | Service | [spec §6.4](../event-service-with-loco/spec/06-functional-requirements.md) |
+| FR-11 | Privacy: masking of identifier values + party emails, masked view, GDPR Article 15 export, consent records | Service | [spec §6.6](../event-service-with-loco/spec/06-functional-requirements.md) |
+| FR-12 | Audit: every CRUD / merge / link writes `audit_log` with old + new JSON, user ID, IP, user agent, timestamp; audit query endpoints | Service | [spec §6.7](../event-service-with-loco/spec/06-functional-requirements.md) |
 | FR-13 | Index-level event streaming: `Created` / `Updated` / `Deleted` / `Merged` / `Linked` / `Unlinked` published on every change | Service | [agents/share/auditability.md](../../agents/share/auditability.md) |
 | FR-14 | Operator UI: dashboard, list/search grid, create with inline 409-duplicate surfacing, detail / edit / soft-delete, per-record audit view, match check, merge with preview | Front-end | [spec §6](../event-front-end-with-svelte/spec/06-functional-requirements.md) |
 | FR-15 | The front-end binds only to the service's `/api/v1` REST surface — never to the database or the matcher directly | Front-end | [spec §9](../event-front-end-with-svelte/spec/09-api-consumption.md) |

@@ -1,7 +1,7 @@
 ## 9. API Surface
 
 Endpoint detail: [`AGENTS/restful.md`](../AGENTS/restful.md); source:
-[`src/controllers/care_pathways.rs`](../care-pathway-service-rust-crate/src/controllers/care_pathways.rs).
+[`src/controllers/care_pathways.rs`](../care-pathway-service-with-loco/src/controllers/care_pathways.rs).
 
 ### 9.1 Service REST API
 
@@ -33,11 +33,15 @@ event stream. Merge additionally writes a `merge_records` history row
 with a snapshot of the transferred (duplicate) payload. A durable broker
 is roadmap (§15).
 
-Bearer-token verification (RS256 against the auth-service JWKS, offline)
-is available via the `AuthUser` extractor; `whoami` is protected by it,
-and create/update/delete stamp the audit `actor` from the token when
-one is present (`MaybeAuthUser`). Blanket `/api/*` enforcement and
-JWKS-over-HTTP fetch are follow-ups (§13 T-7).
+Bearer-token verification (PASETO v4 public against the auth-service's
+published Ed25519 key, offline — per
+[`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md),
+which supersedes the prior RS256-JWT model) is available via the
+`AuthUser` extractor; `whoami` is protected by it, and
+create/update/delete stamp the audit `actor` from the token when one is
+present (`MaybeAuthUser`). The credential switch RS256-JWT → PASETO,
+blanket `/api/*` enforcement, and paseto-keys-over-HTTP fetch are
+follow-ups (§13 T-7).
 
 Conventions: **raw loco JSON** (no `{success, data, error}` envelope
 — this is the loco-era convention, unlike the pre-loco person
@@ -68,3 +72,65 @@ let engine = MatchingEngine::new(MatchConfig::default());
 let result = engine.match_care_pathways(&a, &b);
 // also: engine.rank(&query, &candidates), engine.find_matches(…)
 ```
+
+### 9.4 Bulk import / export
+
+The async, job-based bulk contract is fixed family-wide in
+[bulk import/export](../../agents/share/bulk-import-export.md) (execution
+model on `bg_pg`, the five endpoints, JSONL/CSV/Parquet codecs,
+upsert-by-stable-key + dedupe-to-review, the per-row error report, and
+export masking + audit). This section declares only the
+**care-pathway-specific** bits; the shared doc is the source of truth for
+everything else.
+
+The five endpoints (shared doc §4) mount under the care-pathway resource:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/v1/care-pathways/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |
+| `GET` | `/api/v1/care-pathways/import/{id}` | Job status + counts + `errors_url` + `review_url` |
+| `POST` | `/api/v1/care-pathways/export` | `202 {job_id}` — body: `format`, `filter`, `fields`, `include_soft_deleted`, `masking_profile` |
+| `GET` | `/api/v1/care-pathways/export/{id}` | Job status + `download_url` |
+| `GET` | `/api/v1/care-pathways/bulk-jobs` | List (filter by `kind`/`status`); `GET .../{id}` for one |
+
+**Stable key(s) for upsert** (shared doc §6, §10). A row upserts in place
+when it carries either:
+
+- a **deterministic scheme-scoped identifier** — the same `identifiers`
+  the matcher short-circuits on (R-0, matcher §15), keyed by
+  `(scheme, value)`: `Doi`, `Wikidata`, `GuidelineId`, `Uri`, `Uuid`; or
+- the **provider-scoped pathway code** keyed by `(provider_id,
+  pathway_code)` — never globally unique, so it upserts **only within the
+  same `provider_id`** (the cross-provider-uniqueness invariant, §5.5);
+  the matcher likewise never short-circuits across providers; or
+- the record **`pid`** (the pathway UUID) when present in the row.
+
+A row with neither runs the normal duplicate detection (`check-duplicates`
+path, §6.7), routing likely duplicates to the review queue with
+`provenance = import` (matching the cross-service-linking provenance
+vocabulary).
+
+**CSV column set + flattening** (shared doc §5). CSV is the operator /
+spreadsheet format and is lossy for deep nesting — steer fidelity-sensitive
+loads to **JSONL** (the lossless reference). Flat columns:
+
+- **scalar** (one column each): `pid`, `name`, `pathway_code`,
+  `provider_id`, `provider_name`, `care_setting`, `in_language`, `active`;
+- **arrays / arrays-of-objects** → a single **JSON-encoded cell** each:
+  `alternate_names`, `condition_codes` (`{system, code}`), `interventions`,
+  `keywords`, `tags`, `identifiers` (`{scheme, value}`), `same_as`, and
+  `relationships` (`{relation, pathway_id}`).
+
+There is no single-nested-object field, so no dotted columns; every
+repeated / nested field is a JSON-encoded cell. JSONL round-trips the whole
+`CarePathway` payload losslessly.
+
+**Export sensitivity** (shared doc §8). Care pathways are **clinical
+reference data** (medium sensitivity — clinical guidance, but pathway
+templates carry **no patient-level data**, §12 / §5.5): export defaults to
+**masked** per the shared contract; full / unmasked output requires a
+`masking_profile` selecting elevated authorisation and must never reveal
+more than the caller could read one record at a time. `include_soft_deleted`
+defaults `false` and is gated. **Every export is audited** (actor, filter,
+format, row count, masking profile, timestamp — written even for a zero-row
+export).

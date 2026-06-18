@@ -12,6 +12,7 @@
     import { onMount } from "svelte";
     import EventForm from "$lib/components/EventForm.svelte";
     import { EventRepository } from "$lib/api/events.js";
+    import { t } from "$lib/i18n.svelte.js";
     import type { Event } from "$lib/api/types.js";
 
     const repo = EventRepository.withFetch();
@@ -43,16 +44,16 @@
 <svelte:head><title>Edit event · {id}</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Edit event</h1>
-    <a href={`/events/${id}`} class="button">Cancel</a>
+    <h1>{t("edit.title")}</h1>
+    <a href={`/events/${id}`} class="button">{t("edit.cancel")}</a>
 </header>
 
 {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{t("edit.loading")}</p>
 {:else if error}
     <div class="banner error">{error}</div>
 {:else if event}
     <section class="surface stack">
-        <EventForm initial={event} submitLabel="Save changes" onsubmit={handleSubmit} />
+        <EventForm initial={event} submitLabel={t("edit.save")} onsubmit={handleSubmit} />
     </section>
 {/if}

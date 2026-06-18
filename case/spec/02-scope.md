@@ -16,16 +16,18 @@ This spec owns the **cross-subproject contract**:
 
 ### 2.2 In scope — per subproject
 
-**case-service-rust-crate** owns:
+**case-service-with-loco** owns:
 
 - Case CRUD with soft delete (`deleted_at`), `422` validation.
 - `GET …/search?q=` (Postgres `ILIKE` title search),
   `POST …/match` (rank an explicit candidate set, no persistence),
   `POST …/check-duplicates` (match a query against stored cases),
   `POST …/merge` (+ `/merges/recent` history).
-- Audit logging, in-memory event streaming, offline RS256 JWT
-  verification (`whoami`, audit/merge `actor` stamping), OpenAPI 3 +
-  Swagger UI.
+- Audit logging, in-memory event streaming, offline PASETO v4 public
+  token verification (`whoami`, audit/merge `actor` stamping), OpenAPI 3 +
+  Swagger UI. Auth model source of truth:
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  (supersedes the RS256-JWT + JWKS model).
 - The `cases` table (`pid`, denormalised `title`, the full `Case`
   JSONB `data`, `active`, `deleted_at`) plus `audit_logs` and
   `merge_records`.
@@ -52,8 +54,8 @@ This spec owns the **cross-subproject contract**:
 
 ### 2.3 Out of scope (today) — deferred
 
-The entity ships CRUD + matching + audit + streaming + merge + JWT
-verification + OpenAPI. Explicitly deferred, tracked in §13 / §15 and
+The entity ships CRUD + matching + audit + streaming + merge + offline
+token verification + OpenAPI. Explicitly deferred, tracked in §13 / §15 and
 the crate specs' §13:
 
 - **Per-field privacy masking + GDPR data-subject export** — *raised
@@ -62,8 +64,8 @@ the crate specs' §13:
 - Durable event bus (today the stream is an in-process ring buffer).
 - Tantivy full-text / fuzzy search over the JSONB payload (today only
   `ILIKE` title search) and a front-end search box / audit views.
-- Blanket `/api/*` JWT enforcement and JWKS-over-HTTP fetch (today the
-  verifier is env-injected and only `whoami` is protected).
+- Blanket `/api/*` token enforcement and paseto-keys-over-HTTP fetch
+  (today the verifier is env-injected and only `whoami` is protected).
 - Real-time duplicate detection on create (`409 Conflict`).
 - Deeper validation (case-number / docket format, status-transition
   rules, terminology checks).

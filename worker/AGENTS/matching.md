@@ -6,7 +6,7 @@ long-term split).
 
 ## Layer 1 — in-service matcher
 
-`worker-service-rust-crate/src/matching/` — the service's own
+`worker-service-with-loco/src/matching/` — the service's own
 `ProbabilisticMatcher` / `DeterministicMatcher` behind the
 `WorkerMatcher` trait. Weighted components (name 0.30, birth date
 0.25, gender 0.10, address 0.10, identifier 0.10, tax ID 0.10,
@@ -14,8 +14,8 @@ document 0.05), Soundex bonus, tax-ID / document short-circuits,
 quality classes Definite ≥ 0.95 / Probable ≥ 0.85 / Possible ≥ 0.50.
 
 → Full reference (weights, rules, per-component scoring tables):
-[service `AGENTS/matching.md`](../worker-service-rust-crate/AGENTS/matching.md);
-normative: [service spec §6.2](../worker-service-rust-crate/spec/06-functional-requirements.md).
+[service `AGENTS/matching.md`](../worker-service-with-loco/AGENTS/matching.md);
+normative: [service spec §6.2](../worker-service-with-loco/spec/06-functional-requirements.md).
 
 ## Layer 2 — canonical matcher (the `worker-matcher` crate)
 
@@ -47,7 +47,7 @@ let result = engine.match_workers(&to_matcher_worker(&a), &to_matcher_worker(&b)
 
 Routing rules: [entity spec §5.3](../spec/05-domain-model.md).
 Pinning tests:
-[`tests/duplicate_detection.rs`](../worker-service-rust-crate/tests/duplicate_detection.rs).
+[`tests/duplicate_detection.rs`](../worker-service-with-loco/tests/duplicate_detection.rs).
 
 ## Ground rules
 

@@ -21,6 +21,7 @@
     //
     // Events: none emitted; the only output is the `onsubmit` callback.
     import { untrack } from "svelte";
+    import { t } from "$lib/i18n.svelte";
     import { ALL_CARE_SETTINGS, ALL_CODE_SYSTEMS, ALL_SCHEMES } from "$lib/api/types";
     import type {
         CarePathway,
@@ -33,13 +34,17 @@
 
     let {
         initial,
-        submitLabel = "Save",
+        submitLabel,
         onsubmit,
     }: {
         initial: CarePathway;
         submitLabel?: string;
         onsubmit: (pathway: CarePathway) => Promise<void>;
     } = $props();
+
+    // Resolve the submit-button label: caller-supplied, else the localized
+    // default. `$derived` so a locale switch re-renders the fallback.
+    const resolvedSubmitLabel = $derived(submitLabel ?? t("form.save"));
 
     // Seed the form once from `initial` (read without tracking).
     const seed = untrack(() => initial);
@@ -60,6 +65,7 @@
     let interventions = $state((seed.interventions ?? []).join(", "));
     let keywords = $state((seed.keywords ?? []).join(", "));
     let sameAs = $state((seed.same_as ?? []).join(", "));
+    let inLanguage = $state((seed.in_language ?? []).join(", "));
     // Repeatable rows: copied out of the seed so edits don't mutate `initial`.
     let conditionCodes = $state<ConditionCode[]>([...(seed.condition_codes ?? [])]);
     // Drop any seeded `Custom`-scheme identifier: the scheme <select> only
@@ -111,6 +117,7 @@
         pathway.interventions = splitList(interventions);
         pathway.keywords = splitList(keywords);
         pathway.same_as = splitList(sameAs);
+        pathway.in_language = splitList(inLanguage);
         // Keep only rows with a non-empty code / value; trim what remains.
         pathway.condition_codes = conditionCodes
             .filter((c) => c.code.trim().length > 0)
@@ -128,7 +135,7 @@
         error = null;
         // Client-side required-field guard before hitting the service.
         if (name.trim().length === 0) {
-            error = "Name is required.";
+            error = t("form.nameRequired");
             return;
         }
         submitting = true;
@@ -137,7 +144,7 @@
         } catch (err) {
             // Surface the service/network error inline; the parent decides
             // navigation on success.
-            error = err instanceof Error ? err.message : "Save failed";
+            error = err instanceof Error ? err.message : t("form.saveFailed");
         } finally {
             submitting = false;
         }
@@ -145,9 +152,9 @@
 </script>
 
 <form class="stack" onsubmit={handleSubmit}>
-    <label>Name<input type="text" bind:value={name} required /></label>
+    <label>{t("form.name")}<input type="text" bind:value={name} required /></label>
     <div class="row">
-        <label>Care setting
+        <label>{t("form.careSetting")}
             <select bind:value={careSetting}>
                 <option value="">—</option>
                 {#each ALL_CARE_SETTINGS as setting (String(setting))}
@@ -155,23 +162,24 @@
                 {/each}
             </select>
         </label>
-        <label>Pathway code<input type="text" bind:value={pathwayCode} placeholder="STROKE-01" /></label>
+        <label>{t("form.pathwayCode")}<input type="text" bind:value={pathwayCode} placeholder="STROKE-01" /></label>
     </div>
     <div class="row">
-        <label>Provider id<input type="text" bind:value={providerId} /></label>
-        <label>Provider name<input type="text" bind:value={providerName} /></label>
+        <label>{t("form.providerId")}<input type="text" bind:value={providerId} /></label>
+        <label>{t("form.providerName")}<input type="text" bind:value={providerName} /></label>
     </div>
-    <label>Alternate names <small>(comma-separated)</small><input type="text" bind:value={alternateNames} /></label>
-    <label>Interventions <small>(comma-separated)</small><input type="text" bind:value={interventions} /></label>
-    <label>Keywords <small>(comma-separated)</small><input type="text" bind:value={keywords} /></label>
-    <label>Same-as URLs <small>(comma-separated)</small><input type="text" bind:value={sameAs} /></label>
+    <label>{t("form.alternateNames")} <small>{t("form.commaSeparated")}</small><input type="text" bind:value={alternateNames} /></label>
+    <label>{t("form.interventions")} <small>{t("form.commaSeparated")}</small><input type="text" bind:value={interventions} /></label>
+    <label>{t("form.keywords")} <small>{t("form.commaSeparated")}</small><input type="text" bind:value={keywords} /></label>
+    <label>{t("form.sameAs")} <small>{t("form.commaSeparated")}</small><input type="text" bind:value={sameAs} /></label>
+    <label>{t("form.languages")} <small>{t("form.bcp47CommaSeparated")}</small><input type="text" bind:value={inLanguage} placeholder="en, cy" /></label>
 
     <!--
         Repeatable condition-code rows. Keyed by index `i` (rows have no
         stable id); `bind:value` writes straight back into each row object.
     -->
     <fieldset class="stack">
-        <legend>Target condition codes</legend>
+        <legend>{t("form.targetConditionCodes")}</legend>
         {#each conditionCodes as condition, i (i)}
             <div class="row">
                 <select bind:value={condition.system}>
@@ -180,15 +188,15 @@
                     {/each}
                 </select>
                 <input type="text" bind:value={condition.code} placeholder="I63" />
-                <button type="button" onclick={() => removeCondition(i)}>Remove</button>
+                <button type="button" onclick={() => removeCondition(i)}>{t("form.remove")}</button>
             </div>
         {/each}
-        <button type="button" onclick={addCondition}>+ Add condition code</button>
+        <button type="button" onclick={addCondition}>{t("form.addConditionCode")}</button>
     </fieldset>
 
     <!-- Repeatable identifier rows (scheme <select> + value), keyed by index. -->
     <fieldset class="stack">
-        <legend>Identifiers</legend>
+        <legend>{t("form.identifiers")}</legend>
         {#each identifiers as identifier, i (i)}
             <div class="row">
                 <select bind:value={identifier.scheme}>
@@ -197,14 +205,14 @@
                     {/each}
                 </select>
                 <input type="text" bind:value={identifier.value} placeholder="value" />
-                <button type="button" onclick={() => removeIdentifier(i)}>Remove</button>
+                <button type="button" onclick={() => removeIdentifier(i)}>{t("form.remove")}</button>
             </div>
         {/each}
-        <button type="button" onclick={addIdentifier}>+ Add identifier</button>
+        <button type="button" onclick={addIdentifier}>{t("form.addIdentifier")}</button>
     </fieldset>
 
     <button class="button" type="submit" disabled={submitting}>
-        {submitting ? "Saving…" : submitLabel}
+        {submitting ? t("form.saving") : resolvedSubmitLabel}
     </button>
     {#if error}<p class="banner" role="alert">{error}</p>{/if}
 </form>

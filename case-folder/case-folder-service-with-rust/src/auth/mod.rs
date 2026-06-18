@@ -1,9 +1,13 @@
-//! Email magic-link authentication with **stateless signed tokens**.
+//! Email magic-link authentication.
 //!
-//! No auth tables: identity comes from a configured allowlist, and both
-//! the short-lived *magic* token and the longer-lived *session* token
-//! are signed JWTs (HS256). The `aud` claim separates the two so a magic
-//! token can never be replayed as a session and vice-versa.
+//! Identity comes from a configured allowlist. The short-lived *magic*
+//! token (the sign-in link) is a signed JWT (HS256, single-use, ~10 min) —
+//! the short-lived signed-token case `agents/share/jwt.md` explicitly
+//! tolerates. The **session is NOT a JWT**: per `jwt.md`, signing in mints
+//! an **opaque server-side session id** held in the HttpOnly `cts_session`
+//! cookie and backed by an in-process session store on [`AuthState`]. (A
+//! durable Postgres-backed store is a roadmap upgrade — see `spec/auth.md`.)
+//! The magic token's `aud` claim stops it being replayed as anything else.
 //!
 //! See `spec/auth.md` for the full flow and configuration matrix.
 
@@ -15,16 +19,15 @@ use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, deco
 use mailer::Mailer;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Mutex;
+use uuid::Uuid;
 
 /// Name of the HttpOnly session cookie.
 pub const SESSION_COOKIE: &str = "cts_session";
 
-/// `aud` claim value for short-lived magic-link (sign-in) tokens.
+/// `aud` claim value for short-lived magic-link (sign-in) tokens. The
+/// session is no longer a token, so this is the only audience.
 const AUD_MAGIC: &str = "magic";
-/// `aud` claim value for longer-lived session tokens. Keeping the two
-/// audiences distinct means a magic token can never be replayed as a
-/// session token, nor vice-versa.
-const AUD_SESSION: &str = "session";
 
 /// A resolved, authenticated person.
 #[derive(Debug, Clone, Serialize)]
@@ -64,6 +67,16 @@ struct Claims {
     iat: usize,
     /// Expiry, Unix seconds (registered `exp` claim); enforced on decode.
     exp: usize,
+}
+
+/// One opaque server-side session: the resolved identity plus the Unix
+/// second at which it expires. Held in [`AuthState`]'s in-process store
+/// and keyed by the opaque session id carried in the `cts_session` cookie.
+struct SessionEntry {
+    /// The signed-in identity this session authenticates.
+    identity: Identity,
+    /// Expiry, Unix seconds; the session is invalid at/after this instant.
+    expires_at: i64,
 }
 
 /// One allowlist entry, as read from `settings.auth.allowlist`.
@@ -159,6 +172,11 @@ pub struct AuthState {
     encoding: EncodingKey,
     /// HS256 decoding key, built once from the configured secret.
     decoding: DecodingKey,
+    /// In-process opaque-session store: session id → entry. Replaces the
+    /// former JWT session token (per `jwt.md`). Process-local — sessions do
+    /// not survive a restart and are not shared across replicas; a durable
+    /// Postgres-backed store is the roadmap upgrade (`spec/auth.md`).
+    sessions: Mutex<HashMap<String, SessionEntry>>,
     /// Mailer used to deliver magic links (public so handlers can call it).
     pub mailer: Box<dyn Mailer>,
 }
@@ -194,6 +212,7 @@ impl AuthState {
             allowlist,
             encoding,
             decoding,
+            sessions: Mutex::new(HashMap::new()),
             mailer,
         }
     }
@@ -276,21 +295,56 @@ impl AuthState {
         self.decode_token(token, AUD_MAGIC)
     }
 
-    /// Mint a longer-lived session token (`aud = "session"`).
-    ///
-    /// # Errors
-    /// Returns [`AuthError::Token`] if encoding fails.
-    pub fn mint_session_token(&self, identity: &Identity) -> Result<String, AuthError> {
-        self.encode_token(identity, AUD_SESSION, self.config.session_ttl_seconds)
+    /// Establish a new opaque server-side session for `identity` and return
+    /// its session id (the value placed in the `cts_session` cookie). The id
+    /// is unguessable (UUIDv4) and is **not** a token — it carries no claims
+    /// and is meaningless without the server-side store.
+    pub fn create_session(&self, identity: &Identity) -> String {
+        let sid = Uuid::new_v4().to_string();
+        let expires_at = Self::now() + self.config.session_ttl_seconds;
+        let mut store = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
+        // Opportunistically drop expired entries so the map can't grow
+        // unbounded across the process lifetime.
+        let now = Self::now();
+        store.retain(|_, e| e.expires_at > now);
+        store.insert(
+            sid.clone(),
+            SessionEntry {
+                identity: identity.clone(),
+                expires_at,
+            },
+        );
+        sid
     }
 
-    /// Verify a session token and resolve its identity.
-    ///
-    /// # Errors
-    /// Returns [`AuthError::Token`] if the token is invalid, expired, or
-    /// not a session-audience token.
-    pub fn verify_session_token(&self, token: &str) -> Result<Identity, AuthError> {
-        self.decode_token(token, AUD_SESSION)
+    /// Resolve the identity for an opaque session id, or `None` when the id
+    /// is unknown or the session has expired (expired entries are evicted).
+    pub fn session_identity(&self, sid: &str) -> Option<Identity> {
+        let mut store = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
+        match store.get(sid) {
+            Some(entry) if entry.expires_at > Self::now() => Some(entry.identity.clone()),
+            Some(_) => {
+                store.remove(sid);
+                None
+            }
+            None => None,
+        }
+    }
+
+    /// Revoke an opaque session (sign-out). Idempotent — revoking an absent
+    /// session is a no-op.
+    pub fn revoke_session(&self, sid: &str) {
+        let mut store = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
+        store.remove(sid);
+    }
+
+    /// Revoke whatever session the request presents (cookie or bearer), if
+    /// any. Used by sign-out so the server-side session is dropped, not just
+    /// the cookie.
+    pub fn revoke_from_headers(&self, headers: &HeaderMap) {
+        if let Some(sid) = cookie_token(headers).or_else(|| bearer_token(headers)) {
+            self.revoke_session(&sid);
+        }
     }
 
     /// Build the magic link a user clicks to sign in.
@@ -324,10 +378,11 @@ impl AuthState {
     }
 
     /// Resolve the signed-in identity from request headers — the session
-    /// cookie first, then an `Authorization: Bearer` header.
+    /// cookie first, then an `Authorization: Bearer` header. The presented
+    /// value is an opaque session id looked up in the server-side store.
     pub fn identity_from_headers(&self, headers: &HeaderMap) -> Option<Identity> {
-        let token = cookie_token(headers).or_else(|| bearer_token(headers))?;
-        self.verify_session_token(&token).ok()
+        let sid = cookie_token(headers).or_else(|| bearer_token(headers))?;
+        self.session_identity(&sid)
     }
 }
 
@@ -357,4 +412,108 @@ fn cookie_token(headers: &HeaderMap) -> Option<String> {
         .map(str::trim)
         .find_map(|part| part.strip_prefix(&needle))
         .map(str::to_string)
+}
+
+#[cfg(test)]
+mod tests {
+    //! In-process pins for the opaque server-side session store. No DB and
+    //! no network — the store lives on `AuthState`, so create / resolve /
+    //! expire / revoke and the header extraction are all exercised here.
+    use super::*;
+    use crate::auth::mailer::LogMailer;
+
+    /// Build an `AuthState` with the given session TTL (seconds). A negative
+    /// TTL yields sessions that are already expired at creation.
+    fn state(session_ttl: i64) -> AuthState {
+        let config = AuthConfig {
+            session_ttl_seconds: session_ttl,
+            ..AuthConfig::default()
+        };
+        AuthState::new(config, Box::new(LogMailer))
+    }
+
+    fn alice() -> Identity {
+        Identity {
+            email: "alice@example.com".to_string(),
+            name: "Alice".to_string(),
+            role: Some("admin".to_string()),
+        }
+    }
+
+    fn cookie_headers(sid: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert(
+            header::COOKIE,
+            format!("{SESSION_COOKIE}={sid}").parse().unwrap(),
+        );
+        h
+    }
+
+    fn bearer_headers(sid: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert(header::AUTHORIZATION, format!("Bearer {sid}").parse().unwrap());
+        h
+    }
+
+    #[test]
+    fn create_then_resolve_round_trips_identity() {
+        let s = state(3600);
+        let sid = s.create_session(&alice());
+        let got = s.session_identity(&sid).expect("session resolves");
+        assert_eq!(got.email, "alice@example.com");
+        assert_eq!(got.role.as_deref(), Some("admin"));
+    }
+
+    #[test]
+    fn unknown_session_id_resolves_to_none() {
+        assert!(state(3600).session_identity("not-a-real-sid").is_none());
+    }
+
+    #[test]
+    fn revoked_session_resolves_to_none() {
+        let s = state(3600);
+        let sid = s.create_session(&alice());
+        s.revoke_session(&sid);
+        assert!(s.session_identity(&sid).is_none());
+    }
+
+    #[test]
+    fn expired_session_resolves_to_none() {
+        // Negative TTL ⇒ expires_at is in the past at creation.
+        let s = state(-10);
+        let sid = s.create_session(&alice());
+        assert!(s.session_identity(&sid).is_none());
+    }
+
+    #[test]
+    fn identity_resolves_from_cookie_and_bearer() {
+        let s = state(3600);
+        let sid = s.create_session(&alice());
+        assert_eq!(
+            s.identity_from_headers(&cookie_headers(&sid)).unwrap().email,
+            "alice@example.com"
+        );
+        assert_eq!(
+            s.identity_from_headers(&bearer_headers(&sid)).unwrap().email,
+            "alice@example.com"
+        );
+        assert!(s.identity_from_headers(&HeaderMap::new()).is_none());
+    }
+
+    #[test]
+    fn revoke_from_headers_drops_the_session() {
+        let s = state(3600);
+        let sid = s.create_session(&alice());
+        s.revoke_from_headers(&cookie_headers(&sid));
+        assert!(s.session_identity(&sid).is_none());
+    }
+
+    #[test]
+    fn session_id_is_opaque_not_a_token() {
+        // An opaque UUID — no dots, so it is structurally not a JWT/PASETO
+        // and carries no claims.
+        let sid = state(3600).create_session(&alice());
+        assert!(!sid.is_empty());
+        assert!(!sid.contains('.'));
+    }
 }

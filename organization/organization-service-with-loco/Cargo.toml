@@ -1,0 +1,66 @@
+[workspace]
+
+[package]
+name = "organization-service"
+version = "0.1.0"
+edition = "2024"
+publish = false
+default-run = "organization-service"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace.dependencies]
+loco-rs = { version = "0.16" }
+
+[dependencies]
+loco-rs = { workspace = true  }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1" }
+tokio = { version = "1.52", default-features = false, features = [
+  "rt-multi-thread",
+] }
+async-trait = { version = "0.1" }
+axum = { version = "0.8" }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+regex = { version = "1.12" }
+migration = { path = "migration" }
+sea-orm = { version = "1.1", features = [
+  "sqlx-postgres",
+  "runtime-tokio-rustls",
+  "macros",
+] }
+chrono = { version = "0.4" }
+validator = { version = "0.20" }
+uuid = { version = "1.23", features = ["v4", "serde"] }
+include_dir = { version = "0.7" }
+# Prometheus text-exposition metrics, served at `/metrics.prom` (see src/metrics.rs).
+prometheus = { version = "0.13" }
+
+# Faster memory allocator, used only for MUSL static builds (see src/bin/main.rs).
+mimalloc = "0.1.52"
+
+# Canonical matching algorithm — embedded and used directly as the API DTO.
+organization-matcher = { path = "../organization-matcher-rust-crate" }
+
+# Offline PASETO v4.public verification against the authentication-service
+# published Ed25519 keys (local path — the monorepo's 0.2 PASETO verifier).
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
+
+[[bin]]
+name = "organization-service"
+path = "src/bin/main.rs"
+required-features = []
+
+[dev-dependencies]
+loco-rs = { workspace = true, features = ["testing"] }
+serial_test = { version = "3.5.0" }
+rstest = { version = "0.25" }
+insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }
+# Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
+# the extractor's happy path is verified un-gated (no auth-service /
+# network dependency).
+ed25519-dalek = { version = "2.2" }
+rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
+sha2 = { version = "0.10" }
+base64 = { version = "0.22" }

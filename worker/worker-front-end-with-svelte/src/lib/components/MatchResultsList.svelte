@@ -10,20 +10,24 @@
 -->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     let {
         results,
-        title = "Match results",
+        title,
     }: {
         results: MatchResult[];
         title?: string;
     } = $props();
+
+    // Fall back to the translated default heading when none is given.
+    const resolvedTitle = $derived(title ?? t("matchResults.title"));
 </script>
 
 <section class="surface stack">
-    <h2>{title} <span class="muted small">({results.length})</span></h2>
+    <h2>{resolvedTitle} <span class="muted small">({results.length})</span></h2>
     {#if results.length === 0}
-        <p class="muted">No candidates.</p>
+        <p class="muted">{t("matchResults.none")}</p>
     {:else}
         <ul class="results">
             {#each results as r}
@@ -38,13 +42,13 @@
                         <span class="score">{(r.score * 100).toFixed(0)}%</span>
                     </header>
                     <div class="meta small muted">
-                        {#if r.worker.birth_date}DOB {r.worker.birth_date}{/if}
+                        {#if r.worker.birth_date}{t("matchResults.dob")} {r.worker.birth_date}{/if}
                         {#if r.worker.gender} · {r.worker.gender}{/if}
                         {#if r.worker.id} · <a href={`/workers/${r.worker.id}`}>{r.worker.id.slice(0, 8)}…</a>{/if}
                     </div>
                     {#if r.breakdown}
                         <details>
-                            <summary class="small">Score breakdown</summary>
+                            <summary class="small">{t("matchResults.breakdown")}</summary>
                             <ul class="breakdown small">
                                 {#each Object.entries(r.breakdown) as [field, score]}
                                     <!-- Skip components that didn't contribute (null). -->

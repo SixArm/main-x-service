@@ -14,10 +14,10 @@ the same in both; the per-step *detail* differs:
   case, and the loco-converted person/worker/place/thing/event/course
   controllers). The API DTO **is** the matcher type, stored verbatim as
   a single JSONB `data` column. Reference handler:
-  [`care-pathway/care-pathway-service-rust-crate/src/controllers/care_pathways.rs`](../../care-pathway/care-pathway-service-rust-crate/src/controllers/care_pathways.rs).
+  [`care-pathway/care-pathway-service-with-loco/src/controllers/care_pathways.rs`](../../care-pathway/care-pathway-service-with-loco/src/controllers/care_pathways.rs).
 - **older Axum services** (the pre-conversion `src/api/rest/handlers.rs`
   layer, e.g.
-  [`person/person-service-rust-crate/src/api/rest/handlers.rs`](../../person/person-service-rust-crate/src/api/rest/handlers.rs)).
+  [`person/person-service-with-loco/src/api/rest/handlers.rs`](../../person/person-service-with-loco/src/api/rest/handlers.rs)).
   Records are spread across **normalized child tables** and indexed in
   **Tantivy**.
 
@@ -270,18 +270,27 @@ the per-crate `spec.md §13` for the live status.
 
 ## 6. Auth flow
 
-Brief; the full design is in [authentication](../authentication/index.md).
+Brief; the full design is in [authentication](../authentication/index.md)
+and [../../agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)
+(source of truth).
 
 ```
 1. Magic-link:  user → authentication-service → emailed link
-2. JWT:         link callback → RS256 JWT issued (+ JWKS published)
-3. Bearer:      caller sends `Authorization: Bearer <jwt>` on requests
-4. Verify:      each service verifies the token OFFLINE against the
-                auth-service JWKS (no introspection hop) — authentication-verifier
-5. Actor:       the verified `sub` becomes the audit/event actor
+2. Session:     link callback → Postgres cookie session created
+                (opaque sid in an httpOnly cookie — NOT a token)
+3. Token:       front-end BFF exchanges the session → short-lived
+                PASETO v4.public (≈5 min) issued by the auth-service
+4. Bearer:      caller sends `Authorization: Bearer v4.public.…` on
+                cross-service requests
+5. Verify:      each service verifies the token OFFLINE against the
+                auth-service published Ed25519 key
+                (/.well-known/paseto-keys; no introspection hop) —
+                authentication-verifier
+6. Actor:       the verified `sub` becomes the audit/event actor
 ```
 
-Two extractors gate handlers in the loco services
+This replaces the prior RS256 JWT + JWKS model 1:1 (code follow-up
+pending). Two extractors gate handlers in the loco services
 (`src/auth.rs`, embedding `authentication-verifier`):
 
 - `AuthUser` — **required** token. The extractor verifies `kid` / `iss`
@@ -292,7 +301,7 @@ Two extractors gate handlers in the loco services
   `caller.actor()`; when absent, the mutation still proceeds with a
   `None` actor.
 
-Blanket `/api/*` JWT enforcement is deferred in several services; today
+Blanket `/api/*` enforcement is deferred in several services; today
 auth is opt-in per route. See the per-crate `spec.md`.
 
 ---
@@ -354,5 +363,6 @@ the source of truth on which of these stages are wired versus deferred.
 - [../auditability/index.md](../auditability/index.md) — audit log
 - [../event-streaming/index.md](../event-streaming/index.md) — event stream
 - [../privacy/index.md](../privacy/index.md) — masking + GDPR export
-- [../authentication/index.md](../authentication/index.md) — magic-link + JWT
+- [../authentication/index.md](../authentication/index.md) — magic-link + cookie session + PASETO
+- [../../agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md) — auth & sessions design (source of truth)
 - [../postgresql/index.md](../postgresql/index.md) — persistence

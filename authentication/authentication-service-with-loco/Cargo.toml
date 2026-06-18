@@ -1,0 +1,82 @@
+[workspace]
+
+[package]
+name = "authentication-service"
+version = "0.1.0"
+edition = "2024"
+publish = true
+default-run = "authentication-service-cli"
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Authentication service."
+readme = "README.md"
+repository = "https://github.com/sixarm/main-x-service"
+license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
+keywords = ["auth", "authentication", "logon", "signin"]
+categories = ["development-tools", "rust-patterns"]
+include = ["src/**/*", "LICENSE.md", "README.md", "llms.txt", "llms.json"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace.dependencies]
+loco-rs = { version = "0.16" }
+
+[dependencies]
+loco-rs = { workspace = true  }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1" }
+tokio = { version = "1.52", default-features = false, features = [
+  "rt-multi-thread",
+] }
+async-trait = { version = "0.1" }
+axum = { version = "0.8" }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+regex = { version = "1.12" }
+sea-orm = { version = "1.1", features = [
+  "sqlx-sqlite",
+  "sqlx-postgres",
+  "runtime-tokio-rustls",
+  "macros",
+] }
+# Migrations live in-crate under `src/migration` (no separate migration
+# crate). The migrator and migration files use the sea-orm-migration
+# prelude directly.
+sea-orm-migration = { version = "1.1", features = ["runtime-tokio-rustls"] }
+chrono = { version = "0.4" }
+validator = { version = "0.20" }
+uuid = { version = "1.23", features = ["v4"] }
+include_dir = { version = "0.7" }
+# PASETO v4.public token signing + Ed25519 public-key publication. As the
+# central auth provider, other services verify tokens offline against the
+# published Ed25519 keys at /.well-known/paseto-keys — no shared secret,
+# no introspection hop. (Supersedes the prior RS256-JWT + JWKS model.)
+rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
+ed25519-dalek = { version = "2.2" }
+base64 = { version = "0.22" }
+sha2 = { version = "0.10" }
+# Prometheus text-exposition metrics served at GET /metrics.prom, for
+# parity with the older Axum services in the family.
+prometheus = { version = "0.13" }
+
+# musl release builds use mimalloc as the global allocator (see
+# src/bin/main.rs); gated by target so normal glibc/macOS builds do not
+# pull it in. cfg(target_env = "musl") matches musl-libc targets.
+[target.'cfg(target_env = "musl")'.dependencies]
+mimalloc = { version = "0.1", default-features = false }
+
+[[bin]]
+name = "authentication-service-cli"
+path = "src/bin/main.rs"
+required-features = []
+
+[dev-dependencies]
+# The peer-side verifier library (local path — the monorepo's 0.2 PASETO
+# verifier, not the published 0.1). Used by tests/sign_verify_contract.rs
+# to pin the duplicated-by-convention Claims shape and footer-kid contract:
+# this service signs PASETO v4.public, the verifier crate verifies, the
+# claims round-trip.
+authentication-verifier = { path = "../authentication-verifier-rust-crate" }
+loco-rs = { workspace = true, features = ["testing"] }
+serial_test = { version = "3.5.0" }
+rstest = { version = "0.25" }
+insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }

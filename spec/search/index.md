@@ -16,10 +16,10 @@ search service — but they all follow the conventions below.
 > [privacy (short)](../../agents/share/privacy.md) ·
 > [match-search-merge (combined)](../../agents/share/match-search-merge.md).
 > Per-entity specs:
-> [organization](../../organization/organization-service-rust-crate/spec/index.md) ·
-> [care-pathway](../../care-pathway/care-pathway-service-rust-crate/spec/index.md) ·
-> [case](../../case/case-service-rust-crate/spec/index.md) ·
-> [person](../../person/person-service-rust-crate/spec/index.md).
+> [organization](../../organization/organization-service-with-loco/spec/index.md) ·
+> [care-pathway](../../care-pathway/care-pathway-service-with-loco/spec/index.md) ·
+> [case](../../case/case-service-with-loco/spec/index.md) ·
+> [person](../../person/person-service-with-loco/spec/index.md).
 
 ---
 
@@ -38,9 +38,9 @@ every create/update alongside the JSONB `data` payload:
 
 | Service | Search column | Source file (model `search`) |
 |---|---|---|
-| organization-service | `name` | [`src/models/organizations.rs`](../../organization/organization-service-rust-crate/src/models/organizations.rs) |
-| care-pathway-service | `name` | [`src/models/care_pathways.rs`](../../care-pathway/care-pathway-service-rust-crate/src/models/care_pathways.rs) |
-| case-service | `title` | [`src/models/cases.rs`](../../case/case-service-rust-crate/src/models/cases.rs) |
+| organization-service | `name` | [`src/models/organizations.rs`](../../organization/organization-service-with-loco/src/models/organizations.rs) |
+| care-pathway-service | `name` | [`src/models/care_pathways.rs`](../../care-pathway/care-pathway-service-with-loco/src/models/care_pathways.rs) |
+| case-service | `title` | [`src/models/cases.rs`](../../case/case-service-with-loco/src/models/cases.rs) |
 
 The SeaORM query is uniform across the three:
 
@@ -119,7 +119,7 @@ Pinned by a unit test in each crate (`escape_like_neutralises_wildcards`):
 > the pattern as a raw `format!("%{q}%")`, so a `%`/`_` in an
 > organization query is still treated as a wildcard. Closing that gap
 > (port `escape_like` into
-> [`organization-service/src/models/organizations.rs`](../../organization/organization-service-rust-crate/src/models/organizations.rs))
+> [`organization-service/src/models/organizations.rs`](../../organization/organization-service-with-loco/src/models/organizations.rs))
 > is a tracked clean-up.
 
 ### 1.4 Why a denormalised column, not the JSONB payload
@@ -151,7 +151,7 @@ table in
 | loco.rs services (organization, care-pathway, case) | **Postgres `ILIKE`** [implemented]; Tantivy [planned] | Deferred in each crate's spec §13 (e.g. care-pathway/case task **T-6**, "full-text / fuzzy search is deferred"). |
 
 The reference Tantivy implementation lives in
-[`person-service/src/search/index.rs`](../../person/person-service-rust-crate/src/search/index.rs):
+[`person-service/src/search/index.rs`](../../person/person-service-with-loco/src/search/index.rs):
 a `PersonIndexSchema` declares ~11 indexed fields, choosing `TEXT`
 (tokenised + lowercased, for fuzzy name search) vs `STRING` (verbatim,
 for exact lookups like postal code / id) per field, plus a `FAST` field

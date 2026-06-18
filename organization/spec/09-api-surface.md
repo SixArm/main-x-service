@@ -1,10 +1,10 @@
 ## 9. API Surface
 
 Source of truth for routes:
-[`src/controllers/organizations.rs`](../organization-service-rust-crate/src/controllers/organizations.rs)
-and [`docs.rs`](../organization-service-rust-crate/src/controllers/docs.rs);
+[`src/controllers/organizations.rs`](../organization-service-with-loco/src/controllers/organizations.rs)
+and [`docs.rs`](../organization-service-with-loco/src/controllers/docs.rs);
 machine-readable form at `/api-docs/openapi.json`
-([`src/openapi.rs`](../organization-service-rust-crate/src/openapi.rs)).
+([`src/openapi.rs`](../organization-service-with-loco/src/openapi.rs)).
 
 ### 9.1 REST endpoints (service, default port 5150)
 
@@ -24,6 +24,11 @@ machine-readable form at `/api-docs/openapi.json`
 | GET | `/api/organizations/audit/recent` | — | `[audit row]` | Newest 100 system-wide |
 | GET | `/api/organizations/{pid}/audit` | — | `[audit row]` | Per-record trail; `400` invalid pid |
 | GET | `/api/organizations/events/recent` | — | `[OrgEvent]` | Newest 100 from the in-memory stream |
+| POST | `/api/v1/organizations/import` | format, dedupe_mode, dry_run + file | `202 {job_id}` | Async bulk import (§8.7; roadmap §13). Not yet implemented |
+| GET | `/api/v1/organizations/import/{id}` | — | job status + counts + errors_url + review_url | Bulk import job status. Not yet implemented |
+| POST | `/api/v1/organizations/export` | format, filter, fields, include_soft_deleted, masking_profile | `202 {job_id}` | Async bulk export (§8.7). Not yet implemented |
+| GET | `/api/v1/organizations/export/{id}` | — | job status + download_url | Bulk export job status. Not yet implemented |
+| GET | `/api/v1/organizations/bulk-jobs` | — | `[bulk_job]` | List/filter bulk jobs; `.../{id}` for one. Not yet implemented |
 | GET | `/api-docs/openapi.json` | — | OpenAPI 3 document | Hand-written |
 | GET | `/swagger-ui` | — | HTML | Interactive docs |
 | GET | `/_health`, `/_ping` | — | — | loco defaults |

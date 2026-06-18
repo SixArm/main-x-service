@@ -5,7 +5,7 @@
 Embedded in `#[cfg(test)] mod tests` blocks in each source file.
 Run with `cargo test --lib`.
 
-### Coverage targets (72 tests today)
+### Coverage targets (76 tests today)
 
 | Module | What's covered |
 |---|---|
@@ -14,7 +14,7 @@ Run with `cargo test --lib`.
 | `normalize` | `fold`, `course_code`, `fold_set` — each rule plus empty/whitespace, diacritic preservation, and NFKC compatibility folding. |
 | `scoring` | `weighted_average` ignores `None` + renormalises + all-`None` → 0.0; `Confidence::classify` boundaries (inclusive lower bounds) + extremes + default. |
 | `phonetic` | Russell-style examples (`Smith` → `S530`, `Robert` → `R163`); empty input returns `None`; short-code zero-padding; case-insensitivity; non-alphabetic stripping; same-group collapse; `same()` helper matches phonetic pairs while respecting the initial-letter contract and is false when either side has no letters. |
-| `matcher` | Identical → 1.0; R-0 DOI short-circuit; R-1 same-provider course-code; R-2 `same_as` overlap; non-deterministic scheme + differing/empty values do NOT short-circuit; component functions (`course_code_score` skipped across providers / zero on mismatch / `None` when missing; `provider_score` exact-id + name fallback + `None`; `educational_level_score` exact/one-off/unrelated/`None`; `set_jaccard` exact fraction / both-empty `None` / one-side `0.0` / case-insensitive); name scoring uses alternate names, round-trips diacritics, empty names don't panic; renormalisation ignores absent components; `find_matches` filters below threshold; strict config rejects a merely-probable match; rank ordering; `match_one_to_many` preserves input order + handles empty input; Soundex bonus fires on homophones, doesn't fire on unrelated names, capped at `0.95`. |
+| `matcher` | Identical → 1.0; R-0 DOI short-circuit; R-1 same-provider course-code; R-2 `same_as` overlap; non-deterministic scheme + differing/empty values do NOT short-circuit; component functions (`course_code_score` skipped across providers / zero on mismatch / `None` when missing; `provider_score` exact-id + name fallback + `None`; `educational_level_score` exact/one-off/unrelated/`None`; `set_jaccard` exact fraction / both-empty `None` / one-side `0.0` / case-insensitive); name scoring uses alternate names, round-trips diacritics, empty names don't panic; renormalisation ignores absent components; `find_matches` filters below threshold; strict config rejects a merely-probable match; rank ordering; `match_one_to_many` preserves input order + handles empty input; Soundex bonus fires on homophones, doesn't fire on unrelated names, capped at `0.95`; off-ladder `EducationalLevel` variants (`Vocational`, `ProfessionalDevelopment`, `Custom`) score `1.0` only when identical and `0.0` otherwise (no adjacency credit); `learning_resource_type` and `in_language` are modelled but unscored — inputs differing only in them score identically. |
 
 ### Integration tests
 
@@ -27,7 +27,8 @@ deterministic scheme, provider-scoped schemes NOT short-circuiting,
 R-2 `same_as` overlap, renormalisation, confidence bands,
 strict/lenient threshold effects on `is_match`, the one-to-many surface
 (`match_one_to_many` / `rank` / `find_matches`, including empty input),
-and `MatchResult` JSON serialisation. (The service-side bridge test —
+that `learning_resource_type` / `in_language` are unscored, and
+`MatchResult` JSON serialisation. (The service-side bridge test —
 see below — remains the cross-crate contract test through the adapter.)
 
 ### Pattern
@@ -48,9 +49,9 @@ on bad input — tests pin those guarantees.
 
 ## Bridge tests (service-side)
 
-The embedding [`course-service`](../../course-service-rust-crate/)
+The embedding [`course-service`](../../course-service-with-loco/)
 ships a bridge test
-[`tests/duplicate_detection.rs`](../../course-service-rust-crate/tests/duplicate_detection.rs)
+[`tests/duplicate_detection.rs`](../../course-service-with-loco/tests/duplicate_detection.rs)
 that drives the service-side `Course` through
 `matching::adapter::to_matcher_course` and asserts on
 `MatchingEngine::match_courses`. That suite is the contract test for
@@ -62,7 +63,7 @@ service-side bridge test in the same PR.
 ## Benchmarks
 
 Benches live in the embedding
-[`course-service-rust-crate/benches/matching_bench.rs`](../../course-service-rust-crate/benches/matching_bench.rs)
+[`course-service-with-loco/benches/matching_bench.rs`](../../course-service-with-loco/benches/matching_bench.rs)
 so the baseline reflects the production path (adapter +
 `CourseMatcher` facade) rather than the bare library. Run with
 `cargo bench` from that crate. Coverage:

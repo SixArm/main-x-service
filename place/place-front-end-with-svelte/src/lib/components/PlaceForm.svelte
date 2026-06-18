@@ -21,6 +21,7 @@
     import type { Place, PlaceType } from "$lib/api/types.js";
     import { PLACE_TYPES, blankPostalAddress } from "$lib/api/types.js";
     import { createForm } from "$lib/forms/form.svelte.js";
+    import { t, translate } from "$lib/i18n.svelte.js";
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import PostalAddressInput from "./PostalAddressInput.svelte";
@@ -31,7 +32,7 @@
         submitLabel?: string;
         onsubmit: (place: Place) => Promise<void>;
     } = $props();
-    const submitLabel = $derived(props.submitLabel ?? "Save");
+    const submitLabel = $derived(props.submitLabel ?? t("form.save"));
 
     // createForm reads props.initial once at setup; the ignore silences the
     // "state referenced locally" hint since this is an intentional snapshot.
@@ -42,15 +43,15 @@
         // operator gets immediate feedback before a 422 round-trip.
         validate(value) {
             const errors: Record<string, string> = {};
-            if (!value.name.trim()) errors.name = "Required";
+            if (!value.name.trim()) errors.name = translate("form.required");
             if (value.geo) {
                 // Only validate coords when the Geo section is present.
-                if (value.geo.latitude < -90 || value.geo.latitude > 90) errors.latitude = "-90 to 90";
-                if (value.geo.longitude < -180 || value.geo.longitude > 180) errors.longitude = "-180 to 180";
+                if (value.geo.latitude < -90 || value.geo.latitude > 90) errors.latitude = translate("form.latRange");
+                if (value.geo.longitude < -180 || value.geo.longitude > 180) errors.longitude = translate("form.lonRange");
             }
             // GLN, when supplied, must be exactly 13 digits (GS1).
             if (value.global_location_number && !/^\d{13}$/.test(value.global_location_number)) {
-                errors.gln = "GLN must be 13 digits";
+                errors.gln = translate("form.glnInvalid");
             }
             return errors;
         },
@@ -98,44 +99,44 @@
 
 <form onsubmit={handleSubmit} class="stack">
     <FieldRow>
-        <LabeledField label="Name" for="name" required error={form.errors.name}>
+        <LabeledField label={t("form.name")} for="name" required error={form.errors.name}>
             <input id="name" bind:value={form.value.name} required />
         </LabeledField>
-        <LabeledField label="Alternate name" for="alt-name">
+        <LabeledField label={t("form.alternateName")} for="alt-name">
             <input id="alt-name" bind:value={form.value.alternate_name} />
         </LabeledField>
-        <LabeledField label="Place type" for="place-type">
+        <LabeledField label={t("form.placeType")} for="place-type">
             <select id="place-type" value={selectedType()} onchange={(e) => setType((e.target as HTMLSelectElement).value)}>
-                <option value="">—</option>
-                {#each PLACE_TYPES as t}
-                    <option value={t}>{t}</option>
+                <option value="">{t("form.none")}</option>
+                {#each PLACE_TYPES as pt}
+                    <option value={pt}>{pt}</option>
                 {/each}
             </select>
         </LabeledField>
     </FieldRow>
 
-    <LabeledField label="Description" for="desc">
+    <LabeledField label={t("form.description")} for="desc">
         <textarea id="desc" rows={3} bind:value={form.value.description}></textarea>
     </LabeledField>
 
     <FieldRow>
-        <LabeledField label="Telephone" for="phone">
+        <LabeledField label={t("form.telephone")} for="phone">
             <input id="phone" type="tel" bind:value={form.value.telephone} />
         </LabeledField>
-        <LabeledField label="Website" for="url">
+        <LabeledField label={t("form.website")} for="url">
             <input id="url" type="url" bind:value={form.value.url} />
         </LabeledField>
-        <LabeledField label="GLN" for="gln" error={form.errors.gln} hint="13-digit Global Location Number">
+        <LabeledField label={t("form.gln")} for="gln" error={form.errors.gln} hint={t("form.glnHint")}>
             <input id="gln" bind:value={form.value.global_location_number} maxlength="13" />
         </LabeledField>
     </FieldRow>
 
     <section class="surface stack">
         <header class="row" style="justify-content: space-between">
-            <h2 class="small">Address</h2>
+            <h2 class="small">{t("form.address")}</h2>
             <label class="row small">
                 <input type="checkbox" checked={hasAddress} onchange={(e) => toggleAddress((e.target as HTMLInputElement).checked)} />
-                Include address
+                {t("form.includeAddress")}
             </label>
         </header>
         {#if hasAddress && form.value.address}
@@ -145,10 +146,10 @@
 
     <section class="surface stack">
         <header class="row" style="justify-content: space-between">
-            <h2 class="small">Geo coordinates</h2>
+            <h2 class="small">{t("form.geo")}</h2>
             <label class="row small">
                 <input type="checkbox" checked={hasGeo} onchange={(e) => toggleGeo((e.target as HTMLInputElement).checked)} />
-                Include coords
+                {t("form.includeCoords")}
             </label>
         </header>
         {#if hasGeo && form.value.geo}
@@ -162,10 +163,10 @@
 
     <div class="row">
         <button type="submit" class="button primary" disabled={form.submitting}>
-            {form.submitting ? "Saving…" : submitLabel}
+            {form.submitting ? t("form.saving") : submitLabel}
         </button>
         <button type="button" class="button" onclick={() => form.reset()} disabled={form.submitting}>
-            Reset
+            {t("form.reset")}
         </button>
     </div>
 </form>

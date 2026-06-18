@@ -13,7 +13,7 @@ compose into one capability:
 
 | Subproject | Role |
 |---|---|
-| [care-pathway-service-rust-crate](../care-pathway-service-rust-crate/) | Registry service — loco.rs CRUD + matching over REST; PostgreSQL persistence |
+| [care-pathway-service-with-loco](../care-pathway-service-with-loco/) | Registry service — loco.rs CRUD + matching over REST; PostgreSQL persistence |
 | [care-pathway-matcher-rust-crate](../care-pathway-matcher-rust-crate/) | Canonical pairwise matching library — deterministic + probabilistic, embedded by the service |
 | [care-pathway-front-end-with-svelte](../care-pathway-front-end-with-svelte/) | Operator UI — SvelteKit SPA over the service's REST API |
 
@@ -66,5 +66,7 @@ health systems:
 - **Not** an authentication / authorisation provider. Sign-on for
   the whole index is the
   [authentication entity](../../authentication/) (passwordless
-  magic-link, RS256 JWT + JWKS); this entity is a JWT *verifier*
-  (roadmap, §15).
+  magic-link, cookie session + PASETO v4 public cross-service tokens —
+  see [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md),
+  which supersedes the prior RS256-JWT + JWKS model); this entity is a
+  token *verifier* (roadmap, §15).

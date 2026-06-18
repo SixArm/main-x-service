@@ -697,6 +697,72 @@ mod tests {
         assert!(matches.iter().all(|(i, _)| *i != 0));
     }
 
+    /// Pins the Soundex bonus path through `name_score` (spec §9): two
+    /// names whose literal Jaro-Winkler is below the High band yet share
+    /// a Soundex code must score *strictly higher* than the same pair
+    /// would without the bonus — confirming `PHONETIC_BONUS` actually
+    /// lifts the name component, and that the lift is capped at
+    /// `PHONETIC_CEILING`.
+    #[test]
+    fn name_score_soundex_bonus_lifts_near_miss() {
+        // "Smith" vs "Smyth": Soundex-equal (S530) but a literal
+        // Jaro-Winkler below the 0.95 ceiling, so the bonus applies.
+        let a = Organization::new("Smith");
+        let b = Organization::new("Smyth");
+        let ak = name_keys(&a);
+        let bk = name_keys(&b);
+        let raw = jaro_winkler(&ak[0], &bk[0]);
+        assert!(
+            raw < PHONETIC_CEILING,
+            "test premise: raw JW must be below the ceiling, got {raw}"
+        );
+        assert!(
+            phonetic::same(&ak[0], &bk[0]),
+            "test premise: the pair must be Soundex-equal"
+        );
+        let scored = name_score(&a, &b);
+        // The bonus lifted the component above the bare Jaro-Winkler…
+        assert!(
+            scored > raw,
+            "expected Soundex bonus to lift name score above raw {raw}, got {scored}"
+        );
+        // …by exactly PHONETIC_BONUS (capped at the ceiling).
+        assert!((scored - (raw + PHONETIC_BONUS).min(PHONETIC_CEILING)).abs() < 1e-9);
+        assert!(scored <= PHONETIC_CEILING);
+    }
+
+    /// Pins the matcher-level consequence of the `legal_name` never-empty
+    /// fallback (spec §8): two organizations whose names are *only* legal
+    /// suffixes (`"The Co"` vs `"Inc"`) must NOT spuriously score a
+    /// perfect 1.0 against each other. The normaliser keeps a non-empty
+    /// fallback rather than collapsing both to `""` (which would match).
+    #[test]
+    fn suffix_only_names_do_not_spuriously_match() {
+        let engine = MatchingEngine::default_config();
+        let a = Organization::new("The Co");
+        let b = Organization::new("Inc");
+        let r = engine.match_organizations(&a, &b);
+        // Neither side normalises to empty, so they are compared on real
+        // (distinct) tokens and must not reach the High band.
+        assert!(
+            r.score < 0.95,
+            "suffix-only names must not score ~1.0, got {}",
+            r.score
+        );
+        assert!(!r.breakdown.deterministic_match);
+    }
+
+    /// Pins the one-sided keywords case of `set_jaccard` (spec §14):
+    /// exactly one side carrying keywords is a present-vs-absent
+    /// disagreement and must yield `Some(0.0)`, not `None` (skip) and not
+    /// a higher score.
+    #[test]
+    fn keywords_jaccard_one_sided_is_zero() {
+        let with = vec!["software".to_string(), "ai".to_string()];
+        assert_eq!(set_jaccard(&with, &[]), Some(0.0));
+        assert_eq!(set_jaccard(&[], &with), Some(0.0));
+    }
+
     /// Pins that `match_one_to_many` returns results in candidate order
     /// (no sorting) and handles an empty candidate slice.
     #[test]

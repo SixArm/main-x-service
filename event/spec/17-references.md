@@ -2,10 +2,10 @@
 
 ### Subprojects (the trio)
 
-- [event-service-rust-crate](../event-service-rust-crate/) —
-  [spec](../event-service-rust-crate/spec/index.md) ·
-  [AGENTS](../event-service-rust-crate/AGENTS/index.md) ·
-  [README](../event-service-rust-crate/README.md)
+- [event-service-with-loco](../event-service-with-loco/) —
+  [spec](../event-service-with-loco/spec/index.md) ·
+  [AGENTS](../event-service-with-loco/AGENTS/index.md) ·
+  [README](../event-service-with-loco/README.md)
 - [event-matcher-rust-crate](../event-matcher-rust-crate/) —
   [spec](../event-matcher-rust-crate/spec/index.md) ·
   [AGENTS.md](../event-matcher-rust-crate/AGENTS.md) ·

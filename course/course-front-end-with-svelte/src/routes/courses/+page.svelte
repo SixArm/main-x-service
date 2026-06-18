@@ -15,6 +15,7 @@
     import CourseGrid from "$lib/components/CourseGrid.svelte";
     import { CourseRepository } from "$lib/api/courses.js";
     import type { Course } from "$lib/api/types.js";
+    import { t, translate, i18n } from "$lib/i18n.svelte.js";
 
     let query = $state("");
     let courses = $state<Course[]>([]);
@@ -61,16 +62,18 @@
 <svelte:head><title>Courses · Course Service</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Courses</h1>
-    <a href="/courses/new" class="button primary">New course</a>
+    <h1>{t("courses.title")}</h1>
+    <a href="/courses/new" class="button primary">{t("courses.new")}</a>
 </header>
 
 <section class="surface stack">
-    <SearchBox bind:value={query} placeholder="Search by name, identifier…" onsearch={runSearch} />
+    <SearchBox bind:value={query} placeholder={t("courses.searchPlaceholder")} onsearch={runSearch} />
     <div class="row small">
-        <label><input type="checkbox" bind:checked={fuzzy} /> Fuzzy</label>
+        <label><input type="checkbox" bind:checked={fuzzy} /> {t("courses.fuzzy")}</label>
         <span class="muted" style="margin-left: auto">
-            {loading ? "Loading…" : `${total} record${total === 1 ? "" : "s"}`}
+            {loading
+                ? t("courses.loading")
+                : translate(total === 1 ? "courses.recordCount.one" : "courses.recordCount.other", i18n.locale).replace("{n}", String(total))}
         </span>
     </div>
     {#if error}

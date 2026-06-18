@@ -58,15 +58,13 @@ case-folder-front-end-with-svelte/
 ├── README.md
 ├── index.md
 ├── spec/                          ← this specification
-├── package.json
-├── pnpm-workspace.yaml
-├── svelte.config.js               ← `kit.alias` → Lily helpers (sibling repo)
+├── package.json                   ← npm; `package-lock.json` committed
+├── svelte.config.js               ← `file:` deps → Lily helpers (sibling repo)
 ├── tsconfig.json
 ├── vite.config.ts                 ← `server.fs.allow` for the sibling repo path
 ├── static/
-│   └── themes/
-│       ├── nhs.css                ← `:root[data-theme="nhs"]` colour tokens
-│       └── nhs-high-contrast.css  ← `:root[data-theme="nhs-high-contrast"]`
+│   └── assets/
+│       └── themes/                ← symlink → shared Lily theme catalogue (~41 themes)
 └── src/
     ├── app.d.ts
     ├── app.html
@@ -98,6 +96,19 @@ case-folder-front-end-with-svelte/
         ├── cabinets/
         │   ├── +page.{ts,svelte}
         │   └── new/+page.{ts,svelte}
+        ├── rooms/[id]/+page.{ts,svelte}
+        ├── volumes/
+        │   ├── +page.{ts,svelte}
+        │   ├── new/+page.{ts,svelte}
+        │   └── [id]/+page.{ts,svelte}
+        ├── workers/
+        │   ├── +page.{ts,svelte}
+        │   └── [id]/+page.{ts,svelte}
         ├── move/+page.{ts,svelte}
+        ├── scan/+page.svelte
+        ├── reports/+page.{ts,svelte}
+        ├── alerts/+page.{ts,svelte}
+        ├── login/+page.svelte
+        ├── auth/callback/+page.{ts,svelte}
         └── history/+page.{ts,svelte}
 ```

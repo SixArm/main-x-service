@@ -14,7 +14,7 @@
 +------------------------------+-------------------------------+
                                |  REST (JSON envelope)
 +------------------------------v-------------------------------+
-|  thing-service-rust-crate            loco.rs 0.16 / Axum 0.8  |
+|  thing-service-with-loco            loco.rs 0.16 / Axum 0.8  |
 |  +----------------+ +----------------+ +-------------------+  |
 |  | REST handlers  | | Validation +   | | Privacy + masking |  |
 |  | 15 endpoints   | | normalisation  | | + GDPR export     |  |
@@ -44,7 +44,7 @@ front-end ──REST──> service ──Cargo dep──> matcher
 - The **matcher** depends on nothing in the trio (pure library: no
   IO, no async runtime, `#![forbid(unsafe_code)]`).
 - The **service** embeds the matcher via
-  [`src/matching/adapter.rs`](../thing-service-rust-crate/src/matching/adapter.rs)
+  [`src/matching/adapter.rs`](../thing-service-with-loco/src/matching/adapter.rs)
   (DTO contract, §5.3) and never the reverse.
 - The **front-end** knows only the REST surface; it never links Rust
   code.

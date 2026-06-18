@@ -1,10 +1,15 @@
-// REST API base URL. Configured via PUBLIC_API_BASE_URL. Falls back
-// to the Course Service's docker-compose host port (8084). 8080 is
-// the person-service slot in the Main X Index family — defaulting
-// to 8080 silently routed every request to the wrong service in
-// developer setups. We read via `import.meta.env` (Vite build-time
-// injection) rather than SvelteKit's `$env/dynamic/public` so this
-// module loads cleanly under vitest, which doesn't run the
-// SvelteKit Vite plugin.
-const meta = import.meta as ImportMeta & { env?: Record<string, string | undefined> };
-export const API_BASE_URL: string = meta.env?.PUBLIC_API_BASE_URL ?? "http://localhost:8084";
+// Build/runtime configuration for the course operator front-end.
+//
+// API calls go to the same-origin BFF proxy (`/api/proxy/...`), whose
+// server handler injects the server-exchanged PASETO and forwards to the
+// course service. The browser never holds a token (see
+// `agents/share/authentication-sessions.md`). Sign-in is the app's own
+// `/signin` (per-app magic-link login), not a cross-origin token handoff.
+
+/**
+ * Base URL the API client posts to: the same-origin BFF proxy. Absolute
+ * (rooted at `location.origin`) so the client's `new URL(path, base)`
+ * resolves; falls back to the dev origin under SSR/tests.
+ */
+export const API_BASE_URL: string =
+    (typeof location !== "undefined" ? location.origin : "http://localhost:5173") + "/api/proxy";

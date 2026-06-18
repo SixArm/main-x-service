@@ -26,8 +26,10 @@ the Main X Index aims at. Items the MVP does not yet meet are marked
   deterministic identifiers.)*
 - **NFR-5 — Security.** TLS at the edge; SSO via the central
   [authentication entity](../../authentication/) — the service
-  verifies RS256 JWTs offline against the auth-service JWKS
-  *(roadmap)*; no secrets in code or images.
+  verifies PASETO v4 public tokens offline against the auth-service's
+  published Ed25519 key *(roadmap)*; no secrets in code or images. See
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md),
+  which supersedes the prior RS256-JWT model.
 - **NFR-6 — Auditability.** Soft delete with audit-friendly
   timestamps today; full audit log (who/what/when, old + new JSON)
   and event streaming on every CRUD *(roadmap)* per

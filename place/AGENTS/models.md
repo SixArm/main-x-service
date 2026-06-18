@@ -7,7 +7,7 @@ and the pointer; field-by-field tables live in the per-crate docs.
 
 | Representation | Where | Shape | Reference |
 |---|---|---|---|
-| Service `Place` (canonical) | `place-service-rust-crate/src/models/place.rs` | schema.org/Place: `name`, `alternate_name`, `place_type`, `PostalAddress`, `GeoCoordinates`, GLN + `identifiers`, hierarchy, opening hours, amenities, soft-delete flags | [service AGENTS/models.md](../place-service-rust-crate/AGENTS/models.md) |
+| Service `Place` (canonical) | `place-service-with-loco/src/models/place.rs` | schema.org/Place: `name`, `alternate_name`, `place_type`, `PostalAddress`, `GeoCoordinates`, GLN + `identifiers`, hierarchy, opening hours, amenities, soft-delete flags | [service AGENTS/models.md](../place-service-with-loco/AGENTS/models.md) |
 | Matcher `Place` (flat builder) | `place-matcher-rust-crate/src/models.rs` | 15 optional fields: `name`, `alternate_names`, bare `latitude`/`longitude`, `category` (34-variant), `place_ids` (scheme + value), `address`, `phone`, `email`, country code, capacity; `#[non_exhaustive]`, built via `Place::builder()` | [matcher spec §3](../place-matcher-rust-crate/spec/03-data-model.md) |
 | Front-end TypeScript types | `place-front-end-with-svelte/src/lib/api/types.ts` | Mirrors the service wire format + the response envelope | [front-end AGENTS.md](../place-front-end-with-svelte/AGENTS.md) |
 
@@ -18,17 +18,17 @@ and the pointer; field-by-field tables live in the per-crate docs.
 `distance_to`), `PlaceType` enum, `PlaceIdentifier`
 (GLN / FIPS / GNIS / OSM / custom), `AmenityFeature`,
 `OpeningHoursSpecification`, `Consent`. Tables in
-[service AGENTS/models.md](../place-service-rust-crate/AGENTS/models.md).
+[service AGENTS/models.md](../place-service-with-loco/AGENTS/models.md).
 
 ## The adapter (service → matcher projection)
 
-[`src/matching/adapter.rs`](../place-service-rust-crate/src/matching/adapter.rs)
+[`src/matching/adapter.rs`](../place-service-with-loco/src/matching/adapter.rs)
 exposes `to_matcher_place(&service::Place) -> place_matcher::Place`.
 It is **lossy by design** — registry-only fields (id, timestamps,
 keywords, amenities, opening hours, fax, url, access flags) drop.
 Normative routing rules: entity
 [spec §5.3](../spec/05-domain-model.md). Pinned by the bridge tests
-([`tests/duplicate_detection.rs`](../place-service-rust-crate/tests/duplicate_detection.rs)).
+([`tests/duplicate_detection.rs`](../place-service-with-loco/tests/duplicate_detection.rs)).
 
 Highlights an agent trips over:
 

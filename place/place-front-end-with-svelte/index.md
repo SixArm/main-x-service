@@ -23,7 +23,7 @@ is [`spec.md`](spec/index.md); deep references live in [`AGENTS/`](AGENTS/).
 
 ## Sibling service
 
-- [`../place-service-rust-crate/`](../place-service-rust-crate/) — the system of record this UI calls. Its [`spec.md`](../place-service-rust-crate/spec/index.md) and [`AGENTS/restful.md`](../place-service-rust-crate/AGENTS/restful.md) are the API contract.
+- [`../place-service-with-loco/`](../place-service-with-loco/) — the system of record this UI calls. Its [`spec.md`](../place-service-with-loco/spec/index.md) and [`AGENTS/restful.md`](../place-service-with-loco/AGENTS/restful.md) are the API contract.
 
 ## Route map
 

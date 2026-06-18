@@ -16,7 +16,7 @@
 
 Subproject specs:
 
-- [thing-service-rust-crate/spec](../thing-service-rust-crate/spec/index.md) — registry service (§1–§18)
+- [thing-service-with-loco/spec](../thing-service-with-loco/spec/index.md) — registry service (§1–§18)
 - [thing-matcher-rust-crate/spec](../thing-matcher-rust-crate/spec/index.md) — matching library (§1–§13, library SDD shape)
 - [thing-front-end-with-svelte/spec](../thing-front-end-with-svelte/spec/index.md) — operator UI (§1–§18)
 

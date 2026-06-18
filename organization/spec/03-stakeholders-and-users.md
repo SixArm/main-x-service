@@ -17,6 +17,6 @@ governmental system. Stakeholders span the trio:
 | Other Main X Index entities | Cross-references via organization `pid` (e.g. a person's managing organization, an event's organizer) | Service REST API |
 
 Per-subproject stakeholder detail: service
-[spec §3](../organization-service-rust-crate/spec/index.md), matcher
+[spec §3](../organization-service-with-loco/spec/index.md), matcher
 [spec §1–§2](../organization-matcher-rust-crate/spec/index.md),
 front-end [spec §3](../organization-front-end-with-svelte/spec/index.md).

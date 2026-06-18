@@ -1,6 +1,6 @@
 {
   "name": "care-pathway-front-end-with-svelte",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "SvelteKit front-end for the Care Pathway Service (Main X Index): care-pathway CRUD + matching.",
@@ -15,6 +15,9 @@
     "test:e2e": "playwright test",
     "format": "prettier --write src",
     "lint": "prettier --check src"
+  },
+  "dependencies": {
+    "lily-design-system-svelte-theme-select": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

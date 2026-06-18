@@ -10,7 +10,61 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **Re-spec to httpOnly-cookie + BFF session model (2026-06-17).** Adopted
+  the canonical design doc
+  [`AGENTS/share/authentication-sessions.md`](../../AGENTS/share/authentication-sessions.md)
+  (single source of truth). **Supersedes the prior bearer-token SPA
+  model.** Spec/docs only in this entry; the code follow-up is tracked in
+  spec §13.
+  - **No token in the browser.** Login now establishes a **server-side
+    session**; the browser holds only the httpOnly Secure `SameSite=Lax`
+    `__Host-mxi_session` cookie (JS never reads a credential). The
+    `localStorage` access token (`mxi.auth.token` / `mxi.auth.user`), the
+    shared federation key `mxi_access_token` / `FEDERATION_TOKEN_KEY`, and
+    the cross-origin `#access_token=` URL-fragment handoff are **removed**.
+  - **BFF pattern.** The SvelteKit **server** (`hooks.server.ts` /
+    `+page.server.ts` / `+server.ts`) holds the session and is the only
+    party that calls the auth service; magic-link verify is server-side
+    and the auth service sets the session cookie (relayed to the browser).
+    Mutating browser→BFF calls add **CSRF** protection
+    (`authentication-sessions.md` §4).
+  - **Magic-link UX unchanged** as the flow; only the outcome changed (a
+    session cookie, not a stored token). Sign-out now revokes the session
+    server-side and clears the cookie.
+  - `return_to` redirect keeps the allowlist as an **open-redirect**
+    control but carries **no credential** (plain navigation; the target
+    relies on its own session cookie).
+  - Spec sections touched: §1–§2 (intro/scope), §4 (glossary), §5–§6
+    (information architecture + functional requirements: session via
+    cookie, server-side auth, CSRF), §7–§12 (NFR/architecture/API/
+    persistence/testing/compliance), §13 (BFF code-follow-up task + the
+    supersede note), §14–§17.
+
 ### Added
+
+- **Bilingual UI (English + Welsh / Cymraeg).** A dependency-free i18n
+  store (`src/lib/i18n.svelte.ts`): a per-locale strings catalog, a
+  reactive `$state` current-locale persisted to
+  `localStorage["mxi.auth.locale"]`, a `t(key)` accessor, a fallback
+  chain (target → English → the key), and region-subtag reduction
+  (`cy-GB` → `cy`). A `<select>` language switcher in `+layout.svelte`
+  re-renders every string live. The chosen locale is sent as the optional
+  `locale` field on signup / magic-link requests so the magic-link **email
+  language matches the UI**; it drops out of the body when unset (service
+  defaults to English). Welsh is a deliberate UK public-sector
+  Welsh-language-duty choice, mirroring the service catalog (`src/i18n.rs`).
+  Tests: `tests/unit/i18n.test.ts` (9) plus `locale`-body assertions in
+  `auth.test.ts`.
+- **Doc harmonization (2026-06-15).** Brought `spec/index.md`, `README.md`,
+  `index.md`, and this changelog into agreement with the shipped i18n
+  feature and the cross-origin handoff: §2 scope, §4 glossary, §6
+  FR (renumbered sequentially 1–6 and `locale`/`is_verified` documented),
+  §7 NFR, §9 request bodies, §10 the `mxi.auth.locale` key, and §11 test
+  itemization (now reconciled to 56 vitest + 9 playwright). Added a
+  `setUser()` persistence test (`session.test.ts`) and a worked
+  cross-origin-handoff example to `index.md`.
 
 - **Cross-origin SSO token handoff (issuer side).** This front-end is now
   the issuer in the first-party, OAuth-implicit-shaped token handoff (see
@@ -35,8 +89,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     `window.location.assign` (cross-origin, not SvelteKit `goto`).
   - Tests: `tests/unit/return-to.test.ts` (24) + `tests/unit/session.test.ts`
     (3); 2 new playwright handoff cases (allowlisted → fragment redirect;
-    non-allowlisted → home, no token). Vitest 25 → 52; playwright 7 → 9.
-    `pnpm run check` clean.
+    non-allowlisted → home, no token). Playwright 7 → 9.
+    `pnpm run check` clean. (Vitest reached 52 here; the i18n suite and
+    the `locale`/`setUser` assertions above bring the current total to 56.)
 
 - **Inaugural scaffold (v0.1.0).** SvelteKit 2 / Svelte 5 (runes) SPA
   for the Authentication Service.
@@ -73,7 +128,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Configuration
 
-- `PUBLIC_API_BASE_URL` (default `http://localhost:5150`).
+- `PUBLIC_API_BASE_URL` (default `http://localhost:5150`): auth service
+  REST base URL, called **server-side** by the BFF.
 - `VITE_RETURN_TO_ALLOWLIST` (default empty ⇒ same-origin only):
-  comma-separated operator-app origins the SSO handoff may redirect the
-  access token to.
+  comma-separated operator-app origins the post-verify redirect may
+  target. An **open-redirect** control — no credential travels in the
+  redirect (the `#access_token=` handoff is removed).

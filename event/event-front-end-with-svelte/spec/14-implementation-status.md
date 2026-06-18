@@ -11,8 +11,8 @@
 | Audit view | ✅ |
 | Match check | ✅ |
 | Merge UI | ✅ |
-| Unit tests | ✅ (8 tests across `client.test.ts` + `events.test.ts`) |
-| E2E smoke | ✅ (6 tests) |
+| Unit tests | ✅ (`client.test.ts` + `events.test.ts` + `form.test.ts`) |
+| E2E smoke | ✅ (5 tests, `events.spec.ts`) |
 | `pnpm install` verified | ❌ — manual step pending |
 | `pnpm test` verified | ❌ — manual step pending |
 | Live integration | ❌ — pending operator walkthrough |

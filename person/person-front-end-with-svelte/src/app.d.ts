@@ -13,9 +13,12 @@ declare global {
             /** Structured error details (mirrors ApiError.details). */
             details?: unknown;
         }
-        // Locals/PageData/PageState/Platform are intentionally empty — this
-        // SPA carries no server-side request locals or typed page data.
-        interface Locals {}
+        // BFF: the server holds the opaque session id from the httpOnly
+        // `__Host-mxi_session` cookie (set in `hooks.server.ts`); the
+        // browser never reads it.
+        interface Locals {
+            sessionId: string | null;
+        }
         interface PageData {}
         interface PageState {}
         interface Platform {}

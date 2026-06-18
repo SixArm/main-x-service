@@ -3,8 +3,8 @@
 The service owns the REST surface; the front-end is its reference
 consumer. This page is the entity-level orientation — full endpoint
 reference with request/response examples:
-[service AGENTS/restful.md](../place-service-rust-crate/AGENTS/restful.md);
-inventory: service [spec §9](../place-service-rust-crate/spec/09-api-surface.md).
+[service AGENTS/restful.md](../place-service-with-loco/AGENTS/restful.md);
+inventory: service [spec §9](../place-service-with-loco/spec/09-api-surface.md).
 
 ## Shape of the surface
 
@@ -21,8 +21,11 @@ inventory: service [spec §9](../place-service-rust-crate/spec/09-api-surface.md
 - **Metrics:** Prometheus at `/metrics.prom` (HTML dashboard at
   `/metrics`).
 - **gRPC:** Tonic stub only (service spec §13 T-4).
-- **Auth:** none yet — JWT via the authentication entity is queued
-  (service spec §13 T-8; entity [spec §13](../spec/13-tasks.md) E-5).
+- **Auth:** none yet — offline PASETO v4.public verification (published
+  Ed25519 key) via the authentication entity is queued (service spec §13
+  T-8; entity [spec §13](../spec/13-tasks.md) E-5). See
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  for the cookie-session + PASETO model.
 
 ## Front-end consumption
 

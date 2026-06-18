@@ -1,7 +1,7 @@
 # AGENTS directory — Person Entity
 
 Entity-level reference documentation for the **person** trio:
-[person-service-rust-crate](../person-service-rust-crate/),
+[person-service-with-loco](../person-service-with-loco/),
 [person-matcher-rust-crate](../person-matcher-rust-crate/),
 [person-front-end-with-svelte](../person-front-end-with-svelte/).
 
@@ -23,7 +23,7 @@ per-subproject AGENTS sets — they do not duplicate them.
 
 | Subproject | Entry point | Highlights |
 |---|---|---|
-| person-service | [AGENTS/index.md](../person-service-rust-crate/AGENTS/index.md) | [models.md](../person-service-rust-crate/AGENTS/models.md), [matching.md](../person-service-rust-crate/AGENTS/matching.md), [restful.md](../person-service-rust-crate/AGENTS/restful.md), [testing.md](../person-service-rust-crate/AGENTS/testing.md), [spec-driven-development.md](../person-service-rust-crate/AGENTS/spec-driven-development.md) |
+| person-service | [AGENTS/index.md](../person-service-with-loco/AGENTS/index.md) | [models.md](../person-service-with-loco/AGENTS/models.md), [matching.md](../person-service-with-loco/AGENTS/matching.md), [restful.md](../person-service-with-loco/AGENTS/restful.md), [testing.md](../person-service-with-loco/AGENTS/testing.md), [spec-driven-development.md](../person-service-with-loco/AGENTS/spec-driven-development.md) |
 | person-matcher | [AGENTS.md](../person-matcher-rust-crate/AGENTS.md) | [matching-algorithm.md](../person-matcher-rust-crate/AGENTS/matching-algorithm.md), [normalization.md](../person-matcher-rust-crate/AGENTS/normalization.md), [national-person-identifiers.md](../person-matcher-rust-crate/AGENTS/national-person-identifiers.md), [security-and-privacy.md](../person-matcher-rust-crate/AGENTS/security-and-privacy.md), [testing.md](../person-matcher-rust-crate/AGENTS/testing.md) |
 | person-front-end | [AGENTS.md](../person-front-end-with-svelte/AGENTS.md) | Ground rules: Svelte 5 runes only, SPA mode, drift accepted, what lives where |
 

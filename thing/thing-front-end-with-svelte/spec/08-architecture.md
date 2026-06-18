@@ -23,7 +23,7 @@
                               | HTTP JSON
                               v
                 +-----------------------------+
-                |   thing-service-rust-crate |
+                |   thing-service-with-loco |
                 |   Axum + SeaORM + Tantivy   |
                 +-----------------------------+
 ```

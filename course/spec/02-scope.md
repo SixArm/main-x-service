@@ -15,7 +15,7 @@ This spec owns the **cross-subproject contract**:
 
 ### 2.2 In scope — per subproject
 
-**course-service-rust-crate** owns:
+**course-service-with-loco** owns:
 
 - Course CRUD with soft delete and full audit trail; the
   `CourseInstance` sub-resource (`/api/courses/{id}/instances/*`).

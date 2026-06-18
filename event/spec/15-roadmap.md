@@ -2,7 +2,7 @@
 
 The path from today's single-region MVP trio to a worldwide public
 governmental registry. Ordered roughly by dependency; per-crate
-roadmaps ([service §15](../event-service-rust-crate/spec/15-roadmap.md),
+roadmaps ([service §15](../event-service-with-loco/spec/15-roadmap.md),
 [front-end §15](../event-front-end-with-svelte/spec/15-roadmap.md))
 carry the implementation detail.
 

@@ -205,6 +205,48 @@ fn one_to_many_surface() {
     assert!(engine.find_matches(&query, &[]).is_empty());
 }
 
+// Pins the documented serde wire shape (spec §6): enum unit variants
+// serialise as their bare PascalCase string, and `Custom(label)`
+// serialises as `{"Custom":"label"}`. Covers IdentifierScheme, CaseType
+// and CaseStatus, and round-trips back.
+#[test]
+fn enum_variants_serialise_to_documented_wire_shape() {
+    // Unit variants → bare PascalCase JSON strings.
+    assert_eq!(
+        serde_json::to_string(&IdentifierScheme::Docket).expect("ser"),
+        "\"Docket\""
+    );
+    assert_eq!(
+        serde_json::to_string(&CaseType::SocialServices).expect("ser"),
+        "\"SocialServices\""
+    );
+    assert_eq!(
+        serde_json::to_string(&CaseStatus::InProgress).expect("ser"),
+        "\"InProgress\""
+    );
+
+    // Custom variants → `{"Custom":"label"}`.
+    assert_eq!(
+        serde_json::to_string(&IdentifierScheme::Custom("LegacySystem".into())).expect("ser"),
+        "{\"Custom\":\"LegacySystem\"}"
+    );
+    assert_eq!(
+        serde_json::to_string(&CaseType::Custom("Bespoke".into())).expect("ser"),
+        "{\"Custom\":\"Bespoke\"}"
+    );
+    assert_eq!(
+        serde_json::to_string(&CaseStatus::Custom("Escalated".into())).expect("ser"),
+        "{\"Custom\":\"Escalated\"}"
+    );
+
+    // Round-trip both forms back to the original value.
+    let unit: CaseType = serde_json::from_str("\"Housing\"").expect("de unit");
+    assert_eq!(unit, CaseType::Housing);
+    let custom: IdentifierScheme =
+        serde_json::from_str("{\"Custom\":\"LegacySystem\"}").expect("de custom");
+    assert_eq!(custom, IdentifierScheme::Custom("LegacySystem".into()));
+}
+
 // Pins serde support: a MatchResult round-trips to JSON containing the
 // `score` and `breakdown` fields (the public wire shape).
 #[test]

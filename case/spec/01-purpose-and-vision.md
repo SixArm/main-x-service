@@ -13,7 +13,7 @@ delivered as a trio of subprojects that compose into one capability:
 
 | Subproject | Role |
 |---|---|
-| [case-service-rust-crate](../case-service-rust-crate/) | Registry service — loco.rs CRUD + matching over REST; PostgreSQL persistence |
+| [case-service-with-loco](../case-service-with-loco/) | Registry service — loco.rs CRUD + matching over REST; PostgreSQL persistence |
 | [case-matcher-rust-crate](../case-matcher-rust-crate/) | Canonical pairwise matching library — deterministic + probabilistic, embedded by the service |
 | [case-front-end-with-svelte](../case-front-end-with-svelte/) | Operator UI — SvelteKit SPA over the service's REST API |
 
@@ -68,5 +68,7 @@ systems:
   [organization entity](../../organization/).
 - **Not** an authentication / authorisation provider. Sign-on for the
   whole index is the [authentication entity](../../authentication/)
-  (passwordless magic-link, RS256 JWT + JWKS); this entity is a JWT
-  *verifier*.
+  (passwordless magic-link + cookie session, short-lived PASETO v4 public
+  tokens); this entity is a token *verifier*. Auth model source of truth:
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  (supersedes the prior RS256-JWT + JWKS model).

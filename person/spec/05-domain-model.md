@@ -8,7 +8,7 @@ and front-end representations are projections of it.
 
 Defined in the service crate (`src/models/person.rs`); field-by-field
 reference in
-[`person-service-rust-crate/AGENTS/models.md`](../person-service-rust-crate/AGENTS/models.md).
+[`person-service-with-loco/AGENTS/models.md`](../person-service-with-loco/AGENTS/models.md).
 Material aspects:
 
 - **Identity** — UUID `id` + `identifiers: Vec<Identifier>`
@@ -20,6 +20,48 @@ Material aspects:
   driver's licence, voter ID, military ID, residence / work permit.
 - **Demographics** — `gender`, `birth_date`, `marital_status`,
   `deceased` + `deceased_datetime`, `multiple_birth`, `photo`.
+- **Biological parentage** — optional `biological_mother` and
+  `biological_father`, **each a reference to another `Person` in the
+  registry** (by `id`; 0..1 each, nullable — unknown parents stay null).
+  Self-referential links within the dataset (schema.org `parent`),
+  distinct from `emergency_contacts` and from the merge
+  `links: Vec<PersonLink>`.
+- **Household** — the set of people **living together in one home /
+  flat / place**. A `Household { id, address (the dwelling), members }`
+  groups all co-resident persons; a `Person` may belong to **0..many**
+  households (membership is **many-to-many** — e.g. a child of divorced
+  parents who lives in two homes), expressed as `household_ids` on the
+  person and `members` on the household. Membership reflects current
+  shared residence, independent of biological parentage (parents and
+  children may or may not share a household).
+- **Relationships** — typed person-to-person links:
+  `relationships: Vec<PersonRelationship>`, each `{ relation, person_id }`
+  **referencing another `Person` in the registry**. `relation` is a
+  `RelationKind` enum, initially **`ParentOf`**, **`ChildOf`**,
+  **`SiblingOf`**, and **`GuardianOf`**:
+  - `ParentOf` / `ChildOf` are **inverses** — A `ParentOf` B ⇔ B `ChildOf` A.
+  - `SiblingOf` is **symmetric** — A `SiblingOf` B ⇔ B `SiblingOf` A.
+  - `GuardianOf` / `WardOf` are **inverses** — A `GuardianOf` B (A is the
+    legal guardian) ⇔ B `WardOf` A (B is the ward / under guardianship).
+    Guardianship is a legal relationship, independent of parentage (a
+    guardian may or may not be a parent).
+  These are broader than the `biological_mother` / `biological_father`
+  fields (which name the two specific *biological* parents): a
+  parent-of / child-of link may be biological, step, adoptive, legal, or
+  foster. The enum is extensible (e.g. `SpouseOf` later).
+- **Tags** — `tags: Vec<String>`, a list of short free-text labels an
+  operator can attach to a record for grouping, filtering, triage, or
+  workflow (e.g. `"vip"`, `"review"`, `"archived-2026"`, `"fast-track"`).
+  **Any `Person` can carry tags.** Each tag is a short, trimmed,
+  non-empty string; the list is unordered, de-duplicated
+  case-insensitively, and defaults to empty. The `Person` entity has no
+  `keywords` field, so **tags are the labelling mechanism** — they are
+  user-applied operational labels for grouping and workflow, not
+  algorithmically derived descriptors. Tags ARE a **supporting** match
+  signal: the matcher scores them by plain set Jaccard over the
+  case-insensitively normalised tag sets (matcher §12.2), weighted
+  `tags_weight` (§5.3). A supporting signal only — not identifying on its
+  own.
 - **Registry plumbing** — `active`, `managing_organization`,
   `links: Vec<PersonLink>`, `created_at`, `updated_at`.
 
@@ -35,11 +77,11 @@ scheme (42 schemes), and `passport_books: Vec<PassportBook>`.
 
 The service embeds the matcher (path dependency, re-exported from
 `src/matching/mod.rs` as `matcher_lib`) and bridges via
-[`src/matching/adapter.rs`](../person-service-rust-crate/src/matching/adapter.rs):
+[`src/matching/adapter.rs`](../person-service-with-loco/src/matching/adapter.rs):
 `to_matcher_person(&service::Person) -> person_matcher::Person`.
 
 Routing rules (normative; pinned by
-[`tests/duplicate_detection.rs`](../person-service-rust-crate/tests/duplicate_detection.rs)):
+[`tests/duplicate_detection.rs`](../person-service-with-loco/tests/duplicate_detection.rs)):
 
 - `name.family` → `family_name`; first/second `name.given` →
   `given_name` / `middle_name`.
@@ -53,6 +95,15 @@ Routing rules (normative; pinned by
   falls back to `IdentifierType` when no URI hint.
 - `tax_id` defaults to `us_ssn` unless a typed identifier overrides.
 - `IdentityDocument` of type `Passport` → `passport_books`.
+- `relationships[]` → matcher `relationships` (typed `(relation,
+  person_id)` refs); `biological_mother` / `biological_father` fold in as
+  `ParentOf` refs (the strongest parent signal). Scored by typed-set
+  Jaccard (matcher §12.2), weighted `relationships_weight`. `household_ids`
+  stay registry-only (dropped — household co-membership is a weaker,
+  separate signal, not routed today).
+- `tags[]` → matcher `tags` (case-insensitively normalised label set).
+  Scored by plain set Jaccard (matcher §12.2), weighted `tags_weight`.
+  Tags are a **supporting** signal, not in the lossy-drop list below.
 
 #### 5.3.1 Identifier scheme-routing audit (E-8)
 
@@ -93,9 +144,10 @@ path in `route_identifier`, a row in this table + the `adapter.rs`
 rustdoc, and a case in `routable_identifier_systems_reach_their_matcher_slot`.
 
 The projection is **lossy by design**: registry-only fields (`id`,
-`active`, `links`, `managing_organization`, timestamps, …) are dropped
+`active`, `links`, `household_ids`, `managing_organization`,
+timestamps, …) are dropped
 — they have no matcher counterpart. Full rationale: service
-[spec §6.2](../person-service-rust-crate/spec/06-functional-requirements.md).
+[spec §6.2](../person-service-with-loco/spec/06-functional-requirements.md).
 
 ### 5.4 Front-end TypeScript types
 
@@ -117,6 +169,27 @@ All subprojects MUST uphold:
 - National identifiers are **scheme-local** — never cross-matched
   across schemes (matcher FR-13; the adapter routes, it does not
   coerce).
+- `biological_mother` / `biological_father`, when set, **reference an
+  existing `Person`** in the registry (or are null); a person is **not
+  its own** parent, and parentage **must not form a cycle** (no person is
+  their own ancestor).
+- A `Person` may belong to **0..many** households (membership is
+  many-to-many — e.g. a child of divorced parents living in two homes).
+  A `Household`'s `members` and a person's `household_ids` all reference
+  existing records.
+- A `PersonRelationship` references an **existing** `Person`; **no person
+  relates to itself** (not its own parent / child / sibling / guardian).
+  `ParentOf` / `ChildOf` and `GuardianOf` / `WardOf` must stay **acyclic**
+  (no person is their own ancestor or guardian, directly or transitively)
+  and, where both directions are stored, mutually consistent
+  (A `ParentOf` B ⇔ B `ChildOf` A; A `GuardianOf` B ⇔ B `WardOf` A);
+  `SiblingOf` is symmetric.
+- `tags` are short, trimmed, non-empty strings, de-duplicated
+  case-insensitively; the list is unordered and defaults to empty. The
+  canonical model is upstream — the service model, matcher DTO (where
+  carried), and front-end types follow in the same change cycle (§5.1
+  contract). Tags are a **supporting** match signal, scored by set
+  Jaccard in the matcher (weighted `tags_weight`; §5.3).
 - Soft delete (`active = false`) is the only delete, end to end: the
   service never row-deletes, and the front-end never offers hard
   delete.

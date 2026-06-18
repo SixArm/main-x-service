@@ -16,6 +16,7 @@
 <script lang="ts">
     import { Grid } from "wx-svelte-grid";
     import type { Thing } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     let {
         things,
@@ -25,14 +26,15 @@
         onselect?: (thing: Thing) => void;
     } = $props();
 
-    // Static grid column definitions (id, header, pixel width).
-    const columns = [
-        { id: "id", header: "ID", width: 220 },
-        { id: "name", header: "Name", width: 240 },
-        { id: "additional_type", header: "Type (schema.org)", width: 200 },
-        { id: "primary_id", header: "Primary identifier", width: 200 },
-        { id: "url", header: "URL", width: 200 },
-    ];
+    // Grid column definitions (id, localized header, pixel width). $derived
+    // so headers re-render when the UI locale changes.
+    const columns = $derived([
+        { id: "id", header: t("grid.id"), width: 220 },
+        { id: "name", header: t("grid.name"), width: 240 },
+        { id: "additional_type", header: t("grid.type"), width: 200 },
+        { id: "primary_id", header: t("grid.primaryId"), width: 200 },
+        { id: "url", header: t("grid.url"), width: 200 },
+    ]);
 
     // Format the first identifier as "<scheme> <value>" for the grid cell,
     // handling both bare-string schemes and the Custom tagged variant.

@@ -5,7 +5,10 @@
 //! Pins the public surface that downstream `thing-service` depends on via
 //! its `to_matcher_thing` adapter.
 
-use thing_matcher::{Confidence, Identifier, MatchConfig, MatchingEngine, Thing, ThingBuilder};
+use thing_matcher::{
+    Confidence, Identifier, MatchConfig, MatchingEngine, Scorer, SimilarityAlgorithm, Thing,
+    ThingBuilder,
+};
 
 // =============================================================================
 // 1. ThingBuilder surface
@@ -161,4 +164,26 @@ fn thing_builder_is_value_type() {
     fn _check(b: ThingBuilder) -> ThingBuilder {
         b.name("ok")
     }
+}
+
+// =============================================================================
+// 5. Scorer primitives (spec §5.6)
+// =============================================================================
+
+/// Pins the re-exported `Scorer` similarity primitives the spec §5.6
+/// documents as public — including `optional_field_score`, which the engine
+/// does not call internally but the crate publishes for downstream reuse.
+/// Their accidental removal must break CI rather than silently shrink the
+/// public surface.
+#[test]
+fn scorer_primitive_surface() {
+    let _: f64 = Scorer::jaro_winkler_similarity("a", "a");
+    let _: f64 = Scorer::levenshtein_similarity("a", "a");
+    let _: f64 = Scorer::exact_match("a", "a");
+    let _: f64 = Scorer::combined_similarity("a", "a");
+    let _: f64 = Scorer::jaccard_set_similarity(&["a"], &["a"]);
+
+    let some = Some("x".to_string());
+    let none: Option<String> = None;
+    let _: f64 = Scorer::optional_field_score(&some, &none, SimilarityAlgorithm::Exact);
 }

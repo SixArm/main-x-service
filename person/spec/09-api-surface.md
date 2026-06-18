@@ -3,7 +3,7 @@
 The entity's externally consumable surface is the **service's HTTP
 API** plus the **front-end's operator routes**. Complete endpoint
 reference (parameters, payloads, status codes):
-[`person-service-rust-crate/AGENTS/restful.md`](../person-service-rust-crate/AGENTS/restful.md).
+[`person-service-with-loco/AGENTS/restful.md`](../person-service-with-loco/AGENTS/restful.md).
 
 ### 9.1 Service REST API (summary)
 

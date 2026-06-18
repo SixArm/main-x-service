@@ -14,9 +14,11 @@ and accept. Ordered roughly by intent.
   every CRUD shipped under T-3 (in-process). Next: a **durable event
   bus** (replacing in-process publishing) so peer registries and
   analytics can subscribe across replicas, and an `actor` on each audit
-  row once JWT auth (T-7) supplies the caller identity.
-- **Security.** JWT enforcement on `/api/*` verifying RS256 tokens
-  against the central auth-service JWKS; role split between
+  row once token auth (T-7) supplies the caller identity.
+- **Security.** Enforcement on `/api/*` verifying **PASETO v4 public**
+  tokens against the central auth-service's published Ed25519 key (per
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md),
+  which supersedes the prior RS256-JWT model); role split between
   read-side integrators and registry operators; rate limiting.
   (Seed: T-7.)
 - **FHIR PlanDefinition import/export.** Map `PlanDefinition.url` /

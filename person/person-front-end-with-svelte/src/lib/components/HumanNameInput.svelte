@@ -15,6 +15,7 @@
 -->
 <script lang="ts">
     import type { HumanName } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
 
@@ -43,10 +44,10 @@
 </script>
 
 <FieldRow>
-    <LabeledField label="Family name" for={`${prefix}-family`} required error={errors.family}>
+    <LabeledField label={t("name.family")} for={`${prefix}-family`} required error={errors.family}>
         <input id={`${prefix}-family`} bind:value={name.family} required />
     </LabeledField>
-    <LabeledField label="Given names" for={`${prefix}-given`} required error={errors.given} hint="Space-separated">
+    <LabeledField label={t("name.given")} for={`${prefix}-given`} required error={errors.given} hint={t("name.givenHint")}>
         <input
             id={`${prefix}-given`}
             value={givenJoined}

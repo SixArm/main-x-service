@@ -10,7 +10,7 @@ See [`../spec.md`](../spec/index.md) for the authoritative behavioural contract.
 | Integration tests | `tests/integration_tests.rs` | Exercise the public API as a downstream user would. |
 | Property tests | `tests/property_tests.rs` | Quickcheck-style invariants via `proptest`. |
 | Doctests | `///` examples on every public item | Keep usage examples honest. Enforced by `#![deny(missing_docs)]` plus `cargo test --doc`. |
-| Examples | `examples/basic_usage.rs`, `examples/custom_config.rs`, plus the demo at `src/main.rs` | Smoke-test ergonomics; not run by `cargo test`. |
+| Examples | `examples/basic_usage.rs`, `examples/custom_config.rs`, `examples/location_matching.rs`, plus the demo at `src/main.rs` | Smoke-test ergonomics; not run by `cargo test`. |
 | Benches | `benches/match_pair.rs` | Criterion benches for hot paths. |
 
 Run everything: `cargo test`. Run a single test: `cargo test test_name`. Show stdout: `cargo test -- --nocapture`. Smoke the demo: `cargo run` and `cargo run --example basic_usage`.

@@ -9,20 +9,24 @@
 -->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     let {
         results,
-        title = "Match results",
+        title,
     }: {
         results: MatchResult[];
         title?: string;
     } = $props();
+
+    // Default the section heading to the localized "Match results".
+    const heading = $derived(title ?? t("results.title"));
 </script>
 
 <section class="surface stack">
-    <h2>{title} <span class="muted small">({results.length})</span></h2>
+    <h2>{heading} <span class="muted small">({results.length})</span></h2>
     {#if results.length === 0}
-        <p class="muted">No candidates.</p>
+        <p class="muted">{t("results.none")}</p>
     {:else}
         <ul class="results">
             {#each results as r}
@@ -40,7 +44,7 @@
                     </div>
                     {#if r.breakdown}
                         <details>
-                            <summary class="small">Score breakdown</summary>
+                            <summary class="small">{t("results.breakdown")}</summary>
                             <ul class="breakdown small">
                                 <!-- Skip components the matcher left null (not applicable). -->
                                 {#each Object.entries(r.breakdown) as [field, score]}

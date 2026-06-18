@@ -4,7 +4,7 @@ Honest snapshot per subproject. Worldwide-governmental-scale
 capabilities that do not exist yet are **not** listed here — they are
 §15 roadmap.
 
-### 14.1 person-service-rust-crate
+### 14.1 person-service-with-loco
 
 | Capability | Status |
 |---|---|
@@ -19,7 +19,7 @@ capabilities that do not exist yet are **not** listed here — they are
 | Authentication | ✘ none — API is open (service T-1 / entity E-1) |
 | Tests | ~100 unit + 7 integration + 14 bridge + 3 benchmark suites |
 
-Detail: [service spec §14](../person-service-rust-crate/spec/14-implementation-status.md).
+Detail: [service spec §14](../person-service-with-loco/spec/14-implementation-status.md).
 
 ### 14.2 person-matcher-rust-crate
 

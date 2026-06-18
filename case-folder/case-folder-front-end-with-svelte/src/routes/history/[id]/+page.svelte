@@ -10,6 +10,7 @@
     import Separator from '$lib/components/Separator/Separator.svelte';
     import SummaryList from '$lib/components/SummaryList/SummaryList.svelte';
     import SummaryListItem from '$lib/components/SummaryListItem/SummaryListItem.svelte';
+    import { t, tf, statusLabel } from '$lib/i18n.svelte';
 
     let { data } = $props();
     const move = $derived(data.move);
@@ -27,43 +28,43 @@
     }
 </script>
 
-<BackLink href="/history">Back to move history</BackLink>
+<BackLink href="/history">{t('historyDetail.backToHistory')}</BackLink>
 
-<h2>Move event</h2>
+<h2>{t('historyDetail.heading')}</h2>
 <p>{new Date(move.movedAt).toLocaleString('en-GB')}</p>
 
 <div class="panel">
-    <h3>Folder involved</h3>
-    <SummaryList label="Move event details">
-        <SummaryListItem term="Folder">
+    <h3>{t('historyDetail.folderInvolved')}</h3>
+    <SummaryList label={t('historyDetail.detailsLabel')}>
+        <SummaryListItem term={t('common.folder')}>
             <a href="/folders/{move.folderId}">{move.folderTitle}</a>
         </SummaryListItem>
-        <SummaryListItem term="Patient">
+        <SummaryListItem term={t('common.patient')}>
             <a href="/patients/{nhsSlug(move.nhsNumber)}">{move.patientName}</a>
             (<span class="nhs-number">{move.nhsNumber}</span>)
         </SummaryListItem>
-        <SummaryListItem term="From">{move.fromCabinetLabel}</SummaryListItem>
-        <SummaryListItem term="To">{move.toCabinetLabel}</SummaryListItem>
-        <SummaryListItem term="Moved by">
+        <SummaryListItem term={t('common.from')}>{move.fromCabinetLabel}</SummaryListItem>
+        <SummaryListItem term={t('common.to')}>{move.toCabinetLabel}</SummaryListItem>
+        <SummaryListItem term={t('common.movedBy')}>
             {move.movedBy}{#if move.workerRole} ({move.workerRole}){/if}
         </SummaryListItem>
-        <SummaryListItem term="Reason">{move.reason ?? '—'}</SummaryListItem>
+        <SummaryListItem term={t('common.reason')}>{move.reason ?? '—'}</SummaryListItem>
     </SummaryList>
 </div>
 
 <Separator />
 
-<h3>Other folders for {move.patientName}</h3>
+<h3>{tf('historyDetail.otherFolders', { patient: move.patientName })}</h3>
 {#if data.folders.length > 0}
     <ul class="folder-links">
         {#each data.folders as folder (folder.id)}
             <li>
                 <a href="/folders/{folder.id}">{folder.title}</a>
-                — <Badge type={badgeType(folder.status)}>{folder.status}</Badge>
+                — <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
                 <span class="muted">{folder.cabinetLabel}</span>
             </li>
         {/each}
     </ul>
 {:else}
-    <p>No other folders for this patient.</p>
+    <p>{t('historyDetail.noOtherFolders')}</p>
 {/if}

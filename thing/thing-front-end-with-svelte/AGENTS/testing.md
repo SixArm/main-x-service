@@ -17,7 +17,7 @@ pnpm test
 pnpm test:e2e
 
 # Type check
-pnpm svelte-check
+pnpm check
 
 # Lint (if configured)
 pnpm lint
@@ -31,8 +31,9 @@ Conventions:
   `things.test.ts`).
 - Mock `fetch` via `vi.fn()`; assert on URL, method, headers, body.
 - For repository tests: pin the exact route path (e.g.
-  `POST /api/things/duplicates` — Thing Service uses `/duplicates`,
-  not `/check-duplicates`).
+  `POST /api/things/check-duplicates` — the path the Thing Service
+  serves; see [`spec §9`](../spec/09-api-consumption.md) and
+  [`thing-service-with-loco/AGENTS/restful.md`](../../thing-service-with-loco/AGENTS/restful.md)).
 - For envelope tests: assert that `ApiClient` unwraps `{success,
   data, error}` correctly and surfaces `ApiError` with `isConflict`
   / `isNotFound` / `isValidation` shortcuts.
@@ -51,6 +52,9 @@ Conventions:
 
 ### Unit test pattern
 
+The real `ApiClient` constructor takes a single `ClientOptions`
+object (`{ baseUrl, fetch }`), not positional args:
+
 ```ts
 import { describe, it, expect, vi } from "vitest";
 import { ApiClient } from "$lib/api/client";
@@ -58,10 +62,12 @@ import { ApiClient } from "$lib/api/client";
 describe("ApiClient", () => {
   it("unwraps the success envelope", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ success: true, data: { id: 1 } })),
+      new Response(JSON.stringify({ success: true, data: { id: 1 }, error: null }), {
+        headers: { "content-type": "application/json" },
+      }),
     );
-    const client = new ApiClient("http://test", fetchMock);
-    const result = await client.get("/health");
+    const client = new ApiClient({ baseUrl: "http://test", fetch: fetchMock as unknown as typeof fetch });
+    const result = await client.get("/api/health");
     expect(result).toEqual({ id: 1 });
   });
 });
@@ -69,12 +75,16 @@ describe("ApiClient", () => {
 
 ### Playwright pattern
 
+The smoke suite must pass with no live service, so assert on static
+route landmarks (headings, nav links) rather than API-driven content:
+
 ```ts
 import { test, expect } from "@playwright/test";
 
-test("dashboard renders health badge", async ({ page }) => {
+test("dashboard renders nav and heading", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText(/healthy|ok|up/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Things" })).toBeVisible();
 });
 ```
 

@@ -12,7 +12,7 @@ Embedded in `#[cfg(test)] mod tests` blocks per source file. Run with
 | `normalize` | `fold`, `case_number` (alphanumeric-only), `url`, `fold_set`. |
 | `scoring` | `weighted_average` renormalisation; `Confidence::classify` bands. |
 | `phonetic` | Soundex examples + `same()` contract. |
-| `matcher` | Identical → high; R-0 docket / external-case-id short-circuit; agency-scoped case number not across agencies; agency-name fallback; `same_as` overlap; subjects Jaccard; case-type / status exact; unrelated → low; rank / find_matches / one-to-many. |
+| `matcher` | Identical → high; R-0 docket / external-case-id short-circuit; agency-scoped case number not across agencies; agency-name fallback; `same_as` overlap; subjects + keywords Jaccard; Soundex title bonus (lift + clamp + symmetry); `alternate_titles` contribution; case-type / status exact; unrelated → low; rank / find_matches / one-to-many. |
 
 ## Integration tests
 
@@ -21,11 +21,12 @@ re-exported surface (`use case_matcher::…`): R-0 for every
 deterministic scheme, agency-scoped/`Custom` NOT short-circuiting,
 R-1 case number, the across-agency non-cross-match, R-2 `same_as`,
 subjects/type corroboration, status discrimination, renormalisation,
-threshold presets, the one-to-many surface, and `MatchResult` JSON
+threshold presets, the one-to-many surface, the documented enum serde
+wire shape (unit variants vs `Custom`), and `MatchResult` JSON
 serialisation. Run `cargo test --test public_api`.
 
 ## Gate
 
-`cargo test` (all green), `cargo clippy --all-targets -- -D warnings`
-(clean), `cargo fmt --check` (clean). No `unwrap`/`expect`/`panic` in
-library code.
+`cargo test` (all green), `cargo clippy --all-targets --all-features
+-- -D warnings` (clean), `cargo fmt --check` (clean). No
+`unwrap`/`expect`/`panic` in library code.

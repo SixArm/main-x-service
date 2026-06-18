@@ -3,7 +3,7 @@
 > **Single source of truth.** Code conforms to this spec. Behavioural
 > change = spec + code + test. Live work queue is §13.
 >
-> Sibling service: [organization-service](../../organization-service-rust-crate/spec/index.md).
+> Sibling service: [organization-service](../../organization-service-with-loco/spec/index.md).
 
 ## 1. Purpose and vision
 
@@ -13,8 +13,11 @@ duplicate-check organization records via the organization service.
 ## 2. Scope
 
 In scope: the four routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`), the
-API client, and the organization form. Out of scope: full-text search
-UI, audit views, auth (the service MVP is unauthenticated).
+API client, the organization form, and the session/auth integration
+(§6.7/§6.8 — BFF + httpOnly-cookie + PASETO per
+[`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md);
+service-side enforcement off by default). Out of scope: full-text search
+UI, audit views.
 
 ## 3. Stakeholders and users
 
@@ -35,6 +38,14 @@ Operators curating the organization registry.
 /[pid]/edit  edit form
 ```
 
+### Layout shell & navigation
+
+Cross-cutting UI rule for every `*-front-end-with-svelte` app:
+
+- Global navigation MUST be a **top navigation bar** (header) spanning the full viewport width. There MUST NOT be a left-hand navigation sidebar / rail.
+- On narrow viewports the top-bar navigation MUST collapse behind a **hamburger menu** toggle.
+- The main content area MUST be **full-width** — never inset by a persistent side-navigation column.
+
 ## 6. Functional requirements
 
 1. List active organizations (`GET /api/organizations`).
@@ -45,28 +56,23 @@ Operators curating the organization registry.
 5. Delete (`DELETE`, soft), redirect to the list.
 6. Check-duplicates posts the current record and lists matches (name,
    score, confidence), excluding the record itself.
-7. **Session / bearer token.** A reactive token store
-   (`src/lib/auth.svelte.ts`) holds an access token hydrated from
-   `localStorage["mxi_access_token"]` (the family-shared key; guarded for
-   SSR/preview). The `ApiClient` attaches `Authorization: Bearer <token>`
-   on every request when the store holds one, and omits it otherwise; a
-   per-request `token` overrides the store. Service-side enforcement
-   (`ORGANIZATION_REQUIRE_AUTH`) is off by default, so an absent token
-   keeps current behaviour. See `agents/share/jwt-enforcement.md`.
-8. **Cross-origin SSO handoff (token acquisition).** When signed out the
-   layout shows a primary **Sign in** action that navigates to
-   `signInUrl()` =
-   `${VITE_AUTH_FRONTEND_URL}/signin?return_to=<encoded origin+base>`
-   (`src/lib/config.ts`). The authentication front-end runs the
-   passwordless magic-link, then (if our origin is on its allowlist)
-   redirects back to `return_to#access_token=<jwt>`. On app load the
-   layout's `onMount` calls `captureFromLocation()` **before any API
-   call**: `captureTokenFromHash(window.location.hash)` pulls the token
-   out of the fragment, `setToken` stores it, and `history.replaceState`
-   strips the fragment from the address bar. The token rides the URL
-   fragment (never the query) so it is not sent to servers / logged. A
-   manual paste field (under a "Paste a token" disclosure) is kept as a
-   dev convenience. Guarded for SSR/preview (no `window`).
+7. **Session (BFF + httpOnly cookie).** The browser holds only the
+   `__Host-mxi_session` httpOnly cookie — no token in JS, no
+   `localStorage`. The SvelteKit **server** (BFF) holds the session and,
+   when calling the organization service, attaches a short-lived PASETO
+   server-side; the browser never calls the service directly. Mutating
+   browser→BFF calls carry a CSRF token. Service-side enforcement
+   (`ORGANIZATION_REQUIRE_AUTH`) is off by default. Per
+   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
+8. **Sign-in.** When signed out the layout shows a primary **Sign in**
+   action routed through the BFF to the central authentication front-end
+   for the passwordless magic-link; on success the authentication-service
+   sets the `__Host-mxi_session` cookie. There is no client-held access
+   token and no URL-fragment handoff. Per
+   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
+9. **Layout shell.** Global navigation is a full-width **top bar**
+   (header) with a **hamburger** toggle on narrow viewports — NOT a left
+   sidebar — and the main content area is **full-width**.
 
 ## 7. Non-functional requirements
 
@@ -76,9 +82,16 @@ dependency-light (no data grid / design system).
 ## 8. Architecture
 
 `ApiClient` (lean, raw-JSON, get/post/put/delete) → `OrganizationRepository`
-→ routes. `OrganizationForm` builds an `Organization` from the inputs
-(comma lists split, blanks stripped, address assembled only if any field
-is set).
+→ routes. The `Organization` payload is the matcher shape serialized
+snake_case: `name`, `legal_name`, `alternate_names`, `identifiers`,
+`url`, `same_as`, `address`, `jurisdiction`, `founding_date`,
+`telephone`, `email` (both contact fields; personal data — see §12),
+`keywords`. `OrganizationForm` edits these and assembles the payload via
+the shared, unit-tested `src/lib/api/build.ts` (`buildOrganization` +
+`splitList`/`blankToUndef`): comma lists split, blanks → `null`, address
+assembled all-or-nothing only if any part is set, empty identifier rows
+dropped. The detail route's `excludeSelf` (same module) drops the
+record's own pid from check-duplicates results (§6.6).
 
 ## 9. API consumption
 
@@ -98,16 +111,24 @@ None client-side beyond in-memory route state.
 ## 11. Testing strategy
 
 `pnpm run check` (svelte-check strict, 0/0). **vitest** unit tests
-(`tests/unit/`) cover the `ApiClient` (verb/body/headers/bearer-token —
-explicit token, store-driven attach, clear, and explicit-`null`
-override / error-classification / empty-body), the `auth` token store
-(`setToken`/`clearToken` round-trip, trim/blank handling) and its SSO
-handoff parser `captureTokenFromHash` (extracts the token from a
-well-formed fragment, URL-decodes, returns `null` for
-empty/garbage/no-token/blank), the `signInUrl` builder (encoded
-`return_to` of origin + base, trailing-slash safe), and
-`OrganizationRepository` (every method's path + verb, incl. a regression
-pinning `check-duplicates`).
+(`tests/unit/`, 49 across 5 files) cover:
+- `client.test.ts` — the `ApiClient` (verb/body/headers/bearer-token —
+  explicit token, store-driven attach, clear, and explicit-`null`
+  override / error-classification / empty-body).
+- `auth.test.ts` — the `auth` token store (`setToken`/`clearToken`
+  round-trip, trim/blank handling), the pure SSO parser
+  `captureTokenFromHash` (extract / URL-decode / `null` for
+  empty/garbage/no-token/blank), and `captureFromLocation` (browser
+  side: stores the token and strips the fragment via
+  `history.replaceState`; no-op when none).
+- `config.test.ts` — the `signInUrl` builder (encoded `return_to` of
+  origin + base, trailing-slash safe).
+- `organizations.test.ts` — `OrganizationRepository` (every method's
+  path + verb, incl. a regression pinning `check-duplicates`).
+- `build.test.ts` — the spec §8 core in `src/lib/api/build.ts`:
+  `buildOrganization` (blank → `null`, comma-list split, contact fields,
+  all-or-nothing address, dropping empty identifier rows),
+  `splitList`/`blankToUndef`, and `excludeSelf` (§6.6 self-match drop).
 **Playwright** smoke tests (`tests/e2e/`) load the four routes (`/`,
 `/new`, `/[pid]`, `/[pid]/edit`) with the API stubbed via
 `page.route`, asserting each renders; they run against the production
@@ -121,21 +142,24 @@ controls when they land.
 
 ## 13. Tasks (live work queue)
 
-- [x] vitest unit tests for `ApiClient` + `OrganizationRepository` +
-  `auth` store (`tests/unit/`, 23 tests).
+- [x] vitest unit tests (`tests/unit/`, 49 across 5 files) for the
+  `ApiClient`, `OrganizationRepository`, `auth` store + SSO handoff
+  (`captureTokenFromHash` / `captureFromLocation`), `signInUrl`, and the
+  form/payload core in `build.ts` (`buildOrganization`, `splitList`,
+  `blankToUndef`, `excludeSelf`).
 - [x] playwright smoke for the four routes (`tests/e2e/smoke.spec.ts`,
   4 tests, API stubbed, runs against `vite preview`).
 - [ ] Identifier `Custom(label)` editing in the form.
 - [ ] Search box once the service ships search.
-- [x] Bearer token wiring — `auth.svelte.ts` token store
+- [x] ~~Bearer token wiring — `auth.svelte.ts` token store
   (`localStorage["mxi_access_token"]`) + `ApiClient` auto-attach +
-  layout session affordance, per `agents/share/jwt-enforcement.md`.
-  Service enforcement is off by default.
-- [x] Cross-origin SSO handoff — `signInUrl()` redirect to the
-  authentication front-end + `captureFromLocation()` / `captureTokenFromHash`
-  capture the token from `…#access_token=<jwt>` on load and strip the
-  fragment (`VITE_AUTH_FRONTEND_URL`), per
-  `agents/share/jwt-enforcement.md`. Manual paste kept as a dev fallback.
+  layout session affordance~~ — **superseded** (see auth-migration task below).
+- [x] ~~Cross-origin SSO handoff — `signInUrl()` redirect +
+  `captureFromLocation()` / `captureTokenFromHash` fragment capture~~ —
+  **superseded** (see auth-migration task below).
+- [ ] Auth — adopt BFF + httpOnly cookie + CSRF; remove
+  `mxi_access_token`/`localStorage` bearer + fragment handoff (per
+  [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 
 ## 14. Implementation status
 
@@ -144,8 +168,12 @@ SPA config. `pnpm run check` clean; production build succeeds.
 
 ## 15. Roadmap
 
-v0.1 (here): CRUD + duplicate-check UI. v0.2: tests + search box.
-v0.3: auth token + audit views.
+v0.1 (here): CRUD + duplicate-check UI, vitest + Playwright suites. The
+v0.1 session shipped as a client-held bearer + cross-origin SSO handoff;
+that is now superseded by the BFF + httpOnly-cookie model (§6.7/§6.8,
+[`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
+Next: migrate auth to the BFF model; search box once the service ships
+search; audit views.
 
 ## 16. Open questions
 

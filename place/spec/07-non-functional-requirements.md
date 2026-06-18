@@ -7,7 +7,7 @@ measurements; multi-region targets are roadmap ([§15](15-roadmap.md)).
 | # | Attribute | Target |
 |---|---|---|
 | NFR-1 | Scale | Millions of place records (national gazetteers run 1–10 M+ entries per country), thousands of data sources, millions of operator + machine users across the index |
-| NFR-2 | Latency (single node, service [spec §7](../place-service-rust-crate/spec/07-non-functional-requirements.md)) | Create ≤ 50 ms p50; read ≤ 5 ms p50; search ≤ 100 ms p50; geo-radius ≤ 200 ms p50; match ≤ 500 ms p99 |
+| NFR-2 | Latency (single node, service [spec §7](../place-service-with-loco/spec/07-non-functional-requirements.md)) | Create ≤ 50 ms p50; read ≤ 5 ms p50; search ≤ 100 ms p50; geo-radius ≤ 200 ms p50; match ≤ 500 ms p99 |
 | NFR-3 | Throughput | ≥ 1 000 req/sec per service instance; horizontal scale via stateless app tier |
 | NFR-4 | Availability | HADR: stateless app tier, PostgreSQL replication, health checks, graceful shutdown; multi-region active/passive is roadmap |
 | NFR-5 | Matching determinism | Same inputs ⇒ same outputs, byte-for-byte; no clocks, RNGs, or env reads in the matcher (matcher [spec §8](../place-matcher-rust-crate/spec/08-determinism-and-safety.md)) |

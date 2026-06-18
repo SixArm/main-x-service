@@ -94,6 +94,31 @@ async fn me_without_session_returns_401() {
     .await;
 }
 
+/// Pins: `POST /api/auth/logout` returns `204` and a `Set-Cookie` that
+/// clears the session (`cts_session=` with `Max-Age=0`). Logout is
+/// idempotent, so it succeeds even without a prior session.
+#[tokio::test]
+#[serial]
+async fn logout_clears_the_session_cookie() {
+    request::<App, _, _>(|request, ctx| async move {
+        super::clean_db(&ctx).await;
+        let response = request.post("/api/auth/logout").await;
+        assert_eq!(response.status_code(), 204);
+        let set_cookie = response
+            .headers()
+            .get("set-cookie")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert!(set_cookie.contains("cts_session="));
+        assert!(set_cookie.contains("Max-Age=0"));
+        // The cleared cookie carries no token value.
+        assert_eq!(super::session_token_from_set_cookie(&set_cookie), "");
+    })
+    .await;
+}
+
 /// Pins the full happy path: request a link, exchange the token for a
 /// session (checks the `cts_session` `HttpOnly` cookie + user payload),
 /// then present the session as a Bearer token to `/api/auth/me`.

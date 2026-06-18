@@ -1,6 +1,6 @@
 ## 9. API Consumption
 
-The front-end binds 1:1 to the Person Service REST surface (see [`person-service-rust-crate/AGENTS/restful.md`](../../person-service-rust-crate/AGENTS/restful.md)):
+The front-end binds 1:1 to the Person Service REST surface (see [`person-service-with-loco/AGENTS/restful.md`](../../person-service-with-loco/AGENTS/restful.md)):
 
 | Endpoint | Used by |
 | --- | --- |

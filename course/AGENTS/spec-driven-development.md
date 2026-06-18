@@ -9,7 +9,7 @@ living specs, with a clear authority split.
 | Question | Governing spec |
 |---|---|
 | How does the trio compose? DTO contract, wire contract, shared invariants, entity goals | [`../spec/`](../spec/index.md) (entity level) |
-| Service internals (handlers, repositories, validation, persistence) | [service spec](../course-service-rust-crate/spec/index.md) (§1–§18) |
+| Service internals (handlers, repositories, validation, persistence) | [service spec](../course-service-with-loco/spec/index.md) (§1–§18) |
 | Matcher internals (algorithms, weights, normalisation) | [matcher spec](../course-matcher-rust-crate/spec/index.md) (§1–§25) |
 | Front-end internals (routes, components, build) | [front-end spec](../course-front-end-with-svelte/spec/index.md) (§1–§18) |
 

@@ -23,7 +23,7 @@
                               | HTTP JSON
                               v
                 +-----------------------------+
-                |   worker-service-rust-crate |
+                |   worker-service-with-loco |
                 |   Axum + SeaORM + Tantivy   |
                 +-----------------------------+
 ```

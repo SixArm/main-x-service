@@ -37,7 +37,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   vitest unit count is now 24 (was 18).
 - **A11y fix.** Removed the redundant `role="separator"` from
   `Separator.svelte` — an `<hr>` already carries the implicit `separator`
-  role. `pnpm run check` is now 0 errors / 0 warnings.
+  role. `npm run check` is now 0 errors / 0 warnings.
 
 ### Added
 
@@ -70,11 +70,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Configuration
 
-- `VITE_API_BASE_URL` (override the API origin; default proxies to
-  `http://localhost:5150`).
+- `LOCO_API_PROXY` (dev-proxy target; default `http://localhost:5150`,
+  read in `vite.config.ts`) keeps `/api` same-origin so the session
+  cookie stays first-party. `VITE_API_BASE_URL` points the client at a
+  different origin instead (bypasses the proxy; affects cookies).
 - The Lily Svelte helpers are consumed in-source via SvelteKit `kit.alias`
   from a sibling clone at `~/git/lilydesignsystem/...`; that repo must be
-  cloned for `pnpm dev` / `pnpm build` to resolve `@lily/locale-picker`
+  cloned for `npm run dev` / `npm run build` to resolve `@lily/locale-picker`
   and `@lily/theme-picker`.
 
 ### Notes

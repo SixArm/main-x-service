@@ -36,7 +36,7 @@ therefore treats residence-linked places with person-grade controls:
 ### 12.3 Subproject obligations
 
 - **Service** — implements every mechanism above; see service
-  [spec §12](../place-service-rust-crate/spec/12-compliance.md).
+  [spec §12](../place-service-with-loco/spec/12-compliance.md).
 - **Matcher** — never logs or `Debug`-formats place data; no real
   personal data in tests (synthetic fixtures only); see matcher
   [`AGENTS/security-and-privacy.md`](../place-matcher-rust-crate/AGENTS/security-and-privacy.md).

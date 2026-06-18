@@ -17,7 +17,7 @@ This spec owns the **cross-subproject contract**:
 
 | Concern | Owner |
 |---|---|
-| Place CRUD, soft delete, audit trail, event streaming | [place-service](../place-service-rust-crate/spec/index.md) |
+| Place CRUD, soft delete, audit trail, event streaming | [place-service](../place-service-with-loco/spec/index.md) |
 | PostgreSQL schema (13 tables), SeaORM entities, migrations | place-service |
 | Tantivy full-text / fuzzy / boolean search; geo-radius search | place-service |
 | Duplicate detection (real-time / explicit / batch), review queue, merge | place-service |

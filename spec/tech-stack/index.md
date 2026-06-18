@@ -37,8 +37,8 @@ is in
 [`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md); the
 summary below maps each concern to its technology and grounds it in the
 representative service manifests
-(`person/person-service-rust-crate/Cargo.toml`,
-`organization/organization-service-rust-crate/Cargo.toml`).
+(`person/person-service-with-loco/Cargo.toml`,
+`organization/organization-service-with-loco/Cargo.toml`).
 
 | Concern | Technology | Purpose |
 |---|---|---|
@@ -59,7 +59,7 @@ representative service manifests
 | Timestamps | chrono 0.4 | Dates, times, durations |
 | Error handling | thiserror 2 + anyhow 1 | Typed + contextual errors |
 | Password hashing | argon2 0.5 | Magic-link / credential hashing (where used) |
-| JWT | jsonwebtoken 9 (RS256) + authentication-verifier 0.1 | Offline RS256 token verification against the auth-service JWKS |
+| Authentication | rusty_paseto (PASETO v4.public) + authentication-verifier 0.1 | Server-side Postgres **cookie sessions** are the session; cross-service auth is short-lived **PASETO v4.public** tokens verified offline against the published Ed25519 key (`/.well-known/paseto-keys`). `jsonwebtoken`/RS256 + JWKS is **decommissioned**. See [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md). |
 | Testing | assertables, tokio-test, mockall, tempfile (+ rstest, insta, serial_test in loco services) | Unit + integration + snapshot tests |
 | Benchmarking | Criterion 0.5 | Statistical performance benchmarks |
 | Memory allocator | MiMalloc 0.1 | Faster allocator on MUSL static builds (NOT jemalloc) |
@@ -206,9 +206,11 @@ Pulls in: `loco-rs` (Hooks / AppContext / CLI / loco config),
 `tokio` (minimal `rt-multi-thread`), `validator`, `uuid`, `mimalloc`,
 the sibling `*-matcher` crate (reused as the API DTO),
 `authentication-verifier`. Dev-deps add `rstest`, `insta`,
-`serial_test`, and in-process RS256 token minting (`jsonwebtoken`,
-`rsa`, `sha2`, `base64`). Search is Postgres `ILIKE`; events are
-in-memory; OpenAPI is hand-written or Utoipa.
+`serial_test`, and in-process short-lived-token minting for auth tests
+(target: PASETO v4.public via `rusty_paseto`; the prior RS256 path —
+`jsonwebtoken`, `rsa`, `sha2`, `base64` — is being decommissioned).
+Search is Postgres `ILIKE`; events are in-memory; OpenAPI is
+hand-written or Utoipa.
 
 ### 5.2 Older Axum generation
 

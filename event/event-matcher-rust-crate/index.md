@@ -19,7 +19,7 @@ The library is pure: no IO, no clocks, no RNGs, `#![forbid(unsafe_code)]`, `Send
 
 ```toml
 [dependencies]
-event-matcher = "0.4"
+event-matcher = "0.6"
 ```
 
 ## Quick start — probabilistic match

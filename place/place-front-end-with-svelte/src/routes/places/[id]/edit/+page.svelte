@@ -14,6 +14,7 @@
     import { onMount } from "svelte";
     import PlaceForm from "$lib/components/PlaceForm.svelte";
     import { PlaceRepository } from "$lib/api/places.js";
+    import { t } from "$lib/i18n.svelte.js";
     import type { Place } from "$lib/api/types.js";
 
     const repo = PlaceRepository.withFetch();
@@ -44,16 +45,16 @@
 <svelte:head><title>Edit place · {id}</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Edit place</h1>
-    <a href={`/places/${id}`} class="button">Cancel</a>
+    <h1>{t("edit.title")}</h1>
+    <a href={`/places/${id}`} class="button">{t("edit.cancel")}</a>
 </header>
 
 {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{t("edit.loading")}</p>
 {:else if error}
     <div class="banner error">{error}</div>
 {:else if place}
     <section class="surface stack">
-        <PlaceForm initial={place} submitLabel="Save changes" onsubmit={handleSubmit} />
+        <PlaceForm initial={place} submitLabel={t("edit.saveChanges")} onsubmit={handleSubmit} />
     </section>
 {/if}

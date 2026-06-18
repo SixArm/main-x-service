@@ -9,6 +9,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **Auth pivot — docs only (code follow-up pending).** The family
+  authentication model moved from **client-held RS256 JWT bearer tokens**
+  (fragment handoff + `localStorage["mxi_access_token"]`) to a
+  **Backend-For-Frontend (BFF) + httpOnly cookie session + CSRF**, with
+  the BFF exchanging the session for a short-lived **PASETO v4.public**
+  token for server-side service calls — see
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  as the source of truth; RS256/JWKS are decommissioned. Human-facing
+  docs (README / index / AGENTS) now describe the BFF + cookie model;
+  the browser holds no token. The runtime (`auth.svelte.ts`, `ApiClient`)
+  still uses the old client-held bearer flow; the BFF code follow-up is
+  tracked in the spec. No code change in this entry.
+- **Doc harmonization pass.** Refreshed `AGENTS.md` to match the spec's
+  auth/SSO layer: added `src/lib/auth.svelte.ts` and the `tests/` tree to
+  the layout, noted `config.ts` now also exports `AUTH_FRONTEND_URL` /
+  `signInUrl()`, added a bearer-token / SSO ground rule, and documented
+  `VITE_AUTH_FRONTEND_URL` alongside `PUBLIC_API_BASE_URL`. Added an
+  SSO token-handoff worked example to `index.md` so the navigation aid
+  reflects the implemented sign-in flow (spec §6.7-6.8, §8). No code
+  change; vitest 40 green, `pnpm run check` 0/0.
+
 ### Added
 
 - **Cross-origin SSO token handoff (consumer side)** (family contract

@@ -22,10 +22,17 @@ pub struct Place {
     pub area_as_metre_2: Option<f64>,
     pub country_code_as_iso_3166_1_alpha_2: Option<String>,
     pub maximum_capacity_count: Option<u32>,
+    pub setting: Option<IndoorOutdoor>,
+    pub tags: Vec<String>,
 }
 ```
 
-`Place` carries **15 fields**, every one optional or defaulting to empty.
+`Place` carries **17 fields**, every one optional or defaulting to empty.
+
+`IndoorOutdoor` is a `#[non_exhaustive]` enum with variants `Indoor`
+(e.g. a house, office, room), `Outdoor` (e.g. a park, road, lake), and
+`Mixed` (both), serialised as the string forms `"Indoor"` / `"Outdoor"` /
+`"Mixed"`.
 
 - `Place` MUST be constructed via `Place::builder()` from outside the crate (`#[non_exhaustive]`).
 - `Place::validate(&self) -> Result<()>` MUST return `Ok(())` when `name` is set and `Err(MatchingError::MissingField(_))` otherwise. Validation is not invoked automatically by the matcher.
@@ -52,12 +59,14 @@ The "Scored" column distinguishes fields the probabilistic matcher uses (§6) fr
 | `area_as_metre_2` | `Option<f64>` | **no** | Footprint in square metres. |
 | `country_code_as_iso_3166_1_alpha_2` | `Option<String>` | yes (§6.6) | ISO 3166-1 alpha-2 code. Stored as supplied; compared case-insensitively after trim. |
 | `maximum_capacity_count` | `Option<u32>` | **no** | Legal / seating capacity. `0` is meaningful; absence is `None`. |
+| `setting` | `Option<IndoorOutdoor>` | yes (§6.10) | Indoor (house/office/room), Outdoor (park/road/lake), or Mixed. |
+| `tags` | `Vec<String>` | yes (§6.11) | Free-text operator labels (e.g. `"vip"`, `"review"`). Scored as a supporting set-Jaccard signal over the case-insensitively normalised tag sets. Default empty. |
 
 Latitude or longitude values that are non-finite or fall outside the conventional ranges MUST be stored as supplied (round-trip honesty) but MUST be treated as missing by the coordinates scorer (§6.3).
 
 #### 3.1.2 JSON shape
 
-The serde-derived JSON form mirrors the Rust struct one-for-one: field names are the snake-case identifiers in §3.1, optional fields serialise as `null` when absent, `alternate_names` and `place_ids` serialise as JSON arrays, `category` serialises as either a string variant (`"Monument"`) or `{"Other": "..."}`, and `place_ids` entries serialise as `{"scheme": "Wikidata", "value": "Q243"}`.
+The serde-derived JSON form mirrors the Rust struct one-for-one: field names are the snake-case identifiers in §3.1, optional fields serialise as `null` when absent, `alternate_names`, `place_ids`, and `tags` serialise as JSON arrays, `category` serialises as either a string variant (`"Monument"`) or `{"Other": "..."}`, and `place_ids` entries serialise as `{"scheme": "Wikidata", "value": "Q243"}`.
 
 ### 3.2 `PlaceBuilder`
 
@@ -66,7 +75,7 @@ The serde-derived JSON form mirrors the Rust struct one-for-one: field names are
 pub struct PlaceBuilder { /* private fields */ }
 ```
 
-Fluent builder for `Place`. All string setters accept `impl Into<String>`. Setters mirror every field on `Place` one-for-one; additionally, `alternate_names(Vec<String>)` and `place_ids(Vec<PlaceId>)` **replace** the entire list, while `add_alternate_name(impl Into<String>)` and `add_place_id(PlaceId)` **append** a single element. `build() -> Place` consumes the builder.
+Fluent builder for `Place`. All string setters accept `impl Into<String>`. Setters mirror every field on `Place` one-for-one; additionally, `alternate_names(Vec<String>)`, `place_ids(Vec<PlaceId>)`, and `tags(Vec<String>)` **replace** the entire list, while `add_alternate_name(impl Into<String>)`, `add_place_id(PlaceId)`, and `add_tag(impl Into<String>)` **append** a single element. `build() -> Place` consumes the builder.
 
 `PlaceBuilder` is `#[derive(Default)]`. All fields start unset (`None` / empty `Vec`).
 
@@ -163,10 +172,12 @@ pub struct MatchBreakdown {
     pub place_ids_score: Option<f64>,
     pub phone_score: Option<f64>,
     pub email_score: Option<f64>,
+    pub setting_score: Option<f64>,
+    pub tags_score: Option<f64>,
 }
 ```
 
-`MatchBreakdown` carries **9 score fields**, each `Option<f64>` in `[0.0, 1.0]`. `None` means "the field did not participate in the weighted sum"; `Some(s)` carries the per-field score. `MatchResult::confidence` carries `#[serde(default = "default_confidence")]` where `default_confidence()` returns `Confidence::Low`, so legacy payloads predating the field round-trip as `Low`. `MatchBreakdown::email_score` also carries `#[serde(default)]` for the same reason.
+`MatchBreakdown` carries **11 score fields**, each `Option<f64>` in `[0.0, 1.0]`. `None` means "the field did not participate in the weighted sum"; `Some(s)` carries the per-field score. `MatchResult::confidence` carries `#[serde(default = "default_confidence")]` where `default_confidence()` returns `Confidence::Low`, so legacy payloads predating the field round-trip as `Low`. `MatchBreakdown::email_score` also carries `#[serde(default)]` for the same reason.
 
 ### 3.8 `MatchConfig`
 

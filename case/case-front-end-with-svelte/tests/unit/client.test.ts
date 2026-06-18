@@ -1,6 +1,8 @@
 // Unit tests for ApiClient. These pin the wire behaviour: URL joining, JSON
-// body + content-type, bearer-token resolution (per-call vs session source),
-// and non-2xx -> ApiError mapping (incl. empty and non-JSON bodies).
+// body + content-type, the optional explicit per-call bearer token, and
+// non-2xx -> ApiError mapping (incl. empty and non-JSON bodies). Auth is
+// normally handled by the BFF proxy, which injects the bearer server-side;
+// the client attaches one only when explicitly passed.
 import { describe, it, expect, vi } from "vitest";
 import { ApiClient, ApiError } from "$lib/api/client";
 
@@ -74,42 +76,18 @@ describe("ApiClient", () => {
     expect(headers.authorization).toBe("Bearer tok-123");
   });
 
-  // Pins: no per-call token + null session source -> no auth header.
-  it("omits the authorization header when no token is available", async () => {
+  // Pins: with no per-call token, no auth header is sent (the BFF injects it).
+  it("omits the authorization header when no token is given", async () => {
     const f = fakeFetch(200, {});
-    // No per-call token and the (default-empty) session source -> no header.
-    const c = new ApiClient({
-      baseUrl: "http://svc.test",
-      fetch: f.fn,
-      tokenSource: () => null,
-    });
-    await c.get("/api/cases");
+    await client(f).get("/api/cases");
     const headers = f.calls[0]?.init.headers as Record<string, string>;
     expect(headers.authorization).toBeUndefined();
   });
 
-  // Pins: with no per-call token, the session source supplies the bearer.
-  it("attaches the session-store token by default when one is set", async () => {
+  // Pins: an explicit per-call `null` sends no authorization header.
+  it("an explicit null token sends no authorization header", async () => {
     const f = fakeFetch(200, {});
-    const c = new ApiClient({
-      baseUrl: "http://svc.test",
-      fetch: f.fn,
-      tokenSource: () => "store-tok",
-    });
-    await c.get("/api/cases");
-    const headers = f.calls[0]?.init.headers as Record<string, string>;
-    expect(headers.authorization).toBe("Bearer store-tok");
-  });
-
-  // Pins: an explicit per-call `null` wins over a set session token.
-  it("a per-call null token overrides a set session token (omits header)", async () => {
-    const f = fakeFetch(200, {});
-    const c = new ApiClient({
-      baseUrl: "http://svc.test",
-      fetch: f.fn,
-      tokenSource: () => "store-tok",
-    });
-    await c.get("/api/cases", { token: null });
+    await client(f).get("/api/cases", { token: null });
     const headers = f.calls[0]?.init.headers as Record<string, string>;
     expect(headers.authorization).toBeUndefined();
   });

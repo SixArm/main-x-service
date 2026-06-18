@@ -9,8 +9,8 @@ tests on both sides of each seam.** Per-subproject detail:
 | Subproject | Suite | What it covers |
 |---|---|---|
 | matcher | unit tests per module + [`tests/public_api.rs`](../organization-matcher-rust-crate/tests/) + doctests | Component scores, deterministic rules, normalisation, config presets, the re-exported public surface |
-| service | [`tests/matching.rs`](../organization-service-rust-crate/tests/matching.rs) (DB-free, 2 tests) + `src/` unit tests (validation `422` pin, OpenAPI shape, streaming) | (a) the embedded matcher fires R-0 on a shared LEI; (b) the `Organization` JSON round-trip the JSONB storage relies on |
-| service | [`tests/requests/organizations.rs`](../organization-service-rust-crate/tests/requests/organizations.rs) (Postgres, `#[ignore]`-gated, 6 tests) | Create round-trip (snake_case wire), blank-name `422` on create + update, unknown-pid `404`, search + blank-`q` `400`, check-duplicates ranking |
+| service | [`tests/matching.rs`](../organization-service-with-loco/tests/matching.rs) (DB-free, 2 tests) + `src/` unit tests (validation `422` pin, OpenAPI shape, streaming) | (a) the embedded matcher fires R-0 on a shared LEI; (b) the `Organization` JSON round-trip the JSONB storage relies on |
+| service | [`tests/requests/organizations.rs`](../organization-service-with-loco/tests/requests/organizations.rs) (Postgres, `#[ignore]`-gated, 6 tests) | Create round-trip (snake_case wire), blank-name `422` on create + update, unknown-pid `404`, search + blank-`q` `400`, check-duplicates ranking |
 | front-end | `pnpm run check` (svelte-check strict, 0 errors / 0 warnings) + production build | Type-level conformance of the TS mirror and routes |
 
 Commands:

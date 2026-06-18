@@ -19,6 +19,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, tf, statusLabel } from '$lib/i18n.svelte';
 
     let { data } = $props();
 
@@ -31,11 +32,15 @@
     // Demo stub: report the queued label/copy count instead of printing.
     function onPrint(detail: { selected: string[]; copies: number }) {
         const n = detail.selected.length;
-        const copy = detail.copies === 1 ? 'copy' : 'copies';
+        const copy = detail.copies === 1 ? t('volumes.copy') : t('volumes.copies');
         printNote =
             n === 0
-                ? 'No labels selected.'
-                : `Queued ${n} label${n === 1 ? '' : 's'} × ${detail.copies} ${copy} for printing.`;
+                ? t('volumes.noLabelsSelected')
+                : tf(n === 1 ? 'volumes.queued.one' : 'volumes.queued.other', {
+                      n,
+                      copies: detail.copies,
+                      copy
+                  });
         showLabels = false;
     }
 
@@ -52,18 +57,18 @@
     }
 </script>
 
-<BackLink href="/">Back to dashboard</BackLink>
+<BackLink href="/">{t('common.backToDashboard')}</BackLink>
 
 <div class="toolbar">
-    <h2>Volumes</h2>
+    <h2>{t('volumes.heading')}</h2>
     <div class="actions">
         <button type="button" class="button secondary" onclick={() => (showLabels = true)}>
-            <Icon name="printer" /> Print labels
+            <Icon name="printer" /> {t('volumes.printLabels')}
         </button>
-        <a href="/volumes/new" class="button">New volume</a>
+        <a href="/volumes/new" class="button">{t('volumes.newVolume')}</a>
     </div>
 </div>
-<p>A volume is a movable bundle of one patient's folders. Move the volume and every folder inside it moves together.</p>
+<p>{t('volumes.intro')}</p>
 
 {#if printNote}
     <Alert type="success">{printNote}</Alert>
@@ -72,14 +77,14 @@
 <LabelsDialogBox bind:open={showLabels} volumes={labelOptions} onprint={onPrint} />
 
 <div class="panel">
-    <DataTable label="Volumes" caption="Bundles of folders, each belonging to one patient">
+    <DataTable label={t('volumes.tableLabel')} caption={t('volumes.tableCaption')}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">Title</th>
-                <th scope="col">Patient</th>
-                <th scope="col">Folders</th>
-                <th scope="col">Location</th>
-                <th scope="col">Status</th>
+                <th scope="col">{t('common.title')}</th>
+                <th scope="col">{t('common.patient')}</th>
+                <th scope="col">{t('volumes.colFolders')}</th>
+                <th scope="col">{t('volumes.colLocation')}</th>
+                <th scope="col">{t('common.status')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>
@@ -92,13 +97,13 @@
                     <DataTableTD>{volume.folderCount}</DataTableTD>
                     <DataTableTD>{volume.cabinetLabel}</DataTableTD>
                     <DataTableTD>
-                        <Badge type={badgeType(volume.status)}>{volume.status}</Badge>
+                        <Badge type={badgeType(volume.status)}>{statusLabel(volume.status)}</Badge>
                     </DataTableTD>
                 </DataTableRow>
             {/each}
             {#if data.volumes.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={5}>No volumes yet. Create one to bundle a patient's folders.</DataTableTD>
+                    <DataTableTD colspan={5}>{t('volumes.noVolumes')}</DataTableTD>
                 </DataTableRow>
             {/if}
         </DataTableBody>

@@ -35,10 +35,11 @@
     IdentifierScheme,
     Priority,
   } from "$lib/api/types";
+  import { t } from "$lib/i18n.svelte";
 
   let {
     initial,
-    submitLabel = "Save",
+    submitLabel,
     onsubmit,
   }: {
     initial: Case;
@@ -137,14 +138,14 @@
     event.preventDefault();
     error = null;
     if (title.trim().length === 0) {
-      error = "Title is required.";
+      error = t("form.titleRequired");
       return;
     }
     submitting = true;
     try {
       await onsubmit(build());
     } catch (err) {
-      error = err instanceof Error ? err.message : "Save failed";
+      error = err instanceof Error ? err.message : t("form.saveFailed");
     } finally {
       submitting = false;
     }
@@ -156,30 +157,30 @@
 
 
 <form class="stack" onsubmit={handleSubmit}>
-  <label>Title<input type="text" bind:value={title} required /></label>
+  <label>{t("form.title")}<input type="text" bind:value={title} required /></label>
   <div class="row">
     <label
-      >Case type
+      >{t("form.caseType")}
       <select bind:value={caseType}>
-        <option value="">—</option>
+        <option value="">{t("form.empty")}</option>
         {#each ALL_CASE_TYPES as type (String(type))}
           <option value={type as CaseType}>{type}</option>
         {/each}
       </select>
     </label>
     <label
-      >Status
+      >{t("form.status")}
       <select bind:value={status}>
-        <option value="">—</option>
+        <option value="">{t("form.empty")}</option>
         {#each ALL_STATUSES as s (String(s))}
           <option value={s as CaseStatus}>{s}</option>
         {/each}
       </select>
     </label>
     <label
-      >Priority
+      >{t("form.priority")}
       <select bind:value={priority}>
-        <option value="">—</option>
+        <option value="">{t("form.empty")}</option>
         {#each ALL_PRIORITIES as p (p)}
           <option value={p}>{p}</option>
         {/each}
@@ -188,51 +189,51 @@
   </div>
   <div class="row">
     <label
-      >Case number<input
+      >{t("form.caseNumber")}<input
         type="text"
         bind:value={caseNumber}
         placeholder="2026-HB-0042"
       /></label
     >
-    <label>Opened date<input type="date" bind:value={openedDate} /></label>
+    <label>{t("form.openedDate")}<input type="date" bind:value={openedDate} /></label>
   </div>
   <div class="row">
-    <label>Agency id<input type="text" bind:value={agencyId} /></label>
-    <label>Agency name<input type="text" bind:value={agencyName} /></label>
+    <label>{t("form.agencyId")}<input type="text" bind:value={agencyId} /></label>
+    <label>{t("form.agencyName")}<input type="text" bind:value={agencyName} /></label>
   </div>
   <label
-    >Alternate titles <small>(comma-separated)</small><input
+    >{t("form.alternateTitles")} <small>{t("form.commaSeparated")}</small><input
       type="text"
       bind:value={alternateTitles}
     /></label
   >
   <label
-    >Subjects <small>(comma-separated)</small><input
+    >{t("form.subjects")} <small>{t("form.commaSeparated")}</small><input
       type="text"
       bind:value={subjects}
     /></label
   >
   <label
-    >Keywords <small>(comma-separated)</small><input
+    >{t("form.keywords")} <small>{t("form.commaSeparated")}</small><input
       type="text"
       bind:value={keywords}
     /></label
   >
   <label
-    >Same-as URLs <small>(comma-separated)</small><input
+    >{t("form.sameAs")} <small>{t("form.commaSeparated")}</small><input
       type="text"
       bind:value={sameAs}
     /></label
   >
   <label
-    >Languages <small>(comma-separated ISO 639-1)</small><input
+    >{t("form.languages")} <small>{t("form.commaSeparatedIso")}</small><input
       type="text"
       bind:value={inLanguage}
     /></label
   >
 
   <fieldset class="stack">
-    <legend>Identifiers</legend>
+    <legend>{t("form.identifiers")}</legend>
     {#each identifiers as identifier, i (i)}
       <div class="row">
         <select bind:value={identifier.scheme}>
@@ -240,16 +241,16 @@
             <option value={scheme as IdentifierScheme}>{scheme}</option>
           {/each}
         </select>
-        <input type="text" bind:value={identifier.value} placeholder="value" />
-        <button type="button" onclick={() => removeIdentifier(i)}>Remove</button
+        <input type="text" bind:value={identifier.value} placeholder={t("form.valuePlaceholder")} />
+        <button type="button" onclick={() => removeIdentifier(i)}>{t("form.remove")}</button
         >
       </div>
     {/each}
-    <button type="button" onclick={addIdentifier}>+ Add identifier</button>
+    <button type="button" onclick={addIdentifier}>{t("form.addIdentifier")}</button>
   </fieldset>
 
   <button class="button" type="submit" disabled={submitting}>
-    {submitting ? "Saving…" : submitLabel}
+    {submitting ? t("form.saving") : (submitLabel ?? t("form.save"))}
   </button>
   {#if error}<p class="banner" role="alert">{error}</p>{/if}
 </form>

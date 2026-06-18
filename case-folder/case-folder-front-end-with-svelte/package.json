@@ -42,6 +42,8 @@
     "dependencies": {
         "@fortawesome/fontawesome-svg-core": "^7.2.0",
         "@fortawesome/free-solid-svg-icons": "^7.2.0",
+        "lily-design-system-svelte-locale-select": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-select",
+        "lily-design-system-svelte-theme-select": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select",
         "wx-svelte-core": "^2.1.0",
         "wx-svelte-grid": "^2.1.0"
     }

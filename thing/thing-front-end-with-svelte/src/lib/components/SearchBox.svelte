@@ -11,6 +11,8 @@
     - onsearch ((value: string) => void, optional): invoked on submit.
 -->
 <script lang="ts">
+    import { t } from "$lib/i18n.svelte.js";
+
     let {
         value = $bindable(""),
         placeholder = "Search…",
@@ -35,7 +37,7 @@
         {placeholder}
         aria-label={placeholder}
     />
-    <button type="submit" class="button primary">Search</button>
+    <button type="submit" class="button primary">{t("search.action")}</button>
 </form>
 
 <style>

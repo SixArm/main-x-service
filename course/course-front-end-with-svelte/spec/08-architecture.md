@@ -23,7 +23,7 @@
                               | HTTP JSON
                               v
                 +-----------------------------+
-                |   course-service-rust-crate |
+                |   course-service-with-loco |
                 |   Axum + SeaORM + Tantivy   |
                 +-----------------------------+
 ```

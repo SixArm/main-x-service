@@ -396,3 +396,169 @@ fn test_similarity_algorithm_exact_round_trips_through_json() {
     let back: SimilarityAlgorithm = serde_json::from_str(&json).unwrap();
     assert!(matches!(back, SimilarityAlgorithm::Exact));
 }
+
+// ============================================================
+// Location — coordinates sub-score (§6.4) and neutral fallback (§3.3/§6.4)
+// ============================================================
+
+#[test]
+fn test_location_coordinates_close_scores_high() {
+    // Two coordinates ~30 m apart at the default scale of 100 m: the
+    // Gaussian decay keeps the location score well above 0.9.
+    let l1 = Location::new().with_latitude(51.150_30).with_longitude(-2.586_20);
+    let l2 = Location::new().with_latitude(51.150_55).with_longitude(-2.586_20);
+    let a = Event::builder().name("X").location(l1).build();
+    let b = Event::builder().name("X").location(l2).build();
+    let r = MatchingEngine::default_config().match_events(&a, &b);
+    let s = r.breakdown.location_score.expect("both sides have coordinates");
+    assert!(s > 0.9, "expected close coordinates to score high, got {s}");
+}
+
+#[test]
+fn test_location_coordinates_far_apart_scores_low() {
+    // London vs Paris: hundreds of km apart, far beyond the 100 m scale.
+    let l1 = Location::new().with_latitude(51.507_22).with_longitude(-0.127_5);
+    let l2 = Location::new().with_latitude(48.853_0).with_longitude(2.349_2);
+    let a = Event::builder().name("X").location(l1).build();
+    let b = Event::builder().name("X").location(l2).build();
+    let r = MatchingEngine::default_config().match_events(&a, &b);
+    let s = r.breakdown.location_score.expect("both sides have coordinates");
+    assert!(s < 1e-3, "expected far coordinates to decay to ~0, got {s}");
+}
+
+#[test]
+fn test_location_no_shared_subcomponent_is_neutral_half() {
+    // Both sides carry a Location, but they share no populated sub-component:
+    // one has only coordinates, the other only a venue name. §6.4 specifies a
+    // neutral 0.5 fallback rather than None (location_score is None only when a
+    // side has no Location at all).
+    let l1 = Location::new().with_latitude(51.150_3).with_longitude(-2.586_2);
+    let l2 = Location::new().with_venue_name("Worthy Farm");
+    let a = Event::builder().name("X").location(l1).build();
+    let b = Event::builder().name("X").location(l2).build();
+    let r = MatchingEngine::default_config().match_events(&a, &b);
+    assert_eq!(r.breakdown.location_score, Some(0.5));
+}
+
+#[test]
+fn test_location_both_empty_is_neutral_half() {
+    // Both sides carry a present-but-empty Location: neutral 0.5, not None.
+    let a = Event::builder().name("X").location(Location::new()).build();
+    let b = Event::builder().name("X").location(Location::new()).build();
+    let r = MatchingEngine::default_config().match_events(&a, &b);
+    assert_eq!(r.breakdown.location_score, Some(0.5));
+}
+
+// ============================================================
+// Location — address line-1 house-number-weighted blend (§6.4 / §4.5)
+// ============================================================
+
+#[test]
+fn test_location_line1_same_street_different_house_number_below_perfect() {
+    // Same street, different house number: with house numbers present on both
+    // sides §6.4 blends 0.6 * jaro_winkler(street) + 0.4 * (house_number_eq).
+    // Equal streets (jw = 1.0) but unequal house numbers => 0.6, dragging the
+    // line-1-only address sub-score (and hence the location score) below 1.0.
+    let l1 = Location::new().with_address(Address::new().with_line1("10 Main Street"));
+    let l2 = Location::new().with_address(Address::new().with_line1("22 Main Street"));
+    let a = Event::builder().name("X").location(l1).build();
+    let b = Event::builder().name("X").location(l2).build();
+    let r = MatchingEngine::default_config().match_events(&a, &b);
+    let s = r.breakdown.location_score.expect("both sides have a line1");
+    assert!(s < 0.99, "house-number mismatch should lower line1 blend, got {s}");
+    assert!(s > 0.3, "matching street should keep the blend well above zero, got {s}");
+}
+
+#[test]
+fn test_location_line1_same_house_number_beats_different() {
+    // The same-house-number pair must score strictly higher than the
+    // different-house-number pair on an otherwise identical street, pinning the
+    // 0.4 house-number term direction.
+    let street_a = Location::new().with_address(Address::new().with_line1("10 Main Street"));
+    let street_b_same =
+        Location::new().with_address(Address::new().with_line1("10 Main Street"));
+    let street_b_diff =
+        Location::new().with_address(Address::new().with_line1("22 Main Street"));
+    let a = Event::builder().name("X").location(street_a.clone()).build();
+    let b_same = Event::builder().name("X").location(street_b_same).build();
+    let b_diff = Event::builder().name("X").location(street_b_diff).build();
+    let engine = MatchingEngine::default_config();
+    let same = engine.match_events(&a, &b_same).breakdown.location_score.unwrap();
+    let diff = engine.match_events(&a, &b_diff).breakdown.location_score.unwrap();
+    assert!(same > diff, "same house number should beat different: {same} vs {diff}");
+}
+
+// ============================================================
+// Phonetic bonus direction (§6.2 / §5.2.2)
+// ============================================================
+
+#[test]
+fn test_phonetic_bonus_nudges_up_and_never_down() {
+    // A borderline name pair that is phonetically equal (Soundex match) but not
+    // textually identical. Per §6.2 the bonus is gated > 0.9 and MUST NOT lower
+    // the score: turning phonetic matching on must not decrease the overall
+    // score, and where the bonus fires it must increase it.
+    let a = Event::builder().name("Catherine Festival").build();
+    let b = Event::builder().name("Katharine Festival").build();
+
+    let off = MatchConfig {
+        use_phonetic_matching: false,
+        ..MatchConfig::default()
+    };
+    let on = MatchConfig {
+        use_phonetic_matching: true,
+        ..MatchConfig::default()
+    };
+    let r_off = MatchingEngine::new(off).match_events(&a, &b);
+    let r_on = MatchingEngine::new(on).match_events(&a, &b);
+
+    assert!(r_off.breakdown.name_phonetic_score.is_none());
+    assert!(
+        r_on.score >= r_off.score - 1e-12,
+        "phonetic bonus must never lower the score: on={} off={}",
+        r_on.score,
+        r_off.score
+    );
+    // When the phonetic gate clears, the bonus strictly raises the score.
+    if r_on.breakdown.name_phonetic_score == Some(1.0) {
+        assert!(
+            r_on.score > r_off.score,
+            "a fired phonetic bonus must nudge the score up: on={} off={}",
+            r_on.score,
+            r_off.score
+        );
+    }
+}
+
+// ============================================================
+// Worked example §11.1 — pin the renormalised Glastonbury score
+// ============================================================
+
+#[test]
+fn test_glastonbury_worked_example_score_matches_spec_11_1() {
+    // spec/11-worked-examples.md §11.1 hand-computes ≈ 0.976. This guards the
+    // worked example against silent weight drift.
+    let a = Event::builder()
+        .name("Glastonbury Festival 2024")
+        .add_alternate_name("Glasto 2024")
+        .start_date("2024-06-26T09:00:00Z")
+        .end_date("2024-06-30T23:59:00Z")
+        .category(EventCategory::Festival)
+        .country_code_as_iso_3166_1_alpha_2("GB")
+        .build();
+    let b = Event::builder()
+        .name("Glasto 2024")
+        .start_date("2024-06-26T09:15:00Z")
+        .end_date("2024-06-30T23:59:00Z")
+        .category(EventCategory::Festival)
+        .country_code_as_iso_3166_1_alpha_2("GB")
+        .build();
+    let r = MatchingEngine::default_config().match_events(&a, &b);
+    assert!(r.is_match);
+    assert_eq!(r.confidence, Confidence::High);
+    assert!(
+        (r.score - 0.976).abs() < 0.01,
+        "expected the §11.1 worked example to renormalise to ~0.976, got {}",
+        r.score
+    );
+}

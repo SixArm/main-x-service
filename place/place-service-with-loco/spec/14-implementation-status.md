@@ -1,0 +1,37 @@
+## 14. Implementation Status
+
+### 14.1 Delivered
+
+| Capability | Notes |
+|---|---|
+| Project chassis | Cargo, modular architecture |
+| Database schema | 13 tables, SeaORM entities, indexes, audit triggers |
+| Domain model | Full schema.org/Place property coverage including PostalAddress, GeoCoordinates, hierarchy |
+| Matching | Name (Jaro-Winkler + Soundex) + Geo (Haversine) + Address (weighted) + Identifier (GLN deterministic) |
+| Search | Tantivy full-text + fuzzy index (`q` / `limit` / `fuzzy` / `mask_sensitive`); geo-radius `nearby` + `offset` deferred to T-9 |
+| REST API | 14 endpoints + OpenAPI/Swagger + CORS + structured errors |
+| Repository | SeaORM CRUD with transactions, soft delete |
+| Event streaming | InMemoryEventPublisher |
+| Audit log | AuditLogRepository with old / new JSON |
+| Duplicate detection | Real-time + explicit + batch with review queue |
+| Merging | Transfer + alternate-name + link + soft-delete + snapshot + event |
+| Validation | Coordinate bounds, GLN GS1 check digit, URL protocol, telephone format, opening-hours `HH:MM` times, address completeness, `422` |
+| Normalisation | Title-case locality, uppercase region/country, abbreviation expansion |
+| Privacy | Phone / fax masking, geo-coordinate rounding (2 dp), GDPR export |
+| Tests | 125 unit + 86 integration (incl. 14 bridge) + 16 Criterion benchmarks |
+
+### 14.2 Open gaps → tasks
+
+| Gap | Task |
+|---|---|
+| Geo-radius `nearby` HTTP endpoint + search `offset` | T-9 |
+| PostGIS-backed spatial queries | T-1 |
+| Hierarchy depth queries (recursive CTE) | T-2 |
+| Fluvio production publisher | T-3 |
+| Event consumers | (no task yet) |
+| gRPC API | T-4 |
+| OSM import pipeline | T-5 |
+| Reverse-geocoding | T-6 |
+| GeoJSON export | T-7 |
+| Authentication / authorisation | T-8 |
+

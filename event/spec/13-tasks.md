@@ -37,9 +37,9 @@ Prefix `ET-` distinguishes these from per-crate task numbers.
     parties / offers.
 - [x] **ET-3 — Repair cross-entity links broken by monorepo nesting.**
   Service spec §17 links sibling specs as
-  `../../person-service-rust-crate/spec/index.md`, which now resolves
+  `../../person-service-with-loco/spec/index.md`, which now resolves
   inside `event/` since entities moved into per-entity directories
-  (correct: `../../../person/person-service-rust-crate/...`).
+  (correct: `../../../person/person-service-with-loco/...`).
   - **Acceptance:** a link-checker pass over
     `event/**/spec/*.md` and `event/**/AGENTS*` reports no dead
     relative links.

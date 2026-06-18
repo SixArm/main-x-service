@@ -7,7 +7,7 @@ Detailed reference documentation for the Course Service front-end.
 | Document | Description |
 |---|---|
 | [spec-driven-development.md](spec-driven-development.md) | SDD discipline — three-part PRs, section mapping, anti-patterns |
-| [testing.md](testing.md) | Vitest unit + Playwright smoke / integration strategy |
+| [testing.md](testing.md) | Vitest unit + Playwright smoke strategy (live integration is manual) |
 
 ## Related top-level documents
 
@@ -23,10 +23,10 @@ Detailed reference documentation for the Course Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../course-service-rust-crate/spec.md](../../course-service-rust-crate/spec/index.md) | Service spec — system of record |
-| [../../course-service-rust-crate/AGENTS/restful.md](../../course-service-rust-crate/AGENTS/restful.md) | REST API surface |
-| [../../course-service-rust-crate/AGENTS/models.md](../../course-service-rust-crate/AGENTS/models.md) | Wire-format domain types |
-| [../../course-service-rust-crate/AGENTS/matching.md](../../course-service-rust-crate/AGENTS/matching.md) | Matching algorithm reference |
+| [../../course-service-with-loco/spec.md](../../course-service-with-loco/spec/index.md) | Service spec — system of record |
+| [../../course-service-with-loco/AGENTS/restful.md](../../course-service-with-loco/AGENTS/restful.md) | REST API surface |
+| [../../course-service-with-loco/AGENTS/models.md](../../course-service-with-loco/AGENTS/models.md) | Wire-format domain types |
+| [../../course-service-with-loco/AGENTS/matching.md](../../course-service-with-loco/AGENTS/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

@@ -9,6 +9,7 @@
   import { onMount } from "svelte";
   import { CaseRepository } from "$lib/api/cases";
   import type { CaseRef } from "$lib/api/types";
+  import { t } from "$lib/i18n.svelte";
 
   const repo = CaseRepository.withFetch();
 
@@ -21,7 +22,7 @@
     try {
       cases = await repo.list();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load cases";
+      error = err instanceof Error ? err.message : t("list.loadFailed");
     } finally {
       loading = false;
     }
@@ -30,15 +31,15 @@
 
 <svelte:head><title>Cases — Main X</title></svelte:head>
 
-<h1>Cases</h1>
-<p><a class="button" href="/new">New case</a></p>
+<h1>{t("list.title")}</h1>
+<p><a class="button" href="/new">{t("list.new")}</a></p>
 
 {#if loading}
-  <p>Loading…</p>
+  <p>{t("list.loading")}</p>
 {:else if error}
   <p class="banner" role="alert">{error}</p>
 {:else if cases.length === 0}
-  <p class="surface">No cases yet. <a href="/new">Create one</a>.</p>
+  <p class="surface">{t("list.empty")} <a href="/new">{t("list.createOne")}</a>.</p>
 {:else}
   <ul class="stack">
     {#each cases as record (record.pid)}

@@ -47,9 +47,10 @@ material. Two caveats keep the healthcare posture in force:
   [`agents/share/auditability.md`](../../agents/share/auditability.md)
   — tracked as §13 T-3 and roadmap §15.
 - **Access control.** Production deployments MUST sit behind SSO
-  (central authentication entity, RS256 JWT verification — roadmap)
-  and TLS; the registry is read-mostly and writes are restricted to
-  registry operators.
+  (central authentication entity, PASETO v4 public token verification
+  per [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  — roadmap) and TLS; the registry is read-mostly and writes are
+  restricted to registry operators.
 - **Explainability for accountability.** Per-component match
   breakdowns give auditors a replayable rationale for every
   duplicate decision — keep this property (NFR-8).

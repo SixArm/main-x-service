@@ -30,7 +30,7 @@ at the keyboard.
 | Where do public types live? | `src/lib.rs` re-exports; defined under `src/{course,matcher,scoring,normalize,phonetic,config,error}.rs`. |
 | Which deterministic identifier schemes short-circuit? | DOI, Wikidata, OER ID, LOM ID, generic URI, UUID. Plus per-provider course-code equality and `same_as` URL equality. See spec §15–§16. |
 | Which probabilistic components score? | Name (Jaro-Winkler), course code (same-provider), educational level, keywords (Jaccard), teaches / competencies (Jaccard). Spec §9–§14. |
-| What is the public API shape? | `MatchingEngine::new(MatchConfig::default()).match_courses(&a, &b) -> MatchResult { score, confidence, breakdown }`. Mirrors the family-wide convention used by `person-matcher` and `event-matcher`. |
+| What is the public API shape? | `MatchingEngine::new(MatchConfig::default()).match_courses(&a, &b) -> MatchResult { score, is_match, confidence, breakdown }`. Mirrors the family-wide convention used by `person-matcher` and `event-matcher`. |
 
 ---
 
@@ -68,7 +68,7 @@ at the keyboard.
    - Implement the change.
    - Update `CHANGELOG.md` under an "Unreleased" header.
    - If the public surface changed, update the bridge test in
-     [`course-service/tests/duplicate_detection.rs`](../course-service-rust-crate/tests/duplicate_detection.rs).
+     [`course-service/tests/duplicate_detection.rs`](../course-service-with-loco/tests/duplicate_detection.rs).
 4. **For editorial changes:** small batched edits are fine; no spec
    update required.
 5. **Validate locally:**
@@ -146,9 +146,11 @@ that matches your task before editing:
 ├── CHANGELOG.md
 ├── CLAUDE.md                 ← @AGENTS.md (Claude Code entry)
 ├── Cargo.toml
-├── README.md                 ← user-facing
+├── README.md                 ← user-facing (symlink → index.md)
 ├── index.md                  ← documentation entry point
-├── spec.md                   ← LIVING SPECIFICATION (read this)
+├── spec/                     ← LIVING SPECIFICATION (read this)
+│   ├── index.md              ← spec entry point
+│   └── 01..25-*.md           ← numbered §1–§25 section files
 └── src/
     ├── lib.rs                ← public re-exports
     ├── main.rs               ← demo binary (cargo run; not SemVer surface)

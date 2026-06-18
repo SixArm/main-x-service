@@ -3,7 +3,7 @@
 The service is loco.rs and returns **raw JSON** — no
 `{success, data, error}` envelope (unlike the pre-loco person
 service). Source:
-[`src/controllers/care_pathways.rs`](../care-pathway-service-rust-crate/src/controllers/care_pathways.rs).
+[`src/controllers/care_pathways.rs`](../care-pathway-service-with-loco/src/controllers/care_pathways.rs).
 Base URL in development: `http://localhost:5150`.
 
 ## Endpoints
@@ -41,10 +41,15 @@ Base URL in development: `http://localhost:5150`.
 |---|---|---|
 | GET | `/api/care-pathways/whoami` | verified bearer-token `Claims`; `401` without a valid token |
 
-RS256 tokens are verified offline against the auth-service JWKS via the
-embedded `authentication-verifier` (`src/auth.rs`). The `AuthUser`
-extractor requires a token; `MaybeAuthUser` is optional and feeds the
-audit `actor`. Blanket `/api/*` enforcement + JWKS-fetch are follow-ups.
+Short-lived **PASETO v4.public** tokens are verified offline against the
+auth-service's published Ed25519 key via the embedded
+`authentication-verifier` (`src/auth.rs`) — RS256 JWT + JWKS
+decommissioned. The `AuthUser` extractor requires a token; `MaybeAuthUser`
+is optional and feeds the audit `actor`. Blanket `/api/*` enforcement +
+published-key fetch are follow-ups. Auth pivot in progress — source of
+truth
+[agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md);
+code follow-up tracked in entity spec §13.
 
 ### Audit & events
 
@@ -75,8 +80,11 @@ in-memory stream. Durable broker is roadmap.
 | 422 | Validation failure: blank `name` on create or update (family convention; OQ-1 resolved via T-2) |
 | 500 | Internal error |
 
-No authentication yet — JWT verification against the central
-auth-service JWKS is roadmap (entity spec §15).
+Auth via the central auth-service: offline **PASETO v4.public**
+verification against the published Ed25519 key (RS256 JWT + JWKS
+decommissioned). See
+[agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)
+(source of truth); code follow-up tracked in entity spec §13.
 
 ## Example
 

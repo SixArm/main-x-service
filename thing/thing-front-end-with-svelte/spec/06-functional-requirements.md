@@ -10,6 +10,7 @@
 | FR-6 | Edit page MUST PUT the full Thing record. |
 | FR-7 | Soft-delete MUST be confirmed via `confirm()` before issuing DELETE. |
 | FR-8 | Match page MUST POST to `/api/things/match` and render quality + score breakdown. |
-| FR-9 | Merge page MUST issue a per-ID GET to render preview before POST `/api/things/merge`. |
+| FR-9 | Merge page MUST make a per-ID GET preview available (a "Load preview" action) before POST `/api/things/merge`, and MUST guard the merge so both IDs are present and distinct (with a `confirm()` step) before issuing the POST. Preview is optional, not mandatory, before merging. |
 | FR-10 | All pages MUST render the layout shell even when the API is unreachable; API errors render as inline banners. |
+| FR-11 | The layout shell MUST present global navigation as a full-width **top bar** (header) with a **hamburger** toggle on narrow viewports — NOT a left sidebar — and the main content area MUST be full-width. |
 

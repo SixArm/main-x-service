@@ -9,7 +9,7 @@ a trio of subprojects that compose into one capability:
 
 | Subproject | Role |
 |---|---|
-| [person-service-rust-crate](../person-service-rust-crate/) | Registry service — CRUD, search, matching, merge, audit, privacy over REST + FHIR R5 |
+| [person-service-with-loco](../person-service-with-loco/) | Registry service — CRUD, search, matching, merge, audit, privacy over REST + FHIR R5 |
 | [person-matcher-rust-crate](../person-matcher-rust-crate/) | Canonical pairwise matching library — deterministic + probabilistic, embedded by the service |
 | [person-front-end-with-svelte](../person-front-end-with-svelte/) | Operator UI — SvelteKit SPA over the service's REST API |
 

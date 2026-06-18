@@ -1,5 +1,5 @@
 // TypeScript domain types mirroring the Rust Person Service models.
-// Reference: person-service-rust-crate/AGENTS/models.md.
+// Reference: person-service-with-loco/AGENTS/models.md.
 // Field names use snake_case to match the JSON wire format produced by
 // the Axum/SeaORM stack.
 

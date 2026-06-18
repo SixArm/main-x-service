@@ -1,13 +1,13 @@
 # event-front-end-with-svelte
 
-SvelteKit front-end for the **[Event Service](../event-service-rust-crate/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
+SvelteKit front-end for the **[Event Service](../event-service-with-loco/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
 
 ## What's here
 
 | Route | Purpose |
 | --- | --- |
 | `/` | Dashboard — service health + recent audit activity |
-| `/events` | List & search (full-text, fuzzy, phonetic) with SVAR DataGrid |
+| `/events` | List & search (full-text + fuzzy toggle + date / status / type filters) with SVAR DataGrid |
 | `/events/new` | Create event; surfaces 409 duplicate candidates |
 | `/events/[id]` | Detail view — identity (time window, status, type, attendance mode), locations, organizers, performers, identifiers, offers |
 | `/events/[id]/edit` | Edit |
@@ -27,7 +27,7 @@ SvelteKit front-end for the **[Event Service](../event-service-rust-crate/)** in
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Event Service — see [`../event-service-rust-crate/README.md`](../event-service-rust-crate/README.md). Default: `http://localhost:8080`.
+- A running Event Service — see [`../event-service-with-loco/README.md`](../event-service-with-loco/README.md). Default: `http://localhost:8080`.
 
 ## Quick start
 

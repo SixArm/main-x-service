@@ -19,7 +19,7 @@ read [`../spec/index.md`](../spec/index.md) first.
 
 | Subproject | Entry point | Reference set |
 |---|---|---|
-| Service | [CLAUDE.md](../thing-service-rust-crate/CLAUDE.md) | [AGENTS/index.md](../thing-service-rust-crate/AGENTS/index.md) — models, matching, restful, testing, SDD |
+| Service | [CLAUDE.md](../thing-service-with-loco/CLAUDE.md) | [AGENTS/index.md](../thing-service-with-loco/AGENTS/index.md) — models, matching, restful, testing, SDD |
 | Matcher | [AGENTS.md](../thing-matcher-rust-crate/AGENTS.md) | [AGENTS/](../thing-matcher-rust-crate/AGENTS/) — architecture, matching-algorithm, normalization, testing, security-and-privacy, coding-style, release, SDD |
 | Front-end | [AGENTS.md](../thing-front-end-with-svelte/AGENTS.md) | [AGENTS/](../thing-front-end-with-svelte/AGENTS/) — index, SDD, testing |
 

@@ -9,9 +9,9 @@
 
 See also:
 
-- [`../spec.md`](../spec/index.md) — single source of truth
+- [`../spec/index.md`](../spec/index.md) — single source of truth
 - [`../AGENTS.md`](../AGENTS.md) — agent guide
 - [`../README.md`](../README.md) / [`../CLAUDE.md`](../CLAUDE.md) — user intro
 - [`../index.md`](../index.md) — worked examples
-- [`../../case-service-rust-crate/`](../../case-service-rust-crate/) — embedding service
+- [`../../case-service-with-loco/`](../../case-service-with-loco/) — embedding service
 - [`../../case-front-end-with-svelte/`](../../case-front-end-with-svelte/) — front-end consumer

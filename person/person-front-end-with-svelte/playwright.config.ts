@@ -7,7 +7,7 @@ import { defineConfig, devices } from "@playwright/test";
 //                    `pnpm test:e2e`.
 //
 //   `integration`  — golden-path flows that exercise the live
-//                    Rust Person Service (`person-service-rust-crate`)
+//                    Rust Person Service (`person-service-with-loco`)
 //                    over real HTTP. Requires the service to be
 //                    running at PUBLIC_API_BASE_URL (default
 //                    http://localhost:8080). Run with

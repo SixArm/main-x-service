@@ -12,7 +12,7 @@ cargo test                                  # unit + tests/public_api.rs + docte
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 
-# service (organization-service-rust-crate)
+# service (organization-service-with-loco)
 cargo test                                  # DB-free: unit (validation 422 pin, OpenAPI, streaming) + tests/matching.rs
 cargo test -- --ignored                     # request-level suite (tests/requests/organizations.rs); needs Postgres per config/test.yaml
 cargo clippy --all-targets
@@ -30,9 +30,9 @@ pnpm run build                              # production build must succeed
 | Matcher unit tests | `#[cfg(test)]` modules in `src/*.rs` | Component scores, deterministic rules R-0/R-1/R-2, normalisation, presets |
 | Matcher integration | `tests/public_api.rs` | The re-exported SemVer surface |
 | Matcher doctests | rustdoc examples | Usage snippets stay correct |
-| Service ↔ matcher seam | [`tests/matching.rs`](../organization-service-rust-crate/tests/matching.rs) | (1) shared LEI fires R-0 through the embedded engine; (2) `Organization` serde round-trip — the exact contract the JSONB `data` column relies on |
-| Service validation (DB-free) | `#[cfg(test)]` in [`src/controllers/organizations.rs`](../organization-service-rust-crate/src/controllers/organizations.rs) | Blank `name` → `422 Unprocessable Entity` (T-2 pin) |
-| Service REST behaviour | [`tests/requests/organizations.rs`](../organization-service-rust-crate/tests/requests/organizations.rs) (Postgres, `#[ignore]`-gated) | Create round-trip (snake_case wire), `422` blank name on create + update, `404` unknown pid, search + blank-`q` `400`, check-duplicates ranking |
+| Service ↔ matcher seam | [`tests/matching.rs`](../organization-service-with-loco/tests/matching.rs) | (1) shared LEI fires R-0 through the embedded engine; (2) `Organization` serde round-trip — the exact contract the JSONB `data` column relies on |
+| Service validation (DB-free) | `#[cfg(test)]` in [`src/controllers/organizations.rs`](../organization-service-with-loco/src/controllers/organizations.rs) | Blank `name` → `422 Unprocessable Entity` (T-2 pin) |
+| Service REST behaviour | [`tests/requests/organizations.rs`](../organization-service-with-loco/tests/requests/organizations.rs) (Postgres, `#[ignore]`-gated) | Create round-trip (snake_case wire), `422` blank name on create + update, `404` unknown pid, search + blank-`q` `400`, check-duplicates ranking |
 | Front-end | svelte-check + build | Type-level conformance of the TS mirror and routes |
 
 ## What to add when you change things

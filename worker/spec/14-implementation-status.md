@@ -3,7 +3,7 @@
 Honest per-subproject status. Worldwide-scale capabilities that do
 not exist yet live in §15, not here.
 
-### 14.1 worker-service-rust-crate (v0.5.0)
+### 14.1 worker-service-with-loco (v0.5.0)
 
 | Capability | Status |
 |---|---|
@@ -22,7 +22,7 @@ not exist yet live in §15, not here.
 | AuthN/AuthZ | ❌ none — `loco-rs` `auth_jwt` feature compiled in, not enforced (service §13 T-1) |
 | Tests | 99 unit + 7 integration + 13 bridge + 3 bench suites |
 
-Detail: [service §14](../worker-service-rust-crate/spec/14-implementation-status.md).
+Detail: [service §14](../worker-service-with-loco/spec/14-implementation-status.md).
 
 ### 14.2 worker-matcher-rust-crate (v0.6.1, published to crates.io)
 

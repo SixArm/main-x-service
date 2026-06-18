@@ -16,7 +16,7 @@ This spec owns the **cross-subproject contract**:
 
 ### 2.2 In scope — per subproject
 
-**care-pathway-service-rust-crate** owns:
+**care-pathway-service-with-loco** owns:
 
 - Care-pathway CRUD with soft delete (`deleted_at`).
 - `POST …/match` (rank an explicit candidate set, no persistence)
@@ -57,6 +57,7 @@ tracked in §13 / §15 and the crate specs' §13:
 - Real-time duplicate detection on create (`409 Conflict`).
 - OpenAPI / Swagger, gRPC, richer validation (ICD / SNOMED code
   formats).
-- JWT verification middleware (SSO provider exists in the
-  [authentication entity](../../authentication/)).
+- Token verification middleware — PASETO v4 public, per
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  (SSO provider exists in the [authentication entity](../../authentication/)).
 - Request-level integration tests against PostgreSQL.

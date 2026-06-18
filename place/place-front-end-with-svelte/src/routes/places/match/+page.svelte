@@ -16,6 +16,7 @@
     import GeoCoordinatesInput from "$lib/components/GeoCoordinatesInput.svelte";
     import { PlaceRepository } from "$lib/api/places.js";
     import { blankPostalAddress } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
     import type { GeoCoordinates, MatchRequest, MatchResult, PostalAddress } from "$lib/api/types.js";
 
     const repo = PlaceRepository.withFetch();
@@ -50,26 +51,26 @@
 
 <svelte:head><title>Match check · Place Service</title></svelte:head>
 
-<header><h1>Match check</h1></header>
+<header><h1>{t("match.title")}</h1></header>
 
 <section class="surface stack">
     <form onsubmit={runMatch} class="stack">
         <FieldRow>
-            <LabeledField label="Name" for="m-name" required><input id="m-name" bind:value={name} required /></LabeledField>
-            <LabeledField label="Threshold" for="m-threshold" hint="0.0 – 1.0">
+            <LabeledField label={t("match.name")} for="m-name" required><input id="m-name" bind:value={name} required /></LabeledField>
+            <LabeledField label={t("match.threshold")} for="m-threshold" hint={t("match.thresholdHint")}>
                 <input id="m-threshold" type="number" step="0.05" min="0" max="1" bind:value={threshold} />
             </LabeledField>
         </FieldRow>
         <PostalAddressInput bind:address />
         <label class="row small">
-            <input type="checkbox" bind:checked={useGeo} /> Include geo coordinates
+            <input type="checkbox" bind:checked={useGeo} /> {t("match.includeGeo")}
         </label>
         {#if useGeo}
             <GeoCoordinatesInput bind:geo />
         {/if}
         {#if error}<div class="banner error">{error}</div>{/if}
         <button type="submit" class="button primary" disabled={loading}>
-            {loading ? "Matching…" : "Find matches"}
+            {loading ? t("match.matching") : t("match.findMatches")}
         </button>
     </form>
 </section>

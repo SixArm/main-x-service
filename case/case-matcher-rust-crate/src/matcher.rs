@@ -619,6 +619,116 @@ mod tests {
         assert_eq!(status_score(&a, &b), None);
     }
 
+    // Pins the Soundex +0.05 title bonus (PHONETIC_BONUS / PHONETIC_CEILING,
+    // spec §9): a Smith/Smyth-style primary-title pair whose literal
+    // Jaro-Winkler is below the ceiling is lifted by phonetic agreement.
+    // The bonused score must (a) exceed the raw Jaro-Winkler and (b) never
+    // exceed the ceiling.
+    #[test]
+    fn title_soundex_bonus_lifts_phonetic_near_miss() {
+        let a = Case::new("Smith");
+        let b = Case::new("Smyth");
+        // Sanity: the two encode to the same Soundex code, and the raw
+        // Jaro-Winkler is below the phonetic ceiling (so the bonus applies).
+        assert!(phonetic::same("smith", "smyth"));
+        let raw = jaro_winkler("smith", "smyth");
+        assert!(raw < PHONETIC_CEILING, "raw {raw} should be below ceiling");
+        let scored = title_score(&a, &b);
+        assert!(scored > raw, "bonus should lift {raw} but got {scored}");
+        assert!(
+            (scored - (raw + PHONETIC_BONUS)).abs() < 1e-9,
+            "got {scored}"
+        );
+        assert!(
+            scored <= PHONETIC_CEILING,
+            "must not exceed ceiling: {scored}"
+        );
+    }
+
+    // Pins that the phonetic bonus never lifts a near-miss above the
+    // ceiling: even when (raw + bonus) would exceed 0.95, the result is
+    // clamped to PHONETIC_CEILING and the bonus is symmetric in argument
+    // order.
+    #[test]
+    fn title_soundex_bonus_is_clamped_and_symmetric() {
+        // "Jackson" / "Jaksen": same Soundex (J250), raw JW close to but
+        // below the ceiling — the bonus would push past 0.95 if unclamped.
+        let a = Case::new("Jackson");
+        let b = Case::new("Jaksen");
+        if phonetic::same("jackson", "jaksen") {
+            let raw = jaro_winkler("jackson", "jaksen");
+            if raw < PHONETIC_CEILING {
+                let s = title_score(&a, &b);
+                assert!(s <= PHONETIC_CEILING + 1e-12, "clamped: {s}");
+                // Symmetry: order of arguments must not change the score.
+                assert!((s - title_score(&b, &a)).abs() < 1e-9);
+            }
+        }
+    }
+
+    // Pins the alternate_titles contribution to title_score (spec §9): an
+    // alternate on either side that matches the other record's primary
+    // title carries the component via the best-over-alternates rule, and
+    // the result is symmetric in argument order.
+    #[test]
+    fn alternate_titles_carry_title_score() {
+        let primary = Case::new("Housing benefit appeal — J. Smith");
+        // `other` has an unrelated primary but a matching alternate title.
+        let mut other = Case::new("Matter 2024-XYZ");
+        other
+            .alternate_titles
+            .push("Housing benefit appeal — J. Smith".into());
+        // Best-over-alternates should find the strong match (≈1.0), far
+        // above the weak primary-vs-primary score.
+        let with_alt = title_score(&primary, &other);
+        let primary_only = jaro_winkler(
+            &normalize::fold(&primary.title),
+            &normalize::fold("Matter 2024-XYZ"),
+        );
+        assert!(
+            with_alt > primary_only,
+            "alternate should lift {primary_only} but got {with_alt}"
+        );
+        assert!(
+            with_alt >= 0.99,
+            "alternate match should be near-perfect: {with_alt}"
+        );
+        // Symmetric: the alternate may sit on either side.
+        assert!((with_alt - title_score(&other, &primary)).abs() < 1e-9);
+    }
+
+    // Pins the keywords component (spec §13, weight 0.15): keywords use the
+    // same Jaccard path as subjects. A full overlap scores 1.0, a partial
+    // overlap scores the Jaccard ratio, one-sided scores 0.0, both-empty is
+    // skipped (`None`) — and the engine surfaces it in the breakdown.
+    #[test]
+    fn keywords_jaccard_and_skip() {
+        // Full overlap (case-folded) → 1.0.
+        let a = vec!["Eviction".to_string(), "Arrears".to_string()];
+        let b = vec!["eviction".to_string(), "ARREARS".to_string()];
+        assert_eq!(set_jaccard(&a, &b), Some(1.0));
+        // Partial overlap {1,2} vs {1} → 0.5.
+        let got = set_jaccard(&a, &["eviction".to_string()]).expect("some");
+        assert!((got - 0.5).abs() < 1e-9, "got {got}");
+        // One side populated, other empty → 0.0.
+        assert_eq!(set_jaccard(&a, &[]), Some(0.0));
+        // Both empty → component absent.
+        assert_eq!(set_jaccard(&[], &[]), None);
+
+        // End-to-end: the engine populates keywords_score when present and
+        // leaves it None when both sides are empty.
+        let engine = MatchingEngine::default_config();
+        let mut ka = Case::new("Tenancy dispute");
+        let mut kb = Case::new("Tenancy dispute");
+        ka.keywords = vec!["eviction".into(), "arrears".into()];
+        kb.keywords = vec!["eviction".into()];
+        let r = engine.match_cases(&ka, &kb);
+        assert_eq!(r.breakdown.keywords_score, Some(0.5));
+        // No keywords on either side → skipped.
+        let plain = engine.match_cases(&Case::new("X"), &Case::new("X"));
+        assert!(plain.breakdown.keywords_score.is_none());
+    }
+
     // Pins the negative case: dissimilar titles with no corroborating
     // components fall below the threshold and into the `Low` band.
     #[test]
