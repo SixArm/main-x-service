@@ -25,6 +25,8 @@
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import ThingIdentifierInput from "./ThingIdentifierInput.svelte";
+    import { validateThing } from "./thing-validation.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     let props: {
         initial: Thing;
@@ -48,25 +50,9 @@
     // svelte-ignore state_referenced_locally
     const form = createForm<Thing>({
         initial: withDefaults(props.initial),
-        validate(value) {
-            const errors: Record<string, string> = {};
-            // Name is the only hard-required Thing field.
-            if (!value.name.trim()) errors.name = "Required";
-            // These fields must be absolute http(s) URLs when present.
-            const urlFields: [keyof Thing, string][] = [
-                ["url", "URL"],
-                ["additional_type", "Additional type"],
-                ["main_entity_of_page", "Main entity of page"],
-                ["subject_of", "Subject of"],
-            ];
-            for (const [field, label] of urlFields) {
-                const v = value[field];
-                if (typeof v === "string" && v.length > 0 && !/^https?:\/\//i.test(v)) {
-                    errors[field as string] = `${label} must start with http(s)://`;
-                }
-            }
-            return errors;
-        },
+        // FR-4 validation lives in a pure helper so it is unit-testable
+        // without mounting this component (see thing-validation.ts).
+        validate: validateThing,
         onSubmit: (value) => props.onsubmit(value),
     });
 
@@ -91,32 +77,32 @@
 
 <form onsubmit={handleSubmit} class="stack">
     <FieldRow>
-        <LabeledField label="Name" for="name" required error={form.errors.name}>
+        <LabeledField label={t("form.name")} for="name" required error={form.errors.name}>
             <input id="name" bind:value={form.value.name} required />
         </LabeledField>
-        <LabeledField label="Additional type" for="add-type" error={form.errors.additional_type} hint="schema.org subtype URL">
+        <LabeledField label={t("form.additionalType")} for="add-type" error={form.errors.additional_type} hint={t("form.additionalTypeHint")}>
             <input id="add-type" type="url" bind:value={form.value.additional_type} placeholder="https://schema.org/Book" />
         </LabeledField>
     </FieldRow>
 
-    <LabeledField label="Description" for="desc">
+    <LabeledField label={t("form.description")} for="desc">
         <textarea id="desc" rows={3} bind:value={form.value.description}></textarea>
     </LabeledField>
 
-    <LabeledField label="Disambiguating description" for="disambig" hint="Short distinguishing detail">
+    <LabeledField label={t("form.disambiguating")} for="disambig" hint={t("form.disambiguatingHint")}>
         <input id="disambig" bind:value={form.value.disambiguating_description} />
     </LabeledField>
 
     <FieldRow>
-        <LabeledField label="URL" for="url" error={form.errors.url}>
+        <LabeledField label={t("form.url")} for="url" error={form.errors.url}>
             <input id="url" type="url" bind:value={form.value.url} />
         </LabeledField>
-        <LabeledField label="Owner" for="owner">
+        <LabeledField label={t("form.owner")} for="owner">
             <input id="owner" bind:value={form.value.owner} />
         </LabeledField>
     </FieldRow>
 
-    <LabeledField label="Alternate names" for="alt-names" hint="One per line">
+    <LabeledField label={t("form.alternateNames")} for="alt-names" hint={t("form.alternateNamesHint")}>
         <textarea
             id="alt-names"
             rows={3}
@@ -125,7 +111,7 @@
         ></textarea>
     </LabeledField>
 
-    <LabeledField label="Same-as URLs" for="same-as" hint="Wikidata, Wikipedia, etc. — one per line">
+    <LabeledField label={t("form.sameAs")} for="same-as" hint={t("form.sameAsHint")}>
         <textarea
             id="same-as"
             rows={3}
@@ -135,7 +121,7 @@
     </LabeledField>
 
     <section class="stack">
-        <h2 class="small">Identifiers</h2>
+        <h2 class="small">{t("form.identifiers")}</h2>
         <!-- `!` asserts non-null: withDefaults() guarantees identifiers is set. -->
         <ThingIdentifierInput bind:identifiers={form.value.identifiers!} />
     </section>
@@ -146,8 +132,8 @@
 
     <div class="row">
         <button type="submit" class="button primary" disabled={form.submitting}>
-            {form.submitting ? "Saving…" : submitLabel}
+            {form.submitting ? t("form.saving") : submitLabel}
         </button>
-        <button type="button" class="button" onclick={() => form.reset()} disabled={form.submitting}>Reset</button>
+        <button type="button" class="button" onclick={() => form.reset()} disabled={form.submitting}>{t("form.reset")}</button>
     </div>
 </form>

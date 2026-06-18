@@ -25,13 +25,13 @@ A behavioural change is one PR: **spec edit + code edit + test edit.**
 
 - Change confined to one subproject → that subproject's spec + code +
   tests. Follow its own SDD guide:
-  [service](../place-service-rust-crate/AGENTS/spec-driven-development.md) ·
+  [service](../place-service-with-loco/AGENTS/spec-driven-development.md) ·
   [matcher](../place-matcher-rust-crate/AGENTS/spec-driven-development.md) ·
   [front-end](../place-front-end-with-svelte/AGENTS/spec-driven-development.md).
 - Change crossing a seam → edit the entity spec **and** each affected
   crate spec in the same PR, plus the seam's tests:
   - service ↔ matcher seam → a bridge test in
-    [`tests/duplicate_detection.rs`](../place-service-rust-crate/tests/duplicate_detection.rs)
+    [`tests/duplicate_detection.rs`](../place-service-with-loco/tests/duplicate_detection.rs)
     (entity FR-19).
   - service ↔ front-end seam → front-end `src/lib/api/types.ts` +
     its unit tests change with the service field (entity FR-20).

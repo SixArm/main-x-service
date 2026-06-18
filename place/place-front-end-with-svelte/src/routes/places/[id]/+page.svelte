@@ -14,6 +14,7 @@
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
     import { PlaceRepository } from "$lib/api/places.js";
+    import { t, translate } from "$lib/i18n.svelte.js";
     import type { Place } from "$lib/api/types.js";
 
     const repo = PlaceRepository.withFetch();
@@ -36,7 +37,7 @@
 
     // Soft-delete behind a confirm() guard, then return to the list.
     async function handleDelete() {
-        if (!confirm("Soft-delete this place? This cannot be undone via the UI.")) return;
+        if (!confirm(translate("detail.confirmDelete"))) return;
         try {
             await repo.softDelete(id);
             goto("/places");
@@ -48,43 +49,45 @@
     // Display label for the place type; `{ Other }` → "Other: <value>".
     function typeLabel(p: Place): string {
         if (!p.place_type) return "—";
-        return typeof p.place_type === "string" ? p.place_type : `Other: ${p.place_type.Other}`;
+        return typeof p.place_type === "string"
+            ? p.place_type
+            : translate("detail.typeOther").replace("{value}", p.place_type.Other);
     }
 </script>
 
 <svelte:head><title>Place · {id}</title></svelte:head>
 
 {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{t("detail.loading")}</p>
 {:else if error}
     <div class="banner error">{error}</div>
 {:else if place}
     <header class="row" style="justify-content: space-between">
         <h1>{place.name}</h1>
         <div class="row">
-            <a href={`/places/${id}/edit`} class="button">Edit</a>
-            <a href={`/places/${id}/audit`} class="button">Audit</a>
-            <button class="button danger" onclick={handleDelete}>Delete</button>
+            <a href={`/places/${id}/edit`} class="button">{t("detail.edit")}</a>
+            <a href={`/places/${id}/audit`} class="button">{t("detail.audit")}</a>
+            <button class="button danger" onclick={handleDelete}>{t("detail.delete")}</button>
         </div>
     </header>
 
     <section class="surface stack">
-        <h2>Identity</h2>
+        <h2>{t("detail.identity")}</h2>
         <dl class="kv">
-            <dt>ID</dt><dd><code>{place.id}</code></dd>
-            <dt>Alternate name</dt><dd>{place.alternate_name ?? "—"}</dd>
-            <dt>Type</dt><dd>{typeLabel(place)}</dd>
-            <dt>Description</dt><dd>{place.description ?? "—"}</dd>
-            <dt>URL</dt><dd>{#if place.url}<a href={place.url} target="_blank" rel="noopener">{place.url}</a>{:else}—{/if}</dd>
-            <dt>Telephone</dt><dd>{place.telephone ?? "—"}</dd>
-            <dt>GLN</dt><dd>{place.global_location_number ?? "—"}</dd>
-            <dt>Branch code</dt><dd>{place.branch_code ?? "—"}</dd>
+            <dt>{t("detail.id")}</dt><dd><code>{place.id}</code></dd>
+            <dt>{t("detail.alternateName")}</dt><dd>{place.alternate_name ?? "—"}</dd>
+            <dt>{t("detail.type")}</dt><dd>{typeLabel(place)}</dd>
+            <dt>{t("detail.description")}</dt><dd>{place.description ?? "—"}</dd>
+            <dt>{t("detail.url")}</dt><dd>{#if place.url}<a href={place.url} target="_blank" rel="noopener">{place.url}</a>{:else}—{/if}</dd>
+            <dt>{t("detail.telephone")}</dt><dd>{place.telephone ?? "—"}</dd>
+            <dt>{t("detail.gln")}</dt><dd>{place.global_location_number ?? "—"}</dd>
+            <dt>{t("detail.branchCode")}</dt><dd>{place.branch_code ?? "—"}</dd>
         </dl>
     </section>
 
     {#if place.address}
         <section class="surface stack">
-            <h2>Address</h2>
+            <h2>{t("detail.address")}</h2>
             <p>
                 <!-- Join only the populated address parts with commas. -->
                 {[place.address.street_address, place.address.address_locality, place.address.address_region, place.address.postal_code, place.address.address_country]
@@ -96,22 +99,22 @@
 
     {#if place.geo}
         <section class="surface stack">
-            <h2>Geo coordinates</h2>
+            <h2>{t("detail.geo")}</h2>
             <dl class="kv">
-                <dt>Latitude</dt><dd>{place.geo.latitude}</dd>
-                <dt>Longitude</dt><dd>{place.geo.longitude}</dd>
-                {#if place.geo.elevation != null}<dt>Elevation</dt><dd>{place.geo.elevation} m</dd>{/if}
+                <dt>{t("detail.latitude")}</dt><dd>{place.geo.latitude}</dd>
+                <dt>{t("detail.longitude")}</dt><dd>{place.geo.longitude}</dd>
+                {#if place.geo.elevation != null}<dt>{t("detail.elevation")}</dt><dd>{place.geo.elevation} m</dd>{/if}
             </dl>
         </section>
     {/if}
 
     {#if place.identifiers && place.identifiers.length > 0}
         <section class="surface stack">
-            <h2>Identifiers</h2>
+            <h2>{t("detail.identifiers")}</h2>
             <ul>
                 {#each place.identifiers as identifier}
                     <li>
-                        <strong>{typeof identifier.identifier_type === "string" ? identifier.identifier_type : `Custom: ${identifier.identifier_type.Custom}`}</strong>
+                        <strong>{typeof identifier.identifier_type === "string" ? identifier.identifier_type : translate("detail.identifierCustom").replace("{value}", identifier.identifier_type.Custom)}</strong>
                         <code>{identifier.value}</code>
                     </li>
                 {/each}
@@ -121,7 +124,7 @@
 
     {#if place.opening_hours && place.opening_hours.length > 0}
         <section class="surface stack">
-            <h2>Opening hours</h2>
+            <h2>{t("detail.openingHours")}</h2>
             <ul>
                 {#each place.opening_hours as h}
                     <li><strong>{h.day_of_week}</strong> {h.opens}–{h.closes}</li>
@@ -132,7 +135,7 @@
 
     {#if place.amenity_features && place.amenity_features.length > 0}
         <section class="surface stack">
-            <h2>Amenities</h2>
+            <h2>{t("detail.amenities")}</h2>
             <ul>
                 {#each place.amenity_features as a}
                     <li>{a.name}{#if a.value}: {a.value}{/if}</li>

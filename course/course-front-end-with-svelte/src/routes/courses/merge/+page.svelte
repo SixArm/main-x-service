@@ -17,6 +17,7 @@
     import { CourseRepository } from "$lib/api/courses.js";
     import { ApiError } from "$lib/api/client.js";
     import type { MergeResponse, Course } from "$lib/api/types.js";
+    import { t, translate, i18n } from "$lib/i18n.svelte.js";
 
     const repo = CourseRepository.withFetch();
 
@@ -46,15 +47,15 @@
     // Validate the two IDs, confirm, then run the merge.
     async function doMerge() {
         if (!mainId || !duplicateId) {
-            error = "Both IDs required";
+            error = t("merge.bothIdsRequired");
             return;
         }
         // Guard against merging a record into itself.
         if (mainId === duplicateId) {
-            error = "Main and duplicate must differ";
+            error = t("merge.mustDiffer");
             return;
         }
-        if (!confirm(`Merge ${duplicateId.slice(0, 8)}… into ${mainId.slice(0, 8)}…?\nThis soft-deletes the duplicate.`)) return;
+        if (!confirm(translate("merge.confirm", i18n.locale).replace("{dup}", duplicateId.slice(0, 8)).replace("{main}", mainId.slice(0, 8)))) return;
         loading = true;
         error = null;
         try {
@@ -76,31 +77,31 @@
 
     // One-line label for a preview course: name plus optional type.
     function summary(p: Course | null): string {
-        if (!p) return "—";
+        if (!p) return t("detail.empty");
         return `${p.name}${p.additional_type ? ` (${p.additional_type})` : ""}`;
     }
 </script>
 
 <svelte:head><title>Merge courses · Course Service</title></svelte:head>
 
-<header><h1>Merge courses</h1></header>
+<header><h1>{t("merge.title")}</h1></header>
 
 <section class="surface stack">
     <FieldRow>
-        <LabeledField label="Main course ID" for="merge-main" required hint="The surviving record">
+        <LabeledField label={t("merge.mainId")} for="merge-main" required hint={t("merge.mainIdHint")}>
             <input id="merge-main" bind:value={mainId} />
         </LabeledField>
-        <LabeledField label="Duplicate course ID" for="merge-dup" required hint="Will be soft-deleted">
+        <LabeledField label={t("merge.duplicateId")} for="merge-dup" required hint={t("merge.duplicateIdHint")}>
             <input id="merge-dup" bind:value={duplicateId} />
         </LabeledField>
     </FieldRow>
-    <LabeledField label="Reason" for="merge-reason" hint="Recorded in the merge audit trail">
-        <input id="merge-reason" bind:value={reason} placeholder="Confirmed duplicate" />
+    <LabeledField label={t("merge.reason")} for="merge-reason" hint={t("merge.reasonHint")}>
+        <input id="merge-reason" bind:value={reason} placeholder={t("merge.reasonPlaceholder")} />
     </LabeledField>
     <div class="row">
-        <button type="button" class="button" onclick={loadPreview}>Load preview</button>
+        <button type="button" class="button" onclick={loadPreview}>{t("merge.loadPreview")}</button>
         <button type="button" class="button primary" onclick={doMerge} disabled={loading}>
-            {loading ? "Merging…" : "Merge"}
+            {loading ? t("merge.merging") : t("merge.merge")}
         </button>
     </div>
     {#if error}<div class="banner error">{error}</div>{/if}
@@ -108,21 +109,21 @@
 
 {#if preview.main || preview.duplicate}
     <section class="surface stack">
-        <h2>Preview</h2>
+        <h2>{t("merge.preview")}</h2>
         <dl class="kv">
-            <dt>Main</dt><dd>{summary(preview.main)}</dd>
-            <dt>Duplicate</dt><dd>{summary(preview.duplicate)}</dd>
+            <dt>{t("merge.main")}</dt><dd>{summary(preview.main)}</dd>
+            <dt>{t("merge.duplicate")}</dt><dd>{summary(preview.duplicate)}</dd>
         </dl>
     </section>
 {/if}
 
 {#if result}
     <section class="surface stack">
-        <h2>Merge completed</h2>
-        <p>Merge record <code>{result.merge_record.id}</code> created at {new Date(result.merge_record.merged_at).toLocaleString()}.</p>
+        <h2>{t("merge.completed")}</h2>
+        <p>{translate("merge.recordCreated", i18n.locale).replace("{id}", result.merge_record.id).replace("{at}", new Date(result.merge_record.merged_at).toLocaleString())}</p>
         <a href={`/courses/${result.main_course.id}`} class="button primary"
            onclick={() => result?.main_course.id && goto(`/courses/${result.main_course.id}`)}>
-            View merged main course
+            {t("merge.viewMerged")}
         </a>
     </section>
 {/if}

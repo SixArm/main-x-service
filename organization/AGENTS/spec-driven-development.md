@@ -9,7 +9,7 @@ subproject boundary.
 | Document | Source of truth for |
 |---|---|
 | [`../spec/`](../spec/index.md) (this entity's spec) | The **cross-subproject contract**: trio composition, the DTO contract (API body = matcher `Organization` = JSONB payload), wire conventions, shared invariants, entity-wide goals |
-| [service `spec/index.md`](../organization-service-rust-crate/spec/index.md) | Service internals: endpoints' implementation, table layout, loco wiring |
+| [service `spec/index.md`](../organization-service-with-loco/spec/index.md) | Service internals: endpoints' implementation, table layout, loco wiring |
 | [matcher `spec/index.md`](../organization-matcher-rust-crate/spec/index.md) | Matcher internals: algorithms, weights, normalisation, public API |
 | [front-end `spec/index.md`](../organization-front-end-with-svelte/spec/index.md) | Front-end internals: routes, form behaviour, client |
 
@@ -82,8 +82,8 @@ Entity tasks reference, not duplicate, the subproject queues
 - Matcher: [`AGENTS/spec-driven-development.md`](../organization-matcher-rust-crate/AGENTS/spec-driven-development.md)
   (the most detailed in this entity).
 - Service / front-end: "Golden rules" in their
-  [`AGENTS.md`](../organization-service-rust-crate/AGENTS.md) /
+  [`AGENTS.md`](../organization-service-with-loco/AGENTS.md) /
   [`AGENTS.md`](../organization-front-end-with-svelte/AGENTS.md);
   full per-crate guides are queued (entity §13 T-1).
 - House exemplar: the person service's
-  [`AGENTS/spec-driven-development.md`](../../person/person-service-rust-crate/AGENTS/spec-driven-development.md).
+  [`AGENTS/spec-driven-development.md`](../../person/person-service-with-loco/AGENTS/spec-driven-development.md).

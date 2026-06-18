@@ -17,7 +17,7 @@ millions of users.
 ### 3.1 User roles (planned)
 
 JWT-enforced roles are queued in the service spec
-([§13 T-1](../worker-service-rust-crate/spec/13-tasks.md)):
+([§13 T-1](../worker-service-with-loco/spec/13-tasks.md)):
 HR-admin, credentialing-officer, read-only, and service (machine)
 roles, with tokens issued by the
 [authentication entity](../../authentication/) and verified offline

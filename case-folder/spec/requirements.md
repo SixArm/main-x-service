@@ -100,9 +100,12 @@
 ### iFIT-inspired software features (FR-20..23)
 
 Derived from [the iFIT overview](../case-folder-front-end-with-svelte/spec/ifit.md).
-**Hardware/infrastructure (RFID, BLE, GPS, fixed sensors, handheld scanners,
-GIS mapping) is out of scope** for this web app; these are the
-software-equivalent capabilities.
+**Reader hardware (handheld/fixed barcode, QR, RFID, NFC, and BLE readers)
+is deferred to the [roadmap](roadmap.md)** — the data model these feed is
+specified in [scanners.md](scanners.md); today a keyboard/wedge reader
+supplies a decoded id, so no hardware integration is required. **GPS, GIS
+mapping, and fixed environmental sensors remain out of scope** for this web
+app; the features below are the software-equivalent capabilities.
 
 - **AC-I1 (FR-20):** a move whose origin cabinet and destination cabinet
   resolve to **different buildings** is reported as a geofence alert,

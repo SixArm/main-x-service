@@ -3,9 +3,9 @@
 Honest snapshot per subproject. Aspirational items live in
 [§15 Roadmap](15-roadmap.md), not here.
 
-### 14.1 place-service-rust-crate (v0.5.0)
+### 14.1 place-service-with-loco (v0.5.0)
 
-Delivered (service [spec §14](../place-service-rust-crate/spec/14-implementation-status.md)):
+Delivered (service [spec §14](../place-service-with-loco/spec/14-implementation-status.md)):
 full schema.org/Place domain model; 13-table SeaORM schema; 15 REST
 endpoints + Swagger; Tantivy search + app-side geo-radius; matching
 (in-service scorer + embedded canonical matcher via adapter);

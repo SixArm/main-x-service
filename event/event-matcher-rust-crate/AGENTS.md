@@ -20,7 +20,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 | Lint command | `cargo clippy --all-targets -- -D warnings` |
 | Format command | `cargo fmt` |
 | Where do public types live? | `src/lib.rs` re-exports; defined under `src/{models,matcher,scorer,normalizer,error}.rs`. |
-| Where are demo runs? | `cargo run` and `cargo run --example basic_usage` and `cargo run --example custom_config`. |
+| Where are demo runs? | `cargo run` and `cargo run --example basic_usage`, `cargo run --example custom_config`, and `cargo run --example location_matching`. |
 | What's the deterministic-match rule? | Any shared `(scheme, value)` pair across `event_ids`, OR identical normalised `name` plus a `start_date` that parses to the same Unix instant. |
 | What's the probabilistic-match pipeline? | Weighted, weight-renormalised sum across name / start_date / end_date / location / category / country_code / event_ids / organizer / performers / url; missing fields skip. Optional Soundex bonus when phonetic gating clears. |
 | Default match threshold | `0.80`. Strict: `0.95`. Lenient: `0.65`. |
@@ -115,10 +115,16 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 ├── LICENSE.md
 ├── README.md                 ← user-facing
 ├── benches/                  ← criterion benchmarks
-├── examples/                 ← runnable examples (basic_usage, custom_config)
+├── examples/                 ← runnable examples (basic_usage, custom_config, location_matching)
 ├── index.md                  ← documentation entry point
-├── spec.md                   ← LIVING SPECIFICATION (SSOT — read this)
+├── spec/                     ← LIVING SPECIFICATION (SSOT — index.md + NN-*.md; read this)
 ├── scripts/                  ← spec-drift check
 ├── src/                      ← crate source
 └── tests/                    ← integration tests, property tests
 ```
+
+> **Note on `spec.md`.** Throughout these docs `spec.md` is shorthand for
+> the spec **directory**: [`spec/index.md`](./spec/index.md) (table of
+> contents) plus the numbered sections `spec/01-*.md` … `spec/13-*.md`.
+> There is no single top-level `spec.md` file on disk. Markdown links to
+> `spec.md` resolve to `./spec/index.md`.

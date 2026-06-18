@@ -5,7 +5,12 @@ declare global {
             code?: string;
             details?: unknown;
         }
-        interface Locals {}
+        // BFF: the server holds the opaque session id from the httpOnly
+        // `__Host-mxi_session` cookie (set in `hooks.server.ts`); the
+        // browser never reads it.
+        interface Locals {
+            sessionId: string | null;
+        }
         interface PageData {}
         interface PageState {}
         interface Platform {}

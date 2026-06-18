@@ -11,7 +11,7 @@ apply only where a deployment registers healthcare organizations.
 |---|---|
 | EU / UK GDPR | Soft delete (retention with erasure semantics) ✔; audit trail ✔; per-field masking + Article 15 export endpoint **deferred** (§13); consent model **deferred** |
 | UK DPA 2018 | Same mechanisms as GDPR; public-task lawful basis expected for register operation (deployment-side) |
-| ISO/IEC 27001 | Audit log with snapshots ✔; attributable `actor` pending JWT auth (§13); operational controls deployment-side |
+| ISO/IEC 27001 | Audit log with snapshots ✔; attributable `actor` pending PASETO v4.public auth (§13); operational controls deployment-side |
 | ISO/IEC 42001:2023 | Matching is deterministic + explainable (per-component breakdowns, no ML) ✔ — AIMS controls become relevant only if ML scoring is ever introduced (none planned) |
 
 ### 12.1 Organization data is not automatically non-personal

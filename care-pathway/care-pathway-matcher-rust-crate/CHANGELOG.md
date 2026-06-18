@@ -10,9 +10,37 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation harmonization pass: fixed the `repository` URL in
+  `Cargo.toml` to a valid `/tree/main/...` monorepo subpath; corrected
+  `../spec.md` link display text to `../spec/index.md` in `AGENTS/`;
+  added spec notes clarifying that `Error`/`Result` are reserved for
+  future fallible APIs (§21) and that `provider_name` is
+  informational-only (§6); added a renormalised partial-score worked
+  example to `index.md` plus R-1 / R-2 worked examples.
+
 ### Added
 
-- **Inaugural release (v0.1.0).** Pairwise care-pathway (clinical
+- Spec: a `relationships` concept on `CarePathway` — `RelationshipRef
+  { relation: RelationKind, pathway_id }` with `RelationKind`
+  (`PrecededBy` / `FollowedBy` sequencing inverses, `SimilarTo`
+  symmetric, `Supersedes` / `SupersededBy` versioning inverses, plus
+  `Custom`), scored by a typed-set Jaccard over the `(relation,
+  pathway_id)` pairs (§13.1) and weighted `relationships_weight`
+  (default `0.05`, §7) as a supporting signal in the renormalised
+  weighted average (§17). Re-exports `RelationshipRef` / `RelationKind`
+  (§21). Code implementation is tracked in spec §23.
+- Tests closing documented coverage gaps: phonetic (Soundex) +0.05
+  bonus wiring in `name_score` (lift but never reaching the High band);
+  `set_jaccard` `Some(0.0)` one-side-populated branch; an
+  `alternate_names` rescue where primary names diverge.
+
+## [0.1.0] - 2026-06-15
+
+### Added
+
+- **Inaugural release.** Pairwise care-pathway (clinical
   pathway) record matching, copy-adapted from the course-matcher
   template.
   - Domain model: `CarePathway` (name / alternateName / pathway code /

@@ -17,25 +17,25 @@
     padding-bottom: var(--nhs-space-2);
 }
 
+/* Lily LocaleSelect / ThemeSelect render native <select> dropdowns; style
+   them as normal NHS selects. (The previous rules here were for the old
+   radio-group picker — border:0/padding:0/flex — which left the <select>
+   borderless, cramped, and too small.) */
 .utility-row-picker {
-    display: flex;
-    gap: var(--nhs-space-3);
-    align-items: center;
-    border: 0;
-    margin: 0;
-    padding: 0;
-}
-
-.utility-row-picker > .locale-picker-option,
-.utility-row-picker > .theme-picker-option {
-    display: inline-flex;
-    gap: var(--nhs-space-1);
-    align-items: center;
+    font-size: var(--nhs-font-size-16, 1rem);
+    line-height: 1.4;
+    min-height: 2.5rem;
+    padding: var(--nhs-space-1) var(--nhs-space-2);
+    border: var(--nhs-border-width) solid var(--nhs-dark-grey);
+    border-radius: var(--nhs-border-radius);
+    background: var(--nhs-white);
+    color: var(--nhs-black);
     cursor: pointer;
 }
 
-.utility-row-picker input[type='radio'] {
-    margin: 0;
+.utility-row-picker:focus-visible {
+    outline: var(--nhs-border-width-thick, 3px) solid var(--nhs-focus, #ffeb3b);
+    outline-offset: 0;
 }
 
 .page-wrapper {
@@ -51,11 +51,14 @@
 }
 
 .app-header .page-wrapper {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     gap: var(--nhs-space-4);
     align-items: center;
-    justify-content: space-between;
+    /* Hamburger (leftmost) then brand, grouped to the start; the nav menu is
+       an absolutely-positioned dropdown so it stays out of this flow. */
+    justify-content: flex-start;
 }
 
 .app-header h1 {
@@ -78,9 +81,29 @@
 }
 
 .app-header .navigation-menu {
+    /* Always collapsed behind the hamburger at every width: hidden by
+       default, shown only when the toggle adds `.open`. Rendered as a
+       dropdown panel overlaying content (position:absolute) so opening it
+       does not reflow the header. */
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: var(--nhs-space-4);
+    z-index: 50;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--nhs-space-1);
+    min-width: 14rem;
+    margin-top: var(--nhs-space-1);
+    padding: var(--nhs-space-2);
+    background: var(--nhs-blue);
+    border: var(--nhs-border-width) solid var(--nhs-dark-blue);
+    border-radius: var(--nhs-border-radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.app-header .navigation-menu.open {
     display: flex;
-    gap: var(--nhs-space-3);
-    flex-wrap: wrap;
 }
 
 .app-header .navigation-menu a {
@@ -94,6 +117,46 @@
 .app-header .navigation-menu a[aria-current='page'] {
     background: var(--nhs-dark-blue);
     text-decoration: underline;
+}
+
+/* Full-width main content area (spec: top nav, no sidebar, full-width main). */
+.page-content {
+    width: 100%;
+    padding: var(--nhs-space-4);
+}
+
+/* Hamburger toggle for the header navigation; always visible at every
+   width — the primary nav is always collapsed behind it. */
+.app-header .nav-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--nhs-white);
+    border-radius: var(--nhs-border-radius);
+    cursor: pointer;
+}
+
+.app-header .nav-toggle-box,
+.app-header .nav-toggle-box::before,
+.app-header .nav-toggle-box::after {
+    display: block;
+    width: 1.25rem;
+    height: 2px;
+    margin: 0 auto;
+    background: var(--nhs-white);
+    content: '';
+}
+
+.app-header .nav-toggle-box::before {
+    transform: translateY(-6px);
+}
+
+.app-header .nav-toggle-box::after {
+    transform: translateY(4px);
 }
 
 .app-footer {

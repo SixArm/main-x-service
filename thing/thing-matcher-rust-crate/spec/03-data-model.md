@@ -17,6 +17,8 @@ The public types live in `crate::models`. All derive `Serialize + Deserialize`. 
 | `main_entity_of_page` | `Option<String>` | URL of the page for which this is the main entity (schema.org `mainEntityOfPage`). | Exact match after URL normalisation. |
 | `additional_types` | `Vec<String>` | Subtype URIs from external vocabularies (schema.org `additionalType`). | Jaccard set similarity after URL normalisation. |
 | `subject_of` | `Vec<String>` | URLs of works or events about this thing (schema.org `subjectOf`). | Data-only; not scored today. |
+| `relationships` | `Vec<RelationshipRef>` | Typed thing-to-thing references (containment / part-of). | Typed-set Jaccard over the `(relation, thing_id)` pairs (§3.10, §6.6); a supporting signal, not identifying on its own. `None` when either side is empty. |
+| `tags` | `Vec<String>` | Short free-text operational labels (grouping / triage / workflow). | Set Jaccard over the case-insensitively normalised tag sets (§6.8); a supporting signal, not identifying on its own. `None` when either side is empty. Defaults to empty. |
 | `owner` | `Option<String>` | Owner — person or organisation (schema.org `owner`). | Data-only; not scored. The crate does not model `Person` / `Organization` separately. |
 | `local_id` | `Option<String>` | Local identifier issued by the originating system. | Data-only; not normalised, not scored. Different organisations may issue colliding values. |
 
@@ -43,6 +45,25 @@ Two `Identifier`s are equal iff both `property_id` and `value` are equal — equ
 
 The `property_id` SHOULD be a stable vocabulary name (`"wikidata"`, `"isbn"`, `"doi"`, `"gtin"`, `"openlibrary"`) or a fully-qualified URL. The matcher treats it as an opaque case-sensitive string — `"wikidata"` and `"WikiData"` are distinct schemes.
 
+### 3.3.1 `RelationshipRef` and `RelationKind`
+
+```rust
+pub struct RelationshipRef {
+    pub relation: RelationKind,
+    pub thing_id: String,
+}
+
+#[non_exhaustive]
+pub enum RelationKind {
+    Contains,
+    ContainedIn,
+    SuperPart,
+    SubPart,
+}
+```
+
+`relationships: Vec<RelationshipRef>` holds typed thing-to-thing references, each `RelationshipRef { relation: RelationKind, thing_id: String }` where `thing_id` is an opaque registry id (whitespace-trimmed, non-empty). `RelationKind` is a `#[non_exhaustive]` enum mirroring the service: `Contains` / `ContainedIn` are containment inverses (A `Contains` B ⇔ B `ContainedIn` A), and `SuperPart` / `SubPart` are part-of inverses (schema.org `hasPart` / `isPartOf` — A `SuperPart` B is the whole, B `SubPart` A the sub-part). The matcher does **not** resolve, invert, or transitively close the references — it compares the two things' relationship **sets** as opaque, distinct `(relation, thing_id)` keys (§6.6). A supporting signal, not an identifying field on its own. The enum is extensible (e.g. `SimilarTo`, `Replaces` / `ReplacedBy` later) — hence `#[non_exhaustive]`.
+
 ### 3.4 `MatchConfig`
 
 Tunable configuration for the matching engine. All weights are dimensionless and contribute to a renormalised weighted sum — they do not need to add to `1.0`. See §5.10.
@@ -59,6 +80,8 @@ Tunable configuration for the matching engine. All weights are dimensionless and
 | `image_weight` | `f64` | `0.03` | `0.03` | `0.03` |
 | `main_entity_of_page_weight` | `f64` | `0.02` | `0.02` | `0.02` |
 | `additional_types_weight` | `f64` | `0.05` | `0.05` | `0.05` |
+| `relationships_weight` | `f64` | `0.05` | `0.05` | `0.05` |
+| `tags_weight` | `f64` | `0.05` | `0.05` | `0.05` |
 | `use_phonetic_matching` | `bool` | `false` | `false` | `true` |
 | `name_algorithm` | `SimilarityAlgorithm` | `Combined` | `Combined` | `Combined` |
 | `strict_mode` | `bool` | `false` | `true` | `false` |
@@ -105,10 +128,12 @@ pub struct MatchBreakdown {
     pub image_score:                     Option<f64>,
     pub main_entity_of_page_score:       Option<f64>,
     pub additional_types_score:          Option<f64>,
+    pub relationships_score:             Option<f64>,
+    pub tags_score:                      Option<f64>,
 }
 ```
 
-Per field: `Some(s)` means the field was scored, `s ∈ [0.0, 1.0]`. `None` means at least one side was absent / empty, so the field did not participate in the weighted sum. Downstream services MUST NOT discard the breakdown — it is the audit trail for the `score`.
+`MatchBreakdown` carries **12 score fields**, each `Option<f64>`. Per field: `Some(s)` means the field was scored, `s ∈ [0.0, 1.0]`. `None` means at least one side was absent / empty, so the field did not participate in the weighted sum. Downstream services MUST NOT discard the breakdown — it is the audit trail for the `score`.
 
 ### 3.8 `Confidence`
 

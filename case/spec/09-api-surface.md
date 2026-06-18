@@ -1,7 +1,7 @@
 ## 9. API Surface
 
 Endpoint detail: [`AGENTS/restful.md`](../AGENTS/restful.md); source:
-[`src/controllers/cases.rs`](../case-service-rust-crate/src/controllers/cases.rs).
+[`src/controllers/cases.rs`](../case-service-with-loco/src/controllers/cases.rs).
 
 ### 9.1 Service REST API
 
@@ -33,11 +33,15 @@ event stream. Merge additionally writes a `merge_records` history row
 with a snapshot of the transferred (duplicate) payload. A durable
 broker is roadmap (§15).
 
-Bearer-token verification (RS256 against the auth-service JWKS, offline)
-is available via the `AuthUser` extractor; `whoami` is protected by it,
-and create/update/delete/merge stamp the audit `actor` from the token
-when one is present (`MaybeAuthUser`). Blanket `/api/*` enforcement and
-JWKS-over-HTTP fetch are follow-ups (§13 T-7).
+Bearer-token verification (PASETO v4 public, Ed25519, against the
+auth-service's published key, offline — tokens ride in `Authorization:
+Bearer v4.public.…`) is available via the `AuthUser` extractor; `whoami`
+is protected by it, and create/update/delete/merge stamp the audit
+`actor` from the token when one is present (`MaybeAuthUser`). Blanket
+`/api/*` enforcement and paseto-keys-over-HTTP fetch are follow-ups
+(§13 T-7). Auth model source of truth:
+[`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+(supersedes the RS256-JWT + JWKS model).
 
 Conventions: **raw loco JSON** (no `{success, data, error}` envelope —
 this is the loco-era convention, unlike the pre-loco person service).

@@ -61,7 +61,7 @@ Renormalised weighted average over the components both records carry
 
 ## Where matching runs in the service
 
-**File:** [`src/controllers/care_pathways.rs`](../care-pathway-service-rust-crate/src/controllers/care_pathways.rs)
+**File:** [`src/controllers/care_pathways.rs`](../care-pathway-service-with-loco/src/controllers/care_pathways.rs)
 — both endpoints construct `MatchingEngine::new(MatchConfig::default())`:
 
 - `POST /api/care-pathways/match` → `engine.rank(query, candidates)`

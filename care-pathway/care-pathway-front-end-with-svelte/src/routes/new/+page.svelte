@@ -6,6 +6,7 @@
     import CarePathwayForm from "$lib/components/CarePathwayForm.svelte";
     import { CarePathwayRepository } from "$lib/api/care-pathways";
     import type { CarePathway } from "$lib/api/types";
+    import { t } from "$lib/i18n.svelte";
 
     const repo = CarePathwayRepository.withFetch();
     // Empty seed: only `name` is required by the type.
@@ -19,7 +20,7 @@
     }
 </script>
 
-<svelte:head><title>New care pathway — Main X</title></svelte:head>
+<svelte:head><title>{t("new.title")} — Main X</title></svelte:head>
 
-<h1>New care pathway</h1>
-<CarePathwayForm {initial} submitLabel="Create" onsubmit={handleSubmit} />
+<h1>{t("new.title")}</h1>
+<CarePathwayForm {initial} submitLabel={t("new.create")} onsubmit={handleSubmit} />

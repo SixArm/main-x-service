@@ -11,6 +11,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let { data } = $props();
 
@@ -25,22 +26,22 @@
     }
 </script>
 
-<BackLink href="/buildings">Back to buildings</BackLink>
+<BackLink href="/buildings">{t('roomDetail.backToBuildings')}</BackLink>
 
 <h2>{data.place.name}</h2>
 {#if data.place.container_path}<p>{data.place.container_path}</p>{/if}
 
-<h3>Folder presence history</h3>
-<p>Folders that have been in any cabinet in this room, newest first.</p>
+<h3>{t('roomDetail.presenceHistory')}</h3>
+<p>{t('roomDetail.presenceIntro')}</p>
 <div class="panel">
-    <DataTable label="Room folder presence history" caption="Aggregated across this room's cabinets">
+    <DataTable label={t('roomDetail.presenceTable')} caption={t('roomDetail.presenceCaption')}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">Folder</th>
-                <th scope="col">Patient</th>
-                <th scope="col">Cabinet</th>
-                <th scope="col">Entered</th>
-                <th scope="col">Left</th>
+                <th scope="col">{t('common.folder')}</th>
+                <th scope="col">{t('common.patient')}</th>
+                <th scope="col">{t('common.cabinet')}</th>
+                <th scope="col">{t('common.entered')}</th>
+                <th scope="col">{t('common.left')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>
@@ -53,13 +54,13 @@
                     <DataTableTD>{p.cabinetLabel}</DataTableTD>
                     <DataTableTD>{when(p.enteredAt)}</DataTableTD>
                     <DataTableTD>
-                        {#if p.leftAt}{when(p.leftAt)}{:else}<Badge type="success">Still here</Badge>{/if}
+                        {#if p.leftAt}{when(p.leftAt)}{:else}<Badge type="success">{t('common.stillHere')}</Badge>{/if}
                     </DataTableTD>
                 </DataTableRow>
             {/each}
             {#if data.presences.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={5}>No folder presence recorded in this room yet.</DataTableTD>
+                    <DataTableTD colspan={5}>{t('roomDetail.noPresence')}</DataTableTD>
                 </DataTableRow>
             {/if}
         </DataTableBody>

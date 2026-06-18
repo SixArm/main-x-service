@@ -777,6 +777,123 @@ mod tests {
         assert_eq!(educational_level_score(&a, &b), None);
     }
 
+    // Pins that the off-ladder variants — Vocational,
+    // ProfessionalDevelopment, and Custom(_) — never earn adjacency
+    // credit. They sit on no ladder (spec §12 lists only the three
+    // ladders), so a non-identical pairing involving them must score
+    // 0.0, and an identical pairing must still score the exact-match
+    // 1.0. This guards against one of them being silently wired into a
+    // ladder later and minting spurious partial credit.
+    #[test]
+    fn educational_level_off_ladder_variants_score_zero_unless_identical() {
+        use EducationalLevel::{
+            Beginner, Custom, Expert, ProfessionalDevelopment, Vocational,
+        };
+        let mut a = Course::new("A");
+        let mut b = Course::new("B");
+
+        // Identical off-ladder variant ⇒ exact-match 1.0.
+        a.educational_level = Some(Vocational);
+        b.educational_level = Some(Vocational);
+        assert_eq!(educational_level_score(&a, &b), Some(1.0));
+        a.educational_level = Some(ProfessionalDevelopment);
+        b.educational_level = Some(ProfessionalDevelopment);
+        assert_eq!(educational_level_score(&a, &b), Some(1.0));
+        a.educational_level = Some(Custom("apprenticeship".into()));
+        b.educational_level = Some(Custom("apprenticeship".into()));
+        assert_eq!(educational_level_score(&a, &b), Some(1.0));
+
+        // Off-ladder variant vs anything different ⇒ 0.0 (no adjacency).
+        for (left, right) in [
+            (Vocational, Beginner),
+            (Vocational, ProfessionalDevelopment),
+            (ProfessionalDevelopment, Expert),
+            (Custom("apprenticeship".into()), Vocational),
+            (Custom("apprenticeship".into()), Custom("internship".into())),
+        ] {
+            a.educational_level = Some(left.clone());
+            b.educational_level = Some(right.clone());
+            assert_eq!(
+                educational_level_score(&a, &b),
+                Some(0.0),
+                "{left:?} vs {right:?} must score 0.0"
+            );
+        }
+    }
+
+    // Pins that `educational_level_one_off` returns false for every
+    // off-ladder variant — they appear on none of the three ladders.
+    #[test]
+    fn educational_level_one_off_false_for_off_ladder_variants() {
+        use EducationalLevel::{
+            Beginner, Custom, ProfessionalDevelopment, Vocational,
+        };
+        assert!(!educational_level_one_off(&Vocational, &Beginner));
+        assert!(!educational_level_one_off(
+            &ProfessionalDevelopment,
+            &Beginner
+        ));
+        assert!(!educational_level_one_off(
+            &Custom("apprenticeship".into()),
+            &Beginner
+        ));
+        // Two off-ladder variants are never adjacent either.
+        assert!(!educational_level_one_off(
+            &Vocational,
+            &ProfessionalDevelopment
+        ));
+    }
+
+    // Pins that `learning_resource_type` carries NO scoring weight: it is
+    // modelled on `Course` (spec §6) but deliberately excluded from the
+    // algorithm. Two otherwise-identical inputs that differ ONLY in
+    // `learning_resource_type` must score identically, and the type must
+    // never surface in the breakdown (there is no such component).
+    #[test]
+    fn learning_resource_type_does_not_affect_score() {
+        use crate::course::LearningResourceType;
+        let engine = MatchingEngine::default_config();
+
+        let mut a = Course::new("Introduction to Computer Science");
+        a.keywords = vec!["programming".into()];
+        a.learning_resource_type = Some(LearningResourceType::Lecture);
+
+        let mut b = a.clone();
+        b.learning_resource_type = Some(LearningResourceType::Workshop);
+
+        let mut baseline = a.clone();
+        baseline.learning_resource_type = None;
+
+        let differing = engine.match_courses(&a, &b);
+        let absent = engine.match_courses(&a, &baseline);
+        // Differing types, type set on one side only, or type absent
+        // everywhere all yield the same score — it is not an input.
+        assert!((differing.score - absent.score).abs() < 1e-12);
+    }
+
+    // Pins that `in_language` is ignored by scoring (cross-language
+    // matching is out of scope per spec §2.2 — callers use `same_as`).
+    // Two otherwise-identical inputs differing only in `in_language`
+    // must score identically.
+    #[test]
+    fn in_language_does_not_affect_score() {
+        let engine = MatchingEngine::default_config();
+
+        let mut a = Course::new("Introduction to Computer Science");
+        a.keywords = vec!["programming".into()];
+        a.in_language = vec!["en".into()];
+
+        let mut b = a.clone();
+        b.in_language = vec!["fr".into(), "de".into()];
+
+        let mut baseline = a.clone();
+        baseline.in_language = vec![];
+
+        let differing = engine.match_courses(&a, &b);
+        let absent = engine.match_courses(&a, &baseline);
+        assert!((differing.score - absent.score).abs() < 1e-12);
+    }
+
     #[test]
     fn jaccard_exact_fraction() {
         let a = vec!["alpha".to_string(), "beta".to_string()];

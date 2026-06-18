@@ -13,6 +13,7 @@
 -->
 <script lang="ts">
     import { Grid } from "wx-svelte-grid";
+    import { t } from "$lib/i18n.svelte.js";
     import type { Event } from "$lib/api/types.js";
 
     let {
@@ -23,15 +24,16 @@
         onselect?: (event: Event) => void;
     } = $props();
 
-    // Static column definitions for the SVAR grid (id matches the row keys below).
-    const columns = [
-        { id: "id", header: "ID", width: 220 },
-        { id: "name", header: "Name", width: 240 },
-        { id: "start_date", header: "Start", width: 160 },
-        { id: "event_type", header: "Type", width: 140 },
-        { id: "event_status", header: "Status", width: 120 },
-        { id: "attendance_mode", header: "Mode", width: 100 },
-    ];
+    // Column definitions for the SVAR grid (id matches the row keys below).
+    // Headers are localized; `$derived` so a locale switch re-renders them.
+    const columns = $derived([
+        { id: "id", header: t("grid.id"), width: 220 },
+        { id: "name", header: t("grid.name"), width: 240 },
+        { id: "start_date", header: t("grid.start"), width: 160 },
+        { id: "event_type", header: t("grid.type"), width: 140 },
+        { id: "event_status", header: t("grid.status"), width: 120 },
+        { id: "attendance_mode", header: t("grid.mode"), width: 100 },
+    ]);
 
     // Flatten/format each Event into a primitive row for the grid; nullable
     // fields collapse to "" and the start date is localized for display.

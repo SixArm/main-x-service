@@ -17,6 +17,7 @@
     import Form from '$lib/components/Form/Form.svelte';
     import Field from '$lib/components/Field/Field.svelte';
     import Button from '$lib/components/Button/Button.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let label = $state('');
     let roomId = $state<string>(cache.rooms[0]?.id ?? '');
@@ -40,8 +41,8 @@
         labelError = '';
         roomError = '';
         submitError = '';
-        if (!label.trim()) labelError = 'Cabinet label is required.';
-        if (!roomId) roomError = 'Select a room.';
+        if (!label.trim()) labelError = t('cabinetNew.labelRequired');
+        if (!roomId) roomError = t('cabinetNew.roomRequired');
         if (labelError || roomError) return;
         try {
             await cache.addCabinet({
@@ -64,42 +65,42 @@
     }
 </script>
 
-<BackLink href="/cabinets">Back to cabinets</BackLink>
+<BackLink href="/cabinets">{t('cabinetNew.backToCabinets')}</BackLink>
 
-<h2>Add a file cabinet</h2>
-<p>A cabinet lives inside a room (which lives inside a building).</p>
+<h2>{t('cabinetNew.heading')}</h2>
+<p>{t('cabinetNew.intro')}</p>
 
 {#if cache.rooms.length === 0}
-    <Alert type="warning" heading="No rooms exist yet">
-        Create a <a href="/buildings/new">building</a> first, then add a room
-        from the building's page.
+    <Alert type="warning" heading={t('cabinetNew.noRoomsHeading')}>
+        {t('cabinetNew.noRoomsCreate')} <a href="/buildings/new">{t('cabinetNew.noRoomsBuilding')}</a>
+        {t('cabinetNew.noRoomsBody')}
     </Alert>
 {/if}
 
 {#if submitError}
-    <Alert type="error" heading="Cannot save cabinet">{submitError}</Alert>
+    <Alert type="error" heading={t('cabinetNew.cannotSave')}>{submitError}</Alert>
 {/if}
 
-<Form label="Add cabinet" onsubmit={handleSubmit}>
-    <Field label="Cabinet label" required error={labelError}>
-        <input bind:value={label} required placeholder="e.g. Cabinet D3" />
+<Form label={t('cabinetNew.formLabel')} onsubmit={handleSubmit}>
+    <Field label={t('cabinetNew.labelLabel')} required error={labelError}>
+        <input bind:value={label} required placeholder={t('cabinetNew.labelPlaceholder')} />
     </Field>
-    <Field label="Room" required error={roomError}>
+    <Field label={t('cabinetNew.roomLabel')} required error={roomError}>
         <select bind:value={roomId} required>
-            <option value="">— Select a room —</option>
+            <option value="">{t('cabinetNew.selectRoomOption')}</option>
             {#each roomOptions as r (r.id)}
                 <option value={r.id}>{r.label}</option>
             {/each}
         </select>
     </Field>
-    <Field label="Capacity" description="Approximate number of folders the cabinet holds. Leave blank for unknown.">
+    <Field label={t('cabinetNew.capacityLabel')} description={t('cabinetNew.capacityDescription')}>
         <input type="number" min="1" bind:value={capacity} />
     </Field>
-    <Field label="Description">
+    <Field label={t('common.description')}>
         <textarea bind:value={description} rows="2"></textarea>
     </Field>
     <div class="actions">
-        <a href="/cabinets" class="button secondary">Cancel</a>
-        <Button type="submit" disabled={cache.rooms.length === 0}>Save cabinet</Button>
+        <a href="/cabinets" class="button secondary">{t('common.cancel')}</a>
+        <Button type="submit" disabled={cache.rooms.length === 0}>{t('cabinetNew.saveCabinet')}</Button>
     </div>
 </Form>

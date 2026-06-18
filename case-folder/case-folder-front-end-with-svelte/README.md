@@ -74,9 +74,10 @@ room.
 - [Lily Design System (Svelte headless)](https://lilydesignsystem.io)
   for accessible UI primitives, styled with NHS UK design tokens.
 - Lily Svelte helpers (`~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers`,
-  cloned alongside this repo) — `lily-design-system-svelte-locale-picker` and
-  `lily-design-system-svelte-theme-picker`, consumed in-source via
-  SvelteKit `kit.alias` (no copying, no npm publish).
+  cloned alongside this repo) — `lily-design-system-svelte-locale-select` and
+  `lily-design-system-svelte-theme-select`, declared as `file:`
+  dependencies in `package.json` (symlinked into `node_modules` by
+  `npm install`; no copying, no npm publish).
 
 ## Prerequisites
 
@@ -108,11 +109,26 @@ npm run test:e2e:ui          # interactive Playwright UI
 npm run test:e2e:headed      # headed Chromium for debugging
 ```
 
-Override the API URL with `VITE_API_BASE_URL`:
+### API URL & the same-origin proxy
+
+By default the API client's base is `''` (empty), so every request goes
+to a relative `/api/*` path. The Vite dev server **proxies** `/api`
+(and `/healthz`) to the Loco app, which keeps the request first-party so
+the magic-link session's HttpOnly cookie is preserved (see
+[spec/auth.md](spec/auth.md)). Two env vars tune this:
 
 ```bash
+# Change the dev-proxy TARGET while staying same-origin (cookie preserved):
+LOCO_API_PROXY=http://localhost:5150 npm run dev   # see vite.config.ts
+
+# Point the client at a DIFFERENT origin (bypasses the proxy). This makes
+# /api requests cross-origin, which changes cookie behaviour — only use
+# it for a back-end whose CORS + cookie policy you control:
 VITE_API_BASE_URL=http://localhost:5150 npm run dev
 ```
+
+Prefer `LOCO_API_PROXY` for local dev; reach for `VITE_API_BASE_URL`
+only when you deliberately want a cross-origin client.
 
 If the API is unreachable, the page renders the error route at
 `src/routes/+error.svelte` with the failure message. There is **no
@@ -123,12 +139,14 @@ seed-data fallback** — the seed lives in the Loco subproject's
 
 A utility row above the header carries two Lily helpers:
 
-- **Theme** — `nhs` (default) and `nhs-high-contrast`. Selecting one
-  swaps a managed `<link>` in `<head>` to load
-  `/themes/<slug>.css` and sets `<html data-theme="<slug>">`.
-  Colour tokens live in `static/themes/*.css`, scoped to
-  `:root[data-theme="…"]`. Theme-invariant tokens (typography,
-  spacing, layout) stay in `src/lib/css/nhs.css`.
+- **Theme** — the full shared Lily theme catalogue (~41 themes incl. the
+  NHS England/Scotland/Wales themes; default
+  `…england-for-practitioners`). Selecting one swaps a managed `<link>` in
+  `<head>` to load `/assets/themes/<slug>.css` (a symlink to the shared
+  design-system themes) and sets `<html data-theme="<slug>">`. Each theme
+  defines DaisyUI `--color-*` tokens; `src/lib/css/nhs.css` bridges the base
+  `--nhs-*` tokens onto them so themes restyle the app. Theme-invariant
+  tokens (typography, spacing, layout) stay in `src/lib/css/nhs.css`.
 - **Language** — `en`, `cy`, `gd`. Selecting one sets `<html lang>`
   (and `<html dir>` if an RTL locale is added). No UI-string
   translation today; the value influences assistive-tech voice
@@ -139,9 +157,11 @@ Both pickers persist via `localStorage` (`case-folder:theme`,
 
 The helpers are consumed from the sibling git path
 `~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/`
-via two SvelteKit `kit.alias` entries (`@lily/theme-picker`,
-`@lily/locale-picker`) and a Vite `server.fs.allow` entry that lets
-Vite serve files from outside the project root. **The sibling repo
+via two `file:` dependencies in `package.json`
+(`lily-design-system-svelte-theme-select`, `lily-design-system-svelte-locale-select`),
+which `npm install` symlinks into `node_modules`, plus a Vite
+`server.fs.allow` entry that lets Vite serve the symlinked files from
+outside the project root. **The sibling repo
 must be cloned next to this one** (under `~/git/lilydesignsystem/…`)
 for `npm run dev` and `npm run build` to resolve the imports.
 
@@ -157,9 +177,8 @@ tests/e2e/
                                  #   workers (clickthrough), auth, a11y,
                                  #   ifit, wiring
 static/
-└── themes/
-    ├── nhs.css                  # :root[data-theme="nhs"] colour tokens
-    └── nhs-high-contrast.css    # :root[data-theme="nhs-high-contrast"]
+└── assets/
+    └── themes/                  # symlink → shared Lily theme catalogue
 src/
 ├── app.html
 ├── app.d.ts

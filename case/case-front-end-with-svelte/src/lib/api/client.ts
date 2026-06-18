@@ -4,16 +4,10 @@
 // {success,data,error} envelope), so this client returns the parsed
 // body directly and throws ApiError on non-2xx.
 //
-// Auth: by default the client reads the operator's bearer token from the
-// shared session store (`$lib/auth.svelte`) on each request and attaches
-// it as `Authorization: Bearer <token>`, so it travels automatically once
-// the operator authenticates the SPA. A per-call `token` overrides the
-// store: pass a string to force a token, or `null` to omit the header.
-// The store getter is injectable for tests.
-
-// The default bearer-token source: the shared reactive session store.
-// Imported as a function so each request reads the *current* token.
-import { token as sessionToken } from "$lib/auth.svelte";
+// Auth is handled by the same-origin BFF proxy (it injects a server-
+// exchanged PASETO), so this client attaches no bearer of its own — only
+// an explicit per-request `token` override, if ever passed. See
+// `agents/share/authentication-sessions.md`.
 
 /**
  * Construction-time configuration for {@link ApiClient}.
@@ -23,8 +17,6 @@ export interface ClientOptions {
     baseUrl: string;
     /** Override the `fetch` implementation (SSR, tests, instrumentation). Defaults to the global `fetch`. */
     fetch?: typeof fetch;
-    /** Override the default session-token source (testing/seam). */
-    tokenSource?: () => string | null;
 }
 
 /**
@@ -33,7 +25,7 @@ export interface ClientOptions {
 export interface RequestOptions {
     /** JSON request body; serialised with `JSON.stringify`. Omit for bodyless requests (GET/DELETE). */
     body?: unknown;
-    /** Per-call bearer override: a string forces that token, `null` omits the header, `undefined` falls back to the session source. */
+    /** Override the bearer for this request: a string sets the header, `null`/`""` suppresses it. Omit to send no bearer (the BFF injects one). */
     token?: string | null;
     /** Extra request headers, merged over (and able to override) the JSON defaults. */
     headers?: Record<string, string>;
@@ -83,16 +75,13 @@ export class ApiClient {
     private readonly baseUrl: string;
     /** The `fetch` implementation to use for every request. */
     private readonly fetchFn: typeof fetch;
-    /** Callback returning the default bearer token (session store by default). */
-    private readonly tokenSource: () => string | null;
 
     /**
-     * @param options Base URL, plus optional `fetch` and token-source seams.
+     * @param options Base URL, plus optional `fetch` seam.
      */
     constructor(options: ClientOptions) {
         this.baseUrl = options.baseUrl.replace(/\/+$/, "");
         this.fetchFn = options.fetch ?? globalThis.fetch.bind(globalThis);
-        this.tokenSource = options.tokenSource ?? sessionToken;
     }
 
     /**
@@ -155,11 +144,10 @@ export class ApiClient {
             accept: "application/json",
             ...opts.headers,
         };
-        // A per-call `token` (string or explicit `null`) overrides the
-        // session store; `undefined` falls back to the store.
-        const token = opts.token !== undefined ? opts.token : this.tokenSource();
-        if (token) {
-            headers.authorization = `Bearer ${token}`;
+        // The BFF proxy injects the bearer server-side; this client sends a
+        // bearer only when one is explicitly passed for this request.
+        if (opts.token) {
+            headers.authorization = `Bearer ${opts.token}`;
         }
 
         const init: RequestInit = { method, headers, signal: opts.signal };

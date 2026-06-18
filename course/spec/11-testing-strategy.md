@@ -27,6 +27,6 @@ entity-level pin that the trio composes correctly.
   (front-end spec §14) — tracked in §13.
 
 Per-subproject layouts: service
-[AGENTS/testing.md](../course-service-rust-crate/AGENTS/testing.md),
+[AGENTS/testing.md](../course-service-with-loco/AGENTS/testing.md),
 matcher [AGENTS/testing.md](../course-matcher-rust-crate/AGENTS/testing.md),
 front-end [AGENTS/testing.md](../course-front-end-with-svelte/AGENTS/testing.md).

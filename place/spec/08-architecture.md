@@ -16,7 +16,7 @@
 +----------------------------+---------------------------------------+
                              | REST (JSON envelope, PUBLIC_API_BASE_URL)
 +----------------------------v---------------------------------------+
-|              place-service-rust-crate (loco.rs / Axum)              |
+|              place-service-with-loco (loco.rs / Axum)              |
 |  +---------------+ +----------------+ +-------------------------+   |
 |  |  Validation   | |  Matching      | |  Search (Tantivy)       |   |
 |  |  & Privacy    | |  adapter.rs ---+-+--> place-matcher crate  |   |
@@ -41,7 +41,7 @@
 Strictly one-way; no cycles:
 
 ```
-place-front-end-with-svelte  --HTTP-->  place-service-rust-crate  --Cargo dep-->  place-matcher-rust-crate
+place-front-end-with-svelte  --HTTP-->  place-service-with-loco  --Cargo dep-->  place-matcher-rust-crate
 ```
 
 - The **matcher** depends on nothing in the trio (pure library, no IO).

@@ -68,7 +68,7 @@ nor inflates the denominator — it is skipped, not penalised. See
 > renormalisation can produce a high score from thin evidence. This is
 > documented, not a bug — see the person-service bridge test
 > `sparse_records_do_not_panic_and_score_in_range` in
-> [`tests/duplicate_detection.rs`](../../person/person-service-rust-crate/tests/duplicate_detection.rs).
+> [`tests/duplicate_detection.rs`](../../person/person-service-with-loco/tests/duplicate_detection.rs).
 
 ---
 
@@ -223,7 +223,7 @@ Two embedding patterns exist:
    `identifiers` / `addresses` / `telecom` / `documents`). It embeds the
    matcher crate and projects its model onto the matcher's flat input via
    an adapter `to_matcher_<entity>` (e.g.
-   [`to_matcher_person`](../../person/person-service-rust-crate/src/matching/adapter.rs)).
+   [`to_matcher_person`](../../person/person-service-with-loco/src/matching/adapter.rs)).
    The projection is lossy-but-well-defined: scalars sampled from
    collections (first phone / email; first address → primary, rest →
    `previous_addresses`), field renames (FHIR `state` → matcher `county`,
@@ -240,7 +240,7 @@ For adapter-bridge services, a black-box integration test drives the
 service domain model through the adapter and asserts on
 `MatchingEngine` output — pinning **both** the adapter's field-routing
 **and** the matcher's scoring against the service's model. See
-[`tests/duplicate_detection.rs`](../../person/person-service-rust-crate/tests/duplicate_detection.rs)
+[`tests/duplicate_detection.rs`](../../person/person-service-with-loco/tests/duplicate_detection.rs)
 (18 tests): identical-clone ≥ 0.95 / High; one-letter typo fuzzy ≥ 0.85;
 shared NHS-number / tax-id / passport deterministic; unrelated records <
 0.70; sparse-record safety; the full national-ID routing audit; strict ⊆
@@ -271,7 +271,7 @@ this way (e.g. `nhs-number` → UK NHS Number; `us-ssn`/`ssa.gov` → US
 SSN; `cpf` → BR CPF; `ihi` disambiguated AU vs IE by digit count;
 free-form `tax_id` defaults to US SSN). The full routing table is
 documented inline in
-[`adapter.rs`](../../person/person-service-rust-crate/src/matching/adapter.rs)
+[`adapter.rs`](../../person/person-service-with-loco/src/matching/adapter.rs)
 and pinned by `all_national_id_schemes_route_to_their_slot`.
 
 ### 6.2 Permanent out-of-scope decisions

@@ -12,6 +12,10 @@ Field naming for national identifiers: `<cc>_<scheme>` (lower-case ISO 3166-1 al
 
 **Contact** — `phone: Option<String>` (E.164 + legacy fallback per FR-30); `mobile: Option<String>` (fallback when `phone` is `None`); `email: Option<String>` (canonical form per FR-35/FR-36). `local_id: Option<String>` carried but deliberately NOT scored (OQ-2 cross-org collision risk).
 
+**Relationships (scored, not identifying)** — `relationships: Vec<RelationshipRef>` (default empty; §8.6a): typed references to other workers by registry id. A **supporting** signal, NOT an identifying field on its own: two records that reference the **same** related workers (same line-manager / report ids) are more likely the same worker. Scored by typed-set Jaccard (§12.2), weighted `relationships_weight` (§13.1).
+
+**Tags (scored, not identifying)** — `tags: Vec<String>` (default empty): operator-applied free-text labels, normalised case-insensitively. A **supporting** signal, NOT an identifying field on its own: two records carrying the **same** tags are weakly more likely the same worker. Scored by set Jaccard (§12.2), weighted `tags_weight` (§13.1); `None` (does not participate) when either side has an empty tag set.
+
 ### 8.2 `Gender`
 
 Enum variants: `Male`, `Female`, `Other`, `Unknown`.
@@ -32,9 +36,13 @@ All fields are `Option<String>`: `line1`, `line2`, `city`, `county`, `postcode`,
 
 `PassportBook { country: String (ISO 3166-1 alpha-2, 2 ASCII letters), number: String (non-empty, uppercased), issued, expires: Option<NaiveDate> }`. `PassportBook::new` canonicalises both fields and rejects invalid input. Dates are metadata only — NOT used in matching. `Debug + Clone + PartialEq + Eq + Serialize + Deserialize`.
 
+### 8.6a `RelationshipRef` / `RelationKind`
+
+`RelationshipRef { relation: RelationKind, worker_id: String }` references another worker in the consuming registry by **opaque id**; `worker_id` is whitespace-trimmed and non-empty. `RelationKind` is an enum mirroring the service `Worker`: `LineManagerOf`, `ReportsTo` (inverses — A `LineManagerOf` B ⇔ B `ReportsTo` A); extensible (e.g. `MentorOf`, `ColleagueOf` later). The matcher does **not** resolve the references (it has no registry) — it only compares the two workers' relationship **sets** (§12.2). Derives `Debug + Clone + PartialEq + Eq + Hash + Serialize + Deserialize`; re-exported from the crate root.
+
 ### 8.5 `MatchBreakdown`
 
-Each field `Option<f64>` (`None` = not scored; `Some(v)` ∈ `[0.0, 1.0]`). One field per scoring axis: 42 `<cc>_<scheme>_score` + `passport_book_score` + demographic + address + contact scores (`given_name_score`, `family_name_score`, `date_of_birth_score`, `gender_score`, `blood_type_score`, `multiple_birth_score`, `address_score`, `birth_place_score`, `death_date_score`, `death_place_score`, `phone_score`, `email_score`, `phonetic_name_score`). All `#[serde(default)]` so legacy payloads deserialise with `None` for later-added fields.
+Each field `Option<f64>` (`None` = not scored; `Some(v)` ∈ `[0.0, 1.0]`). One field per scoring axis: 42 `<cc>_<scheme>_score` + `passport_book_score` + demographic + address + contact scores (`given_name_score`, `family_name_score`, `date_of_birth_score`, `gender_score`, `blood_type_score`, `multiple_birth_score`, `address_score`, `birth_place_score`, `death_date_score`, `death_place_score`, `phone_score`, `email_score`, `phonetic_name_score`, `relationships_score`, `tags_score`). All `#[serde(default)]` so legacy payloads deserialise with `None` for later-added fields.
 
 ---
 

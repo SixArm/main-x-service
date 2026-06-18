@@ -21,6 +21,7 @@
     import { CourseRepository } from "$lib/api/courses.js";
     import { EDUCATIONAL_LEVEL_OPTIONS } from "$lib/api/types.js";
     import type { CourseIdentifier, EducationalLevel, MatchRequest, MatchResult } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     const repo = CourseRepository.withFetch();
 
@@ -73,26 +74,26 @@
 
 <svelte:head><title>Match check · Course Service</title></svelte:head>
 
-<header><h1>Match check</h1></header>
+<header><h1>{t("match.title")}</h1></header>
 
 <section class="surface stack">
     <form onsubmit={runMatch} class="stack">
         <FieldRow>
-            <LabeledField label="Name" for="m-name" required>
+            <LabeledField label={t("match.name")} for="m-name" required>
                 <input id="m-name" bind:value={name} required />
             </LabeledField>
-            <LabeledField label="Course code" for="m-code">
+            <LabeledField label={t("match.courseCode")} for="m-code">
                 <input id="m-code" bind:value={courseCode} />
             </LabeledField>
-            <LabeledField label="Provider ID" for="m-prov">
+            <LabeledField label={t("match.providerId")} for="m-prov">
                 <input id="m-prov" bind:value={providerId} />
             </LabeledField>
-            <LabeledField label="Display threshold" for="m-threshold" hint="Client-side filter (0.0 – 1.0)">
+            <LabeledField label={t("match.displayThreshold")} for="m-threshold" hint={t("match.thresholdHint")}>
                 <input id="m-threshold" type="number" step="0.05" min="0" max="1" bind:value={threshold} />
             </LabeledField>
         </FieldRow>
         <FieldRow>
-            <LabeledField label="Educational level" for="m-level">
+            <LabeledField label={t("match.educationalLevel")} for="m-level">
                 <select id="m-level" bind:value={educationalLevel}>
                     <option value="">—</option>
                     {#each EDUCATIONAL_LEVEL_OPTIONS as l}
@@ -101,22 +102,22 @@
                 </select>
             </LabeledField>
         </FieldRow>
-        <LabeledField label="Keywords" for="m-kw" hint="Comma- or newline-separated">
+        <LabeledField label={t("match.keywords")} for="m-kw" hint={t("match.keywordsHint")}>
             <input id="m-kw" bind:value={keywordsRaw} />
         </LabeledField>
-        <LabeledField label="Teaches (competencies)" for="m-teaches" hint="One per line">
+        <LabeledField label={t("match.teaches")} for="m-teaches" hint={t("match.teachesHint")}>
             <textarea id="m-teaches" rows={2} bind:value={teachesRaw}></textarea>
         </LabeledField>
-        <LabeledField label="Same-as URLs" for="m-sameas" hint="One per line">
+        <LabeledField label={t("match.sameAs")} for="m-sameas" hint={t("match.sameAsHint")}>
             <textarea id="m-sameas" rows={2} bind:value={sameAsRaw}></textarea>
         </LabeledField>
         <section class="stack">
-            <h2 class="small">Identifiers</h2>
+            <h2 class="small">{t("match.identifiers")}</h2>
             <CourseIdentifierInput bind:identifiers />
         </section>
         {#if error}<div class="banner error">{error}</div>{/if}
         <button type="submit" class="button primary" disabled={loading}>
-            {loading ? "Matching…" : "Find matches"}
+            {loading ? t("match.matching") : t("match.findMatches")}
         </button>
     </form>
 </section>

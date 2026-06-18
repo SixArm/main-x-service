@@ -114,9 +114,10 @@ Run with: `cargo test --test adapter_contract`
 
 The suite touches every symbol called by the service-side adapter:
 
-- `Place::builder()` + every fluent builder method (demographic, contact,
-  identifier, address slots).
-- PlaceBuilder full surface, PlaceId / PlaceIdScheme variants (Google, OSM*, Wikidata, Foursquare, …), PlaceCategory variant set (34 variants), Address builder (county/postcode), MatchBreakdown component fields.
+- `Place::builder()` + every fluent builder method (name / alternate_names,
+  coordinates, category, place_ids, address, phone / email, and the
+  geographic fields).
+- PlaceBuilder full surface, PlaceId / PlaceIdScheme variants (Google, OSM*, Wikidata, Foursquare, …), PlaceCategory variant set (35 unit variants + `Other` = 36 total), Address builder (county/postcode), MatchBreakdown component fields.
 - `MatchingEngine::default_config`, `MatchingEngine::new`,
   `match_places`, `deterministic_match`, `match_one_to_many`.
 - `MatchResult {{ score, is_match, confidence, breakdown }}` field shape.
@@ -138,7 +139,8 @@ because it lives outside this crate.
 
 ### Precedent
 
-A real prior incident: the worker-matcher renamed `se_personnummer` to
-`se_workernummer` on crates.io 0.3.0, which broke `person-service`
-silently. With the contract test in place, the rename would have failed
-the matcher's CI before publish.
+A real prior incident from a sibling crate (illustrative, cross-crate
+history — `place-matcher` itself exposes no national-identifier fields):
+the worker-matcher renamed `se_personnummer` to `se_workernummer` on
+crates.io 0.3.0, which broke `person-service` silently. With the contract
+test in place, the rename would have failed the matcher's CI before publish.

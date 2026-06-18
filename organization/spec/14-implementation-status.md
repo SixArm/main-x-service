@@ -12,7 +12,7 @@
 | Config | Threshold 0.85; `strict()` 0.95 / `lenient()` 0.70 presets |
 | Quality | No IO / `unsafe` / panics; deterministic; per-component breakdown; unit + public-API + doctests |
 
-**organization-service-rust-crate** (MVP + recent additions):
+**organization-service-with-loco** (MVP + recent additions):
 
 | Capability | Notes |
 |---|---|
@@ -24,7 +24,7 @@
 | Audit log | Best-effort row per CRUD with JSONB snapshot; recent + per-record queries *(recent)* |
 | Event streaming | In-memory ring buffer (capacity 1 000) + `/events/recent` *(recent)* |
 | Record merge | `POST /merge` folds a duplicate into a survivor (union fields, former-name alias, soft-delete, `merge_records` history + snapshot, `Merged` event); pure `src/merge.rs`; `/merges/recent` *(recent)* |
-| JWT verification | Offline RS256 verification against the auth-service JWKS (`src/auth.rs`, embeds `authentication-verifier`); `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit + merge `actor` stamped from the token *(recent)* |
+| Token verification | Offline verification against the auth-service published key (`src/auth.rs`, embeds `authentication-verifier`); `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit + merge `actor` stamped from the token *(recent)*. Shipped against RS256-JWT/JWKS; switch to PASETO v4.public per [`authentication-sessions.md`](../../agents/share/authentication-sessions.md) queued (§13) |
 | OpenAPI / Swagger | Hand-written OpenAPI 3 at `/api-docs/openapi.json` + `/swagger-ui` *(recent)* |
 | Tests | DB-free `tests/matching.rs` + unit tests (validation `422` pin, 5 `merge` cases); request-level suite `tests/requests/organizations.rs` (Postgres, `#[ignore]`-gated, 9 tests); green build + clippy |
 | Hygiene | loco scaffolding leftovers removed (no `workers/` / `data/` / `tasks/` stubs) *(recent)* |
@@ -49,7 +49,7 @@ Open gaps drive tasks in §13 (entity-level) or the subproject queues.
 | Merge, review queue, batch dedup | T-6 |
 | Duplicate check scans ≤ 1 000 rows in-process | T-7 |
 | `ILIKE`-only search (no Tantivy / fuzzy / phonetic) | T-8 |
-| JWT verification exists (`/whoami` + audit/merge `actor`) but is not yet *enforced* on every `/api/*` route, and the JWKS is injected via env rather than fetched from the auth service | T-9 follow-up |
+| Token verification exists (`/whoami` + audit/merge `actor`) but still uses the RS256-JWT/JWKS credential — switch to PASETO v4.public per [`authentication-sessions.md`](../../agents/share/authentication-sessions.md) pending; blanket `/api/*` enforcement is wired but default-off; keys are injected via env rather than fetched from the auth service | T-9 follow-up |
 | In-memory event stream (not durable, not HA-safe) | T-10 |
 | Front-end has vitest + Playwright tests now, but still lacks a search box and audit views | T-11 follow-up |
 | Matcher spec is one file (its own §23 queues the split) | matcher §23 |

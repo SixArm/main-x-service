@@ -17,6 +17,7 @@
     import WorkerForm from "$lib/components/WorkerForm.svelte";
     import { WorkerRepository } from "$lib/api/workers.js";
     import type { Worker } from "$lib/api/types.js";
+    import { t, tf } from "$lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
     let worker = $state<Worker | null>(null);
@@ -44,19 +45,19 @@
     }
 </script>
 
-<svelte:head><title>Edit worker · {id}</title></svelte:head>
+<svelte:head><title>{tf("edit.titleTab", { id })}</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Edit worker</h1>
-    <a href={`/workers/${id}`} class="button">Cancel</a>
+    <h1>{t("edit.heading")}</h1>
+    <a href={`/workers/${id}`} class="button">{t("edit.cancel")}</a>
 </header>
 
 {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{t("common.loading")}</p>
 {:else if error}
     <div class="banner error">{error}</div>
 {:else if worker}
     <section class="surface stack">
-        <WorkerForm initial={worker} submitLabel="Save changes" onsubmit={handleSubmit} />
+        <WorkerForm initial={worker} submitLabel={t("edit.submit")} onsubmit={handleSubmit} />
     </section>
 {/if}

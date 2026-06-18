@@ -12,6 +12,42 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Relationships component (spec-only; code follow-up tracked in spec §23).**
+  Specced a typed organization-to-organization relationship signal:
+  `relationships: Vec<RelationshipRef>` on `Organization`,
+  `RelationshipRef { relation: RelationKind, organization_id }` with a
+  `#[non_exhaustive] RelationKind` (`SubOrganizationOf` /
+  `ParentOrganizationOf` — schema.org subOrganization / parentOrganization
+  inverses; `SuccessorOf` / `PredecessorOf` — merger / rename / reorg
+  inverses), a typed-set **Jaccard** `relationships_score` over
+  `(relation, organization_id)` pairs (§14a, `None` when either side is
+  empty), and a **supporting** `relationships_weight` (default `0.05`, §7)
+  folded into the renormalised weighted average. Supporting signal only —
+  shared references never single-handedly establish a match.
+
+### Changed
+
+- **Doc harmonization pass.** Corrected `AGENTS/spec-driven-development.md`,
+  which carried unadapted course-matcher residue: the "When To Update
+  Which Section" table now maps §10 Address, §11 URL/domain, §12
+  Jurisdiction, §13 Founding date, §14 Keywords (was course-matcher's
+  organization-code / provider / educational-level rows); the
+  CS101/`provider_id` anti-pattern was replaced with the
+  organization-relevant TaxId-jurisdiction-gate (§15–§16) anti-pattern;
+  and stale bare `spec.md` references were updated to `spec/index.md`.
+- **index.md worked example.** Added a probabilistic multi-component
+  walkthrough with a full numeric breakdown (name + address + url +
+  founding date + keywords, renormalised → 0.849 / `Medium`).
+
+### Added
+
+- **Tests for previously-uncovered spec behaviour.** (1) Soundex bonus
+  path through `name_score` (§9) — confirms the +0.05 lift on a
+  Soundex-equal near-miss whose Jaro-Winkler is below the ceiling;
+  (2) suffix-only names (`"The Co"` vs `"Inc"`) do not spuriously score
+  ~1.0 via the `legal_name` never-empty fallback (§8); (3) one-sided
+  `set_jaccard` keywords case returns `Some(0.0)` (§14).
+
 - **Inaugural release (v0.1.0).** Pairwise organization-record matching
   modelled on schema.org/Organization, copy-adapted from the
   course-matcher template.
@@ -31,5 +67,5 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     0.85) with `strict()` / `lenient()` presets.
   - Normalisation: `fold`, `legal_name` (legal-suffix stripping),
     `domain` (URL→registered domain), `fold_set`.
-  - 42 embedded unit tests + a 11-test public-API integration suite +
+  - 45 embedded unit tests + a 11-test public-API integration suite +
     7 doctests. Green `cargo build`, clippy clean, rustfmt formatted.

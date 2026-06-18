@@ -17,6 +17,7 @@
     import { page } from "$app/state";
     import { CarePathwayRepository } from "$lib/api/care-pathways";
     import type { AuditEntry, CarePathway, ScoredRef } from "$lib/api/types";
+    import { t, tf } from "$lib/i18n.svelte";
 
     const repo = CarePathwayRepository.withFetch();
     const pid = page.params.pid ?? "";
@@ -44,7 +45,7 @@
         try {
             pathway = await repo.get(pid);
         } catch (err) {
-            error = err instanceof Error ? err.message : "Not found";
+            error = err instanceof Error ? err.message : t("detail.notFound");
         } finally {
             loading = false;
         }
@@ -68,7 +69,7 @@
             // Drop the self-match: a record always matches itself.
             duplicates = hits.filter((h) => h.pid !== pid);
         } catch (err) {
-            error = err instanceof Error ? err.message : "Check failed";
+            error = err instanceof Error ? err.message : t("detail.checkFailed");
         } finally {
             checking = false;
         }
@@ -79,7 +80,7 @@
     async function handleMerge(duplicatePid: string) {
         // Guard: equal pids would 422; should never happen here.
         if (duplicatePid === pid) {
-            error = "Cannot merge a record into itself.";
+            error = t("detail.cannotMergeSelf");
             confirming = null;
             return;
         }
@@ -92,14 +93,14 @@
             // The survivor's data may have changed: use the returned
             // record, then re-fetch the duplicates list.
             pathway = result.main;
-            mergeMessage = `Merged ${duplicatePid} into this record.`;
+            mergeMessage = tf("detail.mergedInto", { dup: duplicatePid });
             confirming = null;
             // Refresh candidates against the post-merge survivor (the just-
             // merged duplicate should now be gone).
             const hits = await repo.checkDuplicates(result.main);
             duplicates = hits.filter((h) => h.pid !== pid);
         } catch (err) {
-            error = err instanceof Error ? err.message : "Merge failed";
+            error = err instanceof Error ? err.message : t("detail.mergeFailed");
         } finally {
             merging = null;
         }
@@ -120,30 +121,30 @@
                 (b.created_at ?? "").localeCompare(a.created_at ?? ""),
             );
         } catch (err) {
-            auditError = err instanceof Error ? err.message : "Audit load failed";
+            auditError = err instanceof Error ? err.message : t("detail.auditLoadFailed");
         } finally {
             auditLoading = false;
         }
     }
 </script>
 
-<svelte:head><title>{pathway?.name ?? "Care pathway"} — Main X</title></svelte:head>
+<svelte:head><title>{pathway?.name ?? t("detail.fallbackName")} — Main X</title></svelte:head>
 
 {#if loading}
-    <p>Loading…</p>
+    <p>{t("detail.loading")}</p>
 {:else if error}
     <p class="banner" role="alert">{error}</p>
 {:else if pathway}
     <h1>{pathway.name}</h1>
     <div class="surface stack">
         {#if pathway.care_setting}
-            <div><strong>Care setting:</strong> {typeof pathway.care_setting === "string" ? pathway.care_setting : pathway.care_setting.Custom}</div>
+            <div><strong>{t("detail.careSetting")}</strong> {typeof pathway.care_setting === "string" ? pathway.care_setting : pathway.care_setting.Custom}</div>
         {/if}
-        {#if pathway.provider_name}<div><strong>Provider:</strong> {pathway.provider_name}</div>{/if}
-        {#if pathway.pathway_code}<div><strong>Pathway code:</strong> <code>{pathway.pathway_code}</code></div>{/if}
+        {#if pathway.provider_name}<div><strong>{t("detail.provider")}</strong> {pathway.provider_name}</div>{/if}
+        {#if pathway.pathway_code}<div><strong>{t("detail.pathwayCode")}</strong> <code>{pathway.pathway_code}</code></div>{/if}
         {#if pathway.condition_codes && pathway.condition_codes.length > 0}
             <div>
-                <strong>Condition codes:</strong>
+                <strong>{t("detail.conditionCodes")}</strong>
                 {pathway.condition_codes
                     .map((c) => `${typeof c.system === "string" ? c.system : c.system.Custom}:${c.code}`)
                     .join(", ")}
@@ -151,7 +152,7 @@
         {/if}
         {#if pathway.identifiers && pathway.identifiers.length > 0}
             <div>
-                <strong>Identifiers:</strong>
+                <strong>{t("detail.identifiers")}</strong>
                 <ul>
                     {#each pathway.identifiers as id, i (i)}
                         <li>{typeof id.scheme === "string" ? id.scheme : `Custom(${id.scheme.Custom})`}: <code>{id.value}</code></li>
@@ -160,20 +161,23 @@
             </div>
         {/if}
         {#if pathway.interventions && pathway.interventions.length > 0}
-            <div><strong>Interventions:</strong> {pathway.interventions.join(", ")}</div>
+            <div><strong>{t("detail.interventions")}</strong> {pathway.interventions.join(", ")}</div>
         {/if}
         {#if pathway.keywords && pathway.keywords.length > 0}
-            <div><strong>Keywords:</strong> {pathway.keywords.join(", ")}</div>
+            <div><strong>{t("detail.keywords")}</strong> {pathway.keywords.join(", ")}</div>
         {/if}
-        <div><strong>ID:</strong> <code>{pid}</code></div>
+        {#if pathway.in_language && pathway.in_language.length > 0}
+            <div><strong>{t("detail.languages")}</strong> {pathway.in_language.join(", ")}</div>
+        {/if}
+        <div><strong>{t("detail.id")}</strong> <code>{pid}</code></div>
     </div>
 
     <div class="row" style="margin-top:1rem">
-        <a class="button" href={`/${pid}/edit`}>Edit</a>
+        <a class="button" href={`/${pid}/edit`}>{t("detail.edit")}</a>
         <button class="button" onclick={handleCheckDuplicates} disabled={checking}>
-            {checking ? "Checking…" : "Check duplicates"}
+            {checking ? t("detail.checking") : t("detail.checkDuplicates")}
         </button>
-        <button onclick={handleDelete}>Delete</button>
+        <button onclick={handleDelete}>{t("detail.delete")}</button>
     </div>
 
     {#if mergeMessage}
@@ -184,9 +188,9 @@
          two-step merge: "Merge into this record" arms the inline confirm
          (`confirming === dup.pid`), then "Confirm merge" folds it in. -->
     {#if duplicates}
-        <h2>Potential duplicates</h2>
+        <h2>{t("detail.potentialDuplicates")}</h2>
         {#if duplicates.length === 0}
-            <p>None above the match threshold.</p>
+            <p>{t("detail.noneAboveThreshold")}</p>
         {:else}
             <ul class="stack">
                 {#each duplicates as dup (dup.pid)}
@@ -194,16 +198,16 @@
                         <a href={`/${dup.pid}`}>{dup.name}</a>
                         <span>{dup.score.toFixed(3)} · {dup.confidence}</span>
                         {#if confirming === dup.pid}
-                            <span>Merge into this record?</span>
+                            <span>{t("detail.mergeIntoConfirm")}</span>
                             <button
                                 class="button"
                                 onclick={() => handleMerge(dup.pid)}
                                 disabled={merging === dup.pid}
                             >
-                                {merging === dup.pid ? "Merging…" : "Confirm merge"}
+                                {merging === dup.pid ? t("detail.merging") : t("detail.confirmMerge")}
                             </button>
                             <button onclick={() => (confirming = null)} disabled={merging === dup.pid}>
-                                Cancel
+                                {t("detail.cancel")}
                             </button>
                         {:else}
                             <button
@@ -212,7 +216,7 @@
                                 }}
                                 disabled={merging !== null}
                             >
-                                Merge into this record
+                                {t("detail.mergeInto")}
                             </button>
                         {/if}
                     </li>
@@ -223,7 +227,7 @@
 
     <div class="row" style="margin-top:1rem">
         <button class="button" onclick={toggleAudit}>
-            {showAudit ? "Hide audit trail" : "Show audit trail"}
+            {showAudit ? t("detail.hideAudit") : t("detail.showAudit")}
         </button>
     </div>
 
@@ -231,9 +235,9 @@
          newest-first by created_at (sorted in `toggleAudit`), with "—"
          shown for a null actor. -->
     {#if showAudit}
-        <h2>Audit trail</h2>
+        <h2>{t("detail.auditTrail")}</h2>
         {#if auditLoading}
-            <p>Loading audit trail…</p>
+            <p>{t("detail.loadingAudit")}</p>
         {:else if auditError}
             <p class="banner" role="alert">{auditError}</p>
         {:else if audit && audit.length > 0}
@@ -247,7 +251,7 @@
                 {/each}
             </ul>
         {:else}
-            <p>No audit entries.</p>
+            <p>{t("detail.noAuditEntries")}</p>
         {/if}
     {/if}
 {/if}

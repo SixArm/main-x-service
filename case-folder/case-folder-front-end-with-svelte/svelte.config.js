@@ -1,18 +1,15 @@
 import adapter from '@sveltejs/adapter-auto';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
-const LILY_HELPERS =
-    '../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers';
-
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
     preprocess: vitePreprocess(),
     kit: {
-        adapter: adapter(),
-        alias: {
-            '@lily/locale-picker': `${LILY_HELPERS}/lily-design-system-svelte-locale-picker`,
-            '@lily/theme-picker': `${LILY_HELPERS}/lily-design-system-svelte-theme-picker`
-        }
+        adapter: adapter()
+        // Lily helpers (theme-select / locale-select) are declared as `file:`
+        // dependencies in package.json and imported by their package names, so
+        // no kit.alias is needed (and `npm install` fails loudly if the sibling
+        // design-system repo is missing, rather than a confusing build error).
     }
 };
 

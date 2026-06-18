@@ -15,6 +15,7 @@
     import SummaryList from '$lib/components/SummaryList/SummaryList.svelte';
     import SummaryListItem from '$lib/components/SummaryListItem/SummaryListItem.svelte';
     import FolderGrid from '$lib/components/FolderGrid.svelte';
+    import { t, tf } from '$lib/i18n.svelte';
 
     const stats = $derived(cache.stats);
     const folders = $derived(cache.folders);
@@ -24,31 +25,34 @@
 
 {#if stats}
     <Banner type="info">
-        <strong>Welcome.</strong>
-        You have {stats.folders.inTransit} folder{stats.folders.inTransit === 1 ? '' : 's'} currently in transit. Use the
-        <a href="/move">Move folder</a> page to record a placement.
+        <strong>{t('dashboard.welcomePrefix')}</strong>
+        {tf(stats.folders.inTransit === 1 ? 'dashboard.inTransit.one' : 'dashboard.inTransit.other', {
+            n: stats.folders.inTransit
+        })}
+        <a href="/move">{t('dashboard.moveFolderPage')}</a>
+        {t('dashboard.pageToRecord')}
     </Banner>
 
-    <section class="metric-grid" aria-label="Folder summary">
-        <Card heading="Patients" headingLevel={3}>
+    <section class="metric-grid" aria-label={t('dashboard.folderSummary')}>
+        <Card heading={t('dashboard.patients')} headingLevel={3}>
             <p class="metric-value">{stats.patients}</p>
-            <p class="metric-sub">{stats.folders.total} folders tracked</p>
+            <p class="metric-sub">{tf('dashboard.foldersTracked', { n: stats.folders.total })}</p>
         </Card>
-        <Card heading="In cabinet" headingLevel={3}>
+        <Card heading={t('dashboard.inCabinet')} headingLevel={3}>
             <p class="metric-value">{stats.folders.inCabinet}</p>
-            <p class="metric-sub"><Badge type="success">Located</Badge></p>
+            <p class="metric-sub"><Badge type="success">{t('badge.located')}</Badge></p>
         </Card>
-        <Card heading="In transit" headingLevel={3}>
+        <Card heading={t('dashboard.inTransitCard')} headingLevel={3}>
             <p class="metric-value">{stats.folders.inTransit}</p>
-            <p class="metric-sub"><Badge type="warning">Porter in motion</Badge></p>
+            <p class="metric-sub"><Badge type="warning">{t('badge.porterInMotion')}</Badge></p>
         </Card>
-        <Card heading="Buildings" headingLevel={3}>
+        <Card heading={t('dashboard.buildings')} headingLevel={3}>
             <p class="metric-value">{stats.places.buildings}</p>
-            <p class="metric-sub">{stats.places.rooms} rooms · {stats.places.cabinets} cabinets</p>
+            <p class="metric-sub">{tf('dashboard.roomsCabinets', { rooms: stats.places.rooms, cabinets: stats.places.cabinets })}</p>
         </Card>
-        <Card heading="Moves (24h)" headingLevel={3}>
+        <Card heading={t('dashboard.moves24h')} headingLevel={3}>
             <p class="metric-value">{stats.moves24h}</p>
-            <p class="metric-sub">Audited folder placements</p>
+            <p class="metric-sub">{t('dashboard.auditedPlacements')}</p>
         </Card>
     </section>
 {/if}
@@ -57,10 +61,10 @@
 
 <section aria-labelledby="folders-heading">
     <div class="toolbar">
-        <h2 id="folders-heading">Folder register</h2>
+        <h2 id="folders-heading">{t('dashboard.folderRegister')}</h2>
         <div>
-            <a href="/folders" class="button secondary">View all</a>
-            <a href="/folders/new" class="button">Add folder</a>
+            <a href="/folders" class="button secondary">{t('dashboard.viewAll')}</a>
+            <a href="/folders/new" class="button">{t('dashboard.addFolder')}</a>
         </div>
     </div>
     <FolderGrid {folders} />
@@ -70,7 +74,7 @@
 
 <div class="split">
     <section class="panel" aria-labelledby="recent-moves">
-        <h2 id="recent-moves">Recent moves</h2>
+        <h2 id="recent-moves">{t('dashboard.recentMoves')}</h2>
         <div class="move-stack">
             {#each moves.slice(0, 5) as move (move.id)}
                 <article class="move-card">
@@ -90,13 +94,13 @@
             {/each}
         </div>
         <p style="margin-top: var(--nhs-space-3);">
-            <a href="/history">See full audit history →</a>
+            <a href="/history">{t('dashboard.seeFullHistory')}</a>
         </p>
     </section>
 
     <section class="panel" aria-labelledby="cabinet-util">
-        <h2 id="cabinet-util">Cabinet utilisation</h2>
-        <SummaryList label="Cabinet utilisation">
+        <h2 id="cabinet-util">{t('dashboard.cabinetUtilisation')}</h2>
+        <SummaryList label={t('dashboard.cabinetUtilisation')}>
             {#each cabinets as c (c.id)}
                 <!-- Capacity may be null (uncapped); treat as 0 so the
                      percentage maths is skipped and we show ∞ / — instead. -->

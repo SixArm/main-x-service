@@ -25,11 +25,11 @@ records or go offline.
 
 - **[Loco](https://loco.rs)** 0.16 — Rails-style Rust web framework on Axum
 - **PostgreSQL** dependency is currently *vestigial* — Loco still needs a database connection at boot, but the tracker has zero local tables.
-- **[main-person-service-rust-crate](../../person/person-service-rust-crate)** — Main Patient Service backend
-- **[main-place-service-rust-crate](../../place/place-service-rust-crate)** — Main Place Service backend
-- **[main-worker-service-rust-crate](../../worker/worker-service-rust-crate)** — Main Worker Service backend
-- **[main-thing-service-rust-crate](../../thing/thing-service-rust-crate)** — Main Thing Service backend *(see caveat below)*
-- **[main-event-service-rust-crate](../../event/event-service-rust-crate)** — Main Event Service backend
+- **[person-service-with-loco](../../person/person-service-with-loco)** — Main Patient Service backend
+- **[place-service-with-loco](../../place/place-service-with-loco)** — Main Place Service backend
+- **[worker-service-with-loco](../../worker/worker-service-with-loco)** — Main Worker Service backend
+- **[thing-service-with-loco](../../thing/thing-service-with-loco)** — Main Thing Service backend *(see caveat below)*
+- **[event-service-with-loco](../../event/event-service-with-loco)** — Main Event Service backend
 
 > ⚠️ **Thing-service caveat.** As of writing, `main-thing-service`
 > ships a working web UI but **no REST endpoints yet** — its spec
@@ -163,7 +163,7 @@ cargo run -- task seed         # populate demo records across all services
 
 # Tests (use stub clients — no real services needed)
 DATABASE_URL=postgres://postgres@localhost:5432/case_folder_test \
-  cargo test                   # 14 unit (nhs + geofence) + 49 request tests
+  cargo test                   # 14 unit (nhs + geofence) + 50 request tests
 ```
 
 The request tests need a Postgres database (`case_folder_test`

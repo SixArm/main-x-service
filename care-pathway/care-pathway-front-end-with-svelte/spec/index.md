@@ -3,7 +3,7 @@
 > **Single source of truth.** Code conforms to this spec. Behavioural
 > change = spec + code + test. Live work queue is §13.
 >
-> Sibling service: [care-pathway-service](../../care-pathway-service-rust-crate/spec/index.md).
+> Sibling service: [care-pathway-service](../../care-pathway-service-with-loco/spec/index.md).
 
 ## 1. Purpose and vision
 
@@ -17,8 +17,9 @@ In scope: the four routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`), the
 API client, the care-pathway form, a name-search box on the list, a
 merge-duplicate action on the detail page, a per-pathway audit-trail
 view on the detail page, and a system-wide recent-activity (event
-stream) view on the list page. Out of scope: fuzzy/full-text search UI,
-system-wide audit feed, auth.
+stream) view on the list page, and a BFF + httpOnly-cookie session (§6.9, per
+[`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
+Out of scope: fuzzy/full-text search UI, system-wide audit feed.
 
 ## 3. Stakeholders and users
 
@@ -38,6 +39,14 @@ Clinical informaticians and pathway authors.
 /[pid]       detail + delete + check-duplicates
 /[pid]/edit  edit form
 ```
+
+### Layout shell & navigation
+
+Cross-cutting UI rule for every `*-front-end-with-svelte` app:
+
+- Global navigation MUST be a **top navigation bar** (header) spanning the full viewport width. There MUST NOT be a left-hand navigation sidebar / rail.
+- On narrow viewports the top-bar navigation MUST collapse behind a **hamburger menu** toggle.
+- The main content area MUST be **full-width** — never inset by a persistent side-navigation column.
 
 ## 6. Functional requirements
 
@@ -71,27 +80,22 @@ Clinical informaticians and pathway authors.
    renders the rows newest-first (action, actor or "—" when null,
    timestamp). Loading, empty, and error states are shown; the panel
    does not auto-load on mount.
-9. Session / bearer auth: the layout sidebar carries a session
-   affordance. The primary path is **Sign in**, which redirects to the
-   central authentication front-end
-   (`${VITE_AUTH_FRONTEND_URL}/signin?return_to=<origin + base>`); after
-   the passwordless magic-link the auth front-end hands the access token
-   back via the URL fragment (`…#access_token=<jwt>`, only when this
-   origin is on its allowlist). On app load the layout `onMount` calls
-   `captureFromLocation()` **before** any API call: it reads
-   `window.location.hash`, stores any `access_token`, and strips the
-   fragment via `history.replaceState`. A manual paste field remains
-   (behind a disclosure) as a dev convenience; **Sign out** clears the
-   token. The token is held in a reactive store (`$lib/auth.svelte`)
-   under the family-shared `localStorage` key `mxi_access_token` (guarded
-   for SSR / `vite preview`). The `ApiClient` attaches `Authorization:
-   Bearer <token>` to every request when the store holds one, omitting it
-   otherwise; a per-call token overrides the store. This lets operator
-   traffic through once the service turns on blanket JWT enforcement
-   (`CARE_PATHWAY_REQUIRE_AUTH`, off by default — family contract
-   `agents/share/jwt-enforcement.md`). The auth front-end URL is
-   configured with `VITE_AUTH_FRONTEND_URL` (default
-   `http://localhost:5173`).
+9. Session / auth (BFF + httpOnly cookie): the top navigation bar
+   carries a session affordance. The primary path is **Sign in**, routed
+   through the BFF to the central authentication front-end for the
+   passwordless magic-link; on success the authentication-service sets the
+   `__Host-mxi_session` httpOnly cookie. The browser holds only that
+   cookie — **no token in JS, no `localStorage`, no URL-fragment handoff**.
+   The SvelteKit **server** (BFF) holds the session and attaches a
+   short-lived PASETO server-side when calling the care-pathway service;
+   the browser never calls the service directly. Mutating browser→BFF
+   calls carry a CSRF token; **Sign out** revokes the session. This lets
+   operator traffic through once the service turns on blanket enforcement
+   (`CARE_PATHWAY_REQUIRE_AUTH`, off by default). Per
+   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
+10. Layout shell: global navigation is a full-width **top bar** (header)
+    with a **hamburger** toggle on narrow viewports — NOT a left sidebar —
+    and the main content area is **full-width**.
 
 ## 7. Non-functional requirements
 
@@ -101,11 +105,20 @@ dependency-light (no data grid / design system).
 ## 8. Architecture
 
 `ApiClient` (lean, raw-JSON, get/post/put/delete) → `CarePathwayRepository`
-→ routes. The `ApiClient` reads the reactive auth store
-(`$lib/auth.svelte`) on each request and attaches `Authorization: Bearer
-<token>` when a token is present. `CarePathwayForm` builds a `CarePathway`
+→ routes. Under the BFF model (§6.9) the browser carries only the
+`__Host-mxi_session` cookie and the SvelteKit server attaches the
+short-lived PASETO server-side when calling the service; no token is read
+or attached in browser JS. `CarePathwayForm` builds a `CarePathway`
 from the inputs (comma lists split, blanks nulled, condition codes and
-identifiers as editable rows).
+identifiers as editable rows). The editable fields are: `name`
+(required), `care_setting` (unit-variant `<select>`; a seeded `Custom`
+collapses to "—"), `pathway_code`, `provider_id`, `provider_name`, the
+comma-separated list fields `alternate_names` / `interventions` /
+`keywords` / `same_as` / `in_language` (BCP-47 tags), and the repeatable
+`condition_codes` / `identifiers` rows (empty rows dropped on submit; a
+seeded `Custom`-scheme identifier is dropped because the scheme
+`<select>` offers only unit variants). The detail page renders the same
+fields (incl. `in_language` as "Languages").
 
 ## 9. API consumption
 
@@ -143,9 +156,17 @@ trailing slash so there is no `//signin`), and
 method's path + verb, incl. a regression pinning `check-duplicates`,
 `search()` pinning the `/search?q=` path with URL-encoding, and
 `merge()` pinning `POST /merge` with the `{main_pid, duplicate_pid,
-reason?}` body — pids in the body, not the URL; `audit()` pinning
-`GET /{pid}/audit` with URL-encoding; and `recentEvents()` pinning
-`GET /events/recent`). **Playwright** smoke
+reason?}` body — pids in the body, not the URL, plus `404` (unknown pid)
+and `422` (equal-pid) `ApiError` propagation for the detail-page error
+banner; `audit()` pinning `GET /{pid}/audit` with URL-encoding; and
+`recentEvents()` pinning `GET /events/recent`), and the
+**`CarePathwayForm`** component (`tests/unit/care-pathway-form.test.ts`,
+via `@testing-library/svelte` mounted client-side by the
+`svelteTesting()` vite plugin: the required-name guard blocks `onsubmit`
+on a blank/whitespace name and shows the banner; `build()` trims scalars
++ nulls blanks, splits the comma list fields incl. `in_language`, drops
+empty condition-code / identifier rows, and collapses a `Custom`
+care-setting / identifier-scheme seed). **Playwright** smoke
 tests (`tests/e2e/`) load the four routes (`/`, `/new`, `/[pid]`,
 `/[pid]/edit`) with the API stubbed via `page.route`, asserting each
 renders; one test exercises the list search box (matching query keeps
@@ -166,9 +187,12 @@ for any access/audit requirements.
 ## 13. Tasks (live work queue)
 
 - [x] vitest unit tests for `ApiClient` + `CarePathwayRepository`
-  + auth token store (`tests/unit/`, 29 tests).
+  (incl. merge 404/422 `ApiError` propagation) + auth token store +
+  `signInUrl` + `CarePathwayForm` (required-name guard + `build()`
+  normalization, incl. `in_language`) (`tests/unit/`, 46 tests across 5 files).
 - [x] playwright smoke for the four routes (`tests/e2e/smoke.spec.ts`,
-  4 tests, API stubbed, runs against `vite preview`).
+  8 tests — the four routes plus search / merge / audit / recent-activity,
+  API stubbed, runs against `vite preview`).
 - [x] Merge-duplicate action on the detail page — each duplicate row
   offers "Merge into this record" (two-step inline confirm) calling
   `POST /api/care-pathways/merge`; adopts the returned survivor and
@@ -188,21 +212,15 @@ for any access/audit requirements.
 - [x] Search box once the service ships search — list page calls
   `GET /api/care-pathways/search?q=` (search-on-submit + Clear);
   `repository.search()` added; vitest (2) + Playwright (1) cover it.
-- [x] Bearer token wiring (blanket-enforcement front-end half) —
-  reactive token store `$lib/auth.svelte` (hydrated from
-  `localStorage["mxi_access_token"]`, SSR-guarded; `setToken`/`clearToken`/
-  `token`), `ApiClient` attaches `Authorization: Bearer <token>` from the
-  store by default (per-call override preserved), and a session
-  affordance in the layout (paste/clear token). vitest (6) cover the store
-  + client attachment; Playwright smoke stays green. Family contract:
-  `agents/share/jwt-enforcement.md`.
-- [x] Cross-origin SSO token handoff (consumer side) — `captureTokenFromHash`
-  + browser-only `captureFromLocation()` (run in layout `onMount` before
-  any API call: store the fragment `access_token`, then
-  `history.replaceState` to strip it); `VITE_AUTH_FRONTEND_URL` config +
-  `signInUrl()` builder; layout leads with **Sign in** (paste kept behind
-  a disclosure for dev). vitest (10) cover `captureTokenFromHash` (7) and
-  `signInUrl` (3). Family contract: `agents/share/jwt-enforcement.md`.
+- [x] ~~Bearer token wiring — reactive token store `$lib/auth.svelte`
+  (`localStorage["mxi_access_token"]`) + `ApiClient` bearer attach +
+  layout paste/clear affordance~~ — **superseded** (see auth-migration task below).
+- [x] ~~Cross-origin SSO token handoff — `captureTokenFromHash` +
+  `captureFromLocation()` fragment capture + `signInUrl()` redirect~~ —
+  **superseded** (see auth-migration task below).
+- [ ] Auth — adopt BFF + httpOnly cookie + CSRF; remove
+  `mxi_access_token`/`localStorage` bearer + fragment handoff (per
+  [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 
 ## 14. Implementation status
 

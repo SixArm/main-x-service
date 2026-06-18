@@ -5,6 +5,8 @@
 **Maintainer**: Joel Parker Henderson
 
 > **Historical snapshot.** This document captures the initial implementation and is **superseded by [spec.md](./spec/index.md)** as the authoritative behaviour reference. It is retained for context only. For an up-to-date map of the docs, see [index.md](./index.md).
+>
+> In particular, the "Limitations" and "Future Enhancements" lists below are obsolete: the single-identifier-scheme limitation and the "additional national identifiers (SSN, etc.)" / batch-matching enhancements are all delivered — the crate now ships 42 national personal-identifier schemes plus the `match_one_to_many` / `rank_one_to_many` batch API. See [spec.md](./spec/index.md) §2 / §11 / §21 for current scope.
 
 ## Overview
 

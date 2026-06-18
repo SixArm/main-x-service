@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { ApiClient } from "../../src/lib/api/client";
 import { EventRepository } from "../../src/lib/api/events";
-import type { Event } from "../../src/lib/api/types";
+import type { Event, MergeRequest } from "../../src/lib/api/types";
 
 // Cast a plain async function to the `fetch` type for injection.
 function mockFetch(impl: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
@@ -60,6 +60,84 @@ describe("EventRepository", () => {
         await repo.search({ q: "*", date_from: "2026-06-01", date_to: "2026-06-30" });
         expect(capturedUrl).toContain("date_from=2026-06-01");
         expect(capturedUrl).toContain("date_to=2026-06-30");
+    });
+
+    // Pins: search() forwards the `fuzzy` toggle as a query param when set,
+    // and omits it (nullish) when left off (FR-2: fuzzy toggle wired in).
+    it("forwards fuzzy=true when the toggle is on and omits it when off", async () => {
+        let onUrl = "";
+        const onClient = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                onUrl = String(input);
+                return jsonResponse({ success: true, data: [], error: null });
+            }),
+        });
+        await new EventRepository(onClient).search({ q: "*", fuzzy: true });
+        expect(onUrl).toContain("fuzzy=true");
+
+        let offUrl = "";
+        const offClient = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                offUrl = String(input);
+                return jsonResponse({ success: true, data: [], error: null });
+            }),
+        });
+        await new EventRepository(offClient).search({ q: "*" });
+        expect(offUrl).not.toContain("fuzzy");
+    });
+
+    // Pins: merge() POSTs to /api/v1/events/merge with the snake_case body
+    // shape the service expects (FR-9 / merge workflow).
+    it("POSTs the merge body shape to /api/v1/events/merge", async () => {
+        let capturedUrl = "";
+        let capturedBody: unknown = null;
+        let capturedMethod = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input, init) => {
+                capturedUrl = String(input);
+                capturedMethod = init?.method ?? "";
+                capturedBody = init?.body ? JSON.parse(String(init.body)) : null;
+                return jsonResponse({
+                    success: true,
+                    data: { merge_record: { id: "m-1", merged_at: "2026-06-01T00:00:00Z" }, main_event: sampleEvent },
+                    error: null,
+                });
+            }),
+        });
+        const request: MergeRequest = {
+            main_event_id: "main-1",
+            duplicate_event_id: "dup-1",
+            merge_reason: "Confirmed duplicate",
+        };
+        const result = await new EventRepository(client).merge(request);
+        expect(capturedMethod).toBe("POST");
+        expect(capturedUrl).toContain("/api/v1/events/merge");
+        expect(capturedBody).toEqual({
+            main_event_id: "main-1",
+            duplicate_event_id: "dup-1",
+            merge_reason: "Confirmed duplicate",
+        });
+        expect(result.main_event.id).toBe("event-1");
+    });
+
+    // Pins: merge preview issues a per-ID GET (FR-9: preview before POST).
+    it("fetches a single event by id for merge preview", async () => {
+        let capturedUrl = "";
+        let capturedMethod = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input, init) => {
+                capturedUrl = String(input);
+                capturedMethod = init?.method ?? "";
+                return jsonResponse({ success: true, data: sampleEvent, error: null });
+            }),
+        });
+        await new EventRepository(client).get("main-1");
+        expect(capturedMethod).toBe("GET");
+        expect(capturedUrl).toContain("/api/v1/events/main-1");
     });
 
     // Pins: a bare-array search payload is normalized to {items, total}

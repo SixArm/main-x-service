@@ -26,8 +26,8 @@ inferring from the code.
 | `src/lib/store/nhs.ts`                  | Modulus 11 + formatter (pre-flight only; API revalidates)       |
 | `src/lib/components/`                   | Lily headless primitives + `FolderGrid` SVAR wrapper            |
 | `src/lib/css/`                          | `nhs.css` (theme-invariant NHS tokens + components) + `app.css` |
-| `static/themes/`                        | Per-theme colour-token CSS, swapped at runtime by `ThemePicker` |
-| `svelte.config.js`                      | `kit.alias` mapping `@lily/*` to sibling helper repo path       |
+| `static/assets/themes/`                 | Symlink to the shared Lily theme catalogue, swapped at runtime by `ThemeSelect` |
+| `svelte.config.js`                      | SvelteKit config (Lily helpers are `file:` deps, not aliased)   |
 | `vite.config.ts`                        | `server.fs.allow` for the same sibling repo path                |
 
 ## Working rules
@@ -92,20 +92,25 @@ component to add styles; extend the CSS instead.
 
 ### 8a. Lily helpers come from the sibling repo
 
-`@lily/locale-picker` and `@lily/theme-picker` are not npm
-dependencies. They resolve via SvelteKit `kit.alias` to source files
-in `~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/`.
-The sibling repo must exist for `npm run dev`, `npm run build`, and
-`npm run check` to work.
+`lily-design-system-svelte-locale-select` and
+`lily-design-system-svelte-theme-select` are declared as **`file:`
+dependencies** in `package.json` pointing at the sibling repo
+(`~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/`),
+and imported by their package names. `npm install` symlinks them into
+`node_modules`, so resolution is standard (no `kit.alias`). The sibling
+repo must exist for `npm install` (and therefore dev/build/check) to
+work — install **fails loudly** if it is absent.
 
 - Don't vendor the helpers into `src/lib/`. If a helper needs to
   change, change it upstream and let this app pick it up.
-- Don't add a fallback path. If the sibling is missing, fail loudly —
-  silent fallbacks hide drift.
-- Theme colour tokens live in `static/themes/<slug>.css` scoped to
-  `:root[data-theme="<slug>"]`. Anything that's the same across
-  themes (spacing, typography, layout) belongs in `src/lib/css/nhs.css`
-  under `:root`.
+- Don't add a fallback path. If the sibling is missing, the `file:`
+  install fails loudly — that's intentional; silent fallbacks hide drift.
+- Themes come from the shared Lily catalogue at `static/assets/themes/`
+  (a symlink); each defines DaisyUI `--color-*` tokens. `src/lib/css/nhs.css`
+  bridges the base `--nhs-*` colour tokens onto the active `--color-*` so
+  themes restyle the app. Theme-invariant tokens (spacing, typography,
+  layout) stay in `src/lib/css/nhs.css` under `:root`. (The old app-local
+  `static/themes/nhs*.css` files were dropped.)
 
 ### 9. CI gate
 
@@ -119,8 +124,10 @@ Both required green:
 
 - `npm run check` — zero errors. Warnings in third-party / pre-existing
   components are tolerated unless they came in with this PR.
-- `npm run test:e2e` — 50 Playwright tests. The Loco API must be
-  running in **stub mode** (see Prerequisites in [README.md](README.md)).
+- `npm run test:e2e` — the Playwright suite (14 spec files, ~65
+  `test()` cases; see [spec/testing.md](spec/testing.md) for the table).
+  The Loco API must be running in **stub mode** (see Prerequisites in
+  [README.md](README.md)).
   Tests are serialised (`fullyParallel: false`) because they share
   the API's upstream state.
 
@@ -197,7 +204,8 @@ Both required green:
   — the JSON API back-end this client talks to. **Start the API
   before running the dev server.**
 - `~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/`
-  — source of `@lily/locale-picker` and `@lily/theme-picker`.
+  — source of the `lily-design-system-svelte-locale-select` and
+  `lily-design-system-svelte-theme-select` `file:` dependencies.
   **Must be cloned next to this repo** under `~/git/lilydesignsystem/`
   for dev/build to succeed.
 - The five upstream Main-X-Services live under

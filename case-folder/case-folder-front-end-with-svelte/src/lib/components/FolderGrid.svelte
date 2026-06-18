@@ -10,17 +10,19 @@
 
     import { Grid, Willow } from 'wx-svelte-grid';
     import type { Folder } from '$lib/store/types';
+    import { t } from '$lib/i18n.svelte';
 
     let { folders }: { folders: Folder[] } = $props();
 
-    const columns = [
-        { id: 'nhsNumber', header: 'NHS Number', width: 130 },
-        { id: 'patientName', header: 'Patient', width: 160 },
-        { id: 'title', header: 'Folder', width: 200 },
-        { id: 'cabinetLabel', header: 'Cabinet', width: 220 },
-        { id: 'status', header: 'Status', width: 110 },
-        { id: 'lastMovedAt', header: 'Last moved', flexgrow: 1 }
-    ];
+    // Column headers are reactive so a locale switch relabels the grid.
+    const columns = $derived([
+        { id: 'nhsNumber', header: t('grid.nhsNumber'), width: 130 },
+        { id: 'patientName', header: t('grid.patient'), width: 160 },
+        { id: 'title', header: t('grid.folder'), width: 200 },
+        { id: 'cabinetLabel', header: t('grid.cabinet'), width: 220 },
+        { id: 'status', header: t('grid.status'), width: 110 },
+        { id: 'lastMovedAt', header: t('grid.lastMoved'), flexgrow: 1 }
+    ]);
 
     let rows = $derived(
         folders.map((f) => ({

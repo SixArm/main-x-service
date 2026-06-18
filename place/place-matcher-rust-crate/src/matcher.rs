@@ -1437,4 +1437,185 @@ mod tests {
         .match_places(&p, &q);
         assert!(r.breakdown.name_phonetic_score.is_some());
     }
+
+    // ---------- Confidence::from_score degenerate inputs ----------
+
+    // Pins spec.md §3.6 — Confidence::from_score total-over-f64 contract.
+    #[test]
+    fn confidence_from_score_degenerate_inputs() {
+        // NaN is neither >= 0.90 nor >= 0.75, so it falls through to Low.
+        assert_eq!(Confidence::from_score(f64::NAN), Confidence::Low);
+        // Negative scores are below every band → Low.
+        assert_eq!(Confidence::from_score(-0.5), Confidence::Low);
+        assert_eq!(Confidence::from_score(f64::NEG_INFINITY), Confidence::Low);
+        // Scores above 1.0 still satisfy the High band (>= 0.90).
+        assert_eq!(Confidence::from_score(2.0), Confidence::High);
+        assert_eq!(Confidence::from_score(f64::INFINITY), Confidence::High);
+    }
+
+    // ---------- address line-1 house-number blend ----------
+
+    // Pins spec.md §6.4 — line 1 sub-score is 0.6*street + 0.4*house_number
+    // equality when a house number is present on both sides.
+    #[test]
+    fn address_line1_blends_street_and_house_number_when_both_present() {
+        // Same street, same house number → line1 sub-score 1.0.
+        let same = MatchingEngine::compare_addresses(
+            &Address::new().with_line1("10 Downing Street"),
+            &Address::new().with_line1("10 Downing Street"),
+        );
+        assert!((same - 1.0).abs() < 1e-9, "got {same}");
+
+        // Same street, different house number → 0.6*1.0 + 0.4*0.0 = 0.6.
+        let diff_number = MatchingEngine::compare_addresses(
+            &Address::new().with_line1("10 Downing Street"),
+            &Address::new().with_line1("12 Downing Street"),
+        );
+        assert!((diff_number - 0.6).abs() < 1e-9, "got {diff_number}");
+    }
+
+    // Pins spec.md §6.4 — when a house number is absent on either side the
+    // line 1 sub-score falls back to street similarity alone (no 0.4 term).
+    #[test]
+    fn address_line1_falls_back_to_street_only_without_house_number() {
+        // No house number on either side → street-only, identical → 1.0.
+        let s = MatchingEngine::compare_addresses(
+            &Address::new().with_line1("Downing Street"),
+            &Address::new().with_line1("Downing Street"),
+        );
+        assert!((s - 1.0).abs() < 1e-9, "got {s}");
+
+        // House number on one side only → still street-only, so the
+        // differing numbers do NOT pull the score down to the 0.6 blend.
+        let one_sided = MatchingEngine::compare_addresses(
+            &Address::new().with_line1("10 Downing Street"),
+            &Address::new().with_line1("Downing Street"),
+        );
+        assert!(
+            one_sided > 0.9,
+            "street-only fallback expected near 1.0, got {one_sided}"
+        );
+    }
+
+    // ---------- phone cross-country disambiguation ----------
+
+    // Pins spec.md §6.8 — E.164-preferred path: a UK and a FR number that
+    // share the same national-significant digits must NOT collide.
+    #[test]
+    fn phone_same_nsn_different_country_does_not_collide() {
+        let engine = MatchingEngine::default_config();
+        // Same trailing digits, different country dial codes.
+        let uk = Place::builder().name("X").phone("+44 161 496 0000").build();
+        let fr = Place::builder().name("X").phone("+33 161 496 0000").build();
+        let r = engine.match_places(&uk, &fr);
+        assert_eq!(
+            r.breakdown.phone_score,
+            Some(0.0),
+            "UK and FR numbers sharing NSN must not match"
+        );
+    }
+
+    // Pins spec.md §6.8 — two identical E.164-parseable numbers score 1.0.
+    #[test]
+    fn phone_identical_e164_scores_one() {
+        let engine = MatchingEngine::default_config();
+        let a = Place::builder().name("X").phone("+44 161 496 0000").build();
+        let b = Place::builder().name("X").phone("0161 496 0000").build();
+        let r = engine.match_places(&a, &b);
+        assert_eq!(r.breakdown.phone_score, Some(1.0));
+    }
+
+    // Pins spec.md §6.8 — legacy-fallback path: when neither side parses to
+    // E.164 the comparison uses the legacy national-significant form.
+    #[test]
+    fn phone_legacy_fallback_when_not_e164() {
+        // phone_default_country = None forces E.164 to fail (no default
+        // jurisdiction), so the legacy normaliser decides the outcome.
+        let engine = MatchingEngine::new(MatchConfig {
+            phone_default_country: None,
+            ..MatchConfig::default()
+        });
+        let a = Place::builder().name("X").phone("0161 496 0000").build();
+        let b = Place::builder().name("X").phone("01614960000").build();
+        let r = engine.match_places(&a, &b);
+        assert_eq!(r.breakdown.phone_score, Some(1.0));
+    }
+
+    // ---------- email scoring at the engine level ----------
+
+    // Pins spec.md §6.9 — an unparseable email is treated as missing (None),
+    // not as a 0.0 mismatch.
+    #[test]
+    fn email_unparseable_is_none_not_zero() {
+        let engine = MatchingEngine::default_config();
+        // Second address lacks an '@' so normalize_email returns None.
+        let a = Place::builder().name("X").email("info@example.org").build();
+        let b = Place::builder().name("X").email("not-an-email").build();
+        let r = engine.match_places(&a, &b);
+        assert_eq!(r.breakdown.email_score, None);
+    }
+
+    // Pins spec.md §6.9 — two valid but different emails score 0.0.
+    #[test]
+    fn email_both_parse_but_differ_is_zero() {
+        let engine = MatchingEngine::default_config();
+        let a = Place::builder().name("X").email("info@example.org").build();
+        let b = Place::builder().name("X").email("sales@example.org").build();
+        let r = engine.match_places(&a, &b);
+        assert_eq!(r.breakdown.email_score, Some(0.0));
+    }
+
+    // ---------- phonetic bonus arithmetic ----------
+
+    // Pins spec.md §5.2.2 — the phonetic bonus (score*0.05, weight 0.05) is
+    // only applied when name_phonetic_score > 0.9. Compare the same place
+    // pair with the bonus arithmetically engaged vs not.
+    #[test]
+    fn phonetic_bonus_lifts_score_only_when_gate_clears() {
+        // Names that sound alike (shared Soundex) but score < 1.0 literally,
+        // so the phonetic bonus has room to lift the renormalised score.
+        let p = Place::builder().name("Catherine").build();
+        let q = Place::builder().name("Kathryn").build();
+
+        let off = MatchingEngine::new(MatchConfig {
+            use_phonetic_matching: false,
+            ..MatchConfig::default()
+        })
+        .match_places(&p, &q);
+
+        let on = MatchingEngine::new(MatchConfig {
+            use_phonetic_matching: true,
+            ..MatchConfig::default()
+        })
+        .match_places(&p, &q);
+
+        // With phonetic off there is no phonetic sub-score at all.
+        assert!(off.breakdown.name_phonetic_score.is_none());
+
+        // With phonetic on the gating sub-score is present.
+        let phon = on
+            .breakdown
+            .name_phonetic_score
+            .expect("phonetic score present when enabled");
+
+        if phon > 0.9 {
+            // Gate fires: the bonus is added with positive weight, so the
+            // renormalised score is strictly higher than with the gate off.
+            assert!(
+                on.score > off.score,
+                "gate fired (phon={phon}) so on.score ({}) should exceed off.score ({})",
+                on.score,
+                off.score
+            );
+        } else {
+            // Gate does not fire: the only-name pair has identical
+            // participating weights, so the score is unchanged.
+            assert!(
+                approx_eq(on.score, off.score),
+                "gate did not fire (phon={phon}) so scores should be equal: {} vs {}",
+                on.score,
+                off.score
+            );
+        }
+    }
 }

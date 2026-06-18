@@ -80,6 +80,6 @@ Tracked in §13 and §15; mature-entity parity is the goal.
 | Duplicate review queue + batch deduplication scan | Deferred | service |
 | Tantivy full-text / fuzzy search (replacing `ILIKE`) | Deferred | service |
 | Real-time `409` duplicate detection on create | Open question (§16) | service |
-| JWT verification (auth-service JWKS) + bearer wiring | Deferred | service + front-end |
+| PASETO v4.public verification (auth-service Ed25519 key) + bearer wiring — see [`authentication-sessions.md`](../../agents/share/authentication-sessions.md) (supersedes RS256-JWT + JWKS) | Deferred | service + front-end |
 | Search box, audit views, auth token in UI | Deferred | front-end |
 | Telephone / email match component | Deferred (matcher spec §23) | matcher |

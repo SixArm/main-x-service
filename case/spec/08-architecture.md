@@ -12,13 +12,13 @@
                                | REST (raw loco JSON, no envelope)
                                | PUBLIC_API_BASE_URL (default :5150)
 +------------------------------v-------------------------------+
-|                  case-service-rust-crate                     |
+|                  case-service-with-loco                     |
 |  loco.rs 0.16 (Axum 0.8) · port 5150                         |
 |  controllers/cases.rs                                        |
 |    CRUD + /search + /match + /check-duplicates + /merge      |
 |    + /audit + /events + /whoami + /api-docs + /swagger-ui    |
 |  models/cases.rs  (CRUD over the JSONB payload)              |
-|  auth.rs (RS256 JWT) · merge.rs · streaming.rs · openapi.rs  |
+|  auth.rs (PASETO v4) · merge.rs · streaming.rs · openapi.rs  |
 +--------------+-------------------------------+---------------+
                |  path dependency (Cargo)      |
 +--------------v---------------+  +------------v---------------+
@@ -39,11 +39,11 @@ matcher's `Case` directly as its API DTO — there is no adapter layer
 ### 8.2 Service layout (loco.rs)
 
 ```
-case-service-rust-crate/
+case-service-with-loco/
 ├── src/
 │   ├── app.rs                  loco Hooks (routes, truncate)
 │   ├── bin/main.rs             loco CLI entrypoint
-│   ├── auth.rs                 RS256 JWT verification (embeds authentication-verifier)
+│   ├── auth.rs                 PASETO v4 public verification (embeds authentication-verifier)
 │   ├── merge.rs                pure merge_cases
 │   ├── streaming.rs            in-memory CaseEvent ring buffer
 │   ├── validation.rs           422 validation (title, dates, identifiers)
@@ -82,14 +82,17 @@ development). The front-end runs with `pnpm dev` against
 
 ### 8.4 SSO integration
 
-The service is a JWT *verifier*, not an issuer. It embeds the
+The service is a token *verifier*, not an issuer. It embeds the
 [authentication entity](../../authentication/)'s
-`authentication-verifier` crate, builds a process-wide verifier from
-`CASE_JWKS` / `CASE_JWT_ISSUER` / `CASE_JWT_AUDIENCE`, and exposes
-`AuthUser` / `MaybeAuthUser` extractors. `whoami` is protected; CRUD
-and merge stamp the audit `actor` from the token's `sub` when present.
-Blanket `/api/*` enforcement and JWKS-over-HTTP fetch from the auth
-service at boot are follow-ups (§13 T-7).
+`authentication-verifier` crate (now a PASETO v4 public verifier), builds
+a process-wide verifier from `CASE_PASETO_KEYS` / `CASE_TOKEN_ISSUER` /
+`CASE_TOKEN_AUDIENCE`, and exposes `AuthUser` / `MaybeAuthUser`
+extractors. `whoami` is protected; CRUD and merge stamp the audit `actor`
+from the token's `sub` when present. Blanket `/api/*` enforcement and
+paseto-keys-over-HTTP fetch from the auth service at boot are follow-ups
+(§13 T-7). Auth model source of truth:
+[`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+(supersedes the RS256-JWT + JWKS model).
 
 ### 8.5 Deployment topology (governmental scale)
 
@@ -100,8 +103,9 @@ and [`agents/share/availability.md`](../../agents/share/availability.md):
 
 - N stateless service replicas behind a load balancer; PostgreSQL
   primary + replicas; connection pooling.
-- Blanket JWT verification at the service edge against the central
-  auth-service JWKS (offline, no per-request auth-service call).
+- Blanket PASETO token verification at the service edge against the
+  central auth-service's published Ed25519 key (offline, no per-request
+  auth-service call).
 - Durable event bus for CRUD/merge events; OTLP observability pipeline.
 - Per-jurisdiction deployment with cross-registry linkage through
   deterministic identifiers rather than shared databases.

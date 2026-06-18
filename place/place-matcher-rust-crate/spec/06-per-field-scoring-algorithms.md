@@ -75,5 +75,27 @@ Compute `normalize_phone_e164(phone, cc)` for both sides where `cc = MatchConfig
 
 Compute `normalize_email(email, gmail_dot_folding)` for both sides. `1.0` iff both canonicalise and are equal; `0.0` if both canonicalise but differ. `None` if either side has `email = None`, or if either side fails to canonicalise (`normalize_email` returned `None`).
 
+### 6.10 Setting (indoor / outdoor) — `setting_score`
+
+Compare the two `setting` values (`IndoorOutdoor`). `1.0` iff equal (both `Indoor`, both `Outdoor`, or both `Mixed`); `0.5` when one side is `Mixed` and the other is `Indoor` or `Outdoor` (compatible — a mixed place partly matches either); `0.0` when one is `Indoor` and the other `Outdoor` (a strong non-match signal — an enclosed place and an open place are rarely the same). `None` when either side has `setting = None`.
+
+### 6.11 Tags — `tags_score`
+
+Plain set Jaccard over the two tag sets (identical in shape to how
+`keywords` are scored where present). Each side's `tags` are normalised
+case-insensitively (trim + ASCII lowercase) and collected into a set,
+dropping empty / whitespace-only entries; then
+
+```text
+tags_score = |A ∩ B| / |A ∪ B|
+```
+
+`tags_score` is a **supporting** signal — operator labels group and
+triage records, but identical tags alone do not identify a place — so it
+carries a small weight (§7) and never short-circuits a match.
+
+`tags_score` is `None` (does not participate) when **either** side has an
+empty tag set.
+
 ---
 

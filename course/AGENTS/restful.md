@@ -2,7 +2,7 @@
 
 Orientation only. The complete endpoint reference (parameters,
 envelopes, status codes) is
-[`course-service/AGENTS/restful.md`](../course-service-rust-crate/AGENTS/restful.md);
+[`course-service/AGENTS/restful.md`](../course-service-with-loco/AGENTS/restful.md);
 the normative summary is entity spec [§9](../spec/09-api-surface.md).
 
 ## The one wire contract
@@ -48,6 +48,9 @@ create), `/courses/[id]` (+ `/edit`, `/audit`), `/courses/match`,
 - Handlers are idiomatic loco controllers (registered in
   `App::routes` with the `/api` prefix); this service is the family
   reference for that pattern — keep new endpoints in the same shape.
-- Auth: none today; RS256 JWT verification against the
-  [authentication entity](../../authentication/) JWKS is the planned
-  family-wide rollout (entity spec §13 T-7).
+- Auth: none today; offline PASETO v4.public verification (published
+  Ed25519 key) against the
+  [authentication entity](../../authentication/) is the planned
+  family-wide rollout (entity spec §13 T-7). See
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  for the cookie-session + PASETO model.

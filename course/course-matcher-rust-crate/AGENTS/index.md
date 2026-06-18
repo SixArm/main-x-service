@@ -13,5 +13,5 @@ See also:
 - [`../AGENTS.md`](../AGENTS.md) — agent guide
 - [`../README.md`](../README.md) / [`../CLAUDE.md`](../CLAUDE.md) — user intro
 - [`../index.md`](../index.md) — worked examples
-- [`../../course-service-rust-crate/`](../../course-service-rust-crate/) — embedding service
+- [`../../course-service-with-loco/`](../../course-service-with-loco/) — embedding service
 - [`../../course-front-end-with-svelte/`](../../course-front-end-with-svelte/) — front-end consumer

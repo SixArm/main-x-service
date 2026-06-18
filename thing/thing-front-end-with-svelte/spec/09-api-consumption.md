@@ -1,6 +1,6 @@
 ## 9. API Consumption
 
-The front-end binds 1:1 to the Thing Service REST surface (see [`thing-service-rust-crate/AGENTS/restful.md`](../../thing-service-rust-crate/AGENTS/restful.md)):
+The front-end binds 1:1 to the Thing Service REST surface (see [`thing-service-with-loco/AGENTS/restful.md`](../../thing-service-with-loco/AGENTS/restful.md)):
 
 | Endpoint | Used by |
 | --- | --- |

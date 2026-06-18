@@ -6,8 +6,8 @@ Entity-level terms; per-crate glossaries are in the subproject specs.
 |---|---|
 | **Event** (capital E) | The domain entity — a time-bounded occurrence with parties + (optional) location + offers, aligned with schema.org/Event |
 | **event stream / index-level events** | The CRUD-change records (`Created`, `Updated`, `Deleted`, `Merged`, `Linked`, `Unlinked`) the service publishes when registry records change. **Not** the domain Events themselves — an unfortunate but unavoidable name collision in this entity |
-| **The trio** | event-service-rust-crate + event-matcher-rust-crate + event-front-end-with-svelte |
-| **Service** | event-service-rust-crate — the system of record |
+| **The trio** | event-service-with-loco + event-matcher-rust-crate + event-front-end-with-svelte |
+| **Service** | event-service-with-loco — the system of record |
 | **Matcher** | event-matcher-rust-crate — the canonical pairwise-comparison library |
 | **Front-end** | event-front-end-with-svelte — the operator UI |
 | **Adapter / bridge** | `src/matching/adapter.rs` in the service: `to_matcher_event` projects a service `Event` into the matcher's `Event` shape (§5.3) |

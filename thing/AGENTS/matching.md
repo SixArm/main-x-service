@@ -36,16 +36,16 @@ handlers.
   SerialNumber / UUID.
 - Quality buckets (configurable): Certain ≥ 0.95, Probable ≥ 0.80,
   Possible ≥ 0.60, Unlikely.
-- Reference: [service AGENTS/matching.md](../thing-service-rust-crate/AGENTS/matching.md).
+- Reference: [service AGENTS/matching.md](../thing-service-with-loco/AGENTS/matching.md).
 
 ## How the layers connect
 
 The service re-exports the matcher as `matcher_lib` and bridges via
-[`src/matching/adapter.rs`](../thing-service-rust-crate/src/matching/adapter.rs)
+[`src/matching/adapter.rs`](../thing-service-with-loco/src/matching/adapter.rs)
 (`to_matcher_thing`). The contract is entity spec
 [§5.3](../spec/05-domain-model.md); enforcement is the 15 bridge
 tests in
-[`tests/duplicate_detection.rs`](../thing-service-rust-crate/tests/duplicate_detection.rs).
+[`tests/duplicate_detection.rs`](../thing-service-with-loco/tests/duplicate_detection.rs).
 
 Open questions an agent should not pre-empt: whether the in-service
 scorer is retired in favour of the engine (entity spec §16 OQ-1), and
@@ -55,7 +55,7 @@ The two confidence vocabularies (Certain/Probable/Possible/Unlikely
 vs High/Medium/Low) classify the same score with interleaving cut
 points, so they have **no 1:1 label mapping** — see the score-range
 overlay table in
-[service `AGENTS/matching.md`](../thing-service-rust-crate/AGENTS/matching.md)
+[service `AGENTS/matching.md`](../thing-service-with-loco/AGENTS/matching.md)
 ("Relationship to the embedded matcher's confidence bands").
 
 ## Rules of thumb

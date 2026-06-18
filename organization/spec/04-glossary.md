@@ -1,7 +1,7 @@
 ## 4. Glossary
 
 Entity-level terms. Per-subproject vocabularies: service
-[spec §4](../organization-service-rust-crate/spec/index.md), matcher
+[spec §4](../organization-service-with-loco/spec/index.md), matcher
 [spec §3](../organization-matcher-rust-crate/spec/index.md), front-end
 [spec §4](../organization-front-end-with-svelte/spec/index.md).
 
@@ -25,5 +25,5 @@ Entity-level terms. Per-subproject vocabularies: service
 | **Soft delete** | Retention with a `deleted_at` stamp; reads filter `deleted_at IS NULL`; never `DELETE FROM` |
 | **Audit log** | Per-CRUD row in `audit_logs`: `entity_pid`, `action` (created / updated / deleted), optional `actor`, JSONB `snapshot` |
 | **Event stream** | In-memory ring buffer of `OrgEvent { kind, pid, name, seq }` published on every CRUD (MVP; durable bus is roadmap) |
-| **SSO** | Single sign-on via the [authentication entity](../../authentication/): magic-link, RS256 JWT + JWKS |
+| **SSO** | Single sign-on via the [authentication entity](../../authentication/): magic-link, cookie sessions, short-lived PASETO v4.public cross-service tokens (see [`authentication-sessions.md`](../../agents/share/authentication-sessions.md); supersedes RS256-JWT + JWKS) |
 | **Drift policy** | Front-ends keep per-project copies of types/client/forms; no shared package (repo decision 2026-06-02) |

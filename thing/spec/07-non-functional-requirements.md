@@ -8,7 +8,7 @@ infrastructure lands.
 | # | Attribute | Target |
 |---|---|---|
 | NFR-1 | Scale | Millions of Thing records; thousands of data sources; population-scale read traffic |
-| NFR-2 | Service latency (single node, per [service §7](../thing-service-rust-crate/spec/07-non-functional-requirements.md)) | Create ≤ 50 ms p50; read ≤ 5 ms p50; search ≤ 100 ms p50; match ≤ 500 ms p99; ≥ 1 000 req/sec per instance |
+| NFR-2 | Service latency (single node, per [service §7](../thing-service-with-loco/spec/07-non-functional-requirements.md)) | Create ≤ 50 ms p50; read ≤ 5 ms p50; search ≤ 100 ms p50; match ≤ 500 ms p99; ≥ 1 000 req/sec per instance |
 | NFR-3 | Matcher throughput (single node, per [matcher §7.1](../thing-matcher-rust-crate/spec/07-quality-attributes-and-tuning.md)) | `match_things` < 50 µs per call on typical records; `rank_one_to_many` linear in candidates; `Send + Sync` so callers may parallelise |
 | NFR-4 | Availability | Stateless app tier, horizontal scaling, health checks, graceful shutdown ([agents/share/availability.md](../../agents/share/availability.md)); PostgreSQL replication; multi-region active/active is **roadmap** |
 | NFR-5 | Internationalisation | Operator UI and API error text localisable to the full locale set in [agents/share/locales.md](../../agents/share/locales.md); Unicode-correct matching (diacritics round-trip through matcher normalisation) — UI localisation is **roadmap** |

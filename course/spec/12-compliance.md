@@ -26,7 +26,7 @@ clears / masks exactly these fields.
 | Regime | How the entity addresses it |
 |---|---|
 | **EU / UK GDPR, UK DPA 2018** | Right of access / portability via `GET /api/courses/{id}/export` (Article 15 envelope); erasure via soft delete + masking; accountability via the audit log recording who accessed and changed each record |
-| **FERPA** (where instances carry instructor / student-adjacent data) | Masked view conceals personal identifiers; audit log preserves the access trail (service [spec §12](../course-service-rust-crate/spec/12-compliance.md)) |
+| **FERPA** (where instances carry instructor / student-adjacent data) | Masked view conceals personal identifiers; audit log preserves the access trail (service [spec §12](../course-service-with-loco/spec/12-compliance.md)) |
 | **ISO/IEC 27001** | Audit trail, soft-delete retention, health checks, observability, and (roadmap) JWT-enforced access control supply ISMS evidence; full conformance is an operational/organisational programme, not a crate feature |
 | **ISO/IEC 42001** | The matcher is deterministic and fully explainable (per-component breakdowns, no ML) — match decisions are reviewable by design; if ML scoring ever lands (explicitly out of scope today), it triggers AIMS review |
 | **WCAG** | Front-end concern; Lily Headless primitives are the accessibility path (front-end [spec §12](../course-front-end-with-svelte/spec/12-compliance.md)) |

@@ -16,7 +16,7 @@ identifier. Short-circuits to 1.0 on a strong identifier
 / Possible ≥ 0.50 / Unlikely.
 
 → Weights, rules, per-component algorithms:
-[`event-service-rust-crate/AGENTS/matching.md`](../event-service-rust-crate/AGENTS/matching.md).
+[`event-service-with-loco/AGENTS/matching.md`](../event-service-with-loco/AGENTS/matching.md).
 
 ## 2. Canonical matcher crate (the reference algorithm)
 
@@ -37,10 +37,10 @@ and the crate [README](../event-matcher-rust-crate/README.md).
 
 The service embeds the crate (re-export `matcher_lib`) and projects
 records through
-[`src/matching/adapter.rs`](../event-service-rust-crate/src/matching/adapter.rs)
+[`src/matching/adapter.rs`](../event-service-with-loco/src/matching/adapter.rs)
 (`to_matcher_event`). Contract: entity spec
 [§5.3](../spec/05-domain-model.md). Pinned by
-[`tests/duplicate_detection.rs`](../event-service-rust-crate/tests/duplicate_detection.rs)
+[`tests/duplicate_detection.rs`](../event-service-with-loco/tests/duplicate_detection.rs)
 (16 tests) — change adapter or scoring, change a bridge test.
 
 ## Which one wins?

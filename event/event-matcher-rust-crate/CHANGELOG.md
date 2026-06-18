@@ -7,7 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > See also: [index.md](./index.md) (documentation map), [spec.md](./spec/index.md) (authoritative behaviour — each entry below corresponds to a section / FR / task in the spec), [README.md](./README.md) (user-facing overview).
 
-## [Unreleased] → 0.6.0
+## [Unreleased]
+
+### Added — `tags` weighted component (spec-first; implementation pending)
+
+Spec added the operator-applied **tags** match component
+([§3 `Event.tags` field](./spec/03-data-model.md),
+[§6.12 `tags_score`](./spec/06-per-field-scoring-algorithms.md),
+[§7 `tags_weight` = 0.05](./spec/07-configuration.md), and
+`MatchBreakdown::tags_score`). **Implementation is pending** — this
+entry tracks the code follow-up:
+
+- Add `tags: Vec<String>` to `Event` (default empty); add the `tags` /
+  `add_tag` builder setters mirroring `keywords`.
+- Implement `tags_score`: plain set Jaccard over case-insensitively
+  normalised tags (trim + ASCII lowercase, empties dropped); `None`
+  when either side empty (§6.12).
+- Add `tags_weight` (default `0.05`) to `MatchConfig`; include `tags`
+  in the renormalised weighted average; add `tags_score` to
+  `MatchBreakdown`.
+- Wire the service adapter (`to_matcher_event`) to route the service
+  `tags` field (event-entity spec §5.3) + a bridge test.
+- Unit tests (overlap Jaccard, empty-skip); `cargo test` +
+  `cargo clippy --all-targets -- -D warnings` clean.
+
+### Added — `relationships` weighted component (spec-first; implementation pending)
+
+Spec added the typed event-to-event **relationships** match component
+([§3 `Event.relationships` field + `RelationshipRef` / `RelationKind`](./spec/03-data-model.md),
+[§6.11 `relationships_score`](./spec/06-per-field-scoring-algorithms.md),
+[§7 `relationships_weight` = 0.05](./spec/07-configuration.md), and
+`MatchBreakdown::relationships_score`). **Implementation is pending** — this
+entry tracks the code follow-up:
+
+- Add `relationships: Vec<RelationshipRef>` to `Event` + `RelationshipRef`
+  / `RelationKind` (`Outer` / `Inner` / `ImmediatelyBefore` /
+  `ImmediatelyAfter`; `#[non_exhaustive]`); re-export from `lib.rs`; add the
+  `relationships` / `add_relationship` builder setters.
+- Implement `relationships_score`: typed-set Jaccard over `(relation,
+  event_id)` pairs; `None` when either side empty (§6.11).
+- Add `relationships_weight` (default `0.05`) to `MatchConfig`; include
+  `relationships` in the renormalised weighted average; add
+  `relationships_score` to `MatchBreakdown`.
+- Wire the service adapter (`to_matcher_event`) to route the service
+  `relationships` field (event-entity spec §5.3) + a bridge test.
+- Unit tests (kind-keyed agreement, empty-skip); `cargo test` +
+  `cargo clippy --all-targets -- -D warnings` clean.
+
+## [0.6.1] - 2026-06-15
+
+### Documentation — spec/doc harmonisation pass
+
+- Fixed the install snippet in `README.md` / `index.md` to
+  `event-matcher = "0.6"` (was `"0.4"`, which is the upgrade-incompatible
+  place-matcher line per `spec/09-public-api-contract-semver.md`).
+- Reconciled this CHANGELOG with `Cargo.toml` `version = "0.6.1"`: the
+  0.5.0 place→event domain change now lives under its own dated [0.5.0]
+  section, and [0.6.0] / [0.6.1] are released sections.
+- Fixed `scripts/spec-drift-check.sh`: it previously grepped for a
+  non-existent top-level `spec.md`; it now matches any path under
+  `spec/`, and the watched source pattern was widened from `src/matcher.rs`
+  to also cover `src/scorer.rs`, `src/normalizer.rs`, `src/models.rs`.
+- Added integration tests pinning the coordinates location sub-score, the
+  all-empty-`Location` neutral-`0.5` fallback, the house-number-weighted
+  line-1 address blend, the phonetic-bonus direction (nudges up, never
+  down), and the §11.1 Glastonbury renormalised score (`≈ 0.976`).
+- Added a `location_matching` example demonstrating the coordinates path
+  and strict-mode rejection (§11.3).
+
+## [0.6.0] - 2026-06-10
 
 ### Changed — version-aligned with the matcher-family `chrono` elimination
 
@@ -34,6 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   table) and cross-referenced from `spec.md` (§18.5 for person /
   worker — full §1–§25 shape; §9 callout for place / thing / event —
   shorter §1–§13 shape).
+
+## [0.5.0] - 2026-06-09
 
 **Domain change.** 0.5.0 repurposes the crate from geographic *place* matching to **event matcher** modelled on [schema.org/Event](https://schema.org/Event). Prior 0.4.x releases matched landmarks, natural features, chain branches, and administrative areas; 0.5.0 matches festivals, conferences, concerts, sports fixtures, screenings, hackathons, meetups, theatre runs, and other instances of `schema:Event`. There is **no smooth upgrade path** from 0.4.x. Every public type, scoring component, and `MatchConfig` weight has been renamed or replaced. Pin to `0.4.x` for the place-matcher behaviour; treat the upgrade as an integration project against the new surface.
 

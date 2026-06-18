@@ -4,7 +4,7 @@
 >
 > **Three-part PRs.** A behavioural change is one PR: spec edit + code edit + test edit.
 
-For the underlying service contract, see [`../thing-service-rust-crate/spec.md`](../../thing-service-rust-crate/spec/index.md). For shared MXI guidance (REST conventions, observability, compliance), see the repo-root [`AGENTS.md`](../../../AGENTS.md) and [`agents/share/`](../../../agents/share/).
+For the underlying service contract, see [`../thing-service-with-loco/spec.md`](../../thing-service-with-loco/spec/index.md). For shared MXI guidance (REST conventions, observability, compliance), see the repo-root [`AGENTS.md`](../../../AGENTS.md) and [`agents/share/`](../../../agents/share/).
 
 ## Table of contents
 

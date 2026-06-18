@@ -4,9 +4,16 @@
 > [loco auth](../case-folder-service-with-rust/spec/auth.md),
 > [svelte auth](../case-folder-front-end-with-svelte/spec/auth.md).
 
-Authentication is **passwordless email magic link**, backed by
-**stateless signed tokens** (no auth tables — consistent with the
-aggregator decision [D-1](design.md)).
+Authentication is **passwordless email magic link**. The **sign-in
+(magic) token is a short-lived signed JWT**; the **session is an opaque
+server-side session id** (not a JWT) held in the HttpOnly `cts_session`
+cookie — per [`agents/share/jwt.md`](../agents/share/jwt.md) ("JWTs must
+not be used to keep users logged in"). Identity still comes from the
+configured allowlist (no *user* table). The session store is **in-process
+today** (an upgrade from the previous JWT-in-cookie session); a **durable
+Postgres-backed `sessions` table** is the roadmap upgrade (see §Roadmap /
+[roadmap.md](roadmap.md)) — it would be this app's first local table, so
+it is deferred from the otherwise table-less aggregator design [D-1](design.md).
 
 ## Flow
 
@@ -21,30 +28,45 @@ aggregator decision [D-1](design.md)).
 
 3. POST /api/auth/verify { token }
       └─ validate MAGIC token (sig, exp, aud)
-      └─ mint a SESSION token (signed JWT, ~24 h, aud=session)
-      └─ Set-Cookie: cts_session=<SESSION>; HttpOnly; SameSite=Lax; Path=/
+      └─ CREATE an opaque server-side session (random id; in-process store)
+      └─ Set-Cookie: cts_session=<opaque-sid>; HttpOnly; SameSite=Lax; Path=/
       └─ 200 { user: { email, name, role } }
 
-4. subsequent requests carry the cookie (or Authorization: Bearer <SESSION>)
-      └─ a guard requires a valid SESSION on /api/* (except /api/auth/*)
+4. subsequent requests carry the cookie (or Authorization: Bearer <sid>)
+      └─ a guard looks the sid up in the session store and requires a
+         live session on /api/* (except /api/auth/*)
 
 5. GET  /api/auth/me      → 200 { user } | 401
-   POST /api/auth/logout  → clears the cookie, 204
+   POST /api/auth/logout  → REVOKE the server-side session + clear cookie, 204
 ```
 
-## Token claims (HS256, shared `secret`)
+## Magic-token claims (HS256, shared `secret`)
 
-| Claim  | Magic token            | Session token          |
-| ------ | ---------------------- | ---------------------- |
-| `sub`  | email                  | email                  |
-| `name` | identity display name  | identity display name  |
-| `role` | identity role          | identity role          |
-| `aud`  | `"magic"`              | `"session"`            |
-| `iat`  | issued-at (unix)       | issued-at (unix)       |
-| `exp`  | `iat + magic_ttl`      | `iat + session_ttl`    |
+Only the **magic** (sign-in) token is a JWT. The session is an opaque
+server-side id with **no claims** — its identity lives in the session
+store, keyed by the random `cts_session` value.
 
-`aud` separation means a magic token can never be replayed as a session
-token and vice-versa.
+| Claim  | Magic token            |
+| ------ | ---------------------- |
+| `sub`  | email                  |
+| `name` | identity display name  |
+| `role` | identity role          |
+| `aud`  | `"magic"`              |
+| `iat`  | issued-at (unix)       |
+| `exp`  | `iat + magic_ttl`      |
+
+The `aud = "magic"` claim means the sign-in token can only be redeemed at
+`/api/auth/verify`. The session TTL (`session_ttl`) now governs the
+server-side session entry's expiry rather than a token `exp`.
+
+## Roadmap — durable session store
+
+The session store is **in-process** today: opaque sessions are held in a
+map on `AuthState`, so they do not survive a restart and are not shared
+across replicas (single-instance deployments are unaffected). The upgrade
+is a **Postgres-backed `sessions` table** (session id, identity, expiry,
+revoked-at) — this would be the app's first local table, so it is tracked
+as a deliberate follow-up rather than folded into the table-less design.
 
 ## Identity
 

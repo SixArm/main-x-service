@@ -7,7 +7,7 @@ path to meet them at population scale is roadmap (§15), not delivered.
 
 | # | Attribute | Target |
 |---|---|---|
-| NFR-1 | Scale | Millions of worker records; thousands of organisations; population-scale national registries per [service §7](../worker-service-rust-crate/spec/07-non-functional-requirements.md) |
+| NFR-1 | Scale | Millions of worker records; thousands of organisations; population-scale national registries per [service §7](../worker-service-with-loco/spec/07-non-functional-requirements.md) |
 | NFR-2 | Latency *(current single-node)* | Create ≤ 50 ms p50; read ≤ 5 ms p50; search ≤ 100 ms p50; match ≤ 500 ms p99 |
 | NFR-3 | Throughput *(current single-node)* | ≥ 1 000 req/sec per service instance |
 | NFR-4 | Pairwise match cost | Microseconds per comparison on commodity hardware ([matcher NFR-1](../worker-matcher-rust-crate/spec/07-non-functional-requirements.md)) — this is what makes batch dedup over millions of records tractable |

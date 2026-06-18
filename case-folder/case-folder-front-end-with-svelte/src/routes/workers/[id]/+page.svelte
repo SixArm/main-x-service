@@ -14,6 +14,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, tf, statusLabel } from '$lib/i18n.svelte';
 
     let { data } = $props();
 
@@ -36,10 +37,10 @@
     <DataTable {label}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">Title</th>
-                <th scope="col">Patient</th>
-                <th scope="col">Cabinet</th>
-                <th scope="col">Status</th>
+                <th scope="col">{t('common.title')}</th>
+                <th scope="col">{t('common.patient')}</th>
+                <th scope="col">{t('common.cabinet')}</th>
+                <th scope="col">{t('common.status')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>
@@ -51,7 +52,7 @@
                     </DataTableTD>
                     <DataTableTD>{folder.cabinetLabel}</DataTableTD>
                     <DataTableTD>
-                        <Badge type={badgeType(folder.status)}>{folder.status}</Badge>
+                        <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
                     </DataTableTD>
                 </DataTableRow>
             {/each}
@@ -59,33 +60,33 @@
     </DataTable>
 {/snippet}
 
-<BackLink href="/workers">Back to workers</BackLink>
+<BackLink href="/workers">{t('workerDetail.backToWorkers')}</BackLink>
 
 <h2>{data.worker.name}</h2>
 {#if data.worker.role}<p><em>{data.worker.role}</em></p>{/if}
 
 <div class="panel">
-    <h3>Folders moved by this worker ({data.movedFolders.length})</h3>
+    <h3>{tf('workerDetail.foldersMoved', { n: data.movedFolders.length })}</h3>
     {#if data.movedFolders.length > 0}
-        {@render folderTable(data.movedFolders, 'Folders moved by this worker')}
+        {@render folderTable(data.movedFolders, t('workerDetail.foldersMovedTable'))}
     {:else}
-        <p>This worker hasn't moved any folders yet.</p>
+        <p>{t('workerDetail.noMovedFolders')}</p>
     {/if}
 </div>
 
 <div class="panel">
-    <h3>All their patients' folders ({data.patientFolders.length})</h3>
-    <p>Every folder belonging to a patient this worker has handled.</p>
+    <h3>{tf('workerDetail.patientsFolders', { n: data.patientFolders.length })}</h3>
+    <p>{t('workerDetail.patientsFoldersIntro')}</p>
     {#if data.patientFolders.length > 0}
-        {@render folderTable(data.patientFolders, "This worker's patients' folders")}
+        {@render folderTable(data.patientFolders, t('workerDetail.patientsFoldersTable'))}
     {:else}
-        <p>No patient folders to show yet.</p>
+        <p>{t('workerDetail.noPatientFolders')}</p>
     {/if}
 </div>
 
 <Separator />
 
-<h3>Moves by this worker</h3>
+<h3>{t('workerDetail.movesByWorker')}</h3>
 <div class="move-stack">
     {#each data.moves as move (move.id)}
         <article class="move-card">
@@ -102,6 +103,6 @@
         </article>
     {/each}
     {#if data.moves.length === 0}
-        <p>No moves recorded yet.</p>
+        <p>{t('common.noMovesYet')}</p>
     {/if}
 </div>

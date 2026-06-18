@@ -21,7 +21,9 @@
 - [x] **ST-9** `+error.svelte` hard-fail handling (404/503) (SD-4) — UR-8
 - [x] **ST-10** Accessibility baseline (skip link, single h1, labelled fields) (SD-6) — UR-9
 - [x] **ST-11** Locale + theme pickers via Lily helpers; NHS themes (SD-6)
-- [x] **ST-12** 50 Playwright e2e tests against stub-mode API (—)
+- [x] **ST-12** Playwright e2e suite against stub-mode API — 14 spec
+  files, ~65 `test()` cases (smoke, dashboard, folders, patients, places,
+  move, history, errors, volumes, clickthrough, auth, ifit, wiring, a11y) (—)
 
 ## Active / next
 
@@ -30,7 +32,7 @@
   every exported mapper (`toPatient`, `toFolder`, `toMove`, `toBuilding`,
   `toRoom`, `toCabinet`, `toWorker`, `toStats`) + `ApiError`. Also removed a
   redundant `role="separator"` on `Separator.svelte` (`<hr>` carries the
-  implicit role), so `pnpm run check` is back to 0 errors / 0 warnings.
+  implicit role), so `npm run check` is back to 0 errors / 0 warnings.
 - [x] **ST-13b** Modulus-11 hardening (root **T-15**). `nhs.test.ts` adds the
   `check === 10 → invalid` branch (`999 000 0140`), the documented invalid
   number `614 309 0431`, leading-zero normalisation, empty input, and
@@ -47,7 +49,10 @@
   Also fixed a `cache-api.md` drift: `cabinetLocation` returns "In transit"
   for an unknown id, not only `null`. vitest unit count 26→43.
 - [ ] **ST-14** ESLint + svelte-eslint (P1)
-- [ ] **ST-15** `@axe-core/playwright` scans in CI (P1) — UR-9
+- [x] **ST-15** `@axe-core/playwright` scans (P1) — UR-9.
+  `tests/e2e/a11y.spec.ts` scans 9 primary routes (`/`, `/patients`,
+  `/folders`, `/volumes`, `/workers`, `/cabinets`, `/alerts`, `/reports`,
+  `/scan`) for serious/critical violations.
 - [ ] **ST-16** Codegen client types from API OpenAPI/JSON Schema (P1) — UR-6
 
 ## Production gates

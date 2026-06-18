@@ -75,7 +75,7 @@ Synthetic data only. Reuse the existing illustrative fixtures rather than invent
 
 ## Property tests
 
-- `tests/property_tests.rs` uses `proptest` to pin invariants that example-based tests can miss: normalisation idempotency (`f(f(x)) == f(x)`), score bounds (`s ∈ [0.0, 1.0]`), self-match positivity (`match_places(p, p).score == 1.0` when at least one field scores), symmetry of `match_places` and `deterministic_match`, monotonicity of `Confidence::from_score`, and serde round-trips.
+- `tests/property_tests.rs` uses `proptest` to pin invariants that example-based tests can miss: normalisation idempotency (`f(f(x)) == f(x)`), score bounds (`s ∈ [0.0, 1.0]`), self-match positivity (`match_things(p, p).score == 1.0` when at least one field scores), symmetry of `match_things` and `deterministic_match`, monotonicity of `Confidence::from_score`, and serde round-trips.
 - When a property fails, `proptest` shrinks the input and writes a seed to `tests/property_tests.proptest-regressions`. **Commit that file** — it makes the seed a permanent fixed-input regression test for everyone who runs `cargo test`.
 - New invariants belong in `proptest!` blocks if the property is naturally universally quantified (e.g. "for all `p`, …"). One-off corner cases belong in `integration_tests.rs` as ordinary `#[test]` functions.
 

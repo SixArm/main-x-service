@@ -4,14 +4,11 @@
 // {success,data,error} envelope), so this client returns the parsed
 // body directly and throws ApiError on non-2xx.
 //
-// Bearer token: by default the client reads the current token from the
-// shared `auth` store (hydrated from localStorage["mxi_access_token"])
-// and attaches `Authorization: Bearer <token>` when one is present,
-// omitting the header otherwise. A per-request `token` overrides the
-// store (pass `null`/`""` to force no header). See `auth.svelte.ts` and
-// `agents/share/jwt-enforcement.md`.
-
-import { auth } from "$lib/auth.svelte";
+// Auth is handled by the same-origin BFF proxy (it injects a
+// server-exchanged PASETO server-side), so the browser holds no token and
+// this client attaches no bearer of its own — only an explicit per-request
+// `token` override, if ever passed. See
+// `agents/share/authentication-sessions.md`.
 
 /** Construction options for {@link ApiClient}. */
 export interface ClientOptions {
@@ -132,11 +129,10 @@ export class ApiClient {
             accept: "application/json",
             ...opts.headers,
         };
-        // Explicit `token` (including `null`/`""`) overrides the store;
-        // otherwise fall back to the shared session token.
-        const token = "token" in opts ? opts.token : auth.token;
-        if (token) {
-            headers.authorization = `Bearer ${token}`;
+        // The BFF proxy injects the bearer server-side; this client sends a
+        // bearer only when one is explicitly passed for this request.
+        if (opts.token) {
+            headers.authorization = `Bearer ${opts.token}`;
         }
 
         const init: RequestInit = { method, headers, signal: opts.signal };

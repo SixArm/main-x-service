@@ -10,7 +10,7 @@ One subproject persists; the other two are deliberately stateless.
 
 ### 10.1 Service tables
 
-Per [service spec §10](../thing-service-rust-crate/spec/10-persistence.md):
+Per [service spec §10](../thing-service-with-loco/spec/10-persistence.md):
 `things`, `thing_identifiers`, `thing_alternate_names`,
 `thing_images`, `thing_same_as`, `thing_links`,
 `thing_match_scores`, `audit_log`.
@@ -35,9 +35,9 @@ hand-maintained — there is no generator script, build step, or
 `pg_dump` pipeline anywhere in the entity that produces or verifies
 it, so it can drift from the service's actual migrations silently.
 Current deltas against the service's two raw-SQL migrations
-([`migrations/`](../thing-service-rust-crate/migrations/), executed
+([`migrations/`](../thing-service-with-loco/migrations/), executed
 verbatim by the SeaORM wrappers in
-[`migration/src/`](../thing-service-rust-crate/migration/src/)):
+[`migration/src/`](../thing-service-with-loco/migration/src/)):
 
 - The migrations create 7 tables (`things`,
   `thing_alternate_names`, `thing_identifiers`, `thing_images`,

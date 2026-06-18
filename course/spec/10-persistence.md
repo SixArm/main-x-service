@@ -13,7 +13,7 @@ HTTP state in global stores by ground rule).
 | Tantivy index (local directory) | Full-text / fuzzy search + blocking queries; rebuilt from the database; reader-reload after every commit |
 | In-memory event bus | `CourseEvent` stream (MVP; durable bus is roadmap §15) |
 
-Detail: service [spec §10](../course-service-rust-crate/spec/10-persistence.md).
+Detail: service [spec §10](../course-service-with-loco/spec/10-persistence.md).
 
 ### 10.2 Entity-level persistence rules
 

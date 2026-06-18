@@ -14,7 +14,7 @@ This spec owns the **cross-subproject contract**:
 
 ### 2.2 In scope — per subproject
 
-**person-service-rust-crate** owns:
+**person-service-with-loco** owns:
 
 - Person CRUD with soft delete and full audit trail.
 - Identifiers, identity documents, addresses, telecom, emergency

@@ -16,6 +16,8 @@
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
     import { OrganizationRepository } from "$lib/api/organizations";
+    import { excludeSelf } from "$lib/api/build";
+    import { t } from "$lib/i18n.svelte";
     import type { Organization, ScoredRef } from "$lib/api/types";
 
     const repo = OrganizationRepository.withFetch();
@@ -33,7 +35,7 @@
         try {
             org = await repo.get(pid);
         } catch (err) {
-            error = err instanceof Error ? err.message : "Not found";
+            error = err instanceof Error ? err.message : t("detail.notFound");
         } finally {
             loading = false;
         }
@@ -55,31 +57,31 @@
         try {
             const hits = await repo.checkDuplicates(org);
             // Drop the self-match; the record always matches itself.
-            duplicates = hits.filter((h) => h.pid !== pid);
+            duplicates = excludeSelf(hits, pid);
         } catch (err) {
-            error = err instanceof Error ? err.message : "Check failed";
+            error = err instanceof Error ? err.message : t("detail.checkFailed");
         } finally {
             checking = false;
         }
     }
 </script>
 
-<svelte:head><title>{org?.name ?? "Organization"} — Main X</title></svelte:head>
+<svelte:head><title>{org?.name ?? t("detail.organization")} — Main X</title></svelte:head>
 
 {#if loading}
-    <p>Loading…</p>
+    <p>{t("detail.loading")}</p>
 {:else if error}
     <p class="banner" role="alert">{error}</p>
 {:else if org}
     <h1>{org.name}</h1>
     <div class="surface stack">
-        {#if org.legal_name}<div><strong>Legal name:</strong> {org.legal_name}</div>{/if}
-        {#if org.url}<div><strong>URL:</strong> <a href={org.url}>{org.url}</a></div>{/if}
-        {#if org.jurisdiction}<div><strong>Jurisdiction:</strong> {org.jurisdiction}</div>{/if}
-        {#if org.founding_date}<div><strong>Founded:</strong> {org.founding_date}</div>{/if}
+        {#if org.legal_name}<div><strong>{t("detail.legalName")}</strong> {org.legal_name}</div>{/if}
+        {#if org.url}<div><strong>{t("detail.url")}</strong> <a href={org.url}>{org.url}</a></div>{/if}
+        {#if org.jurisdiction}<div><strong>{t("detail.jurisdiction")}</strong> {org.jurisdiction}</div>{/if}
+        {#if org.founding_date}<div><strong>{t("detail.founded")}</strong> {org.founding_date}</div>{/if}
         {#if org.identifiers && org.identifiers.length > 0}
             <div>
-                <strong>Identifiers:</strong>
+                <strong>{t("detail.identifiers")}</strong>
                 <ul>
                     <!-- Render bare-string schemes directly; unwrap the
                          `{ Custom: label }` variant as `Custom(label)`. -->
@@ -90,23 +92,23 @@
             </div>
         {/if}
         {#if org.keywords && org.keywords.length > 0}
-            <div><strong>Keywords:</strong> {org.keywords.join(", ")}</div>
+            <div><strong>{t("detail.keywords")}</strong> {org.keywords.join(", ")}</div>
         {/if}
-        <div><strong>ID:</strong> <code>{pid}</code></div>
+        <div><strong>{t("detail.id")}</strong> <code>{pid}</code></div>
     </div>
 
     <div class="row" style="margin-top:1rem">
-        <a class="button" href={`/${pid}/edit`}>Edit</a>
+        <a class="button" href={`/${pid}/edit`}>{t("detail.edit")}</a>
         <button class="button" onclick={handleCheckDuplicates} disabled={checking}>
-            {checking ? "Checking…" : "Check duplicates"}
+            {checking ? t("detail.checking") : t("detail.checkDuplicates")}
         </button>
-        <button onclick={handleDelete}>Delete</button>
+        <button onclick={handleDelete}>{t("detail.delete")}</button>
     </div>
 
     {#if duplicates}
-        <h2>Potential duplicates</h2>
+        <h2>{t("detail.potentialDuplicates")}</h2>
         {#if duplicates.length === 0}
-            <p>None above the match threshold.</p>
+            <p>{t("detail.noneAboveThreshold")}</p>
         {:else}
             <ul class="stack">
                 {#each duplicates as dup (dup.pid)}

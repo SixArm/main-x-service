@@ -1,6 +1,6 @@
 // TypeScript domain types mirroring the Rust Course Service models
 // (schema.org/Course-aligned). Reference:
-// course-service-rust-crate/AGENTS/models.md.
+// course-service-with-loco/AGENTS/models.md.
 
 // ─── HTTP envelope ───────────────────────────────────────────────────
 

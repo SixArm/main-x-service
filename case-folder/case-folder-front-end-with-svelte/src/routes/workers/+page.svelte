@@ -10,24 +10,22 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let { data } = $props();
 </script>
 
-<BackLink href="/">Back to dashboard</BackLink>
+<BackLink href="/">{t('common.backToDashboard')}</BackLink>
 
-<h2>Workers</h2>
-<p>
-    Staff who move folders. Open a worker to see the folders they've moved and
-    every folder belonging to their patients.
-</p>
+<h2>{t('workers.heading')}</h2>
+<p>{t('workers.intro')}</p>
 
 <div class="panel">
-    <DataTable label="Workers" caption="Workers from the Main Worker Service">
+    <DataTable label={t('workers.tableLabel')} caption={t('workers.tableCaption')}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">Name</th>
-                <th scope="col">Role</th>
+                <th scope="col">{t('common.name')}</th>
+                <th scope="col">{t('common.role')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>
@@ -39,7 +37,7 @@
             {/each}
             {#if data.workers.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={2}>No workers found.</DataTableTD>
+                    <DataTableTD colspan={2}>{t('workers.noWorkers')}</DataTableTD>
                 </DataTableRow>
             {/if}
         </DataTableBody>

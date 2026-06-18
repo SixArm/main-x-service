@@ -9,7 +9,7 @@
 | Lint          | `cargo clippy -- -D warnings`                       | required green                                                     |
 | Format        | `cargo fmt --check`                                 | required green                                                     |
 | Unit          | `cargo test --lib` (in-crate `#[cfg(test)]`)        | **14 in repo (nhs + geofence)**                                   |
-| Request tests | `cargo test --test requests` (Loco testing harness) | **49 in repo** (use `StubClient`s — no real Patient/Worker needed) |
+| Request tests | `cargo test --test requests` (Loco testing harness) | **50 in repo** (use `StubClient`s — no real Patient/Worker needed) |
 
 ## Unit tests in repo
 
@@ -40,10 +40,12 @@ Run with `DATABASE_URL=postgres://…/case_folder_test cargo test
 --test requests`. Each test marks `#[serial]` and calls `clean_db()` at
 the top (which resets all five stub services), so it starts from an
 empty world. Each test asserts a status code + JSON shape — no HTML
-markup. The table below is a representative subset of the 49 tests;
+markup. The table below is a representative subset of the 50 tests;
 `auth.rs`, `alerts.rs`, and `volumes.rs` add the remainder (auth
-request/verify/guard, geofence cross-building vs same-building, and the
-volume CRUD + move flow).
+request/verify/me-guard/logout, geofence cross-building vs
+same-building, and the volume CRUD + move flow). `auth.rs`'s
+`logout_clears_the_session_cookie` pins `POST /api/auth/logout` → `204`
+with a `Set-Cookie` that clears `cts_session` (`Max-Age=0`).
 
 | File          | Test                                                                     | Asserts                                                               |
 | ------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |

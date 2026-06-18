@@ -24,7 +24,7 @@ detail (subproject map, model shapes, matching layers), see
 
 | Subproject | Role | Spec |
 |---|---|---|
-| [worker-service-rust-crate](../worker-service-rust-crate/) | System of record — REST/FHIR API, PostgreSQL, search, audit | [spec](../worker-service-rust-crate/spec/index.md) (§1–§18) |
+| [worker-service-with-loco](../worker-service-with-loco/) | System of record — REST/FHIR API, PostgreSQL, search, audit | [spec](../worker-service-with-loco/spec/index.md) (§1–§18) |
 | [worker-matcher-rust-crate](../worker-matcher-rust-crate/) | Canonical pairwise matching library, embedded by the service | [spec](../worker-matcher-rust-crate/spec/index.md) (§1–§25) |
 | [worker-front-end-with-svelte](../worker-front-end-with-svelte/) | Operator UI — SvelteKit SPA over the service REST API | [spec](../worker-front-end-with-svelte/spec/index.md) (§1–§18) |
 

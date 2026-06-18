@@ -9,7 +9,7 @@ Best-of cartesian product over `(primary name + alternate names)` on each side. 
 - `JaroWinkler` — `Scorer::jaro_winkler_similarity` over the normalised strings.
 - `Levenshtein` — `Scorer::levenshtein_similarity` (edit distance normalised by max length).
 - `Exact` — `1.0` if equal, `0.0` otherwise.
-- `Combined` (default) — `0.6 · jaro_winkler + 0.4 · levenshtein`.
+- `Combined` (default) — `0.7 · jaro_winkler + 0.3 · levenshtein`.
 
 `name_score` is `None` iff either side has no non-empty name (after trimming).
 
@@ -29,9 +29,17 @@ See §5.9 — exact equality after `Normalizer::normalize_url`. `None` if either
 
 Jaccard set similarity (`|A ∩ B| / |A ∪ B|`) over the URL lists after `Normalizer::normalize_url`. `None` only when both lists are empty.
 
-### 6.6 `name_phonetic_score`
+### 6.6 `relationships_score`
+
+See §5.9.1 — typed-set Jaccard (`|A ∩ B| / |A ∪ B|`) over the `(relation, thing_id)` pairs, where `relation` is part of the key. `None` only when either side has no relationships. A supporting signal weighted `relationships_weight` (default `0.05`); not identifying on its own.
+
+### 6.7 `name_phonetic_score`
 
 See §5.7. `None` when `use_phonetic_matching` is `false` or either side has no names.
+
+### 6.8 `tags_score`
+
+See §5.9.2 — plain set Jaccard (`|A ∩ B| / |A ∪ B|`) over the tag sets after case-insensitive normalisation (trim + lowercase, de-duplicated). `None` when either side has an empty tag set. A supporting signal weighted `tags_weight` (default `0.05`); not identifying on its own.
 
 ---
 

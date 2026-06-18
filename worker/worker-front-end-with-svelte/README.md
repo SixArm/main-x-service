@@ -1,6 +1,6 @@
 # worker-front-end-with-svelte
 
-SvelteKit front-end for the **[Worker Service](../worker-service-rust-crate/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
+SvelteKit front-end for the **[Worker Service](../worker-service-with-loco/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
 
 ## What's here
 
@@ -27,7 +27,7 @@ SvelteKit front-end for the **[Worker Service](../worker-service-rust-crate/)** 
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Worker Service — see [`../worker-service-rust-crate/README.md`](../worker-service-rust-crate/README.md). Default: `http://localhost:8080`.
+- A running Worker Service — see [`../worker-service-with-loco/README.md`](../worker-service-with-loco/README.md). Default: `http://localhost:8080`.
 
 ## Quick start
 

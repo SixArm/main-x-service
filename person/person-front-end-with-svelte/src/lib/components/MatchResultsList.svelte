@@ -12,20 +12,22 @@
 -->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
-    let {
-        results,
-        title = "Match results",
-    }: {
+    let props: {
         results: MatchResult[];
         title?: string;
     } = $props();
+    const results = $derived(props.results);
+    // Default the section heading to the translated "Match results" when the
+    // caller doesn't supply one (callers pass their own translated title).
+    const title = $derived(props.title ?? t("matchResults.title"));
 </script>
 
 <section class="surface stack">
     <h2>{title} <span class="muted small">({results.length})</span></h2>
     {#if results.length === 0}
-        <p class="muted">No candidates.</p>
+        <p class="muted">{t("matchResults.noCandidates")}</p>
     {:else}
         <ul class="results">
             {#each results as r}
@@ -40,13 +42,13 @@
                         <span class="score">{(r.score * 100).toFixed(0)}%</span>
                     </header>
                     <div class="meta small muted">
-                        {#if r.person.birth_date}DOB {r.person.birth_date}{/if}
+                        {#if r.person.birth_date}{t("matchResults.dob")} {r.person.birth_date}{/if}
                         {#if r.person.gender} · {r.person.gender}{/if}
                         {#if r.person.id} · <a href={`/persons/${r.person.id}`}>{r.person.id.slice(0, 8)}…</a>{/if}
                     </div>
                     {#if r.breakdown}
                         <details>
-                            <summary class="small">Score breakdown</summary>
+                            <summary class="small">{t("matchResults.breakdown")}</summary>
                             <ul class="breakdown small">
                                 {#each Object.entries(r.breakdown) as [field, score]}
                                     <!-- Skip components the matcher didn't score (null). -->

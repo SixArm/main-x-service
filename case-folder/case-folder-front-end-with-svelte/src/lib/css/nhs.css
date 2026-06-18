@@ -1,7 +1,7 @@
 /* NHS UK Design System — CSS Design Tokens & Component Styles
  *
  * Colour tokens live in /static/themes/<slug>.css and are swapped at
- * runtime by ThemePicker via :root[data-theme="…"]. This file holds
+ * runtime by ThemeSelect via :root[data-theme="…"]. This file holds
  * only theme-invariant tokens (typography, spacing, layout) plus the
  * component rules that read from --nhs-* custom properties.
  */
@@ -11,6 +11,47 @@
    ============================================================ */
 
 :root {
+    /* ----------------------------------------------------------------
+       Theme token bridge
+       ----------------------------------------------------------------
+       The base NHS colour tokens are mapped onto the Lily theme tokens
+       (`--color-*`) that the active theme stylesheet under
+       `/assets/themes/<slug>.css` defines, with the NHS palette as
+       fallbacks for first paint (before a theme loads). This is what
+       makes selecting any theme in ThemeSelect restyle the whole
+       NHS-styled app, not just the Lily helper components — every
+       component rule in this file reads from these `--nhs-*` tokens.
+       ---------------------------------------------------------------- */
+    --nhs-dark-blue: var(--color-primary, #003087);
+    --nhs-blue: var(--color-primary, #005eb8);
+    --nhs-bright-blue: var(--color-primary, #0072ce);
+    --nhs-light-blue: var(--color-info, #41b6e6);
+    --nhs-aqua-blue: var(--color-info, #00a9ce);
+
+    --nhs-black: var(--color-base-content, #231f20);
+    --nhs-dark-grey: color-mix(in oklch, var(--color-base-content, #425563) 75%, var(--color-base-100, #ffffff));
+    --nhs-mid-grey: color-mix(in oklch, var(--color-base-content, #5d6b75) 55%, var(--color-base-100, #ffffff));
+    --nhs-pale-grey: var(--color-base-200, #e8edee);
+    --nhs-light-grey: var(--color-base-200, #f0f4f5);
+    --nhs-white: var(--color-base-100, #ffffff);
+
+    --nhs-dark-green: var(--color-success, #006747);
+    --nhs-green: var(--color-success, #009639);
+    --nhs-light-green: var(--color-success, #78be20);
+    --nhs-aqua-green: var(--color-success, #00a499);
+
+    --nhs-purple: #330072;
+    --nhs-dark-pink: #7c2855;
+    --nhs-pink: #ae2573;
+    --nhs-dark-red: var(--color-error, #8a1538);
+    --nhs-red: var(--color-error, #da291c);
+    --nhs-orange: var(--color-warning, #ed8b00);
+    --nhs-warm-yellow: var(--color-warning, #ffb81c);
+    --nhs-yellow: var(--color-warning, #fae100);
+
+    --nhs-focus-color: var(--color-warning, #ffeb3b);
+    --nhs-focus-text-color: var(--color-base-content, #231f20);
+
     /* Typography */
     --nhs-font-family: "Frutiger W01", Arial, sans-serif;
     --nhs-font-size-14: 0.875rem;
@@ -1856,8 +1897,8 @@ article[class*="card"] {
     border-color: var(--nhs-black);
 }
 
-/* theme-picker, theme-view */
-.theme-picker {
+/* theme-select, theme-view */
+.theme-select {
     display: flex;
     gap: var(--nhs-space-2);
 }

@@ -11,7 +11,7 @@
                                    |  HTTPS JSON  (envelope: success/data/error)
                                    |  /api/workers/*  /api/audit/*  /api/health
 +----------------------------------v---------------------------------+
-|                 worker-service-rust-crate (loco.rs 0.16 / Axum 0.8) |
+|                 worker-service-with-loco (loco.rs 0.16 / Axum 0.8) |
 |  +-----------+ +-----------+ +------------+ +--------------------+ |
 |  | REST API  | | FHIR R5   | | gRPC stub  | | Swagger UI (utoipa)| |
 |  +-----------+ +-----------+ +------------+ +--------------------+ |
@@ -85,5 +85,5 @@ service validation → blocking via Tantivy → candidate scoring (adapter
 inline by the front-end → else INSERT + index + event + audit → `201`.
 
 In-crate flow detail:
-[service §8.5](../worker-service-rust-crate/spec/08-architecture.md),
+[service §8.5](../worker-service-with-loco/spec/08-architecture.md),
 [`agents/share/dataflow.md`](../../agents/share/dataflow.md).

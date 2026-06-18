@@ -18,7 +18,7 @@ to the spec; not the other way around.
   `lib.rs`, `MatchConfig` fields, `MatchResult` / `MatchBreakdown`
   shape, deterministic-identifier scheme list), update the bridge
   test in
-  [`../course-service-rust-crate/tests/duplicate_detection.rs`](../../course-service-rust-crate/tests/duplicate_detection.rs)
+  [`../course-service-with-loco/tests/duplicate_detection.rs`](../../course-service-with-loco/tests/duplicate_detection.rs)
   in the same PR.
 
 ## When To Update Which Section

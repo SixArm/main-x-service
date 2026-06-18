@@ -12,6 +12,7 @@
     import CarePathwayForm from "$lib/components/CarePathwayForm.svelte";
     import { CarePathwayRepository } from "$lib/api/care-pathways";
     import type { CarePathway } from "$lib/api/types";
+    import { t } from "$lib/i18n.svelte";
 
     const repo = CarePathwayRepository.withFetch();
     // The pid path param (`?? ""` only to satisfy the optional type).
@@ -26,7 +27,7 @@
         try {
             pathway = await repo.get(pid);
         } catch (err) {
-            error = err instanceof Error ? err.message : "Not found";
+            error = err instanceof Error ? err.message : t("detail.notFound");
         } finally {
             loading = false;
         }
@@ -39,14 +40,14 @@
     }
 </script>
 
-<svelte:head><title>Edit {pathway?.name ?? "care pathway"} — Main X</title></svelte:head>
+<svelte:head><title>{pathway?.name ?? t("edit.fallbackName")} — Main X</title></svelte:head>
 
-<h1>Edit care pathway</h1>
+<h1>{t("edit.title")}</h1>
 
 {#if loading}
-    <p>Loading…</p>
+    <p>{t("edit.loading")}</p>
 {:else if error}
     <p class="banner" role="alert">{error}</p>
 {:else if pathway}
-    <CarePathwayForm initial={pathway} submitLabel="Save changes" onsubmit={handleSubmit} />
+    <CarePathwayForm initial={pathway} submitLabel={t("edit.saveChanges")} onsubmit={handleSubmit} />
 {/if}

@@ -8,13 +8,13 @@ be pinned by tests on at least one side.
 
 | Subproject | Layers | Reference |
 |---|---|---|
-| person-service | ~100 unit tests (matching, search, validation, privacy, models) + 7 HTTP integration tests + **14 bridge tests** + 3 Criterion benchmark suites | [service spec §11](../person-service-rust-crate/spec/11-testing-strategy.md), [AGENTS/testing.md](../person-service-rust-crate/AGENTS/testing.md) |
+| person-service | ~100 unit tests (matching, search, validation, privacy, models) + 7 HTTP integration tests + **14 bridge tests** + 3 Criterion benchmark suites | [service spec §11](../person-service-with-loco/spec/11-testing-strategy.md), [AGENTS/testing.md](../person-service-with-loco/AGENTS/testing.md) |
 | person-matcher | Pure-library suite: `cargo test` green on a fresh checkout, doctests compile, clippy `-D warnings` clean; no PII in fixtures | [matcher spec §18](../person-matcher-rust-crate/spec/18-testing-strategy.md), [AGENTS/testing.md](../person-matcher-rust-crate/AGENTS/testing.md) |
 | person-front-end | 8 vitest unit tests (ApiClient + PersonRepository, mocked fetch) + 6 playwright e2e smoke (API-down resilience) + 9 playwright integration golden-paths against a live service | [front-end spec §11](../person-front-end-with-svelte/spec/11-testing-strategy.md) |
 
 ### 11.2 Seam 1 — service ↔ matcher (bridge tests)
 
-[`tests/duplicate_detection.rs`](../person-service-rust-crate/tests/duplicate_detection.rs)
+[`tests/duplicate_detection.rs`](../person-service-with-loco/tests/duplicate_detection.rs)
 in the service crate pins **both sides** of the adapter contract:
 field-routing rules (telecom → phone/email, address renames,
 identifier-system-URI routing, tax-ID default) **and** the matcher's

@@ -150,9 +150,12 @@ pattern) and the bearer-gated per-subject `/api/auth/account/audit`.
 ### 2.5 The actor
 
 `actor` is the **bearer-token `sub`** (the caller's user pid) when a
-verified RS256 JWT was presented, obtained via the `AuthUser` /
-`MaybeAuthUser` extractor (`src/auth.rs`, backed by the
-[authentication-verifier](../authentication/index.md) library). When no
+verified cross-service token was presented (target: PASETO v4.public;
+RS256/JWKS decommissioned — see
+[../../agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)),
+obtained via the `AuthUser` / `MaybeAuthUser` extractor (`src/auth.rs`,
+backed by the [authentication-verifier](../authentication/index.md)
+library). When no
 token is present, `actor` is `None` / `NULL`. The same value flows into
 both the audit row and the event envelope, so the two mechanisms agree
 on identity.

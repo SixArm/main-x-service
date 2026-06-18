@@ -30,8 +30,8 @@ assert!((0.0..=1.0).contains(&r.score));
 | Status | 0.05 | Exact enum (1.0 / 0.0) |
 | Keywords | 0.15 | Jaccard |
 
-`priority` and `opened_date` are carried for downstream consumers but
-are **never scored**.
+`priority`, `opened_date`, and `in_language` are carried for
+downstream consumers but are **never scored**.
 
 **Deterministic short-circuit → 1.0** on a shared globally-unique
 identifier (`Docket`, `ExternalCaseId`, URI, UUID), a same-agency case
@@ -48,7 +48,7 @@ cargo run
 
 ```bash
 cargo test
-cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --check
 ```
 

@@ -16,7 +16,7 @@
 
 Subproject specs:
 
-- [person-service-rust-crate/spec](../person-service-rust-crate/spec/index.md) — registry service (§1–§18)
+- [person-service-with-loco/spec](../person-service-with-loco/spec/index.md) — registry service (§1–§18)
 - [person-matcher-rust-crate/spec](../person-matcher-rust-crate/spec/index.md) — matching library (§1–§25)
 - [person-front-end-with-svelte/spec](../person-front-end-with-svelte/spec/index.md) — operator UI (§1–§18)
 

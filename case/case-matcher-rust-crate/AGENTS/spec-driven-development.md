@@ -1,7 +1,7 @@
 # Spec-Driven Development — Agent Guide
 
 This crate practises **spec-driven development**: the specification
-([`../spec.md`](../spec/index.md)) is the canonical artefact. Code conforms
+([`../spec/index.md`](../spec/index.md)) is the canonical artefact. Code conforms
 to the spec; not the other way around.
 
 ## What That Means In Practice
@@ -18,7 +18,7 @@ to the spec; not the other way around.
   `lib.rs`, `MatchConfig` fields, `MatchResult` / `MatchBreakdown`
   shape, deterministic-identifier scheme list), update the bridge
   test in
-  [`../case-service-rust-crate/tests/matching.rs`](../../case-service-rust-crate/tests/matching.rs)
+  [`../case-service-with-loco/tests/matching.rs`](../../case-service-with-loco/tests/matching.rs)
   in the same PR.
 
 ## When To Update Which Section
@@ -40,7 +40,7 @@ from the §1–§18 shape used by the service crates).
 | Case-number rule (same-agency gate, shape) | §11 |
 | Case-type / status score | §12 |
 | Keywords / Jaccard | §13 |
-| Data-only fields (priority, opened_date) | §14 |
+| Data-only fields (priority, opened_date, in_language) | §14 |
 | Identifier short-circuit scheme list | §15 |
 | Agency+number / same-as short-circuit | §16 |
 | Renormalisation arithmetic | §17 |
@@ -92,7 +92,7 @@ bigger, split it (`T-12a`, `T-12b`).
 | §7 Configuration | `src/config.rs` (`MatchConfig`) |
 | §8 Normalisation | `src/normalize.rs`, `AGENTS/normalization.md` |
 | §9–§13 per-component scoring | `src/matcher.rs` component fns |
-| §14 Data-only fields | `src/case.rs` (`priority`, `opened_date`) |
+| §14 Data-only fields | `src/case.rs` (`priority`, `opened_date`, `in_language`) |
 | §15–§16 short-circuits | `src/matcher.rs` deterministic gate |
 | §17 Renormalisation | `src/scoring.rs` weighted-sum helper |
 | §18 Confidence classification | `src/scoring.rs` `Confidence` |

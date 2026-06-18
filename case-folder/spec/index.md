@@ -39,6 +39,12 @@ edition exposes a JSON API; the Svelte edition is a reference UI client.
 | [purpose.md](purpose.md)           | Why this exists, the problem, who it serves                  |
 | [scope.md](scope.md)               | In scope / out of scope for the project as a whole           |
 | [domain-model.md](domain-model.md) | Entities, the five upstream services, invariants             |
+| [places.md](places.md)             | Physical place hierarchy: campus → building → floor → room → cabinet/shelf |
+| [volume.md](volume.md)             | What a volume is — a movable bundle of one patient's folders |
+| [batch.md](batch.md)               | What a batch is — a transient bulk grouping across patients (proposed) |
+| [tag-it.md](tag-it.md)             | Declare an interest in a folder, with desired dates (🚧 TODO / draft) |
+| [receive-it.md](receive-it.md)     | Confirm receiving a case folder (🚧 TODO / draft)            |
+| [scanners.md](scanners.md)         | Scanner codes & tags on folders — optical (barcode / QR) and wireless (RFID / NFC / BLE) |
 | [auth.md](auth.md)                 | Email magic-link authentication (stateless signed tokens)    |
 | [nhs-number.md](nhs-number.md)     | NHS Number Modulus 11 rules + worked examples                |
 | [architecture.md](architecture.md) | How the two editions fit together                            |

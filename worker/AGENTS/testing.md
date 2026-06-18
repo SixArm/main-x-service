@@ -16,19 +16,19 @@ entity owns the seams. Normative strategy:
 | front-end | 6 Playwright smoke tests (no live service) | `pnpm test:e2e` |
 
 Guides:
-[service `AGENTS/testing.md`](../worker-service-rust-crate/AGENTS/testing.md) ·
+[service `AGENTS/testing.md`](../worker-service-with-loco/AGENTS/testing.md) ·
 [matcher `AGENTS/testing.md`](../worker-matcher-rust-crate/AGENTS/testing.md) ·
 [front-end spec §11](../worker-front-end-with-svelte/spec/11-testing-strategy.md).
 
 ## Seam tests — the entity's own concern
 
 **Service↔matcher (exists):**
-[`tests/duplicate_detection.rs`](../worker-service-rust-crate/tests/duplicate_detection.rs)
+[`tests/duplicate_detection.rs`](../worker-service-with-loco/tests/duplicate_detection.rs)
 — 13 black-box tests pinning both the adapter's field routing and the
 matcher's scoring.
 
 ```bash
-cd worker-service-rust-crate
+cd worker-service-with-loco
 cargo test --test duplicate_detection
 ```
 

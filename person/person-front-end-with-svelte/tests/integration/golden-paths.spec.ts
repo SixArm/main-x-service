@@ -1,10 +1,10 @@
 // Golden-path integration tests for the Person front-end driven
-// against a *live* person-service-rust-crate.
+// against a *live* person-service-with-loco.
 //
 // Prerequisites:
 //   - Rust service running at PUBLIC_API_BASE_URL (default
 //     http://localhost:8080). Bring it up with
-//     `(cd ../person-service-rust-crate && docker compose up -d)`
+//     `(cd ../person-service-with-loco && docker compose up -d)`
 //     or via `bin/e2e` which health-checks first.
 //   - Postgres reachable from the service (handled by the service's
 //     docker-compose).

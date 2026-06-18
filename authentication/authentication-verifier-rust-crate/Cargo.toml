@@ -1,33 +1,32 @@
 [package]
 name = "authentication-verifier"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
-description = "Offline RS256 JWT verification for the Main X Index federation: fetch the authentication-service JWKS once, then verify peer-service bearer tokens locally — no shared secret, no per-request introspection hop."
+description = "Offline PASETO v4.public token verification for the Main X Index federation: fetch the authentication-service Ed25519 public keys once, then verify peer-service bearer tokens locally — no shared secret, no per-request introspection hop."
 license = "MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause"
 repository = "https://github.com/sixarm/authentication-verifier-rust-crate"
 readme = "README.md"
-keywords = ["jwt", "jwks", "rs256", "authentication", "verification"]
+keywords = ["paseto", "ed25519", "authentication", "verification", "token"]
 categories = ["authentication", "web-programming"]
 include = ["src/**/*", "LICENSE.md", "README.md", "CHANGELOG.md"]
 
 [features]
 default = []
-# Pull the JWKS over HTTP at boot (`Verifier::from_jwks_url`).
+# Pull the PASETO public keys over HTTP at boot (`Verifier::from_paseto_keys_url`).
 fetch = ["dep:reqwest"]
 
 [dependencies]
-jsonwebtoken = "9.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
+base64 = "0.22"
+rusty_paseto = { version = "0.10.0", default-features = false, features = ["v4_public", "serde_json"] }
 reqwest = { version = "0.12", default-features = false, features = [
   "rustls-tls",
   "json",
 ], optional = true }
 
 [dev-dependencies]
-rsa = { version = "0.9", features = ["pem"] }
-base64 = "0.22"
-sha2 = "0.10"
+ed25519-dalek = "2.2.0"
 tokio = { version = "1", features = ["rt", "macros"] }

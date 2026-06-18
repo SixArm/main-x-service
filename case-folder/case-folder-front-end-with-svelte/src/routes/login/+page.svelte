@@ -21,6 +21,7 @@
     import Form from '$lib/components/Form/Form.svelte';
     import Field from '$lib/components/Field/Field.svelte';
     import Button from '$lib/components/Button/Button.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let email = $state('');
     let emailError = $state('');
@@ -35,7 +36,7 @@
         magicLink = null;
 
         if (!email.trim()) {
-            emailError = 'Enter your email address.';
+            emailError = t('login.enterEmail');
             return;
         }
 
@@ -54,36 +55,32 @@
     }
 </script>
 
-<h2>Sign in</h2>
-<p>
-    Enter your work email address. If it is recognised, we'll send you a
-    one-time sign-in link. No password required.
-</p>
+<h2>{t('login.title')}</h2>
+<p>{t('login.intro')}</p>
 
 {#if submitError}
-    <Alert type="error" heading="Could not send sign-in link">{submitError}</Alert>
+    <Alert type="error" heading={t('login.sendError')}>{submitError}</Alert>
 {/if}
 
 {#if sent}
-    <Alert type="success" heading="Check your email">
-        If <strong>{email}</strong> matches a known account, a sign-in link is on
-        its way. The link expires in 10 minutes.
+    <Alert type="success" heading={t('login.checkEmail')}>
+        {t('login.sentPrefix')} <strong>{email}</strong> {t('login.sentBody')}
     </Alert>
     {#if magicLink}
         <!-- Dev convenience: the API exposes the link directly so you can
              click it without an email server. Never shown in production. -->
         <p class="dev-magic-link">
-            Development shortcut:
-            <a href={magicLink} data-testid="magic-link">open your sign-in link</a>
+            {t('login.devShortcut')}
+            <a href={magicLink} data-testid="magic-link">{t('login.openLink')}</a>
         </p>
     {/if}
 {:else}
-    <Form label="Sign in" onsubmit={handleSubmit}>
-        <Field label="Email address" required error={emailError}>
+    <Form label={t('login.formLabel')} onsubmit={handleSubmit}>
+        <Field label={t('login.emailLabel')} required error={emailError}>
             <input type="email" bind:value={email} required autocomplete="email" />
         </Field>
         <div class="actions">
-            <Button type="submit">Email me a sign-in link</Button>
+            <Button type="submit">{t('login.submit')}</Button>
         </div>
     </Form>
 {/if}

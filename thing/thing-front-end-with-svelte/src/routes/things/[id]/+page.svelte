@@ -18,6 +18,7 @@
     import { onMount } from "svelte";
     import { ThingRepository } from "$lib/api/things.js";
     import type { Thing } from "$lib/api/types.js";
+    import { t, translate } from "$lib/i18n.svelte.js";
 
     const repo = ThingRepository.withFetch();
     let thing = $state<Thing | null>(null);
@@ -39,7 +40,7 @@
 
     // Soft-delete the Thing after explicit confirmation, then return to list.
     async function handleDelete() {
-        if (!confirm("Soft-delete this thing? This cannot be undone via the UI.")) return;
+        if (!confirm(t("detail.confirmDelete"))) return;
         try {
             await repo.softDelete(id);
             goto("/things");
@@ -51,44 +52,44 @@
     // Render an identifier's scheme as a label, handling the Custom variant.
     // The conditional type extracts the element type of the identifiers array.
     function identifierLabel(t: Thing["identifiers"] extends (infer U)[] | undefined ? U : never): string {
-        return typeof t.property_id === "string" ? t.property_id : `Custom: ${t.property_id.Custom}`;
+        return typeof t.property_id === "string" ? t.property_id : `${translate("detail.customPrefix")}${t.property_id.Custom}`;
     }
 </script>
 
 <svelte:head><title>Thing · {id}</title></svelte:head>
 
 {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{t("detail.loading")}</p>
 {:else if error}
     <div class="banner error">{error}</div>
 {:else if thing}
     <header class="row" style="justify-content: space-between">
         <h1>{thing.name}</h1>
         <div class="row">
-            <a href={`/things/${id}/edit`} class="button">Edit</a>
-            <a href={`/things/${id}/audit`} class="button">Audit</a>
-            <button class="button danger" onclick={handleDelete}>Delete</button>
+            <a href={`/things/${id}/edit`} class="button">{t("detail.edit")}</a>
+            <a href={`/things/${id}/audit`} class="button">{t("detail.audit")}</a>
+            <button class="button danger" onclick={handleDelete}>{t("detail.delete")}</button>
         </div>
     </header>
 
     <section class="surface stack">
-        <h2>Identity</h2>
+        <h2>{t("detail.identity")}</h2>
         <dl class="kv">
-            <dt>ID</dt><dd><code>{thing.id}</code></dd>
-            <dt>Additional type</dt>
+            <dt>{t("detail.id")}</dt><dd><code>{thing.id}</code></dd>
+            <dt>{t("detail.additionalType")}</dt>
             <dd>{#if thing.additional_type}<a href={thing.additional_type} target="_blank" rel="noopener">{thing.additional_type}</a>{:else}—{/if}</dd>
-            <dt>Description</dt><dd>{thing.description ?? "—"}</dd>
-            <dt>Disambiguating</dt><dd>{thing.disambiguating_description ?? "—"}</dd>
-            <dt>URL</dt><dd>{#if thing.url}<a href={thing.url} target="_blank" rel="noopener">{thing.url}</a>{:else}—{/if}</dd>
-            <dt>Owner</dt><dd>{thing.owner ?? "—"}</dd>
-            <dt>Main entity of page</dt>
+            <dt>{t("detail.description")}</dt><dd>{thing.description ?? "—"}</dd>
+            <dt>{t("detail.disambiguating")}</dt><dd>{thing.disambiguating_description ?? "—"}</dd>
+            <dt>{t("detail.url")}</dt><dd>{#if thing.url}<a href={thing.url} target="_blank" rel="noopener">{thing.url}</a>{:else}—{/if}</dd>
+            <dt>{t("detail.owner")}</dt><dd>{thing.owner ?? "—"}</dd>
+            <dt>{t("detail.mainEntityOfPage")}</dt>
             <dd>{#if thing.main_entity_of_page}<a href={thing.main_entity_of_page} target="_blank" rel="noopener">{thing.main_entity_of_page}</a>{:else}—{/if}</dd>
         </dl>
     </section>
 
     {#if thing.identifiers && thing.identifiers.length > 0}
         <section class="surface stack">
-            <h2>Identifiers</h2>
+            <h2>{t("detail.identifiers")}</h2>
             <ul>
                 {#each thing.identifiers as identifier}
                     <li>
@@ -103,7 +104,7 @@
 
     {#if thing.alternate_names && thing.alternate_names.length > 0}
         <section class="surface stack">
-            <h2>Alternate names</h2>
+            <h2>{t("detail.alternateNames")}</h2>
             <ul>
                 {#each thing.alternate_names as alt}<li>{alt}</li>{/each}
             </ul>
@@ -112,7 +113,7 @@
 
     {#if thing.same_as && thing.same_as.length > 0}
         <section class="surface stack">
-            <h2>Same-as (authoritative URLs)</h2>
+            <h2>{t("detail.sameAs")}</h2>
             <ul>
                 {#each thing.same_as as href}<li><a {href} target="_blank" rel="noopener">{href}</a></li>{/each}
             </ul>
@@ -121,7 +122,7 @@
 
     {#if thing.images && thing.images.length > 0}
         <section class="surface stack">
-            <h2>Images</h2>
+            <h2>{t("detail.images")}</h2>
             <ul>
                 {#each thing.images as src}<li><a href={src} target="_blank" rel="noopener">{src}</a></li>{/each}
             </ul>

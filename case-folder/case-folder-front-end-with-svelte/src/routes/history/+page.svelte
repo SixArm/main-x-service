@@ -15,6 +15,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let { data } = $props();
 
@@ -38,30 +39,30 @@
     }
 </script>
 
-<BackLink href="/">Back to dashboard</BackLink>
+<BackLink href="/">{t('history.backToDashboard')}</BackLink>
 
 <div class="toolbar">
-    <h2>Move history (audit log)</h2>
+    <h2>{t('history.heading')}</h2>
     <input
         type="search"
         bind:value={query}
         oninput={onSearchInput}
-        placeholder="Filter by patient, NHS number, cabinet, or porter"
-        aria-label="Filter audit log"
+        placeholder={t('history.filterPlaceholder')}
+        aria-label={t('history.filterLabel')}
     />
 </div>
 
 <div class="panel">
-    <DataTable label="Move audit log" caption="Every recorded movement of a paper folder, newest first">
+    <DataTable label={t('history.tableLabel')} caption={t('history.tableCaption')}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">When</th>
-                <th scope="col">NHS Number</th>
-                <th scope="col">Patient</th>
-                <th scope="col">From</th>
-                <th scope="col">To</th>
-                <th scope="col">Moved by</th>
-                <th scope="col">Reason</th>
+                <th scope="col">{t('common.when')}</th>
+                <th scope="col">{t('common.nhsNumber')}</th>
+                <th scope="col">{t('common.patient')}</th>
+                <th scope="col">{t('common.from')}</th>
+                <th scope="col">{t('common.to')}</th>
+                <th scope="col">{t('common.movedBy')}</th>
+                <th scope="col">{t('common.reason')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>
@@ -86,7 +87,7 @@
             {/each}
             {#if cache.moves.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={7}>No moves match your filter.</DataTableTD>
+                    <DataTableTD colspan={7}>{t('history.noMatch')}</DataTableTD>
                 </DataTableRow>
             {/if}
         </DataTableBody>

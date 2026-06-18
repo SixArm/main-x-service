@@ -12,6 +12,7 @@
     import MatchResultsList from "$lib/components/MatchResultsList.svelte";
     import { EventRepository } from "$lib/api/events.js";
     import { ApiError } from "$lib/api/client.js";
+    import { t, translate } from "$lib/i18n.svelte.js";
     import type { Event, MatchResult } from "$lib/api/types.js";
 
     const repo = EventRepository.withFetch();
@@ -41,7 +42,7 @@
         } catch (err) {
             if (err instanceof ApiError && err.isConflict && Array.isArray(err.details)) {
                 duplicates = err.details as MatchResult[];
-                throw new Error(`Duplicates detected (${duplicates.length}) — review below before resubmitting.`);
+                throw new Error(translate("new.duplicatesDetected").replace("{n}", String(duplicates.length)));
             }
             throw err;
         }
@@ -50,12 +51,12 @@
 
 <svelte:head><title>New event · Event Service</title></svelte:head>
 
-<header><h1>New event</h1></header>
+<header><h1>{t("new.title")}</h1></header>
 
 <section class="surface stack">
-    <EventForm initial={blank} submitLabel="Create" onsubmit={handleSubmit} />
+    <EventForm initial={blank} submitLabel={t("new.create")} onsubmit={handleSubmit} />
 </section>
 
 {#if duplicates.length > 0}
-    <MatchResultsList results={duplicates} title="Possible duplicates" />
+    <MatchResultsList results={duplicates} title={t("new.duplicatesTitle")} />
 {/if}

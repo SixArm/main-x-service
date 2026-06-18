@@ -15,5 +15,5 @@ Topic-specific guides for working in this crate. Start with
 
 ## Related projects
 
-- [`../../organization-service-rust-crate/`](../../organization-service-rust-crate/) — embedding service
+- [`../../organization-service-with-loco/`](../../organization-service-with-loco/) — embedding service
 - [`../../organization-front-end-with-svelte/`](../../organization-front-end-with-svelte/) — front-end consumer

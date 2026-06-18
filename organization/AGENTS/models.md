@@ -57,8 +57,8 @@ comparison contribute to the address score.
 
 ## Persistence row (service)
 
-**Files:** [`src/models/organizations.rs`](../organization-service-rust-crate/src/models/organizations.rs),
-[`migration/src/m20220101_000001_organizations.rs`](../organization-service-rust-crate/migration/src/m20220101_000001_organizations.rs)
+**Files:** [`src/models/organizations.rs`](../organization-service-with-loco/src/models/organizations.rs),
+[`migration/src/m20220101_000001_organizations.rs`](../organization-service-with-loco/migration/src/m20220101_000001_organizations.rs)
 
 | Column | Type | Notes |
 |---|---|---|
@@ -70,18 +70,18 @@ comparison contribute to the address score.
 | deleted_at | timestamptz null | Soft delete; reads filter `IS NULL` |
 
 Audit row (`audit_logs`,
-[`src/models/audit_logs.rs`](../organization-service-rust-crate/src/models/audit_logs.rs)):
+[`src/models/audit_logs.rs`](../organization-service-with-loco/src/models/audit_logs.rs)):
 `entity_pid`, `action` (created/updated/deleted), `actor` (null until
 auth lands), `snapshot` (JSONB).
 
 Event (`OrgEvent`,
-[`src/streaming.rs`](../organization-service-rust-crate/src/streaming.rs)):
+[`src/streaming.rs`](../organization-service-with-loco/src/streaming.rs)):
 `{kind, pid, name, seq}` in an in-memory ring buffer (capacity 1 000).
 
 ## Wire-only response shapes (service)
 
 Defined in
-[`src/controllers/organizations.rs`](../organization-service-rust-crate/src/controllers/organizations.rs):
+[`src/controllers/organizations.rs`](../organization-service-with-loco/src/controllers/organizations.rs):
 
 - `OrgRef` — `{pid, name}` (create / update / list / search).
 - `ScoredRef` — `{pid, name, score, confidence, is_match}`

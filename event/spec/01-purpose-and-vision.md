@@ -15,7 +15,7 @@ The entity ships as a trio of subprojects:
 
 | Subproject | Role |
 |---|---|
-| [event-service-rust-crate](../event-service-rust-crate/) | System of record — CRUD, search, matching, merge, audit, privacy, REST API |
+| [event-service-with-loco](../event-service-with-loco/) | System of record — CRUD, search, matching, merge, audit, privacy, REST API |
 | [event-matcher-rust-crate](../event-matcher-rust-crate/) | Canonical pairwise comparison library, embedded by the service |
 | [event-front-end-with-svelte](../event-front-end-with-svelte/) | Operator UI over the service's REST API |
 

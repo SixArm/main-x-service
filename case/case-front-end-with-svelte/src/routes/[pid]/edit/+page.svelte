@@ -14,6 +14,7 @@
   import CaseForm from "$lib/components/CaseForm.svelte";
   import { CaseRepository } from "$lib/api/cases";
   import type { Case } from "$lib/api/types";
+  import { t } from "$lib/i18n.svelte";
 
   const repo = CaseRepository.withFetch();
   // Route param; `?? ""` satisfies strict typing (params may be undefined).
@@ -28,7 +29,7 @@
     try {
       record = await repo.get(pid);
     } catch (err) {
-      error = err instanceof Error ? err.message : "Not found";
+      error = err instanceof Error ? err.message : t("edit.notFound");
     } finally {
       loading = false;
     }
@@ -44,16 +45,16 @@
 <svelte:head><title>Edit {record?.title ?? "case"} — Main X</title></svelte:head
 >
 
-<h1>Edit case</h1>
+<h1>{t("edit.title")}</h1>
 
 {#if loading}
-  <p>Loading…</p>
+  <p>{t("edit.loading")}</p>
 {:else if error}
   <p class="banner" role="alert">{error}</p>
 {:else if record}
   <CaseForm
     initial={record}
-    submitLabel="Save changes"
+    submitLabel={t("edit.saveChanges")}
     onsubmit={handleSubmit}
   />
 {/if}

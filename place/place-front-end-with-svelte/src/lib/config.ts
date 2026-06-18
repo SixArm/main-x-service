@@ -1,16 +1,15 @@
-// REST API base URL. Configured via PUBLIC_API_BASE_URL. Falls back to
-// the service crate's default (8080). We read via `import.meta.env`
-// (Vite build-time injection) rather than SvelteKit's `$env/dynamic/public`
-// so this module loads cleanly under vitest, which doesn't run the
-// SvelteKit Vite plugin.
-// Narrow `import.meta` to expose the optional Vite `env` bag without
-// asserting it always exists (vitest runs this module with no Vite env).
-const meta = import.meta as ImportMeta & { env?: Record<string, string | undefined> };
+// Build/runtime configuration for the place operator front-end.
+//
+// API calls go to the same-origin BFF proxy (`/api/proxy/...`), whose
+// server handler injects the server-exchanged PASETO and forwards to the
+// place service. The browser never holds a token (see
+// `agents/share/authentication-sessions.md`). Sign-in is the app's own
+// `/signin` (per-app magic-link login), not a cross-origin token handoff.
+
 /**
- * Base URL of the Place Service REST API, resolved once at module load.
- *
- * Read from the Vite build-time variable `PUBLIC_API_BASE_URL` so the
- * value is baked into the bundle; falls back to the service crate's
- * local default (port 8080) when the variable is unset (e.g. in tests).
+ * Base URL the API client posts to: the same-origin BFF proxy. Absolute
+ * (rooted at `location.origin`) so the client's `new URL(path, base)`
+ * resolves; falls back to the dev origin under SSR/tests.
  */
-export const API_BASE_URL: string = meta.env?.PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+export const API_BASE_URL: string =
+    (typeof location !== "undefined" ? location.origin : "http://localhost:5173") + "/api/proxy";

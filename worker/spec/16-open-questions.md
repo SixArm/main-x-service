@@ -1,7 +1,7 @@
 ## 16. Open Questions
 
 Entity-level questions only. Crate-internal OQs live in
-[service §16](../worker-service-rust-crate/spec/16-open-questions.md),
+[service §16](../worker-service-with-loco/spec/16-open-questions.md),
 [matcher §22](../worker-matcher-rust-crate/spec/22-open-questions-and-risks.md),
 [front-end §16](../worker-front-end-with-svelte/spec/16-open-questions.md).
 Resolved questions move into the relevant section and are deleted

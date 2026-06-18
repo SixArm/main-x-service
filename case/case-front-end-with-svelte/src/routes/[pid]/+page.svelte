@@ -16,6 +16,7 @@
   import { page } from "$app/state";
   import { CaseRepository } from "$lib/api/cases";
   import type { Case, ScoredRef } from "$lib/api/types";
+  import { t } from "$lib/i18n.svelte";
 
   const repo = CaseRepository.withFetch();
   // Route param; `?? ""` satisfies strict typing (params may be undefined).
@@ -32,7 +33,7 @@
     try {
       record = await repo.get(pid);
     } catch (err) {
-      error = err instanceof Error ? err.message : "Not found";
+      error = err instanceof Error ? err.message : t("detail.notFound");
     } finally {
       loading = false;
     }
@@ -53,7 +54,7 @@
       const hits = await repo.checkDuplicates(record);
       duplicates = hits.filter((h) => h.pid !== pid);
     } catch (err) {
-      error = err instanceof Error ? err.message : "Check failed";
+      error = err instanceof Error ? err.message : t("detail.checkFailed");
     } finally {
       checking = false;
     }
@@ -63,7 +64,7 @@
 <svelte:head><title>{record?.title ?? "Case"} — Main X</title></svelte:head>
 
 {#if loading}
-  <p>Loading…</p>
+  <p>{t("detail.loading")}</p>
 {:else if error}
   <p class="banner" role="alert">{error}</p>
 {:else if record}
@@ -71,7 +72,7 @@
   <div class="surface stack">
     {#if record.case_type}
       <div>
-        <strong>Case type:</strong>
+        <strong>{t("detail.caseType")}</strong>
         {typeof record.case_type === "string"
           ? record.case_type
           : record.case_type.Custom}
@@ -79,33 +80,33 @@
     {/if}
     {#if record.status}
       <div>
-        <strong>Status:</strong>
+        <strong>{t("detail.status")}</strong>
         {typeof record.status === "string"
           ? record.status
           : record.status.Custom}
       </div>
     {/if}
     {#if record.priority}<div>
-        <strong>Priority:</strong>
+        <strong>{t("detail.priority")}</strong>
         {record.priority}
       </div>{/if}
     {#if record.agency_name}<div>
-        <strong>Agency:</strong>
+        <strong>{t("detail.agency")}</strong>
         {record.agency_name}
       </div>{/if}
     {#if record.case_number}
-      <div><strong>Case number:</strong> <code>{record.case_number}</code></div>
+      <div><strong>{t("detail.caseNumber")}</strong> <code>{record.case_number}</code></div>
     {/if}
     {#if record.opened_date}<div>
-        <strong>Opened:</strong>
+        <strong>{t("detail.opened")}</strong>
         {record.opened_date}
       </div>{/if}
     {#if record.subjects && record.subjects.length > 0}
-      <div><strong>Subjects:</strong> {record.subjects.join(", ")}</div>
+      <div><strong>{t("detail.subjects")}</strong> {record.subjects.join(", ")}</div>
     {/if}
     {#if record.identifiers && record.identifiers.length > 0}
       <div>
-        <strong>Identifiers:</strong>
+        <strong>{t("detail.identifiers")}</strong>
         <ul>
           {#each record.identifiers as id, i (i)}
             <li>
@@ -119,24 +120,24 @@
       </div>
     {/if}
     {#if record.keywords && record.keywords.length > 0}
-      <div><strong>Keywords:</strong> {record.keywords.join(", ")}</div>
+      <div><strong>{t("detail.keywords")}</strong> {record.keywords.join(", ")}</div>
     {/if}
-    <div><strong>ID:</strong> <code>{pid}</code></div>
+    <div><strong>{t("detail.id")}</strong> <code>{pid}</code></div>
   </div>
 
   <div class="row" style="margin-top:1rem">
-    <a class="button" href={`/${pid}/edit`}>Edit</a>
+    <a class="button" href={`/${pid}/edit`}>{t("detail.edit")}</a>
     <button class="button" onclick={handleCheckDuplicates} disabled={checking}>
-      {checking ? "Checking…" : "Check duplicates"}
+      {checking ? t("detail.checking") : t("detail.checkDuplicates")}
     </button>
-    <button onclick={handleDelete}>Delete</button>
+    <button onclick={handleDelete}>{t("detail.delete")}</button>
   </div>
 
   <!-- `duplicates` is null before any check; show results only once run. -->
   {#if duplicates}
-    <h2>Potential duplicates</h2>
+    <h2>{t("detail.potentialDuplicates")}</h2>
     {#if duplicates.length === 0}
-      <p>None above the match threshold.</p>
+      <p>{t("detail.noneAboveThreshold")}</p>
     {:else}
       <ul class="stack">
         {#each duplicates as dup (dup.pid)}

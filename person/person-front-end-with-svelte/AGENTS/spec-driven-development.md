@@ -21,7 +21,7 @@ This is a thin presentation layer over a system of record. There are
 **two** specs in play:
 
 1. **Service spec** —
-   [`../../person-service-rust-crate/spec.md`](../../person-service-rust-crate/spec/index.md)
+   [`../../person-service-with-loco/spec.md`](../../person-service-with-loco/spec/index.md)
    — describes the API contract. If `Person` loses a field server-side,
    fix `src/lib/api/types.ts` here; do not let the front-end drift.
 2. **Front-end spec** — [`../spec.md`](../spec/index.md) — describes

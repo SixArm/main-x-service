@@ -1,7 +1,7 @@
 ## 14. Implementation Status
 
 Honest snapshot. The entity delivers CRUD + matching + audit +
-streaming + merge + JWT verification + OpenAPI. Aspirational items live
+streaming + merge + offline token verification + OpenAPI. Aspirational items live
 in §15, not here. The headline gap — **privacy controls (masking /
 GDPR export)** — is honest and high-priority because case data is
 personal data (§12).
@@ -22,7 +22,7 @@ personal data (§12).
 | service | Matching endpoints | `/match` (rank explicit candidates), `/check-duplicates` (scan ≤ `CHECK_DUPLICATES_SCAN_CAP` rows, WARN at cap, ranked hits) |
 | service | Audit + streaming | `audit_logs` table + best-effort row per CRUD/merge (action + snapshot + `actor`); in-memory `CaseEvent` stream (cap 1 000); read at `/audit/recent`, `/{pid}/audit`, `/events/recent` |
 | service | Record merge | `POST /merge` folds a duplicate into a survivor (union fields, former-title alias, soft-delete, `merge_records` history, `Merged` event); pure `src/merge.rs`; `/merges/recent` history |
-| service | JWT verification | Offline RS256 verification against the auth-service JWKS (`src/auth.rs`, embeds `authentication-verifier`); `AuthUser`/`MaybeAuthUser`; `/whoami` protected; audit/merge `actor` stamped from the token |
+| service | Token verification | Offline bearer-token verification against the auth-service's published key (`src/auth.rs`, embeds `authentication-verifier`); `AuthUser`/`MaybeAuthUser`; `/whoami` protected; audit/merge `actor` stamped from the token. Credential is switching RS256-JWT → PASETO v4 public per [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md) (source of truth; supersedes RS256-JWT + JWKS), §13 T-7 |
 | service | API docs | OpenAPI 3 (`src/openapi.rs`, hand-written) + Swagger UI at `/api-docs/openapi.json` · `/swagger-ui` |
 | service | Tests | DB-free `tests/matching.rs` + module unit tests (validation, merge, streaming, auth crypto, openapi, scan-cap); request-level loco tests `tests/requests/cases.rs` (`#[ignore]`-gated on Postgres); green build + clippy |
 | front-end | Routes | `/`, `/new`, `/[pid]` (detail + delete + check-duplicates), `/[pid]/edit` |
@@ -41,7 +41,7 @@ Open gaps drive tasks in §13. Live gap list:
 | Event streaming is in-memory only (process-local ring buffer); no durable broker, no cross-replica delivery | T-12 / §15 |
 | Title search is Postgres `ILIKE` only — no full-text/fuzzy search over the JSONB payload, and `check-duplicates` still full-scans (capped at 1 000 rows) rather than using search-blocked candidates | T-6 |
 | No front-end search box, audit view, or event view (service endpoints exist ahead of the UI) | T-11 |
-| JWT verification exists (extractor + `/whoami` + audit `actor`) but is not yet *enforced* on every `/api/*` route, and the JWKS is injected via env rather than fetched from the auth service | T-7 follow-up |
+| Token verification exists (extractor + `/whoami` + audit `actor`) but is not yet *enforced* on every `/api/*` route, the credential is not yet switched to PASETO v4 public per [`authentication-sessions.md`](../../agents/share/authentication-sessions.md), and the published key is injected via env rather than fetched from the auth service | T-7 follow-up |
 | Record merge has no front-end action yet (backend `POST /merge` is done) | T-8 follow-up / T-11 |
 | Request-level tests exist but are `#[ignore]`-gated; no DB-backed run wired into CI yet | T-4 follow-up |
 | No deeper validation (docket / case-number format, status transitions) | T-9 follow-up |

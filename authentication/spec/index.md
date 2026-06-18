@@ -2,13 +2,16 @@
 
 > **Source of truth — scoped.** Each subproject's own `spec/` remains
 > the single source of truth **for that subproject** (the
-> [service spec](../authentication-service-rust-crate/spec/index.md) and
+> [service spec](../authentication-service-with-loco/spec/index.md) and
 > the [front-end spec](../authentication-front-end-with-svelte/spec/index.md),
 > and the [verifier spec](../authentication-verifier-rust-crate/spec/index.md)).
 > This entity-level spec
 > is the source of truth for the **cross-subproject contract**: the SSO
-> protocol surface (magic-link flow, JWT claims, JWKS), the
-> verifier-library contract peer services embed, and entity-wide goals.
+> protocol surface (magic-link flow, cookie sessions, PASETO v4.public
+> claims, published Ed25519 keys), the verifier-library contract peer
+> services embed, and entity-wide goals. As of 2026-06-17 this entity
+> has pivoted off JWT-for-sessions per
+> [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
 > When this spec and a crate spec disagree about **crate internals**,
 > the crate spec wins; about the **integration contract**, this spec
 > wins. Open a task in §13 to reconcile — do not silently rewrite
@@ -22,7 +25,7 @@ The authentication entity is **different from its siblings**: there is
 no matcher crate and nothing to match. Instead of a
 service + matcher + front-end trio, it ships a
 service + **verifier library** + front-end trio — the verifier is what
-peer services embed to verify RS256 tokens offline. Where sibling
+peer services embed to verify PASETO v4.public tokens offline. Where sibling
 entities carry `AGENTS/matching.md`, this entity carries
 [`AGENTS/verification.md`](../AGENTS/verification.md).
 

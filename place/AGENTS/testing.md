@@ -8,7 +8,7 @@ the bridge tests if you went near the adapter.
 
 | Subproject | Run | Inventory | Guide |
 |---|---|---|---|
-| place-service | `cargo test` (+ `cargo bench`) | 104 unit + 67 integration + 14 bridge tests + 16 Criterion benchmarks | [service AGENTS/testing.md](../place-service-rust-crate/AGENTS/testing.md) |
+| place-service | `cargo test` (+ `cargo bench`) | 104 unit + 67 integration + 14 bridge tests + 16 Criterion benchmarks | [service AGENTS/testing.md](../place-service-with-loco/AGENTS/testing.md) |
 | place-matcher | `cargo test` + `cargo clippy --all-targets -- -D warnings` + `cargo doc --no-deps` | unit + integration + property tests + doctests; all three commands must be clean before declaring success | [matcher AGENTS/testing.md](../place-matcher-rust-crate/AGENTS/testing.md) |
 | place-front-end | `pnpm test` (Vitest) + `pnpm test:e2e` (Playwright) + `pnpm check` | 8 unit (mocked fetch) + 6 e2e smoke (run without a live service) | [front-end AGENTS/testing.md](../place-front-end-with-svelte/AGENTS/testing.md) |
 
@@ -17,11 +17,11 @@ the bridge tests if you went near the adapter.
 ### Service ↔ matcher: the bridge suite
 
 ```bash
-cd place-service-rust-crate
+cd place-service-with-loco
 cargo test --test duplicate_detection
 ```
 
-[`tests/duplicate_detection.rs`](../place-service-rust-crate/tests/duplicate_detection.rs)
+[`tests/duplicate_detection.rs`](../place-service-with-loco/tests/duplicate_detection.rs)
 drives service records through `adapter::to_matcher_place` into
 `MatchingEngine::match_places`, pinning both the adapter routing rules
 (entity [spec §5.3](../spec/05-domain-model.md)) and the matcher's

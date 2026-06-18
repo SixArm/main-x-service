@@ -2,10 +2,10 @@
 
 ### Subproject documentation
 
-- Service: [spec](../person-service-rust-crate/spec/index.md) ·
-  [AGENTS](../person-service-rust-crate/AGENTS/index.md) ·
-  [README](../person-service-rust-crate/README.md) ·
-  [index](../person-service-rust-crate/index.md)
+- Service: [spec](../person-service-with-loco/spec/index.md) ·
+  [AGENTS](../person-service-with-loco/AGENTS/index.md) ·
+  [README](../person-service-with-loco/README.md) ·
+  [index](../person-service-with-loco/index.md)
 - Matcher: [spec](../person-matcher-rust-crate/spec/index.md) ·
   [AGENTS.md](../person-matcher-rust-crate/AGENTS.md) ·
   [README](../person-matcher-rust-crate/README.md) ·

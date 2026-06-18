@@ -1,10 +1,10 @@
 # Agent guide — person-front-end-with-svelte
 
-Sibling to [`person-service-rust-crate/`](../person-service-rust-crate/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
+Sibling to [`person-service-with-loco/`](../person-service-with-loco/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
 
 ## Single source of truth
 
-- The service's [`spec.md`](../person-service-rust-crate/spec/index.md) and [`AGENTS/`](../person-service-rust-crate/AGENTS/) describe the API contract. If a field disappears from `Person` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
+- The service's [`spec.md`](../person-service-with-loco/spec/index.md) and [`AGENTS/`](../person-service-with-loco/AGENTS/) describe the API contract. If a field disappears from `Person` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
 - This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
 
 ## Three-part change rule

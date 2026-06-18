@@ -15,6 +15,7 @@
     import { page } from "$app/state";
     import OrganizationForm from "$lib/components/OrganizationForm.svelte";
     import { OrganizationRepository } from "$lib/api/organizations";
+    import { t } from "$lib/i18n.svelte";
     import type { Organization } from "$lib/api/types";
 
     const repo = OrganizationRepository.withFetch();
@@ -30,7 +31,7 @@
         try {
             org = await repo.get(pid);
         } catch (err) {
-            error = err instanceof Error ? err.message : "Not found";
+            error = err instanceof Error ? err.message : t("edit.notFound");
         } finally {
             loading = false;
         }
@@ -43,14 +44,14 @@
     }
 </script>
 
-<svelte:head><title>Edit {org?.name ?? "organization"} — Main X</title></svelte:head>
+<svelte:head><title>{t("edit.title")}: {org?.name ?? t("edit.organizationFallback")} — Main X</title></svelte:head>
 
-<h1>Edit organization</h1>
+<h1>{t("edit.title")}</h1>
 
 {#if loading}
-    <p>Loading…</p>
+    <p>{t("edit.loading")}</p>
 {:else if error}
     <p class="banner" role="alert">{error}</p>
 {:else if org}
-    <OrganizationForm initial={org} submitLabel="Save changes" onsubmit={handleSubmit} />
+    <OrganizationForm initial={org} submitLabel={t("edit.saveChanges")} onsubmit={handleSubmit} />
 {/if}

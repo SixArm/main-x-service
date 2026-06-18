@@ -17,6 +17,7 @@
     import { onMount } from "svelte";
     import PersonForm from "$lib/components/PersonForm.svelte";
     import { PersonRepository } from "$lib/api/persons.js";
+    import { t } from "$lib/i18n.svelte.js";
     import type { Person } from "$lib/api/types.js";
 
     const repo = PersonRepository.withFetch();
@@ -45,19 +46,19 @@
     }
 </script>
 
-<svelte:head><title>Edit person · {id}</title></svelte:head>
+<svelte:head><title>{t("edit.head.title.prefix")}{id}</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Edit person</h1>
-    <a href={`/persons/${id}`} class="button">Cancel</a>
+    <h1>{t("edit.title")}</h1>
+    <a href={`/persons/${id}`} class="button">{t("edit.cancel")}</a>
 </header>
 
 {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{t("edit.loading")}</p>
 {:else if error}
     <div class="banner error">{error}</div>
 {:else if person}
     <section class="surface stack">
-        <PersonForm initial={person} submitLabel="Save changes" onsubmit={handleSubmit} />
+        <PersonForm initial={person} submitLabel={t("edit.save")} onsubmit={handleSubmit} />
     </section>
 {/if}

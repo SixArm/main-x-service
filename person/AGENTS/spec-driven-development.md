@@ -11,7 +11,7 @@ way around.
 
 | Question | Authoritative spec |
 |---|---|
-| What fields does the service `Person` have? What are the match weights? | [service spec](../person-service-rust-crate/spec/index.md) |
+| What fields does the service `Person` have? What are the match weights? | [service spec](../person-service-with-loco/spec/index.md) |
 | How does the matcher score? Which identifier schemes exist? | [matcher spec](../person-matcher-rust-crate/spec/index.md) |
 | What routes / components does the UI have? | [front-end spec](../person-front-end-with-svelte/spec/index.md) |
 | How does the trio compose? What is the adapter contract? What invariants are shared? | [entity spec](../spec/index.md) |
@@ -28,7 +28,7 @@ A behavioural change is one PR: **spec edit + code edit + test edit**.
 
 - Change inside one subproject → that subproject's spec + code +
   tests. Follow its own SDD guide:
-  [service](../person-service-rust-crate/AGENTS/spec-driven-development.md),
+  [service](../person-service-with-loco/AGENTS/spec-driven-development.md),
   [matcher](../person-matcher-rust-crate/AGENTS/spec-driven-development.md),
   [front-end](../person-front-end-with-svelte/AGENTS.md).
 - Change touching a **seam** (adapter routing, wire types, shared

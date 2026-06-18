@@ -278,6 +278,41 @@ fn one_to_many_handles_empty_candidates() {
     assert!(engine.find_matches(&query, &[]).is_empty());
 }
 
+// ─── Deliberately-unscored fields ────────────────────────────────────
+
+// Pins, via the public surface, that `learning_resource_type` and
+// `in_language` carry no scoring weight: cross-language matching is out
+// of scope (spec §2.2) and `learning_resource_type` is modelled but not
+// scored. Inputs differing only in these fields must score identically.
+#[test]
+fn learning_resource_type_and_in_language_are_unscored() {
+    let engine = MatchingEngine::default_config();
+
+    let mut a = Course::new("Introduction to Computer Science");
+    a.keywords = vec!["programming".into()];
+    a.learning_resource_type = Some(LearningResourceType::Lecture);
+    a.in_language = vec!["en".into()];
+
+    let mut b = a.clone();
+    b.learning_resource_type = Some(LearningResourceType::Workshop);
+    b.in_language = vec!["fr".into()];
+
+    let baseline = {
+        let mut c = a.clone();
+        c.learning_resource_type = None;
+        c.in_language = vec![];
+        c
+    };
+
+    let differing = engine.match_courses(&a, &b);
+    let absent = engine.match_courses(&a, &baseline);
+    assert!((differing.score - absent.score).abs() < 1e-12);
+    // The breakdown exposes no component for either field.
+    let json = serde_json::to_string(&differing.breakdown).expect("serialize");
+    assert!(!json.contains("learning_resource_type"));
+    assert!(!json.contains("in_language"));
+}
+
 // ─── Result serialisation ────────────────────────────────────────────
 
 // Pins that a `MatchResult` serialises with its key fields present —

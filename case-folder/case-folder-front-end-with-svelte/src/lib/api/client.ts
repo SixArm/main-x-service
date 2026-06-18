@@ -740,4 +740,15 @@ export const api = {
     }
 };
 
-export { toBuilding, toCabinet, toFolder, toMove, toPatient, toRoom, toStats, toWorker };
+export {
+    toBuilding,
+    toCabinet,
+    toFolder,
+    toMove,
+    toPatient,
+    toRoom,
+    toStats,
+    toVolume,
+    toVolumeDetail,
+    toWorker
+};

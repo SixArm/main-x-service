@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { ApiClient } from "$lib/api/client";
+import { ApiClient, ApiError } from "$lib/api/client";
 import { CarePathwayRepository } from "$lib/api/care-pathways";
 import type { CarePathway } from "$lib/api/types";
 
@@ -19,6 +19,19 @@ function spyClient() {
     new ApiClient({ baseUrl: "http://svc.test", fetch: fetchFn }),
   );
   return { repo, calls };
+}
+
+/** A repository whose backing fetch returns a fixed error status/body. */
+function failingRepo(status: number, body: unknown) {
+  const fetchFn = vi.fn(async () => {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  }) as unknown as typeof fetch;
+  return new CarePathwayRepository(
+    new ApiClient({ baseUrl: "http://svc.test", fetch: fetchFn }),
+  );
 }
 
 const pathway: CarePathway = {
@@ -115,6 +128,29 @@ describe("CarePathwayRepository", () => {
     expect(calls[0]?.init.body).toBe(
       JSON.stringify({ main_pid: "m1", duplicate_pid: "d1" }),
     );
+  });
+
+  it("merge() propagates a 404 ApiError (unknown pid) for the detail-page error banner", async () => {
+    // The detail page surfaces this via the error banner (spec §6.7).
+    const repo = failingRepo(404, { error: "care pathway not found" });
+    await expect(repo.merge("m1", "missing")).rejects.toMatchObject({
+      name: "ApiError",
+      status: 404,
+    });
+  });
+
+  it("merge() propagates a 422 ApiError (service-side equal-pid rejection)", async () => {
+    // The UI guards equal pids client-side; the service also 422s. Pin
+    // that the repository surfaces it as a classified ApiError.
+    const repo = failingRepo(422, { error: "cannot merge a record into itself" });
+    let err: ApiError | undefined;
+    try {
+      await repo.merge("same", "same");
+    } catch (e) {
+      err = e as ApiError;
+    }
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err?.status).toBe(422);
   });
 
   it("audit() GETs the per-pathway audit endpoint", async () => {

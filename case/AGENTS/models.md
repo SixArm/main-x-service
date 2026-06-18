@@ -50,8 +50,8 @@ substantive case content in free-text fields.
 ## Service persistence model
 
 **Files:**
-[`src/models/cases.rs`](../case-service-rust-crate/src/models/cases.rs),
-[`migration/src/m20220101_000001_cases.rs`](../case-service-rust-crate/migration/src/m20220101_000001_cases.rs)
+[`src/models/cases.rs`](../case-service-with-loco/src/models/cases.rs),
+[`migration/src/m20220101_000001_cases.rs`](../case-service-with-loco/migration/src/m20220101_000001_cases.rs)
 
 One `cases` table: `id` (PK), `pid` (public UUID), `title`
 (denormalised from `data.title`), `data` (JSONB `Case`), `active`,
@@ -62,7 +62,7 @@ One `cases` table: `id` (PK), `pid` (public UUID), `title`
 
 ## Wire DTOs (service controller)
 
-**File:** [`src/controllers/cases.rs`](../case-service-rust-crate/src/controllers/cases.rs)
+**File:** [`src/controllers/cases.rs`](../case-service-with-loco/src/controllers/cases.rs)
 
 | Type | Shape | Used by |
 |---|---|---|

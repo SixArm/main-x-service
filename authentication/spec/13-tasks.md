@@ -45,7 +45,7 @@ confirms it. Split larger tasks (`T-5a`, `T-5b`).
   - [x] Test that builds a `Verifier` from the service's published
     JWKS document and verifies a token signed by
     `auth::sign_access_token`
-    (`authentication-service-rust-crate/tests/sign_verify_contract.rs`;
+    (`authentication-service-with-loco/tests/sign_verify_contract.rs`;
     the verifier is a dev-dependency of the service).
   - **Acceptance met:** the claims round-trip through both crates in
     one DB-free, un-gated test; a `kid` mismatch fails with
@@ -190,3 +190,44 @@ confirms it. Split larger tasks (`T-5a`, `T-5b`).
     description named the Course Service).
   - **Acceptance met:** `pnpm test` (16) and `pnpm test:e2e` (7) pass;
     `pnpm run check` 0/0; authored files prettier-clean.
+- [ ] **T-12 — Pivot off JWT-for-sessions → cookie sessions + PASETO.**
+  *(spec'd 2026-06-17; supersedes the RS256 JWT + JWKS model)* Adopts
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  across all three subprojects. Split into per-subproject sub-tasks:
+  - [ ] **T-12a — Service: cookie sessions.** New `sessions` schema
+    (`sid` / `user_pid` / `data` / `created_at` / `last_seen_at` /
+    `idle_expires_at` / `absolute_expires_at` / `revoked_at`; migration);
+    magic-link redemption creates a session row and sets the
+    `__Host-mxi_session` cookie (HttpOnly/Secure/SameSite/`Path=/`)
+    instead of returning a token; `/me` resolves + slides the session;
+    signout sets `revoked_at` + clears the cookie; `sid` rotation on
+    privilege change (shared §3, §7).
+  - [ ] **T-12b — Service: PASETO minting + key publication.**
+    `POST /token` exchanges a valid session for a short-lived
+    (~5 min) PASETO **v4.public** (Ed25519, claims §5.3, footer `kid`);
+    publish the Ed25519 public key set at `/.well-known/paseto-keys`;
+    load/store the Ed25519 keypair (shared §5). Candidate crate:
+    `rusty_paseto` (confirm `#![forbid(unsafe_code)]` compatibility —
+    shared §10).
+  - [ ] **T-12c — Service: CSRF.** Per-session CSRF token
+    (synchroniser / double-submit + `Origin`/`Referer` allow-list) on
+    cookie-authenticated `POST`/`PUT`/`PATCH`/`DELETE` incl. `POST /token`,
+    signout, `DELETE /api/auth/account` (shared §4).
+  - [ ] **T-12d — Service: remove RS256/JWKS.** Drop RS256 signing and
+    `GET /.well-known/jwks.json`; update OpenAPI; keep JWKS only
+    transitionally during peer migration, then delete (shared §9 step 6).
+  - [ ] **T-12e — Verifier: PASETO support.**
+    `Verifier::from_paseto_keys_value` / `from_paseto_keys_url` replace
+    the RS256 `from_jwks_*`; same `Claims`; footer-`kid` selection;
+    update `VerifyError` taxonomy (shared §5).
+  - [ ] **T-12f — Front-end: BFF + remove `localStorage`.** Move
+    session-holding + PASETO exchange to the SvelteKit server (BFF);
+    browser holds only the cookie; add CSRF on mutating calls; drop
+    `mxi.auth.token` / `mxi.auth.user` (shared §6).
+  - **Acceptance:** magic-link redemption returns `Set-Cookie:
+    __Host-mxi_session` and no token; `POST /token` mints a PASETO that a
+    verifier built from `/.well-known/paseto-keys` accepts and a peer
+    verifies offline; signout sets `revoked_at`; no `/.well-known/jwks.json`
+    and no RS256 path remain; the cross-crate contract test signs PASETO
+    and verifies through the verifier; the front-end never stores a
+    credential in JS.

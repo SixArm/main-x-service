@@ -13,6 +13,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, tf, statusLabel } from '$lib/i18n.svelte';
 
     let { data } = $props();
 
@@ -34,20 +35,20 @@
     }
 </script>
 
-<BackLink href="/cabinets">Back to cabinets</BackLink>
+<BackLink href="/cabinets">{t('cabinetDetail.backToCabinets')}</BackLink>
 
 <h2>{data.place.name}</h2>
 {#if data.place.container_path}<p>{data.place.container_path}</p>{/if}
 
 <div class="panel">
-    <h3>Folders currently in this cabinet ({data.folders.length})</h3>
+    <h3>{tf('cabinetDetail.currentFolders', { n: data.folders.length })}</h3>
     {#if data.folders.length > 0}
-        <DataTable label="Current folders">
+        <DataTable label={t('cabinetDetail.currentFoldersTable')}>
             <DataTableHead>
                 <DataTableRow>
-                    <th scope="col">Title</th>
-                    <th scope="col">Patient</th>
-                    <th scope="col">Status</th>
+                    <th scope="col">{t('common.title')}</th>
+                    <th scope="col">{t('common.patient')}</th>
+                    <th scope="col">{t('common.status')}</th>
                 </DataTableRow>
             </DataTableHead>
             <DataTableBody>
@@ -58,30 +59,30 @@
                             <a href="/patients/{nhsSlug(folder.nhsNumber)}">{folder.patientName}</a>
                         </DataTableTD>
                         <DataTableTD>
-                            <Badge type={badgeType(folder.status)}>{folder.status}</Badge>
+                            <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
                         </DataTableTD>
                     </DataTableRow>
                 {/each}
             </DataTableBody>
         </DataTable>
     {:else}
-        <p>This cabinet is currently empty.</p>
+        <p>{t('cabinetDetail.empty')}</p>
     {/if}
 </div>
 
 <Separator />
 
-<h3>Folder presence history</h3>
-<p>Which folders have been in this cabinet, and when. Newest first.</p>
+<h3>{t('cabinetDetail.presenceHistory')}</h3>
+<p>{t('cabinetDetail.presenceIntro')}</p>
 <div class="panel">
-    <DataTable label="Folder presence history" caption="Derived from the move audit log">
+    <DataTable label={t('cabinetDetail.presenceTable')} caption={t('cabinetDetail.presenceCaption')}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">Folder</th>
-                <th scope="col">Patient</th>
-                <th scope="col">Entered</th>
-                <th scope="col">Left</th>
-                <th scope="col">Reason left</th>
+                <th scope="col">{t('common.folder')}</th>
+                <th scope="col">{t('common.patient')}</th>
+                <th scope="col">{t('common.entered')}</th>
+                <th scope="col">{t('common.left')}</th>
+                <th scope="col">{t('cabinetDetail.colReasonLeft')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>
@@ -93,14 +94,14 @@
                     </DataTableTD>
                     <DataTableTD>{when(p.enteredAt)}</DataTableTD>
                     <DataTableTD>
-                        {#if p.leftAt}{when(p.leftAt)}{:else}<Badge type="success">Still here</Badge>{/if}
+                        {#if p.leftAt}{when(p.leftAt)}{:else}<Badge type="success">{t('common.stillHere')}</Badge>{/if}
                     </DataTableTD>
                     <DataTableTD>{p.leftReason ?? ''}</DataTableTD>
                 </DataTableRow>
             {/each}
             {#if data.presences.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={5}>No folder has been recorded in this cabinet yet.</DataTableTD>
+                    <DataTableTD colspan={5}>{t('cabinetDetail.noPresence')}</DataTableTD>
                 </DataTableRow>
             {/if}
         </DataTableBody>

@@ -68,7 +68,9 @@ The `secret` must be overridden in production (env `AUTH_SECRET`).
 
 `tests/requests/auth.rs`: `request` returns a dev magic link →
 `verify` sets a session → `me` returns the user; bad token → `401`;
-`me` with no session → `401`. A shared `tests/requests.rs::auth_header()`
+`me` with no session → `401`; `logout` → `204` clearing the
+`cts_session` cookie (`Max-Age=0`). A shared
+`tests/requests.rs::auth_header()`
 mints a session token so other suites *could* run guarded, though the
 `test` env keeps `require_session: false` so existing domain tests are
 unchanged.

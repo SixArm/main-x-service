@@ -15,6 +15,7 @@
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import { WorkerRepository } from "$lib/api/workers.js";
     import type { Gender, MatchRequest, MatchResult } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
 
@@ -55,31 +56,31 @@
     }
 </script>
 
-<svelte:head><title>Match check · Worker Service</title></svelte:head>
+<svelte:head><title>{t("match.titleTab")}</title></svelte:head>
 
-<header><h1>Match check</h1></header>
+<header><h1>{t("match.heading")}</h1></header>
 
 <section class="surface stack">
     <form onsubmit={runMatch} class="stack">
         <FieldRow>
-            <LabeledField label="Family" for="m-family" required><input id="m-family" bind:value={family} required /></LabeledField>
-            <LabeledField label="Given" for="m-given" required hint="Space-separated"><input id="m-given" bind:value={given} required /></LabeledField>
+            <LabeledField label={t("match.family")} for="m-family" required><input id="m-family" bind:value={family} required /></LabeledField>
+            <LabeledField label={t("match.given")} for="m-given" required hint={t("match.givenHint")}><input id="m-given" bind:value={given} required /></LabeledField>
         </FieldRow>
         <FieldRow>
-            <LabeledField label="Birth date" for="m-dob"><input id="m-dob" type="date" bind:value={birthDate} /></LabeledField>
-            <LabeledField label="Gender" for="m-gender">
+            <LabeledField label={t("match.birthDate")} for="m-dob"><input id="m-dob" type="date" bind:value={birthDate} /></LabeledField>
+            <LabeledField label={t("match.gender")} for="m-gender">
                 <select id="m-gender" bind:value={gender}>
                     {#each genders as g}<option value={g}>{g}</option>{/each}
                 </select>
             </LabeledField>
-            <LabeledField label="Tax ID" for="m-tax"><input id="m-tax" bind:value={taxId} /></LabeledField>
-            <LabeledField label="Threshold" for="m-threshold" hint="0.0 – 1.0">
+            <LabeledField label={t("match.taxId")} for="m-tax"><input id="m-tax" bind:value={taxId} /></LabeledField>
+            <LabeledField label={t("match.threshold")} for="m-threshold" hint={t("match.thresholdHint")}>
                 <input id="m-threshold" type="number" step="0.05" min="0" max="1" bind:value={threshold} />
             </LabeledField>
         </FieldRow>
         {#if error}<div class="banner error">{error}</div>{/if}
         <button type="submit" class="button primary" disabled={loading}>
-            {loading ? "Matching…" : "Find matches"}
+            {loading ? t("match.matching") : t("match.find")}
         </button>
     </form>
 </section>

@@ -1,5 +1,5 @@
 <!--
-  Root layout — the app shell wrapping every route: a sidebar with the
+  Root layout — the app shell wrapping every route: a top navigation bar with the
   brand, primary nav, theme picker, and locale picker, plus a main content
   area that renders the active page.
 
@@ -12,137 +12,155 @@
 <script lang="ts">
     import "../app.css";
     import { page } from "$app/state";
+    import { enhance } from "$app/forms";
     import type { Snippet } from "svelte";
-    import ThemePicker from "lily-design-system-svelte-theme-picker/ThemePicker.svelte";
+    import type { LayoutData } from "./$types";
+    import { ThemeSelect } from "lily-design-system-svelte-theme-select";
 
-    // Full set of Lily/daisyUI theme ids offered by the ThemePicker.
+    // Full set of Lily/daisyUI theme ids offered by the ThemeSelect.
+    // Lily theme catalogue offered in the theme select (incl.
+    // NHS England/Scotland/Wales patient & practitioner themes). Each slug
+    // has a Lily stylesheet at `static/assets/themes/<slug>.css` (a symlink
+    // to the shared design-system themes) that ThemeSelect swaps in.
     const THEMES = [
-        "abyss",
-        "acid",
-        "aqua",
-        "autumn",
-        "black",
-        "bumblebee",
-        "business",
-        "caramellatte",
-        "cmyk",
-        "coffee",
-        "corporate",
-        "cupcake",
-        "cyberpunk",
-        "dark",
-        "dim",
-        "dracula",
-        "emerald",
-        "fantasy",
-        "forest",
-        "garden",
-        "halloween",
-        "lemonade",
-        "light",
-        "lofi",
-        "luxury",
-        "night",
-        "nord",
-        "pastel",
-        "retro",
-        "silk",
-        "sunset",
-        "synthwave",
+        "abyss", "acid", "aqua", "autumn", "black", "bumblebee", "business",
+        "caramellatte", "cmyk", "coffee", "corporate", "cupcake", "cyberpunk",
+        "dark", "dim", "dracula", "emerald", "fantasy", "forest", "garden",
+        "halloween", "lemonade", "light", "lofi", "luxury", "night", "nord",
+        "pastel", "retro", "silk", "sunset", "synthwave",
         "united-kingdom-national-health-service-england-for-patients",
         "united-kingdom-national-health-service-england-for-practitioners",
         "united-kingdom-national-health-service-scotland-for-patients",
         "united-kingdom-national-health-service-scotland-for-practitioners",
         "united-kingdom-national-health-service-wales-for-patients",
         "united-kingdom-national-health-service-wales-for-practitioners",
-        "valentine",
-        "winter",
-        "wireframe"
+        "valentine", "winter", "wireframe"
     ];
 
-    import LocalePicker from "lily-design-system-svelte-locale-picker/LocalePicker.svelte";
+    // Human-readable labels for the theme select — the FULL theme name for
+    // each slug (DaisyUI names title-cased; the NHS slugs spelled out in full).
+    const THEME_LABELS: Record<string, string> = {
+        abyss: "Abyss", acid: "Acid", aqua: "Aqua", autumn: "Autumn",
+        black: "Black", bumblebee: "Bumblebee", business: "Business",
+        caramellatte: "Caramellatte", cmyk: "Cmyk", coffee: "Coffee",
+        corporate: "Corporate", cupcake: "Cupcake", cyberpunk: "Cyberpunk",
+        dark: "Dark", dim: "Dim", dracula: "Dracula", emerald: "Emerald",
+        fantasy: "Fantasy", forest: "Forest", garden: "Garden",
+        halloween: "Halloween", lemonade: "Lemonade", light: "Light",
+        lofi: "Lofi", luxury: "Luxury", night: "Night", nord: "Nord",
+        pastel: "Pastel", retro: "Retro", silk: "Silk", sunset: "Sunset",
+        synthwave: "Synthwave", valentine: "Valentine", winter: "Winter",
+        wireframe: "Wireframe",
+        "united-kingdom-national-health-service-england-for-patients": "United Kingdom National Health Service England for Patients",
+        "united-kingdom-national-health-service-england-for-practitioners": "United Kingdom National Health Service England for Practitioners",
+        "united-kingdom-national-health-service-scotland-for-patients": "United Kingdom National Health Service Scotland for Patients",
+        "united-kingdom-national-health-service-scotland-for-practitioners": "United Kingdom National Health Service Scotland for Practitioners",
+        "united-kingdom-national-health-service-wales-for-patients": "United Kingdom National Health Service Wales for Patients",
+        "united-kingdom-national-health-service-wales-for-practitioners": "United Kingdom National Health Service Wales for Practitioners",
+    };
 
-    // Locale ids offered by the LocalePicker (BCP-47-ish tags).
-    const LOCALES = [
-        "ar",
-        "cy",
-        "de",
-        "en",
-        "en_GB",
-        "en_US",
-        "es",
-        "fa",
-        "fr",
-        "fr_CA",
-        "he",
-        "hi",
-        "it",
-        "ja",
-        "ko",
-        "nl",
-        "pl",
-        "pt",
-        "pt_BR",
-        "ru",
-        "sv",
-        "tr",
-        "ur",
-        "zh",
-        "zh_TW"
-    ];
+    import { LocaleSelect } from "lily-design-system-svelte-locale-select";
+    import { browser } from "$app/environment";
+    import { i18n, t, isRtl, LOCALE_LABELS } from "$lib/i18n.svelte.js";
+
+    // The locales the UI is translated into; the i18n store is the single
+    // source of truth (the LocaleSelect mirrors it, so it can never drift).
+    const LOCALES = [...i18n.locales];
 
     // Lily headless example — uncomment after `pnpm install` resolves the
     // file: dependency to use Lily's accessibility-primitive Button:
     // import Button from "lily-design-system-svelte-headless/src/lib/components/Button/Button.svelte";
 
-    let { children }: { children: Snippet } = $props();
+    // `data.signedIn` is resolved server-side from the httpOnly session
+    // cookie (`+layout.server.ts`).
+    let { children, data }: { children: Snippet; data: LayoutData } = $props();
 
-    // Primary navigation entries, rendered in order in the sidebar.
+    // Reactive signed-in flag from the server load data.
+    const signedIn = $derived(data.signedIn);
+
+    // Hamburger toggle state for the top navigation bar (narrow viewports).
+    let menuOpen = $state(false);
+
+    // Primary navigation entries, rendered in order. Labels are i18n keys
+    // resolved reactively at render so a locale switch relabels the nav.
     const navItems = [
-        { href: "/", label: "Dashboard" },
-        { href: "/places", label: "Places" },
-        { href: "/places/new", label: "New place" },
-        { href: "/places/match", label: "Match check" },
-        { href: "/places/merge", label: "Merge" },
+        { href: "/", key: "nav.dashboard" as const },
+        { href: "/places", key: "nav.places" as const },
+        { href: "/places/new", key: "nav.newPlace" as const },
+        { href: "/places/match", key: "nav.matchCheck" as const },
+        { href: "/places/merge", key: "nav.merge" as const },
     ];
+
+    // Reflect the chosen locale onto <html lang> for assistive tech and CSS,
+    // and <html dir> so RTL locales (Arabic, Urdu) flip the whole UI.
+    // Guarded for SSR, where there is no document.
+    $effect(() => {
+        if (!browser) return;
+        document.documentElement.lang = i18n.locale;
+        document.documentElement.dir = isRtl(i18n.locale) ? "rtl" : "ltr";
+    });
 </script>
 
 <div class="layout">
-    <aside class="sidebar">
-        <h1 class="brand">Place<br /><span class="muted small">Main X Index</span></h1>
-        <nav>
+    <header class="topbar">
+        <button
+            type="button"
+            class="hamburger"
+            aria-expanded={menuOpen}
+            aria-controls="primary-nav"
+            aria-label={t("nav.toggle")}
+            onclick={() => (menuOpen = !menuOpen)}
+        >
+            <span class="hamburger-box" aria-hidden="true"></span>
+        </button>
+        <a href="/" class="brand">Place <span class="muted small">{t("brand.tagline")}</span></a>
+        <nav id="primary-nav" class="primary-nav" class:open={menuOpen}>
             <ul>
                 {#each navItems as item}
                     <li>
-                        <!-- Mark the current route for a11y + active styling. -->
                         <a
                             href={item.href}
                             aria-current={page.url.pathname === item.href ? "page" : null}
+                            onclick={() => (menuOpen = false)}
                         >
-                            {item.label}
+                            {t(item.key)}
                         </a>
                     </li>
                 {/each}
             </ul>
+            <div class="chrome">
+                <ThemeSelect
+                    label={t("chrome.theme")}
+                    themesUrl="/assets/themes/"
+                    themes={THEMES}
+                    themeLabels={THEME_LABELS}
+                    storageKey="lily-theme"
+                />
+                <LocaleSelect
+                    label={t("chrome.language")}
+                    locales={LOCALES}
+                    localeLabels={LOCALE_LABELS}
+                    value={i18n.locale}
+                    applyDir={false}
+                    onChange={(code) => i18n.set(code)}
+                />
+                <section class="session" aria-label={t("session.title")}>
+                    <div class="session-title">{t("session.title")}</div>
+                    {#if signedIn}
+                        <p class="session-status">{t("session.signedIn")}</p>
+                        <!-- Sign-out posts to the root page's `signout` action
+                             (BFF: revokes server-side + clears the cookie). -->
+                        <form method="POST" action="/?/signout" use:enhance>
+                            <button type="submit">{t("session.signOut")}</button>
+                        </form>
+                    {:else}
+                        <!-- Per-app magic-link login on this app's own origin. -->
+                        <a class="signin button" href="/signin">{t("session.signIn")}</a>
+                    {/if}
+                </section>
+            </div>
         </nav>
-        <div class="theme-section">
-            <ThemePicker
-                label="Theme"
-                themesUrl="/assets/themes/"
-                themes={THEMES}
-                storageKey="lily-theme"
-            />
-        </div>
-        <div class="locale-section">
-            <LocalePicker
-                label="Language"
-                locales={LOCALES}
-                defaultValue="en"
-                storageKey="lily-locale"
-                detectFromNavigator
-            />
-        </div>
-    </aside>
+    </header>
     <main>
         {@render children()}
     </main>
@@ -150,78 +168,139 @@
 
 <style>
     .layout {
-        display: grid;
-        grid-template-columns: 220px 1fr;
+        display: flex;
+        flex-direction: column;
         min-height: 100vh;
     }
-    .sidebar {
+    .topbar {
+        position: relative;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+        padding: 0.75rem 1.5rem;
         background: var(--mxi-color-surface);
-        border-right: 1px solid var(--mxi-color-border);
-        padding: 1.25rem 1rem;
+        border-bottom: 1px solid var(--mxi-color-border);
     }
-    .brand { font-size: 1.125rem; margin-bottom: 1.25rem; }
-    nav ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.125rem; }
-    nav a {
+    .brand {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--mxi-color-fg);
+        white-space: nowrap;
+    }
+    .brand:hover { text-decoration: none; }
+    /* The hamburger toggle is the only nav affordance — visible at every
+       viewport width (not a narrow-only responsive fallback). */
+    .hamburger {
+        display: block;
+        width: 2.5rem;
+        height: 2.5rem;
+        padding: 0;
+        background: transparent;
+        border: 1px solid var(--mxi-color-border);
+        border-radius: var(--mxi-radius);
+        cursor: pointer;
+    }
+    .hamburger-box,
+    .hamburger-box::before,
+    .hamburger-box::after {
+        display: block;
+        width: 1.1rem;
+        height: 2px;
+        margin: 0 auto;
+        background: var(--mxi-color-fg);
+        content: "";
+    }
+    .hamburger-box::before { transform: translateY(-5px); }
+    .hamburger-box::after { transform: translateY(3px); }
+    /* Nav is hidden by default at every width and opens as a dropdown panel
+       overlaying the page content (position:absolute) so it never reflows the
+       header bar. The toggle sets `aria-expanded` + `.open`. */
+    .primary-nav {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 1.5rem;
+        z-index: 20;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+        min-width: 14rem;
+        padding: 0.75rem;
+        background: var(--mxi-color-surface);
+        border: 1px solid var(--mxi-color-border);
+        border-radius: var(--mxi-radius);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+    .primary-nav.open { display: flex; }
+    .primary-nav ul {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin: 0;
+        padding: 0;
+    }
+    .primary-nav a {
         display: block;
         padding: 0.5rem 0.625rem;
         border-radius: var(--mxi-radius);
         color: var(--mxi-color-fg);
     }
-    nav a:hover { background: var(--mxi-color-bg); text-decoration: none; }
-    nav a[aria-current="page"] {
+    .primary-nav a:hover { background: var(--mxi-color-bg); text-decoration: none; }
+    .primary-nav a[aria-current="page"] {
         background: var(--mxi-color-primary);
         color: var(--mxi-color-primary-fg);
         font-weight: 600;
     }
-    main { padding: 1.5rem; max-width: 1100px; width: 100%; }
-
-    .theme-section {
-        margin-top: 1.25rem;
-        padding-top: 1rem;
+    .chrome {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+    .chrome :global(.theme-select),
+    .chrome :global(.locale-select) {
+        padding: 0.375rem 0.5rem;
+        font-size: 0.875rem;
+        color: var(--mxi-color-fg);
+        background: var(--mxi-color-bg, transparent);
+        border: 1px solid var(--mxi-color-border);
+        border-radius: 0.25rem;
+        cursor: pointer;
+    }
+    main {
+        width: 100%;
+        padding: 1.5rem;
+    }
+    .session {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+        padding-top: 0.5rem;
         border-top: 1px solid var(--mxi-color-border);
+        font-size: 0.85rem;
     }
-    .theme-section :global(.theme-picker) {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
+    .session-title {
+        font-weight: 600;
+    }
+    .session-status {
         margin: 0;
-        padding: 0;
-        border: 0;
+        color: var(--mxi-color-muted, #555);
     }
-    .theme-section :global(.theme-picker legend) {
-        font-size: 0.875rem;
-        color: var(--mxi-color-fg);
-        margin-bottom: 0.25rem;
+    .session button {
+        padding: 0.3rem 0.5rem;
+        border-radius: var(--mxi-radius);
+        cursor: pointer;
     }
-    .theme-section :global(.theme-picker label) {
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-        font-size: 0.875rem;
-        color: var(--mxi-color-fg);
-    }
-
-    .locale-section {
-        margin-top: 0.75rem;
-    }
-    .locale-section :global(fieldset) {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        margin: 0;
-        padding: 0;
-        border: 0;
-    }
-    .locale-section :global(legend) {
-        font-size: 0.875rem;
-        color: var(--mxi-color-fg);
-        margin-bottom: 0.25rem;
-    }
-    .locale-section :global(label) {
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-        font-size: 0.875rem;
-        color: var(--mxi-color-fg);
+    .session .signin {
+        display: inline-block;
+        padding: 0.3rem 0.5rem;
+        border-radius: var(--mxi-radius);
+        background: var(--mxi-color-primary, #356);
+        color: var(--mxi-color-primary-fg, #fff);
+        text-decoration: none;
+        font-weight: 600;
     }
 </style>

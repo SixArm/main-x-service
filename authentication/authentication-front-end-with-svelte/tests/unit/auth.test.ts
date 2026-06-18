@@ -45,6 +45,23 @@ describe("AuthRepository", () => {
     );
   });
 
+  it("signup() includes the locale email-language hint when supplied", async () => {
+    const { repo, calls } = spyClient();
+    await repo.signup("a@example.com", "Alice", "cy");
+    expect(calls[0]?.init.body).toBe(
+      JSON.stringify({ email: "a@example.com", name: "Alice", locale: "cy" }),
+    );
+  });
+
+  it("signup() drops the locale when omitted", async () => {
+    const { repo, calls } = spyClient();
+    await repo.signup("a@example.com", "Alice");
+    // `locale` undefined ⇒ dropped from the JSON body (service defaults to en).
+    expect(calls[0]?.init.body).toBe(
+      JSON.stringify({ email: "a@example.com", name: "Alice" }),
+    );
+  });
+
   it("requestMagicLink() POSTs the email to /api/auth/magic-link", async () => {
     const { repo, calls } = spyClient();
     await repo.requestMagicLink("a@example.com");
@@ -52,6 +69,14 @@ describe("AuthRepository", () => {
     expect(calls[0]?.url).toBe("http://auth.test/api/auth/magic-link");
     expect(calls[0]?.init.body).toBe(
       JSON.stringify({ email: "a@example.com" }),
+    );
+  });
+
+  it("requestMagicLink() includes the locale email-language hint when supplied", async () => {
+    const { repo, calls } = spyClient();
+    await repo.requestMagicLink("a@example.com", "cy");
+    expect(calls[0]?.init.body).toBe(
+      JSON.stringify({ email: "a@example.com", locale: "cy" }),
     );
   });
 

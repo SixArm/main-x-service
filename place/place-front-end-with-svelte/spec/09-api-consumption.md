@@ -1,6 +1,6 @@
 ## 9. API Consumption
 
-The front-end binds 1:1 to the Place Service REST surface (see [`place-service-rust-crate/AGENTS/restful.md`](../../place-service-rust-crate/AGENTS/restful.md)):
+The front-end binds 1:1 to the Place Service REST surface (see [`place-service-with-loco/AGENTS/restful.md`](../../place-service-with-loco/AGENTS/restful.md)):
 
 | Endpoint | Used by |
 | --- | --- |

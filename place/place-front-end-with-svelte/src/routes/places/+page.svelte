@@ -14,6 +14,7 @@
     import SearchBox from "$lib/components/SearchBox.svelte";
     import PlaceGrid from "$lib/components/PlaceGrid.svelte";
     import { PlaceRepository } from "$lib/api/places.js";
+    import { t } from "$lib/i18n.svelte.js";
     import type { Place } from "$lib/api/types.js";
 
     let query = $state("");
@@ -59,17 +60,17 @@
 <svelte:head><title>Places · Place Service</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Places</h1>
-    <a href="/places/new" class="button primary">New place</a>
+    <h1>{t("places.title")}</h1>
+    <a href="/places/new" class="button primary">{t("places.new")}</a>
 </header>
 
 <section class="surface stack">
-    <SearchBox bind:value={query} placeholder="Search by name, locality, identifier…" onsearch={runSearch} />
+    <SearchBox bind:value={query} placeholder={t("places.searchPlaceholder")} onsearch={runSearch} />
     <div class="row small">
-        <label><input type="checkbox" bind:checked={fuzzy} /> Fuzzy</label>
-        <label><input type="checkbox" bind:checked={phonetic} /> Phonetic (Soundex)</label>
+        <label><input type="checkbox" bind:checked={fuzzy} /> {t("places.fuzzy")}</label>
+        <label><input type="checkbox" bind:checked={phonetic} /> {t("places.phonetic")}</label>
         <span class="muted" style="margin-left: auto">
-            {loading ? "Loading…" : `${total} place${total === 1 ? "" : "s"}`}
+            {loading ? t("places.loading") : `${total} ${total === 1 ? t("places.countOne") : t("places.countMany")}`}
         </span>
     </div>
     {#if error}

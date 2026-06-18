@@ -11,8 +11,8 @@ merge / review-queue / consent / organization support types and the
 SeaORM table entities.
 
 → Full field tables:
-[service `AGENTS/models.md`](../worker-service-rust-crate/AGENTS/models.md);
-normative shape: [service spec §5](../worker-service-rust-crate/spec/05-domain-model.md).
+[service `AGENTS/models.md`](../worker-service-with-loco/AGENTS/models.md);
+normative shape: [service spec §5](../worker-service-with-loco/spec/05-domain-model.md).
 
 ## 2. Matcher `Worker` (comparison shape)
 
@@ -38,11 +38,11 @@ changes, this file changes in the same effort — see
 ## The adapter between shapes 1 and 2
 
 `to_matcher_worker()` in
-[`src/matching/adapter.rs`](../worker-service-rust-crate/src/matching/adapter.rs)
+[`src/matching/adapter.rs`](../worker-service-with-loco/src/matching/adapter.rs)
 is the only sanctioned projection from the service shape to the
 matcher shape. It is lossy (service-only fields dropped) but
 well-defined (routing table inline in the file), and pinned by
-[`tests/duplicate_detection.rs`](../worker-service-rust-crate/tests/duplicate_detection.rs).
+[`tests/duplicate_detection.rs`](../worker-service-with-loco/tests/duplicate_detection.rs).
 
 **The routing rules are the entity-level contract** — specified in
 [entity spec §5.3](../spec/05-domain-model.md). Change them only with

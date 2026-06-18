@@ -14,6 +14,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     // Resolve each cabinet's room/building names and occupancy percentage.
     const rows = $derived(
@@ -40,24 +41,24 @@
     }
 </script>
 
-<BackLink href="/">Back to dashboard</BackLink>
+<BackLink href="/">{t('common.backToDashboard')}</BackLink>
 
 <div class="toolbar">
-    <h2>File cabinets</h2>
-    <a href="/cabinets/new" class="button">Add cabinet</a>
+    <h2>{t('cabinets.heading')}</h2>
+    <a href="/cabinets/new" class="button">{t('cabinets.addCabinet')}</a>
 </div>
 
 <div class="panel">
-    <DataTable label="Cabinets" caption="Physical file cabinets, their building/room, and occupancy">
+    <DataTable label={t('cabinets.tableLabel')} caption={t('cabinets.tableCaption')}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">Label</th>
-                <th scope="col">Building</th>
-                <th scope="col">Room</th>
-                <th scope="col">Capacity</th>
-                <th scope="col">Folders</th>
-                <th scope="col">Utilisation</th>
-                <th scope="col">Description</th>
+                <th scope="col">{t('cabinets.colLabel')}</th>
+                <th scope="col">{t('cabinets.colBuilding')}</th>
+                <th scope="col">{t('cabinets.colRoom')}</th>
+                <th scope="col">{t('cabinets.colCapacity')}</th>
+                <th scope="col">{t('cabinets.colFolders')}</th>
+                <th scope="col">{t('cabinets.colUtilisation')}</th>
+                <th scope="col">{t('common.description')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>

@@ -48,7 +48,7 @@ are the current gates.
 ### 11.4 Cross-subproject contract tests
 
 The **service-signs / verifier-verifies** contract is pinned by
-`authentication-service-rust-crate/tests/sign_verify_contract.rs`
+`authentication-service-with-loco/tests/sign_verify_contract.rs`
 (§13 T-4): the service's `auth` module signs a real token; a
 `Verifier` built from the service's published JWKS document verifies
 it through `authentication-verifier` (a dev-dependency of the

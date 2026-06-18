@@ -23,11 +23,14 @@ is [`spec.md`](spec/index.md); deep references live in [`AGENTS/`](AGENTS/).
 
 ## Sibling service
 
-- [`../person-service-rust-crate/`](../person-service-rust-crate/) — the system of record this UI calls. Its [`spec.md`](../person-service-rust-crate/spec/index.md) and [`AGENTS/restful.md`](../person-service-rust-crate/AGENTS/restful.md) are the API contract.
+- [`../person-service-with-loco/`](../person-service-with-loco/) — the system of record this UI calls. Its [`spec.md`](../person-service-with-loco/spec/index.md) and [`AGENTS/restful.md`](../person-service-with-loco/AGENTS/restful.md) are the API contract.
 
 ## Route map
 
-The SPA mounts at `/`. All operator workflows live under `/persons`.
+The SPA mounts at `/`. All operator workflows live under `/persons`. The
+persistent layout sidebar (every route) also carries a Lily **theme
+switcher** (`ThemeSelect`, FR-11) and **locale switcher** (`LocaleSelect`,
+FR-12); both persist their selection to `localStorage`.
 
 | Path | Purpose |
 |---|---|

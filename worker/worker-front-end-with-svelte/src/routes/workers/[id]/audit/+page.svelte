@@ -16,6 +16,7 @@
     import { onMount } from "svelte";
     import { WorkerRepository } from "$lib/api/workers.js";
     import type { AuditEntry } from "$lib/api/types.js";
+    import { t, tf } from "$lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
     let entries = $state<AuditEntry[]>([]);
@@ -35,20 +36,20 @@
     });
 </script>
 
-<svelte:head><title>Audit · {id}</title></svelte:head>
+<svelte:head><title>{tf("audit.titleTab", { id })}</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Audit log</h1>
-    <a href={`/workers/${id}`} class="button">Back to worker</a>
+    <h1>{t("audit.heading")}</h1>
+    <a href={`/workers/${id}`} class="button">{t("audit.back")}</a>
 </header>
 
 <section class="surface stack">
     {#if loading}
-        <p class="muted">Loading…</p>
+        <p class="muted">{t("common.loading")}</p>
     {:else if error}
         <div class="banner error">{error}</div>
     {:else if entries.length === 0}
-        <p class="muted">No audit entries.</p>
+        <p class="muted">{t("audit.none")}</p>
     {:else}
         <ol class="entries">
             {#each entries as entry}
@@ -56,11 +57,11 @@
                     <header class="row">
                         <code>{entry.action}</code>
                         <span class="muted small">{new Date(entry.created_at).toLocaleString()}</span>
-                        {#if entry.user_id}<span class="muted small">by {entry.user_id}</span>{/if}
+                        {#if entry.user_id}<span class="muted small">{t("audit.by")} {entry.user_id}</span>{/if}
                     </header>
                     {#if entry.new_values}
                         <details>
-                            <summary class="small">Payload</summary>
+                            <summary class="small">{t("audit.payload")}</summary>
                             <pre class="small">{JSON.stringify(entry.new_values, null, 2)}</pre>
                         </details>
                     {/if}

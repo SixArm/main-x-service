@@ -23,10 +23,10 @@ Detailed reference documentation for the Event Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../event-service-rust-crate/spec.md](../../event-service-rust-crate/spec/index.md) | Service spec — system of record |
-| [../../event-service-rust-crate/AGENTS/restful.md](../../event-service-rust-crate/AGENTS/restful.md) | REST API surface |
-| [../../event-service-rust-crate/AGENTS/models.md](../../event-service-rust-crate/AGENTS/models.md) | Wire-format domain types |
-| [../../event-service-rust-crate/AGENTS/matching.md](../../event-service-rust-crate/AGENTS/matching.md) | Matching algorithm reference |
+| [../../event-service-with-loco/spec.md](../../event-service-with-loco/spec/index.md) | Service spec — system of record |
+| [../../event-service-with-loco/AGENTS/restful.md](../../event-service-with-loco/AGENTS/restful.md) | REST API surface |
+| [../../event-service-with-loco/AGENTS/models.md](../../event-service-with-loco/AGENTS/models.md) | Wire-format domain types |
+| [../../event-service-with-loco/AGENTS/matching.md](../../event-service-with-loco/AGENTS/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

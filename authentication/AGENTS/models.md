@@ -3,15 +3,24 @@
 Entity-level summary. Normative contract: entity spec
 [§5 Domain Model](../spec/05-domain-model.md).
 
+> **Auth model source of truth:**
+> [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
+> The session is a server-side httpOnly **cookie session**; cross-service
+> auth is short-lived **PASETO v4.public** verified offline via the
+> published Ed25519 key at `/.well-known/paseto-keys`. RS256 JWT + JWKS
+> are **decommissioned**. **Pivot in progress** — the service code
+> follow-up is tracked in the service spec §13, so the `Session` columns
+> and key endpoint below may still reflect the RS256 era until then.
+
 ## User
 
 The sign-in account (not a person registry record — identity
 attributes live in the person entity).
 
 **Files:**
-[`src/models/users.rs`](../authentication-service-rust-crate/src/models/users.rs),
+[`src/models/users.rs`](../authentication-service-with-loco/src/models/users.rs),
 entity in `src/models/_entities/users.rs`, migration
-[`m20220101_000001_users.rs`](../authentication-service-rust-crate/src/migration/m20220101_000001_users.rs).
+[`m20220101_000001_users.rs`](../authentication-service-with-loco/src/migration/m20220101_000001_users.rs).
 
 | Field | Type | Description |
 |---|---|---|
@@ -38,12 +47,18 @@ expiry), `ActiveModel::create_magic_link`,
 
 ## Session
 
-One row per issued token; the unit of revocation.
+The unit of revocation. In the **target** model (auth-sessions design)
+a session is the source of truth for being logged in: an opaque,
+high-entropy `sid` carried in the httpOnly `__Host-mxi_session` cookie,
+with sliding idle + absolute TTLs and a `data` JSONB blob. The columns
+below are the **current (RS256-era)** shape — one row per issued JWT
+(`jid` = the token `jti`) — and survive only until the cookie-session
+migration tracked in the service spec §13.
 
 **Files:**
-[`src/models/sessions.rs`](../authentication-service-rust-crate/src/models/sessions.rs),
+[`src/models/sessions.rs`](../authentication-service-with-loco/src/models/sessions.rs),
 migration
-[`m20220101_000002_sessions.rs`](../authentication-service-rust-crate/src/migration/m20220101_000002_sessions.rs).
+[`m20220101_000002_sessions.rs`](../authentication-service-with-loco/src/migration/m20220101_000002_sessions.rs).
 
 | Field | Type | Description |
 |---|---|---|
@@ -62,7 +77,7 @@ migration
 ## Claims (cross-crate contract)
 
 Defined twice, byte-compatible by convention — service
-[`src/auth/mod.rs`](../authentication-service-rust-crate/src/auth/mod.rs)
+[`src/auth/mod.rs`](../authentication-service-with-loco/src/auth/mod.rs)
 and verifier
 [`src/lib.rs`](../authentication-verifier-rust-crate/src/lib.rs):
 
@@ -75,15 +90,21 @@ and verifier
 | aud | String | Default `main-x-service` |
 | exp | i64 | Unix seconds; default `iat` + 3600 |
 | iat | i64 | Unix seconds |
-| jti | String | UUID = `sessions.jid` |
+| jti | String | UUID; correlates the originating session |
 
-Header: `alg: RS256`, `kid` = base64url(SHA-256(RSA public modulus)).
+In the target model the same `Claims` shape is carried in a **PASETO
+v4.public** token whose **footer** holds the `kid` (key id) selecting the
+verifier's Ed25519 key. (Current RS256-era runtime puts `alg: RS256` +
+`kid` = base64url(SHA-256(RSA public modulus)) in the JWT header until the
+spec §13 follow-up lands.)
 
-## AuthKeys / JWKS (service)
+## AuthKeys / published keys (service)
 
-`auth::AuthKeys` holds the encoding/decoding keys, `kid`, `issuer`,
-`audience`, `expiration`, and the pre-rendered `jwks` JSON value
-served verbatim by the JWKS controller:
+`auth::AuthKeys` holds the signing/verification key(s), `kid`, `issuer`,
+`audience`, `expiration`, and the pre-rendered published-key JSON. The
+**target** publishes Ed25519 public key(s) at `/.well-known/paseto-keys`
+for offline PASETO verification; the **current (RS256-era)** runtime still
+serves an RSA JWKS at `/.well-known/jwks.json`:
 
 ```json
 { "keys": [ { "kty": "RSA", "use": "sig", "alg": "RS256",
@@ -92,15 +113,17 @@ served verbatim by the JWKS controller:
 
 ## Verifier (peer side)
 
-`Verifier { keys: HashMap<kid, DecodingKey>, validation }` — see
+`Verifier { keys: HashMap<kid, …>, validation }` — see
 [`verification.md`](verification.md) for the full API and usage rules.
 
 ## View models
 
-**Service** ([`src/views/auth.rs`](../authentication-service-rust-crate/src/views/auth.rs)):
+**Service** ([`src/views/auth.rs`](../authentication-service-with-loco/src/views/auth.rs)):
 `LoginResponse { token, pid, name, email, is_verified }`,
 `CurrentResponse { pid, name, email }`.
 
-**Front-end** (`src/lib/api/types.ts`): mirrors of the two views;
-session state in `src/lib/auth/session.svelte.ts` persisted to
-`localStorage` (`mxi.auth.token`, `mxi.auth.user`).
+**Front-end** (`src/lib/api/types.ts`): mirrors of the two views. The
+browser holds **no token** — the SvelteKit **BFF** holds the httpOnly
+`__Host-mxi_session` cookie and calls the service server-side. There is
+no `localStorage` bearer / `mxi_access_token`. See the front-end docs
+(already harmonized) for the BFF specifics.

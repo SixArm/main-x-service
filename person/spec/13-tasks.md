@@ -89,7 +89,7 @@ or clearly described manual check confirms it. Split oversized tasks
   - [x] Crate docs still link `../../agents/share/…` and
     `../../AGENTS.md`, which after nesting resolve inside `person/`
     and dangle; sibling-entity links (e.g.
-    `../../worker-service-rust-crate/`) dangle likewise.
+    `../../worker-service-with-loco/`) dangle likewise.
   - **Acceptance:** a link-checker pass over `person/**/*.md` reports
     no broken relative links. *(Done 2026-06-13: repo-root links
     re-pointed `../`→`../../` / `../../`→`../../../`, cross-entity
@@ -98,7 +98,7 @@ or clearly described manual check confirms it. Split oversized tasks
     (`rust-loco-stack.md`, `rust-tracing-opentelemetry-stack.md`,
     `loco.md`). Link-checker over the three subprojects: 288 relative
     links resolve; the only remaining broken links are pre-nesting
-    rot in `person-service-rust-crate/README.md` + `index.md`
+    rot in `person-service-with-loco/README.md` + `index.md`
     pointing at never-committed files — LICENSE / LICENSE-MIT /
     LICENSE-APACHE / ARCHITECTURE.md / API_GUIDE.md / task-10.md —
     plus a pre-existing dangling `@AGENTS/architecture.md` include in
@@ -121,3 +121,37 @@ or clearly described manual check confirms it. Split oversized tasks
   - **Acceptance:** a documented, repeatable command reproduces the
     file from the migrations (or a CI check fails on drift), and the
     divergences above are either migrated or removed from the file.
+- [ ] **E-11 — Person-to-person relationships (parentage + household).**
+  Implement the concepts now defined in §5: `biological_mother` /
+  `biological_father` (each a nullable reference to another `Person`),
+  and `Household` (people living together in one home/flat/place) with
+  **many-to-many** person↔household membership (`household_ids`).
+  - [ ] Service: model fields + persistence (FK to `persons`; a
+    `households` table + a join table for membership), nested/related
+    read endpoints, and validation enforcing the §5.5 invariants
+    (references resolve; no self-parent; parentage acyclic; a person may
+    belong to 0..many households).
+  - [ ] Front-end: show/edit a person's biological parents (as person
+    references) and household membership on the detail page.
+  - [ ] Matcher: no change — both are registry-only and dropped by the
+    adapter (§5.3).
+  - **Acceptance:** create two persons + link parent/child and a shared
+    household; reads reflect the links; invariants are enforced (a cycle
+    or self-parent is rejected `422`); an integration test covers it.
+- [ ] **E-12 — Typed person relationships (parent-of / child-of /
+  sibling-of / guardian-of).** Implement the
+  `relationships: Vec<PersonRelationship>` concept from §5 — a
+  `RelationKind` enum (`ParentOf`, `ChildOf`, `SiblingOf`, `GuardianOf`
+  /`WardOf`; extensible) over references to other persons.
+  - [ ] Service: model + persistence (relationship join table), CRUD to
+    add/remove a relationship, and validation enforcing the §5.5
+    invariants (references resolve; no self-relationship; ParentOf/ChildOf
+    acyclic + inverse-consistent; SiblingOf symmetric). Decide whether the
+    inverse edge is stored automatically or derived on read.
+  - [ ] Front-end: show/edit a person's parents, children, and siblings
+    on the detail page (each as a person reference).
+  - [ ] Matcher: no change — `relationships` is registry-only, dropped by
+    the adapter (§5.3).
+  - **Acceptance:** linking A `ParentOf` B surfaces B under A's children
+    and A under B's parents; a self- or cyclic parent link is rejected
+    `422`; sibling links are symmetric; an integration test covers it.

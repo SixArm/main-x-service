@@ -14,6 +14,7 @@
 <script lang="ts">
     import { Grid } from "wx-svelte-grid";
     import type { Course } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     let {
         courses,
@@ -23,15 +24,16 @@
         onselect?: (course: Course) => void;
     } = $props();
 
-    // Static column definitions (id ⇒ row key, header label, pixel width).
-    const columns = [
-        { id: "id", header: "ID", width: 220 },
-        { id: "name", header: "Name", width: 240 },
-        { id: "course_code", header: "Course code", width: 120 },
-        { id: "educational_level", header: "Level", width: 140 },
-        { id: "status", header: "Status", width: 100 },
-        { id: "primary_id", header: "Primary identifier", width: 200 },
-    ];
+    // Column definitions (id ⇒ row key, localized header label, pixel width).
+    // Headers are derived so a locale switch relabels the grid columns.
+    const columns = $derived([
+        { id: "id", header: t("grid.id"), width: 220 },
+        { id: "name", header: t("grid.name"), width: 240 },
+        { id: "course_code", header: t("grid.courseCode"), width: 120 },
+        { id: "educational_level", header: t("grid.level"), width: 140 },
+        { id: "status", header: t("grid.status"), width: 100 },
+        { id: "primary_id", header: t("grid.primaryIdentifier"), width: 200 },
+    ]);
 
     // Render the first identifier as "Type value" for the grid cell;
     // handles the { Custom } object variant of property_id.
@@ -39,7 +41,7 @@
         if (!c.identifiers || c.identifiers.length === 0) return "";
         const first = c.identifiers[0];
         if (!first) return "";
-        const type = typeof first.property_id === "string" ? first.property_id : `Custom:${first.property_id.Custom}`;
+        const type = typeof first.property_id === "string" ? first.property_id : `${t("detail.customPrefix")}${first.property_id.Custom}`;
         return `${type} ${first.value}`;
     }
 
@@ -47,7 +49,7 @@
     function levelLabel(c: Course): string {
         const l = c.educational_level;
         if (!l) return "";
-        return typeof l === "string" ? l : `Custom: ${l.Custom}`;
+        return typeof l === "string" ? l : `${t("detail.customPrefix")} ${l.Custom}`;
     }
 
     // Project courses into the flat row shape the grid columns expect.

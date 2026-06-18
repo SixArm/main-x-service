@@ -7,7 +7,7 @@ touching before you edit anything.
 
 | Stack | Lives in | What it is | Reference |
 |---|---|---|---|
-| In-service matcher | service `src/matching/{algorithms,scoring,phonetic}.rs` | Probabilistic (weighted: name 0.30, birth date 0.25, gender 0.10, address 0.10, identifier 0.10, tax ID 0.10, document 0.05) + deterministic short-circuits; serves the REST `match` / dedup endpoints today | [service AGENTS/matching.md](../person-service-rust-crate/AGENTS/matching.md) — full weights, rules, Soundex table |
+| In-service matcher | service `src/matching/{algorithms,scoring,phonetic}.rs` | Probabilistic (weighted: name 0.30, birth date 0.25, gender 0.10, address 0.10, identifier 0.10, tax ID 0.10, document 0.05) + deterministic short-circuits; serves the REST `match` / dedup endpoints today | [service AGENTS/matching.md](../person-service-with-loco/AGENTS/matching.md) — full weights, rules, Soundex table |
 | Canonical matcher (embedded) | `person-matcher` crate, re-exported as `matcher_lib`, reached via `adapter.rs` | Pure-library `MatchingEngine` + `MatchConfig` (`strict` / `default` / `lenient`); 42 national-identifier schemes, passport books, nickname tables, NFKD normalisation, E.164 phone (39 jurisdictions) | [matcher AGENTS/matching-algorithm.md](../person-matcher-rust-crate/AGENTS/matching-algorithm.md), [normalization.md](../person-matcher-rust-crate/AGENTS/normalization.md), [matcher spec §12](../person-matcher-rust-crate/spec/12-algorithm-specifications.md) |
 
 Which is authoritative long-term is an open question — entity

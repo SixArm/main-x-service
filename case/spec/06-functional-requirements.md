@@ -11,7 +11,7 @@ are marked and tracked in §13 / §15.
   in one `422` — blank `title`; `opened_date` present but not a valid
   ISO 8601 date; any `identifiers` entry whose `value` is blank; any
   blank entry in `subjects` or `keywords`. Validation rules live in
-  [`crate::validation`](../case-service-rust-crate/src/validation.rs).
+  [`crate::validation`](../case-service-with-loco/src/validation.rs).
   Docket / case-number format checks and status-transition rules
   remain deferred (§13 T-9).
 - **FR-2** List active cases: `GET /api/cases` returns `{pid, title}`
@@ -75,7 +75,7 @@ Algorithm reference:
   a snapshot of the transferred payload), and publish a `Merged`
   event. Equal `main_pid`/`duplicate_pid` → `422`; unknown pid →
   `404`. `GET /api/cases/merges/recent` lists the history. Merge logic
-  lives in [`crate::merge`](../case-service-rust-crate/src/merge.rs).
+  lives in [`crate::merge`](../case-service-with-loco/src/merge.rs).
 
 ### 6.3 Audit, events, auth, docs — service
 
@@ -87,14 +87,17 @@ Algorithm reference:
   (`created`/`updated`/`deleted`/`merged`) to an in-memory ring buffer
   (cap 1 000). Read at `GET /api/cases/events/recent`. Durable broker
   is roadmap (§15).
-- **FR-19** JWT verification: RS256 tokens verified offline against the
-  auth-service JWKS via the embedded
-  [`authentication-verifier`](../../authentication/) crate (env
-  `CASE_JWKS` / `CASE_JWT_ISSUER` / `CASE_JWT_AUDIENCE`). `AuthUser`
-  (required) and `MaybeAuthUser` (optional) extractors; `GET
+- **FR-19** Token verification: PASETO v4 public tokens (Ed25519)
+  verified offline against the auth-service's published key via the
+  embedded [`authentication-verifier`](../../authentication/) crate (env
+  `CASE_PASETO_KEYS` / `CASE_TOKEN_ISSUER` / `CASE_TOKEN_AUDIENCE`).
+  `AuthUser` (required) and `MaybeAuthUser` (optional) extractors; `GET
   /api/cases/whoami` is protected; the audit / merge `actor` is stamped
   from the token when present. Blanket `/api/*` enforcement +
-  JWKS-over-HTTP fetch are follow-ups (§13 T-7).
+  paseto-keys-over-HTTP fetch are follow-ups (§13 T-7). Auth model source
+  of truth:
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  (supersedes the RS256-JWT + JWKS model).
 - **FR-20** API docs: OpenAPI 3 document at `GET /api-docs/openapi.json`
   and Swagger UI at `GET /swagger-ui`.
 
@@ -120,7 +123,7 @@ Algorithm reference:
 | Durable event bus (replacing in-process ring buffer) | service |
 | Full-text / fuzzy search (Tantivy) + search UI | service + front-end |
 | Front-end search box + audit / event views | front-end |
-| Blanket `/api/*` JWT enforcement + JWKS-over-HTTP fetch | service |
+| Blanket `/api/*` token enforcement + paseto-keys-over-HTTP fetch | service |
 | Real-time duplicate detection on create (`409`) | service |
 | Deeper validation (docket / case-number formats, status transitions) | service (+ inline UI validation) |
 | gRPC | service |

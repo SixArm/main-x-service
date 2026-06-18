@@ -9,6 +9,57 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **Auth pivot — BFF + cookie session + PASETO (spec-level; code
+  follow-up pending).** The family is moving off the browser-held RS256
+  JWT (cross-origin `#access_token` fragment handoff,
+  `localStorage["mxi_access_token"]`) to a **Backend-For-Frontend**: the
+  browser holds only an httpOnly `__Host-mxi_session` cookie, the
+  front-end's own SvelteKit server exchanges the session for a
+  short-lived **PASETO v4.public** token and calls the care pathway
+  service server-side, and mutating requests are CSRF-protected. RS256
+  JWT + JWKS are decommissioned. Human-facing docs (README/AGENTS/index)
+  updated to describe the target model; the current runtime still uses
+  the older client-held-token flow and the code follow-up is tracked in
+  spec §13. Source of truth:
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
+
+- **Docs ↔ spec harmonization pass.** Refreshed `AGENTS.md`, `README.md`,
+  and `index.md` from "CRUD + matching" to the shipped surface (name
+  search, merge, audit trail, recent activity, bearer-token / SSO auth):
+  added the search / recent-events / audit rows to the AGENTS API table,
+  the full `types.ts` export set and `care-pathways.ts` method list, an
+  Auth section, and `pnpm test` / `pnpm test:e2e` to the command blocks;
+  added the search / merge / audit / recent-activity endpoints and the
+  bearer/SSO note to the `index.md` Flow block. Populated the previously
+  empty `.env.example` with `PUBLIC_API_BASE_URL` and
+  `VITE_AUTH_FRONTEND_URL`. Corrected the stale "29 tests" count in
+  spec §13, and the stale "4 tests" Playwright count there to 8 (the four
+  routes plus search / merge / audit / recent-activity smoke tests).
+
+### Added
+
+- **`in_language` (BCP-47 languages) form + detail wiring.** The
+  `CarePathway.in_language` field (a real, BCP-47-validated service field)
+  was carried in `types.ts` but neither editable nor displayed. Added a
+  comma-separated **Languages** input to `CarePathwayForm` (round-tripping
+  through `build()` like the other list fields) and a "Languages" row to
+  the detail page. Spec §8 now lists it among the editable fields.
+- **`CarePathwayForm` component tests.** New
+  `tests/unit/care-pathway-form.test.ts` (5 tests, via
+  `@testing-library/svelte` mounted client-side by the `svelteTesting()`
+  vite plugin): the required-name guard blocks `onsubmit` on a
+  blank/whitespace name and shows the banner; `build()` normalization
+  (trim scalars, blank→null, comma-list split incl. `in_language`, drop
+  empty condition-code / identifier rows, collapse a `Custom`
+  care-setting / identifier-scheme seed).
+- **Merge error-path tests.** Two repository tests pin that `merge()`
+  propagates a `404` (unknown pid) and `422` (equal-pid) as a classified
+  `ApiError` for the detail-page error banner (spec §6.7).
+
+## [0.3.0] — 2026-06-15
+
 ### Added
 
 - **Cross-origin SSO token handoff (consumer side).** The session
@@ -80,6 +131,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   2 unit tests (body shape + reason-omitted); Playwright adds 1 smoke
   test (check-duplicates → confirm merge → success state, asserting the
   merge endpoint fired).
+## [0.2.0] — 2026-06-13
+
+### Added
+
 - **List search box.** The list page (`/`) gains a name-search box
   (search-on-submit + **Clear**). A non-blank query calls
   `GET /api/care-pathways/search?q=` (URL-encoded) via a new
@@ -102,7 +157,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   said "Authentication Service"; `app.html` description said "Course
   Service" — both now read "Care Pathway Service".
 
-### Added (scaffold)
+## [0.1.0] — 2026-06-12
+
+### Added
 
 - **Inaugural scaffold (v0.1.0).** SvelteKit 2 / Svelte 5 (runes) SPA
   for the Care Pathway Service, copy-adapted from

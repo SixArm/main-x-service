@@ -58,8 +58,8 @@ The engine owns only a `MatchConfig`, so cloning is cheap. A consumer MAY hold o
 - `Scorer::jaro_winkler_similarity(&a, &b) -> f64`
 - `Scorer::levenshtein_similarity(&a, &b)  -> f64`
 - `Scorer::exact_match(&a, &b)             -> f64`  // `1.0` or `0.0`
-- `Scorer::combined_similarity(&a, &b)     -> f64`  // `0.6·JW + 0.4·Lev`
-- `Scorer::jaccard_similarity(&[T], &[T])  -> f64`  // for `same_as`, `additional_types`
+- `Scorer::combined_similarity(&a, &b)     -> f64`  // `0.7·JW + 0.3·Lev`
+- `Scorer::jaccard_set_similarity(&[T], &[T]) -> f64`  // for `same_as`, `additional_types`
 
 All similarity values are in `[0.0, 1.0]`. Empty-string handling: `jaro_winkler` / `levenshtein` / `combined` return `1.0` when both inputs are empty and `0.0` when exactly one is empty; `exact_match` returns `1.0` only when both inputs are equal (including both empty).
 
@@ -89,6 +89,14 @@ Note the **asymmetry vs. deterministic match**: an empty `identifiers` list on e
 | `same_as_score` | Jaccard over the union of normalised `same_as` URLs. `None` only if BOTH sides are empty; otherwise `Some(intersection / union)`. |
 | `additional_types_score` | Same shape as `same_as_score`. |
 
+### 5.9.1 Relationships scoring
+
+`relationships_score` is typed-set **Jaccard** over the `(relation, thing_id)` pairs: `score = |A ∩ B| / |A ∪ B|`, where each side's set is `{ (r.relation, r.thing_id) for r in relationships }`. The relation kind is part of the key — a `Contains` reference only agrees with a `Contains` reference to the **same** thing id; `ContainedIn` / `SuperPart` / `SubPart` are compared as opaque, distinct kinds (no inversion, no transitive closure). `None` (does not participate) when **either** side has no relationships; otherwise a value in `[0.0, 1.0]`. A supporting signal weighted `relationships_weight` (§3.4, default `0.05`); shared references never single-handedly establish a match.
+
+### 5.9.2 Tags scoring
+
+`tags_score` is plain set **Jaccard** over the tag sets: `score = |A ∩ B| / |A ∪ B|`, where each side's set is the operator's `tags` after case-insensitive normalisation (trim + lowercase, de-duplicated). `None` (does not participate) when **either** side has an empty tag set; otherwise a value in `[0.0, 1.0]`. A supporting signal weighted `tags_weight` (§3.4, default `0.05`); shared tags never single-handedly establish a match.
+
 ### 5.10 Renormalised weighted sum
 
 ```
@@ -97,7 +105,7 @@ total_weight  = 0.0
 
 for each scored field (name, description, disambig, identifiers,
                        url, same_as, image, main_entity_of_page,
-                       additional_types):
+                       additional_types, relationships, tags):
     if breakdown.field_score is Some(s):
         weighted_sum += s * config.field_weight
         total_weight += config.field_weight

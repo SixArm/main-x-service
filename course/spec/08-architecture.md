@@ -14,7 +14,7 @@
 +------------------------------+-------------------------------+
                                | HTTP JSON  /api/*  (:8084)
 +------------------------------v-------------------------------+
-|  course-service-rust-crate              (loco.rs 0.16 / Axum) |
+|  course-service-with-loco              (loco.rs 0.16 / Axum) |
 |  +----------------+ +-----------------+ +------------------+  |
 |  | REST controllers| | Validation     | | Privacy / masking|  |
 |  | (idiomatic loco)| | FR-21..FR-28   | | + GDPR export    |  |
@@ -91,6 +91,6 @@ index → audit log → event → `201` rendered as detail view.
 rendered with per-component scores.
 
 Per-crate internals: service
-[spec §8](../course-service-rust-crate/spec/08-architecture.md),
+[spec §8](../course-service-with-loco/spec/08-architecture.md),
 matcher [spec §5](../course-matcher-rust-crate/spec/05-algorithm-overview.md),
 front-end [spec §8](../course-front-end-with-svelte/spec/08-architecture.md).

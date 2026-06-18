@@ -1,7 +1,7 @@
 ## 16. Open Questions
 
 Entity-level questions only — crate-internal OQs stay in the owning
-crate's spec ([service §16](../thing-service-rust-crate/spec/16-open-questions.md),
+crate's spec ([service §16](../thing-service-with-loco/spec/16-open-questions.md),
 [matcher §10](../thing-matcher-rust-crate/spec/10-open-questions.md)).
 
 - **OQ-1 — One matching engine or two?** The service carries its own

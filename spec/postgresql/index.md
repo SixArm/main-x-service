@@ -28,7 +28,8 @@ follow the conventions below.
 
 Every service is isolated in its own database (microservice-per-DB). There
 is **no** cross-database access and no shared schema; services integrate
-over HTTP/JWT, not the database.
+over HTTP (authenticated with cross-service PASETO v4.public tokens; the
+prior RS256 JWT model is decommissioned), not the database.
 
 - **Naming.** `<entity>_service_<env>` for development and test
   (`person_service_development`, `organization_service_test`, …);

@@ -52,7 +52,7 @@ Two shapes exist today, **both process-local and volatile**.
 The loco services (organization, care-pathway, case) implement **Phase
 1** of the durable-bus design: the canonical versioned envelope and the
 publisher trait, wired to an in-memory ring buffer. Reference
-implementation: `care-pathway-service-rust-crate/src/streaming.rs`.
+implementation: `care-pathway-service-with-loco/src/streaming.rs`.
 
 **`Envelope`** — the canonical, versioned event shape (one shape per
 entity and transport):
@@ -112,7 +112,7 @@ writes one `audit_logs` row.
 
 The older Axum-era services (person, worker, place, thing, event)
 predate the canonical envelope. Reference:
-`person-service-rust-crate/src/streaming/mod.rs`. They use a
+`person-service-with-loco/src/streaming/mod.rs`. They use a
 **producer/consumer trait pair** over a richer, record-bearing event
 enum:
 
@@ -214,7 +214,7 @@ so the operator API is unchanged across the rollout.
 
 ### 4.5 Publisher selection (config-driven)
 
-Selection mirrors the JWT `REQUIRE_AUTH` pattern — per service,
+Selection mirrors the auth `REQUIRE_AUTH` pattern — per service,
 env-driven, defaulting to today's behaviour:
 
 | Var | Meaning | Default |

@@ -7,6 +7,7 @@
     import { goto } from "$app/navigation";
     import OrganizationForm from "$lib/components/OrganizationForm.svelte";
     import { OrganizationRepository } from "$lib/api/organizations";
+    import { t } from "$lib/i18n.svelte";
     import type { Organization } from "$lib/api/types";
 
     const repo = OrganizationRepository.withFetch();
@@ -20,7 +21,7 @@
     }
 </script>
 
-<svelte:head><title>New organization — Main X</title></svelte:head>
+<svelte:head><title>{t("new.title")} — Main X</title></svelte:head>
 
-<h1>New organization</h1>
-<OrganizationForm {initial} submitLabel="Create" onsubmit={handleSubmit} />
+<h1>{t("new.title")}</h1>
+<OrganizationForm {initial} submitLabel={t("new.create")} onsubmit={handleSubmit} />

@@ -60,9 +60,9 @@ Welsh-language duty (Welsh Language (Wales) Measure 2011 — treat Welsh
 ### 2.1 Authentication **service** — localized magic-link email
 
 Reference implementation:
-[`authentication-service-rust-crate/src/i18n.rs`](../../authentication/authentication-service-rust-crate/src/i18n.rs)
+[`authentication-service-with-loco/src/i18n.rs`](../../authentication/authentication-service-with-loco/src/i18n.rs)
 (see also the service
-[spec](../../authentication/authentication-service-rust-crate/spec/index.md)).
+[spec](../../authentication/authentication-service-with-loco/spec/index.md)).
 
 The magic-link email is the only user-facing text the service emits, and
 it is localized. The module is a **pure, dependency-free** catalog: a

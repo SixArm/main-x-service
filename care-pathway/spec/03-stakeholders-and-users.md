@@ -17,7 +17,7 @@ governmental health system. Stakeholders span the trio:
 | Other Main X Index entities | Cross-references via `pid`; provider organisations resolve in the [organization entity](../../organization/) | Service REST API |
 
 Per-subproject stakeholder detail: service
-[spec §3](../care-pathway-service-rust-crate/spec/index.md), matcher
+[spec §3](../care-pathway-service-with-loco/spec/index.md), matcher
 [spec §3](../care-pathway-matcher-rust-crate/spec/index.md),
 front-end
 [spec §3](../care-pathway-front-end-with-svelte/spec/index.md).

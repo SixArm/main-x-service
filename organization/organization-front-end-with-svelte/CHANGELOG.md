@@ -9,8 +9,46 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **Auth pivot — BFF + cookie session + PASETO (spec-level; code
+  follow-up pending).** The family is moving off the browser-held RS256
+  JWT (cross-origin `#access_token` fragment handoff,
+  `localStorage["mxi_access_token"]`) to a **Backend-For-Frontend**: the
+  browser holds only an httpOnly `__Host-mxi_session` cookie, the
+  front-end's own SvelteKit server exchanges the session for a
+  short-lived **PASETO v4.public** token and calls the organization
+  service server-side, and mutating requests are CSRF-protected. RS256
+  JWT + JWKS are decommissioned. Human-facing docs (README/AGENTS/index)
+  updated to describe the target model; the current runtime still uses
+  the older client-held-token flow and the code follow-up is tracked in
+  spec §13. Source of truth:
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
+
+- **Docs/tests harmonization pass.** Brought the doc set back in line
+  with the implemented bearer-token + SSO handoff increments: spec §2
+  now scopes in the opt-in session/SSO (was "auth out of scope"), §8
+  enumerates the payload incl. `telephone`/`email` and points at the new
+  `build.ts`, and §11/§13 record the suite at 49 tests across 5 files.
+  AGENTS.md gained `auth.svelte.ts`, `build.ts`, `VITE_AUTH_FRONTEND_URL`/
+  `signInUrl`, the `tests/` tree, a Session/SSO section, and
+  `pnpm test`/`pnpm test:e2e`. README documents `telephone`/`email` and
+  the test commands. index.md adds a worked SSO-handoff diagram and an
+  Organization payload JSON example (incl. the `{Custom: label}`
+  identifier variant).
+
 ### Added
 
+- **Form/payload core extracted + tested.** `OrganizationForm.build()`
+  and its helpers moved into a pure `src/lib/api/build.ts`
+  (`buildOrganization` + `splitList`/`blankToUndef`) so the spec §8 core
+  is unit-testable without mounting the component; the §6.6 self-match
+  filter is now `excludeSelf` in the same module (used by the detail
+  route). New `tests/unit/build.test.ts` (14) covers comma-list
+  splitting, blank→null clearing, contact fields, all-or-nothing
+  address, dropping empty identifier rows, and self-match exclusion.
+  `tests/unit/auth.test.ts` gained `captureFromLocation` coverage
+  (store-write + fragment-strip / no-op). Suite is now 49 unit tests.
 - **Cross-origin SSO token handoff (consumer side).** The operator now
   obtains a token from the central authentication front-end instead of
   pasting it. `signInUrl()` (`src/lib/config.ts`, new
@@ -39,7 +77,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   vitest covers store round-trip + store-driven / override / cleared
   header attachment. Implements `agents/share/jwt-enforcement.md`
   (service enforcement stays off by default).
-- **Test suites (T-11).** vitest unit tests (`tests/unit/`, 16) for the
+- **Test suites (T-11).** vitest unit tests (`tests/unit/`) for the
   `ApiClient` and `OrganizationRepository` — verb/path/body/bearer-token,
   error classification, and a regression pinning the `check-duplicates`
   path. Playwright smoke tests (`tests/e2e/`, 4) load the four routes

@@ -2,9 +2,9 @@
 
 Entity-level orientation. The full endpoint reference (parameters,
 envelopes, status codes, FHIR, library API, metrics) is
-[service `AGENTS/restful.md`](../worker-service-rust-crate/AGENTS/restful.md);
+[service `AGENTS/restful.md`](../worker-service-with-loco/AGENTS/restful.md);
 the normative inventory is
-[service spec §9](../worker-service-rust-crate/spec/09-api-surface.md)
+[service spec §9](../worker-service-with-loco/spec/09-api-surface.md)
 and [entity spec §9](../spec/09-api-surface.md).
 
 ## Shape of the surface
@@ -39,5 +39,8 @@ matching & dedup (`/match`, `/check-duplicates`, `/merge`,
 `worker-front-end-with-svelte/src/lib/api/` (`types.ts`,
 `client.ts`, `workers.ts`) is the working example of consuming this
 API, route map in [entity spec §9.2](../spec/09-api-surface.md).
-Authentication: none yet — JWT enforcement and SSO wiring are queued
-(entity spec §13 T-4; service §13 T-1).
+Authentication: none yet — blanket auth enforcement and SSO wiring are
+queued (entity spec §13 T-4; service §13 T-1). When it lands, peers
+verify a short-lived PASETO v4.public token (published Ed25519 key) and
+browsers carry an httpOnly cookie session via the front-end BFF — see
+[`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).

@@ -4,14 +4,10 @@
 // {success,data,error} envelope), so this client returns the parsed
 // body directly and throws ApiError on non-2xx.
 //
-// By default every request attaches `Authorization: Bearer <token>` when
-// the shared auth store (`$lib/auth.svelte`) holds a token, so operator
-// traffic carries the SSO token once the service has blanket JWT
-// enforcement turned on (see `agents/share/jwt-enforcement.md`). A
-// per-call `token` overrides the store: pass a string to force a token,
-// or `null` to suppress the header for that request.
-
-import { token as storeToken } from "$lib/auth.svelte";
+// Auth is handled by the same-origin BFF proxy (it injects a server-
+// exchanged PASETO), so this client attaches no bearer of its own — only
+// an explicit per-request `token` override, if ever passed. See
+// `agents/share/authentication-sessions.md`.
 
 /** Construction options for {@link ApiClient}. */
 export interface ClientOptions {
@@ -30,8 +26,8 @@ export interface RequestOptions {
     body?: unknown;
     /**
      * Per-call bearer token override. A string forces that token; an
-     * explicit `null` suppresses the `Authorization` header for this
-     * request; `undefined` (the default) falls back to the shared auth store.
+     * explicit `null`/`""` suppresses the `Authorization` header. The BFF
+     * proxy injects the bearer server-side, so this is normally omitted.
      */
     token?: string | null;
     /** Extra request headers, merged over the JSON content/accept defaults. */
@@ -77,9 +73,9 @@ export class ApiError extends Error {
  *
  * The service returns RAW JSON (no `{success,data,error}` envelope), so
  * the verb helpers resolve the parsed body directly and throw
- * {@link ApiError} on any non-2xx response. By default each request reads
- * the shared auth store and attaches `Authorization: Bearer <token>` when
- * a token is present (overridable per call via `RequestOptions.token`).
+ * {@link ApiError} on any non-2xx response. The BFF proxy injects the
+ * bearer server-side, so this client sends one only when an explicit
+ * per-call `token` is passed (via `RequestOptions.token`).
  */
 export class ApiClient {
     private readonly baseUrl: string;
@@ -143,11 +139,10 @@ export class ApiClient {
             accept: "application/json",
             ...opts.headers,
         };
-        // A per-call `token` (string or explicit null) overrides the
-        // shared store; otherwise fall back to the current stored token.
-        const bearer = opts.token !== undefined ? opts.token : storeToken();
-        if (bearer) {
-            headers.authorization = `Bearer ${bearer}`;
+        // The BFF proxy injects the bearer server-side; this client sends a
+        // bearer only when one is explicitly passed for this request.
+        if (opts.token) {
+            headers.authorization = `Bearer ${opts.token}`;
         }
 
         const init: RequestInit = { method, headers, signal: opts.signal };

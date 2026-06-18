@@ -10,7 +10,7 @@ delivered as a trio of subprojects that compose into one capability:
 
 | Subproject | Role |
 |---|---|
-| [organization-service-rust-crate](../organization-service-rust-crate/) | Registry service — loco.rs CRUD, name search, matching, audit log, event streaming, OpenAPI/Swagger over REST |
+| [organization-service-with-loco](../organization-service-with-loco/) | Registry service — loco.rs CRUD, name search, matching, audit log, event streaming, OpenAPI/Swagger over REST |
 | [organization-matcher-rust-crate](../organization-matcher-rust-crate/) | Canonical pairwise matching library — deterministic identifier short-circuits + explainable probabilistic scoring, embedded by the service |
 | [organization-front-end-with-svelte](../organization-front-end-with-svelte/) | Operator UI — SvelteKit SPA for CRUD + duplicate-check over the service's REST API |
 
@@ -57,7 +57,10 @@ national / international register scale:
   traversal — matcher [spec §2](../organization-matcher-rust-crate/spec/index.md)).
 - **Not** an authentication / authorisation provider. Sign-on for the
   whole index is the [authentication entity](../../authentication/)
-  (passwordless magic-link, RS256 JWT + JWKS); this entity will be a
-  JWT *verifier* (roadmap, §15).
+  (passwordless magic-link, cookie sessions, short-lived PASETO v4.public
+  cross-service tokens — see
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md),
+  which supersedes the prior RS256-JWT + JWKS model); this entity will be
+  a token *verifier* (roadmap, §15).
 - **Not** a credit-rating, risk-scoring, or due-diligence platform;
   it resolves identity, it does not assess organizations.

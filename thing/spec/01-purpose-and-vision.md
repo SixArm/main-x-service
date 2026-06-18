@@ -9,7 +9,7 @@ subprojects that compose into one capability:
 
 | Subproject | Role |
 |---|---|
-| [thing-service-rust-crate](../thing-service-rust-crate/) | System of record — REST CRUD, search, dedup, merge, audit, privacy |
+| [thing-service-with-loco](../thing-service-with-loco/) | System of record — REST CRUD, search, dedup, merge, audit, privacy |
 | [thing-matcher-rust-crate](../thing-matcher-rust-crate/) | Canonical pairwise-comparison algorithm, embedded by the service |
 | [thing-front-end-with-svelte](../thing-front-end-with-svelte/) | Operator UI over the service's REST API |
 

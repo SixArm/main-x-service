@@ -57,7 +57,7 @@ record IDs are left intact.
 | Postal address | address lines | per `agents/share/privacy.md` |
 
 The implemented person masker is
-[`mask_person`](../../person/person-service-rust-crate/src/privacy/mod.rs);
+[`mask_person`](../../person/person-service-with-loco/src/privacy/mod.rs);
 worker and place ship the analogous `mask_worker` / `mask_place`.
 
 ### 1.3 `mask_value` semantics
@@ -84,7 +84,7 @@ boundary. This was a real fix: the earlier byte-indexed implementation
 panicked on multibyte input such as `"1é345"` (the naive `len - 4` byte
 cut landed *inside* the two-byte `é`). The regression is pinned by
 `test_mask_value_multibyte_does_not_panic`
-([source](../../person/person-service-rust-crate/src/privacy/mod.rs)),
+([source](../../person/person-service-with-loco/src/privacy/mod.rs)),
 covering `"1é345"`, `"naïve12"`, `"café"`, and `"Müller-9981"`. The
 practical consequence: accented names and non-Latin identifiers are
 masked correctly and the endpoint cannot be crashed by exotic input.
@@ -103,7 +103,7 @@ GET /<plural>/{id}/export
 ```
 
 Backed by `export_<entity>_data` (e.g.
-[`export_person_data`](../../person/person-service-rust-crate/src/privacy/mod.rs)),
+[`export_person_data`](../../person/person-service-with-loco/src/privacy/mod.rs)),
 which serializes the full, **unmasked** record to JSON for the
 data-subject right of access. The export is the complete record
 (identifiers, names, addresses, contacts, documents, dates) — masking
@@ -117,7 +117,7 @@ GET /api/auth/account/export   (bearer token required)
 ```
 
 Implemented in
-[`authentication/.../src/controllers/auth.rs`](../../authentication/authentication-service-rust-crate/src/controllers/auth.rs)
+[`authentication/.../src/controllers/auth.rs`](../../authentication/authentication-service-with-loco/src/controllers/auth.rs)
 (`export_account` → `AccountExport`). It bundles three datasets for the
 authenticated subject:
 
@@ -160,9 +160,9 @@ DELETE /api/auth/account   (bearer token required)
 
 The authentication service implements true Art. 17 erasure
 (`erase_account` in
-[`auth.rs`](../../authentication/authentication-service-rust-crate/src/controllers/auth.rs),
+[`auth.rs`](../../authentication/authentication-service-with-loco/src/controllers/auth.rs),
 `Model::erase` in
-[`models/users.rs`](../../authentication/authentication-service-rust-crate/src/models/users.rs)).
+[`models/users.rs`](../../authentication/authentication-service-with-loco/src/models/users.rs)).
 It is a **soft-delete + anonymise + revoke + audit** sequence:
 
 1. **Soft-delete** — stamp `users.deleted_at`.
@@ -172,9 +172,12 @@ It is a **soft-delete + anonymise + revoke + audit** sequence:
 3. **Revoke** — revoke all of the subject's sessions.
 4. **Audit** — record an `account_erased` audit row.
 
-After erasure the bearer token still *verifies cryptographically* until
-its `exp` (stateless RS256; see
-[spec/authentication](../authentication/index.md)), but `/me`, the
+After erasure a cross-service token still *verifies cryptographically*
+until its short `exp` (the offline-verified PASETO v4.public token;
+RS256/JWKS decommissioned — see
+[spec/authentication](../authentication/index.md) and
+[../../agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)),
+but the subject's session is revoked immediately, and `/me`, the
 account export, and the audit routes all refuse it with `401` — a
 deleted account is treated as gone. Re-erasing an already-erased account
 is a no-op `200`.
@@ -191,7 +194,7 @@ is a no-op `200`.
 ## 4. Consent management
 
 The MPI services model GDPR/DPA consent as a first-class record
-([`models/consent.rs`](../../person/person-service-rust-crate/src/models/consent.rs)).
+([`models/consent.rs`](../../person/person-service-with-loco/src/models/consent.rs)).
 
 ### 4.1 Consent model
 
@@ -214,7 +217,7 @@ The MPI services model GDPR/DPA consent as a first-class record
 
 ### 4.2 `has_active_consent` checking utility
 
-[`has_active_consent(consents, consent_type) -> bool`](../../person/person-service-rust-crate/src/privacy/mod.rs)
+[`has_active_consent(consents, consent_type) -> bool`](../../person/person-service-with-loco/src/privacy/mod.rs)
 answers whether the subject has granted a given consent type that is
 currently in force. A consent counts when, and only when:
 
@@ -324,7 +327,8 @@ The regulatory regime lists are in
 ### See also
 
 - [`agents/share/privacy.md`](../../agents/share/privacy.md) — the brief this spec expands
-- [spec/authentication](../authentication/index.md) — account lifecycle, anti-enumeration, RS256/JWKS
+- [spec/authentication](../authentication/index.md) — account lifecycle, anti-enumeration, cookie sessions + PASETO v4.public
+- [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md) — auth & sessions design (source of truth)
 - [spec/restful](../restful/index.md) — endpoint conventions (status codes, JSON envelope)
 - [spec/postgresql](../postgresql/index.md) — persistence, soft-delete columns
 - [`agents/share/auditability.md`](../../agents/share/auditability.md) — audit logging & event streaming

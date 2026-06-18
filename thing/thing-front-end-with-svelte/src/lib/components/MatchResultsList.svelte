@@ -11,20 +11,24 @@
 -->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     let {
         results,
-        title = "Match results",
+        title,
     }: {
         results: MatchResult[];
         title?: string;
     } = $props();
+
+    // Fall back to the localized default heading when no title is supplied.
+    const heading = $derived(title ?? t("results.title"));
 </script>
 
 <section class="surface stack">
-    <h2>{title} <span class="muted small">({results.length})</span></h2>
+    <h2>{heading} <span class="muted small">({results.length})</span></h2>
     {#if results.length === 0}
-        <p class="muted">No candidates.</p>
+        <p class="muted">{t("results.noCandidates")}</p>
     {:else}
         <ul class="results">
             {#each results as r}
@@ -45,15 +49,15 @@
                          when that component actually contributed (non-null). -->
                     {#if r.breakdown}
                         <details>
-                            <summary class="small">Score breakdown</summary>
+                            <summary class="small">{t("results.scoreBreakdown")}</summary>
                             <ul class="breakdown small">
-                                {#if r.breakdown.name_score != null}<li>name: {(r.breakdown.name_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.identifier_score != null}<li>identifier: {(r.breakdown.identifier_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.description_score != null}<li>description: {(r.breakdown.description_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.url_score != null}<li>URL: {(r.breakdown.url_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.same_as_score != null}<li>same-as: {(r.breakdown.same_as_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.phonetic_match}<li>phonetic match</li>{/if}
-                                {#if r.breakdown.deterministic_match}<li>deterministic (DOI/ISBN/…)</li>{/if}
+                                {#if r.breakdown.name_score != null}<li>{t("results.nameScore")}: {(r.breakdown.name_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.identifier_score != null}<li>{t("results.identifierScore")}: {(r.breakdown.identifier_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.description_score != null}<li>{t("results.descriptionScore")}: {(r.breakdown.description_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.url_score != null}<li>{t("results.urlScore")}: {(r.breakdown.url_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.same_as_score != null}<li>{t("results.sameAsScore")}: {(r.breakdown.same_as_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.phonetic_match}<li>{t("results.phoneticMatch")}</li>{/if}
+                                {#if r.breakdown.deterministic_match}<li>{t("results.deterministicMatch")}</li>{/if}
                             </ul>
                         </details>
                     {/if}

@@ -7,9 +7,9 @@ Entity-level summary; detail in [`AGENTS/testing.md`](../AGENTS/testing.md).
 | Subproject | Layer | Today |
 |---|---|---|
 | matcher | Unit tests embedded per module (`#[cfg(test)]`); integration suite `tests/public_api.rs` over the re-exported surface; rustdoc examples as doctests | Delivered |
-| service | DB-free tests in [`tests/matching.rs`](../care-pathway-service-rust-crate/tests/matching.rs): matcher embedding + JSON round-trip of the DTO | Delivered |
+| service | DB-free tests in [`tests/matching.rs`](../care-pathway-service-with-loco/tests/matching.rs): matcher embedding + JSON round-trip of the DTO | Delivered |
 | service | Controller validation unit tests (`src/controllers/care_pathways.rs`): blank-name → `422` pin, DB-free | Delivered |
-| service | Request-level integration tests against PostgreSQL ([`tests/requests/care_pathways.rs`](../care-pathway-service-rust-crate/tests/requests/care_pathways.rs), loco testing harness): CRUD, 422s, 404, `/match`, `/check-duplicates`. `#[ignore]`-gated; run with `cargo test -- --ignored` and a Postgres URL | Delivered (gated) — §13 T-4 |
+| service | Request-level integration tests against PostgreSQL ([`tests/requests/care_pathways.rs`](../care-pathway-service-with-loco/tests/requests/care_pathways.rs), loco testing harness): CRUD, 422s, 404, `/match`, `/check-duplicates`. `#[ignore]`-gated; run with `cargo test -- --ignored` and a Postgres URL | Delivered (gated) — §13 T-4 |
 | front-end | `pnpm run check` (svelte-check strict, 0 errors / 0 warnings) + production build | Delivered |
 | front-end | vitest unit tests (`ApiClient`, `CarePathwayRepository`) and Playwright smoke over the four routes | Deferred — §13 T-5 |
 

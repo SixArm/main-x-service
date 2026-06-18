@@ -11,7 +11,7 @@
 | Audit view | ✅ |
 | Match check | ✅ |
 | Merge UI | ✅ |
-| Unit tests | ✅ 9 tests (5 in `client.test.ts` + 4 in `courses.test.ts`) |
+| Unit tests | ✅ 27 tests (5 `client.test.ts` + 6 `courses.test.ts` + 7 `form.test.ts` + 9 `courseFormValidate.test.ts`) |
 | E2E smoke | ✅ 5 Playwright tests in `e2e/courses.spec.ts` |
 | `pnpm install` verified | ✅ |
 | `pnpm test` verified | ✅ |

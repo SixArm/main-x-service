@@ -3,7 +3,17 @@
 Entity-level summary. Normative strategy: entity spec
 [§11 Testing Strategy](../spec/11-testing-strategy.md).
 
-## Service (`authentication-service-rust-crate`)
+> **Auth model source of truth:**
+> [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
+> Sessions are server-side httpOnly **cookie sessions**; cross-service
+> auth is **PASETO v4.public** verified offline via the published Ed25519
+> key at `/.well-known/paseto-keys`. RS256 JWT + JWKS are
+> **decommissioned**. **Pivot in progress** — the service code follow-up
+> (and the test updates that ride with it) is tracked in the service spec
+> §13, so the crypto tests below still describe the RS256-era surface
+> until then; the verifier and front-end docs are already harmonized.
+
+## Service (`authentication-service-with-loco`)
 
 ```bash
 cargo test --lib        # DB-free unit tests (the src/auth module)
@@ -18,21 +28,25 @@ cargo test              # full loco request tests — needs PostgreSQL
 
 ## Verifier (`authentication-verifier-rust-crate`)
 
+The verifier crate is **already harmonized** to PASETO v4.public; see its
+own docs for the authoritative test list.
+
 ```bash
-cargo test                      # 9 offline unit tests
-cargo test --features fetch     # compile the HTTP path too
+cargo test                      # offline unit tests
+cargo test --features fetch     # compile the HTTP published-key path too
 ```
 
-All tests are offline: a throwaway RSA keypair signs locally; the JWKS
-is rebuilt exactly the way the service derives `kid` / `n` / `e`.
+All tests are offline: a throwaway Ed25519 keypair signs locally; the
+published-key document is rebuilt exactly the way the service derives
+`kid`.
 
 | Category | Tests |
 |---|---|
 | Round-trip | valid token returns full claims; `key_count` |
 | Claim policy | expired rejected; wrong audience rejected |
-| Key selection | unknown `kid` rejected; empty JWKS builds but rejects all; non-RSA keys skipped |
+| Key selection | unknown `kid` rejected; empty key set builds but rejects all |
 | Integrity | tampered signature rejected; garbage/empty token rejected |
-| Document shape | missing `keys` array errors |
+| Document shape | malformed published-key document errors |
 
 ## Front-end (`authentication-front-end-with-svelte`)
 

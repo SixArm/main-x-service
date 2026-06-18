@@ -21,6 +21,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, tf, statusLabel } from '$lib/i18n.svelte';
 
     let { data } = $props();
 
@@ -44,18 +45,16 @@
         } else if (key === 'patient' || key === 'case-notes') {
             // Already on the patient record; case notes are listed below.
         } else {
-            actionNote = `“${key.replaceAll('-', ' ')}” isn't available in this demo.`;
+            actionNote = tf('patientDetail.demoUnavailable', { action: key.replaceAll('-', ' ') });
         }
     }
 </script>
 
-<BackLink href="/patients">Back to patients</BackLink>
+<BackLink href="/patients">{t('patientDetail.backToPatients')}</BackLink>
 
 {#if !data.patientServiceMatch}
-    <Alert type="warning" heading="Patient not found in Main Patient Service">
-        No patient record exists for NHS Number <span class="nhs-number">{data.nhsNumber}</span>.
-        The folders below are reconstructed from local snapshots written when
-        each folder was created.
+    <Alert type="warning" heading={t('patientDetail.notFoundHeading')}>
+        {tf('patientDetail.notFoundBody', { nhs: data.nhsNumber })}
     </Alert>
 {/if}
 
@@ -66,27 +65,27 @@
         nhsNumber={data.patient.nhsNumber}
         dateOfBirth={data.patient.dateOfBirth}
     />
-    <p class="muted">Source: {data.patient.source}</p>
-    <ButtonBar active="patient" onselect={onAction} label="Patient record actions" />
+    <p class="muted">{t('patientDetail.sourcePrefix')} {data.patient.source}</p>
+    <ButtonBar active="patient" onselect={onAction} label={t('patientDetail.recordActions')} />
     {#if actionNote}
         <Alert type="info">{actionNote}</Alert>
     {/if}
 {:else}
-    <h2>NHS Number {data.nhsNumber}</h2>
+    <h2>{tf('patientDetail.nhsNumberHeading', { nhs: data.nhsNumber })}</h2>
 {/if}
 
 <div class="panel">
-    <h3>Folders for this patient ({data.folders.length})</h3>
+    <h3>{tf('patientDetail.foldersForPatient', { n: data.folders.length })}</h3>
     {#if data.folders.length > 0}
-        <DataTable label="Patient folders">
+        <DataTable label={t('patientDetail.patientFoldersTable')}>
             <DataTableHead>
                 <DataTableRow>
-                    <th scope="col">Title</th>
-                    <th scope="col">Volume</th>
-                    <th scope="col">Cabinet</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Last moved</th>
-                    <th scope="col">Action</th>
+                    <th scope="col">{t('common.title')}</th>
+                    <th scope="col">{t('patientDetail.colVolume')}</th>
+                    <th scope="col">{t('common.cabinet')}</th>
+                    <th scope="col">{t('common.status')}</th>
+                    <th scope="col">{t('common.lastMoved')}</th>
+                    <th scope="col">{t('common.action')}</th>
                 </DataTableRow>
             </DataTableHead>
             <DataTableBody>
@@ -97,36 +96,36 @@
                         </DataTableTD>
                         <DataTableTD>
                             {#if folder.volumeId}
-                                <a href="/volumes/{folder.volumeId}">{folder.volumeTitle ?? 'Volume'}</a>
+                                <a href="/volumes/{folder.volumeId}">{folder.volumeTitle ?? t('common.volume')}</a>
                             {:else}
                                 —
                             {/if}
                         </DataTableTD>
                         <DataTableTD>{folder.cabinetLabel}</DataTableTD>
                         <DataTableTD>
-                            <Badge type={badgeType(folder.status)}>{folder.status}</Badge>
+                            <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
                         </DataTableTD>
                         <DataTableTD>
                             {folder.lastMovedAt ? new Date(folder.lastMovedAt).toLocaleString('en-GB') : '—'}
                         </DataTableTD>
                         <DataTableTD>
-                            <a href="/move?folder={folder.id}">Move</a>
+                            <a href="/move?folder={folder.id}">{t('common.move')}</a>
                         </DataTableTD>
                     </DataTableRow>
                 {/each}
             </DataTableBody>
         </DataTable>
     {:else}
-        <p>No folders yet.</p>
+        <p>{t('patientDetail.noFoldersYet')}</p>
     {/if}
     <p style="margin-top: var(--nhs-space-3);">
-        <a href="/folders/new" class="button">Add a folder for this patient</a>
+        <a href="/folders/new" class="button">{t('patientDetail.addFolderForPatient')}</a>
     </p>
 </div>
 
 <Separator />
 
-<h3>Move history for this patient</h3>
+<h3>{t('patientDetail.moveHistoryForPatient')}</h3>
 <div class="move-stack">
     {#each data.history as move (move.id)}
         <article class="move-card">
@@ -144,6 +143,6 @@
         </article>
     {/each}
     {#if data.history.length === 0}
-        <p>No moves recorded yet.</p>
+        <p>{t('common.noMovesYet')}</p>
     {/if}
 </div>

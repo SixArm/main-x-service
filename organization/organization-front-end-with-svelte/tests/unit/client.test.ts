@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ApiClient, ApiError } from "$lib/api/client";
-import { auth } from "$lib/auth.svelte";
 
 // Pins the ApiClient transport: JSON parsing, URL joining, body
-// serialization, bearer-token precedence (store vs explicit vs null),
-// and ApiError construction across the error paths.
+// serialization, the optional explicit bearer token, and ApiError
+// construction across the error paths. (Auth is normally handled by the
+// BFF proxy, which injects the bearer server-side; the client attaches one
+// only when explicitly passed.)
 
 /** A fake `fetch` that records the last call and returns a canned response. */
 function fakeFetch(
@@ -39,9 +40,6 @@ async function caughtError(p: Promise<unknown>): Promise<ApiError> {
 }
 
 describe("ApiClient", () => {
-  // Each test starts signed out; some set a store token explicitly.
-  afterEach(() => auth.clearToken());
-
   it("GET parses a JSON body and resolves it", async () => {
     const f = fakeFetch(200, [{ pid: "p1", name: "Acme" }]);
     const data =
@@ -81,33 +79,7 @@ describe("ApiClient", () => {
     expect(headers.authorization).toBeUndefined();
   });
 
-  it("attaches the store token automatically when the SPA is signed in", async () => {
-    auth.setToken("store-tok");
-    const f = fakeFetch(200, {});
-    await client(f).get("/api/organizations");
-    const headers = f.calls[0]?.init.headers as Record<string, string>;
-    expect(headers.authorization).toBe("Bearer store-tok");
-  });
-
-  it("omits the header again after the token is cleared", async () => {
-    auth.setToken("store-tok");
-    auth.clearToken();
-    const f = fakeFetch(200, {});
-    await client(f).get("/api/organizations");
-    const headers = f.calls[0]?.init.headers as Record<string, string>;
-    expect(headers.authorization).toBeUndefined();
-  });
-
-  it("an explicit per-request token overrides the store", async () => {
-    auth.setToken("store-tok");
-    const f = fakeFetch(200, {});
-    await client(f).get("/x", { token: "call-tok" });
-    const headers = f.calls[0]?.init.headers as Record<string, string>;
-    expect(headers.authorization).toBe("Bearer call-tok");
-  });
-
-  it("an explicit null token suppresses the header even when signed in", async () => {
-    auth.setToken("store-tok");
+  it("an explicit null token sends no authorization header", async () => {
     const f = fakeFetch(200, {});
     await client(f).get("/x", { token: null });
     const headers = f.calls[0]?.init.headers as Record<string, string>;

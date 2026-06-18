@@ -19,6 +19,7 @@
     //     the app stylesheet renders it monospaced/bold like everywhere else.
 
     import UnitedKingdomNationalHealthServiceNumberView from '$lib/components/UnitedKingdomNationalHealthServiceNumberView/UnitedKingdomNationalHealthServiceNumberView.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let {
         name,
@@ -26,7 +27,7 @@
         dateOfBirth = null,
         gender = null,
         address = null,
-        label = 'Patient addressograph',
+        label = undefined,
         class: className = ''
     }: {
         name: string;
@@ -37,34 +38,37 @@
         label?: string;
         class?: string;
     } = $props();
+
+    // Default the region's accessible name to the translated label.
+    const regionLabel = $derived(label ?? t('addressograph.label'));
 </script>
 
-<section class={`addressograph-box ${className}`} aria-label={label}>
+<section class={`addressograph-box ${className}`} aria-label={regionLabel}>
     <p class="addressograph-name">{name}</p>
     <dl class="addressograph-fields">
         <div>
-            <dt>NHS No.</dt>
+            <dt>{t('addressograph.nhsNo')}</dt>
             <dd>
                 <UnitedKingdomNationalHealthServiceNumberView
                     class="nhs-number"
-                    label="NHS Number"
+                    label={t('common.nhsNumber')}
                     value={nhsNumber}
                 />
             </dd>
         </div>
         <div>
-            <dt>D.O.B.</dt>
+            <dt>{t('addressograph.dob')}</dt>
             <dd>{dateOfBirth ?? '—'}</dd>
         </div>
         {#if gender}
             <div>
-                <dt>Sex</dt>
+                <dt>{t('addressograph.sex')}</dt>
                 <dd>{gender}</dd>
             </div>
         {/if}
         {#if address}
             <div>
-                <dt>Address</dt>
+                <dt>{t('addressograph.address')}</dt>
                 <dd>{address}</dd>
             </div>
         {/if}

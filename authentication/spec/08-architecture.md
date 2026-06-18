@@ -1,5 +1,17 @@
 ## 8. Architecture
 
+> **Pivot (2026-06-17).** The flows and key-management below describe the
+> **RS256 JWT + JWKS** model now **superseded** by cookie sessions +
+> PASETO v4.public
+> ([`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md);
+> §1, §5, §9, §13 T-12). After T-12: §8.1 redemption sets a
+> `__Host-mxi_session` cookie (no token in the body) and `POST /token`
+> mints the PASETO the BFF carries to peers; §8.2 verifies PASETO
+> v4.public (Ed25519) offline against `/.well-known/paseto-keys`; §8.4's
+> key material is an **Ed25519** keypair (the rotation runbook structure
+> carries over, swapping RSA→Ed25519 and JWKS→paseto-keys); §8.5's UI
+> state moves to the SvelteKit-server BFF (no `localStorage`).
+
 ### 8.1 Issuance flow (sign-in)
 
 ```

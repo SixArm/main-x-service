@@ -19,7 +19,7 @@ The entity stores the canonical DTO **verbatim** as the `data` column
 - Whatever the API accepts is exactly what is stored and exactly what
   matching deserialises. One serde round-trip is the whole mapping,
   pinned by the service's
-  [`tests/matching.rs`](../organization-service-rust-crate/tests/matching.rs).
+  [`tests/matching.rs`](../organization-service-with-loco/tests/matching.rs).
 - `name` is the only denormalised column, maintained on create /
   update, serving listing and `ILIKE` search.
 - Trade-off: no per-field SQL indexing of identifiers / addresses
@@ -37,7 +37,7 @@ removed — this is the entity's GDPR-balancing retention mechanism
 ### 10.4 Migrations and environments
 
 - Migrations live in
-  [`migration/src/`](../organization-service-rust-crate/migration/);
+  [`migration/src/`](../organization-service-with-loco/migration/);
   new tables MUST be added as `sea-orm-migration` migrations.
 - `auto_migrate: true` in `config/development.yaml`; production
   applies migrations explicitly.

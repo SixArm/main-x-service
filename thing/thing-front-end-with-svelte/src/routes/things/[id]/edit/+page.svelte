@@ -17,6 +17,7 @@
     import ThingForm from "$lib/components/ThingForm.svelte";
     import { ThingRepository } from "$lib/api/things.js";
     import type { Thing } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     const repo = ThingRepository.withFetch();
     let thing = $state<Thing | null>(null);
@@ -45,16 +46,16 @@
 <svelte:head><title>Edit thing · {id}</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Edit thing</h1>
-    <a href={`/things/${id}`} class="button">Cancel</a>
+    <h1>{t("edit.title")}</h1>
+    <a href={`/things/${id}`} class="button">{t("edit.cancel")}</a>
 </header>
 
 {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{t("edit.loading")}</p>
 {:else if error}
     <div class="banner error">{error}</div>
 {:else if thing}
     <section class="surface stack">
-        <ThingForm initial={thing} submitLabel="Save changes" onsubmit={handleSubmit} />
+        <ThingForm initial={thing} submitLabel={t("edit.submitLabel")} onsubmit={handleSubmit} />
     </section>
 {/if}

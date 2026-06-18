@@ -1,7 +1,7 @@
 ## 9. API Surface
 
 Complete endpoint reference with parameters, envelopes, and status
-codes: [service `AGENTS/restful.md`](../worker-service-rust-crate/AGENTS/restful.md).
+codes: [service `AGENTS/restful.md`](../worker-service-with-loco/AGENTS/restful.md).
 This section is the entity-level summary.
 
 ### 9.1 Service REST API (consumed by the front-end)

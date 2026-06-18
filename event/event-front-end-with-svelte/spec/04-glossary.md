@@ -3,6 +3,6 @@
 | Term | Meaning |
 | --- | --- |
 | **Envelope** | `{ success, data, error }` JSON wrapper from the service. |
-| **Match quality** | `definite` / `certain` / `probable` / `possible` / `unlikely` (per `event-service-rust-crate/AGENTS/matching.md`). |
+| **Match quality** | `definite` / `certain` / `probable` / `possible` / `unlikely` (per `event-service-with-loco/AGENTS/matching.md`). |
 | **Main / Duplicate** | Merge terminology: main survives, duplicate is soft-deleted. |
 

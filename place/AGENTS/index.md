@@ -1,7 +1,7 @@
 # AGENTS directory — Place entity
 
 Entity-level reference documentation for the **place** trio:
-[place-service-rust-crate](../place-service-rust-crate/),
+[place-service-with-loco](../place-service-with-loco/),
 [place-matcher-rust-crate](../place-matcher-rust-crate/),
 [place-front-end-with-svelte](../place-front-end-with-svelte/).
 
@@ -23,7 +23,7 @@ per-subproject docs — they do not replace them.
 
 | Subproject | Entry point | Topic docs |
 |---|---|---|
-| place-service | [AGENTS/index.md](../place-service-rust-crate/AGENTS/index.md) | [models](../place-service-rust-crate/AGENTS/models.md) · [matching](../place-service-rust-crate/AGENTS/matching.md) · [restful](../place-service-rust-crate/AGENTS/restful.md) · [testing](../place-service-rust-crate/AGENTS/testing.md) · [SDD](../place-service-rust-crate/AGENTS/spec-driven-development.md) |
+| place-service | [AGENTS/index.md](../place-service-with-loco/AGENTS/index.md) | [models](../place-service-with-loco/AGENTS/models.md) · [matching](../place-service-with-loco/AGENTS/matching.md) · [restful](../place-service-with-loco/AGENTS/restful.md) · [testing](../place-service-with-loco/AGENTS/testing.md) · [SDD](../place-service-with-loco/AGENTS/spec-driven-development.md) |
 | place-matcher | [AGENTS.md](../place-matcher-rust-crate/AGENTS.md) | [architecture](../place-matcher-rust-crate/AGENTS/architecture.md) · [matching-algorithm](../place-matcher-rust-crate/AGENTS/matching-algorithm.md) · [normalization](../place-matcher-rust-crate/AGENTS/normalization.md) · [testing](../place-matcher-rust-crate/AGENTS/testing.md) · [security-and-privacy](../place-matcher-rust-crate/AGENTS/security-and-privacy.md) · [SDD](../place-matcher-rust-crate/AGENTS/spec-driven-development.md) |
 | place-front-end | [AGENTS.md](../place-front-end-with-svelte/AGENTS.md) | [index](../place-front-end-with-svelte/AGENTS/index.md) · [testing](../place-front-end-with-svelte/AGENTS/testing.md) · [SDD](../place-front-end-with-svelte/AGENTS/spec-driven-development.md) |
 

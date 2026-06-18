@@ -17,7 +17,7 @@ subproject's spec owns its internals (see the authority banner in
 
 ### 2.2 In scope — per subproject
 
-**event-service-rust-crate** owns:
+**event-service-with-loco** owns:
 
 - Event identity CRUD with soft delete and full audit trail.
 - The persisted domain model (schema.org/Event-aligned: time window,

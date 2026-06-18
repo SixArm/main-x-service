@@ -17,6 +17,7 @@
     import { onMount } from "svelte";
     import { WorkerRepository } from "$lib/api/workers.js";
     import type { Worker } from "$lib/api/types.js";
+    import { t, tf } from "$lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
     let worker = $state<Worker | null>(null);
@@ -39,7 +40,7 @@
 
     // Soft-delete after a confirm prompt, then return to the list.
     async function handleDelete() {
-        if (!confirm("Soft-delete this worker? This cannot be undone via the UI.")) return;
+        if (!confirm(t("detail.confirmDelete"))) return;
         try {
             await repo.softDelete(id);
             goto("/workers");
@@ -49,37 +50,37 @@
     }
 </script>
 
-<svelte:head><title>Worker · {id}</title></svelte:head>
+<svelte:head><title>{tf("detail.titleTab", { id })}</title></svelte:head>
 
 {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{t("common.loading")}</p>
 {:else if error}
     <div class="banner error">{error}</div>
 {:else if worker}
     <header class="row" style="justify-content: space-between">
         <h1>{worker.name.given.join(" ")} {worker.name.family}</h1>
         <div class="row">
-            <a href={`/workers/${id}/edit`} class="button">Edit</a>
-            <a href={`/workers/${id}/audit`} class="button">Audit</a>
-            <button class="button danger" onclick={handleDelete}>Delete</button>
+            <a href={`/workers/${id}/edit`} class="button">{t("detail.edit")}</a>
+            <a href={`/workers/${id}/audit`} class="button">{t("detail.audit")}</a>
+            <button class="button danger" onclick={handleDelete}>{t("detail.delete")}</button>
         </div>
     </header>
 
     <section class="surface stack">
-        <h2>Identity</h2>
+        <h2>{t("detail.identity")}</h2>
         <dl class="kv">
-            <dt>ID</dt><dd><code>{worker.id}</code></dd>
-            <dt>Active</dt><dd>{worker.active ? "Yes" : "No"}</dd>
-            <dt>Gender</dt><dd>{worker.gender}</dd>
-            <dt>Birth date</dt><dd>{worker.birth_date ?? "—"}</dd>
-            <dt>Tax ID</dt><dd>{worker.tax_id ?? "—"}</dd>
-            <dt>Deceased</dt><dd>{worker.deceased ? worker.deceased_datetime ?? "yes" : "no"}</dd>
+            <dt>{t("detail.id")}</dt><dd><code>{worker.id}</code></dd>
+            <dt>{t("detail.active")}</dt><dd>{worker.active ? t("detail.yes") : t("detail.no")}</dd>
+            <dt>{t("detail.gender")}</dt><dd>{worker.gender}</dd>
+            <dt>{t("detail.birthDate")}</dt><dd>{worker.birth_date ?? "—"}</dd>
+            <dt>{t("detail.taxId")}</dt><dd>{worker.tax_id ?? "—"}</dd>
+            <dt>{t("detail.deceased")}</dt><dd>{worker.deceased ? worker.deceased_datetime ?? t("detail.deceasedYes") : t("detail.deceasedNo")}</dd>
         </dl>
     </section>
 
     {#if worker.identifiers && worker.identifiers.length > 0}
         <section class="surface stack">
-            <h2>Identifiers</h2>
+            <h2>{t("detail.identifiers")}</h2>
             <ul>
                 {#each worker.identifiers as identifier}
                     <li>
@@ -94,7 +95,7 @@
 
     {#if worker.addresses && worker.addresses.length > 0}
         <section class="surface stack">
-            <h2>Addresses</h2>
+            <h2>{t("detail.addresses")}</h2>
             <ul>
                 {#each worker.addresses as a}
                     <li>
@@ -108,7 +109,7 @@
 
     {#if worker.telecom && worker.telecom.length > 0}
         <section class="surface stack">
-            <h2>Telecom</h2>
+            <h2>{t("detail.telecom")}</h2>
             <ul>
                 {#each worker.telecom as t}
                     <li><strong>{t.system}</strong> {t.value}</li>
@@ -119,12 +120,12 @@
 
     {#if worker.emergency_contacts && worker.emergency_contacts.length > 0}
         <section class="surface stack">
-            <h2>Emergency contacts</h2>
+            <h2>{t("detail.emergencyContacts")}</h2>
             <ul>
                 {#each worker.emergency_contacts as ec}
                     <li>
                         <strong>{ec.name}</strong> — {ec.relationship}
-                        {#if ec.is_primary}<span class="muted small">(primary)</span>{/if}
+                        {#if ec.is_primary}<span class="muted small">({t("detail.primary")})</span>{/if}
                     </li>
                 {/each}
             </ul>

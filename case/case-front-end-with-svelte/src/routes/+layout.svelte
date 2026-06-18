@@ -2,186 +2,311 @@
   Root layout — chrome shared by every route.
 
   Purpose:
-    Renders the sidebar (brand, nav, session panel) plus the routed page,
-    and runs the one-time SSO handoff capture on mount.
+    Renders the top navigation bar (brand, nav, session panel) plus the
+    routed page.
 
   $props:
     - children: Snippet — the routed page content (`{@render children()}`).
+    - data: LayoutData — `signedIn` resolved server-side from the httpOnly
+            session cookie (`+layout.server.ts`).
 
-  State:
-    - draft   : $state<string>  — the manual "paste a token" input.
-    - signedIn: $derived<boolean> — tracks `token()`; flips the session UI
-                between the signed-in and signed-out affordances.
-
-  Session affordance: primary path is "Sign in" -> central auth front-end,
-  which returns the token in the URL fragment (captured by
-  `captureFromLocation` on mount). The paste field is a dev fallback.
+  Session affordance: per-app magic-link login on this app's own `/signin`;
+  sign-out posts to the root page's `signout` action (BFF: revokes the
+  session server-side + clears the cookie). The browser never holds a token.
 -->
 <script lang="ts">
   import "../app.css";
-  import { onMount } from "svelte";
+  import { browser } from "$app/environment";
   import { page } from "$app/state";
+  import { enhance } from "$app/forms";
   import type { Snippet } from "svelte";
-  import { token, setToken, clearToken, captureFromLocation } from "$lib/auth.svelte";
-  import { signInUrl } from "$lib/config";
+  import type { LayoutData } from "./$types";
+  import { i18n, t, isRtl, LOCALE_LABELS, type StringKey } from "$lib/i18n.svelte";
+  import { ThemeSelect } from "lily-design-system-svelte-theme-select";
 
-  let { children }: { children: Snippet } = $props();
-
-  // Capture a returning SSO handoff (`…#access_token=<jwt>`) and strip the
-  // fragment before any route makes an API call. See
-  // `agents/share/jwt-enforcement.md`.
-  onMount(() => {
-    captureFromLocation();
-  });
-
-  // Sidebar navigation targets; `aria-current` is set per item below.
-  const navItems = [
-    { href: "/", label: "Cases" },
-    { href: "/new", label: "New case" },
+  // Lily theme catalogue offered in the theme select (incl.
+  // NHS England/Scotland/Wales patient & practitioner themes). Each slug
+  // has a Lily stylesheet at `static/assets/themes/<slug>.css` (a symlink
+  // to the shared design-system themes) that ThemeSelect swaps in.
+  const THEMES = [
+    "abyss", "acid", "aqua", "autumn", "black", "bumblebee", "business",
+    "caramellatte", "cmyk", "coffee", "corporate", "cupcake", "cyberpunk",
+    "dark", "dim", "dracula", "emerald", "fantasy", "forest", "garden",
+    "halloween", "lemonade", "light", "lofi", "luxury", "night", "nord",
+    "pastel", "retro", "silk", "sunset", "synthwave",
+    "united-kingdom-national-health-service-england-for-patients",
+    "united-kingdom-national-health-service-england-for-practitioners",
+    "united-kingdom-national-health-service-scotland-for-patients",
+    "united-kingdom-national-health-service-scotland-for-practitioners",
+    "united-kingdom-national-health-service-wales-for-patients",
+    "united-kingdom-national-health-service-wales-for-practitioners",
+    "valentine", "winter", "wireframe"
   ];
 
-  // Session affordance. Primary path: "Sign in" redirects to the central
-  // authentication front-end, which hands the access token back via the
-  // URL fragment (captured above). The manual paste field is kept as a dev
-  // convenience. Service-side enforcement is off by default.
-  let draft = $state("");
-  // Reactive: re-derives whenever the auth store's token changes.
-  const signedIn = $derived(token() !== null);
+    // Human-readable labels for the theme select — the FULL theme name for
+    // each slug (DaisyUI names title-cased; the NHS slugs spelled out in full).
+    const THEME_LABELS: Record<string, string> = {
+        abyss: "Abyss", acid: "Acid", aqua: "Aqua", autumn: "Autumn",
+        black: "Black", bumblebee: "Bumblebee", business: "Business",
+        caramellatte: "Caramellatte", cmyk: "Cmyk", coffee: "Coffee",
+        corporate: "Corporate", cupcake: "Cupcake", cyberpunk: "Cyberpunk",
+        dark: "Dark", dim: "Dim", dracula: "Dracula", emerald: "Emerald",
+        fantasy: "Fantasy", forest: "Forest", garden: "Garden",
+        halloween: "Halloween", lemonade: "Lemonade", light: "Light",
+        lofi: "Lofi", luxury: "Luxury", night: "Night", nord: "Nord",
+        pastel: "Pastel", retro: "Retro", silk: "Silk", sunset: "Sunset",
+        synthwave: "Synthwave", valentine: "Valentine", winter: "Winter",
+        wireframe: "Wireframe",
+        "united-kingdom-national-health-service-england-for-patients": "United Kingdom National Health Service England for Patients",
+        "united-kingdom-national-health-service-england-for-practitioners": "United Kingdom National Health Service England for Practitioners",
+        "united-kingdom-national-health-service-scotland-for-patients": "United Kingdom National Health Service Scotland for Patients",
+        "united-kingdom-national-health-service-scotland-for-practitioners": "United Kingdom National Health Service Scotland for Practitioners",
+        "united-kingdom-national-health-service-wales-for-patients": "United Kingdom National Health Service Wales for Patients",
+        "united-kingdom-national-health-service-wales-for-practitioners": "United Kingdom National Health Service Wales for Practitioners",
+    };
 
-  // Redirect the whole tab to the central auth front-end's sign-in page.
-  function signIn(): void {
-    window.location.href = signInUrl();
+  // `data.signedIn` is resolved server-side from the httpOnly session
+  // cookie (`+layout.server.ts`).
+  let { children, data }: { children: Snippet; data: LayoutData } = $props();
+
+  // Hamburger toggle state for the top navigation bar (narrow viewports).
+  let menuOpen = $state(false);
+
+  // The i18n store is the single source of truth for the locale; mirror it
+  // onto `<html lang>` / `<html dir>` (RTL for ar/ur) whenever it changes.
+  // SSR-guarded — `document` is only touched in the browser.
+  $effect(() => {
+    const locale = i18n.locale;
+    if (!browser || typeof document === "undefined") return;
+    document.documentElement.lang = locale;
+    document.documentElement.dir = isRtl(locale) ? "rtl" : "ltr";
+  });
+
+  // Sidebar navigation targets; `key` is an i18n key so labels follow the
+  // selected locale. `aria-current` is set per item below.
+  const navItems: { href: string; key: StringKey }[] = [
+    { href: "/", key: "nav.cases" },
+    { href: "/new", key: "nav.newCase" },
+  ];
+
+  // Locale <select> handler: push the chosen value into the i18n store,
+  // which persists it and re-renders every translated string.
+  function onLocaleChange(event: Event) {
+    i18n.set((event.currentTarget as HTMLSelectElement).value);
   }
 
-  // Dev fallback: store a manually pasted token, then clear the input.
-  function applyToken(): void {
-    const value = draft.trim();
-    if (value.length > 0) {
-      setToken(value);
-      draft = "";
-    }
-  }
-
-  // Sign out: drop the token from store + storage and clear the draft.
-  function signOut(): void {
-    clearToken();
-    draft = "";
-  }
+  // Reactive: tracks the server-resolved session presence.
+  const signedIn = $derived(data.signedIn);
 </script>
 
 <div class="layout">
-  <aside class="sidebar">
-    <div class="brand">Main X · Cases</div>
-    <nav>
-      {#each navItems as item (item.href)}
-        <a
-          href={item.href}
-          aria-current={page.url.pathname === item.href ? "page" : undefined}
-        >
-          {item.label}
-        </a>
-      {/each}
-    </nav>
+  <header class="topbar">
+    <button
+      type="button"
+      class="hamburger"
+      aria-expanded={menuOpen}
+      aria-controls="primary-nav"
+      aria-label={t("nav.toggle")}
+      onclick={() => (menuOpen = !menuOpen)}
+    >
+      <span class="hamburger-box" aria-hidden="true"></span>
+    </button>
+    <a href="/" class="brand">{t("brand.name")}</a>
+    <nav id="primary-nav" class="primary-nav" class:open={menuOpen}>
+      <ul>
+        {#each navItems as item (item.href)}
+          <li>
+            <a
+              href={item.href}
+              aria-current={page.url.pathname === item.href ? "page" : undefined}
+              onclick={() => (menuOpen = false)}
+            >
+              {t(item.key)}
+            </a>
+          </li>
+        {/each}
+      </ul>
 
-    <div class="session">
-      <div class="session-title small muted">Session</div>
+      <div class="chrome">
+        <ThemeSelect
+          label={t("chrome.theme")}
+          themesUrl="/assets/themes/"
+          themes={THEMES}
+          themeLabels={THEME_LABELS}
+          storageKey="lily-theme"
+        />
+        <label class="locale">
+          <span class="small muted">{t("chrome.language")}</span>
+          <select aria-label={t("chrome.language")} value={i18n.locale} onchange={onLocaleChange}>
+            {#each i18n.locales as locale (locale)}
+              <option value={locale}>{LOCALE_LABELS[locale]}</option>
+            {/each}
+          </select>
+        </label>
+      </div>
+
+      <div class="session">
+      <div class="session-title small muted">{t("session.title")}</div>
       {#if signedIn}
-        <p class="small" data-testid="session-status">Token attached.</p>
-        <button class="button danger small" type="button" onclick={signOut}>
-          Clear token
-        </button>
-      {:else}
-        <p class="small" data-testid="session-status">No token.</p>
-        <button class="button primary small signin" type="button" onclick={signIn}>
-          Sign in
-        </button>
-        <details class="paste">
-          <summary class="small muted">Paste a token</summary>
-          <input
-            class="session-input"
-            type="password"
-            placeholder="Paste access token"
-            aria-label="Access token"
-            bind:value={draft}
-          />
-          <button
-            class="button small"
-            type="button"
-            onclick={applyToken}
-            disabled={draft.trim().length === 0}
-          >
-            Use token
+        <p class="small" data-testid="session-status">{t("session.tokenAttached")}</p>
+        <!-- Sign-out posts to the root page's `signout` action
+             (BFF: revokes server-side + clears the cookie). -->
+        <form method="POST" action="/?/signout" use:enhance>
+          <button class="button danger small" type="submit">
+            {t("session.clearToken")}
           </button>
-        </details>
+        </form>
+      {:else}
+        <p class="small" data-testid="session-status">{t("session.noToken")}</p>
+        <!-- Per-app magic-link login on this app's own origin. -->
+        <a class="button primary small signin" href="/signin">
+          {t("session.signIn")}
+        </a>
       {/if}
       <p class="small muted">
-        From the authentication-service (magic-link sign-in).
+        {t("session.hint")}
       </p>
     </div>
-  </aside>
+    </nav>
+  </header>
   <main>{@render children()}</main>
 </div>
 
 <style>
   .layout {
-    display: grid;
-    grid-template-columns: 240px 1fr;
-    min-height: 100vh;
-  }
-  .sidebar {
-    border-right: 1px solid var(--mxi-border, #ddd);
-    padding: 1rem;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    min-height: 100vh;
+  }
+  .topbar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--mxi-color-surface);
+    border-bottom: 1px solid var(--mxi-color-border);
   }
   .brand {
     font-weight: 700;
-    margin-bottom: 1rem;
+    color: inherit;
+    text-decoration: none;
+    white-space: nowrap;
   }
-  nav {
+  .hamburger {
+    /* Always visible: the primary nav is collapsed behind it at every width. */
+    display: block;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--mxi-color-border);
+    border-radius: var(--mxi-radius);
+    cursor: pointer;
+  }
+  .hamburger-box,
+  .hamburger-box::before,
+  .hamburger-box::after {
+    display: block;
+    width: 1.1rem;
+    height: 2px;
+    margin: 0 auto;
+    background: currentColor;
+    content: "";
+  }
+  .hamburger-box::before { transform: translateY(-5px); }
+  .hamburger-box::after { transform: translateY(3px); }
+  .primary-nav {
+    /* Always collapsed behind the hamburger: hidden by default at every
+       width, shown only when the toggle adds `.open`. Rendered as a dropdown
+       panel overlaying content (position:absolute) so opening it does not
+       reflow the header. */
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 1.5rem;
+    z-index: 20;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    min-width: 16rem;
+    padding: 0.75rem;
+    background: var(--mxi-color-surface);
+    border: 1px solid var(--mxi-color-border);
+    border-radius: var(--mxi-radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+  .primary-nav.open { display: flex; }
+  .primary-nav ul {
+    list-style: none;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    margin: 0;
+    padding: 0;
   }
-  nav a {
+  .primary-nav a {
+    display: block;
     text-decoration: none;
-    padding: 0.4rem 0.5rem;
-    border-radius: 6px;
+    padding: 0.5rem 0.625rem;
+    border-radius: var(--mxi-radius);
     color: inherit;
   }
-  nav a[aria-current="page"] {
-    background: var(--mxi-accent-soft, #eef);
+  .primary-nav a:hover { background: var(--mxi-color-bg); }
+  .primary-nav a[aria-current="page"] {
+    background: var(--mxi-color-primary);
+    color: var(--mxi-color-primary-fg);
     font-weight: 600;
   }
   main {
+    width: 100%;
     padding: 1.5rem 2rem;
   }
-  .session {
-    margin-top: auto;
-    padding-top: 1rem;
-    border-top: 1px solid var(--mxi-border, #ddd);
+  .chrome {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .chrome :global(.theme-select) {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.875rem;
+    color: var(--mxi-color-fg);
+    background: var(--mxi-color-bg, transparent);
+    border: 1px solid var(--mxi-color-border);
+    border-radius: 0.25rem;
+    cursor: pointer;
+  }
+  .locale {
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
+  }
+  .locale select {
+    padding: 0.3rem 0.4rem;
+    border-radius: var(--mxi-radius);
+    border: 1px solid var(--mxi-color-border);
+  }
+  .session {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--mxi-color-border);
   }
   .session-title {
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
-  .session-input {
-    width: 100%;
-    box-sizing: border-box;
+  .session form {
+    margin: 0;
   }
   .session .signin {
+    display: block;
     width: 100%;
-  }
-  .session .paste {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-  .session .paste summary {
-    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
   }
 </style>

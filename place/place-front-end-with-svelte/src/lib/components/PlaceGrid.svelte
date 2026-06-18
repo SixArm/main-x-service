@@ -13,6 +13,7 @@
 <script lang="ts">
     import { Grid } from "wx-svelte-grid";
     import type { Place } from "$lib/api/types.js";
+    import { t, translate } from "$lib/i18n.svelte.js";
 
     let {
         places,
@@ -22,21 +23,22 @@
         onselect?: (place: Place) => void;
     } = $props();
 
-    // Static column definitions (id keys must match the row shape below).
-    const columns = [
-        { id: "id", header: "ID", width: 220 },
-        { id: "name", header: "Name", width: 220 },
-        { id: "place_type", header: "Type", width: 140 },
-        { id: "locality", header: "City", width: 160 },
-        { id: "country", header: "Country", width: 80 },
-        { id: "geo", header: "Lat / Lon", width: 160 },
-    ];
+    // Column definitions (id keys must match the row shape below). Headers
+    // are reactive so a locale switch relabels the grid columns.
+    const columns = $derived([
+        { id: "id", header: t("grid.id"), width: 220 },
+        { id: "name", header: t("grid.name"), width: 220 },
+        { id: "place_type", header: t("grid.type"), width: 140 },
+        { id: "locality", header: t("grid.city"), width: 160 },
+        { id: "country", header: t("grid.country"), width: 80 },
+        { id: "geo", header: t("grid.latLon"), width: 160 },
+    ]);
 
     // Render a PlaceType for the grid cell; `{ Other }` → "Other: <value>".
     function placeTypeLabel(p: Place): string {
         if (!p.place_type) return "";
         if (typeof p.place_type === "string") return p.place_type;
-        return `Other: ${p.place_type.Other}`;
+        return translate("grid.typeOther").replace("{value}", p.place_type.Other);
     }
 
     // Flatten nested Place fields (address, geo) into the flat columns the

@@ -15,6 +15,7 @@
 -->
 <script lang="ts">
     import { Grid } from "wx-svelte-grid";
+    import { t } from "$lib/i18n.svelte.js";
     import type { Person } from "$lib/api/types.js";
 
     let {
@@ -26,14 +27,15 @@
     } = $props();
 
     // Column definitions for the SVAR grid (id/header/width per column).
-    const columns = [
-        { id: "id", header: "ID", width: 280 },
-        { id: "family", header: "Family", width: 160 },
-        { id: "given", header: "Given", width: 200 },
-        { id: "birth_date", header: "DOB", width: 120 },
-        { id: "gender", header: "Gender", width: 90 },
-        { id: "active", header: "Active", width: 80 },
-    ];
+    // Headers are translated reactively so a locale switch relabels them.
+    const columns = $derived([
+        { id: "id", header: t("grid.id"), width: 280 },
+        { id: "family", header: t("grid.family"), width: 160 },
+        { id: "given", header: t("grid.given"), width: 200 },
+        { id: "birth_date", header: t("grid.dob"), width: 120 },
+        { id: "gender", header: t("grid.gender"), width: 90 },
+        { id: "active", header: t("grid.active"), width: 80 },
+    ]);
 
     // SVAR Grid wants flat row records. The `id` field must match
     // the Person.id so the select-row event can map back to a Person.
@@ -44,7 +46,7 @@
             given: p.name.given.join(" "),
             birth_date: p.birth_date ?? "",
             gender: p.gender,
-            active: (p.active ?? true) ? "yes" : "no",
+            active: (p.active ?? true) ? t("grid.yes") : t("grid.no"),
         })),
     );
 

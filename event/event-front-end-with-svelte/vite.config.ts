@@ -1,10 +1,11 @@
 // Vite + Vitest config. Uses vitest/config so the SvelteKit plugin and the
 // `test` block coexist in one file.
 import { sveltekit } from "@sveltejs/kit/vite";
+import { svelteTesting } from "@testing-library/svelte/vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-    plugins: [sveltekit()],
+    plugins: [sveltekit(), svelteTesting()],
     server: {
         // Dev server port; strictPort=false lets Vite pick the next free port.
         port: 5173,

@@ -2,7 +2,7 @@
 
 Phased path from today's MVP trio to a governmental-scale national
 course registry. Crate-internal milestones stay in the crate roadmaps
-(service [§15](../course-service-rust-crate/spec/15-roadmap.md),
+(service [§15](../course-service-with-loco/spec/15-roadmap.md),
 front-end [§15](../course-front-end-with-svelte/spec/15-roadmap.md));
 this is the entity-level sequence.
 

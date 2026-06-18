@@ -1,14 +1,20 @@
 // Pins the i18n catalog + reactive locale store: en/cy lookups, the
 // fallback chain (unknown locale → en, unknown key → the key itself),
-// that every locale covers the core keys, and that the reactive `i18n`
-// store reflects switches, reduces region subtags (cy-GB → cy), and falls
-// back to the default for an unsupported locale.
+// that every one of the 13 locales covers every English key, a spot-check
+// of a non-Latin locale, RTL detection for ar/ur, and that the reactive
+// `i18n` store reflects switches, reduces region subtags (cy-GB → cy), and
+// falls back to the default for an unsupported locale.
 import { describe, it, expect, beforeEach } from "vitest";
 import {
     translate,
     t,
     i18n,
+    isRtl,
     LOCALES,
+    LOCALE_LABELS,
+    STRING_KEYS,
+    STRINGS_BY_LOCALE,
+    RTL_LOCALES,
     DEFAULT_LOCALE,
     type StringKey,
 } from "$lib/i18n.svelte";
@@ -33,7 +39,7 @@ describe("i18n catalog", () => {
 
     it("falls back to English for an unknown locale", () => {
         // Cast through unknown: an unsupported locale must still resolve.
-        const unknown = "fr" as unknown as (typeof LOCALES)[number];
+        const unknown = "zz" as unknown as (typeof LOCALES)[number];
         expect(translate("signin.title", unknown)).toBe(translate("signin.title", "en"));
     });
 
@@ -43,27 +49,61 @@ describe("i18n catalog", () => {
         expect(translate(bogus, "en")).toBe("does.not.exist");
     });
 
-    it("every locale covers every English key (no silent gaps)", () => {
-        const enKeys = Object.keys(
-            // Re-derive the key set from a known-present key's siblings by
-            // probing a representative subset; here we assert each locale
-            // returns a non-key (translated) value for the core keys.
-            { "x": 0 },
-        );
-        void enKeys;
-        const coreKeys: StringKey[] = [
-            "brand",
-            "nav.home",
-            "signin.title",
-            "signup.title",
-            "verify.working.title",
-            "account.title",
-        ];
+    it("supports exactly the 13 expected locales with endonym labels", () => {
+        expect([...LOCALES]).toEqual([
+            "en",
+            "cy",
+            "es",
+            "fr",
+            "de",
+            "ar",
+            "ru",
+            "hi",
+            "zh",
+            "bn",
+            "pt",
+            "id",
+            "ur",
+        ]);
         for (const locale of LOCALES) {
-            for (const key of coreKeys) {
-                const value = translate(key, locale);
-                expect(value, `${locale}:${key} should be translated`).not.toBe("");
+            expect(LOCALE_LABELS[locale], `${locale} needs an endonym label`).toBeTruthy();
+        }
+    });
+
+    it("every one of the 13 locales covers every English key (full coverage)", () => {
+        expect(LOCALES.length).toBe(13);
+        for (const locale of LOCALES) {
+            const table = STRINGS_BY_LOCALE[locale];
+            for (const key of STRING_KEYS) {
+                const value = table[key];
+                expect(value, `${locale}:${key} should be present`).toBeTruthy();
             }
+            // No stray keys beyond the English source-of-truth set.
+            expect(Object.keys(table).sort()).toEqual([...STRING_KEYS].sort());
+        }
+    });
+
+    it("spot-checks a non-Latin locale (Arabic)", () => {
+        expect(translate("nav.signin", "ar")).toBe("تسجيل الدخول");
+        expect(translate("signup.title", "ar")).toBe("إنشاء حساب");
+        // Hindi too, to cover a Devanagari script.
+        expect(translate("nav.home", "hi")).toBe("होम");
+    });
+});
+
+describe("i18n RTL", () => {
+    it("marks ar and ur as right-to-left", () => {
+        expect(isRtl("ar")).toBe(true);
+        expect(isRtl("ur")).toBe(true);
+        // Region subtags reduce to their primary language.
+        expect(isRtl("ar-EG")).toBe(true);
+        expect([...RTL_LOCALES].sort()).toEqual(["ar", "ur"]);
+    });
+
+    it("marks every other locale as left-to-right", () => {
+        for (const locale of LOCALES) {
+            if (locale === "ar" || locale === "ur") continue;
+            expect(isRtl(locale), `${locale} should be ltr`).toBe(false);
         }
     });
 });
@@ -94,6 +134,7 @@ describe("i18n reactive locale", () => {
     it("exposes the supported locale list", () => {
         expect(i18n.locales).toEqual(LOCALES);
         expect(i18n.locales).toContain("en");
-        expect(i18n.locales).toContain("cy");
+        expect(i18n.locales).toContain("ar");
+        expect(i18n.locales).toContain("zh");
     });
 });

@@ -124,8 +124,12 @@ serialises the result.
 `folders.list({nhsNumber})` and routes to the move form. **Role display**
 reads the auth identity's role ([D-9](design.md)); audit-by-worker reuses
 the move log. _Rationale:_ delivers the buildable, software part of iFIT
-without inventing hardware or new services. _Out of scope:_ RFID/BLE/GPS
-sensing and GIS mapping — not implementable in a browser demo.
+without inventing hardware or new services. _Deferred to the
+[roadmap](roadmap.md):_ barcode / QR / RFID / NFC / BLE reader capture — the
+data model these feed is specified in [scanners.md](scanners.md), and only
+the dedicated capture hardware is unbuilt in the browser demo (today a
+keyboard / wedge reader supplies a decoded id). _Out of scope:_ GPS sensing
+and GIS mapping.
 
 ## Requirement → design trace
 

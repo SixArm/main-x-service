@@ -41,10 +41,11 @@ _Satisfies:_ the no-PII-beyond-session privacy posture.
 
 ## SD-6 — Headless Lily + external token CSS (UR-9)
 
-Lily components are headless; their styles live in `src/lib/css/*` and
-per-theme `static/themes/*.css`. Locale/theme pickers are sibling-repo
-helpers resolved via `kit.alias`, not vendored. _Satisfies:_ themeable,
-accessible UI without forking components.
+Lily components are headless; their styles live in `src/lib/css/*`, and
+themes come from the shared Lily catalogue at `static/assets/themes/` (a
+symlink), bridged onto `--nhs-*` via `nhs.css`. Locale/theme pickers are
+sibling-repo helpers as `file:` deps (symlinked), not vendored.
+_Satisfies:_ themeable, accessible UI without forking components.
 
 ## Requirement → design trace
 

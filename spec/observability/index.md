@@ -231,7 +231,7 @@ response carries a `traceparent` header for cross-service correlation.
 ### 3.5 Correlation across services
 
 The services form a federation (one per entity) plus the central
-[authentication-service](../../authentication/authentication-service-rust-crate).
+[authentication-service](../../authentication/authentication-service-with-loco).
 Trace correlation relies on W3C `traceparent` propagation: an inbound
 request's context is extracted, attached to the request span, and
 propagated outbound on DB / RPC / HTTP calls. The reserved

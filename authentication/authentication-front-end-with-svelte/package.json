@@ -5,6 +5,9 @@
   "type": "module",
   "description": "SvelteKit front-end for the Authentication Service (Main X Index): passwordless magic-link sign up / sign in / sign out.",
   "license": "MIT OR Apache-2.0",
+  "dependencies": {
+    "lily-design-system-svelte-theme-select": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",

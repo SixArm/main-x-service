@@ -28,13 +28,14 @@ pnpm lint
 Conventions:
 
 - One file per source module under test (`client.test.ts`,
-  `places.test.ts`).
+  `places.test.ts`, `form.svelte.test.ts`). Tests that exercise rune
+  state (e.g. the `createForm` store) use the `.svelte.test.ts` suffix
+  so the SvelteKit Vite plugin compiles the runes.
 - Mock `fetch` via `vi.fn()`; assert on URL, method, headers, body.
-- For repository tests: pin the exact route path. **Known bug
-  (2026-06-13):** `PlaceRepository` calls
-  `POST /api/places/duplicates`, but the Place Service serves
-  `POST /api/places/check-duplicates` — the client path (and the
-  unit test pinning it) needs fixing; tracked in entity spec §13 E-1.
+- For repository tests: pin the exact route path. `PlaceRepository`
+  pins `POST /api/places/check-duplicates` (hyphenated) for the
+  duplicate-check — distinct from `POST /api/places/match` — and the
+  unit test asserts that exact path so the two never get conflated.
 - For envelope tests: assert that `ApiClient` unwraps `{success,
   data, error}` correctly and surfaces `ApiError` with `isConflict`
   / `isNotFound` / `isValidation` shortcuts.
@@ -60,10 +61,13 @@ import { ApiClient } from "$lib/api/client";
 describe("ApiClient", () => {
   it("unwraps the success envelope", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ success: true, data: { id: 1 } })),
+      new Response(
+        JSON.stringify({ success: true, data: { id: 1 }, error: null }),
+      ),
     );
-    const client = new ApiClient("http://test", fetchMock);
-    const result = await client.get("/health");
+    // ApiClient takes an options object, not positional args.
+    const client = new ApiClient({ baseUrl: "http://test", fetch: fetchMock });
+    const result = await client.get("/api/health");
     expect(result).toEqual({ id: 1 });
   });
 });

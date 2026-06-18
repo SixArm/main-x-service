@@ -18,7 +18,7 @@ attendees, sponsors, funders, contributors), `Vec<Offer>`,
 `EventLink`s.
 
 → Full reference:
-[`event-service-rust-crate/AGENTS/models.md`](../event-service-rust-crate/AGENTS/models.md)
+[`event-service-with-loco/AGENTS/models.md`](../event-service-with-loco/AGENTS/models.md)
 (includes invariants and the SeaORM table mapping).
 
 ## 2. Matcher `Event` (comparison DTO)
@@ -44,7 +44,7 @@ between front-ends accepted.
 ## The contract between 1 and 2
 
 `to_matcher_event` in
-[`src/matching/adapter.rs`](../event-service-rust-crate/src/matching/adapter.rs)
+[`src/matching/adapter.rs`](../event-service-with-loco/src/matching/adapter.rs)
 projects the persisted record into the comparison DTO: DateTimes →
 RFC 3339 strings, first populated `Location` variant-dispatched,
 first organizer name, performer names only, identifier `system` URI
@@ -52,7 +52,7 @@ hints → `EventIdScheme`. Service-only fields (attendees, offers,
 links, audit columns, …) are dropped. The projection is normative in
 the entity spec [§5.3](../spec/05-domain-model.md) and pinned by the
 bridge tests
-([`tests/duplicate_detection.rs`](../event-service-rust-crate/tests/duplicate_detection.rs)).
+([`tests/duplicate_detection.rs`](../event-service-with-loco/tests/duplicate_detection.rs)).
 
 ## Shared invariants
 

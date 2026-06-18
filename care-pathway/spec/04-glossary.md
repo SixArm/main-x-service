@@ -1,7 +1,7 @@
 ## 4. Glossary
 
 Entity-level terms. Per-subproject vocabularies: service
-[spec §4](../care-pathway-service-rust-crate/spec/index.md), matcher
+[spec §4](../care-pathway-service-with-loco/spec/index.md), matcher
 [spec §3](../care-pathway-matcher-rust-crate/spec/index.md),
 front-end
 [spec §4](../care-pathway-front-end-with-svelte/spec/index.md).
@@ -30,5 +30,5 @@ front-end
 | **CQL** | Clinical Quality Language — HL7 language for shareable clinical logic; out of execution scope, in linkage scope |
 | **CDS Hooks** | HL7 specification for hooking decision support into an EHR — execution-side, out of scope (§1.3) |
 | **BPM+ Health** | OMG/industry framework for machine-readable pathways using BPMN (workflow), CMMN (case management), DMN (decision rules) — modelling-side, out of scope (§1.3) |
-| **SSO** | Single sign-on via the [authentication entity](../../authentication/): magic-link, RS256 JWT + JWKS |
+| **SSO** | Single sign-on via the [authentication entity](../../authentication/): magic-link, cookie session + PASETO v4 public cross-service tokens (see [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md), supersedes RS256 JWT + JWKS) |
 | **Drift policy** | Front-ends keep per-project copies of types/client/forms; no shared package (repo decision 2026-06-02) |

@@ -19,6 +19,7 @@
     import Field from '$lib/components/Field/Field.svelte';
     import Button from '$lib/components/Button/Button.svelte';
     import UnitedKingdomNationalHealthServiceNumberInput from '$lib/components/UnitedKingdomNationalHealthServiceNumberInput/UnitedKingdomNationalHealthServiceNumberInput.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let nhsNumber = $state('');
     let title = $state('');
@@ -36,10 +37,10 @@
         // Client-side Modulus-11 gate before contacting the server.
         const formatted = formatNhsNumber(nhsNumber);
         if (!isValidNhsNumber(formatted)) {
-            nhsError = 'Enter a valid 10-digit NHS Number (Modulus 11 check failed).';
+            nhsError = t('volumeNew.invalidNhs');
         }
         if (!title.trim()) {
-            titleError = 'Volume title is required.';
+            titleError = t('volumeNew.titleRequired');
         }
         if (nhsError || titleError) return;
 
@@ -64,40 +65,36 @@
     }
 </script>
 
-<BackLink href="/volumes">Back to volumes</BackLink>
+<BackLink href="/volumes">{t('volumeNew.backToVolumes')}</BackLink>
 
-<h2>New volume</h2>
-<p>
-    A volume bundles folders for one patient. The patient must already be
-    registered (create a folder for them first). You can add folders to the
-    volume once it exists.
-</p>
+<h2>{t('volumeNew.heading')}</h2>
+<p>{t('volumeNew.intro')}</p>
 
 {#if submitError}
-    <Alert type="error" heading="Cannot create volume">{submitError}</Alert>
+    <Alert type="error" heading={t('volumeNew.cannotCreate')}>{submitError}</Alert>
 {/if}
 
-<Form label="New volume" onsubmit={handleSubmit}>
-    <Field label="Patient NHS Number" required error={nhsError} description="10 digits, formatted XXX XXX XXXX.">
+<Form label={t('volumeNew.formLabel')} onsubmit={handleSubmit}>
+    <Field label={t('volumeNew.patientNhs')} required error={nhsError} description={t('volumeNew.nhsDescription')}>
         <UnitedKingdomNationalHealthServiceNumberInput
-            label="NHS Number"
+            label={t('common.nhsNumber')}
             bind:value={nhsNumber}
             required
         />
     </Field>
-    <Field label="Volume title" required error={titleError} description="e.g. Alice Johnson — Vol 1">
+    <Field label={t('volumeNew.titleLabel')} required error={titleError} description={t('volumeNew.titleDescription')}>
         <input bind:value={title} required />
     </Field>
-    <Field label="Initial cabinet" description="Where the volume lives. Leave blank if in transit.">
+    <Field label={t('volumeNew.initialCabinet')} description={t('volumeNew.initialCabinetDescription')}>
         <select bind:value={cabinetId}>
-            <option value="">— In transit —</option>
+            <option value="">{t('common.inTransitOption')}</option>
             {#each cache.cabinets as c (c.id)}
                 <option value={c.id}>{c.label} ({c.containerPath})</option>
             {/each}
         </select>
     </Field>
     <div class="actions">
-        <a href="/volumes" class="button secondary">Cancel</a>
-        <Button type="submit">Create volume</Button>
+        <a href="/volumes" class="button secondary">{t('common.cancel')}</a>
+        <Button type="submit">{t('volumeNew.createVolume')}</Button>
     </div>
 </Form>

@@ -49,4 +49,12 @@ Best-of cartesian product across `e1.performers × e2.performers`: each pair is 
 
 `1.0` iff both `url` values are set and equal after trimming whitespace, else `0.0`. `None` if either is `None`. No URL canonicalisation (scheme folding, trailing-slash stripping, query-parameter ordering) is performed.
 
+### 6.11 Relationships — `relationships_score`
+
+Typed-set **Jaccard** over the `(relation, event_id)` pairs: `score = |A ∩ B| / |A ∪ B|`, where each side's set is `{ (r.relation, r.event_id) for r in relationships }`. So an `Outer` reference only agrees with an `Outer` reference to the **same** event id — the relation kind is part of the key; `Inner` / `ImmediatelyBefore` / `ImmediatelyAfter` are compared as opaque, distinct kinds (no inversion or transitive closure). `None` (does not participate) when **either** side has no relationships; otherwise a value in `[0.0, 1.0]`. A **supporting** signal weighted `relationships_weight` (§7, default `0.05`); shared references never single-handedly establish a match.
+
+### 6.12 Tags — `tags_score`
+
+Plain set **Jaccard** over the operator-applied tags: `score = |A ∩ B| / |A ∪ B|`, where each side's set is the case-insensitively normalised tags (trim + ASCII lowercase, empties dropped). Unlike `relationships` (§6.11) the key is the bare normalised string — there is no relation kind. `None` (does not participate) when **either** side has an empty tag set; otherwise a value in `[0.0, 1.0]`. A **supporting** signal weighted `tags_weight` (§7, default `0.05`); shared tags never single-handedly establish a match.
+
 ---

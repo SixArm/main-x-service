@@ -12,6 +12,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **Doc/test harmonization pass.** Added the missing `CLAUDE.md`
+  (one-line `@AGENTS.md` include, matching every sibling subproject).
+  Rewrote the `AGENTS.md` "Sibling projects" bullet to match the spec:
+  the Svelte sibling is a **client** of this API and its Playwright
+  suite runs against this service in stub mode (`USE_UPSTREAM_STUBS=1`)
+  — dropped the stale "own back-end shim / future P1" wording.
+  Renumbered the duplicate `### 8.` working rule to `### 9.`. Corrected
+  the inaugural v0.1.0 "Added" Tests bullet (it still said "6 unit");
+  it now reads 14 unit + the live request count. Added the missing
+  `POST /api/auth/logout` request test
+  (`logout_clears_the_session_cookie`: `204` + cleared `cts_session`
+  cookie), bumping request tests 49 → 50. Added worked `examples.md`
+  recipes for the volume-move flow (`POST /api/volumes/{id}/move` plus
+  the assign/remove/rename companions) and for `GET /api/alerts`
+  (geofence breaches). No behaviour change.
+
+
 - **LT-16 / T-16 — Geofence-breach derivation made pure + unit-tested.**
   Extracted the cross-building alert logic behind `GET /api/alerts` from the
   controller into a pure `detect_geofence_breaches` function (plus a
@@ -61,9 +78,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     UUIDs when an upstream is unreachable.
   - **Hand-written OpenAPI 3** document (`openapi.yaml`) covering all 29
     operations; kept accurate to the mounted routes.
-  - **Tests**: 6 unit (NHS Modulus 11) + 49 Postgres-backed request tests
-    (`tests/requests/*`) exercising every controller against the
-    in-process stubs.
+  - **Tests**: 14 unit (8 NHS Modulus 11 + 6 geofence breach) + 50
+    Postgres-backed request tests (`tests/requests/*`) exercising every
+    controller against the in-process stubs. (The unit count started at
+    6 in this inaugural cut and was raised to 14 by the LT-6 / LT-16
+    entries above; request tests grew from 29 → 49 → 50.)
 
 ### Notes
 

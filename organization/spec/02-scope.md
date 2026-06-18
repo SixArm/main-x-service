@@ -15,7 +15,7 @@ This spec owns the **cross-subproject contract**:
 
 ### 2.2 In scope — per subproject
 
-**organization-service-rust-crate** owns:
+**organization-service-with-loco** owns:
 
 - Organization CRUD with soft delete (`deleted_at` stamp) — loco.rs
   controllers over one `organizations` table.
@@ -58,8 +58,10 @@ deferred, tracked in §13 / §15:
 - Tantivy full-text / fuzzy search (today: `ILIKE` name search only).
 - Real-time `409` duplicate detection on create (today: explicit
   `/check-duplicates` only — open question, §16).
-- JWT verification middleware (auth-service JWKS) and front-end
-  bearer-token wiring.
+- PASETO v4.public verification middleware (auth-service published
+  Ed25519 key) and front-end auth wiring — see
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  (supersedes the prior RS256-JWT + JWKS model).
 - Durable event bus (today: in-memory ring buffer, capacity 1 000).
 - Richer validation (identifier formats, URL, country codes), gRPC,
   multi-region deployment, register-feed ingestion.

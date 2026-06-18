@@ -1,6 +1,6 @@
 # case-front-end-with-svelte
 
-Operator UI for the [Case Service](../case-service-rust-crate):
+Operator UI for the [Case Service](../case-service-with-loco):
 case **CRUD + matching** (governmental case management).
 
 SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
@@ -17,7 +17,7 @@ SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
 ## Prerequisites
 
 - Node 20+ and pnpm
-- A running [Case Service](../case-service-rust-crate)
+- A running [Case Service](../case-service-with-loco)
 
 ## Quick start
 
@@ -32,20 +32,27 @@ pnpm dev                 # http://localhost:5173
 | Var | Default | Purpose |
 |---|---|---|
 | `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Case service REST base URL. |
-| `VITE_AUTH_FRONTEND_URL` | `http://localhost:5173` | Central authentication front-end (SSO sign-in) base URL. "Sign in" redirects to `${VITE_AUTH_FRONTEND_URL}/signin?return_to=…`; the auth front-end hands the access token back via the URL fragment. |
+| `VITE_AUTH_FRONTEND_URL` | `http://localhost:5173` | Central authentication front-end (SSO sign-in) base URL. "Sign in" redirects to `${VITE_AUTH_FRONTEND_URL}/signin?return_to=…`; the magic-link establishes a server-side session and sets an httpOnly cookie. |
 
 ## Sign in (SSO)
 
 The operator clicks **Sign in** in the sidebar and is sent to the central
 authentication front-end (`VITE_AUTH_FRONTEND_URL`). After the
-passwordless magic-link, the auth front-end redirects back to this app
-with the access token in the URL fragment
-(`…#access_token=<jwt>`); the app captures it on load, stores it under the
-family-shared `localStorage["mxi_access_token"]`, and strips the fragment
-from the address bar. The `ApiClient` then attaches it as
-`Authorization: Bearer <token>` on every request. A manual token-paste
-field is kept for development. See
-[`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md).
+passwordless magic-link, the auth service establishes a **server-side
+session** and sets an **httpOnly session cookie** (`__Host-mxi_session`);
+the browser holds **no token** — there is no `localStorage`, no URL
+fragment, and no `mxi_access_token`. This app's own **SvelteKit server
+acts as a Backend-For-Frontend (BFF)**: it holds the session cookie,
+exchanges it for a short-lived **PASETO v4.public** token, and calls the
+case service server-side with that bearer. State-changing requests carry
+a **CSRF token**. See
+[`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+(source of truth; RS256/JWKS decommissioned).
+
+> Auth pivot in progress: the family moved from client-held bearer
+> tokens to the BFF + cookie-session + PASETO model above. The runtime
+> here may still reflect the old client-held flow; the BFF follow-up is
+> tracked in the spec.
 
 ## How it works
 

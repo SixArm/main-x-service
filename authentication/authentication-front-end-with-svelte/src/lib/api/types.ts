@@ -1,5 +1,5 @@
 // Types mirroring the Authentication Service responses.
-// Source of truth: authentication-service-rust-crate/src/views/auth.rs.
+// Source of truth: authentication-service-with-loco/src/views/auth.rs.
 // These shapes must stay in lockstep with the Rust view structs; the
 // field names match the raw JSON the loco.rs service emits (no envelope).
 

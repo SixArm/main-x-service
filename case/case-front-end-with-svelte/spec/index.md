@@ -3,7 +3,7 @@
 > **Single source of truth.** Code conforms to this spec. Behavioural
 > change = spec + code + test. Live work queue is §13.
 >
-> Sibling service: [case-service](../../case-service-rust-crate/spec/index.md).
+> Sibling service: [case-service](../../case-service-with-loco/spec/index.md).
 
 ## 1. Purpose and vision
 
@@ -14,8 +14,9 @@ service.
 ## 2. Scope
 
 In scope: the four routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`), the
-API client, and the case form. Out of scope: full-text search UI,
-audit views, auth.
+API client, the case form, and a BFF + httpOnly-cookie session (§6.7/§6.8,
+per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
+Out of scope: full-text search UI, audit views.
 
 ## 3. Stakeholders and users
 
@@ -36,6 +37,14 @@ Caseworkers and case administrators across governmental agencies.
 /[pid]/edit  edit form
 ```
 
+### Layout shell & navigation
+
+Cross-cutting UI rule for every `*-front-end-with-svelte` app:
+
+- Global navigation MUST be a **top navigation bar** (header) spanning the full viewport width. There MUST NOT be a left-hand navigation sidebar / rail.
+- On narrow viewports the top-bar navigation MUST collapse behind a **hamburger menu** toggle.
+- The main content area MUST be **full-width** — never inset by a persistent side-navigation column.
+
 ## 6. Functional requirements
 
 1. List active cases (`GET /api/cases`).
@@ -46,27 +55,24 @@ Caseworkers and case administrators across governmental agencies.
 5. Delete (`DELETE`, soft), redirect to the list.
 6. Check-duplicates posts the current record and lists matches (title,
    score, confidence), excluding the record itself.
-7. Session affordance: the layout sidebar offers a primary **Sign in**
-   link and, once signed in, **Sign out**; a manual token-paste field is
-   kept for development. While a token is set, the API client attaches
-   `Authorization: Bearer <token>` to every request, so operator traffic
-   passes the service's blanket JWT enforcement (`CASE_REQUIRE_AUTH`) once
-   activated. The token lives under the family-shared `localStorage` key
-   `mxi_access_token`.
-8. SSO token handoff (consumer side; see the family contract
-   `agents/share/jwt-enforcement.md`, "Token acquisition handoff"):
-   **Sign in** redirects to the central **authentication-service**
-   front-end at `${AUTH_FRONTEND_URL}/signin?return_to=<this app's
-   absolute URL>` (`AUTH_FRONTEND_URL` from `VITE_AUTH_FRONTEND_URL`,
-   default `http://localhost:5173`; built by `signInUrl()` in
-   `src/lib/config.ts`). After the passwordless magic-link, the auth
-   front-end redirects back with the access token in the URL fragment
-   (`…#access_token=<jwt>`). On load the layout calls
-   `captureFromLocation()` (in `onMount`, before any API call), which
-   reads `window.location.hash`, stores any token, and strips the
-   fragment via `history.replaceState` so the bearer credential never
-   lingers in the address bar / history. The pure parser
-   `captureTokenFromHash(hash)` underlies it.
+7. Session affordance (BFF + httpOnly cookie): the top navigation bar
+   offers a primary **Sign in** link and, once signed in, **Sign out**.
+   The browser holds only the `__Host-mxi_session` httpOnly cookie — **no
+   token in JS, no `localStorage`**. The SvelteKit **server** (BFF) holds
+   the session and attaches a short-lived PASETO server-side when calling
+   the case service, so operator traffic passes the service's blanket
+   enforcement (`CASE_REQUIRE_AUTH`) once activated. Mutating browser→BFF
+   calls carry a CSRF token. Per
+   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
+8. Sign-in (BFF): **Sign in** is routed through the BFF to the central
+   **authentication-service** front-end for the passwordless magic-link;
+   on success the authentication-service sets the `__Host-mxi_session`
+   cookie. There is no client-held access token and **no URL-fragment
+   handoff**. Per
+   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
+9. Layout shell: global navigation is a full-width **top bar** (header)
+   with a **hamburger** toggle on narrow viewports — NOT a left sidebar —
+   and the main content area is **full-width**.
 
 ## 7. Non-functional requirements
 
@@ -78,12 +84,10 @@ dependency-light (no data grid / design system).
 `ApiClient` (lean, raw-JSON, get/post/put/delete) → `CaseRepository`
 → routes. `CaseForm` builds a `Case` from the inputs (comma lists
 split, blanks nulled, case type / status / priority / identifier
-schemes from `ALL_*` dropdowns, identifiers as editable rows). The
-reactive session store `src/lib/auth.svelte.ts` (`token` / `setToken` /
-`clearToken`, hydrated from `localStorage["mxi_access_token"]`, guarded
-for SSR / preview / vitest where `localStorage` is absent) is the default
-token source for `ApiClient`, which attaches the bearer header per request
-when a token is present; a per-call `token` (string or `null`) overrides.
+schemes from `ALL_*` dropdowns, identifiers as editable rows). Under the
+BFF model (§6.7) the browser carries only the `__Host-mxi_session` cookie
+and the SvelteKit server attaches the short-lived PASETO server-side when
+calling the service; no token is read or attached in browser JS.
 
 ## 9. API consumption
 
@@ -127,17 +131,18 @@ access/audit requirements.
 
 ## 13. Tasks (live work queue)
 
-- [x] vitest unit tests for `ApiClient` + `CaseRepository`
-  (`tests/unit/`, 16 tests).
-- [x] playwright smoke for the four routes (`tests/e2e/smoke.spec.ts`,
-  4 tests, API stubbed, runs against `vite preview`).
-- [x] Cross-origin SSO token handoff (consumer side): capture token from
-  the URL fragment + strip it; `signInUrl` builder + sidebar **Sign in**
-  redirect (`captureTokenFromHash` / `captureFromLocation` /
-  `signInUrl`; `auth.test.ts` + `config.test.ts`).
+- [x] vitest unit tests for `ApiClient` + `CaseRepository` + auth store +
+  `signInUrl` + `CaseForm` assembly (`tests/unit/`, 40 tests across 5 files).
+- [x] playwright smoke for the four routes + check-duplicates self-exclusion
+  (`tests/e2e/smoke.spec.ts`, 5 tests, API stubbed, runs against `vite preview`).
+- [x] ~~Cross-origin SSO token handoff (consumer side): capture token
+  from the URL fragment + strip it; `signInUrl` builder + top-bar **Sign
+  in** redirect~~ — **superseded** (see auth-migration task below).
 - [ ] `Custom(label)` editing for case type / status / schemes.
 - [ ] Search box once the service ships search.
-- [ ] Bearer token wiring once the service enforces auth.
+- [ ] Auth — adopt BFF + httpOnly cookie + CSRF; remove
+  `mxi_access_token`/`localStorage` bearer + fragment handoff (per
+  [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 
 ## 14. Implementation status
 
@@ -148,7 +153,9 @@ type / status / priority dropdowns + identifiers editor); SPA config.
 ## 15. Roadmap
 
 v0.1 (here): CRUD + duplicate-check UI. v0.2: tests + search box.
-v0.3: auth token + audit views.
+v0.3: auth (BFF + httpOnly cookie + CSRF, per
+[`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md))
++ audit views.
 
 ## 16. Open questions
 

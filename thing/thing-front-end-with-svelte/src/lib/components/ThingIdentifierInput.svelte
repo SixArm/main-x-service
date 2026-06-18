@@ -18,6 +18,7 @@
     import { IDENTIFIER_TYPE_OPTIONS, blankThingIdentifier } from "$lib/api/types.js";
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
+    import { t } from "$lib/i18n.svelte.js";
 
     let {
         identifiers = $bindable(),
@@ -65,7 +66,7 @@
     {#each identifiers as identifier, idx (idx)}
         <div class="identifier surface">
             <FieldRow>
-                <LabeledField label="Type" for={`id-type-${idx}`}>
+                <LabeledField label={t("identifier.type")} for={`id-type-${idx}`}>
                     <!-- Show "Custom" when the scheme is the tagged variant,
                          otherwise the bare scheme literal. -->
                     <select
@@ -76,12 +77,12 @@
                         {#each IDENTIFIER_TYPE_OPTIONS as t}
                             <option value={t}>{t}</option>
                         {/each}
-                        <option value="Custom">Custom…</option>
+                        <option value="Custom">{t("identifier.customOption")}</option>
                     </select>
                 </LabeledField>
                 <!-- Extra free-text label field, only for Custom schemes. -->
                 {#if isCustom(identifier.property_id)}
-                    <LabeledField label="Custom label" for={`id-custom-${idx}`}>
+                    <LabeledField label={t("identifier.customLabel")} for={`id-custom-${idx}`}>
                         <input
                             id={`id-custom-${idx}`}
                             value={identifier.property_id.Custom}
@@ -89,17 +90,17 @@
                         />
                     </LabeledField>
                 {/if}
-                <LabeledField label="Value" for={`id-val-${idx}`} required>
+                <LabeledField label={t("identifier.value")} for={`id-val-${idx}`} required>
                     <input id={`id-val-${idx}`} bind:value={identifier.value} required />
                 </LabeledField>
-                <LabeledField label="URL" for={`id-url-${idx}`}>
+                <LabeledField label={t("identifier.url")} for={`id-url-${idx}`}>
                     <input id={`id-url-${idx}`} bind:value={identifier.url} />
                 </LabeledField>
             </FieldRow>
-            <button type="button" class="button danger small" onclick={() => remove(idx)}>Remove</button>
+            <button type="button" class="button danger small" onclick={() => remove(idx)}>{t("identifier.remove")}</button>
         </div>
     {/each}
-    <button type="button" class="button" onclick={add}>+ Add identifier</button>
+    <button type="button" class="button" onclick={add}>{t("identifier.add")}</button>
 </section>
 
 <style>

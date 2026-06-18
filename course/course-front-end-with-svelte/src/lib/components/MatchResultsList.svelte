@@ -10,20 +10,25 @@
 -->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     let {
         results,
-        title = "Match results",
+        title,
     }: {
         results: MatchResult[];
         title?: string;
     } = $props();
+
+    // Default the heading to the localized "Match results" when the
+    // parent supplies none.
+    const heading = $derived(title ?? t("results.title"));
 </script>
 
 <section class="surface stack">
-    <h2>{title} <span class="muted small">({results.length})</span></h2>
+    <h2>{heading} <span class="muted small">({results.length})</span></h2>
     {#if results.length === 0}
-        <p class="muted">No candidates.</p>
+        <p class="muted">{t("results.none")}</p>
     {:else}
         <ul class="results">
             {#each results as r}
@@ -40,15 +45,15 @@
                     </div>
                     {#if r.breakdown}
                         <details>
-                            <summary class="small">Score breakdown</summary>
+                            <summary class="small">{t("results.scoreBreakdown")}</summary>
                             <ul class="breakdown small">
-                                {#if r.breakdown.name_score != null}<li>name: {(r.breakdown.name_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.course_code_score != null}<li>course code: {(r.breakdown.course_code_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.provider_score != null}<li>provider: {(r.breakdown.provider_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.educational_level_score != null}<li>level: {(r.breakdown.educational_level_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.keywords_score != null}<li>keywords: {(r.breakdown.keywords_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.teaches_score != null}<li>teaches: {(r.breakdown.teaches_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.deterministic_match}<li>deterministic (identifier / provider+code / same-as)</li>{/if}
+                                {#if r.breakdown.name_score != null}<li>{t("results.score.name")}: {(r.breakdown.name_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.course_code_score != null}<li>{t("results.score.courseCode")}: {(r.breakdown.course_code_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.provider_score != null}<li>{t("results.score.provider")}: {(r.breakdown.provider_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.educational_level_score != null}<li>{t("results.score.level")}: {(r.breakdown.educational_level_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.keywords_score != null}<li>{t("results.score.keywords")}: {(r.breakdown.keywords_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.teaches_score != null}<li>{t("results.score.teaches")}: {(r.breakdown.teaches_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.deterministic_match}<li>{t("results.score.deterministic")}</li>{/if}
                             </ul>
                         </details>
                     {/if}

@@ -18,6 +18,7 @@
 <script lang="ts">
     import { Grid } from "wx-svelte-grid";
     import type { Worker } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     let {
         workers,
@@ -28,14 +29,15 @@
     } = $props();
 
     // Column definitions for the SVAR grid (id + fixed pixel widths).
-    const columns = [
-        { id: "id", header: "ID", width: 280 },
-        { id: "family", header: "Family", width: 160 },
-        { id: "given", header: "Given", width: 200 },
-        { id: "birth_date", header: "DOB", width: 120 },
-        { id: "gender", header: "Gender", width: 90 },
-        { id: "active", header: "Active", width: 80 },
-    ];
+    // Headers are translated reactively so a locale switch relabels them.
+    const columns = $derived([
+        { id: "id", header: t("grid.id"), width: 280 },
+        { id: "family", header: t("grid.family"), width: 160 },
+        { id: "given", header: t("grid.given"), width: 200 },
+        { id: "birth_date", header: t("grid.dob"), width: 120 },
+        { id: "gender", header: t("grid.gender"), width: 90 },
+        { id: "active", header: t("grid.active"), width: 80 },
+    ]);
 
     // Flatten nested Worker fields into primitive grid cells; `id` must be a
     // non-empty string so initGrid can map a selected row back to a Worker.
@@ -47,7 +49,7 @@
             birth_date: p.birth_date ?? "",
             gender: p.gender,
             // active defaults to true when unset; render as yes/no for display.
-            active: (p.active ?? true) ? "yes" : "no",
+            active: (p.active ?? true) ? t("grid.yes") : t("grid.no"),
         })),
     );
 

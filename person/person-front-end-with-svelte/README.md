@@ -1,6 +1,6 @@
 # person-front-end-with-svelte
 
-SvelteKit front-end for the **[Person Service](../person-service-rust-crate/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
+SvelteKit front-end for the **[Person Service](../person-service-with-loco/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
 
 ## What's here
 
@@ -15,11 +15,16 @@ SvelteKit front-end for the **[Person Service](../person-service-rust-crate/)** 
 | `/persons/match` | Match check — score a hypothetical record against the index |
 | `/persons/merge` | Merge two persons (main + duplicate) |
 
+The persistent layout sidebar (every route) also carries a Lily **theme switcher** and **locale switcher** (FR-11 / FR-12); selections persist to `localStorage`.
+
 ## Stack
 
 - **SvelteKit 2** + **Svelte 5** (runes API)
 - **SVAR Svelte DataGrid** (`wx-svelte-grid`, `wx-svelte-core`)
-- **Lily Design System Svelte Headless** (consumed via `file:` dependency)
+- **Lily Design System** (all consumed via `file:` dependencies):
+  - `lily-design-system-svelte-headless` — accessibility primitives
+  - `lily-design-system-svelte-theme-select` — `ThemeSelect` (live in the layout shell)
+  - `lily-design-system-svelte-locale-select` — `LocaleSelect` (live in the layout shell)
 - **TypeScript** strict mode
 - **Vitest** for unit tests, **Playwright** for e2e
 
@@ -27,7 +32,7 @@ SvelteKit front-end for the **[Person Service](../person-service-rust-crate/)** 
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Person Service — see [`../person-service-rust-crate/README.md`](../person-service-rust-crate/README.md). Default: `http://localhost:8080`.
+- A running Person Service — see [`../person-service-with-loco/README.md`](../person-service-with-loco/README.md). Default: `http://localhost:8080`.
 
 ## Quick start
 
@@ -60,7 +65,7 @@ The unit tests mock `fetch`. The smoke suite (`tests/e2e/`) asserts the page she
 
 ### Integration tests (live Person Service)
 
-`tests/integration/golden-paths.spec.ts` drives the live SvelteKit preview against a running `person-service-rust-crate` over real HTTP. Coverage:
+`tests/integration/golden-paths.spec.ts` drives the live SvelteKit preview against a running `person-service-with-loco` over real HTTP. Coverage:
 
 | Test | Spec FR | What it asserts |
 | --- | --- | --- |
@@ -80,7 +85,7 @@ Each test creates its own records with a timestamped family name and cleans up v
 
 ```bash
 # 1. Start the Rust service (Postgres + Axum) in the background
-(cd ../person-service-rust-crate && podman compose up -d)
+(cd ../person-service-with-loco && podman compose up -d)
 
 # 2. Wait for the service to report healthy (first Rust build can take ~5 min)
 curl -sf http://localhost:8080/api/health && echo ok
@@ -94,7 +99,7 @@ bin/e2e --ui
 bin/e2e tests/integration/golden-paths.spec.ts -g "FR-9"
 
 # 4. Tear down when done
-(cd ../person-service-rust-crate && podman compose down)
+(cd ../person-service-with-loco && podman compose down)
 ```
 
 To target a different service URL:
@@ -128,7 +133,7 @@ src/
       PersonForm.svelte
       MatchResultsList.svelte
   routes/
-    +layout.svelte         - sidebar nav
+    +layout.svelte         - sidebar nav + Lily theme/locale pickers
     +page.svelte           - dashboard
     persons/
       +page.svelte         - list
@@ -149,13 +154,23 @@ tests/
 
 ## Lily Design System
 
-The Lily file: dependency resolves to `~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-headless`. Components import via deep path:
+Three Lily packages are consumed via `file:` dependencies (see `package.json`):
+
+| Package | Used for | Status |
+| --- | --- | --- |
+| `lily-design-system-svelte-theme-select` | `ThemeSelect` in the layout sidebar (theme switcher, FR-11) | **Live** |
+| `lily-design-system-svelte-locale-select` | `LocaleSelect` in the layout sidebar (locale switcher, FR-12) | **Live** |
+| `lily-design-system-svelte-headless` | accessibility primitives (focus trap, listbox, combobox, dialog) | Headless package wired; richer primitives (Dialog/Combobox/Banner) tracked in spec §13 T-14 |
+
+`src/routes/+layout.svelte` imports and renders the `ThemeSelect` and
+`LocaleSelect`; their selections persist to `localStorage` under
+`lily-theme` / `lily-locale`. Forms still use styled native HTML controls;
+deeper headless primitives are swapped in as the design system stabilises.
 
 ```svelte
-import Button from "lily-design-system-svelte-headless/src/lib/components/Button/Button.svelte";
+import ThemeSelect from "lily-design-system-svelte-theme-select/ThemeSelect.svelte";
+import LocaleSelect from "lily-design-system-svelte-locale-select/LocaleSelect.svelte";
 ```
-
-See the commented example in `src/routes/+layout.svelte`. The MVP currently uses styled native HTML controls; swap in Lily primitives as the design system stabilises.
 
 ## SVAR DataGrid
 

@@ -1,7 +1,7 @@
 ## 16. Open Questions
 
 Entity-level questions. Crate-internal questions stay in the crate
-specs (service [§16](../course-service-rust-crate/spec/16-open-questions.md),
+specs (service [§16](../course-service-with-loco/spec/16-open-questions.md),
 front-end [§16](../course-front-end-with-svelte/spec/16-open-questions.md)).
 
 - **OQ-1**: SVAR DataGrid is GPL-3.0 in its free tier. A worldwide

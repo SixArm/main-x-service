@@ -569,6 +569,79 @@ mod tests {
         assert_eq!(r.confidence, crate::scoring::Confidence::Low);
     }
 
+    // Phonetic bonus wiring (§9): two non-identical but Soundex-equal
+    // names get the +0.05 nudge, yet the bonus is capped at the ceiling so
+    // it can never reach the High band (>= 0.95) from sound-alikes alone.
+    #[test]
+    fn phonetic_bonus_lifts_but_caps_below_high_band() {
+        // "Smyth" / "Smith" share Soundex S530 but are not identical, so the
+        // base Jaro-Winkler is below the ceiling and the bonus applies.
+        let base = jaro_winkler(&normalize::fold("Smyth"), &normalize::fold("Smith"));
+        assert!(base < PHONETIC_CEILING, "base {base} must be below ceiling");
+        let a = CarePathway::new("Smyth");
+        let b = CarePathway::new("Smith");
+        let lifted = name_score(&a, &b);
+        // The score is lifted by the bonus (up to the ceiling)...
+        assert!(lifted > base, "lifted {lifted} should exceed base {base}");
+        assert!(
+            (lifted - (base + PHONETIC_BONUS).min(PHONETIC_CEILING)).abs() < 1e-9,
+            "lifted {lifted} should be base + bonus, capped at ceiling"
+        );
+        // ...but a phonetic-only agreement can never reach the High band.
+        assert!(lifted < 0.95, "phonetic bonus must stay below High band");
+    }
+
+    // The phonetic bonus is suppressed once the base score already clears
+    // the ceiling: identical names stay at exactly 1.0 (no +0.05 overshoot).
+    #[test]
+    fn phonetic_bonus_suppressed_at_or_above_ceiling() {
+        let a = CarePathway::new("Stroke");
+        let b = CarePathway::new("Stroke");
+        let s = name_score(&a, &b);
+        assert!((s - 1.0).abs() < 1e-9, "identical names stay at 1.0, got {s}");
+    }
+
+    // `set_jaccard` `Some(0.0)` branch (§13): exactly one side populated is
+    // real disagreement (not skipped). Distinct from both-empty (`None`).
+    #[test]
+    fn set_jaccard_one_side_populated_is_zero() {
+        let populated = vec!["thrombolysis".to_string()];
+        let empty: Vec<String> = vec![];
+        assert_eq!(set_jaccard(&populated, &empty), Some(0.0));
+        assert_eq!(set_jaccard(&empty, &populated), Some(0.0));
+        // Contrast: both empty is `None` (component dropped, not scored 0.0).
+        assert_eq!(set_jaccard(&empty, &empty), None);
+        // Folding to empty (blanks only on one side) is still the 0.0 branch.
+        let blanks = vec!["   ".to_string()];
+        assert_eq!(set_jaccard(&populated, &blanks), Some(0.0));
+    }
+
+    // `alternate_names` rescue (§9): primary names diverge, but A's
+    // alternate equals B's primary, so the best Jaro-Winkler is taken from
+    // the alternate and the names component scores ~1.0.
+    #[test]
+    fn alternate_name_rescues_diverging_primary_names() {
+        let mut a = CarePathway::new("CVA Pathway");
+        a.alternate_names = vec!["Acute Stroke Care Pathway".into()];
+        let b = CarePathway::new("Acute Stroke Care Pathway");
+        // Primary-vs-primary alone is weak; the alternate rescues it.
+        let primary_only = jaro_winkler(
+            &normalize::fold("CVA Pathway"),
+            &normalize::fold("Acute Stroke Care Pathway"),
+        );
+        let rescued = name_score(&a, &b);
+        assert!(
+            rescued > primary_only,
+            "alternate should rescue: rescued {rescued} vs primary {primary_only}"
+        );
+        assert!(rescued >= 0.99, "alternate equals B's primary, got {rescued}");
+        // Symmetric: the same rescue works when the alternate is on B.
+        let a2 = CarePathway::new("Acute Stroke Care Pathway");
+        let mut b2 = CarePathway::new("CVA Pathway");
+        b2.alternate_names = vec!["Acute Stroke Care Pathway".into()];
+        assert!(name_score(&a2, &b2) >= 0.99);
+    }
+
     // One-to-many surface: `rank` orders the exact match first (index 1),
     // `find_matches` returns only `is_match` entries, and the empty-input
     // path yields an empty result.

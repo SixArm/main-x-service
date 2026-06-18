@@ -14,6 +14,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { PersonRepository } from "$lib/api/persons.js";
+    import { t } from "$lib/i18n.svelte.js";
     import type { AuditEntry } from "$lib/api/types.js";
 
     let healthStatus = $state<"ok" | "down" | "loading">("loading");
@@ -43,12 +44,12 @@
     });
 </script>
 
-<svelte:head><title>Dashboard · Person Service</title></svelte:head>
+<svelte:head><title>{t("dashboard.head.title")}</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Dashboard</h1>
+    <h1>{t("dashboard.title")}</h1>
     <span class="status" data-status={healthStatus}>
-        Service: {healthStatus}
+        {t("dashboard.serviceStatus")} {healthStatus}
     </span>
 </header>
 
@@ -57,11 +58,11 @@
 {/if}
 
 <section class="surface stack">
-    <h2>Recent activity</h2>
+    <h2>{t("dashboard.recentActivity")}</h2>
     {#if recentError}
         <div class="banner error">{recentError}</div>
     {:else if recent.length === 0}
-        <p class="muted">No recent audit entries.</p>
+        <p class="muted">{t("dashboard.noRecent")}</p>
     {:else}
         <ul class="audit">
             {#each recent as entry}

@@ -1,7 +1,7 @@
 ## 9. API Surface
 
 Complete REST reference:
-[service `AGENTS/restful.md`](../thing-service-rust-crate/AGENTS/restful.md).
+[service `AGENTS/restful.md`](../thing-service-with-loco/AGENTS/restful.md).
 Front-end consumption map:
 [front-end §9](../thing-front-end-with-svelte/spec/09-api-consumption.md).
 

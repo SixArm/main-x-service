@@ -2,9 +2,9 @@
 
 Field-by-field reference: [`AGENTS/models.md`](../AGENTS/models.md).
 Source: service
-[`src/models/users.rs`](../authentication-service-rust-crate/src/models/users.rs),
-[`src/models/sessions.rs`](../authentication-service-rust-crate/src/models/sessions.rs),
-[`src/auth/mod.rs`](../authentication-service-rust-crate/src/auth/mod.rs);
+[`src/models/users.rs`](../authentication-service-with-loco/src/models/users.rs),
+[`src/models/sessions.rs`](../authentication-service-with-loco/src/models/sessions.rs),
+[`src/auth/mod.rs`](../authentication-service-with-loco/src/auth/mod.rs);
 verifier [`src/lib.rs`](../authentication-verifier-rust-crate/src/lib.rs).
 
 ### 5.1 `User` (service)
@@ -25,54 +25,89 @@ The sign-in account — **not** a person registry record.
   `email_verification_sent_at`. Retained to satisfy the schema; no
   password flow exists.
 
-### 5.2 `Session` (service)
+### 5.2 `Session` (service) — the human login
 
-One row per issued token; the unit of revocation.
+The server-side session, per
+[`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+§3. One row per logged-in browser; the unit of revocation. The browser
+holds only the opaque `sid` in the `__Host-mxi_session` cookie.
 
-- `jid` (unique) — equals the token `jti`.
-- `user_pid` — the holder's `pid`.
-- `expires_at` — mirrors the token `exp`.
-- `revoked_at` — set on signout; `is_active()` = `revoked_at IS NULL`.
-- `user_agent` — optional issuance context.
+| Column | Type | Content |
+|---|---|---|
+| `sid` | text, pk | Opaque, high-entropy session id (**not** a JWT); rotated on privilege change |
+| `user_pid` | uuid | The holder's `pid` |
+| `data` | jsonb | Session attributes — roles, scopes, MFA state, … (default `{}`) |
+| `created_at` | timestamptz | Login time |
+| `last_seen_at` | timestamptz | Sliding idle marker, bumped on use |
+| `idle_expires_at` | timestamptz | `now() + idle TTL`, bumped on use |
+| `absolute_expires_at` | timestamptz | Hard ceiling, never extended |
+| `revoked_at` | timestamptz, null | Explicit logout / admin revoke |
 
-### 5.3 JWT `Claims` (contract — both crates)
+A session is valid iff
+`revoked_at IS NULL AND now() < idle_expires_at AND now() < absolute_expires_at`.
+Partial index `sessions_user ON (user_pid) WHERE revoked_at IS NULL`.
 
-Defined identically in the service (`auth::Claims`) and the verifier
-(`authentication_verifier::Claims`) so a token signed at one
+### 5.3 PASETO `Claims` (cross-service contract — both crates)
+
+Carried in the short-lived **PASETO v4.public** token minted by
+`POST /token` (shared §5). Defined identically in the service and the
+verifier (`authentication_verifier::Claims`) so a token signed at one
 round-trips at the other:
 
 | Claim | Type | Content |
 |---|---|---|
 | `sub` | String | User `pid` (UUID string) |
-| `email` | String | User email, for convenience at the edge |
-| `name` | String | Display name |
-| `iss` | String | Issuer — default `authentication-service` (`JWT_ISSUER`) |
-| `aud` | String | Audience — default `main-x-service` (`JWT_AUDIENCE`) |
-| `exp` | i64 | Expiry, unix seconds (`iat` + `JWT_EXPIRATION`, default 3600) |
+| `iss` | String | Issuer — default `authentication-service` (`PASETO_ISSUER`) |
+| `aud` | String | Audience — default `main-x-service` (`PASETO_AUDIENCE`) |
 | `iat` | i64 | Issued-at, unix seconds |
-| `jti` | String | JWT id (UUID) = `sessions.jid` |
+| `nbf` | i64 | Not-before, unix seconds |
+| `exp` | i64 | Expiry, unix seconds (`iat` + ~5 min, `PASETO_EXPIRATION`) |
+| `sid` | String | Originating `sessions.sid` (for revocation correlation) |
+| `scope` / `roles` | String / [String] | Authorization hints carried from `sessions.data` |
 
-Token header: `alg: RS256`, `kid` = base64url(SHA-256(public modulus)).
+Token footer carries `kid` (selects the verifying Ed25519 key).
+`email` / `name` are no longer carried by default (fetched at the edge
+where needed); add them to `data`/claims only if a peer requires them.
 
-### 5.4 JWKS key set (contract)
+### 5.4 PASETO public-key set (contract)
+
+The Ed25519 public key(s) published at `/.well-known/paseto-keys` — the
+JWKS analog. Document shape (one entry per `kid`):
 
 ```json
-{ "keys": [ { "kty": "RSA", "use": "sig", "alg": "RS256",
-              "kid": "…", "n": "…", "e": "…" } ] }
+{ "keys": [ { "kty": "OKP", "crv": "Ed25519", "use": "sig",
+              "alg": "EdDSA", "kid": "…", "x": "…" } ] }
 ```
 
-`n` / `e` are base64url-no-pad big-endian RSA components. One key
-today; the document is an array so rotation can publish old + new
-keys side by side (§13 T-5).
+`x` is the base64url-no-pad Ed25519 public key. One key today; the
+document is an array so rotation can publish old + new keys side by
+side (the footer `kid` selects the verifier key).
 
 ### 5.5 Invariants
 
 The implementations MUST enforce:
 
-- Access tokens are RS256 — never HS256, never a shared secret.
-- A magic-link token is single-use and expires within 5 minutes.
-- `sessions.jid` equals the token `jti`; signout sets `revoked_at`.
-- The published JWKS `kid` equals the `kid` stamped into token headers.
+- The **human session is a server-side cookie session**, never a token
+  in browser JS; the cookie is `__Host-mxi_session` (HttpOnly, Secure,
+  SameSite, host-locked) carrying only the opaque `sid`.
+- A magic-link token is single-use and expires within 5 minutes; its
+  redemption **establishes a session + sets the cookie** (no JWT/PASETO
+  returned to the browser).
+- Cross-service tokens are **PASETO v4.public** (Ed25519) — never JWT,
+  never HS256, never a shared secret — minted only by exchanging a
+  valid session at `POST /token`, with a ~5-minute `exp`.
+- The published key-set `kid` equals the `kid` stamped into token
+  footers.
+- Logout / revocation sets `sessions.revoked_at`; cross-service
+  revocation relies on the short PASETO `exp` (shared §10 open
+  question).
+- CSRF protection is enforced on cookie-authenticated mutating requests
+  (shared §4).
 - `signup` / `magic-link` responses never reveal account existence.
-- The verifier rejects tokens whose `kid` is absent or unknown, and
-  validates signature, `iss`, `aud`, and `exp` on every call.
+- The verifier rejects tokens whose footer `kid` is absent or unknown,
+  and validates signature, `iss`, `aud`, and `exp` on every call.
+
+> RS256 JWT + `/.well-known/jwks.json` are **decommissioned** by this
+> pivot (§1). See
+> [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+> §9 for the rollout.

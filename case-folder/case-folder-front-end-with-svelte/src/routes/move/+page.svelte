@@ -27,6 +27,7 @@
     import Field from '$lib/components/Field/Field.svelte';
     import Button from '$lib/components/Button/Button.svelte';
     import UnitedKingdomNationalHealthServiceNumberInput from '$lib/components/UnitedKingdomNationalHealthServiceNumberInput/UnitedKingdomNationalHealthServiceNumberInput.svelte';
+    import { t, tf, statusLabel } from '$lib/i18n.svelte';
 
     let nhsNumber = $state('');
     let folderId = $state('');
@@ -103,10 +104,10 @@
 
         const formatted = formatNhsNumber(nhsNumber);
         if (!isValidNhsNumber(formatted)) {
-            nhsError = 'Enter a valid 10-digit NHS Number.';
+            nhsError = t('move.invalidNhs');
         }
         if (!folderId) {
-            folderError = 'Select which folder to move.';
+            folderError = t('move.selectFolderError');
         }
         if (nhsError || folderError) return;
 
@@ -121,7 +122,12 @@
                 movedBy: movedBy.trim() || undefined,
                 reason: reason.trim() || undefined
             });
-            success = `Recorded move of ${event.patientName} — ${event.folderTitle} from ${event.fromCabinetLabel} to ${event.toCabinetLabel}.`;
+            success = tf('move.recordedSummary', {
+                patient: event.patientName,
+                folder: event.folderTitle,
+                from: event.fromCabinetLabel,
+                to: event.toCabinetLabel
+            });
             reason = '';
             // Refresh the patient folders pane to reflect the new location.
             lookupFolders(nhsNumber);
@@ -135,7 +141,7 @@
                     folderError = e.message;
                 }
             } else if (e instanceof ApiError && e.status === 404) {
-                folderError = 'Folder not found.';
+                folderError = t('move.folderNotFound');
             } else {
                 folderError = (e as Error).message;
             }
@@ -143,82 +149,79 @@
     }
 </script>
 
-<BackLink href="/">Back to dashboard</BackLink>
+<BackLink href="/">{t('common.backToDashboard')}</BackLink>
 
-<h2>Move a folder</h2>
-<p>
-    Enter a patient's NHS Number, pick the folder you're moving, then pick the
-    destination cabinet (or mark it in transit).
-</p>
+<h2>{t('move.heading')}</h2>
+<p>{t('move.intro')}</p>
 
 {#if success}
-    <Alert type="success" heading="Move recorded">{success}</Alert>
+    <Alert type="success" heading={t('move.recorded')}>{success}</Alert>
 {/if}
 
 <div class="split">
-    <Form label="Move folder" onsubmit={handleSubmit}>
-        <Field label="Patient NHS Number" required error={nhsError}>
+    <Form label={t('move.formLabel')} onsubmit={handleSubmit}>
+        <Field label={t('move.patientNhs')} required error={nhsError}>
             <UnitedKingdomNationalHealthServiceNumberInput
-                label="NHS Number" bind:value={nhsNumber} oninput={onNhsInput} required
+                label={t('common.nhsNumber')} bind:value={nhsNumber} oninput={onNhsInput} required
             />
         </Field>
 
-        <Field label="Folder" required error={folderError} description={patientFolders.length ? 'Pick which of this patient\'s folders to move.' : 'Enter an NHS Number to see folders.'}>
+        <Field label={t('move.folder')} required error={folderError} description={patientFolders.length ? t('move.pickFolderDescription') : t('move.enterNhsDescription')}>
             <select bind:value={folderId} required disabled={patientFolders.length === 0}>
-                <option value="">— Select folder —</option>
+                <option value="">{t('move.selectFolderOption')}</option>
                 {#each patientFolders as f (f.id)}
-                    <option value={f.id}>{f.title} — {f.cabinetLabel} · {f.status}</option>
+                    <option value={f.id}>{f.title} — {f.cabinetLabel} · {statusLabel(f.status)}</option>
                 {/each}
             </select>
         </Field>
 
-        <Field label="Destination" required error={cabinetError}>
+        <Field label={t('move.destination')} required error={cabinetError}>
             <select bind:value={toCabinetId} required>
-                <option value="">— Select cabinet —</option>
-                <option value="__transit">In transit (porter carrying)</option>
+                <option value="">{t('common.selectCabinetOption')}</option>
+                <option value="__transit">{t('common.inTransitPorter')}</option>
                 {#each cache.cabinets as c (c.id)}
                     <option value={c.id}>{c.label} ({c.containerPath})</option>
                 {/each}
             </select>
         </Field>
 
-        <Field label="Worker (from Main Worker Service)" description="Pick a registered worker, or leave blank to use the free-text field below.">
+        <Field label={t('move.workerLabel')} description={t('move.workerDescription')}>
             <select bind:value={workerId}>
-                <option value="">— Free-text only —</option>
+                <option value="">{t('move.freeTextOnly')}</option>
                 {#each cache.workers as w (w.id)}
                     <option value={w.id}>{w.name}{w.role ? ` — ${w.role}` : ''}</option>
                 {/each}
             </select>
         </Field>
 
-        <Field label="Moved by (free text)" description="Used when no worker is selected.">
-            <input bind:value={movedBy} placeholder="e.g. Alice (porter)" />
+        <Field label={t('move.movedByLabel')} description={t('move.movedByDescription')}>
+            <input bind:value={movedBy} placeholder={t('move.movedByPlaceholder')} />
         </Field>
 
-        <Field label="Reason">
-            <input bind:value={reason} placeholder="e.g. Outpatient appointment" />
+        <Field label={t('common.reason')}>
+            <input bind:value={reason} placeholder={t('move.reasonPlaceholder')} />
         </Field>
 
         <div class="actions">
-            <a href="/" class="button secondary">Cancel</a>
-            <Button type="submit" disabled={!folderId}>Record move</Button>
+            <a href="/" class="button secondary">{t('common.cancel')}</a>
+            <Button type="submit" disabled={!folderId}>{t('move.recordMove')}</Button>
         </div>
     </Form>
 
     <aside class="panel" aria-labelledby="patient-folders">
-        <h3 id="patient-folders">Patient folders</h3>
+        <h3 id="patient-folders">{t('move.patientFolders')}</h3>
         {#if patientFolders.length > 0}
             <ul style="list-style: none; padding: 0; margin: 0;">
                 {#each patientFolders as f (f.id)}
                     <li style="padding: var(--nhs-space-1) 0; border-bottom: 1px solid var(--nhs-pale-grey);">
                         <strong>{f.title}</strong>
-                        <Badge type={badgeType(f.status)}>{f.status}</Badge><br />
+                        <Badge type={badgeType(f.status)}>{statusLabel(f.status)}</Badge><br />
                         <small>{f.cabinetLabel}</small>
                     </li>
                 {/each}
             </ul>
         {:else}
-            <p>Enter a valid NHS Number to see this patient's folders.</p>
+            <p>{t('move.enterValidNhs')}</p>
         {/if}
     </aside>
 </div>

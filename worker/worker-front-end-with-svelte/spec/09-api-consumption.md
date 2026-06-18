@@ -1,6 +1,6 @@
 ## 9. API Consumption
 
-The front-end binds 1:1 to the Worker Service REST surface (see [`worker-service-rust-crate/AGENTS/restful.md`](../../worker-service-rust-crate/AGENTS/restful.md)):
+The front-end binds 1:1 to the Worker Service REST surface (see [`worker-service-with-loco/AGENTS/restful.md`](../../worker-service-with-loco/AGENTS/restful.md)):
 
 | Endpoint | Used by |
 | --- | --- |

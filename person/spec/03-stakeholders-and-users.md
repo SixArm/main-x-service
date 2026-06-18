@@ -15,7 +15,7 @@ governmental system. Stakeholders span the trio:
 | Other Main X Index entities | Cross-references via `person_id`; the worker entity refines persons into workforce records | Service REST API |
 
 Per-subproject stakeholder detail: service
-[spec §3](../person-service-rust-crate/spec/03-stakeholders-and-users.md),
+[spec §3](../person-service-with-loco/spec/03-stakeholders-and-users.md),
 matcher
 [spec §3](../person-matcher-rust-crate/spec/03-stakeholders-and-users.md),
 front-end

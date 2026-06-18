@@ -23,7 +23,7 @@ is [`spec.md`](spec/index.md); deep references live in [`AGENTS/`](AGENTS/).
 
 ## Sibling service
 
-- [`../event-service-rust-crate/`](../event-service-rust-crate/) — the system of record this UI calls. Its [`spec.md`](../event-service-rust-crate/spec/index.md) and [`AGENTS/restful.md`](../event-service-rust-crate/AGENTS/restful.md) are the API contract.
+- [`../event-service-with-loco/`](../event-service-with-loco/) — the system of record this UI calls. Its [`spec.md`](../event-service-with-loco/spec/index.md) and [`AGENTS/restful.md`](../event-service-with-loco/AGENTS/restful.md) are the API contract.
 
 ## Route map
 
@@ -32,7 +32,7 @@ The SPA mounts at `/`. All operator workflows live under `/events`.
 | Path | Purpose |
 |---|---|
 | `/` | Dashboard — service health + recent audit feed |
-| `/events` | List + search (SVAR DataGrid; `q` + fuzzy + phonetic toggles) |
+| `/events` | List + search (SVAR DataGrid; `q` + fuzzy toggle + date / status / type filters) |
 | `/events/new` | Create form with real-time 409 duplicate detection inline |
 | `/events/[id]` | Detail view (identity, time window, Location union, Party / Offer) |
 | `/events/[id]/edit` | Edit form |
@@ -44,7 +44,8 @@ The SPA mounts at `/`. All operator workflows live under `/events`.
 
 ### Search → create with duplicate inline
 
-1. Operator hits `/events`, searches `"Annual Conference"` in the SearchBox.
+1. Operator hits `/events`, searches `"Annual Conference"` in the SearchBox,
+   optionally enabling the **Fuzzy** toggle and narrowing by date / status / type.
 2. Grid renders SVAR DataGrid with matching rows.
 3. Operator clicks **New event** → `/events/new`.
 4. Form submits to `POST /api/v1/events`. Service returns 409 with a

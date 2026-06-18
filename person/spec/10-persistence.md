@@ -19,7 +19,7 @@ PostgreSQL 18+ via SeaORM with migrations. Tables: `persons`,
 `organization_addresses`, `organization_contacts`,
 `organization_identifiers`, `person_match_scores`, `audit_log`.
 Extensions, pooling, and soft-delete mechanics:
-[service spec §10](../person-service-rust-crate/spec/10-persistence.md)
+[service spec §10](../person-service-with-loco/spec/10-persistence.md)
 and [agents/share/postgresql.md](../../agents/share/postgresql.md).
 
 #### Schema artifact: `person-service-schema.sql`

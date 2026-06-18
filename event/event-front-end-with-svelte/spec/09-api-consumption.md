@@ -1,6 +1,6 @@
 ## 9. API Consumption
 
-The front-end binds 1:1 to the Event Service REST surface (see [`event-service-rust-crate/AGENTS/restful.md`](../../event-service-rust-crate/AGENTS/restful.md)):
+The front-end binds 1:1 to the Event Service REST surface (see [`event-service-with-loco/AGENTS/restful.md`](../../event-service-with-loco/AGENTS/restful.md)):
 
 | Endpoint | Used by |
 | --- | --- |

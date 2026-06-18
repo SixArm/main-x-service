@@ -14,7 +14,7 @@ The entity is delivered as a trio of subprojects:
 
 | Subproject | Role |
 |---|---|
-| [place-service-rust-crate](../place-service-rust-crate/) | System of record — REST API, PostgreSQL persistence, Tantivy search, duplicate detection, merge, audit, privacy |
+| [place-service-with-loco](../place-service-with-loco/) | System of record — REST API, PostgreSQL persistence, Tantivy search, duplicate detection, merge, audit, privacy |
 | [place-matcher-rust-crate](../place-matcher-rust-crate/) | Canonical pairwise-comparison algorithm — pure, deterministic, dependency-light library embedded by the service |
 | [place-front-end-with-svelte](../place-front-end-with-svelte/) | Operator UI — SvelteKit SPA for CRUD / search / match / merge / audit |
 
@@ -43,7 +43,7 @@ registries, OSM imports, agency CRMs, GIS feeds) hold a shard:
 - **Not a map-rendering service** — the front-end shows records and
   scores, not maps (map embeds are a roadmap idea, not a goal).
 - **Not a geocoder** — reverse-geocoding is a service-crate roadmap
-  item ([service spec §13 T-6](../place-service-rust-crate/spec/13-tasks.md)),
+  item ([service spec §13 T-6](../place-service-with-loco/spec/13-tasks.md)),
   not an entity commitment.
 - **Not an address-validation authority** — the registry stores and
   normalises addresses; postal-reference lookups belong to integrated

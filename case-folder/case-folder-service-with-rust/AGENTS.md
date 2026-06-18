@@ -103,7 +103,7 @@ SvelteKit Playwright suite depends on this. Keep the
 `bootstrap_stubs` initializer in lock-step with any change to the
 seeding logic or the Client traits.
 
-### 8. CI gates (run all four before PR)
+### 9. CI gates (run all four before PR)
 
 ```bash
 cargo check
@@ -163,7 +163,9 @@ Don't, unless the spec really demands it. If you must:
 ## Sibling projects
 
 - [`../case-folder-front-end-with-svelte`](../case-folder-front-end-with-svelte)
-  — same domain, Svelte + Vite + TypeScript front-end. **Not** a
-  client of this API yet; it currently has its own back-end shim. The
-  two can be wired together as a future P1.
+  — same domain, SvelteKit + TypeScript front-end, and a **client of
+  this API**. It calls this service under `/api/*`, and its Playwright
+  e2e suite runs against this service booted in stub mode
+  (`USE_UPSTREAM_STUBS=1`), so the API is fully functional with no
+  external upstreams. Keep the JSON contract stable for it.
 - The five upstream services live under `~/git/sixarm/main-x-service/`.

@@ -67,7 +67,7 @@ contribute to the score.
 
 ## Where matching runs in the service
 
-**File:** [`src/controllers/cases.rs`](../case-service-rust-crate/src/controllers/cases.rs)
+**File:** [`src/controllers/cases.rs`](../case-service-with-loco/src/controllers/cases.rs)
 — both endpoints construct `MatchingEngine::new(MatchConfig::default())`:
 
 - `POST /api/cases/match` → `engine.rank(query, candidates)` over the

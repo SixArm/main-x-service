@@ -13,6 +13,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let query = $state('');
 
@@ -33,28 +34,28 @@
     }
 </script>
 
-<BackLink href="/">Back to dashboard</BackLink>
+<BackLink href="/">{t('common.backToDashboard')}</BackLink>
 
 <div class="toolbar">
-    <h2>Patients</h2>
+    <h2>{t('patients.heading')}</h2>
     <input
         type="search"
         bind:value={query}
-        placeholder="Search by NHS Number or name"
-        aria-label="Search patients"
+        placeholder={t('patients.searchPlaceholder')}
+        aria-label={t('patients.searchLabel')}
     />
 </div>
 
 <div class="panel">
-    <DataTable label="Patients" caption="All patients with one or more registered folders">
+    <DataTable label={t('patients.tableLabel')} caption={t('patients.tableCaption')}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">NHS Number</th>
-                <th scope="col">Name</th>
-                <th scope="col">Date of birth</th>
-                <th scope="col">Folders</th>
-                <th scope="col">Source</th>
-                <th scope="col">Action</th>
+                <th scope="col">{t('common.nhsNumber')}</th>
+                <th scope="col">{t('common.name')}</th>
+                <th scope="col">{t('common.dateOfBirth')}</th>
+                <th scope="col">{t('patients.colFolders')}</th>
+                <th scope="col">{t('common.source')}</th>
+                <th scope="col">{t('common.action')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>
@@ -70,13 +71,13 @@
                     <DataTableTD>{patient.folderCount}</DataTableTD>
                     <DataTableTD>{patient.source}</DataTableTD>
                     <DataTableTD>
-                        <a href="/patients/{nhsSlug(patient.nhsNumber)}">View</a>
+                        <a href="/patients/{nhsSlug(patient.nhsNumber)}">{t('common.view')}</a>
                     </DataTableTD>
                 </DataTableRow>
             {/each}
             {#if filtered.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={6}>No patients match <strong>{query}</strong>.</DataTableTD>
+                    <DataTableTD colspan={6}>{t('patients.noMatch')} <strong>{query}</strong>.</DataTableTD>
                 </DataTableRow>
             {/if}
         </DataTableBody>

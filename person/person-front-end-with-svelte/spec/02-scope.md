@@ -11,6 +11,13 @@
 - Match check page (score a hypothetical record against the index).
 - Merge UI (preview + execute).
 - Per-record audit log view.
+- Theme switcher in the layout shell (Lily `ThemeSelect`, persisted to
+  `localStorage` under `lily-theme`; DaisyUI themes plus the bespoke NHS
+  England / Scotland / Wales patient & practitioner themes).
+- Locale switcher in the layout shell (Lily `LocaleSelect`, persisted to
+  `localStorage` under `lily-locale`, with navigator detection). This is
+  the locale *picker* only; message catalogues / translated copy remain
+  out of scope (see §2.2).
 
 ### 2.2 Out of scope (MVP)
 
@@ -20,6 +27,6 @@
 - Consent management UI.
 - Identity-document detail editing (read-only on detail page).
 - Batch deduplication scan UI (API exists; defer until ops asks).
-- i18n / locale switching.
-- Theme switcher.
+- Full i18n message catalogues / translated copy. The locale *picker* is
+  in scope (§2.1); wiring its selection to translated strings is deferred.
 

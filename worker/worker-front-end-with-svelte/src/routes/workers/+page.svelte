@@ -14,6 +14,7 @@
     import WorkerGrid from "$lib/components/WorkerGrid.svelte";
     import { WorkerRepository } from "$lib/api/workers.js";
     import type { Worker } from "$lib/api/types.js";
+    import { t, tf } from "$lib/i18n.svelte.js";
 
     let query = $state("");
     let workers = $state<Worker[]>([]);
@@ -55,20 +56,20 @@
     });
 </script>
 
-<svelte:head><title>Workers · Worker Service</title></svelte:head>
+<svelte:head><title>{t("workers.titleTab")}</title></svelte:head>
 
 <header class="row" style="justify-content: space-between">
-    <h1>Workers</h1>
-    <a href="/workers/new" class="button primary">New worker</a>
+    <h1>{t("workers.heading")}</h1>
+    <a href="/workers/new" class="button primary">{t("workers.new")}</a>
 </header>
 
 <section class="surface stack">
-    <SearchBox bind:value={query} placeholder="Search by name, identifier…" onsearch={runSearch} />
+    <SearchBox bind:value={query} placeholder={t("workers.searchPlaceholder")} onsearch={runSearch} />
     <div class="row small">
-        <label><input type="checkbox" bind:checked={fuzzy} /> Fuzzy</label>
-        <label><input type="checkbox" bind:checked={phonetic} /> Phonetic (Soundex)</label>
+        <label><input type="checkbox" bind:checked={fuzzy} /> {t("workers.fuzzy")}</label>
+        <label><input type="checkbox" bind:checked={phonetic} /> {t("workers.phonetic")}</label>
         <span class="muted" style="margin-left: auto">
-            {loading ? "Loading…" : `${total} record${total === 1 ? "" : "s"}`}
+            {loading ? t("common.loading") : total === 1 ? t("workers.recordsOne") : tf("workers.recordsOther", { count: total })}
         </span>
     </div>
     {#if error}

@@ -10,6 +10,7 @@
 -->
 <script lang="ts">
     import type { PostalAddress } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
 
@@ -23,21 +24,21 @@
 </script>
 
 <FieldRow>
-    <LabeledField label="Street" for={`${prefix}-street`}>
+    <LabeledField label={t("address.street")} for={`${prefix}-street`}>
         <input id={`${prefix}-street`} bind:value={address.street_address} />
     </LabeledField>
-    <LabeledField label="City / locality" for={`${prefix}-city`}>
+    <LabeledField label={t("address.cityLocality")} for={`${prefix}-city`}>
         <input id={`${prefix}-city`} bind:value={address.address_locality} />
     </LabeledField>
 </FieldRow>
 <FieldRow>
-    <LabeledField label="Region / state" for={`${prefix}-region`}>
+    <LabeledField label={t("address.regionState")} for={`${prefix}-region`}>
         <input id={`${prefix}-region`} bind:value={address.address_region} />
     </LabeledField>
-    <LabeledField label="Postal code" for={`${prefix}-postal`}>
+    <LabeledField label={t("address.postalCode")} for={`${prefix}-postal`}>
         <input id={`${prefix}-postal`} bind:value={address.postal_code} />
     </LabeledField>
-    <LabeledField label="Country" for={`${prefix}-country`} hint="ISO 3166 alpha-2">
+    <LabeledField label={t("address.country")} for={`${prefix}-country`} hint={t("address.countryHint")}>
         <input id={`${prefix}-country`} bind:value={address.address_country} maxlength="2" />
     </LabeledField>
 </FieldRow>

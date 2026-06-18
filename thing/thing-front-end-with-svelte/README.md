@@ -1,6 +1,6 @@
 # thing-front-end-with-svelte
 
-SvelteKit front-end for the **[Thing Service](../thing-service-rust-crate/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
+SvelteKit front-end for the **[Thing Service](../thing-service-with-loco/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
 
 ## What's here
 
@@ -27,7 +27,7 @@ SvelteKit front-end for the **[Thing Service](../thing-service-rust-crate/)** in
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Thing Service — see [`../thing-service-rust-crate/README.md`](../thing-service-rust-crate/README.md). Default: `http://localhost:8080`.
+- A running Thing Service — see [`../thing-service-with-loco/README.md`](../thing-service-with-loco/README.md). Default: `http://localhost:8080`.
 
 ## Quick start
 

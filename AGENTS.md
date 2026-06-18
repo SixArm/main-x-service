@@ -13,16 +13,17 @@ per-crate `AGENTS/spec-driven-development.md` files for the discipline.
 
 | Crate | Entity | Spec | Index |
 |---|---|---|---|
-| [Person Service](person/person-service-rust-crate/) | Person (general) | [spec](person/person-service-rust-crate/spec/index.md) | [index](person/person-service-rust-crate/index.md) |
-| [Worker Service](worker/worker-service-rust-crate/) | Worker (workforce / professional) | [spec](worker/worker-service-rust-crate/spec/index.md) | [index](worker/worker-service-rust-crate/index.md) |
-| [Place Service](place/place-service-rust-crate/) | Place (schema.org/Place) | [spec](place/place-service-rust-crate/spec/index.md) | [index](place/place-service-rust-crate/index.md) |
-| [Thing Service](thing/thing-service-rust-crate/) | Thing (schema.org/Thing — generic) | [spec](thing/thing-service-rust-crate/spec/index.md) | [index](thing/thing-service-rust-crate/index.md) |
-| [Event Service](event/event-service-rust-crate/) | Event (schema.org/Event — time-bounded) | [spec](event/event-service-rust-crate/spec/index.md) | [index](event/event-service-rust-crate/index.md) |
-| [Course Service](course/course-service-rust-crate/) | Course (schema.org/Course) — template + `CourseInstance` sub-resource | [spec](course/course-service-rust-crate/spec/index.md) | [index](course/course-service-rust-crate/index.md) |
-| [Authentication Service](authentication/authentication-service-rust-crate/) | User (central single sign-on provider) — passwordless magic-link, RS256 JWT + JWKS. **First real loco.rs crate**; reference for converting the others. | [spec](authentication/authentication-service-rust-crate/spec/index.md) | [index](authentication/authentication-service-rust-crate/index.md) |
-| [Organization Service](organization/organization-service-rust-crate/) | Organization (schema.org/Organization) — loco.rs CRUD + matching (embeds organization-matcher) + name search + audit log + event streaming + OpenAPI/Swagger + record merge + JWT verification | [spec](organization/organization-service-rust-crate/spec/index.md) | [index](organization/organization-service-rust-crate/index.md) |
-| [Care Pathway Service](care-pathway/care-pathway-service-rust-crate/) | Care pathway (clinical pathway) — loco.rs CRUD + name search + matching (embeds care-pathway-matcher) + condition-code validation + OpenAPI/Swagger + audit log + event streaming + JWT verification + record merge | [spec](care-pathway/care-pathway-service-rust-crate/spec/index.md) | [index](care-pathway/care-pathway-service-rust-crate/index.md) |
-| [Case Service](case/case-service-rust-crate/) | Case (governmental case management / case tracking) — loco.rs CRUD + title search + matching (embeds case-matcher) + validation + OpenAPI/Swagger + audit log + event streaming + JWT verification + record merge | [spec](case/case-service-rust-crate/spec/index.md) | [index](case/case-service-rust-crate/index.md) |
+| [Person Service](person/person-service-with-loco/) | Person (general) | [spec](person/person-service-with-loco/spec/index.md) | [index](person/person-service-with-loco/index.md) |
+| [Worker Service](worker/worker-service-with-loco/) | Worker (workforce / professional) | [spec](worker/worker-service-with-loco/spec/index.md) | [index](worker/worker-service-with-loco/index.md) |
+| [Place Service](place/place-service-with-loco/) | Place (schema.org/Place) | [spec](place/place-service-with-loco/spec/index.md) | [index](place/place-service-with-loco/index.md) |
+| [Thing Service](thing/thing-service-with-loco/) | Thing (schema.org/Thing — generic) | [spec](thing/thing-service-with-loco/spec/index.md) | [index](thing/thing-service-with-loco/index.md) |
+| [Event Service](event/event-service-with-loco/) | Event (schema.org/Event — time-bounded) | [spec](event/event-service-with-loco/spec/index.md) | [index](event/event-service-with-loco/index.md) |
+| [Course Service](course/course-service-with-loco/) | Course (schema.org/Course) — template + `CourseInstance` sub-resource | [spec](course/course-service-with-loco/spec/index.md) | [index](course/course-service-with-loco/index.md) |
+| [Authentication Service](authentication/authentication-service-with-loco/) | User (central single sign-on provider) — passwordless magic-link, RS256 JWT + JWKS. **First real loco.rs crate**; reference for converting the others. | [spec](authentication/authentication-service-with-loco/spec/index.md) | [index](authentication/authentication-service-with-loco/index.md) |
+| [Organization Service](organization/organization-service-with-loco/) | Organization (schema.org/Organization) — loco.rs CRUD + matching (embeds organization-matcher) + name search + audit log + event streaming + OpenAPI/Swagger + record merge + JWT verification | [spec](organization/organization-service-with-loco/spec/index.md) | [index](organization/organization-service-with-loco/index.md) |
+| [Care Pathway Service](care-pathway/care-pathway-service-with-loco/) | Care pathway (clinical pathway) — loco.rs CRUD + name search + matching (embeds care-pathway-matcher) + condition-code validation + OpenAPI/Swagger + audit log + event streaming + JWT verification + record merge | [spec](care-pathway/care-pathway-service-with-loco/spec/index.md) | [index](care-pathway/care-pathway-service-with-loco/index.md) |
+| [Case Service](case/case-service-with-loco/) | Case (governmental case management / case tracking) — loco.rs CRUD + title search + matching (embeds case-matcher) + validation + OpenAPI/Swagger + audit log + event streaming + JWT verification + record merge | [spec](case/case-service-with-loco/spec/index.md) | [index](case/case-service-with-loco/index.md) |
+| [Plan Service](plan/plan-service-with-loco/) | Plan (project / product / programme / initiative / portfolio / epic) — loco.rs CRUD + matching (embeds plan-matcher; DTO = matcher `Plan` type as JSONB) + **project-management sub-resources** (goals / tasks / issues / posts / comments / members + derived timeline & burndown) + name search + audit + event streaming + OpenAPI/Swagger + record merge + JWT verification + cross-service links + bulk import/export. Integrates auth (users/SSO), person/worker (people), organization (sponsor). | [spec](plan/plan-service-with-loco/spec/index.md) | [index](plan/plan-service-with-loco/index.md) |
 
 ### Matcher crates
 
@@ -43,6 +44,7 @@ the corresponding service crate's matching layer.
 | [Organization Matcher](organization/organization-matcher-rust-crate/) | Organization (schema.org/Organization) | [spec](organization/organization-matcher-rust-crate/spec/index.md) | [index](organization/organization-matcher-rust-crate/index.md) |
 | [Care Pathway Matcher](care-pathway/care-pathway-matcher-rust-crate/) | Care pathway (clinical pathway) | [spec](care-pathway/care-pathway-matcher-rust-crate/spec/index.md) | [index](care-pathway/care-pathway-matcher-rust-crate/index.md) |
 | [Case Matcher](case/case-matcher-rust-crate/) | Case (governmental case) — title (Jaro-Winkler), subjects/keywords Jaccard, agency-scoped case number, type/status; deterministic short-circuits on Docket / external case id / URI / UUID, same-agency case number, sameAs URL | [spec](case/case-matcher-rust-crate/spec/index.md) | [index](case/case-matcher-rust-crate/index.md) |
+| [Plan Matcher](plan/plan-matcher-rust-crate/) | Plan (project / programme / initiative) — name (Jaro-Winkler), goal-title & keywords Jaccard, owner-scoped plan code, owner org, plan type, timeframe proximity, relationships & tags Jaccard; deterministic short-circuits on Jira/Asana/Trello/MS-Project/GitHub/Linear ids / URI / UUID, same-owner plan code, sameAs URL | [spec](plan/plan-matcher-rust-crate/spec/index.md) | [index](plan/plan-matcher-rust-crate/index.md) |
 
 ### Library crates
 
@@ -51,7 +53,7 @@ and published to crates.io for downstream consumers.
 
 | Crate | Entity | Spec | Index |
 |---|---|---|---|
-| [Authentication Verifier](authentication/authentication-verifier-rust-crate/) | User — peer-side **offline RS256 JWT verification** for the [Authentication Service](authentication/authentication-service-rust-crate/); fetches/holds the service's JWKS, mirrors the `Claims` shape, verifies `kid`/`iss`/`aud`/`exp`. Published to crates.io as `authentication-verifier` (0.1). | [spec](authentication/authentication-verifier-rust-crate/spec/index.md) | [index](authentication/authentication-verifier-rust-crate/index.md) |
+| [Authentication Verifier](authentication/authentication-verifier-rust-crate/) | User — peer-side **offline RS256 JWT verification** for the [Authentication Service](authentication/authentication-service-with-loco/); fetches/holds the service's JWKS, mirrors the `Claims` shape, verifies `kid`/`iss`/`aud`/`exp`. Published to crates.io as `authentication-verifier` (0.1). | [spec](authentication/authentication-verifier-rust-crate/spec/index.md) | [index](authentication/authentication-verifier-rust-crate/index.md) |
 
 ### Front-end projects
 
@@ -64,16 +66,17 @@ accepted (see `feedback_front_end_drift` memory) — no shared package.
 
 | Project | Consumes | Spec | Changelog |
 |---|---|---|---|
-| [person-front-end-with-svelte](person/person-front-end-with-svelte/) | [person-service](person/person-service-rust-crate/) | [spec](person/person-front-end-with-svelte/spec/index.md) | [CHANGELOG](person/person-front-end-with-svelte/CHANGELOG.md) |
-| [worker-front-end-with-svelte](worker/worker-front-end-with-svelte/) | [worker-service](worker/worker-service-rust-crate/) | [spec](worker/worker-front-end-with-svelte/spec/index.md) | [CHANGELOG](worker/worker-front-end-with-svelte/CHANGELOG.md) |
-| [place-front-end-with-svelte](place/place-front-end-with-svelte/) | [place-service](place/place-service-rust-crate/) | [spec](place/place-front-end-with-svelte/spec/index.md) | [CHANGELOG](place/place-front-end-with-svelte/CHANGELOG.md) |
-| [thing-front-end-with-svelte](thing/thing-front-end-with-svelte/) | [thing-service](thing/thing-service-rust-crate/) | [spec](thing/thing-front-end-with-svelte/spec/index.md) | [CHANGELOG](thing/thing-front-end-with-svelte/CHANGELOG.md) |
-| [event-front-end-with-svelte](event/event-front-end-with-svelte/) | [event-service](event/event-service-rust-crate/) | [spec](event/event-front-end-with-svelte/spec/index.md) | [CHANGELOG](event/event-front-end-with-svelte/CHANGELOG.md) |
-| [course-front-end-with-svelte](course/course-front-end-with-svelte/) | [course-service](course/course-service-rust-crate/) | [spec](course/course-front-end-with-svelte/spec/index.md) | [CHANGELOG](course/course-front-end-with-svelte/CHANGELOG.md) |
-| [authentication-front-end-with-svelte](authentication/authentication-front-end-with-svelte/) | [authentication-service](authentication/authentication-service-rust-crate/) | [spec](authentication/authentication-front-end-with-svelte/spec/index.md) | [CHANGELOG](authentication/authentication-front-end-with-svelte/CHANGELOG.md) |
-| [organization-front-end-with-svelte](organization/organization-front-end-with-svelte/) | [organization-service](organization/organization-service-rust-crate/) | [spec](organization/organization-front-end-with-svelte/spec/index.md) | [CHANGELOG](organization/organization-front-end-with-svelte/CHANGELOG.md) |
-| [care-pathway-front-end-with-svelte](care-pathway/care-pathway-front-end-with-svelte/) | [care-pathway-service](care-pathway/care-pathway-service-rust-crate/) | [spec](care-pathway/care-pathway-front-end-with-svelte/spec/index.md) | [CHANGELOG](care-pathway/care-pathway-front-end-with-svelte/CHANGELOG.md) |
-| [case-front-end-with-svelte](case/case-front-end-with-svelte/) | [case-service](case/case-service-rust-crate/) | [spec](case/case-front-end-with-svelte/spec/index.md) | [CHANGELOG](case/case-front-end-with-svelte/CHANGELOG.md) |
+| [person-front-end-with-svelte](person/person-front-end-with-svelte/) | [person-service](person/person-service-with-loco/) | [spec](person/person-front-end-with-svelte/spec/index.md) | [CHANGELOG](person/person-front-end-with-svelte/CHANGELOG.md) |
+| [worker-front-end-with-svelte](worker/worker-front-end-with-svelte/) | [worker-service](worker/worker-service-with-loco/) | [spec](worker/worker-front-end-with-svelte/spec/index.md) | [CHANGELOG](worker/worker-front-end-with-svelte/CHANGELOG.md) |
+| [place-front-end-with-svelte](place/place-front-end-with-svelte/) | [place-service](place/place-service-with-loco/) | [spec](place/place-front-end-with-svelte/spec/index.md) | [CHANGELOG](place/place-front-end-with-svelte/CHANGELOG.md) |
+| [thing-front-end-with-svelte](thing/thing-front-end-with-svelte/) | [thing-service](thing/thing-service-with-loco/) | [spec](thing/thing-front-end-with-svelte/spec/index.md) | [CHANGELOG](thing/thing-front-end-with-svelte/CHANGELOG.md) |
+| [event-front-end-with-svelte](event/event-front-end-with-svelte/) | [event-service](event/event-service-with-loco/) | [spec](event/event-front-end-with-svelte/spec/index.md) | [CHANGELOG](event/event-front-end-with-svelte/CHANGELOG.md) |
+| [course-front-end-with-svelte](course/course-front-end-with-svelte/) | [course-service](course/course-service-with-loco/) | [spec](course/course-front-end-with-svelte/spec/index.md) | [CHANGELOG](course/course-front-end-with-svelte/CHANGELOG.md) |
+| [authentication-front-end-with-svelte](authentication/authentication-front-end-with-svelte/) | [authentication-service](authentication/authentication-service-with-loco/) | [spec](authentication/authentication-front-end-with-svelte/spec/index.md) | [CHANGELOG](authentication/authentication-front-end-with-svelte/CHANGELOG.md) |
+| [organization-front-end-with-svelte](organization/organization-front-end-with-svelte/) | [organization-service](organization/organization-service-with-loco/) | [spec](organization/organization-front-end-with-svelte/spec/index.md) | [CHANGELOG](organization/organization-front-end-with-svelte/CHANGELOG.md) |
+| [care-pathway-front-end-with-svelte](care-pathway/care-pathway-front-end-with-svelte/) | [care-pathway-service](care-pathway/care-pathway-service-with-loco/) | [spec](care-pathway/care-pathway-front-end-with-svelte/spec/index.md) | [CHANGELOG](care-pathway/care-pathway-front-end-with-svelte/CHANGELOG.md) |
+| [case-front-end-with-svelte](case/case-front-end-with-svelte/) | [case-service](case/case-service-with-loco/) | [spec](case/case-front-end-with-svelte/spec/index.md) | [CHANGELOG](case/case-front-end-with-svelte/CHANGELOG.md) |
+| [plan-front-end-with-svelte](plan/plan-front-end-with-svelte/) | [plan-service](plan/plan-service-with-loco/) | [spec](plan/plan-front-end-with-svelte/spec/index.md) | [CHANGELOG](plan/plan-front-end-with-svelte/CHANGELOG.md) |
 
 ### Consumer applications
 
@@ -92,6 +95,15 @@ front-end) and are not part of the entity trio tables above.
 |---|---|---|
 | [case-folder](case-folder/spec/index.md) | NHS paper case-note folder location tracking ("where is the folder for NHS Number X right now?") — barcode/QR/RFID move audit trail | [service-with-rust](case-folder/case-folder-service-with-rust/spec/index.md) (Loco JSON API) · [front-end-with-svelte](case-folder/case-folder-front-end-with-svelte/spec/index.md) (SvelteKit + SVAR + Lily) |
 
+### Cross-cutting services
+
+Infrastructure services that span the entity trios rather than owning one
+entity. They are not matcher-backed and have no front-end of their own.
+
+| Service | Purpose | Spec |
+|---|---|---|
+| [link-graph-service-with-loco](link/link-graph-service-with-loco/spec/index.md) | **Read-model aggregator** for cross-service entity linking — consumes every entity's event stream (+ the new `linked`/`unlinked` events) and serves the queryable cross-service graph (`neighbors` / `single-view` / freshness). The read side of the hybrid topology in [cross-service-linking.md](agents/share/cross-service-linking.md); each entity service owns its own link **writes** (`entity_links` + events). v1 edges: `same_identity` (person↔worker), `works_at`/`member_of` (person→org), `employed_by` (worker→org), `subject_of` (case→person). | [spec](link/link-graph-service-with-loco/spec/index.md) |
+
 ## Shared reference docs
 
 @agents/share/index.md
@@ -103,7 +115,11 @@ front-end) and are not part of the entity trio tables above.
 @agents/share/search.md
 @agents/share/merge.md
 @agents/share/privacy.md
+@agents/share/jwt.md
+@agents/share/authentication-sessions.md
 @agents/share/auditability.md
+@agents/share/cross-service-linking.md
+@agents/share/bulk-import-export.md
 @agents/share/availability.md
 @agents/share/observability.md
 @agents/share/restful.md

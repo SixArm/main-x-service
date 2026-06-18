@@ -20,6 +20,7 @@
     import ThingIdentifierInput from "$lib/components/ThingIdentifierInput.svelte";
     import { ThingRepository } from "$lib/api/things.js";
     import type { MatchRequest, MatchResult, ThingIdentifier } from "$lib/api/types.js";
+    import { t } from "$lib/i18n.svelte.js";
 
     const repo = ThingRepository.withFetch();
 
@@ -61,32 +62,32 @@
 
 <svelte:head><title>Match check · Thing Service</title></svelte:head>
 
-<header><h1>Match check</h1></header>
+<header><h1>{t("match.title")}</h1></header>
 
 <section class="surface stack">
     <form onsubmit={runMatch} class="stack">
         <FieldRow>
-            <LabeledField label="Name" for="m-name" required><input id="m-name" bind:value={name} required /></LabeledField>
-            <LabeledField label="Threshold" for="m-threshold" hint="0.0 – 1.0">
+            <LabeledField label={t("match.name")} for="m-name" required><input id="m-name" bind:value={name} required /></LabeledField>
+            <LabeledField label={t("match.threshold")} for="m-threshold" hint={t("match.thresholdHint")}>
                 <input id="m-threshold" type="number" step="0.05" min="0" max="1" bind:value={threshold} />
             </LabeledField>
         </FieldRow>
-        <LabeledField label="Description" for="m-desc">
+        <LabeledField label={t("match.description")} for="m-desc">
             <textarea id="m-desc" rows={2} bind:value={description}></textarea>
         </LabeledField>
-        <LabeledField label="URL" for="m-url">
+        <LabeledField label={t("match.url")} for="m-url">
             <input id="m-url" type="url" bind:value={url} />
         </LabeledField>
-        <LabeledField label="Same-as URLs" for="m-sameas" hint="One per line">
+        <LabeledField label={t("match.sameAs")} for="m-sameas" hint={t("match.sameAsHint")}>
             <textarea id="m-sameas" rows={2} bind:value={sameAsRaw}></textarea>
         </LabeledField>
         <section class="stack">
-            <h2 class="small">Identifiers</h2>
+            <h2 class="small">{t("match.identifiers")}</h2>
             <ThingIdentifierInput bind:identifiers />
         </section>
         {#if error}<div class="banner error">{error}</div>{/if}
         <button type="submit" class="button primary" disabled={loading}>
-            {loading ? "Matching…" : "Find matches"}
+            {loading ? t("match.matching") : t("match.findMatches")}
         </button>
     </form>
 </section>

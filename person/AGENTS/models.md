@@ -8,7 +8,7 @@ not the territory — field tables live in the per-crate docs.
 
 | Representation | Shape | Where defined | Reference |
 |---|---|---|---|
-| Service `Person` (canonical) | FHIR-shaped: `HumanName`, `Vec<Identifier>` with system URIs, `Vec<Address>`, `Vec<ContactPoint>`, `Vec<IdentityDocument>`, emergency contacts, links, soft-delete flags | `src/models/person.rs` | [service AGENTS/models.md](../person-service-rust-crate/AGENTS/models.md) — full field tables for `Person`, `HumanName`, `Identifier`, `IdentityDocument`, `EmergencyContact`, `MergeRecord`, `ReviewQueueItem`, `Consent`, … |
+| Service `Person` (canonical) | FHIR-shaped: `HumanName`, `Vec<Identifier>` with system URIs, `Vec<Address>`, `Vec<ContactPoint>`, `Vec<IdentityDocument>`, emergency contacts, links, soft-delete flags | `src/models/person.rs` | [service AGENTS/models.md](../person-service-with-loco/AGENTS/models.md) — full field tables for `Person`, `HumanName`, `Identifier`, `IdentityDocument`, `EmergencyContact`, `MergeRecord`, `ReviewQueueItem`, `Consent`, … |
 | Matcher `Person` (flat) | Builder shape: `family_name` / `given_name` / `date_of_birth` / `address` / `phone` / `email`, one field per national-identifier scheme (42), `passport_books` | matcher `src/models.rs` | [matcher spec §8](../person-matcher-rust-crate/spec/08-domain-model.md), [national-person-identifiers.md](../person-matcher-rust-crate/AGENTS/national-person-identifiers.md) |
 | Front-end TypeScript types | Mirror of the service wire format | `src/lib/api/types.ts` | [front-end AGENTS.md](../person-front-end-with-svelte/AGENTS.md) ("what lives where") |
 
@@ -23,8 +23,8 @@ to scheme slots by `system` URI, `tax_id` defaults to `us_ssn`,
 passports → `passport_books`. Registry-only fields are dropped.
 
 - Normative rule list: entity [spec §5.3](../spec/05-domain-model.md)
-  and service [spec §6.2](../person-service-rust-crate/spec/06-functional-requirements.md).
-- Pinned by: [`tests/duplicate_detection.rs`](../person-service-rust-crate/tests/duplicate_detection.rs)
+  and service [spec §6.2](../person-service-with-loco/spec/06-functional-requirements.md).
+- Pinned by: [`tests/duplicate_detection.rs`](../person-service-with-loco/tests/duplicate_detection.rs)
   (14 bridge tests).
 - Changing a routing rule = seam change → entity spec §5.3 edit +
   bridge test in the same PR.

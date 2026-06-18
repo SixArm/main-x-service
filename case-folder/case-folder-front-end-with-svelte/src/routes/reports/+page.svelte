@@ -14,6 +14,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, tf } from '$lib/i18n.svelte';
 
     let { data } = $props();
 
@@ -52,30 +53,30 @@
     }
 </script>
 
-<BackLink href="/">Back to dashboard</BackLink>
+<BackLink href="/">{t('reports.backToDashboard')}</BackLink>
 
-<h2><Icon name="clipboard" /> Reports</h2>
+<h2><Icon name="clipboard" /> {t('reports.heading')}</h2>
 
 <div class="panel">
-    <h3>At a glance</h3>
+    <h3>{t('reports.atAGlance')}</h3>
     <ul class="report-kpis">
-        <li>Patients: <strong>{data.stats.patients}</strong></li>
-        <li>Folders: <strong>{data.stats.folders.total}</strong> ({data.stats.folders.inCabinet} in cabinet, {data.stats.folders.inTransit} in transit)</li>
-        <li>Volumes: <strong>{data.volumes.length}</strong></li>
-        <li>Cabinets: <strong>{data.stats.places.cabinets}</strong> in {data.stats.places.buildings} buildings</li>
-        <li>Moves — last 24h: <strong>{throughput24h}</strong> · last 7d: <strong>{throughput7d}</strong></li>
+        <li>{t('reports.kpiPatients')} <strong>{data.stats.patients}</strong></li>
+        <li>{t('reports.kpiFolders')} <strong>{data.stats.folders.total}</strong> {tf('reports.kpiFoldersDetail', { inCabinet: data.stats.folders.inCabinet, inTransit: data.stats.folders.inTransit })}</li>
+        <li>{t('reports.kpiVolumes')} <strong>{data.volumes.length}</strong></li>
+        <li>{t('reports.kpiCabinets')} <strong>{data.stats.places.cabinets}</strong> {tf('reports.kpiCabinetsDetail', { n: data.stats.places.buildings })}</li>
+        <li>{t('reports.kpiMoves')} <strong>{throughput24h}</strong> · {t('reports.kpiMoves7d')} <strong>{throughput7d}</strong></li>
     </ul>
 </div>
 
 <div class="panel">
-    <h3>Cabinet utilisation</h3>
-    <DataTable label="Cabinet utilisation">
+    <h3>{t('reports.cabinetUtilisation')}</h3>
+    <DataTable label={t('reports.cabinetUtilisation')}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">Cabinet</th>
-                <th scope="col">Folders</th>
-                <th scope="col">Capacity</th>
-                <th scope="col">Utilisation</th>
+                <th scope="col">{t('reports.colCabinet')}</th>
+                <th scope="col">{t('reports.colFolders')}</th>
+                <th scope="col">{t('reports.colCapacity')}</th>
+                <th scope="col">{t('reports.colUtilisation')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>
@@ -93,7 +94,7 @@
 
 <div class="split">
     <div class="panel">
-        <h3>In transit ({inTransit.length})</h3>
+        <h3>{tf('reports.inTransit', { n: inTransit.length })}</h3>
         {#if inTransit.length > 0}
             <ul class="report-list">
                 {#each inTransit as folder (folder.id)}
@@ -101,18 +102,18 @@
                 {/each}
             </ul>
         {:else}
-            <p>No folders are in transit.</p>
+            <p>{t('reports.noInTransit')}</p>
         {/if}
     </div>
 
     <div class="panel">
-        <h3>Activity by worker</h3>
+        <h3>{t('reports.activityByWorker')}</h3>
         {#if perWorker.length > 0}
-            <DataTable label="Activity by worker">
+            <DataTable label={t('reports.activityByWorker')}>
                 <DataTableHead>
                     <DataTableRow>
-                        <th scope="col">Worker</th>
-                        <th scope="col">Moves</th>
+                        <th scope="col">{t('reports.colWorker')}</th>
+                        <th scope="col">{t('reports.colMoves')}</th>
                     </DataTableRow>
                 </DataTableHead>
                 <DataTableBody>
@@ -125,10 +126,10 @@
                 </DataTableBody>
             </DataTable>
         {:else}
-            <p>No moves recorded yet.</p>
+            <p>{t('reports.noMovesYet')}</p>
         {/if}
     </div>
 </div>
 
 <Separator />
-<p class="muted">Reports are derived live from the API — no separate reporting store.</p>
+<p class="muted">{t('reports.derivedLive')}</p>

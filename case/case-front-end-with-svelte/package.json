@@ -16,6 +16,9 @@
     "format": "prettier --write src",
     "lint": "prettier --check src"
   },
+  "dependencies": {
+    "lily-design-system-svelte-theme-select": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select"
+  },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@sveltejs/adapter-auto": "^4.0.0",

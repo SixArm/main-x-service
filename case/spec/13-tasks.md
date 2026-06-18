@@ -45,18 +45,27 @@ manual check confirms it. Split tasks too big for one PR
     `vite preview`).
   - **Acceptance:** both suites run and fail on a broken endpoint
     contract.
-- [x] **T-7 — JWT verification (partial).**
-  - [x] Verify RS256 JWTs offline against the auth-service JWKS via the
-    embedded `authentication-verifier` (`src/auth.rs`), built from
-    `CASE_JWKS` / `CASE_JWT_ISSUER` / `CASE_JWT_AUDIENCE`. `AuthUser`
-    (required) and `MaybeAuthUser` (optional) extractors; `/whoami`
-    protected; audit / merge `actor` stamped from the token.
+- [x] **T-7 — Token verification (partial).**
+  - [x] Verify tokens offline against the auth-service's published key via
+    the embedded `authentication-verifier` (`src/auth.rs`), built from
+    `CASE_PASETO_KEYS` / `CASE_TOKEN_ISSUER` / `CASE_TOKEN_AUDIENCE`.
+    `AuthUser` (required) and `MaybeAuthUser` (optional) extractors;
+    `/whoami` protected; audit / merge `actor` stamped from the token.
   - **Acceptance:** no token → `401`; valid signed token → `2xx`
-    (un-gated crypto unit tests mint a token + matching JWKS in-process).
+    (un-gated crypto unit tests mint a token + matching key in-process).
+  - [ ] Switch the credential from RS256 JWT to PASETO v4 public
+    (Ed25519) per
+    [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+    (source of truth; supersedes the RS256-JWT + JWKS model): verifier
+    consumes the auth-service's published Ed25519 key(s)
+    (`Verifier::from_paseto_keys_value` / `from_paseto_keys_url`); same
+    `Claims` shape (`kid`/`iss`/`aud`/`exp`; footer carries `kid`);
+    un-gated unit tests mint a real PASETO v4 public token + matching
+    Ed25519 key in-process.
   - [ ] *Follow-up:* blanket enforcement on every `/api/*` route (awaits
-    the coordinated family SSO rollout; the front-end must attach the
-    bearer token first) and JWKS-over-HTTP fetch from the auth service
-    at boot (currently injected via env).
+    the coordinated family SSO rollout; the front-end BFF attaches the
+    bearer token server-side) and paseto-keys-over-HTTP fetch from the
+    auth service at boot (currently injected via env).
 - [x] **T-8 — Record merge.**
   - [x] `POST /merge` folds a duplicate into a survivor (union list
     fields, former-title alias, soft-delete the duplicate,

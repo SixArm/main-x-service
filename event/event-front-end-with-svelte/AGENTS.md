@@ -1,10 +1,10 @@
 # Agent guide — event-front-end-with-svelte
 
-Sibling to [`event-service-rust-crate/`](../event-service-rust-crate/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
+Sibling to [`event-service-with-loco/`](../event-service-with-loco/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
 
 ## Single source of truth
 
-- The service's [`spec.md`](../event-service-rust-crate/spec/index.md) and [`AGENTS/`](../event-service-rust-crate/AGENTS/) describe the API contract. If a field disappears from `Event` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
+- The service's [`spec.md`](../event-service-with-loco/spec/index.md) and [`AGENTS/`](../event-service-with-loco/AGENTS/) describe the API contract. If a field disappears from `Event` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
 - This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
 
 ## Three-part change rule

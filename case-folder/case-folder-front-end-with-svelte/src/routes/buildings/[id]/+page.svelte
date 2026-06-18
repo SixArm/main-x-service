@@ -23,6 +23,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, tf } from '$lib/i18n.svelte';
 
     let { data } = $props();
     const building = $derived(data.building);
@@ -36,7 +37,7 @@
     async function addRoom() {
         roomError = '';
         if (!newRoomName.trim()) {
-            roomError = 'Room name is required.';
+            roomError = t('buildingDetail.roomNameRequired');
             return;
         }
         try {
@@ -59,21 +60,21 @@
     }
 </script>
 
-<BackLink href="/buildings">Back to buildings</BackLink>
+<BackLink href="/buildings">{t('buildingDetail.backToBuildings')}</BackLink>
 
 <h2>{building.name}</h2>
 {#if building.description}<p>{building.description}</p>{/if}
 
 <div class="split">
     <div class="panel">
-        <h3>Rooms ({data.rooms.length})</h3>
+        <h3>{tf('buildingDetail.rooms', { n: data.rooms.length })}</h3>
         {#if data.rooms.length > 0}
-            <DataTable label="Rooms">
+            <DataTable label={t('buildingDetail.roomsTable')}>
                 <DataTableHead>
                     <DataTableRow>
-                        <th scope="col">Name</th>
-                        <th scope="col">Cabinets</th>
-                        <th scope="col">Description</th>
+                        <th scope="col">{t('common.name')}</th>
+                        <th scope="col">{t('buildingDetail.colCabinets')}</th>
+                        <th scope="col">{t('common.description')}</th>
                     </DataTableRow>
                 </DataTableHead>
                 <DataTableBody>
@@ -87,21 +88,21 @@
                 </DataTableBody>
             </DataTable>
         {:else}
-            <p>No rooms yet.</p>
+            <p>{t('buildingDetail.noRooms')}</p>
         {/if}
     </div>
 
     <div class="panel">
-        <h3>Add a room</h3>
-        <Form label="Add room" onsubmit={addRoom}>
-            <Field label="Room name" required error={roomError}>
+        <h3>{t('buildingDetail.addRoom')}</h3>
+        <Form label={t('buildingDetail.addRoomLabel')} onsubmit={addRoom}>
+            <Field label={t('buildingDetail.roomName')} required error={roomError}>
                 <input bind:value={newRoomName} required />
             </Field>
-            <Field label="Description">
+            <Field label={t('common.description')}>
                 <textarea bind:value={newRoomDescription} rows="2"></textarea>
             </Field>
             <div class="actions">
-                <Button type="submit">Save room</Button>
+                <Button type="submit">{t('buildingDetail.saveRoom')}</Button>
             </div>
         </Form>
     </div>
@@ -109,17 +110,17 @@
 
 <Separator />
 
-<h3>Folder presence history</h3>
-<p>Folders that have been in any cabinet in this building, newest first.</p>
+<h3>{t('buildingDetail.presenceHistory')}</h3>
+<p>{t('buildingDetail.presenceIntro')}</p>
 <div class="panel">
-    <DataTable label="Building folder presence history" caption="Aggregated across this building's cabinets">
+    <DataTable label={t('buildingDetail.presenceTable')} caption={t('buildingDetail.presenceCaption')}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">Folder</th>
-                <th scope="col">Patient</th>
-                <th scope="col">Cabinet</th>
-                <th scope="col">Entered</th>
-                <th scope="col">Left</th>
+                <th scope="col">{t('common.folder')}</th>
+                <th scope="col">{t('common.patient')}</th>
+                <th scope="col">{t('common.cabinet')}</th>
+                <th scope="col">{t('common.entered')}</th>
+                <th scope="col">{t('common.left')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>
@@ -135,14 +136,14 @@
                         {#if p.leftAt}
                             {new Date(p.leftAt).toLocaleString('en-GB')}
                         {:else}
-                            <Badge type="success">Still here</Badge>
+                            <Badge type="success">{t('common.stillHere')}</Badge>
                         {/if}
                     </DataTableTD>
                 </DataTableRow>
             {/each}
             {#if data.presences.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={5}>No folder presence recorded in this building yet.</DataTableTD>
+                    <DataTableTD colspan={5}>{t('buildingDetail.noPresence')}</DataTableTD>
                 </DataTableRow>
             {/if}
         </DataTableBody>

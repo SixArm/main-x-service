@@ -12,17 +12,31 @@
 | E2E           | Playwright (Chromium)                 | ✓ in repo (`npm run test:e2e`)                  |
 | Accessibility | `@axe-core/playwright`                | ✓ in repo (`tests/e2e/a11y.spec.ts`)            |
 
-## Minimum unit tests to add
+## Unit + component tests (in repo)
 
-- `nhs.ts`:
+vitest runs in `jsdom`; `npm run test:unit` currently passes **43**
+cases across 7 files. Required coverage:
+
+- `store/nhs.ts` (`nhs.test.ts`):
   - `normaliseNhsNumber("943 476 5919") === "9434765919"`
   - `formatNhsNumber("9434765919") === "943 476 5919"`
   - `isValidNhsNumber("943 476 5919") === true`
   - `isValidNhsNumber("943 476 5918") === false`
-  - `isValidNhsNumber("0136282963") === false` (Mod 11 = 10)
-- `api/client.ts`:
-  - snake → camel mapping for `Patient`, `Folder`, `MoveEvent`, `Place`.
+  - `check === 10 → invalid` branch (`999 000 0140`), leading-zero
+    normalisation, empty input, grouped/bare parity.
+- `api/client.ts` (`client.test.ts`):
+  - snake → camel mapping for every exported mapper (`toPatient`,
+    `toFolder`, `toMove`, `toBuilding`, `toRoom`, `toCabinet`,
+    `toWorker`, `toStats`, `toVolume`).
   - `ApiError` is thrown with the correct status + body shape.
+- `store/cache.svelte.ts` (`cache.svelte.test.ts`):
+  - setters / `clearUser` / `upsertFolder` (insert vs replace), the
+    synchronous lookups, `cabinetLocation`'s three-step resolution, and
+    (with `$lib/api/client` mocked) the cache side effects of
+    `recordMove`, `addFolder`, `addBuilding/Room/Cabinet`.
+- Components (`@testing-library/svelte`): `Icon`, `InputCount`,
+  `AddressographBox`, `ButtonBar` each ship a `*.test.ts` asserting
+  rendered output and prop reactivity.
 
 ## End-to-end tests (Playwright)
 
@@ -45,18 +59,24 @@ the difference. `tests/e2e/global-setup.ts` pings `/healthz` and
 `/api/stats` before any test runs and fails fast with actionable
 instructions if the API isn't up or hasn't been seeded.
 
-Suites (50 tests total):
+Suites (14 spec files, ~65 `test()` cases):
 
-| File                 | Coverage                                                                                |
-| -------------------- | --------------------------------------------------------------------------------------- |
-| `smoke.spec.ts`      | Every primary route returns 200; nav links exist; skip-link is first; aria-current.     |
-| `dashboard.spec.ts`  | KPI cards render; patient count; recent moves; cabinet utilisation; FolderGrid.         |
-| `folders.spec.ts`    | List + search by title/patient/no-match; click → detail; create happy path + validation. |
-| `patients.spec.ts`   | List + search; detail (incl. snapshot fallback warning for unknown NHS Number).         |
-| `places.spec.ts`     | Buildings list/show/create/validation; add-room inline; cabinets list/create/validation. |
-| `move.spec.ts`       | NHS lookup populates pane; worker + cabinet pickers; full move workflow; "In transit".  |
-| `history.spec.ts`    | Seeded synthetic events visible; search by name/NHS; clearing filter.                   |
-| `errors.spec.ts`     | `+error.svelte` when API blocked; 404 path; NHS Modulus 11 validation on both forms.    |
+| File                   | Tests | Coverage                                                                                |
+| ---------------------- | ----- | --------------------------------------------------------------------------------------- |
+| `smoke.spec.ts`        | 4     | Every primary route returns 200; nav links exist; skip-link is first; aria-current.     |
+| `dashboard.spec.ts`    | 6     | KPI cards render; patient count; recent moves; cabinet utilisation; FolderGrid.         |
+| `folders.spec.ts`      | 11    | List + search by title/patient/no-match; click → detail; create happy path + validation. |
+| `patients.spec.ts`     | 7     | List + search; detail (incl. snapshot fallback warning for unknown NHS Number).         |
+| `places.spec.ts`       | 8     | Buildings list/show/create/validation; add-room inline; cabinets list/create/validation. |
+| `move.spec.ts`         | 5     | NHS lookup populates pane; worker + cabinet pickers; full move workflow; "In transit".  |
+| `history.spec.ts`      | 5     | Seeded synthetic events visible; search by name/NHS; clearing filter.                   |
+| `errors.spec.ts`       | 4     | `+error.svelte` when API blocked; 404 path; NHS Modulus 11 validation on both forms.    |
+| `volumes.spec.ts`      | 2     | Seeded volume detail lists its folders (UC-V3); create → add folder → move whole volume (UC-V1/V2/V4). |
+| `clickthrough.spec.ts` | 4     | Worker → moved folders + patients (UC-W1); cabinet → presence history (UC-P1); move row → event detail (UC-E1); building → room → presence history. |
+| `auth.spec.ts`         | 3     | Protected route redirects to `/login` when signed out; magic-link sign in → sign out; unknown email does not reveal existence. |
+| `ifit.spec.ts`         | 3     | Geofence alerts list a cross-building move (UC-I1); reports KPIs + cabinet utilisation (UC-I2); scan finds a folder by NHS Number and offers a move (UC-I3). |
+| `wiring.spec.ts`       | 2     | Patient page shows the addressograph + action bar; volumes page opens the Labels print dialog. |
+| `a11y.spec.ts`         | 9     | `@axe-core/playwright` scan (no serious/critical violations) over 9 primary routes (`/`, `/patients`, `/folders`, `/volumes`, `/workers`, `/cabinets`, `/alerts`, `/reports`, `/scan`). |
 
 Helpers in `tests/e2e/helpers/`:
 

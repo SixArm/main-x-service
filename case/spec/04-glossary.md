@@ -1,7 +1,7 @@
 ## 4. Glossary
 
 Entity-level terms. Per-subproject vocabularies: service
-[spec §4](../case-service-rust-crate/spec/index.md), matcher
+[spec §4](../case-service-with-loco/spec/index.md), matcher
 [spec §3](../case-matcher-rust-crate/spec/index.md),
 front-end
 [spec §4](../case-front-end-with-svelte/spec/index.md).
@@ -31,5 +31,5 @@ front-end
 | **Audit log** | `audit_logs` row per CRUD / merge: action + JSON snapshot + `actor` + timestamp |
 | **Event stream** | In-memory ring buffer of `CaseEvent`s (`created`/`updated`/`deleted`/`merged`); durable broker is roadmap |
 | **Personal data** | Case records concern identified people / organisations — GDPR / UK DPA personal data (§12) |
-| **SSO** | Single sign-on via the [authentication entity](../../authentication/): magic-link, RS256 JWT + JWKS |
+| **SSO** | Single sign-on via the [authentication entity](../../authentication/): magic-link + cookie session, PASETO v4 public tokens ([`authentication-sessions.md`](../../agents/share/authentication-sessions.md), supersedes RS256 JWT + JWKS) |
 | **Drift policy** | Front-ends keep per-project copies of types/client/forms; no shared package (repo decision 2026-06-02) |

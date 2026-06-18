@@ -26,6 +26,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, tf, statusLabel } from '$lib/i18n.svelte';
 
     let { data } = $props();
     const volume = $derived(data.detail.volume);
@@ -91,29 +92,29 @@
         });
 </script>
 
-<BackLink href="/volumes">Back to volumes</BackLink>
+<BackLink href="/volumes">{t('volumeDetail.backToVolumes')}</BackLink>
 
 <h2>{volume.title}</h2>
 <p>
     <a href="/patients/{nhsSlug(volume.nhsNumber)}">{volume.patientName}</a>
-    · <Badge type={badgeType(volume.status)}>{volume.status}</Badge>
+    · <Badge type={badgeType(volume.status)}>{statusLabel(volume.status)}</Badge>
     · {volume.cabinetLabel}
 </p>
 
 {#if pageError}
-    <Alert type="error" heading="Something went wrong">{pageError}</Alert>
+    <Alert type="error" heading={t('volumeDetail.somethingWrong')}>{pageError}</Alert>
 {/if}
 
 <div class="panel">
-    <h3>Folders in this volume ({folders.length})</h3>
+    <h3>{tf('volumeDetail.foldersIn', { n: folders.length })}</h3>
     {#if folders.length > 0}
-        <DataTable label="Volume folders">
+        <DataTable label={t('volumeDetail.foldersTable')}>
             <DataTableHead>
                 <DataTableRow>
-                    <th scope="col">Title</th>
-                    <th scope="col">Cabinet</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Action</th>
+                    <th scope="col">{t('common.title')}</th>
+                    <th scope="col">{t('common.cabinet')}</th>
+                    <th scope="col">{t('common.status')}</th>
+                    <th scope="col">{t('common.action')}</th>
                 </DataTableRow>
             </DataTableHead>
             <DataTableBody>
@@ -122,11 +123,11 @@
                         <DataTableTD><a href="/folders/{folder.id}">{folder.title}</a></DataTableTD>
                         <DataTableTD>{folder.cabinetLabel}</DataTableTD>
                         <DataTableTD>
-                            <Badge type={badgeType(folder.status)}>{folder.status}</Badge>
+                            <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
                         </DataTableTD>
                         <DataTableTD>
                             <button type="button" class="link-button" onclick={() => removeFolder(folder.id)}>
-                                Remove
+                                {t('common.remove')}
                             </button>
                         </DataTableTD>
                     </DataTableRow>
@@ -134,21 +135,21 @@
             </DataTableBody>
         </DataTable>
     {:else}
-        <p>No folders in this volume yet.</p>
+        <p>{t('volumeDetail.noFolders')}</p>
     {/if}
 
     {#if data.candidates.length > 0}
-        <Form label="Add a folder" onsubmit={addFolder}>
-            <Field label="Add a folder for {volume.patientName}">
+        <Form label={t('volumeDetail.addFolderLabel')} onsubmit={addFolder}>
+            <Field label={tf('volumeDetail.addFolderFor', { patient: volume.patientName })}>
                 <select bind:value={addFolderId}>
-                    <option value="">— Choose a folder —</option>
+                    <option value="">{t('volumeDetail.chooseFolder')}</option>
                     {#each data.candidates as f (f.id)}
                         <option value={f.id}>{f.title}</option>
                     {/each}
                 </select>
             </Field>
             <div class="actions">
-                <Button type="submit">Add to volume</Button>
+                <Button type="submit">{t('volumeDetail.addToVolume')}</Button>
             </div>
         </Form>
     {/if}
@@ -156,34 +157,34 @@
 
 <div class="split">
     <div class="panel">
-        <h3>Rename volume</h3>
-        <Form label="Rename volume" onsubmit={rename}>
-            <Field label="Volume title" required>
+        <h3>{t('volumeDetail.renameVolume')}</h3>
+        <Form label={t('volumeDetail.renameVolume')} onsubmit={rename}>
+            <Field label={t('volumeNew.titleLabel')} required>
                 <input bind:value={title} required />
             </Field>
             <div class="actions">
-                <Button type="submit">Rename</Button>
+                <Button type="submit">{t('volumeDetail.rename')}</Button>
             </div>
         </Form>
     </div>
 
     <div class="panel">
-        <h3>Move this volume</h3>
-        <p>Relocates every folder in the volume together.</p>
-        <Form label="Move volume" onsubmit={moveVolume}>
-            <Field label="Destination cabinet">
+        <h3>{t('volumeDetail.moveVolume')}</h3>
+        <p>{t('volumeDetail.moveIntro')}</p>
+        <Form label={t('volumeDetail.moveFormLabel')} onsubmit={moveVolume}>
+            <Field label={t('volumeDetail.destinationCabinet')}>
                 <select bind:value={moveCabinetId}>
-                    <option value="">— In transit —</option>
+                    <option value="">{t('common.inTransitOption')}</option>
                     {#each cache.cabinets as c (c.id)}
                         <option value={c.id}>{c.label} ({c.containerPath})</option>
                     {/each}
                 </select>
             </Field>
-            <Field label="Reason">
-                <input bind:value={moveReason} placeholder="e.g. Outpatient clinic" />
+            <Field label={t('common.reason')}>
+                <input bind:value={moveReason} placeholder={t('volumeDetail.moveReasonPlaceholder')} />
             </Field>
             <div class="actions">
-                <Button type="submit">Move volume</Button>
+                <Button type="submit">{t('volumeDetail.moveVolumeButton')}</Button>
             </div>
         </Form>
     </div>
@@ -191,7 +192,7 @@
 
 <Separator />
 
-<h3>Move history</h3>
+<h3>{t('volumeDetail.moveHistory')}</h3>
 <div class="move-stack">
     {#each history as move (move.id)}
         <article class="move-card">
@@ -209,6 +210,6 @@
         </article>
     {/each}
     {#if history.length === 0}
-        <p>No moves recorded yet.</p>
+        <p>{t('common.noMovesYet')}</p>
     {/if}
 </div>

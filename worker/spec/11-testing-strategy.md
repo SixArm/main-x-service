@@ -14,13 +14,13 @@ Each subproject owns its own pyramid; the entity level owns the
 | front-end | unit (Vitest, mocked fetch) | `pnpm test` | 8 |
 | front-end | e2e smoke (Playwright, no live service) | `pnpm test:e2e` | 6 |
 
-Guides: [service `AGENTS/testing.md`](../worker-service-rust-crate/AGENTS/testing.md),
+Guides: [service `AGENTS/testing.md`](../worker-service-with-loco/AGENTS/testing.md),
 [matcher `AGENTS/testing.md`](../worker-matcher-rust-crate/AGENTS/testing.md),
 [front-end §11](../worker-front-end-with-svelte/spec/11-testing-strategy.md).
 
 ### 11.2 Seam 1 — service↔matcher bridge tests (exists)
 
-[`tests/duplicate_detection.rs`](../worker-service-rust-crate/tests/duplicate_detection.rs)
+[`tests/duplicate_detection.rs`](../worker-service-with-loco/tests/duplicate_detection.rs)
 (14 tests) is the contract suite for §5.3: it drives the service
 domain model through `to_matcher_worker()` and asserts on
 `MatchingEngine::match_workers` output, pinning **both** the
@@ -32,14 +32,14 @@ negative pin), negative cases, per-field routing
 pins, and sparse-record edge cases.
 
 ```bash
-cd worker-service-rust-crate
+cd worker-service-with-loco
 cargo test --test duplicate_detection
 ```
 
 Rule: a new adapter routing rule, a new matcher scoring component
 surfaced by the service, or a contract regression each REQUIRE a new
 bridge test (see the "when to add" list in
-[service `AGENTS/testing.md`](../worker-service-rust-crate/AGENTS/testing.md)).
+[service `AGENTS/testing.md`](../worker-service-with-loco/AGENTS/testing.md)).
 
 ### 11.3 Seam 2 — front-end↔service contract (gap)
 

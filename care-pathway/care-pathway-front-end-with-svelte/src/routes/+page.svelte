@@ -13,6 +13,7 @@
     import { onMount } from "svelte";
     import { CarePathwayRepository } from "$lib/api/care-pathways";
     import type { PathwayEvent, PathwayRef } from "$lib/api/types";
+    import { t, tf } from "$lib/i18n.svelte";
 
     const repo = CarePathwayRepository.withFetch();
 
@@ -34,7 +35,7 @@
         try {
             pathways = await repo.list();
         } catch (err) {
-            error = err instanceof Error ? err.message : "Failed to load care pathways";
+            error = err instanceof Error ? err.message : t("detail.notFound");
         } finally {
             loading = false;
         }
@@ -50,7 +51,7 @@
         try {
             pathways = q === "" ? await repo.list() : await repo.search(q);
         } catch (err) {
-            error = err instanceof Error ? err.message : "Search failed";
+            error = err instanceof Error ? err.message : t("detail.checkFailed");
         } finally {
             searching = false;
         }
@@ -64,7 +65,7 @@
         try {
             pathways = await repo.list();
         } catch (err) {
-            error = err instanceof Error ? err.message : "Failed to load care pathways";
+            error = err instanceof Error ? err.message : t("detail.notFound");
         } finally {
             searching = false;
         }
@@ -84,17 +85,17 @@
             // oldest-first / highest seq last).
             events = [...rows].sort((a, b) => b.seq - a.seq);
         } catch (err) {
-            eventsError = err instanceof Error ? err.message : "Recent activity load failed";
+            eventsError = err instanceof Error ? err.message : t("detail.auditLoadFailed");
         } finally {
             eventsLoading = false;
         }
     }
 </script>
 
-<svelte:head><title>Care pathways — Main X</title></svelte:head>
+<svelte:head><title>{t("list.title")} — Main X</title></svelte:head>
 
-<h1>Care pathways</h1>
-<p><a class="button" href="/new">New care pathway</a></p>
+<h1>{t("list.title")}</h1>
+<p><a class="button" href="/new">{t("list.new")}</a></p>
 
 <!-- Name search box; Clear appears only when there is a query to clear. -->
 <form class="row" onsubmit={runSearch} role="search">
@@ -102,24 +103,24 @@
         type="search"
         name="q"
         bind:value={query}
-        placeholder="Search by name…"
-        aria-label="Search care pathways by name"
+        placeholder={t("list.searchPlaceholder")}
+        aria-label={t("list.searchLabel")}
     />
-    <button class="button primary" type="submit" disabled={searching}>Search</button>
+    <button class="button primary" type="submit" disabled={searching}>{t("list.search")}</button>
     {#if query.trim() !== ""}
-        <button class="button" type="button" onclick={clearSearch} disabled={searching}>Clear</button>
+        <button class="button" type="button" onclick={clearSearch} disabled={searching}>{t("list.clear")}</button>
     {/if}
 </form>
 
 {#if loading || searching}
-    <p>Loading…</p>
+    <p>{t("list.loading")}</p>
 {:else if error}
     <p class="banner error" role="alert">{error}</p>
 {:else if pathways.length === 0}
     {#if query.trim() !== ""}
-        <p class="surface">No care pathways match “{query.trim()}”.</p>
+        <p class="surface">{tf("list.noMatch", { q: query.trim() })}</p>
     {:else}
-        <p class="surface">No care pathways yet. <a href="/new">Create one</a>.</p>
+        <p class="surface">{t("list.empty")} <a href="/new">{t("list.createOne")}</a>.</p>
     {/if}
 {:else}
     <ul class="stack">
@@ -134,16 +135,16 @@
 
 <div class="row" style="margin-top:1rem">
     <button class="button" onclick={toggleEvents}>
-        {showEvents ? "Hide recent activity" : "Show recent activity"}
+        {showEvents ? t("list.hideActivity") : t("list.showActivity")}
     </button>
 </div>
 
 <!-- Recent-activity panel: rendered only when toggled open; rows are
      newest-first by `seq` (sorted in `toggleEvents`). -->
 {#if showEvents}
-    <h2>Recent activity</h2>
+    <h2>{t("list.recentActivity")}</h2>
     {#if eventsLoading}
-        <p>Loading recent activity…</p>
+        <p>{t("list.loadingActivity")}</p>
     {:else if eventsError}
         <p class="banner error" role="alert">{eventsError}</p>
     {:else if events && events.length > 0}
@@ -157,6 +158,6 @@
             {/each}
         </ul>
     {:else}
-        <p>No recent activity.</p>
+        <p>{t("list.noActivity")}</p>
     {/if}
 {/if}

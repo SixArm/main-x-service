@@ -9,27 +9,33 @@
 -->
 <script lang="ts">
     import type { MatchResult } from "$lib/api/types.js";
+    import { t, translate } from "$lib/i18n.svelte.js";
 
     let {
         results,
-        title = "Match results",
+        title,
     }: {
         results: MatchResult[];
         title?: string;
     } = $props();
 
+    // Fall back to the generic "Match results" heading when none is supplied.
+    const resolvedTitle = $derived(title ?? t("matchResults.title"));
+
     // Render a PlaceType for display: known variants print as-is; the open
     // `{ Other }` variant is shown as "Other: <value>".
-    function typeLabel(t: MatchResult["place"]["place_type"]): string {
-        if (!t) return "";
-        return typeof t === "string" ? t : `Other: ${t.Other}`;
+    function typeLabel(type: MatchResult["place"]["place_type"]): string {
+        if (!type) return "";
+        return typeof type === "string"
+            ? type
+            : translate("matchResults.typeOther").replace("{value}", type.Other);
     }
 </script>
 
 <section class="surface stack">
-    <h2>{title} <span class="muted small">({results.length})</span></h2>
+    <h2>{resolvedTitle} <span class="muted small">({results.length})</span></h2>
     {#if results.length === 0}
-        <p class="muted">No candidates.</p>
+        <p class="muted">{t("matchResults.noCandidates")}</p>
     {:else}
         <ul class="results">
             {#each results as r}
@@ -50,14 +56,14 @@
                     <!-- Optional per-component breakdown, collapsed by default. -->
                     {#if r.breakdown}
                         <details>
-                            <summary class="small">Score breakdown</summary>
+                            <summary class="small">{t("matchResults.scoreBreakdown")}</summary>
                             <ul class="breakdown small">
-                                {#if r.breakdown.name_score != null}<li>name: {(r.breakdown.name_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.geo_score != null}<li>geo: {(r.breakdown.geo_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.address_score != null}<li>address: {(r.breakdown.address_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.identifier_score != null}<li>identifier: {(r.breakdown.identifier_score * 100).toFixed(0)}%</li>{/if}
-                                {#if r.breakdown.phonetic_match}<li>phonetic match</li>{/if}
-                                {#if r.breakdown.deterministic_match}<li>deterministic (GLN)</li>{/if}
+                                {#if r.breakdown.name_score != null}<li>{t("matchResults.nameScore")}: {(r.breakdown.name_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.geo_score != null}<li>{t("matchResults.geoScore")}: {(r.breakdown.geo_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.address_score != null}<li>{t("matchResults.addressScore")}: {(r.breakdown.address_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.identifier_score != null}<li>{t("matchResults.identifierScore")}: {(r.breakdown.identifier_score * 100).toFixed(0)}%</li>{/if}
+                                {#if r.breakdown.phonetic_match}<li>{t("matchResults.phoneticMatch")}</li>{/if}
+                                {#if r.breakdown.deterministic_match}<li>{t("matchResults.deterministicMatch")}</li>{/if}
                             </ul>
                         </details>
                     {/if}

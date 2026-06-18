@@ -13,7 +13,7 @@ are marked and tracked in §13 / §15.
   `system` — ICD-10, ICD-11, and SNOMED CT (SCTID Verhoeff check digit)
   are format-checked; `Custom` codes need only be non-blank. All
   problems (including a blank `name`) are reported in one response. Code
-  rules live in [`crate::validation`](../care-pathway-service-rust-crate/src/validation.rs).
+  rules live in [`crate::validation`](../care-pathway-service-with-loco/src/validation.rs).
   Existence-in-a-release checks (terminology server) remain deferred (§13 T-9).
 - **FR-2** List active pathways: `GET /api/care-pathways` returns
   `{pid, name}` refs, most-recent first, capped at 100.
@@ -69,7 +69,7 @@ Algorithm reference:
   (with a snapshot of the transferred payload), and publish a `Merged`
   event. Equal `main_pid`/`duplicate_pid` → `422`; unknown pid →
   `404`. `GET /api/care-pathways/merges/recent` lists the history. Merge
-  logic lives in [`crate::merge`](../care-pathway-service-rust-crate/src/merge.rs).
+  logic lives in [`crate::merge`](../care-pathway-service-with-loco/src/merge.rs).
 
 ### 6.3 Operator UI — front-end
 

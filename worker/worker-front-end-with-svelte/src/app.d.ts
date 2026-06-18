@@ -13,8 +13,14 @@ declare global {
             /** Endpoint-specific extra detail. */
             details?: unknown;
         }
-        /** Per-request server locals (unused — SPA has no server load). */
-        interface Locals {}
+        /**
+         * Per-request server locals. BFF: the server holds the opaque
+         * session id from the httpOnly `__Host-mxi_session` cookie (set in
+         * `hooks.server.ts`); the browser never reads it.
+         */
+        interface Locals {
+            sessionId: string | null;
+        }
         /** Shared page load data (unused — no load functions). */
         interface PageData {}
         /** Ephemeral page state for shallow routing (unused). */

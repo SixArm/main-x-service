@@ -7,15 +7,16 @@
     // (with a link back to /login) if the link could not be used.
 
     import Alert from '$lib/components/Alert/Alert.svelte';
+    import { t } from '$lib/i18n.svelte';
 
     let { data } = $props();
 </script>
 
-<h2>Signing you in</h2>
+<h2>{t('callback.title')}</h2>
 
 {#if data?.error}
-    <Alert type="error" heading="Sign-in link could not be used">{data.error}</Alert>
-    <p><a href="/login">Back to sign in</a></p>
+    <Alert type="error" heading={t('callback.error')}>{data.error}</Alert>
+    <p><a href="/login">{t('callback.backToSignIn')}</a></p>
 {:else}
-    <p>One moment — completing your sign-in…</p>
+    <p>{t('callback.completing')}</p>
 {/if}

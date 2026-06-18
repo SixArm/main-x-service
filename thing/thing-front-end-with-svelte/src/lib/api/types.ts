@@ -1,6 +1,6 @@
 // TypeScript domain types mirroring the Rust Thing Service models
 // (schema.org/Thing-based). Reference:
-// thing-service-rust-crate/AGENTS/models.md.
+// thing-service-with-loco/AGENTS/models.md.
 
 // ─── HTTP envelope ───────────────────────────────────────────────────
 

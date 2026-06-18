@@ -19,6 +19,7 @@
     import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
     import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
     import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, statusLabel } from '$lib/i18n.svelte';
 
     let { data } = $props();
 
@@ -54,33 +55,33 @@
     }
 </script>
 
-<BackLink href="/">Back to dashboard</BackLink>
+<BackLink href="/">{t('common.backToDashboard')}</BackLink>
 
 <div class="toolbar">
-    <h2>Folder register</h2>
+    <h2>{t('folders.register')}</h2>
     <div style="display:flex; gap: var(--nhs-space-2);">
         <input
             type="search"
             bind:value={query}
             oninput={onSearchInput}
-            placeholder="Search by NHS Number, patient, folder title, or cabinet"
-            aria-label="Search folders"
+            placeholder={t('folders.searchPlaceholder')}
+            aria-label={t('folders.searchLabel')}
         />
-        <a href="/folders/new" class="button">Add folder</a>
+        <a href="/folders/new" class="button">{t('folders.addFolder')}</a>
     </div>
 </div>
 
 <div class="panel">
-    <DataTable label="Folders" caption="All paper case-note folders tracked by the system">
+    <DataTable label={t('folders.tableLabel')} caption={t('folders.tableCaption')}>
         <DataTableHead>
             <DataTableRow>
-                <th scope="col">NHS Number</th>
-                <th scope="col">Patient</th>
-                <th scope="col">Folder</th>
-                <th scope="col">Cabinet</th>
-                <th scope="col">Status</th>
-                <th scope="col">Last moved</th>
-                <th scope="col">Action</th>
+                <th scope="col">{t('folders.colNhsNumber')}</th>
+                <th scope="col">{t('folders.colPatient')}</th>
+                <th scope="col">{t('folders.colFolder')}</th>
+                <th scope="col">{t('folders.colCabinet')}</th>
+                <th scope="col">{t('folders.colStatus')}</th>
+                <th scope="col">{t('folders.colLastMoved')}</th>
+                <th scope="col">{t('folders.colAction')}</th>
             </DataTableRow>
         </DataTableHead>
         <DataTableBody>
@@ -97,20 +98,20 @@
                     </DataTableTD>
                     <DataTableTD>{folder.cabinetLabel}</DataTableTD>
                     <DataTableTD>
-                        <Badge type={badgeType(folder.status)}>{folder.status}</Badge>
+                        <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
                     </DataTableTD>
                     <DataTableTD>
                         {folder.lastMovedAt ? new Date(folder.lastMovedAt).toLocaleString('en-GB') : '—'}
                     </DataTableTD>
                     <DataTableTD>
-                        <a href="/move?folder={folder.id}">Move</a>
+                        <a href="/move?folder={folder.id}">{t('common.move')}</a>
                     </DataTableTD>
                 </DataTableRow>
             {/each}
             {#if cache.folders.length === 0}
                 <DataTableRow>
                     <DataTableTD colspan={7}>
-                        No folders match <strong>{data.query}</strong>.
+                        {t('folders.noMatch')} <strong>{data.query}</strong>.
                     </DataTableTD>
                 </DataTableRow>
             {/if}

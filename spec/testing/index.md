@@ -14,8 +14,8 @@ explicitly gated and opted into.
 Each subproject keeps its own testing doc as the local source of truth.
 The per-crate service docs are the most detailed:
 
-- [person-service AGENTS/testing.md](../../person/person-service-rust-crate/AGENTS/testing.md)
-- [worker-service AGENTS/testing.md](../../worker/worker-service-rust-crate/AGENTS/testing.md)
+- [person-service AGENTS/testing.md](../../person/person-service-with-loco/AGENTS/testing.md)
+- [worker-service AGENTS/testing.md](../../worker/worker-service-with-loco/AGENTS/testing.md)
 
 This page is the cross-cutting view that sits above them. Related
 monorepo docs: [matching](../matching/index.md),
@@ -38,7 +38,7 @@ and most-frequently-run to most expensive:
 
 | Layer | Command | Needs DB / net? | What it pins |
 | ----- | ------- | --------------- | ------------ |
-| **Unit tests** (un-gated) | `cargo test --lib` | No | Matching algorithms, validation, privacy/masking, normalization, auth crypto (RS256/JWKS), OpenAPI document shape, in-memory streaming, model (de)serialization |
+| **Unit tests** (un-gated) | `cargo test --lib` | No | Matching algorithms, validation, privacy/masking, normalization, auth crypto (PASETO v4.public verification; RS256/JWKS decommissioned), OpenAPI document shape, in-memory streaming, model (de)serialization |
 | **Bridge tests** (un-gated) | `cargo test --test duplicate_detection` / `--test matching` | No | The service ↔ matcher contract: adapter field-routing **and** matcher scoring, in one black-box suite |
 | **Request / integration tests** (gated) | `cargo test -- --ignored` | Yes (Postgres) | Full HTTP request/response cycles against a live database |
 | **Doc tests** (un-gated) | `cargo test --doc` | No | Public-API examples in `///` doc comments stay compilable and correct |
@@ -69,12 +69,12 @@ Coverage tracks the business-logic layer from
 | `validation` | Required-field enforcement, phone normalization, address standardization |
 | `privacy` | Field masking, record masking |
 | `models::*` | Construction + serde round-trips |
-| `auth` (loco services) | RS256 verification, `kid`/`iss`/`aud`/`exp` checks, JWKS parsing |
+| `auth` (loco services) | PASETO v4.public verification, `kid`/`iss`/`aud`/`exp` checks, published-key parsing (RS256/JWKS decommissioned) |
 | `openapi` (loco services) | Hand-written OpenAPI 3 document shape |
 
 These are pure and deterministic: same input, same result, no ordering
 or environment sensitivity. See the per-module breakdown in
-[person-service AGENTS/testing.md](../../person/person-service-rust-crate/AGENTS/testing.md).
+[person-service AGENTS/testing.md](../../person/person-service-with-loco/AGENTS/testing.md).
 
 ### 1.2 Bridge tests
 
@@ -89,7 +89,7 @@ test** that pins *both sides of the contract at once*:
 - the matcher's **scoring behaviour** on the projected records.
 
 In the person and worker services this is
-[`tests/duplicate_detection.rs`](../../person/person-service-rust-crate/tests/duplicate_detection.rs):
+[`tests/duplicate_detection.rs`](../../person/person-service-with-loco/tests/duplicate_detection.rs):
 each test builds one or two service-side records, projects them through
 `matching::adapter::to_matcher_person`, runs the canonical
 `MatchingEngine`, and asserts on `MatchResult { score, is_match,
@@ -108,7 +108,7 @@ escapes the adapter's own `#[cfg(test)]` module.
 The newer loco.rs services (care-pathway, organization, case) store the
 matcher type **verbatim** as JSONB, so there is no adapter to drift; the
 equivalent bridge test is
-[`tests/matching.rs`](../../care-pathway/care-pathway-service-rust-crate/tests/matching.rs),
+[`tests/matching.rs`](../../care-pathway/care-pathway-service-with-loco/tests/matching.rs),
 which proves the crate really embeds the canonical matcher (a shared
 guideline-id deterministically scores `1.0`) and that the payload JSON
 round-trips for JSONB storage. It is also un-gated.
@@ -305,7 +305,9 @@ test`, fmt/clippy/check):
   serialization logic (unit tests).
 - The service ↔ matcher contract end-to-end through the scorer (bridge
   tests) — the most behaviourally rich layer, and it needs nothing.
-- Auth crypto (RS256 verification, JWKS parsing, claim checks).
+- Auth crypto (PASETO v4.public verification, published-key parsing,
+  claim checks; RS256/JWKS decommissioned — see
+  [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)).
 - The OpenAPI document shape and the JSONB storage round-trip.
 - Front-end client / repository / type logic and route smoke flows
   (backend stubbed).
@@ -334,7 +336,7 @@ algorithms.
 ## 6. CI workflows
 
 Each service crate ships a GitHub Actions workflow (the reference is
-[care-pathway-service `.github/workflows/ci.yaml`](../../care-pathway/care-pathway-service-rust-crate/.github/workflows/ci.yaml)),
+[care-pathway-service `.github/workflows/ci.yaml`](../../care-pathway/care-pathway-service-with-loco/.github/workflows/ci.yaml)),
 triggered on push to the default branch and on every pull request. It is
 four jobs:
 

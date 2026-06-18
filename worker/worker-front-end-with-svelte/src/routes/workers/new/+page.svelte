@@ -14,6 +14,7 @@
     import { WorkerRepository } from "$lib/api/workers.js";
     import { ApiError } from "$lib/api/client.js";
     import type { MatchResult, Worker } from "$lib/api/types.js";
+    import { t, tf } from "$lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
     let duplicates = $state<MatchResult[]>([]);
@@ -37,7 +38,7 @@
             // letting the operator review before resubmitting.
             if (err instanceof ApiError && err.isConflict && Array.isArray(err.details)) {
                 duplicates = err.details as MatchResult[];
-                throw new Error(`Duplicates detected (${duplicates.length}) — review below before resubmitting.`);
+                throw new Error(tf("new.duplicatesDetected", { count: duplicates.length }));
             }
             // Any other error bubbles to the form banner.
             throw err;
@@ -45,14 +46,14 @@
     }
 </script>
 
-<svelte:head><title>New worker · Worker Service</title></svelte:head>
+<svelte:head><title>{t("new.titleTab")}</title></svelte:head>
 
-<header><h1>New worker</h1></header>
+<header><h1>{t("new.heading")}</h1></header>
 
 <section class="surface stack">
-    <WorkerForm initial={blank} submitLabel="Create" onsubmit={handleSubmit} />
+    <WorkerForm initial={blank} submitLabel={t("new.submit")} onsubmit={handleSubmit} />
 </section>
 
 {#if duplicates.length > 0}
-    <MatchResultsList results={duplicates} title="Possible duplicates" />
+    <MatchResultsList results={duplicates} title={t("new.possibleDuplicates")} />
 {/if}
