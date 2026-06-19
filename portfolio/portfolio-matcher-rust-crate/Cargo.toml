@@ -1,0 +1,32 @@
+[package]
+name = "portfolio-matcher"
+version = "0.1.0"
+edition = "2024"
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Portfolio matcher — pairwise work-item (portfolio / project / product / program) record matching with a kind gate plus weighted fuzzy + deterministic strategies"
+license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
+repository = "https://github.com/sixarm/main-x-service/tree/main/portfolio/portfolio-matcher-rust-crate"
+keywords = ["portfolio", "project", "matching", "identity"]
+categories = ["algorithms", "text-processing"]
+
+[lib]
+name = "portfolio_matcher"
+path = "src/lib.rs"
+
+[[bin]]
+name = "portfolio-matcher"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+strsim = "0.11"
+unicode-normalization = "0.1"
+thiserror = "2.0"
+mimalloc = "0.1.52"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
