@@ -23,7 +23,7 @@ Operator UI for organization CRUD + matching, consuming the
 /[pid]/edit ─> PUT  /api/organizations/{pid}            edit
 ```
 
-## Session / authentication (BFF target)
+## Session / authentication (BFF)
 
 ```text
 signed in ──> central auth-service magic-link ──> server-side cookie session
@@ -38,8 +38,8 @@ Service-side enforcement (`ORGANIZATION_REQUIRE_AUTH`) is off by default.
 Source of truth:
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 (RS256 JWT + JWKS and the `#access_token` fragment handoff decommissioned).
-**Pivot in progress** — the current runtime still uses the older
-client-held-token flow; code follow-up tracked in spec §13.
+The runtime is the BFF: `src/lib/server/` + the `/api/proxy` server route
+hold the session and inject the PASETO server-side.
 
 ## Worked example — the Organization payload
 

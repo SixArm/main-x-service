@@ -68,9 +68,10 @@
 
 ### Auth, hardening, observability
 
-- [ ] T-19: Offline RS256 JWT verification via
-  `authentication-verifier` (NFR-10), coordinated with the family-wide
-  auth rollout
+- [ ] T-19: Offline PASETO v4.public verification via
+  `authentication-verifier` (NFR-10, per
+  [authentication-sessions.md](../../../agents/share/authentication-sessions.md)),
+  coordinated with the family-wide auth rollout
   ([jwt-enforcement.md](../../../agents/share/jwt-enforcement.md)).
 - [ ] T-20: Reconciliation worker — diff read-model vs each service's
   authoritative `entity_links` (bulk-read or replay); emit divergence

@@ -12,5 +12,5 @@
 | Fault tolerance | Graceful shutdown; connection pooling; health checks; non-root containers |
 | Observability | OTLP traces / metrics / logs; `traceparent` per request; JSON logs in production |
 | Background jobs | Loco `BackgroundQueue` backed by **PostgreSQL** (`bg_pg`) — same database as application data; no external broker |
-| Security | Argon2 password hashing (when auth lands); JWT (planned); TLS at the edge |
+| Security | Offline PASETO v4.public bearer verification against the auth-service published Ed25519 keys (opt-in per handler; blanket enforcement is T-1b); TLS at the edge |
 

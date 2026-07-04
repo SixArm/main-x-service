@@ -82,8 +82,10 @@ organization/tenant modelling, account self-service beyond sign-in.
   scopes / MFA state), `created_at`, `last_seen_at`, `idle_expires_at`,
   `absolute_expires_at`, `revoked_at`. One row per logged-in browser;
   the unit of revocation. Valid iff `revoked_at IS NULL AND now() <
-  idle_expires_at AND now() < absolute_expires_at`. *(Replaces the old
-  `jid`/`expires_at` JWT-session schema.)*
+  idle_expires_at AND now() < absolute_expires_at`. *(Target shape per
+  shared §3; the code currently reuses the legacy `jid`/`expires_at`
+  columns with `sid` = `jid`, pending the §13 reshape. Either way the
+  session is an opaque server-side row — not a JWT.)*
 - **PASETO key material** — an Ed25519 keypair (not in the DB; env /
   files per §8). The private key signs `POST /token`; the public
   key(s) are published at `/.well-known/paseto-keys`, keyed by `kid`.
@@ -218,7 +220,8 @@ single-use (cleared on consumption).
 - **Dependency-light i18n**: user-facing email copy is a pure-Rust
   catalog (`src/i18n.rs`, en / cy) — no templating engine, no extra
   crate, no DB. See §6.11.
-- **Deterministic keys**: a stable committed dev Ed25519 keypair so the
+- **Deterministic keys**: a stable built-in dev Ed25519 seed (no
+  committed key files) so the
   `/.well-known/paseto-keys` set is stable across restarts in dev.
 - **Abuse resistance**: per-email sliding-window rate limiting on
   magic-link issuance (`MAX_REQUESTS` = 5 per `WINDOW` = 5 min) bounds
@@ -232,25 +235,28 @@ single-use (cleared on consumption).
 loco.rs `App` (`src/app.rs`) registers the `auth`, `token`,
 `paseto_keys`, `docs`, and `metrics` controllers and the
 Postgres-backed worker queue. Token crypto is a self-contained module
-(`src/auth`); post-pivot it mints + verifies **PASETO v4.public**
-(Ed25519, candidate crate `rusty_paseto`) instead of RS256 JWTs. The
+(`src/auth`); it mints + verifies **PASETO v4.public**
+(Ed25519, via `rusty_paseto`) — RS256 JWTs are decommissioned. The
 session/cookie extractor and the PASETO bearer extractor are plain Axum
 `FromRequestParts`, so peer services can reuse the same verification
 approach.
 
-> **Pivot (2026-06-17).** The key-set + rotation description below is
-> the **RS256/JWKS** model superseded by Ed25519/PASETO; see the
-> umbrella [`../../spec/08-architecture.md`](../../spec/08-architecture.md)
+> The key-set + zero-downtime rotation structure below carried over
+> unchanged from the decommissioned RS256/JWKS model, swapping
+> RSA→Ed25519 and `/.well-known/jwks.json`→`/.well-known/paseto-keys`;
+> see the umbrella
+> [`../../spec/08-architecture.md`](../../spec/08-architecture.md)
 > and shared
 > [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
-> Post-pivot the same key-set + zero-downtime rotation structure carries
-> over, swapping RSA→Ed25519 and `/.well-known/jwks.json`→`/.well-known/paseto-keys`.
 
 **Key set & rotation.** `auth::AuthKeys` holds a **set** of keys: one
-primary signing key plus zero or more additional verify-only public
-keys (loaded from env / files; unset ⇒ just the primary,
-backward-compatible). Signing uses the primary and stamps its `kid`;
-verification selects the key by `kid` from {primary} ∪ {additional};
+primary Ed25519 signing seed (`TOKEN_PRIVATE_KEY_SEED` /
+`TOKEN_PRIVATE_KEY_FILE`; unset ⇒ the built-in dev seed) plus zero or
+more additional verify-only public keys
+(`TOKEN_ADDITIONAL_PUBLIC_KEYS`; unset ⇒ just the primary,
+backward-compatible). Signing uses the primary and stamps its `kid`
+into the token footer; verification selects the key by `kid` from
+{primary} ∪ {additional};
 the published key set carries all keys (primary first). This enables
 operator-driven, **zero-downtime key rotation** — see the entity spec
 §8.4 runbook and
@@ -271,8 +277,8 @@ The API is described by a hand-written **OpenAPI 3.0.3** document
 (`src/openapi.rs`; the family authors these by hand rather than via
 `utoipa`). It is served by the docs controller
 (`src/controllers/docs.rs`) at `GET /api-docs/openapi.json`, with a
-Swagger UI page at `GET /swagger-ui` (CDN assets). Post-pivot (§13
-T-12d) the document covers every endpoint plus the `SignupParams` /
+Swagger UI page at `GET /swagger-ui` (CDN assets). The document covers
+every endpoint plus the `SignupParams` /
 `MagicLinkParams` / `CurrentResponse` / `Claims` (PASETO) /
 `PasetoKeys` / `PasetoKey` / `AuthEvent` / `AccountExport`
 (+ `AccountUserExport` / `AccountSessionExport` / `AccountAuditExport`)
@@ -298,27 +304,29 @@ GDPR-erasure soft-delete column), and `m20220101_000005_auth_rate_limits`
 (the magic-link rate-limiter window log). `auto_migrate` is on in
 development, off in production.
 
-**Pivot (§13 T-12).** The `sessions` table is replaced by the
-cookie-session schema (shared §3): `sid` (opaque pk, **not** a JWT),
-`user_pid`, `data` JSONB, `created_at`, `last_seen_at`,
-`idle_expires_at`, `absolute_expires_at`, `revoked_at`; partial index
-on `(user_pid) WHERE revoked_at IS NULL`. The **Ed25519** PASETO
-keypair lives in env / files (not the DB), public keys published at
-`/.well-known/paseto-keys`. RS256 RSA keys are decommissioned.
+**Cookie sessions.** The cookie session currently reuses the existing
+`sessions` table (`sid` = the legacy `jid` column); the reshape to the
+full shared-§3 schema (`data` JSONB, `last_seen_at`, idle/absolute
+TTLs, partial index on `(user_pid) WHERE revoked_at IS NULL`) is a
+deferred §13 follow-up. The **Ed25519** PASETO signing seed lives in
+env / a file (not the DB; built-in dev seed otherwise), public keys
+published at `/.well-known/paseto-keys`. RS256 RSA keys are
+decommissioned.
 
 ## 11. Testing strategy
 
-- **Unit (DB-free):** `src/auth` — sign/verify roundtrip, JWKS shape,
+- **Unit (DB-free):** `src/auth` — PASETO sign/verify roundtrip,
+  published key-set shape (Ed25519 entries, `kid` =
+  base64url(SHA-256(public bytes))),
   tampered/garbage-token rejection, and **key rotation**: a single-key
-  set is byte-for-byte backward-compatible (same `kid`), a multi-key set
+  set is backward-compatible (same `kid`), a multi-key set
   publishes all keys (primary first), a token signed by a now-additional
-  (verify-only) key still verifies via `kid` lookup, an unknown `kid` is
-  rejected, duplicate additional keys are de-duplicated, and inline-PEM
-  splitting works. Built deterministically via the `load_from(...)` test
-  constructor (no env mutation). Run with `cargo test --lib`.
+  (verify-only) key still verifies via footer-`kid` lookup, and an
+  unknown `kid` is
+  rejected. Run with `cargo test --lib`.
 - **Request tests:** loco's `tests/requests/auth.rs` exercises the §6
   magic-link surface (signup / magic-link / redeem incl. single-use and
-  anti-enumeration / me / signout / JWKS). The HTTP tests require a
+  anti-enumeration / me / signout / paseto-keys). The HTTP tests require a
   Postgres instance (standard loco) and are `#[ignore]`d so plain
   `cargo test` stays green; run them with `cargo test -- --ignored`.
   DB-free route-table and params-contract assertions always run.
@@ -370,11 +378,13 @@ keypair lives in env / files (not the DB), public keys published at
 - **Cross-crate contract test (DB-free):** `tests/sign_verify_contract.rs`
   pins the convention shared with
   [`authentication-verifier`](../../authentication-verifier-rust-crate/index.md):
-  a token signed by `auth::sign_access_token` verifies through the
-  verifier crate built from this service's published JWKS; the claims
-  round-trip and `kid` = base64url(SHA-256(modulus)) holds; a `kid`
+  a PASETO signed by `auth::sign_access_token` verifies through the
+  verifier crate built from this service's published key set; the claims
+  round-trip and `kid` = base64url(SHA-256(public key bytes)) holds; a
+  `kid`
   mismatch fails. A **multi-key** case asserts a verifier built from a
-  JWKS carrying more than the primary key still verifies a primary-signed
+  key set carrying more than the primary key still verifies a
+  primary-signed
   token and rejects a token whose `kid` is absent from the set.
 
 ## 12. Compliance
@@ -515,49 +525,60 @@ that subject, while the operator-facing system feed stays open.
       current coverage pins the catalog + params + anti-enumeration shape,
       and a DB-free mailer-render unit test, but not the connected
       handler→mailer SMTP path). Needs a mail capture harness.
-- [ ] **Pivot off JWT-for-sessions → cookie sessions + PASETO v4.public**
+- [x] **Pivot off JWT-for-sessions → cookie sessions + PASETO v4.public**
       (entity spec §13 T-12; supersedes the RS256 JWT + JWKS model). Per
       [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
-      Code follow-up, in three-part PRs:
-  - [ ] **Sessions table + cookie issuance.** New `sessions` schema
-        (`sid` / `user_pid` / `data` JSONB / `created_at` /
-        `last_seen_at` / `idle_expires_at` / `absolute_expires_at` /
-        `revoked_at`; migration replacing `m20220101_000002_sessions`);
-        magic-link redemption creates a session and sets the
-        `__Host-mxi_session` cookie (HttpOnly/Secure/SameSite/`Path=/`)
-        instead of returning a token; `/me` resolves + slides the
-        session; signout sets `revoked_at` + clears the cookie; `sid`
-        rotation on privilege change.
-  - [ ] **`POST /token` PASETO minting.** Exchange a valid session for a
+      **Landed** (see CHANGELOG `[Unreleased]`), with two deferred
+      refinements tracked below:
+  - [x] **Sessions + cookie issuance.** Magic-link redemption creates a
+        session and sets the
+        `__Host-mxi_session` cookie (HttpOnly/Secure/SameSite/`Path=/`);
+        `/me` resolves the
+        session; signout sets `revoked_at` + clears the cookie. The
+        cookie session reuses the existing `sessions` table
+        (`sid` = the legacy `jid` column). Transitionally, redemption
+        *also* still returns the PASETO in the body until every
+        front-end adopts the BFF.
+  - [x] **`POST /token` PASETO minting.** Exchanges a valid session for a
         short-lived (~5 min) PASETO **v4.public** (Ed25519, claims as
-        §5, footer `kid`); candidate crate `rusty_paseto` (confirm
-        `#![forbid(unsafe_code)]`).
-  - [ ] **Ed25519 key publication.** `/.well-known/paseto-keys`
-        (`src/controllers/paseto_keys.rs`); load/store the Ed25519
-        keypair; committed dev keypair under `config/keys/`.
-  - [ ] **CSRF.** Per-session synchroniser / double-submit token +
-        `Origin`/`Referer` allow-list on cookie-authenticated
-        `POST`/`PUT`/`PATCH`/`DELETE`.
-  - [ ] **Remove RS256/JWKS.** Drop `src/controllers/jwks.rs`,
-        `/.well-known/jwks.json`, RS256 signing + the `LoginResponse` /
-        `Jwks` / `Jwk` schemas from OpenAPI; keep JWKS only
-        transitionally during peer migration, then delete.
-  - **Acceptance:** redemption returns `Set-Cookie: __Host-mxi_session`
-        and no token; `POST /token` mints a PASETO a verifier built from
+        §5, footer `kid`); `rusty_paseto` + `ed25519-dalek`
+        (`#![forbid(unsafe_code)]` holds).
+  - [x] **Ed25519 key publication.** `/.well-known/paseto-keys`
+        (`src/controllers/paseto_keys.rs`); Ed25519 seed from
+        `TOKEN_PRIVATE_KEY_SEED` / `TOKEN_PRIVATE_KEY_FILE`, built-in
+        dev seed otherwise — no committed key files.
+  - [x] **Remove RS256/JWKS.** Dropped `src/controllers/jwks.rs`,
+        `/.well-known/jwks.json`, RS256 signing + the `Jwks` /
+        `Jwk` schemas from OpenAPI; the `jsonwebtoken`/`rsa` stack is
+        gone.
+  - [ ] **CSRF (remaining refinement).** The `Origin`/`Referer`
+        allow-list backstop (`AUTH_ALLOWED_ORIGINS`) is in place; the
+        per-session synchroniser / double-submit token on
+        cookie-authenticated `POST`/`PUT`/`PATCH`/`DELETE` remains.
+  - [ ] **Sessions-table reshape (remaining refinement).** Migrate to
+        the shared-§3 schema (`sid` pk / `data` JSONB / `last_seen_at` /
+        `idle_expires_at` / `absolute_expires_at`; partial index), with
+        idle-TTL sliding on `/me` and `sid` rotation on privilege
+        change; then drop the transitional PASETO body from redemption.
+  - **Acceptance (met):** redemption returns
+        `Set-Cookie: __Host-mxi_session`; `POST /token` mints a PASETO a
+        verifier built from
         `/.well-known/paseto-keys` accepts; signout sets `revoked_at`; no
         RS256/JWKS path remains; OpenAPI + the cross-crate contract test
-        updated for PASETO.
+        cover PASETO.
 
 ## 14. Implementation status
 
-> **Pivot pending (2026-06-17).** The "Done" list below is the **RS256
-> JWT + JWKS** model, now **superseded** by cookie sessions + PASETO
+> **Pivot landed.** The code reality is cookie sessions + PASETO
 > v4.public (§1, §13 T-12,
-> [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
-> It remains the current code reality until T-12 lands.
+> [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md));
+> RS256 JWT + JWKS are removed. Remaining refinements: full
+> double-submit CSRF and the sessions-table reshape (§13).
 
-Done: real loco scaffold; passwordless magic-link flow; RS256 signing;
-JWKS endpoint; sessions + signout; console magic links; Postgres queue;
+Done: real loco scaffold; passwordless magic-link flow; PASETO
+v4.public signing (Ed25519); `/.well-known/paseto-keys` key set;
+cookie sessions (`__Host-mxi_session`) + `POST /token` session→PASETO
+exchange + signout; console magic links; Postgres queue;
 green `cargo build`, clippy clean, DB-free unit tests passing;
 magic-link request tests (Postgres-gated); peer-service verifier crate
 (`../authentication-verifier-rust-crate/`) with a DB-free cross-crate
@@ -568,20 +589,22 @@ hand-written OpenAPI 3 + Swagger UI; durable `auth_events` audit trail
 `DELETE /api/auth/account` — right of access + soft-delete/anonymise
 erasure, `users.deleted_at`); operator-driven **zero-downtime key
 rotation** (`AuthKeys` is a primary + additional verify-only key set;
-JWKS publishes all keys; `verify_token` selects by `kid`); localized
+the published key set carries all keys; `verify_token` selects by the
+footer `kid`); localized
 magic-link email (en / cy via `src/i18n.rs`, optional request `locale`).
 
 ## 15. Roadmap
 
-v0.1 (here): core magic-link + RS256/JWKS + signout, reworked request
+v0.1: core magic-link + RS256/JWKS + signout, reworked request
 tests, peer-service verifier + contract test, operator-driven key
-rotation (multi-key set). **v0.2 (the pivot — §13 T-12, lead item):**
-move the human session to a `__Host-mxi_session` cookie session,
+rotation (multi-key set). **v0.2 (the pivot — landed):**
+the human session moved to a `__Host-mxi_session` cookie session,
 cross-service auth to **PASETO v4.public** (`POST /token` +
-`/.well-known/paseto-keys`), add CSRF, move the front-end to the BFF
-pattern, and decommission RS256 + JWKS — per
+`/.well-known/paseto-keys`), front-ends to the BFF
+pattern, and RS256 + JWKS decommissioned — per
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
-This **supersedes** the JWT model above. Also v0.2: Mailpit,
+This **supersedes** the JWT model. Remaining v0.2 items: full
+double-submit CSRF, the sessions-table reshape, Mailpit,
 auto-rotation scheduler. v0.3: begin loco conversion of the sibling
 services using this as the template (peers adopt the PASETO
 `authentication-verifier`).
@@ -595,7 +618,8 @@ services using this as the template (peers adopt the PASETO
   deny-list peers poll) or rely on the short PASETO `exp`? (Lean:
   expiry only — shared §10.)
 - Audience model when peers need distinct audiences.
-- PASETO library choice (`rusty_paseto` candidate) and BFF token-exchange
+- ~~PASETO library choice~~ — resolved: `rusty_paseto` (+
+  `ed25519-dalek`) shipped. Still open: BFF token-exchange
   caching (shared §10).
 
 ## 17. References

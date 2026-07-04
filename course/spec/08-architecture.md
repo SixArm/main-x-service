@@ -58,9 +58,13 @@ shape. See [`agents/share/loco.md`](../../agents/share/loco.md).
 ### 8.3 SSO integration (roadmap)
 
 Sign-on is centralised in the
-[authentication entity](../../authentication/): the front-end will
-obtain an RS256 JWT via passwordless magic-link; the service will
-verify offline against the auth service's JWKS. No per-entity user
+[authentication entity](../../authentication/): passwordless
+magic-link establishes a server-side cookie session; the front-end
+BFF exchanges the session for a short-lived PASETO v4.public token,
+which the service will verify offline against the auth service's
+published Ed25519 key (per
+[`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)).
+No per-entity user
 store. Until service T-15 lands, all endpoints are unauthenticated —
 acceptable for development only, blocking for any governmental
 deployment (§13, §15).

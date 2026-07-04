@@ -112,14 +112,14 @@ manual check confirms it. Split tasks too big for one PR
     (required) and `MaybeAuthUser` (optional) extractors; `GET
     /api/care-pathways/whoami` is protected. CRUD now stamps the audit
     `actor` from the token when present (previously always `NULL`).
-  - [ ] *Switch the credential RS256-JWT → **PASETO v4 public** per
+  - [x] *Switch the credential RS256-JWT → **PASETO v4 public** per
     [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)*
-    (supersedes the RS256-JWT + JWKS model). `Verifier` verifies
+    (supersedes the RS256-JWT + JWKS model). **Done:** `Verifier` verifies
     `Authorization: Bearer v4.public.…` tokens against the auth-service's
-    published Ed25519 key; the embedded `authentication-verifier` switches
-    to PASETO (`from_paseto_keys_value` / `from_paseto_keys_url` replace
+    published Ed25519 key; the embedded `authentication-verifier` (0.2) is
+    PASETO (`from_paseto_keys_value` / `from_paseto_keys_url` replaced
     `from_jwks_*`); same `Claims` shape, verifying `kid`/`iss`/`aud`/`exp`
-    with `kid` carried in the footer. Env vars become
+    with `kid` carried in the footer. Env vars are now
     `CARE_PATHWAY_PASETO_KEYS` / `CARE_PATHWAY_TOKEN_ISSUER` /
     `CARE_PATHWAY_TOKEN_AUDIENCE`.
   - **Acceptance:** no token → `401`; valid signed token → `2xx`.
@@ -127,9 +127,10 @@ manual check confirms it. Split tasks too big for one PR
     crypto unit tests in `auth::tests` (valid→claims, missing/non-bearer/
     expired/tampered→401, empty-verifier rejects) minting a real token +
     matching key in-process.
-  - [ ] *Follow-up:* blanket enforcement on every `/api/*` route (awaits
-    the coordinated family SSO rollout; the front-end must attach the
-    bearer token first) and paseto-keys-over-HTTP fetch from the auth
+  - [ ] *Follow-up:* blanket enforcement on every `/api/*` route is
+    wired (`auth::enforce`) but **default-off** via
+    `CARE_PATHWAY_REQUIRE_AUTH` — activation awaits the coordinated
+    family SSO rollout; and paseto-keys-over-HTTP fetch from the auth
     service at boot (currently injected via env).
 - [x] **T-8 — Record merge.**
   - [x] Merge confirmed duplicates: union list fields, keep the

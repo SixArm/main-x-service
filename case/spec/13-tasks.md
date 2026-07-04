@@ -53,7 +53,7 @@ manual check confirms it. Split tasks too big for one PR
     `/whoami` protected; audit / merge `actor` stamped from the token.
   - **Acceptance:** no token → `401`; valid signed token → `2xx`
     (un-gated crypto unit tests mint a token + matching key in-process).
-  - [ ] Switch the credential from RS256 JWT to PASETO v4 public
+  - [x] Switch the credential from RS256 JWT to PASETO v4 public
     (Ed25519) per
     [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
     (source of truth; supersedes the RS256-JWT + JWKS model): verifier

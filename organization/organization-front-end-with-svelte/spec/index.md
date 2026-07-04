@@ -157,9 +157,13 @@ controls when they land.
 - [x] ~~Cross-origin SSO handoff — `signInUrl()` redirect +
   `captureFromLocation()` / `captureTokenFromHash` fragment capture~~ —
   **superseded** (see auth-migration task below).
-- [ ] Auth — adopt BFF + httpOnly cookie + CSRF; remove
+- [x] Auth — adopt BFF + httpOnly cookie + CSRF; remove
   `mxi_access_token`/`localStorage` bearer + fragment handoff (per
   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
+  **Done:** `src/lib/server/` (session cookie + magic-link +
+  session→PASETO exchange), `/signin` + `/verify` routes, and the
+  same-origin `/api/proxy` BFF route that injects the PASETO bearer
+  server-side; the browser holds no token.
 
 ## 14. Implementation status
 
@@ -171,8 +175,8 @@ SPA config. `pnpm run check` clean; production build succeeds.
 v0.1 (here): CRUD + duplicate-check UI, vitest + Playwright suites. The
 v0.1 session shipped as a client-held bearer + cross-origin SSO handoff;
 that is now superseded by the BFF + httpOnly-cookie model (§6.7/§6.8,
-[`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
-Next: migrate auth to the BFF model; search box once the service ships
+[`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)),
+which has since shipped (§13). Next: search box once the service ships
 search; audit views.
 
 ## 16. Open questions

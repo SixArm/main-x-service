@@ -8,9 +8,7 @@ Entity-level summary. Normative contract: entity spec
 > The session is a server-side httpOnly **cookie session**; cross-service
 > auth is short-lived **PASETO v4.public** verified offline via the
 > published Ed25519 key at `/.well-known/paseto-keys`. RS256 JWT + JWKS
-> are **decommissioned**. **Pivot in progress** — the service code
-> follow-up is tracked in the service spec §13, so the `Session` columns
-> and key endpoint below may still reflect the RS256 era until then.
+> are **decommissioned** and removed from the code.
 
 ## User
 
@@ -47,13 +45,13 @@ expiry), `ActiveModel::create_magic_link`,
 
 ## Session
 
-The unit of revocation. In the **target** model (auth-sessions design)
-a session is the source of truth for being logged in: an opaque,
-high-entropy `sid` carried in the httpOnly `__Host-mxi_session` cookie,
-with sliding idle + absolute TTLs and a `data` JSONB blob. The columns
-below are the **current (RS256-era)** shape — one row per issued JWT
-(`jid` = the token `jti`) — and survive only until the cookie-session
-migration tracked in the service spec §13.
+The unit of revocation. A session is the source of truth for being
+logged in: an opaque,
+high-entropy `sid` carried in the httpOnly `__Host-mxi_session` cookie.
+In the columns below the `sid` is stored in the **legacy `jid`
+column**; the reshape to the full auth-sessions schema (a `data` JSONB
+blob plus sliding idle + absolute TTLs) is the deferred follow-up
+tracked in the service spec §13.
 
 **Files:**
 [`src/models/sessions.rs`](../authentication-service-with-loco/src/models/sessions.rs),
@@ -63,9 +61,9 @@ migration
 | Field | Type | Description |
 |---|---|---|
 | id | i32 (pk auto) | |
-| jid | String (unique) | = the token `jti` |
+| jid | String (unique) | the opaque session id (`sid`); correlated by the PASETO `sid` claim |
 | user_pid | Uuid | Holder |
-| expires_at | DateTime\<FixedOffset\> | = the token `exp` |
+| expires_at | DateTime\<FixedOffset\> | Session expiry |
 | revoked_at | Option\<DateTime\> | Set on signout |
 | user_agent | Option\<String\> | Issuance context |
 
@@ -88,27 +86,27 @@ and verifier
 | name | String | Display name |
 | iss | String | Default `authentication-service` |
 | aud | String | Default `main-x-service` |
-| exp | i64 | Unix seconds; default `iat` + 3600 |
+| exp | i64 | Unix seconds; default `iat` + 300 (`TOKEN_EXPIRATION`) |
 | iat | i64 | Unix seconds |
-| jti | String | UUID; correlates the originating session |
+| nbf | Option\<i64\> | Not-before; omitted from the wire form when absent |
+| sid | String | Opaque id of the originating session (revocation correlation) |
+| scope / roles | Vec\<String\> | Granted scopes / roles; empty when none |
 
-In the target model the same `Claims` shape is carried in a **PASETO
+The `Claims` are carried in a **PASETO
 v4.public** token whose **footer** holds the `kid` (key id) selecting the
-verifier's Ed25519 key. (Current RS256-era runtime puts `alg: RS256` +
-`kid` = base64url(SHA-256(RSA public modulus)) in the JWT header until the
-spec §13 follow-up lands.)
+verifier's Ed25519 key, with
+`kid` = base64url(SHA-256(Ed25519 public key bytes)).
 
 ## AuthKeys / published keys (service)
 
 `auth::AuthKeys` holds the signing/verification key(s), `kid`, `issuer`,
-`audience`, `expiration`, and the pre-rendered published-key JSON. The
-**target** publishes Ed25519 public key(s) at `/.well-known/paseto-keys`
-for offline PASETO verification; the **current (RS256-era)** runtime still
-serves an RSA JWKS at `/.well-known/jwks.json`:
+`audience`, `expiration`, and the pre-rendered published-key JSON,
+served as Ed25519 public key(s) at `/.well-known/paseto-keys`
+for offline PASETO verification:
 
 ```json
-{ "keys": [ { "kty": "RSA", "use": "sig", "alg": "RS256",
-              "kid": "…", "n": "…", "e": "…" } ] }
+{ "keys": [ { "kty": "OKP", "crv": "Ed25519", "use": "sig",
+              "kid": "…", "x": "…" } ] }
 ```
 
 ## Verifier (peer side)
@@ -119,7 +117,9 @@ serves an RSA JWKS at `/.well-known/jwks.json`:
 ## View models
 
 **Service** ([`src/views/auth.rs`](../authentication-service-with-loco/src/views/auth.rs)):
-`LoginResponse { token, pid, name, email, is_verified }`,
+`LoginResponse { token, pid, name, email, is_verified }` (the `token`
+is the transitional PASETO body kept until every front-end adopts the
+BFF; the credential proper is the `Set-Cookie` session),
 `CurrentResponse { pid, name, email }`.
 
 **Front-end** (`src/lib/api/types.ts`): mirrors of the two views. The

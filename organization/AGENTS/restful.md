@@ -19,10 +19,10 @@ Default base URL: `http://localhost:5150` (loco default port).
 - Auth via the central auth-service: offline **PASETO v4.public**
   verification against the published Ed25519 key (replaces the
   decommissioned RS256 JWT + JWKS); blanket `/api/*` enforcement is
-  default-off via `ORGANIZATION_REQUIRE_AUTH`. Auth pivot in progress —
-  source of truth
+  default-off via `ORGANIZATION_REQUIRE_AUTH`. Source of truth:
   [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md);
-  code follow-up tracked in entity spec §13.
+  remaining follow-up (entity spec §13): paseto-keys-over-HTTP fetch
+  at boot (keys are env-injected today).
 
 ## Endpoints
 

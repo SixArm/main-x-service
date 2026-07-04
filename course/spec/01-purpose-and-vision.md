@@ -66,5 +66,5 @@ catalogue scale:
   enrollment workflow, or recommendation algorithms.
 - **Not** an authentication / authorisation provider. Sign-on for the
   whole index is the [authentication entity](../../authentication/)
-  (passwordless magic-link, RS256 JWT + JWKS); the course entity is a
-  JWT *verifier* (roadmap, §15).
+  (passwordless magic-link, cookie sessions + PASETO v4.public
+  tokens); the course entity is a token *verifier* (roadmap, §15).

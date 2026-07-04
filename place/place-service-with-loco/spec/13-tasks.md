@@ -45,8 +45,12 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] `GET /api/places/search.geojson?bbox=` (FeatureCollection).
   - **Acceptance:** `jq -e '.type == "Feature"'` passes.
 - [ ] **T-8 — Authentication / authorisation.**
-  - [ ] JWT middleware on `/api/*` with editor / curator / read-only
-    / service roles.
+  - [ ] PASETO verification middleware on `/api/*` — offline
+    PASETO v4.public verification via the `authentication-verifier`
+    crate ≥0.2 (keys fetched from the authentication-service
+    `/.well-known/paseto-keys`; per
+    [authentication-sessions](../../../agents/share/authentication-sessions.md))
+    — with editor / curator / read-only / service roles.
   - **Acceptance:** unauthenticated requests get `401`; valid token
     + role gets `2xx`.
 - [ ] **T-9 — Geo-radius `nearby` HTTP endpoint + search `offset`.**

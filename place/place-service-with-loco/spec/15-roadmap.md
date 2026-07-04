@@ -1,8 +1,11 @@
 ## 15. Roadmap
 
-- **Authentication & authorisation** — JWT, RBAC for editor /
-  curator / read-only / service roles, rate limiting, security
-  headers.
+- **Authentication & authorisation** — offline PASETO v4.public
+  verification via the `authentication-verifier` crate (cookie
+  sessions + short-lived tokens per
+  [authentication-sessions](../../../agents/share/authentication-sessions.md)),
+  RBAC for editor / curator / read-only / service roles, rate
+  limiting, security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`place_created`,
   `geo_search_radius_km_histogram`), Grafana dashboards + alerting.

@@ -69,8 +69,9 @@ full-text search, durable event bus, and privacy are tracked in
 > Auth pivot in progress: the family moved from RS256 JWT + JWKS to
 > cookie sessions + offline PASETO v4.public verification — see
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
-> (source of truth; RS256/JWKS decommissioned). The runtime here still
-> verifies the old credential; the PASETO follow-up is tracked in
+> (source of truth; RS256/JWKS decommissioned). The runtime here
+> verifies PASETO v4.public via `authentication-verifier`; the
+> paseto-keys-over-HTTP fetch follow-up is tracked in
 > [spec §13](./spec/index.md).
 
 ## License

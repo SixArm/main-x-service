@@ -119,3 +119,12 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   invariant (`src/validation/mod.rs`); added a FHIR-501 integration
   test (`tests/api_integration_test.rs`). Refreshed stale test counts
   in `AGENTS/testing.md`.
+
+### Removed
+
+- The unused `jsonwebtoken` dependency (never referenced in `src/` or
+  `tests/`). The family auth design has pivoted from RS256 JWT / JWKS
+  to cookie sessions + short-lived PASETO v4.public tokens (see
+  `agents/share/authentication-sessions.md`); the still-pending auth
+  task in `spec/13-tasks.md` T-8 now targets PASETO verification via
+  the `authentication-verifier` crate.

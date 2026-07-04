@@ -55,7 +55,7 @@ to require that bearer token on every `/api/*` route (`/metrics.prom`,
 `/api-docs/openapi.json`, `/swagger-ui`, `/_health`, `/_ping` stay
 public).
 
-Auth pivot in progress (RS256 JWT + JWKS decommissioned in favour of
-cookie sessions + PASETO v4.public). Source of truth:
-[agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md);
-code follow-up tracked in spec §13.
+Auth pivot done in this crate (RS256 JWT + JWKS decommissioned in favour
+of cookie sessions + PASETO v4.public; `src/auth.rs` embeds the
+`authentication-verifier` crate). Source of truth:
+[agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md).

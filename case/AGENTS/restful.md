@@ -44,16 +44,16 @@ Base URL in development: `http://localhost:5150`.
 Short-lived **PASETO v4.public** tokens are verified offline against the
 auth-service's published **Ed25519 key** via the embedded
 `authentication-verifier` (`src/auth.rs`), built from
-`CASE_JWT_ISSUER` / `CASE_JWT_AUDIENCE` and the published-key source. The
+`CASE_PASETO_KEYS` / `CASE_TOKEN_ISSUER` / `CASE_TOKEN_AUDIENCE`. The
 `AuthUser` extractor requires a token; `MaybeAuthUser` is optional and
 feeds the audit / merge `actor`. Blanket `/api/*` auth enforcement +
 published-key fetch are follow-ups.
 
-> Auth pivot in progress: the family moved from RS256 JWT + JWKS to
+> Auth pivot done here: the family moved from RS256 JWT + JWKS to
 > cookie sessions + offline PASETO v4.public verification — see
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
-> (source of truth; RS256/JWKS decommissioned). The current `src/auth.rs`
-> runtime still verifies the old credential; the code follow-up is
+> (source of truth; RS256/JWKS decommissioned). `src/auth.rs` verifies
+> PASETO v4.public; the paseto-keys-over-HTTP fetch follow-up is
 > tracked in the service spec §13.
 
 ### Audit & events

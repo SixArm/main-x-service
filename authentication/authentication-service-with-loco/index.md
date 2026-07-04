@@ -8,9 +8,9 @@ on loco.rs.
 
 > **Auth model source of truth:**
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
-> RS256 JWT + JWKS are **decommissioned**. **Pivot in progress** — the
-> code follow-up is tracked in spec §13, so the current runtime may still
-> emit JWTs until those tasks land.
+> RS256 JWT + JWKS are **decommissioned**. The pivot has **landed in
+> code** — the runtime mints Ed25519 PASETO v4.public tokens and
+> publishes its key set at `/.well-known/paseto-keys`; no JWT is issued.
 
 ## Start here
 

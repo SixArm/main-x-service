@@ -31,10 +31,10 @@ service REST API, whose request/response body is the
    [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
    (source of truth; RS256/JWKS decommissioned).
 
-   > Auth pivot in progress: the current `src/lib/auth.svelte.ts` /
-   > `ApiClient` runtime still uses the old client-held bearer +
-   > fragment-capture flow described in the layout below; the BFF +
-   > cookie + PASETO follow-up is tracked in the spec.
+   > Auth pivot landed: `src/hooks.server.ts` +
+   > `src/lib/server/{session,auth,config}.ts` implement the BFF
+   > (session cookie → PASETO exchange → server-side proxy at
+   > `/api/proxy/[...path]`); there is no client-held token.
 
 ## Layout
 
@@ -42,18 +42,20 @@ service REST API, whose request/response body is the
 src/
 ├── lib/
 │   ├── config.ts                 PUBLIC_API_BASE_URL (:5150) + AUTH_FRONTEND_URL + signInUrl()
-│   ├── auth.svelte.ts            reactive session store (token/setToken/clearToken) + captureTokenFromHash / captureFromLocation
+│   ├── server/                   BFF: session cookie helpers + session→PASETO exchange + service config
 │   ├── api/
-│   │   ├── client.ts             lean fetch wrapper (+ ApiError; bearer from auth store)
+│   │   ├── client.ts             lean fetch wrapper (+ ApiError; optional per-request token)
 │   │   ├── types.ts              Case + CaseIdentifier + CaseType + CaseStatus + Priority + IdentifierScheme + CaseRef + ScoredRef
 │   │   └── cases.ts              CaseRepository (CRUD + checkDuplicates)
 │   └── components/CaseForm.svelte
 └── routes/
-    ├── +layout.svelte / +layout.ts   nav + SPA toggle + SSO sign-in/out + fragment capture
+    ├── +layout.svelte / +layout.ts   nav + SPA toggle + SSO sign-in/out
     ├── +page.svelte              list
     ├── new/+page.svelte          create
     ├── [pid]/+page.svelte        detail + delete + check-duplicates
-    └── [pid]/edit/+page.svelte   edit
+    ├── [pid]/edit/+page.svelte   edit
+    ├── signin / verify           BFF session establishment (server routes)
+    └── api/proxy/[...path]       BFF proxy → case service (attaches the PASETO server-side)
 
 tests/
 ├── unit/                         vitest: client / cases / auth / config / case-form

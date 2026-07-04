@@ -1,8 +1,11 @@
 ## 15. Roadmap
 
-- **Authentication & authorisation** — JWT, RBAC for HR-admin /
-  credentialing-officer / service roles, rate limiting, user
-  endpoints, security headers.
+- **Authentication & authorisation** — offline PASETO v4.public
+  verification via the `authentication-verifier` crate (cookie
+  sessions + short-lived tokens per
+  [authentication-sessions](../../../agents/share/authentication-sessions.md)),
+  RBAC for HR-admin / credentialing-officer / service roles, rate
+  limiting, user endpoints, security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`worker_created`,
   `credential_expiry_within_30d`, …), Grafana dashboards + alerting.

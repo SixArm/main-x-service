@@ -112,3 +112,14 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   `uk_nhs_number`) is now caught at the matcher level by each
   matcher's `tests/adapter_contract.rs` — see the matcher
   CHANGELOG.
+
+### Removed
+
+- The unused `jsonwebtoken` dependency (never referenced in `src/` or
+  `tests/`). The family auth design has pivoted from RS256 JWT / JWKS
+  to cookie sessions + short-lived PASETO v4.public tokens (see
+  `agents/share/authentication-sessions.md`); the still-pending auth
+  task in `spec/13-tasks.md` T-1 now targets PASETO verification via
+  the `authentication-verifier` crate.
+- The stray backup file `src/api/rest/handlers.rs.bak` (accidentally
+  committed; the live `handlers.rs` is unchanged).

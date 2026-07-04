@@ -47,6 +47,7 @@ spec OQ-1, resolved).
 
 The `/whoami` bearer is a short-lived PASETO v4.public token verified
 offline against the authentication-service's published Ed25519 key
-(RS256/JWKS decommissioned). Auth pivot in progress; see
+(RS256/JWKS decommissioned); `src/auth.rs` embeds the
+`authentication-verifier` crate. See
 [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)
-(source of truth); code follow-up tracked in spec §13.
+(source of truth).

@@ -21,8 +21,8 @@ secret and no per-request introspection call.
 > [authentication-sessions.md](../../agents/share/authentication-sessions.md)
 > §5, JWT is removed from the auth path. The crate keeps its role
 > (peer-side, offline, dependency-light verification) but changes its
-> implementation. The shipped `src/lib.rs` is still the RS256-JWT code;
-> the PASETO rewrite is the open spec task (`spec/index.md` §13 T-1).
+> implementation. The shipped `src/lib.rs` **is** the PASETO code —
+> v0.2.0 is published to crates.io; the RS256-JWT implementation is gone.
 
 | Question | Answer |
 |---|---|

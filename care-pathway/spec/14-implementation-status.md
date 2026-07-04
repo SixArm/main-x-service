@@ -21,7 +21,7 @@ Aspirational items live in §15, not here.
 | service | Audit + streaming | `audit_logs` table + best-effort row per CRUD (action + snapshot + `actor`); in-memory `PathwayEvent` stream (cap 1 000); read at `/audit/recent`, `/{pid}/audit`, `/events/recent` |
 | service | Name search | `GET /search?q=` — Postgres `ILIKE` substring match on the denormalised `name` (cap 50, wildcards escaped); blank `q` → `400` |
 | service | Record merge | `POST /merge` folds a duplicate into a survivor (union fields, former-title alias, soft-delete, `merge_records` history, `Merged` event); pure `src/merge.rs`; `/merges/recent` history |
-| service | Token verification | Offline bearer-token verification against the auth-service's published key (`src/auth.rs`, embeds `authentication-verifier`); `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit `actor` stamped from the token. Credential is switching RS256-JWT → PASETO v4 public per [`authentication-sessions.md`](../../agents/share/authentication-sessions.md) (T-7) |
+| service | Token verification | Offline bearer-token verification against the auth-service's published key (`src/auth.rs`, embeds `authentication-verifier`); `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit `actor` stamped from the token. Credential is **PASETO v4 public** (Ed25519) per [`authentication-sessions.md`](../../agents/share/authentication-sessions.md) — originally RS256-JWT, since switched (T-7) |
 | service | Tests | DB-free `tests/matching.rs` (matcher embedding + JSON round-trip) + controller validation unit tests (422 pin); request-level loco tests `tests/requests/care_pathways.rs` (`#[ignore]`-gated on Postgres); green build + clippy |
 | front-end | Routes | `/`, `/new`, `/[pid]` (detail + delete + check-duplicates), `/[pid]/edit` |
 | front-end | API layer | Lean raw-JSON client, `CarePathwayRepository`, hand-mirrored TS types |
@@ -40,7 +40,7 @@ Open gaps drive tasks in §13. Live gap list:
 | Request-level tests exist but are `#[ignore]`-gated; no DB-backed run in CI yet | T-4 follow-up |
 | Front-end tests run locally but aren't wired into CI; no merge-action UI yet | T-5 follow-up |
 | Name search is Postgres `ILIKE` only — no full-text/fuzzy search over the JSONB payload, and `check-duplicates` still full-scans (capped at 1 000 rows) rather than using search-blocked candidates | T-6 follow-up |
-| Offline token verification exists (extractor + `/whoami` + audit `actor`) but the credential is still RS256-JWT and must switch to PASETO v4 public per [`authentication-sessions.md`](../../agents/share/authentication-sessions.md); it is not yet *enforced* on every `/api/*` route, and the keys are injected via env rather than fetched from the auth service | T-7 follow-up |
+| Offline token verification (extractor + `/whoami` + audit `actor`) verifies PASETO v4 public per [`authentication-sessions.md`](../../agents/share/authentication-sessions.md), but blanket `/api/*` enforcement is wired default-off (`CARE_PATHWAY_REQUIRE_AUTH`), and the keys are injected via env rather than fetched from the auth service's `/.well-known/paseto-keys` | T-7 follow-up |
 | Record merge has no front-end action yet (backend `POST /merge` is done) | T-8 follow-up / T-5 |
 | No terminology-server check that codes exist in a published release (formats are validated; existence is not) | T-9 follow-up |
 | No privacy controls (none required while no restricted fields exist — §12.3) | (re-assess; no task) |

@@ -38,8 +38,12 @@ clearly described manual check confirms the acceptance criterion.
   - **Acceptance:** Apple Calendar imports the exported `.ics`
     without warnings.
 - [ ] **T-8 — Authentication / authorisation.**
-  - [ ] JWT middleware on `/api/v1/*` with scheduler / admin /
-    read-only / service roles.
+  - [ ] PASETO verification middleware on `/api/v1/*` — offline
+    PASETO v4.public verification via the `authentication-verifier`
+    crate ≥0.2 (keys fetched from the authentication-service
+    `/.well-known/paseto-keys`; per
+    [authentication-sessions](../../../agents/share/authentication-sessions.md))
+    — with scheduler / admin / read-only / service roles.
   - **Acceptance:** unauthenticated requests get `401`; valid token
     + role gets `2xx`.
 - [ ] **T-9 — Bulk import / export.** (§9.1, §10.3;

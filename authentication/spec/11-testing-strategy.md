@@ -4,14 +4,15 @@ Per-subproject detail: [`AGENTS/testing.md`](../AGENTS/testing.md).
 
 ### 11.1 Service
 
-- **Unit (DB-free):** `src/auth` `#[cfg(test)]` — JWKS shape (one RSA
-  signing key, `kid` matches the token-header `kid`), sign → verify
+- **Unit (DB-free):** `src/auth` `#[cfg(test)]` — published key-set
+  shape (Ed25519 signing key, `kid` matches the token-footer `kid`),
+  PASETO sign → verify
   claim round-trip, tampered-signature rejection, garbage-token
-  rejection. Run with `cargo test --lib` against the committed dev
-  keypair.
+  rejection. Run with `cargo test --lib` against the built-in dev
+  seed.
 - **Request tests:** loco's `tests/requests/auth.rs` covers the
   magic-link / redeem (single-use, anti-enumeration) / me / signout /
-  JWKS surface (§13 T-3 done). The PostgreSQL-backed tests are
+  paseto-keys surface (§13 T-3 done). The PostgreSQL-backed tests are
   `#[ignore]`d so plain `cargo test` stays green without a database;
   run them with `cargo test -- --ignored`. DB-free route-table and
   params-contract assertions always run (including the optional
@@ -26,17 +27,17 @@ Per-subproject detail: [`AGENTS/testing.md`](../AGENTS/testing.md).
 
 ### 11.2 Verifier
 
-Nine offline unit tests in `src/lib.rs` using a throwaway RSA keypair
-(sign locally, verify against a JWKS built exactly the way the service
-derives `kid` / `n` / `e`):
+Offline unit tests in `src/lib.rs` using a throwaway Ed25519 keypair
+(sign locally, verify against a key-set document built exactly the way
+the service derives `kid` and encodes the public key):
 
 | Category | Pins |
 |---|---|
-| Round-trip | Valid token returns the full claim set; `key_count` |
-| Claim policy | Expired token rejected; wrong audience rejected |
-| Key selection | Missing-`kid` / unknown-`kid` rejected; empty JWKS builds but rejects everything; non-RSA keys skipped |
+| Round-trip | Valid PASETO v4.public returns the full claim set; `key_count` |
+| Claim policy | Expired (`exp`) token rejected; not-yet-valid (`nbf`) rejected; wrong audience / issuer rejected |
+| Key selection | Missing-`kid` / unknown-`kid` rejected; empty key set builds but rejects everything; non-Ed25519 keys skipped |
 | Integrity | Tampered signature rejected; garbage / empty token rejected |
-| Document shape | JWKS without a `keys` array errors |
+| Document shape | Key set without a key array errors; entries missing `kid` / key material error |
 
 ### 11.3 Front-end
 
@@ -49,10 +50,10 @@ are the current gates.
 
 The **service-signs / verifier-verifies** contract is pinned by
 `authentication-service-with-loco/tests/sign_verify_contract.rs`
-(§13 T-4): the service's `auth` module signs a real token; a
-`Verifier` built from the service's published JWKS document verifies
+(§13 T-4): the service's `auth` module signs a real PASETO; a
+`Verifier` built from the service's published key-set document verifies
 it through `authentication-verifier` (a dev-dependency of the
 service); the claims round-trip byte-for-byte; the
-`kid = base64url(SHA-256(modulus))` thumbprint is recomputed
+`kid = base64url(SHA-256(public key bytes))` thumbprint is recomputed
 independently; and a `kid` mismatch fails with `UnknownKid`. The test
 is DB-free and runs un-gated in every `cargo test`.

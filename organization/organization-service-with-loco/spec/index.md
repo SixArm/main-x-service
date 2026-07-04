@@ -228,12 +228,12 @@ personal data — honour GDPR when the privacy layer lands (§13).
   `authentication-verifier` behind a process-wide `Verifier`
   (env-configured keys/issuer/audience); `AuthUser`/`MaybeAuthUser`
   extractors; `/whoami` protected; audit + merge `actor` from the token.
-  (Shipped against the prior RS256-JWT + JWKS model.)
-  - [ ] **Switch to PASETO v4.public** per
-    [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md):
-    move `src/auth.rs` from RS256-JWT/JWKS to PASETO v4.public verification
+  (Originally shipped against the prior RS256-JWT + JWKS model.)
+  - [x] **Switch to PASETO v4.public** per
+    [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
+    **Done:** `src/auth.rs` verifies PASETO v4.public tokens
     against the auth-service's published Ed25519 key (`authentication-verifier`
-    `from_paseto_keys_*`); same `Claims` shape (`kid`/`iss`/`aud`/`exp`);
+    0.2 `from_paseto_keys_*`); same `Claims` shape (`kid`/`iss`/`aud`/`exp`);
     env vars `ORGANIZATION_PASETO_KEYS` / `ORGANIZATION_TOKEN_ISSUER` /
     `ORGANIZATION_TOKEN_AUDIENCE`. Supersedes the RS256-JWT model.
   - [x] Blanket `/api/*` enforcement — `auth::enforce` (pure, unit-tested)
@@ -268,11 +268,11 @@ organization-matcher; audit log; in-memory event streaming (Phase 1:
 canonical `Envelope` + `EventPublisher` seam, `EventView` projection
 frozen for `/events/recent`); name search (`ILIKE`); record merge
 (`/merge` + `merge_records` history); offline
-bearer-token verification (`AuthUser`/`MaybeAuthUser`, `/whoami`, audit +
-merge `actor` from the token) — shipped against RS256-JWT/JWKS, with the
-switch to PASETO v4.public per
+**PASETO v4.public** verification (`AuthUser`/`MaybeAuthUser`, `/whoami`,
+audit + merge `actor` from the token) per
 [`authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
-queued (§13); OpenAPI 3 + Swagger UI; Prometheus
+— originally shipped against RS256-JWT/JWKS, since switched (§13);
+OpenAPI 3 + Swagger UI; Prometheus
 metrics (`/metrics.prom`, root + public, CRUD/merge counters); DB-free
 tests;
 request-level test suite (Postgres, `#[ignore]`-gated); loco scaffolding

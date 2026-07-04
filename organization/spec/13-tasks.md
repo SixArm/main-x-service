@@ -95,9 +95,9 @@ oversized tasks (`T-2a`, `T-2b`).
 - [x] **T-9 — Offline token verification (service).**
   > Credential model is now **PASETO v4.public** per
   > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md),
-  > which supersedes the RS256-JWT + JWKS model the items below shipped
-  > against. The `[x]` items record what landed in Rust; the migration
-  > to PASETO is the open sub-task.
+  > which supersedes the RS256-JWT + JWKS model the first item below
+  > shipped against. The migration to PASETO has since landed (second
+  > item).
   - [x] Offline verification consuming the auth-service published key;
     populate audit `actor` (and merge `actor`) from the token subject.
     **Done (2026-06-13, against RS256-JWT/JWKS):** `src/auth.rs` embeds the
@@ -106,9 +106,10 @@ oversized tasks (`T-2a`, `T-2b`).
     (required) + `MaybeAuthUser` (optional) extractors; `GET
     /api/organizations/whoami` is protected; create/update/delete/merge
     stamp the audit + merge `actor` from the token when present.
-  - [ ] **Switch `src/auth.rs` to verify PASETO v4.public** per
-    [`authentication-sessions.md`](../../agents/share/authentication-sessions.md):
-    `authentication-verifier` `from_paseto_keys_value` /
+  - [x] **Switch `src/auth.rs` to verify PASETO v4.public** per
+    [`authentication-sessions.md`](../../agents/share/authentication-sessions.md).
+    **Done:** `src/auth.rs` builds the verifier via
+    `authentication-verifier` (0.2) `from_paseto_keys_value` /
     `from_paseto_keys_url` (was `from_jwks_*`); same `Claims` shape
     (`kid`/`iss`/`aud`/`exp`, `kid` in the footer); `Verifier` built from
     `ORGANIZATION_PASETO_KEYS` / `ORGANIZATION_TOKEN_ISSUER` /

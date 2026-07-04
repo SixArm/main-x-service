@@ -5,6 +5,7 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 | Tier | Surface |
 |---|---|
 | REST (Axum) | 15 endpoints under `/api/persons/*` + `/api/audit/*` + `/api/health` |
+| Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | FHIR R5 (Axum) | Person CRUD + search under `/fhir/Person` |
 | gRPC (Tonic) | Stubbed; not yet implemented |
 | Docs | Swagger UI at `/swagger-ui` (OpenAPI 3.0 via utoipa) |
@@ -12,6 +13,11 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 All REST endpoints return `{ "success": bool, "data": …, "error": … }`.
 HTTP status codes follow REST conventions: `409` for duplicate
 detection on create, `422` for validation failure.
+
+Authentication is opt-in per handler: taking an `AuthUser` argument
+requires a valid `Authorization: Bearer <paseto>` token, verified
+offline (PASETO `v4.public`, Ed25519) against the auth-service
+published key set (see §13 T-1a; blanket enforcement is T-1b).
 
 ### 9.1 Cross-service link endpoints
 

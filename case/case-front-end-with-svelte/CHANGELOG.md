@@ -11,7 +11,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
-- **Auth pivot — docs only (code follow-up pending).** The family
+- **Auth pivot.** The family
   authentication model moved from **client-held RS256 JWT bearer tokens**
   (fragment handoff + `localStorage["mxi_access_token"]`) to a
   **Backend-For-Frontend (BFF) + httpOnly cookie session + CSRF**, with
@@ -19,10 +19,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   token for server-side service calls — see
   [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
   as the source of truth; RS256/JWKS are decommissioned. Human-facing
-  docs (README / index / AGENTS) now describe the BFF + cookie model;
-  the browser holds no token. The runtime (`auth.svelte.ts`, `ApiClient`)
-  still uses the old client-held bearer flow; the BFF code follow-up is
-  tracked in the spec. No code change in this entry.
+  docs (README / index / AGENTS) describe the BFF + cookie model;
+  the browser holds no token. The runtime implements the BFF
+  (`src/hooks.server.ts`, `src/lib/server/*`, the `/api/proxy/[...path]`
+  server route); the old client-held bearer flow (`auth.svelte.ts`,
+  fragment capture) is removed.
 - **Doc harmonization pass.** Refreshed `AGENTS.md` to match the spec's
   auth/SSO layer: added `src/lib/auth.svelte.ts` and the `tests/` tree to
   the layout, noted `config.ts` now also exports `AUTH_FRONTEND_URL` /

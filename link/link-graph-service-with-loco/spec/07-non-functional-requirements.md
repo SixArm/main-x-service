@@ -39,10 +39,12 @@
 - **NFR-9** — `case ↔ person` edges carry the case service's
   compliance posture (access control + audit + masking, §12); the
   default-open affiliation posture does **not** apply to them.
-- **NFR-10** — Offline RS256 JWT verification via the
+- **NFR-10** — Offline PASETO v4.public verification via the
   [authentication-verifier](../../../authentication/authentication-verifier-rust-crate/)
-  (JWKS-based, no introspection hop), consistent with the sibling
-  services.
+  (against the auth-service's published Ed25519 key, no introspection
+  hop; per
+  [`authentication-sessions.md`](../../../agents/share/authentication-sessions.md)),
+  consistent with the sibling services.
 
 ### 7.5 Availability & operability
 

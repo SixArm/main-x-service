@@ -28,6 +28,7 @@ identity:
 - **Not** a credentialing / licensing source — link to the issuing
   authority; we record the credential, we do not validate it.
 - **Not** a payroll system.
-- **Not** an authentication / authorisation provider — JWT middleware
-  is planned (§15) but identity proofing is out of scope.
+- **Not** an authentication / authorisation provider — PASETO
+  verification middleware is planned (§15) but identity proofing is
+  out of scope.
 

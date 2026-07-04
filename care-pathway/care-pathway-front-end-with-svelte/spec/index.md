@@ -218,19 +218,23 @@ for any access/audit requirements.
 - [x] ~~Cross-origin SSO token handoff — `captureTokenFromHash` +
   `captureFromLocation()` fragment capture + `signInUrl()` redirect~~ —
   **superseded** (see auth-migration task below).
-- [ ] Auth — adopt BFF + httpOnly cookie + CSRF; remove
+- [x] Auth — adopt BFF + httpOnly cookie + CSRF; remove
   `mxi_access_token`/`localStorage` bearer + fragment handoff (per
   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
+  **Done:** `src/lib/server/` (session cookie + magic-link +
+  session→PASETO exchange), `/signin` + `/verify` routes, and the
+  same-origin `/api/proxy` BFF route that injects the PASETO bearer
+  server-side; the browser holds no token.
 
 ## 14. Implementation status
 
 Done: all four routes; lean client; repository (incl. `search()`,
 `merge()`, `audit()`, and `recentEvents()`); list search box;
 list-page recent-activity (event-stream) view; detail-page
-merge-duplicate action; detail-page audit-trail view; auth token store
-(`$lib/auth.svelte`) + client bearer-attachment + layout session
-affordance with cross-origin SSO sign-in (fragment capture + strip,
-`signInUrl` redirect); form (incl.
+merge-duplicate action; detail-page audit-trail view; BFF auth
+(`src/lib/server/` session cookie + magic-link + session→PASETO
+exchange, `/signin` + `/verify` routes, `/api/proxy` bearer injection —
+the browser holds no token); form (incl.
 condition codes + identifiers editors); SPA config. `pnpm run check`
 clean; production build succeeds.
 
@@ -238,7 +242,8 @@ clean; production build succeeds.
 
 v0.1 (here): CRUD + duplicate-check UI. v0.2: tests + search box.
 v0.3: audit-trail view (done) + recent-activity view (done) + auth token
-(done) + cross-origin SSO sign-in handoff (done).
++ cross-origin SSO sign-in handoff (shipped, since superseded by the BFF
++ cookie-session model — §13).
 
 ## 16. Open questions
 

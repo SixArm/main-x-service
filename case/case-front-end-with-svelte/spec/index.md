@@ -140,7 +140,7 @@ access/audit requirements.
   in** redirect~~ — **superseded** (see auth-migration task below).
 - [ ] `Custom(label)` editing for case type / status / schemes.
 - [ ] Search box once the service ships search.
-- [ ] Auth — adopt BFF + httpOnly cookie + CSRF; remove
+- [x] Auth — adopt BFF + httpOnly cookie + CSRF; remove
   `mxi_access_token`/`localStorage` bearer + fragment handoff (per
   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 

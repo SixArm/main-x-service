@@ -1,7 +1,10 @@
 ## 15. Roadmap
 
-- **Authentication & authorisation** — JWT, RBAC, rate limiting,
-  user endpoints, security headers.
+- **Authentication & authorisation** — offline PASETO v4.public
+  verification via the `authentication-verifier` crate (cookie
+  sessions + short-lived tokens per
+  [authentication-sessions](../../../agents/share/authentication-sessions.md)),
+  RBAC, rate limiting, user endpoints, security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`thing_created`, `match_score_histogram`),
   Grafana dashboards + alerting.

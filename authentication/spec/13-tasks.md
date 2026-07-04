@@ -193,37 +193,45 @@ confirms it. Split larger tasks (`T-5a`, `T-5b`).
 - [ ] **T-12 — Pivot off JWT-for-sessions → cookie sessions + PASETO.**
   *(spec'd 2026-06-17; supersedes the RS256 JWT + JWKS model)* Adopts
   [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
-  across all three subprojects. Split into per-subproject sub-tasks:
-  - [ ] **T-12a — Service: cookie sessions.** New `sessions` schema
-    (`sid` / `user_pid` / `data` / `created_at` / `last_seen_at` /
-    `idle_expires_at` / `absolute_expires_at` / `revoked_at`; migration);
-    magic-link redemption creates a session row and sets the
-    `__Host-mxi_session` cookie (HttpOnly/Secure/SameSite/`Path=/`)
-    instead of returning a token; `/me` resolves + slides the session;
-    signout sets `revoked_at` + clears the cookie; `sid` rotation on
-    privilege change (shared §3, §7).
-  - [ ] **T-12b — Service: PASETO minting + key publication.**
+  across all three subprojects. **Core landed** (a–b, d–f); remaining:
+  T-12c (full CSRF) and the T-12a sessions-table reshape:
+  - [x] **T-12a — Service: cookie sessions (core).** Magic-link
+    redemption creates a session row and sets the
+    `__Host-mxi_session` cookie (HttpOnly/Secure/SameSite/`Path=/`);
+    signout sets `revoked_at` + clears the cookie (shared §3, §7).
+    *Remaining refinement:* reshape `sessions` to the shared-§3 schema
+    (`sid` / `data` JSONB / `last_seen_at` / `idle_expires_at` /
+    `absolute_expires_at`; today `sid` = the legacy `jid` column),
+    idle-TTL sliding on `/me`, and `sid` rotation on privilege change;
+    then drop the transitional PASETO body from redemption.
+  - [x] **T-12b — Service: PASETO minting + key publication.**
     `POST /token` exchanges a valid session for a short-lived
     (~5 min) PASETO **v4.public** (Ed25519, claims §5.3, footer `kid`);
-    publish the Ed25519 public key set at `/.well-known/paseto-keys`;
-    load/store the Ed25519 keypair (shared §5). Candidate crate:
-    `rusty_paseto` (confirm `#![forbid(unsafe_code)]` compatibility —
-    shared §10).
+    the Ed25519 public key set is published at
+    `/.well-known/paseto-keys`; seed loading via `TOKEN_PRIVATE_KEY_SEED`
+    / `TOKEN_PRIVATE_KEY_FILE` (built-in dev seed otherwise). Crate:
+    `rusty_paseto` + `ed25519-dalek` (`#![forbid(unsafe_code)]` holds).
   - [ ] **T-12c — Service: CSRF.** Per-session CSRF token
-    (synchroniser / double-submit + `Origin`/`Referer` allow-list) on
+    (synchroniser / double-submit) on
     cookie-authenticated `POST`/`PUT`/`PATCH`/`DELETE` incl. `POST /token`,
-    signout, `DELETE /api/auth/account` (shared §4).
-  - [ ] **T-12d — Service: remove RS256/JWKS.** Drop RS256 signing and
-    `GET /.well-known/jwks.json`; update OpenAPI; keep JWKS only
-    transitionally during peer migration, then delete (shared §9 step 6).
-  - [ ] **T-12e — Verifier: PASETO support.**
-    `Verifier::from_paseto_keys_value` / `from_paseto_keys_url` replace
+    signout, `DELETE /api/auth/account` (shared §4). The
+    `Origin`/`Referer` allow-list backstop (`AUTH_ALLOWED_ORIGINS`) is
+    already in place.
+  - [x] **T-12d — Service: remove RS256/JWKS.** RS256 signing,
+    `GET /.well-known/jwks.json`, and the `jsonwebtoken`/`rsa` stack are
+    removed; OpenAPI updated (shared §9 step 6).
+  - [x] **T-12e — Verifier: PASETO support.**
+    `Verifier::from_paseto_keys_value` / `from_paseto_keys_url` replaced
     the RS256 `from_jwks_*`; same `Claims`; footer-`kid` selection;
-    update `VerifyError` taxonomy (shared §5).
-  - [ ] **T-12f — Front-end: BFF + remove `localStorage`.** Move
-    session-holding + PASETO exchange to the SvelteKit server (BFF);
-    browser holds only the cookie; add CSRF on mutating calls; drop
-    `mxi.auth.token` / `mxi.auth.user` (shared §6).
+    `VerifyError` taxonomy updated (`Keys` / `Paseto`). Shipped as
+    `authentication-verifier` 0.2.0 on crates.io.
+  - [x] **T-12f — Front-end: BFF + remove `localStorage`.**
+    Session-holding moved to the SvelteKit server (BFF:
+    `hooks.server.ts` + server loads);
+    browser holds only the cookie;
+    `mxi.auth.token` / `mxi.auth.user` / `mxi_access_token` dropped
+    (shared §6). *Remaining:* browser→BFF CSRF token (with T-12c) and
+    restating the front-end test suites to the BFF model.
   - **Acceptance:** magic-link redemption returns `Set-Cookie:
     __Host-mxi_session` and no token; `POST /token` mints a PASETO that a
     verifier built from `/.well-known/paseto-keys` accepts and a peer

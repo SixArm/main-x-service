@@ -10,9 +10,9 @@ Built on **loco.rs** — and the family's reference loco application.
 > **Auth model source of truth:**
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
 > The previous **RS256 JWT + JWKS** access-token model is **decommissioned**
-> in favour of httpOnly cookie sessions + PASETO. **Pivot in progress** —
-> this README describes the target; the code follow-up is tracked in spec §13,
-> so the current runtime may still emit JWTs until those tasks land.
+> in favour of httpOnly cookie sessions + PASETO. The pivot has **landed
+> in code**: the runtime mints Ed25519 PASETO v4.public tokens and
+> publishes its key set at `/.well-known/paseto-keys`; no JWT is issued.
 
 - Spec: [spec/index.md](./spec/index.md)
 - Agent guide: [AGENTS.md](./AGENTS.md)
@@ -25,6 +25,7 @@ Built on **loco.rs** — and the family's reference loco application.
 | POST | `/api/auth/signup` | — | Create account, send magic link |
 | POST | `/api/auth/magic-link` | — | Request magic link (sign in) |
 | GET | `/api/auth/magic-link/{token}` | — | Consume link → session cookie |
+| POST | `/api/auth/token` | Session | Exchange session for a short-lived PASETO v4.public bearer |
 | GET | `/api/auth/me` | Session | Current user |
 | POST | `/api/auth/signout` | Session | Revoke session |
 | GET | `/api/auth/audit/recent` | — | System-wide authentication audit trail |
@@ -63,12 +64,13 @@ curl -s localhost:5150/api/auth/magic-link/<TOKEN>
 
 - **Magic links** are logged to the tracing console (the SMTP mailer is
   disabled in `config/development.yaml`). Production supplies real SMTP.
-- **Signing keys**: the target model publishes an **Ed25519** public key
-  at `/.well-known/paseto-keys` for PASETO v4.public verification. Until
-  the §13 follow-up lands, a dev RSA keypair remains committed under
-  `config/keys/` (see [config/keys/README.md](./config/keys/README.md)).
-  Production supplies key material from the edges via env. See
-  [AGENTS.md](./AGENTS.md) for all env vars.
+- **Signing keys**: the service publishes its **Ed25519** public key(s)
+  at `/.well-known/paseto-keys` for PASETO v4.public verification. No
+  key files are committed — development uses a built-in dev seed
+  (`DEV_SEED`); production supplies the seed via `TOKEN_PRIVATE_KEY_SEED`
+  / `TOKEN_PRIVATE_KEY_FILE` (see
+  [config/keys/README.md](./config/keys/README.md) and
+  [AGENTS.md](./AGENTS.md) for all env vars).
 - **Queue**: Postgres-backed background jobs (repo convention).
 
 ## Testing
@@ -86,8 +88,7 @@ The Postgres-backed tests under `tests/` are `#[ignore]`d so plain
 ## How peers authenticate requests
 
 Peers authenticate **offline**, with no per-request hop back to this
-service. In the target model (see the auth-model source of truth above)
-a peer fetches the published **Ed25519 public key(s)** from
+service. A peer fetches the published **Ed25519 public key(s)** from
 `/.well-known/paseto-keys` once at boot, then verifies each
 `Authorization: Bearer v4.public.…` **PASETO v4.public** token locally,
 checking `iss = authentication-service` and `aud = main-x-service`.
@@ -99,6 +100,5 @@ PASETO keys, then `verify(token)` per request. The cross-crate contract
 test (`tests/sign_verify_contract.rs`) keeps this service and the
 verifier in lock-step on the `Claims` shape and `kid` derivation.
 
-> RS256 JWT + JWKS are **decommissioned**. Pivot in progress; the code
-> follow-up (PASETO issuance + `/.well-known/paseto-keys`) is tracked in
-> spec §13, so the running binary may still emit JWTs until then.
+> RS256 JWT + JWKS are **decommissioned**; the running binary issues
+> PASETO v4.public only.

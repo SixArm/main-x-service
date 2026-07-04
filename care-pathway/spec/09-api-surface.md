@@ -39,9 +39,9 @@ published Ed25519 key, offline — per
 which supersedes the prior RS256-JWT model) is available via the
 `AuthUser` extractor; `whoami` is protected by it, and
 create/update/delete stamp the audit `actor` from the token when one is
-present (`MaybeAuthUser`). The credential switch RS256-JWT → PASETO,
-blanket `/api/*` enforcement, and paseto-keys-over-HTTP fetch are
-follow-ups (§13 T-7).
+present (`MaybeAuthUser`). Blanket `/api/*` enforcement is wired but
+**default-off** (`CARE_PATHWAY_REQUIRE_AUTH`); paseto-keys-over-HTTP
+fetch at boot remains a follow-up (§13 T-7).
 
 Conventions: **raw loco JSON** (no `{success, data, error}` envelope
 — this is the loco-era convention, unlike the pre-loco person

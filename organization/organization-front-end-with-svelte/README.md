@@ -22,7 +22,6 @@ SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
 ## Quick start
 
 ```bash
-cp .env.example .env     # PUBLIC_API_BASE_URL=http://localhost:5150
 pnpm install
 pnpm dev                 # http://localhost:5173
 ```
@@ -31,8 +30,8 @@ pnpm dev                 # http://localhost:5173
 
 | Var | Default | Purpose |
 |---|---|---|
-| `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Organization service REST base URL. |
-| `VITE_AUTH_FRONTEND_URL` | `http://localhost:5173` | Central authentication front-end base URL for the SSO sign-in handoff. |
+| `ORGANIZATION_API_URL` | `http://localhost:5150` | Organization service REST base URL (read server-side by the BFF proxy; see `src/lib/server/config.ts`). |
+| `AUTH_API_URL` | `http://localhost:5150` | Authentication service base URL (BFF-side magic-link + session→PASETO exchange). |
 
 ## How it works
 
@@ -47,7 +46,7 @@ excluding the record itself.
 
 ## Session / authentication
 
-**Target model (BFF).** The browser holds **no token** and never calls
+**BFF model (current).** The browser holds **no token** and never calls
 the organization service directly. Sign-in via the central
 [authentication-service](../../authentication/authentication-service-with-loco)
 passwordless magic-link establishes a server-side **cookie session**
@@ -63,9 +62,9 @@ default).
 Source of truth:
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 (RS256 JWT + JWKS and the cross-origin `#access_token` fragment handoff
-are decommissioned). **Pivot in progress** — the current runtime still
-uses the older client-held-token flow; the BFF + cookie + CSRF code
-follow-up is tracked in spec §13.
+are decommissioned). The runtime is the BFF: sign-in via the app's own
+`/signin` + `/verify` routes, API calls via the same-origin `/api/proxy`
+route, which injects the server-exchanged PASETO.
 
 ## Testing
 

@@ -8,10 +8,8 @@ Entity-level summary. Normative strategy: entity spec
 > Sessions are server-side httpOnly **cookie sessions**; cross-service
 > auth is **PASETO v4.public** verified offline via the published Ed25519
 > key at `/.well-known/paseto-keys`. RS256 JWT + JWKS are
-> **decommissioned**. **Pivot in progress** — the service code follow-up
-> (and the test updates that ride with it) is tracked in the service spec
-> §13, so the crypto tests below still describe the RS256-era surface
-> until then; the verifier and front-end docs are already harmonized.
+> **decommissioned** and removed from the code; the crypto tests below
+> exercise the PASETO/Ed25519 surface.
 
 ## Service (`authentication-service-with-loco`)
 
@@ -23,8 +21,8 @@ cargo test              # full loco request tests — needs PostgreSQL
 
 | Layer | Where | Covers |
 |---|---|---|
-| Unit (DB-free) | `src/auth/mod.rs` `#[cfg(test)]` | JWKS shape (one RSA signing key; published `kid` = token-header `kid`), sign → verify claim round-trip, tampered-signature rejection, garbage-token rejection. Runs against the committed dev keypair in `config/keys/`. |
-| Request | `tests/requests/auth.rs` | Magic-link surface: signup / magic-link / redeem (single-use, anti-enumeration) / me / signout / JWKS. Postgres-backed tests are `#[ignore]`d (run: `cargo test -- --ignored`); DB-free route-table + params-contract tests always run. |
+| Unit (DB-free) | `src/auth/mod.rs` `#[cfg(test)]` | Published key-set shape (Ed25519 entries; published `kid` = token-footer `kid`), PASETO sign → verify claim round-trip, tampered-signature rejection, garbage-token rejection. Runs against the built-in dev seed. |
+| Request | `tests/requests/auth.rs` | Magic-link surface: signup / magic-link / redeem (single-use, anti-enumeration) / me / signout / paseto-keys. Postgres-backed tests are `#[ignore]`d (run: `cargo test -- --ignored`); DB-free route-table + params-contract tests always run. |
 
 ## Verifier (`authentication-verifier-rust-crate`)
 

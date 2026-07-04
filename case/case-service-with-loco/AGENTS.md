@@ -63,13 +63,13 @@ Deferred (spec §13): Tantivy full-text/fuzzy search (title search via
 Phases 2–3 (transactional outbox → Fluvio), privacy, front-end merge
 action, blanket `/api/*` auth enforcement + published-key fetch.
 
-> **Auth pivot in progress.** The family moved from RS256 JWT + JWKS to
+> **Auth pivot done here.** The family moved from RS256 JWT + JWKS to
 > cookie sessions + offline **PASETO v4.public** verification (published
 > Ed25519 key) — see
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
-> (source of truth; RS256/JWKS decommissioned). The current `src/auth.rs`
-> runtime still verifies the old credential; the PASETO code follow-up is
-> tracked in spec §13.
+> (source of truth; RS256/JWKS decommissioned). `src/auth.rs` verifies
+> PASETO v4.public via `authentication-verifier`; the
+> paseto-keys-over-HTTP fetch follow-up is tracked in spec §13.
 
 ## Golden rules
 
@@ -90,7 +90,7 @@ src/
 ├── controllers/docs.rs    OpenAPI JSON + Swagger UI
 ├── controllers/metrics.rs Prometheus /metrics.prom (root-mounted, public)
 ├── metrics.rs             process-wide Prometheus registry (CRUD counters + http_requests_total)
-├── auth.rs                RS256 JWT verification (AuthUser/MaybeAuthUser) via authentication-verifier
+├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) via authentication-verifier
 ├── merge.rs               pure record-merge logic (merge_cases)
 ├── openapi.rs             hand-written OpenAPI 3 document
 ├── streaming.rs           durable-bus Phase 1: Envelope + EventPublisher seam (in-memory)

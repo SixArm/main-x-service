@@ -26,9 +26,9 @@ and `kid` derivation across the two crates.
 > **Auth model source of truth:**
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
 > The old **RS256 JWT + JWKS** model is **decommissioned** in favour of
-> cookie sessions + PASETO. **Pivot in progress** — this guide describes
-> the target; the code follow-up is tracked in spec §13, so the current
-> runtime may still emit JWTs until those tasks land.
+> cookie sessions + PASETO. The pivot has **landed in code**: the runtime
+> mints Ed25519 PASETO v4.public tokens and publishes its key set at
+> `/.well-known/paseto-keys`; no JWT is issued anywhere.
 
 It is also the family's **reference loco.rs application**: the existing
 service crates only *declare* `loco-rs` but actually run hand-rolled
@@ -54,6 +54,7 @@ template (see root `AGENTS.md`).
 | POST | `/api/auth/signup` | — | Create a passwordless account, issue a magic link. |
 | POST | `/api/auth/magic-link` | — | Request a magic link for an existing account (sign in). |
 | GET | `/api/auth/magic-link/{token}` | — | Consume the link → server-side session + `__Host-mxi_session` cookie. |
+| POST | `/api/auth/token` | Session | Exchange a valid session for a short-lived PASETO v4.public bearer (~5 min). |
 | GET | `/api/auth/me` | Session | Current user (rejects revoked + GDPR-erased accounts). |
 | POST | `/api/auth/signout` | Session | Revoke the current session. |
 | GET | `/api/auth/audit/recent` | — | System-wide authentication audit trail (newest 100). |
@@ -90,11 +91,10 @@ to add a locale. See spec §6.11 / §12.
    `src/migration/mod.rs` with a matching entity under
    `src/models/_entities/`.
 2. **Asymmetric public-key tokens only.** Cross-service token
-   signing/verification lives in `src/auth`. The target is PASETO
-   v4.public (Ed25519); do not reintroduce loco's symmetric HS256 helper
+   signing/verification lives in `src/auth`: PASETO v4.public
+   (Ed25519). Do not reintroduce loco's symmetric HS256 helper
    for cross-service tokens — peers rely on the published public key(s)
-   at `/.well-known/paseto-keys`. (RS256 JWT + JWKS are decommissioned;
-   the migration is tracked in spec §13.)
+   at `/.well-known/paseto-keys`. (RS256 JWT + JWKS are decommissioned.)
 3. **No password flow.** This is passwordless. The `users.password`
    column exists only to satisfy `NOT NULL`; it holds an unusable random
    hash (`create_passwordless`).
@@ -102,20 +102,19 @@ to add a locale. See spec §6.11 / §12.
    the unauthenticated endpoints.
 5. **Dev has no SMTP.** Magic links are logged to the tracing console in
    development (mailer disabled). Production supplies SMTP via config.
-6. **Keys come from the edges.** Private/public PEM load from env in
-   production (`JWT_PRIVATE_KEY_FILE` / `JWT_PUBLIC_KEY_FILE` or the
-   `*_PEM` inline variants); the committed `config/keys/*_dev.pem` are
-   **dev only**.
+6. **Keys come from the edges.** The Ed25519 signing seed loads from
+   env in production (`TOKEN_PRIVATE_KEY_SEED` inline base64url, or
+   `TOKEN_PRIVATE_KEY_FILE`); with neither set, a built-in dev seed
+   (`DEV_SEED` in `src/auth/mod.rs`) keeps local runs and tests working
+   offline — **dev only**. No key files are committed.
 7. **Key rotation is a key set.** `auth::AuthKeys` holds one *primary*
    signing key plus zero or more *additional* verify-only public keys
-   (`JWT_ADDITIONAL_PUBLIC_KEY_FILES` / `_PEMS`). Signing always uses the
-   primary; verification selects by the token header / footer `kid`; the
-   published key set advertises all keys. To rotate with zero downtime,
-   follow the runbook in `config/keys/README.md` (spec §8.4). Unset
-   additional vars ⇒ the single-key behaviour is unchanged. *(The env
-   var names + the current published `/.well-known/jwks.json` document
-   are RS256-era and survive only until the PASETO migration in spec §13;
-   the target publishes Ed25519 keys at `/.well-known/paseto-keys`.)*
+   (`TOKEN_ADDITIONAL_PUBLIC_KEYS`). Signing always uses the
+   primary; verification selects by the token footer `kid`; the
+   published key set at `/.well-known/paseto-keys` advertises all keys.
+   To rotate with zero downtime, follow the runbook in
+   `config/keys/README.md` (spec §8.4). Unset
+   additional vars ⇒ the single-key behaviour is unchanged.
 
 ---
 
@@ -125,11 +124,12 @@ to add a locale. See spec §6.11 / §12.
 src/
 ├── app.rs                 loco Hooks: routes, workers, truncate, seed
 ├── bin/main.rs            loco CLI entrypoint
-├── auth/mod.rs            cross-service token signing + verification + key publication + bearer extractor (RS256-era today; PASETO target per spec §13)
+├── auth/mod.rs            PASETO v4.public signing + verification + key-set publication + bearer extractor (Ed25519; built-in DEV_SEED for dev)
+├── cookie.rs              __Host-mxi_session cookie helpers (set / clear / parse)
 ├── controllers/
 │   ├── auth.rs            signup / magic-link / verify / me / signout / audit + GDPR account export/audit/erasure
 │   ├── docs.rs            /api-docs/openapi.json + /swagger-ui
-│   ├── jwks.rs            published key endpoint (RS256 /.well-known/jwks.json today; PASETO /.well-known/paseto-keys target)
+│   ├── paseto_keys.rs     published key endpoint (/.well-known/paseto-keys — Ed25519 public key set)
 │   └── metrics.rs         /metrics.prom (Prometheus text exposition)
 ├── metrics.rs            Prometheus registry + auth-specific counters
 ├── i18n.rs               dependency-light email copy catalog (en / cy)
@@ -137,31 +137,25 @@ src/
 ├── rate_limit.rs         per-email sliding-window magic-link issuance limiter
 ├── models/
 │   ├── users.rs           magic-link user model (+ create_passwordless, GDPR erase + find_active_by_pid)
-│   ├── sessions.rs        session issue/revoke; revoke_all_for_user for erasure (target: opaque cookie session per the auth-sessions design)
+│   ├── sessions.rs        opaque cookie session issue/revoke; revoke_all_for_user for erasure (per the auth-sessions design)
 │   └── _entities/         generated SeaORM entities
 ├── mailers/auth.rs        magic-link mailer (prod)
 ├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits
 └── views/auth.rs          LoginResponse / CurrentResponse
-config/                    development/production/test yaml + dev RSA keys
+config/                    development/production/test yaml (keys/ holds only a README — no committed key files)
 ```
 
 ## Configuration (env)
 
-> The `JWT_*` vars below are RS256-era and describe the **current**
-> runtime. They survive only until the PASETO migration in spec §13;
-> the target signs Ed25519 PASETO and publishes at
-> `/.well-known/paseto-keys`.
-
 | Var | Default | Purpose |
 |---|---|---|
-| `JWT_PRIVATE_KEY_FILE` | `config/keys/jwt_private_dev.pem` | RSA private signing key (PEM). |
-| `JWT_PUBLIC_KEY_FILE` | `config/keys/jwt_public_dev.pem` | RSA public verification key (PEM). |
-| `JWT_PRIVATE_KEY_PEM` / `JWT_PUBLIC_KEY_PEM` | — | Inline PEM (takes precedence over the file vars). |
-| `JWT_ADDITIONAL_PUBLIC_KEY_FILES` | — | Comma-separated paths to extra **verify-only** public keys (rotated-out keys whose tokens are still live). See key rotation below. |
-| `JWT_ADDITIONAL_PUBLIC_KEY_PEMS` | — | Inline verify-only public PEMs (comma- or newline-separated). Combined with the files var. |
-| `JWT_ISSUER` | `authentication-service` | `iss` claim. |
-| `JWT_AUDIENCE` | `main-x-service` | `aud` claim. |
-| `JWT_EXPIRATION` | `3600` | Access-token lifetime (seconds). |
+| `TOKEN_PRIVATE_KEY_SEED` | — | Primary Ed25519 signing seed, 32 bytes base64url (no pad). Takes precedence over the file var. |
+| `TOKEN_PRIVATE_KEY_FILE` | — | Path to a file holding the same base64url seed. |
+| *(neither set)* | built-in `DEV_SEED` | Development-only stable keypair; never rely on it in production. |
+| `TOKEN_ADDITIONAL_PUBLIC_KEYS` | — | Comma-separated base64url 32-byte Ed25519 **verify-only** public keys (rotated-out keys whose tokens are still live). See key rotation above. |
+| `TOKEN_ISSUER` | `authentication-service` | `iss` claim + key-set issuer. |
+| `TOKEN_AUDIENCE` | `main-x-service` | `aud` claim. |
+| `TOKEN_EXPIRATION` | `300` | Access-token lifetime (seconds) — deliberately short; the cookie session is the durable thing. |
 | `FRONTEND_URL` | `http://localhost:5173` | Base for the magic link in emails/logs. |
 | `DATABASE_URL` | loco config default | Postgres connection. |
 

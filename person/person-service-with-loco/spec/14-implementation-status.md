@@ -17,6 +17,7 @@
 | Merging | Transfer + alias + link + soft-delete + snapshot + event |
 | Validation | Required fields, format checks, phone normalisation, address standardisation, `422` |
 | Privacy | Field masking, GDPR export, consent model |
+| Authentication (peer verification) | Offline PASETO v4.public (Ed25519) bearer verification via `authentication-verifier` 0.2; `AuthUser` extractor + `GET /api/whoami`; env-configured key set (T-1a) |
 | Docker | Multi-stage Dockerfile, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 | Documentation | README, CLAUDE.md, AGENTS/* set, architecture, deploy guide, this spec |
@@ -34,6 +35,6 @@ Open gaps drive tasks in §13. Live gap list:
 | Event consumers | (no task yet) |
 | gRPC API | T-6 |
 | Dedup / merge / privacy integration tests | T-5 |
-| Authentication / authorisation | T-1 |
+| Authentication — blanket enforcement (peer PASETO verification delivered, T-1a) | T-1b |
 | Spec-drift CI guard | T-7 |
 

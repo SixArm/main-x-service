@@ -3,9 +3,12 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
-- [ ] **T-1 — JWT middleware on `/api/*`.**
-  - [ ] Add `jsonwebtoken` validator extractor with HR-admin /
-    credentialing-officer / read-only / service roles.
+- [ ] **T-1 — PASETO verification middleware on `/api/*`.**
+  - [ ] Add an offline PASETO v4.public verifier extractor (via the
+    `authentication-verifier` crate ≥0.2; keys fetched from the
+    authentication-service `/.well-known/paseto-keys`) with HR-admin /
+    credentialing-officer / read-only / service roles — per
+    [authentication-sessions](../../../agents/share/authentication-sessions.md).
   - **Acceptance:** unauthenticated requests get `401`; valid signed
     token with sufficient role gets `2xx`.
 - [ ] **T-2 — Production Fluvio publisher.**

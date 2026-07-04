@@ -50,7 +50,7 @@
 - [case-service-with-loco](../../../case/case-service-with-loco/spec/index.md)
   — the high-governance `subject_of` / `about` producer (§12).
 - [authentication-verifier-rust-crate](../../../authentication/authentication-verifier-rust-crate/spec/index.md)
-  — offline RS256 JWT verification.
+  — offline PASETO v4.public verification.
 
 ### 17.4 External
 

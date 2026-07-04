@@ -18,8 +18,12 @@ clearly described manual check confirms the acceptance criterion.
   - **Acceptance:** `grpcurl` against `ThingService.GetThing`
     round-trips a record.
 - [ ] **T-4 — Authentication / authorisation.**
-  - [ ] JWT middleware on `/api/*` with editor / read-only / service
-    roles.
+  - [ ] PASETO verification middleware on `/api/*` — offline
+    PASETO v4.public verification via the `authentication-verifier`
+    crate ≥0.2 (keys fetched from the authentication-service
+    `/.well-known/paseto-keys`; per
+    [authentication-sessions](../../../agents/share/authentication-sessions.md))
+    — with editor / read-only / service roles.
   - **Acceptance:** unauthenticated requests get `401`; valid token
     + role gets `2xx`.
 - [ ] **T-5 — Embedding-based similarity (optional / experimental).**

@@ -37,7 +37,7 @@ fn geo_radius_filters_collection_to_nearby_places() {
     // Centre: Central Park, NYC.
     let centre = GeoCoordinates::new(40.7829, -73.9654);
 
-    let collection = vec![
+    let collection = [
         place_at("Times Square", 40.7580, -73.9855), // ~3 km away
         place_at("The Met", 40.7794, -73.9632),       // ~0.4 km away
         place_at("Statue of Liberty", 40.6892, -74.0445), // ~12 km away
@@ -68,7 +68,7 @@ fn geo_radius_filters_collection_to_nearby_places() {
 #[test]
 fn geo_radius_is_monotonic_in_radius() {
     let centre = GeoCoordinates::new(40.7829, -73.9654);
-    let collection = vec![
+    let collection = [
         place_at("The Met", 40.7794, -73.9632),
         place_at("Times Square", 40.7580, -73.9855),
         place_at("Statue of Liberty", 40.6892, -74.0445),

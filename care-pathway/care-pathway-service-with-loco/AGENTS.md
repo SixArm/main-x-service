@@ -65,13 +65,14 @@ front-end merge
 action, published-key-over-HTTP fetch at boot, terminology-server
 code-existence checks.
 
-Auth pivot in progress: the family moved from RS256 JWT + JWKS to cookie
-sessions + short-lived PASETO v4.public verified offline against a
+Auth pivot done in this crate: the family moved from RS256 JWT + JWKS to
+cookie sessions + short-lived PASETO v4.public verified offline against a
 published Ed25519 key (RS256/JWKS decommissioned); the
 `CARE_PATHWAY_REQUIRE_AUTH` flag and enforcement semantics are unchanged,
-only the credential changes. See
+only the credential changed. See
 [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)
-(source of truth); code follow-up tracked in spec §13.
+(source of truth); `src/auth.rs` verifies PASETO via the
+`authentication-verifier` crate (0.2, `from_paseto_keys_*`).
 
 ## Golden rules
 
@@ -93,7 +94,7 @@ src/
 ├── controllers/docs.rs    OpenAPI JSON + Swagger UI
 ├── controllers/metrics.rs root /metrics.prom Prometheus endpoint
 ├── metrics.rs             process-wide Prometheus registry (CRUD/merge counters + http_requests_total)
-├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) via authentication-verifier (RS256/JWKS decommissioned; code follow-up per spec §13)
+├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) via authentication-verifier (RS256/JWKS decommissioned)
 ├── merge.rs               pure record-merge logic (merge_pathways)
 ├── openapi.rs             hand-written OpenAPI 3 document
 ├── streaming.rs           CRUD/merge event stream — Phase 1 durable-bus

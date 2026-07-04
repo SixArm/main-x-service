@@ -43,8 +43,8 @@ service so the magic-link email language matches.
 
 ## Layout
 
-Target layout under the BFF model (the code follow-up in spec §13 lands
-this; the prior `session.svelte.ts` token store + fragment handoff are
+Layout under the BFF model (landed; the prior `session.svelte.ts` token
+store + fragment handoff are
 removed):
 
 ```

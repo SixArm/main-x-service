@@ -8,9 +8,8 @@ Entity-level summary. Normative contract: entity spec
 > Browser/BFF requests carry the httpOnly `__Host-mxi_session` **cookie**;
 > cross-service requests carry a short-lived **PASETO v4.public** bearer,
 > verified offline via the published Ed25519 key at
-> `/.well-known/paseto-keys`. RS256 JWT + JWKS are **decommissioned**.
-> **Pivot in progress** — the service code follow-up is tracked in the
-> service spec §13.
+> `/.well-known/paseto-keys`. RS256 JWT + JWKS are **decommissioned**
+> and removed from the code.
 
 ## Service REST API
 
@@ -26,6 +25,7 @@ leaner).
 | POST | `/api/auth/signup` | — | `{}` always `200` — body `{email, name?}`; creates account + sends magic link |
 | POST | `/api/auth/magic-link` | — | `{}` always `200` — body `{email}`; sends magic link for an existing account |
 | GET | `/api/auth/magic-link/{token}` | — | establishes session + sets `__Host-mxi_session` cookie; body `{pid, name, email, is_verified}` or `401` on invalid/expired link |
+| POST | `/api/auth/token` | Session | exchanges the valid session for a short-lived PASETO v4.public bearer (~5 min) |
 | GET | `/api/auth/me` | Session | `{pid, name, email}`; `401` if session invalid, revoked, or account erased |
 | POST | `/api/auth/signout` | Session | `{}` — revokes the session |
 
@@ -46,7 +46,7 @@ name→`"deleted user"`); see entity spec [§12](../spec/12-compliance.md).
 
 | Method | Path | Auth | Returns |
 |---|---|---|---|
-| GET | `/.well-known/paseto-keys` | — | published Ed25519 public key(s) for offline PASETO v4.public verification (target). *(RS256-era runtime still serves `/.well-known/jwks.json`: `{"keys":[{kty,use,alg,kid,n,e}]}` until the spec §13 follow-up.)* |
+| GET | `/.well-known/paseto-keys` | — | published Ed25519 public key(s) for offline PASETO v4.public verification: `{"keys":[{kty:"OKP",crv:"Ed25519",use,kid,x}]}` |
 
 ### Status codes
 
@@ -61,8 +61,8 @@ OpenAPI 3 + Swagger UI at `/api-docs/openapi.json` + `/swagger-ui`
 
 **Source:**
 [`src/controllers/auth.rs`](../authentication-service-with-loco/src/controllers/auth.rs),
-[`src/controllers/jwks.rs`](../authentication-service-with-loco/src/controllers/jwks.rs)
-(published-key endpoint; PASETO-keys target), routes registered in
+[`src/controllers/paseto_keys.rs`](../authentication-service-with-loco/src/controllers/paseto_keys.rs)
+(published-key endpoint), routes registered in
 [`src/app.rs`](../authentication-service-with-loco/src/app.rs).
 
 ## Verifier library API
@@ -98,16 +98,13 @@ BFF client/repository specifics.
 
 ## Configuration (service env)
 
-> The `JWT_*` vars below are RS256-era and describe the **current**
-> runtime; they survive only until the PASETO migration in the service
-> spec §13 (target: Ed25519 PASETO + `/.well-known/paseto-keys`).
-
 | Var | Default | Purpose |
 |---|---|---|
-| `JWT_PRIVATE_KEY_FILE` / `JWT_PUBLIC_KEY_FILE` | `config/keys/jwt_{private,public}_dev.pem` | RSA PEM paths |
-| `JWT_PRIVATE_KEY_PEM` / `JWT_PUBLIC_KEY_PEM` | — | Inline PEM (takes precedence) |
-| `JWT_ISSUER` | `authentication-service` | `iss` claim |
-| `JWT_AUDIENCE` | `main-x-service` | `aud` claim |
-| `JWT_EXPIRATION` | `3600` | Token TTL (seconds) |
+| `TOKEN_PRIVATE_KEY_SEED` | — | Primary Ed25519 signing seed (base64url 32 bytes; takes precedence) |
+| `TOKEN_PRIVATE_KEY_FILE` | — | Path to a file holding the same seed; unset ⇒ built-in dev seed |
+| `TOKEN_ADDITIONAL_PUBLIC_KEYS` | — | Comma-separated verify-only Ed25519 public keys (rotation) |
+| `TOKEN_ISSUER` | `authentication-service` | `iss` claim |
+| `TOKEN_AUDIENCE` | `main-x-service` | `aud` claim |
+| `TOKEN_EXPIRATION` | `300` | PASETO TTL (seconds) |
 | `FRONTEND_URL` | `http://localhost:5173` | Magic-link base |
 | `DATABASE_URL` | loco config default | PostgreSQL |

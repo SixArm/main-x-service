@@ -4,15 +4,16 @@ Roadmap items become §13 tasks when they are concrete enough to size
 and accept. Ordered roughly by the path from today's MVP to a
 worldwide governmental deployment with millions of users.
 
-- **Session + PASETO pivot (now the lead item — §13 T-12).** Move the
-  human session off JWT to a server-side `__Host-mxi_session` cookie
+- **Session + PASETO pivot (§13 T-12 — core landed).** The human
+  session moved off JWT to a server-side `__Host-mxi_session` cookie
   session, and the cross-service credential to **PASETO v4.public**
   (Ed25519) minted by `POST /token` and published at
-  `/.well-known/paseto-keys`; add CSRF; move front-ends to the BFF
-  pattern; decommission RS256 + `/.well-known/jwks.json`. Per
+  `/.well-known/paseto-keys`; front-ends moved to the BFF
+  pattern; RS256 + `/.well-known/jwks.json` decommissioned. Per
   [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
   This **supersedes** the previous JWT model and reframes the
-  enforcement rollout below.
+  enforcement rollout below. Remaining: full double-submit CSRF + the
+  sessions-table reshape (§13 T-12a/T-12c).
 - **PASETO enforcement rollout across peer services.** Embed the
   PASETO-mode `authentication-verifier` in every entity service (the
   loco conversion's next step), reject unauthenticated `/api/*`
@@ -21,8 +22,10 @@ worldwide governmental deployment with millions of users.
   and have sibling front-ends call entity services server-side (BFF)
   with a minted PASETO. The verifier crate exists precisely to make
   this a per-crate one-liner.
-- **Key rotation automation.** Multi-key JWKS with a grace window
-  (§13 T-5), scheduled rotation, secrets-manager integration, and a
+- **Key rotation automation.** Multi-key published key set
+  (`paseto-keys`) with a grace window
+  (§13 T-5 — delivered), scheduled rotation, secrets-manager
+  integration, and a
   documented emergency-revocation runbook (key compromise = rotate +
   wait out the TTL).
 - **Rate limiting and abuse resistance.** Per-email / per-IP issuance
@@ -40,7 +43,8 @@ worldwide governmental deployment with millions of users.
   [`agents/share/locales.md`](../../agents/share/locales.md)),
   including RTL scripts (ar, fa, ur).
 - **Multi-region deployment.** Active-active stateless app tier,
-  PostgreSQL replication across regions, JWKS served from a CDN edge
+  PostgreSQL replication across regions, the `paseto-keys` key set
+  served from a CDN edge
   (it is public, cacheable, and tiny), regional SMTP relays.
 - **Auditability at governmental grade.** Auth event audit log +
   event streaming (§13 T-10), retention policy, auditor query API —

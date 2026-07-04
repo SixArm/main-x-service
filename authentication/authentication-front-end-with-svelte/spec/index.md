@@ -277,30 +277,31 @@ session on sign-out and the BFF clears the cookie. CSRF protection (§6 FR
 > remain in the log as history; the code follow-up below reverses their
 > credential-handling parts.
 
-- [ ] **BFF migration (code follow-up to this re-spec).** One three-part
-      PR (spec already done here):
-      - Add the SvelteKit **server** auth boundary: `hooks.server.ts`
-        (read/validate `__Host-mxi_session`, populate `event.locals`),
-        `+page.server.ts` for `/` (dashboard load via `GET /me`,
-        server-side), `+server.ts` / `+page.server.ts` for `/verify`
-        (token exchange → relay `Set-Cookie`) and sign-out (revoke +
-        clear cookie).
-      - **Cookie handling**: relay `Set-Cookie: __Host-mxi_session=…` from
-        the auth service; clear on sign-out
-        (`authentication-sessions.md` §3, §7).
+- [x] **BFF migration (core landed).** The SvelteKit **server** auth
+      boundary is in place: `hooks.server.ts`
+      (read `__Host-mxi_session`, populate `event.locals`),
+      `+page.server.ts` for `/` (dashboard load via `GET /me`,
+      server-side) and for `/verify`
+      (token exchange → relay `Set-Cookie`), and sign-out (revoke +
+      clear cookie). Cookie handling relays
+      `Set-Cookie: __Host-mxi_session=…` from
+      the auth service and clears on sign-out
+      (`authentication-sessions.md` §3, §7). The
+      `mxi_access_token` / `FEDERATION_TOKEN_KEY` federation key, the
+      `localStorage` token (`mxi.auth.token`/`mxi.auth.user`) model
+      (`src/lib/auth/session.svelte.ts`), and the `#access_token=` URL
+      **fragment** handoff are **removed**
+      (the allowlist survives as an open-redirect control; the redirect
+      is a plain navigation to `return_to`).
+- [ ] **BFF migration residuals.**
       - **CSRF**: issue a per-session token at the BFF and validate it on
         all browser→BFF mutations, with an `Origin`/`Referer` backstop
         (`authentication-sessions.md` §4); pick the token transport (open
         question, `authentication-sessions.md` §10).
-      - **Remove** `mxi_access_token` / `FEDERATION_TOKEN_KEY`, the
-        `localStorage` token (`mxi.auth.token`/`mxi.auth.user`) model in
-        `src/lib/auth/session.svelte.ts`, and the `#access_token=` URL
-        **fragment** handoff in `/verify` + `src/lib/auth/return-to.ts`
-        (keep only the allowlist as an open-redirect control; the redirect
-        becomes a plain navigation to `return_to`).
-      - Update tests per §11 (drop federation-key/token-mirror cases; add
-        CSRF + server-side session cases; restate the `return_to` e2e to
-        assert no token in the URL).
+      - Restate the tests per §11 (drop federation-key/token-mirror cases;
+        add CSRF + server-side session cases; restate the `return_to` e2e
+        to assert no token in the URL — the e2e suite still asserts the
+        old fragment handoff).
 - [x] Add vitest unit tests for `ApiClient` and `AuthRepository`
       (`tests/unit/client.test.ts` + `tests/unit/auth.test.ts`, 16
       tests). *(2026-06-13; entity spec T-11.)*
@@ -343,16 +344,18 @@ client, repository, runes session, SPA config, bilingual (en/cy) i18n with
 a reactive locale switcher, and the cross-origin token handoff.
 
 **Re-spec'd 2026-06-17** to the httpOnly-cookie + BFF model
-(`authentication-sessions.md`); the code follow-up (BFF hooks, cookie
-handling, CSRF, removal of `mxi_access_token` / `localStorage` token + the
-`#access_token=` fragment handoff) is the open §13 task. Spec/docs lead the
-code per the three-part rule.
+(`authentication-sessions.md`), and the **BFF core has landed in code**:
+server hooks + server loads, cookie relay/clear, and removal of
+`mxi_access_token` / the `localStorage` token + the
+`#access_token=` fragment handoff. Remaining (§13): the per-session CSRF
+token and restating the test suites to the BFF model.
 
 ## 15. Roadmap
 
 v0.1 (shipped): functional magic-link UI (bearer-token SPA). v0.2: **BFF +
-httpOnly-cookie session migration** (`authentication-sessions.md`) — the
-current focus. v0.3: shared-nav integration with sibling front-ends, all
+httpOnly-cookie session migration** (`authentication-sessions.md`) — core
+landed; CSRF + test restatement remain. v0.3: shared-nav integration with
+sibling front-ends, all
 now session-cookie + BFF based (no shared client token).
 
 ## 16. Open questions

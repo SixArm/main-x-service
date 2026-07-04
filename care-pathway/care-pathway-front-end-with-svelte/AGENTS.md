@@ -2,7 +2,7 @@
 
 Operator UI for the [Care Pathway Service](../care-pathway-service-with-loco):
 care-pathway CRUD + matching + name search + merge + audit trail +
-recent-activity + cookie-session / BFF auth (PASETO; pivot in progress).
+recent-activity + cookie-session / BFF auth (PASETO).
 
 > Read [`spec/index.md`](./spec/index.md) first — the living spec.
 
@@ -27,17 +27,20 @@ service REST API, whose request/response body is the
 
 ```
 src/
+├── hooks.server.ts               BFF session handling (reads the httpOnly session cookie)
 ├── lib/
-│   ├── config.ts                 PUBLIC_API_BASE_URL (:5150) + VITE_AUTH_FRONTEND_URL (:5173) + signInUrl()
-│   ├── auth.svelte.ts            reactive bearer-token store (mxi_access_token) + captureTokenFromHash
+│   ├── config.ts                 API_BASE_URL → same-origin BFF proxy (/api/proxy)
 │   ├── api/
-│   │   ├── client.ts             lean fetch wrapper (+ ApiError); attaches Bearer from auth store
+│   │   ├── client.ts             lean fetch wrapper (+ ApiError); no browser-held bearer — the BFF proxy injects the PASETO server-side
 │   │   ├── types.ts              CarePathway + ConditionCode + CodeSystem + CareSetting + IdentifierScheme + PathwayIdentifier + PathwayRef + ScoredRef + MergeResult + AuditEntry + PathwayEvent
 │   │   └── care-pathways.ts      CarePathwayRepository (CRUD + search + checkDuplicates + merge + audit + recentEvents)
+│   ├── server/                   BFF-only (never bundled to the browser): auth.ts (magic-link + session→PASETO exchange), session.ts (cookie), config.ts (CARE_PATHWAY_API_URL / AUTH_API_URL)
 │   └── components/CarePathwayForm.svelte
 └── routes/
-    ├── +layout.svelte / +layout.ts   nav + SPA toggle + session affordance (Sign in / paste / Sign out)
+    ├── +layout.svelte / +layout.ts / +layout.server.ts   nav + session panel
     ├── +page.svelte              list + name-search box + recent-activity toggle
+    ├── signin/ · verify/         per-app magic-link sign-in (BFF server routes)
+    ├── api/proxy/[...path]/+server.ts   BFF proxy → care-pathway service (injects the PASETO bearer)
     ├── new/+page.svelte          create
     ├── [pid]/+page.svelte        detail + delete + check-duplicates + merge + audit-trail toggle
     └── [pid]/edit/+page.svelte   edit
@@ -71,7 +74,7 @@ pnpm test:e2e     # Playwright smoke (runs against `vite preview`)
 
 ## Auth
 
-**Target model (BFF).** Sign-in via the central authentication-service
+**BFF model (current).** Sign-in via the central authentication-service
 magic-link establishes a server-side **cookie session**
 (`__Host-mxi_session`, httpOnly). The browser holds **no token** and
 talks only to this front-end's own SvelteKit server (BFF), which
@@ -84,10 +87,13 @@ default and unchanged in semantics — only the credential changes.
 Source of truth:
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 (RS256 JWT + JWKS and the cross-origin `#access_token` fragment handoff
-are decommissioned). **Pivot in progress** — the listed `auth.svelte.ts`
-client-held-token store keyed on `localStorage["mxi_access_token"]` /
-`captureFromLocation` handoff is the current runtime; the BFF + cookie +
-CSRF code follow-up is tracked in spec §13.
+are decommissioned). The former `auth.svelte.ts` client-held-token store
+keyed on `localStorage["mxi_access_token"]` / `captureFromLocation`
+handoff has been removed — the runtime is the BFF: `src/lib/server/`
+exchanges the session for the PASETO and the `/api/proxy` route calls
+the service server-side.
 
-Configure with `PUBLIC_API_BASE_URL` and `VITE_AUTH_FRONTEND_URL`
-(see `.env.example`).
+Configure the BFF's upstream URLs with the server-side env vars
+`CARE_PATHWAY_API_URL` (care-pathway service) and `AUTH_API_URL`
+(authentication service) — see `src/lib/server/config.ts`; both default
+to `http://localhost:5150`.

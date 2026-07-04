@@ -24,7 +24,7 @@
 | **Timestamps**       | chrono                                              | Dates, times, durations                     |
 | **Error Handling**   | thiserror, anyhow                                 | Typed and contextual error handling         |
 | **Security**         | argon2                                            | Password hashing                            |
-| **Authentication**   | jsonwebtoken                                      | JWT authentication                          |
+| **Authentication**   | rusty_paseto, authentication-verifier             | PASETO v4.public cross-service tokens (offline verification); cookie sessions for humans |
 | **Testing**          | assertables, tokio-test                           | Unit testing, integration                   |
 | **Mock Testing**     | mockall, tempfile                                 | Mock testing                                |
 | **Benchmarking**     | Criterion                                         | Statistical performance benchmarking        |

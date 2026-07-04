@@ -5,11 +5,34 @@ tick the box when an automated test or clearly described manual check
 confirms the criterion is met. Tasks small enough to land in a single
 PR; split larger tasks (`T-12a`, `T-12b`).
 
-- [ ] **T-1 — Wire JWT middleware on `/api/*`.**
-  - [ ] Add `jsonwebtoken` validator extractor.
-  - [ ] Reject unauthenticated requests with `401`.
-  - **Acceptance:** integration test posts without a token → `401`;
-    posts with a valid signed token → `2xx`.
+- [x] **T-1a — Flip peer verification to PASETO v4.public.** *(done
+  2026-07-04)* Per
+  [authentication-sessions.md](../../../agents/share/authentication-sessions.md)
+  §5/§9: the family moved off RS256-JWT + JWKS.
+  - [x] `authentication-verifier` 0.2 (path dep; PASETO-only) replaces
+    the crates.io 0.1 RS256 version; direct `jsonwebtoken` dep dropped.
+  - [x] [`AuthUser`] extractor + `GET /api/whoami` verify PASETO
+    `v4.public` (Ed25519) bearer tokens offline — signature, footer
+    `kid`, `iss`, `aud`, `exp` — via `bearer_claims` in
+    `src/api/rest/auth.rs`.
+  - [x] Verifier built from env at boot (`PERSON_PASETO_KEYS` key set as
+    published at `/.well-known/paseto-keys`; `PERSON_TOKEN_ISSUER` /
+    `PERSON_TOKEN_AUDIENCE`, defaults `authentication-service` /
+    `main-x-service`); absent key set ⇒ empty set, every token rejected,
+    service still boots.
+  - **Acceptance:** DB-free unit tests in `src/api/rest/auth.rs` mint
+    `v4.public` tokens in-process (throwaway Ed25519 key) and pin
+    valid / missing / non-bearer / expired / tampered / no-key
+    outcomes. Met: `cargo test --lib` green.
+- [ ] **T-1b — Blanket auth enforcement on `/api/*`.**
+  - [ ] Require a valid PASETO bearer token on every route except
+    public paths (health, OpenAPI/Swagger, metrics), gated by a
+    default-off `PERSON_REQUIRE_AUTH` env flag (family contract:
+    `agents/share/jwt-enforcement.md`).
+  - [ ] Fetch the key set over HTTP from the auth service at boot
+    (today it is injected via `PERSON_PASETO_KEYS`).
+  - **Acceptance:** integration test with enforcement on posts without
+    a token → `401`; posts with a valid token → `2xx`.
 - [ ] **T-2 — Production Fluvio publisher.**
   - [ ] Implement `FluvioEventPublisher : EventProducer` behind
     feature flag `fluvio`.

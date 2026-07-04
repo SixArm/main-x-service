@@ -60,13 +60,14 @@ deferred (spec §13): Tantivy full-text (this uses Postgres `ILIKE`),
 per-field privacy/GDPR export, blanket-enforcement published-Ed25519-key-over-HTTP
 fetch at boot (env injection is wired today), richer validation.
 
-Auth pivot in progress: the family moved from RS256 JWT + JWKS to
+Auth pivot done in this crate: the family moved from RS256 JWT + JWKS to
 cookie sessions + short-lived PASETO v4.public verified offline against a
 published Ed25519 key (RS256/JWKS decommissioned); the `*_REQUIRE_AUTH`
 flag and enforcement semantics are unchanged, only the credential
-changes. See
+changed. See
 [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)
-(source of truth); code follow-up tracked in spec §13.
+(source of truth); `src/auth.rs` verifies PASETO via the
+`authentication-verifier` crate (0.2, `from_paseto_keys_*`).
 
 ## Golden rules
 

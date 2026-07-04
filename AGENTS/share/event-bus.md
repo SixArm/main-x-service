@@ -207,7 +207,7 @@ don't know the transport.
   subscriptions and retention independent.
 - **Partition key** = `pid`. Partition count is an ops choice (start 3–6);
   per-record order holds regardless.
-- **Config** (per service, env-driven, mirroring the JWT/`REQUIRE_AUTH`
+- **Config** (per service, env-driven, mirroring the auth/`REQUIRE_AUTH`
   pattern):
 
 | Var | Meaning | Default |

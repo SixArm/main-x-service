@@ -27,29 +27,32 @@ service REST API, whose request/response body is the
 
 ```
 src/
+├── hooks.server.ts               BFF session handling (reads the httpOnly session cookie)
 ├── lib/
-│   ├── config.ts                 PUBLIC_API_BASE_URL (:5150) + VITE_AUTH_FRONTEND_URL (:5173) + signInUrl()
-│   ├── auth.svelte.ts            bearer-token store (mxi_access_token) + captureTokenFromHash / captureFromLocation (SSO handoff)
+│   ├── config.ts                 API_BASE_URL → same-origin BFF proxy (/api/proxy)
 │   ├── api/
-│   │   ├── client.ts             lean fetch wrapper (+ ApiError, auto-attaches Bearer from auth)
+│   │   ├── client.ts             lean fetch wrapper (+ ApiError); no browser-held bearer — the BFF proxy injects the PASETO server-side
 │   │   ├── types.ts              Organization + OrgIdentifier + PostalAddress + OrgRef + ScoredRef; IdentifierScheme + DETERMINISTIC_SCHEMES + ALL_SCHEMES
 │   │   ├── build.ts              pure form->payload core: buildOrganization + splitList/blankToUndef + excludeSelf
 │   │   └── organizations.ts      OrganizationRepository (CRUD + checkDuplicates)
+│   ├── server/                   BFF-only (never bundled to the browser): auth.ts (magic-link + session→PASETO exchange), session.ts (cookie), config.ts (ORGANIZATION_API_URL / AUTH_API_URL)
 │   └── components/OrganizationForm.svelte
 ├── routes/
-│   ├── +layout.svelte / +layout.ts   nav + Session panel + SPA toggle
+│   ├── +layout.svelte / +layout.ts / +layout.server.ts   nav + session panel
 │   ├── +page.svelte              list
+│   ├── signin/ · verify/         per-app magic-link sign-in (BFF server routes)
+│   ├── api/proxy/[...path]/+server.ts   BFF proxy → organization service (injects the PASETO bearer)
 │   ├── new/+page.svelte          create
 │   ├── [pid]/+page.svelte        detail + delete + check-duplicates
 │   └── [pid]/edit/+page.svelte   edit
 tests/
-├── unit/                         vitest (client, auth, config, organizations, build)
+├── unit/                         vitest (client, build, organizations, i18n, layout)
 └── e2e/smoke.spec.ts             Playwright (four routes, API stubbed)
 ```
 
 ## Session / SSO
 
-**Target model (BFF).** The browser holds no token: sign-in establishes
+**BFF model (current).** The browser holds no token: sign-in establishes
 a server-side **cookie session** (`__Host-mxi_session`, httpOnly), the
 browser talks only to this front-end's own SvelteKit server (BFF), and
 the BFF exchanges the session for a short-lived **PASETO v4.public**
@@ -60,9 +63,10 @@ Service-side enforcement (`ORGANIZATION_REQUIRE_AUTH`) is off by default.
 Source of truth:
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 (RS256 JWT + JWKS and the cross-origin `#access_token` fragment handoff
-are decommissioned). **Pivot in progress** — the listed `auth.svelte.ts`
-client-held-token store / `captureFromLocation` handoff is the current
-runtime; the BFF + cookie + CSRF code follow-up is tracked in spec §13.
+are decommissioned). The former `auth.svelte.ts` client-held-token store
+/ `captureFromLocation` handoff has been removed — the runtime is the
+BFF: `src/lib/server/` exchanges the session for the PASETO and the
+`/api/proxy` route calls the service server-side.
 
 ## API consumption
 
@@ -86,5 +90,7 @@ pnpm test         # vitest unit suite
 pnpm test:e2e     # Playwright smoke (production build)
 ```
 
-Configure the API base URL with `PUBLIC_API_BASE_URL` and the central
-auth front-end with `VITE_AUTH_FRONTEND_URL` (see `.env.example`).
+Configure the BFF's upstream URLs with the server-side env vars
+`ORGANIZATION_API_URL` (organization service) and `AUTH_API_URL`
+(authentication service) — see `src/lib/server/config.ts`; both default
+to `http://localhost:5150`.

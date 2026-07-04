@@ -33,6 +33,8 @@ A single person identity surface that:
   encounters, observations, transactions, conditions) — link out
   to the dedicated domain index.
 - **Not** a workforce credentialing system — use the Worker Service.
-- **Not** an authentication / authorisation provider — JWT middleware
-  is planned (§15) but identity proofing is out of scope.
+- **Not** an authentication / authorisation provider — the central
+  authentication-service owns identity; this service only verifies its
+  PASETO v4.public tokens offline (blanket enforcement is planned, §15)
+  and identity proofing is out of scope.
 

@@ -128,7 +128,8 @@ See §5. Crate name: `authentication-verifier` (lib
 
 ## 10. Persistence
 
-None. The crate is stateless; the JWKS document is the caller's input.
+None. The crate is stateless; the published key-set document
+(`/.well-known/paseto-keys`) is the caller's input.
 
 ## 11. Testing strategy
 
@@ -158,7 +159,8 @@ token ever transits to a third party.
 
 ## 13. Tasks (live work queue)
 
-- [ ] **PASETO v4.public pivot (code follow-up).** Replace the
+- [x] **PASETO v4.public pivot (code follow-up).** *(2026-06-17 —
+      shipped as v0.2.0)* Replaced the
       RS256-JWT/JWKS implementation in `src/lib.rs` with PASETO
       v4.public per §5/§6 and
       [authentication-sessions.md](../../../agents/share/authentication-sessions.md)
@@ -168,9 +170,9 @@ token ever transits to a third party.
       footer `kid`; verify the Ed25519 signature + `iss`/`aud`/`exp`/
       `nbf`; rename `VerifyError::Jwks`→`Keys` and
       `Jwt`→`Paseto`; keep the same `Claims` shape (now `sid` +
-      `scope`/`roles`, no `jti`/`email`/`name`). Update the throwaway
-      keypair and all unit tests to Ed25519. Ship alongside JWT during
-      overlap (shared-doc §9 step 3), then drop JWT.
+      `scope`/`roles`, no `jti`/`email`/`name`). Updated the throwaway
+      keypair and all unit tests to Ed25519. Published to crates.io as
+      `authentication-verifier` 0.2.
 - [ ] Refetch-on-`UnknownKid` helper (or document the pattern per
       entity spec §13 T-5 key rotation).
 - [ ] Property-test the PASETO-keys parser against fuzzed documents.
@@ -189,12 +191,12 @@ token ever transits to a third party.
 
 ## 14. Implementation status
 
-**Spec re-targeted to PASETO v4.public (2026-06-17); code follow-up is
-§13 T-1.** The shipped `src/lib.rs` (v0.1.x) still implements the
-RS256-JWT/JWKS surface; it is superseded by this spec and will be
-replaced by the PASETO implementation. The doc set, `fetch` feature,
-offline-test discipline, and packageability (`cargo package --list`)
-carry over unchanged in shape.
+**PASETO v4.public shipped (v0.2.0, 2026-06-17).** The shipped
+`src/lib.rs` implements the PASETO v4.public surface of §5/§6
+(`from_paseto_keys_*`, footer-`kid` selection, Ed25519 verification via
+`rusty_paseto`); the RS256-JWT/JWKS implementation (v0.1.x) is removed.
+The doc set, `fetch` feature, offline-test discipline, and
+packageability (`cargo package --list`) carried over unchanged in shape.
 
 ## 15. Roadmap
 
@@ -210,9 +212,9 @@ change (see [CHANGELOG.md](../CHANGELOG.md)). Later: rotation ergonomics
 - Should the crate offer an Axum extractor, or stay framework-free and
   let each service wrap it? (Currently framework-free.)
 - Multiple audiences per verifier, if peers ever get distinct `aud`s.
-- PASETO library choice: `rusty_paseto` (v4 public) is the candidate;
-  confirm its feature set verifies with `#![forbid(unsafe_code)]`
-  (shared-doc §10).
+- ~~PASETO library choice~~ — resolved: `rusty_paseto` (v4 public,
+  `default-features = false`) ships in v0.2.0 and builds under
+  `#![forbid(unsafe_code)]` (shared-doc §10).
 
 ## 17. References
 

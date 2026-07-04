@@ -15,7 +15,7 @@ SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
 | `/[pid]` | Detail + delete + check-duplicates + merge + audit-trail toggle |
 | `/[pid]/edit` | Edit |
 
-Auth (target model): **Sign in** via the central authentication-service
+Auth (BFF): **Sign in** via the central authentication-service
 magic-link establishes a server-side **cookie session**
 (`__Host-mxi_session`, httpOnly); the browser holds **no token** and
 talks only to this front-end's own SvelteKit server (BFF), which
@@ -25,8 +25,9 @@ CSRF-protected; there is no `localStorage` and no `mxi_access_token`.
 Source of truth:
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 (RS256 JWT + JWKS and the `#access_token` fragment handoff
-decommissioned). **Pivot in progress** — the current runtime still uses
-the older client-held-token flow; code follow-up tracked in spec §13.
+decommissioned). The runtime is the BFF: sign-in via the app's own
+`/signin` + `/verify` routes, API calls via the same-origin `/api/proxy`
+route, which injects the server-exchanged PASETO.
 
 ## Prerequisites
 
@@ -36,7 +37,6 @@ the older client-held-token flow; code follow-up tracked in spec §13.
 ## Quick start
 
 ```bash
-cp .env.example .env     # PUBLIC_API_BASE_URL=http://localhost:5150
 pnpm install
 pnpm dev                 # http://localhost:5173
 ```
@@ -45,8 +45,8 @@ pnpm dev                 # http://localhost:5173
 
 | Var | Default | Purpose |
 |---|---|---|
-| `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Care pathway service REST base URL. |
-| `VITE_AUTH_FRONTEND_URL` | `http://localhost:5173` | Central authentication front-end base URL for sign-in. Target model is a server-side cookie session + BFF (no browser token); see [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md). Pivot in progress — code follow-up tracked in spec §13. |
+| `CARE_PATHWAY_API_URL` | `http://localhost:5150` | Care pathway service REST base URL (read server-side by the BFF proxy; see `src/lib/server/config.ts`). |
+| `AUTH_API_URL` | `http://localhost:5150` | Authentication service base URL (BFF-side magic-link + session→PASETO exchange); see [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md). |
 
 ## How it works
 

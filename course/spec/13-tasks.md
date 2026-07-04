@@ -42,11 +42,15 @@ front-end [§13](../course-front-end-with-svelte/spec/13-tasks.md)).
       the front-end renders instances read-only (front-end T-15).
 - [ ] T-6: Syllabus-section round-trip — service read/write API
       (service roadmap v0.4) then front-end edit UI, in that order.
-- [ ] T-7: SSO rollout across the trio — service verifies RS256 JWT
-      against the [authentication entity](../../authentication/)
-      JWKS (service T-15); front-end sign-in + token carriage +
-      401/403 redirect handling (front-end OQ-3). One coordinated
-      change cycle; blocks any governmental deployment (§12.3).
+- [ ] T-7: SSO rollout across the trio — service verifies PASETO
+      v4.public offline against the
+      [authentication entity](../../authentication/)'s published
+      Ed25519 key (service T-15, per
+      [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md));
+      front-end BFF sign-in (httpOnly cookie session; PASETO attached
+      server-side) + 401/403 redirect handling (front-end OQ-3). One
+      coordinated change cycle; blocks any governmental deployment
+      (§12.3).
 - [ ] T-8: Durable event bus — land the service's Fluvio adapter
       behind its feature flag so `CourseEvent`s survive process
       restart; document the consumer contract here when it exists.

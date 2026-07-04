@@ -238,12 +238,13 @@ access controls added later.
   `Verifier` (env-configured keys/issuer/audience);
   `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit
   `actor` stamped from the token. (Originally RS256-JWT against the
-  auth-service JWKS; the credential is being switched to PASETO — below.)
-  - [ ] Switch the credential RS256-JWT → **PASETO v4 public** per
+  auth-service JWKS; the credential has since been switched to PASETO —
+  below.)
+  - [x] Switch the credential RS256-JWT → **PASETO v4 public** per
     [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
-    (supersedes the RS256-JWT + JWKS model): `Verifier` verifies
+    (supersedes the RS256-JWT + JWKS model). **Done:** `Verifier` verifies
     `v4.public.…` tokens against the auth-service's published Ed25519
-    key; `from_paseto_keys_value` / `from_paseto_keys_url` replace
+    key; `from_paseto_keys_value` / `from_paseto_keys_url` replaced
     `from_jwks_*`; same `Claims` shape (`kid`/`iss`/`aud`/`exp`, `kid`
     in the footer); env vars `CARE_PATHWAY_PASETO_KEYS` /
     `CARE_PATHWAY_TOKEN_ISSUER` / `CARE_PATHWAY_TOKEN_AUDIENCE`.
@@ -291,9 +292,9 @@ embedding care-pathway-matcher; audit log + in-memory event streaming on
 every CRUD/merge (`/audit/recent`, `/{pid}/audit`, `/events/recent`,
 `/merges/recent`) — Phase 1 of the durable event bus (canonical
 `Envelope` + `EventPublisher` seam + `InMemoryPublisher`; frozen
-`EventView` projection on `/events/recent`); offline bearer-token verification (`AuthUser`/
-`MaybeAuthUser`, `/whoami`, audit `actor` from the token — switching
-RS256-JWT → PASETO v4 public per §13); OpenAPI 3 doc
+`EventView` projection on `/events/recent`); offline **PASETO v4 public**
+verification (`AuthUser`/`MaybeAuthUser`, `/whoami`, audit `actor` from
+the token — credential switched from RS256-JWT per §13); OpenAPI 3 doc
 + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`); a root-level
 Prometheus `/metrics.prom` endpoint (CRUD/merge counters +
 `http_requests_total`, public under enforcement); blanket `/api/*`
@@ -309,11 +310,11 @@ the CRUD + matching MVP, then `ILIKE` search + audit + in-memory
 streaming, then record merge + OpenAPI/Swagger + Prometheus + offline
 bearer-token verification + blanket `/api/*` enforcement middleware. The
 original v0.2 / v0.3 milestone split was never cut as a tagged release.
-Next (deferred, §13): switch the credential RS256-JWT → PASETO v4 public
-per [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
-(supersedes the RS256-JWT model), Tantivy full-text/fuzzy search, durable
-event bus Phases 2–3 (outbox → Fluvio), paseto-keys-over-HTTP fetch at
-boot, privacy, front-end merge action.
+The credential switch RS256-JWT → PASETO v4 public per
+[`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
+has since landed (§13). Next (deferred, §13): Tantivy full-text/fuzzy
+search, durable event bus Phases 2–3 (outbox → Fluvio),
+paseto-keys-over-HTTP fetch at boot, privacy, front-end merge action.
 
 ## 16. Open questions
 

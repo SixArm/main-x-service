@@ -35,10 +35,10 @@ is personal data.
   registries and analytics can subscribe across replicas. (Seed: T-12.)
 - **Security — blanket SSO enforcement.** Offline token verification
   against the central auth-service's published key is delivered for
-  `whoami` + `actor` stamping; switch the credential to **PASETO v4
+  `whoami` + `actor` stamping, with the credential already **PASETO v4
   public** (Ed25519) per
   [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
-  (source of truth; supersedes the RS256-JWT + JWKS model), then extend
+  (source of truth; supersedes the RS256-JWT + JWKS model); extend
   to **blanket `/api/*` enforcement**, role split between read-side
   integrators and caseworkers, paseto-keys-over-HTTP fetch at boot, and
   rate limiting. (Seed: T-7 follow-up.)

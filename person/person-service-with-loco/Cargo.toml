@@ -82,10 +82,11 @@ person-matcher = { version = "0.6.1", path = "../person-matcher-rust-crate" }
 
 # Security
 argon2 = "0.5"
-jsonwebtoken = "9.3"
-# Offline RS256 verification of authentication-service tokens against its
-# published JWKS — no shared secret, no per-request introspection hop.
-authentication-verifier = "0.1"
+# Offline PASETO v4.public verification of authentication-service tokens
+# against its published Ed25519 key set (`/.well-known/paseto-keys`) — no
+# shared secret, no per-request introspection hop (local path — the
+# monorepo's 0.2 PASETO verifier).
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
 mimalloc = "0.1.52"
 
 [dev-dependencies]
@@ -94,6 +95,13 @@ assertables = "10"
 tokio-test = "0.4"
 mockall = "0.13"
 tempfile = "3.27"
+
+# Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
+# the bearer-verification path is exercised without the auth service or
+# any network dependency.
+ed25519-dalek = { version = "2.2" }
+rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
+base64 = { version = "0.22" }
 
 # Benchmarking
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }

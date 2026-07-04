@@ -116,13 +116,14 @@ and published-key-over-HTTP fetch at boot. Token issuance is provided by
 the central
 [authentication-service](../../authentication/authentication-service-with-loco).
 
-Auth pivot in progress: the family moved from RS256 JWT + JWKS to cookie
-sessions + short-lived PASETO v4.public verified offline against a
+Auth pivot done in this crate: the family moved from RS256 JWT + JWKS to
+cookie sessions + short-lived PASETO v4.public verified offline against a
 published Ed25519 key (RS256/JWKS decommissioned); the
 `CARE_PATHWAY_REQUIRE_AUTH` flag and enforcement semantics are unchanged,
-only the credential changes. See
+only the credential changed. See
 [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)
-(source of truth); code follow-up tracked in spec §13.
+(source of truth); `src/auth.rs` verifies PASETO via the
+`authentication-verifier` crate.
 
 ## License
 

@@ -8,6 +8,28 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed — auth pivot: RS256 JWT/JWKS → PASETO v4.public
+
+- Bearer-token verification migrated off RS256 JWT + JWKS to **PASETO
+  `v4.public`** (Ed25519), per the family-wide design in
+  `agents/share/authentication-sessions.md` (§5, §9 step 4; spec §13
+  T-1a). The `AuthUser` extractor and `GET /api/whoami` are unchanged
+  in shape; only the credential changes.
+- `authentication-verifier` bumped from the crates.io `0.1` (RS256)
+  release to the monorepo path dependency `0.2` (PASETO-only:
+  `Verifier::from_paseto_keys_value`); the direct `jsonwebtoken`
+  dependency is dropped.
+- The verifier is now built from the environment at boot:
+  `PERSON_PASETO_KEYS` (the Ed25519 key set the auth service publishes
+  at `/.well-known/paseto-keys`), `PERSON_TOKEN_ISSUER` (default
+  `authentication-service`), `PERSON_TOKEN_AUDIENCE` (default
+  `main-x-service`). Absent/blank/unparseable key set ⇒ empty key set:
+  every token is rejected but the service still boots.
+- New DB-free unit tests in `src/api/rest/auth.rs` mint `v4.public`
+  tokens in-process (throwaway Ed25519 key via `rusty_paseto` +
+  `ed25519-dalek` dev-deps) and pin valid / missing / non-bearer /
+  expired / tampered / no-key outcomes.
+
 ### Fixed — privacy masking UTF-8 safety
 
 - `privacy::mask_value` is now char-based instead of byte-based. The

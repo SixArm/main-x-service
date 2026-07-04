@@ -28,10 +28,11 @@ Auth column: **Cookie** = `__Host-mxi_session` session cookie;
 
 > **Decommissioned (this pivot).** `GET /.well-known/jwks.json` and
 > RS256 access-token issuance are removed; the magic-link redemption no
-> longer returns a bearer token. Per
-> [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
-> §9, JWKS may be kept transitionally during peer migration, then
-> dropped once no peer or front-end depends on it. Bearer-token auth is
+> longer returns a bearer token. The shared design allowed keeping the
+> JWKS transitionally during peer migration
+> ([`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+> §9); in practice it was removed outright — no JWKS or RS256 path
+> remains in the code. Bearer-token auth is
 > superseded by the session cookie (browser↔service) and PASETO
 > (service↔service).
 

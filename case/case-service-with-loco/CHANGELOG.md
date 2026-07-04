@@ -11,7 +11,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
-- **Auth pivot — docs only (code follow-up pending).** The family
+- **Auth pivot.** The family
   authentication model moved from **RS256 JWT + JWKS** to **server-side
   cookie sessions + offline PASETO v4.public verification** (published
   Ed25519 key replacing the JWKS) — see
@@ -20,10 +20,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   docs (README / AGENTS / index) now describe PASETO v4.public offline
   verification and "blanket auth enforcement"; the `CASE_REQUIRE_AUTH`
   flag and enforcement semantics are unchanged — only the credential
-  checked changes. The runtime `src/auth.rs` still verifies the old
-  credential; the PASETO code follow-up (verifier swap, published-key
-  fetch) is tracked in [spec §13](./spec/index.md). No code change in
-  this entry.
+  checked changes. The runtime `src/auth.rs` verifies PASETO v4.public
+  via `authentication-verifier` (env-configured `CASE_PASETO_KEYS` /
+  `CASE_TOKEN_ISSUER` / `CASE_TOKEN_AUDIENCE`); the
+  paseto-keys-over-HTTP fetch follow-up is tracked in
+  [spec §13](./spec/index.md).
 - **Documentation harmonization pass.** Expanded `index.md`'s "Worked
   flow" to the full v0.1 surface (list / search / update / delete /
   merge / merges-recent / whoami / audit / events / OpenAPI+Swagger /
@@ -87,7 +88,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   on/public, on/protected/no-token, on/valid, on/expired, on/tampered,
   plus `parse_bool`); a DB-gated `#[serial]` request test asserts un-authed
   `GET /api/cases` ⇒ `401` while `GET /api-docs/openapi.json` ⇒ `200`.
-  Activation (setting the flag) and JWKS-over-HTTP fetch remain
+  Activation (setting the flag) and paseto-keys-over-HTTP fetch remain
   operational follow-ups.
 
 ## [0.1.0] - 2026-06-13

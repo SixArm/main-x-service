@@ -22,9 +22,12 @@ implements the service side identically. It supersedes the per-crate
 
 Applies to the loco services that embed
 [`authentication-verifier`](../../authentication/authentication-verifier-rust-crate)
-via `src/auth.rs`: **organization**, **care-pathway**, **case**, **plan**.
-The older Axum services (person / worker / place) carry their own
-middleware story and are a separate follow-up.
+via `src/auth.rs`: **organization**, **care-pathway**, **case**, **portfolio**.
+**person** embeds the same verifier in its older api/rest architecture
+(`src/api/rest/auth.rs`, opt-in `AuthUser`); blanket enforcement there is
+tracked as its spec §13 T-1b. The other older Axum services (worker /
+place / thing / event) carry their own middleware story and are a
+separate follow-up.
 
 ## Why a flag, not a flip
 
@@ -112,7 +115,7 @@ is exactly as today.
 ### Tests
 
 - **Un-gated unit tests** of `enforce(...)` in `auth::tests` (reuse the
-  in-module test JWKS + `sign`): off + no token ⇒ `Ok`; on + public path
+  in-module test PASETO key pair + `sign`): off + no token ⇒ `Ok`; on + public path
   ⇒ `Ok`; on + protected + no token ⇒ `401`; on + protected + valid token
   ⇒ `Ok`; on + protected + expired/tampered ⇒ `401`. Also a
   `require_auth` parser test (`"1"`/`"true"`/`"on"` ⇒ true; ``/`"0"`/junk
@@ -223,8 +226,9 @@ Rules:
 ## Rollout order (operations)
 
 1. Ship both sides (service middleware + front-end attachment), flag off.
-2. Stand up the authentication-service token flow; operators obtain a
-   token into `mxi_access_token`.
+2. Stand up the authentication-service session + PASETO token flow; each
+   front-end BFF exchanges its session for short-lived PASETO tokens
+   ([authentication-sessions.md §5–§6](authentication-sessions.md)).
 3. Set `<ENTITY>_REQUIRE_AUTH=true` per service. Un-authenticated calls
    now 401; the front-end's attached token lets operator traffic through.
 4. Wire the DB-gated request suites to run with the flag in CI.
@@ -232,6 +236,6 @@ Rules:
 ## Status
 
 Per service: tick the "blanket `/api/*` enforcement" follow-up under the
-JWT task in that crate's spec §13 once the middleware + front-end
-attachment land green (default-off). Activation (step 3) and JWKS-over-HTTP
-fetch remain separate operational follow-ups.
+auth task in that crate's spec §13 once the middleware + BFF token
+attachment land green (default-off). Activation (step 3) and
+paseto-keys-over-HTTP fetch remain separate operational follow-ups.

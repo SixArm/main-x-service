@@ -45,11 +45,10 @@ Short-lived **PASETO v4.public** tokens are verified offline against the
 auth-service's published Ed25519 key via the embedded
 `authentication-verifier` (`src/auth.rs`) — RS256 JWT + JWKS
 decommissioned. The `AuthUser` extractor requires a token; `MaybeAuthUser`
-is optional and feeds the audit `actor`. Blanket `/api/*` enforcement +
-published-key fetch are follow-ups. Auth pivot in progress — source of
-truth
-[agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md);
-code follow-up tracked in entity spec §13.
+is optional and feeds the audit `actor`. Blanket `/api/*` enforcement is
+wired but default-off (`CARE_PATHWAY_REQUIRE_AUTH`); published-key fetch
+at boot remains a follow-up (entity spec §13). Source of truth:
+[agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md).
 
 ### Audit & events
 
@@ -84,7 +83,8 @@ Auth via the central auth-service: offline **PASETO v4.public**
 verification against the published Ed25519 key (RS256 JWT + JWKS
 decommissioned). See
 [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)
-(source of truth); code follow-up tracked in entity spec §13.
+(source of truth); remaining follow-up (entity spec §13):
+paseto-keys-over-HTTP fetch at boot.
 
 ## Example
 

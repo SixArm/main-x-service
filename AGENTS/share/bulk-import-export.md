@@ -246,7 +246,7 @@ adds one section + a §13 task declaring only what differs:
 ## 12. Open questions
 
 - **Artifact store** — S3-compatible in deployment, local fs in dev; config
-  shape (mirror the event-bus/JWT env-var pattern). Confirm the dev default.
+  shape (mirror the event-bus/auth env-var pattern). Confirm the dev default.
 - **Parquet import** — export-only in v1, or both? (Lean: export-only;
   import is roadmap.)
 - **File-size ceiling** — max upload before requiring chunked / presigned

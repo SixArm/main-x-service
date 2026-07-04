@@ -6,12 +6,14 @@ course registry. Crate-internal milestones stay in the crate roadmaps
 front-end [§15](../course-front-end-with-svelte/spec/15-roadmap.md));
 this is the entity-level sequence.
 
-- **E-1 — Secure the surface (next).** JWT enforcement in the
-  service (verify RS256 against the
-  [authentication entity](../../authentication/) JWKS, offline) +
-  front-end sign-in / token carriage / 401-403 handling. One
-  coordinated change cycle (§13 T-7). Nothing below ships to a
-  governmental environment before this.
+- **E-1 — Secure the surface (next).** Auth enforcement in the
+  service (verify PASETO v4.public offline against the
+  [authentication entity](../../authentication/)'s published Ed25519
+  key, per [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)) +
+  front-end sign-in via the BFF (httpOnly cookie session; the
+  SvelteKit server attaches the short-lived PASETO) / 401-403
+  handling. One coordinated change cycle (§13 T-7). Nothing below
+  ships to a governmental environment before this.
 - **E-2 — Close the operator loop.** Instance + syllabus edit UI
   (after the service's syllabus read/write API),
   `check-duplicates` pre-submit preview, masked-view toggle,

@@ -450,7 +450,7 @@ the other v1 edge kinds even though it shares the same edge shape.
   a process-wide `Verifier` (env-configured `CASE_PASETO_KEYS` /
   `CASE_TOKEN_ISSUER` / `CASE_TOKEN_AUDIENCE`); `AuthUser`/`MaybeAuthUser`
   extractors; `/whoami` protected; audit `actor` stamped from the token.
-  - [ ] Switch the credential to PASETO v4 public (Ed25519) per
+  - [x] Switch the credential to PASETO v4 public (Ed25519) per
     [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
     (source of truth; supersedes the RS256-JWT + JWKS model): verifier
     consumes the auth-service's published Ed25519 key(s)
@@ -556,11 +556,11 @@ green build + clippy.
 ## 15. Roadmap
 
 v0.1 (here): CRUD + title search + matching + merge + audit + streaming
-+ OpenAPI + offline token verification. v0.2: Tantivy full-text/fuzzy
-search, durable event bus, switch verification to PASETO v4 public per
++ OpenAPI + offline PASETO v4 public token verification per
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
-(source of truth; supersedes the RS256-JWT model). v0.3: privacy
-controls, blanket `/api/*` enforcement.
+(source of truth; supersedes the RS256-JWT model). v0.2: Tantivy
+full-text/fuzzy search, durable event bus, paseto-keys-over-HTTP fetch.
+v0.3: privacy controls, blanket `/api/*` enforcement.
 
 ## 16. Open questions
 
