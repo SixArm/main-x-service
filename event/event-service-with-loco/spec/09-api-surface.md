@@ -5,6 +5,7 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 | Tier | Surface |
 |---|---|
 | REST (Axum) | 15 endpoints under `/api/v1/events/*` + `/api/v1/audit/*` + `/api/v1/health` |
+| Auth (Axum) | `GET /api/v1/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | FHIR R5 (Axum) | `501 Not Implemented` stub (see §6.8) |
 | gRPC (Tonic) | Stubbed |
 | Web UI | None in this crate (backend-only loco service, no view tier). The operator UI is the sibling [`event-front-end-with-svelte`](../../event-front-end-with-svelte/spec/index.md). |
@@ -12,6 +13,12 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 
 Standard response envelope. `409` on duplicate-detected create; `422`
 on validation failure.
+
+Authentication is opt-in per handler: taking an `AuthUser` argument
+requires a valid `Authorization: Bearer <paseto>` token, verified
+offline (PASETO `v4.public`, Ed25519) against the auth-service
+published key set (see §13 T-8; blanket enforcement is the open
+remainder of T-8).
 
 ### 9.1 Bulk import / export
 

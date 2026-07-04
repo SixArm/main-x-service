@@ -26,6 +26,8 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+/// Bearer-token authentication extractor + `whoami` endpoint.
+pub mod auth;
 /// REST endpoint handlers and their request/response DTOs.
 pub mod handlers;
 /// Route-organization helpers.
@@ -141,6 +143,8 @@ pub fn create_router(state: AppState) -> Router {
     let api_routes = Router::new()
         // Health
         .route("/health", get(handlers::health_check))
+        // Auth — echo verified bearer-token claims
+        .route("/whoami", get(auth::whoami))
         // Event CRUD
         .route("/events", post(handlers::create_event))
         .route("/events/{id}", get(handlers::get_event))
@@ -202,6 +206,7 @@ pub fn events_routes() -> loco_rs::controller::Routes {
     Routes::new()
         .prefix("/api/v1")
         .add("/health", get(handlers::health_check))
+        .add("/whoami", get(auth::whoami))
         .add("/events", post(handlers::create_event))
         .add(
             "/events/{id}",

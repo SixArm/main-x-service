@@ -30,4 +30,7 @@ One canonical place record regardless of how many source systems
 - **Not** a routing engine — places have coordinates; turn-by-turn
   is out of scope.
 - **Not** a geocoder — reverse-geocoding endpoint is a roadmap item.
+- **Not** an authentication / authorisation provider — the central
+  authentication-service owns identity; this service only verifies its
+  PASETO v4.public tokens offline (blanket enforcement is planned, §15).
 

@@ -28,7 +28,8 @@ identity:
 - **Not** a credentialing / licensing source — link to the issuing
   authority; we record the credential, we do not validate it.
 - **Not** a payroll system.
-- **Not** an authentication / authorisation provider — PASETO
-  verification middleware is planned (§15) but identity proofing is
-  out of scope.
+- **Not** an authentication / authorisation provider — the central
+  authentication-service owns identity; this service only verifies its
+  PASETO v4.public tokens offline (blanket enforcement is planned,
+  §15); identity proofing is out of scope.
 

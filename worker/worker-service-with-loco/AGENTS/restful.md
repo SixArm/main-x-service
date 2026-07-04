@@ -90,6 +90,20 @@ is [`api::rest::handlers::metrics_prom`](../src/api/rest/handlers.rs).
 | ------ | ---------------- | ------------ |
 | GET    | `/api/health` | Health check |
 
+### Auth
+
+| Method | Path             | Description                                                          |
+| ------ | ---------------- | -------------------------------------------------------------------- |
+| GET    | `/api/v1/whoami` | Echo the verified bearer-token claims (`401` without a valid token) |
+
+Bearer tokens are PASETO `v4.public` (Ed25519) minted by the central
+authentication-service and verified **offline** against its published
+key set (`/.well-known/paseto-keys`) via the `authentication-verifier`
+crate — no shared secret, no introspection call. Configure with
+`WORKER_PASETO_KEYS` (key-set JSON), `WORKER_TOKEN_ISSUER`, and
+`WORKER_TOKEN_AUDIENCE`. Handlers opt in by taking an `AuthUser`
+argument (`src/api/rest/auth.rs`).
+
 ### Worker CRUD
 
 | Method | Path                   | Description                                        |

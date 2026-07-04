@@ -17,15 +17,33 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] Promote the stub to a working Tonic server mirroring REST CRUD.
   - **Acceptance:** `grpcurl` against `ThingService.GetThing`
     round-trips a record.
-- [ ] **T-4 — Authentication / authorisation.**
-  - [ ] PASETO verification middleware on `/api/*` — offline
-    PASETO v4.public verification via the `authentication-verifier`
-    crate ≥0.2 (keys fetched from the authentication-service
-    `/.well-known/paseto-keys`; per
-    [authentication-sessions](../../../agents/share/authentication-sessions.md))
-    — with editor / read-only / service roles.
-  - **Acceptance:** unauthenticated requests get `401`; valid token
-    + role gets `2xx`.
+- [ ] **T-4 — Authentication / authorisation.** Peer PASETO
+  verification *(done 2026-07-04)*; blanket enforcement + roles still
+  open. Per
+  [authentication-sessions](../../../agents/share/authentication-sessions.md)
+  §5: the family moved off RS256-JWT + JWKS.
+  - [x] Offline PASETO `v4.public` (Ed25519) verification via the
+    `authentication-verifier` crate 0.2 (path dep; key set as
+    published at the authentication-service
+    `/.well-known/paseto-keys`): `AuthUser` extractor + `GET
+    /api/whoami` verify bearer tokens offline — signature, footer
+    `kid`, `iss`, `aud`, `exp` — via `bearer_claims` in
+    `src/api/rest/auth.rs`.
+  - [x] Verifier built from env at boot (`THING_PASETO_KEYS` key set
+    as published at `/.well-known/paseto-keys`; `THING_TOKEN_ISSUER` /
+    `THING_TOKEN_AUDIENCE`, defaults `authentication-service` /
+    `main-x-service`); absent key set ⇒ empty set, every token
+    rejected, service still boots.
+  - [ ] Blanket enforcement middleware on `/api/*` — require a valid
+    PASETO bearer token on every route (health/metrics excepted) —
+    with editor / read-only / service roles.
+  - **Acceptance (verification — met):** DB-free unit tests in
+    `src/api/rest/auth.rs` mint `v4.public` tokens in-process
+    (throwaway Ed25519 key) and pin valid / missing / non-bearer /
+    expired / tampered / no-key outcomes. Met: `cargo test --lib`
+    green.
+  - **Acceptance (enforcement — open):** unauthenticated requests get
+    `401`; valid token + role gets `2xx`.
 - [ ] **T-5 — Embedding-based similarity (optional / experimental).**
   - [ ] Vector index via `pg_vector`.
   - [ ] `compute_match` augmented with cosine-similarity score.

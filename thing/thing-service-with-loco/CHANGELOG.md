@@ -8,6 +8,30 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — offline PASETO v4.public bearer verification
+
+- Peer-side bearer-token verification landed (the verification part of
+  spec §13 T-4), per the family-wide design in
+  `agents/share/authentication-sessions.md` §5: a new `AuthUser`
+  extractor and `GET /api/whoami` endpoint (`src/api/rest/auth.rs`)
+  verify **PASETO `v4.public`** (Ed25519) bearer tokens offline —
+  signature, footer `kid`, `iss`, `aud`, `exp` — via the monorepo
+  `authentication-verifier` 0.2 path dependency. No shared secret, no
+  per-request introspection hop.
+- The verifier is built from the environment at boot:
+  `THING_PASETO_KEYS` (the Ed25519 key set the auth service publishes
+  at `/.well-known/paseto-keys`), `THING_TOKEN_ISSUER` (default
+  `authentication-service`), `THING_TOKEN_AUDIENCE` (default
+  `main-x-service`). Absent/blank/unparseable key set ⇒ empty key set:
+  every token is rejected but the service still boots.
+  `AppState::with_verifier` swaps in a replacement (e.g. one built from
+  a freshly fetched key set).
+- New DB-free unit tests in `src/api/rest/auth.rs` mint `v4.public`
+  tokens in-process (throwaway Ed25519 key via `rusty_paseto` +
+  `ed25519-dalek` dev-deps) and pin valid / missing / non-bearer /
+  expired / tampered / no-key outcomes.
+- Blanket `/api/*` enforcement + roles remain open in spec §13 T-4.
+
 ### Added — matcher bridge
 
 - New `src/matching/adapter.rs` exposing

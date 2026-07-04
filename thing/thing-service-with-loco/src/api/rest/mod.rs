@@ -8,6 +8,8 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+/// Bearer-token authentication extractor + `whoami` endpoint.
+pub mod auth;
 pub mod handlers;
 pub mod state;
 
@@ -23,6 +25,7 @@ pub use state::AppState;
     paths(
         handlers::health,
         handlers::metrics_prom,
+        auth::whoami,
         handlers::create_thing,
         handlers::get_thing,
         handlers::update_thing,
@@ -57,6 +60,7 @@ pub use state::AppState;
     tags(
         (name = "health",   description = "Liveness probe"),
         (name = "observability", description = "Prometheus metrics endpoint"),
+        (name = "auth",     description = "Bearer-token verification (PASETO v4.public)"),
         (name = "things",   description = "Thing CRUD"),
         (name = "search",   description = "Full-text + fuzzy search"),
         (name = "matching", description = "Match / dedup / merge"),
@@ -71,6 +75,7 @@ pub struct ApiDoc;
 pub fn create_router(state: AppState) -> Router {
     let api_routes = Router::new()
         .route("/health", get(handlers::health))
+        .route("/whoami", get(auth::whoami))
         .route("/things", post(handlers::create_thing))
         .route("/things/search", get(handlers::search_things))
         .route("/things/match", post(handlers::match_thing))
@@ -106,6 +111,7 @@ pub fn things_routes() -> loco_rs::controller::Routes {
     Routes::new()
         .prefix("/api")
         .add("/health", get(handlers::health))
+        .add("/whoami", get(auth::whoami))
         .add("/things", post(handlers::create_thing))
         .add("/things/search", get(handlers::search_things))
         .add("/things/match", post(handlers::match_thing))

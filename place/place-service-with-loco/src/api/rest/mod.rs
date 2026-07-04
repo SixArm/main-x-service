@@ -11,10 +11,34 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+/// Bearer-token authentication extractor + `whoami` endpoint.
+pub mod auth;
 pub mod handlers;
 pub mod state;
 
 pub use state::AppState;
+
+/// Registers the `bearer` HTTP security scheme (PASETO `v4.public`
+/// bearer tokens) that [`auth::whoami`]'s `security(("bearer" = []))`
+/// requirement references.
+struct SecurityAddon;
+
+impl utoipa::Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "bearer",
+                SecurityScheme::Http(
+                    HttpBuilder::new()
+                        .scheme(HttpAuthScheme::Bearer)
+                        .bearer_format("PASETO")
+                        .build(),
+                ),
+            );
+        }
+    }
+}
 
 #[derive(OpenApi)]
 #[openapi(
@@ -26,6 +50,7 @@ pub use state::AppState;
     paths(
         handlers::health,
         handlers::metrics_prom,
+        auth::whoami,
         handlers::create_place,
         handlers::get_place,
         handlers::update_place,
@@ -63,9 +88,11 @@ pub use state::AppState;
         handlers::BatchDeduplicationRequest,
         handlers::BatchDeduplicationResponse,
     )),
+    modifiers(&SecurityAddon),
     tags(
         (name = "health",   description = "Liveness probe"),
         (name = "observability", description = "Prometheus metrics endpoint"),
+        (name = "auth",     description = "Bearer-token verification (PASETO v4.public)"),
         (name = "places",   description = "Place CRUD"),
         (name = "search",   description = "Full-text + fuzzy search"),
         (name = "matching", description = "Match / dedup / merge"),
@@ -80,6 +107,8 @@ pub struct ApiDoc;
 pub fn create_router(state: AppState) -> Router {
     let api_routes = Router::new()
         .route("/health", get(handlers::health))
+        // Auth — echo verified bearer-token claims
+        .route("/whoami", get(auth::whoami))
         .route("/places", post(handlers::create_place))
         .route("/places/search", get(handlers::search_places))
         .route("/places/match", post(handlers::match_place))
@@ -115,6 +144,7 @@ pub fn places_routes() -> loco_rs::controller::Routes {
     Routes::new()
         .prefix("/api")
         .add("/health", get(handlers::health))
+        .add("/whoami", get(auth::whoami))
         .add("/places", post(handlers::create_place))
         .add("/places/search", get(handlers::search_places))
         .add("/places/match", post(handlers::match_place))
@@ -153,6 +183,25 @@ mod tests {
             doc.paths.paths.contains_key("/metrics.prom"),
             "OpenAPI paths missing /metrics.prom: {:?}",
             doc.paths.paths.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// The generated `OpenAPI` document advertises `GET /api/whoami` and
+    /// defines the `bearer` security scheme its `security` requirement
+    /// references (DB-free — built from `ApiDoc`).
+    #[test]
+    fn openapi_includes_whoami_path_and_bearer_scheme() {
+        let doc = ApiDoc::openapi();
+        assert!(
+            doc.paths.paths.contains_key("/api/whoami"),
+            "OpenAPI paths missing /api/whoami: {:?}",
+            doc.paths.paths.keys().collect::<Vec<_>>()
+        );
+        let components = doc.components.expect("components present");
+        assert!(
+            components.security_schemes.contains_key("bearer"),
+            "OpenAPI security schemes missing 'bearer': {:?}",
+            components.security_schemes.keys().collect::<Vec<_>>()
         );
     }
 }

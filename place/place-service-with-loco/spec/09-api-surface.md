@@ -5,6 +5,7 @@ Complete reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 | Tier | Surface |
 |---|---|
 | REST (Axum) | 14 endpoints under `/api/places/*` + `/api/audit/recent` + `/api/health` |
+| Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | Observability | `GET /metrics.prom` (root path, Prometheus text-exposition `text/plain; version=0.0.4`) |
 | gRPC (Tonic) | Stubbed |
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
@@ -26,4 +27,10 @@ FHIR-resource concern.
 
 Standard response envelope. `409` on duplicate-detected create; `422`
 on validation failure.
+
+Authentication is opt-in per handler: taking an `AuthUser` argument
+requires a valid `Authorization: Bearer <paseto>` token, verified
+offline (PASETO `v4.public`, Ed25519) against the auth-service
+published key set (see §13 T-8; blanket enforcement is the T-8
+remainder).
 

@@ -8,6 +8,29 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — offline PASETO v4.public bearer verification (2026-07-04)
+
+- New `src/api/rest/auth.rs`: an `AuthUser` Axum extractor plus
+  `GET /api/v1/whoami` verify PASETO **`v4.public`** (Ed25519) bearer
+  tokens **offline** — signature, footer `kid`, `iss`, `aud`, `exp` —
+  via the monorepo `authentication-verifier` 0.2 path dependency, per
+  the family-wide design in `agents/share/authentication-sessions.md`
+  (§5, §9 step 4; spec §13 T-8, verification part). Handlers opt in by
+  taking an `AuthUser` argument; blanket `/api/v1/*` enforcement stays
+  an open T-8 item.
+- The verifier is built from the environment at boot and carried on
+  `AppState`: `EVENT_PASETO_KEYS` (the Ed25519 key set the auth service
+  publishes at `/.well-known/paseto-keys`), `EVENT_TOKEN_ISSUER`
+  (default `authentication-service`), `EVENT_TOKEN_AUDIENCE` (default
+  `main-x-service`). Absent/blank/unparseable key set ⇒ empty key set:
+  every token is rejected but the service still boots.
+  `AppState::with_verifier` swaps in a replacement (e.g. one built from
+  a freshly fetched key set).
+- New DB-free unit tests in `src/api/rest/auth.rs` mint `v4.public`
+  tokens in-process (throwaway Ed25519 key via `rusty_paseto` +
+  `ed25519-dalek` dev-deps) and pin valid / missing / non-bearer /
+  expired / tampered / no-key outcomes.
+
 ### Added — matcher bridge
 
 - New `src/matching/adapter.rs` exposing

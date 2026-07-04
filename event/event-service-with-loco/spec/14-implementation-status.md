@@ -16,6 +16,7 @@
 | Merging | Transfer + alias + link + soft-delete + snapshot + event |
 | Validation | Required fields, format checks, time-window guards, `422` |
 | Privacy | Field masking, GDPR export, consent model |
+| Authentication (peer verification) | Offline PASETO v4.public (Ed25519) bearer verification via `authentication-verifier` 0.2; `AuthUser` extractor + `GET /api/v1/whoami`; env-configured key set (T-8, verification part) |
 | Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 
@@ -31,5 +32,5 @@
 | Dedup / merge / privacy integration tests | T-5 |
 | gRPC API | T-6 |
 | iCalendar I/O | T-7 |
-| Authentication / authorisation | T-8 |
+| Authentication — blanket enforcement + roles (peer PASETO verification delivered) | T-8 |
 

@@ -23,11 +23,12 @@ implements the service side identically. It supersedes the per-crate
 Applies to the loco services that embed
 [`authentication-verifier`](../../authentication/authentication-verifier-rust-crate)
 via `src/auth.rs`: **organization**, **care-pathway**, **case**, **portfolio**.
-**person** embeds the same verifier in its older api/rest architecture
-(`src/api/rest/auth.rs`, opt-in `AuthUser`); blanket enforcement there is
-tracked as its spec §13 T-1b. The other older Axum services (worker /
-place / thing / event) carry their own middleware story and are a
-separate follow-up.
+The five older api/rest-architecture services (**person / worker /
+place / thing / event**) embed the same verifier in
+`src/api/rest/auth.rs` (opt-in `AuthUser` extractor + `whoami`,
+env-driven `<ENTITY>_PASETO_KEYS` / `_TOKEN_ISSUER` / `_TOKEN_AUDIENCE`);
+blanket enforcement for them is tracked in each crate's spec §13
+(person T-1b, worker T-1b, place T-8, thing T-4, event T-8 remainders).
 
 ## Why a flag, not a flip
 

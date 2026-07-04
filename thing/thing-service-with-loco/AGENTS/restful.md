@@ -130,6 +130,7 @@ histograms) is in [`src/metrics.rs`](../src/metrics.rs).
 | Method | Path                      | Description           |
 |--------|---------------------------|-----------------------|
 | GET    | `/api/health`             | Health check          |
+| GET    | `/api/whoami`             | Echo the verified bearer-token claims (`401` without a valid token) |
 | POST   | `/api/things`             | Create thing          |
 | GET    | `/api/things/{id}`        | Get thing             |
 | PUT    | `/api/things/{id}`        | Update thing          |
@@ -144,3 +145,13 @@ histograms) is in [`src/metrics.rs`](../src/metrics.rs).
 | GET    | `/api/things/{id}/audit`  | Audit logs            |
 | GET    | `/api/audit/recent`       | Recent audit activity |
 | GET    | `/api/audit/user`         | User audit logs       |
+
+### Auth
+
+Bearer tokens are PASETO `v4.public` (Ed25519) minted by the central
+authentication-service and verified **offline** against its published
+key set (`/.well-known/paseto-keys`) via the `authentication-verifier`
+crate — no shared secret, no introspection call. Configure with
+`THING_PASETO_KEYS` (key-set JSON), `THING_TOKEN_ISSUER`, and
+`THING_TOKEN_AUDIENCE`. Handlers opt in by taking an `AuthUser`
+argument (`src/api/rest/auth.rs`).

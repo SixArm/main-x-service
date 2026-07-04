@@ -3,14 +3,36 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
-- [ ] **T-1 — PASETO verification middleware on `/api/*`.**
-  - [ ] Add an offline PASETO v4.public verifier extractor (via the
-    `authentication-verifier` crate ≥0.2; keys fetched from the
-    authentication-service `/.well-known/paseto-keys`) with HR-admin /
-    credentialing-officer / read-only / service roles — per
-    [authentication-sessions](../../../agents/share/authentication-sessions.md).
-  - **Acceptance:** unauthenticated requests get `401`; valid signed
-    token with sufficient role gets `2xx`.
+- [x] **T-1a — Offline PASETO v4.public peer verification.** *(done
+  2026-07-04)* Per
+  [authentication-sessions](../../../agents/share/authentication-sessions.md)
+  §5/§9: the family moved off RS256-JWT + JWKS. Ported from the
+  person-service T-1a implementation.
+  - [x] `authentication-verifier` 0.2 (path dep; PASETO-only) added.
+  - [x] `AuthUser` extractor + `GET /api/v1/whoami` verify PASETO
+    `v4.public` (Ed25519) bearer tokens offline — signature, footer
+    `kid`, `iss`, `aud`, `exp` — via `bearer_claims` in
+    `src/api/rest/auth.rs`.
+  - [x] Verifier built from env at boot (`WORKER_PASETO_KEYS` key set as
+    published at `/.well-known/paseto-keys`; `WORKER_TOKEN_ISSUER` /
+    `WORKER_TOKEN_AUDIENCE`, defaults `authentication-service` /
+    `main-x-service`); absent key set ⇒ empty set, every token rejected,
+    service still boots.
+  - **Acceptance:** DB-free unit tests in `src/api/rest/auth.rs` mint
+    `v4.public` tokens in-process (throwaway Ed25519 key) and pin
+    valid / missing / non-bearer / expired / tampered / no-key
+    outcomes. Met: `cargo test --lib` green.
+- [ ] **T-1b — Blanket auth enforcement on `/api/*`.**
+  - [ ] Require a valid PASETO bearer token on every route except
+    public paths (health, OpenAPI/Swagger, metrics), gated by a
+    default-off `WORKER_REQUIRE_AUTH` env flag (family contract:
+    `agents/share/jwt-enforcement.md`), with HR-admin /
+    credentialing-officer / read-only / service roles.
+  - [ ] Fetch the key set over HTTP from the auth service at boot
+    (today it is injected via `WORKER_PASETO_KEYS`).
+  - **Acceptance:** integration test with enforcement on posts without
+    a token → `401`; posts with a valid token and sufficient role →
+    `2xx`.
 - [ ] **T-2 — Production Fluvio publisher.**
   - [ ] Implement `FluvioEventPublisher : EventProducer` behind
     feature flag `fluvio`.

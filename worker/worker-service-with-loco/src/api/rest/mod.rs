@@ -14,6 +14,8 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+/// Bearer-token authentication extractor + `whoami` endpoint.
+pub mod auth;
 /// REST endpoint handler implementations.
 pub mod handlers;
 /// Loco route-group registration (`workers_routes`, `fhir_routes`, `metrics_routes`).
@@ -39,6 +41,7 @@ pub use state::AppState;
     paths(
         handlers::health_check,
         handlers::metrics_prom,
+        auth::whoami,
         handlers::create_worker,
         handlers::get_worker,
         handlers::update_worker,
@@ -94,6 +97,7 @@ pub use state::AppState;
     tags(
         (name = "health", description = "Health check endpoint"),
         (name = "observability", description = "Prometheus metrics endpoint"),
+        (name = "auth", description = "Bearer-token verification endpoints"),
         (name = "workers", description = "Worker management endpoints"),
         (name = "search", description = "Worker search endpoints"),
         (name = "matching", description = "Worker matcher endpoints"),
@@ -130,6 +134,8 @@ pub fn create_router(state: AppState) -> Router {
     let api_routes = Router::new()
         // Health
         .route("/health", get(handlers::health_check))
+        // Auth — echo verified bearer-token claims
+        .route("/whoami", get(auth::whoami))
         // Worker CRUD
         .route("/workers", post(handlers::create_worker))
         .route("/workers/{id}", get(handlers::get_worker))
@@ -180,6 +186,7 @@ pub fn workers_routes() -> loco_rs::controller::Routes {
     Routes::new()
         .prefix("/api/v1")
         .add("/health", get(handlers::health_check))
+        .add("/whoami", get(auth::whoami))
         .add("/workers", post(handlers::create_worker))
         .add(
             "/workers/{id}",

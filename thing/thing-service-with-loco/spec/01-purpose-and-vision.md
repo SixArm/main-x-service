@@ -32,4 +32,8 @@ A stable identity for any "thing" with:
   marketing copy or pricing.
 - **Not** a recommendation engine — `same_as` and `additional_type`
   give downstream systems the hooks they need.
+- **Not** an authentication / authorisation provider — the central
+  authentication-service owns identity; this service only verifies its
+  PASETO v4.public tokens offline (blanket enforcement is planned,
+  §15) and identity proofing is out of scope.
 

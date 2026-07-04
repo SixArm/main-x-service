@@ -1,8 +1,9 @@
 ## 15. Roadmap
 
-- **Authentication & authorisation** — offline PASETO v4.public
-  verification via the `authentication-verifier` crate (cookie
-  sessions + short-lived tokens per
+- **Authentication & authorisation** — blanket PASETO enforcement on
+  `/api/v1/*` (T-8 remainder; peer offline PASETO v4.public
+  verification via the `authentication-verifier` crate landed
+  2026-07-04, per
   [authentication-sessions](../../../agents/share/authentication-sessions.md)),
   RBAC for scheduler / admin / read-only / service, rate limiting,
   security headers.

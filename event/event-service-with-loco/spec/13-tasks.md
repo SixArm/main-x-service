@@ -38,12 +38,27 @@ clearly described manual check confirms the acceptance criterion.
   - **Acceptance:** Apple Calendar imports the exported `.ics`
     without warnings.
 - [ ] **T-8 — Authentication / authorisation.**
-  - [ ] PASETO verification middleware on `/api/v1/*` — offline
-    PASETO v4.public verification via the `authentication-verifier`
-    crate ≥0.2 (keys fetched from the authentication-service
-    `/.well-known/paseto-keys`; per
-    [authentication-sessions](../../../agents/share/authentication-sessions.md))
-    — with scheduler / admin / read-only / service roles.
+  - [x] Offline PASETO v4.public verification. *(done 2026-07-04)* Per
+    [authentication-sessions](../../../agents/share/authentication-sessions.md)
+    §5/§9:
+    - [x] `authentication-verifier` 0.2 (path dep; PASETO-only) added.
+    - [x] [`AuthUser`] extractor + `GET /api/v1/whoami` verify PASETO
+      `v4.public` (Ed25519) bearer tokens offline — signature, footer
+      `kid`, `iss`, `aud`, `exp` — via `bearer_claims` in
+      `src/api/rest/auth.rs`.
+    - [x] Verifier built from env at boot (`EVENT_PASETO_KEYS` key set
+      as published at `/.well-known/paseto-keys`;
+      `EVENT_TOKEN_ISSUER` / `EVENT_TOKEN_AUDIENCE`, defaults
+      `authentication-service` / `main-x-service`); absent key set ⇒
+      empty set, every token rejected, service still boots.
+    - **Acceptance:** DB-free unit tests in `src/api/rest/auth.rs` mint
+      `v4.public` tokens in-process (throwaway Ed25519 key) and pin
+      valid / missing / non-bearer / expired / tampered / no-key
+      outcomes. Met: `cargo test --lib` green.
+  - [ ] Blanket enforcement middleware on `/api/v1/*` — with
+    scheduler / admin / read-only / service roles; keys fetched from
+    the authentication-service `/.well-known/paseto-keys` at boot
+    (today the key set is injected via `EVENT_PASETO_KEYS`).
   - **Acceptance:** unauthenticated requests get `401`; valid token
     + role gets `2xx`.
 - [ ] **T-9 — Bulk import / export.** (§9.1, §10.3;

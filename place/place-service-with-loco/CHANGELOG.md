@@ -8,6 +8,37 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — auth: offline PASETO v4.public bearer verification
+
+- Peer bearer-token verification landed, per the family-wide design in
+  `agents/share/authentication-sessions.md` (§5; spec §13 T-8, the
+  verification half). New `src/api/rest/auth.rs`: an `AuthUser` Axum
+  extractor plus `GET /api/whoami` verify **PASETO `v4.public`**
+  (Ed25519) bearer tokens **offline** — signature, footer `kid`, `iss`,
+  `aud`, `exp` — via the monorepo `authentication-verifier` 0.2 path
+  dependency (`Verifier::from_paseto_keys_value`). No shared secret, no
+  per-request introspection hop. Handlers opt in by taking an `AuthUser`
+  argument; blanket `/api/*` enforcement remains open in T-8.
+- The verifier rides on `AppState` and is built from the environment at
+  boot: `PLACE_PASETO_KEYS` (the Ed25519 key set the auth service
+  publishes at `/.well-known/paseto-keys`), `PLACE_TOKEN_ISSUER`
+  (default `authentication-service`), `PLACE_TOKEN_AUDIENCE` (default
+  `main-x-service`). Absent/blank/unparseable key set ⇒ empty key set:
+  every token is rejected but the service still boots.
+  `AppState::with_verifier` swaps in a replacement (e.g. one built from
+  a freshly fetched key set).
+- `GET /api/whoami` is registered in both routers (`create_router` and
+  the loco `places_routes`) and in the OpenAPI document under a new
+  `auth` tag, with a `bearer` (PASETO) security scheme added via a
+  utoipa `SecurityAddon` modifier.
+- New DB-free unit tests: `src/api/rest/auth.rs` mints `v4.public`
+  tokens in-process (throwaway Ed25519 key via `rusty_paseto` +
+  `ed25519-dalek` + `base64` dev-deps) and pins valid / missing /
+  non-bearer / expired / tampered / no-key outcomes;
+  `src/api/rest/state.rs` pins the empty-key-set fallback and the
+  `env_or` default; `src/api/rest/mod.rs` pins that OpenAPI advertises
+  `/api/whoami` and defines the `bearer` scheme.
+
 ### Added — observability
 
 - **Prometheus metrics endpoint — `GET /metrics.prom`.** The process-wide
@@ -155,6 +186,6 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 - The unused `jsonwebtoken` dependency (never referenced in `src/` or
   `tests/`). The family auth design has pivoted from RS256 JWT / JWKS
   to cookie sessions + short-lived PASETO v4.public tokens (see
-  `agents/share/authentication-sessions.md`); the still-pending auth
-  task in `spec/13-tasks.md` T-8 now targets PASETO verification via
-  the `authentication-verifier` crate.
+  `agents/share/authentication-sessions.md`); `spec/13-tasks.md` T-8's
+  PASETO-verification half is now delivered (see *Added — auth* above);
+  blanket enforcement remains open.

@@ -48,6 +48,20 @@ is [`api::rest::handlers::metrics_prom`](../src/api/rest/handlers.rs).
 |---|---|---|
 | GET | `/health` | Health check (returns `HealthResponse`) |
 
+## Auth
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/whoami` | Echo the verified bearer-token claims (`401` without a valid token) |
+
+Bearer tokens are PASETO `v4.public` (Ed25519) minted by the central
+authentication-service and verified **offline** against its published
+key set (`/.well-known/paseto-keys`) via the `authentication-verifier`
+crate — no shared secret, no introspection call. Configure with
+`EVENT_PASETO_KEYS` (key-set JSON), `EVENT_TOKEN_ISSUER`, and
+`EVENT_TOKEN_AUDIENCE`. Handlers opt in by taking an `AuthUser`
+argument (`src/api/rest/auth.rs`).
+
 ## Event CRUD
 
 | Method | Path | Notes |

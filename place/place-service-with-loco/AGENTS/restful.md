@@ -149,6 +149,7 @@ registered at root via `api::rest::metrics_routes()`.
 | Method | Path                      | Description           |
 | ------ | ------------------------- | --------------------- |
 | GET    | `/api/health`             | Health check          |
+| GET    | `/api/whoami`             | Echo the verified bearer-token claims (`401` without a valid token) |
 | POST   | `/api/places`             | Create place          |
 | GET    | `/api/places/{id}`        | Get place             |
 | PUT    | `/api/places/{id}`        | Update place          |
@@ -162,3 +163,14 @@ registered at root via `api::rest::metrics_routes()`.
 | GET    | `/api/places/{id}/masked` | Masked place view     |
 | GET    | `/api/places/{id}/audit`  | Audit logs            |
 | GET    | `/api/audit/recent`       | Recent audit activity |
+
+### Auth
+
+Bearer tokens are PASETO `v4.public` (Ed25519) minted by the central
+authentication-service and verified **offline** against its published
+key set (`/.well-known/paseto-keys`) via the `authentication-verifier`
+crate — no shared secret, no introspection call. Configure with
+`PLACE_PASETO_KEYS` (key-set JSON), `PLACE_TOKEN_ISSUER`, and
+`PLACE_TOKEN_AUDIENCE` (defaults `authentication-service` /
+`main-x-service`). Handlers opt in by taking an `AuthUser`
+argument (`src/api/rest/auth.rs`).

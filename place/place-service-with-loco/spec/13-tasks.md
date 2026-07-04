@@ -45,14 +45,29 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] `GET /api/places/search.geojson?bbox=` (FeatureCollection).
   - **Acceptance:** `jq -e '.type == "Feature"'` passes.
 - [ ] **T-8 — Authentication / authorisation.**
-  - [ ] PASETO verification middleware on `/api/*` — offline
-    PASETO v4.public verification via the `authentication-verifier`
-    crate ≥0.2 (keys fetched from the authentication-service
-    `/.well-known/paseto-keys`; per
-    [authentication-sessions](../../../agents/share/authentication-sessions.md))
-    — with editor / curator / read-only / service roles.
-  - **Acceptance:** unauthenticated requests get `401`; valid token
-    + role gets `2xx`.
+  - [x] Peer PASETO verification *(done 2026-07-04)* — offline PASETO
+    v4.public (Ed25519) verification via the `authentication-verifier`
+    crate 0.2 (path dep; per
+    [authentication-sessions](../../../agents/share/authentication-sessions.md)
+    §5). `AuthUser` extractor + `GET /api/whoami` verify bearer tokens
+    offline — signature, footer `kid`, `iss`, `aud`, `exp` — via
+    `bearer_claims` in `src/api/rest/auth.rs`. Verifier built from env
+    at boot (`PLACE_PASETO_KEYS` key set as published at
+    `/.well-known/paseto-keys`; `PLACE_TOKEN_ISSUER` /
+    `PLACE_TOKEN_AUDIENCE`, defaults `authentication-service` /
+    `main-x-service`); absent key set ⇒ empty set, every token
+    rejected, service still boots. Acceptance met: DB-free unit tests
+    in `src/api/rest/auth.rs` mint `v4.public` tokens in-process
+    (throwaway Ed25519 key) and pin valid / missing / non-bearer /
+    expired / tampered / no-key outcomes — `cargo test --lib` green.
+  - [ ] Blanket enforcement middleware on `/api/*` — require a valid
+    PASETO bearer token on every route except public paths (health,
+    OpenAPI/Swagger, metrics), gated by a default-off
+    `PLACE_REQUIRE_AUTH` env flag — with editor / curator / read-only
+    / service roles; fetch the key set over HTTP from the auth service
+    at boot (today it is injected via `PLACE_PASETO_KEYS`).
+  - **Acceptance (remainder):** with enforcement on, unauthenticated
+    requests get `401`; valid token + role gets `2xx`.
 - [ ] **T-9 — Geo-radius `nearby` HTTP endpoint + search `offset`.**
   - [ ] Add `GET /api/places/nearby?lat=&lon=&radius_km=` wiring the
     existing `matching::geo::within_radius` Haversine primitive with a

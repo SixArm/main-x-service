@@ -5,6 +5,7 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 | Tier | Surface |
 |---|---|
 | REST (Axum) | 15 endpoints under `/api/workers/*` + `/api/audit/*` + `/api/health` |
+| Auth (Axum) | `GET /api/v1/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | FHIR R5 (Axum) | `Worker` CRUD + search under `/fhir/Worker` (handlers implemented and **mounted** via `fhir_routes()` in `App::routes`; pinned by `tests/api_integration_test.rs::test_fhir_worker_route_is_mounted`) |
 | gRPC (Tonic) | Stubbed |
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
@@ -12,6 +13,11 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 
 Standard response envelope. `409` on duplicate-detected create; `422`
 on validation failure.
+
+Authentication is opt-in per handler: taking an `AuthUser` argument
+requires a valid `Authorization: Bearer <paseto>` token, verified
+offline (PASETO `v4.public`, Ed25519) against the auth-service
+published key set (see §13 T-1a; blanket enforcement is T-1b).
 
 ### 9.1 Cross-service link endpoints
 

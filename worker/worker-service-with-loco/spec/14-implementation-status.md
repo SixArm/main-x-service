@@ -17,6 +17,7 @@
 | Merging | Transfer + alias + link + soft-delete + snapshot + event |
 | Validation | Required fields, format checks, phone normalisation, address standardisation, `422` |
 | Privacy | Field masking, GDPR export, consent model |
+| Authentication (peer verification) | Offline PASETO v4.public (Ed25519) bearer verification via `authentication-verifier` 0.2; `AuthUser` extractor + `GET /api/v1/whoami`; env-configured key set (T-1a) |
 | Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 
@@ -24,7 +25,7 @@
 
 | Gap | Task |
 |---|---|
-| Authentication / authorisation | T-1 |
+| Authentication — blanket enforcement (peer PASETO verification delivered, T-1a) | T-1b |
 | Fluvio production publisher | T-2 |
 | FHIR capability statement | T-3 |
 | FHIR bundle (full) | T-3 |
