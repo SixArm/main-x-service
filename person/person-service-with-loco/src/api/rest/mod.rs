@@ -16,7 +16,8 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-/// Bearer-token authentication extractor + `whoami` endpoint.
+/// Bearer-token authentication extractor, `whoami` endpoint, and the
+/// blanket `/api/*` enforcement middleware (`PERSON_REQUIRE_AUTH`).
 pub mod auth;
 /// REST endpoint handler functions.
 pub mod handlers;
@@ -110,10 +111,13 @@ pub struct ApiDoc;
 /// Build the fully-wired Axum [`Router`] for the service.
 ///
 /// Mounts the entity/search/match/merge/privacy/audit routes under
-/// `/api`, exposes `/metrics.prom` and the Swagger UI, and applies a
-/// permissive CORS layer. The given [`AppState`] is moved into the
-/// router as shared state.
+/// `/api`, exposes `/metrics.prom` and the Swagger UI, and applies the
+/// blanket-auth-enforcement middleware (default-off, gated by
+/// `PERSON_REQUIRE_AUTH` — snapshotted here, so changing the env var
+/// requires a restart) and a permissive CORS layer. The given
+/// [`AppState`] is moved into the router as shared state.
 pub fn create_router(state: AppState) -> Router {
+    let enforcement = auth::Enforcement::from_env(state.verifier.clone());
     let api_routes = Router::new()
         // Health
         .route("/health", get(handlers::health_check))
@@ -151,6 +155,10 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api", api_routes)
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .layer(axum::middleware::from_fn_with_state(
+            enforcement,
+            auth::require_auth_middleware,
+        ))
         .layer(CorsLayer::permissive())
 }
 

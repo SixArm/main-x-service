@@ -104,6 +104,18 @@ crate — no shared secret, no introspection call. Configure with
 `PERSON_TOKEN_AUDIENCE`. Handlers opt in by taking an `AuthUser`
 argument (`src/api/rest/auth.rs`).
 
+**Blanket enforcement** — setting `PERSON_REQUIRE_AUTH` to a truthy
+value (`1`/`true`/`yes`/`on`, case-insensitive; anything else,
+including unset/blank/junk, means **off** — the default) makes every
+route require a valid PASETO bearer token, except the public
+allow-list: `/api/health`, loco's `/_health` / `/_ping`,
+`/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom`.
+Unauthorised requests get `401`. The middleware
+(`auth::require_auth_middleware`) is layered unconditionally on both
+router surfaces (`create_router` and the loco `after_routes` hook);
+the flag is read once at router construction, so changing it requires
+a restart. Family contract: `agents/share/jwt-enforcement.md`.
+
 ### Person CRUD
 
 | Method | Path | Description |

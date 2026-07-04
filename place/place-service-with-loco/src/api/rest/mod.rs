@@ -11,7 +11,8 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-/// Bearer-token authentication extractor + `whoami` endpoint.
+/// Bearer-token authentication extractor + `whoami` endpoint + blanket
+/// `/api/*` enforcement middleware (default-off, `PLACE_REQUIRE_AUTH`).
 pub mod auth;
 pub mod handlers;
 pub mod state;
@@ -104,7 +105,12 @@ impl utoipa::Modify for SecurityAddon {
 pub struct ApiDoc;
 
 /// Build the REST router with the given application state.
+///
+/// The blanket-enforcement middleware is layered unconditionally; the
+/// `PLACE_REQUIRE_AUTH` flag (read here, at construction — restart to
+/// change) is the only switch. Default-off; see `auth::enforce`.
 pub fn create_router(state: AppState) -> Router {
+    let enforcement = auth::EnforcementState::from_app_state(&state);
     let api_routes = Router::new()
         .route("/health", get(handlers::health))
         // Auth — echo verified bearer-token claims
@@ -131,6 +137,10 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api", api_routes)
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .layer(axum::middleware::from_fn_with_state(
+            enforcement,
+            auth::require_auth_middleware,
+        ))
         .layer(CorsLayer::permissive())
 }
 

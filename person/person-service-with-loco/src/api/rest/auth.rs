@@ -10,15 +10,148 @@
 //! `agents/share/authentication-sessions.md` for the family-wide design
 //! (cookie sessions + short-lived PASETO v4.public cross-service tokens;
 //! this replaces the earlier RS256-JWT + JWKS model).
+//!
+//! ## Blanket enforcement
+//!
+//! When `PERSON_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
+//! case-insensitive), the [`enforce`] decision — wired as an Axum
+//! middleware layer on both router surfaces (`create_router` and the
+//! loco `after_routes` hook) — requires a valid bearer token on every
+//! route except the public allow-list in [`PUBLIC_PATHS`]. It is **off
+//! by default**: unset/blank/junk ⇒ today's behaviour, where the
+//! extractor is opt-in per handler and `GET /api/whoami` proves
+//! end-to-end verification. The flag is read **once at router
+//! construction** ([`Enforcement::from_env`]), so changing the
+//! environment variable requires a restart. Activation is an
+//! operations decision once the SSO token flow is live; see
+//! `agents/share/jwt-enforcement.md` for the family-wide contract.
+
+use std::sync::Arc;
 
 use authentication_verifier::{Claims, Verifier};
 use axum::Json;
-use axum::extract::{FromRef, FromRequestParts};
+use axum::extract::{FromRef, FromRequestParts, Request, State};
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::IntoResponse;
+use axum::middleware::Next;
+use axum::response::{IntoResponse, Response};
 
 use super::state::AppState;
+
+/// Paths that stay public even when blanket enforcement is on. This is
+/// what the crate actually serves without a token:
+///
+/// - `/api/health` — this service's own health endpoint (under `/api`);
+/// - `/_health` / `/_ping` — loco's default health/ping routes (present
+///   on the loco-mounted surface only);
+/// - `/api-docs/openapi.json` — the `OpenAPI` 3 document;
+/// - `/metrics.prom` — the root-mounted Prometheus scrape path (outside
+///   `/api`, but the middleware layers the whole router, so it is
+///   allow-listed explicitly for scrapers).
+///
+/// The Swagger UI (`/swagger-ui` + everything under `/swagger-ui/`) is
+/// also public, matched by prefix in [`is_public_path`]. Everything
+/// else requires a valid bearer token when enforcement is on.
+pub const PUBLIC_PATHS: [&str; 5] = [
+    "/api/health",
+    "/_health",
+    "/_ping",
+    "/api-docs/openapi.json",
+    "/metrics.prom",
+];
+
+/// Whether `path` is on the public allow-list ([`PUBLIC_PATHS`] plus
+/// the Swagger UI prefix).
+fn is_public_path(path: &str) -> bool {
+    PUBLIC_PATHS.contains(&path) || path == "/swagger-ui" || path.starts_with("/swagger-ui/")
+}
+
+/// Lenient boolean parse for the `PERSON_REQUIRE_AUTH` flag:
+/// `1`/`true`/`yes`/`on` (case-insensitive, surrounding whitespace
+/// ignored) ⇒ `true`; everything else (incl. empty/unset/junk) ⇒
+/// `false`. Family contract: `agents/share/jwt-enforcement.md`.
+#[must_use]
+pub fn parse_bool(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
+/// Read the `PERSON_REQUIRE_AUTH` flag from the environment via
+/// [`parse_bool`]. Called once at router construction (see
+/// [`Enforcement::from_env`]) — changing the variable requires a
+/// restart.
+#[must_use]
+pub fn require_auth_from_env() -> bool {
+    parse_bool(&std::env::var("PERSON_REQUIRE_AUTH").unwrap_or_default())
+}
+
+/// The blanket-enforcement decision. `Ok(())` ⇒ let the request
+/// through; `Err((401, msg))` ⇒ reject. Pure: the caller passes the
+/// flag, path, headers and verifier, so it is fully unit-testable
+/// without booting the app or a database.
+///
+/// # Errors
+///
+/// `401` when enforcement is on, the path is not public, and the
+/// request carries no valid bearer token
+/// (missing/malformed/expired/tampered).
+pub fn enforce(
+    require_auth: bool,
+    path: &str,
+    headers: &HeaderMap,
+    verifier: &Verifier,
+) -> Result<(), (StatusCode, String)> {
+    if !require_auth || is_public_path(path) {
+        return Ok(());
+    }
+    bearer_claims(headers, verifier).map(|_| ())
+}
+
+/// State for the blanket-enforcement middleware: the flag (read once
+/// from the environment at construction) and the shared PASETO
+/// verifier. Cheap to clone (a `bool` + an `Arc`).
+#[derive(Clone)]
+pub struct Enforcement {
+    /// Whether blanket enforcement is on (`PERSON_REQUIRE_AUTH`,
+    /// snapshotted at construction — restart to change).
+    pub require_auth: bool,
+    /// The PASETO `v4.public` verifier requests are checked against.
+    pub verifier: Arc<Verifier>,
+}
+
+impl Enforcement {
+    /// Snapshot `PERSON_REQUIRE_AUTH` and pair it with the given
+    /// verifier (normally `AppState::verifier`).
+    #[must_use]
+    pub fn from_env(verifier: Arc<Verifier>) -> Self {
+        Self {
+            require_auth: require_auth_from_env(),
+            verifier,
+        }
+    }
+}
+
+/// Axum middleware applying the blanket [`enforce`] decision to every
+/// request on the router it is layered onto. A near-noop when the flag
+/// is off, so it is wired unconditionally on both router surfaces and
+/// `PERSON_REQUIRE_AUTH` is the only switch.
+pub async fn require_auth_middleware(
+    State(enforcement): State<Enforcement>,
+    request: Request,
+    next: Next,
+) -> Response {
+    match enforce(
+        enforcement.require_auth,
+        request.uri().path(),
+        request.headers(),
+        &enforcement.verifier,
+    ) {
+        Ok(()) => next.run(request).await,
+        Err(rejection) => rejection.into_response(),
+    }
+}
 
 /// Extract and verify the bearer token from request headers. Pure (the
 /// verifier is passed in), so it is unit-testable without an [`AppState`]
@@ -231,5 +364,78 @@ mod tests {
             bearer_claims(&bearer(&token), &no_keys).unwrap_err().0,
             StatusCode::UNAUTHORIZED
         );
+    }
+
+    /// `parse_bool` accepts the documented truthy set and rejects the
+    /// rest (including empty, `0`, and junk) — the
+    /// `PERSON_REQUIRE_AUTH` flag semantics from
+    /// `agents/share/jwt-enforcement.md`.
+    #[test]
+    fn test_parse_bool_truthy_and_falsy() {
+        for truthy in ["1", "true", "TRUE", "Yes", "on", " on ", "ON"] {
+            assert!(parse_bool(truthy), "{truthy:?} should parse true");
+        }
+        for falsy in ["", " ", "0", "false", "no", "off", "junk", "2"] {
+            assert!(!parse_bool(falsy), "{falsy:?} should parse false");
+        }
+    }
+
+    /// Enforcement off ⇒ a protected path passes with no token
+    /// (default-off keeps today's behaviour).
+    #[test]
+    fn test_enforce_off_allows_without_token() {
+        assert!(enforce(false, "/api/persons", &HeaderMap::new(), &verifier()).is_ok());
+    }
+
+    /// Enforcement on ⇒ every allow-listed public path (health/ping,
+    /// `OpenAPI` doc, Swagger UI, Prometheus metrics) still passes
+    /// without a token.
+    #[test]
+    fn test_enforce_on_allows_public_paths() {
+        let verifier = verifier();
+        for path in PUBLIC_PATHS {
+            assert!(
+                enforce(true, path, &HeaderMap::new(), &verifier).is_ok(),
+                "{path} should be public"
+            );
+        }
+        for path in ["/swagger-ui", "/swagger-ui/index.html"] {
+            assert!(
+                enforce(true, path, &HeaderMap::new(), &verifier).is_ok(),
+                "{path} should be public"
+            );
+        }
+    }
+
+    /// Enforcement on, protected path, no token ⇒ `401`.
+    #[test]
+    fn test_enforce_on_protected_without_token_is_401() {
+        let err = enforce(true, "/api/persons", &HeaderMap::new(), &verifier()).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+    }
+
+    /// Enforcement on, protected path, valid token ⇒ passes.
+    #[test]
+    fn test_enforce_on_protected_with_valid_token_is_ok() {
+        let token = sign(10_000_000_000);
+        assert!(enforce(true, "/api/persons", &bearer(&token), &verifier()).is_ok());
+    }
+
+    /// Enforcement on, protected path, expired token ⇒ `401`.
+    #[test]
+    fn test_enforce_on_protected_with_expired_token_is_401() {
+        let token = sign(-60);
+        let err = enforce(true, "/api/persons", &bearer(&token), &verifier()).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+    }
+
+    /// Enforcement on, protected path, tampered token ⇒ `401`.
+    #[test]
+    fn test_enforce_on_protected_with_tampered_token_is_401() {
+        let mut token = sign(10_000_000_000);
+        let last = token.pop().unwrap();
+        token.push(if last == 'a' { 'b' } else { 'a' });
+        let err = enforce(true, "/api/persons", &bearer(&token), &verifier()).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
     }
 }

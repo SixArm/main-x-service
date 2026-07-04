@@ -20,15 +20,17 @@ How the Main X Index family turns on **mandatory** auth for every
 implements the service side identically. It supersedes the per-crate
 "follow-up: blanket enforcement" notes in the service specs §13.
 
-Applies to the loco services that embed
+Applies to every entity service. The loco-idiomatic services embed
 [`authentication-verifier`](../../authentication/authentication-verifier-rust-crate)
-via `src/auth.rs`: **organization**, **care-pathway**, **case**, **portfolio**.
-The five older api/rest-architecture services (**person / worker /
-place / thing / event**) embed the same verifier in
+via `src/auth.rs`: **organization**, **care-pathway**, **case**,
+**portfolio**. The five older api/rest-architecture services
+(**person / worker / place / thing / event**) embed the same verifier in
 `src/api/rest/auth.rs` (opt-in `AuthUser` extractor + `whoami`,
-env-driven `<ENTITY>_PASETO_KEYS` / `_TOKEN_ISSUER` / `_TOKEN_AUDIENCE`);
-blanket enforcement for them is tracked in each crate's spec §13
-(person T-1b, worker T-1b, place T-8, thing T-4, event T-8 remainders).
+env-driven `<ENTITY>_PASETO_KEYS` / `_TOKEN_ISSUER` / `_TOKEN_AUDIENCE`)
+and, as of 2026-07-04, carry the same default-off blanket middleware
+(`<ENTITY>_REQUIRE_AUTH`, flag read at router construction — restart to
+change), layered on both their Axum and loco router surfaces. Remaining
+per-crate §13 items: roles/RBAC and boot-time HTTP key fetch.
 
 ## Why a flag, not a flip
 

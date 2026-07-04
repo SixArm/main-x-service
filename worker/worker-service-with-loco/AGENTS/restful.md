@@ -104,6 +104,27 @@ crate — no shared secret, no introspection call. Configure with
 `WORKER_TOKEN_AUDIENCE`. Handlers opt in by taking an `AuthUser`
 argument (`src/api/rest/auth.rs`).
 
+**Blanket enforcement (default off).** Setting `WORKER_REQUIRE_AUTH`
+to a truthy value (`1`/`true`/`yes`/`on`, case-insensitive; anything
+else — including unset, blank, `0`, or junk — means off) requires a
+valid PASETO bearer token on **every** route of both router surfaces
+(the standalone Axum `create_router` and the loco router) and returns
+`401` otherwise. The flag and the verifier are captured **once, at
+router construction** — changing the flag requires a process restart.
+The public allow-list (`PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES` in
+`src/api/rest/auth.rs`) stays token-free even when enforcement is on:
+
+- `/_health`, `/_ping` (loco health probes)
+- `/api/v1/health` (this crate's health endpoint)
+- `/api-docs/openapi.json` (OpenAPI document)
+- `/swagger-ui*` (Swagger UI + assets)
+- `/metrics.prom` (Prometheus scrape)
+
+The `/fhir` surface is deliberately **not** on the allow-list — it
+serves worker PII. Family-wide contract:
+`agents/share/jwt-enforcement.md`. Remaining follow-ups (spec §13
+T-1b): RBAC roles and boot-time key-set fetch over HTTP.
+
 ### Worker CRUD
 
 | Method | Path                   | Description                                        |

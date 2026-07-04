@@ -10,7 +10,7 @@
 | Throughput | ≥ 1 000 req/sec single instance |
 | Availability | HADR; stateless app tier; PostgreSQL replication |
 | Fault tolerance | Graceful shutdown; connection pooling; health checks; non-root containers |
-| Security | Offline PASETO v4.public bearer verification against the auth-service published Ed25519 keys (opt-in per handler; blanket enforcement is T-1b); TLS at the edge |
+| Security | Offline PASETO v4.public bearer verification against the auth-service published Ed25519 keys; blanket `/api/*` enforcement implemented **default-off** behind `WORKER_REQUIRE_AUTH` (read at router construction — restart to change; public allow-list: health, OpenAPI/Swagger, metrics; T-1b remainder: RBAC roles + boot-time HTTP key fetch); TLS at the edge |
 | Observability | OTLP traces / metrics / logs; `traceparent` per request |
 | Background jobs | Loco `BackgroundQueue` backed by **PostgreSQL** (`bg_pg`) — same database as application data; no external broker |
 

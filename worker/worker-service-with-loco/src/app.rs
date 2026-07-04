@@ -23,7 +23,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, fhir_routes, metrics_routes, workers_routes},
+    api::rest::{ApiDoc, AppState, auth, fhir_routes, metrics_routes, workers_routes},
     config::Config,
     matching::ProbabilisticMatcher,
     search::SearchEngine,
@@ -107,12 +107,21 @@ impl Hooks for App {
         let matcher = ProbabilisticMatcher::new(config.matching.clone());
         // Bundle DB handle + singletons into shared application state.
         let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
+        // Capture the verifier for the enforcement layer before the state
+        // moves into the shared store.
+        let enforcement_verifier = state.verifier.clone();
         // Make the state retrievable by request handlers via the shared store.
         ctx.shared_store.insert(state);
-        // Mount Swagger UI and a permissive CORS layer on the router.
+        // Mount Swagger UI, then the blanket auth-enforcement middleware
+        // (spec §13 T-1b: default-off, gated by `WORKER_REQUIRE_AUTH` read
+        // here at construction — restart to change), then a permissive CORS
+        // layer (outermost, so preflight `OPTIONS` is answered before
+        // enforcement runs).
         let router = router
-            .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-            .layer(tower_http::cors::CorsLayer::permissive());
+            .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
+        let router =
+            auth::apply_enforcement(router, auth::require_auth_from_env(), enforcement_verifier)
+                .layer(tower_http::cors::CorsLayer::permissive());
         Ok(router)
     }
 

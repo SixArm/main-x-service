@@ -55,12 +55,33 @@ clearly described manual check confirms the acceptance criterion.
       `v4.public` tokens in-process (throwaway Ed25519 key) and pin
       valid / missing / non-bearer / expired / tampered / no-key
       outcomes. Met: `cargo test --lib` green.
-  - [ ] Blanket enforcement middleware on `/api/v1/*` — with
-    scheduler / admin / read-only / service roles; keys fetched from
-    the authentication-service `/.well-known/paseto-keys` at boot
-    (today the key set is injected via `EVENT_PASETO_KEYS`).
-  - **Acceptance:** unauthenticated requests get `401`; valid token
-    + role gets `2xx`.
+  - [x] Blanket enforcement middleware on `/api/v1/*` *(done
+    2026-07-04)* — env-gated by `EVENT_REQUIRE_AUTH`, **default off**
+    (`1`/`true`/`yes`/`on` case-insensitive ⇒ on; unset/blank/junk ⇒
+    off; read once at `AppState` construction — restart to change).
+    The pure `auth::enforce` decision + `auth::require_auth_mw`
+    middleware require a valid PASETO bearer token on every
+    `/api/v1/*` route except the public allow-list `/api/v1/health`
+    (`auth::PUBLIC_API_PATHS`); root-level `/_health`, `/_ping`,
+    `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`, and the
+    `/fhir/*` `501` stubs are outside the `/api/v1` scope and stay
+    public. Wired on both router surfaces (`create_router` and the
+    loco router in `App::after_routes`) via
+    `axum::middleware::from_fn_with_state`, inside the CORS layer.
+    Family contract:
+    [jwt-enforcement](../../../agents/share/jwt-enforcement.md).
+    - **Acceptance (enforcement middleware — met):** DB-free unit
+      tests in `src/api/rest/auth.rs` pin the `enforce` matrix — off +
+      no token ⇒ pass; on + public/out-of-scope paths (incl. `/fhir/*`)
+      ⇒ pass; on + protected + no token ⇒ `401`; on + valid ⇒ pass;
+      on + expired / tampered ⇒ `401` — plus the lenient `parse_bool`
+      flag parser. Met: `cargo test --lib` green.
+  - [ ] Scheduler / admin / read-only / service roles.
+  - [ ] Keys fetched from the authentication-service
+    `/.well-known/paseto-keys` at boot (today the key set is injected
+    via `EVENT_PASETO_KEYS`).
+  - **Acceptance (roles — open):** valid token + role gets `2xx`;
+    insufficient role gets `403`.
 - [ ] **T-9 — Bulk import / export.** (§9.1, §10.3;
   [bulk import/export](../../../agents/share/bulk-import-export.md))
   - [ ] `bulk_jobs` migration (family-wide schema, shared doc §3).

@@ -62,6 +62,19 @@ crate — no shared secret, no introspection call. Configure with
 `EVENT_TOKEN_AUDIENCE`. Handlers opt in by taking an `AuthUser`
 argument (`src/api/rest/auth.rs`).
 
+Blanket enforcement (default **off**): when `EVENT_REQUIRE_AUTH` is
+truthy (`1`/`true`/`yes`/`on`, case-insensitive; anything else
+including unset/blank ⇒ off), the `auth::require_auth_mw` middleware
+requires a valid bearer token on **every** `/api/v1/*` route except
+the public `/api/v1/health`. Root-level `/_health`, `/_ping`,
+`/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`, and the
+`/fhir/*` `501 Not Implemented` stubs sit outside the `/api/v1` scope
+and stay public. The flag is read once at `AppState` construction —
+restart the service to change it. Wired on both router surfaces
+(`create_router` and the loco router in `App::after_routes`). Family
+contract:
+[`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md).
+
 ## Event CRUD
 
 | Method | Path | Notes |

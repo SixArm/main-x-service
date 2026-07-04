@@ -174,3 +174,27 @@ crate — no shared secret, no introspection call. Configure with
 `PLACE_TOKEN_AUDIENCE` (defaults `authentication-service` /
 `main-x-service`). Handlers opt in by taking an `AuthUser`
 argument (`src/api/rest/auth.rs`).
+
+#### Blanket enforcement (default-off)
+
+Setting `PLACE_REQUIRE_AUTH` truthy (`1`/`true`/`yes`/`on`,
+case-insensitive; anything else — unset, blank, `0`, junk — means
+off) turns on a blanket middleware that requires a valid PASETO
+bearer token on **every** route except the public allow-list:
+
+| Public path | Why |
+| --- | --- |
+| `/api/health` | Liveness probe (this crate's surface) |
+| `/_health`, `/_ping` | loco default health routes |
+| `/api-docs/openapi.json` | Raw OpenAPI document |
+| `/swagger-ui*` (prefix) | Swagger UI + static assets |
+| `/metrics.prom` | Prometheus scrape (root-mounted, outside `/api`) |
+
+The list is the `PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES` constants in
+`src/api/rest/auth.rs`; the pure `auth::enforce` decision is layered
+via `axum::middleware::from_fn_with_state` on both router surfaces
+(`create_router` and the loco router in `src/app.rs`). The flag is
+read once at router construction — restart the service to change it.
+Unauthenticated requests to any non-public path return `401`. See
+`agents/share/jwt-enforcement.md` for the family-wide contract; roles
+and boot-time HTTP key fetch remain open (spec §13 T-8).

@@ -30,7 +30,38 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   tokens in-process (throwaway Ed25519 key via `rusty_paseto` +
   `ed25519-dalek` dev-deps) and pin valid / missing / non-bearer /
   expired / tampered / no-key outcomes.
-- Blanket `/api/*` enforcement + roles remain open in spec §13 T-4.
+- Blanket `/api/*` enforcement has since landed default-off (see the
+  next section); roles + published-key HTTP fetch remain open in spec
+  §13 T-4.
+
+### Added — blanket `/api/*` auth enforcement (default-off, 2026-07-04)
+
+- The enforcement remainder of spec §13 T-4, per the family contract
+  in `agents/share/jwt-enforcement.md`: a pure `auth::enforce`
+  decision plus the `auth::require_auth_mw` Axum middleware require a
+  valid PASETO `v4.public` bearer token on every `/api/*` route when
+  `THING_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
+  case-insensitive via `auth::parse_bool`; anything else including
+  unset/blank ⇒ off — the default, so behaviour is unchanged until a
+  deployment opts in). The flag is read once at `AppState`
+  construction (`auth::require_auth_from_env`, carried as
+  `AppState::require_auth`); restart to change.
+- Public allow-list (`auth::PUBLIC_API_PATHS`): `/api/health` stays
+  public inside the enforced prefix; root-level `/_health`, `/_ping`,
+  `/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom` sit
+  outside the `/api` scope and are never gated (segment-aware prefix
+  check, so `/api-docs` is not mistaken for `/api/...`).
+- Wired on **both** router surfaces via
+  `axum::middleware::from_fn_with_state` — the hand-written
+  `create_router` and the loco router in `App::after_routes` — inside
+  the CORS layer so preflight requests are still answered.
+- New DB-free unit tests in `src/api/rest/auth.rs` pin the full
+  matrix: off + no token ⇒ pass; on + public / out-of-scope paths ⇒
+  pass; on + protected + no token ⇒ `401`; on + valid token ⇒ pass;
+  on + expired / tampered ⇒ `401`; plus the lenient `parse_bool`
+  flag-parser semantics.
+- Still open in spec §13 T-4: roles (editor / read-only / service)
+  and fetching the published Ed25519 key set over HTTP at boot.
 
 ### Added — matcher bridge
 

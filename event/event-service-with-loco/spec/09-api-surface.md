@@ -17,8 +17,18 @@ on validation failure.
 Authentication is opt-in per handler: taking an `AuthUser` argument
 requires a valid `Authorization: Bearer <paseto>` token, verified
 offline (PASETO `v4.public`, Ed25519) against the auth-service
-published key set (see §13 T-8; blanket enforcement is the open
-remainder of T-8).
+published key set (see §13 T-8).
+
+Blanket enforcement is implemented **default-off**: when
+`EVENT_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
+case-insensitive), every `/api/v1/*` route requires a valid bearer
+token except the public `/api/v1/health`. Root-level `/_health`,
+`/_ping`, `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`,
+and the `/fhir/*` `501 Not Implemented` stubs sit outside the
+`/api/v1` scope and stay public. The flag is read once at
+construction — restart to change. Roles + fetching the published key
+set over HTTP remain open (§13 T-8). Family contract:
+[jwt-enforcement](../../../agents/share/jwt-enforcement.md).
 
 ### 9.1 Bulk import / export
 

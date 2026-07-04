@@ -24,7 +24,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, metrics_routes, persons_routes},
+    api::rest::{ApiDoc, AppState, auth, metrics_routes, persons_routes},
     config::Config,
     matching::ProbabilisticMatcher,
     search::SearchEngine,
@@ -73,9 +73,17 @@ impl Hooks for App {
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let matcher = ProbabilisticMatcher::new(config.matching.clone());
         let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
+        // Blanket auth enforcement (default-off, `PERSON_REQUIRE_AUTH`),
+        // snapshotted here at boot — changing the env var requires a
+        // restart. Layered unconditionally; the flag is the only switch.
+        let enforcement = auth::Enforcement::from_env(state.verifier.clone());
         ctx.shared_store.insert(state);
         let router = router
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+            .layer(axum::middleware::from_fn_with_state(
+                enforcement,
+                auth::require_auth_middleware,
+            ))
             .layer(tower_http::cors::CorsLayer::permissive());
         Ok(router)
     }

@@ -86,7 +86,11 @@ impl Hooks for App {
     /// Final router assembly. Builds the boot-time singletons
     /// (`SearchEngine`, `ProbabilisticMatcher`, domain `Config`), stashes
     /// the resulting [`AppState`] in loco's shared store so handlers can
-    /// retrieve it, then mounts Swagger UI and a permissive CORS layer.
+    /// retrieve it, then mounts Swagger UI, the blanket auth-enforcement
+    /// middleware (`auth::require_auth_mw` — a near-noop unless
+    /// `EVENT_REQUIRE_AUTH` was truthy at construction; layered inside
+    /// CORS so preflight requests still pass), and a permissive CORS
+    /// layer.
     ///
     /// # Errors
     ///
@@ -98,9 +102,13 @@ impl Hooks for App {
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let matcher = ProbabilisticMatcher::new(config.matching.clone());
         let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
-        ctx.shared_store.insert(state);
+        ctx.shared_store.insert(state.clone());
         let router = router
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+            .layer(axum::middleware::from_fn_with_state(
+                state,
+                crate::api::rest::auth::require_auth_mw,
+            ))
             .layer(tower_http::cors::CorsLayer::permissive());
         Ok(router)
     }

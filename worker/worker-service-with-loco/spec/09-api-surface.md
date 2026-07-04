@@ -14,10 +14,18 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 Standard response envelope. `409` on duplicate-detected create; `422`
 on validation failure.
 
-Authentication is opt-in per handler: taking an `AuthUser` argument
-requires a valid `Authorization: Bearer <paseto>` token, verified
-offline (PASETO `v4.public`, Ed25519) against the auth-service
-published key set (see §13 T-1a; blanket enforcement is T-1b).
+Authentication is opt-in per handler by default: taking an `AuthUser`
+argument requires a valid `Authorization: Bearer <paseto>` token,
+verified offline (PASETO `v4.public`, Ed25519) against the auth-service
+published key set (see §13 T-1a). **Blanket enforcement** (§13 T-1b) is
+implemented and **off by default**: when `WORKER_REQUIRE_AUTH` is truthy
+(`1`/`true`/`yes`/`on`; read once at router construction — restart to
+change), every route on both router surfaces requires a valid bearer
+token and returns `401` otherwise, except the public allow-list:
+`/_health`, `/_ping`, `/api/v1/health`, `/api-docs/openapi.json`,
+`/metrics.prom`, and `/swagger-ui*`. The `/fhir` surface is deliberately
+protected (worker PII). Remaining T-1b follow-ups: RBAC roles and
+boot-time key-set fetch over HTTP.
 
 ### 9.1 Cross-service link endpoints
 

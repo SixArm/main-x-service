@@ -8,6 +8,27 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — blanket auth enforcement (default-off)
+
+- New blanket `/api/*` auth enforcement middleware (spec §13 T-1b; family
+  contract: `agents/share/jwt-enforcement.md`). When `PERSON_REQUIRE_AUTH`
+  is truthy (`1`/`true`/`yes`/`on`, case-insensitive; unset/blank/junk ⇒
+  **off**, the default), every route requires a valid PASETO `v4.public`
+  bearer token except the public allow-list: `/api/health`, loco's
+  `/_health` / `/_ping`, `/api-docs/openapi.json`, `/swagger-ui*`, and
+  `/metrics.prom`. Unauthorised requests get `401`.
+- Implemented as a pure, DB-free `auth::enforce(flag, path, headers,
+  verifier)` decision plus an `Enforcement` middleware state in
+  `src/api/rest/auth.rs`, layered unconditionally on **both** router
+  surfaces (`create_router` and the loco `after_routes` hook). The flag
+  is snapshotted at router construction — changing the env var requires
+  a restart; the flag is the only switch.
+- New DB-free unit tests pin the full enforcement matrix (off + no
+  token ⇒ Ok; on + each public path ⇒ Ok; on + protected + no token ⇒
+  `401`; on + valid ⇒ Ok; on + expired/tampered ⇒ `401`) and the lenient
+  flag-parser semantics, reusing the in-process PASETO minting helpers.
+- Boot-time HTTP key fetch and roles/RBAC remain open as spec §13 T-1c.
+
 ### Changed — auth pivot: RS256 JWT/JWKS → PASETO v4.public
 
 - Bearer-token verification migrated off RS256 JWT + JWKS to **PASETO

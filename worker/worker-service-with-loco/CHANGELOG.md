@@ -8,6 +8,33 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — blanket auth enforcement (default off; spec §13 T-1b)
+
+- Blanket `/api/*` auth enforcement per the family contract in
+  `agents/share/jwt-enforcement.md`: when `WORKER_REQUIRE_AUTH` is
+  truthy (`1`/`true`/`yes`/`on`, case-insensitive; unset/blank/`0`/junk
+  ⇒ off — the default), every route on **both** router surfaces (the
+  standalone Axum `create_router` and the loco router built in
+  `App::after_routes`) requires a valid PASETO `v4.public` bearer token
+  and returns `401` otherwise.
+- New in `src/api/rest/auth.rs`: pure, unit-testable `enforce(...)`
+  decision; lenient `parse_bool` + `require_auth_from_env()` flag
+  reader; `apply_enforcement(router, flag, verifier)` middleware layer.
+  The flag and verifier are captured **at router construction** —
+  changing `WORKER_REQUIRE_AUTH` requires a process restart. The layer
+  sits beneath CORS so preflight `OPTIONS` is answered before
+  enforcement.
+- Public allow-list (`PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES`):
+  `/_health`, `/_ping`, `/api/v1/health`, `/api-docs/openapi.json`,
+  `/metrics.prom`, and `/swagger-ui*`. The `/fhir` surface is
+  deliberately protected (worker PII).
+- New DB-free unit tests pin the family test matrix: off + no token ⇒
+  pass; on + public path ⇒ pass; on + protected + no token ⇒ `401`;
+  on + valid token ⇒ pass; on + expired/tampered token ⇒ `401`; plus
+  the flag-parser truthy/falsy table and a `/fhir`-is-protected pin.
+- Remaining T-1b follow-ups (spec §13): RBAC roles and boot-time
+  key-set fetch over HTTP.
+
 ### Added — offline PASETO v4.public bearer verification
 
 - New `src/api/rest/auth.rs`: `AuthUser` extractor + `GET /api/v1/whoami`
@@ -32,7 +59,9 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   tokens in-process (throwaway Ed25519 key via `rusty_paseto` +
   `ed25519-dalek` dev-deps) and pin valid / missing / non-bearer /
   expired / tampered / no-key outcomes.
-- Blanket `/api/*` enforcement stays open as spec §13 T-1b.
+- Blanket `/api/*` enforcement landed in the same cycle (see the
+  entry above); the spec §13 T-1b remainders are RBAC roles and
+  boot-time key-set fetch over HTTP.
 
 ### Added — matcher bridge
 

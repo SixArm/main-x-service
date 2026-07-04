@@ -10,15 +10,120 @@
 //! `agents/share/authentication-sessions.md` for the family-wide design
 //! (cookie sessions + short-lived PASETO v4.public cross-service tokens;
 //! this replaces the earlier RS256-JWT + JWKS model).
+//!
+//! ## Blanket enforcement (spec §13 T-1b)
+//!
+//! When `WORKER_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
+//! case-insensitive), the [`enforce`] decision — wired as an Axum
+//! middleware layer via [`apply_enforcement`] on **both** router
+//! surfaces (`create_router` and the loco router in
+//! `App::after_routes`) — requires a valid PASETO `v4.public` bearer
+//! token on every route except the public allow-list in
+//! [`PUBLIC_PATHS`] / [`PUBLIC_PATH_PREFIXES`] (health probes, the
+//! `OpenAPI` document + Swagger UI, and the Prometheus scrape endpoint).
+//! It is **off by default**: unset/blank/`0`/junk ⇒ today's behaviour,
+//! where authentication is opt-in per handler. The flag is read **once,
+//! at router construction** ([`require_auth_from_env`]) — changing it
+//! requires a process restart. Activation is an operations decision once
+//! the SSO token flow is live; the family-wide contract is
+//! `agents/share/jwt-enforcement.md`.
+
+use std::sync::Arc;
 
 use authentication_verifier::{Claims, Verifier};
-use axum::Json;
-use axum::extract::{FromRef, FromRequestParts};
+use axum::extract::{FromRef, FromRequestParts, Request};
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, StatusCode};
+use axum::middleware::Next;
 use axum::response::IntoResponse;
+use axum::{Json, Router};
 
 use super::state::AppState;
+
+/// Exact-match paths that stay public even when blanket enforcement is
+/// on: loco's default health probes (`/_health`, `/_ping`), this crate's
+/// own health endpoint (`/api/v1/health` — orchestration probes carry no
+/// token), the served `OpenAPI` document, and the Prometheus scrape
+/// endpoint (`/metrics.prom` — scrapers carry no token). Everything else
+/// — the whole `/api/v1` surface and the `/fhir` surface (worker PII) —
+/// requires a valid bearer token when enforcement is on.
+pub const PUBLIC_PATHS: [&str; 5] = [
+    "/_health",
+    "/_ping",
+    "/api/v1/health",
+    "/api-docs/openapi.json",
+    "/metrics.prom",
+];
+
+/// Prefix-match public paths: the Swagger UI page and its assets
+/// (`/swagger-ui`, `/swagger-ui/…`).
+pub const PUBLIC_PATH_PREFIXES: [&str; 1] = ["/swagger-ui"];
+
+/// Whether `path` is on the public allow-list ([`PUBLIC_PATHS`] exact or
+/// [`PUBLIC_PATH_PREFIXES`] prefix match).
+fn is_public_path(path: &str) -> bool {
+    PUBLIC_PATHS.contains(&path) || PUBLIC_PATH_PREFIXES.iter().any(|p| path.starts_with(p))
+}
+
+/// Lenient boolean parse for the enforcement flag: `1`/`true`/`yes`/`on`
+/// (case-insensitive, surrounding whitespace ignored) ⇒ `true`;
+/// everything else (incl. empty, `0`, junk) ⇒ `false`.
+#[must_use]
+pub fn parse_bool(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
+/// Read the blanket-enforcement flag from `WORKER_REQUIRE_AUTH`
+/// (default **off**: unset/blank/`0`/junk ⇒ `false`). Called once at
+/// router construction — changing the flag requires a restart.
+#[must_use]
+pub fn require_auth_from_env() -> bool {
+    parse_bool(&std::env::var("WORKER_REQUIRE_AUTH").unwrap_or_default())
+}
+
+/// The blanket-enforcement decision. `Ok(())` ⇒ let the request through;
+/// `Err((401, msg))` ⇒ reject. Pure: the caller passes the flag, path,
+/// headers and verifier, so it is fully unit-testable without booting
+/// the app or a database.
+///
+/// # Errors
+///
+/// `401` when enforcement is on, the path is not public, and the request
+/// carries no valid bearer token (missing/malformed/expired/tampered).
+pub fn enforce(
+    require_auth: bool,
+    path: &str,
+    headers: &HeaderMap,
+    verifier: &Verifier,
+) -> Result<(), (StatusCode, String)> {
+    if !require_auth || is_public_path(path) {
+        return Ok(());
+    }
+    bearer_claims(headers, verifier).map(|_| ())
+}
+
+/// Layer the blanket-enforcement middleware onto a finished router. The
+/// flag and verifier are captured **at construction** (restart to
+/// change); when the flag is off the middleware is a near-noop, so both
+/// router surfaces wire it unconditionally and `WORKER_REQUIRE_AUTH` is
+/// the only switch. Applied beneath the CORS layer so preflight
+/// `OPTIONS` requests are answered by CORS before enforcement runs.
+pub fn apply_enforcement(router: Router, require_auth: bool, verifier: Arc<Verifier>) -> Router {
+    router.layer(axum::middleware::from_fn(
+        move |req: Request, next: Next| {
+            let verifier = Arc::clone(&verifier);
+            async move {
+                match enforce(require_auth, req.uri().path(), req.headers(), &verifier) {
+                    Ok(()) => next.run(req).await,
+                    Err(reject) => reject.into_response(),
+                }
+            }
+        },
+    ))
+}
 
 /// Extract and verify the bearer token from request headers. Pure (the
 /// verifier is passed in), so it is unit-testable without an [`AppState`]
@@ -231,5 +336,83 @@ mod tests {
             bearer_claims(&bearer(&token), &no_keys).unwrap_err().0,
             StatusCode::UNAUTHORIZED
         );
+    }
+
+    /// `parse_bool` accepts the documented truthy set and rejects the
+    /// rest (including empty, `0`, and junk) — the `WORKER_REQUIRE_AUTH`
+    /// flag semantics from `agents/share/jwt-enforcement.md`.
+    #[test]
+    fn test_parse_bool_truthy_and_falsy() {
+        for t in ["1", "true", "TRUE", "Yes", "on", " on ", "ON"] {
+            assert!(parse_bool(t), "{t:?} should parse true");
+        }
+        for f in ["", " ", "0", "false", "no", "off", "junk", "2"] {
+            assert!(!parse_bool(f), "{f:?} should parse false");
+        }
+    }
+
+    /// Enforcement off ⇒ a protected path passes with no token (today's
+    /// default behaviour is preserved).
+    #[test]
+    fn test_enforce_off_allows_protected_without_token() {
+        assert!(enforce(false, "/api/v1/workers", &HeaderMap::new(), &verifier()).is_ok());
+    }
+
+    /// Enforcement on ⇒ every allow-listed public path still passes
+    /// without a token.
+    #[test]
+    fn test_enforce_on_allows_public_paths() {
+        for path in PUBLIC_PATHS {
+            assert!(
+                enforce(true, path, &HeaderMap::new(), &verifier()).is_ok(),
+                "{path} should be public"
+            );
+        }
+        for path in ["/swagger-ui", "/swagger-ui/index.html"] {
+            assert!(
+                enforce(true, path, &HeaderMap::new(), &verifier()).is_ok(),
+                "{path} should be public"
+            );
+        }
+    }
+
+    /// Enforcement on, protected path, no token ⇒ `401`.
+    #[test]
+    fn test_enforce_on_protected_without_token_is_401() {
+        let err = enforce(true, "/api/v1/workers", &HeaderMap::new(), &verifier()).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+    }
+
+    /// Enforcement on, protected path, valid token ⇒ passes.
+    #[test]
+    fn test_enforce_on_protected_with_valid_token_is_ok() {
+        let token = sign(10_000_000_000);
+        assert!(enforce(true, "/api/v1/workers", &bearer(&token), &verifier()).is_ok());
+    }
+
+    /// Enforcement on, protected path, expired token ⇒ `401`.
+    #[test]
+    fn test_enforce_on_protected_with_expired_token_is_401() {
+        let token = sign(-60);
+        let err = enforce(true, "/api/v1/workers", &bearer(&token), &verifier()).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+    }
+
+    /// Enforcement on, protected path, tampered token ⇒ `401`.
+    #[test]
+    fn test_enforce_on_protected_with_tampered_token_is_401() {
+        let mut token = sign(10_000_000_000);
+        let last = token.pop().unwrap();
+        token.push(if last == 'a' { 'b' } else { 'a' });
+        let err = enforce(true, "/api/v1/workers", &bearer(&token), &verifier()).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+    }
+
+    /// The FHIR surface is protected too — it serves worker PII, so it
+    /// is deliberately not on the allow-list.
+    #[test]
+    fn test_enforce_on_fhir_without_token_is_401() {
+        let err = enforce(true, "/fhir/Worker", &HeaderMap::new(), &verifier()).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
     }
 }

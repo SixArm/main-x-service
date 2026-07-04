@@ -137,6 +137,11 @@ pub struct ApiDoc;
 /// handler with shared [`AppState`], plus the top-level
 /// `/metrics.prom` scrape endpoint, the Swagger UI, and a permissive
 /// CORS layer.
+///
+/// The blanket-enforcement middleware ([`auth::require_auth_mw`]) is
+/// layered unconditionally (inside CORS, so preflight requests still
+/// pass); it is a near-noop unless `EVENT_REQUIRE_AUTH` was truthy at
+/// [`AppState`] construction.
 pub fn create_router(state: AppState) -> Router {
     use crate::api::fhir::handlers as fhir;
 
@@ -165,7 +170,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/events/{id}/audit", get(handlers::get_event_audit_logs))
         .route("/audit/recent", get(handlers::get_recent_audit_logs))
         .route("/audit/user", get(handlers::get_user_audit_logs))
-        .with_state(state);
+        .with_state(state.clone());
 
     // FHIR R5 stub surface: every `/fhir/Event*` route returns `501 Not
     // Implemented` with an `OperationOutcome` body (spec §6.8). Bound
@@ -191,6 +196,12 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/fhir", fhir_routes)
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        // Blanket auth enforcement (default-off; scoped to /api/v1 by
+        // `auth::enforce`); layered inside CORS so preflights pass.
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            auth::require_auth_mw,
+        ))
         // Permissive CORS: this is a backend service fronted elsewhere;
         // tighten if exposed directly to browsers.
         .layer(CorsLayer::permissive())

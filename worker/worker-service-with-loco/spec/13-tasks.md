@@ -23,16 +23,32 @@ clearly described manual check confirms the acceptance criterion.
     valid / missing / non-bearer / expired / tampered / no-key
     outcomes. Met: `cargo test --lib` green.
 - [ ] **T-1b — Blanket auth enforcement on `/api/*`.**
-  - [ ] Require a valid PASETO bearer token on every route except
-    public paths (health, OpenAPI/Swagger, metrics), gated by a
+  - [x] *(done 2026-07-04)* Require a valid PASETO `v4.public` bearer
+    token on every route except the public allow-list, gated by the
     default-off `WORKER_REQUIRE_AUTH` env flag (family contract:
-    `agents/share/jwt-enforcement.md`), with HR-admin /
-    credentialing-officer / read-only / service roles.
+    `agents/share/jwt-enforcement.md`; lenient parse: `1`/`true`/`yes`/
+    `on` ⇒ on, unset/blank/`0`/junk ⇒ off). Pure `enforce(...)`
+    decision + `require_auth_from_env()` in `src/api/rest/auth.rs`,
+    layered via `apply_enforcement` on **both** router surfaces
+    (`create_router` and the loco router in `App::after_routes`); the
+    flag and verifier are captured at router construction (restart to
+    change). Public allow-list (`PUBLIC_PATHS` +
+    `PUBLIC_PATH_PREFIXES`): `/_health`, `/_ping`, `/api/v1/health`,
+    `/api-docs/openapi.json`, `/metrics.prom`, `/swagger-ui*`. The
+    `/fhir` surface is deliberately protected (worker PII).
+    **Acceptance met:** DB-free unit tests in `src/api/rest/auth.rs`
+    pin the family test matrix — off+no-token ⇒ Ok, on+public ⇒ Ok,
+    on+protected+no-token ⇒ 401, on+protected+valid ⇒ Ok,
+    on+expired/tampered ⇒ 401, plus the flag-parser test —
+    `cargo test --lib` green.
+  - [ ] RBAC: HR-admin / credentialing-officer / read-only / service
+    roles (the token's `roles` claim is verified but not yet
+    authorised against per-route policy).
   - [ ] Fetch the key set over HTTP from the auth service at boot
     (today it is injected via `WORKER_PASETO_KEYS`).
-  - **Acceptance:** integration test with enforcement on posts without
-    a token → `401`; posts with a valid token and sufficient role →
-    `2xx`.
+  - **Acceptance (remaining):** integration test with enforcement on
+    posts without a token → `401`; posts with a valid token and
+    sufficient role → `2xx`.
 - [ ] **T-2 — Production Fluvio publisher.**
   - [ ] Implement `FluvioEventPublisher : EventProducer` behind
     feature flag `fluvio`.

@@ -14,7 +14,8 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-/// Bearer-token authentication extractor + `whoami` endpoint.
+/// Bearer-token authentication extractor + `whoami` endpoint + blanket
+/// auth-enforcement middleware (default-off, `WORKER_REQUIRE_AUTH`).
 pub mod auth;
 /// REST endpoint handler implementations.
 pub mod handlers;
@@ -110,8 +111,15 @@ pub struct ApiDoc;
 
 /// Builds the full Axum [`Router`]: API routes nested under `/api/v1`, the
 /// `/metrics.prom` scrape endpoint, the Swagger UI, and a permissive CORS
-/// layer. Shared [`AppState`] is injected into the API routes.
+/// layer. Shared [`AppState`] is injected into the API routes. The blanket
+/// auth-enforcement middleware ([`auth::apply_enforcement`]) is layered
+/// unconditionally; the `WORKER_REQUIRE_AUTH` flag (read here, at
+/// construction — restart to change; default off) is the only switch.
 pub fn create_router(state: AppState) -> Router {
+    // Capture the verifier for the enforcement layer before `state` is
+    // moved into the route groups.
+    let enforcement_verifier = state.verifier.clone();
+
     // FHIR R5 `/fhir/Worker` surface, mirroring the loco mount in
     // `crate::app::App::routes` (built from [`fhir_routes`]) so the
     // integration-test router matches production.
@@ -161,7 +169,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/audit/user", get(handlers::get_user_audit_logs))
         .with_state(state);
 
-    Router::new()
+    let router = Router::new()
         // Mount the JSON API under `/api/v1` and the FHIR surface under `/fhir`
         // (both already carry the shared `AppState`).
         .nest("/api/v1", api_routes)
@@ -170,7 +178,12 @@ pub fn create_router(state: AppState) -> Router {
         // scrape config (`metrics_path: /metrics.prom`) finds it.
         .route("/metrics.prom", get(handlers::metrics_prom))
         // Swagger UI + the served OpenAPI JSON built from `ApiDoc`.
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
+
+    // Blanket auth enforcement (spec §13 T-1b): default-off, gated by
+    // `WORKER_REQUIRE_AUTH` read at construction. Layered beneath CORS so
+    // preflight `OPTIONS` requests are answered before enforcement runs.
+    auth::apply_enforcement(router, auth::require_auth_from_env(), enforcement_verifier)
         // Permissive CORS so browser-based operator UIs on other origins can
         // call the API; tighten for production deployments.
         .layer(CorsLayer::permissive())

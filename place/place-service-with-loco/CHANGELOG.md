@@ -18,7 +18,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   `aud`, `exp` — via the monorepo `authentication-verifier` 0.2 path
   dependency (`Verifier::from_paseto_keys_value`). No shared secret, no
   per-request introspection hop. Handlers opt in by taking an `AuthUser`
-  argument; blanket `/api/*` enforcement remains open in T-8.
+  argument; blanket `/api/*` enforcement landed the same day (next
+  section).
 - The verifier rides on `AppState` and is built from the environment at
   boot: `PLACE_PASETO_KEYS` (the Ed25519 key set the auth service
   publishes at `/.well-known/paseto-keys`), `PLACE_TOKEN_ISSUER`
@@ -38,6 +39,37 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   `src/api/rest/state.rs` pins the empty-key-set fallback and the
   `env_or` default; `src/api/rest/mod.rs` pins that OpenAPI advertises
   `/api/whoami` and defines the `bearer` scheme.
+
+### Added — auth: blanket `/api/*` enforcement (default-off)
+
+- Blanket auth enforcement landed, per the family-wide contract in
+  `agents/share/jwt-enforcement.md` (spec §13 T-8, the enforcement
+  half). `src/api/rest/auth.rs` gains a pure `enforce(require_auth,
+  path, headers, verifier)` decision — `Ok(())` lets the request
+  through, `Err((401, msg))` rejects — plus `parse_bool` /
+  `require_auth_from_env` (lenient flag parse: `1`/`true`/`yes`/`on`
+  case-insensitive ⇒ on; unset/blank/`0`/junk ⇒ off) and a
+  `require_auth_middleware` Axum middleware carrying an
+  `EnforcementState { require_auth, verifier }`.
+- **Off by default.** `PLACE_REQUIRE_AUTH` is read once at router
+  construction (restart to change). When on, every route requires a
+  valid PASETO `v4.public` bearer token except the public allow-list,
+  documented in the `PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES` constants:
+  `/api/health`, loco's `/_health` / `/_ping`,
+  `/api-docs/openapi.json`, `/swagger-ui*` (prefix), and the
+  root-mounted `/metrics.prom`. When off, behaviour is unchanged
+  (opt-in `AuthUser` per handler).
+- Wired on **both** router surfaces via
+  `axum::middleware::from_fn_with_state`: the `create_router` Axum
+  surface (`src/api/rest/mod.rs`) and the loco router
+  (`src/app.rs::after_routes`), so the flag guards the service however
+  it is mounted.
+- New DB-free unit tests in `src/api/rest/auth.rs` reuse the in-process
+  PASETO minting helpers and pin the required matrix: off + no token ⇒
+  Ok; on + each public path ⇒ Ok; on + protected (incl. `/api/whoami`)
+  + no token ⇒ `401`; on + protected + valid token ⇒ Ok; on +
+  expired/tampered token ⇒ `401`; plus the `parse_bool`
+  truthy/falsy parser pin.
 
 ### Added — observability
 
@@ -187,5 +219,6 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   `tests/`). The family auth design has pivoted from RS256 JWT / JWKS
   to cookie sessions + short-lived PASETO v4.public tokens (see
   `agents/share/authentication-sessions.md`); `spec/13-tasks.md` T-8's
-  PASETO-verification half is now delivered (see *Added — auth* above);
-  blanket enforcement remains open.
+  PASETO-verification and blanket-enforcement halves are now delivered
+  (see the *Added — auth* sections above); roles + boot-time HTTP key
+  fetch remain open.

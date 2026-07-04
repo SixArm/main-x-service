@@ -18,8 +18,8 @@ clearly described manual check confirms the acceptance criterion.
   - **Acceptance:** `grpcurl` against `ThingService.GetThing`
     round-trips a record.
 - [ ] **T-4 — Authentication / authorisation.** Peer PASETO
-  verification *(done 2026-07-04)*; blanket enforcement + roles still
-  open. Per
+  verification *(done 2026-07-04)* and default-off blanket enforcement
+  *(done 2026-07-04)*; roles + published-key HTTP fetch still open. Per
   [authentication-sessions](../../../agents/share/authentication-sessions.md)
   §5: the family moved off RS256-JWT + JWKS.
   - [x] Offline PASETO `v4.public` (Ed25519) verification via the
@@ -34,16 +34,36 @@ clearly described manual check confirms the acceptance criterion.
     `THING_TOKEN_AUDIENCE`, defaults `authentication-service` /
     `main-x-service`); absent key set ⇒ empty set, every token
     rejected, service still boots.
-  - [ ] Blanket enforcement middleware on `/api/*` — require a valid
-    PASETO bearer token on every route (health/metrics excepted) —
-    with editor / read-only / service roles.
+  - [x] Blanket enforcement middleware on `/api/*` *(done 2026-07-04)*
+    — env-gated by `THING_REQUIRE_AUTH`, **default off**
+    (`1`/`true`/`yes`/`on` case-insensitive ⇒ on; unset/blank/junk ⇒
+    off; read once at `AppState` construction — restart to change).
+    The pure `auth::enforce` decision + `auth::require_auth_mw`
+    middleware require a valid PASETO bearer token on every `/api/*`
+    route except the public allow-list `/api/health`
+    (`auth::PUBLIC_API_PATHS`); root-level `/_health`, `/_ping`,
+    `/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom` are
+    outside the `/api` scope and stay public. Wired on both router
+    surfaces (`create_router` and the loco router in
+    `App::after_routes`) via `axum::middleware::from_fn_with_state`,
+    inside the CORS layer. Family contract:
+    [jwt-enforcement](../../../agents/share/jwt-enforcement.md).
+  - [ ] Editor / read-only / service roles.
+  - [ ] Fetch the published Ed25519 key set over HTTP at boot (today:
+    `THING_PASETO_KEYS` env injection).
   - **Acceptance (verification — met):** DB-free unit tests in
     `src/api/rest/auth.rs` mint `v4.public` tokens in-process
     (throwaway Ed25519 key) and pin valid / missing / non-bearer /
     expired / tampered / no-key outcomes. Met: `cargo test --lib`
     green.
-  - **Acceptance (enforcement — open):** unauthenticated requests get
-    `401`; valid token + role gets `2xx`.
+  - **Acceptance (enforcement middleware — met):** DB-free unit tests
+    in `src/api/rest/auth.rs` pin the `enforce` matrix — off + no
+    token ⇒ pass; on + public/out-of-scope paths ⇒ pass; on +
+    protected + no token ⇒ `401`; on + valid ⇒ pass; on + expired /
+    tampered ⇒ `401` — plus the lenient `parse_bool` flag parser. Met:
+    `cargo test --lib` green.
+  - **Acceptance (roles — open):** valid token + role gets `2xx`;
+    insufficient role gets `403`.
 - [ ] **T-5 — Embedding-based similarity (optional / experimental).**
   - [ ] Vector index via `pg_vector`.
   - [ ] `compute_match` augmented with cosine-similarity score.

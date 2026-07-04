@@ -155,3 +155,15 @@ crate — no shared secret, no introspection call. Configure with
 `THING_PASETO_KEYS` (key-set JSON), `THING_TOKEN_ISSUER`, and
 `THING_TOKEN_AUDIENCE`. Handlers opt in by taking an `AuthUser`
 argument (`src/api/rest/auth.rs`).
+
+Blanket enforcement (default **off**): when `THING_REQUIRE_AUTH` is
+truthy (`1`/`true`/`yes`/`on`, case-insensitive; anything else
+including unset/blank ⇒ off), the `auth::require_auth_mw` middleware
+requires a valid bearer token on **every** `/api/*` route except the
+public `/api/health`. Root-level `/_health`, `/_ping`,
+`/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom` sit
+outside the `/api` scope and stay public. The flag is read once at
+`AppState` construction — restart the service to change it. Wired on
+both router surfaces (`create_router` and the loco router in
+`App::after_routes`). Family contract:
+[`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md).

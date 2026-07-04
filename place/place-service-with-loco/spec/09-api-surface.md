@@ -28,9 +28,18 @@ FHIR-resource concern.
 Standard response envelope. `409` on duplicate-detected create; `422`
 on validation failure.
 
-Authentication is opt-in per handler: taking an `AuthUser` argument
-requires a valid `Authorization: Bearer <paseto>` token, verified
-offline (PASETO `v4.public`, Ed25519) against the auth-service
-published key set (see §13 T-8; blanket enforcement is the T-8
-remainder).
+Authentication is opt-in per handler by default: taking an `AuthUser`
+argument requires a valid `Authorization: Bearer <paseto>` token,
+verified offline (PASETO `v4.public`, Ed25519) against the
+auth-service published key set (see §13 T-8).
+
+Blanket enforcement: when the default-off `PLACE_REQUIRE_AUTH` env
+flag is truthy (`1`/`true`/`yes`/`on`, case-insensitive; read at
+router construction — restart to change), an Axum middleware on both
+router surfaces requires a valid bearer token on **every** route
+except the public allow-list — `/api/health`, `/_health`, `/_ping`,
+`/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom` (constants
+`auth::PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES`). Unauthenticated
+requests to any other path get `401`. Roles and boot-time HTTP key
+fetch are the T-8 remainder.
 

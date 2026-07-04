@@ -1,12 +1,14 @@
 ## 15. Roadmap
 
-- **Authentication & authorisation** — blanket PASETO enforcement on
-  `/api/*` (the T-8 remainder; peer offline PASETO v4.public
-  verification via the `authentication-verifier` crate landed
-  2026-07-04, per
-  [authentication-sessions](../../../agents/share/authentication-sessions.md)),
-  RBAC for editor / curator / read-only / service roles, rate
-  limiting, security headers.
+- **Authentication & authorisation** — RBAC for editor / curator /
+  read-only / service roles and boot-time HTTP key-set fetch (the T-8
+  remainder; peer offline PASETO v4.public verification via the
+  `authentication-verifier` crate and the default-off
+  `PLACE_REQUIRE_AUTH` blanket `/api/*` enforcement middleware both
+  landed 2026-07-04, per
+  [authentication-sessions](../../../agents/share/authentication-sessions.md)
+  and `agents/share/jwt-enforcement.md`; activation is an operations
+  decision), rate limiting, security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`place_created`,
   `geo_search_radius_km_histogram`), Grafana dashboards + alerting.

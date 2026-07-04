@@ -72,6 +72,11 @@ pub use state::AppState;
 pub struct ApiDoc;
 
 /// Build the REST router with the given application state.
+///
+/// The blanket-enforcement middleware ([`auth::require_auth_mw`]) is
+/// layered unconditionally (inside CORS, so preflight requests still
+/// pass); it is a near-noop unless `THING_REQUIRE_AUTH` was truthy at
+/// [`AppState`] construction.
 pub fn create_router(state: AppState) -> Router {
     let api_routes = Router::new()
         .route("/health", get(handlers::health))
@@ -92,12 +97,16 @@ pub fn create_router(state: AppState) -> Router {
         .route("/things/{id}/masked", get(handlers::masked_thing))
         .route("/things/{id}/audit", get(handlers::audit_for_thing))
         .route("/audit/recent", get(handlers::audit_recent))
-        .with_state(state);
+        .with_state(state.clone());
 
     Router::new()
         .nest("/api", api_routes)
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            auth::require_auth_mw,
+        ))
         .layer(CorsLayer::permissive())
 }
 

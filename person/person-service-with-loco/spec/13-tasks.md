@@ -24,15 +24,36 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     `v4.public` tokens in-process (throwaway Ed25519 key) and pin
     valid / missing / non-bearer / expired / tampered / no-key
     outcomes. Met: `cargo test --lib` green.
-- [ ] **T-1b — Blanket auth enforcement on `/api/*`.**
-  - [ ] Require a valid PASETO bearer token on every route except
-    public paths (health, OpenAPI/Swagger, metrics), gated by a
-    default-off `PERSON_REQUIRE_AUTH` env flag (family contract:
-    `agents/share/jwt-enforcement.md`).
+- [x] **T-1b — Blanket auth enforcement on `/api/*`.** *(done
+  2026-07-04; remainders split to T-1c)*
+  - [x] Require a valid PASETO bearer token on every route except the
+    public allow-list (`/api/health`, loco `/_health` / `/_ping`,
+    `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`), gated
+    by a default-off `PERSON_REQUIRE_AUTH` env flag with lenient
+    parsing (`1`/`true`/`yes`/`on` ⇒ on; unset/blank/junk ⇒ off;
+    family contract: `agents/share/jwt-enforcement.md`). Pure
+    `auth::enforce` decision + `Enforcement` middleware state in
+    `src/api/rest/auth.rs`, layered unconditionally on **both** router
+    surfaces (`create_router` and the loco `after_routes` hook); the
+    flag is snapshotted at router construction, so changing it
+    requires a restart.
+  - **Acceptance:** DB-free unit tests in `src/api/rest/auth.rs`
+    (reusing the T-1a in-process token minting) pin the full
+    enforcement matrix — off + no token ⇒ Ok; on + each public path ⇒
+    Ok; on + protected + no token ⇒ `401`; on + protected + valid ⇒
+    Ok; on + expired/tampered ⇒ `401` — plus the flag-parser
+    semantics. Met: `cargo test --lib` green.
+- [ ] **T-1c — Auth follow-ups: boot-time key fetch + roles/RBAC.**
   - [ ] Fetch the key set over HTTP from the auth service at boot
-    (today it is injected via `PERSON_PASETO_KEYS`).
+    (today it is injected via `PERSON_PASETO_KEYS`); swap it into
+    `AppState` via `with_verifier`.
+  - [ ] Roles / RBAC on top of the verified claims (`roles` / `scope`).
+  - [ ] DB-gated request test (`#[ignore]`, Postgres): with
+    `PERSON_REQUIRE_AUTH` set, an unauthenticated `GET /api/persons/…`
+    returns `401` while `GET /api-docs/openapi.json` stays `200`.
   - **Acceptance:** integration test with enforcement on posts without
-    a token → `401`; posts with a valid token → `2xx`.
+    a token → `401`; posts with a valid token → `2xx`; key set fetched
+    from a stub auth service at boot.
 - [ ] **T-2 — Production Fluvio publisher.**
   - [ ] Implement `FluvioEventPublisher : EventProducer` behind
     feature flag `fluvio`.

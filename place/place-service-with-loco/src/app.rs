@@ -23,7 +23,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, metrics_routes, places_routes},
+    api::rest::{ApiDoc, AppState, auth, metrics_routes, places_routes},
     config::Config,
     matching::PlaceMatcher,
     search::SearchEngine,
@@ -88,8 +88,10 @@ impl Hooks for App {
     /// Builds the domain `Config` from the environment, opens the Tantivy
     /// `SearchEngine`, constructs the `PlaceMatcher`, and stuffs the resulting
     /// `AppState` into the context's shared store so `FromRef` handler
-    /// extraction can reach it. Then mounts Swagger UI and a permissive CORS
-    /// layer.
+    /// extraction can reach it. Then mounts Swagger UI, the blanket
+    /// auth-enforcement middleware (default-off, gated by
+    /// `PLACE_REQUIRE_AUTH` — read here, at construction, so changing the
+    /// flag requires a restart), and a permissive CORS layer.
     ///
     /// # Errors
     ///
@@ -101,9 +103,14 @@ impl Hooks for App {
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let matcher = PlaceMatcher::new(&config.matching);
         let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
+        let enforcement = auth::EnforcementState::from_app_state(&state);
         ctx.shared_store.insert(state);
         let router = router
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+            .layer(axum::middleware::from_fn_with_state(
+                enforcement,
+                auth::require_auth_middleware,
+            ))
             .layer(tower_http::cors::CorsLayer::permissive());
         Ok(router)
     }

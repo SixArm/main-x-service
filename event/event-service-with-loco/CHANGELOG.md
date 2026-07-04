@@ -16,8 +16,9 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   via the monorepo `authentication-verifier` 0.2 path dependency, per
   the family-wide design in `agents/share/authentication-sessions.md`
   (§5, §9 step 4; spec §13 T-8, verification part). Handlers opt in by
-  taking an `AuthUser` argument; blanket `/api/v1/*` enforcement stays
-  an open T-8 item.
+  taking an `AuthUser` argument; blanket `/api/v1/*` enforcement has
+  since landed default-off (see the next section) — roles +
+  published-key HTTP fetch remain open T-8 items.
 - The verifier is built from the environment at boot and carried on
   `AppState`: `EVENT_PASETO_KEYS` (the Ed25519 key set the auth service
   publishes at `/.well-known/paseto-keys`), `EVENT_TOKEN_ISSUER`
@@ -30,6 +31,37 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   tokens in-process (throwaway Ed25519 key via `rusty_paseto` +
   `ed25519-dalek` dev-deps) and pin valid / missing / non-bearer /
   expired / tampered / no-key outcomes.
+
+### Added — blanket `/api/v1/*` auth enforcement (default-off, 2026-07-04)
+
+- The enforcement remainder of spec §13 T-8, per the family contract
+  in `agents/share/jwt-enforcement.md`: a pure `auth::enforce`
+  decision plus the `auth::require_auth_mw` Axum middleware require a
+  valid PASETO `v4.public` bearer token on every `/api/v1/*` route
+  when `EVENT_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
+  case-insensitive via `auth::parse_bool`; anything else including
+  unset/blank ⇒ off — the default, so behaviour is unchanged until a
+  deployment opts in). The flag is read once at `AppState`
+  construction (`auth::require_auth_from_env`, carried as
+  `AppState::require_auth`); restart to change.
+- Public allow-list (`auth::PUBLIC_API_PATHS`): `/api/v1/health` stays
+  public inside the enforced prefix; root-level `/_health`, `/_ping`,
+  `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`, and the
+  `/fhir/*` `501 Not Implemented` stubs sit outside the `/api/v1`
+  scope and are never gated (the FHIR surface mounts at `/fhir`, not
+  under the enforced API prefix, so it deliberately stays public until
+  it grows beyond stubs).
+- Wired on **both** router surfaces via
+  `axum::middleware::from_fn_with_state` — the hand-written
+  `create_router` and the loco router in `App::after_routes` — inside
+  the CORS layer so preflight requests are still answered.
+- New DB-free unit tests in `src/api/rest/auth.rs` pin the full
+  matrix: off + no token ⇒ pass; on + public / out-of-scope paths
+  (incl. `/fhir/*`) ⇒ pass; on + protected + no token ⇒ `401`; on +
+  valid token ⇒ pass; on + expired / tampered ⇒ `401`; plus the
+  lenient `parse_bool` flag-parser semantics.
+- Still open in spec §13 T-8: scheduler / admin / read-only / service
+  roles and fetching the published Ed25519 key set over HTTP at boot.
 
 ### Added — matcher bridge
 

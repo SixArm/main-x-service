@@ -18,6 +18,7 @@
 | Validation | Required fields, format checks, phone normalisation, address standardisation, `422` |
 | Privacy | Field masking, GDPR export, consent model |
 | Authentication (peer verification) | Offline PASETO v4.public (Ed25519) bearer verification via `authentication-verifier` 0.2; `AuthUser` extractor + `GET /api/whoami`; env-configured key set (T-1a) |
+| Authentication (blanket enforcement) | Default-off `/api/*` enforcement middleware behind `PERSON_REQUIRE_AUTH` (lenient parse), public allow-list (health, OpenAPI/Swagger, metrics), layered on both router surfaces; DB-free unit-test matrix (T-1b) |
 | Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 | Documentation | README, CLAUDE.md, AGENTS/* set, architecture, deploy guide, this spec |
@@ -35,6 +36,6 @@ Open gaps drive tasks in §13. Live gap list:
 | Event consumers | (no task yet) |
 | gRPC API | T-6 |
 | Dedup / merge / privacy integration tests | T-5 |
-| Authentication — blanket enforcement (peer PASETO verification delivered, T-1a) | T-1b |
+| Authentication — boot-time key fetch + roles/RBAC (peer verification T-1a and blanket enforcement T-1b delivered) | T-1c |
 | Spec-drift CI guard | T-7 |
 

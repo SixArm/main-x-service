@@ -60,14 +60,29 @@ clearly described manual check confirms the acceptance criterion.
     in `src/api/rest/auth.rs` mint `v4.public` tokens in-process
     (throwaway Ed25519 key) and pin valid / missing / non-bearer /
     expired / tampered / no-key outcomes — `cargo test --lib` green.
-  - [ ] Blanket enforcement middleware on `/api/*` — require a valid
-    PASETO bearer token on every route except public paths (health,
-    OpenAPI/Swagger, metrics), gated by a default-off
-    `PLACE_REQUIRE_AUTH` env flag — with editor / curator / read-only
-    / service roles; fetch the key set over HTTP from the auth service
-    at boot (today it is injected via `PLACE_PASETO_KEYS`).
-  - **Acceptance (remainder):** with enforcement on, unauthenticated
-    requests get `401`; valid token + role gets `2xx`.
+  - [x] Blanket enforcement middleware on `/api/*` *(done 2026-07-04)*
+    — a valid PASETO bearer token is required on every route except
+    the public allow-list (`auth::PUBLIC_PATHS` +
+    `PUBLIC_PATH_PREFIXES`: `/api/health`, `/_health`, `/_ping`,
+    `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`), gated
+    by the default-off `PLACE_REQUIRE_AUTH` env flag (lenient parse:
+    `1`/`true`/`yes`/`on` ⇒ on; unset/blank/`0`/junk ⇒ off; read at
+    router construction — restart to change). The pure
+    `auth::enforce` decision is wired as an Axum
+    `from_fn_with_state` middleware on **both** router surfaces
+    (`create_router` and the loco router in `app.rs::after_routes`).
+    Acceptance met: DB-free unit tests in `src/api/rest/auth.rs` pin
+    the full matrix — off + no token ⇒ Ok; on + public paths ⇒ Ok;
+    on + protected + no token ⇒ `401`; on + protected + valid ⇒ Ok;
+    on + expired/tampered ⇒ `401`; `parse_bool` parser — `cargo test
+    --lib` green.
+  - [ ] Roles — editor / curator / read-only / service authorisation
+    on top of the enforced authentication.
+  - [ ] Fetch the key set over HTTP from the auth service at boot
+    (today it is injected via `PLACE_PASETO_KEYS`).
+  - **Acceptance (remainder):** valid token + role gets `2xx`,
+    insufficient role gets `403`; boot-time key fetch verified against
+    a live auth service.
 - [ ] **T-9 — Geo-radius `nearby` HTTP endpoint + search `offset`.**
   - [ ] Add `GET /api/places/nearby?lat=&lon=&radius_km=` wiring the
     existing `matching::geo::within_radius` Haversine primitive with a

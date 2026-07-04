@@ -14,10 +14,17 @@ All REST endpoints return `{ "success": bool, "data": …, "error": … }`.
 HTTP status codes follow REST conventions: `409` for duplicate
 detection on create, `422` for validation failure.
 
-Authentication is opt-in per handler: taking an `AuthUser` argument
-requires a valid `Authorization: Bearer <paseto>` token, verified
-offline (PASETO `v4.public`, Ed25519) against the auth-service
-published key set (see §13 T-1a; blanket enforcement is T-1b).
+Authentication is opt-in per handler by default: taking an `AuthUser`
+argument requires a valid `Authorization: Bearer <paseto>` token,
+verified offline (PASETO `v4.public`, Ed25519) against the
+auth-service published key set (see §13 T-1a). **Blanket enforcement**
+(§13 T-1b) is wired on both router surfaces and gated by the
+default-off `PERSON_REQUIRE_AUTH` env flag (`1`/`true`/`yes`/`on` ⇒
+on; unset/blank/junk ⇒ off; read once at boot — restart to change).
+When on, every route requires a valid bearer token except the public
+allow-list: `/api/health`, loco's `/_health` / `/_ping`,
+`/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom`.
+Roles/RBAC and boot-time HTTP key fetch are T-1c.
 
 ### 9.1 Cross-service link endpoints
 

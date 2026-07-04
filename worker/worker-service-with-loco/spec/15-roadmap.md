@@ -1,12 +1,16 @@
 ## 15. Roadmap
 
 - **Authentication & authorisation** — blanket PASETO enforcement on
-  `/api/*` (T-1b; peer PASETO v4.public verification via the
-  `authentication-verifier` crate landed as T-1a, per
-  [authentication-sessions](../../../agents/share/authentication-sessions.md)),
-  boot-time key-set fetch from `/.well-known/paseto-keys`, RBAC for
-  HR-admin / credentialing-officer / service roles, rate limiting,
-  user endpoints, security headers.
+  `/api/*` **landed 2026-07-04** (T-1b enforcement sub-item: default-off
+  `WORKER_REQUIRE_AUTH` middleware on both router surfaces; peer PASETO
+  v4.public verification via the `authentication-verifier` crate landed
+  as T-1a, per
+  [authentication-sessions](../../../agents/share/authentication-sessions.md)).
+  Remaining: operational activation (set the flag once the SSO token
+  flow is live), boot-time key-set fetch from
+  `/.well-known/paseto-keys`, RBAC for HR-admin /
+  credentialing-officer / service roles, rate limiting, user endpoints,
+  security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`worker_created`,
   `credential_expiry_within_30d`, …), Grafana dashboards + alerting.
