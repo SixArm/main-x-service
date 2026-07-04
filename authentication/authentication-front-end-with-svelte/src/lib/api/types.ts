@@ -12,16 +12,16 @@
  */
 /// Returned by GET /api/auth/magic-link/{token} (the verify step).
 export interface LoginResponse {
-    /** RS256 JWT access token (the federation bearer credential). */
-    token: string;
-    /** Public/stable user id (UUID). */
-    pid: string;
-    /** Display name. */
-    name: string;
-    /** Account email address. */
-    email: string;
-    /** Whether the account's email is verified. */
-    is_verified: boolean;
+  /** RS256 JWT access token (the federation bearer credential). */
+  token: string;
+  /** Public/stable user id (UUID). */
+  pid: string;
+  /** Display name. */
+  name: string;
+  /** Account email address. */
+  email: string;
+  /** Whether the account's email is verified. */
+  is_verified: boolean;
 }
 
 /**
@@ -32,10 +32,10 @@ export interface LoginResponse {
  */
 /// Returned by GET /api/auth/me.
 export interface CurrentUser {
-    /** Public/stable user id (UUID). */
-    pid: string;
-    /** Display name. */
-    name: string;
-    /** Account email address. */
-    email: string;
+  /** Public/stable user id (UUID). */
+  pid: string;
+  /** Display name. */
+  name: string;
+  /** Account email address. */
+  email: string;
 }

@@ -11,6 +11,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Prettier formatting drift across `src/` (left behind by recent
+  BFF/auth-era edits) broke the `pnpm lint` (`prettier --check src`)
+  gate. Reformatted with `pnpm format`; no behavioural change —
+  `svelte-check` and the vitest suite are unchanged and green.
 - **`checkDuplicates()` endpoint path.** `ThingRepository.checkDuplicates()` now POSTs to `/api/things/check-duplicates` (the path the Thing Service actually serves, per the service spec §6 / `AGENTS/restful.md` and this project's spec §9). It previously POSTed to `/api/things/duplicates`, which 404s against the real service. Removed the contradicting `/duplicates` claims from `AGENTS/testing.md` and this changelog, and updated the unit test to pin `check-duplicates`.
 - **Doc fixes.** `AGENTS/testing.md` "Running" now says `pnpm check` (the actual type-check script; `pnpm svelte-check` was undefined). Corrected the `ApiClient` unit-test example to the real `new ApiClient({ baseUrl, fetch })` object constructor, and the Playwright example to the shipped no-service smoke approach (assert headings/nav, not API-driven health text). Spec §14 corrected to "5 E2E tests" (matches the suite). Stale `T-7` SSR cross-references in spec §7 and §10 corrected to `T-13`. FR-9 reconciled to match the implementation (preview is available but optional; merge is guarded by both-IDs-present-and-distinct + `confirm()`).
 

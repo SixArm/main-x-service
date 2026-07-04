@@ -11,6 +11,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Prettier formatting drift across `src/` (left behind by recent
+  BFF/auth-era edits) broke the `pnpm lint` (`prettier --check src`)
+  gate. Reformatted with `pnpm format`; no behavioural change —
+  `svelte-check` and the vitest suite are unchanged and green.
 - **Docs harmonization.** Removed stale `/api/places/duplicates` copy
   artifacts from `CHANGELOG.md` and `AGENTS/testing.md`; the client,
   unit test, and service contract have always used the hyphenated

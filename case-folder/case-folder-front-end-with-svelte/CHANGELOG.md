@@ -10,6 +10,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- `pnpm lint` (`eslint .`) failed on two intentionally-unused
+  underscore-prefixed bindings in the unit-test stubs
+  (`src/lib/test-support/`). `@typescript-eslint/no-unused-vars` is now
+  configured with the conventional `^_` ignore patterns (args, vars,
+  caught errors, rest siblings) in `eslint.config.js`; no source change.
+
 ### Changed
 
 - **ST-13c — cache store unit coverage.** New `cache.svelte.test.ts`

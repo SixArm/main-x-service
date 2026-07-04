@@ -10,8 +10,11 @@
  * @param duplicateId - The record to fold in and soft-delete.
  * @returns An error message to surface, or `null` when the pair is valid.
  */
-export function validateMerge(mainId: string, duplicateId: string): string | null {
-    if (!mainId || !duplicateId) return "Both IDs required";
-    if (mainId === duplicateId) return "Main and duplicate must differ";
-    return null;
+export function validateMerge(
+  mainId: string,
+  duplicateId: string,
+): string | null {
+  if (!mainId || !duplicateId) return "Both IDs required";
+  if (mainId === duplicateId) return "Main and duplicate must differ";
+  return null;
 }

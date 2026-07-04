@@ -7,6 +7,8 @@ import type { LayoutServerLoad } from "./$types";
 import { currentUser } from "$lib/server/auth";
 
 export const load: LayoutServerLoad = async ({ locals, fetch }) => {
-    const user = locals.sessionId ? await currentUser(fetch, locals.sessionId) : null;
-    return { user };
+  const user = locals.sessionId
+    ? await currentUser(fetch, locals.sessionId)
+    : null;
+  return { user };
 };

@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Prettier formatting drift across `src/` (left behind by recent
+  BFF/auth-era edits) broke the `pnpm lint` (`prettier --check src`)
+  gate. Reformatted with `pnpm format`; no behavioural change —
+  `svelte-check` and the vitest suite are unchanged and green.
+
 ### Added
 
 - **Theme + locale switchers in the layout shell** documented as in-scope. `src/routes/+layout.svelte` renders Lily `ThemeSelect` and `LocaleSelect` (persisted to `localStorage`). Spec §2.1 now lists both as in-scope; §2.2 narrows the out-of-scope item to full i18n message catalogues only. New functional requirements FR-11 (theme switcher) and FR-12 (locale picker) added to spec §6. README Stack/Lily sections and `index.md` updated to list `lily-design-system-svelte-theme-select` + `lily-design-system-svelte-locale-select`.

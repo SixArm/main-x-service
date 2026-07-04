@@ -82,6 +82,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Prettier formatting drift across `src/` (left behind by recent
+  BFF/auth-era edits) broke the `pnpm lint` (`prettier --check src`)
+  gate. Reformatted with `pnpm format`; no behavioural change —
+  `svelte-check` and the vitest suite are unchanged and green.
 - **`API_BASE_URL` default pointed at the wrong service.** The
   fallback was `http://localhost:8080` — the person-service slot in
   the Main X Index family. Course Service runs on host port 8084

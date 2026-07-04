@@ -10,27 +10,27 @@
 /// Identifier schemes. Rust serializes unit variants as the bare string;
 /// `Custom` as `{ "Custom": "label" }`.
 export type IdentifierScheme =
-    | "Doi"
-    | "Wikidata"
-    | "GuidelineId"
-    | "Uri"
-    | "Uuid"
-    | "PathwayCode"
-    | "LocalId"
-    | { Custom: string };
+  | "Doi"
+  | "Wikidata"
+  | "GuidelineId"
+  | "Uri"
+  | "Uuid"
+  | "PathwayCode"
+  | "LocalId"
+  | { Custom: string };
 
 /**
  * All unit-variant identifier schemes, in display order — used to populate
  * the scheme `<select>` in the form. Excludes the `Custom` object variant.
  */
 export const ALL_SCHEMES: IdentifierScheme[] = [
-    "Doi",
-    "Wikidata",
-    "GuidelineId",
-    "Uri",
-    "Uuid",
-    "PathwayCode",
-    "LocalId",
+  "Doi",
+  "Wikidata",
+  "GuidelineId",
+  "Uri",
+  "Uuid",
+  "PathwayCode",
+  "LocalId",
 ];
 
 /**
@@ -50,44 +50,44 @@ export const ALL_CODE_SYSTEMS: CodeSystem[] = ["Icd10", "Icd11", "Snomed"];
  */
 /// Care settings (unit variants only here).
 export type CareSetting =
-    | "Inpatient"
-    | "Outpatient"
-    | "PrimaryCare"
-    | "EmergencyDepartment"
-    | "Community"
-    | "HomeCare"
-    | "Rehabilitation"
-    | "MentalHealth"
-    | "Palliative"
-    | { Custom: string };
+  | "Inpatient"
+  | "Outpatient"
+  | "PrimaryCare"
+  | "EmergencyDepartment"
+  | "Community"
+  | "HomeCare"
+  | "Rehabilitation"
+  | "MentalHealth"
+  | "Palliative"
+  | { Custom: string };
 
 /** All unit-variant care settings, for the care-setting `<select>`. */
 export const ALL_CARE_SETTINGS: CareSetting[] = [
-    "Inpatient",
-    "Outpatient",
-    "PrimaryCare",
-    "EmergencyDepartment",
-    "Community",
-    "HomeCare",
-    "Rehabilitation",
-    "MentalHealth",
-    "Palliative",
+  "Inpatient",
+  "Outpatient",
+  "PrimaryCare",
+  "EmergencyDepartment",
+  "Community",
+  "HomeCare",
+  "Rehabilitation",
+  "MentalHealth",
+  "Palliative",
 ];
 
 /** A coded target condition: a coding system plus its code value. */
 export interface ConditionCode {
-    /** The coding system the `code` belongs to. */
-    system: CodeSystem;
-    /** The code value within `system` (e.g. `"I63"`). */
-    code: string;
+  /** The coding system the `code` belongs to. */
+  system: CodeSystem;
+  /** The code value within `system` (e.g. `"I63"`). */
+  code: string;
 }
 
 /** An external identifier for a pathway: a scheme plus its value. */
 export interface PathwayIdentifier {
-    /** The identifier scheme (DOI, GuidelineId, …). */
-    scheme: IdentifierScheme;
-    /** The identifier value within `scheme`. */
-    value: string;
+  /** The identifier scheme (DOI, GuidelineId, …). */
+  scheme: IdentifierScheme;
+  /** The identifier value within `scheme`. */
+  value: string;
 }
 
 /**
@@ -96,54 +96,54 @@ export interface PathwayIdentifier {
  * Only `name` is required; the rest are optional and may be `null`.
  */
 export interface CarePathway {
-    /** Primary name of the pathway (required). */
-    name: string;
-    /** Additional / former names. */
-    alternate_names?: string[];
-    /** Provider-scoped pathway code (e.g. `"STROKE-01"`). */
-    pathway_code?: string | null;
-    /** Identifier of the owning provider. */
-    provider_id?: string | null;
-    /** Human-readable provider name. */
-    provider_name?: string | null;
-    /** Care setting in which the pathway is delivered. */
-    care_setting?: CareSetting | null;
-    /** Target condition codes (ICD/SNOMED/…). */
-    condition_codes?: ConditionCode[];
-    /** Interventions the pathway prescribes. */
-    interventions?: string[];
-    /** Free-text keywords for search/matching. */
-    keywords?: string[];
-    /** External identifiers (DOI, GuidelineId, …). */
-    identifiers?: PathwayIdentifier[];
-    /** `sameAs` reference URLs to equivalent resources. */
-    same_as?: string[];
-    /** BCP-47 language tags the pathway is available in. */
-    in_language?: string[];
+  /** Primary name of the pathway (required). */
+  name: string;
+  /** Additional / former names. */
+  alternate_names?: string[];
+  /** Provider-scoped pathway code (e.g. `"STROKE-01"`). */
+  pathway_code?: string | null;
+  /** Identifier of the owning provider. */
+  provider_id?: string | null;
+  /** Human-readable provider name. */
+  provider_name?: string | null;
+  /** Care setting in which the pathway is delivered. */
+  care_setting?: CareSetting | null;
+  /** Target condition codes (ICD/SNOMED/…). */
+  condition_codes?: ConditionCode[];
+  /** Interventions the pathway prescribes. */
+  interventions?: string[];
+  /** Free-text keywords for search/matching. */
+  keywords?: string[];
+  /** External identifiers (DOI, GuidelineId, …). */
+  identifiers?: PathwayIdentifier[];
+  /** `sameAs` reference URLs to equivalent resources. */
+  same_as?: string[];
+  /** BCP-47 language tags the pathway is available in. */
+  in_language?: string[];
 }
 
 /** Lightweight `{pid, name}` reference returned by create / list / search. */
 /// `{pid, name}` returned by create / list.
 export interface PathwayRef {
-    /** Persistent identifier of the pathway. */
-    pid: string;
-    /** The pathway's name at the time of the response. */
-    name: string;
+  /** Persistent identifier of the pathway. */
+  pid: string;
+  /** The pathway's name at the time of the response. */
+  name: string;
 }
 
 /** A scored candidate duplicate returned by `POST /check-duplicates`. */
 /// A scored duplicate from /check-duplicates.
 export interface ScoredRef {
-    /** Persistent identifier of the candidate. */
-    pid: string;
-    /** The candidate's name. */
-    name: string;
-    /** Match score in `[0, 1]`. */
-    score: number;
-    /** Confidence band label (e.g. `"Certain"`, `"Probable"`). */
-    confidence: string;
-    /** Whether the score clears the service's match threshold. */
-    is_match: boolean;
+  /** Persistent identifier of the candidate. */
+  pid: string;
+  /** The candidate's name. */
+  name: string;
+  /** Match score in `[0, 1]`. */
+  score: number;
+  /** Confidence band label (e.g. `"Certain"`, `"Probable"`). */
+  confidence: string;
+  /** Whether the score clears the service's match threshold. */
+  is_match: boolean;
 }
 
 /**
@@ -154,12 +154,12 @@ export interface ScoredRef {
 /// Result of merging a duplicate into a survivor (`POST /merge`).
 /// `main` is the survivor's refreshed `CarePathway`.
 export interface MergeResult {
-    /** Persistent identifier of the surviving (main) record. */
-    main_pid: string;
-    /** Persistent identifier of the merged-away duplicate. */
-    duplicate_pid: string;
-    /** The survivor's refreshed record after the merge. */
-    main: CarePathway;
+  /** Persistent identifier of the surviving (main) record. */
+  main_pid: string;
+  /** Persistent identifier of the merged-away duplicate. */
+  duplicate_pid: string;
+  /** The survivor's refreshed record after the merge. */
+  main: CarePathway;
 }
 
 /**
@@ -172,14 +172,14 @@ export interface MergeResult {
 /// (the caller's user pid when a verified token was presented, else
 /// `null`), an optional JSON `snapshot`, and the `created_at` timestamp.
 export interface AuditEntry {
-    /** The audited operation: `created` / `updated` / `deleted` / `merged`. */
-    action: string;
-    /** Caller's user pid when a verified token was presented, else `null`. */
-    actor: string | null;
-    /** Optional JSON snapshot of the record state for the audited action. */
-    snapshot?: unknown;
-    /** ISO-8601 timestamp of when the action was recorded. */
-    created_at?: string;
+  /** The audited operation: `created` / `updated` / `deleted` / `merged`. */
+  action: string;
+  /** Caller's user pid when a verified token was presented, else `null`. */
+  actor: string | null;
+  /** Optional JSON snapshot of the record state for the audited action. */
+  snapshot?: unknown;
+  /** ISO-8601 timestamp of when the action was recorded. */
+  created_at?: string;
 }
 
 /**
@@ -193,12 +193,12 @@ export interface AuditEntry {
 /// `kind` (created/updated/deleted/merged), the pathway's `pid` and
 /// `name` at the time of the event, and a per-process monotonic `seq`.
 export interface PathwayEvent {
-    /** The kind of CRUD/merge operation that produced the event. */
-    kind: "created" | "updated" | "deleted" | "merged";
-    /** Persistent identifier of the affected pathway. */
-    pid: string;
-    /** The pathway's name at the time of the event. */
-    name: string;
-    /** Per-process monotonic sequence number; used to order newest-first. */
-    seq: number;
+  /** The kind of CRUD/merge operation that produced the event. */
+  kind: "created" | "updated" | "deleted" | "merged";
+  /** Persistent identifier of the affected pathway. */
+  pid: string;
+  /** The pathway's name at the time of the event. */
+  name: string;
+  /** Per-process monotonic sequence number; used to order newest-first. */
+  seq: number;
 }

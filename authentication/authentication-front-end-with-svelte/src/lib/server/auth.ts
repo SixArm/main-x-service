@@ -13,69 +13,80 @@ type FetchFn = typeof fetch;
 
 /** Consume a magic-link token; returns the raw upstream response so the
  *  caller can read the `Set-Cookie` that establishes the session. */
-export function verifyMagicLink(fetchFn: FetchFn, token: string): Promise<Response> {
-    return fetchFn(`${AUTH_API_URL}/api/auth/magic-link/${encodeURIComponent(token)}`);
+export function verifyMagicLink(
+  fetchFn: FetchFn,
+  token: string,
+): Promise<Response> {
+  return fetchFn(
+    `${AUTH_API_URL}/api/auth/magic-link/${encodeURIComponent(token)}`,
+  );
 }
 
 /** Request a magic link for an existing account (sign in). */
 export async function requestMagicLink(
-    fetchFn: FetchFn,
-    email: string,
-    locale?: string,
+  fetchFn: FetchFn,
+  email: string,
+  locale?: string,
 ): Promise<boolean> {
-    const res = await fetchFn(`${AUTH_API_URL}/api/auth/magic-link`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, locale }),
-    });
-    return res.ok;
+  const res = await fetchFn(`${AUTH_API_URL}/api/auth/magic-link`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, locale }),
+  });
+  return res.ok;
 }
 
 /** Create a passwordless account and trigger a magic link (sign up). */
 export async function signup(
-    fetchFn: FetchFn,
-    email: string,
-    name?: string,
-    locale?: string,
+  fetchFn: FetchFn,
+  email: string,
+  name?: string,
+  locale?: string,
 ): Promise<boolean> {
-    const res = await fetchFn(`${AUTH_API_URL}/api/auth/signup`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, name, locale }),
-    });
-    return res.ok;
+  const res = await fetchFn(`${AUTH_API_URL}/api/auth/signup`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, name, locale }),
+  });
+  return res.ok;
 }
 
 /** Exchange the opaque session id for a short-lived PASETO (server-to-
  *  server; sends the session as a `Cookie` header). `null` if invalid. */
-async function exchangeToken(fetchFn: FetchFn, sid: string): Promise<string | null> {
-    const res = await fetchFn(`${AUTH_API_URL}/api/auth/token`, {
-        method: "POST",
-        headers: { cookie: `${SESSION_COOKIE}=${sid}` },
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { token?: string };
-    return body.token ?? null;
+async function exchangeToken(
+  fetchFn: FetchFn,
+  sid: string,
+): Promise<string | null> {
+  const res = await fetchFn(`${AUTH_API_URL}/api/auth/token`, {
+    method: "POST",
+    headers: { cookie: `${SESSION_COOKIE}=${sid}` },
+  });
+  if (!res.ok) return null;
+  const body = (await res.json()) as { token?: string };
+  return body.token ?? null;
 }
 
 /** Resolve the current user for a session id, or `null` when the session
  *  is missing/expired/revoked. */
-export async function currentUser(fetchFn: FetchFn, sid: string): Promise<CurrentUser | null> {
-    const token = await exchangeToken(fetchFn, sid);
-    if (!token) return null;
-    const res = await fetchFn(`${AUTH_API_URL}/api/auth/me`, {
-        headers: { authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as CurrentUser;
+export async function currentUser(
+  fetchFn: FetchFn,
+  sid: string,
+): Promise<CurrentUser | null> {
+  const token = await exchangeToken(fetchFn, sid);
+  if (!token) return null;
+  const res = await fetchFn(`${AUTH_API_URL}/api/auth/me`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as CurrentUser;
 }
 
 /** Revoke the session server-side (best-effort) before the cookie clear. */
 export async function signout(fetchFn: FetchFn, sid: string): Promise<void> {
-    const token = await exchangeToken(fetchFn, sid);
-    if (!token) return;
-    await fetchFn(`${AUTH_API_URL}/api/auth/signout`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}` },
-    });
+  const token = await exchangeToken(fetchFn, sid);
+  if (!token) return;
+  await fetchFn(`${AUTH_API_URL}/api/auth/signout`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}` },
+  });
 }

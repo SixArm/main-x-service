@@ -9,15 +9,15 @@ export type FieldErrors = Record<string, string>;
 
 /** Thing fields that, when present, must be absolute http(s) URLs (FR-4). */
 const URL_FIELDS: [keyof Thing, string][] = [
-    ["url", "URL"],
-    ["additional_type", "Additional type"],
-    ["main_entity_of_page", "Main entity of page"],
-    ["subject_of", "Subject of"],
+  ["url", "URL"],
+  ["additional_type", "Additional type"],
+  ["main_entity_of_page", "Main entity of page"],
+  ["subject_of", "Subject of"],
 ];
 
 /** True when `v` is an absolute `http://` or `https://` URL. */
 function isHttpUrl(v: string): boolean {
-    return /^https?:\/\//i.test(v);
+  return /^https?:\/\//i.test(v);
 }
 
 /**
@@ -27,15 +27,15 @@ function isHttpUrl(v: string): boolean {
  * @returns A map of field → error message; empty when the value is valid.
  */
 export function validateThing(value: Thing): FieldErrors {
-    const errors: FieldErrors = {};
-    // Name is the only hard-required Thing field.
-    if (!value.name.trim()) errors.name = "Required";
-    // URL-shaped fields must be absolute http(s) URLs when present.
-    for (const [field, label] of URL_FIELDS) {
-        const v = value[field];
-        if (typeof v === "string" && v.length > 0 && !isHttpUrl(v)) {
-            errors[field as string] = `${label} must start with http(s)://`;
-        }
+  const errors: FieldErrors = {};
+  // Name is the only hard-required Thing field.
+  if (!value.name.trim()) errors.name = "Required";
+  // URL-shaped fields must be absolute http(s) URLs when present.
+  for (const [field, label] of URL_FIELDS) {
+    const v = value[field];
+    if (typeof v === "string" && v.length > 0 && !isHttpUrl(v)) {
+      errors[field as string] = `${label} must start with http(s)://`;
     }
-    return errors;
+  }
+  return errors;
 }

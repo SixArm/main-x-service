@@ -11,32 +11,36 @@ export const SESSION_COOKIE = "__Host-mxi_session";
 
 /** Cookie attributes for `cookies.set` — httpOnly, Secure, host-locked. */
 export const SESSION_COOKIE_OPTIONS = {
-    path: "/",
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
+  path: "/",
+  httpOnly: true,
+  secure: true,
+  sameSite: "lax",
 } as const;
 
 /** Extract `__Host-mxi_session` from a single `Set-Cookie` header line. */
 export function parseSessionId(setCookie: string): string | null {
-    const prefix = `${SESSION_COOKIE}=`;
-    const segment = setCookie
-        .split(";")
-        .map((s) => s.trim())
-        .find((s) => s.startsWith(prefix));
-    if (!segment) return null;
-    const value = segment.slice(prefix.length);
-    return value.length > 0 ? value : null;
+  const prefix = `${SESSION_COOKIE}=`;
+  const segment = setCookie
+    .split(";")
+    .map((s) => s.trim())
+    .find((s) => s.startsWith(prefix));
+  if (!segment) return null;
+  const value = segment.slice(prefix.length);
+  return value.length > 0 ? value : null;
 }
 
 /** Find the session id across all `Set-Cookie` lines of an upstream
  *  response (uses `getSetCookie()` where available). */
 export function sessionIdFromResponse(response: Response): string | null {
-    const headers = response.headers as Headers & { getSetCookie?: () => string[] };
-    const lines = headers.getSetCookie?.() ?? [response.headers.get("set-cookie") ?? ""];
-    for (const line of lines) {
-        const sid = parseSessionId(line);
-        if (sid) return sid;
-    }
-    return null;
+  const headers = response.headers as Headers & {
+    getSetCookie?: () => string[];
+  };
+  const lines = headers.getSetCookie?.() ?? [
+    response.headers.get("set-cookie") ?? "",
+  ];
+  for (const line of lines) {
+    const sid = parseSessionId(line);
+    if (sid) return sid;
+  }
+  return null;
 }

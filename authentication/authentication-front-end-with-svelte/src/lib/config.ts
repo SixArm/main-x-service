@@ -7,7 +7,9 @@
 // default dev port.
 // Narrow `import.meta` to expose the optional `env` bag without assuming
 // any particular key exists (keys are absent when undefined at build).
-const meta = import.meta as ImportMeta & { env?: Record<string, string | undefined> };
+const meta = import.meta as ImportMeta & {
+  env?: Record<string, string | undefined>;
+};
 
 /**
  * Base URL of the Authentication Service REST API.
@@ -17,7 +19,7 @@ const meta = import.meta as ImportMeta & { env?: Record<string, string | undefin
  * {@link AuthRepository.withFetch} to construct the {@link ApiClient}.
  */
 export const API_BASE_URL: string =
-    meta.env?.PUBLIC_API_BASE_URL ?? "http://localhost:5150";
+  meta.env?.PUBLIC_API_BASE_URL ?? "http://localhost:5150";
 
 /**
  * Comma-separated allowlist of operator-app origins that the cross-origin
@@ -37,4 +39,4 @@ export const API_BASE_URL: string =
 /// `$lib/auth/return-to`). Each entry is an exact `scheme://host[:port]`
 /// origin. Unset/empty ⇒ same-origin only (no external handoff).
 export const RETURN_TO_ALLOWLIST: string =
-    meta.env?.VITE_RETURN_TO_ALLOWLIST ?? "";
+  meta.env?.VITE_RETURN_TO_ALLOWLIST ?? "";

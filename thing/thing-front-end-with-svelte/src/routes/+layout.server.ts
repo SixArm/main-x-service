@@ -5,5 +5,5 @@
 import type { LayoutServerLoad } from "./$types";
 
 export const load: LayoutServerLoad = ({ locals }) => {
-    return { signedIn: locals.sessionId !== null };
+  return { signedIn: locals.sessionId !== null };
 };

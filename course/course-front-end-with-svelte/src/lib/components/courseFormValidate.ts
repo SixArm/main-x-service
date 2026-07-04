@@ -15,26 +15,29 @@ import type { FieldErrors } from "$lib/forms/form.svelte.js";
  * `course_code` ≤ 100 chars; `number_of_credits` ≥ 0.
  */
 export function validateCourse(value: Course): FieldErrors {
-    const errors: FieldErrors = {};
-    if (!value.name.trim()) errors.name = "Required";
-    const urlFields: [keyof Course, string][] = [
-        ["url", "URL"],
-        ["additional_type", "Additional type"],
-        ["license", "License URL"],
-    ];
-    for (const [field, label] of urlFields) {
-        const v = value[field];
-        if (typeof v === "string" && v.length > 0 && !/^https?:\/\//i.test(v)) {
-            errors[field as string] = `${label} must start with http(s)://`;
-        }
+  const errors: FieldErrors = {};
+  if (!value.name.trim()) errors.name = "Required";
+  const urlFields: [keyof Course, string][] = [
+    ["url", "URL"],
+    ["additional_type", "Additional type"],
+    ["license", "License URL"],
+  ];
+  for (const [field, label] of urlFields) {
+    const v = value[field];
+    if (typeof v === "string" && v.length > 0 && !/^https?:\/\//i.test(v)) {
+      errors[field as string] = `${label} must start with http(s)://`;
     }
-    if (typeof value.course_code === "string" && value.course_code.length > 100) {
-        errors.course_code = "Max 100 chars";
-    }
-    if (typeof value.number_of_credits === "number" && value.number_of_credits < 0) {
-        errors.number_of_credits = "Must be ≥ 0";
-    }
-    return errors;
+  }
+  if (typeof value.course_code === "string" && value.course_code.length > 100) {
+    errors.course_code = "Max 100 chars";
+  }
+  if (
+    typeof value.number_of_credits === "number" &&
+    value.number_of_credits < 0
+  ) {
+    errors.number_of_credits = "Must be ≥ 0";
+  }
+  return errors;
 }
 
 /**
@@ -46,25 +49,25 @@ export function validateCourse(value: Course): FieldErrors {
  * default fires. Identifier `url` / `name` follow the same rule.
  */
 export function normalizeForWire(c: Course): Course {
-    const blankToUndef = <T>(v: T): T | undefined =>
-        typeof v === "string" && v.trim() === "" ? undefined : v;
-    return {
-        ...c,
-        description: blankToUndef(c.description),
-        disambiguating_description: blankToUndef(c.disambiguating_description),
-        url: blankToUndef(c.url),
-        license: blankToUndef(c.license),
-        additional_type: blankToUndef(c.additional_type),
-        course_code: blankToUndef(c.course_code),
-        typical_age_range: blankToUndef(c.typical_age_range),
-        time_required: blankToUndef(c.time_required),
-        version: blankToUndef(c.version),
-        audience: blankToUndef(c.audience),
-        educational_use: blankToUndef(c.educational_use),
-        identifiers: c.identifiers?.map((i) => ({
-            ...i,
-            url: blankToUndef(i.url),
-            name: blankToUndef(i.name),
-        })),
-    };
+  const blankToUndef = <T>(v: T): T | undefined =>
+    typeof v === "string" && v.trim() === "" ? undefined : v;
+  return {
+    ...c,
+    description: blankToUndef(c.description),
+    disambiguating_description: blankToUndef(c.disambiguating_description),
+    url: blankToUndef(c.url),
+    license: blankToUndef(c.license),
+    additional_type: blankToUndef(c.additional_type),
+    course_code: blankToUndef(c.course_code),
+    typical_age_range: blankToUndef(c.typical_age_range),
+    time_required: blankToUndef(c.time_required),
+    version: blankToUndef(c.version),
+    audience: blankToUndef(c.audience),
+    educational_use: blankToUndef(c.educational_use),
+    identifiers: c.identifiers?.map((i) => ({
+      ...i,
+      url: blankToUndef(i.url),
+      name: blankToUndef(i.name),
+    })),
+  };
 }

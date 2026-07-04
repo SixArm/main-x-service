@@ -7,6 +7,6 @@ import type { Handle } from "@sveltejs/kit";
 import { SESSION_COOKIE } from "$lib/server/session";
 
 export const handle: Handle = async ({ event, resolve }) => {
-    event.locals.sessionId = event.cookies.get(SESSION_COOKIE) ?? null;
-    return resolve(event);
+  event.locals.sessionId = event.cookies.get(SESSION_COOKIE) ?? null;
+  return resolve(event);
 };

@@ -16,6 +16,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Prettier formatting drift across `src/` (left behind by recent
+  BFF/auth-era edits) broke the `pnpm lint` (`prettier --check src`)
+  gate. Reformatted with `pnpm format`; no behavioural change —
+  `svelte-check` and the vitest suite are unchanged and green.
 - **Doc/spec harmonisation.** Dropped the unimplemented "phonetic" search claim from spec §02 / §06 FR-2, `README.md`, and `index.md`; FR-2 now matches the implemented fuzzy toggle. Corrected the spec §14 test-count line and the §08 architecture diagram path (`lib/api/events.ts`, not `lib/api/v1/events.ts`). Fixed `AGENTS/testing.md`: the `ApiClient` example now uses the `{ baseUrl, fetch }` options object, and the type-check command is `pnpm check` (not `pnpm svelte-check`).
 
 ## [0.1.0] — 2026-06-02

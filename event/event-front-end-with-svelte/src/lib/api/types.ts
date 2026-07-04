@@ -16,19 +16,19 @@
  * @typeParam T - The shape of the successful payload.
  */
 export interface ApiResponse<T> {
-    success: boolean;
-    data: T | null;
-    error: ApiErrorBody | null;
+  success: boolean;
+  data: T | null;
+  error: ApiErrorBody | null;
 }
 
 /** Structured error body inside a failed {@link ApiResponse}. */
 export interface ApiErrorBody {
-    /** Stable machine-readable error code (e.g. for branching in the UI). */
-    code: string;
-    /** Human-readable message safe to surface to operators. */
-    message: string;
-    /** Optional extra context (validation field errors, conflict candidates, …). */
-    details?: unknown;
+  /** Stable machine-readable error code (e.g. for branching in the UI). */
+  code: string;
+  /** Human-readable message safe to surface to operators. */
+  message: string;
+  /** Optional extra context (validation field errors, conflict candidates, …). */
+  details?: unknown;
 }
 
 // ─── Status / mode / type enums ──────────────────────────────────────
@@ -39,44 +39,99 @@ export interface ApiErrorBody {
  * snake_case forms the service serializes.
  */
 export type EventStatus =
-    | "scheduled"
-    | "cancelled"
-    | "moved_online"
-    | "postponed"
-    | "rescheduled"
-    | "completed";
+  | "scheduled"
+  | "cancelled"
+  | "moved_online"
+  | "postponed"
+  | "rescheduled"
+  | "completed";
 
 /** All {@link EventStatus} values in canonical order — drives select inputs. */
 export const EVENT_STATUSES: EventStatus[] = [
-    "scheduled", "cancelled", "moved_online", "postponed", "rescheduled", "completed",
+  "scheduled",
+  "cancelled",
+  "moved_online",
+  "postponed",
+  "rescheduled",
+  "completed",
 ];
 
 /** How attendees take part: in person, online, or both (schema.org/EventAttendanceModeEnumeration). */
 export type EventAttendanceMode = "offline" | "online" | "mixed";
 
 /** All {@link EventAttendanceMode} values in canonical order — drives select inputs. */
-export const ATTENDANCE_MODES: EventAttendanceMode[] = ["offline", "online", "mixed"];
+export const ATTENDANCE_MODES: EventAttendanceMode[] = [
+  "offline",
+  "online",
+  "mixed",
+];
 
 /**
  * Event subtype, mirroring the schema.org/Event subtypes the service
  * recognizes (`generic` is the catch-all base type).
  */
 export type EventType =
-    | "generic" | "appointment" | "business" | "childrens" | "comedy"
-    | "conference" | "course" | "dance" | "delivery" | "education"
-    | "encounter" | "exhibition" | "festival" | "food" | "hackathon"
-    | "incident" | "literary" | "music" | "performing_arts" | "publication"
-    | "sale" | "screening" | "series" | "session" | "shift"
-    | "social" | "sports" | "theater" | "visual_arts";
+  | "generic"
+  | "appointment"
+  | "business"
+  | "childrens"
+  | "comedy"
+  | "conference"
+  | "course"
+  | "dance"
+  | "delivery"
+  | "education"
+  | "encounter"
+  | "exhibition"
+  | "festival"
+  | "food"
+  | "hackathon"
+  | "incident"
+  | "literary"
+  | "music"
+  | "performing_arts"
+  | "publication"
+  | "sale"
+  | "screening"
+  | "series"
+  | "session"
+  | "shift"
+  | "social"
+  | "sports"
+  | "theater"
+  | "visual_arts";
 
 /** All {@link EventType} values in canonical order — drives select inputs. */
 export const EVENT_TYPES: EventType[] = [
-    "generic", "appointment", "business", "childrens", "comedy",
-    "conference", "course", "dance", "delivery", "education",
-    "encounter", "exhibition", "festival", "food", "hackathon",
-    "incident", "literary", "music", "performing_arts", "publication",
-    "sale", "screening", "series", "session", "shift",
-    "social", "sports", "theater", "visual_arts",
+  "generic",
+  "appointment",
+  "business",
+  "childrens",
+  "comedy",
+  "conference",
+  "course",
+  "dance",
+  "delivery",
+  "education",
+  "encounter",
+  "exhibition",
+  "festival",
+  "food",
+  "hackathon",
+  "incident",
+  "literary",
+  "music",
+  "performing_arts",
+  "publication",
+  "sale",
+  "screening",
+  "series",
+  "session",
+  "shift",
+  "social",
+  "sports",
+  "theater",
+  "visual_arts",
 ];
 
 // ─── Address (inline for events) ─────────────────────────────────────
@@ -87,13 +142,13 @@ export const EVENT_TYPES: EventType[] = [
  * service treats addresses as best-effort, partially-known data.
  */
 export interface Address {
-    use_type?: string | null;
-    line1?: string | null;
-    line2?: string | null;
-    city?: string | null;
-    state?: string | null;
-    postal_code?: string | null;
-    country?: string | null;
+  use_type?: string | null;
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
 }
 
 // ─── Location union (schema.org/Event.location) ──────────────────────
@@ -104,13 +159,13 @@ export interface Address {
  * distinguishes it within the {@link Location} union.
  */
 export interface PlaceLocation {
-    kind: "place";
-    id?: string | null;
-    name: string;
-    address?: Address | null;
-    latitude?: number | null;
-    longitude?: number | null;
-    url?: string | null;
+  kind: "place";
+  id?: string | null;
+  name: string;
+  address?: Address | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  url?: string | null;
 }
 
 /**
@@ -118,13 +173,13 @@ export interface PlaceLocation {
  * used when only the address fields are known.
  */
 export interface PostalAddressLocation {
-    kind: "postal_address";
-    line1?: string | null;
-    line2?: string | null;
-    city?: string | null;
-    state?: string | null;
-    postal_code?: string | null;
-    country?: string | null;
+  kind: "postal_address";
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
 }
 
 /**
@@ -132,15 +187,15 @@ export interface PostalAddressLocation {
  * join link) while `name` is an optional label.
  */
 export interface VirtualLocation {
-    kind: "virtual";
-    name?: string | null;
-    url: string;
+  kind: "virtual";
+  name?: string | null;
+  url: string;
 }
 
 /** Location variant for unstructured free-text descriptions ("Main hall, 2nd floor"). */
 export interface TextLocation {
-    kind: "text";
-    value: string;
+  kind: "text";
+  value: string;
 }
 
 /**
@@ -148,7 +203,11 @@ export interface TextLocation {
  * Switch on the `kind` field to narrow to the concrete variant. An event may
  * have several locations (e.g. a mixed-mode event with a place and a stream).
  */
-export type Location = PlaceLocation | PostalAddressLocation | VirtualLocation | TextLocation;
+export type Location =
+  | PlaceLocation
+  | PostalAddressLocation
+  | VirtualLocation
+  | TextLocation;
 
 // ─── Party ───────────────────────────────────────────────────────────
 
@@ -161,11 +220,11 @@ export type PartyKind = "person" | "organization";
  * sibling index service; `name` is always present for display.
  */
 export interface Party {
-    kind: PartyKind;
-    id?: string | null;
-    name: string;
-    email?: string | null;
-    url?: string | null;
+  kind: PartyKind;
+  id?: string | null;
+  name: string;
+  email?: string | null;
+  url?: string | null;
 }
 
 // ─── Reference ───────────────────────────────────────────────────────
@@ -176,16 +235,21 @@ export interface Party {
  * the display label.
  */
 export interface Reference {
-    id?: string | null;
-    name: string;
-    url?: string | null;
-    kind?: string | null;
+  id?: string | null;
+  name: string;
+  url?: string | null;
+  kind?: string | null;
 }
 
 // ─── Offer ───────────────────────────────────────────────────────────
 
 /** Ticket/offer availability, mirroring schema.org/ItemAvailability (PascalCase wire values). */
-export type OfferAvailability = "InStock" | "SoldOut" | "PreOrder" | "OutOfStock" | "Discontinued";
+export type OfferAvailability =
+  | "InStock"
+  | "SoldOut"
+  | "PreOrder"
+  | "OutOfStock"
+  | "Discontinued";
 
 /**
  * A purchasable offer attached to an event, e.g. a ticket tier
@@ -193,27 +257,27 @@ export type OfferAvailability = "InStock" | "SoldOut" | "PreOrder" | "OutOfStock
  * formatting; `valid_from`/`valid_through` are RFC 3339 timestamps.
  */
 export interface Offer {
-    name?: string | null;
-    price?: string | null;
-    price_currency?: string | null;
-    url?: string | null;
-    availability?: OfferAvailability | null;
-    valid_from?: string | null;
-    valid_through?: string | null;
+  name?: string | null;
+  price?: string | null;
+  price_currency?: string | null;
+  url?: string | null;
+  availability?: OfferAvailability | null;
+  valid_from?: string | null;
+  valid_through?: string | null;
 }
 
 // ─── Identifier ──────────────────────────────────────────────────────
 
 /** Category of an event identifier; some categories are "strong" (see {@link STRONG_IDENTIFIER_TYPES}). */
 export type IdentifierType =
-    | "BookingNumber"
-    | "ConfirmationCode"
-    | "TicketNumber"
-    | "EncounterId"
-    | "TransactionId"
-    | "ExternalRef"
-    | "Tax"
-    | "Other";
+  | "BookingNumber"
+  | "ConfirmationCode"
+  | "TicketNumber"
+  | "EncounterId"
+  | "TransactionId"
+  | "ExternalRef"
+  | "Tax"
+  | "Other";
 
 /**
  * Identifier types treated as "strong" by the matcher: an exact match on
@@ -222,13 +286,23 @@ export type IdentifierType =
  */
 // Strong identifiers short-circuit matching to score = 1.0.
 export const STRONG_IDENTIFIER_TYPES: IdentifierType[] = [
-    "BookingNumber", "ConfirmationCode", "TicketNumber", "EncounterId", "TransactionId",
+  "BookingNumber",
+  "ConfirmationCode",
+  "TicketNumber",
+  "EncounterId",
+  "TransactionId",
 ];
 
 /** All {@link IdentifierType} values in canonical order — drives select inputs. */
 export const IDENTIFIER_TYPES: IdentifierType[] = [
-    "BookingNumber", "ConfirmationCode", "TicketNumber", "EncounterId",
-    "TransactionId", "ExternalRef", "Tax", "Other",
+  "BookingNumber",
+  "ConfirmationCode",
+  "TicketNumber",
+  "EncounterId",
+  "TransactionId",
+  "ExternalRef",
+  "Tax",
+  "Other",
 ];
 
 /** FHIR-style "use" qualifier for an identifier (which value is current/official). */
@@ -240,11 +314,11 @@ export type IdentifierUse = "usual" | "official" | "temp" | "secondary" | "old";
  * together they form a globally unique key used by deterministic matching.
  */
 export interface Identifier {
-    use_type?: IdentifierUse | null;
-    identifier_type: IdentifierType;
-    system: string;
-    value: string;
-    assigner?: string | null;
+  use_type?: IdentifierUse | null;
+  identifier_type: IdentifierType;
+  system: string;
+  value: string;
+  assigner?: string | null;
 }
 
 // ─── EventLink ───────────────────────────────────────────────────────
@@ -258,8 +332,8 @@ export type LinkType = "replaced-by" | "replaces" | "refer" | "seealso";
 
 /** A directed link from this event to another (`other_event_id`) with a typed relationship. */
 export interface EventLink {
-    other_event_id: string;
-    link_type: LinkType;
+  other_event_id: string;
+  link_type: LinkType;
 }
 
 // ─── Event ───────────────────────────────────────────────────────────
@@ -276,49 +350,49 @@ export interface EventLink {
  * absent on create.
  */
 export interface Event {
-    id?: string;
-    identifiers?: Identifier[];
-    active?: boolean;
-    name: string;
-    alternate_names?: string[];
-    description?: string | null;
-    disambiguating_description?: string | null;
-    url?: string | null;
-    image?: string[];
-    same_as?: string[];
-    keywords?: string[];
-    start_date: string; // RFC 3339 — required
-    end_date?: string | null;
-    door_time?: string | null;
-    duration?: string | null; // ISO 8601 e.g. "PT1H30M"
-    previous_start_date?: string | null;
-    time_zone?: string | null;
-    all_day?: boolean;
-    event_status?: EventStatus | null;
-    event_attendance_mode?: EventAttendanceMode | null;
-    event_type?: EventType | null;
-    typical_age_range?: string | null;
-    in_language?: string[];
-    is_accessible_for_free?: boolean | null;
-    maximum_attendee_capacity?: number | null;
-    maximum_physical_attendee_capacity?: number | null;
-    maximum_virtual_attendee_capacity?: number | null;
-    remaining_attendee_capacity?: number | null;
-    location?: Location[];
-    organizers?: Party[];
-    performers?: Party[];
-    attendees?: Party[];
-    sponsors?: Party[];
-    funders?: Party[];
-    contributors?: Party[];
-    about?: Reference[];
-    works?: Reference[];
-    super_event?: string | null;
-    sub_events?: string[];
-    offers?: Offer[];
-    links?: EventLink[];
-    created_at?: string;
-    updated_at?: string;
+  id?: string;
+  identifiers?: Identifier[];
+  active?: boolean;
+  name: string;
+  alternate_names?: string[];
+  description?: string | null;
+  disambiguating_description?: string | null;
+  url?: string | null;
+  image?: string[];
+  same_as?: string[];
+  keywords?: string[];
+  start_date: string; // RFC 3339 — required
+  end_date?: string | null;
+  door_time?: string | null;
+  duration?: string | null; // ISO 8601 e.g. "PT1H30M"
+  previous_start_date?: string | null;
+  time_zone?: string | null;
+  all_day?: boolean;
+  event_status?: EventStatus | null;
+  event_attendance_mode?: EventAttendanceMode | null;
+  event_type?: EventType | null;
+  typical_age_range?: string | null;
+  in_language?: string[];
+  is_accessible_for_free?: boolean | null;
+  maximum_attendee_capacity?: number | null;
+  maximum_physical_attendee_capacity?: number | null;
+  maximum_virtual_attendee_capacity?: number | null;
+  remaining_attendee_capacity?: number | null;
+  location?: Location[];
+  organizers?: Party[];
+  performers?: Party[];
+  attendees?: Party[];
+  sponsors?: Party[];
+  funders?: Party[];
+  contributors?: Party[];
+  about?: Reference[];
+  works?: Reference[];
+  super_event?: string | null;
+  sub_events?: string[];
+  offers?: Offer[];
+  links?: EventLink[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ─── Matching ────────────────────────────────────────────────────────
@@ -329,7 +403,12 @@ export interface Event {
  * short-circuit (e.g. strong identifier hit); the rest are probabilistic
  * bands.
  */
-export type MatchQuality = "definite" | "certain" | "probable" | "possible" | "unlikely";
+export type MatchQuality =
+  | "definite"
+  | "certain"
+  | "probable"
+  | "possible"
+  | "unlikely";
 
 /** Per-component score map (component name → 0..1 score, or null if not applicable). */
 export type MatchBreakdown = Record<string, number | null>;
@@ -340,10 +419,10 @@ export type MatchBreakdown = Record<string, number | null>;
  * optional per-component `breakdown` for explainability.
  */
 export interface MatchResult {
-    event: Event;
-    score: number;
-    quality: MatchQuality;
-    breakdown?: MatchBreakdown;
+  event: Event;
+  score: number;
+  quality: MatchQuality;
+  breakdown?: MatchBreakdown;
 }
 
 /**
@@ -352,14 +431,14 @@ export interface MatchResult {
  * `max_candidates` caps the result count.
  */
 export interface MatchRequest {
-    name?: string;
-    start_date?: string;
-    end_date?: string | null;
-    location?: Location[];
-    organizers?: Party[];
-    identifiers?: Identifier[];
-    threshold?: number;
-    max_candidates?: number;
+  name?: string;
+  start_date?: string;
+  end_date?: string | null;
+  location?: Location[];
+  organizers?: Party[];
+  identifiers?: Identifier[];
+  threshold?: number;
+  max_candidates?: number;
 }
 
 // ─── Merge ───────────────────────────────────────────────────────────
@@ -373,10 +452,10 @@ export type MergeStatus = "Completed" | "Reversed";
  * soft-deleted and linked back to the survivor.
  */
 export interface MergeRequest {
-    main_event_id: string;
-    duplicate_event_id: string;
-    merge_reason?: string | null;
-    merged_by?: string | null;
+  main_event_id: string;
+  duplicate_event_id: string;
+  merge_reason?: string | null;
+  merged_by?: string | null;
 }
 
 /**
@@ -385,21 +464,21 @@ export interface MergeRequest {
  * merge can be audited or reversed.
  */
 export interface MergeRecord {
-    id: string;
-    main_event_id: string;
-    duplicate_event_id: string;
-    status: MergeStatus;
-    merged_by?: string | null;
-    merge_reason?: string | null;
-    match_score?: number | null;
-    transferred_data?: unknown;
-    merged_at: string;
+  id: string;
+  main_event_id: string;
+  duplicate_event_id: string;
+  status: MergeStatus;
+  merged_by?: string | null;
+  merge_reason?: string | null;
+  match_score?: number | null;
+  transferred_data?: unknown;
+  merged_at: string;
 }
 
 /** Result of a merge call: the {@link MergeRecord} plus the post-merge surviving event. */
 export interface MergeResponse {
-    merge_record: MergeRecord;
-    main_event: Event;
+  merge_record: MergeRecord;
+  main_event: Event;
 }
 
 // ─── Audit ───────────────────────────────────────────────────────────
@@ -410,14 +489,14 @@ export interface MergeResponse {
  * the user_* fields capture request provenance for HIPAA-style auditing.
  */
 export interface AuditEntry {
-    id: string;
-    entity_type: string;
-    entity_id: string;
-    action: string;
-    user_id?: string | null;
-    user_ip_address?: string | null;
-    user_agent?: string | null;
-    old_values?: unknown;
-    new_values?: unknown;
-    created_at: string;
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  user_id?: string | null;
+  user_ip_address?: string | null;
+  user_agent?: string | null;
+  old_values?: unknown;
+  new_values?: unknown;
+  created_at: string;
 }

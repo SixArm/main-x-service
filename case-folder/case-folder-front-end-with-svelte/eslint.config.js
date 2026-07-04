@@ -31,6 +31,17 @@ export default ts.config(
     },
     {
         rules: {
+            // Underscore prefix marks intentionally-unused bindings (test
+            // stubs discard rest props / no-op arguments).
+            '@typescript-eslint/no-unused-vars': [
+                'error',
+                {
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    caughtErrorsIgnorePattern: '^_',
+                    ignoreRestSiblings: true
+                }
+            ],
             // This app uses plain same-origin hrefs / goto throughout and
             // has not adopted SvelteKit's resolve() typed-route helper.
             'svelte/no-navigation-without-resolve': 'off',

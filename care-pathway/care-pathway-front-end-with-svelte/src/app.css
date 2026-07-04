@@ -1,102 +1,143 @@
 :root {
-    /* Design tokens, mapped onto the Lily theme tokens (`--color-*`) that the
+  /* Design tokens, mapped onto the Lily theme tokens (`--color-*`) that the
        active theme stylesheet defines, with the original values as fallbacks
        for first paint (before a theme loads). This is what makes selecting a
        theme in ThemeSelect restyle the whole app, not just Lily components. */
-    --mxi-color-bg: var(--color-base-100, #fafafa);
-    --mxi-color-fg: var(--color-base-content, #111827);
-    --mxi-color-muted: color-mix(in oklch, var(--color-base-content, #6b7280) 55%, var(--color-base-100, #fafafa));
-    --mxi-color-border: var(--color-base-300, #e5e7eb);
-    --mxi-color-primary: var(--color-primary, #2563eb);
-    --mxi-color-primary-fg: var(--color-primary-content, #ffffff);
-    --mxi-color-danger: var(--color-error, #b91c1c);
-    --mxi-color-success: var(--color-success, #15803d);
-    --mxi-color-surface: var(--color-base-200, #ffffff);
-    --mxi-radius: var(--radius-field, 6px);
-    --mxi-spacing: 1rem;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    color: var(--mxi-color-fg);
-    background: var(--mxi-color-bg);
+  --mxi-color-bg: var(--color-base-100, #fafafa);
+  --mxi-color-fg: var(--color-base-content, #111827);
+  --mxi-color-muted: color-mix(
+    in oklch,
+    var(--color-base-content, #6b7280) 55%,
+    var(--color-base-100, #fafafa)
+  );
+  --mxi-color-border: var(--color-base-300, #e5e7eb);
+  --mxi-color-primary: var(--color-primary, #2563eb);
+  --mxi-color-primary-fg: var(--color-primary-content, #ffffff);
+  --mxi-color-danger: var(--color-error, #b91c1c);
+  --mxi-color-success: var(--color-success, #15803d);
+  --mxi-color-surface: var(--color-base-200, #ffffff);
+  --mxi-radius: var(--radius-field, 6px);
+  --mxi-spacing: 1rem;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  color: var(--mxi-color-fg);
+  background: var(--mxi-color-bg);
 }
 
 * {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 body {
-    margin: 0;
-    min-height: 100vh;
+  margin: 0;
+  min-height: 100vh;
 }
 
 a {
-    color: var(--mxi-color-primary);
-    text-decoration: none;
+  color: var(--mxi-color-primary);
+  text-decoration: none;
 }
-a:hover { text-decoration: underline; }
+a:hover {
+  text-decoration: underline;
+}
 
-h1, h2, h3 {
-    margin: 0 0 0.5rem;
+h1,
+h2,
+h3 {
+  margin: 0 0 0.5rem;
 }
 
 button.button,
 .button {
-    appearance: none;
-    border: 1px solid var(--mxi-color-border);
-    background: var(--mxi-color-surface);
-    color: var(--mxi-color-fg);
-    padding: 0.5rem 0.875rem;
-    border-radius: var(--mxi-radius);
-    cursor: pointer;
-    font-size: 0.875rem;
-    line-height: 1;
+  appearance: none;
+  border: 1px solid var(--mxi-color-border);
+  background: var(--mxi-color-surface);
+  color: var(--mxi-color-fg);
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--mxi-radius);
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1;
 }
-button.button:hover { border-color: var(--mxi-color-fg); }
+button.button:hover {
+  border-color: var(--mxi-color-fg);
+}
 button.button.primary {
-    background: var(--mxi-color-primary);
-    color: var(--mxi-color-primary-fg);
-    border-color: var(--mxi-color-primary);
+  background: var(--mxi-color-primary);
+  color: var(--mxi-color-primary-fg);
+  border-color: var(--mxi-color-primary);
 }
-button.button.primary:hover { filter: brightness(0.95); }
-button.button.danger { color: var(--mxi-color-danger); border-color: var(--mxi-color-danger); }
-button.button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.button.primary:hover {
+  filter: brightness(0.95);
+}
+button.button.danger {
+  color: var(--mxi-color-danger);
+  border-color: var(--mxi-color-danger);
+}
+button.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
-input, select, textarea {
-    font: inherit;
-    padding: 0.4rem 0.6rem;
-    border: 1px solid var(--mxi-color-border);
-    border-radius: var(--mxi-radius);
-    background: var(--mxi-color-surface);
+input,
+select,
+textarea {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--mxi-color-border);
+  border-radius: var(--mxi-radius);
+  background: var(--mxi-color-surface);
 }
-input:focus, select:focus, textarea:focus {
-    outline: 2px solid var(--mxi-color-primary);
-    outline-offset: 1px;
-    border-color: var(--mxi-color-primary);
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--mxi-color-primary);
+  outline-offset: 1px;
+  border-color: var(--mxi-color-primary);
 }
 
 .surface {
-    background: var(--mxi-color-surface);
-    border: 1px solid var(--mxi-color-border);
-    border-radius: var(--mxi-radius);
-    padding: var(--mxi-spacing);
+  background: var(--mxi-color-surface);
+  border: 1px solid var(--mxi-color-border);
+  border-radius: var(--mxi-radius);
+  padding: var(--mxi-spacing);
 }
 
-.stack > * + * { margin-top: var(--mxi-spacing); }
+.stack > * + * {
+  margin-top: var(--mxi-spacing);
+}
 
 .row {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-wrap: wrap;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .banner {
-    padding: 0.75rem 1rem;
-    border-radius: var(--mxi-radius);
-    border: 1px solid var(--mxi-color-border);
-    background: var(--mxi-color-surface);
+  padding: 0.75rem 1rem;
+  border-radius: var(--mxi-radius);
+  border: 1px solid var(--mxi-color-border);
+  background: var(--mxi-color-surface);
 }
-.banner.error { color: var(--mxi-color-danger); border-color: var(--mxi-color-danger); background: #fef2f2; }
-.banner.success { color: var(--mxi-color-success); border-color: var(--mxi-color-success); background: #f0fdf4; }
+.banner.error {
+  color: var(--mxi-color-danger);
+  border-color: var(--mxi-color-danger);
+  background: #fef2f2;
+}
+.banner.success {
+  color: var(--mxi-color-success);
+  border-color: var(--mxi-color-success);
+  background: #f0fdf4;
+}
 
-.muted { color: var(--mxi-color-muted); }
-.small { font-size: 0.875rem; }
+.muted {
+  color: var(--mxi-color-muted);
+}
+.small {
+  font-size: 0.875rem;
+}

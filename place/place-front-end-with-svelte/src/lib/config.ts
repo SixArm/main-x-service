@@ -12,4 +12,6 @@
  * resolves; falls back to the dev origin under SSR/tests.
  */
 export const API_BASE_URL: string =
-    (typeof location !== "undefined" ? location.origin : "http://localhost:5173") + "/api/proxy";
+  (typeof location !== "undefined"
+    ? location.origin
+    : "http://localhost:5173") + "/api/proxy";

@@ -5,19 +5,19 @@
 /// Deterministic + scoped identifier schemes. Rust serializes unit
 /// variants as the bare string; `Custom` as `{ "Custom": "label" }`.
 export type IdentifierScheme =
-    | "Lei"
-    | "Duns"
-    | "Iso6523"
-    | "Gln"
-    | "Wikidata"
-    | "Ror"
-    | "Isni"
-    | "Vat"
-    | "TaxId"
-    | "Naics"
-    | "IsicV4"
-    | "Sic"
-    | { Custom: string };
+  | "Lei"
+  | "Duns"
+  | "Iso6523"
+  | "Gln"
+  | "Wikidata"
+  | "Ror"
+  | "Isni"
+  | "Vat"
+  | "TaxId"
+  | "Naics"
+  | "IsicV4"
+  | "Sic"
+  | { Custom: string };
 
 /**
  * Identifier schemes that the matcher treats as deterministic, i.e. an
@@ -26,14 +26,14 @@ export type IdentifierScheme =
  * ISNI / VAT). Surfaced in the form's scheme dropdown.
  */
 export const DETERMINISTIC_SCHEMES: IdentifierScheme[] = [
-    "Lei",
-    "Duns",
-    "Iso6523",
-    "Gln",
-    "Wikidata",
-    "Ror",
-    "Isni",
-    "Vat",
+  "Lei",
+  "Duns",
+  "Iso6523",
+  "Gln",
+  "Wikidata",
+  "Ror",
+  "Isni",
+  "Vat",
 ];
 
 /**
@@ -43,17 +43,17 @@ export const DETERMINISTIC_SCHEMES: IdentifierScheme[] = [
  * the form only edits unit-variant (bare-string) schemes.
  */
 export const ALL_SCHEMES: IdentifierScheme[] = [
-    ...DETERMINISTIC_SCHEMES,
-    "TaxId",
-    "Naics",
-    "IsicV4",
-    "Sic",
+  ...DETERMINISTIC_SCHEMES,
+  "TaxId",
+  "Naics",
+  "IsicV4",
+  "Sic",
 ];
 
 /** A single typed identifier on an organization: a scheme + its value. */
 export interface OrgIdentifier {
-    scheme: IdentifierScheme;
-    value: string;
+  scheme: IdentifierScheme;
+  value: string;
 }
 
 /**
@@ -62,11 +62,11 @@ export interface OrgIdentifier {
  * (see `OrganizationForm.build`).
  */
 export interface PostalAddress {
-    street_address?: string | null;
-    locality?: string | null;
-    region?: string | null;
-    postal_code?: string | null;
-    country?: string | null;
+  street_address?: string | null;
+  locality?: string | null;
+  region?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
 }
 
 /**
@@ -78,31 +78,31 @@ export interface PostalAddress {
  * (`null`) from "left as default".
  */
 export interface Organization {
-    name: string;
-    legal_name?: string | null;
-    alternate_names?: string[];
-    identifiers?: OrgIdentifier[];
-    url?: string | null;
-    same_as?: string[];
-    address?: PostalAddress | null;
-    jurisdiction?: string | null;
-    founding_date?: string | null;
-    telephone?: string | null;
-    email?: string | null;
-    keywords?: string[];
+  name: string;
+  legal_name?: string | null;
+  alternate_names?: string[];
+  identifiers?: OrgIdentifier[];
+  url?: string | null;
+  same_as?: string[];
+  address?: PostalAddress | null;
+  jurisdiction?: string | null;
+  founding_date?: string | null;
+  telephone?: string | null;
+  email?: string | null;
+  keywords?: string[];
 }
 
 /// `{pid, name}` returned by create / list.
 export interface OrgRef {
-    pid: string;
-    name: string;
+  pid: string;
+  name: string;
 }
 
 /// A scored duplicate from /check-duplicates.
 export interface ScoredRef {
-    pid: string;
-    name: string;
-    score: number;
-    confidence: string;
-    is_match: boolean;
+  pid: string;
+  name: string;
+  score: number;
+  confidence: string;
+  is_match: boolean;
 }
