@@ -328,8 +328,11 @@ async fn require_auth_gate_blocks_unauthed_list_but_allows_openapi() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn crud_publishes_created_updated_deleted_events() {
     request::<App, _, _>(|request, _ctx| async move {
-        let created: serde_json::Value =
-            request.post("/api/organizations").json(&acme()).await.json();
+        let created: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&acme())
+            .await
+            .json();
         let pid = created["pid"].as_str().expect("pid").to_string();
 
         request
@@ -345,9 +348,7 @@ async fn crud_publishes_created_updated_deleted_events() {
         // Each EventView is the frozen flat projection: kind/pid/name/seq.
         for kind in ["created", "updated", "deleted"] {
             assert!(
-                events
-                    .iter()
-                    .any(|e| e["kind"] == kind && e["pid"] == pid),
+                events.iter().any(|e| e["kind"] == kind && e["pid"] == pid),
                 "expected a {kind} event for pid {pid}"
             );
         }
@@ -372,8 +373,11 @@ async fn crud_publishes_created_updated_deleted_events() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn audit_endpoints_record_crud_actions() {
     request::<App, _, _>(|request, _ctx| async move {
-        let created: serde_json::Value =
-            request.post("/api/organizations").json(&acme()).await.json();
+        let created: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&acme())
+            .await
+            .json();
         let pid = created["pid"].as_str().expect("pid").to_string();
 
         request
@@ -382,8 +386,7 @@ async fn audit_endpoints_record_crud_actions() {
             .await;
 
         // System-wide recent audit contains a `created` row for our pid.
-        let recent: serde_json::Value =
-            request.get("/api/organizations/audit/recent").await.json();
+        let recent: serde_json::Value = request.get("/api/organizations/audit/recent").await.json();
         let recent = recent.as_array().expect("array of audit rows");
         assert!(
             recent
@@ -399,12 +402,12 @@ async fn audit_endpoints_record_crud_actions() {
             .await
             .json();
         let entity = entity.as_array().expect("array of audit rows");
-        let actions: Vec<&str> = entity
-            .iter()
-            .filter_map(|r| r["action"].as_str())
-            .collect();
+        let actions: Vec<&str> = entity.iter().filter_map(|r| r["action"].as_str()).collect();
         assert!(actions.contains(&"created"), "expected a created audit row");
-        assert!(actions.contains(&"updated"), "expected an updated audit row");
+        assert!(
+            actions.contains(&"updated"),
+            "expected an updated audit row"
+        );
 
         // A malformed pid on the per-entity route is a clear 400.
         let bad = request.get("/api/organizations/not-a-uuid/audit").await;

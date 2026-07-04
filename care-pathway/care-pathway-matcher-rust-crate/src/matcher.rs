@@ -598,7 +598,10 @@ mod tests {
         let a = CarePathway::new("Stroke");
         let b = CarePathway::new("Stroke");
         let s = name_score(&a, &b);
-        assert!((s - 1.0).abs() < 1e-9, "identical names stay at 1.0, got {s}");
+        assert!(
+            (s - 1.0).abs() < 1e-9,
+            "identical names stay at 1.0, got {s}"
+        );
     }
 
     // `set_jaccard` `Some(0.0)` branch (§13): exactly one side populated is
@@ -634,7 +637,10 @@ mod tests {
             rescued > primary_only,
             "alternate should rescue: rescued {rescued} vs primary {primary_only}"
         );
-        assert!(rescued >= 0.99, "alternate equals B's primary, got {rescued}");
+        assert!(
+            rescued >= 0.99,
+            "alternate equals B's primary, got {rescued}"
+        );
         // Symmetric: the same rescue works when the alternate is on B.
         let a2 = CarePathway::new("Acute Stroke Care Pathway");
         let mut b2 = CarePathway::new("CVA Pathway");

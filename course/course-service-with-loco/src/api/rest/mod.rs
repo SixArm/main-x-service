@@ -269,7 +269,11 @@ mod tests {
             let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
                 .await
                 .unwrap();
-            (status, content_type, String::from_utf8(bytes.to_vec()).unwrap())
+            (
+                status,
+                content_type,
+                String::from_utf8(bytes.to_vec()).unwrap(),
+            )
         };
 
         // Record the pre-increment value of `course_merged_total`, then

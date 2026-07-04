@@ -13,7 +13,7 @@ anything modelled by schema.org/Place.
 Prerequisites: Rust 1.93+ (2024 edition), PostgreSQL 18+ with PostGIS.
 
 ```bash
-cd place-service-with-loco
+cd place/place-service-with-loco   # within the main-x-service monorepo
 
 # Build and run (loco.rs): point DATABASE_URL at the database, then
 # start. Migrations run automatically in development (auto_migrate).

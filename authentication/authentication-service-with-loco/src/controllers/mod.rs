@@ -9,7 +9,7 @@
 pub mod auth;
 /// `OpenAPI` JSON document + Swagger UI page (CDN assets).
 pub mod docs;
-/// Public key set (`/.well-known/paseto-keys`) for offline peer verification.
-pub mod paseto_keys;
 /// Prometheus metrics (`/metrics.prom`), mounted at the root.
 pub mod metrics;
+/// Public key set (`/.well-known/paseto-keys`) for offline peer verification.
+pub mod paseto_keys;

@@ -143,14 +143,12 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   `uk_nhs_number`) is now caught at the matcher level by each
   matcher's `tests/adapter_contract.rs` — see the matcher
   CHANGELOG.
-
-### Fixed
-
 - `tests/integration_geo_radius.rs` used `vec![]` for two fixed
   candidate collections that are only iterated, tripping
   `clippy::useless_vec` and breaking the crate's clippy-clean gate
-  (`--all-targets -- -D warnings`). Now plain arrays; tests unchanged
-  and green.
+  (`--all-targets -- -D warnings`). Now plain arrays, reformatted with
+  `cargo fmt` (the same file also had pre-existing rustfmt drift); no
+  behavioural change, tests unchanged and green.
 
 ### Removed
 

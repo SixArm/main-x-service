@@ -119,11 +119,11 @@ optional email / URL.
 
 ## Quick start
 
-### Docker
+### Podman
 
 ```bash
-git clone https://github.com/sixarm/event-service-with-loco.git
-cd event-service-with-loco
+git clone https://github.com/SixArm/main-x-service.git
+cd main-x-service/event/event-service-with-loco
 cp .env.example .env
 podman compose up -d
 curl http://localhost:8080/api/v1/health
@@ -134,13 +134,14 @@ curl http://localhost:8080/api/v1/health
 
 ### Local
 
-Prereqs: Rust 1.93+ (2024 edition), PostgreSQL 18+, `sea-orm-cli`.
+Prereqs: Rust 1.93+ (2024 edition), PostgreSQL 18+.
 
 ```bash
 createdb event_service
 cp .env.example .env  # set DATABASE_URL
-sea-orm-cli migrate up
-cargo run --release
+# Migrations run automatically in development (auto_migrate);
+# or run them explicitly with `cargo loco db migrate`.
+cargo loco start            # or: cargo run -- start
 ```
 
 ## API examples
@@ -213,5 +214,5 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for more.
 
 Dual-licensed under MIT OR Apache-2.0.
 
-**Status**: Schema.org/Event rebuild complete.
+**Status**: See [spec/13-tasks.md](spec/13-tasks.md) (live task queue) and [spec/14-implementation-status.md](spec/14-implementation-status.md) (canonical implementation status).
 **Version**: 0.2.0

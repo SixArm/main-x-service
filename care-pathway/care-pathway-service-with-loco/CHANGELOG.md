@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **`cargo fmt` drift.** Reformatted `src/auth.rs` and
+  `src/validation.rs` so `cargo fmt --check` passes again (no
+  behavioural change).
+
 ### Changed
 
 - **Auth pivot — sessions + PASETO (spec-level; code follow-up pending).**

@@ -451,7 +451,10 @@ mod tests {
 
     fn bearer_headers(sid: &str) -> HeaderMap {
         let mut h = HeaderMap::new();
-        h.insert(header::AUTHORIZATION, format!("Bearer {sid}").parse().unwrap());
+        h.insert(
+            header::AUTHORIZATION,
+            format!("Bearer {sid}").parse().unwrap(),
+        );
         h
     }
 
@@ -490,11 +493,15 @@ mod tests {
         let s = state(3600);
         let sid = s.create_session(&alice());
         assert_eq!(
-            s.identity_from_headers(&cookie_headers(&sid)).unwrap().email,
+            s.identity_from_headers(&cookie_headers(&sid))
+                .unwrap()
+                .email,
             "alice@example.com"
         );
         assert_eq!(
-            s.identity_from_headers(&bearer_headers(&sid)).unwrap().email,
+            s.identity_from_headers(&bearer_headers(&sid))
+                .unwrap()
+                .email,
             "alice@example.com"
         );
         assert!(s.identity_from_headers(&HeaderMap::new()).is_none());

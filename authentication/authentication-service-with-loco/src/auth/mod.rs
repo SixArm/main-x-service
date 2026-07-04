@@ -531,7 +531,9 @@ mod tests {
     fn additional_key_token_still_verifies_after_rotation() {
         // OTHER used to be primary; now it is an additional verify-only key
         // alongside the dev primary.
-        let other_public = SigningKey::from_bytes(&OTHER_SEED).verifying_key().to_bytes();
+        let other_public = SigningKey::from_bytes(&OTHER_SEED)
+            .verifying_key()
+            .to_bytes();
         let k = build_keys(&DEV_SEED, &[other_public]).expect("build");
         assert_eq!(k.key_count(), 2);
 
@@ -552,7 +554,11 @@ mod tests {
         // Set with only the primary; OTHER is not in the set.
         let k = build_keys(&DEV_SEED, &[]).expect("build");
         let other_keypair = SigningKey::from_bytes(&OTHER_SEED).to_keypair_bytes();
-        let other_kid = kid_for(&SigningKey::from_bytes(&OTHER_SEED).verifying_key().to_bytes());
+        let other_kid = kid_for(
+            &SigningKey::from_bytes(&OTHER_SEED)
+                .verifying_key()
+                .to_bytes(),
+        );
         let claims = claims_for(&k, "s", 3600);
         let token = mint(&other_keypair, &other_kid, &claims).expect("mint");
         assert!(verify_with(&k, &token).is_err());

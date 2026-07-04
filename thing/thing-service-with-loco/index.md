@@ -18,7 +18,7 @@ The first seven are globally unique and short-circuit matching to
 Prerequisites: Rust 1.93+ (2024 edition), PostgreSQL 18+.
 
 ```bash
-cd thing-service-with-loco
+cd thing/thing-service-with-loco   # within the main-x-service monorepo
 
 # Build and run (loco.rs): point DATABASE_URL at the database, then
 # start. Migrations run automatically in development (auto_migrate).

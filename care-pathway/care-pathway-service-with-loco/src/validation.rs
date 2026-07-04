@@ -586,7 +586,11 @@ mod tests {
             ..CarePathway::new("   ") // blank name
         };
         let problems = problems(&p);
-        assert_eq!(problems.len(), 4, "every dimension reports once: {problems:?}");
+        assert_eq!(
+            problems.len(),
+            4,
+            "every dimension reports once: {problems:?}"
+        );
         assert!(problems.iter().any(|m| m.contains("name is required")));
         assert!(problems.iter().any(|m| m.contains("condition_codes[0]")));
         assert!(problems.iter().any(|m| m.contains("identifiers[0]")));

@@ -405,24 +405,38 @@ fn test_similarity_algorithm_exact_round_trips_through_json() {
 fn test_location_coordinates_close_scores_high() {
     // Two coordinates ~30 m apart at the default scale of 100 m: the
     // Gaussian decay keeps the location score well above 0.9.
-    let l1 = Location::new().with_latitude(51.150_30).with_longitude(-2.586_20);
-    let l2 = Location::new().with_latitude(51.150_55).with_longitude(-2.586_20);
+    let l1 = Location::new()
+        .with_latitude(51.150_30)
+        .with_longitude(-2.586_20);
+    let l2 = Location::new()
+        .with_latitude(51.150_55)
+        .with_longitude(-2.586_20);
     let a = Event::builder().name("X").location(l1).build();
     let b = Event::builder().name("X").location(l2).build();
     let r = MatchingEngine::default_config().match_events(&a, &b);
-    let s = r.breakdown.location_score.expect("both sides have coordinates");
+    let s = r
+        .breakdown
+        .location_score
+        .expect("both sides have coordinates");
     assert!(s > 0.9, "expected close coordinates to score high, got {s}");
 }
 
 #[test]
 fn test_location_coordinates_far_apart_scores_low() {
     // London vs Paris: hundreds of km apart, far beyond the 100 m scale.
-    let l1 = Location::new().with_latitude(51.507_22).with_longitude(-0.127_5);
-    let l2 = Location::new().with_latitude(48.853_0).with_longitude(2.349_2);
+    let l1 = Location::new()
+        .with_latitude(51.507_22)
+        .with_longitude(-0.127_5);
+    let l2 = Location::new()
+        .with_latitude(48.853_0)
+        .with_longitude(2.349_2);
     let a = Event::builder().name("X").location(l1).build();
     let b = Event::builder().name("X").location(l2).build();
     let r = MatchingEngine::default_config().match_events(&a, &b);
-    let s = r.breakdown.location_score.expect("both sides have coordinates");
+    let s = r
+        .breakdown
+        .location_score
+        .expect("both sides have coordinates");
     assert!(s < 1e-3, "expected far coordinates to decay to ~0, got {s}");
 }
 
@@ -432,7 +446,9 @@ fn test_location_no_shared_subcomponent_is_neutral_half() {
     // one has only coordinates, the other only a venue name. §6.4 specifies a
     // neutral 0.5 fallback rather than None (location_score is None only when a
     // side has no Location at all).
-    let l1 = Location::new().with_latitude(51.150_3).with_longitude(-2.586_2);
+    let l1 = Location::new()
+        .with_latitude(51.150_3)
+        .with_longitude(-2.586_2);
     let l2 = Location::new().with_venue_name("Worthy Farm");
     let a = Event::builder().name("X").location(l1).build();
     let b = Event::builder().name("X").location(l2).build();
@@ -465,8 +481,14 @@ fn test_location_line1_same_street_different_house_number_below_perfect() {
     let b = Event::builder().name("X").location(l2).build();
     let r = MatchingEngine::default_config().match_events(&a, &b);
     let s = r.breakdown.location_score.expect("both sides have a line1");
-    assert!(s < 0.99, "house-number mismatch should lower line1 blend, got {s}");
-    assert!(s > 0.3, "matching street should keep the blend well above zero, got {s}");
+    assert!(
+        s < 0.99,
+        "house-number mismatch should lower line1 blend, got {s}"
+    );
+    assert!(
+        s > 0.3,
+        "matching street should keep the blend well above zero, got {s}"
+    );
 }
 
 #[test]
@@ -475,17 +497,29 @@ fn test_location_line1_same_house_number_beats_different() {
     // different-house-number pair on an otherwise identical street, pinning the
     // 0.4 house-number term direction.
     let street_a = Location::new().with_address(Address::new().with_line1("10 Main Street"));
-    let street_b_same =
-        Location::new().with_address(Address::new().with_line1("10 Main Street"));
-    let street_b_diff =
-        Location::new().with_address(Address::new().with_line1("22 Main Street"));
-    let a = Event::builder().name("X").location(street_a.clone()).build();
+    let street_b_same = Location::new().with_address(Address::new().with_line1("10 Main Street"));
+    let street_b_diff = Location::new().with_address(Address::new().with_line1("22 Main Street"));
+    let a = Event::builder()
+        .name("X")
+        .location(street_a.clone())
+        .build();
     let b_same = Event::builder().name("X").location(street_b_same).build();
     let b_diff = Event::builder().name("X").location(street_b_diff).build();
     let engine = MatchingEngine::default_config();
-    let same = engine.match_events(&a, &b_same).breakdown.location_score.unwrap();
-    let diff = engine.match_events(&a, &b_diff).breakdown.location_score.unwrap();
-    assert!(same > diff, "same house number should beat different: {same} vs {diff}");
+    let same = engine
+        .match_events(&a, &b_same)
+        .breakdown
+        .location_score
+        .unwrap();
+    let diff = engine
+        .match_events(&a, &b_diff)
+        .breakdown
+        .location_score
+        .unwrap();
+    assert!(
+        same > diff,
+        "same house number should beat different: {same} vs {diff}"
+    );
 }
 
 // ============================================================

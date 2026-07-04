@@ -22,20 +22,34 @@ fn location_coordinates() {
 
     // Worthy Farm, ~30 m apart.
     let near = pair(
-        Location::new().with_latitude(51.150_30).with_longitude(-2.586_20),
-        Location::new().with_latitude(51.150_55).with_longitude(-2.586_20),
+        Location::new()
+            .with_latitude(51.150_30)
+            .with_longitude(-2.586_20),
+        Location::new()
+            .with_latitude(51.150_55)
+            .with_longitude(-2.586_20),
     );
     // London vs Paris — hundreds of km apart.
     let far = pair(
-        Location::new().with_latitude(51.507_22).with_longitude(-0.127_5),
-        Location::new().with_latitude(48.853_0).with_longitude(2.349_2),
+        Location::new()
+            .with_latitude(51.507_22)
+            .with_longitude(-0.127_5),
+        Location::new()
+            .with_latitude(48.853_0)
+            .with_longitude(2.349_2),
     );
 
     let engine = MatchingEngine::default_config();
     let r_near = engine.match_events(&near.0, &near.1);
     let r_far = engine.match_events(&far.0, &far.1);
-    println!("  ~30 m apart : location_score = {:?}", r_near.breakdown.location_score);
-    println!("  London/Paris: location_score = {:?}", r_far.breakdown.location_score);
+    println!(
+        "  ~30 m apart : location_score = {:?}",
+        r_near.breakdown.location_score
+    );
+    println!(
+        "  London/Paris: location_score = {:?}",
+        r_far.breakdown.location_score
+    );
     println!();
 }
 
@@ -57,11 +71,17 @@ fn location_address() {
     let engine = MatchingEngine::default_config();
     println!(
         "  same street + same house number : {:?}",
-        engine.match_events(&same_house.0, &same_house.1).breakdown.location_score
+        engine
+            .match_events(&same_house.0, &same_house.1)
+            .breakdown
+            .location_score
     );
     println!(
         "  same street + diff house number : {:?}",
-        engine.match_events(&diff_house.0, &diff_house.1).breakdown.location_score
+        engine
+            .match_events(&diff_house.0, &diff_house.1)
+            .breakdown
+            .location_score
     );
     println!();
 }
@@ -72,11 +92,16 @@ fn location_neutral_fallback() {
     println!("=== Location: neutral 0.5 fallback (no shared sub-component) ===\n");
 
     let p = pair(
-        Location::new().with_latitude(51.150_3).with_longitude(-2.586_2),
+        Location::new()
+            .with_latitude(51.150_3)
+            .with_longitude(-2.586_2),
         Location::new().with_venue_name("Worthy Farm"),
     );
     let r = MatchingEngine::default_config().match_events(&p.0, &p.1);
-    println!("  coords-only vs venue-only: location_score = {:?}", r.breakdown.location_score);
+    println!(
+        "  coords-only vs venue-only: location_score = {:?}",
+        r.breakdown.location_score
+    );
     println!();
 }
 
@@ -103,8 +128,14 @@ fn strict_mode_rejection() {
     let r_default = default.match_events(&a, &b);
     let r_strict = strict.match_events(&a, &b);
 
-    println!("  default: score {:.3}  is_match {}", r_default.score, r_default.is_match);
-    println!("  strict : score {:.3}  is_match {}", r_strict.score, r_strict.is_match);
+    println!(
+        "  default: score {:.3}  is_match {}",
+        r_default.score, r_default.is_match
+    );
+    println!(
+        "  strict : score {:.3}  is_match {}",
+        r_strict.score, r_strict.is_match
+    );
     println!(
         "  deterministic_match = {} (no shared EventId; names differ under normalisation)",
         strict.deterministic_match(&a, &b)

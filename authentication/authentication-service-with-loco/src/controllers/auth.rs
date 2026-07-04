@@ -377,8 +377,7 @@ async fn token(headers: axum::http::HeaderMap, State(ctx): State<AppContext>) ->
     }
     // Resolve the user for the token claims, then mint a fresh PASETO bound
     // to this session id.
-    let Ok(user) =
-        users::Model::find_active_by_pid(&ctx.db, &session.user_pid.to_string()).await
+    let Ok(user) = users::Model::find_active_by_pid(&ctx.db, &session.user_pid.to_string()).await
     else {
         return unauthorized("account not found");
     };
@@ -563,7 +562,11 @@ mod tests {
     #[test]
     fn allowlisted_return_url_is_honoured() {
         assert_eq!(
-            choose_frontend(Some("https://organization.example.com"), &allowlist(), DEFAULT),
+            choose_frontend(
+                Some("https://organization.example.com"),
+                &allowlist(),
+                DEFAULT
+            ),
             "https://organization.example.com"
         );
         // Surrounding whitespace is trimmed before matching.

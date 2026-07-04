@@ -9,7 +9,6 @@ centralized registry of place identities across multiple areas.
 
 - [Features](#features)
 - [Quick Start](#quick-start)
-- [Docker Deployment](#docker-deployment)
 - [Technology Stack](#technology-stack)
 - [Architecture](#architecture)
 - [Development](#development)
@@ -87,7 +86,7 @@ Based on [schema.org/Place](https://schema.org/Place):
 - No extra CLI tooling: migrations are a SeaORM migration crate (`migration/`) run through the built-in loco CLI
 
 ```bash
-cd place-service-with-loco
+cd place/place-service-with-loco   # within the main-x-service monorepo
 
 # Point DATABASE_URL at the database, then start. Migrations run
 # automatically in development (auto_migrate).
@@ -483,7 +482,7 @@ podman build -t place-server:v0.5.0 . && podman run ...  # Production
 
 - Audit Logging: Complete audit trail for compliance
 - Soft Delete: Place records never truly deleted
-- Non-Root Containers: Docker containers run as non-root user
+- Non-Root Containers: Podman containers run as non-root user
 - Environment-Based Secrets: No secrets in code or images
 - CORS Configuration: Configurable cross-origin policies
 - Data Masking: Sensitive fields (coordinates, telephone) masked on demand
@@ -538,5 +537,5 @@ GPL-3.0-only (see `Cargo.toml`).
 
 ---
 
-**Status**: Production-Ready
+**Status**: See [spec/13-tasks.md](spec/13-tasks.md) (live task queue) and [spec/14-implementation-status.md](spec/14-implementation-status.md) (canonical implementation status).
 **Version**: 0.5.0

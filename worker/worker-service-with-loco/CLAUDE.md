@@ -9,7 +9,6 @@ centralized registry of worker identities across source systems.
 
 - [Features](#features)
 - [Quick Start](#quick-start)
-- [Docker Deployment](#docker-deployment)
 - [Technology Stack](#technology-stack)
 - [Architecture](#architecture)
 - [Development](#development)
@@ -80,12 +79,12 @@ centralized registry of worker identities across source systems.
 
 ## Quick Start
 
-### Option 1: Docker (Recommended)
+### Option 1: Podman (Recommended)
 
 ```bash
 # Clone repository
-git clone https://github.com/sixarm/worker-service-with-loco.git
-cd worker-service-with-loco
+git clone https://github.com/SixArm/main-x-service.git
+cd main-x-service/worker/worker-service-with-loco
 
 # Copy environment configuration
 cp .env.example .env
@@ -117,24 +116,23 @@ See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
 
 - Rust 1.93+ ([Install Rust](https://rustup.rs/))
 - PostgreSQL 18+
-- SeaORM CLI: `cargo install sea-orm-cli`
+- No extra CLI tooling required: migrations run through the built-in
+  loco CLI (`cargo loco db migrate`)
 
 ```bash
 # Clone repository
-git clone https://github.com/sixarm/worker-service-with-loco.git
-cd worker-service-with-loco
+git clone https://github.com/SixArm/main-x-service.git
+cd main-x-service/worker/worker-service-with-loco
 
 # Set up database
 createdb worker_service
 cp .env.example .env
 # Edit .env and set DATABASE_URL
 
-# Run migrations
-sea-orm-cli migrate up
-
-# Build and run
-cargo build --release
-cargo run --release
+# Build and run (loco.rs). Migrations run automatically in development
+# (auto_migrate); or run them explicitly with `cargo loco db migrate`.
+export DATABASE_URL=postgres://localhost/worker_service_development
+cargo loco start            # or: cargo run -- start
 ```
 
 ### Data Flow
@@ -371,7 +369,7 @@ cargo test --lib -- --nocapture               # With output
 
 ```bash
 cargo test --test api_integration_test        # All integration tests
-podman compose -f docker-compose.test.yml up  # Run with Docker
+podman compose -f docker-compose.test.yml up  # Run with Podman
 ```
 
 ### Test Coverage
@@ -410,7 +408,7 @@ podman build -t worker-server:v1.0.0 . && podman run ...  # Production
 
 - Audit Logging: Complete audit trail for HIPAA compliance
 - Soft Delete: Worker records never truly deleted
-- Non-Root Containers: Docker containers run as non-root user
+- Non-Root Containers: Podman containers run as non-root user
 - Environment-Based Secrets: No secrets in code or images
 - CORS Configuration: Configurable cross-origin policies
 - Data Masking: Sensitive fields (SSN, tax ID, passport, phone) masked on demand
@@ -472,5 +470,5 @@ Dual-licensed under MIT OR Apache-2.0.
 
 ---
 
-**Status**: Production-Ready
+**Status**: See [spec/13-tasks.md](spec/13-tasks.md) (live task queue) and [spec/14-implementation-status.md](spec/14-implementation-status.md) (canonical implementation status).
 **Version**: 0.2.0

@@ -8,6 +8,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md) — single source of truth;
 > [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
 
+## [Unreleased]
+
+### Fixed
+
+- Formatting drift in `src/lib.rs` (six spots not rustfmt-formatted);
+  `cargo fmt --check` is clean again. No behaviour change.
+
 ## [0.2.0] - 2026-06-17
 
 > **BREAKING — the PASETO v4.public pivot (implemented).** Per the

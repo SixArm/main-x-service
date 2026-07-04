@@ -17,7 +17,7 @@
 | Merging | Transfer + alias + link + soft-delete + snapshot + event |
 | Validation | Required fields, format checks, phone normalisation, address standardisation, `422` |
 | Privacy | Field masking, GDPR export, consent model |
-| Docker | Multi-stage Dockerfile, dev + test Compose |
+| Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 
 ### 14.2 Open gaps → tasks

@@ -10,6 +10,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **`cargo fmt` drift.** Reformatted `src/auth/mod.rs`,
+  `src/controllers/auth.rs`, `src/controllers/mod.rs`, `src/cookie.rs`,
+  and `tests/sign_verify_contract.rs` so `cargo fmt --check` passes
+  again (no behavioural change).
+
 ### Changed
 
 - **Auth model pivot: cookie sessions + PASETO replace RS256 JWT + JWKS

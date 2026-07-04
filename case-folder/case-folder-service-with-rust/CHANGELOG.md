@@ -10,6 +10,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- `src/auth/mod.rs` had rustfmt drift that broke the crate's
+  `cargo fmt --check` gate. Reformatted with `cargo fmt`; no
+  behavioural change, tests unchanged and green.
+
 ### Changed
 
 - **Doc/test harmonization pass.** Added the missing `CLAUDE.md`

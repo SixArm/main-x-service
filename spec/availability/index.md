@@ -131,7 +131,7 @@ container is marked unhealthy.
 
 ## 5. Containerization
 
-The family standardizes on **Podman, not Docker** (the `docker build` /
+The family standardizes on **Podman, not Docker** (the `Dockerfile` /
 `docker-compose.yml` filenames stay Docker-compatible, so Docker works
 if a contributor has it, but Podman is the supported runtime — see
 [`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md)).

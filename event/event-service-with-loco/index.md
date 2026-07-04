@@ -4,7 +4,7 @@ A high-performance, enterprise-grade Event Service system built with Rust.
 
 [![Rust](https://img.shields.io/badge/rust-1.93%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
-[![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](Dockerfile)
+[![Podman](https://img.shields.io/badge/podman-ready-brightgreen.svg)](Dockerfile)
 
 ## Overview
 
@@ -15,7 +15,7 @@ The Event Service is an identity-registry system that maintains a centralized re
 - ✅ **RESTful API**: Modern HTTP API with OpenAPI/Swagger documentation
 - ✅ **Event Streaming**: Real-time event event publishing with audit logging
 - ✅ **Database Integration**: PostgreSQL with SeaORM and migrations
-- ✅ **Docker Ready**: Multi-stage builds, Docker Compose for dev/test/prod
+- ✅ **Podman Ready**: Multi-stage container builds, Podman Compose for dev/test/prod
 - ✅ **Integration Tests**: Comprehensive test coverage
 - ✅ **Production Hardened**: Security, monitoring, and compliance features
 
@@ -23,7 +23,7 @@ The Event Service is an identity-registry system that maintains a centralized re
 
 - [Features](#features)
 - [Quick Start](#quick-start)
-- [Docker Deployment](#docker-deployment)
+- [Podman Deployment](#podman-deployment)
 - [Technology Stack](#technology-stack)
 - [Architecture](#architecture)
 - [Development](#development)
@@ -111,7 +111,7 @@ The Event Service is an identity-registry system that maintains a centralized re
 - ✅ Health check endpoints for orchestration
 - ✅ Graceful shutdown
 - ✅ Horizontal scaling support (stateless design)
-- ✅ Docker health checks
+- ✅ Podman health checks
 - ✅ Non-root container execution
 
 ### Observability
@@ -126,12 +126,12 @@ The Event Service is an identity-registry system that maintains a centralized re
 
 ## Quick Start
 
-### Option 1: Docker (Recommended)
+### Option 1: Podman (Recommended)
 
 ```bash
 # Clone repository
-git clone https://github.com/sixarm/event-service-with-loco.git
-cd event-service-with-loco
+git clone https://github.com/SixArm/main-x-service.git
+cd main-x-service/event/event-service-with-loco
 
 # Copy environment configuration
 cp .env.example .env
@@ -163,12 +163,13 @@ See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
 
 - Rust 1.93+ ([Install Rust](https://rustup.rs/))
 - PostgreSQL 18+
-- SeaORM CLI: `cargo install sea-orm-cli`
+- No extra CLI tooling required: migrations run through the built-in
+  loco CLI (`cargo loco db migrate`)
 
 ```bash
 # Clone repository
-git clone https://github.com/sixarm/event-service-with-loco.git
-cd event-service-with-loco
+git clone https://github.com/SixArm/main-x-service.git
+cd main-x-service/event/event-service-with-loco
 
 # Set up database
 createdb event_service
@@ -181,7 +182,7 @@ export DATABASE_URL=postgres://localhost/event_service_development
 cargo loco start            # or: cargo run -- start
 ```
 
-## Docker Deployment
+## Podman Deployment
 
 ### Development Environment
 
@@ -202,7 +203,7 @@ podman compose down
 ### Testing Environment
 
 ```bash
-# Run all tests in Docker
+# Run all tests with Podman Compose
 podman compose -f docker-compose.test.yml up --build
 
 # View test results
@@ -244,7 +245,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 | **Logging**          | Tracing                              | Structured logging                       |
 | **Observability**    | OpenTelemetry                        | Structured observability                 |
 | **String Matching**  | strsim, fuzzy-matcher                | Jaro-Winkler, Levenshtein                |
-| **Containerization** | Docker                               | Deployment packaging                     |
+| **Containerization** | Podman                               | Deployment packaging                     |
 
 ## Architecture
 
@@ -505,7 +506,7 @@ cargo test --test api_integration_test
 # Run specific integration test
 cargo test --test api_integration_test test_create_event
 
-# Run with Docker (recommended)
+# Run with Podman (recommended)
 podman compose -f docker-compose.test.yml up --build
 ```
 
@@ -523,7 +524,7 @@ See [AGENTS/testing.md](AGENTS/testing.md) for the full layout and counts.
 
 ## Deployment
 
-### Docker Deployment
+### Podman Deployment
 
 See [DEPLOY.md](DEPLOY.md) for comprehensive deployment guide.
 
@@ -558,7 +559,7 @@ Helm chart and Kubernetes manifests planned for Phase 13.
 
 - ✅ **Audit Logging**: Complete audit trail for HIPAA compliance
 - ✅ **Soft Delete**: Event records never truly deleted
-- ✅ **Non-Root Containers**: Docker containers run as non-root user
+- ✅ **Non-Root Containers**: Podman containers run as non-root user
 - ✅ **Environment-Based Secrets**: No secrets in code or images
 - ✅ **CORS Configuration**: Configurable cross-origin policies
 
@@ -651,7 +652,7 @@ This project was developed in 11 comprehensive phases:
 5. **Phase 10**: Integration Testing
 6. **Phase 11**: Docker & Deployment
 
-See individual `task-*.md` files for detailed phase documentation.
+See [spec/13-tasks.md](spec/13-tasks.md) for the live task queue and [spec/14-implementation-status.md](spec/14-implementation-status.md) for implementation status.
 
 ## Contributing
 
@@ -704,6 +705,6 @@ And many more listed in `Cargo.toml`.
 
 ---
 
-**Status**: Production-Ready ✅
+**Status**: See [spec/13-tasks.md](spec/13-tasks.md) (live task queue) and [spec/14-implementation-status.md](spec/14-implementation-status.md) (canonical implementation status).
 **Version**: 0.2.0
-**Last Updated**: 2026-03-18
+**Last Updated**: 2026-07-04

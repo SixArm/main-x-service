@@ -74,7 +74,10 @@ mod tests {
             read_session("foo=1; __Host-mxi_session=sid-42; bar=2").as_deref(),
             Some("sid-42")
         );
-        assert_eq!(read_session("__Host-mxi_session=only").as_deref(), Some("only"));
+        assert_eq!(
+            read_session("__Host-mxi_session=only").as_deref(),
+            Some("only")
+        );
     }
 
     #[test]

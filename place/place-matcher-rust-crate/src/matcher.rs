@@ -1560,7 +1560,10 @@ mod tests {
     fn email_both_parse_but_differ_is_zero() {
         let engine = MatchingEngine::default_config();
         let a = Place::builder().name("X").email("info@example.org").build();
-        let b = Place::builder().name("X").email("sales@example.org").build();
+        let b = Place::builder()
+            .name("X")
+            .email("sales@example.org")
+            .build();
         let r = engine.match_places(&a, &b);
         assert_eq!(r.breakdown.email_score, Some(0.0));
     }

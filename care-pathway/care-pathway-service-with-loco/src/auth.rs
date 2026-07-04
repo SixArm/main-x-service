@@ -233,7 +233,9 @@ mod tests {
     use base64::Engine;
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use ed25519_dalek::SigningKey;
-    use rusty_paseto::core::{Footer, Key, Paseto, PasetoAsymmetricPrivateKey, Payload, Public, V4};
+    use rusty_paseto::core::{
+        Footer, Key, Paseto, PasetoAsymmetricPrivateKey, Payload, Public, V4,
+    };
     use sha2::{Digest, Sha256};
 
     /// Issuer the test tokens and verifier agree on.

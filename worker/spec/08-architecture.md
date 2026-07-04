@@ -60,7 +60,7 @@ blocker in §13 / §15.
 ### 8.4 Deployment topology
 
 **Current:** single node per subproject — service + PostgreSQL via
-Docker/Podman Compose, front-end as a static SPA (Vite dev server or
+Podman Compose, front-end as a static SPA (Vite dev server or
 any static host), Tantivy index on local disk, in-memory event
 publisher.
 

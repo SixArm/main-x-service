@@ -128,3 +128,9 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   `agents/share/authentication-sessions.md`); the still-pending auth
   task in `spec/13-tasks.md` T-8 now targets PASETO verification via
   the `authentication-verifier` crate.
+
+### Fixed
+
+- `tests/api_integration_test.rs` had rustfmt drift that broke the
+  crate's `cargo fmt --check` gate. Reformatted with `cargo fmt`; no
+  behavioural change, tests unchanged and green.

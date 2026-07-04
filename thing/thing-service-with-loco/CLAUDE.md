@@ -88,14 +88,14 @@ event stream.
 
 ### Local dev
 
-**Prerequisites:** Rust 1.75+, PostgreSQL 15+ (optional for in-memory paths)
+**Prerequisites:** Rust 1.95+ (2024 edition), PostgreSQL 18+ (optional for in-memory paths)
 
 ```bash
-git clone https://github.com/sixarm/thing-service-with-loco.git
-cd thing-service-with-loco
+git clone https://github.com/SixArm/main-x-service.git
+cd main-x-service/thing/thing-service-with-loco
 
-# REST API
-cargo run --release
+# REST API (loco.rs)
+cargo loco start            # or: cargo run -- start
 
 # Tests
 cargo test --lib

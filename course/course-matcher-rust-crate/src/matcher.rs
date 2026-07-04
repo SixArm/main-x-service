@@ -786,9 +786,7 @@ mod tests {
     // ladder later and minting spurious partial credit.
     #[test]
     fn educational_level_off_ladder_variants_score_zero_unless_identical() {
-        use EducationalLevel::{
-            Beginner, Custom, Expert, ProfessionalDevelopment, Vocational,
-        };
+        use EducationalLevel::{Beginner, Custom, Expert, ProfessionalDevelopment, Vocational};
         let mut a = Course::new("A");
         let mut b = Course::new("B");
 
@@ -825,9 +823,7 @@ mod tests {
     // off-ladder variant — they appear on none of the three ladders.
     #[test]
     fn educational_level_one_off_false_for_off_ladder_variants() {
-        use EducationalLevel::{
-            Beginner, Custom, ProfessionalDevelopment, Vocational,
-        };
+        use EducationalLevel::{Beginner, Custom, ProfessionalDevelopment, Vocational};
         assert!(!educational_level_one_off(&Vocational, &Beginner));
         assert!(!educational_level_one_off(
             &ProfessionalDevelopment,

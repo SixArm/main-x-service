@@ -18,7 +18,7 @@
 | Validation | Required fields, format checks, phone normalisation, address standardisation, `422` |
 | Privacy | Field masking, GDPR export, consent model |
 | Authentication (peer verification) | Offline PASETO v4.public (Ed25519) bearer verification via `authentication-verifier` 0.2; `AuthUser` extractor + `GET /api/whoami`; env-configured key set (T-1a) |
-| Docker | Multi-stage Dockerfile, dev + test Compose |
+| Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 | Documentation | README, CLAUDE.md, AGENTS/* set, architecture, deploy guide, this spec |
 

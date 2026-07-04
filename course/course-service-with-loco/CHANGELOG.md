@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- `src/api/rest/mod.rs` had rustfmt drift (test-module comment/line
+  wrapping) that broke the crate's `cargo fmt --check` gate.
+  Reformatted with `cargo fmt`; no behavioural change, 42 lib tests
+  and clippy `-D warnings` unchanged and green.
+
 ## [0.3.0] — 2026-06-15
 
 ### Added

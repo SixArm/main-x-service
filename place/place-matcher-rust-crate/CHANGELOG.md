@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Formatting drift in `src/matcher.rs` (one test's builder chain was not
+  rustfmt-formatted); `cargo fmt --check` is clean again. No behaviour
+  change.
+
 ### Added — `tags` weighted component (spec-first; implementation pending)
 
 Spec added the **tags** match component

@@ -39,7 +39,7 @@ fn geo_radius_filters_collection_to_nearby_places() {
 
     let collection = [
         place_at("Times Square", 40.7580, -73.9855), // ~3 km away
-        place_at("The Met", 40.7794, -73.9632),       // ~0.4 km away
+        place_at("The Met", 40.7794, -73.9632),      // ~0.4 km away
         place_at("Statue of Liberty", 40.6892, -74.0445), // ~12 km away
         place_at("Los Angeles City Hall", 34.0537, -118.2428), // continent away
     ];
@@ -89,7 +89,10 @@ fn geo_radius_is_monotonic_in_radius() {
     let medium = count_within(5_000.0);
     let wide = count_within(20_000.0);
 
-    assert!(tight <= medium, "tight {tight} should be <= medium {medium}");
+    assert!(
+        tight <= medium,
+        "tight {tight} should be <= medium {medium}"
+    );
     assert!(medium <= wide, "medium {medium} should be <= wide {wide}");
     assert_eq!(wide, 3, "all three NYC places fall within 20 km");
 }

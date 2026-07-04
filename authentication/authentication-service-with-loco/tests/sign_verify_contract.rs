@@ -100,8 +100,8 @@ fn kid_mismatch_fails_peer_side_verification() {
 
     let mut altered = keys.paseto_keys.clone();
     altered["keys"][0]["kid"] = serde_json::Value::String("some-other-kid".to_string());
-    let verifier = Verifier::from_paseto_keys_value(&altered, &keys.issuer, &keys.audience)
-        .expect("build");
+    let verifier =
+        Verifier::from_paseto_keys_value(&altered, &keys.issuer, &keys.audience).expect("build");
     assert!(
         matches!(verifier.verify(&token), Err(VerifyError::UnknownKid(kid)) if kid == keys.kid),
         "a kid mismatch must surface as UnknownKid(service kid)"
@@ -121,14 +121,21 @@ fn multi_key_set_verifies_primary_and_rejects_unknown_kid() {
     let other_public = [9u8; 32];
     let other_kid = URL_SAFE_NO_PAD.encode(Sha256::digest(other_public));
     let mut multi = keys.paseto_keys.clone();
-    multi["keys"].as_array_mut().unwrap().push(serde_json::json!({
-        "kty": "OKP", "crv": "Ed25519", "use": "sig",
-        "kid": other_kid, "x": URL_SAFE_NO_PAD.encode(other_public),
-    }));
+    multi["keys"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "kty": "OKP", "crv": "Ed25519", "use": "sig",
+            "kid": other_kid, "x": URL_SAFE_NO_PAD.encode(other_public),
+        }));
 
     let verifier =
         Verifier::from_paseto_keys_value(&multi, &keys.issuer, &keys.audience).expect("build");
-    assert_eq!(verifier.key_count(), 2, "the multi-key set publishes two keys");
+    assert_eq!(
+        verifier.key_count(),
+        2,
+        "the multi-key set publishes two keys"
+    );
 
     // The primary-signed token still verifies (kid selects the primary).
     let claims = verifier.verify(&token).expect("primary token verifies");

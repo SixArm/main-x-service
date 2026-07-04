@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Formatting drift in `examples/location_matching.rs` and
+  `tests/integration_tests.rs` (builder chains and long `println!`/
+  `assert!` lines were not rustfmt-formatted); `cargo fmt --check` is
+  clean again. No behaviour change.
+
 ### Added — `tags` weighted component (spec-first; implementation pending)
 
 Spec added the operator-applied **tags** match component

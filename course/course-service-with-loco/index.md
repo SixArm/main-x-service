@@ -28,7 +28,7 @@ locations and parties).
 ```bash
 # From the repo root because the Dockerfile pulls in the sibling
 # course-matcher crate via the path dependency.
-cd course-service-with-loco
+cd course/course-service-with-loco
 cp .env.example .env
 
 # Brings up postgres + course-service.

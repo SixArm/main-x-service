@@ -122,7 +122,10 @@ async fn fhir_event_returns_501_not_implemented() {
         .await
         .unwrap();
     let s = String::from_utf8(body.to_vec()).unwrap();
-    assert!(s.contains("OperationOutcome"), "expected OperationOutcome, got {s}");
+    assert!(
+        s.contains("OperationOutcome"),
+        "expected OperationOutcome, got {s}"
+    );
 }
 
 /// An empty `name` is rejected with `422 Unprocessable Entity`.

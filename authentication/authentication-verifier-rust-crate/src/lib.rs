@@ -314,8 +314,8 @@ impl Verifier {
         //    footer is authenticated (covered by the signature), so reading
         //    the `kid` here and feeding the same footer back to `try_verify`
         //    is safe: tampering with it fails the signature check in step 4.
-        let untrusted = UntrustedToken::try_parse(token)
-            .map_err(|err| VerifyError::Paseto(err.to_string()))?;
+        let untrusted =
+            UntrustedToken::try_parse(token).map_err(|err| VerifyError::Paseto(err.to_string()))?;
         let footer = untrusted
             .footer_str()
             .map_err(|err| VerifyError::Paseto(err.to_string()))?
@@ -521,7 +521,10 @@ mod tests {
     fn expired_token_is_rejected() {
         let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
         let token = sign(KID, &claims(-10_000_000_000));
-        assert!(matches!(verifier.verify(&token), Err(VerifyError::Claim(_))));
+        assert!(matches!(
+            verifier.verify(&token),
+            Err(VerifyError::Claim(_))
+        ));
     }
 
     #[test]
@@ -530,7 +533,10 @@ mod tests {
         let mut c = claims(3600);
         c.nbf = Some(1_900_000_000); // year 2030, after the real clock
         let token = sign(KID, &c);
-        assert!(matches!(verifier.verify(&token), Err(VerifyError::Claim(_))));
+        assert!(matches!(
+            verifier.verify(&token),
+            Err(VerifyError::Claim(_))
+        ));
     }
 
     #[test]
@@ -538,7 +544,10 @@ mod tests {
         let verifier =
             Verifier::from_paseto_keys_value(&test_keys(), ISSUER, "some-other-service").unwrap();
         let token = sign(KID, &claims(3600));
-        assert!(matches!(verifier.verify(&token), Err(VerifyError::Claim(_))));
+        assert!(matches!(
+            verifier.verify(&token),
+            Err(VerifyError::Claim(_))
+        ));
     }
 
     #[test]
@@ -546,7 +555,10 @@ mod tests {
         let verifier =
             Verifier::from_paseto_keys_value(&test_keys(), "some-other-issuer", AUDIENCE).unwrap();
         let token = sign(KID, &claims(3600));
-        assert!(matches!(verifier.verify(&token), Err(VerifyError::Claim(_))));
+        assert!(matches!(
+            verifier.verify(&token),
+            Err(VerifyError::Claim(_))
+        ));
     }
 
     #[test]
@@ -655,8 +667,7 @@ mod tests {
     #[cfg(feature = "fetch")]
     #[tokio::test]
     async fn from_paseto_keys_url_maps_transport_error_to_fetch() {
-        let result =
-            Verifier::from_paseto_keys_url("not-a-url://nowhere", ISSUER, AUDIENCE).await;
+        let result = Verifier::from_paseto_keys_url("not-a-url://nowhere", ISSUER, AUDIENCE).await;
         assert!(matches!(result, Err(VerifyError::Fetch(_))));
     }
 }

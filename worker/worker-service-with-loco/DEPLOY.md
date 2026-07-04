@@ -1,6 +1,7 @@
 # Worker Service - Deployment Guide
 
-This guide covers deploying the Worker Service using Docker and Docker Compose.
+This guide covers deploying the Worker Service using Podman and Podman Compose. (The compose files keep their
+`docker-compose.yml` names, which `podman compose` reads as-is.)
 
 ## Table of Contents
 
@@ -17,13 +18,13 @@ This guide covers deploying the Worker Service using Docker and Docker Compose.
 
 ### Required Software
 
-- **Docker**: Version 20.10 or later
-- **Docker Compose**: Version 2.0 or later
+- **Podman**: Version 4.0 or later
+- **Podman Compose**: the built-in `podman compose` subcommand
 
 ### Verify Installation
 
 ```bash
-docker --version
+podman --version
 podman compose --version
 ```
 
@@ -32,8 +33,8 @@ podman compose --version
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/your-org/worker-service-with-loco.git
-cd worker-service-with-loco
+git clone https://github.com/SixArm/main-x-service.git
+cd main-x-service/worker/worker-service-with-loco
 ```
 
 ### 2. Configure Environment
@@ -123,17 +124,17 @@ nano .env.production
 podman build -t worker-server:latest .
 
 # Tag for registry
-docker tag worker-server:latest your-registry.com/worker_service-server:v1.0.0
+podman tag worker-server:latest your-registry.com/worker_service-server:v1.0.0
 ```
 
 ### 3. Push to Container Registry
 
 ```bash
 # Login to your container registry
-docker login your-registry.com
+podman login your-registry.com
 
 # Push image
-docker push your-registry.com/worker_service-server:v1.0.0
+podman push your-registry.com/worker_service-server:v1.0.0
 ```
 
 ### 4. Deploy to Production Server
@@ -143,10 +144,10 @@ docker push your-registry.com/worker_service-server:v1.0.0
 ssh production-server
 
 # Pull latest image
-docker pull your-registry.com/worker_service-server:v1.0.0
+podman pull your-registry.com/worker_service-server:v1.0.0
 
 # Start with production compose file
-podman compose -f podman compose.production.yml up -d
+podman compose --env-file .env.production up -d
 ```
 
 ### 5. Production Checklist
@@ -164,7 +165,7 @@ podman compose -f podman compose.production.yml up -d
 
 ## Testing Deployment
 
-Run the full test suite using Docker Compose:
+Run the full test suite using Podman Compose:
 
 ```bash
 # Build test image and run tests
@@ -231,7 +232,7 @@ RUST_LOG=info
 RUST_BACKTRACE=0
 ```
 
-### Docker Compose Profiles
+### Compose Profiles
 
 #### Default Profile
 
@@ -306,7 +307,7 @@ The server includes a health check endpoint:
 curl http://localhost:8080/api/health
 ```
 
-### Docker Health Checks
+### Container Health Checks
 
 Health checks are configured in `docker-compose.yml`:
 
@@ -315,7 +316,7 @@ Health checks are configured in `docker-compose.yml`:
 podman compose ps
 
 # View health check logs
-docker inspect worker-server --format='{{json .State.Health}}'
+podman inspect worker-server --format='{{json .State.Health}}'
 ```
 
 ### Logs
@@ -343,10 +344,10 @@ TODO: Implement Prometheus metrics endpoint
 
 ```bash
 # View resource usage
-docker stats
+podman stats
 
 # View resource usage for specific container
-docker stats worker-server
+podman stats worker-server
 ```
 
 ## Troubleshooting
@@ -415,7 +416,7 @@ DATABASE_MAX_CONNECTIONS=5
 DATABASE_MIN_CONNECTIONS=1
 ```
 
-**Set Docker memory limits**:
+**Set container memory limits**:
 
 ```yaml
 # In docker-compose.yml
@@ -454,10 +455,10 @@ podman compose exec -T postgres psql -U worker_user worker_service < backup-2023
 
 ```bash
 # Backup search index
-docker cp worker-server:/app/data/search_index ./search_index_backup
+podman cp worker-server:/app/data/search_index ./search_index_backup
 
 # Restore search index
-docker cp ./search_index_backup worker-server:/app/data/search_index
+podman cp ./search_index_backup worker-server:/app/data/search_index
 podman compose restart worker-server
 ```
 
@@ -466,8 +467,8 @@ podman compose restart worker-server
 1. **Use Strong Passwords**: Generate cryptographically strong passwords
 2. **Enable SSL**: Use SSL for database connections in production
 3. **Limit Network Exposure**: Only expose necessary ports
-4. **Regular Updates**: Keep Docker images and dependencies updated
-5. **Secrets Management**: Use Docker secrets or environment variable injection
+4. **Regular Updates**: Keep container images and dependencies updated
+5. **Secrets Management**: Use Podman secrets or environment variable injection
 6. **Run as Non-Root**: Container runs as `worker` user (UID 1000)
 7. **Resource Limits**: Set memory and CPU limits in production
 8. **Log Management**: Rotate logs and avoid logging sensitive data

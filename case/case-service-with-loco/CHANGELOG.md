@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- `src/auth.rs` test-module imports had rustfmt drift (an over-long
+  `rusty_paseto` `use` line) that broke the crate's `cargo fmt --check`
+  gate. Reformatted with `cargo fmt`; no behavioural change, tests
+  unchanged and green.
+
 ### Changed
 
 - **Auth pivot.** The family
