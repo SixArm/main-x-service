@@ -9,6 +9,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Boot-time PASETO key-set fetch over HTTP.** New env var
+  `ORGANIZATION_PASETO_KEYS_URL`: when set, the service fetches the
+  auth-service's published Ed25519 key set once at boot
+  (`Verifier::from_paseto_keys_url`, `authentication-verifier` `fetch`
+  feature) from `App::after_routes` via the new `auth::init_from_env`,
+  seeding the process-wide verifier before serving. The fetched key set
+  wins over `ORGANIZATION_PASETO_KEYS` (`tracing::info!`); any fetch
+  failure logs a warning and falls back to the env key set, so the
+  service always boots. Unset/blank URL keeps the prior env-injection
+  behaviour exactly. Fetch-once only — a periodic refresh loop on key
+  rotation is tracked as a future spec item (spec §16). Tests: a local
+  ephemeral-port HTTP listener serving the test key set (the fetch-built
+  verifier accepts a token signed by that key), a fast-failing-URL
+  fallback pin (no panic), and a no-URL env-path pin. (Spec §7 env
+  table + §13 fetch follow-up.)
+
 ### Fixed
 
 - **`cargo fmt` drift.** Reformatted `src/auth.rs` and

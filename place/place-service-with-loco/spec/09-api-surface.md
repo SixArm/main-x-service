@@ -33,6 +33,21 @@ argument requires a valid `Authorization: Bearer <paseto>` token,
 verified offline (PASETO `v4.public`, Ed25519) against the
 auth-service published key set (see §13 T-8).
 
+Key-set configuration (issuer/audience from `PLACE_TOKEN_ISSUER` /
+`PLACE_TOKEN_AUDIENCE`, defaults `authentication-service` /
+`main-x-service`):
+
+- `PLACE_PASETO_KEYS_URL` set (non-blank) — the key-set JSON is
+  fetched over HTTP **once at boot** (async, in `after_routes`, before
+  the routers/middleware capture the verifier) from the auth service
+  (normally `/.well-known/paseto-keys`). A successful fetch **wins**
+  over `PLACE_PASETO_KEYS`; a failed fetch warn-logs and falls back to
+  the env path. No refresh loop (rotation re-fetch is roadmap, §15).
+- Unset/blank — the key set comes from the `PLACE_PASETO_KEYS` env
+  var; absent/unparseable ⇒ an empty reject-all key set.
+
+Either way the service **always boots**.
+
 Blanket enforcement: when the default-off `PLACE_REQUIRE_AUTH` env
 flag is truthy (`1`/`true`/`yes`/`on`, case-insensitive; read at
 router construction — restart to change), an Axum middleware on both
@@ -40,6 +55,6 @@ router surfaces requires a valid bearer token on **every** route
 except the public allow-list — `/api/health`, `/_health`, `/_ping`,
 `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom` (constants
 `auth::PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES`). Unauthenticated
-requests to any other path get `401`. Roles and boot-time HTTP key
-fetch are the T-8 remainder.
+requests to any other path get `401`. Roles are the only T-8
+remainder (boot-time HTTP key fetch landed 2026-07-04).
 

@@ -84,6 +84,7 @@ embedded library; soft-delete with audit-friendly timestamps.
 | Variable | Default | Purpose |
 |---|---|---|
 | `ORGANIZATION_PASETO_KEYS` | empty key set | Published Ed25519 public-key set (`paseto-keys` JSON) for offline PASETO v4.public token verification (`src/auth.rs`). |
+| `ORGANIZATION_PASETO_KEYS_URL` | unset ⇒ no fetch | When set, fetch the key set over HTTP **once at boot** (`Verifier::from_paseto_keys_url`, typically the auth-service `/.well-known/paseto-keys`; seeded from `App::after_routes` via `auth::init_from_env`). Success ⇒ the fetched set wins over `ORGANIZATION_PASETO_KEYS`; failure ⇒ warn + fall back to the env key set — the service always boots. No refresh loop (periodic re-fetch on key rotation is a future item, §16). |
 | `ORGANIZATION_TOKEN_ISSUER` | `authentication-service` | Expected `iss` (see [`authentication-sessions.md`](../../../agents/share/authentication-sessions.md) §5 claims). |
 | `ORGANIZATION_TOKEN_AUDIENCE` | `main-x-service` | Expected `aud` (see [`authentication-sessions.md`](../../../agents/share/authentication-sessions.md) §5 claims). |
 | `ORGANIZATION_REQUIRE_AUTH` | unset ⇒ **off** | Blanket `/api/*` enforcement (credential is now a PASETO v4.public token or BFF cookie session). Lenient bool: `1`/`true`/`yes`/`on` ⇒ on; else off. See [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md) (credential superseded by [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)). |
@@ -246,8 +247,20 @@ personal data — honour GDPR when the privacy layer lands (§13).
     [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md)
     (credential now PASETO per `authentication-sessions.md`; `enforce()`
     shape unchanged).
-  - [ ] paseto-keys-over-HTTP fetch at boot (vs env injection) — fetch +
-    cache the auth-service `/.well-known/paseto-keys` at startup — follow-up.
+  - [x] paseto-keys-over-HTTP fetch at boot (vs env injection) — fetch +
+    cache the auth-service `/.well-known/paseto-keys` at startup.
+    **Done 2026-07-04:** new `ORGANIZATION_PASETO_KEYS_URL` env var (§7);
+    when set, `auth::init_from_env` (called from `App::after_routes`
+    before serving) fetches the key set once via
+    `Verifier::from_paseto_keys_url` (`authentication-verifier` `fetch`
+    feature) and seeds the process-wide verifier — fetched set wins
+    (`tracing::info!`); on fetch failure it warns and falls back to the
+    `ORGANIZATION_PASETO_KEYS` env path, so the service always boots.
+    Unset/blank URL ⇒ prior behaviour exactly. Fetch-once only; a
+    periodic refresh loop on key rotation stays future work (§16).
+    Tests: local ephemeral-port HTTP listener serving the test key set
+    (fetched verifier accepts a token signed by that key) + fast-failing
+    URL fallback (no panic) + no-URL env path.
 - [ ] Bulk import / export — adopt the family contract
   ([`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md)):
   `bulk_jobs` migration, the five `/api/v1/organizations/{import,export,bulk-jobs}`
@@ -271,7 +284,9 @@ frozen for `/events/recent`); name search (`ILIKE`); record merge
 **PASETO v4.public** verification (`AuthUser`/`MaybeAuthUser`, `/whoami`,
 audit + merge `actor` from the token) per
 [`authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
-— originally shipped against RS256-JWT/JWKS, since switched (§13);
+— originally shipped against RS256-JWT/JWKS, since switched (§13) —
+including the boot-time paseto-keys-over-HTTP fetch
+(`ORGANIZATION_PASETO_KEYS_URL`, fetch-once, env fallback; §7, §13);
 OpenAPI 3 + Swagger UI; Prometheus
 metrics (`/metrics.prom`, root + public, CRUD/merge counters); DB-free
 tests;
@@ -290,6 +305,9 @@ superseding the RS256-JWT model).
 - Should identifiers/address be normalised into their own tables (vs the
   single JSONB payload) once search lands?
 - Real-time duplicate check on create (409) vs the explicit endpoint?
+- Periodic re-fetch of the PASETO key set (key rotation) — the boot
+  fetch (§7 `ORGANIZATION_PASETO_KEYS_URL`) runs once; is a refresh
+  loop (or refetch-on-`UnknownKid`) needed before rotation goes live?
 
 ## 17. References
 

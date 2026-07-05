@@ -100,7 +100,10 @@ impl Hooks for App {
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }
-    /// Wrap the assembled router in the blanket JWT-enforcement layer.
+    /// Seed the process-wide token verifier (fetching the PASETO key set
+    /// over HTTP once when `CARE_PATHWAY_PASETO_KEYS_URL` is set; env /
+    /// reject-all fallback otherwise — the boot never fails on it), then
+    /// wrap the assembled router in the blanket auth-enforcement layer.
     ///
     /// Layered unconditionally; [`require_auth_mw`] is a near-noop unless
     /// `CARE_PATHWAY_REQUIRE_AUTH` is on (see [`auth::require_auth`]).
@@ -109,7 +112,10 @@ impl Hooks for App {
     ///
     /// Infallible here; the signature is loco's.
     async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
-        // Blanket JWT enforcement, off by default and gated per-request by
+        // Seed the verifier before serving so `enforce()`/`AuthUser`
+        // consult the boot-fetched key set from the first request on.
+        auth::init_from_env().await;
+        // Blanket auth enforcement, off by default and gated per-request by
         // `CARE_PATHWAY_REQUIRE_AUTH` (see `auth::require_auth`). Wired
         // unconditionally; the flag is the only switch.
         Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))

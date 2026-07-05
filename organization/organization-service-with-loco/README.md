@@ -79,10 +79,12 @@ default run stays green without a database. Validation failures
 Done: CRUD + matching + name search (`ILIKE`) + audit log + event
 streaming + record merge + OpenAPI/Swagger + Prometheus metrics
 (`/metrics.prom`) + offline PASETO v4.public verification (blanket
-`/api/*` enforcement is wired, default-off). Still deferred (see
+`/api/*` enforcement is wired, default-off; the published key set is
+fetched over HTTP once at boot when `ORGANIZATION_PASETO_KEYS_URL` is
+set, with warn + env fallback). Still deferred (see
 [spec §13](./spec/index.md)): Tantivy full-text search, per-field
-privacy/GDPR export, published-key-over-HTTP fetch at boot, and richer
-validation. Auth is provided by the central
+privacy/GDPR export, a key-set refresh loop (the boot fetch runs once),
+and richer validation. Auth is provided by the central
 [authentication-service](../../authentication/authentication-service-with-loco).
 
 Auth pivot done in this crate: the family moved from RS256 JWT + JWKS to

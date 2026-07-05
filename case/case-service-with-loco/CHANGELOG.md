@@ -9,6 +9,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Boot-time paseto-keys-over-HTTP fetch** (the spec §13 follow-up, done
+  2026-07-04). New optional env var `CASE_PASETO_KEYS_URL`: when set
+  (non-blank), `auth::init` — called from `App::after_routes`, before the
+  app serves traffic — fetches the auth-service's published Ed25519 key
+  set once over HTTP via `Verifier::from_paseto_keys_url` (the
+  `authentication-verifier` crate's `fetch` feature, now enabled). On
+  success the fetched key set **wins** over the `CASE_PASETO_KEYS` env
+  key set (`tracing::info!`); on failure the service logs a
+  `tracing::warn!` and falls back to the env path, so it **always
+  boots**. Unset/blank ⇒ prior behaviour unchanged (env key set, else
+  empty reject-all). Fetch is once-at-boot only — no refresh loop
+  (rotation-triggered refetch is tracked in spec §16). The seeding is
+  idempotent (`OnceLock`), and the fetch-or-fallback helper
+  (`auth::fetch_or`) is dependency-injected (URL / issuer / audience /
+  fallback passed in) so tests cover it without the process global: a
+  `#[tokio::test]` local ephemeral-port HTTP listener proves a token
+  signed by the served key verifies via the fetch-built verifier, and a
+  fast-failing URL (`http://127.0.0.1:1/`) proves fallback without
+  panic. Existing env-key auth tests unchanged and green.
+
 ### Fixed
 
 - `src/auth.rs` test-module imports had rustfmt drift (an over-long

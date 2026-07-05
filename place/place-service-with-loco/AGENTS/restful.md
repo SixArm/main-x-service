@@ -170,10 +170,20 @@ Bearer tokens are PASETO `v4.public` (Ed25519) minted by the central
 authentication-service and verified **offline** against its published
 key set (`/.well-known/paseto-keys`) via the `authentication-verifier`
 crate — no shared secret, no introspection call. Configure with
-`PLACE_PASETO_KEYS` (key-set JSON), `PLACE_TOKEN_ISSUER`, and
-`PLACE_TOKEN_AUDIENCE` (defaults `authentication-service` /
+`PLACE_PASETO_KEYS_URL` (boot-time HTTP fetch of the key set) or
+`PLACE_PASETO_KEYS` (key-set JSON via env), plus `PLACE_TOKEN_ISSUER`
+and `PLACE_TOKEN_AUDIENCE` (defaults `authentication-service` /
 `main-x-service`). Handlers opt in by taking an `AuthUser`
 argument (`src/api/rest/auth.rs`).
+
+Key-set precedence (`state::boot_verifier`, run in `after_routes`
+before the routers/middleware capture the verifier): when
+`PLACE_PASETO_KEYS_URL` is set (non-blank) the key set is fetched over
+HTTP **once at boot** and, on success, **wins** over
+`PLACE_PASETO_KEYS`; a fetch failure logs a warning and falls back to
+the env path. Unset/blank ⇒ `PLACE_PASETO_KEYS`, else an empty
+reject-all key set. The service **always boots**; there is no refresh
+loop (key-rotation re-fetch is a roadmap item, spec §15).
 
 #### Blanket enforcement (default-off)
 
@@ -197,4 +207,4 @@ via `axum::middleware::from_fn_with_state` on both router surfaces
 read once at router construction — restart the service to change it.
 Unauthenticated requests to any non-public path return `401`. See
 `agents/share/jwt-enforcement.md` for the family-wide contract; roles
-and boot-time HTTP key fetch remain open (spec §13 T-8).
+remain the only open auth item (spec §13 T-8).

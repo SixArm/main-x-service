@@ -17,15 +17,20 @@ on validation failure.
 Authentication is opt-in per handler by default: taking an `AuthUser`
 argument requires a valid `Authorization: Bearer <paseto>` token,
 verified offline (PASETO `v4.public`, Ed25519) against the auth-service
-published key set (see §13 T-1a). **Blanket enforcement** (§13 T-1b) is
+published key set (see §13 T-1a). The key set comes from
+`WORKER_PASETO_KEYS` (key-set JSON), or — when `WORKER_PASETO_KEYS_URL`
+is set — is fetched once at boot from that URL
+(`/.well-known/paseto-keys` on the auth service); the fetched set wins
+over the env key set, and any fetch failure logs a warning and falls
+back to the env path, so the service **always boots** (§13 T-1b fetch
+item; no refresh loop). **Blanket enforcement** (§13 T-1b) is
 implemented and **off by default**: when `WORKER_REQUIRE_AUTH` is truthy
 (`1`/`true`/`yes`/`on`; read once at router construction — restart to
 change), every route on both router surfaces requires a valid bearer
 token and returns `401` otherwise, except the public allow-list:
 `/_health`, `/_ping`, `/api/v1/health`, `/api-docs/openapi.json`,
 `/metrics.prom`, and `/swagger-ui*`. The `/fhir` surface is deliberately
-protected (worker PII). Remaining T-1b follow-ups: RBAC roles and
-boot-time key-set fetch over HTTP.
+protected (worker PII). Remaining T-1b follow-up: RBAC roles.
 
 ### 9.1 Cross-service link endpoints
 

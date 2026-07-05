@@ -38,9 +38,10 @@ Matching is **within a collection only** — a project never matches a
 product (enforced by the matcher's `kind` gate, §5/§9.2).
 Deferred (§13): Tantivy full-text/fuzzy search, search-blocked dedup
 candidates, durable event bus Phases 2–3 (outbox → Fluvio), privacy,
-front-end merge action, paseto-keys-over-HTTP fetch at boot, bulk import/export,
+front-end merge action, bulk import/export,
 gRPC, and the deferred `posts` / `comments` / `members` collaboration
-sub-resources. Token **issuance** is out of scope — provided by the central
+sub-resources. (The paseto-keys-over-HTTP fetch at boot landed
+2026-07-04 — `PORTFOLIO_PASETO_KEYS_URL`, §9.6/§13.) Token **issuance** is out of scope — provided by the central
 authentication-service. Auth source of truth (supersedes the RS256-JWT
 model): [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
 
@@ -295,6 +296,13 @@ on). When on, any `/api/*` route without a valid token is `401`; the
 public paths `/_health`, `/_ping`, `/api-docs/openapi.json`,
 `/swagger-ui*`, and `/metrics.prom` stay open (via
 `src/auth.rs::is_public_path`). Keys/issuer/audience come from
+`PORTFOLIO_PASETO_KEYS_URL` (optional URL of the auth-service's published
+key set, e.g. `https://auth…/.well-known/paseto-keys`; set ⇒ fetched over
+HTTP **once at boot** in `App::after_routes` via `auth::init` /
+`Verifier::from_paseto_keys_url` — on success the fetched key set wins
+over `PORTFOLIO_PASETO_KEYS`, on failure the service logs a warning and
+falls back to the env path, so it always boots; no refresh loop — a
+rotation-triggered refetch is a future item, §16) /
 `PORTFOLIO_PASETO_KEYS` (the auth-service's published Ed25519 public-key
 set; absent ⇒ empty key set, all tokens rejected) / `PORTFOLIO_TOKEN_ISSUER`
 (default `authentication-service`) / `PORTFOLIO_TOKEN_AUDIENCE` (default
@@ -471,8 +479,18 @@ HIPAA/NHS/GDPR posture for audit and access controls.
     headers, verifier)` + an `after_routes` layer, gated per-request by
     `PORTFOLIO_REQUIRE_AUTH` (off by default). Public paths stay open.
     Family contract: `agents/share/jwt-enforcement.md`.
-  - [ ] paseto-keys-over-HTTP fetch from the auth service at boot
-    (env-injected today).
+  - [x] paseto-keys-over-HTTP fetch at boot — done 2026-07-04.
+    `PORTFOLIO_PASETO_KEYS_URL` set (non-blank) ⇒ `auth::init` (called
+    from `App::after_routes`, before serving) fetches the published key
+    set once via `Verifier::from_paseto_keys_url` (verifier `fetch`
+    feature); success ⇒ fetched key set wins over
+    `PORTFOLIO_PASETO_KEYS` (`tracing::info!`), failure ⇒
+    `tracing::warn!` + fall back to the env path (the service always
+    boots); unset/blank ⇒ prior behaviour unchanged. No refresh loop
+    (rotation-triggered refetch → §16). Tests: a `#[tokio::test]` local
+    ephemeral-port HTTP listener proves the fetch-built verifier accepts
+    a token signed by the served key, and a fast-failing URL
+    (`http://127.0.0.1:1/`) proves fallback without panic.
 - [ ] Privacy — masking of lead / assignee / person refs on read +
   export; GDPR obligations for those people.
 - [ ] Bulk import/export — `bulk_jobs` migration + the five endpoints per
@@ -509,9 +527,11 @@ offline PASETO v4 public verification + blanket `/api/*` enforcement (auth
 source of truth, superseding the RS256-JWT model:
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 Next (deferred, §13): Tantivy full-text/fuzzy search, durable event bus
-Phases 2–3 (outbox → Fluvio), paseto-keys-over-HTTP fetch at boot, privacy,
+Phases 2–3 (outbox → Fluvio), privacy,
 front-end merge action, bulk import/export, the `posts` / `comments` /
-`members` collaboration sub-resources, gRPC.
+`members` collaboration sub-resources, gRPC. (Done since: the
+paseto-keys-over-HTTP fetch at boot, 2026-07-04 —
+`PORTFOLIO_PASETO_KEYS_URL`, fetched key set wins, env fallback.)
 
 ## 16. Open questions
 
@@ -524,6 +544,9 @@ front-end merge action, bulk import/export, the `posts` / `comments` /
 - Should a portfolio's child roll-up (its projects / products / programs)
   be a derived read view on the portfolio (`…/{pid}/children`), or driven
   purely by the front-end querying each child collection by `portfolio_ref`?
+- Key-set refresh: the boot-time paseto-keys fetch is once-only — add a
+  rotation-triggered refetch (e.g. on `UnknownKid`) or a periodic
+  refresh loop?
 
 ## 17. References
 
@@ -538,5 +561,3 @@ front-end merge action, bulk import/export, the `posts` / `comments` /
 Update this spec with any behavioural change; bump `CHANGELOG.md`. When
 the integration contract changes, also update the
 [portfolio entity spec](../../spec/index.md).
-</content>
-</invoke>

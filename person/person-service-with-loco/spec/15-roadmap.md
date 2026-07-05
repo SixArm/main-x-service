@@ -5,10 +5,12 @@ and accept.
 
 - **Authentication & authorisation** — blanket PASETO enforcement on
   `/api/*` landed as T-1b (default-off behind `PERSON_REQUIRE_AUTH`;
-  peer PASETO v4.public verification landed as T-1a); still open:
-  boot-time key fetch + RBAC (T-1c), operational activation of the
-  flag once the SSO token flow is live, rate limiting, user
-  endpoints, security headers.
+  peer PASETO v4.public verification landed as T-1a; boot-time key-set
+  fetch behind `PERSON_PASETO_KEYS_URL` landed as the T-1c fetch item);
+  still open: RBAC (T-1c), periodic key-set refresh / refetch on
+  `UnknownKid` (today the fetch is once at boot only), operational
+  activation of the flag once the SSO token flow is live, rate
+  limiting, user endpoints, security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`person_created`, `match_score_histogram`,
   …), Grafana dashboards + alerting.

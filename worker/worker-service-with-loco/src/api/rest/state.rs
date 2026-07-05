@@ -129,18 +129,79 @@ fn env_or(name: &str, default: &str) -> String {
 /// - `WORKER_TOKEN_AUDIENCE` — expected `aud` (default
 ///   `main-x-service`).
 ///
-/// Fetching the key set over HTTP from the auth service at boot (instead
-/// of injecting it via env) is a follow-up — see spec §13.
+/// For the boot-time HTTP fetch of the key set
+/// (`WORKER_PASETO_KEYS_URL`), see [`verifier_from_env_or_fetch`].
 fn verifier_from_env() -> Verifier {
     let issuer = env_or("WORKER_TOKEN_ISSUER", DEFAULT_ISSUER);
     let audience = env_or("WORKER_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+    env_keys_verifier(&issuer, &audience)
+}
+
+/// The `WORKER_PASETO_KEYS` env-key-set path with an explicit issuer /
+/// audience: parse the key-set JSON from the variable, or fall back to
+/// an empty (reject-all) set so the service always boots.
+fn env_keys_verifier(issuer: &str, audience: &str) -> Verifier {
     let keys = std::env::var("WORKER_PASETO_KEYS")
         .ok()
         .filter(|s| !s.trim().is_empty())
         .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
         .unwrap_or_else(|| serde_json::json!({ "keys": [] }));
-    Verifier::from_paseto_keys_value(&keys, &issuer, &audience)
-        .unwrap_or_else(|_| empty_verifier(&issuer, &audience))
+    Verifier::from_paseto_keys_value(&keys, issuer, audience)
+        .unwrap_or_else(|_| empty_verifier(issuer, audience))
+}
+
+/// Build the boot-time PASETO verifier, preferring an HTTP fetch of the
+/// key set (spec §13 T-1b fetch item). Reads:
+///
+/// - `WORKER_PASETO_KEYS_URL` — URL of the auth-service published key
+///   set (`/.well-known/paseto-keys`). **Unset/blank** ⇒ exactly the
+///   env-key-set path ([`verifier_from_env`]). **Set** ⇒ fetch once at
+///   boot; on success the fetched key set **wins** over
+///   `WORKER_PASETO_KEYS`; on failure (network/HTTP/parse) log a
+///   warning and fall back to the env path — the service always boots,
+///   auth-service downtime never prevents startup.
+/// - `WORKER_TOKEN_ISSUER` / `WORKER_TOKEN_AUDIENCE` — expected `iss` /
+///   `aud`, same defaults as [`verifier_from_env`].
+///
+/// The fetch happens once at boot; there is no refresh loop (periodic
+/// refresh is a possible future item — spec §15).
+pub async fn verifier_from_env_or_fetch() -> Verifier {
+    let issuer = env_or("WORKER_TOKEN_ISSUER", DEFAULT_ISSUER);
+    let audience = env_or("WORKER_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+    let url = std::env::var("WORKER_PASETO_KEYS_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty());
+    verifier_from_url_or_env(url.as_deref(), &issuer, &audience).await
+}
+
+/// Core of [`verifier_from_env_or_fetch`], parameterised on the URL so
+/// it is unit-testable without touching the process environment.
+/// `None` ⇒ the `WORKER_PASETO_KEYS` env path; `Some(url)` ⇒ fetch via
+/// [`Verifier::from_paseto_keys_url`] — the fetched set wins on
+/// success, the env path is the fallback on any fetch error. Never
+/// panics; the service always gets a verifier.
+pub async fn verifier_from_url_or_env(url: Option<&str>, issuer: &str, audience: &str) -> Verifier {
+    let Some(url) = url else {
+        return env_keys_verifier(issuer, audience);
+    };
+    match Verifier::from_paseto_keys_url(url, issuer, audience).await {
+        Ok(verifier) => {
+            tracing::info!(
+                url,
+                key_count = verifier.key_count(),
+                "PASETO key set fetched at boot; fetched set overrides WORKER_PASETO_KEYS"
+            );
+            verifier
+        }
+        Err(error) => {
+            tracing::warn!(
+                url,
+                error = %error,
+                "PASETO key set fetch failed; falling back to the WORKER_PASETO_KEYS env path"
+            );
+            env_keys_verifier(issuer, audience)
+        }
+    }
 }
 
 /// A verifier with no keys: every token is rejected until a real key set

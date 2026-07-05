@@ -109,11 +109,13 @@ audit log + in-memory event streaming (durable-bus Phase 1) +
 OpenAPI/Swagger + Prometheus metrics + offline PASETO v4.public
 verification + blanket `/api/*` auth enforcement (off by default, gated
 by `CARE_PATHWAY_REQUIRE_AUTH`) + rich payload validation
-(ICD/SNOMED/UUID/DOI/BCP-47). Deferred (see [spec §13](./spec/index.md)):
+(ICD/SNOMED/UUID/DOI/BCP-47) + boot-time published-key fetch over HTTP
+(once, when `CARE_PATHWAY_PASETO_KEYS_URL` is set, with warn + env
+fallback). Deferred (see [spec §13](./spec/index.md)):
 Tantivy full-text/fuzzy search, search-blocked dedup candidates, durable
 event bus Phases 2–3 (outbox → Fluvio), privacy, front-end merge action,
-and published-key-over-HTTP fetch at boot. Token issuance is provided by
-the central
+and a key-set refresh loop (the boot fetch runs once). Token issuance is
+provided by the central
 [authentication-service](../../authentication/authentication-service-with-loco).
 
 Auth pivot done in this crate: the family moved from RS256 JWT + JWKS to

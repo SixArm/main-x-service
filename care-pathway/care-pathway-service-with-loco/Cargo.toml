@@ -43,7 +43,9 @@ prometheus = { version = "0.13" }
 care-pathway-matcher = { path = "../care-pathway-matcher-rust-crate" }
 
 # Offline PASETO v4.public verification against the authentication-service Ed25519 keys (local path; monorepo 0.2 verifier).
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
+# The `fetch` feature adds `Verifier::from_paseto_keys_url` for the boot-time
+# key-set fetch (`CARE_PATHWAY_PASETO_KEYS_URL`; see src/auth.rs).
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 
 [[bin]]
 name = "care-pathway-service"
@@ -61,3 +63,10 @@ ed25519-dalek = { version = "2.2" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 sha2 = { version = "0.10" }
 base64 = { version = "0.22" }
+# `macros` + `net` power the boot-time key-set fetch tests in src/auth.rs
+# (#[tokio::test] + an ephemeral-port TcpListener serving the key set).
+tokio = { version = "1.52", default-features = false, features = [
+  "macros",
+  "net",
+  "rt-multi-thread",
+] }

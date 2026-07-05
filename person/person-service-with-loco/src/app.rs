@@ -24,7 +24,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, auth, metrics_routes, persons_routes},
+    api::rest::{ApiDoc, AppState, auth, metrics_routes, persons_routes, state},
     config::Config,
     matching::ProbabilisticMatcher,
     search::SearchEngine,
@@ -72,7 +72,18 @@ impl Hooks for App {
         let search_engine = SearchEngine::new(&config.search.index_path)
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let matcher = ProbabilisticMatcher::new(config.matching.clone());
-        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
+        // Boot-time PASETO key-set fetch (`PERSON_PASETO_KEYS_URL`, spec
+        // §13 T-1c): resolve the verifier — fetched key set when the URL
+        // is set and reachable, env key set otherwise — BEFORE the
+        // enforcement middleware and the shared-store state are built,
+        // so both router surfaces (the enforcement layer, which
+        // snapshots the verifier here, and the loco handlers' `AuthUser`
+        // extractor, which reads it from the shared-store `AppState`)
+        // verify against the same key set. Fetch failure falls back to
+        // the env path — the service always boots.
+        let verifier = std::sync::Arc::new(state::verifier_from_env_or_fetch().await);
+        let state =
+            AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
         // Blanket auth enforcement (default-off, `PERSON_REQUIRE_AUTH`),
         // snapshotted here at boot — changing the env var requires a
         // restart. Layered unconditionally; the flag is the only switch.

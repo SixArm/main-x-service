@@ -404,4 +404,44 @@ mod tests {
         let err = enforce(true, "/api/things", &bearer(&token), &verifier()).unwrap_err();
         assert_eq!(err.0, StatusCode::UNAUTHORIZED);
     }
+
+    /// Boot-time HTTP key fetch: a local ephemeral-port listener plays
+    /// the auth service's `/.well-known/paseto-keys` role, serving the
+    /// in-process test key set. The fetch-built verifier holds that key
+    /// and accepts a token signed by it — no real auth service needed.
+    #[tokio::test]
+    async fn test_verifier_from_url_fetch_wins() {
+        let keys = test_keys();
+        let app = axum::Router::new().route(
+            "/.well-known/paseto-keys",
+            axum::routing::get(move || async move { Json(keys) }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind ephemeral port");
+        let addr = listener.local_addr().expect("local addr");
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("serve key set");
+        });
+        let url = format!("http://{addr}/.well-known/paseto-keys");
+        let fetched = crate::api::rest::state::verifier_from_url_or_env(&url).await;
+        assert_eq!(fetched.key_count(), 1);
+        let token = sign(10_000_000_000);
+        let claims =
+            bearer_claims(&bearer(&token), &fetched).expect("fetched key set verifies token");
+        assert_eq!(claims.sub, "11111111-1111-1111-1111-111111111111");
+    }
+
+    /// Boot-time HTTP key fetch failure: nothing listens on port 1, so
+    /// the fetch fails fast and the builder falls back to the env path
+    /// without panicking. `THING_PASETO_KEYS` is unset in the test
+    /// environment, so the fallback is the empty reject-all key set —
+    /// the service-always-boots guarantee.
+    #[tokio::test]
+    async fn test_verifier_from_url_failure_falls_back_to_env_path() {
+        let fallback =
+            crate::api::rest::state::verifier_from_url_or_env("http://127.0.0.1:1/").await;
+        assert_eq!(fallback.key_count(), 0);
+        assert!(fallback.verify(&sign(10_000_000_000)).is_err());
+    }
 }

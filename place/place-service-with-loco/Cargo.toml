@@ -89,8 +89,10 @@ argon2 = "0.5"
 # Offline PASETO v4.public verification of authentication-service tokens
 # against its published Ed25519 key set (`/.well-known/paseto-keys`) — no
 # shared secret, no per-request introspection hop (local path — the
-# monorepo's 0.2 PASETO verifier).
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
+# monorepo's 0.2 PASETO verifier). The `fetch` feature adds the boot-time
+# HTTP key-set fetch (`Verifier::from_paseto_keys_url`) used when
+# `PLACE_PASETO_KEYS_URL` is set.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 mimalloc = "0.1.52"
 
 [dev-dependencies]

@@ -92,6 +92,14 @@ impl Hooks for App {
     /// CORS so preflight requests still pass), and a permissive CORS
     /// layer.
     ///
+    /// The PASETO verifier is finalised **first** via
+    /// [`crate::api::rest::state::boot_verifier`] — when
+    /// `EVENT_PASETO_KEYS_URL` is set the key set is fetched over HTTP
+    /// once, here, in async context (fetch failure falls back to the
+    /// `EVENT_PASETO_KEYS` env path; the service always boots) —
+    /// **before** the shared-store insert and the middleware capture
+    /// the state, so both router surfaces consult the fetched key set.
+    ///
     /// # Errors
     ///
     /// Returns a loco error if the domain config cannot be read from the
@@ -101,7 +109,9 @@ impl Hooks for App {
         let search_engine = SearchEngine::new(&config.search.index_path)
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let matcher = ProbabilisticMatcher::new(config.matching.clone());
-        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
+        let verifier = std::sync::Arc::new(crate::api::rest::state::boot_verifier().await);
+        let state =
+            AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
         ctx.shared_store.insert(state.clone());
         let router = router
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))

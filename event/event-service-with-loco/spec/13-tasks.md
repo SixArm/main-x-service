@@ -77,9 +77,28 @@ clearly described manual check confirms the acceptance criterion.
       on + expired / tampered ⇒ `401` — plus the lenient `parse_bool`
       flag parser. Met: `cargo test --lib` green.
   - [ ] Scheduler / admin / read-only / service roles.
-  - [ ] Keys fetched from the authentication-service
-    `/.well-known/paseto-keys` at boot (today the key set is injected
-    via `EVENT_PASETO_KEYS`).
+  - [x] Keys fetched from the authentication-service
+    `/.well-known/paseto-keys` at boot *(done 2026-07-04)* — when the
+    new `EVENT_PASETO_KEYS_URL` env var is set (non-blank),
+    `App::after_routes` (async boot context) calls
+    `state::boot_verifier`, which fetches the key-set JSON once via
+    `Verifier::from_paseto_keys_url` (the `authentication-verifier`
+    `fetch` feature, now enabled on the path dep). A successful fetch
+    **wins** over any `EVENT_PASETO_KEYS` env value (info-logged with
+    the source URL); any fetch failure warn-logs and falls back to the
+    env path (else the empty reject-all set) — the service **always
+    boots**. Unset/blank URL ⇒ prior behaviour exactly. The fetched
+    verifier is installed via `AppState::with_verifier` **before** the
+    shared-store insert and the `require_auth_mw` middleware capture
+    the state, so both router surfaces consult the fetched key set.
+    Fetch happens once at boot; no refresh loop (rotation re-fetch is
+    roadmap — §15).
+    - **Acceptance (boot-time key fetch — met):** DB-free tokio tests
+      in `src/api/rest/auth.rs` — a local ephemeral-port HTTP listener
+      serves the in-process key set and the fetch-built verifier
+      accepts a token signed by that key; a fast-failing URL
+      (`http://127.0.0.1:1/`) falls back to the env/empty path without
+      panic. Met: `cargo test --lib` green.
   - **Acceptance (roles — open):** valid token + role gets `2xx`;
     insufficient role gets `403`.
 - [ ] **T-9 — Bulk import / export.** (§9.1, §10.3;

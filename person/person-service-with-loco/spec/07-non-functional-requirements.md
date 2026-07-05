@@ -12,5 +12,5 @@
 | Fault tolerance | Graceful shutdown; connection pooling; health checks; non-root containers |
 | Observability | OTLP traces / metrics / logs; `traceparent` per request; JSON logs in production |
 | Background jobs | Loco `BackgroundQueue` backed by **PostgreSQL** (`bg_pg`) — same database as application data; no external broker |
-| Security | Offline PASETO v4.public bearer verification against the auth-service published Ed25519 keys; blanket `/api/*` enforcement middleware (T-1b), **default-off** behind `PERSON_REQUIRE_AUTH` with a public allow-list (health, OpenAPI/Swagger, metrics); roles/RBAC + boot-time key fetch are T-1c; TLS at the edge |
+| Security | Offline PASETO v4.public bearer verification against the auth-service published Ed25519 keys; key set from `PERSON_PASETO_KEYS` (JSON) or fetched once at boot from `PERSON_PASETO_KEYS_URL` (fetched set wins; fetch failure warns and falls back to the env path — the service **always boots**); blanket `/api/*` enforcement middleware (T-1b), **default-off** behind `PERSON_REQUIRE_AUTH` with a public allow-list (health, OpenAPI/Swagger, metrics); roles/RBAC is the remaining T-1c item; TLS at the edge |
 

@@ -111,7 +111,14 @@ loco-idiomatic; Postgres persistence; deterministic matching via the
 embedded library; soft-delete with audit-friendly timestamps.
 
 **Configuration (environment).** PASETO keys / verification:
-`CASE_PASETO_KEYS` (the auth-service's published Ed25519 public-key set;
+`CASE_PASETO_KEYS_URL` (optional URL of the auth-service's published key
+set, e.g. `https://auth…/.well-known/paseto-keys`; set ⇒ fetched over
+HTTP **once at boot** in `App::after_routes` via `auth::init` /
+`Verifier::from_paseto_keys_url` — on success the fetched key set wins
+over `CASE_PASETO_KEYS`, on failure the service logs a warning and falls
+back to the env path, so it always boots; no refresh loop — a
+rotation-triggered refetch is a future item, §16), `CASE_PASETO_KEYS`
+(the auth-service's published Ed25519 public-key set;
 absent ⇒ empty key set, all tokens rejected), `CASE_TOKEN_ISSUER`
 (default `authentication-service`), `CASE_TOKEN_AUDIENCE` (default
 `main-x-service`). Access control:
@@ -462,8 +469,19 @@ the other v1 edge kinds even though it shares the same edge shape.
     tests + DB-gated request test). Family contract
     [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md).
     Case data is personal data, so this is the access-control gate.
-  - [ ] paseto-keys-over-HTTP fetch (instead of env injection) remains a
-    follow-up, as does activating the flag (operations decision).
+  - [x] paseto-keys-over-HTTP fetch at boot — done 2026-07-04.
+    `CASE_PASETO_KEYS_URL` set (non-blank) ⇒ `auth::init` (called from
+    `App::after_routes`, before serving) fetches the published key set
+    once via `Verifier::from_paseto_keys_url` (verifier `fetch` feature);
+    success ⇒ fetched key set wins over `CASE_PASETO_KEYS`
+    (`tracing::info!`), failure ⇒ `tracing::warn!` + fall back to the env
+    path (the service always boots); unset/blank ⇒ prior behaviour
+    unchanged. No refresh loop (rotation-triggered refetch → §16). Tests:
+    a `#[tokio::test]` local ephemeral-port HTTP listener proves the
+    fetch-built verifier accepts a token signed by the served key, and a
+    fast-failing URL (`http://127.0.0.1:1/`) proves fallback without
+    panic. Activating the enforcement flag remains an operations
+    decision.
 - [ ] **Cross-service entity links (write side).** See §5, §8.6, §9,
   §10 (§12.1) and
   [cross-service linking](../../../agents/share/cross-service-linking.md).
@@ -547,7 +565,9 @@ identifier / subject / keyword, all problems reported together);
 event streaming on every CRUD/merge (`/audit/recent`, `/{pid}/audit`,
 `/events/recent`, `/merges/recent`); offline PASETO v4 public token
 verification (`AuthUser`/`MaybeAuthUser`, `/whoami`, audit `actor` from
-the token);
+the token) with boot-time key-set fetch over HTTP
+(`CASE_PASETO_KEYS_URL`; fetched key set wins, env fallback, always
+boots);
 OpenAPI 3 doc + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`);
 Prometheus metrics (`/metrics.prom`, root-mounted + public, CRUD counters
 + HTTP request label vec); DB-free tests + gated request-level tests;
@@ -558,8 +578,9 @@ green build + clippy.
 v0.1 (here): CRUD + title search + matching + merge + audit + streaming
 + OpenAPI + offline PASETO v4 public token verification per
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
-(source of truth; supersedes the RS256-JWT model). v0.2: Tantivy
-full-text/fuzzy search, durable event bus, paseto-keys-over-HTTP fetch.
+(source of truth; supersedes the RS256-JWT model) + boot-time
+paseto-keys-over-HTTP fetch (`CASE_PASETO_KEYS_URL`, fetched key set wins,
+env fallback). v0.2: Tantivy full-text/fuzzy search, durable event bus.
 v0.3: privacy controls, blanket `/api/*` enforcement.
 
 ## 16. Open questions
@@ -567,6 +588,9 @@ v0.3: privacy controls, blanket `/api/*` enforcement.
 - Normalise subjects / identifiers into their own tables once search
   lands?
 - Real-time duplicate check on create (409) vs the explicit endpoint?
+- Key-set refresh: the boot-time paseto-keys fetch is once-only — add a
+  rotation-triggered refetch (e.g. on `UnknownKid`) or a periodic
+  refresh loop?
 
 ## 17. References
 

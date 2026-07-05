@@ -4,11 +4,13 @@
   blanket PASETO enforcement on `/api/v1/*` (env-gated
   `EVENT_REQUIRE_AUTH`, default-off middleware landed 2026-07-04; peer
   offline PASETO v4.public verification via the
-  `authentication-verifier` crate also 2026-07-04, per
+  `authentication-verifier` crate and the boot-time
+  `EVENT_PASETO_KEYS_URL` HTTP key-set fetch also 2026-07-04, per
   [authentication-sessions](../../../agents/share/authentication-sessions.md)),
-  activation as an ops decision, published-key HTTP fetch at boot,
-  RBAC for scheduler / admin / read-only / service, rate limiting,
-  security headers.
+  activation as an ops decision, a periodic key-set
+  **re-fetch/refresh loop** for key rotation (today the fetch happens
+  once at boot), RBAC for scheduler / admin / read-only / service,
+  rate limiting, security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`event_created`, `event_duration_seconds`,
   `match_score`), Grafana dashboards + alerting.

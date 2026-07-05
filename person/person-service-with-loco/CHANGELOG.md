@@ -8,6 +8,33 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — boot-time PASETO key-set fetch (`PERSON_PASETO_KEYS_URL`)
+
+- New `PERSON_PASETO_KEYS_URL` env var (spec §13 T-1c fetch item): when
+  set, the auth-service published Ed25519 key set
+  (`/.well-known/paseto-keys`) is fetched **once at boot** via
+  `Verifier::from_paseto_keys_url` (the `authentication-verifier`
+  `fetch` feature, now enabled in Cargo.toml). On success the fetched
+  key set **wins** over `PERSON_PASETO_KEYS` (logged at `info`); on any
+  fetch failure (network / HTTP / parse) a `warn` is logged and the
+  verifier falls back to the `PERSON_PASETO_KEYS` env path — the
+  service **always boots**; auth-service downtime never prevents
+  startup. Unset/blank URL ⇒ prior behaviour exactly. One-shot fetch —
+  no refresh loop (periodic refresh is a spec §15 roadmap note).
+- Wired in the loco `after_routes` hook: the verifier is resolved
+  (`state::verifier_from_env_or_fetch`) and swapped into `AppState` via
+  `with_verifier` **before** the enforcement middleware and the
+  shared-store state are built, so both router surfaces (the
+  enforcement layer and the `AuthUser` extractor) verify against the
+  fetched key set. Issuer/audience still come from
+  `PERSON_TOKEN_ISSUER` / `PERSON_TOKEN_AUDIENCE` (same defaults).
+- New DB-free tokio tests in `src/api/rest/auth.rs` (reusing the
+  in-process PASETO minting helpers): a local ephemeral-port HTTP
+  listener serves the key set and a token signed by that key verifies;
+  a dead port falls back to the env path without panicking; URL-unset
+  uses the env path (precedence).
+- Roles/RBAC remains the open spec §13 T-1c item.
+
 ### Added — blanket auth enforcement (default-off)
 
 - New blanket `/api/*` auth enforcement middleware (spec §13 T-1b; family
@@ -27,7 +54,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   token ⇒ Ok; on + each public path ⇒ Ok; on + protected + no token ⇒
   `401`; on + valid ⇒ Ok; on + expired/tampered ⇒ `401`) and the lenient
   flag-parser semantics, reusing the in-process PASETO minting helpers.
-- Boot-time HTTP key fetch and roles/RBAC remain open as spec §13 T-1c.
+- Boot-time HTTP key fetch has since landed (see the entry above);
+  roles/RBAC remains open as spec §13 T-1c.
 
 ### Changed — auth pivot: RS256 JWT/JWKS → PASETO v4.public
 

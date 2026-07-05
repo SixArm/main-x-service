@@ -104,6 +104,16 @@ crate — no shared secret, no introspection call. Configure with
 `WORKER_TOKEN_AUDIENCE`. Handlers opt in by taking an `AuthUser`
 argument (`src/api/rest/auth.rs`).
 
+**Boot-time key fetch** — set `WORKER_PASETO_KEYS_URL` to the auth
+service's `/.well-known/paseto-keys` URL to fetch the key set once at
+boot instead of injecting it via env. Precedence: unset/blank URL ⇒
+the `WORKER_PASETO_KEYS` env path exactly as before; URL set and the
+fetch succeeds ⇒ the fetched key set **wins** over
+`WORKER_PASETO_KEYS`; URL set but the fetch fails (network / HTTP /
+parse) ⇒ a warning is logged and the env path is used — the service
+**always boots**; auth-service downtime never prevents startup. The
+fetch is one-shot (no refresh loop; restart to pick up a rotation).
+
 **Blanket enforcement (default off).** Setting `WORKER_REQUIRE_AUTH`
 to a truthy value (`1`/`true`/`yes`/`on`, case-insensitive; anything
 else — including unset, blank, `0`, or junk — means off) requires a
@@ -122,8 +132,8 @@ The public allow-list (`PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES` in
 
 The `/fhir` surface is deliberately **not** on the allow-list — it
 serves worker PII. Family-wide contract:
-`agents/share/jwt-enforcement.md`. Remaining follow-ups (spec §13
-T-1b): RBAC roles and boot-time key-set fetch over HTTP.
+`agents/share/jwt-enforcement.md`. Remaining follow-up (spec §13
+T-1b): RBAC roles.
 
 ### Worker CRUD
 

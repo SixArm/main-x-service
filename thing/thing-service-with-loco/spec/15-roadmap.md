@@ -3,11 +3,14 @@
 - **Authentication & authorisation** — roles on top of the delivered
   blanket PASETO enforcement (env-gated `THING_REQUIRE_AUTH`,
   default-off middleware landed 2026-07-04; peer offline PASETO
-  v4.public verification via the `authentication-verifier` crate also
+  v4.public verification via the `authentication-verifier` crate and
+  the boot-time `THING_PASETO_KEYS_URL` HTTP key-set fetch also
   2026-07-04, per
   [authentication-sessions](../../../agents/share/authentication-sessions.md)),
-  activation as an ops decision, published-key HTTP fetch at boot,
-  RBAC, rate limiting, user endpoints, security headers.
+  activation as an ops decision, a periodic key-set
+  **re-fetch/refresh loop** for key rotation (today the fetch happens
+  once at boot), RBAC, rate limiting, user endpoints, security
+  headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`thing_created`, `match_score_histogram`),
   Grafana dashboards + alerting.

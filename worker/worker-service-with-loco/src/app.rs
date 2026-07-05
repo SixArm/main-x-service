@@ -23,7 +23,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, auth, fhir_routes, metrics_routes, workers_routes},
+    api::rest::{ApiDoc, AppState, auth, fhir_routes, metrics_routes, state, workers_routes},
     config::Config,
     matching::ProbabilisticMatcher,
     search::SearchEngine,
@@ -105,8 +105,19 @@ impl Hooks for App {
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         // Build the probabilistic matcher from the matching thresholds.
         let matcher = ProbabilisticMatcher::new(config.matching.clone());
+        // Boot-time PASETO key-set fetch (`WORKER_PASETO_KEYS_URL`, spec
+        // §13 T-1b fetch item): resolve the verifier — fetched key set
+        // when the URL is set and reachable, env key set otherwise —
+        // BEFORE the enforcement middleware and the shared-store state
+        // are built, so both router surfaces (the enforcement layer,
+        // which captures the verifier here, and the handlers' `AuthUser`
+        // extractor, which reads it from the shared-store `AppState`)
+        // verify against the same key set. Fetch failure falls back to
+        // the env path — the service always boots.
+        let verifier = std::sync::Arc::new(state::verifier_from_env_or_fetch().await);
         // Bundle DB handle + singletons into shared application state.
-        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
+        let state =
+            AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
         // Capture the verifier for the enforcement layer before the state
         // moves into the shared store.
         let enforcement_verifier = state.verifier.clone();

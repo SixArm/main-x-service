@@ -61,7 +61,8 @@ projection unchanged (see
 Deferred (spec §13): Tantivy full-text/fuzzy search (title search via
 `ILIKE` is done), search-blocked dedup candidates, durable event bus
 Phases 2–3 (transactional outbox → Fluvio), privacy, front-end merge
-action, blanket `/api/*` auth enforcement + published-key fetch.
+action, blanket `/api/*` auth enforcement activation (the middleware is
+wired, off by default).
 
 > **Auth pivot done here.** The family moved from RS256 JWT + JWKS to
 > cookie sessions + offline **PASETO v4.public** verification (published
@@ -69,7 +70,10 @@ action, blanket `/api/*` auth enforcement + published-key fetch.
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 > (source of truth; RS256/JWKS decommissioned). `src/auth.rs` verifies
 > PASETO v4.public via `authentication-verifier`; the
-> paseto-keys-over-HTTP fetch follow-up is tracked in spec §13.
+> paseto-keys-over-HTTP fetch landed 2026-07-04 (spec §13): set
+> `CASE_PASETO_KEYS_URL` to fetch the published key set once at boot
+> (`auth::init` from `App::after_routes`; fetched key set wins, env
+> `CASE_PASETO_KEYS` fallback, the service always boots).
 
 ## Golden rules
 

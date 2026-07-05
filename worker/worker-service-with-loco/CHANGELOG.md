@@ -8,6 +8,33 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — boot-time PASETO key-set fetch (`WORKER_PASETO_KEYS_URL`; spec §13 T-1b fetch item)
+
+- New `WORKER_PASETO_KEYS_URL` env var: when set, the auth-service
+  published Ed25519 key set (`/.well-known/paseto-keys`) is fetched
+  **once at boot** via `Verifier::from_paseto_keys_url` (the
+  `authentication-verifier` `fetch` feature, now enabled in
+  Cargo.toml). On success the fetched key set **wins** over
+  `WORKER_PASETO_KEYS` (logged at `info`); on any fetch failure
+  (network / HTTP / parse) a `warn` is logged and the verifier falls
+  back to the `WORKER_PASETO_KEYS` env path — the service **always
+  boots**; auth-service downtime never prevents startup. Unset/blank
+  URL ⇒ prior behaviour exactly. One-shot fetch — no refresh loop
+  (periodic refresh is a spec §15 roadmap note).
+- Wired in `App::after_routes`: the verifier is resolved
+  (`state::verifier_from_env_or_fetch`) and swapped into `AppState`
+  via `with_verifier` **before** the enforcement middleware and the
+  shared-store state are built, so both router surfaces (the
+  `apply_enforcement` layer and the `AuthUser` extractor) verify
+  against the fetched key set. Issuer/audience still come from
+  `WORKER_TOKEN_ISSUER` / `WORKER_TOKEN_AUDIENCE` (same defaults).
+- New DB-free tokio tests in `src/api/rest/auth.rs` (reusing the
+  in-process PASETO minting helpers): a local ephemeral-port HTTP
+  listener serves the key set and a token signed by that key verifies;
+  a dead port falls back to the env path without panicking; URL-unset
+  uses the env path (precedence).
+- Remaining T-1b follow-up (spec §13): RBAC roles.
+
 ### Added — blanket auth enforcement (default off; spec §13 T-1b)
 
 - Blanket `/api/*` auth enforcement per the family contract in
@@ -32,8 +59,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   pass; on + public path ⇒ pass; on + protected + no token ⇒ `401`;
   on + valid token ⇒ pass; on + expired/tampered token ⇒ `401`; plus
   the flag-parser truthy/falsy table and a `/fhir`-is-protected pin.
-- Remaining T-1b follow-ups (spec §13): RBAC roles and boot-time
-  key-set fetch over HTTP.
+- Boot-time key-set fetch has since landed (see the entry above);
+  RBAC roles remain open as spec §13 T-1b.
 
 ### Added — offline PASETO v4.public bearer verification
 

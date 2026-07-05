@@ -102,8 +102,9 @@ fn env_or(name: &str, default: &str) -> String {
 /// - `PLACE_TOKEN_AUDIENCE` — expected `aud` (default
 ///   `main-x-service`).
 ///
-/// Fetching the key set over HTTP from the auth service at boot (instead
-/// of injecting it via env) is a follow-up — see spec §13.
+/// This is the env-injection path. Prefer [`boot_verifier`], which
+/// fetches the key set over HTTP at boot when `PLACE_PASETO_KEYS_URL`
+/// is set and falls back to this path otherwise.
 fn verifier_from_env() -> Verifier {
     let issuer = env_or("PLACE_TOKEN_ISSUER", DEFAULT_ISSUER);
     let audience = env_or("PLACE_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
@@ -114,6 +115,64 @@ fn verifier_from_env() -> Verifier {
         .unwrap_or_else(|| serde_json::json!({ "keys": [] }));
     Verifier::from_paseto_keys_value(&keys, &issuer, &audience)
         .unwrap_or_else(|_| empty_verifier(&issuer, &audience))
+}
+
+/// Build the PASETO token verifier at boot (async — call from an async
+/// boot hook such as `App::after_routes`, **before** the routers /
+/// enforcement middleware capture the verifier):
+///
+/// - `PLACE_PASETO_KEYS_URL` **set (non-blank)** — fetch the key-set
+///   JSON over HTTP from the auth service (normally its
+///   `/.well-known/paseto-keys` endpoint), once, at boot. A successful
+///   fetch **wins** over any `PLACE_PASETO_KEYS` env value; a failed
+///   fetch logs a warning and falls back to the env path. See
+///   [`verifier_from_url_or_env`].
+/// - `PLACE_PASETO_KEYS_URL` **unset / blank** — exactly the previous
+///   behaviour: build from the `PLACE_PASETO_KEYS` env key set, else an
+///   empty reject-all key set.
+///
+/// Either way the service always boots. The fetch happens **once**;
+/// there is no refresh loop (re-fetch on key rotation is a roadmap
+/// item — spec §15).
+pub async fn boot_verifier() -> Verifier {
+    match std::env::var("PLACE_PASETO_KEYS_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+    {
+        Some(url) => verifier_from_url_or_env(url.trim()).await,
+        None => verifier_from_env(),
+    }
+}
+
+/// Fetch the PASETO key set from `url` (via
+/// `Verifier::from_paseto_keys_url`, the `authentication-verifier`
+/// `fetch` feature) and build a verifier expecting the
+/// `PLACE_TOKEN_ISSUER` / `PLACE_TOKEN_AUDIENCE` claims (same defaults
+/// as [`verifier_from_env`]). On success the fetched key set wins (an
+/// info log records the source); on any transport / status / parse
+/// failure a warning is logged and the [`verifier_from_env`] path is
+/// used instead — the service always boots.
+pub async fn verifier_from_url_or_env(url: &str) -> Verifier {
+    let issuer = env_or("PLACE_TOKEN_ISSUER", DEFAULT_ISSUER);
+    let audience = env_or("PLACE_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+    match Verifier::from_paseto_keys_url(url, &issuer, &audience).await {
+        Ok(verifier) => {
+            tracing::info!(
+                url,
+                keys = verifier.key_count(),
+                "PASETO key set fetched from the auth service at boot"
+            );
+            verifier
+        }
+        Err(error) => {
+            tracing::warn!(
+                url,
+                error = %error,
+                "boot-time PASETO key-set fetch failed; falling back to the PLACE_PASETO_KEYS env path"
+            );
+            verifier_from_env()
+        }
+    }
 }
 
 /// A verifier with no keys: every token is rejected until a real key set

@@ -5,12 +5,14 @@
   `WORKER_REQUIRE_AUTH` middleware on both router surfaces; peer PASETO
   v4.public verification via the `authentication-verifier` crate landed
   as T-1a, per
-  [authentication-sessions](../../../agents/share/authentication-sessions.md)).
-  Remaining: operational activation (set the flag once the SSO token
-  flow is live), boot-time key-set fetch from
-  `/.well-known/paseto-keys`, RBAC for HR-admin /
-  credentialing-officer / service roles, rate limiting, user endpoints,
-  security headers.
+  [authentication-sessions](../../../agents/share/authentication-sessions.md);
+  boot-time key-set fetch from `/.well-known/paseto-keys` behind
+  `WORKER_PASETO_KEYS_URL` landed 2026-07-04 as the T-1b fetch
+  sub-item). Remaining: operational activation (set the flag once the
+  SSO token flow is live), periodic key-set refresh / refetch on
+  `UnknownKid` (today the fetch is once at boot only), RBAC for
+  HR-admin / credentialing-officer / service roles, rate limiting,
+  user endpoints, security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`worker_created`,
   `credential_expiry_within_30d`, …), Grafana dashboards + alerting.

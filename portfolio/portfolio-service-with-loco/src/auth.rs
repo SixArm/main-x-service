@@ -12,8 +12,18 @@
 //!
 //! ## Key source
 //!
-//! The process-wide [`verifier`] is built once from the environment:
+//! The process-wide [`verifier`] is seeded once at boot ([`init`] is
+//! called from `App::after_routes`, before the app serves traffic) and
+//! built from the environment:
 //!
+//! - `PORTFOLIO_PASETO_KEYS_URL` — optional URL of the auth service's
+//!   published key set (`/.well-known/paseto-keys`). Set (non-blank) ⇒
+//!   the key set is fetched over HTTP **once at boot** via
+//!   [`Verifier::from_paseto_keys_url`]; on success the fetched key set
+//!   wins over `PORTFOLIO_PASETO_KEYS` (`tracing::info!`), on failure the
+//!   service logs a `tracing::warn!` and falls back to the env path
+//!   below — the service always boots. There is no refresh loop; a
+//!   rotation-triggered refetch is a future spec item.
 //! - `PORTFOLIO_PASETO_KEYS` — the Ed25519 key set (JSON, OKP/Ed25519
 //!   JWK form) the auth service publishes at `/.well-known/paseto-keys`.
 //!   Absent ⇒ an empty key set, so every token is rejected (the service
@@ -22,9 +32,6 @@
 //!   `authentication-service`).
 //! - `PORTFOLIO_TOKEN_AUDIENCE` — expected `aud` (default
 //!   `main-x-service`).
-//!
-//! Fetching the key set over HTTP from the auth service at boot (instead of
-//! injecting it via env) is a follow-up — see spec §13.
 //!
 //! ## Blanket enforcement
 //!
@@ -53,12 +60,70 @@ const DEFAULT_ISSUER: &str = "authentication-service";
 /// Default audience expected in tokens (`aud`).
 const DEFAULT_AUDIENCE: &str = "main-x-service";
 
-/// The process-wide token verifier, built from the environment on first
-/// use (see the module docs). Shared behind an `Arc` and read-only.
+/// The process-wide token verifier, seeded by [`init`] at boot (or, if
+/// [`init`] never ran — e.g. in unit tests — built lazily from the
+/// environment on first use). Shared behind an `Arc` and read-only.
+static VERIFIER: OnceLock<Arc<Verifier>> = OnceLock::new();
+
+/// The process-wide token verifier (see [`VERIFIER`] and the module
+/// docs). Shared behind an `Arc` and read-only.
 #[must_use]
 pub fn verifier() -> &'static Arc<Verifier> {
-    static VERIFIER: OnceLock<Arc<Verifier>> = OnceLock::new();
     VERIFIER.get_or_init(|| Arc::new(build_from_env()))
+}
+
+/// Seed the process-wide [`verifier`] before the app serves traffic
+/// (called from `App::after_routes`). When `PORTFOLIO_PASETO_KEYS_URL` is
+/// set (non-blank) the published key set is fetched over HTTP **once** —
+/// no refresh loop — and, on success, wins over the
+/// `PORTFOLIO_PASETO_KEYS` env key set; on fetch failure, or with the URL
+/// unset/blank, the verifier is built from the environment exactly as
+/// before, so the service always boots. Idempotent: a no-op when the
+/// verifier is already built.
+pub async fn init() {
+    if VERIFIER.get().is_some() {
+        return;
+    }
+    let verifier = match std::env::var("PORTFOLIO_PASETO_KEYS_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+    {
+        Some(url) => {
+            let issuer = env_or("PORTFOLIO_TOKEN_ISSUER", DEFAULT_ISSUER);
+            let audience = env_or("PORTFOLIO_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+            fetch_or(url.trim(), &issuer, &audience, build_from_env()).await
+        }
+        None => build_from_env(),
+    };
+    let _ = VERIFIER.set(Arc::new(verifier));
+}
+
+/// Build a verifier by fetching the published key set from `url`
+/// ([`Verifier::from_paseto_keys_url`]); on success the fetched key set
+/// wins (`tracing::info!`), on any fetch/parse failure the given
+/// `fallback` verifier is returned after a `tracing::warn!` — never a
+/// panic, so the caller always boots. Pure dependency injection (URL,
+/// issuer, audience and fallback are all passed in), so it is testable
+/// against a local HTTP listener without touching the process global.
+pub async fn fetch_or(url: &str, issuer: &str, audience: &str, fallback: Verifier) -> Verifier {
+    match Verifier::from_paseto_keys_url(url, issuer, audience).await {
+        Ok(fetched) => {
+            tracing::info!(
+                url,
+                keys = fetched.key_count(),
+                "PASETO key set fetched over HTTP; fetched key set wins over the env key set"
+            );
+            fetched
+        }
+        Err(error) => {
+            tracing::warn!(
+                url,
+                %error,
+                "PASETO key set fetch failed; falling back to the env-configured key set"
+            );
+            fallback
+        }
+    }
 }
 
 /// Whether blanket `/api/*` enforcement is on, read once from
@@ -450,5 +515,56 @@ mod tests {
         token.push(if last == 'a' { 'b' } else { 'a' });
         let err = enforce(true, "/api/v1/projects", &bearer(&token), &verifier).unwrap_err();
         assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+    }
+
+    /// Serve `keys` as the key-set JSON from a local ephemeral-port HTTP
+    /// listener (the auth service's `/.well-known/paseto-keys` stand-in)
+    /// and return the URL to fetch it from.
+    async fn serve_keys(keys: serde_json::Value) -> String {
+        let app = axum::Router::new().route(
+            "/.well-known/paseto-keys",
+            axum::routing::get(move || {
+                let keys = keys.clone();
+                async move { axum::Json(keys) }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind ephemeral port");
+        let addr = listener.local_addr().expect("local addr");
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("serve key set");
+        });
+        format!("http://{addr}/.well-known/paseto-keys")
+    }
+
+    /// Boot-time fetch happy path: `fetch_or` against a local listener
+    /// serving a valid key set builds the verifier from the **fetched**
+    /// keys — a token signed by the served key verifies even though the
+    /// fallback verifier has no keys (the fetched key set wins).
+    #[tokio::test]
+    async fn fetch_or_fetched_key_set_wins() {
+        let (keys, kid) = test_keys_and_kid();
+        let url = serve_keys(keys).await;
+        let verifier = fetch_or(&url, ISSUER, AUDIENCE, empty_verifier(ISSUER, AUDIENCE)).await;
+        assert_eq!(verifier.key_count(), 1);
+        let token = sign(&kid, 10_000_000_000);
+        let claims =
+            bearer_claims(&bearer(&token), &verifier).expect("token signed by fetched key");
+        assert_eq!(claims.sub, "11111111-1111-1111-1111-111111111111");
+    }
+
+    /// Boot-time fetch fallback: a fast-failing URL (nothing listens on
+    /// port 1) makes `fetch_or` return the env-style fallback verifier —
+    /// no panic, and tokens signed by the fallback key set still verify,
+    /// so the service always boots.
+    #[tokio::test]
+    async fn fetch_or_unreachable_url_falls_back() {
+        let (keys, kid) = test_keys_and_kid();
+        let fallback = Verifier::from_paseto_keys_value(&keys, ISSUER, AUDIENCE).unwrap();
+        let verifier = fetch_or("http://127.0.0.1:1/", ISSUER, AUDIENCE, fallback).await;
+        assert_eq!(verifier.key_count(), 1);
+        let token = sign(&kid, 10_000_000_000);
+        assert!(bearer_claims(&bearer(&token), &verifier).is_ok());
     }
 }

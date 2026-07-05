@@ -415,4 +415,74 @@ mod tests {
         let err = enforce(true, "/fhir/Worker", &HeaderMap::new(), &verifier()).unwrap_err();
         assert_eq!(err.0, StatusCode::UNAUTHORIZED);
     }
+
+    // ---- Boot-time key-set fetch (`WORKER_PASETO_KEYS_URL`) ----
+
+    use crate::api::rest::state::verifier_from_url_or_env;
+
+    /// Serve `test_keys()` from a local ephemeral-port HTTP listener,
+    /// the way the auth service publishes `/.well-known/paseto-keys`.
+    /// Returns the full key-set URL; the server task lives until the
+    /// test process exits.
+    async fn serve_test_keys() -> String {
+        let router = Router::new().route(
+            "/.well-known/paseto-keys",
+            axum::routing::get(|| async { Json(test_keys()) }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind ephemeral port");
+        let addr = listener.local_addr().expect("local addr");
+        tokio::spawn(async move {
+            axum::serve(listener, router).await.expect("serve keys");
+        });
+        format!("http://{addr}/.well-known/paseto-keys")
+    }
+
+    /// URL unset ⇒ the env-key-set path: with no `WORKER_PASETO_KEYS`
+    /// pointing at the test key, a token signed by it is rejected (and
+    /// the builder never panics).
+    #[tokio::test]
+    async fn test_fetch_builder_without_url_uses_env_path() {
+        let v = verifier_from_url_or_env(None, ISSUER, AUDIENCE).await;
+        let token = sign(10_000_000_000);
+        assert_eq!(
+            bearer_claims(&bearer(&token), &v).unwrap_err().0,
+            StatusCode::UNAUTHORIZED
+        );
+    }
+
+    /// URL set and reachable ⇒ the fetched key set wins: a token signed
+    /// by the served key verifies end to end.
+    #[tokio::test]
+    async fn test_fetch_builder_fetches_key_set_from_url() {
+        let url = serve_test_keys().await;
+        let v = verifier_from_url_or_env(Some(&url), ISSUER, AUDIENCE).await;
+        assert_eq!(v.key_count(), 1);
+        let token = sign(10_000_000_000);
+        let claims = bearer_claims(&bearer(&token), &v).expect("token from fetched key verifies");
+        assert_eq!(claims.sub, "11111111-1111-1111-1111-111111111111");
+        assert_eq!(claims.iss, ISSUER);
+        assert_eq!(claims.aud, AUDIENCE);
+    }
+
+    /// URL set but unreachable (bind an ephemeral port, note it, drop
+    /// the listener) ⇒ the builder falls back to the env-key-set path
+    /// without panicking, so the service always boots: the test-key
+    /// token is rejected exactly as on the env path.
+    #[tokio::test]
+    async fn test_fetch_builder_falls_back_on_fetch_failure() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind ephemeral port");
+        let addr = listener.local_addr().expect("local addr");
+        drop(listener);
+        let url = format!("http://{addr}/.well-known/paseto-keys");
+        let v = verifier_from_url_or_env(Some(&url), ISSUER, AUDIENCE).await;
+        let token = sign(10_000_000_000);
+        assert_eq!(
+            bearer_claims(&bearer(&token), &v).unwrap_err().0,
+            StatusCode::UNAUTHORIZED
+        );
+    }
 }

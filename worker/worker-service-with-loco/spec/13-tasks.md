@@ -44,11 +44,25 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] RBAC: HR-admin / credentialing-officer / read-only / service
     roles (the token's `roles` claim is verified but not yet
     authorised against per-route policy).
-  - [ ] Fetch the key set over HTTP from the auth service at boot
-    (today it is injected via `WORKER_PASETO_KEYS`).
-  - **Acceptance (remaining):** integration test with enforcement on
-    posts without a token → `401`; posts with a valid token and
-    sufficient role → `2xx`.
+  - [x] *(done 2026-07-04)* Fetch the key set over HTTP from the auth
+    service at boot: new `WORKER_PASETO_KEYS_URL` env var —
+    unset/blank ⇒ the `WORKER_PASETO_KEYS` env path exactly as
+    before; set ⇒ fetch once at boot in `App::after_routes` via
+    `Verifier::from_paseto_keys_url` (verifier `fetch` feature); on
+    success the fetched key set **wins** over `WORKER_PASETO_KEYS`
+    (`tracing::info!`); on any fetch failure `tracing::warn!` and
+    fall back to the env path — the service **always boots**.
+    Swapped into `AppState` via `with_verifier` **before** the
+    enforcement middleware and shared-store state are built, so both
+    router surfaces verify against it. One-shot fetch; no refresh
+    loop (periodic refresh is a §15 roadmap note). Pinned by DB-free
+    tokio tests in `src/api/rest/auth.rs`: fetch from a local
+    ephemeral-port listener serving the in-process key set (minted
+    token verifies), fallback on a dead port (no panic, token
+    rejected), and the URL-unset ⇒ env-path precedence.
+  - **Acceptance (remaining, RBAC only):** integration test with
+    enforcement on posts without a token → `401`; posts with a valid
+    token and sufficient role → `2xx`.
 - [ ] **T-2 — Production Fluvio publisher.**
   - [ ] Implement `FluvioEventPublisher : EventProducer` behind
     feature flag `fluvio`.

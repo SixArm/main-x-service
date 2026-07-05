@@ -1,14 +1,16 @@
 ## 15. Roadmap
 
 - **Authentication & authorisation** — RBAC for editor / curator /
-  read-only / service roles and boot-time HTTP key-set fetch (the T-8
-  remainder; peer offline PASETO v4.public verification via the
-  `authentication-verifier` crate and the default-off
-  `PLACE_REQUIRE_AUTH` blanket `/api/*` enforcement middleware both
-  landed 2026-07-04, per
+  read-only / service roles (the T-8 remainder; peer offline PASETO
+  v4.public verification, the default-off `PLACE_REQUIRE_AUTH` blanket
+  `/api/*` enforcement middleware, and the boot-time
+  `PLACE_PASETO_KEYS_URL` HTTP key-set fetch all landed 2026-07-04,
+  per
   [authentication-sessions](../../../agents/share/authentication-sessions.md)
   and `agents/share/jwt-enforcement.md`; activation is an operations
-  decision), rate limiting, security headers.
+  decision), a periodic key-set **re-fetch/refresh loop** for key
+  rotation (today the fetch happens once at boot), rate limiting,
+  security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`place_created`,
   `geo_search_radius_km_histogram`), Grafana dashboards + alerting.

@@ -50,7 +50,8 @@ prometheus = { version = "0.13" }
 portfolio-matcher = { path = "../portfolio-matcher-rust-crate" }
 
 # Offline PASETO v4.public verification against the authentication-service Ed25519 keys (local path; monorepo 0.2 verifier).
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
+# The `fetch` feature adds `Verifier::from_paseto_keys_url` for the boot-time key-set fetch (`PORTFOLIO_PASETO_KEYS_URL`).
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 
 [[bin]]
 name = "portfolio-service"
@@ -59,6 +60,12 @@ required-features = []
 
 [dev-dependencies]
 loco-rs = { workspace = true, features = ["testing"] }
+# `#[tokio::test]` + a local ephemeral-port HTTP listener for the boot-time key-set fetch tests.
+tokio = { version = "1.52", default-features = false, features = [
+  "rt-multi-thread",
+  "macros",
+  "net",
+] }
 serial_test = { version = "3.5.0" }
 rstest = { version = "0.25" }
 insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }

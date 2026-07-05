@@ -70,8 +70,10 @@ full-text search, durable event bus, and privacy are tracked in
 > cookie sessions + offline PASETO v4.public verification — see
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 > (source of truth; RS256/JWKS decommissioned). The runtime here
-> verifies PASETO v4.public via `authentication-verifier`; the
-> paseto-keys-over-HTTP fetch follow-up is tracked in
+> verifies PASETO v4.public via `authentication-verifier`, with the
+> published key set fetched over HTTP once at boot when
+> `CASE_PASETO_KEYS_URL` is set (fetched key set wins; falls back to the
+> `CASE_PASETO_KEYS` env key set, so the service always boots) — see
 > [spec §13](./spec/index.md).
 
 ## License

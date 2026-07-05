@@ -86,6 +86,11 @@ impl Hooks for App {
     }
 
     async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
+        // Seed the process-wide PASETO verifier before the app serves
+        // traffic: when `CASE_PASETO_KEYS_URL` is set the published key
+        // set is fetched over HTTP once at boot (fetch failure falls back
+        // to the `CASE_PASETO_KEYS` env path — the service always boots).
+        auth::init().await;
         // Blanket JWT enforcement layer. Added unconditionally; the
         // `CASE_REQUIRE_AUTH` flag is read per request and the layer is a
         // near-noop when the flag is off (the default).

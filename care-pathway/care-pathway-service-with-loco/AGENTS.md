@@ -62,8 +62,11 @@ done), search-blocked dedup candidates, durable event bus Phases 2–3
 (outbox + Fluvio; Phase 1 in-memory envelope + `EventPublisher` seam is
 done — see `agents/share/event-bus.md`), privacy,
 front-end merge
-action, published-key-over-HTTP fetch at boot, terminology-server
-code-existence checks.
+action, terminology-server code-existence checks. The published key set
+is fetched over HTTP once at boot when `CARE_PATHWAY_PASETO_KEYS_URL` is
+set (fetched set wins; warn + env fallback via
+`CARE_PATHWAY_PASETO_KEYS` otherwise — the service always boots); a
+periodic refresh loop is a future spec item.
 
 Auth pivot done in this crate: the family moved from RS256 JWT + JWKS to
 cookie sessions + short-lived PASETO v4.public verified offline against a

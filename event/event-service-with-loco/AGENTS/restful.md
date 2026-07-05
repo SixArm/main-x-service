@@ -58,9 +58,19 @@ Bearer tokens are PASETO `v4.public` (Ed25519) minted by the central
 authentication-service and verified **offline** against its published
 key set (`/.well-known/paseto-keys`) via the `authentication-verifier`
 crate — no shared secret, no introspection call. Configure with
-`EVENT_PASETO_KEYS` (key-set JSON), `EVENT_TOKEN_ISSUER`, and
-`EVENT_TOKEN_AUDIENCE`. Handlers opt in by taking an `AuthUser`
+`EVENT_PASETO_KEYS_URL` (boot-time HTTP fetch of the key set) or
+`EVENT_PASETO_KEYS` (key-set JSON via env), plus `EVENT_TOKEN_ISSUER`
+and `EVENT_TOKEN_AUDIENCE`. Handlers opt in by taking an `AuthUser`
 argument (`src/api/rest/auth.rs`).
+
+Key-set precedence (`state::boot_verifier`, run in
+`App::after_routes` before the shared-store insert and the middleware
+capture the state): when `EVENT_PASETO_KEYS_URL` is set (non-blank)
+the key set is fetched over HTTP **once at boot** and, on success,
+**wins** over `EVENT_PASETO_KEYS`; a fetch failure logs a warning and
+falls back to the env path. Unset/blank ⇒ `EVENT_PASETO_KEYS`, else an
+empty reject-all key set. The service **always boots**; there is no
+refresh loop (key-rotation re-fetch is a roadmap item, spec §15).
 
 Blanket enforcement (default **off**): when `EVENT_REQUIRE_AUTH` is
 truthy (`1`/`true`/`yes`/`on`, case-insensitive; anything else

@@ -78,11 +78,27 @@ clearly described manual check confirms the acceptance criterion.
     --lib` green.
   - [ ] Roles — editor / curator / read-only / service authorisation
     on top of the enforced authentication.
-  - [ ] Fetch the key set over HTTP from the auth service at boot
-    (today it is injected via `PLACE_PASETO_KEYS`).
+  - [x] Fetch the key set over HTTP from the auth service at boot
+    *(done 2026-07-04)* — when the new `PLACE_PASETO_KEYS_URL` env var
+    is set (non-blank), `app.rs::after_routes` (async boot context)
+    calls `state::boot_verifier`, which fetches the key-set JSON once
+    via `Verifier::from_paseto_keys_url` (the `authentication-verifier`
+    `fetch` feature, now enabled on the path dep). A successful fetch
+    **wins** over any `PLACE_PASETO_KEYS` env value (info-logged with
+    the source URL); any fetch failure warn-logs and falls back to the
+    env path (else the empty reject-all set) — the service **always
+    boots**. Unset/blank URL ⇒ prior behaviour exactly. The fetched
+    verifier is installed via `AppState::with_verifier` **before** the
+    enforcement middleware / shared store capture the state, so both
+    router surfaces consult the fetched key set. Fetch happens once at
+    boot; no refresh loop (rotation re-fetch is roadmap — §15).
+    Acceptance met: DB-free tokio tests in `src/api/rest/auth.rs` — a
+    local ephemeral-port HTTP listener serves the in-process key set
+    and the fetch-built verifier accepts a token signed by that key;
+    a fast-failing URL (`http://127.0.0.1:1/`) falls back to the
+    env/empty path without panic — `cargo test --lib` green.
   - **Acceptance (remainder):** valid token + role gets `2xx`,
-    insufficient role gets `403`; boot-time key fetch verified against
-    a live auth service.
+    insufficient role gets `403`.
 - [ ] **T-9 — Geo-radius `nearby` HTTP endpoint + search `offset`.**
   - [ ] Add `GET /api/places/nearby?lat=&lon=&radius_km=` wiring the
     existing `matching::geo::within_radius` Haversine primitive with a

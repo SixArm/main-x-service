@@ -19,6 +19,21 @@ requires a valid `Authorization: Bearer <paseto>` token, verified
 offline (PASETO `v4.public`, Ed25519) against the auth-service
 published key set (see §13 T-8).
 
+Key-set configuration (issuer/audience from `EVENT_TOKEN_ISSUER` /
+`EVENT_TOKEN_AUDIENCE`, defaults `authentication-service` /
+`main-x-service`):
+
+- `EVENT_PASETO_KEYS_URL` set (non-blank) — the key-set JSON is
+  fetched over HTTP **once at boot** (async, in `after_routes`, before
+  the routers/middleware capture the verifier) from the auth service
+  (normally `/.well-known/paseto-keys`). A successful fetch **wins**
+  over `EVENT_PASETO_KEYS`; a failed fetch warn-logs and falls back to
+  the env path. No refresh loop (rotation re-fetch is roadmap, §15).
+- Unset/blank — the key set comes from the `EVENT_PASETO_KEYS` env
+  var; absent/unparseable ⇒ an empty reject-all key set.
+
+Either way the service **always boots**.
+
 Blanket enforcement is implemented **default-off**: when
 `EVENT_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 case-insensitive), every `/api/v1/*` route requires a valid bearer
@@ -26,8 +41,8 @@ token except the public `/api/v1/health`. Root-level `/_health`,
 `/_ping`, `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`,
 and the `/fhir/*` `501 Not Implemented` stubs sit outside the
 `/api/v1` scope and stay public. The flag is read once at
-construction — restart to change. Roles + fetching the published key
-set over HTTP remain open (§13 T-8). Family contract:
+construction — restart to change. Roles are the only open T-8 item
+(boot-time HTTP key fetch landed 2026-07-04). Family contract:
 [jwt-enforcement](../../../agents/share/jwt-enforcement.md).
 
 ### 9.1 Bulk import / export

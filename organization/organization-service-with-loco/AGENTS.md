@@ -57,8 +57,11 @@ wire format is snake_case (`legal_name`, `same_as`, …) and validation
 failures return `422`. Blanket `/api/*` auth enforcement is implemented
 (`auth::enforce`, default-off via `ORGANIZATION_REQUIRE_AUTH`). Still
 deferred (spec §13): Tantivy full-text (this uses Postgres `ILIKE`),
-per-field privacy/GDPR export, blanket-enforcement published-Ed25519-key-over-HTTP
-fetch at boot (env injection is wired today), richer validation.
+per-field privacy/GDPR export, richer validation. The published-Ed25519-key
+set is fetched over HTTP once at boot when `ORGANIZATION_PASETO_KEYS_URL`
+is set (fetched set wins; warn + env fallback via
+`ORGANIZATION_PASETO_KEYS` otherwise — the service always boots); a
+periodic refresh loop is a future spec item.
 
 Auth pivot done in this crate: the family moved from RS256 JWT + JWKS to
 cookie sessions + short-lived PASETO v4.public verified offline against a

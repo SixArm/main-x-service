@@ -93,6 +93,15 @@ impl Hooks for App {
     /// `PLACE_REQUIRE_AUTH` — read here, at construction, so changing the
     /// flag requires a restart), and a permissive CORS layer.
     ///
+    /// The PASETO verifier is finalised **first** via
+    /// [`crate::api::rest::state::boot_verifier`] — when
+    /// `PLACE_PASETO_KEYS_URL` is set the key set is fetched over HTTP
+    /// once, here, in async context (fetch failure falls back to the
+    /// `PLACE_PASETO_KEYS` env path; the service always boots) —
+    /// **before** the enforcement middleware and the shared store
+    /// capture the state, so both router surfaces consult the fetched
+    /// key set.
+    ///
     /// # Errors
     ///
     /// Returns a loco error if config loading or search-index creation fails
@@ -102,7 +111,9 @@ impl Hooks for App {
         let search_engine = SearchEngine::new(&config.search.index_path)
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let matcher = PlaceMatcher::new(&config.matching);
-        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
+        let verifier = std::sync::Arc::new(crate::api::rest::state::boot_verifier().await);
+        let state =
+            AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
         let enforcement = auth::EnforcementState::from_app_state(&state);
         ctx.shared_store.insert(state);
         let router = router

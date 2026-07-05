@@ -44,16 +44,30 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     Ok; on + expired/tampered ⇒ `401` — plus the flag-parser
     semantics. Met: `cargo test --lib` green.
 - [ ] **T-1c — Auth follow-ups: boot-time key fetch + roles/RBAC.**
-  - [ ] Fetch the key set over HTTP from the auth service at boot
-    (today it is injected via `PERSON_PASETO_KEYS`); swap it into
-    `AppState` via `with_verifier`.
+  - [x] Fetch the key set over HTTP from the auth service at boot
+    *(done 2026-07-04)*: new `PERSON_PASETO_KEYS_URL` env var —
+    unset/blank ⇒ the `PERSON_PASETO_KEYS` env path exactly as before;
+    set ⇒ fetch once at boot in `after_routes` via
+    `Verifier::from_paseto_keys_url` (verifier `fetch` feature); on
+    success the fetched key set **wins** over `PERSON_PASETO_KEYS`
+    (`tracing::info!`); on any fetch failure `tracing::warn!` and fall
+    back to the env path — the service **always boots**. Swapped into
+    `AppState` via `with_verifier` **before** the enforcement
+    middleware and shared-store state are built, so both router
+    surfaces verify against it. One-shot fetch; no refresh loop
+    (periodic refresh is a §15 roadmap note). Pinned by DB-free tokio
+    tests in `src/api/rest/auth.rs`: fetch from a local ephemeral-port
+    listener serving the in-process key set (minted token verifies),
+    fallback on a dead port (no panic, token rejected), and the
+    URL-unset ⇒ env-path precedence.
   - [ ] Roles / RBAC on top of the verified claims (`roles` / `scope`).
   - [ ] DB-gated request test (`#[ignore]`, Postgres): with
     `PERSON_REQUIRE_AUTH` set, an unauthenticated `GET /api/persons/…`
     returns `401` while `GET /api-docs/openapi.json` stays `200`.
   - **Acceptance:** integration test with enforcement on posts without
-    a token → `401`; posts with a valid token → `2xx`; key set fetched
-    from a stub auth service at boot.
+    a token → `401`; posts with a valid token → `2xx`. Key-set fetch
+    from a stub auth service at boot: **met** via the local-listener
+    tokio tests above (`cargo test --lib` green).
 - [ ] **T-2 — Production Fluvio publisher.**
   - [ ] Implement `FluvioEventPublisher : EventProducer` behind
     feature flag `fluvio`.

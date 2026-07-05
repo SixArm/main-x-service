@@ -18,8 +18,9 @@ clearly described manual check confirms the acceptance criterion.
   - **Acceptance:** `grpcurl` against `ThingService.GetThing`
     round-trips a record.
 - [ ] **T-4 — Authentication / authorisation.** Peer PASETO
-  verification *(done 2026-07-04)* and default-off blanket enforcement
-  *(done 2026-07-04)*; roles + published-key HTTP fetch still open. Per
+  verification *(done 2026-07-04)*, default-off blanket enforcement
+  *(done 2026-07-04)*, and boot-time published-key HTTP fetch
+  *(done 2026-07-04)*; roles are the only open item. Per
   [authentication-sessions](../../../agents/share/authentication-sessions.md)
   §5: the family moved off RS256-JWT + JWKS.
   - [x] Offline PASETO `v4.public` (Ed25519) verification via the
@@ -49,8 +50,21 @@ clearly described manual check confirms the acceptance criterion.
     inside the CORS layer. Family contract:
     [jwt-enforcement](../../../agents/share/jwt-enforcement.md).
   - [ ] Editor / read-only / service roles.
-  - [ ] Fetch the published Ed25519 key set over HTTP at boot (today:
-    `THING_PASETO_KEYS` env injection).
+  - [x] Fetch the published Ed25519 key set over HTTP at boot
+    *(done 2026-07-04)* — when the new `THING_PASETO_KEYS_URL` env var
+    is set (non-blank), `App::after_routes` (async boot context) calls
+    `state::boot_verifier`, which fetches the key-set JSON once via
+    `Verifier::from_paseto_keys_url` (the `authentication-verifier`
+    `fetch` feature, now enabled on the path dep). A successful fetch
+    **wins** over any `THING_PASETO_KEYS` env value (info-logged with
+    the source URL); any fetch failure warn-logs and falls back to the
+    env path (else the empty reject-all set) — the service **always
+    boots**. Unset/blank URL ⇒ prior behaviour exactly. The fetched
+    verifier is installed via `AppState::with_verifier` **before** the
+    shared-store insert and the `require_auth_mw` middleware capture
+    the state, so both router surfaces consult the fetched key set.
+    Fetch happens once at boot; no refresh loop (rotation re-fetch is
+    roadmap — §15).
   - **Acceptance (verification — met):** DB-free unit tests in
     `src/api/rest/auth.rs` mint `v4.public` tokens in-process
     (throwaway Ed25519 key) and pin valid / missing / non-bearer /
@@ -62,6 +76,12 @@ clearly described manual check confirms the acceptance criterion.
     protected + no token ⇒ `401`; on + valid ⇒ pass; on + expired /
     tampered ⇒ `401` — plus the lenient `parse_bool` flag parser. Met:
     `cargo test --lib` green.
+  - **Acceptance (boot-time key fetch — met):** DB-free tokio tests in
+    `src/api/rest/auth.rs` — a local ephemeral-port HTTP listener
+    serves the in-process key set and the fetch-built verifier accepts
+    a token signed by that key; a fast-failing URL
+    (`http://127.0.0.1:1/`) falls back to the env/empty path without
+    panic. Met: `cargo test --lib` green.
   - **Acceptance (roles — open):** valid token + role gets `2xx`;
     insufficient role gets `403`.
 - [ ] **T-5 — Embedding-based similarity (optional / experimental).**

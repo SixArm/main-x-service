@@ -88,11 +88,14 @@ PM-tool-id / URI identifier shapes; non-blank goal titles; BCP-47
 audit log + in-memory event stream (durable-bus Phase 1 — see
 `agents/share/event-bus.md`), offline PASETO v4.public verification
 (`src/auth.rs`, embeds `authentication-verifier`; `/whoami` + audit
-`actor`), and blanket `/api/*` auth enforcement wired but **off by
+`actor`; boot-time published-key fetch when `PORTFOLIO_PASETO_KEYS_URL`
+is set — fetched key set wins, env `PORTFOLIO_PASETO_KEYS` fallback, the
+service always boots; spec §13, done 2026-07-04), and blanket `/api/*`
+auth enforcement wired but **off by
 default** — gated by `PORTFOLIO_REQUIRE_AUTH`. Deferred (spec §13):
 Tantivy full-text/fuzzy search, durable event bus Phases 2–3 (outbox +
-Fluvio), privacy, front-end merge action, bulk import/export, published-key
-fetch at boot, the `posts` / `comments` / `members` collaboration
+Fluvio), privacy, front-end merge action, bulk import/export, the
+`posts` / `comments` / `members` collaboration
 sub-resources, gRPC.
 
 > Auth model (intended): the human session is a server-side cookie

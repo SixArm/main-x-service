@@ -8,6 +8,32 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — boot-time HTTP fetch of the PASETO key set (2026-07-04)
+
+- Boot-time key-set fetch landed (the fetch part of spec §13 T-4;
+  family contract shared with the sibling services). New env var
+  `THING_PASETO_KEYS_URL`: when set (non-blank), `App::after_routes`
+  calls the new `state::boot_verifier` (async), which fetches the
+  key-set JSON once via `Verifier::from_paseto_keys_url` — the
+  `authentication-verifier` path dep now enables its `fetch` feature.
+  A successful fetch **wins** over any `THING_PASETO_KEYS` env value
+  (`tracing::info!` records the source URL and key count); any fetch
+  failure `tracing::warn!`s and falls back to the env path (else the
+  empty reject-all key set) — the service **always boots**.
+  Unset/blank URL ⇒ previous behaviour exactly.
+- Boot order matters and is now explicit: the fetched verifier is
+  installed with `AppState::with_verifier` **before** the shared-store
+  insert and before `require_auth_mw` captures the state, so both
+  router surfaces (the loco router's enforcement middleware and the
+  `FromRef` handler extraction) consult the fetched key set.
+- Fetch happens once at boot; there is deliberately no refresh loop —
+  key-rotation re-fetch is a roadmap item (spec §15).
+- New DB-free tokio tests in `src/api/rest/auth.rs`: a local
+  ephemeral-port axum listener serves the in-process test key set and
+  the fetch-built verifier accepts a token signed by that key; a
+  fast-failing URL (`http://127.0.0.1:1/`) falls back to the env/empty
+  path without panicking.
+
 ### Added — offline PASETO v4.public bearer verification
 
 - Peer-side bearer-token verification landed (the verification part of

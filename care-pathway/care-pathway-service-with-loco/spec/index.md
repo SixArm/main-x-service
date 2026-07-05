@@ -20,8 +20,10 @@ Prometheus metrics + offline PASETO v4 public token verification + blanket
 `/api/*` enforcement (off by default) + rich payload validation
 (ICD/SNOMED/UUID/DOI/BCP-47). Deferred (§13): Tantivy full-text/fuzzy
 search, search-blocked dedup candidates, durable event bus Phases 2–3
-(outbox → Fluvio), privacy, front-end merge action, paseto-keys-over-HTTP
-fetch at boot, terminology-server code-existence checks, gRPC. Token
+(outbox → Fluvio), privacy, front-end merge action, a PASETO key-set
+refresh loop (the boot-time paseto-keys-over-HTTP fetch is done —
+`CARE_PATHWAY_PASETO_KEYS_URL`, §9/§13 — but runs once, no re-fetch),
+terminology-server code-existence checks, gRPC. Token
 issuance is out of scope — provided by the central authentication-service.
 The session / cross-service token model is fixed by
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md),
@@ -136,7 +138,14 @@ middleware calling `auth::enforce`) but **off by default** — gated by
 `/metrics.prom` stay open (matching §6.12 and
 `src/auth.rs::is_public_path`). The paseto-keys / issuer / audience come
 from `CARE_PATHWAY_PASETO_KEYS` / `CARE_PATHWAY_TOKEN_ISSUER` /
-`CARE_PATHWAY_TOKEN_AUDIENCE`. See the family contract
+`CARE_PATHWAY_TOKEN_AUDIENCE`. When `CARE_PATHWAY_PASETO_KEYS_URL` is
+set, the key set is instead **fetched over HTTP once at boot**
+(`Verifier::from_paseto_keys_url`, typically the auth-service
+`/.well-known/paseto-keys`; seeded from `App::after_routes` via
+`auth::init_from_env`): the fetched set wins over
+`CARE_PATHWAY_PASETO_KEYS`; on fetch failure the service warns and falls
+back to the env key set, so it always boots. No refresh loop — periodic
+re-fetch on key rotation is a future item (§16). See the family contract
 `agents/share/jwt-enforcement.md`; the session / token model is fixed by
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md),
 which supersedes the prior RS256-JWT model.
@@ -159,7 +168,11 @@ real PASETO v4 public token + matching Ed25519 key in-process, then assert
 valid → claims
 and missing / non-bearer / expired / tampered / empty-verifier → `401`;
 plus `parse_bool` cases and `enforce` — off+no-token → `Ok`, on+public →
-`Ok`, on+protected+{no/valid/expired/tampered} token → `401`/`Ok`),
+`Ok`, on+protected+{no/valid/expired/tampered} token → `401`/`Ok`; plus
+the boot-time key-set fetch — a local ephemeral-port HTTP listener
+serving the test key set proves the fetch-built verifier accepts a token
+signed by that key, a fast-failing URL proves the env fallback without
+panic, and no-URL pins the plain env path),
 the `src/merge.rs` unit tests (former-title alias, scalar fallback, list
 union, transferred snapshot), the `escape_like` unit test (search
 wildcard neutralisation), the `src/metrics.rs` unit tests (the rendered
@@ -257,8 +270,19 @@ access controls added later.
     `agents/share/jwt-enforcement.md` (credential now PASETO, semantics
     unchanged). Activation is an operations decision once the SSO token
     flow is live.
-  - [ ] paseto-keys-over-HTTP fetch from the auth service at boot (still
-    env-injected today).
+  - [x] paseto-keys-over-HTTP fetch from the auth service at boot.
+    **Done 2026-07-04:** new `CARE_PATHWAY_PASETO_KEYS_URL` env var (§9);
+    when set, `auth::init_from_env` (called from `App::after_routes`
+    before serving) fetches the key set once via
+    `Verifier::from_paseto_keys_url` (`authentication-verifier` `fetch`
+    feature) and seeds the process-wide verifier — fetched set wins
+    (`tracing::info!`); on fetch failure it warns and falls back to the
+    `CARE_PATHWAY_PASETO_KEYS` env path, so the service always boots.
+    Unset/blank URL ⇒ prior env-injection behaviour exactly. Fetch-once
+    only; a periodic refresh loop on key rotation stays future work
+    (§16). Tests: local ephemeral-port HTTP listener serving the test
+    key set (fetched verifier accepts a token signed by that key) +
+    fast-failing URL fallback (no panic) + no-URL env path (§11).
 - [ ] Bulk import/export — `bulk_jobs` migration (shared doc §3 schema,
   `UNIQUE (entity, kind, idempotency_key)`); the five endpoints
   (§6.13: `POST`/`GET /api/v1/care-pathways/import`,
@@ -294,7 +318,9 @@ every CRUD/merge (`/audit/recent`, `/{pid}/audit`, `/events/recent`,
 `Envelope` + `EventPublisher` seam + `InMemoryPublisher`; frozen
 `EventView` projection on `/events/recent`); offline **PASETO v4 public**
 verification (`AuthUser`/`MaybeAuthUser`, `/whoami`, audit `actor` from
-the token — credential switched from RS256-JWT per §13); OpenAPI 3 doc
+the token — credential switched from RS256-JWT per §13), including the
+boot-time paseto-keys-over-HTTP fetch (`CARE_PATHWAY_PASETO_KEYS_URL`,
+fetch-once, env fallback; §9/§13); OpenAPI 3 doc
 + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`); a root-level
 Prometheus `/metrics.prom` endpoint (CRUD/merge counters +
 `http_requests_total`, public under enforcement); blanket `/api/*`
@@ -312,15 +338,20 @@ bearer-token verification + blanket `/api/*` enforcement middleware. The
 original v0.2 / v0.3 milestone split was never cut as a tagged release.
 The credential switch RS256-JWT → PASETO v4 public per
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
-has since landed (§13). Next (deferred, §13): Tantivy full-text/fuzzy
-search, durable event bus Phases 2–3 (outbox → Fluvio),
-paseto-keys-over-HTTP fetch at boot, privacy, front-end merge action.
+has since landed (§13), as has the boot-time paseto-keys-over-HTTP fetch
+(`CARE_PATHWAY_PASETO_KEYS_URL`, fetch-once, env fallback; §9/§13). Next
+(deferred, §13): Tantivy full-text/fuzzy search, durable event bus
+Phases 2–3 (outbox → Fluvio), a PASETO key-set refresh loop, privacy,
+front-end merge action.
 
 ## 16. Open questions
 
 - Normalise condition codes / interventions into their own tables once
   search lands?
 - Real-time duplicate check on create (409) vs the explicit endpoint?
+- Periodic re-fetch of the PASETO key set (key rotation) — the boot
+  fetch (§9 `CARE_PATHWAY_PASETO_KEYS_URL`) runs once; is a refresh
+  loop (or refetch-on-`UnknownKid`) needed before rotation goes live?
 
 ## 17. References
 

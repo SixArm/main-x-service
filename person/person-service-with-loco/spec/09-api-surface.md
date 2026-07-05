@@ -17,14 +17,20 @@ detection on create, `422` for validation failure.
 Authentication is opt-in per handler by default: taking an `AuthUser`
 argument requires a valid `Authorization: Bearer <paseto>` token,
 verified offline (PASETO `v4.public`, Ed25519) against the
-auth-service published key set (see §13 T-1a). **Blanket enforcement**
+auth-service published key set (see §13 T-1a). The key set comes from
+`PERSON_PASETO_KEYS` (key-set JSON), or — when `PERSON_PASETO_KEYS_URL`
+is set — is fetched once at boot from that URL
+(`/.well-known/paseto-keys` on the auth service); the fetched set wins
+over the env key set, and any fetch failure logs a warning and falls
+back to the env path, so the service **always boots** (§13 T-1c fetch
+item; no refresh loop). **Blanket enforcement**
 (§13 T-1b) is wired on both router surfaces and gated by the
 default-off `PERSON_REQUIRE_AUTH` env flag (`1`/`true`/`yes`/`on` ⇒
 on; unset/blank/junk ⇒ off; read once at boot — restart to change).
 When on, every route requires a valid bearer token except the public
 allow-list: `/api/health`, loco's `/_health` / `/_ping`,
 `/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom`.
-Roles/RBAC and boot-time HTTP key fetch are T-1c.
+Roles/RBAC is the remaining T-1c item.
 
 ### 9.1 Cross-service link endpoints
 
