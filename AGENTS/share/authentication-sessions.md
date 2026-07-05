@@ -133,9 +133,11 @@ entity service ──verify OFFLINE via published ed25519 public key──▶ ok
   `scope`/`roles`. **Footer** carries `kid` (key id) for rotation.
 - **Offline verification** — the authentication-service publishes its
   **Ed25519 public key(s)** at `/.well-known/paseto-keys` (the JWKS
-  analog). Peers fetch once at boot, hold the key, and verify
-  `signature`/`iss`/`aud`/`exp`/`kid` locally — **no per-request hop**,
-  exactly as before, but with a trusted spec.
+  analog). Peers fetch once at boot (set `<ENTITY>_PASETO_KEYS_URL`;
+  fetch failure falls back to the `<ENTITY>_PASETO_KEYS` env key set so
+  the peer always boots — implemented in all nine services 2026-07-04),
+  hold the key, and verify `signature`/`iss`/`aud`/`exp`/`kid` locally —
+  **no per-request hop**, exactly as before, but with a trusted spec.
 - **Key rotation** — multiple published keys keyed by `kid`; the footer's
   `kid` selects the verifier key. Rotating keys never requires a shared
   secret.
@@ -209,11 +211,13 @@ credential it checks changes.
 - **Token-exchange caching at the BFF** — cache the minted PASETO for its
   ~5-min lifetime per session vs mint per outbound call? (Lean: cache to
   expiry.)
-- **PASETO library** — `rusty_paseto` (v4 local/public) is the candidate;
-  confirm features + `#![forbid(unsafe_code)]` compatibility.
-- **Session store sharing** — authentication-service owns `sessions`;
-  peers never read it (they trust the PASETO). Confirm no peer needs
-  direct session reads.
+- ~~**PASETO library**~~ — RESOLVED: `rusty_paseto` 0.10
+  (`default-features = false`, `v4_public` + `serde_json`) is in
+  production use in the verifier crate and every service, compatible
+  with `#![forbid(unsafe_code)]`.
+- ~~**Session store sharing**~~ — RESOLVED: no peer reads `sessions`.
+  All nine services verify the PASETO offline (env or boot-fetched key
+  set); none takes a database dependency on the auth service.
 - **CSRF token transport** — double-submit cookie vs synchroniser token in
   the BFF page payload. (Lean: synchroniser token via the BFF.)
 - **Immediate cross-service revocation** — rely on the ~5-min PASETO
