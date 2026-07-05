@@ -20,5 +20,6 @@ Ok(
         magic_link_token: None,
         magic_link_expiration: None,
         deleted_at: None,
+        attributes: Object {},
     },
 )

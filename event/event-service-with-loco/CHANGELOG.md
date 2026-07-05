@@ -8,6 +8,34 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — authz: ABAC policy authorization inside the blanket guard (2026-07-05)
+
+- ABAC authorization landed (spec §13 authorization item — supersedes
+  the earlier RBAC scheduler / admin / read-only / service sketch;
+  family contract: `agents/share/authorization-attributes.md`). When
+  `EVENT_REQUIRE_AUTH` is on, a verified PASETO token is further
+  checked by the shared policy engine in `authentication-verifier`
+  0.3: the request's action is derived from the HTTP method plus the
+  crate's destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES`
+  — `/merge`, `/deduplicate`, `/import`), and the policy is evaluated
+  over the token's new `attrs` claim, first-match-wins, defaulting to
+  allow-read / deny-mutation.
+- New env vars `EVENT_ABAC_POLICY` (inline JSON) and
+  `EVENT_ABAC_POLICY_FILE` (path), read once at `AppState`
+  construction (restart to change); unset or unparsable ⇒
+  `tracing::warn!` + the built-in default policy (`svc=true` ⇒
+  everything; `access=admin` ⇒ destructive+write; `access=write` ⇒
+  write) — the service always boots.
+- `auth::enforce` now takes the HTTP method and the policy and
+  returns `403` (with the deciding-rule reason) for a valid token the
+  policy denies; `401` remains missing/bad credential.
+- DB-free unit tests pin the family §7 matrix: action derivation,
+  empty-`attrs` read-only default, `access=write` / `access=admin` /
+  `svc=true` tiers, deny-beats-later-allow, 401-vs-403, bad-policy
+  fallback.
+- Flag off ⇒ behaviour-neutral: no authn and no authz, exactly as
+  before.
+
 ### Added — boot-time HTTP fetch of the PASETO key set (2026-07-04)
 
 - Boot-time key-set fetch landed (the fetch part of spec §13 T-8;

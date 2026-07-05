@@ -124,7 +124,12 @@ absent ⇒ empty key set, all tokens rejected), `CASE_TOKEN_ISSUER`
 `main-x-service`). Access control:
 `CASE_REQUIRE_AUTH` — blanket-enforcement flag, parsed leniently
 (`1`/`true`/`yes`/`on`, case-insensitive ⇒ on; unset/blank/other ⇒ off),
-**off by default** (see §9). Plus loco's own `DATABASE_URL` etc.
+**off by default** (see §9); `CASE_ABAC_POLICY` (inline JSON) /
+`CASE_ABAC_POLICY_FILE` (path) — the ABAC authorization policy
+evaluated inside the guard (see §9; unset or unparsable ⇒ warn-log +
+the built-in default policy — read allow / mutation deny — so the
+service always boots; read once per process, restart to change). Plus
+loco's own `DATABASE_URL` etc.
 
 ## 8. Architecture
 
@@ -278,7 +283,8 @@ verification (Ed25519; `src/auth.rs`, embedding `authentication-verifier`)
 underpins the `AuthUser` / `MaybeAuthUser` extractors. When
 `CASE_REQUIRE_AUTH` is on,
 an Axum `from_fn` middleware wired in `App::after_routes` (delegating to
-the pure `auth::enforce(require_auth, path, headers, verifier)`) rejects
+the pure `auth::enforce(require_auth, method, path, headers, verifier,
+policy)`) rejects
 every non-public request lacking a valid bearer token with `401`;
 `/_health`, `/_ping`, `/api-docs/openapi.json`, `/swagger-ui*` and
 `/metrics.prom` stay public. The flag is read once per process and the layer is always wired,
@@ -290,6 +296,42 @@ the family-wide [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-en
 the credential is now a PASETO token per
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
 (source of truth; supersedes the RS256-JWT model).
+
+**Authorization (ABAC).** Inside the same guard — so only when
+`CASE_REQUIRE_AUTH` is on — a verified token is authorized by
+**attribute-based access control** per
+[`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md):
+the request's action is derived from the HTTP method plus this crate's
+destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` — `/merge`,
+`/deduplicate`, `/import`; the latter two ahead of the dedup-scan and
+bulk-import features), and the shared engine in
+`authentication-verifier` 0.3 evaluates the policy over the token's
+`attrs` claim, first-match-wins. Configure with `CASE_ABAC_POLICY`
+(inline JSON) or `CASE_ABAC_POLICY_FILE` (path); unset or unparsable ⇒
+warn-log + the built-in default policy (any authenticated subject
+reads; `access=write` writes; `access=admin` adds DELETE/merge;
+`svc=true` does everything). `401` = missing/bad credential; `403` =
+valid credential, policy denied (the body names the deciding rule).
+Because case data is personal data, deployments can express e.g.
+department or **purpose-of-use** scoping as configured policy rules
+over the same `attrs` claim — configuration, not code.
+
+**Record-level authorization (delivered).** Beyond the coarse blanket
+guard, the single-case handlers `GET`/`PUT`/`DELETE /api/cases/{pid}`
+run a **second, finer** ABAC pass after loading the record, per
+[`authorization-attributes.md`](../../../agents/share/authorization-attributes.md)
+§9. `auth::case_resource_attrs` derives the case's classification fields
+into resource attributes — `resource.case_type`, `resource.status`,
+`resource.priority` (lowercase tokens, e.g. `investigation`, `closed`,
+`high`) — and `auth::authorize_record` calls the verifier 0.4
+`Policy::evaluate_with_resource` (gated on `CASE_REQUIRE_AUTH`, so it is
+a no-op when enforcement is off). A deployment can then write, as
+policy, e.g. "deny `write` when `resource.status=closed` unless
+`access=admin`" or "deny `read` when `resource.case_type=investigation`
+unless `dept=investigations`". `PUT`/`DELETE` evaluate the **stored**
+case's attributes (the record being modified), not the incoming payload.
+No schema change — these are the case's existing fields; a dedicated
+per-case **sensitivity tier** column remains an optional roadmap add.
 
 **Cross-service link authorisation (governance).** The `subject_of` /
 `about` edge (§8.6) is **sensitive data**: the edge itself asserts a

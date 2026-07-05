@@ -26,7 +26,7 @@
 //!
 //! [`agents/share/authentication-sessions.md`]: https://github.com/sixarm/main-x-service
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::OnceLock;
 
 use axum::extract::FromRequestParts;
@@ -126,6 +126,17 @@ pub struct Claims {
     /// Granted roles, if any.
     #[serde(default)]
     pub roles: Vec<String>,
+    /// Subject attributes for ABAC authorization — a string→strings map
+    /// minted from the user's assigned attributes (e.g.
+    /// `access: ["write"]`, `dept: ["cardiology"]`, `svc: ["true"]` for
+    /// machine peers). Multi-valued keys mean "has each of these values";
+    /// policies match set-membership; unknown attributes are inert
+    /// (forward-compatible). Absent on the wire (old tokens) ⇒ empty map
+    /// — no re-issue needed. Evaluated by the peer-side
+    /// `authentication_verifier::abac` engine per
+    /// `agents/share/authorization-attributes.md` §2–§3.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub attrs: BTreeMap<String, Vec<String>>,
 }
 
 /// Errors from key loading or token handling.
@@ -302,8 +313,9 @@ pub fn build_keys(seed: &[u8; 32], additional: &[[u8; 32]]) -> Result<AuthKeys, 
 }
 
 /// Mint a PASETO `v4.public` access token for a user, bound to session
-/// `sid`. Returns the token, the `sid` (echoed for the caller's
-/// convenience), and its expiry (unix seconds).
+/// `sid` and carrying the subject's ABAC `attrs` map (empty ⇒ the claim
+/// is omitted from the wire form). Returns the token, the `sid` (echoed
+/// for the caller's convenience), and its expiry (unix seconds).
 ///
 /// # Errors
 ///
@@ -313,6 +325,7 @@ pub fn sign_access_token(
     email: &str,
     name: &str,
     sid: &str,
+    attrs: BTreeMap<String, Vec<String>>,
 ) -> Result<(String, String, i64), AuthError> {
     let k = keys();
     let now = chrono::Utc::now().timestamp();
@@ -329,6 +342,7 @@ pub fn sign_access_token(
         sid: sid.to_string(),
         scope: Vec::new(),
         roles: Vec::new(),
+        attrs,
     };
     let token = mint(&k.signing_keypair, &k.kid, &claims)?;
     Ok((token, sid.to_string(), exp))
@@ -469,6 +483,7 @@ mod tests {
             sid: sid.to_string(),
             scope: Vec::new(),
             roles: Vec::new(),
+            attrs: BTreeMap::new(),
         }
     }
 
@@ -494,6 +509,35 @@ mod tests {
         assert_eq!(got.iss, k.issuer);
         assert_eq!(got.aud, k.audience);
         assert_eq!(got.sid, "session-abc");
+    }
+
+    #[test]
+    fn attrs_claim_round_trips_mint_to_verify() {
+        let k = dev_keys();
+        let mut claims = claims_for(&k, "session-abc", 3600);
+        claims
+            .attrs
+            .insert("access".to_string(), vec!["write".to_string()]);
+        claims.attrs.insert(
+            "dept".to_string(),
+            vec!["cardiology".to_string(), "oncology".to_string()],
+        );
+        let token = mint(&k.signing_keypair, &k.kid, &claims).expect("mint");
+        let got = verify_with(&k, &token).expect("verify");
+        assert_eq!(got.attrs, claims.attrs);
+    }
+
+    #[test]
+    fn empty_attrs_claim_is_omitted_from_the_payload() {
+        // skip_serializing_if: an empty map never reaches the wire, so
+        // pre-ABAC verifiers see the exact pre-0.3 payload shape.
+        let k = dev_keys();
+        let claims = claims_for(&k, "s", 3600);
+        let payload = serde_json::to_value(&claims).expect("serialize");
+        assert!(payload.get("attrs").is_none());
+        // …and it still deserializes back to an empty map.
+        let got: Claims = serde_json::from_value(payload).expect("deserialize");
+        assert!(got.attrs.is_empty());
     }
 
     #[test]

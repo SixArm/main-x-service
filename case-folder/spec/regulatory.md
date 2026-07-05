@@ -28,14 +28,15 @@ this boundary first.
 
 ## Security & privacy gates (pre-production checklist)
 
-The three P0 gates are sketched as designs: [rbac.md](rbac.md) (identity +
+The three P0 gates are sketched as designs:
+[authorization.md](authorization.md) (identity +
 authorization), [audit-integrity.md](audit-integrity.md), and
 [deployment.md](deployment.md).
 
-- [ ] **Authentication + RBAC** via NHS CIS2 smartcard or OIDC/Azure AD —
-      [rbac.md](rbac.md).
+- [ ] **Authentication + ABAC** via NHS CIS2 smartcard or OIDC/Azure AD —
+      [authorization.md](authorization.md).
 - [ ] **Per-user attribution** on every move (`movedBy` from the auth
-      context, not free-text input) — [rbac.md](rbac.md) §4.
+      context, not free-text input) — [authorization.md](authorization.md) §4.
 - [ ] **Append-only audit storage** with chained signatures for move
       events; backups + point-in-time recovery under NHS retention rules —
       [audit-integrity.md](audit-integrity.md).

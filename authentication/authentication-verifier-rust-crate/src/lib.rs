@@ -28,6 +28,16 @@
 //! not exist. See [`agents/share/authentication-sessions.md`] in the
 //! monorepo for the family-wide design.
 //!
+//! # Authorization (ABAC)
+//!
+//! Since 0.3 the crate is also the family's shared **authorization**
+//! foundation: verified [`Claims`] carry the subject's attributes in the
+//! [`attrs`](Claims::attrs) claim, and the [`abac`] module provides the
+//! pure policy engine ([`Policy`], [`Rule`], [`Action`],
+//! [`Policy::evaluate`] → [`Decision`]) that the nine entity services
+//! call from their blanket `/api/*` guards. See
+//! [`agents/share/authorization-attributes.md`] for the design.
+//!
 //! # Security properties
 //!
 //! - **Asymmetric trust.** Verifiers never possess signing material, so a
@@ -63,6 +73,7 @@
 //!
 //! [`authentication-service`]: https://github.com/sixarm/authentication-service-with-loco
 //! [`agents/share/authentication-sessions.md`]: https://github.com/sixarm/main-x-service
+//! [`agents/share/authorization-attributes.md`]: https://github.com/sixarm/main-x-service
 
 // Reject `unsafe` outright: this crate touches only safe, allocation-light
 // code paths and a security library has no business reaching for `unsafe`.
@@ -73,7 +84,7 @@
 // any item lacks a doc comment.
 #![deny(missing_docs)]
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // base64url (no padding) decodes the published key's `x` component.
@@ -88,6 +99,13 @@ use rusty_paseto::core::{
 // `serde` derives let `Claims` deserialize from the token payload (and
 // serialize again, which the tests rely on to mint tokens).
 use serde::{Deserialize, Serialize};
+
+pub mod abac;
+
+// Re-export the ABAC engine types at the crate root so callers can use
+// `authentication_verifier::{Policy, Action, ...}` alongside `Verifier`
+// and `Claims` without spelling the module path.
+pub use abac::{Action, ActionPattern, Decision, Effect, Policy, Rule};
 
 /// Verified token claims. Mirrors the auth-service `Claims` exactly so a
 /// token signed there round-trips here. `sub` carries the user `pid`.
@@ -125,11 +143,33 @@ pub struct Claims {
     /// token can be correlated back to (and revoked with) its session.
     pub sid: String,
     /// Granted scopes, if any. Empty when the token carries none.
+    ///
+    /// **Deprecated for authorization** (kept on the wire for
+    /// compatibility; removal is a future major): the ABAC guard ignores
+    /// `scope` and decides from [`attrs`](Self::attrs) instead. See
+    /// `agents/share/authorization-attributes.md` §3.
     #[serde(default)]
     pub scope: Vec<String>,
     /// Granted roles, if any. Empty when the token carries none.
+    ///
+    /// **Deprecated for authorization** (kept on the wire for
+    /// compatibility; removal is a future major): the ABAC guard ignores
+    /// `roles` and decides from [`attrs`](Self::attrs) instead — a role,
+    /// where one is wanted, is just another attribute (`role=editor`).
+    /// See `agents/share/authorization-attributes.md` §3.
     #[serde(default)]
     pub roles: Vec<String>,
+    /// Subject attributes for ABAC authorization — a string→strings map
+    /// minted by the auth-service from the user's assigned attributes
+    /// (e.g. `access: ["write"]`, `dept: ["cardiology"]`,
+    /// `svc: ["true"]` for machine peers). Multi-valued keys mean "has
+    /// each of these values"; policies match set-membership; unknown
+    /// attributes are inert (forward-compatible). Absent on the wire
+    /// (old tokens) ⇒ empty map — no re-issue needed. Evaluated by the
+    /// [`abac`] engine per `agents/share/authorization-attributes.md`
+    /// §2–§3, alongside the pseudo-attributes `sub` and `email`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub attrs: BTreeMap<String, Vec<String>>,
 }
 
 /// Failure modes for key-set loading and token verification.
@@ -473,13 +513,20 @@ mod tests {
     // Mint a v4.public token with the given footer kid and claims, using
     // the test private key — the inverse of what the verifier does.
     fn sign(kid: &str, claims: &Claims) -> String {
+        let payload = serde_json::to_string(claims).expect("serialize claims");
+        sign_payload(kid, &payload)
+    }
+
+    // Mint a v4.public token from a raw JSON payload string, so tests can
+    // exercise wire forms `Claims` itself would not serialize (e.g. a
+    // pre-0.3 token with no `attrs` member at all).
+    fn sign_payload(kid: &str, payload: &str) -> String {
         let keypair = signing_key().to_keypair_bytes(); // [u8; 64]
         let key = Key::<64>::from(keypair);
         let private = PasetoAsymmetricPrivateKey::<V4, Public>::from(&key);
-        let payload = serde_json::to_string(claims).expect("serialize claims");
         let footer = format!(r#"{{"kid":"{kid}"}}"#);
         let mut builder = Paseto::<V4, Public>::builder();
-        builder.set_payload(Payload::from(payload.as_str()));
+        builder.set_payload(Payload::from(payload));
         builder.set_footer(Footer::from(footer.as_str()));
         builder.try_sign(&private).expect("sign")
     }
@@ -501,6 +548,7 @@ mod tests {
             sid: "22222222-2222-2222-2222-222222222222".to_string(),
             scope: vec![],
             roles: vec![],
+            attrs: BTreeMap::new(),
         }
     }
 
@@ -515,6 +563,43 @@ mod tests {
         assert_eq!(got.iss, ISSUER);
         assert_eq!(got.aud, AUDIENCE);
         assert_eq!(got.sid, "22222222-2222-2222-2222-222222222222");
+    }
+
+    #[test]
+    fn attrs_claim_round_trips_mint_to_verify() {
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
+        let mut c = claims(3600);
+        c.attrs.insert(
+            "access".to_string(),
+            vec!["write".to_string(), "admin".to_string()],
+        );
+        c.attrs
+            .insert("dept".to_string(), vec!["cardiology".to_string()]);
+        let token = sign(KID, &c);
+        let got = verifier.verify(&token).expect("verify");
+        assert_eq!(got.attrs, c.attrs);
+    }
+
+    #[test]
+    fn absent_attrs_claim_verifies_to_empty_map() {
+        // A pre-0.3 token carries no `attrs` member at all; it must verify
+        // and land as an empty map — no re-issue needed.
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
+        let now = 1_900_000_000_i64;
+        let payload = serde_json::json!({
+            "sub": "11111111-1111-1111-1111-111111111111",
+            "email": "alice@example.com",
+            "name": "Alice",
+            "iss": ISSUER,
+            "aud": AUDIENCE,
+            "exp": now + 3600,
+            "iat": now,
+            "sid": "22222222-2222-2222-2222-222222222222",
+        })
+        .to_string();
+        let token = sign_payload(KID, &payload);
+        let got = verifier.verify(&token).expect("verify");
+        assert!(got.attrs.is_empty());
     }
 
     #[test]

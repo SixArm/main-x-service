@@ -126,6 +126,23 @@ router surfaces (`create_router` and the loco `after_routes` hook);
 the flag is read once at router construction, so changing it requires
 a restart. Family contract: `agents/share/jwt-enforcement.md`.
 
+#### Authorization (ABAC)
+
+Inside the same guard (so only when `PERSON_REQUIRE_AUTH` is on), a
+verified token is authorized by **attribute-based access control**
+per `agents/share/authorization-attributes.md`: the request's action
+is derived from the HTTP method plus the crate's destructive named
+POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` — `/merge`, `/deduplicate`,
+`/import`), and the shared engine in `authentication-verifier` 0.3
+evaluates the policy over the token's `attrs` claim. Configure with
+`PERSON_ABAC_POLICY` (inline JSON) or `PERSON_ABAC_POLICY_FILE`
+(path); unset or unparsable ⇒ warn-log + the built-in default policy
+(any authenticated subject reads; `access=write` writes;
+`access=admin` adds DELETE/merge/deduplicate; `svc=true` does
+everything). Read once at router construction — restart to change.
+`401` = missing/bad credential; `403` = valid credential, policy
+denied (the body names the deciding rule).
+
 ### Person CRUD
 
 | Method | Path | Description |

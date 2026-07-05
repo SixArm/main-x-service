@@ -1,16 +1,18 @@
 ## 15. Roadmap
 
-- **Authentication & authorisation** — roles on top of the delivered
-  blanket PASETO enforcement (env-gated `THING_REQUIRE_AUTH`,
-  default-off middleware landed 2026-07-04; peer offline PASETO
-  v4.public verification via the `authentication-verifier` crate and
-  the boot-time `THING_PASETO_KEYS_URL` HTTP key-set fetch also
-  2026-07-04, per
-  [authentication-sessions](../../../agents/share/authentication-sessions.md)),
-  activation as an ops decision, a periodic key-set
+- **Authentication & authorisation** — T-4 is complete: peer offline
+  PASETO v4.public verification, the default-off `THING_REQUIRE_AUTH`
+  blanket `/api/*` enforcement middleware, the boot-time
+  `THING_PASETO_KEYS_URL` HTTP key-set fetch (all 2026-07-04), and
+  **ABAC authorization** (2026-07-05, per
+  [authorization-attributes](../../../agents/share/authorization-attributes.md)
+  — the shared policy engine over the token's `attrs` claim;
+  supersedes the earlier roles/RBAC sketch). Remaining: activation is
+  an ops decision; richer deployment policies are configuration
+  (`THING_ABAC_POLICY*`), not code; record-level resource attributes
+  are a shared-design open question. Also: a periodic key-set
   **re-fetch/refresh loop** for key rotation (today the fetch happens
-  once at boot), RBAC, rate limiting, user endpoints, security
-  headers.
+  once at boot), rate limiting, user endpoints, security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`thing_created`, `match_score_histogram`),
   Grafana dashboards + alerting.

@@ -566,7 +566,7 @@ Helm chart and Kubernetes manifests planned for Phase 13.
 ### Planned
 
 - ⏳ **Authentication**: cookie sessions + offline PASETO v4.public verification (see [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md))
-- ⏳ **Authorization**: Role-based access control (RBAC)
+- ✅ **Authorization**: Attribute-based access control (ABAC) inside the blanket guard — the shared `authentication-verifier` policy engine over the token's `attrs` claim (see [`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md)); default-off with enforcement
 - ⏳ **Encryption at Rest**: Database encryption
 - ⏳ **TLS/SSL**: HTTPS enforcement
 - ⏳ **Rate Limiting**: API rate limiting

@@ -32,7 +32,7 @@ pub fn spec() -> Value {
 /// per-area path groups (merged into a single object).
 fn paths() -> Value {
     let mut paths = serde_json::Map::new();
-    for group in [auth_paths(), account_paths(), infra_paths()] {
+    for group in [auth_paths(), account_paths(), admin_paths(), infra_paths()] {
         if let Value::Object(map) = group {
             paths.extend(map);
         }
@@ -158,6 +158,44 @@ fn account_paths() -> Value {
     })
 }
 
+/// Admin endpoints: ABAC attribute assignment over HTTP. Gated by an
+/// `access=admin` bearer (403 otherwise); see
+/// `agents/share/authorization-attributes.md` §6.
+fn admin_paths() -> Value {
+    json!({
+            "/api/auth/admin/users/{pid}/attributes": {
+                "get": {
+                    "tags": ["admin"],
+                    "summary": "Show a user's ABAC subject attributes",
+                    "description": "Returns the user's current ABAC attribute map (the string→strings map minted into the PASETO attrs claim). Requires a bearer whose own attributes include access=admin.",
+                    "security": [{ "bearer": [] }],
+                    "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                    "responses": {
+                        "200": { "description": "The user's attribute map", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserAttributes" } } } },
+                        "401": { "description": "Missing/invalid bearer token" },
+                        "403": { "description": "Valid token but the caller is not an admin (access=admin required)" },
+                        "404": { "description": "No such (live) user" }
+                    }
+                },
+                "put": {
+                    "tags": ["admin"],
+                    "summary": "Replace a user's ABAC subject attributes",
+                    "description": "Replaces the user's entire ABAC attribute map. Keys and values must be short lowercase tokens; the reserved pseudo-attributes sub/email/entity are refused, and no key may map to an empty value list (send {} to clear). Requires access=admin. Writes an attributes_assigned auth_events audit row (actor = the admin's pid).",
+                    "security": [{ "bearer": [] }],
+                    "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReplaceUserAttributes" } } } },
+                    "responses": {
+                        "200": { "description": "The updated attribute map", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserAttributes" } } } },
+                        "401": { "description": "Missing/invalid bearer token" },
+                        "403": { "description": "Valid token but the caller is not an admin (access=admin required)" },
+                        "404": { "description": "No such (live) user" },
+                        "422": { "description": "Invalid attribute key or value" }
+                    }
+                }
+            }
+    })
+}
+
 /// Infrastructure endpoints: the public key set and Prometheus metrics.
 fn infra_paths() -> Value {
     json!({
@@ -191,7 +229,14 @@ fn components() -> Value {
                 "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "PASETO",
                     "description": "PASETO v4.public access token issued by this service, verified offline against its published Ed25519 keys." }
             },
-            "schemas": {
+            "schemas": schemas()
+    })
+}
+
+/// The `components.schemas` object, split out of [`components`] so each
+/// stays under the pedantic line budget.
+fn schemas() -> Value {
+    json!({
                 "SignupParams": { "type": "object", "required": ["email"], "properties": {
                     "email": { "type": "string", "format": "email", "description": "Email to register and the magic-link recipient." },
                     "name": { "type": "string", "nullable": true, "description": "Optional display name; defaults from the email local-part." },
@@ -221,8 +266,9 @@ fn components() -> Value {
                     "iat": { "type": "integer", "format": "int64", "description": "Issued-at (unix seconds)." },
                     "nbf": { "type": "integer", "format": "int64", "nullable": true, "description": "Not-before (unix seconds); omitted when absent." },
                     "sid": { "type": "string", "format": "uuid", "description": "Session id; also sessions.jid for revocation." },
-                    "scope": { "type": "array", "items": { "type": "string" }, "description": "Granted scopes, if any." },
-                    "roles": { "type": "array", "items": { "type": "string" }, "description": "Granted roles, if any." } } },
+                    "scope": { "type": "array", "items": { "type": "string" }, "description": "Granted scopes, if any. Deprecated for authorization — the ABAC guard decides from attrs." },
+                    "roles": { "type": "array", "items": { "type": "string" }, "description": "Granted roles, if any. Deprecated for authorization — the ABAC guard decides from attrs." },
+                    "attrs": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } }, "description": "ABAC subject attributes (string→strings map, e.g. access: [\"write\"]), copied from the session at minting. Omitted when empty; absent on old tokens means an empty map. See agents/share/authorization-attributes.md." } } },
                 "PasetoKey": { "type": "object", "required": ["kty", "crv", "use", "kid", "x"], "properties": {
                     "kty": { "type": "string", "example": "OKP" },
                     "crv": { "type": "string", "example": "Ed25519" },
@@ -248,6 +294,7 @@ fn components() -> Value {
                     "email": { "type": "string", "format": "email" },
                     "name": { "type": "string" },
                     "email_verified_at": { "type": "string", "format": "date-time", "nullable": true },
+                    "attributes": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } }, "description": "ABAC subject attributes assigned to the account (subject data, not a secret); {} until an operator assigns any." },
                     "created_at": { "type": "string", "format": "date-time" },
                     "updated_at": { "type": "string", "format": "date-time" } } },
                 "AccountSessionExport": { "type": "object",
@@ -272,10 +319,20 @@ fn components() -> Value {
                     "user": { "$ref": "#/components/schemas/AccountUserExport" },
                     "sessions": { "type": "array", "items": { "$ref": "#/components/schemas/AccountSessionExport" } },
                     "auth_events": { "type": "array", "items": { "$ref": "#/components/schemas/AccountAuditExport" } } } },
+                "UserAttributes": { "type": "object",
+                    "description": "A user's ABAC subject attributes (the string→strings map minted into the PASETO attrs claim).",
+                    "required": ["pid", "email", "attributes"], "properties": {
+                    "pid": { "type": "string", "format": "uuid" },
+                    "email": { "type": "string", "format": "email" },
+                    "attributes": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } },
+                        "description": "e.g. { \"access\": [\"write\"], \"dept\": [\"cardiology\"] }." } } },
+                "ReplaceUserAttributes": { "type": "object",
+                    "description": "Full replacement ABAC attribute map. Keys/values are short lowercase tokens; sub/email/entity are reserved; no key may map to an empty list (send {} to clear).",
+                    "required": ["attributes"], "properties": {
+                    "attributes": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } } } },
                 "Error": { "type": "object", "properties": {
                     "error": { "type": "string", "description": "Machine-readable error code, e.g. rate_limited." },
                     "description": { "type": "string" } } }
-            }
     })
 }
 
@@ -307,6 +364,23 @@ mod tests {
         assert!(paths["/api/auth/account"]["delete"].is_object());
         assert!(paths["/.well-known/paseto-keys"]["get"].is_object());
         assert!(paths["/metrics.prom"]["get"].is_object());
+    }
+
+    #[test]
+    fn documents_the_admin_attribute_endpoints_as_admin_gated() {
+        let s = spec();
+        let ep = &s["paths"]["/api/auth/admin/users/{pid}/attributes"];
+        // Both verbs exist and require the bearer.
+        assert_eq!(ep["get"]["security"][0]["bearer"], serde_json::json!([]));
+        assert_eq!(ep["put"]["security"][0]["bearer"], serde_json::json!([]));
+        // The 403 (non-admin) and 422 (bad body) responses are documented.
+        assert!(ep["get"]["responses"]["403"].is_object());
+        assert!(ep["put"]["responses"]["403"].is_object());
+        assert!(ep["put"]["responses"]["422"].is_object());
+        // The referenced schemas exist.
+        let schemas = &s["components"]["schemas"];
+        assert!(schemas["UserAttributes"]["properties"]["attributes"].is_object());
+        assert!(schemas["ReplaceUserAttributes"]["required"][0] == "attributes");
     }
 
     #[test]
@@ -345,6 +419,24 @@ mod tests {
         assert!(export["user"]["$ref"].is_string());
         assert!(export["sessions"]["items"]["$ref"].is_string());
         assert!(export["auth_events"]["items"]["$ref"].is_string());
+    }
+
+    #[test]
+    fn claims_schema_documents_the_abac_attrs_map() {
+        let s = spec();
+        let attrs = &s["components"]["schemas"]["Claims"]["properties"]["attrs"];
+        // The ABAC subject-attribute claim: string→strings map, optional
+        // on the wire (omitted when empty).
+        assert_eq!(attrs["type"], "object");
+        assert_eq!(attrs["additionalProperties"]["items"]["type"], "string");
+        assert!(
+            !s["components"]["schemas"]["Claims"]["required"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|v| v == "attrs"),
+            "attrs must stay optional (empty maps are omitted from the wire)"
+        );
     }
 
     #[test]

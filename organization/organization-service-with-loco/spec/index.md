@@ -88,6 +88,8 @@ embedded library; soft-delete with audit-friendly timestamps.
 | `ORGANIZATION_TOKEN_ISSUER` | `authentication-service` | Expected `iss` (see [`authentication-sessions.md`](../../../agents/share/authentication-sessions.md) §5 claims). |
 | `ORGANIZATION_TOKEN_AUDIENCE` | `main-x-service` | Expected `aud` (see [`authentication-sessions.md`](../../../agents/share/authentication-sessions.md) §5 claims). |
 | `ORGANIZATION_REQUIRE_AUTH` | unset ⇒ **off** | Blanket `/api/*` enforcement (credential is now a PASETO v4.public token or BFF cookie session). Lenient bool: `1`/`true`/`yes`/`on` ⇒ on; else off. See [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md) (credential superseded by [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)). |
+| `ORGANIZATION_ABAC_POLICY` | unset ⇒ built-in default policy | ABAC authorization policy as inline JSON (evaluated only when enforcement is on). Unparsable ⇒ warn-log + built-in default. See [`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md). |
+| `ORGANIZATION_ABAC_POLICY_FILE` | unset | Path to the ABAC policy JSON file (used when `ORGANIZATION_ABAC_POLICY` is unset). Unreadable/unparsable ⇒ warn-log + built-in default. |
 
 ## 8. Architecture
 
@@ -144,6 +146,23 @@ layer (`App::after_routes` → `auth::enforce`) requires a valid bearer
 token on **every** route except the public health/ping, OpenAPI/Swagger,
 and `/metrics.prom` paths, returning `401` otherwise. The flag is read
 per request and is **off by default**, so default behaviour is unchanged.
+
+**Authorization (ABAC).** Inside the same guard — so only when
+`ORGANIZATION_REQUIRE_AUTH` is on — a verified token is authorized by
+**attribute-based access control** per
+[`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md):
+the request's action is derived from the HTTP method plus this crate's
+destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` — `/merge`,
+`/deduplicate`, `/import`; the latter two ahead of the dedup-scan and
+bulk-import features), and the shared engine in
+`authentication-verifier` 0.3 evaluates the policy over the token's
+`attrs` claim, first-match-wins. Configure with `ORGANIZATION_ABAC_POLICY`
+(inline JSON) or `ORGANIZATION_ABAC_POLICY_FILE` (path); unset or
+unparsable ⇒ warn-log + the built-in default policy (any authenticated
+subject reads; `access=write` writes; `access=admin` adds DELETE/merge;
+`svc=true` does everything). `401` = missing/bad credential; `403` =
+valid credential, policy denied (the body names the deciding rule). This
+supersedes the earlier per-crate roles/RBAC sketch.
 
 **Observability.** `GET /metrics.prom` (root path, public) serves the
 process-wide Prometheus registry (`src/metrics.rs`) in text-exposition

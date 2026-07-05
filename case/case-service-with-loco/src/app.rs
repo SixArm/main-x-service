@@ -31,14 +31,25 @@ use crate::{
     workers::downloader::DownloadWorker,
 };
 
-/// Blanket JWT-enforcement middleware. Reads the `CASE_REQUIRE_AUTH` flag
-/// per request via [`auth::require_auth`] and delegates the decision to
-/// the pure [`auth::enforce`]: public paths and the disabled flag pass
-/// through; otherwise a valid bearer token is required or the request is
-/// rejected with `401`. Off by default (see `auth.rs`).
+/// Blanket auth-enforcement middleware. Reads the `CASE_REQUIRE_AUTH`
+/// flag per request via [`auth::require_auth`] and delegates the decision
+/// to the pure [`auth::enforce`]: public paths and the disabled flag pass
+/// through; otherwise a valid bearer token is required (`401`) and the
+/// token's `attrs` claim must satisfy the process-wide ABAC policy
+/// ([`auth::policy`]) for the action derived from the method + path
+/// (`403` with the deciding rule otherwise). Off by default (see
+/// `auth.rs` and `agents/share/authorization-attributes.md`).
 async fn require_auth_mw(req: Request, next: Next) -> Response {
     let path = req.uri().path().to_string();
-    match auth::enforce(auth::require_auth(), &path, req.headers(), auth::verifier()) {
+    let method = req.method().clone();
+    match auth::enforce(
+        auth::require_auth(),
+        &method,
+        &path,
+        req.headers(),
+        auth::verifier(),
+        auth::policy(),
+    ) {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),
     }
@@ -91,7 +102,8 @@ impl Hooks for App {
         // set is fetched over HTTP once at boot (fetch failure falls back
         // to the `CASE_PASETO_KEYS` env path — the service always boots).
         auth::init().await;
-        // Blanket JWT enforcement layer. Added unconditionally; the
+        // Blanket auth enforcement layer (authn + ABAC authz). Added
+        // unconditionally; the
         // `CASE_REQUIRE_AUTH` flag is read per request and the layer is a
         // near-noop when the flag is off (the default).
         Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))

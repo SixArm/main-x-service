@@ -60,7 +60,7 @@ Design sketches for the gates that must close before any live use. They are
 
 | File                                       | Covers                                                    |
 | ------------------------------------------ | --------------------------------------------------------- |
-| [rbac.md](rbac.md)                         | NHS CIS2/OIDC identity + role-based authorization (T-G1)  |
+| [authorization.md](authorization.md)       | NHS CIS2/OIDC identity + attribute-based authorization (ABAC) (T-G1) |
 | [audit-integrity.md](audit-integrity.md)   | Append-only, hash-chained, signed audit log (T-G2)        |
 | [deployment.md](deployment.md)             | Same-origin deployment, SSR re-enable, TLS/HSTS/CSP (T-G3) |
 

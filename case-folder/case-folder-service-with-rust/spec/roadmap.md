@@ -5,7 +5,7 @@
 
 | Priority | Item                                                                |
 | -------- | ------------------------------------------------------------------- |
-| P0       | Auth (CIS2 smartcard or OIDC) + RBAC                                |
+| P0       | Auth (CIS2 smartcard or OIDC) + ABAC                                |
 | P0       | Append-only audit storage with chained signatures                   |
 | P0       | API versioning via `Accept` header mediatype (`application/vnd...`) |
 | P1       | OpenAPI / JSON Schema document for every endpoint                   |

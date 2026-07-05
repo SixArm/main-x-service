@@ -61,9 +61,12 @@ is retained for governmental information governance.
 - **Access control.** Production deployments MUST sit behind SSO
   (central authentication entity, PASETO v4 public token verification;
   [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md),
-  supersedes the RS256-JWT model) and TLS (role-based write
-  authorisation over a work item's sub-resources is roadmap once auth
-  is enforced, §15).
+  supersedes the RS256-JWT model) and TLS. **ABAC** authorisation over
+  the token's `attrs` claim gates write vs read vs destructive actions
+  (per
+  [`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md);
+  delivered, supersedes the earlier role-based sketch); default-off
+  until the coordinated SSO activation (§15).
 - **Explainability for accountability.** Per-component match
   breakdowns — and the kind gate — give auditors a replayable rationale
   for every duplicate decision; keep this property (NFR-8).

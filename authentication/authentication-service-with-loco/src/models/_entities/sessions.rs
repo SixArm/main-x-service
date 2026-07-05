@@ -22,6 +22,11 @@ pub struct Model {
     pub revoked_at: Option<DateTimeWithTimeZone>,
     /// Best-effort user agent captured at issuance.
     pub user_agent: Option<String>,
+    /// Session payload JSONB (shared authentication-sessions design §3).
+    /// Holds the user's ABAC attributes under `attrs`, copied at session
+    /// establishment so token minting reads only the session.
+    #[sea_orm(column_type = "JsonBinary")]
+    pub data: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

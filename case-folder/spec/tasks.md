@@ -76,15 +76,15 @@
 
 ## Production gates (blocked on deployment decisions)
 
-- [~] **T-G1** Auth + RBAC across API and client (P0) — magic-link auth
-  **done** (T-AUTH); remaining: **CIS2 / OIDC** identity + RBAC — **sketched**
-  in [rbac.md](rbac.md); implementation pending
+- [~] **T-G1** Auth + ABAC across API and client (P0) — magic-link auth
+  **done** (T-AUTH); remaining: **CIS2 / OIDC** identity + ABAC — **sketched**
+  in [authorization.md](authorization.md); implementation pending
 - [~] **T-G2** Append-only, hash-chained, signed audit log (P0) — **sketched**
   in [audit-integrity.md](audit-integrity.md); implementation pending
 - [~] **T-G3** Same-origin deployment + re-enable SSR (P0) — **sketched**
   in [deployment.md](deployment.md); implementation pending
 - [ ] **T-G4** Per-user move attribution from auth context (replaces free-text
-  `movedBy`) — see [rbac.md](rbac.md) §4
+  `movedBy`) — see [authorization.md](authorization.md) §4
 - [ ] **T-G5** Secrets manager, `auto_migrate: false`, TLS/HSTS, CSP — see
   [deployment.md](deployment.md)
 

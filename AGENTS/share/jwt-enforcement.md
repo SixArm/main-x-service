@@ -30,7 +30,9 @@ env-driven `<ENTITY>_PASETO_KEYS` / `_TOKEN_ISSUER` / `_TOKEN_AUDIENCE`)
 and, as of 2026-07-04, carry the same default-off blanket middleware
 (`<ENTITY>_REQUIRE_AUTH`, flag read at router construction — restart to
 change), layered on both their Axum and loco router surfaces. Remaining
-per-crate §13 item: roles/RBAC. Boot-time HTTP key fetch landed
+per-crate §13 item: attribute-based access control (ABAC) per
+[authorization-attributes.md](authorization-attributes.md). Boot-time
+HTTP key fetch landed
 2026-07-04 in all nine services: set `<ENTITY>_PASETO_KEYS_URL` to fetch
 the published key set once at boot (fetched set wins; fetch failure
 warn-logs and falls back to the `<ENTITY>_PASETO_KEYS` env key set, so
@@ -246,4 +248,5 @@ Rules:
 Implemented (default-off) in all nine entity services as of 2026-07-04,
 including the paseto-keys-over-HTTP boot fetch (`<ENTITY>_PASETO_KEYS_URL`).
 Remaining operational follow-ups: activation (step 3), the DB-gated
-request suites in CI (step 4), and per-crate roles/RBAC (spec §13).
+request suites in CI (step 4), and per-crate ABAC policy authorization
+(spec §13; [authorization-attributes.md](authorization-attributes.md)).

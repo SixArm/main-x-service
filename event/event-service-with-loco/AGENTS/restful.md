@@ -85,6 +85,25 @@ restart the service to change it. Wired on both router surfaces
 contract:
 [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md).
 
+### Authorization (ABAC)
+
+Inside the same guard (so only when `EVENT_REQUIRE_AUTH` is on), a
+verified token is authorized by **attribute-based access control**
+per
+[`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md):
+the request's action is derived from the HTTP method plus the crate's
+destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` —
+`/merge`, `/deduplicate`, `/import`; matched on path suffix, so
+`/api/v1/events/merge` is destructive), and the shared engine in
+`authentication-verifier` 0.3 evaluates the policy over the token's
+`attrs` claim. Configure with `EVENT_ABAC_POLICY` (inline JSON) or
+`EVENT_ABAC_POLICY_FILE` (path); unset or unparsable ⇒ warn-log + the
+built-in default policy (any authenticated subject reads;
+`access=write` writes; `access=admin` adds DELETE/merge/deduplicate;
+`svc=true` does everything). Read once at `AppState` construction —
+restart to change. `401` = missing/bad credential; `403` = valid
+credential, policy denied (the body names the deciding rule).
+
 ## Event CRUD
 
 | Method | Path | Notes |

@@ -39,8 +39,9 @@ An **interest** would record, at minimum:
   services do not model "interest").
 - How does it interact with [moves](domain-model.md), [volumes](volume.md),
   and any future [batch](batch.md) handling?
-- Audit + RBAC: who may declare, view, or withdraw an interest, and how is
-  it logged? (Follow the append-only snapshot conventions.)
+- Audit + ABAC: who may declare, view, or withdraw an interest (which
+  subject attributes gate it), and how is it logged? (Follow the
+  append-only snapshot conventions.)
 
 ## Next steps
 

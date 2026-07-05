@@ -4,6 +4,7 @@
 //! verbatim (as JSON) and matches with the canonical `case-matcher`
 //! engine, so there is no separate model or adapter to drift.
 
+use authentication_verifier::Action;
 use axum::http::StatusCode;
 use case_matcher::{Case, MatchConfig, MatchingEngine};
 use loco_rs::controller::ErrorDetail;
@@ -189,17 +190,43 @@ async fn audit(
     }
 }
 
+/// Map a record-level authorization rejection (`(status, reason)`) to a
+/// loco error response. `403` = the policy denied the action given the
+/// record's attributes; `401` = a fail-safe when claims are missing
+/// behind the guard.
+fn record_rejection((status, reason): (StatusCode, String)) -> Error {
+    let code = if status == StatusCode::FORBIDDEN {
+        "forbidden"
+    } else {
+        "unauthorized"
+    };
+    Error::CustomError(status, ErrorDetail::new(code, &reason))
+}
+
 /// Fetch a case by public id. `GET /api/cases/{pid}`.
 ///
 /// Responds `200` with the full stored `case_matcher::Case`.
 ///
 /// # Errors
 ///
-/// `404` when no active case has that `pid` (or `pid` is not a UUID).
+/// `404` when no active case has that `pid` (or `pid` is not a UUID);
+/// `403` when the record-level ABAC policy denies reading this specific
+/// case (e.g. an `resource.case_type`-gated rule) with enforcement on.
 #[debug_handler]
-async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+async fn get_one(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
     let model = CaseModel::find_by_pid(&ctx.db, &pid).await?;
-    format::json(model.to_case()?)
+    let case = model.to_case()?;
+    crate::auth::authorize_record(
+        &caller,
+        Action::Read,
+        &crate::auth::case_resource_attrs(&case),
+    )
+    .map_err(record_rejection)?;
+    format::json(case)
 }
 
 /// Replace a case's payload. `PUT /api/cases/{pid}`.
@@ -211,7 +238,9 @@ async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Resu
 ///
 /// # Errors
 ///
-/// `422` on validation failure; `404` when the `pid` is unknown.
+/// `422` on validation failure; `404` when the `pid` is unknown; `403`
+/// when the record-level ABAC policy denies writing this specific case
+/// (evaluated against the *stored* case's attributes) with enforcement on.
 #[debug_handler]
 async fn update(
     Path(pid): Path<String>,
@@ -221,6 +250,14 @@ async fn update(
 ) -> Result<Response> {
     validate(&case)?;
     let model = CaseModel::find_by_pid(&ctx.db, &pid).await?;
+    // Record-level check uses the *existing* stored case's attributes
+    // (e.g. deny modifying a case whose stored status is `closed`).
+    crate::auth::authorize_record(
+        &caller,
+        Action::Write,
+        &crate::auth::case_resource_attrs(&model.to_case()?),
+    )
+    .map_err(record_rejection)?;
     let updated = model
         .into_active_model()
         .update_data(&ctx.db, &case)
@@ -252,7 +289,8 @@ async fn update(
 ///
 /// # Errors
 ///
-/// `404` when the `pid` is unknown.
+/// `404` when the `pid` is unknown; `403` when the record-level ABAC
+/// policy denies deleting this specific case with enforcement on.
 #[debug_handler]
 async fn remove(
     Path(pid): Path<String>,
@@ -260,6 +298,12 @@ async fn remove(
     caller: MaybeAuthUser,
 ) -> Result<Response> {
     let model = CaseModel::find_by_pid(&ctx.db, &pid).await?;
+    crate::auth::authorize_record(
+        &caller,
+        Action::Delete,
+        &crate::auth::case_resource_attrs(&model.to_case()?),
+    )
+    .map_err(record_rejection)?;
     let (entity_pid, title) = (model.pid, model.title.clone());
     model.into_active_model().soft_delete(&ctx.db).await?;
     audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;

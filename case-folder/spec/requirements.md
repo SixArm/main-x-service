@@ -145,7 +145,7 @@ already exist and are unchanged: **folder → its move history**
 
 ## Out-of-scope (explicit non-requirements)
 
-Authentication/RBAC, clinical content, local persistence, real-time
+Authentication/ABAC, clinical content, local persistence, real-time
 push, multi-tenancy — see [scope.md](scope.md). These are production
 gates tracked in [regulatory.md](regulatory.md) and [roadmap.md](roadmap.md),
 not current requirements.

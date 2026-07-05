@@ -45,7 +45,7 @@ A **receipt** would record, at minimum:
 - Does receiving **require** a destination container, or can a folder be
   "received, location TBD" (still effectively in-transit / in-hand)?
 - Who may confirm — only the named recipient, anyone at the destination, or
-  any authorised worker? (RBAC.)
+  any authorised worker? (ABAC — which subject attributes gate it.)
 - Exceptions: received the **wrong** folder, a folder that was **never
   dispatched**, or a dispatched folder that **never arrives** (overdue) —
   how are these surfaced and recorded?

@@ -3,7 +3,8 @@
 //! The `App` type implements loco's `Hooks`, the seam the CLI drives to boot the
 //! service, register routes (`routes`), layer middleware (`after_routes`),
 //! and truncate tables between tests (`truncate`). It carries no state.
-//! The blanket JWT enforcement layer is wired here via `require_auth_mw`.
+//! The blanket auth enforcement layer (PASETO authentication + ABAC
+//! authorization) is wired here via `require_auth_mw`.
 
 use async_trait::async_trait;
 use axum::{
@@ -31,13 +32,21 @@ use crate::{
     models::_entities::{audit_logs, merge_records, organizations},
 };
 
-/// Blanket JWT-enforcement middleware. Reads the flag and verifier per
-/// request (both are cached `OnceLock`s), so the layer is wired
+/// Blanket auth-enforcement middleware: authentication (PASETO bearer)
+/// then ABAC authorization. Reads the flag, verifier, and policy per
+/// request (all cached `OnceLock`s), so the layer is wired
 /// unconditionally and is a near-noop when `ORGANIZATION_REQUIRE_AUTH`
 /// is off. See [`auth::enforce`] for the pure decision.
 async fn require_auth_mw(req: Request, next: Next) -> Response {
-    let path = req.uri().path().to_string();
-    match auth::enforce(auth::require_auth(), &path, req.headers(), auth::verifier()) {
+    let decision = auth::enforce(
+        auth::require_auth(),
+        req.method(),
+        req.uri().path(),
+        req.headers(),
+        auth::verifier(),
+        auth::policy(),
+    );
+    match decision {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),
     }

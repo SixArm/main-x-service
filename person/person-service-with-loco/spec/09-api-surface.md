@@ -30,7 +30,19 @@ on; unset/blank/junk ⇒ off; read once at boot — restart to change).
 When on, every route requires a valid bearer token except the public
 allow-list: `/api/health`, loco's `/_health` / `/_ping`,
 `/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom`.
-Roles/RBAC is the remaining T-1c item.
+
+Authorization (ABAC, inside the same guard — so only when
+`PERSON_REQUIRE_AUTH` is on): the request's action is derived from
+the HTTP method plus this crate's destructive named POSTs
+(`auth::DESTRUCTIVE_POST_SUFFIXES`: `/merge`, `/deduplicate`,
+`/import`), and the shared engine in `authentication-verifier` 0.3
+evaluates the configured policy (`PERSON_ABAC_POLICY` inline JSON /
+`PERSON_ABAC_POLICY_FILE`; unset/unparsable ⇒ built-in default: any
+authenticated subject reads, `access=write` writes, `access=admin`
+adds delete/merge/deduplicate, `svc=true` does everything) over the
+token's `attrs` claim. A valid token the policy denies gets `403`
+with the deciding rule; see
+[authorization-attributes](../../../agents/share/authorization-attributes.md).
 
 ### 9.1 Cross-service link endpoints
 

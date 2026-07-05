@@ -30,7 +30,20 @@ change), every route on both router surfaces requires a valid bearer
 token and returns `401` otherwise, except the public allow-list:
 `/_health`, `/_ping`, `/api/v1/health`, `/api-docs/openapi.json`,
 `/metrics.prom`, and `/swagger-ui*`. The `/fhir` surface is deliberately
-protected (worker PII). Remaining T-1b follow-up: RBAC roles.
+protected (worker PII).
+
+Authorization (ABAC, inside the same guard — so only when
+`WORKER_REQUIRE_AUTH` is on): the request's action is derived from the
+HTTP method plus this crate's destructive named POSTs
+(`auth::DESTRUCTIVE_POST_SUFFIXES`: `/merge`, `/deduplicate`,
+`/import`), and the shared engine in `authentication-verifier` 0.3
+evaluates the configured policy (`WORKER_ABAC_POLICY` inline JSON /
+`WORKER_ABAC_POLICY_FILE`; unset/unparsable ⇒ built-in default: any
+authenticated subject reads, `access=write` writes, `access=admin`
+adds delete/merge/deduplicate, `svc=true` does everything) over the
+token's `attrs` claim. A valid token the policy denies gets `403`
+with the deciding rule; see
+[authorization-attributes](../../../agents/share/authorization-attributes.md).
 
 ### 9.1 Cross-service link endpoints
 

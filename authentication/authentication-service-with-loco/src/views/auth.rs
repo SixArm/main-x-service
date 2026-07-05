@@ -71,6 +71,10 @@ pub struct AccountUserExport {
     pub name: String,
     /// When the email was verified, if ever (RFC 3339).
     pub email_verified_at: Option<String>,
+    /// ABAC subject attributes assigned to the account (string→strings
+    /// map; `{}` until an operator assigns any). Subject data, not a
+    /// secret, so the right-of-access export includes it.
+    pub attributes: serde_json::Value,
     /// Row creation time (RFC 3339).
     pub created_at: String,
     /// Last update time (RFC 3339).
@@ -86,6 +90,7 @@ impl AccountUserExport {
             email: user.email.clone(),
             name: user.name.clone(),
             email_verified_at: user.email_verified_at.map(|t| t.to_rfc3339()),
+            attributes: user.attributes.clone(),
             created_at: user.created_at.to_rfc3339(),
             updated_at: user.updated_at.to_rfc3339(),
         }
@@ -219,6 +224,7 @@ mod tests {
             magic_link_token: Some("live-token".to_string()),
             magic_link_expiration: Some(ts()),
             deleted_at: None,
+            attributes: serde_json::json!({ "access": ["write"] }),
         }
     }
 
@@ -234,6 +240,7 @@ mod tests {
             expires_at: ts(),
             revoked_at: None,
             user_agent: Some("curl".to_string()),
+            data: serde_json::json!({}),
         }];
         let events = vec![auth_events::Model {
             created_at: ts(),
@@ -248,6 +255,11 @@ mod tests {
         let export = AccountExport::new(&user(pid), &sessions, &events);
         assert_eq!(export.user.pid, pid.to_string());
         assert_eq!(export.user.email, "alice@example.com");
+        // The subject's ABAC attributes are subject data: exported as-is.
+        assert_eq!(
+            export.user.attributes,
+            serde_json::json!({ "access": ["write"] })
+        );
         assert_eq!(export.sessions.len(), 1);
         assert_eq!(export.sessions[0].jid, "jti-1");
         assert_eq!(export.auth_events.len(), 1);

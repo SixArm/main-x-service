@@ -17,7 +17,10 @@ population-scale public-register service.
   [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
   (source of truth; supersedes the RS256-JWT + JWKS model);
   attributable audit `actor`; front-end sign-in + bearer wiring;
-  role-based authorisation for write vs read.
+  **ABAC** authorisation over the token's `attrs` claim for write vs
+  read (per
+  [`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md);
+  delivered, supersedes the earlier role-based sketch).
 - **Privacy layer.** Per-field masking honouring the §12
   open-register / protected-contact split; GDPR Article 15 export;
   consent records where applicable (sole traders).

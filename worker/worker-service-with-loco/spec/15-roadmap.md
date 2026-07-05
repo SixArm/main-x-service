@@ -1,18 +1,22 @@
 ## 15. Roadmap
 
-- **Authentication & authorisation** — blanket PASETO enforcement on
-  `/api/*` **landed 2026-07-04** (T-1b enforcement sub-item: default-off
-  `WORKER_REQUIRE_AUTH` middleware on both router surfaces; peer PASETO
-  v4.public verification via the `authentication-verifier` crate landed
-  as T-1a, per
-  [authentication-sessions](../../../agents/share/authentication-sessions.md);
-  boot-time key-set fetch from `/.well-known/paseto-keys` behind
-  `WORKER_PASETO_KEYS_URL` landed 2026-07-04 as the T-1b fetch
-  sub-item). Remaining: operational activation (set the flag once the
-  SSO token flow is live), periodic key-set refresh / refetch on
-  `UnknownKid` (today the fetch is once at boot only), RBAC for
-  HR-admin / credentialing-officer / service roles, rate limiting,
-  user endpoints, security headers.
+- **Authentication & authorisation** — T-1a and T-1b are complete:
+  peer PASETO v4.public verification via the `authentication-verifier`
+  crate (T-1a, per
+  [authentication-sessions](../../../agents/share/authentication-sessions.md)),
+  the default-off `WORKER_REQUIRE_AUTH` blanket `/api/*` enforcement
+  middleware and the boot-time key-set fetch from
+  `/.well-known/paseto-keys` behind `WORKER_PASETO_KEYS_URL` (both
+  2026-07-04), and **ABAC authorization** (2026-07-05, per
+  [authorization-attributes](../../../agents/share/authorization-attributes.md)
+  — the shared policy engine over the token's `attrs` claim; supersedes
+  the earlier RBAC sketch for HR-admin / credentialing-officer /
+  service roles). Remaining: operational activation (set the flag once
+  the SSO token flow is live); richer deployment policies are
+  configuration (`WORKER_ABAC_POLICY*`), not code; record-level
+  resource attributes are a shared-design open question; periodic
+  key-set refresh / refetch on `UnknownKid` (today the fetch is once
+  at boot only), rate limiting, user endpoints, security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`worker_created`,
   `credential_expiry_within_30d`, …), Grafana dashboards + alerting.

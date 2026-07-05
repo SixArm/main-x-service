@@ -26,7 +26,7 @@
   IndexedDB. Reload re-fetches from the API.
 - A `/patients/new` route — `POST /api/patients` doesn't exist on the
   back-end (patient registration is a side effect of `POST /api/folders`).
-- Authentication / RBAC — the demo runs unauthenticated. Production
+- Authentication / ABAC — the demo runs unauthenticated. Production
   gates listed in [regulatory.md](regulatory.md).
 - Authoring of clinical content.
 - SSR. The app is client-only for now.

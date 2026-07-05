@@ -76,7 +76,26 @@ clearly described manual check confirms the acceptance criterion.
       ⇒ pass; on + protected + no token ⇒ `401`; on + valid ⇒ pass;
       on + expired / tampered ⇒ `401` — plus the lenient `parse_bool`
       flag parser. Met: `cargo test --lib` green.
-  - [ ] Scheduler / admin / read-only / service roles.
+  - [x] ABAC authorization *(done 2026-07-05; supersedes the earlier
+    roles/RBAC sketch — scheduler / admin / read-only / service — per
+    [authorization-attributes](../../../agents/share/authorization-attributes.md))*
+    — inside the blanket guard (so only when `EVENT_REQUIRE_AUTH` is
+    on), a verified token's `attrs` claim is evaluated by the shared
+    engine in `authentication-verifier` 0.3: the action is derived
+    from the HTTP method + this crate's destructive named POSTs
+    (`auth::DESTRUCTIVE_POST_SUFFIXES`: `/merge`, `/deduplicate`,
+    `/import`), and the policy — `EVENT_ABAC_POLICY` (inline JSON) /
+    `EVENT_ABAC_POLICY_FILE` (path), unset/unparsable ⇒ warn-log +
+    built-in default policy, read once at `AppState` construction —
+    decides first-match-wins with default allow-read / deny-mutation.
+    `401` = missing/bad credential; `403` = valid credential, policy
+    denied (body carries the deciding rule). Acceptance met: DB-free
+    unit tests in `src/api/rest/auth.rs` pin the §7 matrix — action
+    derivation; empty `attrs` ⇒ GET ok / POST 403; `access=write` ⇒
+    POST/PUT ok, DELETE + merge 403; `access=admin` ⇒ destructive ok;
+    `svc=true` ⇒ everything; configured deny beats later allow;
+    401-vs-403 split; bad policy JSON falls back to the default —
+    `cargo test --lib` green.
   - [x] Keys fetched from the authentication-service
     `/.well-known/paseto-keys` at boot *(done 2026-07-04)* — when the
     new `EVENT_PASETO_KEYS_URL` env var is set (non-blank),
@@ -99,8 +118,10 @@ clearly described manual check confirms the acceptance criterion.
       accepts a token signed by that key; a fast-failing URL
       (`http://127.0.0.1:1/`) falls back to the env/empty path without
       panic. Met: `cargo test --lib` green.
-  - **Acceptance (roles — open):** valid token + role gets `2xx`;
-    insufficient role gets `403`.
+  - **Acceptance (met):** valid token whose attributes satisfy the
+    policy gets `2xx`; a valid token the policy denies gets `403`;
+    no/bad token gets `401`. T-8 is complete; activation
+    (`EVENT_REQUIRE_AUTH=1`) remains the operational decision.
 - [ ] **T-9 — Bulk import / export.** (§9.1, §10.3;
   [bulk import/export](../../../agents/share/bulk-import-export.md))
   - [ ] `bulk_jobs` migration (family-wide schema, shared doc §3).

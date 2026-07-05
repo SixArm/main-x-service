@@ -9,6 +9,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — authz: ABAC policy authorization inside the blanket guard (2026-07-05)
+
+- ABAC authorization landed (supersedes the earlier per-crate
+  roles/RBAC sketch; family contract:
+  `agents/share/authorization-attributes.md`). When
+  `ORGANIZATION_REQUIRE_AUTH` is on, a verified PASETO token is
+  further checked by the shared policy engine in
+  `authentication-verifier` 0.3: the request's action is derived from
+  the HTTP method plus the crate's destructive named POSTs
+  (`auth::DESTRUCTIVE_POST_SUFFIXES` — `/merge`, `/deduplicate`,
+  `/import`), and the policy is evaluated over the token's new `attrs`
+  claim, first-match-wins, defaulting to allow-read / deny-mutation.
+- New env vars `ORGANIZATION_ABAC_POLICY` (inline JSON) and
+  `ORGANIZATION_ABAC_POLICY_FILE` (path); unset or unparsable ⇒
+  `tracing::warn!` + the built-in default policy (`svc=true` ⇒
+  everything; `access=admin` ⇒ destructive+write; `access=write` ⇒
+  write) — the service always boots.
+- `auth::enforce` now takes the HTTP method and the policy and returns
+  `403` (deciding-rule reason) for a valid token the policy denies;
+  `401` remains missing/bad credential. DB-free unit tests pin the
+  family §7 matrix. Flag off ⇒ behaviour-neutral.
+
 ### Added
 
 - **Boot-time PASETO key-set fetch over HTTP.** New env var

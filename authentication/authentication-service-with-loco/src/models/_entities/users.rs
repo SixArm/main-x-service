@@ -54,6 +54,13 @@ pub struct Model {
     /// soft-deleted (and its `email`/`name` anonymised to a tombstone),
     /// and every read path must treat the user as gone.
     pub deleted_at: Option<DateTimeWithTimeZone>,
+    /// ABAC subject attributes — a JSONB string→strings map (e.g.
+    /// `{"access": ["write"]}`) minted into the PASETO `attrs` claim.
+    /// Defaults to `{}` (read-only under the family's default policy)
+    /// until an operator assigns attributes. See
+    /// `agents/share/authorization-attributes.md` §6.
+    #[sea_orm(column_type = "JsonBinary")]
+    pub attributes: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

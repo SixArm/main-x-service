@@ -76,8 +76,26 @@ clearly described manual check confirms the acceptance criterion.
     on + protected + no token ⇒ `401`; on + protected + valid ⇒ Ok;
     on + expired/tampered ⇒ `401`; `parse_bool` parser — `cargo test
     --lib` green.
-  - [ ] Roles — editor / curator / read-only / service authorisation
-    on top of the enforced authentication.
+  - [x] ABAC authorization *(done 2026-07-05; supersedes the earlier
+    roles/RBAC sketch — editor / curator / read-only / service — per
+    [authorization-attributes](../../../agents/share/authorization-attributes.md))*
+    — inside the blanket guard (so only when `PLACE_REQUIRE_AUTH` is
+    on), a verified token's `attrs` claim is evaluated by the shared
+    engine in `authentication-verifier` 0.3: the action is derived
+    from the HTTP method + this crate's destructive named POSTs
+    (`auth::DESTRUCTIVE_POST_SUFFIXES`: `/merge`, `/deduplicate`,
+    `/import`), and the policy — `PLACE_ABAC_POLICY` (inline JSON) /
+    `PLACE_ABAC_POLICY_FILE` (path), unset/unparsable ⇒ warn-log +
+    built-in default policy, read once at router construction —
+    decides first-match-wins with default allow-read / deny-mutation.
+    `401` = missing/bad credential; `403` = valid credential, policy
+    denied (body carries the deciding rule). Acceptance met: DB-free
+    unit tests in `src/api/rest/auth.rs` pin the §7 matrix — action
+    derivation; empty `attrs` ⇒ GET ok / POST 403; `access=write` ⇒
+    POST/PUT ok, DELETE + merge 403; `access=admin` ⇒ destructive ok;
+    `svc=true` ⇒ everything; configured deny beats later allow;
+    401-vs-403 split; bad policy JSON falls back to the default —
+    `cargo test --lib` green.
   - [x] Fetch the key set over HTTP from the auth service at boot
     *(done 2026-07-04)* — when the new `PLACE_PASETO_KEYS_URL` env var
     is set (non-blank), `app.rs::after_routes` (async boot context)
@@ -97,8 +115,10 @@ clearly described manual check confirms the acceptance criterion.
     and the fetch-built verifier accepts a token signed by that key;
     a fast-failing URL (`http://127.0.0.1:1/`) falls back to the
     env/empty path without panic — `cargo test --lib` green.
-  - **Acceptance (remainder):** valid token + role gets `2xx`,
-    insufficient role gets `403`.
+  - **Acceptance (met):** valid token whose attributes satisfy the
+    policy gets `2xx`; a valid token the policy denies gets `403`;
+    no/bad token gets `401`. T-8 is complete; activation
+    (`PLACE_REQUIRE_AUTH=1`) remains the operational decision.
 - [ ] **T-9 — Geo-radius `nearby` HTTP endpoint + search `offset`.**
   - [ ] Add `GET /api/places/nearby?lat=&lon=&radius_km=` wiring the
     existing `matching::geo::within_radius` Haversine primitive with a

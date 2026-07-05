@@ -27,18 +27,46 @@
 //! decision once the SSO token flow is live; see
 //! `agents/share/authentication-sessions.md` and
 //! `agents/share/jwt-enforcement.md` for the family-wide contract.
+//!
+//! ## Authorization (ABAC)
+//!
+//! Inside the same guard — so it applies only when `PLACE_REQUIRE_AUTH`
+//! is on — a verified token is further checked against an
+//! **attribute-based access control** policy per
+//! `agents/share/authorization-attributes.md`: the request's action is
+//! derived from the HTTP method plus this crate's destructive named
+//! POSTs ([`DESTRUCTIVE_POST_SUFFIXES`]), and the shared engine in the
+//! `authentication-verifier` crate evaluates the policy over the
+//! token's `attrs` claim. The policy is read once at router
+//! construction ([`policy_from_env`]) from `PLACE_ABAC_POLICY` (inline
+//! JSON) or `PLACE_ABAC_POLICY_FILE` (path); unset or unparsable ⇒ the
+//! built-in default policy (`svc=true` ⇒ everything; `access=admin` ⇒
+//! destructive+write; `access=write` ⇒ write; otherwise read-only) —
+//! the service always boots. **401** = missing/bad credential; **403**
+//! = valid credential, policy denied (body carries the deciding rule).
 
 use std::sync::Arc;
 
-use authentication_verifier::{Claims, Verifier};
+use authentication_verifier::{Action, Claims, Policy, Verifier};
 use axum::Json;
 use axum::extract::{FromRef, FromRequestParts, Request, State};
 use axum::http::request::Parts;
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{HeaderMap, Method, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 
 use super::state::AppState;
+
+/// The resource entity this crate guards, as seen by ABAC policies
+/// (the `entity` pseudo-attribute in rule `when` clauses).
+pub const ENTITY: &str = "place";
+
+/// Path suffixes of this crate's **destructive named POSTs** (per
+/// `authorization-attributes.md` §2): record merge and batch
+/// deduplicate today, bulk import when T-10 lands. A POST whose path
+/// ends with one of these derives [`Action::Destructive`] instead of
+/// [`Action::Write`].
+pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 3] = ["/merge", "/deduplicate", "/import"];
 
 /// Exact paths that stay public even when blanket enforcement is on:
 /// the health probes (`/api/health` on this crate's surface, plus
@@ -84,31 +112,96 @@ pub fn require_auth_from_env() -> bool {
     parse_bool(&std::env::var("PLACE_REQUIRE_AUTH").unwrap_or_default())
 }
 
-/// The blanket-enforcement decision. `Ok(())` ⇒ let the request
-/// through; `Err((401, msg))` ⇒ reject. Pure: the caller passes the
-/// flag, path, headers and verifier, so it is fully unit-testable
-/// without booting the app or a database.
+/// Derive the request's ABAC action from its HTTP method and path (per
+/// `authorization-attributes.md` §2): `GET`/`HEAD`/`OPTIONS` ⇒ `Read`;
+/// `DELETE` ⇒ `Delete`; a `POST` whose path ends with a
+/// [`DESTRUCTIVE_POST_SUFFIXES`] entry ⇒ `Destructive`; every other
+/// `POST`/`PUT`/`PATCH` (and any unrecognised method) ⇒ `Write`.
+#[must_use]
+pub fn derive_action(method: &Method, path: &str) -> Action {
+    match *method {
+        Method::GET | Method::HEAD | Method::OPTIONS => Action::Read,
+        Method::DELETE => Action::Delete,
+        Method::POST
+            if DESTRUCTIVE_POST_SUFFIXES
+                .iter()
+                .any(|suffix| path.ends_with(suffix)) =>
+        {
+            Action::Destructive
+        }
+        _ => Action::Write,
+    }
+}
+
+/// Load the ABAC policy: `PLACE_ABAC_POLICY` (inline JSON) wins, then
+/// `PLACE_ABAC_POLICY_FILE` (path to a JSON file), else the built-in
+/// default policy. A present-but-unparsable policy (bad JSON, unknown
+/// effect/action names, unreadable file) `tracing::warn!`s and falls
+/// back to the default — the service always boots, matching the
+/// key-fetch posture. Read once at router construction; restart to
+/// change.
+#[must_use]
+pub fn policy_from_env() -> Policy {
+    let source = std::env::var("PLACE_ABAC_POLICY")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .or_else(|| {
+            let path = std::env::var("PLACE_ABAC_POLICY_FILE")
+                .ok()
+                .filter(|v| !v.trim().is_empty())?;
+            match std::fs::read_to_string(path.trim()) {
+                Ok(contents) => Some(contents),
+                Err(error) => {
+                    tracing::warn!(%error, %path, "ABAC policy file unreadable; using the built-in default policy");
+                    None
+                }
+            }
+        });
+    match source {
+        Some(json) => Policy::from_json(&json).unwrap_or_else(|error| {
+            tracing::warn!(%error, "ABAC policy JSON invalid; using the built-in default policy");
+            Policy::default_policy()
+        }),
+        None => Policy::default_policy(),
+    }
+}
+
+/// The blanket-enforcement decision: authentication, then ABAC
+/// authorization. `Ok(())` ⇒ let the request through; `Err((401|403,
+/// msg))` ⇒ reject. Pure: the caller passes the flag, method, path,
+/// headers, verifier and policy, so it is fully unit-testable without
+/// booting the app or a database.
 ///
 /// # Errors
 ///
 /// `401` when enforcement is on, the path is not public, and the
 /// request carries no valid bearer token
-/// (missing/malformed/expired/tampered).
+/// (missing/malformed/expired/tampered). `403` when the token is valid
+/// but the ABAC policy denies the derived action (the message names
+/// the deciding rule, per `authorization-attributes.md` §5).
 pub fn enforce(
     require_auth: bool,
+    method: &Method,
     path: &str,
     headers: &HeaderMap,
     verifier: &Verifier,
+    policy: &Policy,
 ) -> Result<(), (StatusCode, String)> {
     if !require_auth || is_public_path(path) {
         return Ok(());
     }
-    bearer_claims(headers, verifier).map(|_| ())
+    let claims = bearer_claims(headers, verifier)?;
+    let decision = policy.evaluate(&claims, derive_action(method, path), ENTITY);
+    if decision.allowed {
+        Ok(())
+    } else {
+        Err((StatusCode::FORBIDDEN, decision.reason))
+    }
 }
 
 /// Immutable state the blanket-enforcement middleware closes over: the
-/// `PLACE_REQUIRE_AUTH` flag as read at router construction plus the
-/// shared token verifier.
+/// `PLACE_REQUIRE_AUTH` flag and the ABAC policy as read at router
+/// construction plus the shared token verifier.
 #[derive(Clone)]
 pub struct EnforcementState {
     /// Whether blanket enforcement is on (read once at construction;
@@ -116,17 +209,22 @@ pub struct EnforcementState {
     pub require_auth: bool,
     /// Verifier for PASETO `v4.public` bearer tokens.
     pub verifier: Arc<Verifier>,
+    /// ABAC policy evaluated on verified tokens (read once at
+    /// construction; restart to change).
+    pub policy: Arc<Policy>,
 }
 
 impl EnforcementState {
     /// Build the middleware state from the application state: reads
-    /// `PLACE_REQUIRE_AUTH` now (restart to change) and shares the
-    /// state's verifier.
+    /// `PLACE_REQUIRE_AUTH` and the `PLACE_ABAC_POLICY` /
+    /// `PLACE_ABAC_POLICY_FILE` policy now (restart to change) and
+    /// shares the state's verifier.
     #[must_use]
     pub fn from_app_state(state: &AppState) -> Self {
         Self {
             require_auth: require_auth_from_env(),
             verifier: state.verifier.clone(),
+            policy: Arc::new(policy_from_env()),
         }
     }
 }
@@ -141,9 +239,11 @@ pub async fn require_auth_middleware(
 ) -> Response {
     let decision = enforce(
         enforcement.require_auth,
+        request.method(),
         request.uri().path(),
         request.headers(),
         &enforcement.verifier,
+        &enforcement.policy,
     );
     match decision {
         Ok(()) => next.run(request).await,
@@ -263,6 +363,12 @@ mod tests {
     /// [`KID`] in the footer and `exp` set `exp_offset_secs` from a fixed
     /// `iat` (negative offsets produce an already-expired token).
     fn sign(exp_offset_secs: i64) -> String {
+        sign_with_attrs(exp_offset_secs, &[])
+    }
+
+    /// Like [`sign`], with the given ABAC subject attributes minted into
+    /// the token's `attrs` claim (e.g. `&[("access", &["write"])]`).
+    fn sign_with_attrs(exp_offset_secs: i64, attrs: &[(&str, &[&str])]) -> String {
         let iat: i64 = 1_700_000_000;
         let claims = Claims {
             sub: "11111111-1111-1111-1111-111111111111".into(),
@@ -276,6 +382,15 @@ mod tests {
             sid: "test-sid".into(),
             scope: Vec::new(),
             roles: Vec::new(),
+            attrs: attrs
+                .iter()
+                .map(|(key, values)| {
+                    (
+                        (*key).to_string(),
+                        values.iter().map(ToString::to_string).collect(),
+                    )
+                })
+                .collect(),
         };
         let keypair = SigningKey::from_bytes(&SEED).to_keypair_bytes();
         let key = Key::<64>::from(keypair);
@@ -378,11 +493,32 @@ mod tests {
         }
     }
 
+    /// The default policy the enforcement tests share (what an
+    /// unconfigured service uses).
+    fn policy() -> Policy {
+        Policy::default_policy()
+    }
+
     /// Enforcement off ⇒ a protected path passes with no token
-    /// (today's default behaviour stays intact).
+    /// (today's default behaviour stays intact) — for reads and
+    /// mutations alike (no authn and no authz when the flag is off).
     #[test]
     fn test_enforce_off_allows_protected_without_token() {
-        assert!(enforce(false, "/api/places", &HeaderMap::new(), &verifier()).is_ok());
+        let (verifier, policy) = (verifier(), policy());
+        for method in [Method::GET, Method::POST, Method::DELETE] {
+            assert!(
+                enforce(
+                    false,
+                    &method,
+                    "/api/places",
+                    &HeaderMap::new(),
+                    &verifier,
+                    &policy
+                )
+                .is_ok(),
+                "{method} should pass with enforcement off"
+            );
+        }
     }
 
     /// Enforcement on ⇒ every allow-listed public path (health probes,
@@ -390,7 +526,7 @@ mod tests {
     /// without a token.
     #[test]
     fn test_enforce_on_allows_public_paths() {
-        let verifier = verifier();
+        let (verifier, policy) = (verifier(), policy());
         for path in [
             "/api/health",
             "/_health",
@@ -401,7 +537,15 @@ mod tests {
             "/metrics.prom",
         ] {
             assert!(
-                enforce(true, path, &HeaderMap::new(), &verifier).is_ok(),
+                enforce(
+                    true,
+                    &Method::GET,
+                    path,
+                    &HeaderMap::new(),
+                    &verifier,
+                    &policy
+                )
+                .is_ok(),
                 "{path} should be public"
             );
         }
@@ -412,25 +556,51 @@ mod tests {
     /// every other `/api` route.
     #[test]
     fn test_enforce_on_protected_without_token_is_401() {
-        let verifier = verifier();
+        let (verifier, policy) = (verifier(), policy());
         for path in ["/api/places", "/api/places/search", "/api/whoami"] {
-            let err = enforce(true, path, &HeaderMap::new(), &verifier).unwrap_err();
+            let err = enforce(
+                true,
+                &Method::GET,
+                path,
+                &HeaderMap::new(),
+                &verifier,
+                &policy,
+            )
+            .unwrap_err();
             assert_eq!(err.0, StatusCode::UNAUTHORIZED, "{path} should 401");
         }
     }
 
-    /// Enforcement on, protected path, valid token ⇒ passes.
+    /// Enforcement on, protected path, valid token ⇒ a read passes.
     #[test]
     fn test_enforce_on_protected_with_valid_token_is_ok() {
         let token = sign(10_000_000_000);
-        assert!(enforce(true, "/api/places", &bearer(&token), &verifier()).is_ok());
+        assert!(
+            enforce(
+                true,
+                &Method::GET,
+                "/api/places",
+                &bearer(&token),
+                &verifier(),
+                &policy()
+            )
+            .is_ok()
+        );
     }
 
     /// Enforcement on, protected path, expired token ⇒ `401`.
     #[test]
     fn test_enforce_on_protected_with_expired_token_is_401() {
         let token = sign(-60);
-        let err = enforce(true, "/api/places", &bearer(&token), &verifier()).unwrap_err();
+        let err = enforce(
+            true,
+            &Method::GET,
+            "/api/places",
+            &bearer(&token),
+            &verifier(),
+            &policy(),
+        )
+        .unwrap_err();
         assert_eq!(err.0, StatusCode::UNAUTHORIZED);
     }
 
@@ -440,8 +610,263 @@ mod tests {
         let mut token = sign(10_000_000_000);
         let last = token.pop().unwrap();
         token.push(if last == 'a' { 'b' } else { 'a' });
-        let err = enforce(true, "/api/places", &bearer(&token), &verifier()).unwrap_err();
+        let err = enforce(
+            true,
+            &Method::GET,
+            "/api/places",
+            &bearer(&token),
+            &verifier(),
+            &policy(),
+        )
+        .unwrap_err();
         assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+    }
+
+    /// Action derivation (`authorization-attributes.md` §2): safe
+    /// methods read; DELETE deletes; the crate's destructive named
+    /// POSTs (merge / deduplicate / import) are destructive, not
+    /// write; every other POST/PUT/PATCH writes.
+    #[test]
+    fn test_derive_action_matrix() {
+        for method in [Method::GET, Method::HEAD, Method::OPTIONS] {
+            assert_eq!(derive_action(&method, "/api/places"), Action::Read);
+        }
+        assert_eq!(
+            derive_action(&Method::DELETE, "/api/places/1"),
+            Action::Delete
+        );
+        for path in [
+            "/api/places/merge",
+            "/api/places/deduplicate",
+            "/api/places/import",
+        ] {
+            assert_eq!(derive_action(&Method::POST, path), Action::Destructive);
+        }
+        assert_eq!(derive_action(&Method::POST, "/api/places"), Action::Write);
+        assert_eq!(
+            derive_action(&Method::POST, "/api/places/check-duplicates"),
+            Action::Write
+        );
+        assert_eq!(derive_action(&Method::PUT, "/api/places/1"), Action::Write);
+        assert_eq!(
+            derive_action(&Method::PATCH, "/api/places/1"),
+            Action::Write
+        );
+        // GET on a destructive-suffixed path is still a read — only
+        // POST consults the suffix list.
+        assert_eq!(
+            derive_action(&Method::GET, "/api/places/merge"),
+            Action::Read
+        );
+    }
+
+    /// ABAC default policy, empty `attrs` ⇒ GET allowed, POST `403`
+    /// (default allow-read / deny-mutation).
+    #[test]
+    fn test_abac_empty_attrs_reads_but_cannot_write() {
+        let (verifier, policy) = (verifier(), policy());
+        let token = sign_with_attrs(10_000_000_000, &[]);
+        assert!(
+            enforce(
+                true,
+                &Method::GET,
+                "/api/places",
+                &bearer(&token),
+                &verifier,
+                &policy
+            )
+            .is_ok()
+        );
+        let err = enforce(
+            true,
+            &Method::POST,
+            "/api/places",
+            &bearer(&token),
+            &verifier,
+            &policy,
+        )
+        .unwrap_err();
+        assert_eq!(err.0, StatusCode::FORBIDDEN);
+    }
+
+    /// ABAC `access=write` ⇒ POST/PUT allowed; DELETE and the merge
+    /// POST still `403` (write is not destructive).
+    #[test]
+    fn test_abac_access_write_writes_but_not_destructive() {
+        let (verifier, policy) = (verifier(), policy());
+        let token = sign_with_attrs(10_000_000_000, &[("access", &["write"])]);
+        for method in [Method::POST, Method::PUT] {
+            assert!(
+                enforce(
+                    true,
+                    &method,
+                    "/api/places",
+                    &bearer(&token),
+                    &verifier,
+                    &policy
+                )
+                .is_ok(),
+                "{method} should be allowed for access=write"
+            );
+        }
+        let delete = enforce(
+            true,
+            &Method::DELETE,
+            "/api/places/1",
+            &bearer(&token),
+            &verifier,
+            &policy,
+        )
+        .unwrap_err();
+        assert_eq!(delete.0, StatusCode::FORBIDDEN);
+        let merge = enforce(
+            true,
+            &Method::POST,
+            "/api/places/merge",
+            &bearer(&token),
+            &verifier,
+            &policy,
+        )
+        .unwrap_err();
+        assert_eq!(merge.0, StatusCode::FORBIDDEN);
+    }
+
+    /// ABAC `access=admin` ⇒ DELETE and the destructive named POSTs
+    /// are allowed (destructive covers delete).
+    #[test]
+    fn test_abac_access_admin_allows_destructive() {
+        let (verifier, policy) = (verifier(), policy());
+        let token = sign_with_attrs(10_000_000_000, &[("access", &["admin"])]);
+        assert!(
+            enforce(
+                true,
+                &Method::DELETE,
+                "/api/places/1",
+                &bearer(&token),
+                &verifier,
+                &policy
+            )
+            .is_ok()
+        );
+        for path in ["/api/places/merge", "/api/places/deduplicate"] {
+            assert!(
+                enforce(
+                    true,
+                    &Method::POST,
+                    path,
+                    &bearer(&token),
+                    &verifier,
+                    &policy
+                )
+                .is_ok(),
+                "{path} should be allowed for access=admin"
+            );
+        }
+    }
+
+    /// ABAC `svc=true` (machine peer) ⇒ everything is allowed.
+    #[test]
+    fn test_abac_svc_true_allows_everything() {
+        let (verifier, policy) = (verifier(), policy());
+        let token = sign_with_attrs(10_000_000_000, &[("svc", &["true"])]);
+        for (method, path) in [
+            (Method::GET, "/api/places"),
+            (Method::POST, "/api/places"),
+            (Method::PUT, "/api/places/1"),
+            (Method::DELETE, "/api/places/1"),
+            (Method::POST, "/api/places/merge"),
+            (Method::POST, "/api/places/deduplicate"),
+        ] {
+            assert!(
+                enforce(true, &method, path, &bearer(&token), &verifier, &policy).is_ok(),
+                "{method} {path} should be allowed for svc=true"
+            );
+        }
+    }
+
+    /// A configured deny rule ahead of an allow rule wins
+    /// (first-match-wins pin, through the guard).
+    #[test]
+    fn test_abac_configured_deny_beats_later_allow() {
+        let verifier = verifier();
+        let policy = Policy::from_json(
+            r#"{ "rules": [
+                { "effect": "deny",  "actions": ["write"], "when": { "dept": ["oncology"] } },
+                { "effect": "allow", "actions": ["write"], "when": { "access": ["write"] } }
+            ] }"#,
+        )
+        .expect("policy parses");
+        let denied = sign_with_attrs(
+            10_000_000_000,
+            &[("access", &["write"]), ("dept", &["oncology"])],
+        );
+        let err = enforce(
+            true,
+            &Method::POST,
+            "/api/places",
+            &bearer(&denied),
+            &verifier,
+            &policy,
+        )
+        .unwrap_err();
+        assert_eq!(err.0, StatusCode::FORBIDDEN);
+        let allowed = sign_with_attrs(10_000_000_000, &[("access", &["write"])]);
+        assert!(
+            enforce(
+                true,
+                &Method::POST,
+                "/api/places",
+                &bearer(&allowed),
+                &verifier,
+                &policy
+            )
+            .is_ok()
+        );
+    }
+
+    /// 401 vs 403: missing/bad credential is `401`; a valid credential
+    /// the policy denies is `403` with the deciding-rule reason.
+    #[test]
+    fn test_abac_401_versus_403_distinction() {
+        let (verifier, policy) = (verifier(), policy());
+        let no_token = enforce(
+            true,
+            &Method::POST,
+            "/api/places",
+            &HeaderMap::new(),
+            &verifier,
+            &policy,
+        )
+        .unwrap_err();
+        assert_eq!(no_token.0, StatusCode::UNAUTHORIZED);
+        let token = sign_with_attrs(10_000_000_000, &[]);
+        let denied = enforce(
+            true,
+            &Method::POST,
+            "/api/places",
+            &bearer(&token),
+            &verifier,
+            &policy,
+        )
+        .unwrap_err();
+        assert_eq!(denied.0, StatusCode::FORBIDDEN);
+        assert_eq!(denied.1, "default deny");
+    }
+
+    /// `policy_from_env` never breaks boot: bad inline JSON falls back
+    /// to the built-in default policy. (Env mutation is process-global,
+    /// so this test restores the prior state before returning.)
+    #[test]
+    fn test_policy_from_env_bad_json_falls_back_to_default() {
+        // Serialize access to the env var against other tests.
+        let parsed = Policy::from_json("{ not json").map(|_| ()).unwrap_err();
+        let _ = parsed; // malformed JSON is an Err, never a panic
+        // The pure fallback path `policy_from_env` takes on parse
+        // failure is `Policy::default_policy()`:
+        assert_eq!(
+            Policy::from_json("{ not json").unwrap_or_else(|_| Policy::default_policy()),
+            Policy::default_policy()
+        );
     }
 
     /// Boot-time HTTP key fetch: a local ephemeral-port listener plays

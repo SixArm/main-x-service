@@ -4,6 +4,7 @@
 //! assertions); `prepare_data` holds shared sign-in helpers; `rate_limit`
 //! holds the DB-gated sliding-window limiter tests.
 
+mod admin;
 mod auth;
 mod prepare_data;
 mod rate_limit;

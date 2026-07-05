@@ -19,14 +19,14 @@
 - A JSON API (Loco edition) and a reference browser UI (Svelte edition).
 - **Passwordless authentication** via email magic link (stateless signed
   tokens) — see [auth.md](auth.md). Identity comes from a configured
-  allowlist; CIS2/OIDC + RBAC remain production gates.
+  allowlist; CIS2/OIDC + ABAC remain production gates.
 
 ## Out of scope
 
 - **Clinical content.** The system stores no medical notes — only the
   location of the paper that holds them.
-- **RBAC, SSO, smartcard / CIS2.** Authentication exists (magic link)
-  but fine-grained authorization and federated identity are production
+- **ABAC, SSO, smartcard / CIS2.** Authentication exists (magic link)
+  but attribute-based authorization and federated identity are production
   gates (see [regulatory.md](regulatory.md)).
 - **Patient registration as a first-class flow.** Patients are owned by
   the Main Patient Service; registration is a side effect of creating a

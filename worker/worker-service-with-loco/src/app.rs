@@ -125,14 +125,19 @@ impl Hooks for App {
         ctx.shared_store.insert(state);
         // Mount Swagger UI, then the blanket auth-enforcement middleware
         // (spec §13 T-1b: default-off, gated by `WORKER_REQUIRE_AUTH` read
-        // here at construction — restart to change), then a permissive CORS
-        // layer (outermost, so preflight `OPTIONS` is answered before
-        // enforcement runs).
+        // here at construction — restart to change; the ABAC policy from
+        // `WORKER_ABAC_POLICY`/`_FILE`, else the built-in default, is
+        // captured alongside it), then a permissive CORS layer (outermost,
+        // so preflight `OPTIONS` is answered before enforcement runs).
         let router = router
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
-        let router =
-            auth::apply_enforcement(router, auth::require_auth_from_env(), enforcement_verifier)
-                .layer(tower_http::cors::CorsLayer::permissive());
+        let router = auth::apply_enforcement(
+            router,
+            auth::require_auth_from_env(),
+            enforcement_verifier,
+            std::sync::Arc::new(auth::policy_from_env()),
+        )
+        .layer(tower_http::cors::CorsLayer::permissive());
         Ok(router)
     }
 

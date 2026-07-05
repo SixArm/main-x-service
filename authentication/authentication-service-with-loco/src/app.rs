@@ -86,6 +86,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::auth::routes())
+            .add_route(controllers::admin::routes())
             .add_route(controllers::paseto_keys::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
@@ -101,10 +102,11 @@ impl Hooks for App {
         Ok(())
     }
 
-    /// Register loco CLI tasks. None yet; the marker comment is where the
-    /// loco generator injects new task registrations.
-    #[allow(unused_variables)]
+    /// Register loco CLI tasks. `user_attributes` is the operator surface
+    /// for ABAC attribute assignment (`agents/share/authorization-attributes.md`
+    /// §6).
     fn register_tasks(tasks: &mut Tasks) {
+        tasks.register(crate::tasks::attributes::UserAttributes);
         // tasks-inject (do not remove)
     }
     /// Truncate all application tables (used by the test harness between

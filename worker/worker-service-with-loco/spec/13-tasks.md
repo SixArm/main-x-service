@@ -41,9 +41,27 @@ clearly described manual check confirms the acceptance criterion.
     on+protected+no-token ⇒ 401, on+protected+valid ⇒ Ok,
     on+expired/tampered ⇒ 401, plus the flag-parser test —
     `cargo test --lib` green.
-  - [ ] RBAC: HR-admin / credentialing-officer / read-only / service
-    roles (the token's `roles` claim is verified but not yet
-    authorised against per-route policy).
+  - [x] ABAC authorization *(done 2026-07-05; supersedes the earlier
+    RBAC roles sketch — HR-admin / credentialing-officer / read-only /
+    service — per
+    [authorization-attributes](../../../agents/share/authorization-attributes.md))*
+    — inside the blanket guard (so only when `WORKER_REQUIRE_AUTH` is
+    on), a verified token's `attrs` claim is evaluated by the shared
+    engine in `authentication-verifier` 0.3: the action is derived
+    from the HTTP method + this crate's destructive named POSTs
+    (`auth::DESTRUCTIVE_POST_SUFFIXES`: `/merge`, `/deduplicate`,
+    `/import`), and the policy — `WORKER_ABAC_POLICY` (inline JSON) /
+    `WORKER_ABAC_POLICY_FILE` (path), unset/unparsable ⇒ warn-log +
+    built-in default policy, read once at router construction —
+    decides first-match-wins with default allow-read / deny-mutation.
+    `401` = missing/bad credential; `403` = valid credential, policy
+    denied (body carries the deciding rule). Acceptance met: DB-free
+    unit tests in `src/api/rest/auth.rs` pin the §7 matrix — action
+    derivation; empty `attrs` ⇒ GET ok / POST 403; `access=write` ⇒
+    POST/PUT ok, DELETE + merge 403; `access=admin` ⇒ destructive ok;
+    `svc=true` ⇒ everything; configured deny beats later allow;
+    401-vs-403 split; bad policy JSON falls back to the default —
+    `cargo test --lib` green.
   - [x] *(done 2026-07-04)* Fetch the key set over HTTP from the auth
     service at boot: new `WORKER_PASETO_KEYS_URL` env var —
     unset/blank ⇒ the `WORKER_PASETO_KEYS` env path exactly as
@@ -60,9 +78,10 @@ clearly described manual check confirms the acceptance criterion.
     ephemeral-port listener serving the in-process key set (minted
     token verifies), fallback on a dead port (no panic, token
     rejected), and the URL-unset ⇒ env-path precedence.
-  - **Acceptance (remaining, RBAC only):** integration test with
-    enforcement on posts without a token → `401`; posts with a valid
-    token and sufficient role → `2xx`.
+  - **Acceptance (met):** valid token whose attributes satisfy the
+    policy gets `2xx`; a valid token the policy denies gets `403`;
+    no/bad token gets `401`. T-1b is complete; activation
+    (`WORKER_REQUIRE_AUTH=1`) remains the operational decision.
 - [ ] **T-2 — Production Fluvio publisher.**
   - [ ] Implement `FluvioEventPublisher : EventProducer` behind
     feature flag `fluvio`.

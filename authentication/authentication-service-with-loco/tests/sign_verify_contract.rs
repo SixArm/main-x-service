@@ -14,8 +14,15 @@
 //!    verifier crate,
 //! 5. assert the claims round-trip and the `kid` contract holds.
 //!
+//! Since verifier 0.3 the contract also covers the ABAC `attrs` claim
+//! (`agents/share/authorization-attributes.md` §3): a non-empty map
+//! round-trips, and an empty map is **omitted from the wire**
+//! (`skip_serializing_if`) yet still verifies to an empty map.
+//!
 //! Pure crypto path — **no database required**, so this runs un-gated in
 //! every `cargo test`.
+
+use std::collections::BTreeMap;
 
 use authentication_service::auth;
 use authentication_verifier::{Verifier, VerifyError};
@@ -27,6 +34,11 @@ const PID: &str = "11111111-1111-1111-1111-111111111111";
 const EMAIL: &str = "alice@example.com";
 const NAME: &str = "Alice";
 const SID: &str = "99999999-9999-9999-9999-999999999999";
+
+/// Mint a token the way the handlers do, with no ABAC attributes.
+fn sign(pid: &str, email: &str, name: &str, sid: &str) -> (String, String, i64) {
+    auth::sign_access_token(pid, email, name, sid, BTreeMap::new()).expect("sign")
+}
 
 /// Extract the `kid` from a `v4.public` token's (authenticated) footer.
 fn footer_kid(token: &str) -> String {
@@ -44,7 +56,7 @@ fn service_signed_token_verifies_through_the_verifier_crate() {
     let keys = auth::keys();
 
     // The service mints (exactly as the magic-link redemption handler does).
-    let (token, sid, exp) = auth::sign_access_token(PID, EMAIL, NAME, SID).expect("sign");
+    let (token, sid, exp) = sign(PID, EMAIL, NAME, SID);
     assert_eq!(sid, SID);
 
     // A peer builds a Verifier from the *published* key set with the same
@@ -74,7 +86,7 @@ fn kid_contract_token_footer_keyset_and_thumbprint_agree() {
     let keys = auth::keys();
 
     // 1. The kid stamped into the token footer is the service's kid.
-    let (token, _, _) = auth::sign_access_token(PID, EMAIL, NAME, SID).expect("sign");
+    let (token, _, _) = sign(PID, EMAIL, NAME, SID);
     assert_eq!(footer_kid(&token), keys.kid);
 
     // 2. The published key set carries the same kid.
@@ -96,7 +108,7 @@ fn kid_contract_token_footer_keyset_and_thumbprint_agree() {
 #[test]
 fn kid_mismatch_fails_peer_side_verification() {
     let keys = auth::keys();
-    let (token, _, _) = auth::sign_access_token(PID, EMAIL, NAME, SID).expect("sign");
+    let (token, _, _) = sign(PID, EMAIL, NAME, SID);
 
     let mut altered = keys.paseto_keys.clone();
     altered["keys"][0]["kid"] = serde_json::Value::String("some-other-kid".to_string());
@@ -114,7 +126,7 @@ fn kid_mismatch_fails_peer_side_verification() {
 #[test]
 fn multi_key_set_verifies_primary_and_rejects_unknown_kid() {
     let keys = auth::keys();
-    let (token, _, _) = auth::sign_access_token(PID, EMAIL, NAME, SID).expect("sign");
+    let (token, _, _) = sign(PID, EMAIL, NAME, SID);
 
     // Splice a second, unrelated Ed25519 public key (arbitrary 32 bytes)
     // under its own kid — emulating a rotated-out additional key.
@@ -157,13 +169,63 @@ fn multi_key_set_verifies_primary_and_rejects_unknown_kid() {
     );
 }
 
+/// Pins the ABAC half of the contract: an `attrs` map minted by this
+/// service round-trips byte-for-byte through the peer verifier's
+/// `Claims.attrs` (shared `authorization-attributes.md` §3).
+#[test]
+fn attrs_claim_round_trips_service_mint_to_peer_verify() {
+    let keys = auth::keys();
+
+    let mut attrs: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    attrs.insert("access".to_string(), vec!["write".to_string()]);
+    attrs.insert(
+        "dept".to_string(),
+        vec!["cardiology".to_string(), "oncology".to_string()],
+    );
+    let (token, _, _) =
+        auth::sign_access_token(PID, EMAIL, NAME, SID, attrs.clone()).expect("sign");
+
+    let verifier =
+        Verifier::from_paseto_keys_value(&keys.paseto_keys, &keys.issuer, &keys.audience)
+            .expect("build");
+    let claims = verifier.verify(&token).expect("peer-side verification");
+    assert_eq!(claims.attrs, attrs, "the attrs map must round-trip");
+}
+
+/// Pins the wire form for attribute-less tokens: an empty `attrs` map is
+/// **omitted** from the payload (`skip_serializing_if`), so pre-ABAC
+/// consumers see the exact pre-0.3 shape — and the token still verifies,
+/// yielding an empty map.
+#[test]
+fn empty_attrs_is_omitted_from_the_wire_and_still_verifies() {
+    let keys = auth::keys();
+    let (token, _, _) = sign(PID, EMAIL, NAME, SID);
+
+    // The v4.public payload segment is base64url(claims JSON || 64-byte
+    // Ed25519 signature); strip the signature to inspect the wire JSON.
+    let seg = token.split('.').nth(2).expect("payload segment");
+    let bytes = URL_SAFE_NO_PAD.decode(seg).expect("payload base64url");
+    let payload: serde_json::Value =
+        serde_json::from_slice(&bytes[..bytes.len() - 64]).expect("payload json");
+    assert!(
+        payload.get("attrs").is_none(),
+        "an empty attrs map must be omitted from the wire: {payload}"
+    );
+
+    let verifier =
+        Verifier::from_paseto_keys_value(&keys.paseto_keys, &keys.issuer, &keys.audience)
+            .expect("build");
+    let claims = verifier.verify(&token).expect("peer-side verification");
+    assert!(claims.attrs.is_empty(), "absent attrs must verify to empty");
+}
+
 /// Pins that `iss`/`aud` policy is enforced at the peer: a `Verifier`
 /// built with the wrong audience or wrong issuer rejects an otherwise
 /// valid token (signature alone is not sufficient).
 #[test]
 fn issuer_and_audience_policy_is_enforced_peer_side() {
     let keys = auth::keys();
-    let (token, _, _) = auth::sign_access_token(PID, EMAIL, NAME, SID).expect("sign");
+    let (token, _, _) = sign(PID, EMAIL, NAME, SID);
 
     let wrong_audience =
         Verifier::from_paseto_keys_value(&keys.paseto_keys, &keys.issuer, "some-other-audience")

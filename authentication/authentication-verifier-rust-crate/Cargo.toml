@@ -1,6 +1,6 @@
 [package]
 name = "authentication-verifier"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Offline PASETO v4.public token verification for the Main X Index federation: fetch the authentication-service Ed25519 public keys once, then verify peer-service bearer tokens locally — no shared secret, no per-request introspection hop."

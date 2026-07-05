@@ -31,13 +31,22 @@ use crate::{
     workers::downloader::DownloadWorker,
 };
 
-/// Blanket `/api/*` JWT-enforcement middleware. Reads the flag and
-/// verifier per request and delegates the decision to [`auth::enforce`]:
-/// when enforcement is off (the default) or the path is public it is a
-/// near-noop; otherwise an absent/invalid bearer token yields `401`.
+/// Blanket `/api/*` auth-enforcement middleware. Reads the flag,
+/// verifier, and ABAC policy per request and delegates the decision to
+/// [`auth::enforce`]: when enforcement is off (the default) or the path
+/// is public it is a near-noop; otherwise an absent/invalid bearer
+/// token yields `401`, and a valid token the ABAC policy denies yields
+/// `403` (see `agents/share/authorization-attributes.md`).
 async fn require_auth_mw(req: Request, next: Next) -> Response {
     let path = req.uri().path().to_string();
-    match auth::enforce(auth::require_auth(), &path, req.headers(), auth::verifier()) {
+    match auth::enforce(
+        auth::require_auth(),
+        req.method(),
+        &path,
+        req.headers(),
+        auth::verifier(),
+        auth::policy(),
+    ) {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),
     }

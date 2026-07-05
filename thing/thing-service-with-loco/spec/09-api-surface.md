@@ -43,7 +43,19 @@ case-insensitive), every `/api/*` route requires a valid bearer token
 except the public `/api/health`. Root-level `/_health`, `/_ping`,
 `/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom` sit
 outside the `/api` scope and stay public. The flag is read once at
-construction — restart to change. Roles are the only open T-4 item
-(boot-time HTTP key fetch landed 2026-07-04). Family contract:
+construction — restart to change. Family contract:
 [jwt-enforcement](../../../agents/share/jwt-enforcement.md).
+
+Authorization (ABAC, inside the same guard — so only when
+`THING_REQUIRE_AUTH` is on): the request's action is derived from the
+HTTP method plus this crate's destructive named POSTs
+(`auth::DESTRUCTIVE_POST_SUFFIXES`: `/merge`, `/deduplicate`,
+`/import`), and the shared engine in `authentication-verifier` 0.3
+evaluates the configured policy (`THING_ABAC_POLICY` inline JSON /
+`THING_ABAC_POLICY_FILE`; unset/unparsable ⇒ built-in default: any
+authenticated subject reads, `access=write` writes, `access=admin`
+adds delete/merge/deduplicate, `svc=true` does everything) over the
+token's `attrs` claim. A valid token the policy denies gets `403`
+with the deciding rule; see
+[authorization-attributes](../../../agents/share/authorization-attributes.md).
 

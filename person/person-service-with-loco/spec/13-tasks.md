@@ -43,7 +43,7 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     Ok; on + protected + no token ⇒ `401`; on + protected + valid ⇒
     Ok; on + expired/tampered ⇒ `401` — plus the flag-parser
     semantics. Met: `cargo test --lib` green.
-- [ ] **T-1c — Auth follow-ups: boot-time key fetch + roles/RBAC.**
+- [ ] **T-1c — Auth follow-ups: boot-time key fetch + authorization.**
   - [x] Fetch the key set over HTTP from the auth service at boot
     *(done 2026-07-04)*: new `PERSON_PASETO_KEYS_URL` env var —
     unset/blank ⇒ the `PERSON_PASETO_KEYS` env path exactly as before;
@@ -60,14 +60,36 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     listener serving the in-process key set (minted token verifies),
     fallback on a dead port (no panic, token rejected), and the
     URL-unset ⇒ env-path precedence.
-  - [ ] Roles / RBAC on top of the verified claims (`roles` / `scope`).
+  - [x] ABAC authorization *(done 2026-07-05; supersedes the earlier
+    roles/RBAC-on-`roles`/`scope` sketch, per
+    [authorization-attributes](../../../agents/share/authorization-attributes.md))*
+    — inside the blanket guard (so only when `PERSON_REQUIRE_AUTH` is
+    on), a verified token's `attrs` claim is evaluated by the shared
+    engine in `authentication-verifier` 0.3: the action is derived
+    from the HTTP method + this crate's destructive named POSTs
+    (`auth::DESTRUCTIVE_POST_SUFFIXES`: `/merge`, `/deduplicate`,
+    `/import`), and the policy — `PERSON_ABAC_POLICY` (inline JSON) /
+    `PERSON_ABAC_POLICY_FILE` (path), unset/unparsable ⇒ warn-log +
+    built-in default policy, read once at router construction —
+    decides first-match-wins with default allow-read / deny-mutation.
+    `401` = missing/bad credential; `403` = valid credential, policy
+    denied (body carries the deciding rule). Acceptance met: DB-free
+    unit tests in `src/api/rest/auth.rs` pin the §7 matrix — action
+    derivation; empty `attrs` ⇒ GET ok / POST 403; `access=write` ⇒
+    POST/PUT ok, DELETE + merge 403; `access=admin` ⇒ destructive ok;
+    `svc=true` ⇒ everything; configured deny beats later allow;
+    401-vs-403 split; bad policy JSON falls back to the default —
+    `cargo test --lib` green.
   - [ ] DB-gated request test (`#[ignore]`, Postgres): with
     `PERSON_REQUIRE_AUTH` set, an unauthenticated `GET /api/persons/…`
     returns `401` while `GET /api-docs/openapi.json` stays `200`.
-  - **Acceptance:** integration test with enforcement on posts without
-    a token → `401`; posts with a valid token → `2xx`. Key-set fetch
-    from a stub auth service at boot: **met** via the local-listener
-    tokio tests above (`cargo test --lib` green).
+  - **Acceptance (met, except the DB-gated request test above):**
+    valid token whose attributes satisfy the policy gets `2xx`; a
+    valid token the policy denies gets `403`; no/bad token gets
+    `401`. Key-set fetch from a stub auth service at boot: **met** via
+    the local-listener tokio tests above (`cargo test --lib` green).
+    Activation (`PERSON_REQUIRE_AUTH=1`) remains the operational
+    decision.
 - [ ] **T-2 — Production Fluvio publisher.**
   - [ ] Implement `FluvioEventPublisher : EventProducer` behind
     feature flag `fluvio`.

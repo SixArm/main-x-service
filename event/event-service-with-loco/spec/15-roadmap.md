@@ -1,16 +1,21 @@
 ## 15. Roadmap
 
-- **Authentication & authorisation** — roles on top of the delivered
-  blanket PASETO enforcement on `/api/v1/*` (env-gated
-  `EVENT_REQUIRE_AUTH`, default-off middleware landed 2026-07-04; peer
-  offline PASETO v4.public verification via the
-  `authentication-verifier` crate and the boot-time
-  `EVENT_PASETO_KEYS_URL` HTTP key-set fetch also 2026-07-04, per
+- **Authentication & authorisation** — T-8 is complete: peer offline
+  PASETO v4.public verification via the `authentication-verifier`
+  crate, the default-off `EVENT_REQUIRE_AUTH` blanket `/api/v1/*`
+  enforcement middleware, the boot-time `EVENT_PASETO_KEYS_URL` HTTP
+  key-set fetch (all 2026-07-04, per
   [authentication-sessions](../../../agents/share/authentication-sessions.md)),
-  activation as an ops decision, a periodic key-set
-  **re-fetch/refresh loop** for key rotation (today the fetch happens
-  once at boot), RBAC for scheduler / admin / read-only / service,
-  rate limiting, security headers.
+  and **ABAC authorization** (2026-07-05, per
+  [authorization-attributes](../../../agents/share/authorization-attributes.md)
+  — the shared policy engine over the token's `attrs` claim;
+  supersedes the earlier RBAC scheduler / admin / read-only / service
+  roles sketch). Remaining: activation is an operations decision;
+  richer deployment policies are configuration (`EVENT_ABAC_POLICY*`),
+  not code; record-level resource attributes are a shared-design open
+  question. Also: a periodic key-set **re-fetch/refresh loop** for key
+  rotation (today the fetch happens once at boot), rate limiting,
+  security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`event_created`, `event_duration_seconds`,
   `match_score`), Grafana dashboards + alerting.

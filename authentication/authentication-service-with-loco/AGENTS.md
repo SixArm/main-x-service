@@ -23,6 +23,20 @@ sibling [authentication-verifier](../authentication-verifier-rust-crate)
 library; `tests/sign_verify_contract.rs` pins the shared `Claims` shape
 and `kid` derivation across the two crates.
 
+It is also the **sourcing side of the family's ABAC authorization**
+(shared
+[`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md)):
+`users.attributes` holds a string→strings subject-attribute map (e.g.
+`{"access": ["write"]}`), session establishment copies it into
+`sessions.data.attrs`, and token minting stamps it into the PASETO
+**`attrs`** claim, which peers evaluate with the verifier crate's shared
+`abac` policy engine. Attribute *assignment* is an operator action with
+two surfaces: the `user_attributes` loco CLI task
+(`src/tasks/attributes.rs`) and the admin HTTP API
+(`src/controllers/admin.rs`, gated by `access=admin`); both write an
+`attributes_assigned` `auth_events` audit row. `scope`/`roles` are
+deprecated for authorization.
+
 > **Auth model source of truth:**
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
 > The old **RS256 JWT + JWKS** model is **decommissioned** in favour of
@@ -54,13 +68,15 @@ template (see root `AGENTS.md`).
 | POST | `/api/auth/signup` | — | Create a passwordless account, issue a magic link. |
 | POST | `/api/auth/magic-link` | — | Request a magic link for an existing account (sign in). |
 | GET | `/api/auth/magic-link/{token}` | — | Consume the link → server-side session + `__Host-mxi_session` cookie. |
-| POST | `/api/auth/token` | Session | Exchange a valid session for a short-lived PASETO v4.public bearer (~5 min). |
+| POST | `/api/auth/token` | Session | Exchange a valid session for a short-lived PASETO v4.public bearer (~5 min), carrying the session's ABAC `attrs` claim. |
 | GET | `/api/auth/me` | Session | Current user (rejects revoked + GDPR-erased accounts). |
 | POST | `/api/auth/signout` | Session | Revoke the current session. |
 | GET | `/api/auth/audit/recent` | — | System-wide authentication audit trail (newest 100). |
 | GET | `/api/auth/account/export` | Session | GDPR right of access: the subject's data (`users` + `sessions` + `auth_events`). |
 | GET | `/api/auth/account/audit` | Session | GDPR right of access: the subject's own audit trail. |
 | DELETE | `/api/auth/account` | Session | GDPR right to erasure: soft-delete + anonymise + revoke sessions + audit. |
+| GET | `/api/auth/admin/users/{pid}/attributes` | Admin | Show a user's ABAC subject attributes. `403` unless the caller carries `access=admin`. |
+| PUT | `/api/auth/admin/users/{pid}/attributes` | Admin | Replace a user's ABAC attribute map (body `{ "attributes": { … } }`); validates keys/values, writes an `attributes_assigned` audit row. |
 | GET | `/.well-known/paseto-keys` | — | Published Ed25519 public key(s) for offline PASETO verification. |
 | GET | `/api-docs/openapi.json` | — | Hand-written OpenAPI 3 document. |
 | GET | `/swagger-ui` | — | Swagger UI page (CDN assets) rendering the doc. |
@@ -128,6 +144,7 @@ src/
 ├── cookie.rs              __Host-mxi_session cookie helpers (set / clear / parse)
 ├── controllers/
 │   ├── auth.rs            signup / magic-link / verify / me / signout / audit + GDPR account export/audit/erasure
+│   ├── admin.rs           ABAC attribute assignment over HTTP (GET/PUT /api/auth/admin/users/{pid}/attributes; access=admin gated)
 │   ├── docs.rs            /api-docs/openapi.json + /swagger-ui
 │   ├── paseto_keys.rs     published key endpoint (/.well-known/paseto-keys — Ed25519 public key set)
 │   └── metrics.rs         /metrics.prom (Prometheus text exposition)
@@ -136,11 +153,12 @@ src/
 ├── openapi.rs            hand-written OpenAPI 3 document
 ├── rate_limit.rs         per-email sliding-window magic-link issuance limiter
 ├── models/
-│   ├── users.rs           magic-link user model (+ create_passwordless, GDPR erase + find_active_by_pid)
-│   ├── sessions.rs        opaque cookie session issue/revoke; revoke_all_for_user for erasure (per the auth-sessions design)
+│   ├── users.rs           magic-link user model (+ create_passwordless, GDPR erase + find_active_by_pid, ABAC attributes_map/attrs)
+│   ├── sessions.rs        opaque cookie session issue/revoke; session_data copies ABAC attrs at establishment; revoke_all_for_user for erasure (per the auth-sessions design)
 │   └── _entities/         generated SeaORM entities
 ├── mailers/auth.rs        magic-link mailer (prod)
-├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits
+├── tasks/attributes.rs    `user_attributes` CLI task — operator ABAC attribute assignment (set/show/unset/clear users.attributes)
+├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits, _000006_users_attributes, _000007_sessions_data
 └── views/auth.rs          LoginResponse / CurrentResponse
 config/                    development/production/test yaml (keys/ holds only a README — no committed key files)
 ```

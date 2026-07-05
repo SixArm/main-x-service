@@ -1,16 +1,18 @@
 ## 15. Roadmap
 
-- **Authentication & authorisation** — RBAC for editor / curator /
-  read-only / service roles (the T-8 remainder; peer offline PASETO
-  v4.public verification, the default-off `PLACE_REQUIRE_AUTH` blanket
-  `/api/*` enforcement middleware, and the boot-time
-  `PLACE_PASETO_KEYS_URL` HTTP key-set fetch all landed 2026-07-04,
-  per
-  [authentication-sessions](../../../agents/share/authentication-sessions.md)
-  and `agents/share/jwt-enforcement.md`; activation is an operations
-  decision), a periodic key-set **re-fetch/refresh loop** for key
-  rotation (today the fetch happens once at boot), rate limiting,
-  security headers.
+- **Authentication & authorisation** — T-8 is complete: peer offline
+  PASETO v4.public verification, the default-off `PLACE_REQUIRE_AUTH`
+  blanket `/api/*` enforcement middleware, the boot-time
+  `PLACE_PASETO_KEYS_URL` HTTP key-set fetch (all 2026-07-04), and
+  **ABAC authorization** (2026-07-05, per
+  [authorization-attributes](../../../agents/share/authorization-attributes.md)
+  — the shared policy engine over the token's `attrs` claim;
+  supersedes the earlier RBAC roles sketch). Remaining: activation is
+  an operations decision; richer deployment policies are
+  configuration (`PLACE_ABAC_POLICY*`), not code; record-level
+  resource attributes are a shared-design open question. Also: a
+  periodic key-set **re-fetch/refresh loop** for key rotation (today
+  the fetch happens once at boot), rate limiting, security headers.
 - **Observability** — Prometheus alongside OTLP, complete OTLP trace
   exporter, custom metrics (`place_created`,
   `geo_search_radius_km_histogram`), Grafana dashboards + alerting.

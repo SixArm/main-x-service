@@ -23,7 +23,7 @@
 - **Any built-in user interface.** Browser rendering, HTML, CSS,
   client-side JavaScript, design systems. Front-ends are separate
   projects that consume this API.
-- Authentication, RBAC, single sign-on, smartcard, CIS2.
+- Authentication, ABAC, single sign-on, smartcard, CIS2.
 - Mailer, background workers, queues — Loco supports them but they're
   not needed here.
 - Real-time websockets / SSE.

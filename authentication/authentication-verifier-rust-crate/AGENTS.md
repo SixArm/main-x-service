@@ -24,10 +24,20 @@ secret and no per-request introspection call.
 > implementation. The shipped `src/lib.rs` **is** the PASETO code —
 > v0.2.0 is published to crates.io; the RS256-JWT implementation is gone.
 
+> **v0.3.0 — ABAC (additive).** Per
+> [authorization-attributes.md](../../agents/share/authorization-attributes.md),
+> the crate is also the family's shared **authorization** foundation:
+> `Claims` gains the `attrs` subject-attribute map (`#[serde(default)]`
+> — pre-0.3 tokens verify to an empty map), and `src/abac.rs` ships the
+> pure policy engine (first-match-wins allow/deny rules over attrs +
+> derived action + entity; default allow-read / deny-mutation) that the
+> nine entity services call from their blanket `/api/*` guards.
+> `scope` / `roles` are deprecated for authorization.
+
 | Question | Answer |
 |---|---|
 | Kind | Plain library crate (no framework, no database, no I/O by default). |
-| Public API | `Verifier::{from_paseto_keys_value, from_paseto_keys_url, verify, key_count}`, `Claims`, `VerifyError`. |
+| Public API | `Verifier::{from_paseto_keys_value, from_paseto_keys_url, verify, key_count}`, `Claims` (incl. the 0.3 `attrs` ABAC claim), `VerifyError`, and the `abac` module (`Policy`, `Rule`, `Action`, `ActionPattern`, `Effect`, `Decision` — re-exported at the root). |
 | Features | `fetch` — HTTPS key-set loading via `reqwest` (rustls). Default: none. |
 | Build | `cargo build` |
 | Test | `cargo test` (fully offline; throwaway Ed25519 test keypair). |
@@ -57,8 +67,10 @@ secret and no per-request introspection call.
 ## Layout
 
 ```
-src/lib.rs        the whole crate: Verifier, Claims, VerifyError,
+src/lib.rs        verification: Verifier, Claims, VerifyError,
                   fetch-feature impl, offline unit tests
+src/abac.rs       authorization: the shared ABAC policy engine
+                  (Policy, Rule, Action, Decision) + engine unit tests
 spec/index.md     living spec (§1–§18)
 ```
 

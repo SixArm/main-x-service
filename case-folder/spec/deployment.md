@@ -42,7 +42,7 @@ view of them.
       Nothing in committed config.
 - [ ] **Auth config** for production: `auth.cookie_secure: true`,
       `auth.expose_magic_link: false`, `auth.require_session: true`, and (when
-      built) `auth.rbac.enforce: true` ([rbac.md](rbac.md)).
+      built) `auth.abac.enforce: true` ([authorization.md](authorization.md)).
 - [ ] **DB**: `auto_migrate: false`; migrations run from a controlled release
       step; `dangerously_truncate/recreate: false`.
 - [ ] **CSP** that disallows inline scripts and restricts font/connect sources.

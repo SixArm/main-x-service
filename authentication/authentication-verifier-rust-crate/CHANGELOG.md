@@ -15,6 +15,73 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Formatting drift in `src/lib.rs` (six spots not rustfmt-formatted);
   `cargo fmt --check` is clean again. No behaviour change.
 
+## [0.4.0] - 2026-07-05
+
+> **Record-level resource attributes (additive).** Per
+> [authorization-attributes.md](../../agents/share/authorization-attributes.md)
+> §9, the engine can now feed **attributes of the specific target
+> record** into a decision, so a deployment can express e.g. "deny write
+> on a high-sensitivity record unless `access=admin`". Additive — the
+> existing `Policy::evaluate` is unchanged in behaviour and signature.
+
+### Added
+
+- **`Policy::evaluate_with_resource(claims, action, entity, resource)`**
+  — like `evaluate`, plus a `&BTreeMap<String, Vec<String>>` of
+  **resource attributes** describing the loaded record. `Policy::evaluate`
+  now delegates to it with an empty map.
+- **`resource.<name>` `when` namespace** — a rule condition keyed
+  `resource.sensitivity` matches the resource attribute `sensitivity`
+  (prefix stripped). The namespace is disjoint from subject attributes,
+  so a caller cannot spoof a resource attribute through its token; under
+  the plain `evaluate` (no record loaded) every `resource.*` key resolves
+  empty, keeping the coarse blanket-guard path sound.
+- Engine tests: record-sensitivity deny gated below an admin allow;
+  `resource.*` resolves empty without resource attrs (delegation
+  identity); negated resource values; namespace disjointness.
+
+## [0.3.0] - 2026-07-05
+
+> **ABAC — the crate becomes the family's shared authorization
+> foundation.** Per the canonical design
+> [authorization-attributes.md](../../agents/share/authorization-attributes.md),
+> the nine entity services move from planned per-crate roles/RBAC to
+> **attribute-based access control**: verified claims carry subject
+> attributes, and this crate ships the one shared, pure policy engine
+> their blanket `/api/*` guards call. Additive — no breaking changes;
+> pre-0.3 tokens verify unchanged.
+
+### Added
+
+- **`Claims.attrs`** — subject attributes for ABAC, a
+  `BTreeMap<String, Vec<String>>` minted by the auth-service (e.g.
+  `access: ["write"]`, `svc: ["true"]`). `#[serde(default)]`: absent on
+  old tokens ⇒ empty map, no re-issue needed; omitted from the wire
+  when empty.
+- **`abac` module** — the shared policy engine (re-exported at the
+  crate root): `Policy` / `Rule` / `Action` / `ActionPattern` /
+  `Effect` / `Decision`, with `Policy::from_json` (config loading),
+  `Policy::default_policy` (the built-in §5 default: `svc=true` ⇒
+  everything, `access=admin` ⇒ destructive+write, `access=write` ⇒
+  write), and `Policy::evaluate(claims, action, entity)` —
+  first-match-wins over ordered allow/deny rules, defaulting to
+  allow-read / deny-mutation. Pure data + pure evaluation: no I/O, no
+  clock, no panics on any input. Supports `!`-negated values, the `*`
+  action wildcard, delete-implies-destructive matching, and the
+  reserved pseudo-attributes `sub` / `email` / `entity` (not
+  shadowable by `attrs`).
+- Tests: engine unit suite (matching, negation, first-match, defaults,
+  unknown-field tolerance, malformed-policy errors) plus wire pins —
+  `attrs` round-trips mint→verify; a pre-0.3 token without `attrs`
+  verifies to an empty map.
+
+### Deprecated
+
+- **`Claims.scope` and `Claims.roles` for authorization.** Kept on the
+  wire for compatibility (removal is a future major); the ABAC guard
+  ignores both and decides from `attrs` — a role, where one is wanted,
+  is just another attribute (`role=editor`).
+
 ## [0.2.0] - 2026-06-17
 
 > **BREAKING — the PASETO v4.public pivot (implemented).** Per the

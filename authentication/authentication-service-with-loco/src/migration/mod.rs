@@ -16,6 +16,10 @@ mod m20220101_000003_auth_events;
 mod m20220101_000004_users_deleted_at;
 /// `auth_rate_limits` table — Postgres-backed magic-link issuance limiter.
 mod m20220101_000005_auth_rate_limits;
+/// `users.attributes` column — ABAC subject-attribute map (JSONB).
+mod m20220101_000006_users_attributes;
+/// `sessions.data` column — session payload JSONB (holds copied `attrs`).
+mod m20220101_000007_sessions_data;
 
 /// loco/`SeaORM` migrator that runs every migration in order.
 pub struct Migrator;
@@ -32,6 +36,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000003_auth_events::Migration),
             Box::new(m20220101_000004_users_deleted_at::Migration),
             Box::new(m20220101_000005_auth_rate_limits::Migration),
+            Box::new(m20220101_000006_users_attributes::Migration),
+            Box::new(m20220101_000007_sessions_data::Migration),
             // inject-above (do not remove this comment)
         ]
     }

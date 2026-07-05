@@ -18,18 +18,33 @@ per-request introspection hop.
 > cookie session and the only cross-service token is a short-lived PASETO.
 > See [CHANGELOG.md](./CHANGELOG.md) for the migration note.
 
+> **v0.3.0 adds ABAC** (additive). Per
+> ([authorization-attributes.md](../../agents/share/authorization-attributes.md)),
+> verified `Claims` carry subject attributes in the new `attrs` claim,
+> and the `abac` module ships the family's shared, pure policy engine
+> (`Policy::evaluate` over attrs + action + entity, first-match-wins,
+> default allow-read / deny-mutation). `scope` / `roles` are deprecated
+> for authorization. Pre-0.3 tokens verify unchanged (`attrs` ⇒ empty).
+
+> **v0.4.0 adds record-level resource attributes** (additive). Per §9,
+> `Policy::evaluate_with_resource` feeds attributes of the specific
+> loaded record into the decision via `resource.*` `when` keys (e.g.
+> deny write on a high-sensitivity record unless `access=admin`).
+> `Policy::evaluate` is unchanged.
+
 - Spec: [spec/index.md](./spec/index.md)
 - Agent guide: [AGENTS.md](./AGENTS.md)
-- Design: [authentication-sessions.md](../../agents/share/authentication-sessions.md) §5
+- Design: [authentication-sessions.md](../../agents/share/authentication-sessions.md) §5,
+  [authorization-attributes.md](../../agents/share/authorization-attributes.md)
 - Issuing service: [authentication-service-with-loco](../authentication-service-with-loco)
 
 ## Quick start
 
 ```toml
 [dependencies]
-authentication-verifier = "0.2"
+authentication-verifier = "0.4"
 # or, to fetch the key set over HTTPS at boot:
-# authentication-verifier = { version = "0.2", features = ["fetch"] }
+# authentication-verifier = { version = "0.4", features = ["fetch"] }
 # in-monorepo alternative (path dependency):
 # authentication-verifier = { path = "../authentication-verifier-rust-crate" }
 ```
@@ -56,6 +71,37 @@ println!("authenticated subject: {}", claims.sub); // the user pid (UUID)
 Construct the `Verifier` once and share it behind an `Arc`; `verify`
 is read-only and allocation-light.
 
+### Authorization (ABAC)
+
+After verifying, decide **what the caller may do** with the shared
+policy engine — the same code all nine entity services embed in their
+blanket `/api/*` guards:
+
+```rust
+use authentication_verifier::{Action, Policy};
+
+// Boot: load the configured policy, falling back to the built-in
+// default (svc=true ⇒ everything; access=admin ⇒ destructive+write;
+// access=write ⇒ write; otherwise read-only).
+let policy = std::env::var("PLACE_ABAC_POLICY")
+    .ok()
+    .and_then(|json| Policy::from_json(&json).ok())
+    .unwrap_or_else(Policy::default_policy);
+
+// Per request: derive the action from the HTTP method (plus the
+// crate's destructive named POSTs), then evaluate.
+let decision = policy.evaluate(&claims, Action::Write, "place");
+if !decision.allowed {
+    // 403 — the credential is valid but the policy denied it.
+    eprintln!("forbidden: {}", decision.reason);
+}
+```
+
+`401` means missing/bad credential (verification failed); `403` means
+valid credential, policy denied. See
+[authorization-attributes.md](../../agents/share/authorization-attributes.md)
+for the attribute model, policy language, and default policy.
+
 ## API summary
 
 | Item | Purpose |
@@ -64,7 +110,9 @@ is read-only and allocation-light.
 | `Verifier::from_paseto_keys_url(url, issuer, audience).await` | Fetch the key set over HTTPS, then build. **Requires `features = ["fetch"]`** (pulls in `reqwest` with rustls). |
 | `Verifier::verify(token) -> Result<Claims, VerifyError>` | Select the key by the token **footer `kid`**, check the PASETO v4.public (Ed25519) signature, then enforce `iss`, `aud`, `exp`, and `nbf`. |
 | `Verifier::key_count() -> usize` | Number of Ed25519 keys loaded from the key set. |
-| `Claims` | Verified claims: `sub` (user pid, UUID string), `iss`, `aud`, `iat`, `nbf`, `exp`, `sid` (originating auth-service session), `scope`/`roles`. |
+| `Claims` | Verified claims: `sub` (user pid, UUID string), `iss`, `aud`, `iat`, `nbf`, `exp`, `sid` (originating auth-service session), `attrs` (ABAC subject attributes; empty on pre-0.3 tokens), plus `scope`/`roles` (deprecated for authorization). |
+| `Policy` / `Rule` / `Action` / `Decision` (the `abac` module, re-exported at the root) | The shared ABAC engine: `Policy::from_json` loads a configured policy, `Policy::default_policy()` is the built-in coarse tier, `Policy::evaluate(&claims, action, entity)` decides first-match-wins with default allow-read / deny-mutation. Pure — no I/O, no clock, no panics. |
+| `Policy::evaluate_with_resource(&claims, action, entity, &resource)` | As `evaluate`, plus a `BTreeMap<String, Vec<String>>` of record-level **resource attributes** matched by `resource.*` `when` keys (v0.4). A service passes attributes of the record it just loaded so policies can gate on e.g. record sensitivity. |
 
 ### `VerifyError` variants
 

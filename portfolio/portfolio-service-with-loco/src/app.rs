@@ -31,14 +31,23 @@ use crate::{
     workers::downloader::DownloadWorker,
 };
 
-/// Blanket JWT-enforcement middleware. Reads the `PORTFOLIO_REQUIRE_AUTH` flag
-/// per request via [`auth::require_auth`] and delegates the decision to
-/// the pure [`auth::enforce`]: public paths and the disabled flag pass
-/// through; otherwise a valid bearer token is required or the request is
-/// rejected with `401`. Off by default (see `auth.rs`).
+/// Blanket auth-enforcement middleware: PASETO authentication then ABAC
+/// authorization. Reads the `PORTFOLIO_REQUIRE_AUTH` flag, the verifier,
+/// and the ABAC policy per request (all cached `OnceLock`s) and delegates
+/// to the pure [`auth::enforce`]: public paths and the disabled flag pass
+/// through; otherwise a valid bearer token is required (`401`) and the
+/// derived action is checked against the policy (`403`). Off by default
+/// (see `auth.rs`).
 async fn require_auth_mw(req: Request, next: Next) -> Response {
-    let path = req.uri().path().to_string();
-    match auth::enforce(auth::require_auth(), &path, req.headers(), auth::verifier()) {
+    let decision = auth::enforce(
+        auth::require_auth(),
+        req.method(),
+        req.uri().path(),
+        req.headers(),
+        auth::verifier(),
+        auth::policy(),
+    );
+    match decision {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),
     }

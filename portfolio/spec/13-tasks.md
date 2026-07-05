@@ -83,10 +83,13 @@ described manual check confirms it. Split tasks too big for one PR
   - **Acceptance:** create + update + delete a work item and a task →
     audit rows + events read back; no token → `401`, valid token →
     `2xx`.
-  - [ ] *Follow-up:* blanket `/api/*` enforcement + paseto-keys-over-HTTP
-    fetch (awaits the coordinated family SSO rollout; the front-end
-    must attach the bearer token first); role-based write
-    authorisation.
+  - [x] *Follow-up (delivered):* blanket `/api/*` enforcement +
+    paseto-keys-over-HTTP fetch + **ABAC** write authorisation over
+    the token's `attrs` claim (per
+    [`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md);
+    supersedes the earlier role-based sketch). Default-off via
+    `PORTFOLIO_REQUIRE_AUTH`; activation awaits the coordinated family
+    SSO rollout (the front-end must attach the bearer token first).
 - [ ] **T-6 — Front-end: routes + sub-resource workspaces + tests.**
   - [ ] Per-collection `/{collection}`, `…/new`, `…/[pid]`,
     `…/[pid]/edit` over the thin record; sub-resource workspaces

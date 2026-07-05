@@ -55,6 +55,18 @@ router surfaces requires a valid bearer token on **every** route
 except the public allow-list — `/api/health`, `/_health`, `/_ping`,
 `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom` (constants
 `auth::PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES`). Unauthenticated
-requests to any other path get `401`. Roles are the only T-8
-remainder (boot-time HTTP key fetch landed 2026-07-04).
+requests to any other path get `401`.
+
+Authorization (ABAC, inside the same guard — so only when
+`PLACE_REQUIRE_AUTH` is on): the request's action is derived from the
+HTTP method plus this crate's destructive named POSTs
+(`auth::DESTRUCTIVE_POST_SUFFIXES`: `/merge`, `/deduplicate`,
+`/import`), and the shared engine in `authentication-verifier` 0.3
+evaluates the configured policy (`PLACE_ABAC_POLICY` inline JSON /
+`PLACE_ABAC_POLICY_FILE`; unset/unparsable ⇒ built-in default: any
+authenticated subject reads, `access=write` writes, `access=admin`
+adds delete/merge/deduplicate, `svc=true` does everything) over the
+token's `attrs` claim. A valid token the policy denies gets `403`
+with the deciding rule; see
+[authorization-attributes](../../../agents/share/authorization-attributes.md).
 

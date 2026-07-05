@@ -17,6 +17,13 @@ pub use super::_entities::auth_events::{self, ActiveModel, Entity, Model};
 
 impl ActiveModelBehavior for super::_entities::auth_events::ActiveModel {}
 
+/// The `event` value for an ABAC attribute-assignment audit row, written
+/// whenever an operator changes a user's `users.attributes` (via the
+/// `user_attributes` CLI task or the admin HTTP API). Distinct from the
+/// authentication events so a compliance reviewer can filter for
+/// authorization changes.
+pub const ATTRIBUTES_ASSIGNED: &str = "attributes_assigned";
+
 impl Model {
     /// Record one authentication event. **Best-effort**: callers use
     /// [`record`](Self::record) for its side effect and must never fail
@@ -62,6 +69,37 @@ impl Model {
         if let Err(err) = Self::record(db, event, email, user_pid, detail).await {
             tracing::warn!(error = %err, event, "failed to write auth event");
         }
+    }
+
+    /// Record an ABAC **attribute-assignment** audit row (best-effort).
+    /// The row's subject is the **target** user (`email` / `user_pid`);
+    /// the `detail` captures the operation (`op`), the affected `key`
+    /// where applicable, and the **actor** who made the change (`cli`
+    /// for the CLI task, or the admin's `pid:<uuid>` for the HTTP API) —
+    /// the fixed `auth_events` shape has no actor column, so the actor
+    /// rides in `detail`. Attribute **values** are deliberately omitted
+    /// (a value like a department can itself be sensitive; the value set
+    /// lives in `users.attributes`, not the audit trail).
+    pub async fn record_attribute_assignment_best_effort(
+        db: &DatabaseConnection,
+        target_email: Option<&str>,
+        target_pid: Uuid,
+        op: &str,
+        key: Option<&str>,
+        actor: &str,
+    ) {
+        let detail = match key {
+            Some(key) => format!("op={op} key={key} actor={actor}"),
+            None => format!("op={op} actor={actor}"),
+        };
+        Self::record_best_effort(
+            db,
+            ATTRIBUTES_ASSIGNED,
+            target_email,
+            Some(target_pid),
+            Some(&detail),
+        )
+        .await;
     }
 
     /// All audit rows for one subject, newest first. A subject is matched

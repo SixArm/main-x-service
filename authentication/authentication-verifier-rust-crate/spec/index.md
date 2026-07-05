@@ -30,17 +30,33 @@ secret, no per-request introspection hop.
 > dependency-light verification) but changes its **implementation** from
 > RS256-JWT/JWKS to PASETO v4.public.
 
+> **ABAC (v0.3.0, additive).** Per
+> [authorization-attributes.md](../../../agents/share/authorization-attributes.md),
+> the crate is also the family's shared **authorization** foundation:
+> `Claims` gains the `attrs` subject-attribute map (absent on pre-0.3
+> tokens ⇒ empty; no re-issue needed), and the `abac` module ships the
+> one pure policy engine the nine entity services call from their
+> blanket `/api/*` guards — instead of nine per-crate role/RBAC
+> implementations. `scope`/`roles` are deprecated for authorization.
+
 ## 2. Scope
 
 In scope: PASETO-keys parsing (Ed25519 public keys), footer-`kid`-based
 key selection, PASETO v4.public signature verification, `iss` / `aud` /
 `exp` / `nbf` enforcement, optional HTTPS key-set fetching (`fetch`
-feature).
+feature), and the **ABAC policy engine** (the `abac` module: policy
+parsing, the built-in default policy, pure first-match-wins evaluation
+over the `attrs` claim + derived action + entity).
 
 Out of scope: token issuance, sessions/revocation (auth-service only),
 PASETO `local` (symmetric) tokens, non-Ed25519 algorithms, key-set
 refresh scheduling (callers refetch on `UnknownKid`), framework-specific
-extractors.
+extractors, **action derivation** (each service's guard maps HTTP
+method + its destructive named POSTs to an `Action`), policy
+configuration loading from env/file (callers read
+`<ENTITY>_ABAC_POLICY` / `_FILE` and hand the JSON to
+`Policy::from_json`), and attribute **assignment/sourcing**
+(auth-service only).
 
 ## 3. Stakeholders and users
 
@@ -76,12 +92,45 @@ PASETO trailer (here carrying `kid`), authenticated but not encrypted.
   - `key_count() -> usize`.
 - **`Claims`** — `sub` (user pid, UUID string), `iss`, `aud`, `iat`
   (unix s), `nbf` (unix s), `exp` (unix s), `sid` (originating
-  auth-service session, for revocation correlation), `scope`/`roles`.
+  auth-service session, for revocation correlation), `scope`/`roles`
+  (**deprecated for authorization** — kept on the wire; the ABAC guard
+  ignores them), and `attrs` (`BTreeMap<String, Vec<String>>`,
+  `#[serde(default)]`, omitted when empty — the ABAC subject
+  attributes, e.g. `access: ["write"]`, `svc: ["true"]`).
   **Byte-identical** to the service's `auth::Claims`; pinned by the
   service's cross-crate contract test.
 - **`VerifyError`** — `Keys(String)`, `MissingKid`,
   `UnknownKid(String)`, `Paseto(String)` (signature / claim / parse
   failure), and `Fetch(String)` (feature `fetch`).
+- **`abac` module** (re-exported at the crate root) — the shared
+  authorization engine per
+  [authorization-attributes.md](../../../agents/share/authorization-attributes.md)
+  §2–§5:
+  - `Action` — the derived request action (`Read` / `Write` / `Delete`
+    / `Destructive`); each service's guard derives it from the HTTP
+    method plus the crate's documented destructive named POSTs.
+  - `Policy` / `Rule` / `ActionPattern` / `Effect` — the JSON policy
+    document (`Policy::from_json`; unknown rule fields ignored,
+    forward-compatible) and `Policy::default_policy()` (the built-in
+    §5 coarse tier: `svc=true` ⇒ everything, `access=admin` ⇒
+    destructive+write, `access=write` ⇒ write).
+  - `Policy::evaluate(&claims, action, entity) -> Decision` — ordered
+    first-match-wins allow/deny; no match ⇒ default allow-read /
+    deny-mutation. `when` is a conjunction; a value list is an OR;
+    `!`-prefixed values negate; `delete` implies `destructive` for
+    rule matching; pseudo-attributes `sub` / `email` / `entity`
+    resolve from the verified claims/resource and cannot be shadowed
+    by `attrs`. Pure and total: no I/O, no clock, no panics.
+  - `Policy::evaluate_with_resource(&claims, action, entity, &resource)`
+    (v0.4) — as `evaluate`, plus a `BTreeMap<String, Vec<String>>` of
+    **record-level resource attributes** matched by `resource.<name>`
+    `when` keys (e.g. `resource.sensitivity`). The `resource.`
+    namespace is disjoint from subject attributes (no spoofing via the
+    token); under plain `evaluate` every `resource.*` key resolves
+    empty. `evaluate` delegates here with an empty map.
+  - `Decision` — `allowed` + `reason` (deciding rule index or the
+    default decision), so a 403 body and the audit trail can state
+    exactly why.
 
 ### The PASETO-keys / `kid` contract
 
@@ -107,6 +156,17 @@ PASETO trailer (here carrying `kid`), authenticated but not encrypted.
    `kid` / public-key material, yields `Keys(...)` at construction.
 5. Non-Ed25519 key entries are skipped silently; an empty key set
    constructs successfully.
+6. The `attrs` claim round-trips mint→verify; a token without an
+   `attrs` member (pre-0.3) verifies with an empty map.
+7. The ABAC engine evaluates per
+   [authorization-attributes.md](../../../agents/share/authorization-attributes.md)
+   §4–§5: first match wins; deny-before-allow pins the deny; `!`
+   negation matches absence; `*` covers every action; `delete` implies
+   `destructive` (but not vice versa); empty `when` matches everyone;
+   an empty value list matches no one; no rule matched ⇒ read allowed,
+   everything else denied. Malformed policy JSON is an `Err` from
+   `Policy::from_json` (never a panic); callers fall back to
+   `Policy::default_policy()`.
 
 ## 7. Non-functional requirements
 
@@ -117,9 +177,13 @@ PASETO trailer (here carrying `kid`), authenticated but not encrypted.
 
 ## 8. Architecture
 
-Single-module library (`src/lib.rs`). No I/O in the default feature
-set. Callers cache the `Verifier` for the process lifetime and refetch
-on `UnknownKid` to pick up key rotation (entity spec §13 T-5).
+Two modules: `src/lib.rs` (verification — `Verifier`, `Claims`,
+`VerifyError`, `fetch` feature) and `src/abac.rs` (authorization — the
+policy engine, re-exported at the root). No I/O in the default feature
+set; the engine is pure data + pure evaluation. Callers cache the
+`Verifier` for the process lifetime and refetch on `UnknownKid` to pick
+up key rotation (entity spec §13 T-5), and load their `Policy` once at
+boot.
 
 ## 9. API surface
 
@@ -138,7 +202,13 @@ keypair (never used in production): round-trip, expiry (`exp`),
 not-yet-valid (`nbf`), audience, issuer, unknown-`kid`, missing-`kid`,
 tampered token, garbage tokens, empty/malformed key set, non-Ed25519
 skipping, and the FR4 malformed paths (entry missing `kid` / public-key
-material, and unparsable public-key bytes).
+material, and unparsable public-key bytes). ABAC pins (FR6/FR7):
+`attrs` round-trips mint→verify; a raw pre-0.3 payload without `attrs`
+verifies to an empty map; and the engine suite in `src/abac.rs`
+(default-policy tiers, first-match deny-before-allow, negation,
+wildcard, delete-vs-destructive, empty-`when`/empty-value-list,
+pseudo-attribute matching and non-shadowability, malformed-policy
+errors, unknown-field tolerance, default-policy JSON round-trip).
 
 The `fetch` feature is tested **offline by design**: a test exercises
 the `from_paseto_keys_url` transport-error mapping (an unsupported URL
@@ -153,9 +223,12 @@ service's signer.
 
 ## 12. Compliance
 
-Claims may carry identity data (`sub`, `scope`/`roles`): peers must not
-log them beyond the family's GDPR posture. Verification is local, so no
-token ever transits to a third party.
+Claims may carry identity data (`sub`, `attrs`, `scope`/`roles`):
+peers must not log them beyond the family's GDPR posture — `attrs`
+values (department, clearance, purpose-of-use) are themselves personal
+data. Verification is local, so no token ever transits to a third
+party. `Decision.reason` deliberately names only the rule index, never
+attribute values, so it is safe for 403 bodies and audit trails.
 
 ## 13. Tasks (live work queue)
 
@@ -173,6 +246,24 @@ token ever transits to a third party.
       `scope`/`roles`, no `jti`/`email`/`name`). Updated the throwaway
       keypair and all unit tests to Ed25519. Published to crates.io as
       `authentication-verifier` 0.2.
+- [x] **ABAC (v0.3.0).** *(2026-07-05)* Added the `attrs` claim
+      (`#[serde(default)]`, empty-map fallback for pre-0.3 tokens) and
+      the `abac` module (`Policy` / `Rule` / `Action` / `ActionPattern`
+      / `Effect` / `Decision`, `Policy::from_json`,
+      `Policy::default_policy`, first-match-wins `evaluate` with
+      default allow-read / deny-mutation) per
+      [authorization-attributes.md](../../../agents/share/authorization-attributes.md)
+      §3–§4; deprecated `scope`/`roles` for authorization; engine +
+      wire-pin tests. Version 0.2.0 → 0.3.0 (additive).
+- [x] **Record-level resource attributes (v0.4.0).** *(2026-07-05)*
+      Added `Policy::evaluate_with_resource(claims, action, entity,
+      resource)` and the `resource.<name>` `when` namespace per
+      [authorization-attributes.md](../../../agents/share/authorization-attributes.md)
+      §9 (record-level attributes feed the decision; disjoint from
+      subject attributes; `evaluate` delegates with an empty map).
+      Engine tests: sensitivity-gated deny below an admin allow,
+      delegation identity, negation, namespace disjointness. Version
+      0.3.0 → 0.4.0 (additive).
 - [ ] Refetch-on-`UnknownKid` helper (or document the pattern per
       entity spec §13 T-5 key rotation).
 - [ ] Property-test the PASETO-keys parser against fuzzed documents.
@@ -198,14 +289,21 @@ token ever transits to a third party.
 The doc set, `fetch` feature, offline-test discipline, and
 packageability (`cargo package --list`) carried over unchanged in shape.
 
+**ABAC shipped (v0.3.0, 2026-07-05).** `Claims.attrs` + the `abac`
+policy engine per §5/§6 FR6–FR7; additive (pre-0.3 tokens verify
+unchanged). 31 unit + 4 doc tests green, clippy clean.
+
 ## 15. Roadmap
 
-v0.1 (RS256-JWT, superseded): core JWKS verification + `fetch`. **v0.2.0
-(here): PASETO v4.public pivot** — `from_paseto_keys_*`, footer-`kid`
+v0.1 (RS256-JWT, superseded): core JWKS verification + `fetch`. v0.2.0:
+**PASETO v4.public pivot** — `from_paseto_keys_*`, footer-`kid`
 selection, Ed25519 verification; same `Claims` role. A **BREAKING**
-change (see [CHANGELOG.md](../CHANGELOG.md)). Later: rotation ergonomics
-(refetch-on-`UnknownKid`), adoption by peer services as each flips
-`src/auth.rs` to PASETO (shared-doc §9 step 4).
+change (see [CHANGELOG.md](../CHANGELOG.md)). **v0.3.0 (here): ABAC** —
+the `attrs` claim + the shared `abac` policy engine; additive. Later:
+rotation ergonomics (refetch-on-`UnknownKid`), record-level resource
+attributes and environment attributes if the shared design adopts them
+(authorization-attributes.md §9), removal of `scope`/`roles` in a
+future major.
 
 ## 16. Open questions
 
@@ -220,6 +318,9 @@ change (see [CHANGELOG.md](../CHANGELOG.md)). Later: rotation ergonomics
 
 - [authentication-sessions.md](../../../agents/share/authentication-sessions.md)
   — canonical auth/session design; §5 is this crate's contract.
+- [authorization-attributes.md](../../../agents/share/authorization-attributes.md)
+  — canonical ABAC design; §2–§5 are the `attrs` claim + engine
+  contract.
 - [src/lib.rs](../src/lib.rs) — implementation + rustdoc.
 - [../../spec/index.md](../../spec/index.md) — entity-level contract.
 - [../../AGENTS/verification.md](../../AGENTS/verification.md) — peer

@@ -16,6 +16,8 @@
 //! are short-lived (`MAGIC_LINK_EXPIRATION_MIN`) and single-use (cleared
 //! on redemption).
 
+use std::collections::BTreeMap;
+
 use async_trait::async_trait;
 use chrono::{Duration, offset::Local};
 use loco_rs::{auth::jwt, hash, prelude::*};
@@ -44,6 +46,62 @@ pub fn tombstone_email(pid: &Uuid) -> String {
 
 /// Display name written by GDPR erasure in place of the real name.
 pub const TOMBSTONE_NAME: &str = "deleted user";
+
+/// Parse a stored attribute JSONB value (`users.attributes`, or the
+/// `attrs` member of `sessions.data`) into the ABAC string→strings
+/// subject-attribute map minted into the PASETO `attrs` claim (shared
+/// `agents/share/authorization-attributes.md` §2–§3).
+///
+/// Tolerant by design, mirroring the claim's forward-compatibility rule
+/// ("unknown attributes are inert"): a string value coerces to a
+/// one-element list, non-string list items are skipped, and any other
+/// value shape (or a non-object input) yields no entry — a malformed
+/// stored value can never fail token minting, it just grants nothing.
+#[must_use]
+pub fn attributes_map(value: &serde_json::Value) -> BTreeMap<String, Vec<String>> {
+    let mut map = BTreeMap::new();
+    let Some(object) = value.as_object() else {
+        return map;
+    };
+    for (key, entry) in object {
+        let values: Vec<String> = match entry {
+            serde_json::Value::String(s) => vec![s.clone()],
+            serde_json::Value::Array(items) => items
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_string)
+                .collect(),
+            _ => continue,
+        };
+        map.insert(key.clone(), values);
+    }
+    map
+}
+
+/// Serialize an ABAC subject-attribute map back into the canonical
+/// `users.attributes` JSONB shape (`{ "<key>": ["<value>", …], … }`) —
+/// the inverse of [`attributes_map`]. Every key maps to a JSON array of
+/// string values, so a round-trip through `attributes_map` is lossless.
+/// Used by the operator attribute-assignment task (`user_attributes`) to
+/// write the updated map back to the column.
+#[must_use]
+pub fn attributes_to_value(map: &BTreeMap<String, Vec<String>>) -> serde_json::Value {
+    let object: Map<String, serde_json::Value> = map
+        .iter()
+        .map(|(key, values)| {
+            (
+                key.clone(),
+                serde_json::Value::Array(
+                    values
+                        .iter()
+                        .map(|v| serde_json::Value::String(v.clone()))
+                        .collect(),
+                ),
+            )
+        })
+        .collect();
+    serde_json::Value::Object(object)
+}
 
 /// Password-login params (loco scaffold; unused in the passwordless flow).
 #[derive(Debug, Deserialize, Serialize)]
@@ -282,6 +340,15 @@ impl Model {
         self.deleted_at.is_some()
     }
 
+    /// This user's ABAC subject attributes, parsed from the
+    /// `users.attributes` JSONB column (see [`attributes_map`]). Copied
+    /// into the session at establishment and minted into the PASETO
+    /// `attrs` claim.
+    #[must_use]
+    pub fn attrs(&self) -> BTreeMap<String, Vec<String>> {
+        attributes_map(&self.attributes)
+    }
+
     /// finds a user by the provided api key
     ///
     /// # Errors
@@ -505,6 +572,24 @@ impl ActiveModel {
         self.update(db).await.map_err(ModelError::from)
     }
 
+    /// Replace this user's ABAC subject attributes (`users.attributes`)
+    /// with `attributes` (the canonical `{ "<key>": ["<value>", …] }`
+    /// JSONB shape, e.g. from [`attributes_to_value`]) and persist. Used
+    /// by the operator attribute-assignment task (`user_attributes`); the
+    /// new map is copied into a session at its next establishment and
+    /// minted into the PASETO `attrs` claim from there.
+    ///
+    /// # Errors
+    /// - Returns an error if the database update fails.
+    pub async fn set_attributes(
+        mut self,
+        db: &DatabaseConnection,
+        attributes: serde_json::Value,
+    ) -> ModelResult<Model> {
+        self.attributes = ActiveValue::set(attributes);
+        self.update(db).await.map_err(ModelError::from)
+    }
+
     /// GDPR Art. 17 erasure. **Soft-delete + anonymise**: stamp
     /// `deleted_at`, replace `email` with a `pid`-keyed tombstone (so the
     /// `UNIQUE(email)` constraint still holds and the original address is
@@ -531,7 +616,8 @@ impl ActiveModel {
 
 #[cfg(test)]
 mod tests {
-    use super::{TOMBSTONE_NAME, tombstone_email};
+    use super::{TOMBSTONE_NAME, attributes_map, attributes_to_value, tombstone_email};
+    use std::collections::BTreeMap;
     use uuid::Uuid;
 
     #[test]
@@ -553,6 +639,67 @@ mod tests {
         let a = tombstone_email(&Uuid::new_v4());
         let b = tombstone_email(&Uuid::new_v4());
         assert_ne!(a, b, "distinct pids must yield distinct tombstone emails");
+    }
+
+    #[test]
+    fn attributes_map_parses_the_string_to_strings_shape() {
+        // The canonical stored shape: string keys → lists of strings.
+        let value = serde_json::json!({
+            "access": ["write"],
+            "dept": ["cardiology", "oncology"],
+        });
+        let map = attributes_map(&value);
+        assert_eq!(map.len(), 2);
+        assert_eq!(map["access"], vec!["write"]);
+        assert_eq!(map["dept"], vec!["cardiology", "oncology"]);
+    }
+
+    #[test]
+    fn attributes_map_is_tolerant_of_malformed_values() {
+        // A bare string coerces to a one-element list; non-string list
+        // items are skipped; non-list/non-string values yield no entry;
+        // a non-object input yields an empty map. A malformed stored
+        // value must never fail token minting — it just grants nothing.
+        let value = serde_json::json!({
+            "svc": "true",
+            "mixed": ["ok", 42, null],
+            "number": 7,
+            "object": {"nested": true},
+        });
+        let map = attributes_map(&value);
+        assert_eq!(map["svc"], vec!["true"]);
+        assert_eq!(map["mixed"], vec!["ok"]);
+        assert!(!map.contains_key("number"));
+        assert!(!map.contains_key("object"));
+
+        assert!(attributes_map(&serde_json::json!({})).is_empty());
+        assert!(attributes_map(&serde_json::Value::Null).is_empty());
+        assert!(attributes_map(&serde_json::json!(["not", "an", "object"])).is_empty());
+    }
+
+    #[test]
+    fn attributes_to_value_round_trips_through_attributes_map() {
+        // Serialising a map to the canonical JSONB shape and parsing it
+        // back must be lossless — the invariant the assignment task
+        // relies on when it reads, mutates, and writes the column.
+        let mut map: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        map.insert("access".to_string(), vec!["write".to_string()]);
+        map.insert(
+            "dept".to_string(),
+            vec!["cardiology".to_string(), "oncology".to_string()],
+        );
+        let value = attributes_to_value(&map);
+        // Canonical shape: every value is a JSON array of strings.
+        assert_eq!(value["access"], serde_json::json!(["write"]));
+        assert_eq!(value["dept"], serde_json::json!(["cardiology", "oncology"]));
+        assert_eq!(attributes_map(&value), map);
+    }
+
+    #[test]
+    fn attributes_to_value_of_empty_map_is_an_empty_object() {
+        let value = attributes_to_value(&BTreeMap::new());
+        assert_eq!(value, serde_json::json!({}));
+        assert!(attributes_map(&value).is_empty());
     }
 
     #[test]

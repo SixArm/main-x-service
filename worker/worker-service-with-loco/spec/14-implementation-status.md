@@ -17,9 +17,10 @@
 | Merging | Transfer + alias + link + soft-delete + snapshot + event |
 | Validation | Required fields, format checks, phone normalisation, address standardisation, `422` |
 | Privacy | Field masking, GDPR export, consent model |
-| Authentication (peer verification) | Offline PASETO v4.public (Ed25519) bearer verification via `authentication-verifier` 0.2; `AuthUser` extractor + `GET /api/v1/whoami`; env-configured key set (T-1a) |
+| Authentication (peer verification) | Offline PASETO v4.public (Ed25519) bearer verification via `authentication-verifier` 0.3; `AuthUser` extractor + `GET /api/v1/whoami`; env-configured key set (T-1a) |
 | Authentication (blanket enforcement) | Default-off `WORKER_REQUIRE_AUTH` middleware on both router surfaces: pure `enforce(...)` + `apply_enforcement` in `src/api/rest/auth.rs`; public allow-list = health/ping, `/api/v1/health`, OpenAPI/Swagger, `/metrics.prom`; DB-free unit-test matrix (T-1b enforcement sub-item, done 2026-07-04) |
 | Authentication (boot-time key fetch) | `WORKER_PASETO_KEYS_URL` fetched once at boot via `Verifier::from_paseto_keys_url` (verifier `fetch` feature); fetched set wins over `WORKER_PASETO_KEYS`; fetch failure warns and falls back to the env path — the service always boots; verifier swapped into `AppState` before routers/middleware are built; local-listener + dead-port tokio tests (T-1b fetch sub-item, done 2026-07-04) |
+| Authorization (ABAC) | Inside the blanket guard: action derived from method + destructive named POSTs (`/merge`, `/deduplicate`, `/import`); shared `authentication-verifier` 0.3 engine evaluates `WORKER_ABAC_POLICY`/`_FILE` (else the built-in default policy) over the token's `attrs` claim; first-match-wins, default allow-read / deny-mutation; `401` vs `403` split with deciding-rule reason; DB-free §7 test matrix (T-1b, done 2026-07-05) |
 | Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 
@@ -27,7 +28,6 @@
 
 | Gap | Task |
 |---|---|
-| Authentication — RBAC roles (peer verification T-1a, default-off blanket enforcement, and boot-time HTTP key-set fetch delivered) | T-1b (remainder) |
 | Fluvio production publisher | T-2 |
 | FHIR capability statement | T-3 |
 | FHIR bundle (full) | T-3 |

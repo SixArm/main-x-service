@@ -8,6 +8,35 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — authz: ABAC policy authorization inside the blanket guard
+
+- ABAC authorization landed (spec §13 T-1c, the authorization sub-item
+  — supersedes the earlier roles/RBAC-on-`roles`/`scope` sketch;
+  family contract: `agents/share/authorization-attributes.md`). When
+  `PERSON_REQUIRE_AUTH` is on, a verified PASETO token is further
+  checked by the shared policy engine in `authentication-verifier`
+  0.3: the request's action is derived from the HTTP method plus the
+  crate's destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES`
+  — `/merge`, `/deduplicate`, `/import`), and the policy is evaluated
+  over the token's new `attrs` claim, first-match-wins, defaulting to
+  allow-read / deny-mutation.
+- New env vars `PERSON_ABAC_POLICY` (inline JSON) and
+  `PERSON_ABAC_POLICY_FILE` (path), read once at router construction
+  by the new `auth::policy_from_env` (restart to change); unset or
+  unparsable ⇒ `tracing::warn!` + the built-in default policy
+  (`svc=true` ⇒ everything; `access=admin` ⇒ destructive+write;
+  `access=write` ⇒ write) — the service always boots.
+- `auth::enforce` now takes the HTTP method and the policy and
+  returns `403` (with the deciding-rule reason) for a valid token the
+  policy denies; `401` remains missing/bad credential. `Enforcement`
+  carries the policy alongside the verifier.
+- DB-free unit tests pin the family §7 matrix: action derivation,
+  empty-`attrs` read-only default, `access=write` / `access=admin` /
+  `svc=true` tiers, deny-beats-later-allow, 401-vs-403, bad-policy
+  fallback.
+- Flag off ⇒ behaviour-neutral: no authn and no authz, exactly as
+  before.
+
 ### Added — boot-time PASETO key-set fetch (`PERSON_PASETO_KEYS_URL`)
 
 - New `PERSON_PASETO_KEYS_URL` env var (spec §13 T-1c fetch item): when
@@ -33,7 +62,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   listener serves the key set and a token signed by that key verifies;
   a dead port falls back to the env path without panicking; URL-unset
   uses the env path (precedence).
-- Roles/RBAC remains the open spec §13 T-1c item.
+- Authorization has since landed as ABAC (see the top entry), not
+  RBAC — the spec §13 T-1c authorization item is complete.
 
 ### Added — blanket auth enforcement (default-off)
 
@@ -55,7 +85,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   `401`; on + valid ⇒ Ok; on + expired/tampered ⇒ `401`) and the lenient
   flag-parser semantics, reusing the in-process PASETO minting helpers.
 - Boot-time HTTP key fetch has since landed (see the entry above);
-  roles/RBAC remains open as spec §13 T-1c.
+  authorization has since landed as ABAC (top entry), completing
+  spec §13 T-1c.
 
 ### Changed — auth pivot: RS256 JWT/JWKS → PASETO v4.public
 

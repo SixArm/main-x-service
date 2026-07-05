@@ -305,14 +305,30 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
     // The server-side session id (`sid`) is the durable thing; the
     // short-lived PASETO carries it so peers and signout can correlate.
     let sid = uuid::Uuid::new_v4().to_string();
-    let (access_token, _sid, exp) =
-        crate::auth::sign_access_token(&user.pid.to_string(), &user.email, &user.name, &sid)
-            .map_err(|e| Error::string(&e.to_string()))?;
+    let (access_token, _sid, exp) = crate::auth::sign_access_token(
+        &user.pid.to_string(),
+        &user.email,
+        &user.name,
+        &sid,
+        user.attrs(),
+    )
+    .map_err(|e| Error::string(&e.to_string()))?;
 
     let expires_at = chrono::DateTime::<chrono::Utc>::from_timestamp(exp, 0)
         .unwrap_or_else(chrono::Utc::now)
         .fixed_offset();
-    sessions::Model::issue(&ctx.db, &sid, user.pid, expires_at, None).await?;
+    // Session establishment copies the user's ABAC attributes into the
+    // session payload (shared authorization-attributes.md §6), so token
+    // minting reads them from the session, not the users row.
+    sessions::Model::issue(
+        &ctx.db,
+        &sid,
+        user.pid,
+        expires_at,
+        None,
+        sessions::session_data(&user.attributes),
+    )
+    .await?;
 
     AuthEvent::record_best_effort(
         &ctx.db,
@@ -376,14 +392,21 @@ async fn token(headers: axum::http::HeaderMap, State(ctx): State<AppContext>) ->
         return unauthorized("session revoked or expired");
     }
     // Resolve the user for the token claims, then mint a fresh PASETO bound
-    // to this session id.
+    // to this session id. The ABAC `attrs` claim comes from the session's
+    // copied attributes (shared authorization-attributes.md §6) — the
+    // users read is only for the identity claims + erasure check.
     let Ok(user) = users::Model::find_active_by_pid(&ctx.db, &session.user_pid.to_string()).await
     else {
         return unauthorized("account not found");
     };
-    let (access_token, _sid, _exp) =
-        crate::auth::sign_access_token(&user.pid.to_string(), &user.email, &user.name, &sid)
-            .map_err(|e| Error::string(&e.to_string()))?;
+    let (access_token, _sid, _exp) = crate::auth::sign_access_token(
+        &user.pid.to_string(),
+        &user.email,
+        &user.name,
+        &sid,
+        session.attrs(),
+    )
+    .map_err(|e| Error::string(&e.to_string()))?;
     format::json(serde_json::json!({ "token": access_token }))
 }
 

@@ -38,9 +38,13 @@ build-out.
 - **Security.** Blanket auth enforcement on `/api/*` (PASETO v4 public
   token / cookie session per
   [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md),
-  superseding the RS256-JWT model); role-based write authorisation
-  over sub-resources; role split between read-side integrators and
-  work-item operators; rate limiting.
+  superseding the RS256-JWT model) with **ABAC** authorisation over
+  the token's `attrs` claim (per
+  [`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md);
+  delivered, supersedes the earlier role-based sketch) — deployments
+  express read/write/destructive tiers and any read-integrator vs
+  work-item-operator split as policy attributes, not fixed roles;
+  rate limiting.
 - **PM-tool sync.** Two-way sync with Jira / Asana / MS Project /
   Linear / GitHub Projects keyed on the deterministic external-id
   identifiers (R-0 schemes), so a registered project stays in step with

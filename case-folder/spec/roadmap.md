@@ -8,7 +8,7 @@ Priorities are shared across both editions unless noted.
 
 | Priority | Item                                                                       | Edition       |
 | -------- | -------------------------------------------------------------------------- | ------------- |
-| P0       | Auth (CIS2 smartcard or OIDC) + RBAC, threaded through API + client        | both          |
+| P0       | Auth (CIS2 smartcard or OIDC) + ABAC, threaded through API + client        | both          |
 | P0       | Append-only audit storage with chained signatures                          | loco          |
 | P0       | Same-origin deployment + re-enable SSR                                     | svelte        |
 | P1       | OpenAPI / JSON Schema document for every endpoint; codegen client types     | both          |

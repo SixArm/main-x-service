@@ -7,9 +7,14 @@ roughly by dependency.
 
 ### 15.1 Security first
 
-- **JWT enforcement** on every service endpoint, verified offline
-  against the [authentication entity](../../authentication/)'s JWKS
-  (E-1). RBAC and rate limiting follow.
+- **Blanket auth enforcement** on every service endpoint — PASETO
+  v4.public bearer tokens verified offline against the
+  [authentication entity](../../authentication/)'s published key set,
+  with ABAC policy authorization inside the guard (E-1; per
+  [jwt-enforcement](../../agents/share/jwt-enforcement.md) and
+  [authorization-attributes](../../agents/share/authorization-attributes.md)).
+  Activation (`PERSON_REQUIRE_AUTH`) is an operations decision; rate
+  limiting follows.
 - Security audit + penetration test before any public-sector pilot.
 
 ### 15.2 Durable integration

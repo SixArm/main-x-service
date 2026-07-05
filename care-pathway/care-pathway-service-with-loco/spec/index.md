@@ -150,6 +150,23 @@ re-fetch on key rotation is a future item (§16). See the family contract
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md),
 which supersedes the prior RS256-JWT model.
 
+**Authorization (ABAC).** Inside the same guard — so only when
+`CARE_PATHWAY_REQUIRE_AUTH` is on — a verified token is authorized by
+**attribute-based access control** per
+[`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md):
+the request's action is derived from the HTTP method plus this crate's
+destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` — `/merge`,
+`/deduplicate`, `/import`; the latter two ahead of the dedup-scan and
+bulk-import features), and the shared engine in
+`authentication-verifier` 0.3 evaluates the policy over the token's
+`attrs` claim, first-match-wins. Configure with `CARE_PATHWAY_ABAC_POLICY`
+(inline JSON) or `CARE_PATHWAY_ABAC_POLICY_FILE` (path); unset or
+unparsable ⇒ warn-log + the built-in default policy (any authenticated
+subject reads; `access=write` writes; `access=admin` adds DELETE/merge;
+`svc=true` does everything). `401` = missing/bad credential; `403` =
+valid credential, policy denied (the body names the deciding rule). This
+supersedes the earlier per-crate roles/RBAC sketch.
+
 ## 10. Persistence
 
 PostgreSQL via SeaORM + `sea-orm-migration`. Migrations

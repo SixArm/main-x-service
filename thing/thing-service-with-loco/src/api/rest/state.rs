@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use authentication_verifier::Verifier;
+use authentication_verifier::{Policy, Verifier};
 use sea_orm::DatabaseConnection;
 
 use crate::config::Config;
@@ -45,6 +45,12 @@ pub struct AppState {
     /// PASETO bearer token on every `/api/*` route except the public
     /// allow-list ([`super::auth::PUBLIC_API_PATHS`]).
     pub require_auth: bool,
+    /// ABAC policy evaluated on verified tokens when blanket
+    /// enforcement is on. Read once from `THING_ABAC_POLICY` /
+    /// `THING_ABAC_POLICY_FILE` at construction (see
+    /// [`super::auth::policy_from_env`]) — unset/unparsable ⇒ the
+    /// built-in default policy; restart the service to change it.
+    pub policy: Arc<Policy>,
 }
 
 impl AppState {
@@ -72,6 +78,7 @@ impl AppState {
             config: Arc::new(config),
             verifier: Arc::new(verifier_from_env()),
             require_auth: super::auth::require_auth_from_env(),
+            policy: Arc::new(super::auth::policy_from_env()),
         }
     }
 

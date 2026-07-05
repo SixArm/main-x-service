@@ -7,7 +7,7 @@
 //! derives [`Clone`]). One instance is built at startup and shared
 //! across all requests via Axum's `with_state`.
 
-use authentication_verifier::Verifier;
+use authentication_verifier::{Policy, Verifier};
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 
@@ -58,6 +58,14 @@ pub struct AppState {
     /// PASETO bearer token on every `/api/v1/*` route except the
     /// public allow-list ([`super::auth::PUBLIC_API_PATHS`]).
     pub require_auth: bool,
+
+    /// ABAC policy evaluated on verified tokens inside the blanket
+    /// guard (so only when [`AppState::require_auth`] is on). Read
+    /// once from `EVENT_ABAC_POLICY` / `EVENT_ABAC_POLICY_FILE` at
+    /// construction (see [`super::auth::policy_from_env`]) — unset or
+    /// unparsable ⇒ the built-in default policy; restart the service
+    /// to change it.
+    pub policy: Arc<Policy>,
 }
 
 impl AppState {
@@ -99,6 +107,7 @@ impl AppState {
             config: Arc::new(config),
             verifier: Arc::new(verifier_from_env()),
             require_auth: super::auth::require_auth_from_env(),
+            policy: Arc::new(super::auth::policy_from_env()),
         }
     }
 

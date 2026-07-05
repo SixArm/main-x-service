@@ -17,10 +17,10 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] Promote the stub to a working Tonic server mirroring REST CRUD.
   - **Acceptance:** `grpcurl` against `ThingService.GetThing`
     round-trips a record.
-- [ ] **T-4 — Authentication / authorisation.** Peer PASETO
+- [x] **T-4 — Authentication / authorisation.** Peer PASETO
   verification *(done 2026-07-04)*, default-off blanket enforcement
-  *(done 2026-07-04)*, and boot-time published-key HTTP fetch
-  *(done 2026-07-04)*; roles are the only open item. Per
+  *(done 2026-07-04)*, boot-time published-key HTTP fetch
+  *(done 2026-07-04)*, and ABAC authorization *(done 2026-07-05)*. Per
   [authentication-sessions](../../../agents/share/authentication-sessions.md)
   §5: the family moved off RS256-JWT + JWKS.
   - [x] Offline PASETO `v4.public` (Ed25519) verification via the
@@ -49,7 +49,26 @@ clearly described manual check confirms the acceptance criterion.
     `App::after_routes`) via `axum::middleware::from_fn_with_state`,
     inside the CORS layer. Family contract:
     [jwt-enforcement](../../../agents/share/jwt-enforcement.md).
-  - [ ] Editor / read-only / service roles.
+  - [x] ABAC authorization *(done 2026-07-05; supersedes the earlier
+    roles sketch — editor / read-only / service — per
+    [authorization-attributes](../../../agents/share/authorization-attributes.md))*
+    — inside the blanket guard (so only when `THING_REQUIRE_AUTH` is
+    on), a verified token's `attrs` claim is evaluated by the shared
+    engine in `authentication-verifier` 0.3: the action is derived
+    from the HTTP method + this crate's destructive named POSTs
+    (`auth::DESTRUCTIVE_POST_SUFFIXES`: `/merge`, `/deduplicate`,
+    `/import`), and the policy — `THING_ABAC_POLICY` (inline JSON) /
+    `THING_ABAC_POLICY_FILE` (path), unset/unparsable ⇒ warn-log +
+    built-in default policy, read once at `AppState` construction —
+    decides first-match-wins with default allow-read / deny-mutation.
+    `401` = missing/bad credential; `403` = valid credential, policy
+    denied (body carries the deciding rule). Acceptance met: DB-free
+    unit tests in `src/api/rest/auth.rs` pin the §7 matrix — action
+    derivation; empty `attrs` ⇒ GET ok / POST 403; `access=write` ⇒
+    POST/PUT ok, DELETE + merge 403; `access=admin` ⇒ destructive ok;
+    `svc=true` ⇒ everything; configured deny beats later allow;
+    401-vs-403 split; bad policy JSON falls back to the default —
+    `cargo test --lib` green.
   - [x] Fetch the published Ed25519 key set over HTTP at boot
     *(done 2026-07-04)* — when the new `THING_PASETO_KEYS_URL` env var
     is set (non-blank), `App::after_routes` (async boot context) calls
@@ -82,8 +101,11 @@ clearly described manual check confirms the acceptance criterion.
     a token signed by that key; a fast-failing URL
     (`http://127.0.0.1:1/`) falls back to the env/empty path without
     panic. Met: `cargo test --lib` green.
-  - **Acceptance (roles — open):** valid token + role gets `2xx`;
-    insufficient role gets `403`.
+  - **Acceptance (authorization — met):** valid token whose
+    attributes satisfy the policy gets `2xx`; a valid token the
+    policy denies gets `403`; no/bad token gets `401`. T-4 is
+    complete; activation (`THING_REQUIRE_AUTH=1`) remains the
+    operational decision.
 - [ ] **T-5 — Embedding-based similarity (optional / experimental).**
   - [ ] Vector index via `pg_vector`.
   - [ ] `compute_match` augmented with cosine-similarity score.

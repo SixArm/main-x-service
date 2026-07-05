@@ -38,11 +38,18 @@ converted to idiomatic loco using this crate as the template.
 In scope: sign up, sign in, sign out — all via magic link; server-side
 cookie sessions; PASETO v4.public minting (`POST /token`); Ed25519
 public-key publication (`/.well-known/paseto-keys`); CSRF; session
-revocation; the user record.
+revocation; the user record; **ABAC attribute sourcing** — the
+`users.attributes` map, copied into the session at establishment and
+minted into the token's `attrs` claim (shared
+[`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md)
+§6).
 
 Out of scope (for now): passwords, OAuth/social login, multi-factor,
-roles/permissions/authorization (services authorize locally from claims),
-organization/tenant modelling, account self-service beyond sign-in.
+authorization *enforcement* (peer services evaluate ABAC policies
+locally over the verified `attrs` claim — this service only *sources*
+the attributes; the earlier "roles/permissions" wording is superseded
+by ABAC), organization/tenant modelling, account self-service beyond
+sign-in.
 
 ## 3. Stakeholders and users
 
@@ -72,20 +79,27 @@ organization/tenant modelling, account self-service beyond sign-in.
 ## 5. Domain model
 
 - **users** — `id`, `pid` (UUID), `email` (unique), `name`,
-  `email_verified_at`, magic-link columns, `deleted_at`, audit
+  `email_verified_at`, magic-link columns, `deleted_at`, `attributes`
+  (JSONB `NOT NULL DEFAULT '{}'` — the ABAC string→strings
+  subject-attribute map, e.g. `{"access": ["write"]}`, per shared
+  authorization-attributes.md §6; `{}` = read-only under the family's
+  default policy until an operator assigns attributes), audit
   timestamps. `password` exists only to satisfy `NOT NULL` and holds an
   unusable random hash. `deleted_at` (GDPR Art. 17) soft-deletes the
   account: when set, the `email`/`name` are anonymised to a tombstone
   and every read path treats the user as gone.
 - **sessions** — server-side cookie session (per shared §3): `sid`
-  (opaque pk, **not** a JWT), `user_pid`, `data` (JSONB — roles /
-  scopes / MFA state), `created_at`, `last_seen_at`, `idle_expires_at`,
+  (opaque pk, **not** a JWT), `user_pid`, `data` (JSONB — session
+  payload; holds the user's ABAC attributes under `attrs`, copied at
+  establishment so `POST /token` mints the `attrs` claim from the
+  session alone), `created_at`, `last_seen_at`, `idle_expires_at`,
   `absolute_expires_at`, `revoked_at`. One row per logged-in browser;
   the unit of revocation. Valid iff `revoked_at IS NULL AND now() <
   idle_expires_at AND now() < absolute_expires_at`. *(Target shape per
-  shared §3; the code currently reuses the legacy `jid`/`expires_at`
-  columns with `sid` = `jid`, pending the §13 reshape. Either way the
-  session is an opaque server-side row — not a JWT.)*
+  shared §3; the `data` JSONB column has landed (ABAC sourcing); the
+  code otherwise still reuses the legacy `jid`/`expires_at` columns with
+  `sid` = `jid`, pending the §13 reshape. Either way the session is an
+  opaque server-side row — not a JWT.)*
 - **PASETO key material** — an Ed25519 keypair (not in the DB; env /
   files per §8). The private key signs `POST /token`; the public
   key(s) are published at `/.well-known/paseto-keys`, keyed by `kid`.
@@ -122,10 +136,16 @@ noted in the CHANGELOG "Notes". See §13 for the removal task.
    issue a CSRF token, and return `{pid, name, email, is_verified}`. It
    **no longer returns a bearer token** — the credential is the
    `Set-Cookie`. Mechanism unchanged per shared §7; only the outcome
-   changes.
+   changes. Session establishment **copies the user's ABAC
+   `attributes` into the session** (`sessions.data.attrs`) per shared
+   authorization-attributes.md §6, so token minting reads only the
+   session.
 4. `POST /token` (session cookie, CSRF-protected) — exchange the valid
    session for a short-lived **PASETO v4.public** (`exp` ~5 min, footer
-   `kid`) for use as `Authorization: Bearer v4.public.…` at peers.
+   `kid`) for use as `Authorization: Bearer v4.public.…` at peers. The
+   token's **`attrs` claim** carries the session's copied ABAC
+   attributes (empty map ⇒ the claim is omitted from the wire, keeping
+   the pre-ABAC payload shape).
 5. `GET /api/auth/me` (session cookie) — resolve + slide the session,
    reject expired/revoked (`401`), return the current user.
 6. `POST /api/auth/signout` (session cookie, CSRF-protected) — set
@@ -206,6 +226,30 @@ single-use (cleared on consumption).
     The magic-link URL is locale-independent. The compliance basis is the
     Welsh Language (Wales) Measure 2011 (see §12); add a locale by
     extending `SUPPORTED_LOCALES` + `magic_link_email`.
+
+12. **ABAC attribute sourcing** (shared
+    [`authorization-attributes.md`](../../../agents/share/authorization-attributes.md)
+    §6). The auth service is the *sourcing* side of the family's ABAC
+    model; peers enforce. Three legs:
+    - `users.attributes` (JSONB `NOT NULL DEFAULT '{}'`) holds the
+      subject's string→strings attribute map (e.g. `access: ["write"]`,
+      `svc: ["true"]` for machine peers).
+    - Magic-link redemption copies the map into the new session's
+      `data.attrs` (§6.3) — the session is then the single read for
+      minting.
+    - `POST /token` (and the transitional redemption-body token) mints
+      the map into the PASETO **`attrs`** claim (§6.4), mirrored
+      byte-for-byte by `authentication_verifier::Claims` 0.3. Parsing of
+      the stored JSONB is tolerant (`users::attributes_map`):
+      malformed entries are inert and can never fail minting.
+    - Attribute **assignment** is an operator action. The **CLI task**
+      has **landed** (`user_attributes`, `src/tasks/attributes.rs`):
+      `op:show|set|unset|clear` over one user's `users.attributes`,
+      selected by `email:` or `pid:`, with lowercase key/value
+      validation and the reserved pseudo-attributes `sub`/`email`/
+      `entity` refused. An HTTP admin API is a later follow-up (§13).
+      Until assigned, users hold `{}` and are read-only under the
+      family's default policy.
 
 ## 7. Non-functional requirements
 
@@ -300,15 +344,19 @@ loco-JSON envelope above.
 PostgreSQL via SeaORM + `sea-orm-migration`. Migrations:
 `m20220101_000001_users`, `m20220101_000002_sessions`,
 `m20220101_000003_auth_events`, `m20220101_000004_users_deleted_at` (the
-GDPR-erasure soft-delete column), and `m20220101_000005_auth_rate_limits`
-(the magic-link rate-limiter window log). `auto_migrate` is on in
-development, off in production.
+GDPR-erasure soft-delete column), `m20220101_000005_auth_rate_limits`
+(the magic-link rate-limiter window log),
+`m20220101_000006_users_attributes` (the ABAC subject-attribute map,
+JSONB `NOT NULL DEFAULT '{}'`), and `m20220101_000007_sessions_data`
+(the session payload JSONB holding the copied `attrs`). `auto_migrate`
+is on in development, off in production.
 
 **Cookie sessions.** The cookie session currently reuses the existing
-`sessions` table (`sid` = the legacy `jid` column); the reshape to the
-full shared-§3 schema (`data` JSONB, `last_seen_at`, idle/absolute
-TTLs, partial index on `(user_pid) WHERE revoked_at IS NULL`) is a
-deferred §13 follow-up. The **Ed25519** PASETO signing seed lives in
+`sessions` table (`sid` = the legacy `jid` column); the `data` JSONB
+column has landed (ABAC sourcing, §6.12), and the reshape to the rest
+of the shared-§3 schema (`last_seen_at`, idle/absolute TTLs, partial
+index on `(user_pid) WHERE revoked_at IS NULL`) is a deferred §13
+follow-up. The **Ed25519** PASETO signing seed lives in
 env / a file (not the DB; built-in dev seed otherwise), public keys
 published at `/.well-known/paseto-keys`. RS256 RSA keys are
 decommissioned.
@@ -385,7 +433,21 @@ decommissioned.
   mismatch fails. A **multi-key** case asserts a verifier built from a
   key set carrying more than the primary key still verifies a
   primary-signed
-  token and rejects a token whose `kid` is absent from the set.
+  token and rejects a token whose `kid` is absent from the set. Since
+  verifier 0.3 the contract also pins the ABAC **`attrs`** claim: a
+  non-empty map minted here round-trips through the peer verifier, and
+  an empty map is **omitted from the wire** (`skip_serializing_if`) yet
+  still verifies to an empty map (pre-ABAC payload shape preserved).
+- **ABAC sourcing unit tests (DB-free):** `src/models/users.rs` —
+  `attributes_map` parses the string→strings shape and is tolerant of
+  malformed stored values (bare string coerces, non-string list items
+  skipped, other shapes inert); `src/models/sessions.rs` — the §6 copy
+  path round-trips (`users.attributes` → `session_data` →
+  `Model::attrs`), and a pre-ABAC session (`{}` / no `attrs`) yields an
+  empty map; `src/auth` — a non-empty `attrs` claim round-trips
+  mint→verify and an empty map is omitted from the serialized payload;
+  `src/openapi.rs` — the `Claims` schema documents `attrs` as an
+  optional string→string-array map.
 
 ## 12. Compliance
 
@@ -556,8 +618,9 @@ that subject, while the operator-facing system feed stays open.
         per-session synchroniser / double-submit token on
         cookie-authenticated `POST`/`PUT`/`PATCH`/`DELETE` remains.
   - [ ] **Sessions-table reshape (remaining refinement).** Migrate to
-        the shared-§3 schema (`sid` pk / `data` JSONB / `last_seen_at` /
-        `idle_expires_at` / `absolute_expires_at`; partial index), with
+        the shared-§3 schema (`sid` pk / `last_seen_at` /
+        `idle_expires_at` / `absolute_expires_at`; partial index) — the
+        `data` JSONB column already landed with ABAC sourcing — with
         idle-TTL sliding on `/me` and `sid` rotation on privilege
         change; then drop the transitional PASETO body from redemption.
   - **Acceptance (met):** redemption returns
@@ -566,6 +629,60 @@ that subject, while the operator-facing system feed stays open.
         `/.well-known/paseto-keys` accepts; signout sets `revoked_at`; no
         RS256/JWKS path remains; OpenAPI + the cross-crate contract test
         cover PASETO.
+- [x] **ABAC sourcing (attrs)** (shared
+      [`authorization-attributes.md`](../../../agents/share/authorization-attributes.md)
+      §6, rollout step 4; supersedes any per-crate roles/RBAC sketch).
+      `users.attributes` JSONB `NOT NULL DEFAULT '{}'` (migration
+      `m20220101_000006_users_attributes`) + `sessions.data` JSONB
+      (migration `m20220101_000007_sessions_data`); magic-link
+      redemption copies the user's attributes into the session
+      (`sessions::session_data`); `POST /api/auth/token` (and the
+      transitional redemption body) mints the session's attributes into
+      the PASETO **`attrs`** claim — `auth::Claims` stays byte-identical
+      to `authentication_verifier::Claims` 0.3
+      (`#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]`).
+      Tolerant `users::attributes_map` parsing (malformed stored values
+      are inert, never fail minting); the GDPR account export includes
+      `attributes` (subject data); OpenAPI documents `attrs` +
+      `attributes` and deprecates `scope`/`roles` for authorization.
+      DB-free unit tests (parser, copy round-trip, claim
+      serialization, OpenAPI) + two new cross-crate contract tests
+      (non-empty `attrs` round-trips; empty `attrs` omitted on the wire
+      and still verifies). *(2026-07-05.)*
+- [x] **ABAC attribute assignment surface — CLI task** (follow-up to
+      the above, per shared authorization-attributes.md §6). The
+      `user_attributes` loco task (`src/tasks/attributes.rs`, registered
+      in `App::register_tasks`) sets/inspects `users.attributes` for one
+      operator-selected user: `cargo loco task user_attributes
+      (email:<addr>|pid:<uuid>) [op:show|set|unset|clear] [key:<name>]
+      [values:<v1,v2,…>]`. `set` replaces a key's value list, `unset`
+      removes a key, `clear` empties the map, `show` (default) prints it;
+      it writes via `users::ActiveModel::set_attributes` (canonicalised
+      by `users::attributes_to_value`, the lossless inverse of
+      `attributes_map`) and prints a before/after report, logging the
+      change via `tracing`. Keys/values are validated as short lowercase
+      tokens and the reserved pseudo-attributes `sub`/`email`/`entity`
+      are refused. Machine peers get `svc=true` tokens from ops. DB-free
+      unit tests pin value parsing, key/value validation, command
+      parsing, and the map-mutation ops. *(2026-07-05.)*
+  - [x] **HTTP admin API + per-assignment audit** *(2026-07-05)*.
+        `GET`/`PUT /api/auth/admin/users/{pid}/attributes`
+        (`src/controllers/admin.rs`, mounted in `App::routes`): show /
+        replace a user's `users.attributes` from an authenticated caller
+        whose own attributes include `access=admin` (bootstrap admin via
+        the CLI). `401` no/invalid token; `403` valid non-admin; `404`
+        unknown/erased user; `422` on a bad body (keys/values validated
+        with the CLI task's `validate_key`/`validate_value` — reserved
+        `sub`/`email`/`entity` refused, no empty value lists). Both the
+        CLI task and this endpoint now write an **`attributes_assigned`**
+        `auth_events` row (`Model::record_attribute_assignment_best_effort`;
+        actor = `cli` or the admin's `pid:<uuid>`; attribute values
+        omitted from the audit detail). OpenAPI documents both verbs
+        (`UserAttributes` / `ReplaceUserAttributes` schemas, `admin`
+        tag). DB-free tests: `require_admin` gate, `validate_map`,
+        OpenAPI admin-path assertions; DB-gated request tests
+        (`tests/requests/admin.rs`): admin replace+show+audit, non-admin
+        `403`, missing-token `401`.
 
 ## 14. Implementation status
 
@@ -591,7 +708,10 @@ erasure, `users.deleted_at`); operator-driven **zero-downtime key
 rotation** (`AuthKeys` is a primary + additional verify-only key set;
 the published key set carries all keys; `verify_token` selects by the
 footer `kid`); localized
-magic-link email (en / cy via `src/i18n.rs`, optional request `locale`).
+magic-link email (en / cy via `src/i18n.rs`, optional request `locale`);
+**ABAC attribute sourcing** (`users.attributes` → session `data.attrs`
+→ PASETO `attrs` claim, per shared authorization-attributes.md §6;
+assignment surface deferred — §13).
 
 ## 15. Roadmap
 
@@ -607,7 +727,11 @@ This **supersedes** the JWT model. Remaining v0.2 items: full
 double-submit CSRF, the sessions-table reshape, Mailpit,
 auto-rotation scheduler. v0.3: begin loco conversion of the sibling
 services using this as the template (peers adopt the PASETO
-`authentication-verifier`).
+`authentication-verifier`); **ABAC** — the sourcing side (attributes →
+session → `attrs` claim) has landed here, peers enforce via the shared
+`abac` engine in verifier 0.3 (per shared authorization-attributes.md —
+authorization is attribute-based, not a fixed role list); next: the
+operator attribute-assignment surface (§13).
 
 ## 16. Open questions
 

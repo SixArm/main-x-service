@@ -310,6 +310,25 @@ set; absent ⇒ empty key set, all tokens rejected) / `PORTFOLIO_TOKEN_ISSUER`
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md);
 blanket-enforcement contract: [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md).
 
+**Authorization (ABAC).** Inside the same guard — so only when
+`PORTFOLIO_REQUIRE_AUTH` is on — a verified token is authorized by
+**attribute-based access control** per
+[`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md):
+the request's action is derived from the HTTP method plus this crate's
+destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` — `/merge`,
+`/deduplicate`, `/import`), matched on path suffix so the corresponding
+POST on any of the four collections is `Destructive` rather than `Write`
+(a `/links` DELETE is covered by the `DELETE`⇒`Delete` rule). The shared
+engine in `authentication-verifier` 0.3 evaluates the policy over the
+token's `attrs` claim, first-match-wins. Configure with
+`PORTFOLIO_ABAC_POLICY` (inline JSON) or `PORTFOLIO_ABAC_POLICY_FILE`
+(path); unset or unparsable ⇒ warn-log + the built-in default policy (any
+authenticated subject reads; `access=write` writes; `access=admin` adds
+DELETE/merge/deduplicate/import; `svc=true` does everything). `401` =
+missing/bad credential; `403` = valid credential, policy denied (the body
+names the deciding rule). This supersedes the earlier per-crate roles/RBAC
+sketch.
+
 ### 9.7 Cross-service entity links (write side)
 
 Per [cross-service linking](../../../agents/share/cross-service-linking.md),

@@ -132,8 +132,24 @@ The public allow-list (`PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES` in
 
 The `/fhir` surface is deliberately **not** on the allow-list — it
 serves worker PII. Family-wide contract:
-`agents/share/jwt-enforcement.md`. Remaining follow-up (spec §13
-T-1b): RBAC roles.
+`agents/share/jwt-enforcement.md`.
+
+#### Authorization (ABAC)
+
+Inside the same guard (so only when `WORKER_REQUIRE_AUTH` is on), a
+verified token is authorized by **attribute-based access control**
+per `agents/share/authorization-attributes.md`: the request's action
+is derived from the HTTP method plus the crate's destructive named
+POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` — `/merge`, `/deduplicate`,
+`/import`), and the shared engine in `authentication-verifier` 0.3
+evaluates the policy over the token's `attrs` claim. Configure with
+`WORKER_ABAC_POLICY` (inline JSON) or `WORKER_ABAC_POLICY_FILE`
+(path); unset or unparsable ⇒ warn-log + the built-in default policy
+(any authenticated subject reads; `access=write` writes;
+`access=admin` adds DELETE/merge/deduplicate; `svc=true` does
+everything). Read once at router construction — restart to change.
+`401` = missing/bad credential; `403` = valid credential, policy
+denied (the body names the deciding rule).
 
 ### Worker CRUD
 

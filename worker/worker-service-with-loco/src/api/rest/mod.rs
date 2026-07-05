@@ -181,12 +181,19 @@ pub fn create_router(state: AppState) -> Router {
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
 
     // Blanket auth enforcement (spec §13 T-1b): default-off, gated by
-    // `WORKER_REQUIRE_AUTH` read at construction. Layered beneath CORS so
-    // preflight `OPTIONS` requests are answered before enforcement runs.
-    auth::apply_enforcement(router, auth::require_auth_from_env(), enforcement_verifier)
-        // Permissive CORS so browser-based operator UIs on other origins can
-        // call the API; tighten for production deployments.
-        .layer(CorsLayer::permissive())
+    // `WORKER_REQUIRE_AUTH` read at construction, with the ABAC policy
+    // (`WORKER_ABAC_POLICY`/`_FILE`, else the built-in default) captured
+    // alongside it. Layered beneath CORS so preflight `OPTIONS` requests
+    // are answered before enforcement runs.
+    auth::apply_enforcement(
+        router,
+        auth::require_auth_from_env(),
+        enforcement_verifier,
+        std::sync::Arc::new(auth::policy_from_env()),
+    )
+    // Permissive CORS so browser-based operator UIs on other origins can
+    // call the API; tighten for production deployments.
+    .layer(CorsLayer::permissive())
 }
 
 /// Native loco controller routes (idiomatic path): the `/api/v1` surface

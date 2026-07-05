@@ -9,6 +9,54 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — authz: ABAC policy authorization inside the blanket guard (2026-07-05)
+
+- ABAC authorization landed (supersedes the earlier per-crate
+  roles/RBAC sketch; family contract:
+  `agents/share/authorization-attributes.md`). When
+  `CASE_REQUIRE_AUTH` is on, a verified PASETO token is further
+  checked by the shared policy engine in `authentication-verifier`
+  0.3: the request's action is derived from the HTTP method plus the
+  crate's destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES`
+  — `/merge`, `/deduplicate`, `/import`), and the policy is evaluated
+  over the token's new `attrs` claim, first-match-wins, defaulting to
+  allow-read / deny-mutation.
+- New env vars `CASE_ABAC_POLICY` (inline JSON) and
+  `CASE_ABAC_POLICY_FILE` (path); unset or unparsable ⇒
+  `tracing::warn!` + the built-in default policy (`svc=true` ⇒
+  everything; `access=admin` ⇒ destructive+write; `access=write` ⇒
+  write) — the service always boots. Because case data is personal
+  data, deployments can express department / purpose-of-use scoping
+  as configured policy rules over the same `attrs` claim —
+  configuration, not code.
+- `auth::enforce` now takes the HTTP method and the policy and returns
+  `403` (deciding-rule reason) for a valid token the policy denies;
+  `401` remains missing/bad credential. DB-free unit tests pin the
+  family §7 matrix. Flag off ⇒ behaviour-neutral.
+
+### Added — authz: record-level resource attributes (2026-07-05)
+
+- Record-level ABAC (this crate is the family reference for
+  `authorization-attributes.md` §9). The single-case handlers
+  `GET`/`PUT`/`DELETE /api/cases/{pid}` run a second, finer decision
+  after loading the record: `auth::case_resource_attrs` derives the
+  case's classification into `resource.case_type` / `resource.status` /
+  `resource.priority` tokens, and `auth::authorize_record` calls the
+  new `authentication-verifier` 0.4
+  `Policy::evaluate_with_resource` (path dep bumped 0.3 → 0.4). Gated
+  on `CASE_REQUIRE_AUTH`, so a no-op when enforcement is off.
+- Deployments can now express, as policy, e.g. "deny write when
+  `resource.status=closed` unless `access=admin`" or "deny read on
+  `resource.case_type=investigation` unless `dept=investigations`".
+  `PUT`/`DELETE` evaluate the **stored** case's attributes (the record
+  being modified). No schema change — these are existing fields; a
+  per-case sensitivity column stays an optional roadmap add.
+- `MaybeAuthUser` gains `claims()`. `GET /api/cases/{pid}` now takes
+  `MaybeAuthUser` so a read can be record-gated. DB-free unit tests:
+  the resource-attribute mapping (incl. `Custom` lowercasing and absent
+  fields) and an end-to-end policy decision (writer denied on a closed
+  case, allowed on an open one, admin overrides).
+
 ### Added
 
 - **Boot-time paseto-keys-over-HTTP fetch** (the spec §13 follow-up, done

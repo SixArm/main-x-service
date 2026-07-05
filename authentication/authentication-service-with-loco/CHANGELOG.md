@@ -10,6 +10,89 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **ABAC attribute sourcing (`attrs` claim).** The sourcing side of the
+  family's attribute-based access control, per
+  [`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md)
+  §6 (peers enforce via the shared `abac` engine in
+  `authentication-verifier` 0.3; this supersedes any per-crate
+  roles/RBAC sketch).
+  - New `users.attributes` column (JSONB `NOT NULL DEFAULT '{}'`,
+    migration `m20220101_000006_users_attributes`): the subject's
+    string→strings attribute map (e.g. `{"access": ["write"]}`). `{}`
+    until an operator assigns attributes — read-only under the family's
+    default policy. The assignment surface is the new `user_attributes`
+    CLI task (below).
+  - New `sessions.data` column (JSONB `NOT NULL DEFAULT '{}'`,
+    migration `m20220101_000007_sessions_data` — the first slice of the
+    shared-§3 sessions reshape): magic-link redemption **copies** the
+    user's attributes into the session (`data.attrs`,
+    `sessions::session_data`), so `POST /api/auth/token` mints from the
+    session alone.
+  - `auth::Claims` gains `attrs: BTreeMap<String, Vec<String>>` with
+    `#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]` —
+    byte-identical to `authentication_verifier::Claims` 0.3. An empty
+    map is omitted from the wire (old/attribute-less tokens keep the
+    pre-ABAC payload shape); `sign_access_token` takes the map and both
+    minting paths (redemption + `POST /token`) supply it. Parsing of
+    the stored JSONB is tolerant (`users::attributes_map`): malformed
+    entries are inert and can never fail minting.
+  - The GDPR right-of-access export now includes `attributes`
+    (subject data, not a secret) on `AccountUserExport`. OpenAPI
+    documents the `attrs` claim and the export field, and marks
+    `scope`/`roles` as deprecated for authorization.
+  - Tests: DB-free units (tolerant `attributes_map` parsing; the
+    §6 copy round-trip `users.attributes` → `session_data` →
+    `sessions::Model::attrs`; claim serialization omits an empty map;
+    the OpenAPI `attrs` schema) plus two new cross-crate contract tests
+    (a non-empty `attrs` map round-trips service-mint → peer-verify; an
+    empty map is absent from the wire payload and still verifies to an
+    empty map). Users model snapshots updated for the new column.
+- **ABAC attribute assignment — `user_attributes` CLI task.** The
+  operator surface for assigning `users.attributes`
+  (authorization-attributes.md §6; spec §13). New
+  `src/tasks/attributes.rs`, registered in `App::register_tasks`:
+
+  ```text
+  cargo loco task user_attributes email:alice@example.com            # show
+  cargo loco task user_attributes op:set email:alice@example.com key:access values:write
+  cargo loco task user_attributes op:set email:peer@svc      key:svc    values:true
+  cargo loco task user_attributes op:unset email:alice@example.com key:dept
+  cargo loco task user_attributes op:clear email:alice@example.com
+  ```
+
+  The target user is selected by `email:` or `pid:`; `op` is
+  `show` (default) / `set` / `unset` / `clear`. `set` replaces a key's
+  value list; keys and values are validated as short lowercase tokens
+  and the reserved pseudo-attributes `sub`/`email`/`entity` are
+  refused. Writes go through the new
+  `users::ActiveModel::set_attributes` (canonicalised by the new
+  `users::attributes_to_value`, the lossless inverse of
+  `attributes_map`); the task prints a before/after report. DB-free unit
+  tests cover value parsing, key / value validation, command parsing,
+  and the map-mutation ops, plus the `attributes_to_value` ↔
+  `attributes_map` round-trip.
+- **ABAC attribute assignment — HTTP admin API.** `GET` / `PUT
+  /api/auth/admin/users/{pid}/attributes` (`src/controllers/admin.rs`,
+  mounted in `App::routes`): show / replace a user's `users.attributes`
+  from an authenticated caller whose own attributes include
+  `access=admin` (the bootstrap admin is assigned via the CLI task).
+  `401` no/invalid token, `403` valid non-admin, `404` unknown/erased
+  user, `422` on an invalid body (keys/values validated with the CLI
+  task's `validate_key` / `validate_value` — reserved `sub`/`email`/
+  `entity` refused, no empty value lists). OpenAPI documents both verbs
+  (`UserAttributes` / `ReplaceUserAttributes` schemas, `admin` tag).
+  DB-free tests (`require_admin`, `validate_map`, OpenAPI assertions)
+  plus DB-gated request tests (`tests/requests/admin.rs`).
+- **Per-assignment audit rows.** Both assignment surfaces now write an
+  **`attributes_assigned`** `auth_events` row
+  (`Model::record_attribute_assignment_best_effort`): subject = the
+  target user, `detail` carries the op, the affected key, and the actor
+  (`cli` or the admin's `pid:<uuid>`). Attribute **values** are omitted
+  from the audit detail (a value can itself be sensitive); the value set
+  lives in `users.attributes`.
+
 ### Fixed
 
 - **`cargo fmt` drift.** Reformatted `src/auth/mod.rs`,

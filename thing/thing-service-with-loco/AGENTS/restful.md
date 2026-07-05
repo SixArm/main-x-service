@@ -175,5 +175,24 @@ public `/api/health`. Root-level `/_health`, `/_ping`,
 outside the `/api` scope and stay public. The flag is read once at
 `AppState` construction — restart the service to change it. Wired on
 both router surfaces (`create_router` and the loco router in
-`App::after_routes`). Family contract:
+`App::after_routes`). Unauthenticated requests to any protected path
+return `401`; a valid token the ABAC policy denies (below) returns
+`403`. Family contract:
 [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md).
+
+#### Authorization (ABAC)
+
+Inside the same guard (so only when `THING_REQUIRE_AUTH` is on), a
+verified token is authorized by **attribute-based access control**
+per `agents/share/authorization-attributes.md`: the request's action
+is derived from the HTTP method plus the crate's destructive named
+POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` — `/merge`, `/deduplicate`,
+`/import`), and the shared engine in `authentication-verifier` 0.3
+evaluates the policy over the token's `attrs` claim. Configure with
+`THING_ABAC_POLICY` (inline JSON) or `THING_ABAC_POLICY_FILE` (path);
+unset or unparsable ⇒ warn-log + the built-in default policy (any
+authenticated subject reads; `access=write` writes; `access=admin`
+adds DELETE/merge/deduplicate; `svc=true` does everything). Read once
+at `AppState` construction — restart to change. `401` = missing/bad
+credential; `403` = valid credential, policy denied (the body names
+the deciding rule).
