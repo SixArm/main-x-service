@@ -46,8 +46,7 @@ const USAGE_SETTING: &str = "setting";
 /// `code.code` marking a keyword-topic `useContext`.
 const USAGE_TOPIC: &str = "topic";
 /// The standard usage-context-type code system.
-const USAGE_CONTEXT_TYPE_SYSTEM: &str =
-    "http://terminology.hl7.org/CodeSystem/usage-context-type";
+const USAGE_CONTEXT_TYPE_SYSTEM: &str = "http://terminology.hl7.org/CodeSystem/usage-context-type";
 /// Family namespace for the non-standard `setting` / `topic` context codes.
 const MXI_USAGE_CONTEXT_SYSTEM: &str = "urn:mxi:carepathway:usage-context";
 /// Family namespace for care-setting tokens.
@@ -88,10 +87,12 @@ pub fn system_to_scheme(system: &str) -> IdentifierScheme {
         "urn:mxi:carepathway:uuid" => IdentifierScheme::Uuid,
         "urn:mxi:carepathway:scheme-pathwaycode" => IdentifierScheme::PathwayCode,
         "urn:mxi:carepathway:localid" => IdentifierScheme::LocalId,
-        other => other.strip_prefix("urn:mxi:carepathway:custom:").map_or_else(
-            || IdentifierScheme::Custom(other.to_string()),
-            |label| IdentifierScheme::Custom(label.to_string()),
-        ),
+        other => other
+            .strip_prefix("urn:mxi:carepathway:custom:")
+            .map_or_else(
+                || IdentifierScheme::Custom(other.to_string()),
+                |label| IdentifierScheme::Custom(label.to_string()),
+            ),
     }
 }
 
@@ -116,10 +117,12 @@ pub fn uri_to_code_system(uri: &str) -> CodeSystem {
         "http://hl7.org/fhir/sid/icd-10" => CodeSystem::Icd10,
         "http://id.who.int/icd/release/11/mms" => CodeSystem::Icd11,
         "http://snomed.info/sct" => CodeSystem::Snomed,
-        other => other.strip_prefix("urn:mxi:carepathway:condition:").map_or_else(
-            || CodeSystem::Custom(other.to_string()),
-            |label| CodeSystem::Custom(label.to_string()),
-        ),
+        other => other
+            .strip_prefix("urn:mxi:carepathway:condition:")
+            .map_or_else(
+                || CodeSystem::Custom(other.to_string()),
+                |label| CodeSystem::Custom(label.to_string()),
+            ),
     }
 }
 
@@ -361,9 +364,11 @@ pub fn from_fhir_plan_definition(fhir: &FhirPlanDefinition) -> Result<CarePathwa
             Some(ALTERNATE_NAME_SYSTEM) => pathway.alternate_names.push(value),
             Some(LANGUAGE_SYSTEM) => pathway.in_language.push(value),
             system => {
-                let scheme = system
-                    .map_or(IdentifierScheme::Custom(String::new()), system_to_scheme);
-                pathway.identifiers.push(PathwayIdentifier { scheme, value });
+                let scheme =
+                    system.map_or(IdentifierScheme::Custom(String::new()), system_to_scheme);
+                pathway
+                    .identifiers
+                    .push(PathwayIdentifier { scheme, value });
             }
         }
     }
@@ -397,11 +402,7 @@ pub fn from_fhir_plan_definition(fhir: &FhirPlanDefinition) -> Result<CarePathwa
         }
     }
 
-    pathway.interventions = fhir
-        .action
-        .iter()
-        .filter_map(|a| a.title.clone())
-        .collect();
+    pathway.interventions = fhir.action.iter().filter_map(|a| a.title.clone()).collect();
 
     pathway.same_as = fhir
         .related_artifact
@@ -477,7 +478,11 @@ mod tests {
         ];
         for setting in settings {
             let token = care_setting_to_token(&setting);
-            assert_eq!(token_to_care_setting(&token), setting, "round-trip {setting:?}");
+            assert_eq!(
+                token_to_care_setting(&token),
+                setting,
+                "round-trip {setting:?}"
+            );
         }
     }
 

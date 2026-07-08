@@ -47,7 +47,11 @@ pub struct FhirPlanDefinition {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub action: Vec<FhirPlanAction>,
     /// Related artifacts (cross-system identity URLs from `same_as`).
-    #[serde(rename = "relatedArtifact", skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(
+        rename = "relatedArtifact",
+        skip_serializing_if = "Vec::is_empty",
+        default
+    )]
     pub related_artifact: Vec<FhirRelatedArtifact>,
 }
 
@@ -84,7 +88,11 @@ pub struct FhirMeta {
     #[serde(rename = "versionId", skip_serializing_if = "Option::is_none", default)]
     pub version_id: Option<String>,
     /// Last-updated instant (the row's `updated_at`).
-    #[serde(rename = "lastUpdated", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        rename = "lastUpdated",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub last_updated: Option<String>,
 }
 

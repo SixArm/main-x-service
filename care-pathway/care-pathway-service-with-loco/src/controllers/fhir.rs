@@ -119,7 +119,13 @@ async fn read(Path(id): Path<String>, State(ctx): State<AppContext>) -> Response
     };
     let pathway = match model.to_pathway() {
         Ok(p) => p,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     let resource = to_fhir_plan_definition(
         &pathway,
@@ -159,19 +165,37 @@ async fn create(
     // Write + `Created` event, atomic under the active transport.
     let model = match streaming::create_and_emit(&ctx.db, &pathway, caller.actor()).await {
         Ok(m) => m,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     Metrics::global().care_pathway_created_total.inc();
-    audit(&ctx, model.pid, "created", caller.actor(), Some(model.data.clone())).await;
+    audit(
+        &ctx,
+        model.pid,
+        "created",
+        caller.actor(),
+        Some(model.data.clone()),
+    )
+    .await;
     let pid = model.pid.to_string();
-    let resource = to_fhir_plan_definition(&pathway, &pid, true, Some(model.updated_at.to_rfc3339()));
+    let resource =
+        to_fhir_plan_definition(&pathway, &pid, true, Some(model.updated_at.to_rfc3339()));
     match serde_json::to_vec(&resource) {
         Ok(bytes) => fhir_response(
             StatusCode::CREATED,
             bytes,
             Some(format!("PlanDefinition/{pid}")),
         ),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
@@ -211,10 +235,23 @@ async fn update(
     // Update + `Updated` event, atomic under the active transport.
     let updated = match streaming::update_and_emit(&ctx.db, model, &pathway, caller.actor()).await {
         Ok(m) => m,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     Metrics::global().care_pathway_updated_total.inc();
-    audit(&ctx, updated.pid, "updated", caller.actor(), Some(updated.data.clone())).await;
+    audit(
+        &ctx,
+        updated.pid,
+        "updated",
+        caller.actor(),
+        Some(updated.data.clone()),
+    )
+    .await;
     let resource = to_fhir_plan_definition(
         &pathway,
         &updated.pid.to_string(),
@@ -241,7 +278,13 @@ async fn remove(
     // Soft-delete + `Deleted` event, atomic under the active transport.
     let entity_pid = match streaming::delete_and_emit(&ctx.db, model, caller.actor()).await {
         Ok((pid, _name)) => pid,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     Metrics::global().care_pathway_deleted_total.inc();
     audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
@@ -257,7 +300,13 @@ async fn search(
 ) -> Response {
     let rows = match PathwayModel::list(&ctx.db, FHIR_SEARCH_SCAN_CAP).await {
         Ok(rows) => rows,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     if rows.len() as u64 == FHIR_SEARCH_SCAN_CAP {
         tracing::warn!(
@@ -348,9 +397,23 @@ mod tests {
     /// `name`, `status`), guarding drift between routes and metadata.
     #[test]
     fn capability_statement_search_params_are_stable() {
-        let expected = ["_id", "_lastUpdated", "_count", "identifier", "name", "status"];
+        let expected = [
+            "_id",
+            "_lastUpdated",
+            "_count",
+            "identifier",
+            "name",
+            "status",
+        ];
         // Mirror of the metadata() body; a change here must be intentional.
-        let declared = ["_id", "_lastUpdated", "_count", "identifier", "name", "status"];
+        let declared = [
+            "_id",
+            "_lastUpdated",
+            "_count",
+            "identifier",
+            "name",
+            "status",
+        ];
         assert_eq!(declared, expected);
     }
 
