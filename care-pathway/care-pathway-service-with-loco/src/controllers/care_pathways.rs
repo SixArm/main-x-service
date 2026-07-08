@@ -170,35 +170,9 @@ async fn create(
     // shares one transaction; `memory` keeps today's ring-buffer path).
     let model = streaming::create_and_emit(&ctx.db, &pathway, caller.actor()).await?;
     Metrics::global().care_pathway_created_total.inc();
-    // Audit is a best-effort side channel; the create has already committed.
-    audit(
-        &ctx,
-        model.pid,
-        "created",
-        caller.actor(),
-        Some(model.data.clone()),
-    )
-    .await;
+    // Audit is written inside `create_and_emit` (in the outbox transaction
+    // under `outbox`; best-effort under `memory`) — see `streaming`.
     format::json(PathwayRef::of(&model))
-}
-
-/// Best-effort audit write: log on failure but never fail the request.
-/// `actor` is the verified caller `sub` when a token was presented.
-///
-/// `action` is the verb recorded (`"created"`, `"updated"`, `"deleted"`,
-/// `"merged"`, `"merged_into"`); `snapshot` is the post-change payload
-/// (or `None` for deletes). A failure here is logged at `WARN` and
-/// swallowed — the audit trail is secondary to completing the request.
-async fn audit(
-    ctx: &AppContext,
-    entity_pid: uuid::Uuid,
-    action: &str,
-    actor: Option<&str>,
-    snapshot: Option<serde_json::Value>,
-) {
-    if let Err(err) = AuditModel::record(&ctx.db, entity_pid, action, actor, snapshot).await {
-        tracing::warn!(error = %err, action, "failed to write audit log");
-    }
 }
 
 /// Fetch a care pathway by public id.
@@ -236,14 +210,7 @@ async fn update(
     // Update + `Updated` event, atomic under the active transport.
     let updated = streaming::update_and_emit(&ctx.db, model, &pathway, caller.actor()).await?;
     Metrics::global().care_pathway_updated_total.inc();
-    audit(
-        &ctx,
-        updated.pid,
-        "updated",
-        caller.actor(),
-        Some(updated.data.clone()),
-    )
-    .await;
+    // Audit is written inside `update_and_emit` (see `streaming`).
     format::json(PathwayRef::of(&updated))
 }
 
@@ -264,9 +231,9 @@ async fn remove(
 ) -> Result<Response> {
     let model = PathwayModel::find_by_pid(&ctx.db, &pid).await?;
     // Soft-delete + `Deleted` event, atomic under the active transport.
-    let (entity_pid, _name) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
+    let (_entity_pid, _name) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
     Metrics::global().care_pathway_deleted_total.inc();
-    audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
+    // Audit is written inside `delete_and_emit` (see `streaming`).
     format::empty_json()
 }
 
@@ -433,17 +400,10 @@ async fn merge(
         // failure here must not roll back the already-committed merge.
         tracing::warn!(error = %err, "failed to write merge record");
     }
-    // Two audit entries: one on the survivor ("merged"), one on the
-    // retired duplicate ("merged_into") so both pids carry the trail.
-    audit(
-        &ctx,
-        merged.pid,
-        "merged",
-        caller.actor(),
-        Some(merged.data.clone()),
-    )
-    .await;
-    audit(&ctx, dup_pid, "merged_into", caller.actor(), None).await;
+    // The two audit entries (survivor "merged", duplicate "merged_into")
+    // are written inside `merge_and_emit` — atomic with the merge under
+    // `outbox`. The merge-history row above stays a best-effort side
+    // channel (merge metadata, not the §3 audit trail).
 
     format::json(serde_json::json!({
         "main_pid": merged.pid.to_string(),

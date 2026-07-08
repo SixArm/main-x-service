@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — event bus: audit now joins the outbox transaction (2026-07-08)
+
+- Under the `outbox` transport, the `audit_logs` write now rides the
+  **same transaction** as the entity mutation and its `event_outbox` row
+  (`agents/share/event-bus.md` §3 — the three "can never disagree"). It
+  was previously a best-effort side channel written *after* the
+  transaction committed, so a crash or audit failure could leave a
+  committed change + event with no audit row. `AuditModel::record` is now
+  generic over `ConnectionTrait`; the `create/update/delete/merge_and_emit`
+  functions own the audit write (strict/in-txn under `outbox`, best-effort
+  logged under `memory`), and the controllers no longer audit separately.
+  New DB-gated `tests/outbox_audit.rs` drives `create_and_emit` under
+  `outbox` and asserts entity + event + audit all commit together.
+  (The `merge_records` history row stays a best-effort side channel — it
+  is merge metadata, not the §3 audit trail.)
+
 ### Added — event bus: transactional-outbox storage (Phase 2 start) (2026-07-06)
 
 - New `event_outbox` table (migration `…_000004_event_outbox`) + SeaORM
