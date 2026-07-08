@@ -48,7 +48,7 @@ The SPA mounts at `/`. All operator workflows live under `/events`.
    optionally enabling the **Fuzzy** toggle and narrowing by date / status / type.
 2. Grid renders SVAR DataGrid with matching rows.
 3. Operator clicks **New event** → `/events/new`.
-4. Form submits to `POST /api/v1/events`. Service returns 409 with a
+4. Form submits to `POST /api/events`. Service returns 409 with a
    `MatchResult[]` under `error.details` when the matcher flags
    probable duplicates.
 5. Inline `MatchResultsList` renders each candidate with name,
@@ -58,7 +58,7 @@ The SPA mounts at `/`. All operator workflows live under `/events`.
 ### Match-check workflow
 
 1. `/events/match` posts a partial Event body to
-   `POST /api/v1/events/match`.
+   `POST /api/events/match`.
 2. Service returns blocked candidates sorted by descending score
    (name similarity + window-overlap + identifier short-circuits).
 3. The page renders quality + per-component breakdown.
@@ -66,7 +66,7 @@ The SPA mounts at `/`. All operator workflows live under `/events`.
 ### Merge workflow
 
 1. Operator picks main + duplicate IDs in `/events/merge`.
-2. Page calls `POST /api/v1/events/merge` with the two IDs and a
+2. Page calls `POST /api/events/merge` with the two IDs and a
    merge reason.
 3. On success: detail page redirect to main; duplicate is
    soft-deleted server-side.

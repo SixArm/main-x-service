@@ -241,6 +241,9 @@ mod tests {
             revoked_at: None,
             user_agent: Some("curl".to_string()),
             data: serde_json::json!({}),
+            last_seen_at: None,
+            idle_expires_at: None,
+            absolute_expires_at: None,
         }];
         let events = vec![auth_events::Model {
             created_at: ts(),

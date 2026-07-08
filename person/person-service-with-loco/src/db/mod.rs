@@ -20,6 +20,8 @@ pub mod audit;
 pub mod convert;
 /// SeaORM entity (ActiveModel/Model) definitions.
 pub mod models;
+/// Transactional-outbox write + relay surface (durable event bus, Phase 2).
+pub mod outbox;
 /// Repository traits and their SeaORM implementations.
 pub mod repositories;
 /// Table/column schema definitions.

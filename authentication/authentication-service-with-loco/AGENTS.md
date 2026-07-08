@@ -68,7 +68,7 @@ template (see root `AGENTS.md`).
 | POST | `/api/auth/signup` | — | Create a passwordless account, issue a magic link. |
 | POST | `/api/auth/magic-link` | — | Request a magic link for an existing account (sign in). |
 | GET | `/api/auth/magic-link/{token}` | — | Consume the link → server-side session + `__Host-mxi_session` cookie. |
-| POST | `/api/auth/token` | Session | Exchange a valid session for a short-lived PASETO v4.public bearer (~5 min), carrying the session's ABAC `attrs` claim. |
+| POST | `/api/auth/token` | Session + CSRF | Exchange a valid session for a short-lived PASETO v4.public bearer (~5 min), carrying the session's ABAC `attrs` claim. Requires the `X-CSRF-Token` header to match the session's synchroniser token (`403` on mismatch). |
 | GET | `/api/auth/me` | Session | Current user (rejects revoked + GDPR-erased accounts). |
 | POST | `/api/auth/signout` | Session | Revoke the current session. |
 | GET | `/api/auth/audit/recent` | — | System-wide authentication audit trail (newest 100). |
@@ -142,6 +142,7 @@ src/
 ├── bin/main.rs            loco CLI entrypoint
 ├── auth/mod.rs            PASETO v4.public signing + verification + key-set publication + bearer extractor (Ed25519; built-in DEV_SEED for dev)
 ├── cookie.rs              __Host-mxi_session cookie helpers (set / clear / parse)
+├── csrf.rs                CSRF synchroniser token (generate / __Host-mxi_csrf cookie / constant-time compare) for POST /token
 ├── controllers/
 │   ├── auth.rs            signup / magic-link / verify / me / signout / audit + GDPR account export/audit/erasure
 │   ├── admin.rs           ABAC attribute assignment over HTTP (GET/PUT /api/auth/admin/users/{pid}/attributes; access=admin gated)
@@ -158,7 +159,7 @@ src/
 │   └── _entities/         generated SeaORM entities
 ├── mailers/auth.rs        magic-link mailer (prod)
 ├── tasks/attributes.rs    `user_attributes` CLI task — operator ABAC attribute assignment (set/show/unset/clear users.attributes)
-├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits, _000006_users_attributes, _000007_sessions_data
+├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits, _000006_users_attributes, _000007_sessions_data, _000008_sessions_ttls
 └── views/auth.rs          LoginResponse / CurrentResponse
 config/                    development/production/test yaml (keys/ holds only a README — no committed key files)
 ```
@@ -174,6 +175,10 @@ config/                    development/production/test yaml (keys/ holds only a 
 | `TOKEN_ISSUER` | `authentication-service` | `iss` claim + key-set issuer. |
 | `TOKEN_AUDIENCE` | `main-x-service` | `aud` claim. |
 | `TOKEN_EXPIRATION` | `300` | Access-token lifetime (seconds) — deliberately short; the cookie session is the durable thing. |
+| `AUTH_SESSION_IDLE_TTL_SECS` | `1800` (30 min) | Sliding idle session TTL — bumped on each `/me`; session expires once idle. |
+| `AUTH_SESSION_ABSOLUTE_TTL_SECS` | `43200` (12 h) | Hard absolute session ceiling set at issuance, never extended. |
+| `AUTH_ATTRIBUTE_VOCABULARY` | — | Optional inline-JSON allow-set of ABAC attribute keys→values (`{ "access": ["read","write","admin"], "dept": ["cardiology"], "svc": [] }`; empty list ⇒ any value). Enforced on assignment (CLI + admin) to catch typos. Unset ⇒ unrestricted. |
+| `AUTH_ATTRIBUTE_VOCABULARY_FILE` | — | Path form of the above (used when the inline var is unset). |
 | `FRONTEND_URL` | `http://localhost:5173` | Base for the magic link in emails/logs. |
 | `DATABASE_URL` | loco config default | Postgres connection. |
 

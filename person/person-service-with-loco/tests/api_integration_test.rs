@@ -22,7 +22,7 @@ use tower::ServiceExt; // for `oneshot` and `ready`
 
 use person_service::{api::ApiResponse, models::Person};
 
-/// `GET /api/v1/health` returns 200 and identifies the service.
+/// `GET /api/health` returns 200 and identifies the service.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_health_check() {
@@ -31,7 +31,7 @@ async fn test_health_check() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/v1/health")
+                .uri("/api/health")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -49,7 +49,7 @@ async fn test_health_check() {
     assert!(body_str.contains("person-service"));
 }
 
-/// `POST /api/v1/persons` creates a person and assigns a fresh UUID
+/// `POST /api/persons` creates a person and assigns a fresh UUID
 /// (ignoring the all-zero id in the payload).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
@@ -73,7 +73,7 @@ async fn test_create_person() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/persons")
+                .uri("/api/persons")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&person_json).unwrap()))
                 .unwrap(),
@@ -96,7 +96,7 @@ async fn test_create_person() {
     assert!(person.id.to_string() != "00000000-0000-0000-0000-000000000000");
 }
 
-/// Create a person, then `GET /api/v1/persons/{id}` returns the same
+/// Create a person, then `GET /api/persons/{id}` returns the same
 /// record.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
@@ -122,7 +122,7 @@ async fn test_create_and_get_person() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/persons")
+                .uri("/api/persons")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&person_json).unwrap()))
                 .unwrap(),
@@ -144,7 +144,7 @@ async fn test_create_and_get_person() {
     let get_response = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/v1/persons/{person_id}"))
+                .uri(format!("/api/persons/{person_id}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -165,7 +165,7 @@ async fn test_create_and_get_person() {
     assert_eq!(retrieved_person.name.family, family_name);
 }
 
-/// Create a person, then `PUT /api/v1/persons/{id}` persists a changed
+/// Create a person, then `PUT /api/persons/{id}` persists a changed
 /// given-name list.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
@@ -191,7 +191,7 @@ async fn test_update_person() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/persons")
+                .uri("/api/persons")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&person_json).unwrap()))
                 .unwrap(),
@@ -213,7 +213,7 @@ async fn test_update_person() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/v1/persons/{}", person.id))
+                .uri(format!("/api/persons/{}", person.id))
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&person).unwrap()))
                 .unwrap(),
@@ -259,7 +259,7 @@ async fn test_delete_person() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/persons")
+                .uri("/api/persons")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&person_json).unwrap()))
                 .unwrap(),
@@ -280,7 +280,7 @@ async fn test_delete_person() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(format!("/api/v1/persons/{}", person.id))
+                .uri(format!("/api/persons/{}", person.id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -293,7 +293,7 @@ async fn test_delete_person() {
     let get_response = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/v1/persons/{}", person.id))
+                .uri(format!("/api/persons/{}", person.id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -304,7 +304,7 @@ async fn test_delete_person() {
     assert_eq!(get_response.status(), StatusCode::NOT_FOUND);
 }
 
-/// Create a person, then `GET /api/v1/persons/search` finds it by family
+/// Create a person, then `GET /api/persons/search` finds it by family
 /// name (after a brief indexing delay).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
@@ -330,7 +330,7 @@ async fn test_search_persons() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/persons")
+                .uri("/api/persons")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&person_json).unwrap()))
                 .unwrap(),
@@ -347,7 +347,7 @@ async fn test_search_persons() {
     let search_response = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/v1/persons/search?q={family_name}&limit=10"))
+                .uri(format!("/api/persons/search?q={family_name}&limit=10"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -366,7 +366,7 @@ async fn test_search_persons() {
     assert!(body_str.contains(&family_name));
 }
 
-/// `GET /api/v1/persons/{id}` for an unknown id returns 404.
+/// `GET /api/persons/{id}` for an unknown id returns 404.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_get_person_not_found() {
@@ -375,7 +375,7 @@ async fn test_get_person_not_found() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/v1/persons/00000000-0000-0000-0000-000000000001")
+                .uri("/api/persons/00000000-0000-0000-0000-000000000001")
                 .body(Body::empty())
                 .unwrap(),
         )

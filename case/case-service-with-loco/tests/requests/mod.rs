@@ -1,4 +1,6 @@
-//! Request-level test suites, grouped by controller. Currently just the
-//! `/api/cases` suite in [`cases`].
+//! Request-level test suites, grouped by controller: the `/api/cases`
+//! suite in [`cases`] and the durable event-bus Phase-2 outbox atomicity
+//! suite in [`event_outbox`].
 
 mod cases;
+mod event_outbox;

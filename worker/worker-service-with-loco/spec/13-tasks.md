@@ -9,7 +9,7 @@ clearly described manual check confirms the acceptance criterion.
   §5/§9: the family moved off RS256-JWT + JWKS. Ported from the
   person-service T-1a implementation.
   - [x] `authentication-verifier` 0.2 (path dep; PASETO-only) added.
-  - [x] `AuthUser` extractor + `GET /api/v1/whoami` verify PASETO
+  - [x] `AuthUser` extractor + `GET /api/whoami` verify PASETO
     `v4.public` (Ed25519) bearer tokens offline — signature, footer
     `kid`, `iss`, `aud`, `exp` — via `bearer_claims` in
     `src/api/rest/auth.rs`.
@@ -33,7 +33,7 @@ clearly described manual check confirms the acceptance criterion.
     (`create_router` and the loco router in `App::after_routes`); the
     flag and verifier are captured at router construction (restart to
     change). Public allow-list (`PUBLIC_PATHS` +
-    `PUBLIC_PATH_PREFIXES`): `/_health`, `/_ping`, `/api/v1/health`,
+    `PUBLIC_PATH_PREFIXES`): `/_health`, `/_ping`, `/api/health`,
     `/api-docs/openapi.json`, `/metrics.prom`, `/swagger-ui*`. The
     `/fhir` surface is deliberately protected (worker PII).
     **Acceptance met:** DB-free unit tests in `src/api/rest/auth.rs`
@@ -143,7 +143,7 @@ clearly described manual check confirms the acceptance criterion.
     the crate (drift-accepted; `parse` / `Display` + `entity_type →
     service` map); validate `kind` ∈ {`same_identity`, `employed_by`} and
     the `to_ref` entity type matches the kind's endpoint.
-  - [ ] `POST` / `GET` / `DELETE /api/v1/workers/{pid}/links` controllers
+  - [ ] `POST` / `GET` / `DELETE /api/workers/{pid}/links` controllers
     (optimistic upsert / list / soft-delete; **no** cross-service call).
   - [ ] Emit `linked` / `unlinked` on the existing event envelope via the
     existing `EventProducer` (envelope `entity` = `worker`, edge detail in
@@ -163,8 +163,8 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] Migration adding the `bulk_jobs` table (shared §3 schema) with the
     `UNIQUE (entity, kind, idempotency_key)` retried-submit key.
   - [ ] The five endpoints (shared §4): `POST` / `GET
-    /api/v1/workers/import`, `POST` / `GET /api/v1/workers/export`, and
-    `GET /api/v1/workers/bulk-jobs` (list + by-id).
+    /api/workers/import`, `POST` / `GET /api/workers/export`, and
+    `GET /api/workers/bulk-jobs` (list + by-id).
   - [ ] `bg_pg` background worker draining `queued → running →
     completed | completed_with_errors | failed` with progress updates.
   - [ ] JSONL (lossless reference) + CSV (the §10.4 column set /
@@ -192,4 +192,92 @@ clearly described manual check confirms the acceptance criterion.
     queue with `provenance = import`, masked vs full export (full requires
     elevated role), and that an export — including a zero-row export —
     writes an audit record.
+- [x] **T-12 — FHIR R5 API** (`Practitioner`) — adopt the family contract.
+  *(Done 2026-07-07.)* Reconciled the prototype: `resourceType` switched
+  `Worker` → **`Practitioner`** (`FhirWorker::new`), routes re-pointed
+  `/fhir/Worker*` → `/fhir/Practitioner{,/{id}}` on **both** router
+  surfaces (loco `fhir_routes()` + the `create_router` test harness), and
+  `GET /fhir/metadata` added returning a `CapabilityStatement` (fhirVersion
+  5.0.0, Practitioner resource, read/create/update/delete/search-type,
+  params `_id`/`_lastUpdated`/`_count`/`identifier`/`name`/`family`/`given`/
+  `gender`). All FHIR handlers now emit `application/fhir+json` and every
+  non-2xx body is a FHIR `OperationOutcome` (§5). Routes stay behind the
+  blanket auth+ABAC guard (`/fhir/*` off the public allow-list). New
+  DB-free unit tests in `src/api/fhir/mod.rs` pin `to_fhir` ⇒
+  `resourceType == "Practitioner"`, core-field round-trip, and missing-name
+  rejection; the mount test re-points to `/fhir/Practitioner`.
+  `cargo test --lib` green (161 passed); `cargo clippy --lib` clean.
+  Documented gaps (unchanged from the prototype, `TODO`-marked in
+  `from_fhir_worker`): identifiers decode to `IdentifierType::Other`,
+  and `additional_names` / `marital_status` / `multiple_birth` /
+  `managing_organization` / `tax_id` / `documents`→`qualification` are not
+  yet parsed back; search filters only on the first name param (no
+  `_id`/`_lastUpdated`/`gender`/`identifier` filtering yet); masked-read
+  obligation not yet wired into the FHIR read path.
+  ([`agents/share/fhir.md`](../../../agents/share/fhir.md)). **Reconcile the
+  existing unmounted `src/api/fhir/` prototype**: switch the non-standard
+  `resourceType: "Worker"` to standard **`Practitioner`** (§3, `high`
+  fidelity) and **mount the routes** (handlers exist; T-9 wired the
+  prototype `/fhir/Worker` surface, which this task re-points to
+  `/fhir/Practitioner`). Map the domain worker to `Practitioner`:
+  `name` → `name`, `identifiers` (NPI, professional licence, …) →
+  `identifier` (token `system|value`), `telecom` → `telecom`,
+  `addresses` → `address`, `gender` → `gender`, `birth_date` →
+  `birthDate`, credential `documents` (professional credentials /
+  certificates) → `qualification`; `active`. Add `FhirOperationOutcome`
+  errors (§5), a searchset `Bundle` (§6), and `GET /fhir/metadata`
+  returning a `CapabilityStatement` (§7). Routes join the existing Axum
+  router under the blanket auth+ABAC guard (§8; `/fhir/*` guarded — worker
+  PII, deliberately off the public allow-list — action derived from the
+  HTTP method) and honour masked reads for personal data. Supported search
+  params: `_id`, `_lastUpdated`, `_count`, `identifier`, `name`, `family`,
+  `given`, `gender`. **Acceptance:** tests cover domain↔`Practitioner`
+  round-trip, each interaction (read / create / update / delete / search),
+  search→`Bundle`, `OperationOutcome` on error, `CapabilityStatement`
+  matches the mounted routes, and masked-read.
 
+- [x] **T-13 — Durable event bus Phase 2 (transactional outbox).**
+  *(Done 2026-07-08)* Implements
+  [`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §3/§5
+  storage + write path, copying the completed **event-service** reference.
+  - [x] `event_outbox` migration (`m20260708_000001_create_event_outbox`
+    + hand-written `up.sql`/`down.sql`) registered in the migrator; the
+    `event_outbox` SeaORM entity in `src/db/models.rs`.
+  - [x] `src/db/outbox.rs`: `OutboxInsert` with the pure DB-free
+    `from_envelope` mapping, `for_event`/`for_merge` conveniences, a
+    `ConnectionTrait`-generic `insert_on` (so a `dyn`-repo threads its own
+    transaction), and the relay `Model::recent`/`unpublished`/`mark_published`
+    (Phase-3 roadmap poll+ack).
+  - [x] `src/streaming/envelope.rs`: the canonical `Envelope`
+    (`entity: &'static str` with `#[serde(skip_deserializing,
+    default = "default_entity")]`, plus `merged_from`), `EventKind`,
+    `EventView` projection, and the `EventTransport` selector read once from
+    `WORKER_EVENT_TRANSPORT` (default `memory`).
+  - [x] Repository: a `transport` field + `with_transport` builder +
+    `enqueue_outbox`; the outbox row is written **inside** each write's
+    transaction in `create`/`update`/`delete` (the tx-free soft-delete opens
+    one under the outbox transport). A new `merge(survivor, duplicate_id)`
+    repo method applies the survivor's rows + soft-deletes the duplicate +
+    enqueues `Merged`(+`merged_from`) and `Deleted` outbox rows **atomically
+    in one transaction**; the merge handler now calls it (dropping the old
+    update + delete + separate publish).
+  - **Acceptance:** DB-free unit tests (`from_envelope`, `for_merge`,
+    transport parse) + DB-gated `#[ignore]` atomicity tests
+    (`create_enqueues_a_created_outbox_row`,
+    `merge_enqueues_merged_with_merged_from_and_deleted`) that compile under
+    a bare `cargo test --lib`. Met: `cargo test --lib` green (179 passed,
+    2 ignored); `cargo clippy --lib --tests` clean.
+  - [x] **Phase 3 (relay + retention).** *(Done 2026-07-08, copy-adapted
+    from the organization reference.)* `src/relay.rs`: the `EventSink` trait
+    (the bus seam), a working no-broker **`LoggingSink`** default,
+    `drain_once` (`unpublished` → `sink.send` → `mark_published`,
+    at-least-once, per-pid order preserved on a send failure), and
+    `purge_published` (retention). A background loop (`relay::spawn`, started
+    in `App::after_routes`) ticks every `WORKER_EVENT_RELAY_INTERVAL_SECS`
+    and purges every N ticks — **gated by `WORKER_EVENT_TRANSPORT=outbox` AND
+    `WORKER_EVENT_RELAY`**, so it is a no-op by default; `purge_published`
+    now enforces `WORKER_EVENT_RETENTION_DAYS`. Tests: DB-free
+    `LoggingSink`/capturing-sink send + config defaults; the drain/ack seams
+    are DB-gated-tested via the outbox suite. **Broker-gated follow-up:** a
+    real **`FluvioSink`** (`impl EventSink` behind a `fluvio` cargo feature) —
+    the trait is the seam, so the drain loop is unchanged when it lands.

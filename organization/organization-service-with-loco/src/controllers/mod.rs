@@ -7,6 +7,8 @@
 
 /// OpenAPI JSON + Swagger UI endpoints.
 pub mod docs;
+/// HL7 FHIR R5 endpoints for the `Organization` resource (`/fhir/*`).
+pub mod fhir;
 /// Prometheus `/metrics.prom` endpoint.
 pub mod metrics;
 /// Organization CRUD, matching, merge, audit, and event endpoints.

@@ -42,13 +42,18 @@ use crate::{
 async fn require_auth_mw(req: Request, next: Next) -> Response {
     let path = req.uri().path().to_string();
     let method = req.method().clone();
+    // Snapshot the current (hot-reloadable) policy and verifier for this
+    // request; a concurrent policy reload or key-set refresh does not
+    // affect a decision/verification already in flight.
+    let policy = auth::policy().current();
+    let verifier = auth::verifier().current();
     match auth::enforce(
         auth::require_auth(),
         &method,
         &path,
         req.headers(),
-        auth::verifier(),
-        auth::policy(),
+        &verifier,
+        &policy,
     ) {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),
@@ -92,21 +97,39 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::cases::routes())
+            .add_route(controllers::fhir::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }
 
-    async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
+    async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         // Seed the process-wide PASETO verifier before the app serves
         // traffic: when `CASE_PASETO_KEYS_URL` is set the published key
         // set is fetched over HTTP once at boot (fetch failure falls back
         // to the `CASE_PASETO_KEYS` env path — the service always boots).
         auth::init().await;
+        // Periodically re-fetch the published key set so a key rotation
+        // is picked up without a restart (no-op unless
+        // `CASE_PASETO_KEYS_URL` is set; disable with
+        // `CASE_PASETO_KEYS_REFRESH_SECS=0`).
+        auth::spawn_key_refresh();
+        // Hot-reload the ABAC policy when its file changes (no-op unless
+        // `CASE_ABAC_POLICY_FILE` is set) so operators can edit the
+        // policy without a restart.
+        auth::spawn_policy_watcher();
+        // Durable event bus Phase 3: start the outbox relay loop. A no-op
+        // unless `CASE_EVENT_TRANSPORT=outbox` AND `CASE_EVENT_RELAY` are
+        // set, so the default `memory` transport never spawns it.
+        crate::relay::spawn(ctx.db.clone());
         // Blanket auth enforcement layer (authn + ABAC authz). Added
         // unconditionally; the
         // `CASE_REQUIRE_AUTH` flag is read per request and the layer is a
         // near-noop when the flag is off (the default).
-        Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
+        Ok(router
+            .layer(axum::middleware::from_fn(require_auth_mw))
+            .layer(axum::middleware::from_fn(
+                crate::version::require_version_mw,
+            )))
     }
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue.register(DownloadWorker::build(ctx)).await?;

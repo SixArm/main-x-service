@@ -10,11 +10,19 @@
 
 use serde::{Deserialize, Serialize};
 
-/// FHIR R5 `Person` resource.
+/// FHIR R5 resource for the domain `Person`.
+///
+/// The primary, clinically-expected representation is **`Patient`**
+/// (`resourceType: "Patient"`); the same struct also backs the thin
+/// **`Person`** demographic alias (`resourceType: "Person"`). Both are
+/// built from the same domain `Person` — only the `resource_type`
+/// discriminator differs (per
+/// [`agents/share/fhir.md`](../../../../agents/share/fhir.md) §3).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FhirPerson {
-    /// FHIR resource type discriminator (always `"Person"`).
+    /// FHIR resource-type discriminator — `"Patient"` (primary) or
+    /// `"Person"` (demographic alias).
     pub resource_type: String,
     /// Logical id of the resource (the person UUID as a string).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -311,11 +319,12 @@ impl FhirOperationOutcome {
 
 impl FhirPerson {
     /// Construct a minimal [`FhirPerson`] with `resourceType` set to
-    /// `"Person"` and every optional element left as `None`.
+    /// `"Patient"` (the primary resource type) and every optional
+    /// element left as `None`.
     #[must_use]
     pub fn new() -> Self {
         Self {
-            resource_type: "Person".to_string(),
+            resource_type: "Patient".to_string(),
             id: None,
             meta: None,
             identifier: None,

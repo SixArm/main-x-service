@@ -8,6 +8,23 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — authz: record-level resource attributes + obligations (2026-07-05)
+
+- Record-level ABAC (verifier 0.3 → 0.6). Beyond the coarse blanket
+  guard, `GET`/`PUT`/`DELETE /api/persons/{id}` run a second, finer
+  decision after loading the record: `auth::person_resource_attrs`
+  derives `resource.active` / `resource.deceased` / `resource.managing_org`
+  and `auth::authorize_record` calls `Policy::evaluate_with_context`
+  (gated on `PERSON_REQUIRE_AUTH`, a no-op when off). `PUT`/`DELETE`
+  evaluate the **stored** record. A deployment can thus write e.g.
+  "deny write on a deceased person's record unless `access=admin`".
+- Also supplies **environment attributes** (`env.hour` / `env.after_hours`,
+  UTC, via `auth::request_env_attrs`) and honours the **`mask`
+  obligation** on `GET` (returns `mask_person`). New `auth::MaybeAuthUser`
+  extractor + module-level `auth::policy()` / `require_auth()` accessors.
+  DB-free tests for the resource-attribute mapping and the working-hours
+  derivation.
+
 ### Added — authz: ABAC policy authorization inside the blanket guard
 
 - ABAC authorization landed (spec §13 T-1c, the authorization sub-item

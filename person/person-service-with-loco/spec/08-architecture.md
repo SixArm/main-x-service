@@ -93,11 +93,11 @@ Per [cross-service linking](../../../agents/share/cross-service-linking.md),
 the Person Service originates outbound cross-service edges (§5.4) without
 calling the target service. The write path is **optimistic**:
 
-**Link:** HTTP POST `/api/v1/persons/{pid}/links` → validate edge kind +
+**Link:** HTTP POST `/api/persons/{pid}/links` → validate edge kind +
 `to_ref` → upsert into `entity_links` (§10.4) → publish `linked` event →
 Response. No cross-service call.
 
-**Unlink:** HTTP DELETE `/api/v1/persons/{pid}/links/{id}` → soft-delete
+**Unlink:** HTTP DELETE `/api/persons/{pid}/links/{id}` → soft-delete
 the row (`deleted_at`) → publish `unlinked` event → Response.
 
 The `linked` / `unlinked` events are two new `kind` values on the

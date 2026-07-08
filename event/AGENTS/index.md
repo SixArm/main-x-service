@@ -17,7 +17,7 @@ per-subproject AGENTS docs — they summarise shape, not detail.
 | [subprojects.md](subprojects.md) | The trio: responsibilities, dependency direction, how to run each, where each subproject's docs live |
 | [models.md](models.md) | Entity-level domain-model orientation (canonical Event, matcher DTO, front-end types) |
 | [matching.md](matching.md) | The two matching surfaces and the adapter bridge between them |
-| [restful.md](restful.md) | `/api/v1` REST surface summary + front-end consumption |
+| [restful.md](restful.md) | `/api` REST surface summary + front-end consumption |
 | [testing.md](testing.md) | Test pyramids per subproject + the seam tests that pin the contracts |
 
 ## Entity-level spec

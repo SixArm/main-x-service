@@ -1,6 +1,6 @@
 //! REST API wiring: Axum router, OpenAPI document, and server bootstrap.
 //!
-//! [`create_router`] mounts every handler under `/api/v1`, exposes
+//! [`create_router`] mounts every handler under `/api`, exposes
 //! `/metrics.prom` and the Swagger UI, and applies a permissive CORS layer;
 //! [`serve`] binds the configured host/port and runs it. [`ApiDoc`] is the
 //! utoipa-generated OpenAPI spec. Handlers live in [`handlers`], shared state
@@ -23,6 +23,8 @@ pub mod handlers;
 pub mod routes;
 /// Shared [`AppState`] carried by every handler.
 pub mod state;
+/// Header-based API versioning (`Accepts-version`) middleware + helper.
+pub mod version;
 
 pub use state::AppState;
 
@@ -109,7 +111,7 @@ pub use state::AppState;
 )]
 pub struct ApiDoc;
 
-/// Builds the full Axum [`Router`]: API routes nested under `/api/v1`, the
+/// Builds the full Axum [`Router`]: API routes nested under `/api`, the
 /// `/metrics.prom` scrape endpoint, the Swagger UI, and a permissive CORS
 /// layer. Shared [`AppState`] is injected into the API routes. The blanket
 /// auth-enforcement middleware ([`auth::apply_enforcement`]) is layered
@@ -120,18 +122,19 @@ pub fn create_router(state: AppState) -> Router {
     // moved into the route groups.
     let enforcement_verifier = state.verifier.clone();
 
-    // FHIR R5 `/fhir/Worker` surface, mirroring the loco mount in
-    // `crate::app::App::routes` (built from [`fhir_routes`]) so the
-    // integration-test router matches production.
+    // FHIR R5 `/fhir/Practitioner` surface + `/fhir/metadata`, mirroring the
+    // loco mount in `crate::app::App::routes` (built from [`fhir_routes`]) so
+    // the integration-test router matches production.
     let fhir_routes = {
         use crate::api::fhir::handlers as fhir;
         Router::new()
+            .route("/metadata", get(fhir::metadata))
             .route(
-                "/Worker",
+                "/Practitioner",
                 get(fhir::search_fhir_workers).post(fhir::create_fhir_worker),
             )
             .route(
-                "/Worker/{id}",
+                "/Practitioner/{id}",
                 get(fhir::get_fhir_worker)
                     .put(fhir::update_fhir_worker)
                     .delete(fhir::delete_fhir_worker),
@@ -170,11 +173,11 @@ pub fn create_router(state: AppState) -> Router {
         .with_state(state);
 
     let router = Router::new()
-        // Mount the JSON API under `/api/v1` and the FHIR surface under `/fhir`
+        // Mount the JSON API under `/api` and the FHIR surface under `/fhir`
         // (both already carry the shared `AppState`).
-        .nest("/api/v1", api_routes)
+        .nest("/api", api_routes)
         .nest("/fhir", fhir_routes)
-        // Root-level Prometheus scrape endpoint — outside `/api/v1` so a default
+        // Root-level Prometheus scrape endpoint — outside `/api` so a default
         // scrape config (`metrics_path: /metrics.prom`) finds it.
         .route("/metrics.prom", get(handlers::metrics_prom))
         // Swagger UI + the served OpenAPI JSON built from `ApiDoc`.
@@ -191,12 +194,16 @@ pub fn create_router(state: AppState) -> Router {
         enforcement_verifier,
         std::sync::Arc::new(auth::policy_from_env()),
     )
+    // Header-based API versioning (`Accepts-version`): negotiates the
+    // version for `/api/*` and stamps it on the response
+    // (`agents/share/api-versioning.md`).
+    .layer(axum::middleware::from_fn(version::require_version_mw))
     // Permissive CORS so browser-based operator UIs on other origins can
     // call the API; tighten for production deployments.
     .layer(CorsLayer::permissive())
 }
 
-/// Native loco controller routes (idiomatic path): the `/api/v1` surface
+/// Native loco controller routes (idiomatic path): the `/api` surface
 /// as a loco `Routes`; handlers extract `AppState` from the `AppContext`
 /// shared store via `FromRef`. `create_router` is retained for the
 /// integration tests. The root `/metrics.prom` route is [`metrics_routes`].
@@ -204,7 +211,7 @@ pub fn create_router(state: AppState) -> Router {
 pub fn workers_routes() -> loco_rs::controller::Routes {
     use loco_rs::prelude::{Routes, get, post};
     Routes::new()
-        .prefix("/api/v1")
+        .prefix("/api")
         .add("/health", get(handlers::health_check))
         .add("/whoami", get(auth::whoami))
         .add("/workers", post(handlers::create_worker))
@@ -236,25 +243,28 @@ pub fn metrics_routes() -> loco_rs::controller::Routes {
     Routes::new().add("/metrics.prom", get(handlers::metrics_prom))
 }
 
-/// HL7 FHIR R5 `/fhir/Worker` controller routes.
+/// HL7 FHIR R5 `/fhir/Practitioner` controller routes + `/fhir/metadata`.
 ///
 /// Mounts the handlers in [`crate::api::fhir::handlers`] as a loco `Routes`
 /// group. The handlers extract [`AppState`] from the `AppContext` shared
 /// store via `FromRef`, exactly like the REST surface, so they reuse the same
 /// repository, search engine, and matcher. Wired into the router by
-/// [`crate::app::App::routes`].
+/// [`crate::app::App::routes`]. The literal `/metadata` is added before the
+/// `/Practitioner/{id}` capture. `resourceType` is the standard FHIR R5
+/// `Practitioner` (fhir.md §3), replacing the prototype's `Worker`.
 #[must_use]
 pub fn fhir_routes() -> loco_rs::controller::Routes {
     use crate::api::fhir::handlers;
     use loco_rs::prelude::{Routes, get};
     Routes::new()
         .prefix("/fhir")
+        .add("/metadata", get(handlers::metadata))
         .add(
-            "/Worker",
+            "/Practitioner",
             get(handlers::search_fhir_workers).post(handlers::create_fhir_worker),
         )
         .add(
-            "/Worker/{id}",
+            "/Practitioner/{id}",
             get(handlers::get_fhir_worker)
                 .put(handlers::update_fhir_worker)
                 .delete(handlers::delete_fhir_worker),

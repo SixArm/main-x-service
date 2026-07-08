@@ -26,7 +26,7 @@ browser holds no token).
 ## What this is
 
 A SvelteKit 2 / Svelte 5 (runes) **SPA**. It calls the portfolio service
-REST API under `/api/v1/{portfolios,projects,products,programs}/...`,
+REST API under `/api/{portfolios,projects,products,programs}/...`,
 whose request/response body for the identity record **is** the
 `portfolio_matcher::WorkItem` shape itself (the API DTO = the matcher
 type, persisted as JSONB). There are **four matchable collections** — one
@@ -35,7 +35,7 @@ the identical controller shape; matching is **within a collection only**
 (the matcher gates on `kind`). A Portfolio is the umbrella; Project /
 Product / Program carry a `portfolio_ref` to their parent. The
 operational sub-resources (goals, tasks, issues) hang off a work item
-under `/api/v1/{collection}/{pid}/…` and are **not** part of the matching
+under `/api/{collection}/{pid}/…` and are **not** part of the matching
 surface (except goal titles).
 
 ## Single source of truth
@@ -117,17 +117,17 @@ src/
 
 | UI action | Endpoint |
 |---|---|
-| List | `GET /api/v1/{collection}` |
-| Search | `GET /api/v1/{collection}/search?q=` |
-| Recent activity | `GET /api/v1/{collection}/events/recent` → `WorkItemEvent[]` |
-| Create | `POST /api/v1/{collection}` |
-| Detail | `GET /api/v1/{collection}/{pid}` |
-| Edit | `PUT /api/v1/{collection}/{pid}` |
-| Delete | `DELETE /api/v1/{collection}/{pid}` |
-| Check duplicates | `POST /api/v1/{collection}/check-duplicates` → `ScoredRef[]` w/ `MatchBreakdown` |
-| Merge duplicate | `POST /api/v1/{collection}/merge` (body `{main_pid, duplicate_pid, reason?}`) |
-| Audit timeline | `GET /api/v1/{collection}/{pid}/audit` → `AuditEntry[]` |
-| Portfolio roll-up | `GET /api/v1/{projects,products,programs}?portfolio_ref={pid}` |
+| List | `GET /api/{collection}` |
+| Search | `GET /api/{collection}/search?q=` |
+| Recent activity | `GET /api/{collection}/events/recent` → `WorkItemEvent[]` |
+| Create | `POST /api/{collection}` |
+| Detail | `GET /api/{collection}/{pid}` |
+| Edit | `PUT /api/{collection}/{pid}` |
+| Delete | `DELETE /api/{collection}/{pid}` |
+| Check duplicates | `POST /api/{collection}/check-duplicates` → `ScoredRef[]` w/ `MatchBreakdown` |
+| Merge duplicate | `POST /api/{collection}/merge` (body `{main_pid, duplicate_pid, reason?}`) |
+| Audit timeline | `GET /api/{collection}/{pid}/audit` → `AuditEntry[]` |
+| Portfolio roll-up | `GET /api/{projects,products,programs}?portfolio_ref={pid}` |
 | Tasks (board) | `GET / POST …/{pid}/tasks` · `PUT / PATCH …/{pid}/tasks/{tid}` (PATCH = status move) |
 | Issues | `GET / POST …/{pid}/issues` · `PUT …/{pid}/issues/{iid}` |
 | Goals | `GET / POST …/{pid}/goals` · `PUT / DELETE …/{pid}/goals/{gid}` |

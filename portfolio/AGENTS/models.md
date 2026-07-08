@@ -71,7 +71,7 @@ These hang off any `WorkItem` (portfolio / project / product / program)
 and make it a project-management tool. They are **not** part of the
 matching surface (except goal *titles* — [matching.md](matching.md)
 `Goals` component). Each is owned by its parent work item, has its own
-table, and is reached under `/api/v1/{collection}/{pid}/…`.
+table, and is reached under `/api/{collection}/{pid}/…`.
 
 | Sub-resource | Key fields | Notes |
 |---|---|---|

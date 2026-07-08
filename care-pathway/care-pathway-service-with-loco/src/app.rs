@@ -106,6 +106,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::care_pathways::routes())
+            .add_route(controllers::fhir::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }
@@ -120,14 +121,24 @@ impl Hooks for App {
     /// # Errors
     ///
     /// Infallible here; the signature is loco's.
-    async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
+    async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         // Seed the verifier before serving so `enforce()`/`AuthUser`
         // consult the boot-fetched key set from the first request on.
         auth::init_from_env().await;
+        // Durable event bus Phase 3: spawn the outbox relay (drain → sink →
+        // mark published + retention purge). A no-op unless the transport is
+        // `outbox` and `CARE_PATHWAY_EVENT_RELAY` is truthy.
+        crate::relay::spawn(ctx.db.clone());
         // Blanket auth enforcement, off by default and gated per-request by
         // `CARE_PATHWAY_REQUIRE_AUTH` (see `auth::require_auth`). Wired
-        // unconditionally; the flag is the only switch.
-        Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
+        // unconditionally; the flag is the only switch. The version
+        // middleware negotiates `Accepts-version` for `/api/*` and is
+        // orthogonal to the auth guard.
+        Ok(router
+            .layer(axum::middleware::from_fn(require_auth_mw))
+            .layer(axum::middleware::from_fn(
+                crate::version::require_version_mw,
+            )))
     }
 
     /// Register background workers with the queue — currently just the

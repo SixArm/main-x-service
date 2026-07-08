@@ -7,7 +7,7 @@ roadmaps ([service §15](../event-service-with-loco/spec/15-roadmap.md),
 carry the implementation detail.
 
 1. **Security baseline — SSO enforcement (ET-5).** JWT middleware on
-   `/api/v1/*` verifying RS256 tokens against the
+   `/api/*` verifying RS256 tokens against the
    [authentication entity](../../authentication/)'s JWKS; roles for
    scheduler / admin / read-only / service; front-end magic-link
    sign-in. Rate limiting and security headers ride along. Nothing

@@ -64,6 +64,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes()
             .add_route(persons_routes())
+            .add_route(crate::api::fhir::handlers::routes())
             .add_route(metrics_routes())
     }
 
@@ -89,11 +90,22 @@ impl Hooks for App {
         // restart. Layered unconditionally; the flag is the only switch.
         let enforcement = auth::Enforcement::from_env(state.verifier.clone());
         ctx.shared_store.insert(state);
+        // Durable event bus Phase 3: start the outbox relay loop. Gated
+        // internally — a no-op unless the transport is `outbox`
+        // (`PERSON_EVENT_TRANSPORT`) and `PERSON_EVENT_RELAY` is truthy —
+        // so default (`memory`) boots behave exactly as before.
+        crate::relay::spawn(ctx.db.clone());
         let router = router
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .layer(axum::middleware::from_fn_with_state(
                 enforcement,
                 auth::require_auth_middleware,
+            ))
+            // Header-based API versioning (`Accepts-version`): negotiates
+            // the version for `/api/*` and stamps it on the response
+            // (`agents/share/api-versioning.md`).
+            .layer(axum::middleware::from_fn(
+                crate::api::rest::version::require_version_mw,
             ))
             .layer(tower_http::cors::CorsLayer::permissive());
         Ok(router)

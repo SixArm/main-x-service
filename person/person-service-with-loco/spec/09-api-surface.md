@@ -53,9 +53,9 @@ style above and per
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/v1/persons/{pid}/links` | Create / upsert an outbound edge; emits `linked` |
-| `GET` | `/api/v1/persons/{pid}/links` | List this person's outbound edges |
-| `DELETE` | `/api/v1/persons/{pid}/links/{id}` | Soft-delete an edge; emits `unlinked` |
+| `POST` | `/api/persons/{pid}/links` | Create / upsert an outbound edge; emits `linked` |
+| `GET` | `/api/persons/{pid}/links` | List this person's outbound edges |
+| `DELETE` | `/api/persons/{pid}/links/{id}` | Soft-delete an edge; emits `unlinked` |
 
 Creating a link is **optimistic** — it stores the assertion and emits a
 `linked` event without calling the target service. Verification status is
@@ -74,11 +74,11 @@ The five endpoints (shared doc §4) mount under the person resource:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/v1/persons/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |
-| `GET` | `/api/v1/persons/import/{id}` | Job status + counts + `errors_url` + `review_url` |
-| `POST` | `/api/v1/persons/export` | `202 {job_id}` — body: `format`, `filter`, `fields`, `include_soft_deleted`, `masking_profile` |
-| `GET` | `/api/v1/persons/export/{id}` | Job status + `download_url` |
-| `GET` | `/api/v1/persons/bulk-jobs` | List (filter by `kind`/`status`); `GET .../{id}` for one |
+| `POST` | `/api/persons/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |
+| `GET` | `/api/persons/import/{id}` | Job status + counts + `errors_url` + `review_url` |
+| `POST` | `/api/persons/export` | `202 {job_id}` — body: `format`, `filter`, `fields`, `include_soft_deleted`, `masking_profile` |
+| `GET` | `/api/persons/export/{id}` | Job status + `download_url` |
+| `GET` | `/api/persons/bulk-jobs` | List (filter by `kind`/`status`); `GET .../{id}` for one |
 
 **Stable key(s) for upsert** (shared doc §6, §10). A row upserts in place
 when it carries either:

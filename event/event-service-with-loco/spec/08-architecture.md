@@ -6,9 +6,11 @@
 src/
 ├── api/
 │   ├── mod.rs               # ApiResponse, ApiError
-│   ├── rest/                # /api/v1/* — 15 endpoints
-│   ├── fhir/                # 501 stub + OperationOutcome
+│   ├── rest/                # /api/* — 15 endpoints
 │   └── grpc/                # Tonic stub
+├── controllers/
+│   └── fhir.rs              # mounted FHIR R5 Appointment routes + /fhir/metadata
+├── fhir/                    # FHIR resources, conversions, OperationOutcome, Bundle, CapabilityStatement
 ├── models/                  # Event, Location, Party, Offer, …
 ├── db/                      # SeaORM entities + repositories + audit
 ├── matching/                # algorithms + scoring + phonetic

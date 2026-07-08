@@ -3,10 +3,16 @@
 All endpoints mount under `/api` (per spec.md §9): `courses_routes()`
 is a loco `Routes` table with prefix `/api`, registered in
 `App::routes` alongside loco's default ops routes. The `Event`
-service uses `/api/v1`; `course` does NOT — clients should call
+service uses `/api`; `course` does NOT — clients should call
 `/api/courses/...` directly. The front-end's
 [`CourseRepository`](../../course-front-end-with-svelte/src/lib/api/courses.ts)
 assumes this base path.
+
+API URLs are version-free; select the version with the `Accepts-version`
+header (default `1.0`), stamped back on the response — see
+[`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
+Implemented by `version::require_version_mw` (`src/api/rest/version.rs`),
+layered on both router surfaces (`create_router` + `App::after_routes`).
 
 ## Library API
 

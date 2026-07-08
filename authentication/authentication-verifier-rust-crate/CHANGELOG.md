@@ -15,6 +15,96 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Formatting drift in `src/lib.rs` (six spots not rustfmt-formatted);
   `cargo fmt --check` is clean again. No behaviour change.
 
+## [0.8.0] - 2026-07-05
+
+> **Hot-reloadable verifier for key rotation (additive).** A new
+> `ReloadableVerifier` holder lets a service swap its published key set
+> at runtime — e.g. via a periodic re-fetch of `/.well-known/paseto-keys`
+> — so a **key rotation** is picked up without a restart. `Verifier`
+> itself is unchanged.
+
+### Added
+
+- **`ReloadableVerifier`** (crate root) — the `Verifier` analogue of
+  `ReloadablePolicy`: `new(verifier)`, `current() -> Arc<Verifier>`
+  (per-request snapshot), `store(verifier)` (runtime swap). Poison-safe;
+  no `Debug` (so key material never lands in a log). A refresh should
+  keep the current verifier on a fetch failure — never swap to an empty
+  key set — so a transient auth-service outage cannot lock callers out.
+- Test: a `store` swaps the key set (an empty set → the real set → a
+  token now verifies) while an in-flight `current()` snapshot keeps the
+  key set it captured.
+
+## [0.7.0] - 2026-07-05
+
+> **Hot-reloadable policy (additive).** A new `ReloadablePolicy` holder
+> lets a service swap the active policy at runtime — no restart — while
+> keeping the per-request read path lock-light. The engine and all
+> `evaluate*` methods are unchanged.
+
+### Added
+
+- **`ReloadablePolicy`** (re-exported at the crate root) — wraps an
+  `Arc<Policy>` behind an `RwLock`: `new(policy)`, `current() ->
+  Arc<Policy>` (a brief read-lock returning a cheap clone to evaluate
+  against), `store(policy)` (a brief write-lock swapping the value). A
+  request in flight during a `store` finishes against its snapshot, so a
+  swap is never seen mid-evaluation. Poison-safe (no panics in the API).
+  The reload **trigger** (file watch, signal, endpoint) is the service's
+  concern; this type only holds and swaps.
+- Test: a `store` swaps the active policy for new readers while an
+  earlier `current()` snapshot keeps the policy it captured.
+
+## [0.6.0] - 2026-07-05
+
+> **Obligations (additive).** Per
+> [authorization-attributes.md](../../agents/share/authorization-attributes.md)
+> §11, an allow rule can attach **obligations** — advisory instructions
+> the enforcement point honours (e.g. `"mask"` ⇒ return the masked view,
+> `"audit"` ⇒ write an audit record). The engine carries them; it does
+> not interpret them. Additive: existing decisions gain an empty
+> `obligations` (serde default), and matching / allow-deny logic is
+> unchanged.
+
+### Added
+
+- **`Rule.obligations: Vec<String>`** (serde default) — obligations the
+  rule attaches on an allow; ignored on a deny.
+- **`Decision.obligations: Vec<String>`** (serde default) — the deciding
+  allow rule's obligations (empty on a deny or the default decision),
+  plus **`Decision::requires(&str)`** convenience.
+- Engine tests: an allow rule surfaces its obligations, a deny/default
+  carries none, first-match precedence over an obligation-bearing deny,
+  and the default policy's allows carry no obligations.
+
+## [0.5.0] - 2026-07-05
+
+> **Ownership templates + environment attributes (additive).** Per
+> [authorization-attributes.md](../../agents/share/authorization-attributes.md)
+> §4/§10, a rule can now compare an attribute to the caller's own
+> identity, and decide on request-time / network context. Additive —
+> `evaluate` and `evaluate_with_resource` are unchanged in behaviour.
+
+### Added
+
+- **Value templates `$sub` / `$email`.** A `when` value of `$sub` or
+  `$email` resolves to the caller's `sub` / `email` before comparison,
+  so a rule expresses **ownership** — e.g.
+  `{ "resource.owner": ["$sub"] }` matches when the record's owner is
+  the caller. Any other value (including one merely containing `$`) is a
+  literal.
+- **`Policy::evaluate_with_context(claims, action, entity, resource, env)`**
+  and the **`env.<name>` `when` namespace** — a
+  `BTreeMap<String, Vec<String>>` of environment attributes
+  (request-time / network context, e.g. `env.after_hours`). The service
+  supplies the clock/network, so the engine stays deterministic and
+  pure. `evaluate_with_resource` delegates with an empty env; `evaluate`
+  with empty resource + env. `env.*` is disjoint from subject attributes
+  (no spoofing) and resolves empty when no context is supplied.
+- Engine tests: `$sub` ownership match/deny, literal-`$` non-template,
+  an `env.after_hours` time-window deny below an admin allow, and the
+  empty-env delegation identity.
+
 ## [0.4.0] - 2026-07-05
 
 > **Record-level resource attributes (additive).** Per

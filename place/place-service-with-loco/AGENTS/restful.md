@@ -146,6 +146,9 @@ registered at root via `api::rest::metrics_routes()`.
 
 ## RESTful API Endpoints
 
+API URLs are version-free; select the version with the `Accepts-version` header (default `1.0`) — see [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
+
+
 | Method | Path                      | Description           |
 | ------ | ------------------------- | --------------------- |
 | GET    | `/api/health`             | Health check          |

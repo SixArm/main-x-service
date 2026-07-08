@@ -5,7 +5,7 @@ use care_pathway_matcher::CarePathway as MatchPathway;
 use loco_rs::prelude::*;
 use sea_orm::sea_query::Expr;
 use sea_orm::sea_query::extension::postgres::PgExpr;
-use sea_orm::{QueryOrder, QuerySelect};
+use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
 /// Re-export the generated `care_pathways` entity (the module plus
@@ -29,10 +29,15 @@ impl Model {
 
     /// Insert a new care pathway, returning the created row.
     ///
+    /// Generic over [`ConnectionTrait`] so the caller can pass either the
+    /// pooled `&DatabaseConnection` or a `&DatabaseTransaction` (the
+    /// `outbox` transport writes this insert on the handler's tx alongside
+    /// the `event_outbox` row).
+    ///
     /// # Errors
     ///
     /// When serialization or the insert fails.
-    pub async fn create(db: &DatabaseConnection, pathway: &MatchPathway) -> ModelResult<Self> {
+    pub async fn create<C: ConnectionTrait>(db: &C, pathway: &MatchPathway) -> ModelResult<Self> {
         let data = serde_json::to_value(pathway).map_err(|e| ModelError::Any(e.into()))?;
         let model = care_pathways::ActiveModel {
             pid: ActiveValue::set(Uuid::new_v4()),
@@ -109,12 +114,15 @@ fn escape_like(q: &str) -> String {
 impl ActiveModel {
     /// Replace the payload of an existing care pathway.
     ///
+    /// Generic over [`ConnectionTrait`] so the update can run on a
+    /// caller-supplied transaction (the `outbox` transport path).
+    ///
     /// # Errors
     ///
     /// When serialization or the update fails.
-    pub async fn update_data(
+    pub async fn update_data<C: ConnectionTrait>(
         mut self,
-        db: &DatabaseConnection,
+        db: &C,
         pathway: &MatchPathway,
     ) -> ModelResult<Model> {
         let data = serde_json::to_value(pathway).map_err(|e| ModelError::Any(e.into()))?;
@@ -125,10 +133,13 @@ impl ActiveModel {
 
     /// Soft-delete: mark inactive and stamp `deleted_at`.
     ///
+    /// Generic over [`ConnectionTrait`] so the soft-delete can run on a
+    /// caller-supplied transaction (the `outbox` transport path).
+    ///
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn soft_delete(mut self, db: &DatabaseConnection) -> ModelResult<Model> {
+    pub async fn soft_delete<C: ConnectionTrait>(mut self, db: &C) -> ModelResult<Model> {
         self.active = ActiveValue::set(false);
         self.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
         self.update(db).await.map_err(ModelError::from)

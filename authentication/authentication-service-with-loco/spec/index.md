@@ -613,16 +613,23 @@ that subject, while the operator-facing system feed stays open.
         `/.well-known/jwks.json`, RS256 signing + the `Jwks` /
         `Jwk` schemas from OpenAPI; the `jsonwebtoken`/`rsa` stack is
         gone.
-  - [ ] **CSRF (remaining refinement).** The `Origin`/`Referer`
-        allow-list backstop (`AUTH_ALLOWED_ORIGINS`) is in place; the
-        per-session synchroniser / double-submit token on
-        cookie-authenticated `POST`/`PUT`/`PATCH`/`DELETE` remains.
-  - [ ] **Sessions-table reshape (remaining refinement).** Migrate to
-        the shared-§3 schema (`sid` pk / `last_seen_at` /
-        `idle_expires_at` / `absolute_expires_at`; partial index) — the
-        `data` JSONB column already landed with ABAC sourcing — with
-        idle-TTL sliding on `/me` and `sid` rotation on privilege
-        change; then drop the transitional PASETO body from redemption.
+  - [x] **CSRF synchroniser token** *(2026-07-05)*. Per-session token
+        minted at `verify`, stored in `sessions.data.csrf`, delivered in
+        the readable `__Host-mxi_csrf` cookie; `POST /token` requires the
+        `X-CSRF-Token` header to match (constant-time) → `403` on
+        mismatch; composes with the `Origin` backstop. Legacy sessions
+        (no token) skip the check. `src/csrf.rs` + DB-free tests.
+  - [x] **Sessions-table reshape (idle/absolute TTLs)** *(2026-07-05)*.
+        Migration `…_000008_sessions_ttls` adds `last_seen_at` /
+        `idle_expires_at` / `absolute_expires_at` (nullable) + the
+        `sessions_active_user` partial index. `is_active` now enforces
+        idle + absolute (was revocation-only); `issue` sets the TTLs
+        (`AUTH_SESSION_IDLE_TTL_SECS` def 30 m, `AUTH_SESSION_ABSOLUTE_TTL_SECS`
+        def 12 h, independent of the token exp); `touch` slides the idle
+        window on `/me` (capped at absolute). `sid` rotates per
+        magic-link login already. Pure `is_active_at` test. *(The `jid`
+        column stays the opaque `sid`; a `sid`-pk rename was judged a
+        larger, lower-value migration and deliberately deferred.)*
   - **Acceptance (met):** redemption returns
         `Set-Cookie: __Host-mxi_session`; `POST /token` mints a PASETO a
         verifier built from

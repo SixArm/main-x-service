@@ -25,6 +25,8 @@ pub mod audit;
 pub mod convert;
 /// SeaORM entity modules (one per PostgreSQL table).
 pub mod models;
+/// `event_outbox` write + relay surface for the durable event bus (Phase 2).
+pub mod outbox;
 /// [`repositories::WorkerRepository`] trait and its SeaORM implementation.
 pub mod repositories;
 /// Schema-definition stub retained for entity regeneration (see the module doc).

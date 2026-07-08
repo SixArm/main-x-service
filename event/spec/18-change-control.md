@@ -1,7 +1,7 @@
 ## 18. Change Control
 
 Material changes to this spec — the service ↔ matcher DTO contract
-(§5.3), shared invariants (§5.5), the FR/NFR tables, the `/api/v1`
+(§5.3), shared invariants (§5.5), the FR/NFR tables, the `/api`
 versioning rule (§8.3), compliance scope (§12) — MUST land in the
 same commit as the corresponding code change, alongside a seam-test
 change where the integration contract moved (§11.4).

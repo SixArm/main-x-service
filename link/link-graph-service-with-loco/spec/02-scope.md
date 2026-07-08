@@ -27,8 +27,8 @@
 - **Merge repointing.** Consume `merged{pid, merged_from}` and rewrite
   every edge referencing `merged_from` to `pid`
   ([design §5.3](../../../agents/share/cross-service-linking.md#53-merge-repointing-why-one-aggregator-helps)).
-- **Read API.** `GET /api/v1/neighbors/{ref}`, `GET /api/v1/edges`,
-  `GET /api/v1/single-view/{ref}`, `GET /api/v1/health/freshness` —
+- **Read API.** `GET /api/neighbors/{ref}`, `GET /api/edges`,
+  `GET /api/single-view/{ref}`, `GET /api/health/freshness` —
   every graph response carrying an `as_of` watermark.
 - **Reconciliation worker.** Periodically diff the read-model against
   each service's authoritative `entity_links` and emit a divergence

@@ -3,11 +3,13 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
-- [ ] **T-1 — FHIR R5 mapping decision + implementation.**
-  - [ ] Decide Encounter vs Appointment vs other event-pattern (OQ-1).
-  - [ ] Implement bidirectional conversion for the chosen resource.
-  - **Acceptance:** `POST /fhir/Event` round-trips through the chosen
-    resource; OperationOutcome on errors.
+- [x] **T-1 — FHIR R5 mapping decision + implementation.**
+  *(done via T-10, 2026-07-07 — superseded)*
+  - [x] Decide Encounter vs Appointment vs other event-pattern (OQ-1):
+    **`Appointment`** chosen as the default (`Encounter` roadmap).
+  - [x] Implement bidirectional conversion for the chosen resource.
+  - **Acceptance:** `POST /fhir/Appointment` round-trips through the
+    `Appointment` resource; `OperationOutcome` on errors. See T-10.
 - [ ] **T-2 — Time-zone-aware fuzzy matching.**
   - [ ] Replace naive UTC offsets with `chrono-tz` conversions in the
     date-proximity scorer.
@@ -34,7 +36,7 @@ clearly described manual check confirms the acceptance criterion.
   - **Acceptance:** `grpcurl` against `EventService.GetEvent`
     round-trips a record.
 - [ ] **T-7 — iCalendar import / export.**
-  - [ ] `POST /api/v1/events/import.ics`, `GET /api/v1/events/{id}.ics`.
+  - [ ] `POST /api/events/import.ics`, `GET /api/events/{id}.ics`.
   - **Acceptance:** Apple Calendar imports the exported `.ics`
     without warnings.
 - [ ] **T-8 — Authentication / authorisation.**
@@ -42,7 +44,7 @@ clearly described manual check confirms the acceptance criterion.
     [authentication-sessions](../../../agents/share/authentication-sessions.md)
     §5/§9:
     - [x] `authentication-verifier` 0.2 (path dep; PASETO-only) added.
-    - [x] [`AuthUser`] extractor + `GET /api/v1/whoami` verify PASETO
+    - [x] [`AuthUser`] extractor + `GET /api/whoami` verify PASETO
       `v4.public` (Ed25519) bearer tokens offline — signature, footer
       `kid`, `iss`, `aud`, `exp` — via `bearer_claims` in
       `src/api/rest/auth.rs`.
@@ -55,25 +57,26 @@ clearly described manual check confirms the acceptance criterion.
       `v4.public` tokens in-process (throwaway Ed25519 key) and pin
       valid / missing / non-bearer / expired / tampered / no-key
       outcomes. Met: `cargo test --lib` green.
-  - [x] Blanket enforcement middleware on `/api/v1/*` *(done
+  - [x] Blanket enforcement middleware on `/api/*` *(done
     2026-07-04)* — env-gated by `EVENT_REQUIRE_AUTH`, **default off**
     (`1`/`true`/`yes`/`on` case-insensitive ⇒ on; unset/blank/junk ⇒
     off; read once at `AppState` construction — restart to change).
     The pure `auth::enforce` decision + `auth::require_auth_mw`
     middleware require a valid PASETO bearer token on every
-    `/api/v1/*` route except the public allow-list `/api/v1/health`
-    (`auth::PUBLIC_API_PATHS`); root-level `/_health`, `/_ping`,
-    `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`, and the
-    `/fhir/*` `501` stubs are outside the `/api/v1` scope and stay
-    public. Wired on both router surfaces (`create_router` and the
+    `/api/*` **and** `/fhir/*` route except the public allow-list
+    `/api/health` and `/fhir/metadata` (`auth::PUBLIC_API_PATHS`);
+    root-level `/_health`, `/_ping`, `/api-docs/openapi.json`,
+    `/swagger-ui*`, and `/metrics.prom` are outside the enforced scope
+    and stay public. Wired on both router surfaces (`create_router` and the
     loco router in `App::after_routes`) via
     `axum::middleware::from_fn_with_state`, inside the CORS layer.
     Family contract:
     [jwt-enforcement](../../../agents/share/jwt-enforcement.md).
     - **Acceptance (enforcement middleware — met):** DB-free unit
       tests in `src/api/rest/auth.rs` pin the `enforce` matrix — off +
-      no token ⇒ pass; on + public/out-of-scope paths (incl. `/fhir/*`)
-      ⇒ pass; on + protected + no token ⇒ `401`; on + valid ⇒ pass;
+      no token ⇒ pass; on + public/out-of-scope paths (incl.
+      `/fhir/metadata`) ⇒ pass; on + protected `/fhir/*` + no token ⇒
+      `401`; on + protected + no token ⇒ `401`; on + valid ⇒ pass;
       on + expired / tampered ⇒ `401` — plus the lenient `parse_bool`
       flag parser. Met: `cargo test --lib` green.
   - [x] ABAC authorization *(done 2026-07-05; supersedes the earlier
@@ -125,7 +128,7 @@ clearly described manual check confirms the acceptance criterion.
 - [ ] **T-9 — Bulk import / export.** (§9.1, §10.3;
   [bulk import/export](../../../agents/share/bulk-import-export.md))
   - [ ] `bulk_jobs` migration (family-wide schema, shared doc §3).
-  - [ ] The five endpoints (shared doc §4) under `/api/v1/events/*`:
+  - [ ] The five endpoints (shared doc §4) under `/api/events/*`:
     `POST/GET import`, `POST/GET export`, `GET bulk-jobs`.
   - [ ] `bg_pg` worker draining `queued → running →
     completed|completed_with_errors|failed` with progress updates.
@@ -144,4 +147,88 @@ clearly described manual check confirms the acceptance criterion.
     (re-submitting a file is a no-op), per-row error report,
     dedupe-to-review (`provenance = import`), masked vs full export,
     and the export audit row.
+- [x] **T-10 — FHIR R5 API** (`Appointment` default; `Encounter`
+  roadmap) — adopt the family contract
+  ([`agents/share/fhir.md`](../../../agents/share/fhir.md)),
+  which replaced the former unmapped FHIR placeholder. **Best-effort
+  mapping** (§3, `low` fidelity — schema.org/Event has no clean FHIR
+  analog): map the stored `event_matcher` DTO to a FHIR
+  **`Appointment`** — `start_date`/`end_date` → `start`/`end`;
+  `name` → `description`; `event_status` → `status`; parties
+  (`organizers`/`performers`/`attendees`) → `participant`;
+  `location` → a contained/`reference`; `identifiers` →
+  `identifier`. `Encounter` is a roadmap alternative (resolves
+  OQ-1 / T-1 for the default resource).
+  - [x] New `src/fhir/` module: resource structs, `to_fhir_appointment`
+    / `from_fhir_appointment` over the stored DTO, `FhirOperationOutcome`,
+    searchset `Bundle`, and search-param parsing.
+  - [x] Mounted `src/controllers/fhir.rs` (`routes()` added in
+    `app.rs::routes()`): read / create / update / delete / search at
+    `/fhir/Appointment{,/{id}}` + `GET /fhir/metadata`
+    `CapabilityStatement` that honestly declares the partial,
+    best-effort surface.
+  - [x] Reuse the native model helpers, validators, event/audit paths,
+    and the blanket auth + ABAC guard (§8): `/fhir/*` is guarded (not on
+    the public allow-list), the action derived from the HTTP method.
+  - [x] Supported search params: `_id`, `_lastUpdated`, `_count`,
+    `identifier`, `status`, `date`.
+  - **Acceptance:** DTO↔`Appointment` round-trip, each interaction
+    (read/create/update/delete/search), search → `Bundle`,
+    `OperationOutcome` on 404/400/422, and `CapabilityStatement`
+    matches the mounted routes.
+  - **Done (2026-07-07):** copy-adapted the organization reference into
+    `src/fhir/{resources,mod,search}.rs` + `src/controllers/fhir.rs`
+    (loco `routes()` wired in `app.rs::routes()`, replacing the former
+    placeholder FHIR routes; the old prototype FHIR module under
+    `src/api/` was deleted). Writes go through the
+    native `EventRepository` (audit + event stream) + Tantivy index like
+    the REST handlers. Identifier category ↔ `urn:mxi:event:*` system,
+    `EventStatus` ↔ `Appointment.status`, and party-role participant
+    codings all round-trip. DB-free unit tests (scheme/status round-trip,
+    DTO↔resource round-trip, missing `description`/`start` rejected,
+    search predicates) pass; `cargo test --lib` = 108 passed,
+    `cargo clippy --lib` clean. **Documented gaps** (`low` fidelity):
+    event `description`/`keywords`/`image`/`same_as`/`url`/`offers`/
+    capacity/audience/`sponsors`/`funders`/`contributors`/`about`/
+    `works`/`super_event`/`sub_events`/`door_time`/`duration`/
+    `time_zone` and per-party `email`/`url` are not emitted; locations
+    survive only as a display label (`Location::Text` on the way back);
+    `MovedOnline`/`Rescheduled` fold onto `booked`. `Encounter` remains a
+    roadmap alternative.
+- [x] **T-11 — Durable event bus (transactional outbox + relay).** Adopt
+  the family contract ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md)).
+  - [x] **Phase 2 (transactional outbox).** `event_outbox` table + SeaORM
+    entity (`db::models::event_outbox`); the canonical `Envelope` /
+    `EventKind` / `EventView` + `EventTransport`/`transport()` selector
+    (`src/streaming/envelope.rs`); `OutboxInsert` (pure envelope→row map +
+    `insert_on` on a caller-supplied `ConnectionTrait`, so the entity write
+    and its outbox row share one transaction) and the relay poll/ack seams
+    (`Model::unpublished` / `mark_published`) in `src/db/outbox.rs`. Gated
+    by `EVENT_EVENT_TRANSPORT` (default `memory` ⇒ ring buffer, today's
+    behaviour; `outbox` ⇒ transactional outbox; unrecognised ⇒ `memory`,
+    fail-safe; read once at boot).
+  - [x] **Phase 3 (relay + retention).** *(done 2026-07-08)* `src/relay.rs`:
+    the `EventSink` trait + default no-broker `LoggingSink`, `drain_once`
+    (poll `unpublished` → `send` → `mark_published`, at-least-once, stops
+    on first send failure to keep per-pid order) and `purge_published`
+    (retention). A background loop (`relay::spawn`, started in
+    `App::after_routes` alongside the auth/version layering) ticks every
+    `EVENT_EVENT_RELAY_INTERVAL_SECS` (default 5, floored at 1) and purges
+    every 60 ticks — **gated by `EVENT_EVENT_TRANSPORT=outbox` AND
+    `EVENT_EVENT_RELAY`** (truthy `1`/`true`/`yes`/`on`), so it is a no-op
+    by default. `EVENT_EVENT_RETENTION_DAYS` (default 7) is now **enforced**
+    by `purge_published` (deletes rows with `published_at < now() -
+    INTERVAL '<n> days'`). Copy-adapted from the organization reference
+    (`src/relay.rs`), repathed to event's repository-based outbox
+    (`db::outbox::Model` + `db::models::event_outbox`), `crate::Result`
+    error type, `i64` ids, and `time::OffsetDateTime` retention cutoff.
+  - **Broker-gated follow-up:** a real **`FluvioSink`** (`impl EventSink`
+    behind a future `fluvio` cargo feature) is the only remaining piece;
+    the `EventSink` seam means the drain loop + retention never change when
+    it lands (see also T-4).
+  - **Acceptance:** DB-free unit tests in `src/relay.rs` (logging-sink
+    send, capturing-sink contract, config-parser defaults) pass; the drain
+    poll/ack seams are DB-gated via the outbox suite. `cargo test --lib`
+    green; `cargo clippy --lib --tests` clean. Default (no
+    `EVENT_EVENT_TRANSPORT=outbox` + `EVENT_EVENT_RELAY`) ⇒ no relay loop.
 

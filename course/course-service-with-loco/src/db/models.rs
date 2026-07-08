@@ -775,3 +775,50 @@ pub mod course_syllabus_text_values {
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+// ───────────────────────── course_outbox ─────────────────────────
+
+/// `SeaORM` entity for the `course_outbox` table — the transactional-outbox
+/// hand-off buffer for the durable event bus (Phase 2; see
+/// `agents/share/event-bus.md` §3). One row is written inside the same
+/// transaction as each Course mutation; a Phase-3 relay worker (roadmap)
+/// drains unpublished rows to Fluvio and stamps `published_at`.
+pub mod course_outbox {
+    use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    /// One persisted outbox row: a canonical envelope awaiting relay to
+    /// the durable bus.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+    #[sea_orm(table_name = "course_outbox")]
+    pub struct Model {
+        /// Auto-increment pk; also the global relay order (`ORDER BY id`).
+        #[sea_orm(primary_key)]
+        pub id: i64,
+        /// Envelope id — the consumer dedup key.
+        #[sea_orm(unique)]
+        pub event_id: Uuid,
+        /// The entity name (`course`).
+        pub entity: String,
+        /// The record pid — the bus partition key.
+        pub entity_pid: Uuid,
+        /// The change kind: `created` / `updated` / `deleted` / `merged`.
+        pub kind: String,
+        /// When the change occurred (stamped at enqueue).
+        pub occurred_at: TimeDateTimeWithTimeZone,
+        /// The acting user pid, or `None` when unauthenticated.
+        pub actor: Option<String>,
+        /// The envelope schema version.
+        pub schema_version: i32,
+        /// The full canonical envelope as JSONB.
+        pub payload: Json,
+        /// `None` until the relay ships the row to the bus.
+        pub published_at: Option<TimeDateTimeWithTimeZone>,
+    }
+
+    /// `SeaORM` relations for the outbox entity (none defined).
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}

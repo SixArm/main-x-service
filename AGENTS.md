@@ -124,6 +124,8 @@ entity. They are not matcher-backed and have no front-end of their own.
 @agents/share/availability.md
 @agents/share/observability.md
 @agents/share/restful.md
+@agents/share/fhir.md
+@agents/share/api-versioning.md
 @agents/share/loco.md
 @agents/share/rust-loco-stack.md
 @agents/share/postgresql.md

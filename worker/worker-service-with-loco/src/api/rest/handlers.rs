@@ -23,11 +23,14 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use authentication_verifier::Action;
+
+use super::auth::{MaybeAuthUser, authorize_record, worker_resource_attrs};
 use super::state::AppState;
 use crate::api::ApiResponse;
 use crate::models::Worker;
 
-/// Body of the `/api/v1/health` response: a fixed liveness probe payload.
+/// Body of the `/api/health` response: a fixed liveness probe payload.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct HealthResponse {
     /// Always `"healthy"` while the process can serve requests.
@@ -42,7 +45,7 @@ pub struct HealthResponse {
 /// (Docker/Kubernetes health checks). Performs no I/O.
 #[utoipa::path(
     get,
-    path = "/api/v1/health",
+    path = "/api/health",
     tag = "health",
     responses(
         (status = 200, description = "Service is healthy", body = HealthResponse)
@@ -59,7 +62,7 @@ pub async fn health_check() -> impl IntoResponse {
 /// Prometheus metrics endpoint (text-exposition format).
 ///
 /// Renders [`crate::metrics::METRICS`] for scraping. Mounted at the
-/// root (`/metrics.prom`) — not under `/api/v1` — so a default
+/// root (`/metrics.prom`) — not under `/api` — so a default
 /// Prometheus scrape config (`metrics_path: /metrics.prom`) finds it.
 #[utoipa::path(
     get,
@@ -96,7 +99,7 @@ pub struct CreateWorkerRequest {
 /// is logged, not fatal) → `201` with the stored worker.
 #[utoipa::path(
     post,
-    path = "/api/v1/workers",
+    path = "/api/workers",
     tag = "workers",
     request_body = Worker,
     responses(
@@ -188,7 +191,7 @@ pub async fn create_worker(
 /// active worker has that id, `500` on a database error.
 #[utoipa::path(
     get,
-    path = "/api/v1/workers/{id}",
+    path = "/api/workers/{id}",
     tag = "workers",
     params(
         ("id" = Uuid, Path, description = "Worker UUID")
@@ -199,9 +202,30 @@ pub async fn create_worker(
         (status = 500, description = "Internal server error")
     )
 )]
-pub async fn get_worker(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
+pub async fn get_worker(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
+) -> impl IntoResponse {
     match state.worker_repository.get_by_id(&id).await {
-        Ok(Some(worker)) => (StatusCode::OK, Json(ApiResponse::success(worker))),
+        Ok(Some(worker)) => {
+            // Record-level ABAC: gate the read on the record's attributes;
+            // honour a `mask` obligation by masking.
+            match authorize_record(&caller, Action::Read, &worker_resource_attrs(&worker)) {
+                Ok(obligations) => {
+                    let body = if obligations.iter().any(|o| o == "mask") {
+                        crate::privacy::mask_worker(&worker)
+                    } else {
+                        worker
+                    };
+                    (StatusCode::OK, Json(ApiResponse::success(body)))
+                }
+                Err((status, reason)) => (
+                    status,
+                    Json(ApiResponse::<Worker>::error("FORBIDDEN", reason)),
+                ),
+            }
+        }
         Ok(None) => {
             let error = ApiResponse::<Worker>::error(
                 "NOT_FOUND",
@@ -224,7 +248,7 @@ pub async fn get_worker(State(state): State<AppState>, Path(id): Path<Uuid>) -> 
 /// refreshes the search index (index failure is logged, not fatal).
 #[utoipa::path(
     put,
-    path = "/api/v1/workers/{id}",
+    path = "/api/workers/{id}",
     tag = "workers",
     params(
         ("id" = Uuid, Path, description = "Worker UUID")
@@ -239,6 +263,7 @@ pub async fn get_worker(State(state): State<AppState>, Path(id): Path<Uuid>) -> 
 pub async fn update_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
     Json(mut payload): Json<Worker>,
 ) -> impl IntoResponse {
     // Validate
@@ -261,6 +286,35 @@ pub async fn update_worker(
     // Force the body's id to the path id so the URL is authoritative and a
     // mismatched body id cannot retarget a different record.
     payload.id = id;
+
+    // Record-level ABAC on the *stored* record (e.g. deny modifying an
+    // inactive worker's record). Load it first for the resource attrs.
+    match state.worker_repository.get_by_id(&id).await {
+        Ok(Some(existing)) => {
+            if let Err((status, reason)) =
+                authorize_record(&caller, Action::Write, &worker_resource_attrs(&existing))
+            {
+                return (
+                    status,
+                    Json(ApiResponse::<Worker>::error("FORBIDDEN", reason)),
+                );
+            }
+        }
+        Ok(None) => {
+            let error = ApiResponse::<Worker>::error(
+                "NOT_FOUND",
+                format!("Worker with id '{id}' not found"),
+            );
+            return (StatusCode::NOT_FOUND, Json(error));
+        }
+        Err(e) => {
+            let error = ApiResponse::<Worker>::error(
+                "DATABASE_ERROR",
+                format!("Failed to retrieve worker: {e}"),
+            );
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
+        }
+    }
 
     match state.worker_repository.update(&payload).await {
         Ok(worker) => {
@@ -286,7 +340,7 @@ pub async fn update_worker(
 /// and removes it from the search index. Returns `204 No Content`.
 #[utoipa::path(
     delete,
-    path = "/api/v1/workers/{id}",
+    path = "/api/workers/{id}",
     tag = "workers",
     params(
         ("id" = Uuid, Path, description = "Worker UUID")
@@ -299,7 +353,31 @@ pub async fn update_worker(
 pub async fn delete_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
 ) -> impl IntoResponse {
+    // Record-level ABAC on the stored record before deleting.
+    match state.worker_repository.get_by_id(&id).await {
+        Ok(Some(worker)) => {
+            if let Err((status, reason)) =
+                authorize_record(&caller, Action::Delete, &worker_resource_attrs(&worker))
+            {
+                return (status, Json(ApiResponse::<()>::error("FORBIDDEN", reason)));
+            }
+        }
+        Ok(None) => {
+            let error =
+                ApiResponse::<()>::error("NOT_FOUND", format!("Worker with id '{id}' not found"));
+            return (StatusCode::NOT_FOUND, Json(error));
+        }
+        Err(e) => {
+            let error = ApiResponse::<()>::error(
+                "DATABASE_ERROR",
+                format!("Failed to retrieve worker: {e}"),
+            );
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
+        }
+    }
+
     // The repository `delete` is a soft delete (marks the row inactive); the
     // row is retained for the audit trail rather than physically removed.
     match state.worker_repository.delete(&id).await {
@@ -377,7 +455,7 @@ pub struct SearchResponse {
 /// fields. Ids present in the index but missing from the DB are skipped.
 #[utoipa::path(
     get,
-    path = "/api/v1/workers/search",
+    path = "/api/workers/search",
     tag = "search",
     params(SearchQuery),
     responses(
@@ -511,7 +589,7 @@ pub struct MatchResultsResponse {
 /// bucket. This keeps scoring O(candidates) rather than O(all workers).
 #[utoipa::path(
     post,
-    path = "/api/v1/workers/match",
+    path = "/api/workers/match",
     tag = "matching",
     request_body = MatchRequest,
     responses(
@@ -694,7 +772,7 @@ async fn check_duplicates_internal(state: &AppState, worker: &Worker) -> Vec<Mat
 /// Always returns `200`; the body reports whether duplicates were found.
 #[utoipa::path(
     post,
-    path = "/api/v1/workers/check-duplicates",
+    path = "/api/workers/check-duplicates",
     tag = "deduplication",
     request_body = Worker,
     responses(
@@ -817,7 +895,7 @@ fn transfer_worker_data(
 /// data.
 #[utoipa::path(
     post,
-    path = "/api/v1/workers/merge",
+    path = "/api/workers/merge",
     tag = "deduplication",
     request_body = crate::models::MergeRequest,
     responses(
@@ -883,42 +961,28 @@ pub async fn merge_workers(
     // Merge data from duplicate into main, recording a snapshot of what moved.
     let (merged, transferred) = transfer_worker_data(&main, &duplicate);
 
-    // Update main worker
-    if let Err(e) = state.worker_repository.update(&merged).await {
+    // Persist the survivor's updates and soft-delete the duplicate atomically
+    // in one transaction; the repository enqueues the `Merged` (+`merged_from`)
+    // and `Deleted` outbox rows and publishes the in-memory `Merged`/`Deleted`
+    // stream events.
+    if let Err(e) = state.worker_repository.merge(&merged, &duplicate.id).await {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse::<crate::models::MergeResponse>::error(
                 "DATABASE_ERROR",
-                format!("Failed to update main worker: {e}"),
+                format!("Failed to merge workers: {e}"),
             )),
         );
     }
 
-    // Soft-delete the duplicate
-    if let Err(e) = state.worker_repository.delete(&duplicate.id).await {
-        tracing::error!("Failed to soft-delete duplicate worker: {}", e);
-    }
-
-    // Remove duplicate from search index
+    // Post-merge search-index updates are best-effort: the merge is already
+    // committed, so failures here are logged but do not fail the response.
     if let Err(e) = state.search_engine.delete_worker(&duplicate.id.to_string()) {
         tracing::warn!("Failed to remove duplicate from search index: {}", e);
     }
-
-    // Update search index for main
     if let Err(e) = state.search_engine.index_worker(&merged) {
         tracing::warn!("Failed to update search index for merged worker: {}", e);
     }
-
-    // Publish a `Merged` event on the stream; `.ok()` ignores publish failure
-    // so a streaming hiccup does not fail an already-committed merge.
-    state
-        .event_publisher
-        .publish(crate::streaming::WorkerEvent::Merged {
-            source_id: duplicate.id,
-            target_id: merged.id,
-            timestamp: chrono::Utc::now(),
-        })
-        .ok();
 
     // Record the merge with a snapshot of the transferred data for audit /
     // potential reversal, then return it (200) alongside the merged survivor.
@@ -954,7 +1018,7 @@ pub async fn merge_workers(
 /// guards against re-recording the same unordered pair.
 #[utoipa::path(
     post,
-    path = "/api/v1/workers/deduplicate",
+    path = "/api/workers/deduplicate",
     tag = "deduplication",
     request_body = crate::models::BatchDeduplicationRequest,
     responses(
@@ -1078,7 +1142,7 @@ pub async fn batch_deduplicate(
 /// `200` with the export document, `404` if not found.
 #[utoipa::path(
     get,
-    path = "/api/v1/workers/{id}/export",
+    path = "/api/workers/{id}/export",
     tag = "privacy",
     params(
         ("id" = Uuid, Path, description = "Worker UUID")
@@ -1119,7 +1183,7 @@ pub async fn export_worker_data(
 /// email, address) masked for least-privilege display. `404` if not found.
 #[utoipa::path(
     get,
-    path = "/api/v1/workers/{id}/masked",
+    path = "/api/workers/{id}/masked",
     tag = "privacy",
     params(
         ("id" = Uuid, Path, description = "Worker UUID")
@@ -1174,7 +1238,7 @@ fn default_audit_limit() -> i64 {
 /// Returns the audit trail for one worker, newest first (limit capped at 500).
 #[utoipa::path(
     get,
-    path = "/api/v1/workers/{id}/audit",
+    path = "/api/workers/{id}/audit",
     tag = "audit",
     params(
         ("id" = Uuid, Path, description = "Worker UUID"),
@@ -1214,7 +1278,7 @@ pub async fn get_worker_audit_logs(
 /// Returns the most recent audit entries system-wide (limit capped at 500).
 #[utoipa::path(
     get,
-    path = "/api/v1/audit/recent",
+    path = "/api/audit/recent",
     tag = "audit",
     params(AuditLogQuery),
     responses(
@@ -1258,7 +1322,7 @@ pub struct UserAuditLogQuery {
 /// Returns audit entries performed by a given user (limit capped at 500).
 #[utoipa::path(
     get,
-    path = "/api/v1/audit/user",
+    path = "/api/audit/user",
     tag = "audit",
     params(UserAuditLogQuery),
     responses(

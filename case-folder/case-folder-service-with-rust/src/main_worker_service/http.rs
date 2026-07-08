@@ -1,6 +1,6 @@
 //! HTTP implementation of the Main Worker Service [`Client`].
 //!
-//! Talks to the service's REST surface at `{base_url}/api/v1/workers/...`.
+//! Talks to the service's REST surface at `{base_url}/api/workers/...`.
 //! The service's `Worker` JSON is FHIR-shaped; we project the fields we
 //! care about into our flatter [`Worker`].
 
@@ -105,7 +105,7 @@ impl HttpClient {
 
 #[async_trait]
 impl Client for HttpClient {
-    /// `GET /api/v1/workers/search?q=<query>&limit=25&fuzzy=true` —
+    /// `GET /api/workers/search?q=<query>&limit=25&fuzzy=true` —
     /// fuzzy free-text name search, capped at 25 results.
     ///
     /// # Errors
@@ -114,7 +114,7 @@ impl Client for HttpClient {
     async fn search(&self, query: &str) -> Result<Vec<Worker>, Error> {
         let response = self
             .http
-            .get(self.url("/api/v1/workers/search"))
+            .get(self.url("/api/workers/search"))
             .query(&[("q", query), ("limit", "25"), ("fuzzy", "true")])
             .send()
             .await
@@ -141,7 +141,7 @@ impl Client for HttpClient {
             .collect())
     }
 
-    /// `GET /api/v1/workers/{id}` — look up a worker by UUID. A `404` maps
+    /// `GET /api/workers/{id}` — look up a worker by UUID. A `404` maps
     /// to `Ok(None)`.
     ///
     /// # Errors
@@ -150,7 +150,7 @@ impl Client for HttpClient {
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Worker>, Error> {
         let response = self
             .http
-            .get(self.url(&format!("/api/v1/workers/{id}")))
+            .get(self.url(&format!("/api/workers/{id}")))
             .send()
             .await
             .map_err(|e| Error::Transport(e.to_string()))?;

@@ -15,6 +15,7 @@ mod m20241228_000004_create_audit_tables;
 mod m20241228_000005_add_indexes_and_triggers;
 mod m20260603_000001_rename_patient_tables_to_person;
 mod m20260608_000001_add_person_persistence_fields;
+mod m20260708_000001_create_event_outbox;
 
 pub struct Migrator;
 
@@ -29,6 +30,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20241228_000005_add_indexes_and_triggers::Migration),
             Box::new(m20260603_000001_rename_patient_tables_to_person::Migration),
             Box::new(m20260608_000001_add_person_persistence_fields::Migration),
+            Box::new(m20260708_000001_create_event_outbox::Migration),
         ]
     }
 }

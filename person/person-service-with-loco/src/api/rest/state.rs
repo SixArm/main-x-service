@@ -71,11 +71,14 @@ impl AppState {
         // Create audit log repository
         let audit_log = Arc::new(AuditLogRepository::new(db.clone()));
 
-        // Create person repository with event publisher and audit log
+        // Create person repository with event publisher, audit log, and
+        // the configured event transport (durable event bus, Phase 2;
+        // `PERSON_EVENT_TRANSPORT`, default `memory`).
         let person_repository = Arc::new(
             SeaOrmPersonRepository::new(db.clone())
                 .with_event_publisher(event_publisher.clone())
-                .with_audit_log(audit_log.clone()),
+                .with_audit_log(audit_log.clone())
+                .with_transport(crate::streaming::transport()),
         ) as Arc<dyn PersonRepository>;
 
         let person_matcher = Arc::new(matcher) as Arc<dyn PersonMatcher>;

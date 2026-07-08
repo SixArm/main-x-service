@@ -23,7 +23,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, courses_routes, metrics_routes},
+    api::rest::{ApiDoc, AppState, courses_routes, fhir_routes, metrics_routes},
     config::Config,
     matching::CourseMatcher,
     search::SearchEngine,
@@ -65,6 +65,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // loco /_health, /_ping
             .add_route(courses_routes())
+            .add_route(fhir_routes()) // /fhir/Basic{,/{id}} + /fhir/metadata (non-standard)
             .add_route(metrics_routes()) // GET /metrics.prom (root, public)
     }
 
@@ -76,11 +77,37 @@ impl Hooks for App {
         let search_engine = SearchEngine::new(&config.search.index_path)
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let matcher = CourseMatcher::new(config.matching);
-        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
-        ctx.shared_store.insert(state);
-        // Swagger UI + permissive CORS layered on top of the controllers.
+        // Finalise the PASETO verifier first: when `COURSE_PASETO_KEYS_URL`
+        // is set the key set is fetched over HTTP once, here, in async
+        // context (fetch failure falls back to the `COURSE_PASETO_KEYS` env
+        // path; the service always boots) — before the shared-store insert
+        // and the middleware capture the state, so both router surfaces
+        // consult the fetched key set.
+        let verifier = std::sync::Arc::new(crate::api::rest::state::boot_verifier().await);
+        let state =
+            AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
+        ctx.shared_store.insert(state.clone());
+        // Durable event bus (Phase 3): spawn the outbox relay worker. A
+        // no-op unless the transport is `outbox` and `COURSE_EVENT_RELAY`
+        // is truthy, so the default `memory` transport is unaffected.
+        crate::relay::spawn(ctx.db.clone());
+        // Swagger UI + blanket auth enforcement + permissive CORS layered
+        // on top of the controllers.
         let router = router
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+            // Blanket auth enforcement (default-off; a near-noop unless
+            // `COURSE_REQUIRE_AUTH` was truthy at construction; layered
+            // inside CORS so preflight requests still pass).
+            .layer(axum::middleware::from_fn_with_state(
+                state,
+                crate::api::rest::auth::require_auth_mw,
+            ))
+            // Header-based API versioning (`Accepts-version`): negotiates
+            // the version for `/api/*` and stamps it on the response
+            // (`agents/share/api-versioning.md`).
+            .layer(axum::middleware::from_fn(
+                crate::api::rest::version::require_version_mw,
+            ))
             .layer(tower_http::cors::CorsLayer::permissive());
         Ok(router)
     }

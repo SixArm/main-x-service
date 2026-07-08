@@ -17,7 +17,7 @@ use crate::metrics::Metrics;
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::cases::Model as CaseModel;
 use crate::models::merge_records::Model as MergeRecordModel;
-use crate::streaming::{self, EventKind};
+use crate::streaming;
 
 /// Maximum number of stored cases scanned in-memory by
 /// `check-duplicates`.
@@ -157,7 +157,10 @@ async fn create(
     Json(case): Json<Case>,
 ) -> Result<Response> {
     validate(&case)?;
-    let model = CaseModel::create(&ctx.db, &case).await?;
+    // Write the row and emit its `Created` event atomically under the
+    // active transport (`streaming::create_and_emit`); `outbox` writes the
+    // row and its `event_outbox` row on one transaction.
+    let model = streaming::create_and_emit(&ctx.db, &case, caller.actor()).await?;
     audit(
         &ctx,
         model.pid,
@@ -166,12 +169,6 @@ async fn create(
         Some(model.data.clone()),
     )
     .await;
-    streaming::publish_with_actor(
-        EventKind::Created,
-        &model.pid.to_string(),
-        &model.title,
-        caller.actor(),
-    );
     Metrics::global().case_created_total.inc();
     format::json(CaseRef::of(&model))
 }
@@ -203,9 +200,27 @@ fn record_rejection((status, reason): (StatusCode, String)) -> Error {
     Error::CustomError(status, ErrorDetail::new(code, &reason))
 }
 
+/// A **masked** view of a case, for a `mask`-obligation allow: drops the
+/// fields that most directly expose who the case is about — the
+/// involved-party `subjects`, external `identifiers`, `same_as` URLs,
+/// and the agency `case_number` — keeping the descriptive shell (title,
+/// type, status, …). Case data is personal data, so a policy can attach
+/// the `mask` obligation to a conditional read (e.g. cross-department).
+fn mask_case(case: &Case) -> Case {
+    let mut masked = case.clone();
+    masked.subjects = Vec::new();
+    masked.identifiers = Vec::new();
+    masked.same_as = Vec::new();
+    masked.case_number = None;
+    masked
+}
+
 /// Fetch a case by public id. `GET /api/cases/{pid}`.
 ///
-/// Responds `200` with the full stored `case_matcher::Case`.
+/// Responds `200` with the stored `case_matcher::Case`. When the
+/// record-level ABAC decision carries the `mask` **obligation**, the
+/// **masked** view is returned instead of the full record (see
+/// [`mask_case`]).
 ///
 /// # Errors
 ///
@@ -220,13 +235,18 @@ async fn get_one(
 ) -> Result<Response> {
     let model = CaseModel::find_by_pid(&ctx.db, &pid).await?;
     let case = model.to_case()?;
-    crate::auth::authorize_record(
+    let obligations = crate::auth::authorize_record(
         &caller,
         Action::Read,
         &crate::auth::case_resource_attrs(&case),
     )
     .map_err(record_rejection)?;
-    format::json(case)
+    // mask-on-allow: honour a `mask` obligation by redacting the record.
+    if obligations.iter().any(|o| o == "mask") {
+        format::json(mask_case(&case))
+    } else {
+        format::json(case)
+    }
 }
 
 /// Replace a case's payload. `PUT /api/cases/{pid}`.
@@ -258,10 +278,7 @@ async fn update(
         &crate::auth::case_resource_attrs(&model.to_case()?),
     )
     .map_err(record_rejection)?;
-    let updated = model
-        .into_active_model()
-        .update_data(&ctx.db, &case)
-        .await?;
+    let updated = streaming::update_and_emit(&ctx.db, model, &case, caller.actor()).await?;
     audit(
         &ctx,
         updated.pid,
@@ -270,12 +287,6 @@ async fn update(
         Some(updated.data.clone()),
     )
     .await;
-    streaming::publish_with_actor(
-        EventKind::Updated,
-        &updated.pid.to_string(),
-        &updated.title,
-        caller.actor(),
-    );
     Metrics::global().case_updated_total.inc();
     format::json(CaseRef::of(&updated))
 }
@@ -304,15 +315,8 @@ async fn remove(
         &crate::auth::case_resource_attrs(&model.to_case()?),
     )
     .map_err(record_rejection)?;
-    let (entity_pid, title) = (model.pid, model.title.clone());
-    model.into_active_model().soft_delete(&ctx.db).await?;
+    let (entity_pid, _title) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
     audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
-    streaming::publish_with_actor(
-        EventKind::Deleted,
-        &entity_pid.to_string(),
-        &title,
-        caller.actor(),
-    );
     Metrics::global().case_deleted_total.inc();
     format::empty_json()
 }
@@ -454,13 +458,12 @@ async fn merge(
 
     let outcome = merge_cases(&main.to_case()?, &duplicate.to_case()?);
 
-    // Update the survivor, then retire the duplicate.
-    let merged = main
-        .into_active_model()
-        .update_data(&ctx.db, &outcome.merged)
-        .await?;
-    let (dup_pid, dup_title) = (duplicate.pid, duplicate.title.clone());
-    duplicate.into_active_model().soft_delete(&ctx.db).await?;
+    // Update the survivor + retire the duplicate + emit the `Merged` /
+    // `Deleted` pair, all atomic under the active transport (one
+    // transaction for `outbox`).
+    let (merged, dup_pid, _dup_title) =
+        streaming::merge_and_emit(&ctx.db, main, duplicate, &outcome.merged, caller.actor())
+            .await?;
 
     if let Err(err) = MergeRecordModel::record(
         &ctx.db,
@@ -483,18 +486,6 @@ async fn merge(
     )
     .await;
     audit(&ctx, dup_pid, "merged_into", caller.actor(), None).await;
-    streaming::publish_with_actor(
-        EventKind::Merged,
-        &merged.pid.to_string(),
-        &merged.title,
-        caller.actor(),
-    );
-    streaming::publish_with_actor(
-        EventKind::Deleted,
-        &dup_pid.to_string(),
-        &dup_title,
-        caller.actor(),
-    );
     Metrics::global().case_merged_total.inc();
 
     format::json(serde_json::json!({
@@ -545,16 +536,19 @@ async fn entity_audit(Path(pid): Path<String>, State(ctx): State<AppContext>) ->
     format::json(rows)
 }
 
-/// Recent events from the in-memory event stream (cap 100).
+/// Recent events from the active transport (cap 100).
 /// `GET /api/cases/events/recent`. Responds `200` with the flat
-/// `EventView` projection (`{kind, pid, name, seq}`).
+/// `EventView` projection (`{kind, pid, name, seq}`) — served from the
+/// ring buffer (`memory`) or the `event_outbox` table (`outbox`), with an
+/// identical wire shape either way.
 ///
 /// # Errors
 ///
-/// Propagates a response-serialization error (none expected in practice).
+/// Propagates the outbox query error under the `outbox` transport
+/// (`memory` never errors).
 #[debug_handler]
-async fn recent_events() -> Result<Response> {
-    format::json(streaming::recent(100))
+async fn recent_events(State(ctx): State<AppContext>) -> Result<Response> {
+    format::json(streaming::recent_events(&ctx.db, 100).await?)
 }
 
 /// Echo the verified claims of the bearer token. `GET /api/cases/whoami`.
@@ -617,6 +611,23 @@ mod tests {
                 other => panic!("expected CustomError(422), got {other:?}"),
             }
         }
+    }
+
+    /// The `mask` obligation's redaction drops the involved-party
+    /// linkages (`subjects` / `identifiers` / `same_as` / case number)
+    /// and keeps the descriptive shell.
+    #[test]
+    fn mask_case_redacts_involved_parties() {
+        let mut case = Case::new("Housing benefit appeal");
+        case.subjects = vec!["person:123".to_string()];
+        case.case_number = Some("HB-2026-01".to_string());
+        case.same_as = vec!["https://court.example/rec/1".to_string()];
+        let masked = mask_case(&case);
+        assert!(masked.subjects.is_empty());
+        assert!(masked.same_as.is_empty());
+        assert_eq!(masked.case_number, None);
+        // Descriptive shell preserved.
+        assert_eq!(masked.title, "Housing benefit appeal");
     }
 
     /// The 422 must survive loco's error-to-response conversion.

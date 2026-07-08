@@ -1,4 +1,5 @@
 //! Request-level test suites, grouped by controller. Currently just the
-//! `/api/v1/{collection}` work-item suite in [`work_items`].
+//! `/api/{collection}` work-item suite in [`work_items`].
 
+mod event_outbox;
 mod work_items;

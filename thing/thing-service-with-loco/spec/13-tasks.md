@@ -148,4 +148,93 @@ clearly described manual check confirms the acceptance criterion.
   - **Acceptance:** DB-free tests pin the `/metrics.prom` `OpenAPI`
     path and the root loco-route binding (`api::rest::tests`); the
     registry render test lives in `metrics::tests`.
+- [x] **T-9 — FHIR R5 API** (`Device`) — adopt the family contract
+  ([`agents/share/fhir.md`](../../../agents/share/fhir.md)). Map the
+  stored `thing_matcher` DTO to a FHIR **`Device`** resource (§3,
+  `medium` fidelity — the core fields map; `Device`'s clinical
+  structure is only partly populated): name → `Device.name`
+  (deviceName), identifiers (DOI/ISBN/GTIN/serial, …) → `identifier`
+  (token `system|value`, or `udiCarrier` where a UDI), thing
+  type/category → `type`, manufacturer → `manufacturer`, model →
+  `modelNumber`; `status`. Note `Substance`/`Medication` are out of v1
+  scope. New `src/fhir/` module (resource structs,
+  `to_fhir_device`/`from_fhir_device`, `FhirOperationOutcome`,
+  searchset `Bundle`, search-param parsing) + a mounted
+  `src/controllers/fhir.rs` (`routes()` in `app.rs`):
+  read/create/update/delete/search at `/fhir/Device{,/{id}}` + `GET
+  /fhir/metadata` `CapabilityStatement`. Reuses native model helpers,
+  validators, event/audit, and the blanket auth+ABAC guard (§8;
+  `/fhir/*` guarded, action from HTTP method). Supported search
+  params: `_id`, `_lastUpdated`, `_count`, `identifier`, `type`,
+  `manufacturer`. Tests: DTO↔`Device` round-trip, each interaction,
+  search→Bundle, `OperationOutcome` on 404/400/422,
+  `CapabilityStatement` matches routes.
+  - **Done (2026-07-07):** `src/fhir/` (`resources.rs`, `mod.rs`
+    conversions + scheme↔system map, `search.rs`) + mounted
+    `src/controllers/fhir.rs` (`routes()` added in `app.rs` via
+    `crate::controllers::fhir::routes()`); read/create/update/delete/
+    search at `/fhir/Device{,/{id}}` + `GET /fhir/metadata`. Maps the
+    stored `models::thing::Thing` DTO (`medium` fidelity): `name` +
+    `alternate_names` → `Device.name`, `identifiers` → `identifier`
+    (round-trip `system|value`), `additional_type` → `type`,
+    `owner` → `manufacturer` (approx.), `disambiguating_description` →
+    `modelNumber` (approx.), `description` → `note`, `is_deleted` →
+    `status`. Writes reuse the repository + validators + event/audit
+    of the native controller. The blanket guard now covers `/fhir/*`
+    (`/fhir/metadata` public). Gaps (no `Device` home): `url`,
+    `images`, `main_entity_of_page`, `same_as`, `subject_of`,
+    `potential_action`, per-identifier `name`/`url`;
+    `Substance`/`Medication` out of scope. DB-free tests pass
+    (`cargo test --lib`: 153); `cargo clippy --lib` clean (pedantic).
+- [x] **T-10 — Durable event bus, Phase 2 (transactional outbox).**
+  Adopt the family contract
+  ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md)
+  §3/§5), copying the finished **event-service** repo-based template.
+  - **Done (2026-07-08):** `event_outbox` migration
+    (`migrations/2026070800000001_create_event_outbox/` +
+    `m20260708_000001_create_event_outbox` registered in the migrator)
+    + SeaORM entity (`db::models::event_outbox`). New
+    `src/streaming/envelope.rs` — the canonical versioned `Envelope`
+    (`entity` is `#[serde(skip_deserializing, default = default_entity)]`;
+    `merged_from` on `Merged`), `EventKind`, `EventView`, and the
+    `EventTransport` / `transport()` selector reading
+    `THING_EVENT_TRANSPORT` (default `memory`), alongside — not
+    replacing — the legacy in-memory `ThingEvent`/`EventPublisher`.
+    New `src/db/outbox.rs` — the pure `OutboxInsert::from_envelope`
+    (DB-free) + `for_event`/`for_merge` + `ConnectionTrait`-generic
+    `insert_on` (so the repo passes its own transaction) + relay
+    `recent`/`unpublished`/`mark_published`. `SeaOrmThingRepository`
+    gains a `transport` field + `enqueue_outbox<C: ConnectionTrait>`;
+    `create`/`update`/`soft_delete` write the outbox row **inside the
+    entity write's transaction** (`soft_delete` grows a transaction
+    under `outbox`); a new repo `merge(survivor, duplicate_id)` emits
+    the survivor's `Merged` (+`merged_from`) and the duplicate's
+    `Deleted` atomically in **one** transaction, and the
+    `POST /api/things/merge` handler now calls it (merge-history,
+    search sync, and the in-memory event stay in the handler). Gated
+    by `THING_EVENT_TRANSPORT`; `memory` (default) is behaviour-neutral
+    — the in-memory publish is unchanged. DB-free unit tests
+    (`envelope`, `outbox::from_envelope`, transport parse) pass
+    (`cargo test --lib`: 171; `clippy --lib --tests` clean); DB-gated
+    `#[ignore]` atomicity tests (create + merge) compile and run under
+    `DATABASE_URL=… cargo test --lib -- --ignored`.
+  - **Phase 3 — Done (2026-07-08):** the relay + retention loop landed
+    in `src/relay.rs` (copy-adapted from the finished **organization**
+    reference; paths retargeted to thing's `crate::db::...` outbox and
+    the `.map_err(map_db)` error path, since thing's `Error` has no
+    `From<DbErr>`). The `EventSink` trait + no-broker `LoggingSink`,
+    `drain_once` (drain unpublished → sink → `mark_published`, stopping
+    at the first send failure to preserve per-pid order), and
+    `purge_published` (the `THING_EVENT_RETENTION_DAYS` retention sweep)
+    run in a `tokio` background loop spawned from `App::after_routes`
+    via `relay::spawn(ctx.db.clone())`. Gated on transport `outbox`
+    **and** `THING_EVENT_RELAY` (truthy); a no-op by default. Config:
+    `THING_EVENT_RELAY`, `THING_EVENT_RELAY_INTERVAL_SECS` (default 5,
+    floored at 1), `THING_EVENT_RETENTION_DAYS` (default 7, now
+    enforced). Three DB-free unit tests (`logging_sink_sends_ok`,
+    `capturing_sink_records_entity_and_key`, `config_defaults_are_safe`)
+    pass (`cargo test --lib`: 174; `clippy --lib --tests` clean).
+    Remaining follow-up: a real `FluvioSink` (feature `fluvio`) as
+    another `impl EventSink` shipping to `mxi.thing.events`, plus
+    flipping `THING_EVENT_TRANSPORT=outbox` in deployment.
 

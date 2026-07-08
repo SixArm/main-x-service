@@ -19,8 +19,10 @@ in-memory event streaming (durable-bus Phase 1) + OpenAPI/Swagger +
 Prometheus metrics + offline PASETO v4 public token verification + blanket
 `/api/*` enforcement (off by default) + rich payload validation
 (ICD/SNOMED/UUID/DOI/BCP-47). Deferred (§13): Tantivy full-text/fuzzy
-search, search-blocked dedup candidates, durable event bus Phases 2–3
-(outbox → Fluvio), privacy, front-end merge action, a PASETO key-set
+search, search-blocked dedup candidates, the durable event bus's real
+Fluvio broker sink (Phases 2–3 — transactional outbox + relay/retention
+— are done; only the broker-gated `FluvioSink` remains), privacy,
+front-end merge action, a PASETO key-set
 refresh loop (the boot-time paseto-keys-over-HTTP fetch is done —
 `CARE_PATHWAY_PASETO_KEYS_URL`, §9/§13 — but runs once, no re-fetch),
 terminology-server code-existence checks, gRPC. Token
@@ -90,9 +92,9 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    [`src/metrics.rs`](../src/metrics.rs); handler in
    [`src/controllers/metrics.rs`](../src/controllers/metrics.rs).
 13. Bulk import/export (deferred, §13) — async, job-based, on the loco
-   `bg_pg` worker: `POST`/`GET /api/v1/care-pathways/import`,
-   `POST`/`GET /api/v1/care-pathways/export`,
-   `GET /api/v1/care-pathways/bulk-jobs`. The uniform family contract
+   `bg_pg` worker: `POST`/`GET /api/care-pathways/import`,
+   `POST`/`GET /api/care-pathways/export`,
+   `GET /api/care-pathways/bulk-jobs`. The uniform family contract
    (execution model, five endpoints, JSONL/CSV/Parquet codecs,
    upsert-by-stable-key + dedupe-to-review, per-row error report, export
    masking + audit) is fixed in
@@ -228,11 +230,30 @@ access controls added later.
   `actor`, `name`) plus the `EventPublisher` trait seam with an
   `InMemoryPublisher` ring buffer; `/events/recent` returns the frozen
   `EventView` projection (`{kind, pid, name, seq}`), byte-identical to the
-  previous wire shape. `occurred_at` / `data` are deferred to the outbox
-  stage (Phase 2) per the design. Phases 2–3 (transactional outbox →
-  Fluvio) remain infra-gated roadmap, designed in
+  previous wire shape. **Phase 2** (transactional outbox) is implemented:
+  `CARE_PATHWAY_EVENT_TRANSPORT=outbox` writes one `event_outbox` row on
+  the entity mutation's transaction (`streaming.rs`; default `memory`).
+  **Phase 3** (relay + retention) is implemented — see the dedicated
+  Phase-3 item below. Only the real Fluvio broker sink remains
+  (broker-gated), designed in
   [`agents/share/event-bus.md`](../../../agents/share/event-bus.md);
   `actor` is wired through `publish_with_actor`.
+- [x] **Durable event bus — Phase 3 (relay + retention).** `src/relay.rs`:
+  the `EventSink` trait (the bus seam), a working no-broker **`LoggingSink`**
+  default, `drain_once` (`unpublished` → `sink.send` → `mark_published`,
+  at-least-once, per-pid order preserved on a send failure), and
+  `purge_published` (retention: deletes `published_at < now() -
+  INTERVAL '<CARE_PATHWAY_EVENT_RETENTION_DAYS> days'`, default 7). A
+  background loop (`relay::spawn`, started in `App::after_routes`) ticks
+  every `CARE_PATHWAY_EVENT_RELAY_INTERVAL_SECS` (default 5, floored at 1)
+  and purges every N ticks — **gated by `CARE_PATHWAY_EVENT_TRANSPORT=outbox`
+  AND `CARE_PATHWAY_EVENT_RELAY`** (truthy `1`/`true`/`yes`/`on`), so it is
+  a no-op by default. Tests: DB-free `LoggingSink`/capturing-sink send +
+  config defaults; the drain/ack seams (`unpublished`/`mark_published`) are
+  DB-gated-tested via the outbox suite. **Broker-gated follow-up:** a real
+  **`FluvioSink`** (`impl EventSink` behind a `fluvio` cargo feature) — the
+  trait is the seam, so the drain loop is unchanged when it lands
+  ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §5, §8).
 - [ ] Privacy controls if any restricted fields appear.
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-title alias, soft-delete, `merge_records`
@@ -302,9 +323,9 @@ access controls added later.
     fast-failing URL fallback (no panic) + no-URL env path (§11).
 - [ ] Bulk import/export — `bulk_jobs` migration (shared doc §3 schema,
   `UNIQUE (entity, kind, idempotency_key)`); the five endpoints
-  (§6.13: `POST`/`GET /api/v1/care-pathways/import`,
-  `POST`/`GET /api/v1/care-pathways/export`,
-  `GET /api/v1/care-pathways/bulk-jobs`); `bg_pg` worker draining
+  (§6.13: `POST`/`GET /api/care-pathways/import`,
+  `POST`/`GET /api/care-pathways/export`,
+  `GET /api/care-pathways/bulk-jobs`); `bg_pg` worker draining
   `queued → running → completed | completed_with_errors | failed`;
   JSONL/CSV/Parquet codecs (CSV flattening per entity spec §9.4 —
   every repeated/nested field a JSON-in-cell; Parquet export-only,
@@ -320,6 +341,33 @@ access controls added later.
   entity-level detail: entity spec §9.4 / §10.4 / §13 T-10. Tests:
   idempotent re-import, per-row error report, keyless dedupe-to-review,
   masked vs full export, zero-row export still audited.
+- [x] **FHIR R5 API** (`PlanDefinition`) — **Done** (`src/fhir/{mod,resources,search}.rs`
+  + mounted `src/controllers/fhir.rs`, `routes()` in `app.rs`; 15 DB-free tests,
+  `cargo test --lib` + `cargo clippy --lib` clean). Gaps: the DTO has no `status`
+  field (the record's `active` flag is the source of truth — FHIR `status`/`type`
+  are emitted but not carried back inbound); instantiated `CarePlan` remains
+  roadmap. Original task text follows for reference. — adopt the family contract
+  ([`agents/share/fhir.md`](../../../agents/share/fhir.md)). Map the stored
+  `care_pathway_matcher::CarePathway` DTO to a FHIR **`PlanDefinition`**
+  (§3, `medium` fidelity — a clinical pathway *template*): `name` →
+  `title`, provider-scoped `pathway_code` (with `provider_id` /
+  `provider_name`) → `identifier`, `condition_codes` (ICD/SNOMED) →
+  `useContext` / action `condition`, `care_setting` → `useContext`,
+  `interventions` → `action`, `keywords` → `useContext` / topic,
+  `identifiers` / `same_as` → `identifier` / `relatedArtifact`, status →
+  `status`, `type` = clinical protocol. An instantiated `CarePlan` is a
+  roadmap alternative. New `src/fhir/` module (resource structs,
+  `to_fhir_plan_definition` / `from_fhir_plan_definition`,
+  `FhirOperationOutcome`, searchset `Bundle`, search-param parsing) + a
+  mounted `src/controllers/fhir.rs` (`routes()` in `app.rs`) exposing
+  read/create/update/delete/search at
+  `/fhir/PlanDefinition{,/{id}}` + `GET /fhir/metadata`
+  `CapabilityStatement`. Reuses the native model helpers,
+  `src/validation.rs`, the event/audit path, and the blanket auth + ABAC
+  guard (§8; `/fhir/*` guarded, action from HTTP method). Supported search
+  params: `_id`, `_lastUpdated`, `_count`, `identifier`, `name`, `status`.
+  Tests: DTO↔`PlanDefinition` round-trip, each interaction, search→Bundle,
+  `OperationOutcome` on 404/400/422, `CapabilityStatement` matches routes.
 
 ## 14. Implementation status
 
@@ -357,9 +405,10 @@ The credential switch RS256-JWT → PASETO v4 public per
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
 has since landed (§13), as has the boot-time paseto-keys-over-HTTP fetch
 (`CARE_PATHWAY_PASETO_KEYS_URL`, fetch-once, env fallback; §9/§13). Next
-(deferred, §13): Tantivy full-text/fuzzy search, durable event bus
-Phases 2–3 (outbox → Fluvio), a PASETO key-set refresh loop, privacy,
-front-end merge action.
+(deferred, §13): Tantivy full-text/fuzzy search, the durable event bus's
+real Fluvio broker sink (Phases 2–3 — outbox + relay/retention — are done;
+only the broker-gated `FluvioSink` remains), a PASETO key-set refresh loop,
+privacy, front-end merge action.
 
 ## 16. Open questions
 

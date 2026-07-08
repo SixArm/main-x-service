@@ -82,6 +82,8 @@ pub mod models;
 pub mod observability;
 /// Privacy controls: field masking, consent checking, GDPR export.
 pub mod privacy;
+/// Durable event bus Phase 3: the outbox relay worker + retention purge.
+pub mod relay;
 /// Full-text search backed by Tantivy.
 pub mod search;
 /// Event streaming: producers and consumers for CRUD events.

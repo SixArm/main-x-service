@@ -114,6 +114,10 @@ fn validate_map(map: &BTreeMap<String, Vec<String>>) -> Result<()> {
         for value in values {
             validate_value(value).map_err(unprocessable)?;
         }
+        // Enforce the configured attribute vocabulary (catches typos).
+        crate::tasks::attributes::vocabulary()
+            .check(key, values)
+            .map_err(unprocessable)?;
     }
     Ok(())
 }

@@ -39,3 +39,18 @@ export interface CurrentUser {
   /** Account email address. */
   email: string;
 }
+
+/**
+ * A user's ABAC subject attributes — returned by
+ * `GET`/`PUT /api/auth/admin/users/{pid}/attributes`. The `attributes`
+ * map is the string→strings shape minted into the PASETO `attrs` claim,
+ * e.g. `{ "access": ["write"], "dept": ["cardiology"] }`.
+ */
+export interface UserAttributes {
+  /** Target user's public id (UUID). */
+  pid: string;
+  /** Target user's email. */
+  email: string;
+  /** The ABAC attribute map. */
+  attributes: Record<string, string[]>;
+}

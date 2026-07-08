@@ -12,11 +12,11 @@
 |  SvelteKit 2 + Svelte 5 runes + SVAR DataGrid + Lily         |
 |  SPA; ApiClient + EventRepository (envelope-aware fetch)     |
 +------------------------------+-------------------------------+
-                               |  HTTP JSON, /api/v1/*
+                               |  HTTP JSON, /api/*
 +------------------------------v-------------------------------+
 |  event-service-with-loco (loco.rs / Axum)                   |
 |  +----------------+ +----------------+ +------------------+  |
-|  | REST /api/v1   | | FHIR (501 stub)| | gRPC (stub)      |  |
+|  | REST /api   | | FHIR (501 stub)| | gRPC (stub)      |  |
 |  +----------------+ +----------------+ +------------------+  |
 |  +----------------+ +----------------+ +------------------+  |
 |  | Validation     | | Privacy/Mask   | | Audit log        |  |
@@ -52,7 +52,7 @@ front-end  →(HTTP)→  service  →(Cargo dep)→  matcher
 
 ### 8.3 API versioning
 
-The REST surface is versioned under **`/api/v1`** (confirmed in the
+The REST surface is versioned under **`/api`** (confirmed in the
 service [`AGENTS/restful.md`](../event-service-with-loco/AGENTS/restful.md)
 and the front-end
 [spec §9](../event-front-end-with-svelte/spec/09-api-consumption.md)).
@@ -95,5 +95,5 @@ Create / match / merge flows are owned by the service spec
 entity-level shape mirrors
 [`agents/share/dataflow.md`](../../agents/share/dataflow.md). The
 front-end adds one entity-specific flow: create-with-409 — `POST
-/api/v1/events` returning `409` is rendered inline as duplicate
+/api/events` returning `409` is rendered inline as duplicate
 candidates with links into the merge route.

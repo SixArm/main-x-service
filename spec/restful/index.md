@@ -27,7 +27,7 @@ and
 - **JSON** request and response bodies (`Content-Type: application/json`).
 - **Resource-oriented** routes under `/api/<plural>` where `<plural>`
   is the entity (`/api/organizations`, `/api/persons`, `/api/cases`, …).
-  The event front-end calls under `/api/v1/`; the rest are unversioned.
+  The event front-end calls under `/api/`; the rest are unversioned.
 - A record is addressed by its **public id** (`{pid}`) — a UUID string.
   In the loco services this is the `pid` column, distinct from the
   internal row id; an unparseable pid is treated as not-found (or `400`

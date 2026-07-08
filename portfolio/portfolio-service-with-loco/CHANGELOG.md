@@ -99,14 +99,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   (RS256/JWKS not used).
 - **Adopts the cross-service-linking contract.** Portfolio is a
   participating service with an `entity_links` write-side table and
-  `POST`/`GET`/`DELETE /api/v1/{collection}/{pid}/links` emitting `linked`
+  `POST`/`GET`/`DELETE /api/{collection}/{pid}/links` emitting `linked`
   / `unlinked`; a work item / goal / task / issue can link to **any** index
   entity. Cross-service links are **not** a matcher signal (separate from
   within-payload `relationships`). Contract:
   [`agents/share/cross-service-linking.md`](../../agents/share/cross-service-linking.md).
 - **Adopts the bulk-import/export contract** (deferred §13). Async
   `bg_pg` jobs, JSONL/CSV/Parquet, the five endpoints under
-  `/api/v1/{collection}/*`; stable upsert key = a deterministic external PM
+  `/api/{collection}/*`; stable upsert key = a deterministic external PM
   identifier (Jira / Asana / Trello / MS Project / GitHub Project / Linear /
   URI / UUID) or owner-scoped `code` or `pid`; keyless rows → dedupe →
   review queue (within-collection). Lead / person refs are personal data →

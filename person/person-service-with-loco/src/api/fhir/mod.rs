@@ -103,14 +103,18 @@ fn fhir_names(person: &Person) -> Vec<resources::FhirHumanName> {
     names
 }
 
-/// Map an internal [`Person`] to its FHIR R5 [`FhirPerson`] form.
+/// Map an internal [`Person`] to its primary FHIR R5 **`Patient`**
+/// resource ([`agents/share/fhir.md`](../../../../agents/share/fhir.md)
+/// §3, `high` fidelity).
 ///
 /// Copies identity, names (primary + additional), telecom, gender, birth
 /// date, deceased status, addresses, marital status, multiple-birth,
 /// links, and managing organization, populating FHIR `Reference`s where
 /// the domain holds bare ids. Enum values are lowercased to FHIR codes.
+/// The returned resource carries `resourceType: "Patient"`; use
+/// [`to_fhir_person`] for the `"Person"` demographic alias.
 #[must_use]
-pub fn to_fhir_person(person: &Person) -> FhirPerson {
+pub fn to_fhir_patient(person: &Person) -> FhirPerson {
     use resources::{
         FhirCodeableConcept, FhirCoding, FhirContactPoint, FhirDeceased, FhirMeta,
         FhirMultipleBirth, FhirPerson, FhirPersonLink, FhirReference,
@@ -217,6 +221,18 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
     }
 
     fhir_person
+}
+
+/// Map an internal [`Person`] to the FHIR **`Person`** demographic alias
+/// (`resourceType: "Person"`). Identical field content to
+/// [`to_fhir_patient`], differing only in the resource-type discriminator
+/// — the non-clinical demographic view backing `/fhir/Person`
+/// ([`agents/share/fhir.md`](../../../../agents/share/fhir.md) §3).
+#[must_use]
+pub fn to_fhir_person(person: &Person) -> FhirPerson {
+    let mut resource = to_fhir_patient(person);
+    resource.resource_type = "Person".to_string();
+    resource
 }
 
 /// Parse a FHIR `deceased[x]` choice into the domain

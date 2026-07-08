@@ -6,11 +6,16 @@
 //! pure evaluation of an ordered rule list over the **subject
 //! attributes** carried in the verified [`Claims::attrs`] map, the
 //! derived **action** ([`Action`]), the coarse **resource** (the entity
-//! name), and — for services that load the target record — optional
-//! **record-level resource attributes** matched by `resource.*` `when`
-//! keys (§9; see [`Policy::evaluate_with_resource`]). First match wins;
+//! name), and — for services that load the target record or supply
+//! request context — optional **record-level resource attributes**
+//! (`resource.*`) and **environment attributes** (`env.*`) matched by
+//! prefixed `when` keys (§9–§10; see [`Policy::evaluate_with_context`]).
+//! A `when` value of `$sub` / `$email` is a template resolving to the
+//! caller's identity, so a rule can express ownership. First match wins;
 //! when no rule matches, the default decision is **allow read, deny
-//! everything else**.
+//! everything else**. An allow rule may attach **obligations** (e.g.
+//! `"mask"`, `"audit"`) that the [`Decision`] carries for the
+//! enforcement point to honour — the engine does not interpret them.
 //!
 //! The engine is pure data + pure evaluation: no I/O, no clock, no
 //! panics on any input. Nine entity services embed it inside their
@@ -164,13 +169,22 @@ pub enum Effect {
 ///   an identically-named `attrs` entry.
 /// - A key prefixed **`resource.`** resolves against the **resource
 ///   attributes** passed to [`Policy::evaluate_with_resource`] (record-
-///   level attributes, e.g. `resource.sensitivity`), with the prefix
-///   stripped — so a deployment can gate on properties of the specific
-///   record. Under the plain [`Policy::evaluate`] (no resource attrs)
-///   every `resource.*` key resolves empty, so such a rule never matches
-///   a positive value (and a `!`-negated value always matches). The
-///   `resource.` namespace is disjoint from subject attributes, so a
-///   subject can never spoof a resource attribute through its token.
+///   level attributes, e.g. `resource.sensitivity`), and a key prefixed
+///   **`env.`** against the **environment attributes** passed to
+///   [`Policy::evaluate_with_context`] (request-time / network context,
+///   e.g. `env.hour`), each with the prefix stripped — so a deployment
+///   can gate on properties of the specific record or the request
+///   context. Under a call that does not supply them every such key
+///   resolves empty, so the rule never matches a positive value (and a
+///   `!`-negated value always matches). Both namespaces are disjoint
+///   from subject attributes, so a subject can never spoof either
+///   through its token.
+/// - A `when` **value** of `$sub` or `$email` is a **template**: it
+///   resolves to the caller's `sub` / `email` before comparison, so a
+///   rule can compare an attribute to the caller's own identity — e.g.
+///   `{ "resource.owner": ["$sub"] }` matches when the record's owner
+///   is the caller (the ownership pattern). Any other value (including
+///   one merely containing `$`) is a literal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rule {
     /// Whether a match allows or denies the request.
@@ -180,11 +194,20 @@ pub struct Rule {
     /// Conjunction over subject attributes; empty matches everyone.
     #[serde(default)]
     pub when: BTreeMap<String, Vec<String>>,
+    /// **Obligations** the enforcement point must honour when this rule
+    /// **allows** — advisory instructions the engine carries but does
+    /// not interpret (e.g. `"mask"` ⇒ return the masked view,
+    /// `"audit"` ⇒ write an audit record). Short lowercase tokens, like
+    /// attribute values. Empty by default; ignored on a `deny` rule
+    /// (a denial is a 403, not a conditional allow). Surfaced on the
+    /// [`Decision`] of the deciding rule so the caller can act on them.
+    #[serde(default)]
+    pub obligations: Vec<String>,
 }
 
 impl Rule {
-    /// Whether this rule matches the given subject, action, entity, and
-    /// resource attributes.
+    /// Whether this rule matches the given subject, action, entity,
+    /// resource attributes, and environment attributes.
     #[must_use]
     fn matches(
         &self,
@@ -192,33 +215,67 @@ impl Rule {
         action: Action,
         entity: &str,
         resource: &BTreeMap<String, Vec<String>>,
+        env: &BTreeMap<String, Vec<String>>,
     ) -> bool {
         if !self.actions.iter().any(|pattern| pattern.matches(action)) {
             return false;
         }
         self.when.iter().all(|(key, wanted)| {
-            let have = values_for(claims, entity, resource, key);
-            wanted.iter().any(|want| match want.strip_prefix('!') {
-                Some(negated) => !have.contains(&negated),
-                None => have.iter().any(|h| h == want),
+            let have = values_for(claims, entity, resource, env, key);
+            wanted.iter().any(|want| {
+                let (negate, raw) = match want.strip_prefix('!') {
+                    Some(rest) => (true, rest),
+                    None => (false, want.as_str()),
+                };
+                // Resolve a `$sub` / `$email` template on the wanted
+                // value against the subject before comparing, so a rule
+                // can compare an attribute to the caller's identity
+                // (e.g. `resource.owner: ["$sub"]` = owned by the caller).
+                let resolved = resolve_template(claims, raw);
+                have.contains(&resolved) != negate
             })
         })
     }
 }
 
+/// Resolve a `when` **value** template against the subject: `$sub` →
+/// the caller's `sub`, `$email` → the caller's `email`; any other value
+/// (including one that merely contains `$`) is returned unchanged. This
+/// lets a rule compare an attribute to the caller's own identity rather
+/// than to a fixed literal — the ownership pattern
+/// (`authorization-attributes.md` §4).
+fn resolve_template<'a>(claims: &'a Claims, want: &'a str) -> &'a str {
+    match want {
+        "$sub" => claims.sub.as_str(),
+        "$email" => claims.email.as_str(),
+        other => other,
+    }
+}
+
 /// The values for one `when` key. A `resource.<name>` key resolves from
-/// the request's **resource attributes** (record-level, with the prefix
-/// stripped); every other key resolves the **subject** side — the
-/// reserved pseudo-attributes `sub` / `email` / `entity` first, then the
-/// token's [`Claims::attrs`] map, else empty.
+/// the request's **resource attributes** (record-level) and an
+/// `env.<name>` key from the **environment attributes** (request-time /
+/// network / …), each with the prefix stripped; every other key
+/// resolves the **subject** side — the reserved pseudo-attributes
+/// `sub` / `email` / `entity` first, then the token's [`Claims::attrs`]
+/// map, else empty. The `resource.` / `env.` namespaces are disjoint
+/// from subject attributes, so a subject can never spoof either through
+/// its token.
 fn values_for<'a>(
     claims: &'a Claims,
     entity: &'a str,
     resource: &'a BTreeMap<String, Vec<String>>,
+    env: &'a BTreeMap<String, Vec<String>>,
     key: &str,
 ) -> Vec<&'a str> {
     if let Some(name) = key.strip_prefix("resource.") {
         return resource
+            .get(name)
+            .map(|values| values.iter().map(String::as_str).collect())
+            .unwrap_or_default();
+    }
+    if let Some(name) = key.strip_prefix("env.") {
+        return env
             .get(name)
             .map(|values| values.iter().map(String::as_str).collect())
             .unwrap_or_default();
@@ -291,16 +348,19 @@ impl Policy {
                     effect: Effect::Allow,
                     actions: vec![ActionPattern::Write, ActionPattern::Destructive],
                     when: when("svc", &["true"]),
+                    obligations: Vec::new(),
                 },
                 Rule {
                     effect: Effect::Allow,
                     actions: vec![ActionPattern::Destructive],
                     when: when("access", &["admin"]),
+                    obligations: Vec::new(),
                 },
                 Rule {
                     effect: Effect::Allow,
                     actions: vec![ActionPattern::Write],
                     when: when("access", &["write", "admin"]),
+                    obligations: Vec::new(),
                 },
             ],
         }
@@ -342,7 +402,9 @@ impl Policy {
     /// record unless `access=admin`" as ordered policy rules
     /// (`authorization-attributes.md` §9). The `resource.` namespace is
     /// disjoint from subject attributes, so a caller can never spoof a
-    /// resource attribute through its token.
+    /// resource attribute through its token. Considers **no environment
+    /// attributes** (every `env.*` key resolves empty) — call
+    /// [`Policy::evaluate_with_context`] to pass those too.
     ///
     /// Pure and total: no I/O, no panics on any input.
     #[must_use]
@@ -353,16 +415,49 @@ impl Policy {
         entity: &str,
         resource: &BTreeMap<String, Vec<String>>,
     ) -> Decision {
+        self.evaluate_with_context(claims, action, entity, resource, &BTreeMap::new())
+    }
+
+    /// Evaluate the policy with both **record-level resource attributes**
+    /// (matched by `resource.*` `when` keys) and **environment
+    /// attributes** (matched by `env.*` keys) — a string→strings map of
+    /// request-time / network context, e.g.
+    /// `{"hour": ["22"], "network": ["office"]}`. Otherwise identical to
+    /// [`Policy::evaluate`].
+    ///
+    /// A service derives the environment attributes per request (clock,
+    /// source IP, …) and passes them here so a deployment can express
+    /// e.g. "deny write outside working hours" or geofencing as ordered
+    /// policy rules (`authorization-attributes.md` §10). Like
+    /// `resource.*`, the `env.*` namespace is disjoint from subject
+    /// attributes, so a caller cannot spoof it through its token.
+    ///
+    /// Pure and total: no I/O (the caller supplies the clock/network,
+    /// keeping the engine deterministic), no panics on any input.
+    #[must_use]
+    pub fn evaluate_with_context(
+        &self,
+        claims: &Claims,
+        action: Action,
+        entity: &str,
+        resource: &BTreeMap<String, Vec<String>>,
+        env: &BTreeMap<String, Vec<String>>,
+    ) -> Decision {
         for (index, rule) in self.rules.iter().enumerate() {
-            if rule.matches(claims, action, entity, resource) {
+            if rule.matches(claims, action, entity, resource, env) {
                 return match rule.effect {
+                    // An allow carries the rule's obligations for the
+                    // enforcement point to honour (e.g. "mask"); a deny
+                    // carries none (it is a 403, not a conditional allow).
                     Effect::Allow => Decision {
                         allowed: true,
                         reason: format!("allow (rule {index})"),
+                        obligations: rule.obligations.clone(),
                     },
                     Effect::Deny => Decision {
                         allowed: false,
                         reason: format!("deny (rule {index})"),
+                        obligations: Vec::new(),
                     },
                 };
             }
@@ -371,11 +466,13 @@ impl Policy {
             Decision {
                 allowed: true,
                 reason: "default allow (read)".to_string(),
+                obligations: Vec::new(),
             }
         } else {
             Decision {
                 allowed: false,
                 reason: "default deny".to_string(),
+                obligations: Vec::new(),
             }
         }
     }
@@ -393,6 +490,75 @@ pub struct Decision {
     pub allowed: bool,
     /// The deciding rule index or the default decision.
     pub reason: String,
+    /// **Obligations** the enforcement point must honour on an allow —
+    /// the deciding allow rule's [`Rule::obligations`] (e.g. `"mask"`,
+    /// `"audit"`). Empty on a deny or the default decision. Advisory: the
+    /// engine carries them; the caller (PEP) interprets and acts on them
+    /// (e.g. `"mask"` ⇒ return the masked view). `#[serde(default)]` so
+    /// a decision serialized by an older peer still deserializes.
+    #[serde(default)]
+    pub obligations: Vec<String>,
+}
+
+impl Decision {
+    /// Whether the decision carries the named obligation (a convenience
+    /// for the enforcement point, e.g. `decision.requires("mask")`).
+    #[must_use]
+    pub fn requires(&self, obligation: &str) -> bool {
+        self.obligations.iter().any(|o| o == obligation)
+    }
+}
+
+/// A **hot-reloadable** [`Policy`] holder for the enforcement point: the
+/// active policy can be swapped at runtime (e.g. when the policy file
+/// changes) **without a restart**, while readers keep the coarse
+/// `evaluate` path lock-light.
+///
+/// It wraps an `Arc<Policy>` behind an `RwLock`. Per request the guard
+/// calls [`current`](Self::current) — a brief read-lock returning a
+/// cheap `Arc` clone it then evaluates against; a reload calls
+/// [`store`](Self::store) — a brief write-lock swapping the `Arc`. A
+/// request in flight during a reload finishes against the snapshot it
+/// took, so a swap is never observed mid-evaluation. Poison-safe: a
+/// panic elsewhere never makes `current`/`store` panic (verifier rule:
+/// no panics in the API).
+///
+/// The **trigger** (a file-mtime watch, a signal, an admin endpoint) is
+/// the service's concern — this type only holds and swaps the value.
+#[derive(Debug)]
+pub struct ReloadablePolicy {
+    inner: std::sync::RwLock<std::sync::Arc<Policy>>,
+}
+
+impl ReloadablePolicy {
+    /// Wrap an initial policy (e.g. the one loaded at boot).
+    #[must_use]
+    pub fn new(policy: Policy) -> Self {
+        Self {
+            inner: std::sync::RwLock::new(std::sync::Arc::new(policy)),
+        }
+    }
+
+    /// The currently active policy — a cheap `Arc` clone taken under a
+    /// brief read-lock. Evaluate against the returned snapshot; a
+    /// concurrent [`store`](Self::store) does not affect it.
+    #[must_use]
+    pub fn current(&self) -> std::sync::Arc<Policy> {
+        self.inner
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Atomically replace the active policy (a brief write-lock). New
+    /// requests see the new policy; in-flight requests finish against
+    /// the snapshot they already took.
+    pub fn store(&self, policy: Policy) {
+        *self
+            .inner
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = std::sync::Arc::new(policy);
+    }
 }
 
 /// Engine unit tests — pure, offline, per
@@ -629,12 +795,112 @@ mod tests {
         let policy = Policy::from_json(
             r#"{ "rules": [
                 { "effect": "allow", "actions": ["write"], "when": { "svc": ["true"] },
-                  "comment": "future field", "obligations": ["mask"] }
+                  "comment": "future field", "advice": ["someday"] }
             ] }"#,
         )
         .expect("unknown fields must be ignored");
         let claims = claims_with_attrs(&[("svc", &["true"])]);
         assert!(policy.evaluate(&claims, Action::Write, "worker").allowed);
+    }
+
+    #[test]
+    fn allow_rule_carries_its_obligations_to_the_decision() {
+        // A rule can attach obligations (e.g. "mask") the enforcement
+        // point must honour on an allow; a deny / default carries none.
+        let policy = Policy::from_json(
+            r#"{ "rules": [
+                { "effect": "allow", "actions": ["read"],
+                  "when": { "access": ["read-masked"] },
+                  "obligations": ["mask", "audit"] },
+                { "effect": "deny", "actions": ["read"],
+                  "when": { "resource.sensitivity": ["secret"] },
+                  "obligations": ["mask"] }
+            ] }"#,
+        )
+        .expect("policy parses");
+
+        // The allow rule surfaces its obligations.
+        let masked = claims_with_attrs(&[("access", &["read-masked"])]);
+        let decision = policy.evaluate(&masked, Action::Read, "case");
+        assert!(decision.allowed);
+        assert!(decision.requires("mask"));
+        assert!(decision.requires("audit"));
+        assert!(!decision.requires("delete"));
+
+        // A deny carries no obligations (it's a 403, not a conditional
+        // allow) even though the rule lists one.
+        let onto_secret = policy.evaluate_with_resource(
+            &claims_with_attrs(&[("access", &["read-masked"]), ("other", &["x"])]),
+            Action::Read,
+            "case",
+            &resource(&[("sensitivity", &["secret"])]),
+        );
+        // rule 0 matches first (access=read-masked) → allow+mask; the
+        // deny never reached. Confirm first-match precedence holds.
+        assert!(onto_secret.allowed);
+        assert!(onto_secret.requires("mask"));
+
+        // A subject with no matching allow rule: default decision, no
+        // obligations.
+        let plain = policy.evaluate(&claims_with_attrs(&[]), Action::Read, "case");
+        assert!(plain.allowed); // default allow-read
+        assert!(plain.obligations.is_empty());
+    }
+
+    #[test]
+    fn default_policy_allows_carry_no_obligations() {
+        let policy = Policy::default_policy();
+        let admin = claims_with_attrs(&[("access", &["admin"])]);
+        let d = policy.evaluate(&admin, Action::Write, "place");
+        assert!(d.allowed);
+        assert!(d.obligations.is_empty());
+    }
+
+    #[test]
+    fn reloadable_policy_swaps_the_active_policy() {
+        // Start with a policy that denies all writes (empty rules ⇒
+        // default deny-mutation), then hot-swap to one that allows a
+        // writer — without recreating the holder.
+        let holder = ReloadablePolicy::new(Policy { rules: vec![] });
+        let writer = claims_with_attrs(&[("access", &["write"])]);
+        assert!(
+            !holder
+                .current()
+                .evaluate(&writer, Action::Write, "case")
+                .allowed,
+            "before reload: default deny-mutation"
+        );
+
+        holder.store(
+            Policy::from_json(
+                r#"{ "rules": [
+                    { "effect": "allow", "actions": ["write"], "when": { "access": ["write"] } }
+                ] }"#,
+            )
+            .expect("policy parses"),
+        );
+        assert!(
+            holder
+                .current()
+                .evaluate(&writer, Action::Write, "case")
+                .allowed,
+            "after reload: the new policy allows the writer"
+        );
+
+        // A snapshot taken before a reload is unaffected by it.
+        let snapshot = holder.current();
+        holder.store(Policy { rules: vec![] });
+        assert!(
+            snapshot.evaluate(&writer, Action::Write, "case").allowed,
+            "an in-flight snapshot keeps the policy it captured"
+        );
+        assert!(
+            !holder
+                .current()
+                .evaluate(&writer, Action::Write, "case")
+                .allowed,
+            "new readers see the latest (deny) policy"
+        );
     }
 
     #[test]
@@ -802,5 +1068,138 @@ mod tests {
         // deny for write.
         let spoofer = claims_with_attrs(&[("resource.sensitivity", &["high"])]);
         assert!(!policy.evaluate(&spoofer, Action::Write, "case").allowed);
+    }
+
+    /// The subject's fixed `sub` in [`claims_with_attrs`], reused by the
+    /// ownership-template test as the record's `owner`.
+    const SUBJECT_PID: &str = "11111111-1111-1111-1111-111111111111";
+
+    #[test]
+    fn value_template_sub_expresses_ownership() {
+        // "a writer may write a record they own": allow write when the
+        // record's owner equals the caller's sub (`$sub`).
+        let policy = Policy::from_json(
+            r#"{ "rules": [
+                { "effect": "allow", "actions": ["write"],
+                  "when": { "access": ["write"], "resource.owner": ["$sub"] } }
+            ] }"#,
+        )
+        .expect("policy parses");
+        let writer = claims_with_attrs(&[("access", &["write"])]);
+
+        // Owner == caller ⇒ allowed.
+        assert!(
+            policy
+                .evaluate_with_resource(
+                    &writer,
+                    Action::Write,
+                    "case",
+                    &resource(&[("owner", &[SUBJECT_PID])])
+                )
+                .allowed
+        );
+        // Owner is someone else ⇒ the `$sub` template does not match ⇒
+        // default deny for write.
+        assert!(
+            !policy
+                .evaluate_with_resource(
+                    &writer,
+                    Action::Write,
+                    "case",
+                    &resource(&[("owner", &["99999999-9999-9999-9999-999999999999"])])
+                )
+                .allowed
+        );
+    }
+
+    #[test]
+    fn literal_dollar_value_is_not_a_template() {
+        // Only exactly `$sub` / `$email` are templates; any other value
+        // (incl. one containing `$`) is a literal.
+        let policy = Policy::from_json(
+            r#"{ "rules": [
+                { "effect": "allow", "actions": ["write"], "when": { "tier": ["$gold"] } }
+            ] }"#,
+        )
+        .expect("policy parses");
+        // A subject whose `tier` is literally "$gold" matches.
+        let claims = claims_with_attrs(&[("tier", &["$gold"])]);
+        assert!(policy.evaluate(&claims, Action::Write, "thing").allowed);
+    }
+
+    #[test]
+    fn env_attribute_gates_a_time_window_deny() {
+        // §10 example: deny write outside working hours (here, hour 22).
+        // The service supplies the clock as an env attribute — the engine
+        // stays deterministic.
+        let policy = Policy::from_json(
+            r#"{ "rules": [
+                { "effect": "allow", "actions": ["write"], "when": { "access": ["admin"] } },
+                { "effect": "deny",  "actions": ["write"], "when": { "env.after_hours": ["true"] } },
+                { "effect": "allow", "actions": ["write"], "when": { "access": ["write"] } }
+            ] }"#,
+        )
+        .expect("policy parses");
+        let writer = claims_with_attrs(&[("access", &["write"])]);
+        let admin = claims_with_attrs(&[("access", &["admin"])]);
+        let after_hours = resource(&[("after_hours", &["true"])]);
+        let during_hours = resource(&[("after_hours", &["false"])]);
+
+        // Writer after hours ⇒ denied by rule 1.
+        let denied = policy.evaluate_with_context(
+            &writer,
+            Action::Write,
+            "case",
+            &BTreeMap::new(),
+            &after_hours,
+        );
+        assert!(!denied.allowed);
+        assert_eq!(denied.reason, "deny (rule 1)");
+        // Writer during hours ⇒ allowed by rule 2.
+        assert!(
+            policy
+                .evaluate_with_context(
+                    &writer,
+                    Action::Write,
+                    "case",
+                    &BTreeMap::new(),
+                    &during_hours
+                )
+                .allowed
+        );
+        // Admin overrides the after-hours deny (rule 0 precedes it).
+        assert!(
+            policy
+                .evaluate_with_context(
+                    &admin,
+                    Action::Write,
+                    "case",
+                    &BTreeMap::new(),
+                    &after_hours
+                )
+                .allowed
+        );
+    }
+
+    #[test]
+    fn env_namespace_empty_without_context() {
+        // Under evaluate / evaluate_with_resource (no env supplied), an
+        // `env.*` positive match never fires; the later allow wins.
+        let policy = Policy::from_json(
+            r#"{ "rules": [
+                { "effect": "deny",  "actions": ["write"], "when": { "env.after_hours": ["true"] } },
+                { "effect": "allow", "actions": ["write"], "when": { "access": ["write"] } }
+            ] }"#,
+        )
+        .expect("policy parses");
+        let writer = claims_with_attrs(&[("access", &["write"])]);
+        let d = policy.evaluate(&writer, Action::Write, "case");
+        assert!(d.allowed);
+        assert_eq!(d.reason, "allow (rule 1)");
+        // evaluate_with_resource (resource but no env) is identical.
+        assert_eq!(
+            d,
+            policy.evaluate_with_resource(&writer, Action::Write, "case", &BTreeMap::new())
+        );
     }
 }

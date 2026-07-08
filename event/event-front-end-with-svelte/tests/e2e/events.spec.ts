@@ -50,7 +50,7 @@ test.describe("Event front-end smoke", () => {
     // The Event Service GET is stubbed at the browser boundary so the smoke
     // suite needs no backing service.
     test("detail page renders the loaded event identity", async ({ page }) => {
-        await page.route("**/api/v1/events/evt-1", (route) =>
+        await page.route("**/api/events/evt-1", (route) =>
             route.fulfill({
                 status: 200,
                 contentType: "application/json",

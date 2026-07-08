@@ -41,6 +41,8 @@ pub mod models;
 pub mod observability;
 /// Data masking, GDPR export, and consent checking.
 pub mod privacy;
+/// Durable event bus **Phase 3**: the outbox relay loop + retention purge.
+pub mod relay;
 /// Tantivy full-text search engine and index.
 pub mod search;
 /// Event streaming (PersonEvent, producers, consumers).

@@ -22,6 +22,8 @@ adapter to drift.
 
 ## API surface
 
+API URLs are version-free; select the version with the `Accepts-version` header (default `1.0`) — see [`agents/share/api-versioning.md`](../../agents/share/api-versioning.md).
+
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/api/care-pathways` | Create (body: `CarePathway`; blank `name` → `422`) → `{pid, name}` |
@@ -108,7 +110,8 @@ src/
 │   ├── care_pathways.rs   CRUD helpers over the stored payload
 │   ├── audit_logs.rs      audit-trail record/query helpers
 │   ├── merge_records.rs   merge-history record/query helpers
-│   └── _entities/{care_pathways,audit_logs,merge_records}.rs  SeaORM entities
-migration/src/            …_000001_care_pathways, …_000002_audit_logs, …_000003_merge_records
+│   ├── event_outbox.rs    durable-bus Phase 2: OutboxInsert::from_envelope mapping + enqueue (tx-generic) + relay poll/ack
+│   └── _entities/{care_pathways,audit_logs,merge_records,event_outbox}.rs  SeaORM entities
+migration/src/            …_000001_care_pathways, …_000002_audit_logs, …_000003_merge_records, …_000004_event_outbox
 config/                   development/production/test yaml
 ```

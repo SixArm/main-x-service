@@ -16,6 +16,8 @@ use utoipa_swagger_ui::SwaggerUi;
 pub mod auth;
 pub mod handlers;
 pub mod state;
+/// Header-based API versioning (`Accepts-version`) middleware + helper.
+pub mod version;
 
 pub use state::AppState;
 
@@ -141,6 +143,10 @@ pub fn create_router(state: AppState) -> Router {
             enforcement,
             auth::require_auth_middleware,
         ))
+        // Header-based API versioning (`Accepts-version`): negotiates the
+        // version for `/api/*` and stamps it on the response
+        // (`agents/share/api-versioning.md`).
+        .layer(axum::middleware::from_fn(version::require_version_mw))
         .layer(CorsLayer::permissive())
 }
 

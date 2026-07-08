@@ -55,6 +55,11 @@ pub mod api;
 pub mod app;
 /// Runtime configuration (server, database, search, matching).
 pub mod config;
+/// Loco-idiomatic controllers (the FHIR R5 `Appointment` surface).
+pub mod controllers;
+/// FHIR R5 interop: `Appointment` resource structs, `Event` ⇄ resource
+/// conversions, and search-parameter parsing for the `/fhir` endpoints.
+pub mod fhir;
 /// PostgreSQL persistence (SeaORM entities, repositories, audit log).
 pub mod db;
 /// Crate-wide error type and [`Result`] alias.
@@ -69,6 +74,8 @@ pub mod models;
 pub mod observability;
 /// Privacy controls: masking, GDPR export, consent checks.
 pub mod privacy;
+/// Durable event bus Phase 3: the outbox relay loop + retention purge.
+pub mod relay;
 /// Tantivy full-text search index and query layer.
 pub mod search;
 /// Event-stream publishing and consumption.

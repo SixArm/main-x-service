@@ -218,8 +218,15 @@ credential it checks changes.
 - ~~**Session store sharing**~~ — RESOLVED: no peer reads `sessions`.
   All nine services verify the PASETO offline (env or boot-fetched key
   set); none takes a database dependency on the auth service.
-- **CSRF token transport** — double-submit cookie vs synchroniser token in
-  the BFF page payload. (Lean: synchroniser token via the BFF.)
+- ~~**CSRF token transport**~~ — RESOLVED: a **synchroniser token**
+  stored server-side in the session, delivered in a readable
+  `__Host-mxi_csrf` cookie, and echoed in the `X-CSRF-Token` header
+  (constant-time compared) on `POST /api/auth/token`. Landed 2026-07-05
+  (`authentication-service` `src/csrf.rs`).
+- ~~**Sessions-table reshape**~~ — DONE (idle/absolute TTLs +
+  `last_seen_at` + active-session partial index; idle-slide on `/me`;
+  `is_active` enforces both). The `jid` column stays the opaque `sid`
+  (a `sid`-pk rename was judged lower-value and deferred).
 - **Immediate cross-service revocation** — rely on the ~5-min PASETO
   expiry, or add an optional `sid` deny-list peers poll? (Lean: expiry
   only; add deny-list if a hard-revoke SLA appears.)

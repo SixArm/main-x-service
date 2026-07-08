@@ -105,7 +105,7 @@ pub mod abac;
 // Re-export the ABAC engine types at the crate root so callers can use
 // `authentication_verifier::{Policy, Action, ...}` alongside `Verifier`
 // and `Claims` without spelling the module path.
-pub use abac::{Action, ActionPattern, Decision, Effect, Policy, Rule};
+pub use abac::{Action, ActionPattern, Decision, Effect, Policy, ReloadablePolicy, Rule};
 
 /// Verified token claims. Mirrors the auth-service `Claims` exactly so a
 /// token signed there round-trips here. `sub` carries the user `pid`.
@@ -474,6 +474,62 @@ impl Verifier {
     }
 }
 
+/// A **hot-reloadable** [`Verifier`] holder for **key rotation**: the
+/// active verifier (its published Ed25519 key set) can be swapped at
+/// runtime — e.g. by a periodic re-fetch of `/.well-known/paseto-keys` —
+/// **without a restart**, while the per-request verify path stays
+/// lock-light.
+///
+/// It wraps an `Arc<Verifier>` behind an `RwLock` (the same shape as
+/// [`ReloadablePolicy`](crate::ReloadablePolicy)). Per request a guard
+/// calls [`current`](Self::current) — a brief read-lock returning a cheap
+/// `Arc` clone it verifies against; a refresh calls
+/// [`store`](Self::store) — a brief write-lock swapping the `Arc`. A
+/// verification in flight during a refresh finishes against its snapshot.
+/// Poison-safe: a panic elsewhere never makes `current`/`store` panic.
+///
+/// The **refresh trigger** (a periodic timer, a signal) is the service's
+/// concern — this type only holds and swaps the value. A refresh should
+/// keep the current verifier on a fetch failure (never swap to an empty
+/// key set), so a transient auth-service outage cannot lock everyone out.
+///
+/// (No `Debug` — [`Verifier`] deliberately does not derive it, so its key
+/// material never lands in a debug log.)
+pub struct ReloadableVerifier {
+    inner: std::sync::RwLock<std::sync::Arc<Verifier>>,
+}
+
+impl ReloadableVerifier {
+    /// Wrap an initial verifier (e.g. the one built/fetched at boot).
+    #[must_use]
+    pub fn new(verifier: Verifier) -> Self {
+        Self {
+            inner: std::sync::RwLock::new(std::sync::Arc::new(verifier)),
+        }
+    }
+
+    /// The currently active verifier — a cheap `Arc` clone taken under a
+    /// brief read-lock. Verify against the returned snapshot; a
+    /// concurrent [`store`](Self::store) does not affect it.
+    #[must_use]
+    pub fn current(&self) -> std::sync::Arc<Verifier> {
+        self.inner
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Atomically replace the active verifier (a brief write-lock) — e.g.
+    /// after re-fetching a rotated key set. New requests verify against
+    /// the new key set; in-flight ones finish against their snapshot.
+    pub fn store(&self, verifier: Verifier) {
+        *self
+            .inner
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = std::sync::Arc::new(verifier);
+    }
+}
+
 /// Offline unit tests.
 ///
 /// The whole suite runs without network access: a fixed Ed25519 keypair
@@ -754,5 +810,39 @@ mod tests {
     async fn from_paseto_keys_url_maps_transport_error_to_fetch() {
         let result = Verifier::from_paseto_keys_url("not-a-url://nowhere", ISSUER, AUDIENCE).await;
         assert!(matches!(result, Err(VerifyError::Fetch(_))));
+    }
+
+    #[test]
+    fn reloadable_verifier_swaps_the_key_set_for_rotation() {
+        // Start with an empty key set (rejects every token), then
+        // hot-swap to the real published key set — simulating a key
+        // rotation picked up by a periodic re-fetch.
+        let empty = serde_json::json!({ "keys": [] });
+        let holder = ReloadableVerifier::new(
+            Verifier::from_paseto_keys_value(&empty, ISSUER, AUDIENCE).unwrap(),
+        );
+        let token = sign(KID, &claims(3600));
+        assert!(
+            holder.current().verify(&token).is_err(),
+            "before rotation: the empty key set rejects the token"
+        );
+
+        holder.store(Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap());
+        assert!(
+            holder.current().verify(&token).is_ok(),
+            "after rotation: the token verifies against the new key set"
+        );
+
+        // A snapshot taken before a swap keeps the key set it captured.
+        let snapshot = holder.current();
+        holder.store(Verifier::from_paseto_keys_value(&empty, ISSUER, AUDIENCE).unwrap());
+        assert!(
+            snapshot.verify(&token).is_ok(),
+            "an in-flight verification keeps the key set it snapshotted"
+        );
+        assert!(
+            holder.current().verify(&token).is_err(),
+            "new requests see the latest key set"
+        );
     }
 }

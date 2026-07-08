@@ -46,7 +46,7 @@ link aggregator's job.
 | [person-service](../../person/person-service-with-loco/) | portfolio → person `pid` | `lead_ref`, task / issue `assignee_ref` people references |
 | [worker-service](../../worker/worker-service-with-loco/) | portfolio → worker `pid` | `lead_ref`, assignee references on tasks / issues |
 | [organization-service](../../organization/organization-service-with-loco/) | portfolio → org `pid` | `owner_org_id` sponsor, `OwnerOrg` match component |
-| cross-service links | portfolio ↔ any | `/api/v1/{collection}/{pid}/links` link aggregator — typed inbound / outbound links to other work items and entities |
+| cross-service links | portfolio ↔ any | `/api/{collection}/{pid}/links` link aggregator — typed inbound / outbound links to other work items and entities |
 
 ## How to run each
 

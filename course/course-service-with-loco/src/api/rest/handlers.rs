@@ -755,7 +755,10 @@ pub async fn merge_courses(
 
     let (merged, transferred) = fold_duplicate_into_main(&main, &duplicate);
 
-    let updated = match state.course_repository.update(&merged).await {
+    // Atomic merge (durable event bus Phase 2): the survivor update and the
+    // duplicate soft-delete — plus, under the outbox transport, the `Merged`
+    // (+`merged_from`) and `Deleted` outbox rows — commit in one transaction.
+    let updated = match state.course_repository.merge(&merged, &duplicate.id).await {
         Ok(c) => c,
         Err(crate::Error::NotFound) => return not_found_response("main course not found"),
         Err(e) => return error_response(&e),
@@ -767,9 +770,6 @@ pub async fn merge_courses(
         tracing::warn!("re-indexing main course during merge failed: {e}");
     }
 
-    if let Err(e) = state.course_repository.soft_delete(&duplicate.id).await {
-        tracing::warn!("soft-deleting duplicate during merge failed: {e}");
-    }
     if let Err(e) = state.search_engine.delete_course(&duplicate.id.to_string()) {
         tracing::warn!("removing duplicate course segment during merge failed: {e}");
     }

@@ -20,8 +20,13 @@ use crate::models::Event;
 
 /// Consumer implementations (stub).
 pub mod consumer;
+/// Canonical durable-bus envelope + transport selector (event-bus.md
+/// §4/§7). Sits alongside the legacy [`EventEvent`] ring buffer.
+pub mod envelope;
 /// Producer implementations (in-memory publisher).
 pub mod producer;
+
+pub use envelope::{ENTITY, Envelope, EventKind, EventTransport, EventView, SCHEMA_VERSION, transport};
 
 /// A streamed domain event describing one change to an event record.
 #[derive(Debug, Clone, Serialize, Deserialize)]

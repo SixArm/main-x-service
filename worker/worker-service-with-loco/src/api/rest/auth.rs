@@ -35,8 +35,8 @@
 //! **attribute-based access control** policy per
 //! `agents/share/authorization-attributes.md`: the request's action is
 //! derived from the HTTP method plus this crate's destructive named
-//! POSTs ([`DESTRUCTIVE_POST_SUFFIXES`] — `/api/v1/workers/merge`,
-//! `/api/v1/workers/deduplicate` today), and the shared engine in the
+//! POSTs ([`DESTRUCTIVE_POST_SUFFIXES`] — `/api/workers/merge`,
+//! `/api/workers/deduplicate` today), and the shared engine in the
 //! `authentication-verifier` crate evaluates the policy over the
 //! token's `attrs` claim. The policy is read once at router
 //! construction ([`policy_from_env`]) from `WORKER_ABAC_POLICY` (inline
@@ -46,7 +46,8 @@
 //! the service always boots. **401** = missing/bad credential; **403**
 //! = valid credential, policy denied (body carries the deciding rule).
 
-use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::sync::{Arc, OnceLock};
 
 use authentication_verifier::{Action, Claims, Policy, Verifier};
 use axum::extract::{FromRef, FromRequestParts, Request};
@@ -57,6 +58,7 @@ use axum::response::IntoResponse;
 use axum::{Json, Router};
 
 use super::state::AppState;
+use crate::models::worker::Worker;
 
 /// The resource entity this crate guards, as seen by ABAC policies
 /// (the `entity` pseudo-attribute in rule `when` clauses).
@@ -71,15 +73,15 @@ pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 3] = ["/merge", "/deduplicate", "/im
 
 /// Exact-match paths that stay public even when blanket enforcement is
 /// on: loco's default health probes (`/_health`, `/_ping`), this crate's
-/// own health endpoint (`/api/v1/health` — orchestration probes carry no
+/// own health endpoint (`/api/health` — orchestration probes carry no
 /// token), the served `OpenAPI` document, and the Prometheus scrape
 /// endpoint (`/metrics.prom` — scrapers carry no token). Everything else
-/// — the whole `/api/v1` surface and the `/fhir` surface (worker PII) —
+/// — the whole `/api` surface and the `/fhir` surface (worker PII) —
 /// requires a valid bearer token when enforcement is on.
 pub const PUBLIC_PATHS: [&str; 5] = [
     "/_health",
     "/_ping",
-    "/api/v1/health",
+    "/api/health",
     "/api-docs/openapi.json",
     "/metrics.prom",
 ];
@@ -284,13 +286,128 @@ where
     }
 }
 
-/// `GET /api/v1/whoami` — echo the verified claims of the bearer token.
+/// The caller's verified claims **when present** — `Some(claims)` for a
+/// valid bearer, `None` otherwise. Never rejects, so a handler can run a
+/// **record-level** authorization pass ([`authorize_record`]) only when
+/// enforcement is on (behind the blanket guard a token is guaranteed).
+pub struct MaybeAuthUser(pub Option<Claims>);
+
+impl MaybeAuthUser {
+    /// The verified claims if a valid token was presented.
+    #[must_use]
+    pub fn claims(&self) -> Option<&Claims> {
+        self.0.as_ref()
+    }
+}
+
+impl<S> FromRequestParts<S> for MaybeAuthUser
+where
+    S: Send + Sync,
+    AppState: FromRef<S>,
+{
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let app = AppState::from_ref(state);
+        Ok(MaybeAuthUser(
+            bearer_claims(&parts.headers, &app.verifier).ok(),
+        ))
+    }
+}
+
+/// Whether blanket enforcement is on, cached from `WORKER_REQUIRE_AUTH`
+/// on first use (mirrors what [`EnforcementState`] snapshots at router
+/// construction). Used by [`authorize_record`].
+#[must_use]
+pub fn require_auth() -> bool {
+    static FLAG: OnceLock<bool> = OnceLock::new();
+    *FLAG.get_or_init(require_auth_from_env)
+}
+
+/// The ABAC policy for handler-level record checks, cached from the
+/// environment on first use ([`policy_from_env`]). Read once; restart to
+/// change.
+#[must_use]
+pub fn policy() -> &'static Policy {
+    static POLICY: OnceLock<Policy> = OnceLock::new();
+    POLICY.get_or_init(policy_from_env)
+}
+
+/// Derive the **record-level resource attributes** of a stored worker
+/// for the ABAC decision (`authorization-attributes.md` §9):
+/// `resource.active` / `resource.deceased` (`true`/`false`) and
+/// `resource.managing_org` (the org `pid`, when set). A deployment can
+/// then write e.g. "deny write on an inactive worker's record unless
+/// `access=admin`". No schema change — existing fields.
+#[must_use]
+pub fn worker_resource_attrs(worker: &Worker) -> BTreeMap<String, Vec<String>> {
+    let mut attrs = BTreeMap::new();
+    attrs.insert("active".to_string(), vec![worker.active.to_string()]);
+    attrs.insert("deceased".to_string(), vec![worker.deceased.to_string()]);
+    if let Some(org) = worker.managing_organization {
+        attrs.insert("managing_org".to_string(), vec![org.to_string()]);
+    }
+    attrs
+}
+
+/// Environment attributes for the current request, for the `env.*`
+/// policy namespace (`authorization-attributes.md` §10): `env.hour`
+/// (UTC 0–23) and `env.after_hours` (true outside 08:00–17:59 UTC),
+/// derived at the service edge so the engine stays deterministic.
+#[must_use]
+pub fn request_env_attrs() -> BTreeMap<String, Vec<String>> {
+    use chrono::Timelike;
+    env_attrs_at(chrono::Utc::now().hour())
+}
+
+/// Pure derivation of [`request_env_attrs`] for a given UTC `hour`.
+#[must_use]
+fn env_attrs_at(hour: u32) -> BTreeMap<String, Vec<String>> {
+    let after_hours = !(8..18).contains(&hour);
+    let mut env = BTreeMap::new();
+    env.insert("hour".to_string(), vec![hour.to_string()]);
+    env.insert("after_hours".to_string(), vec![after_hours.to_string()]);
+    env
+}
+
+/// **Record-level** authorization for a handler that has loaded the
+/// target worker: evaluate the policy with the record's resource
+/// attributes ([`worker_resource_attrs`]) and the request's environment
+/// attributes ([`request_env_attrs`]). Gated on `WORKER_REQUIRE_AUTH`
+/// (a no-op when off). On an **allow**, returns the decision's
+/// obligations (e.g. `["mask"]`) for the handler to honour.
+///
+/// # Errors
+///
+/// `401` if enforcement is on but no verified claims are present. `403`
+/// if the policy denies the action (the message names the deciding rule).
+pub fn authorize_record(
+    caller: &MaybeAuthUser,
+    action: Action,
+    resource: &BTreeMap<String, Vec<String>>,
+) -> Result<Vec<String>, (StatusCode, String)> {
+    if !require_auth() {
+        return Ok(Vec::new());
+    }
+    let claims = caller
+        .claims()
+        .ok_or((StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
+    let decision =
+        policy().evaluate_with_context(claims, action, ENTITY, resource, &request_env_attrs());
+    if decision.allowed {
+        Ok(decision.obligations)
+    } else {
+        Err((StatusCode::FORBIDDEN, decision.reason))
+    }
+}
+
+/// `GET /api/whoami` — echo the verified claims of the bearer token.
 /// Returns `401` when the token is missing, malformed, or fails
 /// verification. Useful for confirming peer PASETO verification end to
 /// end.
 #[utoipa::path(
     get,
-    path = "/api/v1/whoami",
+    path = "/api/whoami",
     tag = "auth",
     responses(
         (status = 200, description = "Verified token claims"),
@@ -492,7 +609,7 @@ mod tests {
                 enforce(
                     false,
                     &method,
-                    "/api/v1/workers",
+                    "/api/workers",
                     &HeaderMap::new(),
                     &verifier,
                     &policy
@@ -544,7 +661,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::GET,
-            "/api/v1/workers",
+            "/api/workers",
             &HeaderMap::new(),
             &verifier(),
             &policy(),
@@ -561,7 +678,7 @@ mod tests {
             enforce(
                 true,
                 &Method::GET,
-                "/api/v1/workers",
+                "/api/workers",
                 &bearer(&token),
                 &verifier(),
                 &policy()
@@ -577,7 +694,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::GET,
-            "/api/v1/workers",
+            "/api/workers",
             &bearer(&token),
             &verifier(),
             &policy(),
@@ -595,7 +712,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::GET,
-            "/api/v1/workers",
+            "/api/workers",
             &bearer(&token),
             &verifier(),
             &policy(),
@@ -611,7 +728,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::GET,
-            "/fhir/Worker",
+            "/fhir/Practitioner",
             &HeaderMap::new(),
             &verifier(),
             &policy(),
@@ -627,39 +744,39 @@ mod tests {
     #[test]
     fn test_derive_action_matrix() {
         for method in [Method::GET, Method::HEAD, Method::OPTIONS] {
-            assert_eq!(derive_action(&method, "/api/v1/workers"), Action::Read);
+            assert_eq!(derive_action(&method, "/api/workers"), Action::Read);
         }
         assert_eq!(
-            derive_action(&Method::DELETE, "/api/v1/workers/1"),
+            derive_action(&Method::DELETE, "/api/workers/1"),
             Action::Delete
         );
         for path in [
-            "/api/v1/workers/merge",
-            "/api/v1/workers/deduplicate",
-            "/api/v1/workers/import",
+            "/api/workers/merge",
+            "/api/workers/deduplicate",
+            "/api/workers/import",
         ] {
             assert_eq!(derive_action(&Method::POST, path), Action::Destructive);
         }
         assert_eq!(
-            derive_action(&Method::POST, "/api/v1/workers"),
+            derive_action(&Method::POST, "/api/workers"),
             Action::Write
         );
         assert_eq!(
-            derive_action(&Method::POST, "/api/v1/workers/check-duplicates"),
+            derive_action(&Method::POST, "/api/workers/check-duplicates"),
             Action::Write
         );
         assert_eq!(
-            derive_action(&Method::PUT, "/api/v1/workers/1"),
+            derive_action(&Method::PUT, "/api/workers/1"),
             Action::Write
         );
         assert_eq!(
-            derive_action(&Method::PATCH, "/api/v1/workers/1"),
+            derive_action(&Method::PATCH, "/api/workers/1"),
             Action::Write
         );
         // GET on a destructive-suffixed path is still a read — only
         // POST consults the suffix list.
         assert_eq!(
-            derive_action(&Method::GET, "/api/v1/workers/merge"),
+            derive_action(&Method::GET, "/api/workers/merge"),
             Action::Read
         );
     }
@@ -674,7 +791,7 @@ mod tests {
             enforce(
                 true,
                 &Method::GET,
-                "/api/v1/workers",
+                "/api/workers",
                 &bearer(&token),
                 &verifier,
                 &policy
@@ -684,7 +801,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::POST,
-            "/api/v1/workers",
+            "/api/workers",
             &bearer(&token),
             &verifier,
             &policy,
@@ -704,7 +821,7 @@ mod tests {
                 enforce(
                     true,
                     &method,
-                    "/api/v1/workers",
+                    "/api/workers",
                     &bearer(&token),
                     &verifier,
                     &policy
@@ -716,7 +833,7 @@ mod tests {
         let delete = enforce(
             true,
             &Method::DELETE,
-            "/api/v1/workers/1",
+            "/api/workers/1",
             &bearer(&token),
             &verifier,
             &policy,
@@ -726,7 +843,7 @@ mod tests {
         let merge = enforce(
             true,
             &Method::POST,
-            "/api/v1/workers/merge",
+            "/api/workers/merge",
             &bearer(&token),
             &verifier,
             &policy,
@@ -745,14 +862,14 @@ mod tests {
             enforce(
                 true,
                 &Method::DELETE,
-                "/api/v1/workers/1",
+                "/api/workers/1",
                 &bearer(&token),
                 &verifier,
                 &policy
             )
             .is_ok()
         );
-        for path in ["/api/v1/workers/merge", "/api/v1/workers/deduplicate"] {
+        for path in ["/api/workers/merge", "/api/workers/deduplicate"] {
             assert!(
                 enforce(
                     true,
@@ -774,12 +891,12 @@ mod tests {
         let (verifier, policy) = (verifier(), policy());
         let token = sign_with_attrs(10_000_000_000, &[("svc", &["true"])]);
         for (method, path) in [
-            (Method::GET, "/api/v1/workers"),
-            (Method::POST, "/api/v1/workers"),
-            (Method::PUT, "/api/v1/workers/1"),
-            (Method::DELETE, "/api/v1/workers/1"),
-            (Method::POST, "/api/v1/workers/merge"),
-            (Method::POST, "/api/v1/workers/deduplicate"),
+            (Method::GET, "/api/workers"),
+            (Method::POST, "/api/workers"),
+            (Method::PUT, "/api/workers/1"),
+            (Method::DELETE, "/api/workers/1"),
+            (Method::POST, "/api/workers/merge"),
+            (Method::POST, "/api/workers/deduplicate"),
         ] {
             assert!(
                 enforce(true, &method, path, &bearer(&token), &verifier, &policy).is_ok(),
@@ -807,7 +924,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::POST,
-            "/api/v1/workers",
+            "/api/workers",
             &bearer(&denied),
             &verifier,
             &policy,
@@ -819,7 +936,7 @@ mod tests {
             enforce(
                 true,
                 &Method::POST,
-                "/api/v1/workers",
+                "/api/workers",
                 &bearer(&allowed),
                 &verifier,
                 &policy
@@ -836,7 +953,7 @@ mod tests {
         let no_token = enforce(
             true,
             &Method::POST,
-            "/api/v1/workers",
+            "/api/workers",
             &HeaderMap::new(),
             &verifier,
             &policy,
@@ -847,7 +964,7 @@ mod tests {
         let denied = enforce(
             true,
             &Method::POST,
-            "/api/v1/workers",
+            "/api/workers",
             &bearer(&token),
             &verifier,
             &policy,
@@ -937,5 +1054,46 @@ mod tests {
             bearer_claims(&bearer(&token), &v).unwrap_err().0,
             StatusCode::UNAUTHORIZED
         );
+    }
+
+    /// The record-level resource-attribute derivation maps a worker's
+    /// coarse status to the `resource.*` tokens a policy matches (§9).
+    #[test]
+    fn worker_resource_attrs_maps_status_fields() {
+        use crate::models::Gender;
+        use crate::models::worker::HumanName;
+        let mut worker = Worker::new(
+            HumanName {
+                use_type: None,
+                family: "Smith".to_string(),
+                given: vec!["John".to_string()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Male,
+        );
+        worker.active = false;
+        worker.deceased = false;
+        let org = uuid::Uuid::new_v4();
+        worker.managing_organization = Some(org);
+
+        let attrs = worker_resource_attrs(&worker);
+        assert_eq!(attrs["active"], vec!["false".to_string()]);
+        assert_eq!(attrs["deceased"], vec!["false".to_string()]);
+        assert_eq!(attrs["managing_org"], vec![org.to_string()]);
+
+        worker.managing_organization = None;
+        assert!(!worker_resource_attrs(&worker).contains_key("managing_org"));
+    }
+
+    /// The environment-attribute derivation flags working vs after hours.
+    #[test]
+    fn env_attrs_at_flags_after_hours() {
+        for hour in 8..18 {
+            assert_eq!(env_attrs_at(hour)["after_hours"], vec!["false".to_string()]);
+        }
+        for hour in [0, 7, 18, 23] {
+            assert_eq!(env_attrs_at(hour)["after_hours"], vec!["true".to_string()]);
+        }
     }
 }

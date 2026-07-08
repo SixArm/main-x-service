@@ -1,6 +1,6 @@
 //! HTTP implementation of the Main Patient Service [`Client`].
 //!
-//! Talks to the service's REST surface at `{base_url}/api/v1/persons/...`.
+//! Talks to the service's REST surface at `{base_url}/api/persons/...`.
 //! The service's `Person` JSON is FHIR-shaped; we project the fields we
 //! care about into our flatter [`Patient`].
 
@@ -128,7 +128,7 @@ impl HttpClient {
 
 #[async_trait]
 impl Client for HttpClient {
-    /// `GET /api/v1/persons/search?q=<digits>&limit=5&fuzzy=false` — looks
+    /// `GET /api/persons/search?q=<digits>&limit=5&fuzzy=false` — looks
     /// up a patient by NHS Number. Normalises the input to digits, then
     /// re-checks each candidate's NHS Number identifier exactly (the search
     /// is a coarse text match, so we confirm an exact hit before returning).
@@ -143,7 +143,7 @@ impl Client for HttpClient {
         }
         let response = self
             .http
-            .get(self.url("/api/v1/persons/search"))
+            .get(self.url("/api/persons/search"))
             .query(&[
                 ("q", normalised.as_str()),
                 ("limit", "5"),
@@ -175,7 +175,7 @@ impl Client for HttpClient {
         Ok(matched.map(PersonDto::into_patient))
     }
 
-    /// `GET /api/v1/persons/{id}` — look up a patient by UUID. A `404`
+    /// `GET /api/persons/{id}` — look up a patient by UUID. A `404`
     /// maps to `Ok(None)`.
     ///
     /// # Errors
@@ -184,7 +184,7 @@ impl Client for HttpClient {
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Patient>, Error> {
         let response = self
             .http
-            .get(self.url(&format!("/api/v1/persons/{id}")))
+            .get(self.url(&format!("/api/persons/{id}")))
             .send()
             .await
             .map_err(|e| Error::Transport(e.to_string()))?;
@@ -204,7 +204,7 @@ impl Client for HttpClient {
         Ok(body.data.map(PersonDto::into_patient))
     }
 
-    /// `POST /api/v1/persons` — registers a new patient. Sends the NHS
+    /// `POST /api/persons` — registers a new patient. Sends the NHS
     /// Number as an identifier under [`NHS_NUMBER_SYSTEM`] and the name
     /// split into given/family parts; returns the projected [`Patient`].
     ///
@@ -239,7 +239,7 @@ impl Client for HttpClient {
         });
         let response = self
             .http
-            .post(self.url("/api/v1/persons"))
+            .post(self.url("/api/persons"))
             .json(&payload)
             .send()
             .await

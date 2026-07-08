@@ -10,8 +10,8 @@
 
 use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -24,6 +24,8 @@ use super::models::{
     workers,
 };
 use crate::Result;
+use crate::db::outbox::OutboxInsert;
+use crate::streaming::{EventKind, EventTransport};
 use crate::models::{
     Address, ContactPoint, ContactPointSystem, DocumentType, EmergencyContact, HumanName,
     Identifier, IdentityDocument, Worker, WorkerLink, WorkerType,
@@ -144,6 +146,96 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
     Ok(())
 }
 
+/// Apply a worker's parent-row update and wholesale child-row replacement on
+/// `conn`: update the `workers` row (stamping `updated_at`), delete every
+/// child row for the worker, then re-insert them from the domain model.
+///
+/// Runs on the caller's connection/transaction so it shares that commit
+/// boundary. Used by [`WorkerRepository::merge`] to apply the survivor's
+/// rows atomically alongside the duplicate's soft-delete and the outbox rows.
+///
+/// # Errors
+///
+/// Returns an error if any update/delete/insert query fails.
+async fn apply_worker_row_replacement<C: ConnectionTrait>(
+    conn: &C,
+    worker: &Worker,
+) -> Result<()> {
+    let update_model = workers::ActiveModel {
+        id: Set(worker.id),
+        active: Set(worker.active),
+        worker_type: Set(worker
+            .worker_type
+            .as_ref()
+            .map(std::string::ToString::to_string)),
+        gender: Set(format!("{:?}", worker.gender)),
+        birth_date: Set(worker.birth_date.map(date_to_time)),
+        tax_id: Set(worker.tax_id.clone()),
+        deceased: Set(worker.deceased),
+        deceased_datetime: Set(worker.deceased_datetime.map(ts_to_offset)),
+        marital_status: Set(worker.marital_status.clone()),
+        multiple_birth: Set(worker.multiple_birth),
+        managing_organization_id: Set(worker.managing_organization),
+        updated_at: Set(OffsetDateTime::now_utc()),
+        updated_by: Set(None),
+        ..Default::default()
+    };
+    update_model.update(conn).await?;
+
+    worker_names::Entity::delete_many()
+        .filter(worker_names::Column::WorkerId.eq(worker.id))
+        .exec(conn)
+        .await?;
+    worker_identifiers::Entity::delete_many()
+        .filter(worker_identifiers::Column::WorkerId.eq(worker.id))
+        .exec(conn)
+        .await?;
+    worker_addresses::Entity::delete_many()
+        .filter(worker_addresses::Column::WorkerId.eq(worker.id))
+        .exec(conn)
+        .await?;
+    worker_contacts::Entity::delete_many()
+        .filter(worker_contacts::Column::WorkerId.eq(worker.id))
+        .exec(conn)
+        .await?;
+    worker_links::Entity::delete_many()
+        .filter(worker_links::Column::WorkerId.eq(worker.id))
+        .exec(conn)
+        .await?;
+    worker_emergency_contacts::Entity::delete_many()
+        .filter(worker_emergency_contacts::Column::WorkerId.eq(worker.id))
+        .exec(conn)
+        .await?;
+    worker_documents::Entity::delete_many()
+        .filter(worker_documents::Column::WorkerId.eq(worker.id))
+        .exec(conn)
+        .await?;
+    worker_photos::Entity::delete_many()
+        .filter(worker_photos::Column::WorkerId.eq(worker.id))
+        .exec(conn)
+        .await?;
+
+    let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
+        SeaOrmWorkerRepository::to_active_models(worker);
+    for name in new_names {
+        name.insert(conn).await?;
+    }
+    for identifier in new_identifiers {
+        identifier.insert(conn).await?;
+    }
+    for address in new_addresses {
+        address.insert(conn).await?;
+    }
+    for contact in new_contacts {
+        contact.insert(conn).await?;
+    }
+    for link in new_links {
+        link.insert(conn).await?;
+    }
+    insert_extra_collections(conn, worker).await?;
+    Ok(())
+}
+
 /// Actor metadata attached to audit-log entries for a mutation.
 #[derive(Debug, Clone)]
 pub struct AuditContext {
@@ -196,6 +288,21 @@ pub trait WorkerRepository: Send + Sync {
     /// not found after the update.
     async fn update(&self, worker: &Worker) -> Result<Worker>;
 
+    /// Merges the `duplicate_id` record into `survivor`: applies the
+    /// survivor's parent + child row updates and soft-deletes the
+    /// duplicate **in one transaction**, so the whole merge commits (or
+    /// rolls back) atomically. Under the outbox transport this enqueues a
+    /// `Merged` outbox row for the survivor (carrying the duplicate's pid
+    /// via `merged_from`) and a `Deleted` outbox row for the duplicate on
+    /// the same transaction. Returns the reloaded survivor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction or any query fails, or
+    /// [`crate::Error::Validation`] if the survivor cannot be re-read after
+    /// the merge.
+    async fn merge(&self, survivor: &Worker, duplicate_id: &Uuid) -> Result<Worker>;
+
     /// Soft-deletes a worker by stamping its `deleted_at` column.
     ///
     /// # Errors
@@ -230,17 +337,63 @@ pub struct SeaOrmWorkerRepository {
     event_publisher: Option<std::sync::Arc<dyn crate::streaming::EventProducer>>,
     /// Optional audit repository; mutations log entries when set.
     audit_log: Option<std::sync::Arc<super::audit::AuditLogRepository>>,
+    /// Which event transport is active (durable event bus, Phase 2).
+    /// [`EventTransport::Memory`] (default) keeps the legacy post-commit
+    /// ring-buffer publish; [`EventTransport::Outbox`] additionally writes
+    /// one `event_outbox` row **inside** each write's transaction.
+    transport: EventTransport,
 }
 
 impl SeaOrmWorkerRepository {
-    /// Builds a repository over `db` with no event publisher or audit log.
+    /// Builds a repository over `db` with no event publisher or audit log,
+    /// and the default [`EventTransport::Memory`] transport (behaviour
+    /// unchanged from before the outbox landed).
     #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
             db,
             event_publisher: None,
             audit_log: None,
+            transport: EventTransport::Memory,
         }
+    }
+
+    /// Builder: select the event transport (see [`EventTransport`]).
+    /// `AppState` wires this from `WORKER_EVENT_TRANSPORT` via
+    /// [`crate::streaming::transport`].
+    #[must_use]
+    pub fn with_transport(mut self, transport: EventTransport) -> Self {
+        self.transport = transport;
+        self
+    }
+
+    /// When the outbox transport is active, enqueue one `event_outbox`
+    /// row for `kind` applied to `worker` **on `conn`** — pass the open
+    /// `&DatabaseTransaction` so the row commits with the entity write
+    /// (the outbox atomicity guarantee). A no-op under
+    /// [`EventTransport::Memory`].
+    ///
+    /// The `ConnectionTrait` generic lives here on a concrete method (not
+    /// on the object-safe [`WorkerRepository`] trait), which is how a
+    /// `dyn`-trait repository threads the outbox insert into its own
+    /// transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the outbox `INSERT` fails (e.g. a duplicate
+    /// `event_id`) or the envelope cannot be built.
+    async fn enqueue_outbox<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        worker: &Worker,
+        kind: EventKind,
+    ) -> Result<()> {
+        if self.transport.is_outbox() {
+            OutboxInsert::for_event(worker, kind)?
+                .insert_on(conn)
+                .await?;
+        }
+        Ok(())
     }
 
     /// Builder method attaching an event publisher; returns `self` for chaining.
@@ -891,6 +1044,13 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // Insert documents / emergency contacts / photos (normalized).
         insert_extra_collections(&txn, worker).await?;
 
+        // Durable event bus (Phase 2): under the outbox transport, write the
+        // `event_outbox` row **inside this same transaction**, before the
+        // commit, so the entity rows and the event commit atomically (or roll
+        // back together). A no-op under the memory transport, which keeps the
+        // post-commit ring-buffer publish below.
+        self.enqueue_outbox(&txn, worker, EventKind::Created).await?;
+
         // Commit closes the transaction boundary: everything above is now
         // durable. The reload + event + audit steps below run post-commit and
         // are best-effort (a streaming/audit failure must not undo the write).
@@ -1048,6 +1208,9 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         }
         insert_extra_collections(&txn, worker).await?;
 
+        // Outbox row shares the update transaction (see `create`).
+        self.enqueue_outbox(&txn, worker, EventKind::Updated).await?;
+
         txn.commit().await?;
 
         // Fetch and return updated worker
@@ -1081,6 +1244,97 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         Ok(result)
     }
 
+    async fn merge(&self, survivor: &Worker, duplicate_id: &Uuid) -> Result<Worker> {
+        // Snapshots for the audit trail: the survivor's pre-image for the
+        // UPDATE row, the duplicate's pre-image for the DELETE row (and to
+        // build the duplicate's `Deleted` outbox envelope).
+        let old_survivor = self.get_by_id(&survivor.id).await?;
+        let old_duplicate = self.get_by_id(duplicate_id).await?;
+
+        // The whole merge — survivor row updates + duplicate soft-delete +
+        // both outbox rows — commits (or rolls back) under one transaction.
+        let txn = self.db.begin().await?;
+
+        // Apply the survivor's parent + child rows (parent update + wholesale
+        // child-row replacement), shared with the `update` sequence.
+        apply_worker_row_replacement(&txn, survivor).await?;
+
+        // Soft-delete the duplicate on the same transaction.
+        let dup_delete = workers::ActiveModel {
+            id: Set(*duplicate_id),
+            deleted_at: Set(Some(OffsetDateTime::now_utc())),
+            deleted_by: Set(Some("system".to_string())),
+            ..Default::default()
+        };
+        dup_delete.update(&txn).await?;
+
+        // Durable event bus (Phase 2): a `Merged` outbox row for the survivor
+        // (carrying the duplicate's pid via `merged_from`, so a merge-repointing
+        // consumer can move edges off the duplicate) and a `Deleted` outbox row
+        // for the duplicate — both inside this transaction. A no-op under the
+        // memory transport.
+        if self.transport.is_outbox() {
+            OutboxInsert::for_merge(survivor, duplicate_id)?
+                .insert_on(&txn)
+                .await?;
+            if let Some(dup) = old_duplicate.as_ref() {
+                OutboxInsert::for_event(dup, EventKind::Deleted)?
+                    .insert_on(&txn)
+                    .await?;
+            }
+        }
+
+        txn.commit().await?;
+
+        let result = self
+            .get_by_id(&survivor.id)
+            .await?
+            .ok_or_else(|| crate::Error::Validation("Worker not found after merge".to_string()))?;
+
+        // Post-commit in-memory stream (memory transport keeps this): a `Merged`
+        // for the survivor and a `Deleted` for the duplicate.
+        self.publish_event(crate::streaming::WorkerEvent::Merged {
+            source_id: *duplicate_id,
+            target_id: result.id,
+            timestamp: chrono::Utc::now(),
+        });
+        self.publish_event(crate::streaming::WorkerEvent::Deleted {
+            worker_id: *duplicate_id,
+            timestamp: chrono::Utc::now(),
+        });
+
+        // Audit rows: an UPDATE trail for the survivor and a DELETE trail for
+        // the duplicate.
+        if let Some(old_json) = old_survivor
+            .as_ref()
+            .and_then(|p| serde_json::to_value(p).ok())
+            && let Ok(new_json) = serde_json::to_value(&result)
+        {
+            self.log_audit(
+                "UPDATE",
+                result.id,
+                Some(old_json),
+                Some(new_json),
+                &AuditContext::default(),
+            )
+            .await;
+        }
+        if let Some(dup) = old_duplicate
+            && let Ok(dup_json) = serde_json::to_value(&dup)
+        {
+            self.log_audit(
+                "DELETE",
+                *duplicate_id,
+                Some(dup_json),
+                None,
+                &AuditContext::default(),
+            )
+            .await;
+        }
+
+        Ok(result)
+    }
+
     async fn delete(&self, id: &Uuid) -> Result<()> {
         // Capture the pre-delete state for the audit record.
         let old_worker = self.get_by_id(id).await?;
@@ -1092,7 +1346,20 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             deleted_by: Set(Some("system".to_string())),
             ..Default::default()
         };
-        update_model.update(&self.db).await?;
+        // Unlike create/update, the soft-delete is a single row update with no
+        // existing transaction. Under the outbox transport we open one here so
+        // the tombstone write and the `deleted` outbox row commit atomically;
+        // the memory transport keeps the plain, tx-free update.
+        if self.transport.is_outbox() {
+            let txn = self.db.begin().await?;
+            update_model.update(&txn).await?;
+            if let Some(old) = old_worker.as_ref() {
+                self.enqueue_outbox(&txn, old, EventKind::Deleted).await?;
+            }
+            txn.commit().await?;
+        } else {
+            update_model.update(&self.db).await?;
+        }
 
         // Publish event
         self.publish_event(crate::streaming::WorkerEvent::Deleted {
@@ -1166,5 +1433,96 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         }
 
         Ok(workers)
+    }
+}
+
+/// DB-gated (`#[ignore]`) atomicity tests for the outbox write path. They
+/// require a migrated `PostgreSQL` via `DATABASE_URL` and are skipped by a
+/// bare `cargo test`; run with
+/// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE under a
+/// bare `cargo test --lib`.
+#[cfg(test)]
+mod tests {
+    use super::{SeaOrmWorkerRepository, WorkerRepository};
+    use crate::db::models::event_outbox;
+    use crate::models::{Gender, HumanName, Worker};
+    use crate::streaming::EventTransport;
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    async fn connect() -> sea_orm::DatabaseConnection {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        sea_orm::Database::connect(&url)
+            .await
+            .expect("connect to DATABASE_URL")
+    }
+
+    fn a_worker(family: &str) -> Worker {
+        let name = HumanName {
+            use_type: None,
+            family: family.to_string(),
+            given: vec!["Test".into()],
+            prefix: vec![],
+            suffix: vec![],
+        };
+        Worker::new(name, Gender::Unknown)
+    }
+
+    /// Create writes, in one transaction: exactly one `created` outbox row
+    /// for the new worker under the outbox transport.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn create_enqueues_a_created_outbox_row() {
+        let db = connect().await;
+        let repo = SeaOrmWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+
+        let worker = repo.create(&a_worker("Created")).await.unwrap();
+
+        let rows = event_outbox::Entity::find()
+            .filter(event_outbox::Column::EntityPid.eq(worker.id))
+            .filter(event_outbox::Column::Kind.eq("created"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1, "one created outbox row for the new worker");
+        assert_eq!(rows[0].entity, "worker");
+    }
+
+    /// Merge writes, in one transaction: a `merged` outbox row for the
+    /// survivor carrying the duplicate's pid in `merged_from`, plus a
+    /// `deleted` outbox row for the duplicate.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn merge_enqueues_merged_with_merged_from_and_deleted() {
+        let db = connect().await;
+        let repo = SeaOrmWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+
+        let survivor = repo.create(&a_worker("Survivor")).await.unwrap();
+        let duplicate = repo.create(&a_worker("Duplicate")).await.unwrap();
+
+        let merged = repo.merge(&survivor, &duplicate.id).await.unwrap();
+        assert_eq!(merged.id, survivor.id);
+
+        // Survivor: exactly one `merged` row, carrying the duplicate pid.
+        let merged_rows = event_outbox::Entity::find()
+            .filter(event_outbox::Column::EntityPid.eq(survivor.id))
+            .filter(event_outbox::Column::Kind.eq("merged"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(merged_rows.len(), 1, "one merged outbox row for survivor");
+        assert_eq!(
+            merged_rows[0].payload["merged_from"],
+            serde_json::json!(duplicate.id.to_string()),
+            "merged row carries the duplicate's pid"
+        );
+
+        // Duplicate: a `deleted` row.
+        let deleted_rows = event_outbox::Entity::find()
+            .filter(event_outbox::Column::EntityPid.eq(duplicate.id))
+            .filter(event_outbox::Column::Kind.eq("deleted"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(deleted_rows.len(), 1, "one deleted outbox row for duplicate");
     }
 }

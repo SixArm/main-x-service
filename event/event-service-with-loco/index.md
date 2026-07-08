@@ -93,17 +93,17 @@ The Event Service is an identity-registry system that maintains a centralized re
 - ✅ CORS support for web applications
 - ✅ Comprehensive error handling
 - ✅ HTTP status codes following REST conventions
-- ✅ **Endpoints** (all under `/api/v1`):
-  - `GET /api/v1/health` - Health check
-  - `POST /api/v1/events` - Create event
-  - `GET /api/v1/events/{id}` - Get event
-  - `PUT /api/v1/events/{id}` - Update event
-  - `DELETE /api/v1/events/{id}` - Delete event (soft)
-  - `GET /api/v1/events/search` - Search events
-  - `POST /api/v1/events/match` - Match event records
-  - `GET /api/v1/events/{id}/audit` - Get audit logs
-  - `GET /api/v1/audit/recent` - Recent audit activity
-  - `GET /api/v1/audit/user` - User audit logs
+- ✅ **Endpoints** (all under `/api`):
+  - `GET /api/health` - Health check
+  - `POST /api/events` - Create event
+  - `GET /api/events/{id}` - Get event
+  - `PUT /api/events/{id}` - Update event
+  - `DELETE /api/events/{id}` - Delete event (soft)
+  - `GET /api/events/search` - Search events
+  - `POST /api/events/match` - Match event records
+  - `GET /api/events/{id}/audit` - Get audit logs
+  - `GET /api/audit/recent` - Recent audit activity
+  - `GET /api/audit/user` - User audit logs
 
 ### High Availability
 
@@ -143,12 +143,12 @@ podman compose up -d
 podman compose logs -f event-server
 
 # Access the API
-curl http://localhost:8080/api/v1/health
+curl http://localhost:8080/api/health
 ```
 
 **Services Available:**
 
-- **API**: http://localhost:8080/api/v1
+- **API**: http://localhost:8080/api
 - **Swagger UI**: http://localhost:8080/swagger-ui
 - **pgAdmin** (optional): http://localhost:5050
   ```bash
@@ -386,7 +386,7 @@ Access the Swagger UI at **http://localhost:8080/swagger-ui** for interactive AP
 **Create Event:**
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/events \
+curl -X POST http://localhost:8080/api/events \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Annual Conference",
@@ -407,13 +407,13 @@ curl -X POST http://localhost:8080/api/v1/events \
 **Search Events:**
 
 ```bash
-curl "http://localhost:8080/api/v1/events/search?q=Conference&date_from=2026-06-01&date_to=2026-06-30&limit=10"
+curl "http://localhost:8080/api/events/search?q=Conference&date_from=2026-06-01&date_to=2026-06-30&limit=10"
 ```
 
 **Match Event:**
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/events/match \
+curl -X POST http://localhost:8080/api/events/match \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Conferance",
@@ -425,7 +425,7 @@ curl -X POST http://localhost:8080/api/v1/events/match \
 **Get Audit Logs:**
 
 ```bash
-curl "http://localhost:8080/api/v1/events/{id}/audit?limit=50"
+curl "http://localhost:8080/api/events/{id}/audit?limit=50"
 ```
 
 ### Bridge to the canonical `event-matcher` crate
@@ -576,8 +576,9 @@ Helm chart and Kubernetes manifests planned for Phase 13.
 
 - **HIPAA**: Audit logging, access controls, data encryption
 - **GDPR**: Right to access (audit logs), right to deletion
-- **HL7 FHIR**: Stubbed — `/fhir/Event/*` returns `501 Not Implemented`
-  until the schema.org/Event → FHIR R5 mapping is fixed (spec §6.8)
+- **HL7 FHIR**: Live R5 `Appointment` surface at
+  `/fhir/Appointment{,/{id}}` + `/fhir/metadata` — best-effort
+  schema.org/Event → FHIR mapping (`Encounter` roadmap), spec §6.8
 - **FDA 21 CFR Part 11**: Audit trail capabilities
 
 ## Performance
@@ -607,8 +608,10 @@ event-service-with-loco/
 ├── src/
 │   ├── api/
 │   │   ├── rest/          # REST API handlers, routes
-│   │   ├── fhir/          # FHIR R5 endpoints (501 stub, not yet routed)
 │   │   └── grpc/          # gRPC server (stub)
+│   ├── controllers/
+│   │   └── fhir.rs        # FHIR R5 Appointment routes (mounted)
+│   ├── fhir/              # FHIR R5 resources + conversions (Appointment)
 │   ├── db/
 │   │   ├── models.rs      # Database models
 │   │   ├── schema.rs      # SeaORM schema

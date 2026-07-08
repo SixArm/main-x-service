@@ -43,7 +43,8 @@
 //! the service always boots. **401** = missing/bad credential; **403**
 //! = valid credential, policy denied (body carries the deciding rule).
 
-use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::sync::{Arc, OnceLock};
 
 use authentication_verifier::{Action, Claims, Policy, Verifier};
 use axum::Json;
@@ -54,6 +55,7 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 
 use super::state::AppState;
+use crate::models::person::Person;
 
 /// The resource entity this crate guards, as seen by ABAC policies
 /// (the `entity` pseudo-attribute in rule `when` clauses).
@@ -301,6 +303,136 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let app = AppState::from_ref(state);
         bearer_claims(&parts.headers, &app.verifier).map(AuthUser)
+    }
+}
+
+/// The caller's verified claims **when present** — `Some(claims)` for a
+/// valid bearer, `None` otherwise. Never rejects, so a handler can run a
+/// **record-level** authorization pass ([`authorize_record`]) only when
+/// enforcement is on (behind the blanket guard a token is guaranteed).
+pub struct MaybeAuthUser(pub Option<Claims>);
+
+impl MaybeAuthUser {
+    /// The verified claims if a valid token was presented.
+    #[must_use]
+    pub fn claims(&self) -> Option<&Claims> {
+        self.0.as_ref()
+    }
+}
+
+impl<S> FromRequestParts<S> for MaybeAuthUser
+where
+    S: Send + Sync,
+    AppState: FromRef<S>,
+{
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let app = AppState::from_ref(state);
+        Ok(MaybeAuthUser(
+            bearer_claims(&parts.headers, &app.verifier).ok(),
+        ))
+    }
+}
+
+/// Whether blanket enforcement is on, cached from `PERSON_REQUIRE_AUTH`
+/// on first use (mirrors what [`EnforcementState`] snapshots at router
+/// construction). Used by [`authorize_record`] so a handler's
+/// record-level pass is gated the same way as the blanket guard.
+#[must_use]
+pub fn require_auth() -> bool {
+    static FLAG: OnceLock<bool> = OnceLock::new();
+    *FLAG.get_or_init(require_auth_from_env)
+}
+
+/// The ABAC policy for handler-level record checks, cached from the
+/// environment on first use ([`policy_from_env`]) — the same policy the
+/// blanket guard loads. Read once; restart to change.
+#[must_use]
+pub fn policy() -> &'static Policy {
+    static POLICY: OnceLock<Policy> = OnceLock::new();
+    POLICY.get_or_init(policy_from_env)
+}
+
+/// Derive the **record-level resource attributes** of a stored person
+/// for the ABAC decision (`authorization-attributes.md` §9). Maps the
+/// record's coarse status to `resource.<key>` tokens a policy matches:
+///
+/// | Resource key | From | Tokens |
+/// |---|---|---|
+/// | `resource.active` | `Person::active` | `true` / `false` |
+/// | `resource.deceased` | `Person::deceased` | `true` / `false` |
+/// | `resource.managing_org` | `Person::managing_organization` | the org `pid` (present only when set) |
+///
+/// A deployment can then write e.g. "deny write on a deceased person's
+/// record unless `access=admin`", or "deny read unless
+/// `resource.managing_org` is in the caller's orgs". No schema change —
+/// these are existing fields.
+#[must_use]
+pub fn person_resource_attrs(person: &Person) -> BTreeMap<String, Vec<String>> {
+    let mut attrs = BTreeMap::new();
+    attrs.insert("active".to_string(), vec![person.active.to_string()]);
+    attrs.insert("deceased".to_string(), vec![person.deceased.to_string()]);
+    if let Some(org) = person.managing_organization {
+        attrs.insert("managing_org".to_string(), vec![org.to_string()]);
+    }
+    attrs
+}
+
+/// Environment attributes for the current request, for the `env.*`
+/// policy namespace (`authorization-attributes.md` §10): `env.hour`
+/// (UTC 0–23) and `env.after_hours` (true outside 08:00–17:59 UTC).
+/// Derived at the service edge so the engine stays deterministic.
+#[must_use]
+pub fn request_env_attrs() -> BTreeMap<String, Vec<String>> {
+    use chrono::Timelike;
+    env_attrs_at(chrono::Utc::now().hour())
+}
+
+/// Pure derivation of [`request_env_attrs`] for a given UTC `hour`, so it
+/// is unit-testable without a clock.
+#[must_use]
+fn env_attrs_at(hour: u32) -> BTreeMap<String, Vec<String>> {
+    let after_hours = !(8..18).contains(&hour);
+    let mut env = BTreeMap::new();
+    env.insert("hour".to_string(), vec![hour.to_string()]);
+    env.insert("after_hours".to_string(), vec![after_hours.to_string()]);
+    env
+}
+
+/// **Record-level** authorization for a handler that has loaded the
+/// target person: evaluate the policy with the record's resource
+/// attributes ([`person_resource_attrs`]) and the request's environment
+/// attributes ([`request_env_attrs`]). A finer, second pass on top of
+/// the coarse blanket guard.
+///
+/// Gated on `PERSON_REQUIRE_AUTH`: a no-op when enforcement is off;
+/// when on, the blanket guard guarantees a token, so absent claims are a
+/// `401` fail-safe. On an **allow**, returns the decision's
+/// **obligations** (e.g. `["mask"]`) for the handler to honour.
+///
+/// # Errors
+///
+/// `401` if enforcement is on but no verified claims are present. `403`
+/// if the policy denies the action given the record's / request's
+/// attributes (the message names the deciding rule).
+pub fn authorize_record(
+    caller: &MaybeAuthUser,
+    action: Action,
+    resource: &BTreeMap<String, Vec<String>>,
+) -> Result<Vec<String>, (StatusCode, String)> {
+    if !require_auth() {
+        return Ok(Vec::new());
+    }
+    let claims = caller
+        .claims()
+        .ok_or((StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
+    let decision =
+        policy().evaluate_with_context(claims, action, ENTITY, resource, &request_env_attrs());
+    if decision.allowed {
+        Ok(decision.obligations)
+    } else {
+        Err((StatusCode::FORBIDDEN, decision.reason))
     }
 }
 
@@ -937,5 +1069,48 @@ mod tests {
             bearer_claims(&bearer(&token), &v).unwrap_err().0,
             StatusCode::UNAUTHORIZED
         );
+    }
+
+    /// The record-level resource-attribute derivation maps a person's
+    /// coarse status to the `resource.*` tokens a policy matches
+    /// (`authorization-attributes.md` §9).
+    #[test]
+    fn person_resource_attrs_maps_status_fields() {
+        use crate::models::Gender;
+        use crate::models::person::HumanName;
+        let mut person = Person::new(
+            HumanName {
+                use_type: None,
+                family: "Smith".to_string(),
+                given: vec!["John".to_string()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Male,
+        );
+        person.active = true;
+        person.deceased = true;
+        let org = uuid::Uuid::new_v4();
+        person.managing_organization = Some(org);
+
+        let attrs = person_resource_attrs(&person);
+        assert_eq!(attrs["active"], vec!["true".to_string()]);
+        assert_eq!(attrs["deceased"], vec!["true".to_string()]);
+        assert_eq!(attrs["managing_org"], vec![org.to_string()]);
+
+        // No managing org ⇒ the key is omitted.
+        person.managing_organization = None;
+        assert!(!person_resource_attrs(&person).contains_key("managing_org"));
+    }
+
+    /// The environment-attribute derivation flags working vs after hours.
+    #[test]
+    fn env_attrs_at_flags_after_hours() {
+        for hour in 8..18 {
+            assert_eq!(env_attrs_at(hour)["after_hours"], vec!["false".to_string()]);
+        }
+        for hour in [0, 7, 18, 23] {
+            assert_eq!(env_attrs_at(hour)["after_hours"], vec!["true".to_string()]);
+        }
     }
 }

@@ -53,7 +53,7 @@ src/
 ├── lib/
 │   ├── config.ts                 PUBLIC_API_BASE_URL (:5150) + VITE_RETURN_TO_ALLOWLIST
 │   ├── i18n.svelte.ts            bilingual (en/cy) catalog + reactive locale store + t()
-│   ├── server/                   server-only: csrf token issue/validate, session-cookie helpers
+│   ├── server/                   server-only BFF: session + CSRF cookie helpers, /token exchange, admin.ts (ABAC attribute GET/PUT)
 │   ├── api/
 │   │   ├── client.ts             lean fetch wrapper (server-side; attaches cookie/bearer, ApiError)
 │   │   ├── types.ts              LoginResponse / CurrentUser (mirror the service views)
@@ -66,9 +66,10 @@ src/
     ├── +page.server.ts           dashboard load: read cookie → GET /me ; sign-out action
     ├── signup/+page.svelte       request a magic link (new account)
     ├── signin/+page.svelte       request a magic link (existing account)
+    ├── admin/attributes/         operator UI: view/replace a user's ABAC attributes (?pid=…; admin-gated; save action)
     └── verify/
         ├── +page.svelte          status UI
-        └── +page.server.ts       consume ?token= server-side -> set session cookie -> redirect
+        └── +page.server.ts       consume ?token= server-side -> set session + CSRF cookies -> redirect
 ```
 
 ## API consumption
@@ -84,6 +85,11 @@ on mutations).
 | Verify (`/verify?token=…`) | `GET /api/auth/magic-link/{token}` → relay `Set-Cookie: __Host-mxi_session` |
 | Dashboard | `GET /api/auth/me` (session cookie) |
 | Sign out | `POST /api/auth/signout` (session cookie) → revoke + clear cookie |
+| Manage attributes (admin) | `GET`/`PUT /api/auth/admin/users/{pid}/attributes` (bearer from the session exchange; requires `access=admin`) |
+
+The `POST /api/auth/token` exchange is cookie-authed and mutating, so the
+BFF echoes the session's CSRF token (captured from `__Host-mxi_csrf` at
+verify, re-hosted httpOnly on this origin) in the `X-CSRF-Token` header.
 
 `locale` is the optional current UI locale (`en`/`cy`); it makes the
 magic-link email language match the UI and drops out of the body when

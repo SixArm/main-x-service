@@ -5,7 +5,7 @@ Complete endpoint reference:
 Front-end consumption map:
 [front-end spec §9](../event-front-end-with-svelte/spec/09-api-consumption.md).
 
-### 9.1 REST API (service, under `/api/v1`)
+### 9.1 REST API (service, under `/api`)
 
 | Method | Path | Purpose |
 |---|---|---|

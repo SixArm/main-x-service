@@ -2,4 +2,5 @@
 //! suite, which boots the real loco app against the `test` config and is
 //! therefore `#[ignore]`-gated on PostgreSQL.
 
+mod event_outbox;
 mod organizations;

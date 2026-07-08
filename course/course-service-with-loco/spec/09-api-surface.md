@@ -34,11 +34,11 @@ The five endpoints (shared doc §4) mount under the course resource:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/v1/courses/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |
-| `GET` | `/api/v1/courses/import/{id}` | Job status + counts + `errors_url` + `review_url` |
-| `POST` | `/api/v1/courses/export` | `202 {job_id}` — body: `format`, `filter`, `fields`, `include_soft_deleted`, `masking_profile` |
-| `GET` | `/api/v1/courses/export/{id}` | Job status + `download_url` |
-| `GET` | `/api/v1/courses/bulk-jobs` | List (filter by `kind`/`status`); `GET .../{id}` for one |
+| `POST` | `/api/courses/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |
+| `GET` | `/api/courses/import/{id}` | Job status + counts + `errors_url` + `review_url` |
+| `POST` | `/api/courses/export` | `202 {job_id}` — body: `format`, `filter`, `fields`, `include_soft_deleted`, `masking_profile` |
+| `GET` | `/api/courses/export/{id}` | Job status + `download_url` |
+| `GET` | `/api/courses/bulk-jobs` | List (filter by `kind`/`status`); `GET .../{id}` for one |
 
 **Stable key(s) for upsert** (shared doc §6, §10). A row upserts in place
 when it carries either:

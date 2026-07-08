@@ -9,6 +9,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **De-versioned API URLs.** Dropped the `/api/v1` segment from the work-item client and tests (now `/api/{collection}/…`); the BFF proxy negotiates the API version via the `Accepts-version: 1.0` request header instead (see `agents/share/api-versioning.md`).
+
 ### Fixed
 
 - Prettier formatting drift across `src/` (left behind by recent

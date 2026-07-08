@@ -3,12 +3,12 @@
 One entity, three subprojects, strict one-way dependencies:
 
 ```
-event-front-end-with-svelte  →(HTTP /api/v1)→  event-service-with-loco  →(Cargo dep)→  event-matcher-rust-crate
+event-front-end-with-svelte  →(HTTP /api)→  event-service-with-loco  →(Cargo dep)→  event-matcher-rust-crate
 ```
 
 | Subproject | Kind | Responsibility |
 |---|---|---|
-| [event-service-with-loco](../event-service-with-loco/) | Rust service (loco.rs/Axum, PostgreSQL + SeaORM, Tantivy) | System of record: CRUD, validation, search, matching, dedup, merge, review queue, privacy, audit, event streaming, REST `/api/v1` + OpenAPI; FHIR + gRPC stubs |
+| [event-service-with-loco](../event-service-with-loco/) | Rust service (loco.rs/Axum, PostgreSQL + SeaORM, Tantivy) | System of record: CRUD, validation, search, matching, dedup, merge, review queue, privacy, audit, event streaming, REST `/api` + OpenAPI; FHIR + gRPC stubs |
 | [event-matcher-rust-crate](../event-matcher-rust-crate/) | Rust library (pure, dependency-light) | Canonical pairwise Event comparison: deterministic rule + probabilistic weighted score with per-field breakdown; no IO, no unsafe, deterministic |
 | [event-front-end-with-svelte](../event-front-end-with-svelte/) | SvelteKit 2 SPA (Svelte 5 runes, SVAR DataGrid, Lily Headless) | Operator UI: list/search, create with 409 surfacing, detail/edit/delete, audit, match check, merge |
 
@@ -30,7 +30,7 @@ Rules of the road:
 cd event-service-with-loco
 cp .env.example .env            # set DATABASE_URL
 sea-orm-cli migrate up
-cargo run --release             # http://localhost:8080/api/v1, /swagger-ui
+cargo run --release             # http://localhost:8080/api, /swagger-ui
 cargo test --lib                # unit tests
 cargo test --test duplicate_detection   # service↔matcher bridge tests
 ```

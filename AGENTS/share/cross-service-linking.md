@@ -141,9 +141,9 @@ CREATE TABLE entity_links (
 REST surface (per service, mirroring its existing controller style):
 
 ```
-POST   /api/v1/<plural>/{pid}/links        create/upsert an outbound edge
-GET    /api/v1/<plural>/{pid}/links        list this record's outbound edges
-DELETE /api/v1/<plural>/{pid}/links/{id}   soft-delete (emits unlinked)
+POST   /api/<plural>/{pid}/links        create/upsert an outbound edge
+GET    /api/<plural>/{pid}/links        list this record's outbound edges
+DELETE /api/<plural>/{pid}/links/{id}   soft-delete (emits unlinked)
 ```
 
 The write is **optimistic** (§5): it stores the assertion and emits an
@@ -213,10 +213,10 @@ CREATE TABLE entity_presence (ref TEXT PRIMARY KEY, alive BOOLEAN NOT NULL,
 Read API:
 
 ```
-GET /api/v1/neighbors/{ref}?kind=&direction=out|in|both&depth=1
-GET /api/v1/edges?from=&to=&kind=&status=
-GET /api/v1/single-view/{ref}     -- golden-record walk over same_identity + affiliations
-GET /api/v1/health/freshness      -- per-entity consumer lag (§6)
+GET /api/neighbors/{ref}?kind=&direction=out|in|both&depth=1
+GET /api/edges?from=&to=&kind=&status=
+GET /api/single-view/{ref}     -- golden-record walk over same_identity + affiliations
+GET /api/health/freshness      -- per-entity consumer lag (§6)
 ```
 
 Every graph response carries an `as_of` timestamp (§6).
@@ -356,8 +356,13 @@ affiliation posture:
 
 ## 11. Rollout
 
-1. **Contracts.** Land the `EntityRef` value type + the §9 edge-kind
-   registry (copied per project). No behaviour yet.
+1. **Contracts.** ✅ *Landed 2026-07-06* as the standalone reference crate
+   [`link/entity-ref-rust-crate`](../../link/entity-ref-rust-crate) —
+   `EntityType` (+ `service()` map), `EntityRef` (URN parse/`Display`/serde
+   as one `TEXT` column), and the §9 `EdgeKind` registry
+   (`is_symmetric`/`is_temporal`/`inverse`/`sensitivity`/`permits`). Pure,
+   dependency-light, fully unit-tested; copy per project (or depend on it)
+   as the other rollout steps land. No behaviour yet.
 2. **Backbone.** Add `entity_links` write-side + `linked`/`unlinked` events
    to **person** and **worker**; ship `same_identity`.
 3. **Aggregator.** Stand up `link-graph-service-with-loco` consuming the

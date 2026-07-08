@@ -22,7 +22,7 @@ use crate::metrics::Metrics;
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::merge_records::Model as MergeRecordModel;
 use crate::models::work_items::Model as WorkItemModel;
-use crate::streaming::{self, EventKind};
+use crate::streaming;
 
 /// Maximum number of stored rows scanned in-memory by `check-duplicates`
 /// (per collection). No search-backed candidate blocking yet (deferred —
@@ -211,7 +211,7 @@ async fn audit(
     }
 }
 
-/// Create a work item in `{collection}`. `POST /api/v1/{collection}`.
+/// Create a work item in `{collection}`. `POST /api/{collection}`.
 ///
 /// # Errors
 ///
@@ -226,7 +226,8 @@ async fn create(
 ) -> Result<Response> {
     let collection = resolve(&collection)?;
     validate(collection, &wi)?;
-    let model = WorkItemModel::create(&ctx.db, collection.kind_str(), &wi).await?;
+    let model =
+        streaming::create_and_emit(&ctx.db, collection.kind_str(), &wi, caller.actor()).await?;
     audit(
         &ctx,
         model.pid,
@@ -235,17 +236,11 @@ async fn create(
         Some(model.data.clone()),
     )
     .await;
-    streaming::publish_with_actor(
-        EventKind::Created,
-        &model.pid.to_string(),
-        &model.name,
-        caller.actor(),
-    );
     Metrics::global().work_item_created_total.inc();
     format::json(WorkItemRef::of(&model))
 }
 
-/// Fetch a work item by public id. `GET /api/v1/{collection}/{pid}`.
+/// Fetch a work item by public id. `GET /api/{collection}/{pid}`.
 ///
 /// # Errors
 ///
@@ -260,7 +255,7 @@ async fn get_one(
     format::json(model.to_work_item()?)
 }
 
-/// Replace a work item's payload. `PUT /api/v1/{collection}/{pid}`.
+/// Replace a work item's payload. `PUT /api/{collection}/{pid}`.
 ///
 /// # Errors
 ///
@@ -275,7 +270,7 @@ async fn update(
     let collection = resolve(&collection)?;
     validate(collection, &wi)?;
     let model = WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), &pid).await?;
-    let updated = model.into_active_model().update_data(&ctx.db, &wi).await?;
+    let updated = streaming::update_and_emit(&ctx.db, model, &wi, caller.actor()).await?;
     audit(
         &ctx,
         updated.pid,
@@ -284,17 +279,11 @@ async fn update(
         Some(updated.data.clone()),
     )
     .await;
-    streaming::publish_with_actor(
-        EventKind::Updated,
-        &updated.pid.to_string(),
-        &updated.name,
-        caller.actor(),
-    );
     Metrics::global().work_item_updated_total.inc();
     format::json(WorkItemRef::of(&updated))
 }
 
-/// Soft-delete a work item. `DELETE /api/v1/{collection}/{pid}`.
+/// Soft-delete a work item. `DELETE /api/{collection}/{pid}`.
 ///
 /// # Errors
 ///
@@ -307,22 +296,15 @@ async fn remove(
 ) -> Result<Response> {
     let collection = resolve(&collection)?;
     let model = WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), &pid).await?;
-    let (entity_pid, name) = (model.pid, model.name.clone());
-    model.into_active_model().soft_delete(&ctx.db).await?;
+    let (entity_pid, _name) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
     audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
-    streaming::publish_with_actor(
-        EventKind::Deleted,
-        &entity_pid.to_string(),
-        &name,
-        caller.actor(),
-    );
     Metrics::global().work_item_deleted_total.inc();
     format::empty_json()
 }
 
 /// List active work items in `{collection}` (cap 100). Child collections
 /// accept `?portfolio=<pid>` to roll up one portfolio's children.
-/// `GET /api/v1/{collection}`.
+/// `GET /api/{collection}`.
 ///
 /// # Errors
 ///
@@ -345,7 +327,7 @@ async fn list(
 }
 
 /// Case-insensitive name search within a collection (Postgres `ILIKE`,
-/// cap 50). `GET /api/v1/{collection}/search?q=`.
+/// cap 50). `GET /api/{collection}/search?q=`.
 ///
 /// # Errors
 ///
@@ -367,7 +349,7 @@ async fn search(
 }
 
 /// Score a query against an explicit candidate list (no persistence).
-/// `POST /api/v1/{collection}/match`. The matcher's kind gate makes any
+/// `POST /api/{collection}/match`. The matcher's kind gate makes any
 /// cross-kind candidate score `0.0`.
 ///
 /// # Errors
@@ -385,7 +367,7 @@ async fn match_against(
 }
 
 /// Find stored work items in `{collection}` matching the query above the
-/// threshold. `POST /api/v1/{collection}/check-duplicates`.
+/// threshold. `POST /api/{collection}/check-duplicates`.
 ///
 /// # Errors
 ///
@@ -426,7 +408,7 @@ async fn check_duplicates(
 }
 
 /// Merge a confirmed-duplicate work item into a surviving one (within the
-/// same collection). `POST /api/v1/{collection}/merge`.
+/// same collection). `POST /api/{collection}/merge`.
 ///
 /// # Errors
 ///
@@ -451,12 +433,8 @@ async fn merge(
 
     let outcome = merge_work_items(&main.to_work_item()?, &duplicate.to_work_item()?);
 
-    let merged = main
-        .into_active_model()
-        .update_data(&ctx.db, &outcome.merged)
-        .await?;
-    let (dup_pid, dup_name) = (duplicate.pid, duplicate.name.clone());
-    duplicate.into_active_model().soft_delete(&ctx.db).await?;
+    let (merged, dup_pid, _dup_name) =
+        streaming::merge_and_emit(&ctx.db, main, duplicate, &outcome.merged, caller.actor()).await?;
 
     if let Err(err) = MergeRecordModel::record(
         &ctx.db,
@@ -479,18 +457,6 @@ async fn merge(
     )
     .await;
     audit(&ctx, dup_pid, "merged_into", caller.actor(), None).await;
-    streaming::publish_with_actor(
-        EventKind::Merged,
-        &merged.pid.to_string(),
-        &merged.name,
-        caller.actor(),
-    );
-    streaming::publish_with_actor(
-        EventKind::Deleted,
-        &dup_pid.to_string(),
-        &dup_name,
-        caller.actor(),
-    );
     Metrics::global().work_item_merged_total.inc();
 
     format::json(serde_json::json!({
@@ -501,7 +467,7 @@ async fn merge(
 }
 
 /// Recent merge-history records (cap 100). `GET
-/// /api/v1/{collection}/merges/recent`.
+/// /api/{collection}/merges/recent`.
 ///
 /// # Errors
 ///
@@ -517,7 +483,7 @@ async fn recent_merges(
 }
 
 /// Recent audit entries (cap 100). `GET
-/// /api/v1/{collection}/audit/recent`.
+/// /api/{collection}/audit/recent`.
 ///
 /// # Errors
 ///
@@ -533,7 +499,7 @@ async fn recent_audit(
 }
 
 /// Audit trail for a single work item. `GET
-/// /api/v1/{collection}/{pid}/audit`.
+/// /api/{collection}/{pid}/audit`.
 ///
 /// # Errors
 ///
@@ -551,20 +517,25 @@ async fn entity_audit(
     format::json(rows)
 }
 
-/// Recent events from the in-memory stream (cap 100). `GET
-/// /api/v1/{collection}/events/recent`.
+/// Recent events (cap 100), from whichever transport is active — the
+/// in-memory ring buffer (`memory`) or the `event_outbox` table
+/// (`outbox`); the wire shape is identical. `GET
+/// /api/{collection}/events/recent`.
 ///
 /// # Errors
 ///
-/// `404` unknown collection.
+/// `404` unknown collection; a DB error when the outbox query fails.
 #[debug_handler]
-async fn recent_events(Path(collection): Path<String>) -> Result<Response> {
+async fn recent_events(
+    Path(collection): Path<String>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
     let _ = resolve(&collection)?;
-    format::json(streaming::recent(100))
+    format::json(streaming::recent_events(&ctx.db, 100).await?)
 }
 
 /// Echo the verified bearer-token claims. `GET
-/// /api/v1/{collection}/whoami`; `401` without a valid token.
+/// /api/{collection}/whoami`; `401` without a valid token.
 ///
 /// # Errors
 ///
@@ -575,7 +546,7 @@ async fn whoami(Path(collection): Path<String>, AuthUser(claims): AuthUser) -> R
     format::json(claims)
 }
 
-/// Build the `/api/v1/{collection}` route table (CRUD + match +
+/// Build the `/api/{collection}` route table (CRUD + match +
 /// check-duplicates + merge + audit / events + whoami), shared across all
 /// four collections via the leading `{collection}` segment.
 ///
@@ -583,7 +554,7 @@ async fn whoami(Path(collection): Path<String>, AuthUser(claims): AuthUser) -> R
 /// before the `/{pid}` catch-alls so they are not shadowed.
 pub fn routes() -> Routes {
     Routes::new()
-        .prefix("/api/v1")
+        .prefix("/api")
         .add("/{collection}", post(create))
         .add("/{collection}", get(list))
         .add("/{collection}/search", get(search))

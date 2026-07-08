@@ -24,12 +24,19 @@ pub mod app;
 pub mod auth;
 pub mod controllers;
 pub mod data;
+/// HL7 FHIR R5 interop — the `Task` resource mapping (best-effort) over
+/// the stored `case_matcher::Case` DTO.
+pub mod fhir;
 pub mod initializers;
 pub mod merge;
 pub mod metrics;
 pub mod models;
 pub mod openapi;
+/// Durable event bus Phase 3: the `event_outbox` relay + retention loop.
+pub mod relay;
 pub mod streaming;
 pub mod tasks;
 pub mod validation;
+/// Header-based API versioning (`Accepts-version`) for the REST surface.
+pub mod version;
 pub mod workers;

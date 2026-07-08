@@ -126,10 +126,10 @@ git clone https://github.com/SixArm/main-x-service.git
 cd main-x-service/event/event-service-with-loco
 cp .env.example .env
 podman compose up -d
-curl http://localhost:8080/api/v1/health
+curl http://localhost:8080/api/health
 ```
 
-- API: http://localhost:8080/api/v1
+- API: http://localhost:8080/api
 - Swagger UI: http://localhost:8080/swagger-ui
 
 ### Local
@@ -149,7 +149,7 @@ cargo loco start            # or: cargo run -- start
 Create an event:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/events \
+curl -X POST http://localhost:8080/api/events \
   -H 'content-type: application/json' \
   -d '{
     "name": "Annual Conference",
@@ -170,13 +170,13 @@ curl -X POST http://localhost:8080/api/v1/events \
 Search:
 
 ```bash
-curl "http://localhost:8080/api/v1/events/search?q=Conference&date_from=2026-06-01&date_to=2026-06-30"
+curl "http://localhost:8080/api/events/search?q=Conference&date_from=2026-06-01&date_to=2026-06-30"
 ```
 
 Match:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/events/match \
+curl -X POST http://localhost:8080/api/events/match \
   -H 'content-type: application/json' \
   -d '{ "name": "Conferance", "start_date": "2026-06-01T09:00:00Z", "threshold": 0.5 }'
 ```

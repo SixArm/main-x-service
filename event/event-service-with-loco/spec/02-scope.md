@@ -24,12 +24,14 @@
 - Record merging with link tracking and JSON snapshots.
 - Per-field privacy masking, GDPR Article 15 export, consent records.
 - REST API (Axum) + gRPC stub.
+- FHIR R5 `Appointment` surface (`/fhir/Appointment{,/{id}}` +
+  `/fhir/metadata`) — best-effort schema.org/Event → FHIR mapping.
 - PostgreSQL persistence via SeaORM.
 
 ### 2.2 Out of scope (today)
 
-- FHIR R5 surface — stubbed `501` until the Event → Encounter /
-  Appointment mapping is fixed.
+- FHIR R5 `Encounter` mapping (only `Appointment` ships today) and
+  full FHIR conformance (search-param breadth, `_include`, `_history`).
 - Recurrence (RFC 5545 RRULE).
 - Time-zone-aware fuzzy matching (uses naive UTC offsets today).
 - Production Fluvio publisher / consumers.

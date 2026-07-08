@@ -3,7 +3,7 @@
 //! This module wires the HTTP surface together:
 //! [`ApiDoc`](crate::api::rest::ApiDoc) is the utoipa OpenAPI document,
 //! [`create_router`](crate::api::rest::create_router) mounts every
-//! handler under `/api/v1` (plus `/metrics.prom` and the Swagger UI at
+//! handler under `/api` (plus `/metrics.prom` and the Swagger UI at
 //! `/swagger-ui`), and [`serve`](crate::api::rest::serve) binds the
 //! configured host/port and runs the server. Handlers live in
 //! [`handlers`](crate::api::rest::handlers), shared services in
@@ -34,6 +34,8 @@ pub mod handlers;
 pub mod routes;
 /// Shared application state ([`AppState`]) passed to every handler.
 pub mod state;
+/// Header-based API versioning (`Accepts-version`) middleware + helper.
+pub mod version;
 
 pub use state::AppState;
 
@@ -133,7 +135,7 @@ pub use state::AppState;
 )]
 pub struct ApiDoc;
 
-/// Build the full `axum::Router`: every `/api/v1/*` route bound to its
+/// Build the full `axum::Router`: every `/api/*` route bound to its
 /// handler with shared [`AppState`], plus the top-level
 /// `/metrics.prom` scrape endpoint, the Swagger UI, and a permissive
 /// CORS layer.
@@ -143,8 +145,6 @@ pub struct ApiDoc;
 /// pass); it is a near-noop unless `EVENT_REQUIRE_AUTH` was truthy at
 /// [`AppState`] construction.
 pub fn create_router(state: AppState) -> Router {
-    use crate::api::fhir::handlers as fhir;
-
     let api_routes = Router::new()
         // Health
         .route("/health", get(handlers::health_check))
@@ -172,42 +172,36 @@ pub fn create_router(state: AppState) -> Router {
         .route("/audit/user", get(handlers::get_user_audit_logs))
         .with_state(state.clone());
 
-    // FHIR R5 stub surface: every `/fhir/Event*` route returns `501 Not
-    // Implemented` with an `OperationOutcome` body (spec §6.8). Bound
-    // here so an unmatched request yields `501`, not `404`. The stub
-    // handlers are sync `fn`s, so wrap each in an async closure.
-    let fhir_routes = Router::new()
-        .route(
-            "/Event",
-            get(|| async { fhir::search_events() }).post(|| async { fhir::create_event() }),
-        )
-        .route(
-            "/Event/{id}",
-            get(|| async { fhir::get_event() })
-                .put(|| async { fhir::update_event() })
-                .delete(|| async { fhir::delete_event() }),
-        );
+    // FHIR R5 `Appointment` surface — the SAME real handlers the loco
+    // production router serves (`controllers::fhir`), assembled as an
+    // axum router so this hand-written harness stays identical to
+    // production (it replaced the earlier `/fhir/Event` `501` stub).
+    let fhir_routes = crate::controllers::fhir::axum_router(state.clone());
 
     Router::new()
-        // All entity/audit routes live under `/api/v1`; `/metrics.prom`
+        // All entity/audit routes live under `/api`; `/metrics.prom`
         // sits at the root so a default Prometheus scrape config finds
         // it, and the Swagger UI is mounted at the root as well.
-        .nest("/api/v1", api_routes)
+        .nest("/api", api_routes)
         .nest("/fhir", fhir_routes)
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        // Blanket auth enforcement (default-off; scoped to /api/v1 by
+        // Blanket auth enforcement (default-off; scoped to /api by
         // `auth::enforce`); layered inside CORS so preflights pass.
         .layer(axum::middleware::from_fn_with_state(
             state,
             auth::require_auth_mw,
         ))
+        // Header-based API versioning (`Accepts-version`): negotiates the
+        // version for `/api/*` and stamps it on the response
+        // (`agents/share/api-versioning.md`).
+        .layer(axum::middleware::from_fn(version::require_version_mw))
         // Permissive CORS: this is a backend service fronted elsewhere;
         // tighten if exposed directly to browsers.
         .layer(CorsLayer::permissive())
 }
 
-/// Native loco controller routes (idiomatic path): the `/api/v1` surface
+/// Native loco controller routes (idiomatic path): the `/api` surface
 /// as a loco `Routes`; handlers extract `AppState` from the `AppContext`
 /// shared store via `FromRef`. `create_router` is retained for the
 /// integration tests. The root `/metrics.prom` route is [`metrics_routes`].
@@ -215,7 +209,7 @@ pub fn create_router(state: AppState) -> Router {
 pub fn events_routes() -> loco_rs::controller::Routes {
     use loco_rs::prelude::{Routes, get, post};
     Routes::new()
-        .prefix("/api/v1")
+        .prefix("/api")
         .add("/health", get(handlers::health_check))
         .add("/whoami", get(auth::whoami))
         .add("/events", post(handlers::create_event))
@@ -242,23 +236,4 @@ pub fn events_routes() -> loco_rs::controller::Routes {
 pub fn metrics_routes() -> loco_rs::controller::Routes {
     use loco_rs::prelude::{Routes, get};
     Routes::new().add("/metrics.prom", get(handlers::metrics_prom))
-}
-
-/// FHIR R5 stub routes (`/fhir/Event*`): every method returns
-/// `501 Not Implemented` with an `OperationOutcome` body (spec §6.8).
-/// Bound so an unmatched request yields `501`, not `404`.
-#[must_use]
-pub fn fhir_routes() -> loco_rs::controller::Routes {
-    use crate::api::fhir::handlers as fhir;
-    use loco_rs::prelude::{Routes, get, post};
-    Routes::new()
-        .prefix("/fhir")
-        .add("/Event", get(|| async { fhir::search_events() }))
-        .add("/Event", post(|| async { fhir::create_event() }))
-        .add(
-            "/Event/{id}",
-            get(|| async { fhir::get_event() })
-                .put(|| async { fhir::update_event() })
-                .delete(|| async { fhir::delete_event() }),
-        )
 }

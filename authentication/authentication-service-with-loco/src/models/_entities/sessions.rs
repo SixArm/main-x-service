@@ -27,6 +27,16 @@ pub struct Model {
     /// establishment so token minting reads only the session.
     #[sea_orm(column_type = "JsonBinary")]
     pub data: Json,
+    /// When the session was last used (bumped on each `/me`). Nullable
+    /// for rows predating the TTL reshape.
+    pub last_seen_at: Option<DateTimeWithTimeZone>,
+    /// Sliding **idle** expiry: `now + idle TTL`, bumped on each use. A
+    /// session is expired once `now >= idle_expires_at`. Nullable (legacy
+    /// rows ⇒ no idle bound).
+    pub idle_expires_at: Option<DateTimeWithTimeZone>,
+    /// Hard **absolute** expiry: `now + absolute TTL` at issuance, never
+    /// extended. Nullable (legacy rows ⇒ no absolute bound).
+    pub absolute_expires_at: Option<DateTimeWithTimeZone>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

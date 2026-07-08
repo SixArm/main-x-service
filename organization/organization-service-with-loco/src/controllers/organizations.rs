@@ -17,7 +17,7 @@ use crate::metrics::Metrics;
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::merge_records::Model as MergeRecordModel;
 use crate::models::organizations::Model as OrgModel;
-use crate::streaming::{self, EventKind};
+use crate::streaming;
 
 /// Lightweight response shape: a stored organization reduced to its
 /// public id and name. Returned by create/update/list/search so callers
@@ -120,7 +120,9 @@ async fn create(
     Json(org): Json<Organization>,
 ) -> Result<Response> {
     validate(&org)?;
-    let model = OrgModel::create(&ctx.db, &org).await?;
+    // Write + `Created` event, atomic under the active transport (memory
+    // ring buffer, or one transaction spanning the row + `event_outbox`).
+    let model = streaming::create_and_emit(&ctx.db, &org, caller.actor()).await?;
     Metrics::global().organization_created_total.inc();
     audit(
         &ctx,
@@ -130,12 +132,6 @@ async fn create(
         Some(model.data.clone()),
     )
     .await;
-    streaming::publish_with_actor(
-        EventKind::Created,
-        &model.pid.to_string(),
-        &model.name,
-        caller.actor(),
-    );
     format::json(OrgRef::of(&model))
 }
 
@@ -169,7 +165,8 @@ async fn update(
     let model = OrgModel::find_by_pid(&ctx.db, &pid)
         .await
         .map_err(http_err)?;
-    let updated = model.into_active_model().update_data(&ctx.db, &org).await?;
+    // Replace + `Updated` event, atomic under the active transport.
+    let updated = streaming::update_and_emit(&ctx.db, model, &org, caller.actor()).await?;
     Metrics::global().organization_updated_total.inc();
     audit(
         &ctx,
@@ -179,12 +176,6 @@ async fn update(
         Some(updated.data.clone()),
     )
     .await;
-    streaming::publish_with_actor(
-        EventKind::Updated,
-        &updated.pid.to_string(),
-        &updated.name,
-        caller.actor(),
-    );
     format::json(OrgRef::of(&updated))
 }
 
@@ -204,16 +195,11 @@ async fn remove(
     let model = OrgModel::find_by_pid(&ctx.db, &pid)
         .await
         .map_err(http_err)?;
-    let (entity_pid, name) = (model.pid, model.name.clone());
-    model.into_active_model().soft_delete(&ctx.db).await?;
+    // Soft-delete + `Deleted` event, atomic under the active transport.
+    // The helper captures the name before delete so the event has a label.
+    let (entity_pid, _name) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
     Metrics::global().organization_deleted_total.inc();
     audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
-    streaming::publish_with_actor(
-        EventKind::Deleted,
-        &entity_pid.to_string(),
-        &name,
-        caller.actor(),
-    );
     format::empty_json()
 }
 
@@ -371,12 +357,11 @@ async fn merge(
 
     let outcome = merge_orgs(&main.to_org()?, &duplicate.to_org()?);
 
-    let merged = main
-        .into_active_model()
-        .update_data(&ctx.db, &outcome.merged)
-        .await?;
-    let (dup_pid, dup_name) = (duplicate.pid, duplicate.name.clone());
-    duplicate.into_active_model().soft_delete(&ctx.db).await?;
+    // Update survivor + soft-delete duplicate + `Merged`/`Deleted` events,
+    // all atomic under the active transport (one transaction for `outbox`).
+    let (merged, dup_pid, _dup_name) =
+        streaming::merge_and_emit(&ctx.db, main, duplicate, &outcome.merged, caller.actor())
+            .await?;
     Metrics::global().organization_merged_total.inc();
 
     if let Err(err) = MergeRecordModel::record(
@@ -400,18 +385,6 @@ async fn merge(
     )
     .await;
     audit(&ctx, dup_pid, "merged_into", caller.actor(), None).await;
-    streaming::publish_with_actor(
-        EventKind::Merged,
-        &merged.pid.to_string(),
-        &merged.name,
-        caller.actor(),
-    );
-    streaming::publish_with_actor(
-        EventKind::Deleted,
-        &dup_pid.to_string(),
-        &dup_name,
-        caller.actor(),
-    );
 
     format::json(serde_json::json!({
         "main_pid": merged.pid.to_string(),
@@ -468,14 +441,16 @@ async fn entity_audit(Path(pid): Path<String>, State(ctx): State<AppContext>) ->
     format::json(rows)
 }
 
-/// Recent events from the in-memory event stream.
+/// Recent events from the active event transport.
 ///
 /// `GET /api/organizations/events/recent`. Returns `200` with up to 100
-/// `EventView`s (`{kind, pid, name, seq}`) from the process-wide ring
-/// buffer — no DB access. The buffer is per-process and not durable.
+/// `EventView`s (`{kind, pid, name, seq}`). Under the `memory` transport
+/// these come from the process-wide ring buffer (no DB, not durable);
+/// under `outbox` they are the most recent `event_outbox` rows. The wire
+/// shape is identical either way.
 #[debug_handler]
-async fn recent_events() -> Result<Response> {
-    format::json(streaming::recent(100))
+async fn recent_events(State(ctx): State<AppContext>) -> Result<Response> {
+    format::json(streaming::recent_events(&ctx.db, 100).await?)
 }
 
 /// All organization routes, mounted under `/api/organizations`: CRUD,

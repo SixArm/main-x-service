@@ -13,8 +13,8 @@
 use chrono::Utc;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -27,10 +27,12 @@ use super::models::{
     persons,
 };
 use crate::Result;
+use crate::db::outbox::OutboxInsert;
 use crate::models::{
     Address, ContactPoint, ContactPointSystem, DocumentType, EmergencyContact, HumanName,
     Identifier, IdentityDocument, Person, PersonLink,
 };
+use crate::streaming::{EventKind, EventTransport};
 
 /// Serialize a fieldless enum to its canonical serde string tag (used for
 /// the document/telecom/address enum columns).
@@ -115,6 +117,106 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
     Ok(())
 }
 
+/// Apply a person's parent-row update and wholesale child-row replacement
+/// on `conn`. Shared by [`PersonRepository::update`] and
+/// [`PersonRepository::merge`]: preserves `created_*`, stamps `updated_at`
+/// to now, deletes every child row for the person, then re-inserts them
+/// from the domain model. Runs on the caller's connection/transaction so
+/// it shares that commit boundary.
+async fn apply_update_rows<C: ConnectionTrait>(conn: &C, person: &Person) -> Result<()> {
+    // Update the parent `persons` row (only scalar fields; `..Default`
+    // leaves created_* untouched).
+    let update_model = persons::ActiveModel {
+        id: Set(person.id),
+        active: Set(person.active),
+        // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
+        // Gender's serde rename_all="lowercase" produces the same shape.
+        gender: Set(format!("{:?}", person.gender).to_lowercase()),
+        birth_date: Set(person.birth_date.map(date_to_time)),
+        tax_id: Set(person.tax_id.clone()),
+        deceased: Set(person.deceased),
+        deceased_datetime: Set(person.deceased_datetime.map(ts_to_offset)),
+        marital_status: Set(person.marital_status.clone()),
+        multiple_birth: Set(person.multiple_birth),
+        managing_organization_id: Set(person.managing_organization),
+        updated_at: Set(OffsetDateTime::now_utc()),
+        updated_by: Set(None),
+        ..Default::default()
+    };
+    update_model.update(conn).await?;
+
+    // Delete existing associated child rows.
+    person_names::Entity::delete_many()
+        .filter(person_names::Column::PersonId.eq(person.id))
+        .exec(conn)
+        .await?;
+    person_identifiers::Entity::delete_many()
+        .filter(person_identifiers::Column::PersonId.eq(person.id))
+        .exec(conn)
+        .await?;
+    person_addresses::Entity::delete_many()
+        .filter(person_addresses::Column::PersonId.eq(person.id))
+        .exec(conn)
+        .await?;
+    person_contacts::Entity::delete_many()
+        .filter(person_contacts::Column::PersonId.eq(person.id))
+        .exec(conn)
+        .await?;
+    person_links::Entity::delete_many()
+        .filter(person_links::Column::PersonId.eq(person.id))
+        .exec(conn)
+        .await?;
+    // Deleting emergency contacts cascades to their telecom rows.
+    person_emergency_contacts::Entity::delete_many()
+        .filter(person_emergency_contacts::Column::PersonId.eq(person.id))
+        .exec(conn)
+        .await?;
+    person_documents::Entity::delete_many()
+        .filter(person_documents::Column::PersonId.eq(person.id))
+        .exec(conn)
+        .await?;
+    person_photos::Entity::delete_many()
+        .filter(person_photos::Column::PersonId.eq(person.id))
+        .exec(conn)
+        .await?;
+
+    // Re-insert associated child rows.
+    let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
+        SeaOrmPersonRepository::to_active_models(person);
+    for name in new_names {
+        name.insert(conn).await?;
+    }
+    for identifier in new_identifiers {
+        identifier.insert(conn).await?;
+    }
+    for address in new_addresses {
+        address.insert(conn).await?;
+    }
+    for contact in new_contacts {
+        contact.insert(conn).await?;
+    }
+    for link in new_links {
+        link.insert(conn).await?;
+    }
+    insert_extra_collections(conn, person).await?;
+    Ok(())
+}
+
+/// Soft-delete the person `id` on `conn` by stamping `deleted_at` /
+/// `deleted_by` and leaving every other column (and the child rows) in
+/// place. Factored from [`PersonRepository::delete`]'s soft-delete so
+/// [`PersonRepository::merge`] can reuse it on its own transaction.
+async fn apply_soft_delete_row<C: ConnectionTrait>(conn: &C, id: &Uuid) -> Result<()> {
+    let row = persons::ActiveModel {
+        id: Set(*id),
+        deleted_at: Set(Some(OffsetDateTime::now_utc())),
+        deleted_by: Set(Some("system".to_string())),
+        ..Default::default()
+    };
+    row.update(conn).await?;
+    Ok(())
+}
+
 /// The active-model tuple produced by exploding a [`Person`] into the
 /// parent row plus its child-table rows, ready for insertion.
 type PersonActiveModels = (
@@ -166,6 +268,15 @@ pub trait PersonRepository: Send + Sync {
     /// Replace a person and all its child rows, returning the new state.
     async fn update(&self, person: &Person) -> Result<Person>;
 
+    /// Merge the `duplicate_id` record into `survivor`: apply the
+    /// survivor's parent + child row updates and soft-delete the duplicate
+    /// **in one transaction**, so the whole merge commits (or rolls back)
+    /// atomically. Under the outbox transport this enqueues a `Merged`
+    /// outbox row for the survivor (carrying the duplicate's pid via
+    /// `merged_from`) and a `Deleted` outbox row for the duplicate on the
+    /// same transaction. Returns the reloaded survivor.
+    async fn merge(&self, survivor: &Person, duplicate_id: &Uuid) -> Result<Person>;
+
     /// Soft-delete a person (sets `deleted_at`; row is retained).
     async fn delete(&self, id: &Uuid) -> Result<()>;
 
@@ -187,17 +298,58 @@ pub struct SeaOrmPersonRepository {
     event_publisher: Option<std::sync::Arc<dyn crate::streaming::EventProducer>>,
     /// Optional audit-trail writer.
     audit_log: Option<std::sync::Arc<super::audit::AuditLogRepository>>,
+    /// Which event transport is active (durable event bus, Phase 2).
+    /// [`EventTransport::Memory`] (default) keeps the legacy post-commit
+    /// in-memory publish; [`EventTransport::Outbox`] additionally writes
+    /// one `event_outbox` row **inside** each write's transaction.
+    transport: EventTransport,
 }
 
 impl SeaOrmPersonRepository {
-    /// Build a repository over `db` with no event/audit sinks attached.
+    /// Build a repository over `db` with no event/audit sinks attached and
+    /// the default [`EventTransport::Memory`] transport (behaviour
+    /// unchanged from before the outbox landed).
     #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
             db,
             event_publisher: None,
             audit_log: None,
+            transport: EventTransport::Memory,
         }
+    }
+
+    /// Builder: select the event transport (see [`EventTransport`]).
+    /// `AppState` wires this from `PERSON_EVENT_TRANSPORT` via
+    /// [`crate::streaming::transport`].
+    #[must_use]
+    pub fn with_transport(mut self, transport: EventTransport) -> Self {
+        self.transport = transport;
+        self
+    }
+
+    /// When the outbox transport is active, enqueue one `event_outbox`
+    /// row for `kind` applied to `person` **on `conn`** — pass the open
+    /// `&DatabaseTransaction` so the row commits with the entity write
+    /// (the outbox atomicity guarantee). A no-op under
+    /// [`EventTransport::Memory`].
+    ///
+    /// The `ConnectionTrait` generic lives here on a concrete method (not
+    /// on the object-safe [`PersonRepository`] trait), which is how a
+    /// `dyn`-trait repository threads the outbox insert into its own
+    /// transaction.
+    async fn enqueue_outbox<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        person: &Person,
+        kind: EventKind,
+    ) -> Result<()> {
+        if self.transport.is_outbox() {
+            OutboxInsert::for_event(person, kind)?
+                .insert_on(conn)
+                .await?;
+        }
+        Ok(())
     }
 
     /// Attach an event publisher; returns `self` for chaining.
@@ -765,6 +917,13 @@ impl PersonRepository for SeaOrmPersonRepository {
         // Insert documents / emergency contacts / photos (normalized).
         insert_extra_collections(&txn, person).await?;
 
+        // Durable event bus (Phase 2): under the outbox transport, write
+        // the `event_outbox` row **inside this same transaction**, before
+        // the commit, so the entity rows and the event commit atomically
+        // (or roll back together). A no-op under the memory transport,
+        // which keeps the post-commit in-memory publish below.
+        self.enqueue_outbox(&txn, person, EventKind::Created).await?;
+
         txn.commit().await?;
 
         // Load associations
@@ -837,86 +996,12 @@ impl PersonRepository for SeaOrmPersonRepository {
 
         let txn = self.db.begin().await?;
 
-        // Update person
-        let update_model = persons::ActiveModel {
-            id: Set(person.id),
-            active: Set(person.active),
-            // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
-            // Gender's serde rename_all="lowercase" produces the same shape.
-            gender: Set(format!("{:?}", person.gender).to_lowercase()),
-            birth_date: Set(person.birth_date.map(date_to_time)),
-            tax_id: Set(person.tax_id.clone()),
-            deceased: Set(person.deceased),
-            deceased_datetime: Set(person.deceased_datetime.map(ts_to_offset)),
-            marital_status: Set(person.marital_status.clone()),
-            multiple_birth: Set(person.multiple_birth),
-            managing_organization_id: Set(person.managing_organization),
-            updated_at: Set(OffsetDateTime::now_utc()),
-            updated_by: Set(None),
-            ..Default::default()
-        };
-        update_model.update(&txn).await?;
+        // Parent-row update + wholesale child-row replacement, shared with
+        // `merge` (see `apply_update_rows`).
+        apply_update_rows(&txn, person).await?;
 
-        // Delete existing associated data
-        person_names::Entity::delete_many()
-            .filter(person_names::Column::PersonId.eq(person.id))
-            .exec(&txn)
-            .await?;
-
-        person_identifiers::Entity::delete_many()
-            .filter(person_identifiers::Column::PersonId.eq(person.id))
-            .exec(&txn)
-            .await?;
-
-        person_addresses::Entity::delete_many()
-            .filter(person_addresses::Column::PersonId.eq(person.id))
-            .exec(&txn)
-            .await?;
-
-        person_contacts::Entity::delete_many()
-            .filter(person_contacts::Column::PersonId.eq(person.id))
-            .exec(&txn)
-            .await?;
-
-        person_links::Entity::delete_many()
-            .filter(person_links::Column::PersonId.eq(person.id))
-            .exec(&txn)
-            .await?;
-
-        // Deleting emergency contacts cascades to their telecom rows.
-        person_emergency_contacts::Entity::delete_many()
-            .filter(person_emergency_contacts::Column::PersonId.eq(person.id))
-            .exec(&txn)
-            .await?;
-        person_documents::Entity::delete_many()
-            .filter(person_documents::Column::PersonId.eq(person.id))
-            .exec(&txn)
-            .await?;
-        person_photos::Entity::delete_many()
-            .filter(person_photos::Column::PersonId.eq(person.id))
-            .exec(&txn)
-            .await?;
-
-        // Re-insert associated data
-        let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-            Self::to_active_models(person);
-
-        for name in new_names {
-            name.insert(&txn).await?;
-        }
-        for identifier in new_identifiers {
-            identifier.insert(&txn).await?;
-        }
-        for address in new_addresses {
-            address.insert(&txn).await?;
-        }
-        for contact in new_contacts {
-            contact.insert(&txn).await?;
-        }
-        for link in new_links {
-            link.insert(&txn).await?;
-        }
-        insert_extra_collections(&txn, person).await?;
+        // Outbox row shares the update transaction (see `create`).
+        self.enqueue_outbox(&txn, person, EventKind::Updated).await?;
 
         txn.commit().await?;
 
@@ -951,20 +1036,117 @@ impl PersonRepository for SeaOrmPersonRepository {
         Ok(result)
     }
 
+    /// Merge `duplicate_id` into `survivor` atomically: apply the
+    /// survivor's parent + child updates and soft-delete the duplicate in
+    /// one transaction. Under the outbox transport, a `Merged` outbox row
+    /// for the survivor (carrying the duplicate's pid via `merged_from`)
+    /// and a `Deleted` outbox row for the duplicate are enqueued on the
+    /// same transaction, so the whole merge and both events commit (or
+    /// roll back) together. Post-commit it publishes the in-memory
+    /// `Merged` + `Deleted` events and writes the UPDATE/DELETE audit rows.
+    async fn merge(&self, survivor: &Person, duplicate_id: &Uuid) -> Result<Person> {
+        // Snapshots for the audit trail: the survivor's pre-image for the
+        // UPDATE row, the duplicate's pre-image for the DELETE row (and to
+        // build the duplicate's `Deleted` outbox envelope).
+        let old_survivor = self.get_by_id(&survivor.id).await?;
+        let old_duplicate = self.get_by_id(duplicate_id).await?;
+
+        // The whole merge — survivor row updates + duplicate soft-delete +
+        // both outbox rows — commits (or rolls back) under one transaction.
+        let txn = self.db.begin().await?;
+
+        // Apply the survivor's parent + child rows (shared with `update`).
+        apply_update_rows(&txn, survivor).await?;
+
+        // Soft-delete the duplicate (shared with `delete`).
+        apply_soft_delete_row(&txn, duplicate_id).await?;
+
+        // Durable event bus (Phase 2): a `Merged` outbox row for the
+        // survivor (carrying the duplicate's pid via `merged_from`, so a
+        // merge-repointing consumer can move edges off the duplicate) and a
+        // `Deleted` outbox row for the duplicate — both inside this
+        // transaction. A no-op under the memory transport.
+        if self.transport.is_outbox() {
+            OutboxInsert::for_merge(survivor, duplicate_id)?
+                .insert_on(&txn)
+                .await?;
+            if let Some(dup) = old_duplicate.as_ref() {
+                OutboxInsert::for_event(dup, EventKind::Deleted)?
+                    .insert_on(&txn)
+                    .await?;
+            }
+        }
+
+        txn.commit().await?;
+
+        let result = self
+            .get_by_id(&survivor.id)
+            .await?
+            .ok_or_else(|| crate::Error::Validation("Person not found after merge".to_string()))?;
+
+        // Post-commit in-memory stream (memory transport keeps this): a
+        // `Merged` for the survivor and a `Deleted` for the duplicate.
+        self.publish_event(crate::streaming::PersonEvent::Merged {
+            source_id: *duplicate_id,
+            target_id: result.id,
+            timestamp: Utc::now(),
+        });
+        self.publish_event(crate::streaming::PersonEvent::Deleted {
+            person_id: *duplicate_id,
+            timestamp: Utc::now(),
+        });
+
+        // Audit rows: an UPDATE trail for the survivor and a DELETE trail
+        // for the duplicate.
+        if let Some(old_json) = old_survivor.as_ref().and_then(|p| serde_json::to_value(p).ok())
+            && let Ok(new_json) = serde_json::to_value(&result)
+        {
+            self.log_audit(
+                "UPDATE",
+                result.id,
+                Some(old_json),
+                Some(new_json),
+                &AuditContext::default(),
+            )
+            .await;
+        }
+        if let Some(dup) = old_duplicate
+            && let Ok(dup_json) = serde_json::to_value(&dup)
+        {
+            self.log_audit(
+                "DELETE",
+                *duplicate_id,
+                Some(dup_json),
+                None,
+                &AuditContext::default(),
+            )
+            .await;
+        }
+
+        Ok(result)
+    }
+
     /// Soft-delete by stamping `deleted_at`/`deleted_by`; child rows are
     /// retained. Publishes a `Deleted` event and writes a DELETE audit row.
     async fn delete(&self, id: &Uuid) -> Result<()> {
         // Get old values for audit
         let old_person = self.get_by_id(id).await?;
 
-        // Soft delete
-        let update_model = persons::ActiveModel {
-            id: Set(*id),
-            deleted_at: Set(Some(OffsetDateTime::now_utc())),
-            deleted_by: Set(Some("system".to_string())),
-            ..Default::default()
-        };
-        update_model.update(&self.db).await?;
+        // Soft delete: stamp `deleted_at`/`deleted_by` only. Unlike
+        // create/update, this is a single row update with no existing
+        // transaction. Under the outbox transport we open one here so the
+        // tombstone write and the `deleted` outbox row commit atomically;
+        // the memory transport keeps the plain, tx-free update.
+        if self.transport.is_outbox() {
+            let txn = self.db.begin().await?;
+            apply_soft_delete_row(&txn, id).await?;
+            if let Some(old) = old_person.as_ref() {
+                self.enqueue_outbox(&txn, old, EventKind::Deleted).await?;
+            }
+            txn.commit().await?;
+        } else {
+            apply_soft_delete_row(&self.db, id).await?;
+        }
 
         // Publish event
         self.publish_event(crate::streaming::PersonEvent::Deleted {
@@ -1035,5 +1217,98 @@ impl PersonRepository for SeaOrmPersonRepository {
         }
 
         Ok(persons)
+    }
+}
+
+/// DB-gated (`#[ignore]`) atomicity tests for the outbox write path.
+/// They require a migrated `PostgreSQL` via `DATABASE_URL` and are skipped
+/// by a bare `cargo test`; run with
+/// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE
+/// under a bare `cargo test --lib`.
+#[cfg(test)]
+mod tests {
+    use super::{PersonRepository, SeaOrmPersonRepository};
+    use crate::db::models::event_outbox;
+    use crate::models::{Gender, HumanName, Person};
+    use crate::streaming::EventTransport;
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    async fn connect() -> sea_orm::DatabaseConnection {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        sea_orm::Database::connect(&url)
+            .await
+            .expect("connect to DATABASE_URL")
+    }
+
+    fn a_person(family: &str) -> Person {
+        Person::new(
+            HumanName {
+                use_type: None,
+                family: family.to_string(),
+                given: vec!["Test".to_string()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Unknown,
+        )
+    }
+
+    /// Create writes a `created` outbox row in the same transaction as the
+    /// entity rows.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn create_enqueues_a_created_outbox_row() {
+        let db = connect().await;
+        let repo = SeaOrmPersonRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+
+        let person = repo.create(&a_person("Created")).await.unwrap();
+
+        let rows = event_outbox::Entity::find()
+            .filter(event_outbox::Column::EntityPid.eq(person.id))
+            .filter(event_outbox::Column::Kind.eq("created"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1, "one created outbox row for the new person");
+        assert_eq!(rows[0].entity, "person");
+    }
+
+    /// Merge writes, in one transaction: a `merged` outbox row for the
+    /// survivor carrying the duplicate's pid in `merged_from`, plus a
+    /// `deleted` outbox row for the duplicate.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn merge_enqueues_merged_with_merged_from_and_deleted() {
+        let db = connect().await;
+        let repo = SeaOrmPersonRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+
+        let survivor = repo.create(&a_person("Survivor")).await.unwrap();
+        let duplicate = repo.create(&a_person("Duplicate")).await.unwrap();
+
+        let merged = repo.merge(&survivor, &duplicate.id).await.unwrap();
+        assert_eq!(merged.id, survivor.id);
+
+        // Survivor: exactly one `merged` row, carrying the duplicate pid.
+        let merged_rows = event_outbox::Entity::find()
+            .filter(event_outbox::Column::EntityPid.eq(survivor.id))
+            .filter(event_outbox::Column::Kind.eq("merged"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(merged_rows.len(), 1, "one merged outbox row for survivor");
+        assert_eq!(
+            merged_rows[0].payload["merged_from"],
+            serde_json::json!(duplicate.id.to_string()),
+            "merged row carries the duplicate's pid"
+        );
+
+        // Duplicate: a `deleted` row.
+        let deleted_rows = event_outbox::Entity::find()
+            .filter(event_outbox::Column::EntityPid.eq(duplicate.id))
+            .filter(event_outbox::Column::Kind.eq("deleted"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(deleted_rows.len(), 1, "one deleted outbox row for duplicate");
     }
 }

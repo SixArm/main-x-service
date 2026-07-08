@@ -12,6 +12,31 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **CSRF synchroniser token** on cookie-authenticated mutating requests
+  (`agents/share/authentication-sessions.md` §4). A per-session random
+  token is minted at session establishment (`verify`), stored server-side
+  (`sessions.data.csrf`), and delivered in a readable `__Host-mxi_csrf`
+  cookie (not `HttpOnly`). `POST /api/auth/token` now requires the client
+  to echo it in the `X-CSRF-Token` header, **constant-time** compared
+  against the session copy — a mismatch is `403` (distinct from the
+  `401`s). Composes with the existing `Origin` allow-list backstop.
+  Sessions predating CSRF have no token stored and skip the check
+  (graceful). New `src/csrf.rs` (generate / cookie / constant-time
+  compare) with DB-free tests; `signout` clears the CSRF cookie too.
+- **Sessions-table reshape** (`authentication-sessions.md` §3). New
+  migration `m20220101_000008_sessions_ttls` adds `last_seen_at` /
+  `idle_expires_at` / `absolute_expires_at` (nullable — no backfill) plus
+  the `sessions_active_user` partial index (`WHERE revoked_at IS NULL`).
+  A session now has a sliding **idle** window (`AUTH_SESSION_IDLE_TTL_SECS`,
+  default 30 min) and a hard **absolute** ceiling
+  (`AUTH_SESSION_ABSOLUTE_TTL_SECS`, default 12 h). `Model::is_active`
+  now enforces both (previously it checked only revocation, ignoring the
+  boot-time `expires_at`); `Model::issue` sets the TTLs (independent of
+  the ~5-min token exp); `Model::touch` slides the idle window on `/me`
+  (capped at the absolute ceiling). Legacy rows (nullable bounds) stay
+  valid-until-revoked. `sid` rotation already happens per magic-link
+  login (a fresh `sid` each `verify`). Pure `is_active_at` boundary test.
+
 - **ABAC attribute sourcing (`attrs` claim).** The sourcing side of the
   family's attribute-based access control, per
   [`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md)
@@ -92,6 +117,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   (`cli` or the admin's `pid:<uuid>`). Attribute **values** are omitted
   from the audit detail (a value can itself be sensitive); the value set
   lives in `users.attributes`.
+
+- **Attribute vocabulary (typo guard).** Optional per-deployment
+  allow-set of attribute keys → values, configured via
+  `AUTH_ATTRIBUTE_VOCABULARY` (inline JSON) or
+  `AUTH_ATTRIBUTE_VOCABULARY_FILE` (path), e.g.
+  `{ "access": ["read","write","admin"], "dept": ["cardiology"], "svc": [] }`
+  (an empty value list ⇒ any value for that key).
+  `tasks::attributes::AttributeVocabulary` + the cached `vocabulary()`
+  are enforced by **both** assignment surfaces — the `user_attributes`
+  CLI task (on `set`) and the admin `PUT` (`validate_map`) — so a typo
+  like `dept=cardiolgy` or an unknown key is rejected instead of
+  silently granting nothing. Unset/unparsable ⇒ unrestricted
+  (warn-logged on a parse error) — assignment always works. DB-free
+  tests for the vocabulary checks.
 
 ### Fixed
 

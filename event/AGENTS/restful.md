@@ -1,6 +1,6 @@
 # RESTful API — Event Entity
 
-One HTTP surface, owned by the service, versioned under **`/api/v1`**,
+One HTTP surface, owned by the service, versioned under **`/api`**,
 consumed by the front-end (and any agency integrator). Full endpoint
 reference with request/response shapes:
 [`event-service-with-loco/AGENTS/restful.md`](../event-service-with-loco/AGENTS/restful.md).
@@ -26,7 +26,7 @@ reference.
 
 ## Entity-level conventions
 
-- **Versioned surface.** Breaking wire changes require `/api/v1` →
+- **Versioned surface.** Breaking wire changes require `/api` →
   `/api/v2`; that decision is entity-level
   ([spec §8.3](../spec/08-architecture.md)).
 - **The front-end binds 1:1** to these endpoints via `ApiClient` +

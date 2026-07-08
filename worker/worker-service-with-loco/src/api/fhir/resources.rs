@@ -12,8 +12,9 @@
 
 use serde::{Deserialize, Serialize};
 
-/// FHIR R5 `Patient`-shaped Worker resource — the top-level resource exchanged
-/// by the FHIR endpoints. Fields mirror FHIR R5 element names (see module docs).
+/// FHIR R5 `Practitioner`-shaped Worker resource — the top-level resource
+/// exchanged by the FHIR endpoints (`resourceType: "Practitioner"`). Fields
+/// mirror FHIR R5 element names (see module docs).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FhirWorker {
@@ -320,8 +321,9 @@ impl FhirWorker {
     pub fn new() -> Self {
         Self {
             // Wire discriminator: every emitted resource carries
-            // `"resourceType": "Worker"`.
-            resource_type: "Worker".to_string(),
+            // `"resourceType": "Practitioner"` (the standard FHIR R5 type
+            // for a worker — fhir.md §3).
+            resource_type: "Practitioner".to_string(),
             id: None,
             meta: None,
             identifier: None,

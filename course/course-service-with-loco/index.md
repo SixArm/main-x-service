@@ -15,9 +15,10 @@ locations and parties).
 
 > **Status.** Production-ready MVP. FR-1..FR-9 (CRUD / search /
 > match / merge / dedup) + FR-10..FR-13 (instance sub-resource) +
-> FR-14..FR-18 (audit / streaming / privacy) are all wired. Only
-> auth (T-15) remains, blocked on the family-wide auth rollout
-> (cookie sessions + offline PASETO v4.public; see
+> FR-14..FR-18 (audit / streaming / privacy) are all wired, plus the
+> family-wide auth guard (T-15): offline PASETO v4.public bearer
+> verification + ABAC blanket enforcement on `/api/*` and `/fhir/*`,
+> **default-off** via `COURSE_REQUIRE_AUTH` (see
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)).
 > See [`spec.md §13`](spec/13-tasks.md) for the per-task ledger.
 
@@ -78,7 +79,7 @@ Prometheus metrics are served at the application root:
 
 - `GET /metrics.prom` — text-exposition format (`text/plain; version=0.0.4`), public (no bearer token). Counters: `course_created_total`, `course_updated_total`, `course_deleted_total`, `course_merged_total`, plus a labelled `http_requests_total{path,status}`. Configure your scraper with `metrics_path: /metrics.prom`.
 
-The Event Service uses `/api/v1/`; Course does NOT — direct `/api`.
+The Event Service uses `/api/`; Course does NOT — direct `/api`.
 
 ### Worked example — duplicate on create (409, FR-1 / FR-20)
 
@@ -208,8 +209,9 @@ bring-up the integration suite expects to be migrated against.
   `http_requests_total`.
 - **Tests**: 42 unit + 14 bridge + 12 #[ignore]-tagged integration
   (T-12) + 3 criterion benches (T-13).
-- **Auth**: cookie sessions + offline PASETO v4.public (T-15) blocked
-  on the family-wide rollout; see
+- **Auth**: offline PASETO v4.public bearer verification + ABAC blanket
+  guard on `/api/*` and `/fhir/*` (T-15), **default-off** via
+  `COURSE_REQUIRE_AUTH`; `GET /api/whoami` echoes verified claims. See
   [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
 
 ## License

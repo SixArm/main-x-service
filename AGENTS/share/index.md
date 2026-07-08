@@ -63,6 +63,8 @@ Per-crate `spec.md`:
 | [postgresql.md](postgresql.md)                                   | PostgreSQL database, extensions                        |
 | [privacy.md](privacy.md)                                         | Data masking, GDPR, consent                            |
 | [restful.md](restful.md)                                         | RESTful API guidance                                   |
+| [fhir.md](fhir.md)                                               | HL7 FHIR R5 API (resource mapping per entity, endpoints, Bundle/OperationOutcome/CapabilityStatement, auth/masking, per-entity adoption) |
+| [api-versioning.md](api-versioning.md)                           | Header-based API versioning (`Accepts-version`); no version in URLs (`/api/v1` removed); default/negotiate/406 rules |
 | [jwt.md](jwt.md)                                                 | Why JWTs must not be used for sessions (principle)     |
 | [authentication-sessions.md](authentication-sessions.md)         | Cookie sessions (Postgres) + PASETO v4 cross-service tokens + BFF front-end (supersedes the RS256-JWT model) |
 | [jwt-enforcement.md](jwt-enforcement.md)                         | Blanket `/api/*` auth enforcement (coordinated; credential now PASETO/session) |

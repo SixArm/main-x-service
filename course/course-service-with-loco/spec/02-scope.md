@@ -22,9 +22,18 @@
 - PostgreSQL persistence via SeaORM, with migrations.
 - Observability (tracing + OpenTelemetry OTLP).
 
+### 2.1a Authentication / authorisation (adopted, default-off)
+
+- Offline **PASETO v4.public** bearer verification + **ABAC** blanket
+  guard on `/api/*` and `/fhir/*`, per the family contracts
+  ([`authentication-sessions.md`](../../../agents/share/authentication-sessions.md),
+  [`jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md),
+  [`authorization-attributes.md`](../../../agents/share/authorization-attributes.md)).
+  Enforcement is **off by default** (`COURSE_REQUIRE_AUTH`); activation
+  is an operations decision. See §7 for the config vars and T-15.
+
 ### 2.2 Out of scope (MVP)
 
-- Authentication / authorisation middleware (planned — §15).
 - gRPC API (stub only).
 - FHIR resource mapping (no FHIR resource fits Course cleanly).
 - ML-based match scoring.

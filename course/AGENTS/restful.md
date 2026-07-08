@@ -7,7 +7,7 @@ the normative summary is entity spec [§9](../spec/09-api-surface.md).
 
 ## The one wire contract
 
-- Base path: **`/api`** (not `/api/v1` — that's the event entity).
+- Base path: **`/api`** (not `/api` — that's the event entity).
   Default port **8084**. The front-end's `CourseRepository`
   ([`src/lib/api/courses.ts`](../course-front-end-with-svelte/src/lib/api/courses.ts))
   hard-assumes this.

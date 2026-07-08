@@ -11,6 +11,13 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+pub mod envelope;
+
+// Re-export the durable-bus envelope surface at the `streaming` root, but
+// NOT its `EventKind` (which would collide with the legacy `EventKind`
+// below) — reach that as `crate::streaming::envelope::EventKind`.
+pub use envelope::{ENTITY, Envelope, EventTransport, EventView, SCHEMA_VERSION, transport};
+
 /// One event in the Place stream.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaceEvent {

@@ -28,11 +28,11 @@ export interface SearchOptions {
 
 /**
  * Typed REST client for the Event Service, one method per endpoint. All
- * paths are mounted under `/api/v1/` (see the service's restful.md).
+ * paths are mounted under `/api/` (see the service's restful.md).
  * Construct one per page/component — there is no global HTTP store.
  */
 // REST client for Event Service. Endpoints are mounted under
-// `/api/v1/` — see event-service-with-loco/AGENTS/restful.md.
+// `/api/` — see event-service-with-loco/AGENTS/restful.md.
 export class EventRepository {
   /** @param http - The underlying {@link ApiClient} used for all calls. */
   constructor(private readonly http: ApiClient) {}
@@ -64,7 +64,7 @@ export class EventRepository {
   ): Promise<{ items: Event[]; total: number }> {
     const data = await this.http.get<
       Event[] | { items: Event[]; total?: number }
-    >("/api/v1/events/search", {
+    >("/api/events/search", {
       query: {
         q: opts.q,
         limit: opts.limit,
@@ -84,60 +84,60 @@ export class EventRepository {
 
   /** Fetch a single event by id. @throws {ApiError} 404 when absent. */
   get(id: string): Promise<Event> {
-    return this.http.get<Event>(`/api/v1/events/${id}`);
+    return this.http.get<Event>(`/api/events/${id}`);
   }
   /** Create a new event. @throws {ApiError} 409 on duplicate, 422 on validation error. */
   create(event: Event): Promise<Event> {
-    return this.http.post<Event>("/api/v1/events", { body: event });
+    return this.http.post<Event>("/api/events", { body: event });
   }
   /** Replace an existing event by id. @throws {ApiError} 422 on validation error. */
   update(id: string, event: Event): Promise<Event> {
-    return this.http.put<Event>(`/api/v1/events/${id}`, { body: event });
+    return this.http.put<Event>(`/api/events/${id}`, { body: event });
   }
   /** Soft-delete (deactivate) an event by id. */
   softDelete(id: string): Promise<void> {
-    return this.http.delete<void>(`/api/v1/events/${id}`);
+    return this.http.delete<void>(`/api/events/${id}`);
   }
   /** Score existing events against the given attributes; returns ranked candidates. */
   match(request: MatchRequest): Promise<MatchResult[]> {
-    return this.http.post<MatchResult[]>("/api/v1/events/match", {
+    return this.http.post<MatchResult[]>("/api/events/match", {
       body: request,
     });
   }
   /** Pre-create duplicate check: score a candidate event without persisting it. */
   checkDuplicates(candidate: Partial<Event>): Promise<MatchResult[]> {
-    return this.http.post<MatchResult[]>("/api/v1/events/check-duplicates", {
+    return this.http.post<MatchResult[]>("/api/events/check-duplicates", {
       body: candidate,
     });
   }
   /** Merge a duplicate event into a surviving one; returns the merge record + survivor. */
   merge(request: MergeRequest): Promise<MergeResponse> {
-    return this.http.post<MergeResponse>("/api/v1/events/merge", {
+    return this.http.post<MergeResponse>("/api/events/merge", {
       body: request,
     });
   }
   /** Fetch an event with sensitive fields redacted (privacy-masked view). */
   masked(id: string): Promise<Event> {
-    return this.http.get<Event>(`/api/v1/events/${id}/masked`);
+    return this.http.get<Event>(`/api/events/${id}/masked`);
   }
   /** GDPR data export for one event; shape is service-defined, hence `unknown`. */
   exportGdpr(id: string): Promise<unknown> {
-    return this.http.get<unknown>(`/api/v1/events/${id}/export`);
+    return this.http.get<unknown>(`/api/events/${id}/export`);
   }
   /** Fetch the audit trail for one event (most recent first), capped at `limit`. */
   audit(id: string, limit = 50): Promise<AuditEntry[]> {
-    return this.http.get<AuditEntry[]>(`/api/v1/events/${id}/audit`, {
+    return this.http.get<AuditEntry[]>(`/api/events/${id}/audit`, {
       query: { limit },
     });
   }
   /** Fetch the system-wide recent audit feed across all events, capped at `limit`. */
   recentAudit(limit = 50): Promise<AuditEntry[]> {
-    return this.http.get<AuditEntry[]>("/api/v1/audit/recent", {
+    return this.http.get<AuditEntry[]>("/api/audit/recent", {
       query: { limit },
     });
   }
   /** Liveness/health probe for the service. */
   health(): Promise<{ status: string }> {
-    return this.http.get<{ status: string }>("/api/v1/health");
+    return this.http.get<{ status: string }>("/api/health");
   }
 }

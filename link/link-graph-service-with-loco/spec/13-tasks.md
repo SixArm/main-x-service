@@ -44,15 +44,15 @@
 
 ### Read API
 
-- [ ] T-11: `GET /api/v1/neighbors/{ref}` — both-direction index
+- [ ] T-11: `GET /api/neighbors/{ref}` — both-direction index
   lookups; `kind` / `direction` / `depth` (capped) filters; `as_of`
   (§6 FR-13/17).
-- [ ] T-12: `GET /api/v1/edges` — `from` / `to` / `kind` / `status`
+- [ ] T-12: `GET /api/edges` — `from` / `to` / `kind` / `status`
   filters; `as_of` (§6 FR-14).
-- [ ] T-13: `GET /api/v1/single-view/{ref}` — `same_identity`
+- [ ] T-13: `GET /api/single-view/{ref}` — `same_identity`
   unification + affiliation walk (`person → worker → org`); `as_of`
   (§6 FR-15).
-- [ ] T-14: `GET /api/v1/health/freshness` — per-topic lag (§6 FR-16).
+- [ ] T-14: `GET /api/health/freshness` — per-topic lag (§6 FR-16).
 - [ ] T-15: OpenAPI via utoipa derives + Swagger UI at `/swagger-ui`;
   raw spec at `/api-docs/openapi.json`.
 

@@ -23,6 +23,10 @@ pub mod app;
 pub mod auth;
 /// REST controllers: organization CRUD, matching, audit, and the docs endpoints.
 pub mod controllers;
+
+/// HL7 FHIR R5 interop (`Organization` resource) — conversions, wire
+/// types, and search-parameter parsing for the mounted `/fhir` endpoints.
+pub mod fhir;
 /// Loco initializers (currently empty; reserved for app-startup wiring).
 pub mod initializers;
 /// Pure record-merge logic (fold a duplicate into a survivor).
@@ -33,5 +37,11 @@ pub mod metrics;
 pub mod models;
 /// Hand-written OpenAPI 3 document served at `/api-docs/openapi.json`.
 pub mod openapi;
+
+/// Durable event bus Phase 3: the outbox relay (drain → sink → mark
+/// published) + retention purge. See [`agents/share/event-bus.md`].
+pub mod relay;
 /// In-memory event stream published on every CRUD action.
 pub mod streaming;
+/// Header-based API versioning (`Accepts-version`) for the REST surface.
+pub mod version;

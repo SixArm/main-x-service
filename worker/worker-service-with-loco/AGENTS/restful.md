@@ -84,6 +84,8 @@ is [`api::rest::handlers::metrics_prom`](../src/api/rest/handlers.rs).
 
 ## RESTful API Endpoints
 
+API URLs are version-free; select the version with the `Accepts-version` header (default `1.0`) — see [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
+
 ### Health
 
 | Method | Path             | Description  |
@@ -94,7 +96,7 @@ is [`api::rest::handlers::metrics_prom`](../src/api/rest/handlers.rs).
 
 | Method | Path             | Description                                                          |
 | ------ | ---------------- | -------------------------------------------------------------------- |
-| GET    | `/api/v1/whoami` | Echo the verified bearer-token claims (`401` without a valid token) |
+| GET    | `/api/whoami` | Echo the verified bearer-token claims (`401` without a valid token) |
 
 Bearer tokens are PASETO `v4.public` (Ed25519) minted by the central
 authentication-service and verified **offline** against its published
@@ -125,7 +127,7 @@ The public allow-list (`PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES` in
 `src/api/rest/auth.rs`) stays token-free even when enforcement is on:
 
 - `/_health`, `/_ping` (loco health probes)
-- `/api/v1/health` (this crate's health endpoint)
+- `/api/health` (this crate's health endpoint)
 - `/api-docs/openapi.json` (OpenAPI document)
 - `/swagger-ui*` (Swagger UI + assets)
 - `/metrics.prom` (Prometheus scrape)

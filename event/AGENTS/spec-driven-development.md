@@ -13,7 +13,7 @@ Two layers of "single source of truth", split by subject matter:
 | Subject | Source of truth |
 |---|---|
 | A subproject's internals (algorithms, weights, routes, schema, components) | That subproject's own `spec/` |
-| The cross-subproject contract (trio composition, service ↔ matcher DTO via `adapter.rs`, shared invariants, `/api/v1` versioning, entity-wide goals) | [`../spec/index.md`](../spec/index.md) |
+| The cross-subproject contract (trio composition, service ↔ matcher DTO via `adapter.rs`, shared invariants, `/api` versioning, entity-wide goals) | [`../spec/index.md`](../spec/index.md) |
 
 Conflict rule: about crate internals, the crate spec wins; about the
 integration contract, the entity spec wins. Either way, **the

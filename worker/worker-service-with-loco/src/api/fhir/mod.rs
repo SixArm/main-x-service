@@ -99,7 +99,7 @@ fn to_fhir_names(worker: &Worker) -> Vec<FhirHumanName> {
     names
 }
 
-/// Maps an internal [`Worker`] to a FHIR R5 `Patient`-shaped [`FhirWorker`].
+/// Maps an internal [`Worker`] to a FHIR R5 `Practitioner`-shaped [`FhirWorker`].
 ///
 /// Copies identity, names (primary plus additional), telecom, gender, birth
 /// date, deceased state, addresses, marital status, multiple-birth flag,
@@ -425,4 +425,48 @@ pub fn from_fhir_worker(fhir_worker: &FhirWorker) -> Result<Worker> {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Gender, HumanName, Worker};
+
+    fn sample_worker() -> Worker {
+        let name = HumanName {
+            use_type: None,
+            family: "Smith".to_string(),
+            given: vec!["John".to_string()],
+            prefix: vec![],
+            suffix: vec![],
+        };
+        let mut worker = Worker::new(name, Gender::Male);
+        worker.birth_date = "1980-01-15".parse::<chrono::NaiveDate>().ok();
+        worker
+    }
+
+    #[test]
+    fn to_fhir_worker_emits_practitioner_resource_type() {
+        let fhir = to_fhir_worker(&sample_worker());
+        assert_eq!(fhir.resource_type, "Practitioner");
+    }
+
+    #[test]
+    fn round_trip_preserves_core_fields() {
+        let worker = sample_worker();
+        let fhir = to_fhir_worker(&worker);
+        let back = from_fhir_worker(&fhir).expect("round-trip should succeed");
+        assert_eq!(back.name.family, worker.name.family);
+        assert_eq!(back.name.given, worker.name.given);
+        assert_eq!(back.gender, worker.gender);
+        assert_eq!(back.birth_date, worker.birth_date);
+        assert_eq!(back.id, worker.id);
+    }
+
+    #[test]
+    fn from_fhir_worker_rejects_missing_name() {
+        let fhir = FhirWorker::new(); // no name set
+        let err = from_fhir_worker(&fhir);
+        assert!(err.is_err(), "a resource with no name must be rejected");
+    }
 }

@@ -128,9 +128,20 @@ PASETO trailer (here carrying `kid`), authenticated but not encrypted.
     namespace is disjoint from subject attributes (no spoofing via the
     token); under plain `evaluate` every `resource.*` key resolves
     empty. `evaluate` delegates here with an empty map.
+  - `Policy::evaluate_with_context(&claims, action, entity, &resource,
+    &env)` (v0.5) — as above, plus **environment attributes** matched
+    by `env.<name>` keys (request-time / network context, e.g.
+    `env.after_hours`; the caller supplies the clock so the engine stays
+    deterministic). A `when` **value** `$sub` / `$email` is a template
+    resolving to the caller's identity, so a rule expresses ownership
+    (`resource.owner: ["$sub"]`). `evaluate_with_resource` delegates
+    here with an empty env.
   - `Decision` — `allowed` + `reason` (deciding rule index or the
-    default decision), so a 403 body and the audit trail can state
-    exactly why.
+    default decision) + `obligations` (v0.6) — the deciding allow
+    rule's advisory instructions (`"mask"` / `"audit"`) the enforcement
+    point must honour; empty on a deny/default. `Decision::requires`
+    checks one. So a 403 body and the audit trail can state exactly why,
+    and a conditional allow can carry a mask/audit obligation.
 
 ### The PASETO-keys / `kid` contract
 
@@ -264,6 +275,36 @@ attribute values, so it is safe for 403 bodies and audit trails.
       Engine tests: sensitivity-gated deny below an admin allow,
       delegation identity, negation, namespace disjointness. Version
       0.3.0 → 0.4.0 (additive).
+- [x] **Ownership templates + environment attributes (v0.5.0).**
+      *(2026-07-05)* `$sub`/`$email` `when`-value templates (ownership,
+      §4) + `Policy::evaluate_with_context` with the `env.<name>`
+      namespace (request-time/network context, §10). Additive:
+      `evaluate`/`evaluate_with_resource` unchanged. Engine tests:
+      `$sub` ownership, literal-`$`, `env` time-window deny, empty-env
+      delegation identity. Version 0.4.0 → 0.5.0.
+- [x] **Hot-reloadable verifier for key rotation (v0.8.0).**
+      *(2026-07-05)* `ReloadableVerifier` (`RwLock<Arc<Verifier>>`;
+      `new`/`current`/`store`; poison-safe; no `Debug`) lets a service
+      swap its key set at runtime (periodic re-fetch of
+      `/.well-known/paseto-keys`) so key rotation needs no restart; keep
+      current keys on a failed fetch. Additive; `Verifier` unchanged.
+      Test: `store` swaps the key set while a prior `current()` snapshot
+      is preserved. Version 0.7.0 → 0.8.0.
+- [x] **Hot-reloadable policy (v0.7.0).** *(2026-07-05)*
+      `ReloadablePolicy` (`RwLock<Arc<Policy>>`; `new`/`current`/`store`;
+      poison-safe) lets a service swap the active policy at runtime with
+      a lock-light read path; the trigger is the service's concern.
+      Additive; engine unchanged. Test: `store` swaps for new readers
+      while a prior `current()` snapshot is preserved. Version
+      0.6.0 → 0.7.0.
+- [x] **Obligations (v0.6.0).** *(2026-07-05)* `Rule.obligations` +
+      `Decision.obligations` (both `#[serde(default)]`) +
+      `Decision::requires`, per §11: an allow rule attaches advisory
+      instructions (`"mask"`/`"audit"`) the enforcement point honours;
+      the engine carries but does not interpret them; deny/default carry
+      none. Additive. Engine tests: allow surfaces obligations,
+      deny/default carry none, first-match precedence, default-policy
+      allows carry none. Version 0.5.0 → 0.6.0.
 - [ ] Refetch-on-`UnknownKid` helper (or document the pattern per
       entity spec §13 T-5 key rotation).
 - [ ] Property-test the PASETO-keys parser against fuzzed documents.

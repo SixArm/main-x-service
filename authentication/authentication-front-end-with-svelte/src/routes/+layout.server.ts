@@ -8,7 +8,7 @@ import { currentUser } from "$lib/server/auth";
 
 export const load: LayoutServerLoad = async ({ locals, fetch }) => {
   const user = locals.sessionId
-    ? await currentUser(fetch, locals.sessionId)
+    ? await currentUser(fetch, locals.sessionId, locals.csrfToken)
     : null;
   return { user };
 };

@@ -10,6 +10,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Operator UI for ABAC attribute assignment** (`/admin/attributes`).
+  Pick a user by pid, view their ABAC subject attributes, edit the JSON
+  map, and Save (PUT) — all through the BFF (`src/lib/server/admin.ts`
+  exchanges the session for a PASETO and calls the auth service's admin
+  API). The admin API requires the signed-in operator to carry
+  `access=admin`; a `403` is surfaced in the UI. Sending `{}` clears all
+  attributes. DB-free unit test for the new cookie parsing.
+- **CSRF synchroniser-token plumbing through the BFF.** The auth
+  service's `POST /token` now requires the session's CSRF token in the
+  `X-CSRF-Token` header (`authentication-sessions.md` §4). The BFF now
+  captures the `__Host-mxi_csrf` token at verify, re-hosts it as an
+  httpOnly cookie on its own origin (`hooks.server.ts` → `locals.csrfToken`),
+  and echoes it on every `/token` exchange (`server/auth.ts`). Without
+  this the whole BFF (`/me`, sign-out, admin) would have broken on `403`.
+  Browser↔BFF CSRF stays SvelteKit's native form-action origin check.
+
 ### Changed
 
 - **Re-spec to httpOnly-cookie + BFF session model (2026-06-17).** Adopted

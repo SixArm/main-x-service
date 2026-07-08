@@ -125,6 +125,10 @@ configure your scraper with `metrics_path: /metrics.prom`. The metric
 inventory (entity-CRUD counters, HTTP request counter, latency
 histograms) is in [`src/metrics.rs`](../src/metrics.rs).
 
+## API versioning
+
+API URLs are version-free; select the representation version with the `Accepts-version` header (default `1.0`) — see [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
+
 ## RESTful API endpoints
 
 | Method | Path                      | Description           |

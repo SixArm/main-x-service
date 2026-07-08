@@ -14,7 +14,7 @@ identities across **four matchable collections — portfolios, projects,
 products, programs** — **and** to run each work item as a live project
 workspace: goals, a Kanban task board, issues, a timeline / Gantt, and a
 burndown chart. It is a thin presentation layer over the portfolio
-service's REST API (`/api/v1/{portfolios,projects,products,programs}/...`);
+service's REST API (`/api/{portfolios,projects,products,programs}/...`);
 the Rust service is the system of record.
 
 The entity has two faces that share one record (entity spec §1): a
@@ -89,7 +89,7 @@ match breakdown).
   Product / Program; absent for the Portfolio kind. Drives the roll-up
   and is an exact-match supporting signal for child kinds.
 - **Sub-resource** — a `Goal` / `Task` / `Issue` owned by a work item,
-  reached under `/api/v1/{collection}/{pid}/…`. Not part of the matching
+  reached under `/api/{collection}/{pid}/…`. Not part of the matching
   surface (except goal titles).
 - **check-duplicates** — POST the current record to find stored matches
   (within its collection).
@@ -169,20 +169,20 @@ keys fall back to `en`.
 ## 6. Functional requirements
 
 1. **List** active work items for the selected collection
-   (`GET /api/v1/{collection}`) in a **SVAR DataGrid** with columns:
+   (`GET /api/{collection}`) in a **SVAR DataGrid** with columns:
    name, status, owner org, lead, `portfolio_ref` (child kinds only),
    target date, tags. Sortable; client-side filter/search.
    - Search box (search-on-submit): a non-blank query calls
-     `GET /api/v1/{collection}/search?q=` (URL-encoded) and renders the
+     `GET /api/{collection}/search?q=` (URL-encoded) and renders the
      filtered results; **Clear** (or an empty query) restores the full
      list. Loading and empty-result states are shown.
    - Recent activity: a "Show recent activity" toggle lazy-loads
-     `GET /api/v1/{collection}/events/recent` on first open and renders
+     `GET /api/{collection}/events/recent` on first open and renders
      the events newest-first (highest `seq` first): the kind
      (created/updated/deleted/merged), the name (linked to the work item
      by pid), and the `seq`. Loading, empty, and error states; the panel
      does not auto-load on mount.
-2. **Create** (`POST /api/v1/{collection}`), redirect to the new detail
+2. **Create** (`POST /api/{collection}`), redirect to the new detail
    page. The collection (kind) is fixed by the route.
 3. **Detail**: render the stored `WorkItem`; offer edit, delete,
    check-duplicates, merge, the audit timeline, and entry points to the
@@ -199,13 +199,13 @@ keys fall back to `en`.
    `kind` is a hard match gate, not a scored component.
 7. **Merge**: each duplicate row offers "Merge into this record" (the
    detail record is the survivor/main; the row's pid is the duplicate).
-   A two-step inline confirm calls `POST /api/v1/{collection}/merge` with
+   A two-step inline confirm calls `POST /api/{collection}/merge` with
    `{main_pid, duplicate_pid, reason?}`. On success it adopts the
    returned survivor record, re-runs check-duplicates, and shows a
    success message. Equal pids are guarded client-side (the service
    `422`s); `404`/other errors surface via the error banner.
 8. **Audit timeline**: a "Show audit trail" toggle lazy-loads
-   `GET /api/v1/{collection}/{pid}/audit` on first open and renders the
+   `GET /api/{collection}/{pid}/audit` on first open and renders the
    rows newest-first (action, actor or "—" when null, timestamp).
    Loading, empty, and error states; the panel does not auto-load on
    mount.
@@ -306,17 +306,17 @@ cycle as any matcher-type change (entity spec §18).
 
 | Route / action | Endpoint |
 |---|---|
-| list | `GET /api/v1/{collection}` |
-| search | `GET /api/v1/{collection}/search?q=` |
-| recent activity | `GET /api/v1/{collection}/events/recent` (→ `WorkItemEvent[]`) |
-| create | `POST /api/v1/{collection}` |
-| detail load | `GET /api/v1/{collection}/{pid}` |
-| delete | `DELETE /api/v1/{collection}/{pid}` |
-| duplicates | `POST /api/v1/{collection}/check-duplicates` (→ `ScoredRef[]` w/ `MatchBreakdown`) |
-| merge | `POST /api/v1/{collection}/merge` (`{main_pid, duplicate_pid, reason?}`) |
-| audit | `GET /api/v1/{collection}/{pid}/audit` (→ `AuditEntry[]`) |
-| edit | `PUT /api/v1/{collection}/{pid}` |
-| roll-up (portfolio) | `GET /api/v1/{projects,products,programs}?portfolio_ref={pid}` |
+| list | `GET /api/{collection}` |
+| search | `GET /api/{collection}/search?q=` |
+| recent activity | `GET /api/{collection}/events/recent` (→ `WorkItemEvent[]`) |
+| create | `POST /api/{collection}` |
+| detail load | `GET /api/{collection}/{pid}` |
+| delete | `DELETE /api/{collection}/{pid}` |
+| duplicates | `POST /api/{collection}/check-duplicates` (→ `ScoredRef[]` w/ `MatchBreakdown`) |
+| merge | `POST /api/{collection}/merge` (`{main_pid, duplicate_pid, reason?}`) |
+| audit | `GET /api/{collection}/{pid}/audit` (→ `AuditEntry[]`) |
+| edit | `PUT /api/{collection}/{pid}` |
+| roll-up (portfolio) | `GET /api/{projects,products,programs}?portfolio_ref={pid}` |
 | board: list / move | `GET …/{pid}/tasks` · `PATCH …/{pid}/tasks/{tid}` (status) |
 | board: create / edit | `POST …/{pid}/tasks` · `PUT …/{pid}/tasks/{tid}` |
 | issues | `GET / POST …/{pid}/issues` · `PUT …/{pid}/issues/{iid}` |

@@ -17,7 +17,7 @@ use crate::metrics::Metrics;
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::care_pathways::Model as PathwayModel;
 use crate::models::merge_records::Model as MergeRecordModel;
-use crate::streaming::{self, EventKind};
+use crate::streaming;
 
 /// Maximum number of stored pathways scanned in-memory by
 /// `check-duplicates`.
@@ -166,10 +166,11 @@ async fn create(
     Json(pathway): Json<CarePathway>,
 ) -> Result<Response> {
     validate(&pathway)?;
-    let model = PathwayModel::create(&ctx.db, &pathway).await?;
+    // Write + `Created` event, atomic under the active transport (`outbox`
+    // shares one transaction; `memory` keeps today's ring-buffer path).
+    let model = streaming::create_and_emit(&ctx.db, &pathway, caller.actor()).await?;
     Metrics::global().care_pathway_created_total.inc();
-    // Audit + event are best-effort side channels; the create itself has
-    // already committed by the time we record them.
+    // Audit is a best-effort side channel; the create has already committed.
     audit(
         &ctx,
         model.pid,
@@ -178,12 +179,6 @@ async fn create(
         Some(model.data.clone()),
     )
     .await;
-    streaming::publish_with_actor(
-        EventKind::Created,
-        &model.pid.to_string(),
-        &model.name,
-        caller.actor(),
-    );
     format::json(PathwayRef::of(&model))
 }
 
@@ -238,10 +233,8 @@ async fn update(
 ) -> Result<Response> {
     validate(&pathway)?;
     let model = PathwayModel::find_by_pid(&ctx.db, &pid).await?;
-    let updated = model
-        .into_active_model()
-        .update_data(&ctx.db, &pathway)
-        .await?;
+    // Update + `Updated` event, atomic under the active transport.
+    let updated = streaming::update_and_emit(&ctx.db, model, &pathway, caller.actor()).await?;
     Metrics::global().care_pathway_updated_total.inc();
     audit(
         &ctx,
@@ -251,12 +244,6 @@ async fn update(
         Some(updated.data.clone()),
     )
     .await;
-    streaming::publish_with_actor(
-        EventKind::Updated,
-        &updated.pid.to_string(),
-        &updated.name,
-        caller.actor(),
-    );
     format::json(PathwayRef::of(&updated))
 }
 
@@ -276,17 +263,10 @@ async fn remove(
     caller: MaybeAuthUser,
 ) -> Result<Response> {
     let model = PathwayModel::find_by_pid(&ctx.db, &pid).await?;
-    // Capture identity before consuming the model into an active model.
-    let (entity_pid, name) = (model.pid, model.name.clone());
-    model.into_active_model().soft_delete(&ctx.db).await?;
+    // Soft-delete + `Deleted` event, atomic under the active transport.
+    let (entity_pid, _name) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
     Metrics::global().care_pathway_deleted_total.inc();
     audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
-    streaming::publish_with_actor(
-        EventKind::Deleted,
-        &entity_pid.to_string(),
-        &name,
-        caller.actor(),
-    );
     format::empty_json()
 }
 
@@ -432,13 +412,11 @@ async fn merge(
 
     let outcome = merge_pathways(&main.to_pathway()?, &duplicate.to_pathway()?);
 
-    // Update the survivor, then retire the duplicate.
-    let merged = main
-        .into_active_model()
-        .update_data(&ctx.db, &outcome.merged)
-        .await?;
-    let (dup_pid, dup_name) = (duplicate.pid, duplicate.name.clone());
-    duplicate.into_active_model().soft_delete(&ctx.db).await?;
+    // Update the survivor + retire the duplicate, emitting `Merged` (main)
+    // and `Deleted` (duplicate) — all atomic under the active transport.
+    let (merged, dup_pid, _dup_name) =
+        streaming::merge_and_emit(&ctx.db, main, duplicate, &outcome.merged, caller.actor())
+            .await?;
     Metrics::global().care_pathway_merged_total.inc();
 
     if let Err(err) = MergeRecordModel::record(
@@ -466,18 +444,6 @@ async fn merge(
     )
     .await;
     audit(&ctx, dup_pid, "merged_into", caller.actor(), None).await;
-    streaming::publish_with_actor(
-        EventKind::Merged,
-        &merged.pid.to_string(),
-        &merged.name,
-        caller.actor(),
-    );
-    streaming::publish_with_actor(
-        EventKind::Deleted,
-        &dup_pid.to_string(),
-        &dup_name,
-        caller.actor(),
-    );
 
     format::json(serde_json::json!({
         "main_pid": merged.pid.to_string(),
@@ -532,18 +498,20 @@ async fn entity_audit(Path(pid): Path<String>, State(ctx): State<AppContext>) ->
     format::json(rows)
 }
 
-/// Recent events from the in-memory event stream.
+/// Recent events from the active event transport.
 ///
 /// `GET /api/care-pathways/events/recent` — the last 100
-/// [`streaming::EventView`]s from the process-local ring buffer (not
-/// durable across restarts).
+/// [`streaming::EventView`]s, served from the process-local ring buffer
+/// (`memory`, not durable across restarts) or the `event_outbox` table
+/// (`outbox`). The wire shape is identical either way.
 ///
 /// # Errors
 ///
-/// None — reads the in-memory buffer.
+/// Propagates the outbox query error under the `outbox` transport
+/// (`memory` never errors).
 #[debug_handler]
-async fn recent_events() -> Result<Response> {
-    format::json(streaming::recent(100))
+async fn recent_events(State(ctx): State<AppContext>) -> Result<Response> {
+    format::json(streaming::recent_events(&ctx.db, 100).await?)
 }
 
 /// Echo the verified claims of the bearer token — `401` when the token is

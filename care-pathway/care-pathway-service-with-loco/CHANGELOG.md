@@ -9,6 +9,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — event bus: transactional-outbox storage (Phase 2 start) (2026-07-06)
+
+- New `event_outbox` table (migration `…_000004_event_outbox`) + SeaORM
+  entity + `models::event_outbox` — the durable hand-off buffer for the
+  event bus (`agents/share/event-bus.md` §3). This crate is the family
+  reference for the Phase-2 storage layer. Pieces:
+  - `OutboxInsert::from_envelope` — the **pure** envelope→row mapping
+    (pid parse, kind token, full-envelope JSONB payload, `occurred_at`
+    stamp), DB-free unit-tested.
+  - `Model::enqueue` — generic over `ConnectionTrait`, so a request
+    handler can pass its own `&DatabaseTransaction` and give the entity
+    write and the event one commit boundary.
+  - `Model::unpublished` / `Model::mark_published` — the relay worker's
+    poll (oldest-unpublished, id order) + ack (`published_at`).
+  - Dedup unique index on `event_id`; partial index over unpublished rows.
+  - Remaining (roadmap): the tx-aware `OutboxPublisher` behind the
+    `EventPublisher` seam + handlers on an explicit transaction, then the
+    Fluvio relay worker (Phase 3).
+
 ### Added — authz: ABAC policy authorization inside the blanket guard (2026-07-05)
 
 - ABAC authorization landed (supersedes the earlier per-crate

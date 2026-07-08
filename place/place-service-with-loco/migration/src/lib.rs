@@ -10,6 +10,7 @@ pub use sea_orm_migration::prelude::*;
 
 mod m20260608_000001_create_places;
 mod m20260608_000002_create_audit_and_merge;
+mod m20260708_000001_create_event_outbox;
 
 pub struct Migrator;
 
@@ -19,6 +20,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20260608_000001_create_places::Migration),
             Box::new(m20260608_000002_create_audit_and_merge::Migration),
+            Box::new(m20260708_000001_create_event_outbox::Migration),
         ]
     }
 }

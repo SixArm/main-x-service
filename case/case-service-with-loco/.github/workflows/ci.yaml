@@ -81,11 +81,16 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-      - name: Run cargo test
+      # Run BOTH the default (DB-free) tests AND the `#[ignore]`d
+      # DB-backed suites — `--include-ignored` — against the Postgres
+      # service, so the request tests and the enforcement/ABAC
+      # "activation proof" (`tests/enforcement.rs`) actually execute in
+      # CI rather than being silently skipped.
+      - name: Run cargo test (incl. DB-gated + enforcement)
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all-features --all
+          args: --all-features --all -- --include-ignored
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/case_service_test
           

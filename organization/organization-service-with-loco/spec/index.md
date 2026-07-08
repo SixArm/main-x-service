@@ -90,6 +90,10 @@ embedded library; soft-delete with audit-friendly timestamps.
 | `ORGANIZATION_REQUIRE_AUTH` | unset ⇒ **off** | Blanket `/api/*` enforcement (credential is now a PASETO v4.public token or BFF cookie session). Lenient bool: `1`/`true`/`yes`/`on` ⇒ on; else off. See [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md) (credential superseded by [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)). |
 | `ORGANIZATION_ABAC_POLICY` | unset ⇒ built-in default policy | ABAC authorization policy as inline JSON (evaluated only when enforcement is on). Unparsable ⇒ warn-log + built-in default. See [`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md). |
 | `ORGANIZATION_ABAC_POLICY_FILE` | unset | Path to the ABAC policy JSON file (used when `ORGANIZATION_ABAC_POLICY` is unset). Unreadable/unparsable ⇒ warn-log + built-in default. |
+| `ORGANIZATION_EVENT_TRANSPORT` | `memory` | Durable event-bus transport ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §7). `memory` ⇒ the process-wide ring buffer (Phase 1; no DB, no tx — today's behaviour). `outbox` ⇒ the transactional outbox (Phase 2): every CRUD/merge handler writes one `event_outbox` row **on the same transaction** as the entity mutation, so the change and its event commit or roll back together. Unrecognised value ⇒ `memory` (fail-safe). Read once at boot and cached. |
+| `ORGANIZATION_EVENT_RELAY` | off | Phase-3 relay switch. Truthy (`1`/`true`/`yes`/`on`) **and** `EVENT_TRANSPORT=outbox` ⇒ `App::after_routes` spawns the background relay loop (`src/relay.rs`: drain `event_outbox` → `EventSink` → `mark_published`, + periodic retention purge). Off by default ⇒ no loop. |
+| `ORGANIZATION_EVENT_RELAY_INTERVAL_SECS` | `5` | Relay drain-loop tick interval (floored at 1). |
+| `ORGANIZATION_EVENT_RETENTION_DAYS` | `7` | Outbox row TTL. **Enforced** by the Phase-3 relay's periodic `purge_published` (deletes `published_at < now() - INTERVAL '<n> days'`) when the relay runs ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §3). |
 
 ## 8. Architecture
 
@@ -112,7 +116,7 @@ the aggregator read-model, **not** stored here. Origination from the org
 side is a roadmap item (umbrella spec §15).
 
 **Bulk import / export (roadmap, §13).** The family-wide contract — async
-`bg_pg` jobs, the `bulk_jobs` table, the five `/api/v1/organizations/{import,export,bulk-jobs}`
+`bg_pg` jobs, the `bulk_jobs` table, the five `/api/organizations/{import,export,bulk-jobs}`
 endpoints, JSONL/CSV/Parquet, idempotent upsert-by-key, the per-row error
 report, and the export privacy/audit posture — is fixed in
 [`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md).
@@ -218,8 +222,45 @@ personal data — honour GDPR when the privacy layer lands (§13).
   `/api/organizations/events/recent` returns the frozen flat
   `EventView { kind, pid, name, seq }` projection (wire shape unchanged
   — front-end safe). CRUD/merge call sites stamp the bearer `actor`.
-  Phases 2–3 (transactional outbox + Fluvio relay) remain infra-gated
-  roadmap.
+- [x] **Durable event bus — Phase 2 (transactional outbox).** This is the
+  family **reference** implementation
+  ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §3–§8).
+  New `event_outbox` table (`migration/…_000004_event_outbox`: `BIGSERIAL
+  id`, `event_id UUID UNIQUE`, `entity`, `entity_pid`, `kind`,
+  `occurred_at`, `actor`, `schema_version`, `payload JSONB`,
+  `published_at`, partial index on unpublished rows); SeaORM entity
+  `models/_entities/event_outbox.rs`; `models/event_outbox.rs` with the
+  **pure** DB-free `OutboxInsert::from_envelope` mapping (unit-tested),
+  `insert_on(&impl ConnectionTrait)`, `recent(db, limit) → Vec<EventView>`,
+  and the relay poll/ack (`unpublished`/`mark_published`, unused until
+  Phase 3). New `EventTransport`/`transport()` selector +
+  `OutboxPublisher` in `src/streaming.rs`, plus transport-aware
+  `create_and_emit`/`update_and_emit`/`delete_and_emit`/`merge_and_emit`
+  used by **both** the native and FHIR controllers. The model write
+  helpers (`create`/`update_data`/`soft_delete`) are now generic over
+  `sea_orm::ConnectionTrait`, so the `outbox` path runs the entity write
+  **and** the `event_outbox` insert on one `db.begin()` transaction (crash
+  can't persist one without the other); `memory` keeps the ring buffer,
+  no tx. Gated by `ORGANIZATION_EVENT_TRANSPORT` (default `memory` ⇒
+  behaviour and existing tests unchanged). Tests: DB-free envelope→row
+  mapping (create/update/delete/merge fields, non-UUID pid rejected),
+  transport-string parse, `EventView` projection frozen; DB-gated
+  (`tests/requests/event_outbox.rs`, `#[ignore]`) atomicity — one tx
+  writes org + exactly one outbox row, a rollback drops both.
+- [x] **Durable event bus — Phase 3 (relay + retention).** `src/relay.rs`:
+  the `EventSink` trait (the bus seam), a working no-broker **`LoggingSink`**
+  default, `drain_once` (`unpublished` → `sink.send` → `mark_published`,
+  at-least-once, per-pid order preserved on a send failure), and
+  `purge_published` (retention). A background loop (`relay::spawn`, started
+  in `App::after_routes`) ticks every `ORGANIZATION_EVENT_RELAY_INTERVAL_SECS`
+  and purges every N ticks — **gated by `ORGANIZATION_EVENT_TRANSPORT=outbox`
+  AND `ORGANIZATION_EVENT_RELAY`**, so it is a no-op by default. Tests:
+  DB-free `LoggingSink`/capturing-sink send + config defaults; the drain/ack
+  seams (`unpublished`/`mark_published`) are DB-gated-tested via the outbox
+  suite. **Broker-gated follow-up:** a real **`FluvioSink`** (`impl EventSink`
+  behind a `fluvio` cargo feature + `ORGANIZATION_FLUVIO_ENDPOINT`/
+  `ORGANIZATION_EVENT_TOPIC`) — the trait is the seam, so the drain loop is
+  unchanged when it lands ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §5, §8).
 - [x] Name search (Postgres `ILIKE`) + OpenAPI/Swagger.
 - [x] Prometheus metrics — `GET /metrics.prom` (root, public) serves a
   process-wide `prometheus::Registry` (`src/metrics.rs`, `OnceLock`)
@@ -282,7 +323,7 @@ personal data — honour GDPR when the privacy layer lands (§13).
     URL fallback (no panic) + no-URL env path.
 - [ ] Bulk import / export — adopt the family contract
   ([`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md)):
-  `bulk_jobs` migration, the five `/api/v1/organizations/{import,export,bulk-jobs}`
+  `bulk_jobs` migration, the five `/api/organizations/{import,export,bulk-jobs}`
   endpoints, a `bg_pg` worker, JSONL/CSV/Parquet codecs, a per-row pipeline
   reusing the single-create validators + organization-matcher + review queue
   (`provenance = import`; upsert by deterministic scheme-scoped identifier or
@@ -291,6 +332,30 @@ personal data — honour GDPR when the privacy layer lands (§13).
   (stable key, CSV column set, sensitivity) are umbrella spec §8.7; mirrors
   umbrella spec §13 T-14. Tests: idempotent re-import, error report,
   dedupe-to-review, masked vs full export, export audit.
+- [x] **FHIR R5 API** (`Organization`) — **reference implementation** for
+  the family contract (**Done**: `src/fhir/{mod,resources,search}.rs` +
+  mounted `src/controllers/fhir.rs`, wired in `app.rs`; read/create/update/
+  delete/search at `/fhir/Organization{,/{id}}` + `GET /fhir/metadata`
+  `CapabilityStatement`; `OperationOutcome` errors, searchset `Bundle`,
+  `application/fhir+json`; 9 DB-free unit tests; clippy-clean)
+  ([`agents/share/fhir.md`](../../../agents/share/fhir.md)). Map the stored
+  `organization_matcher::Organization` DTO to a FHIR **`Organization`**
+  resource (`high` fidelity, §3): `name`/`alias` → `name`/`alias`,
+  identifiers (LEI/DUNS/…) → `identifier` (token `system|value`),
+  addresses → `address`, telecom → `telecom`, `part_of` → `partOf`
+  reference; `active`. New `src/fhir/` module (resource structs,
+  `to_fhir_organization`/`from_fhir_organization`, `FhirOperationOutcome`,
+  searchset `Bundle`, search-param parsing) + a mounted
+  `src/controllers/fhir.rs` (`routes()` added in `app.rs`): read/create/
+  update/delete/search at `/fhir/Organization{,/{id}}` + `GET
+  /fhir/metadata` `CapabilityStatement`. Reuses the native model helpers,
+  validators, event/audit path, and the blanket auth+ABAC guard (§8 —
+  `/fhir/*` guarded, action from HTTP method). Supported search params:
+  `_id`, `_lastUpdated`, `_count`, `identifier`, `name`, `address`,
+  `address-city`, `address-postalcode`. Tests: DTO↔resource round-trip,
+  each interaction, search→Bundle, `OperationOutcome` on 404/400/422,
+  `CapabilityStatement` matches mounted routes. First; copied by the other
+  in-scope services.
 
 ## 14. Implementation status
 

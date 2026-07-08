@@ -32,7 +32,11 @@ pub mod merge;
 pub mod metrics;
 pub mod models;
 pub mod openapi;
+/// Durable event bus Phase 3: the outbox relay loop + retention purge.
+pub mod relay;
 pub mod streaming;
 pub mod tasks;
 pub mod validation;
+/// Header-based API versioning (`Accepts-version`) for the REST surface.
+pub mod version;
 pub mod workers;

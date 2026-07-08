@@ -134,7 +134,7 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   - [ ] `EntityRef` value type (parse / `Display` + `entity_type → service`
     map), copied per project (drift-accepted).
   - [ ] Link endpoints: `POST` / `GET` / `DELETE`
-    `/api/v1/persons/{pid}/links`; create/upsert is optimistic (no
+    `/api/persons/{pid}/links`; create/upsert is optimistic (no
     cross-service call) and supports `same_identity` (person ↔ worker)
     and `works_at` / `member_of` (person → organization, temporal).
   - [ ] Emit `linked` / `unlinked` events on the existing event
@@ -150,8 +150,8 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   [bulk import/export](../../../agents/share/bulk-import-export.md).
   - [ ] Migration creating the `bulk_jobs` table (shared doc §3 schema,
     with the `UNIQUE (entity, kind, idempotency_key)` key).
-  - [ ] The five endpoints (§9.2): `POST`/`GET` `/api/v1/persons/import`,
-    `POST`/`GET` `/api/v1/persons/export`, `GET /api/v1/persons/bulk-jobs`.
+  - [ ] The five endpoints (§9.2): `POST`/`GET` `/api/persons/import`,
+    `POST`/`GET` `/api/persons/export`, `GET /api/persons/bulk-jobs`.
   - [ ] `bg_pg` worker draining jobs `queued → running →
     completed | completed_with_errors | failed`, with progress updates.
   - [ ] JSONL (lossless reference) + CSV (flattening per §9.2: dotted
@@ -173,4 +173,122 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     file re-upserts to the same state), the per-row error report, a
     keyless dedupe-to-review row (`provenance = import`), masked vs full
     export, and that a zero-row export still writes an audit record.
+- [x] **T-11 — FHIR R5 API** (`Patient` primary + `Person` alias) — adopt
+  the family contract *(done 2026-07-07)*. **Done:** reconciled the
+  unmounted `src/api/fhir/` prototype to the standard — `resourceType`
+  flipped from non-standard `"Person"` to **`"Patient"`** (primary;
+  `to_fhir_patient`) with a thin `/fhir/Person` demographic **alias**
+  (`to_fhir_person`, same fields, `resourceType: "Person"`). Routes are
+  **mounted** on both router surfaces (loco `after_routes` via
+  `fhir::handlers::routes()` in `App::routes()`, and the hand-written
+  `create_router` via `fhir_router(state)`), under the blanket
+  auth+ABAC guard (`/fhir/*` not on the public allow-list; action from
+  HTTP method). Surface: `GET/POST /fhir/Patient`,
+  `GET/PUT/DELETE /fhir/Patient/{id}`, `GET /fhir/Person{,/{id}}` alias,
+  `GET /fhir/metadata` (`CapabilityStatement`, fhirVersion 5.0.0,
+  Patient interactions read/create/update/delete/search-type + the nine
+  search params). Every non-2xx body is a `FhirOperationOutcome`; all
+  responses are `application/fhir+json`. Writes reuse the repository
+  (audit + events fire) and keep the Tantivy index in sync. 6 new
+  DB-free unit tests (`to_fhir` ⇒ `Patient`, alias ⇒ `Person`,
+  core-field round-trip, missing-name rejected, render selects type,
+  metadata/CapabilityStatement matches routes); `cargo test --lib` green
+  (139), `cargo clippy --lib` clean. **Gap:** PHI masked-read is not yet
+  driven by ABAC masking obligations — FHIR reads return the full
+  resource, consistent with the native default `GET /api/persons/{id}`
+  (masking stays opt-in via the separate `/masked` endpoint); wiring
+  `authorize_record`-style obligations into FHIR reads is deferred. The
+  original detailed acceptance list follows.
 
+  Original contract:
+  the family contract
+  ([`agents/share/fhir.md`](../../../agents/share/fhir.md)).
+  **Reconcile the existing unmounted `src/api/fhir/` prototype**: switch
+  the non-standard `resourceType: "Person"` to standard **`Patient`**
+  (§3, `high` fidelity), keep a thin `/fhir/Person` alias endpoint for the
+  demographic view, and **mount the routes** (the prototype defines
+  handlers but wires none). Map the domain `Person` to `Patient`:
+  `name`/`additional_names` → `name`, `gender` → `gender`, `birth_date` →
+  `birthDate`, `deceased`/`deceased_datetime` → `deceased[x]`, `addresses`
+  → `address`, `telecom` → `telecom`, `identifiers` → `identifier` (token
+  `system|value`), `marital_status` → `maritalStatus`, `multiple_birth` →
+  `multipleBirth[x]`, `managing_organization` → `managingOrganization`,
+  `links` → `link`; `active`. Add `FhirOperationOutcome` errors (§5),
+  searchset `Bundle` (§6), and `GET /fhir/metadata` `CapabilityStatement`
+  (§7). FHIR routes join the existing Axum router under the blanket
+  auth+ABAC guard (§8; `/fhir/*` guarded, action derived from HTTP method)
+  and honour **masked reads** for PHI (§8). Supported search params:
+  `_id`, `_lastUpdated`, `_count`, `identifier`, `name`, `family`,
+  `given`, `birthdate`, `gender`.
+  - **Acceptance:** tests cover domain↔`Patient` round-trip, each
+    interaction, search→Bundle, `OperationOutcome` on 404/400/422, the
+    `CapabilityStatement` matching the mounted routes, and masked-read.
+
+
+- [x] **T-20 — Durable event bus Phase 2 (transactional outbox).** *(done
+  2026-07-08)* Per [event-bus.md](../../../agents/share/event-bus.md)
+  §3/§5, closes the "DB committed, event lost" crash window by writing
+  one `event_outbox` row **inside each write's transaction**. Additive
+  and behaviour-neutral until activated: gated on `PERSON_EVENT_TRANSPORT`
+  (`memory`, the default, keeps today's post-commit in-memory publish;
+  `outbox` also enqueues the durable row). The relay worker
+  (Phase 3) is now delivered (T-21); a real Fluvio sink is the only
+  broker-gated follow-up.
+  - [x] `event_outbox` migration (`BIGSERIAL id`, unique `event_id`,
+    `entity`/`entity_pid`/`kind`/`occurred_at`/`actor`/`schema_version`/
+    JSONB `payload`/`published_at`; partial `WHERE published_at IS NULL`
+    index) + its SeaORM entity (`db::models::event_outbox`).
+  - [x] `db::outbox::OutboxInsert` — pure `from_envelope` /
+    `for_event` / `for_merge` (DB-free), `insert_on(&impl
+    ConnectionTrait)` (so the repo threads its **own** transaction), and
+    the relay `recent` / `unpublished` / `mark_published` poll+ack.
+  - [x] `streaming::Envelope` (canonical §4 shape; `entity: &'static
+    str` with `#[serde(skip_deserializing, default)]`, `merged_from`,
+    `for_merge`) + `EventTransport` / `transport()` reading
+    `PERSON_EVENT_TRANSPORT`.
+  - [x] Repository: a `transport` field + `enqueue_outbox<C:
+    ConnectionTrait>`, integrated **inside** each write's transaction for
+    `create`/`update`/`delete`; a new `merge(survivor, duplicate_id)`
+    that in **one** transaction applies the survivor update, soft-deletes
+    the duplicate, and enqueues a `Merged` (+`merged_from`) row for the
+    survivor and a `Deleted` row for the duplicate. The `/api/persons/merge`
+    handler calls `repository.merge(...)` (dropping the old
+    update+delete+separate-Merged-publish).
+  - **Config:** `PERSON_EVENT_TRANSPORT` (`memory` | `outbox`, default
+    `memory`); `PERSON_EVENT_RETENTION_DAYS` (outbox row TTL, default
+    `7`, enforced by the Phase-3 relay — T-21).
+  - **Acceptance:** DB-free unit tests pin the pure `from_envelope`
+    column mapping, `for_merge` (kind=`merged` + `merged_from`), and
+    transport parsing; a DB-gated `#[ignore]` test asserts `create` and
+    `merge` write the entity rows + the right outbox rows in one
+    transaction. Met: `cargo test --lib` green (157 passed, 2 ignored);
+    `cargo clippy --lib --tests` clean.
+
+
+- [x] **T-21 — Durable event bus Phase 3 (outbox relay + retention).**
+  *(done 2026-07-08)* Per [event-bus.md](../../../agents/share/event-bus.md)
+  §5/§6, the background relay that drains unpublished `event_outbox` rows
+  to the durable bus and enforces retention. Copy-adapted from the
+  `organization-service` reference (`src/relay.rs`).
+  - [x] `src/relay.rs`: the `EventSink` trait (the broker seam) +
+    `LoggingSink` (default no-broker sink), `drain_once` (poll
+    `Model::unpublished` → `EventSink::send` → `Model::mark_published`,
+    at-least-once, stop-on-first-error to keep per-pid order),
+    `purge_published` (delete published rows older than
+    `PERSON_EVENT_RETENTION_DAYS`), the config parsers, and `spawn`.
+  - [x] Wired: `pub mod relay;` in `lib.rs`; `crate::relay::spawn(ctx.db
+    .clone())` in `app.rs::after_routes`, gated internally on
+    transport=`outbox` **and** `PERSON_EVENT_RELAY`, so the default
+    (`memory`) boot is unchanged (no relay loop).
+  - **Config:** `PERSON_EVENT_RELAY` (truthy to run the loop, default
+    off); `PERSON_EVENT_RELAY_INTERVAL_SECS` (poll interval, default `5`,
+    floored at `1`); `PERSON_EVENT_RETENTION_DAYS` (now enforced,
+    default `7`).
+  - **Remaining (broker-gated):** a real `FluvioSink` `impl EventSink`
+    behind a future `fluvio` cargo feature — the trait is the seam, so
+    the drain loop and retention are unchanged when it lands.
+  - **Acceptance:** three DB-free unit tests (logging sink never fails;
+    capturing sink records `(entity, key)`; config defaults). Met:
+    `cargo test --lib` green (160 passed, 2 ignored); `cargo clippy
+    --lib --tests` clean. Default (no `PERSON_EVENT_RELAY`) ⇒ no relay
+    loop, behaviour unchanged.

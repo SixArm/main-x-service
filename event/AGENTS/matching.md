@@ -46,7 +46,7 @@ records through
 ## Which one wins?
 
 The crate is the **canonical reference algorithm**; the in-service
-matcher is what `/api/v1/events/match` actually runs today. Their
+matcher is what `/api/events/match` actually runs today. Their
 weights differ (see entity spec [§6.1](../spec/06-functional-requirements.md));
 convergence is an open decision (EOQ-1 / task ET-4). Do not "fix"
 one to match the other without that decision.

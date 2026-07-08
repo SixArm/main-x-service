@@ -195,8 +195,8 @@ manual check confirms it. Split tasks too big for one PR
   - [ ] Migration creating the `bulk_jobs` table (shared doc §3 schema,
     with the `UNIQUE (entity, kind, idempotency_key)` key).
   - [ ] The five endpoints (§9.4): `POST`/`GET`
-    `/api/v1/care-pathways/import`, `POST`/`GET`
-    `/api/v1/care-pathways/export`, `GET /api/v1/care-pathways/bulk-jobs`.
+    `/api/care-pathways/import`, `POST`/`GET`
+    `/api/care-pathways/export`, `GET /api/care-pathways/bulk-jobs`.
   - [ ] `bg_pg` worker draining jobs `queued → running →
     completed | completed_with_errors | failed`, with progress updates.
   - [ ] JSONL (lossless reference) + CSV (flattening per §9.4: every

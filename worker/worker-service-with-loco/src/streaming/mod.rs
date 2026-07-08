@@ -21,7 +21,13 @@ use crate::Result;
 use crate::models::Worker;
 
 pub mod consumer;
+/// Canonical durable-event-bus envelope + transport selector (Phase 2).
+pub mod envelope;
 pub mod producer;
+
+pub use envelope::{
+    ENTITY, Envelope, EventKind, EventTransport, EventView, SCHEMA_VERSION, transport,
+};
 
 /// A lifecycle event emitted when a worker record changes.
 ///

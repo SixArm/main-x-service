@@ -51,13 +51,13 @@ Bulk operations run as loco **Postgres-backed background jobs**
 (`queue.kind: Postgres`, [loco.md](loco.md)); no external broker.
 
 ```
-POST /api/v1/<plural>/import   ──202──▶ { job_id }
+POST /api/<plural>/import   ──202──▶ { job_id }
                                           │  enqueue bulk_job (queued)
                                           ▼
                         bg_pg worker drains: queued → running
                           per-row pipeline (§6/§7), progress updates
                           → completed | completed_with_errors | failed
-GET  /api/v1/<plural>/import/{job_id} ──▶ status, counts, errors_url, review_url
+GET  /api/<plural>/import/{job_id} ──▶ status, counts, errors_url, review_url
 ```
 
 ### `bulk_jobs` table (per service)
@@ -96,11 +96,11 @@ TTL'd (`expires_at`).
 ## 4. API surface (uniform, per entity service)
 
 ```
-POST   /api/v1/<plural>/import        202 {job_id}  — body: format, dedupe_mode, dry_run; file upload
-GET    /api/v1/<plural>/import/{id}    job status + counts + errors_url + review_url
-POST   /api/v1/<plural>/export        202 {job_id}  — body: format, filter, fields, include_soft_deleted, masking_profile
-GET    /api/v1/<plural>/export/{id}    job status + download_url
-GET    /api/v1/<plural>/bulk-jobs      list (filter by kind/status); GET .../{id} for one
+POST   /api/<plural>/import        202 {job_id}  — body: format, dedupe_mode, dry_run; file upload
+GET    /api/<plural>/import/{id}    job status + counts + errors_url + review_url
+POST   /api/<plural>/export        202 {job_id}  — body: format, filter, fields, include_soft_deleted, masking_profile
+GET    /api/<plural>/export/{id}    job status + download_url
+GET    /api/<plural>/bulk-jobs      list (filter by kind/status); GET .../{id} for one
 ```
 
 - **Import** accepts a `dedupe_mode` (default per §6), an optional `dry_run`

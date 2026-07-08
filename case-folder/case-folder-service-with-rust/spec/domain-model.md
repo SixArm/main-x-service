@@ -96,7 +96,7 @@ pub trait Client: Send + Sync {
 Implementations live in `main_patient_service::`:
 
 - `main_patient_service::http::HttpClient` — `reqwest`-backed; talks to
-  `{MAIN_PATIENT_SERVICE_BASE_URL}/api/v1/persons[/...]`. Wraps NHS
+  `{MAIN_PATIENT_SERVICE_BASE_URL}/api/persons[/...]`. Wraps NHS
   Number as a FHIR-style Identifier (`identifier_type: OTHER`,
   `system: https://fhir.nhs.uk/Id/nhs-number`).
 - `main_patient_service::stub::StubClient` — in-process

@@ -42,13 +42,13 @@ pub struct Metrics {
     /// service-specific metrics beyond this default set.
     pub registry: Registry,
 
-    /// Count of work-item records created (`POST /api/v1/{collection}`).
+    /// Count of work-item records created (`POST /api/{collection}`).
     pub work_item_created_total: Counter,
-    /// Count of work-item records updated (`PUT /api/v1/{collection}/{pid}`).
+    /// Count of work-item records updated (`PUT /api/{collection}/{pid}`).
     pub work_item_updated_total: Counter,
-    /// Count of work-item records soft-deleted (`DELETE /api/v1/{collection}/{pid}`).
+    /// Count of work-item records soft-deleted (`DELETE /api/{collection}/{pid}`).
     pub work_item_deleted_total: Counter,
-    /// Count of work-item records merged (`POST /api/v1/{collection}/merge`).
+    /// Count of work-item records merged (`POST /api/{collection}/merge`).
     pub work_item_merged_total: Counter,
 
     /// HTTP requests handled, labeled by `method`, `path`, and `status`.

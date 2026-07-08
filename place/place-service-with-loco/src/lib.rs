@@ -50,12 +50,23 @@
 pub mod api;
 pub mod app;
 pub mod config;
+/// Loco-idiomatic controllers (the mounted FHIR R5 surface).
+pub mod controllers;
 pub mod db;
 pub mod error;
+/// HL7 FHIR R5 interop: the `Location` resource conversions, wire
+/// types, and search-parameter parsing for the mounted `/fhir` endpoints.
+pub mod fhir;
 pub mod matching;
 pub mod metrics;
 pub mod models;
 pub mod privacy;
+/// Durable event bus **Phase 3** — the transactional-outbox relay worker:
+/// a background loop that drains unpublished `event_outbox` rows to an
+/// [`relay::EventSink`], stamps `published_at`, and purges old published
+/// rows. Off by default; runs only when `PLACE_EVENT_TRANSPORT=outbox`
+/// and `PLACE_EVENT_RELAY` are both set (see `agents/share/event-bus.md`).
+pub mod relay;
 pub mod search;
 pub mod streaming;
 pub mod validation;

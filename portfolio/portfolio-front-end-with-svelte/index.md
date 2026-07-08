@@ -39,19 +39,19 @@ parent and roll up under it.
 `{collection} ∈ { portfolios, projects, products, programs }`.
 
 ```text
-/{collection}         ──>  GET  /api/v1/{collection}                   list (SVAR DataGrid)
-                          GET  /api/v1/{collection}/search?q=migration name search
-                          GET  /api/v1/{collection}/events/recent      recent activity -> WorkItemEvent[]
-/{collection}/new     ──>  POST /api/v1/{collection}  {WorkItem}       create -> /{collection}/[pid]
-/{collection}/[pid]   ──>  GET  /api/v1/{collection}/{pid}             detail
-                          POST /api/v1/{collection}/check-duplicates    -> ScoredRef[] w/ MatchBreakdown
-                          POST /api/v1/{collection}/merge  {main_pid, duplicate_pid, reason?}  merge -> MergeResult
-                          GET  /api/v1/{collection}/{pid}/audit         audit timeline -> AuditEntry[]
-                          DELETE /api/v1/{collection}/{pid}            soft-delete
-                          (portfolio) GET /api/v1/{projects,products,programs}?portfolio_ref={pid}  roll-up
-/{collection}/[pid]/edit ─> PUT /api/v1/{collection}/{pid}             edit
+/{collection}         ──>  GET  /api/{collection}                   list (SVAR DataGrid)
+                          GET  /api/{collection}/search?q=migration name search
+                          GET  /api/{collection}/events/recent      recent activity -> WorkItemEvent[]
+/{collection}/new     ──>  POST /api/{collection}  {WorkItem}       create -> /{collection}/[pid]
+/{collection}/[pid]   ──>  GET  /api/{collection}/{pid}             detail
+                          POST /api/{collection}/check-duplicates    -> ScoredRef[] w/ MatchBreakdown
+                          POST /api/{collection}/merge  {main_pid, duplicate_pid, reason?}  merge -> MergeResult
+                          GET  /api/{collection}/{pid}/audit         audit timeline -> AuditEntry[]
+                          DELETE /api/{collection}/{pid}            soft-delete
+                          (portfolio) GET /api/{projects,products,programs}?portfolio_ref={pid}  roll-up
+/{collection}/[pid]/edit ─> PUT /api/{collection}/{pid}             edit
 
-project-management workspace (sub-resources under /api/v1/{collection}/{pid}/…):
+project-management workspace (sub-resources under /api/{collection}/{pid}/…):
 …/board    ──>  GET/POST …/tasks · PATCH …/tasks/{tid}    Kanban; drag = status change
 …/issues   ──>  GET/POST …/issues · PUT …/issues/{iid}    issues (kind/severity/status)
 …/timeline ──>  GET …/timeline    -> TimelineRow[]        Gantt (milestones + task ranges)

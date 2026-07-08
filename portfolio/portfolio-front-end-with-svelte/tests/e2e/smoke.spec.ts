@@ -24,9 +24,9 @@ const CASE = {
   in_language: ["en"],
 };
 
-/** Stub every `/api/v1/projects*` call so the SPA renders offline. */
+/** Stub every `/api/projects*` call so the SPA renders offline. */
 async function stubApi(page: Page) {
-  await page.route("**/api/v1/projects**", async (route) => {
+  await page.route("**/api/projects**", async (route) => {
     const req = route.request();
     const url = new URL(req.url());
     const method = req.method();
@@ -34,22 +34,22 @@ async function stubApi(page: Page) {
 
     // Dispatch by (path, method) mirroring the real endpoint contract; any
     // unmatched request falls through to a 404 so contract drift fails loud.
-    if (path === "/api/v1/projects" && method === "GET") {
+    if (path === "/api/projects" && method === "GET") {
       return route.fulfill({ json: [{ pid: PID, title: CASE.title }] });
     }
-    if (path === "/api/v1/projects" && method === "POST") {
+    if (path === "/api/projects" && method === "POST") {
       return route.fulfill({ json: { pid: PID, title: CASE.title } });
     }
     if (path.endsWith("/check-duplicates")) {
       return route.fulfill({ json: [] });
     }
-    if (path === `/api/v1/projects/${PID}` && method === "GET") {
+    if (path === `/api/projects/${PID}` && method === "GET") {
       return route.fulfill({ json: CASE });
     }
-    if (path === `/api/v1/projects/${PID}` && method === "PUT") {
+    if (path === `/api/projects/${PID}` && method === "PUT") {
       return route.fulfill({ json: { pid: PID, title: CASE.title } });
     }
-    if (path === `/api/v1/projects/${PID}` && method === "DELETE") {
+    if (path === `/api/projects/${PID}` && method === "DELETE") {
       return route.fulfill({ status: 200, body: "" });
     }
     return route.fulfill({ status: 404, json: { error: "unhandled in stub" } });
@@ -94,7 +94,7 @@ test("detail check-duplicates hides the record itself (self-exclusion)", async (
   page,
 }) => {
   const OTHER = "22222222-2222-4222-8222-222222222222";
-  await page.route("**/api/v1/projects/check-duplicates", async (route) =>
+  await page.route("**/api/projects/check-duplicates", async (route) =>
     route.fulfill({
       json: [
         // The record itself — must be filtered out (h.pid === pid).

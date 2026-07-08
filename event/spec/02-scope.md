@@ -6,7 +6,7 @@ subproject's spec owns its internals (see the authority banner in
 
 ### 2.1 In scope — entity level
 
-- The composition contract: front-end → service REST API (`/api/v1`)
+- The composition contract: front-end → service REST API (`/api`)
   → embedded matcher library.
 - The service ↔ matcher DTO contract
   (`adapter::to_matcher_event`, §5.3).
@@ -26,7 +26,7 @@ subproject's spec owns its internals (see the authority banner in
 - Real-time + batch duplicate detection, review queue, merging.
 - In-service matching *and* the bridge to the embedded matcher.
 - Per-field privacy masking, GDPR Article 15 export, consent records.
-- REST API (15 endpoints under `/api/v1`), OpenAPI/Swagger, FHIR
+- REST API (15 endpoints under `/api`), OpenAPI/Swagger, FHIR
   stub, gRPC stub.
 - PostgreSQL persistence via SeaORM; audit log; event streaming.
 

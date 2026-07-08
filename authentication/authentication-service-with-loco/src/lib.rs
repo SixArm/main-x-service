@@ -21,6 +21,9 @@ pub mod auth;
 pub mod controllers;
 /// The `__Host-mxi_session` session cookie (build / clear / parse).
 pub mod cookie;
+/// CSRF synchroniser-token helpers (generation, constant-time compare,
+/// and the `__Host-mxi_csrf` non-httpOnly delivery cookie).
+pub mod csrf;
 /// Static data loaders (loco `data/` convention).
 pub mod data;
 /// Localised user-facing copy (magic-link email subject + bodies).

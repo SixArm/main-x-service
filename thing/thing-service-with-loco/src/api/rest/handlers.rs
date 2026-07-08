@@ -458,12 +458,19 @@ pub async fn merge_things(
     };
 
     let transferred = serde_json::to_value(&dup).ok();
-    if let Err(e) = state.thing_repository.soft_delete(&dup.id).await {
-        return (
-            status_for(&e),
-            Json(ApiResponse::error("error", e.to_string())),
-        );
-    }
+    // Atomic merge: the survivor's row + the duplicate's soft-delete (and,
+    // under the outbox transport, the `Merged`+`Deleted` outbox rows)
+    // commit in one transaction. Merge-history, search sync, and the
+    // in-memory event stay here in the handler.
+    let main = match state.thing_repository.merge(&main, &dup.id).await {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                status_for(&e),
+                Json(ApiResponse::error("error", e.to_string())),
+            );
+        }
+    };
     let _ = state.search_engine.delete_thing(&dup.id.to_string());
 
     let record = MergeRecord {

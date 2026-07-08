@@ -185,7 +185,7 @@ oversized tasks (`T-2a`, `T-2b`).
   the organization-specific declarations (stable key, CSV columns, export
   sensitivity) are §8.7.
   - [ ] `bulk_jobs` migration (per the shared doc §3 table).
-  - [ ] The five endpoints (shared doc §4): `POST /api/v1/organizations/import`,
+  - [ ] The five endpoints (shared doc §4): `POST /api/organizations/import`,
     `GET …/import/{id}`, `POST …/export`, `GET …/export/{id}`,
     `GET …/bulk-jobs`. (§9.1.)
   - [ ] `bg_pg` background worker draining queued → running → terminal,

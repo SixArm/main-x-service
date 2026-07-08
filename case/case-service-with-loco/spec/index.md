@@ -128,8 +128,24 @@ absent ⇒ empty key set, all tokens rejected), `CASE_TOKEN_ISSUER`
 `CASE_ABAC_POLICY_FILE` (path) — the ABAC authorization policy
 evaluated inside the guard (see §9; unset or unparsable ⇒ warn-log +
 the built-in default policy — read allow / mutation deny — so the
-service always boots; read once per process, restart to change). Plus
-loco's own `DATABASE_URL` etc.
+service always boots; read once per process, restart to change).
+Durable event bus ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md)
+§7): `CASE_EVENT_TRANSPORT` (default `memory`) — `memory` ⇒ the
+process-wide ring buffer (Phase 1; no DB, no tx — today's behaviour);
+`outbox` ⇒ the transactional outbox (Phase 2): every CRUD/merge handler
+writes one `event_outbox` row **on the same transaction** as the entity
+mutation, so the change and its event commit or roll back together;
+unrecognised value ⇒ `memory` (fail-safe), read once at boot and cached.
+`CASE_EVENT_RELAY` (default off; `1`/`true`/`yes`/`on`) — enable the
+Phase-3 outbox **relay** background loop (drains unpublished
+`event_outbox` rows to a sink, stamps `published_at`, purges old rows);
+a no-op unless `CASE_EVENT_TRANSPORT=outbox` **and** this flag is on, so
+the default `memory` transport never starts it.
+`CASE_EVENT_RELAY_INTERVAL_SECS` (default `5`, floored at `1`) — the
+relay poll interval. `CASE_EVENT_RETENTION_DAYS` (default `7`) — outbox
+row TTL, **enforced by the relay**: it periodically deletes rows with
+`published_at < now() - INTERVAL '<n>'` (§3). Plus loco's own
+`DATABASE_URL` etc.
 
 ## 8. Architecture
 
@@ -170,18 +186,18 @@ mirroring the controller style above):
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/v1/cases/{pid}/links` | Create / upsert an outbound edge; emits `linked` |
-| `GET` | `/api/v1/cases/{pid}/links` | List this case's outbound edges |
-| `DELETE` | `/api/v1/cases/{pid}/links/{id}` | Soft-delete an edge; emits `unlinked` |
+| `POST` | `/api/cases/{pid}/links` | Create / upsert an outbound edge; emits `linked` |
+| `GET` | `/api/cases/{pid}/links` | List this case's outbound edges |
+| `DELETE` | `/api/cases/{pid}/links/{id}` | Soft-delete an edge; emits `unlinked` |
 
 The write path is **optimistic**:
 
-**Link:** HTTP POST `/api/v1/cases/{pid}/links` → authorise (§9) →
+**Link:** HTTP POST `/api/cases/{pid}/links` → authorise (§9) →
 validate edge kind + `to_ref` → upsert into `entity_links` → publish
 `linked` event → audit → Response. No cross-service call, so latency and
 availability are unaffected by the target service's state.
 
-**Unlink:** HTTP DELETE `/api/v1/cases/{pid}/links/{id}` → authorise →
+**Unlink:** HTTP DELETE `/api/cases/{pid}/links/{id}` → authorise →
 soft-delete the row (`deleted_at`) → publish `unlinked` event → audit →
 Response.
 
@@ -333,13 +349,30 @@ case's attributes (the record being modified), not the incoming payload.
 No schema change — these are the case's existing fields; a dedicated
 per-case **sensitivity tier** column remains an optional roadmap add.
 
+The same pass supplies **environment attributes** (verifier 0.5
+`Policy::evaluate_with_context`, §10): `auth::request_env_attrs` derives
+`env.hour` / `env.after_hours` (UTC) at the service edge so a deployment
+can add e.g. "deny write when `env.after_hours=true` unless
+`access=admin`". Value templates (`$sub` / `$email`) additionally let a
+rule express **ownership** (`resource.owner: ["$sub"]`) once a record
+carries an owner attribute.
+
+**Mask-on-allow (obligations, verifier 0.6, §11).** An allow rule may
+attach `"obligations": ["mask"]`; `authorize_record` returns the
+decision's obligations and `GET /api/cases/{pid}` honours `mask` by
+returning a **redacted** case (`mask_case` drops `subjects` /
+`identifiers` / `same_as` / case number, keeps the descriptive shell) —
+so a policy can grant a *masked* read (e.g. cross-department) without a
+separate endpoint. This makes ABAC the driver for the case service's
+per-record masking (previously a deferred item).
+
 **Cross-service link authorisation (governance).** The `subject_of` /
 `about` edge (§8.6) is **sensitive data**: the edge itself asserts a
 person is the subject of a government case. Per
 [cross-service linking §10](../../../agents/share/cross-service-linking.md),
 both **creating** and **reading** such an edge require at least the
 authorisation needed to **read the case** — the link endpoints
-(`POST`/`GET`/`DELETE /api/v1/cases/{pid}/links`) are never more
+(`POST`/`GET`/`DELETE /api/cases/{pid}/links`) are never more
 permissive than `GET /api/cases/{pid}`. An unauthorised caller must not
 even learn that the edge exists (responses do not distinguish "no such
 edge" from "not authorised"). This authorisation requirement also
@@ -436,7 +469,7 @@ edge kinds. The implementation MUST enforce:
   `GET /api/cases/{pid}`. An unauthorised caller MUST NOT learn the edge
   exists — a denied read is indistinguishable from "no such edge".
 - **Audit every read and write of these edges.** Each `POST`/`GET`/
-  `DELETE` on `/api/v1/cases/{pid}/links` — and any `single-view` that
+  `DELETE` on `/api/cases/{pid}/links` — and any `single-view` that
   surfaces such an edge — writes an `audit_logs` row, consistent with the
   case service's existing CRUD audit trail (§6.9), with the `actor`
   stamped from the verified token.
@@ -464,8 +497,49 @@ the other v1 edge kinds even though it shares the same edge shape.
   `schema_version` 1, `entity` `"case"`, `kind`, `pid`, `seq`, `actor`,
   `name`) behind an `EventPublisher` trait with an `InMemoryPublisher`
   ring buffer; `/events/recent` returns the flat `EventView` projection
-  (`{kind, pid, name, seq}`). Phases 2–3 (transactional outbox → Fluvio)
-  remain infra-gated roadmap.
+  (`{kind, pid, name, seq}`).
+- [x] **Durable event bus — Phase 2 (transactional outbox).** Copy-adapted
+  from the organization **reference**
+  ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §3–§8).
+  New `event_outbox` table (`migration/…_000004_event_outbox`: `PkAuto id`,
+  `event_id UUID UNIQUE`, `entity`, `entity_pid`, `kind`, `occurred_at`,
+  `actor`, `schema_version`, `payload JSONB`, `published_at`, partial index
+  on unpublished rows); SeaORM entity `models/_entities/event_outbox.rs`;
+  `models/event_outbox.rs` with the **pure** DB-free
+  `OutboxInsert::from_envelope` mapping (unit-tested),
+  `insert_on(&impl ConnectionTrait)`, `recent(db, limit) → Vec<EventView>`,
+  and the relay poll/ack (`unpublished`/`mark_published`, unused until
+  Phase 3). New `EventTransport`/`transport()` selector + `OutboxPublisher`
+  in `src/streaming.rs`, plus transport-aware
+  `create_and_emit`/`update_and_emit`/`delete_and_emit`/`merge_and_emit`
+  used by **both** the native (`controllers/cases.rs`) and FHIR
+  (`controllers/fhir.rs`) controllers. The model write helpers
+  (`create`/`update_data`/`soft_delete`) are now generic over
+  `sea_orm::ConnectionTrait`, so the `outbox` path runs the entity write
+  **and** the `event_outbox` insert on one `db.begin()` transaction (crash
+  can't persist one without the other); `memory` keeps the ring buffer, no
+  tx. Gated by `CASE_EVENT_TRANSPORT` (default `memory` ⇒ behaviour and
+  existing tests unchanged). Case data is personal data, but the outbox
+  stores the same envelope the ring buffer already carries — no new
+  exposure, just durability. Tests: DB-free envelope→row mapping
+  (create/update/delete/merge fields, non-UUID pid rejected),
+  transport-string parse; DB-gated (`tests/requests/event_outbox.rs`,
+  `#[ignore]`) atomicity — one tx writes case + exactly one outbox row, a
+  rollback drops both.
+- [x] **Durable event bus — Phase 3 (relay + retention).** Copy-adapted
+  from the organization **reference** (`src/relay.rs`). A background loop
+  (`crate::relay::spawn`, started from `App::after_routes`) drains
+  `event_outbox` (`unpublished` → `EventSink::send` → `mark_published`,
+  at-least-once, per-pid order preserved) and periodically purges rows
+  with `published_at < now() - CASE_EVENT_RETENTION_DAYS`. The default
+  `LoggingSink` is the no-broker dev/CI sink; the `EventSink` trait is the
+  seam. Gated by transport=`outbox` **and** `CASE_EVENT_RELAY` (both off
+  by default ⇒ no loop, behaviour unchanged); interval via
+  `CASE_EVENT_RELAY_INTERVAL_SECS`. Tests: logging/capturing sink send
+  contract + config-default parsers (DB-free). The remaining follow-up is
+  a real **`FluvioSink`** behind a `fluvio` cargo feature +
+  `CASE_FLUVIO_ENDPOINT`/`CASE_EVENT_TOPIC` (broker-gated) — another
+  `impl EventSink`, no change to the drain/retention loop.
 - [x] Prometheus metrics — `GET /metrics.prom` (root-mounted, public
   under enforcement) renders a process-wide registry
   (`src/metrics.rs`, `controllers/metrics.rs`) in text-exposition format:
@@ -535,7 +609,7 @@ the other v1 edge kinds even though it shares the same edge shape.
   - [ ] `EntityRef` value type (parse / `Display` + `entity_type →
     service` map), copied per project (drift-accepted).
   - [ ] Link endpoints `POST` / `GET` / `DELETE`
-    `/api/v1/cases/{pid}/links`; create/upsert is optimistic (no
+    `/api/cases/{pid}/links`; create/upsert is optimistic (no
     cross-service call) and supports `subject_of` / `about` (case →
     person, temporal).
   - [ ] Emit `linked` / `unlinked` events on the existing event
@@ -564,8 +638,8 @@ the other v1 edge kinds even though it shares the same edge shape.
     schema, with the `UNIQUE (entity, kind, idempotency_key)` retry key).
   - [ ] Five endpoints
     ([bulk import / export §4](../../../agents/share/bulk-import-export.md)):
-    `POST`/`GET /api/v1/cases/import/{id}`,
-    `POST`/`GET /api/v1/cases/export/{id}`, `GET /api/v1/cases/bulk-jobs`.
+    `POST`/`GET /api/cases/import/{id}`,
+    `POST`/`GET /api/cases/export/{id}`, `GET /api/cases/bulk-jobs`.
   - [ ] `bg_pg` worker draining `queued → running →
     completed|completed_with_errors|failed`, with progress + count
     updates on `bulk_jobs`.
@@ -596,6 +670,55 @@ the other v1 edge kinds even though it shares the same edge shape.
     than single-record reads); and an **export-audit test** (every
     export — including a zero-row export — writes an `audit_logs` row
     with actor, filter, format, row count, and masking profile).
+- [x] **FHIR R5 API** (`Task` default; `CarePlan` roadmap) — adopt the
+  family contract ([`agents/share/fhir.md`](../../../agents/share/fhir.md)).
+  **Done:** `src/fhir/{mod,resources,search}.rs` + mounted
+  `src/controllers/fhir.rs` (`routes()` in `app.rs`) implement read /
+  create / update / delete / search at `/fhir/Task{,/{id}}` +
+  `GET /fhir/metadata`, copy-adapted from the organization reference.
+  `case_matcher::Case` → `Task`: `title`→`description`, `status`→`status`,
+  `priority`→`priority`, `case_type`→`code`, agency-scoped `case_number`
+  (with `agency_id`/`agency_name` in `assigner`)→`identifier`,
+  `identifiers`→`identifier` (scheme↔system round-trip), first `subjects`
+  entry→`for`. Documented lossy gaps: `alternate_titles`, `opened_date`,
+  `keywords`, `same_as`, `in_language`, and 2nd+ subjects are not carried;
+  `Closed`/`Resolved` status collide on `completed`; `Low` priority
+  resolves to `Normal`; `Custom` status label is dropped. Writes reuse the
+  native model helpers + audit + event/metrics; `/fhir/*` sits behind the
+  blanket auth+ABAC guard. DB-free unit tests: scheme round-trip, DTO↔Task
+  round-trip, missing-`description` rejected, search predicates,
+  `CapabilityStatement` param drift-guard. **Subject-reference masking is
+  DEFERRED** (see below) — the crate has no field-masking layer today.
+  **Best-effort mapping** (§3, `low` fidelity — a governmental case has
+  no exact FHIR analog): map the stored `case_matcher::Case` DTO (§5) to
+  a FHIR **`Task`**: `title` → `description`, agency-scoped `case_number`
+  (with `agency_id`/`agency_name`) → `identifier`, `status` → `status`,
+  `priority` → `priority`, `case_type` → `code`, subject person (the
+  `subject_of` cross-service link, §8.6) → `for`/`focus`. New `src/fhir/`
+  module (resource structs, `to_fhir_task`/`from_fhir_task`,
+  `FhirOperationOutcome`, searchset `Bundle`, search-param parsing) + a
+  mounted `src/controllers/fhir.rs` (`routes()` in `app.rs`): read /
+  create / update / delete / search at `/fhir/Task{,/{id}}` +
+  `GET /fhir/metadata` `CapabilityStatement`. Reuses native model helpers
+  (`models/cases.rs`), validators (`src/validation.rs`), event/audit
+  (`src/streaming.rs`, `models/audit_logs.rs`), and the blanket
+  auth+ABAC guard (§12.1; `/fhir/*` guarded, not on the public
+  allow-list, action derived from HTTP method).
+  - [ ] **Elevated governance ([fhir §8](../../../agents/share/fhir.md),
+    [cross-service linking §10](../../../agents/share/cross-service-linking.md)):**
+    the `for`/subject person reference inherits the `case ↔ person`
+    (`subject_of`) sensitivity — access control + audit on read AND
+    write, and the subject reference is masked for unauthorised callers
+    (who must not even learn the edge exists).
+  - [ ] Supported search params (§6, reflected in the
+    `CapabilityStatement`): `_id`, `_lastUpdated`, `_count`,
+    `identifier`, `status`, `priority`.
+  - **Acceptance:** DTO↔`Task` round-trip; each interaction (read /
+    create / update / delete / search); search → searchset `Bundle`;
+    `OperationOutcome` on 404 / 400 / 422; `CapabilityStatement` matches
+    the mounted routes; and a subject-reference masking test (an
+    unauthorised caller neither sees the subject reference nor learns the
+    edge exists).
 
 ## 14. Implementation status
 

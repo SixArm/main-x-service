@@ -112,7 +112,7 @@ metric counterpart respectively. See §3 and §6.
 |---|---|
 | Method / path | `GET /metrics.prom` |
 | Content-Type | `text/plain; version=0.0.4; charset=utf-8` |
-| Mount point | service **root** — not under `/api/v1` |
+| Mount point | service **root** — not under `/api` |
 | Handler | `api::rest::handlers::metrics_prom` → `crate::metrics::METRICS.render()` |
 | Scrape config | `metrics_path: /metrics.prom` |
 

@@ -2,7 +2,7 @@
 
 - **Authentication & authorisation** — T-8 is complete: peer offline
   PASETO v4.public verification via the `authentication-verifier`
-  crate, the default-off `EVENT_REQUIRE_AUTH` blanket `/api/v1/*`
+  crate, the default-off `EVENT_REQUIRE_AUTH` blanket `/api/*`
   enforcement middleware, the boot-time `EVENT_PASETO_KEYS_URL` HTTP
   key-set fetch (all 2026-07-04, per
   [authentication-sessions](../../../agents/share/authentication-sessions.md)),

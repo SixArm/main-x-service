@@ -9,8 +9,11 @@
 import type { PageServerLoad } from "./$types";
 import { redirect } from "@sveltejs/kit";
 import {
+  CSRF_COOKIE,
+  CSRF_COOKIE_OPTIONS,
   SESSION_COOKIE,
   SESSION_COOKIE_OPTIONS,
+  csrfFromResponse,
   sessionIdFromResponse,
 } from "$lib/server/session";
 import { verifyMagicLink } from "$lib/server/auth";
@@ -36,6 +39,14 @@ export const load: PageServerLoad = async ({ url, fetch, cookies }) => {
     return { error: "noSession" as const };
   }
   cookies.set(SESSION_COOKIE, sid, SESSION_COOKIE_OPTIONS);
+
+  // Re-host the session's CSRF token too, so the BFF can echo it on the
+  // cookie-authed `POST /token` exchange (httpOnly here — the browser
+  // never needs it).
+  const csrf = csrfFromResponse(upstream);
+  if (csrf) {
+    cookies.set(CSRF_COOKIE, csrf, CSRF_COOKIE_OPTIONS);
+  }
 
   // Signed in — redirect home. No token reaches the browser.
   redirect(303, "/");

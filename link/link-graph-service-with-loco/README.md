@@ -32,10 +32,10 @@ different services**: person *is the same human as* worker, person
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /api/v1/neighbors/{ref}` | Edges incident to an `EntityRef`, both directions, depth-capped |
-| `GET /api/v1/edges` | Filtered edge list (`from` / `to` / `kind` / `status`) |
-| `GET /api/v1/single-view/{ref}` | Golden-record walk: `same_identity` unification + affiliations |
-| `GET /api/v1/health/freshness` | Per-entity consumer lag (eventual consistency, made visible) |
+| `GET /api/neighbors/{ref}` | Edges incident to an `EntityRef`, both directions, depth-capped |
+| `GET /api/edges` | Filtered edge list (`from` / `to` / `kind` / `status`) |
+| `GET /api/single-view/{ref}` | Golden-record walk: `same_identity` unification + affiliations |
+| `GET /api/health/freshness` | Per-entity consumer lag (eventual consistency, made visible) |
 
 Every graph response carries an **`as_of`** watermark — the read-model's
 freshness, so a UI can show "graph as of 10:42:05".

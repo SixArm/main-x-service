@@ -191,6 +191,10 @@ curl -X POST http://localhost:8080/api/things/deduplicate \
 | `SERVER_PORT` | REST port | `8080` |
 | `SEARCH_INDEX_PATH` | Tantivy index dir | `./search_index` |
 | `MATCHING_THRESHOLD` | Default match threshold | `0.7` |
+| `THING_EVENT_TRANSPORT` | Event bus transport: `memory` (in-memory publish) or `outbox` (durable transactional outbox; one `event_outbox` row per change, written inside the entity write's transaction) | `memory` |
+| `THING_EVENT_RELAY` | Enable the Phase-3 outbox relay loop (`1`/`true`/`yes`/`on`); only runs when the transport is `outbox`. Off by default | `off` |
+| `THING_EVENT_RELAY_INTERVAL_SECS` | Relay poll interval in seconds (floored at 1) | `5` |
+| `THING_EVENT_RETENTION_DAYS` | Outbox row TTL; the Phase-3 relay's retention sweep purges published rows older than this | `7` |
 | `RUST_LOG` | Log filter | `info` |
 
 ## Testing

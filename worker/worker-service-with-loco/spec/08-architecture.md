@@ -56,7 +56,7 @@ Repository GET → `Matcher::find_matches` → score + classify → Response.
 **Merge:** HTTP POST → fetch both → transfer data → update survivor →
 soft-delete duplicate → update index → publish `Merged` → Response.
 
-**Link:** HTTP POST `/api/v1/workers/{pid}/links` → validate edge kind +
+**Link:** HTTP POST `/api/workers/{pid}/links` → validate edge kind +
 `EntityRef` → upsert `entity_links` row (optimistic; **no** cross-service
 call) → publish `linked` → Response. Unlink (DELETE) soft-deletes the row
 and publishes `unlinked`. See §8.6.

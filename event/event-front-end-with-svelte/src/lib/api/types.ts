@@ -1,7 +1,7 @@
 // TypeScript domain types mirroring the Rust Event Service models
 // (schema.org/Event-based). Reference:
 // event-service-with-loco/AGENTS/models.md.
-// NOTE: Event Service mounts REST under `/api/v1/`.
+// NOTE: Event Service mounts REST under `/api/`.
 
 // ─── HTTP envelope ───────────────────────────────────────────────────
 

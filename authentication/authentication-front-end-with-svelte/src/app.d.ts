@@ -10,6 +10,10 @@ declare global {
     // `hooks.server.ts` from the request cookie.
     interface Locals {
       sessionId: string | null;
+      // BFF-hosted CSRF synchroniser token (from the httpOnly
+      // `__Host-mxi_csrf` cookie), echoed to the auth service on the
+      // `POST /token` exchange. Set in `hooks.server.ts`.
+      csrfToken: string | null;
     }
     interface PageData {}
     interface PageState {}

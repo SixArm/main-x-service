@@ -8,6 +8,8 @@
 
 /// `audit_logs` entity — CRUD audit-trail rows.
 pub mod audit_logs;
+/// `event_outbox` entity — durable event-bus Phase-2 hand-off buffer.
+pub mod event_outbox;
 /// `merge_records` entity — record-merge history rows.
 pub mod merge_records;
 /// `organizations` entity — the primary table (JSONB payload + lookup cols).

@@ -31,8 +31,8 @@ Conventions:
   `events.test.ts`).
 - Mock `fetch` via `vi.fn()`; assert on URL, method, headers, body.
 - For repository tests: pin the exact route path (e.g.
-  `POST /api/v1/events/check-duplicates` — Event Service uses
-  `/check-duplicates` under the `/api/v1/` prefix).
+  `POST /api/events/check-duplicates` — Event Service uses
+  `/check-duplicates` under the `/api/` prefix).
 - For envelope tests: assert that `ApiClient` unwraps `{success,
   data, error}` correctly and surfaces `ApiError` with `isConflict`
   / `isNotFound` / `isValidation` shortcuts.

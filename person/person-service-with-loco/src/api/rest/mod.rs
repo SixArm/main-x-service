@@ -25,6 +25,8 @@ pub mod handlers;
 pub mod routes;
 /// Shared [`AppState`] definition.
 pub mod state;
+/// Header-based API versioning (`Accepts-version`) middleware + helper.
+pub mod version;
 
 pub use state::AppState;
 
@@ -146,19 +148,31 @@ pub fn create_router(state: AppState) -> Router {
         .route("/persons/{id}/audit", get(handlers::get_person_audit_logs))
         .route("/audit/recent", get(handlers::get_recent_audit_logs))
         .route("/audit/user", get(handlers::get_user_audit_logs))
-        .with_state(state);
+        .with_state(state.clone());
+
+    // FHIR R5 surface (`/fhir/Patient{,/{id}}`, `/fhir/Person{,/{id}}`
+    // alias, `/fhir/metadata`). Merged onto the outer router below,
+    // *before* the auth layer, so `/fhir/*` inherits the same blanket
+    // guard as `/api/*` (it is not on the public allow-list).
+    let fhir_routes = crate::api::fhir::handlers::fhir_router(state);
 
     // Mount under `/api`. Documented in AGENTS/restful.md and
     // consumed by `../person-front-end-with-svelte` at `/api/persons`.
-    // The Event service uses `/api/v1`; Person does not.
+    // No service uses a `/api/v1` URL segment anymore; API
+    // versioning is negotiated via the `Accepts-version` header.
     Router::new()
         .nest("/api", api_routes)
+        .merge(fhir_routes)
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(axum::middleware::from_fn_with_state(
             enforcement,
             auth::require_auth_middleware,
         ))
+        // Header-based API versioning (`Accepts-version`): negotiates the
+        // version for `/api/*` and stamps it on the response
+        // (`agents/share/api-versioning.md`).
+        .layer(axum::middleware::from_fn(version::require_version_mw))
         .layer(CorsLayer::permissive())
 }
 

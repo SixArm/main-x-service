@@ -64,8 +64,10 @@ impl AppState {
         matcher: ThingMatcher,
         config: Config,
     ) -> Self {
-        let thing_repository: Arc<dyn ThingRepository> =
-            Arc::new(SeaOrmThingRepository::new(db.clone()));
+        let thing_repository: Arc<dyn ThingRepository> = Arc::new(
+            SeaOrmThingRepository::new(db.clone())
+                .with_transport(crate::streaming::transport()),
+        );
         let audit_log = Arc::new(AuditLogRepository::new(db.clone()));
         let event_publisher: Arc<dyn EventPublisher> = Arc::new(InMemoryEventPublisher::new());
         Self {

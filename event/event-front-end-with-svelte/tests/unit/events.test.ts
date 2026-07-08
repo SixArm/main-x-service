@@ -1,5 +1,5 @@
 // Unit tests for EventRepository: confirms each method hits the correct
-// /api/v1/ path, forwards query params, and normalizes responses. HTTP is
+// /api/ path, forwards query params, and normalizes responses. HTTP is
 // stubbed via an injected fetch (no network).
 import { describe, expect, it } from "vitest";
 import { ApiClient } from "../../src/lib/api/client";
@@ -29,9 +29,9 @@ const sampleEvent: Event = {
 };
 
 describe("EventRepository", () => {
-    // Pins: create() targets the /api/v1/events path and returns the
+    // Pins: create() targets the /api/events path and returns the
     // unwrapped created event.
-    it("POSTs to /api/v1/events on create (note the /v1 prefix)", async () => {
+    it("POSTs to /api/events on create (version-free path)", async () => {
         let capturedUrl = "";
         const client = new ApiClient({
             baseUrl: "http://test",
@@ -42,7 +42,7 @@ describe("EventRepository", () => {
         });
         const repo = new EventRepository(client);
         const result = await repo.create({ name: "Annual Conference", start_date: "2026-06-01T09:00:00Z" });
-        expect(capturedUrl).toContain("/api/v1/events");
+        expect(capturedUrl).toContain("/api/events");
         expect(result.id).toBe("event-1");
     });
 
@@ -88,9 +88,9 @@ describe("EventRepository", () => {
         expect(offUrl).not.toContain("fuzzy");
     });
 
-    // Pins: merge() POSTs to /api/v1/events/merge with the snake_case body
+    // Pins: merge() POSTs to /api/events/merge with the snake_case body
     // shape the service expects (FR-9 / merge workflow).
-    it("POSTs the merge body shape to /api/v1/events/merge", async () => {
+    it("POSTs the merge body shape to /api/events/merge", async () => {
         let capturedUrl = "";
         let capturedBody: unknown = null;
         let capturedMethod = "";
@@ -114,7 +114,7 @@ describe("EventRepository", () => {
         };
         const result = await new EventRepository(client).merge(request);
         expect(capturedMethod).toBe("POST");
-        expect(capturedUrl).toContain("/api/v1/events/merge");
+        expect(capturedUrl).toContain("/api/events/merge");
         expect(capturedBody).toEqual({
             main_event_id: "main-1",
             duplicate_event_id: "dup-1",
@@ -137,7 +137,7 @@ describe("EventRepository", () => {
         });
         await new EventRepository(client).get("main-1");
         expect(capturedMethod).toBe("GET");
-        expect(capturedUrl).toContain("/api/v1/events/main-1");
+        expect(capturedUrl).toContain("/api/events/main-1");
     });
 
     // Pins: a bare-array search payload is normalized to {items, total}
@@ -155,8 +155,8 @@ describe("EventRepository", () => {
         expect(result.total).toBe(1);
     });
 
-    // Pins: health() targets the /api/v1/health endpoint.
-    it("uses /api/v1/health for health-check", async () => {
+    // Pins: health() targets the /api/health endpoint.
+    it("uses /api/health for health-check", async () => {
         let capturedUrl = "";
         const client = new ApiClient({
             baseUrl: "http://test",
@@ -167,6 +167,6 @@ describe("EventRepository", () => {
         });
         const repo = new EventRepository(client);
         await repo.health();
-        expect(capturedUrl).toContain("/api/v1/health");
+        expect(capturedUrl).toContain("/api/health");
     });
 });

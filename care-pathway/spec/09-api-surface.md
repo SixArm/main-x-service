@@ -87,11 +87,11 @@ The five endpoints (shared doc §4) mount under the care-pathway resource:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/v1/care-pathways/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |
-| `GET` | `/api/v1/care-pathways/import/{id}` | Job status + counts + `errors_url` + `review_url` |
-| `POST` | `/api/v1/care-pathways/export` | `202 {job_id}` — body: `format`, `filter`, `fields`, `include_soft_deleted`, `masking_profile` |
-| `GET` | `/api/v1/care-pathways/export/{id}` | Job status + `download_url` |
-| `GET` | `/api/v1/care-pathways/bulk-jobs` | List (filter by `kind`/`status`); `GET .../{id}` for one |
+| `POST` | `/api/care-pathways/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |
+| `GET` | `/api/care-pathways/import/{id}` | Job status + counts + `errors_url` + `review_url` |
+| `POST` | `/api/care-pathways/export` | `202 {job_id}` — body: `format`, `filter`, `fields`, `include_soft_deleted`, `masking_profile` |
+| `GET` | `/api/care-pathways/export/{id}` | Job status + `download_url` |
+| `GET` | `/api/care-pathways/bulk-jobs` | List (filter by `kind`/`status`); `GET .../{id}` for one |
 
 **Stable key(s) for upsert** (shared doc §6, §10). A row upserts in place
 when it carries either:

@@ -42,7 +42,7 @@
 //! Prometheus metrics paths (see [`is_public_path`]). It is **off by
 //! default**: unset/blank/junk
 //! ⇒ today's behaviour, where the extractor is opt-in per handler and
-//! `GET /api/v1/projects/whoami` proves end-to-end verification.
+//! `GET /api/projects/whoami` proves end-to-end verification.
 //! Activation is an operations decision once the SSO token flow is live;
 //! see `agents/share/authentication-sessions.md` and
 //! `agents/share/jwt-enforcement.md` for the family-wide contract.
@@ -82,9 +82,9 @@ pub const ENTITY: &str = "portfolio";
 
 /// Path suffixes of this crate's **destructive named POSTs** (per
 /// `authorization-attributes.md` §2), fixed family-wide: record
-/// **merge** (`POST /api/v1/{collection}/merge`, live today), batch
+/// **merge** (`POST /api/{collection}/merge`, live today), batch
 /// **deduplicate** and bulk **import** (`POST
-/// /api/v1/{collection}/import` per `bulk-import-export.md` §4 — both
+/// /api/{collection}/import` per `bulk-import-export.md` §4 — both
 /// deferred spec §13 items whose routes end with these suffixes when
 /// they land). A POST whose path ends with one of these derives
 /// [`Action::Destructive`] instead of [`Action::Write`]; the
@@ -596,7 +596,7 @@ mod tests {
                 enforce(
                     false,
                     &method,
-                    "/api/v1/projects",
+                    "/api/projects",
                     &HeaderMap::new(),
                     &verifier,
                     &policy
@@ -645,7 +645,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::GET,
-            "/api/v1/projects",
+            "/api/projects",
             &HeaderMap::new(),
             &verifier,
             &policy(),
@@ -664,7 +664,7 @@ mod tests {
             enforce(
                 true,
                 &Method::GET,
-                "/api/v1/projects",
+                "/api/projects",
                 &bearer(&token),
                 &verifier,
                 &policy()
@@ -682,7 +682,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::GET,
-            "/api/v1/projects",
+            "/api/projects",
             &bearer(&token),
             &verifier,
             &policy(),
@@ -702,7 +702,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::GET,
-            "/api/v1/projects",
+            "/api/projects",
             &bearer(&token),
             &verifier,
             &policy(),
@@ -720,53 +720,53 @@ mod tests {
     #[test]
     fn derive_action_matrix() {
         for method in [Method::GET, Method::HEAD, Method::OPTIONS] {
-            assert_eq!(derive_action(&method, "/api/v1/projects"), Action::Read);
+            assert_eq!(derive_action(&method, "/api/projects"), Action::Read);
         }
         assert_eq!(
-            derive_action(&Method::DELETE, "/api/v1/projects/123"),
+            derive_action(&Method::DELETE, "/api/projects/123"),
             Action::Delete
         );
         // /links/{id} removal is covered by the DELETE method rule —
         // no suffix entry needed.
         assert_eq!(
-            derive_action(&Method::DELETE, "/api/v1/portfolios/123/links/456"),
+            derive_action(&Method::DELETE, "/api/portfolios/123/links/456"),
             Action::Delete
         );
         for path in [
-            "/api/v1/portfolios/merge",
-            "/api/v1/projects/merge",
-            "/api/v1/products/merge",
-            "/api/v1/programs/merge",
-            "/api/v1/projects/deduplicate",
-            "/api/v1/portfolios/import", // §9.8 bulk-import route shape
+            "/api/portfolios/merge",
+            "/api/projects/merge",
+            "/api/products/merge",
+            "/api/programs/merge",
+            "/api/projects/deduplicate",
+            "/api/portfolios/import", // §9.8 bulk-import route shape
         ] {
             assert_eq!(derive_action(&Method::POST, path), Action::Destructive);
         }
         assert_eq!(
-            derive_action(&Method::POST, "/api/v1/projects"),
+            derive_action(&Method::POST, "/api/projects"),
             Action::Write
         );
         assert_eq!(
-            derive_action(&Method::POST, "/api/v1/projects/check-duplicates"),
+            derive_action(&Method::POST, "/api/projects/check-duplicates"),
             Action::Write
         );
         assert_eq!(
-            derive_action(&Method::POST, "/api/v1/portfolios/123/links"),
+            derive_action(&Method::POST, "/api/portfolios/123/links"),
             Action::Write
         );
         assert_eq!(
-            derive_action(&Method::PUT, "/api/v1/projects/123"),
+            derive_action(&Method::PUT, "/api/projects/123"),
             Action::Write
         );
         assert_eq!(
-            derive_action(&Method::PATCH, "/api/v1/projects/123"),
+            derive_action(&Method::PATCH, "/api/projects/123"),
             Action::Write
         );
         // GET on destructive-suffixed paths is still a read — only
         // POST consults the suffix list (e.g. the import-job status
         // read `GET …/import/{id}` and hypothetical `GET …/merge`).
         assert_eq!(
-            derive_action(&Method::GET, "/api/v1/portfolios/merge"),
+            derive_action(&Method::GET, "/api/portfolios/merge"),
             Action::Read
         );
     }
@@ -783,7 +783,7 @@ mod tests {
             enforce(
                 true,
                 &Method::GET,
-                "/api/v1/projects",
+                "/api/projects",
                 &bearer(&token),
                 &verifier,
                 &policy
@@ -793,7 +793,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::POST,
-            "/api/v1/projects",
+            "/api/projects",
             &bearer(&token),
             &verifier,
             &policy,
@@ -816,7 +816,7 @@ mod tests {
                 enforce(
                     true,
                     &method,
-                    "/api/v1/projects",
+                    "/api/projects",
                     &bearer(&token),
                     &verifier,
                     &policy
@@ -828,14 +828,14 @@ mod tests {
         let delete = enforce(
             true,
             &Method::DELETE,
-            "/api/v1/projects/123",
+            "/api/projects/123",
             &bearer(&token),
             &verifier,
             &policy,
         )
         .unwrap_err();
         assert_eq!(delete.0, StatusCode::FORBIDDEN);
-        for path in ["/api/v1/projects/merge", "/api/v1/portfolios/import"] {
+        for path in ["/api/projects/merge", "/api/portfolios/import"] {
             let destructive = enforce(
                 true,
                 &Method::POST,
@@ -861,7 +861,7 @@ mod tests {
             enforce(
                 true,
                 &Method::DELETE,
-                "/api/v1/projects/123",
+                "/api/projects/123",
                 &bearer(&token),
                 &verifier,
                 &policy
@@ -869,9 +869,9 @@ mod tests {
             .is_ok()
         );
         for path in [
-            "/api/v1/projects/merge",
-            "/api/v1/projects/deduplicate",
-            "/api/v1/portfolios/import",
+            "/api/projects/merge",
+            "/api/projects/deduplicate",
+            "/api/portfolios/import",
         ] {
             assert!(
                 enforce(
@@ -896,12 +896,12 @@ mod tests {
         let policy = policy();
         let token = sign_with_attrs(&kid, 10_000_000_000, &[("svc", &["true"])]);
         for (method, path) in [
-            (Method::GET, "/api/v1/projects"),
-            (Method::POST, "/api/v1/projects"),
-            (Method::PUT, "/api/v1/projects/123"),
-            (Method::DELETE, "/api/v1/projects/123"),
-            (Method::POST, "/api/v1/projects/merge"),
-            (Method::POST, "/api/v1/portfolios/import"),
+            (Method::GET, "/api/projects"),
+            (Method::POST, "/api/projects"),
+            (Method::PUT, "/api/projects/123"),
+            (Method::DELETE, "/api/projects/123"),
+            (Method::POST, "/api/projects/merge"),
+            (Method::POST, "/api/portfolios/import"),
         ] {
             assert!(
                 enforce(true, &method, path, &bearer(&token), &verifier, &policy).is_ok(),
@@ -931,7 +931,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::POST,
-            "/api/v1/projects",
+            "/api/projects",
             &bearer(&denied),
             &verifier,
             &policy,
@@ -943,7 +943,7 @@ mod tests {
             enforce(
                 true,
                 &Method::POST,
-                "/api/v1/projects",
+                "/api/projects",
                 &bearer(&allowed),
                 &verifier,
                 &policy
@@ -963,7 +963,7 @@ mod tests {
         let no_token = enforce(
             true,
             &Method::POST,
-            "/api/v1/projects",
+            "/api/projects",
             &HeaderMap::new(),
             &verifier,
             &policy,
@@ -974,7 +974,7 @@ mod tests {
         let denied = enforce(
             true,
             &Method::POST,
-            "/api/v1/projects",
+            "/api/projects",
             &bearer(&token),
             &verifier,
             &policy,

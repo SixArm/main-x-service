@@ -11,13 +11,14 @@
 | REST API | Core endpoints + OpenAPI/Swagger + CORS + structured errors |
 | Repository | SeaORM CRUD with transactions, soft delete |
 | Event streaming | InMemoryEventPublisher (index-level events) |
+| Durable event bus (outbox + relay) | Phase 2 transactional outbox (`event_outbox` table; `Envelope`/`EventTransport`; `OutboxInsert` shares the entity write's tx) + Phase 3 relay (`src/relay.rs`: `EventSink`/`LoggingSink`, `drain_once`, `purge_published`; `relay::spawn` in `after_routes`). Gated by `EVENT_EVENT_TRANSPORT=outbox` + `EVENT_EVENT_RELAY` (both off by default); `EVENT_EVENT_RELAY_INTERVAL_SECS` (5) + `EVENT_EVENT_RETENTION_DAYS` (7, enforced by `purge_published`). Broker-gated `FluvioSink` remains (T-11, T-4) |
 | Audit log | AuditLogRepository with old / new JSON |
 | Duplicate detection | Real-time + explicit + batch with review queue |
 | Merging | Transfer + alias + link + soft-delete + snapshot + event |
 | Validation | Required fields, format checks, time-window guards, `422` |
 | Privacy | Field masking, GDPR export, consent model |
-| Authentication (peer verification) | Offline PASETO v4.public (Ed25519) bearer verification via `authentication-verifier` 0.3; `AuthUser` extractor + `GET /api/v1/whoami`; env-configured key set (T-8, verification part) |
-| Authentication (blanket enforcement, default-off) | Env-gated `EVENT_REQUIRE_AUTH` middleware (`auth::enforce` + `require_auth_mw`) on every `/api/v1/*` route; public allow-list `/api/v1/health`; `/fhir/*` stubs out of scope; wired on both router surfaces; DB-free enforce-matrix + flag-parser tests (T-8, enforcement part) |
+| Authentication (peer verification) | Offline PASETO v4.public (Ed25519) bearer verification via `authentication-verifier` 0.3; `AuthUser` extractor + `GET /api/whoami`; env-configured key set (T-8, verification part) |
+| Authentication (blanket enforcement, default-off) | Env-gated `EVENT_REQUIRE_AUTH` middleware (`auth::enforce` + `require_auth_mw`) on every `/api/*` route; public allow-list `/api/health`; `/fhir/*` stubs out of scope; wired on both router surfaces; DB-free enforce-matrix + flag-parser tests (T-8, enforcement part) |
 | Authentication (boot-time key fetch) | `EVENT_PASETO_KEYS_URL` set ⇒ key set fetched over HTTP once at boot (`state::boot_verifier` in `after_routes`, before shared-store insert / middleware capture; fetched set wins; failure warn-logs and falls back to `EVENT_PASETO_KEYS`/empty — always boots); no refresh loop (rotation re-fetch is roadmap) (T-8, fetch part) |
 | Authorization (ABAC) | Inside the blanket guard: action derived from method + destructive named POSTs (`/merge`, `/deduplicate`, `/import`); shared `authentication-verifier` 0.3 engine evaluates `EVENT_ABAC_POLICY`/`_FILE` (else the built-in default policy) over the token's `attrs` claim; first-match-wins, default allow-read / deny-mutation; `401` vs `403` split with deciding-rule reason; DB-free §7 test matrix (T-8, authorization part) |
 | Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |

@@ -36,8 +36,15 @@ HTTP key fetch landed
 2026-07-04 in all nine services: set `<ENTITY>_PASETO_KEYS_URL` to fetch
 the published key set once at boot (fetched set wins; fetch failure
 warn-logs and falls back to the `<ENTITY>_PASETO_KEYS` env key set, so
-the service always boots; no refresh loop — rotation re-fetch is
-roadmap).
+the service always boots). A **key-rotation refresh loop** then re-fetches
+the key set periodically so a rotation is picked up without a restart
+(verifier 0.8 `ReloadableVerifier`; interval
+`<ENTITY>_PASETO_KEYS_REFRESH_SECS`, default 1 h, `0` disables; keeps the
+current keys on a failed fetch). Delivered in the **case service** as the
+reference (`auth::spawn_key_refresh`); the other services adopt the same
+pattern — swap the boot `OnceLock<Arc<Verifier>>` for a
+`OnceLock<ReloadableVerifier>`, read `current()` per request, and spawn
+the refresh in `after_routes`.
 
 ## Why a flag, not a flip
 
@@ -243,10 +250,39 @@ Rules:
    now 401; the front-end's attached token lets operator traffic through.
 4. Wire the DB-gated request suites to run with the flag in CI.
 
+## Activation playbook (per service)
+
+To turn enforcement on in a deployment:
+
+1. **Point at the key set.** Set `<ENTITY>_PASETO_KEYS_URL` to the auth
+   service's `/.well-known/paseto-keys` (fetched at boot, then re-fetched
+   periodically for rotation — [authentication-sessions.md](authentication-sessions.md)),
+   or supply `<ENTITY>_PASETO_KEYS` inline. Confirm `<ENTITY>_TOKEN_ISSUER`
+   / `<ENTITY>_TOKEN_AUDIENCE` match the issuer (defaults
+   `authentication-service` / `main-x-service`).
+2. **Configure the policy** (optional). Set `<ENTITY>_ABAC_POLICY`
+   (inline JSON) or `<ENTITY>_ABAC_POLICY_FILE`; unset ⇒ the built-in
+   default (read allow / mutation deny; `access=write` ⇒ write;
+   `access=admin` ⇒ +destructive; `svc=true` ⇒ everything). See
+   [authorization-attributes.md](authorization-attributes.md).
+3. **Assign attributes.** Give operators `access=write`/`admin` and
+   machine peers `svc=true` via the auth service (`user_attributes` CLI
+   task or the admin UI) — otherwise every caller is read-only.
+4. **Flip the flag.** Set `<ENTITY>_REQUIRE_AUTH=true` and restart.
+   Unauthenticated calls now `401`; a valid token the policy denies is
+   `403`; the front-end's attached token lets operator traffic through.
+
 ## Status
 
 Implemented (default-off) in all nine entity services as of 2026-07-04,
-including the paseto-keys-over-HTTP boot fetch (`<ENTITY>_PASETO_KEYS_URL`).
-Remaining operational follow-ups: activation (step 3), the DB-gated
-request suites in CI (step 4), and per-crate ABAC policy authorization
-(spec §13; [authorization-attributes.md](authorization-attributes.md)).
+including the paseto-keys-over-HTTP boot fetch (`<ENTITY>_PASETO_KEYS_URL`),
+the key-rotation refresh loop, ABAC authorization + record-level/env
+attributes/obligations, and policy hot-reload. The **DB-backed activation
+proof** landed 2026-07-06: the **case service** is the reference —
+`tests/enforcement.rs` boots the real router with `CASE_REQUIRE_AUTH=1`
+and mints in-process PASETOs to pin the 401 (no token) / 403 (policy
+denied) / 2xx (allowed) matrix over the HTTP stack against Postgres, and
+its CI runs the DB-gated suites with `cargo test -- --include-ignored`
+(previously skipped). Other services adopt the same `tests/enforcement.rs`
++ CI pattern. Remaining operational follow-up: activation itself (the
+per-deployment decision above).

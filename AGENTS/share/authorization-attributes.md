@@ -112,6 +112,11 @@ applies. Pure data (JSON), pure evaluation (no I/O):
   match. A value list means "subject has **any** of these values"
   (`["write","admin"]` = write OR admin). A `!`-prefixed value negates
   ("does not have"). An empty `when` matches every authenticated subject.
+  A key prefixed `resource.` / `env.` matches a **resource** / **environment**
+  attribute (§9–§10) instead of a subject attribute; a value of `$sub` /
+  `$email` is a **template** resolving to the caller's identity, so a
+  rule expresses **ownership** (`{ "resource.owner": ["$sub"] }` = owned
+  by the caller).
 - `effect` — `allow` or `deny`. Deny rules make exceptions expressible;
   first-match-wins keeps evaluation O(rules) and auditable.
 - The engine lives in `authentication-verifier` 0.3 (`abac` module:
@@ -226,12 +231,55 @@ Other services adopt the same pattern where a concrete requirement
 lands; a dedicated per-record **sensitivity tier** column (vs deriving
 from existing fields) stays an optional per-entity add.
 
-## 10. Open questions
+## 10. Environment attributes (delivered)
 
-- **Environment attributes** — time-of-day, source network. The engine's
-  input map can carry them without a language change. (Lean: defer.)
-- **Policy distribution** — per-service env/file now; a central policy
-  service later if policies grow. (Lean: env/file until real pain.)
-- **Obligations / advice** (mask-on-allow, audit-on-allow) — the case
-  service's masking posture may eventually want decision-attached
-  obligations; today masking stays endpoint-level. (Lean: defer.)
+A decision can also consume **request-time / network context** — the
+property this section originally deferred. The engine (verifier 0.5)
+exposes `Policy::evaluate_with_context(claims, action, entity, resource,
+env)`, where `env` is a string→strings map matched by `when` keys
+prefixed **`env.`** (e.g. `env.after_hours`). The **service** derives
+the environment attributes at its edge (clock, source IP, …) and passes
+them in, so the engine stays pure and deterministic; `env.*` is disjoint
+from subject attributes (no spoofing). The **case service is the
+reference**: `auth::request_env_attrs` supplies `env.hour` /
+`env.after_hours` (UTC) on the record-level pass, so a deployment can
+write "deny write when `env.after_hours=true` unless `access=admin`".
+Combined with the `$sub` / `$email` value templates (§4), a policy can
+also express **ownership** (`resource.owner: ["$sub"]`).
+
+## 11. Obligations (delivered)
+
+An allow decision can carry **obligations** — advisory instructions the
+enforcement point must honour on allow, e.g. `"mask"` (return the masked
+view) or `"audit"` (write an audit record). A rule attaches them
+(`{ "effect": "allow", …, "obligations": ["mask"] }`); the engine
+(verifier 0.6) surfaces the deciding allow rule's obligations on
+`Decision.obligations` (empty on a deny or the default) with
+`Decision::requires("mask")` as the check. The engine **carries but does
+not interpret** them — the service acts on them. The **case service is
+the reference**: `auth::authorize_record` returns the obligations and
+`GET /api/cases/{pid}` honours `mask` by returning a redacted case, so a
+policy can grant a *masked* read (e.g. cross-department) without a
+separate endpoint. This makes ABAC the driver for per-record masking.
+
+## 12. Policy lifecycle & attribute vocabulary (delivered)
+
+- **Hot-reload.** The policy is no longer boot-only: verifier 0.7 adds
+  `ReloadablePolicy` (a thread-safe, hot-swappable holder — per-request
+  `current()` snapshot, runtime `store()`), and a service can reload
+  without a restart. The **case service is the reference**:
+  `auth::policy()` is a `ReloadablePolicy`, `auth::reload_policy()`
+  re-reads `CASE_ABAC_POLICY[_FILE]`, and `auth::spawn_policy_watcher`
+  polls the policy file's mtime (15 s) and reloads on change. Other
+  services adopt the same pattern (swap `OnceLock<Policy>` →
+  `OnceLock<ReloadablePolicy>`, read `current()`, spawn the watcher).
+- **Attribute vocabulary.** An optional per-deployment allow-set of
+  attribute keys → values (`AUTH_ATTRIBUTE_VOCABULARY[_FILE]`) enforced
+  at the **assignment** surfaces (auth-service CLI task + admin API), so
+  a typo like `dept=cardiolgy` or an unknown key is rejected rather than
+  silently granting nothing. Unset ⇒ unrestricted (today's behaviour).
+
+## 13. Open questions
+- **Policy distribution** — per-service env/file + hot-reload now; a
+  central policy service later if policies grow. (Lean: env/file until
+  real pain.)

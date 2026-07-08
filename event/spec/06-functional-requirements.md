@@ -22,7 +22,7 @@ capital-E **Event**; the CRUD-change records on the stream are
 | FR-12 | Audit: every CRUD / merge / link writes `audit_log` with old + new JSON, user ID, IP, user agent, timestamp; audit query endpoints | Service | [spec §6.7](../event-service-with-loco/spec/06-functional-requirements.md) |
 | FR-13 | Index-level event streaming: `Created` / `Updated` / `Deleted` / `Merged` / `Linked` / `Unlinked` published on every change | Service | [agents/share/auditability.md](../../agents/share/auditability.md) |
 | FR-14 | Operator UI: dashboard, list/search grid, create with inline 409-duplicate surfacing, detail / edit / soft-delete, per-record audit view, match check, merge with preview | Front-end | [spec §6](../event-front-end-with-svelte/spec/06-functional-requirements.md) |
-| FR-15 | The front-end binds only to the service's `/api/v1` REST surface — never to the database or the matcher directly | Front-end | [spec §9](../event-front-end-with-svelte/spec/09-api-consumption.md) |
+| FR-15 | The front-end binds only to the service's `/api` REST surface — never to the database or the matcher directly | Front-end | [spec §9](../event-front-end-with-svelte/spec/09-api-consumption.md) |
 | FR-16 | Pure-library guarantee: the matcher performs no IO, no logging, no clock/RNG access; same inputs ⇒ same outputs | Matcher | [spec §8](../event-matcher-rust-crate/spec/08-determinism-and-safety.md) |
 | FR-17 | Explainability: every probabilistic result carries a per-field breakdown surfaced through the REST API to the operator UI | All three | [matcher README](../event-matcher-rust-crate/README.md) |
 

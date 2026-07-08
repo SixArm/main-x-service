@@ -32,6 +32,27 @@ per-request introspection hop.
 > deny write on a high-sensitivity record unless `access=admin`).
 > `Policy::evaluate` is unchanged.
 
+> **v0.5.0 adds ownership templates + environment attributes**
+> (additive). A `when` value `$sub` / `$email` resolves to the caller's
+> identity (`resource.owner: ["$sub"]` = owned by the caller), and
+> `Policy::evaluate_with_context` adds an `env.*` namespace for
+> request-time / network context (§4/§10). Prior methods unchanged.
+
+> **v0.6.0 adds obligations** (additive). An allow rule may attach
+> `obligations` (e.g. `"mask"`, `"audit"`) that the `Decision` carries
+> for the enforcement point to honour — the engine does not interpret
+> them (§11). `Decision::requires("mask")` is the convenience check.
+
+> **v0.7.0 adds `ReloadablePolicy`** (additive). A thread-safe holder
+> (`new` / `current` / `store`) that lets a service **hot-swap** the
+> active policy at runtime — no restart — with a lock-light per-request
+> read path. The reload trigger is the service's concern.
+
+> **v0.8.0 adds `ReloadableVerifier`** (additive). The same holder shape
+> for the `Verifier`, so a service can **hot-swap its key set for key
+> rotation** — e.g. via a periodic re-fetch of `/.well-known/paseto-keys`
+> — without a restart. Keep the current keys on a failed fetch.
+
 - Spec: [spec/index.md](./spec/index.md)
 - Agent guide: [AGENTS.md](./AGENTS.md)
 - Design: [authentication-sessions.md](../../agents/share/authentication-sessions.md) §5,
@@ -42,9 +63,9 @@ per-request introspection hop.
 
 ```toml
 [dependencies]
-authentication-verifier = "0.4"
+authentication-verifier = "0.8"
 # or, to fetch the key set over HTTPS at boot:
-# authentication-verifier = { version = "0.4", features = ["fetch"] }
+# authentication-verifier = { version = "0.8", features = ["fetch"] }
 # in-monorepo alternative (path dependency):
 # authentication-verifier = { path = "../authentication-verifier-rust-crate" }
 ```
@@ -111,8 +132,11 @@ for the attribute model, policy language, and default policy.
 | `Verifier::verify(token) -> Result<Claims, VerifyError>` | Select the key by the token **footer `kid`**, check the PASETO v4.public (Ed25519) signature, then enforce `iss`, `aud`, `exp`, and `nbf`. |
 | `Verifier::key_count() -> usize` | Number of Ed25519 keys loaded from the key set. |
 | `Claims` | Verified claims: `sub` (user pid, UUID string), `iss`, `aud`, `iat`, `nbf`, `exp`, `sid` (originating auth-service session), `attrs` (ABAC subject attributes; empty on pre-0.3 tokens), plus `scope`/`roles` (deprecated for authorization). |
+| `Decision` | `{ allowed, reason, obligations }` — the outcome; `obligations` (v0.6) are the deciding allow rule's advisory instructions (`"mask"`, `"audit"`) for the enforcement point. `Decision::requires("mask")` checks one. |
 | `Policy` / `Rule` / `Action` / `Decision` (the `abac` module, re-exported at the root) | The shared ABAC engine: `Policy::from_json` loads a configured policy, `Policy::default_policy()` is the built-in coarse tier, `Policy::evaluate(&claims, action, entity)` decides first-match-wins with default allow-read / deny-mutation. Pure — no I/O, no clock, no panics. |
 | `Policy::evaluate_with_resource(&claims, action, entity, &resource)` | As `evaluate`, plus a `BTreeMap<String, Vec<String>>` of record-level **resource attributes** matched by `resource.*` `when` keys (v0.4). A service passes attributes of the record it just loaded so policies can gate on e.g. record sensitivity. |
+| `Policy::evaluate_with_context(&claims, action, entity, &resource, &env)` | As above, plus **environment attributes** matched by `env.*` `when` keys (v0.5) — request-time / network context the service supplies (e.g. `env.after_hours`), keeping the engine deterministic. A `when` value `$sub`/`$email` resolves to the caller's identity for ownership rules. |
+| `ReloadablePolicy` | A hot-swappable policy holder (v0.7): `new(policy)`, `current() -> Arc<Policy>` (per-request snapshot), `store(policy)` (runtime swap). Lets a service reload the policy without a restart; the reload trigger is the service's concern. |
 
 ### `VerifyError` variants
 

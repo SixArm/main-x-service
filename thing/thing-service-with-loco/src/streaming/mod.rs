@@ -11,6 +11,15 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Canonical durable-bus envelope + transport selector (event-bus.md
+/// §4/§7). Sits alongside the legacy [`ThingEvent`] in-memory buffer.
+/// Its `EventKind` (`Created`/…) is deliberately **not** re-exported here
+/// (it would clash with the legacy [`EventKind`] below); reach it as
+/// `crate::streaming::envelope::EventKind`.
+pub mod envelope;
+
+pub use envelope::{ENTITY, Envelope, EventTransport, EventView, SCHEMA_VERSION, transport};
+
 /// One event in the Thing stream.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThingEvent {

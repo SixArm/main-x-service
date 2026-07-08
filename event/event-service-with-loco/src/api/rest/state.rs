@@ -50,12 +50,12 @@ pub struct AppState {
     /// built from a freshly fetched key set).
     pub verifier: Arc<Verifier>,
 
-    /// Whether blanket `/api/v1/*` bearer-token enforcement is on.
+    /// Whether blanket `/api/*` bearer-token enforcement is on.
     /// Read once from `EVENT_REQUIRE_AUTH` at construction (see
     /// [`super::auth::require_auth_from_env`]) — **off by default**;
     /// restart the service to change it. When on, the
     /// [`super::auth::require_auth_mw`] middleware requires a valid
-    /// PASETO bearer token on every `/api/v1/*` route except the
+    /// PASETO bearer token on every `/api/*` route except the
     /// public allow-list ([`super::auth::PUBLIC_API_PATHS`]).
     pub require_auth: bool,
 

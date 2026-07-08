@@ -28,6 +28,10 @@ const proxy: RequestHandler = async ({
   headers.delete("connection");
   headers.delete("content-length");
 
+  // Negotiate the API version via header, not the URL (URLs are
+  // version-free). See `agents/share/api-versioning.md` §6.4.
+  headers.set("accepts-version", "1.0");
+
   // Inject the server-exchanged PASETO when a session is present.
   if (locals.sessionId) {
     const token = await exchangeToken(fetch, locals.sessionId);

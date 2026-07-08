@@ -1,27 +1,42 @@
-//! Minimal in-memory event stream — Phase 1 of the durable event bus.
+//! Event stream — Phases 1 & 2 of the durable event bus.
 //!
-//! Every CRUD action publishes a canonical [`Envelope`] to a process-wide
-//! ring buffer behind the [`EventPublisher`] seam. This is Phase 1 of the
-//! family's durable event-bus design: the versioned envelope plus the
-//! publisher trait, with an [`InMemoryPublisher`] wired exactly as the
-//! previous free functions behaved. Phases 2–3 (transactional outbox +
-//! Fluvio sink) remain infra-gated roadmap — see
-//! [`agents/share/event-bus.md`](../../../../agents/share/event-bus.md).
+//! Every CRUD action publishes a canonical [`Envelope`]. Two transports
+//! sit behind the [`EventTransport`] selector (config
+//! `CARE_PATHWAY_EVENT_TRANSPORT`, default `memory`; see
+//! [`agents/share/event-bus.md`](../../../../agents/share/event-bus.md) §7):
 //!
-//! `occurred_at` and `data` are deliberately **omitted** in Phase 1: the
-//! design (§4) places them at the outbox stage (Phase 2), and adding a
-//! timestamp would mean threading a non-trivial type through the in-memory
-//! path. They arrive with `OutboxPublisher`.
+//! - **`memory`** (Phase 1, default) — a process-wide ring buffer via the
+//!   [`EventPublisher`] seam / [`InMemoryPublisher`]. Behaviour is
+//!   identical to the original free-function ring buffer; no DB, no tx.
+//! - **`outbox`** (Phase 2) — the [`OutboxPublisher`] inserts one
+//!   `event_outbox` row **on the handler's transaction**, so the entity
+//!   write and its event commit or roll back together (no committed
+//!   change without its event, and vice versa). The transaction-aware
+//!   write+emit path is exposed as [`create_and_emit`] /
+//!   [`update_and_emit`] / [`delete_and_emit`] / [`merge_and_emit`], which
+//!   both the native and FHIR controllers call so neither has to know the
+//!   transport. Phase 3 (the Fluvio relay worker) is roadmap.
 //!
-//! The operator endpoint `GET /api/care-pathways/events/recent` returns an
-//! [`EventView`] projection (`{kind, pid, name, seq}`) whose JSON is frozen
-//! and byte-identical to the previous `PathwayEvent` wire shape.
+//! `occurred_at` and `data` are omitted from the in-memory [`Envelope`]:
+//! the design (§4) places them at the outbox stage, where the handler
+//! transaction supplies an authoritative timestamp.
+//!
+//! The operator endpoint `GET /api/care-pathways/events/recent` returns
+//! the flat [`EventView`] projection (`{kind, pid, name, seq}`), a frozen
+//! wire shape consumed by the front-end — served from the ring buffer
+//! (`memory`) or the outbox (`outbox`) via [`recent_events`], identically.
 
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
+use care_pathway_matcher::CarePathway;
+use loco_rs::prelude::ModelResult;
+use sea_orm::{ConnectionTrait, DatabaseConnection, IntoActiveModel, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::models::care_pathways::Model as PathwayModel;
+use crate::models::event_outbox::{Model as OutboxRow, OutboxInsert};
 
 /// Current envelope schema version. Bumped only on a breaking change to
 /// the [`Envelope`] shape; additive fields do not bump it.
@@ -29,6 +44,15 @@ pub const SCHEMA_VERSION: u32 = 1;
 
 /// The `snake_case` entity name carried by every envelope from this service.
 pub const ENTITY: &str = "care_pathway";
+
+/// Deserialize default for [`Envelope::entity`]: a `&'static str` cannot
+/// borrow from the input, so on deserialize the field is fixed to
+/// [`ENTITY`] (correct — this service only ever emits its own entity).
+/// Without this the derived `Deserialize` would only hold for `'static`,
+/// breaking the owned `serde_json::from_value` used to project outbox rows.
+fn default_entity() -> &'static str {
+    ENTITY
+}
 
 /// The kind of change that occurred.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -55,6 +79,11 @@ pub struct Envelope {
     /// Envelope schema version (currently [`SCHEMA_VERSION`]).
     pub schema_version: u32,
     /// The `snake_case` entity name, e.g. `"care_pathway"`.
+    ///
+    /// Serialized verbatim; on deserialize it is fixed to [`ENTITY`] (a
+    /// `&'static str` cannot borrow from the input), which is correct
+    /// because this service only ever emits its own entity.
+    #[serde(skip_deserializing, default = "default_entity")]
     pub entity: &'static str,
     /// The kind of change.
     pub kind: EventKind,
@@ -209,6 +238,262 @@ pub fn recent(limit: usize) -> Vec<EventView> {
     publisher().recent(limit)
 }
 
+/// Which event transport is active (event-bus.md §7). `memory` is the
+/// default and today's behaviour; `outbox` durably enqueues each event on
+/// the entity mutation's transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventTransport {
+    /// Process-wide ring buffer; no DB, no transaction (default).
+    Memory,
+    /// Transactional outbox: an `event_outbox` row per event, written on
+    /// the handler's transaction (Phase 2).
+    Outbox,
+}
+
+impl EventTransport {
+    /// Parse the `CARE_PATHWAY_EVENT_TRANSPORT` value. `outbox` selects the
+    /// outbox; `memory` and **any unrecognised value** fall back to
+    /// `memory` (fail-safe to today's behaviour), case-insensitively.
+    #[must_use]
+    pub fn parse(s: &str) -> Self {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "outbox" => Self::Outbox,
+            _ => Self::Memory,
+        }
+    }
+
+    /// Whether the outbox transport is selected.
+    #[must_use]
+    pub const fn is_outbox(self) -> bool {
+        matches!(self, Self::Outbox)
+    }
+}
+
+/// The process-wide transport, read once from `CARE_PATHWAY_EVENT_TRANSPORT`
+/// and cached (mirrors the auth `REQUIRE_AUTH` env pattern). Unset or
+/// unrecognised ⇒ [`EventTransport::Memory`].
+#[must_use]
+pub fn transport() -> EventTransport {
+    static TRANSPORT: OnceLock<EventTransport> = OnceLock::new();
+    *TRANSPORT.get_or_init(|| {
+        std::env::var("CARE_PATHWAY_EVENT_TRANSPORT")
+            .map_or(EventTransport::Memory, |v| EventTransport::parse(&v))
+    })
+}
+
+/// The transactional-outbox publisher (event-bus.md §5), sitting alongside
+/// [`InMemoryPublisher`]. Unlike the ring buffer, its `publish` is async
+/// and takes a connection, so it can run **inside the handler's
+/// transaction** — the outbox guarantee. It holds no state (the durable
+/// store is Postgres), so it is a unit type.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct OutboxPublisher;
+
+impl OutboxPublisher {
+    /// Insert one `event_outbox` row for `env` **on `conn`**. Pass a
+    /// `&DatabaseTransaction` to share the entity mutation's commit
+    /// boundary. `occurred_at` is stamped now (the Phase-1 envelope has no
+    /// wall-clock time).
+    ///
+    /// # Errors
+    ///
+    /// When the envelope pid is not a UUID, or the insert fails.
+    pub async fn publish<C: ConnectionTrait>(self, conn: &C, env: &Envelope) -> ModelResult<()> {
+        let insert = OutboxInsert::from_envelope(env, chrono::Utc::now().into())?;
+        insert.insert_on(conn).await?;
+        Ok(())
+    }
+
+    /// The most recent outbox rows, newest first, projected to
+    /// [`EventView`] (drives `/events/recent` under the `outbox`
+    /// transport).
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn recent(self, db: &DatabaseConnection, limit: usize) -> ModelResult<Vec<EventView>> {
+        OutboxRow::recent(db, u64::try_from(limit).unwrap_or(u64::MAX)).await
+    }
+}
+
+/// Recent events for the operator endpoint, from whichever transport is
+/// active: the ring buffer (`memory`) or the outbox table (`outbox`). The
+/// wire shape — a `Vec<EventView>` — is identical either way.
+///
+/// # Errors
+///
+/// When the outbox query fails (`memory` never errors).
+pub async fn recent_events(db: &DatabaseConnection, limit: usize) -> ModelResult<Vec<EventView>> {
+    match transport() {
+        EventTransport::Memory => Ok(recent(limit)),
+        EventTransport::Outbox => OutboxPublisher.recent(db, limit).await,
+    }
+}
+
+/// Create a care pathway and emit its `Created` event, atomically under
+/// the active transport. `memory`: insert on `db`, then push to the ring
+/// buffer (today's behaviour). `outbox`: open one transaction, insert the
+/// row **and** the `event_outbox` row on it, then commit — so a crash can
+/// never persist one without the other.
+///
+/// # Errors
+///
+/// When the insert (or, for `outbox`, the transaction / outbox insert)
+/// fails; the transaction rolls back both writes on any error.
+pub async fn create_and_emit(
+    db: &DatabaseConnection,
+    pathway: &CarePathway,
+    actor: Option<&str>,
+) -> ModelResult<PathwayModel> {
+    match transport() {
+        EventTransport::Memory => {
+            let model = PathwayModel::create(db, pathway).await?;
+            publish_with_actor(
+                EventKind::Created,
+                &model.pid.to_string(),
+                &model.name,
+                actor,
+            );
+            Ok(model)
+        }
+        EventTransport::Outbox => {
+            let txn = db.begin().await?;
+            let model = PathwayModel::create(&txn, pathway).await?;
+            let env = envelope(EventKind::Created, &model.pid.to_string(), &model.name, actor);
+            OutboxPublisher.publish(&txn, &env).await?;
+            txn.commit().await?;
+            Ok(model)
+        }
+    }
+}
+
+/// Replace a care pathway's payload and emit its `Updated` event,
+/// atomically under the active transport (see [`create_and_emit`] for the
+/// two paths). Consumes the fetched `model`.
+///
+/// # Errors
+///
+/// When the update (or, for `outbox`, the transaction / outbox insert)
+/// fails.
+pub async fn update_and_emit(
+    db: &DatabaseConnection,
+    model: PathwayModel,
+    pathway: &CarePathway,
+    actor: Option<&str>,
+) -> ModelResult<PathwayModel> {
+    match transport() {
+        EventTransport::Memory => {
+            let updated = model.into_active_model().update_data(db, pathway).await?;
+            publish_with_actor(
+                EventKind::Updated,
+                &updated.pid.to_string(),
+                &updated.name,
+                actor,
+            );
+            Ok(updated)
+        }
+        EventTransport::Outbox => {
+            let txn = db.begin().await?;
+            let updated = model.into_active_model().update_data(&txn, pathway).await?;
+            let env = envelope(
+                EventKind::Updated,
+                &updated.pid.to_string(),
+                &updated.name,
+                actor,
+            );
+            OutboxPublisher.publish(&txn, &env).await?;
+            txn.commit().await?;
+            Ok(updated)
+        }
+    }
+}
+
+/// Soft-delete a care pathway and emit its `Deleted` event, atomically
+/// under the active transport. Returns the record's `(pid, name)` — captured
+/// before the delete — so the caller can audit and respond.
+///
+/// # Errors
+///
+/// When the soft-delete (or, for `outbox`, the transaction / outbox
+/// insert) fails.
+pub async fn delete_and_emit(
+    db: &DatabaseConnection,
+    model: PathwayModel,
+    actor: Option<&str>,
+) -> ModelResult<(Uuid, String)> {
+    let (pid, name) = (model.pid, model.name.clone());
+    match transport() {
+        EventTransport::Memory => {
+            model.into_active_model().soft_delete(db).await?;
+            publish_with_actor(EventKind::Deleted, &pid.to_string(), &name, actor);
+        }
+        EventTransport::Outbox => {
+            let txn = db.begin().await?;
+            model.into_active_model().soft_delete(&txn).await?;
+            let env = envelope(EventKind::Deleted, &pid.to_string(), &name, actor);
+            OutboxPublisher.publish(&txn, &env).await?;
+            txn.commit().await?;
+        }
+    }
+    Ok((pid, name))
+}
+
+/// Fold a duplicate into a survivor and emit the pair of events (`Merged`
+/// on the survivor, `Deleted` on the duplicate), atomically under the
+/// active transport. Under `outbox`, both writes and both outbox rows
+/// share one transaction. Returns `(merged_survivor, duplicate_pid,
+/// duplicate_name)` for the caller's merge-record / audit follow-up.
+///
+/// # Errors
+///
+/// When either write (or, for `outbox`, the transaction / outbox inserts)
+/// fails; the transaction rolls back the whole merge on any error.
+pub async fn merge_and_emit(
+    db: &DatabaseConnection,
+    main: PathwayModel,
+    duplicate: PathwayModel,
+    merged_pathway: &CarePathway,
+    actor: Option<&str>,
+) -> ModelResult<(PathwayModel, Uuid, String)> {
+    let (dup_pid, dup_name) = (duplicate.pid, duplicate.name.clone());
+    match transport() {
+        EventTransport::Memory => {
+            let merged = main
+                .into_active_model()
+                .update_data(db, merged_pathway)
+                .await?;
+            duplicate.into_active_model().soft_delete(db).await?;
+            publish_with_actor(
+                EventKind::Merged,
+                &merged.pid.to_string(),
+                &merged.name,
+                actor,
+            );
+            publish_with_actor(EventKind::Deleted, &dup_pid.to_string(), &dup_name, actor);
+            Ok((merged, dup_pid, dup_name))
+        }
+        EventTransport::Outbox => {
+            let txn = db.begin().await?;
+            let merged = main
+                .into_active_model()
+                .update_data(&txn, merged_pathway)
+                .await?;
+            duplicate.into_active_model().soft_delete(&txn).await?;
+            let merged_env = envelope(
+                EventKind::Merged,
+                &merged.pid.to_string(),
+                &merged.name,
+                actor,
+            );
+            OutboxPublisher.publish(&txn, &merged_env).await?;
+            let deleted_env = envelope(EventKind::Deleted, &dup_pid.to_string(), &dup_name, actor);
+            OutboxPublisher.publish(&txn, &deleted_env).await?;
+            txn.commit().await?;
+            Ok((merged, dup_pid, dup_name))
+        }
+    }
+}
+
 /// Tests for the Phase-1 in-memory event path: publish/read-back,
 /// monotonic sequencing, the envelope's Serde round-trip, and the frozen
 /// `EventView` wire shape. All DB-free.
@@ -292,6 +577,21 @@ mod tests {
         assert_eq!(with.actor.as_deref(), Some("user-9"));
         let without = envelope(EventKind::Updated, "p", "n", None);
         assert_eq!(without.actor, None);
+    }
+
+    /// The transport selector parses `outbox` (case-insensitively, with
+    /// surrounding whitespace), and falls back to `memory` for `memory`,
+    /// the empty string, and any unrecognised value (fail-safe to today's
+    /// behaviour). The `is_outbox` helper agrees.
+    #[test]
+    fn transport_parse_defaults_to_memory() {
+        assert_eq!(EventTransport::parse("outbox"), EventTransport::Outbox);
+        assert_eq!(EventTransport::parse("  OutBox "), EventTransport::Outbox);
+        assert_eq!(EventTransport::parse("memory"), EventTransport::Memory);
+        assert_eq!(EventTransport::parse(""), EventTransport::Memory);
+        assert_eq!(EventTransport::parse("junk"), EventTransport::Memory);
+        assert!(EventTransport::parse("outbox").is_outbox());
+        assert!(!EventTransport::parse("memory").is_outbox());
     }
 
     /// Sequence numbers are monotonic across publishes on one publisher.

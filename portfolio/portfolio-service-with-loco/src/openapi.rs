@@ -5,7 +5,7 @@
 //! the schema is authored here by hand rather than derived — which also
 //! keeps the doc accurate to the wire format. The four collections
 //! (portfolios / projects / products / programs) share one templated path
-//! set under `/api/v1/{collection}`.
+//! set under `/api/{collection}`.
 
 use serde_json::{Value, json};
 
@@ -52,7 +52,7 @@ fn collection_param() -> Value {
 /// The CRUD + matching + merge paths (templated over `{collection}`).
 fn crud_paths() -> Value {
     json!({
-            "/api/v1/{collection}": {
+            "/api/{collection}": {
                 "parameters": [collection_param()],
                 "get": {
                     "tags": ["work-items"],
@@ -70,7 +70,7 @@ fn crud_paths() -> Value {
                     }
                 }
             },
-            "/api/v1/{collection}/search": {
+            "/api/{collection}/search": {
                 "parameters": [collection_param()],
                 "get": {
                     "tags": ["work-items"],
@@ -82,7 +82,7 @@ fn crud_paths() -> Value {
                     }
                 }
             },
-            "/api/v1/{collection}/match": {
+            "/api/{collection}/match": {
                 "parameters": [collection_param()],
                 "post": {
                     "tags": ["matching"],
@@ -91,7 +91,7 @@ fn crud_paths() -> Value {
                     "responses": { "200": { "description": "Ranked results (index + MatchResult)" } }
                 }
             },
-            "/api/v1/{collection}/check-duplicates": {
+            "/api/{collection}/check-duplicates": {
                 "parameters": [collection_param()],
                 "post": {
                     "tags": ["matching"],
@@ -101,7 +101,7 @@ fn crud_paths() -> Value {
                         "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ScoredRef" } } } } } }
                 }
             },
-            "/api/v1/{collection}/merge": {
+            "/api/{collection}/merge": {
                 "parameters": [collection_param()],
                 "post": {
                     "tags": ["matching"],
@@ -114,7 +114,7 @@ fn crud_paths() -> Value {
                     }
                 }
             },
-            "/api/v1/{collection}/merges/recent": {
+            "/api/{collection}/merges/recent": {
                 "parameters": [collection_param()],
                 "get": { "tags": ["matching"], "summary": "Recent merge-history records", "responses": { "200": { "description": "Merge records" } } }
             }
@@ -124,7 +124,7 @@ fn crud_paths() -> Value {
 /// The auth / audit / events / single-record / metrics paths.
 fn aux_paths() -> Value {
     json!({
-            "/api/v1/{collection}/whoami": {
+            "/api/{collection}/whoami": {
                 "parameters": [collection_param()],
                 "get": {
                     "tags": ["auth"],
@@ -136,15 +136,15 @@ fn aux_paths() -> Value {
                     }
                 }
             },
-            "/api/v1/{collection}/audit/recent": {
+            "/api/{collection}/audit/recent": {
                 "parameters": [collection_param()],
                 "get": { "tags": ["audit"], "summary": "Recent audit-log entries", "responses": { "200": { "description": "Audit entries" } } }
             },
-            "/api/v1/{collection}/events/recent": {
+            "/api/{collection}/events/recent": {
                 "parameters": [collection_param()],
                 "get": { "tags": ["audit"], "summary": "Recent events from the in-memory stream", "responses": { "200": { "description": "Events" } } }
             },
-            "/api/v1/{collection}/{pid}": {
+            "/api/{collection}/{pid}": {
                 "parameters": [collection_param(), { "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
                 "get": { "tags": ["work-items"], "summary": "Fetch the stored work item",
                     "responses": { "200": { "description": "WorkItem", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkItem" } } } }, "404": { "description": "Not found" } } },
@@ -153,7 +153,7 @@ fn aux_paths() -> Value {
                     "responses": { "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkItemRef" } } } }, "404": { "description": "Not found" }, "422": { "description": "Validation failure" } } },
                 "delete": { "tags": ["work-items"], "summary": "Soft-delete a work item", "responses": { "200": { "description": "Deleted" } } }
             },
-            "/api/v1/{collection}/{pid}/audit": {
+            "/api/{collection}/{pid}/audit": {
                 "parameters": [collection_param(), { "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
                 "get": { "tags": ["audit"], "summary": "Audit trail for one work item", "responses": { "200": { "description": "Audit entries" } } }
             },
@@ -225,8 +225,8 @@ mod tests {
     fn spec_is_wellformed() {
         let s = spec();
         assert_eq!(s["openapi"], "3.0.3");
-        assert!(s["paths"]["/api/v1/{collection}"]["post"].is_object());
-        assert!(s["paths"]["/api/v1/{collection}/check-duplicates"]["post"].is_object());
+        assert!(s["paths"]["/api/{collection}"]["post"].is_object());
+        assert!(s["paths"]["/api/{collection}/check-duplicates"]["post"].is_object());
         assert!(s["components"]["schemas"]["WorkItem"]["properties"]["name"].is_object());
         assert!(s["components"]["schemas"]["WorkItem"]["properties"]["kind"].is_object());
         assert!(
@@ -239,13 +239,13 @@ mod tests {
     fn spec_documents_core_endpoints() {
         let s = spec();
         let paths = &s["paths"];
-        assert!(paths["/api/v1/{collection}"]["get"].is_object());
-        assert!(paths["/api/v1/{collection}"]["post"].is_object());
-        assert!(paths["/api/v1/{collection}/match"]["post"].is_object());
-        assert!(paths["/api/v1/{collection}/check-duplicates"]["post"].is_object());
-        assert!(paths["/api/v1/{collection}/{pid}"]["get"].is_object());
-        assert!(paths["/api/v1/{collection}/{pid}"]["put"].is_object());
-        assert!(paths["/api/v1/{collection}/{pid}"]["delete"].is_object());
+        assert!(paths["/api/{collection}"]["get"].is_object());
+        assert!(paths["/api/{collection}"]["post"].is_object());
+        assert!(paths["/api/{collection}/match"]["post"].is_object());
+        assert!(paths["/api/{collection}/check-duplicates"]["post"].is_object());
+        assert!(paths["/api/{collection}/{pid}"]["get"].is_object());
+        assert!(paths["/api/{collection}/{pid}"]["put"].is_object());
+        assert!(paths["/api/{collection}/{pid}"]["delete"].is_object());
     }
 
     /// Pins that the audit + event-stream endpoints are documented.
@@ -253,16 +253,16 @@ mod tests {
     fn spec_documents_audit_and_event_endpoints() {
         let s = spec();
         let paths = &s["paths"];
-        assert!(paths["/api/v1/{collection}/audit/recent"]["get"].is_object());
-        assert!(paths["/api/v1/{collection}/events/recent"]["get"].is_object());
-        assert!(paths["/api/v1/{collection}/{pid}/audit"]["get"].is_object());
+        assert!(paths["/api/{collection}/audit/recent"]["get"].is_object());
+        assert!(paths["/api/{collection}/events/recent"]["get"].is_object());
+        assert!(paths["/api/{collection}/{pid}/audit"]["get"].is_object());
     }
 
     /// Pins that the name-search endpoint is documented with its `q` param.
     #[test]
     fn spec_documents_search_endpoint() {
         let s = spec();
-        let op = &s["paths"]["/api/v1/{collection}/search"]["get"];
+        let op = &s["paths"]["/api/{collection}/search"]["get"];
         assert!(op.is_object());
         assert_eq!(op["parameters"][0]["name"], "q");
     }
@@ -271,8 +271,8 @@ mod tests {
     #[test]
     fn spec_documents_merge_endpoints() {
         let s = spec();
-        assert!(s["paths"]["/api/v1/{collection}/merge"]["post"].is_object());
-        assert!(s["paths"]["/api/v1/{collection}/merges/recent"]["get"].is_object());
+        assert!(s["paths"]["/api/{collection}/merge"]["post"].is_object());
+        assert!(s["paths"]["/api/{collection}/merges/recent"]["get"].is_object());
         assert!(s["components"]["schemas"]["MergeRequest"]["properties"]["main_pid"].is_object());
     }
 
@@ -290,7 +290,7 @@ mod tests {
     fn spec_documents_whoami_with_bearer_security() {
         let s = spec();
         assert!(
-            s["paths"]["/api/v1/{collection}/whoami"]["get"]["security"][0]["bearer"].is_array()
+            s["paths"]["/api/{collection}/whoami"]["get"]["security"][0]["bearer"].is_array()
         );
         assert_eq!(
             s["components"]["securitySchemes"]["bearer"]["scheme"],

@@ -1,6 +1,8 @@
 # RESTful API Reference
 
-All REST endpoints are mounted under `/api/v1`.
+All REST endpoints are mounted under `/api`.
+
+API URLs are version-free; select the version with the `Accepts-version` header (default `1.0`) — see [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
 
 ## Library API — bridge to the canonical `event-matcher` crate
 
@@ -75,11 +77,11 @@ refresh loop (key-rotation re-fetch is a roadmap item, spec §15).
 Blanket enforcement (default **off**): when `EVENT_REQUIRE_AUTH` is
 truthy (`1`/`true`/`yes`/`on`, case-insensitive; anything else
 including unset/blank ⇒ off), the `auth::require_auth_mw` middleware
-requires a valid bearer token on **every** `/api/v1/*` route except
-the public `/api/v1/health`. Root-level `/_health`, `/_ping`,
-`/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`, and the
-`/fhir/*` `501 Not Implemented` stubs sit outside the `/api/v1` scope
-and stay public. The flag is read once at `AppState` construction —
+requires a valid bearer token on **every** `/api/*` and `/fhir/*`
+route except the public `/api/health` and `/fhir/metadata`.
+Root-level `/_health`, `/_ping`, `/api-docs/openapi.json`,
+`/swagger-ui*`, and `/metrics.prom` sit outside the enforced scope and
+stay public. The flag is read once at `AppState` construction —
 restart the service to change it. Wired on both router surfaces
 (`create_router` and the loco router in `App::after_routes`). Family
 contract:
@@ -94,7 +96,7 @@ per
 the request's action is derived from the HTTP method plus the crate's
 destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` —
 `/merge`, `/deduplicate`, `/import`; matched on path suffix, so
-`/api/v1/events/merge` is destructive), and the shared engine in
+`/api/events/merge` is destructive), and the shared engine in
 `authentication-verifier` 0.3 evaluates the policy over the token's
 `attrs` claim. Configure with `EVENT_ABAC_POLICY` (inline JSON) or
 `EVENT_ABAC_POLICY_FILE` (path); unset or unparsable ⇒ warn-log + the
@@ -163,11 +165,18 @@ the search index is queried for events with similar names whose
 
 ## FHIR
 
-`/fhir/Event` endpoints currently return `501 Not Implemented` with
-an `OperationOutcome` body. See
-[`src/api/fhir/mod.rs`](../src/api/fhir/mod.rs) for the rationale —
-the schema.org/Event → FHIR R5 mapping isn't fixed yet
-(Appointment vs Encounter vs other event-pattern resources).
+FHIR R5 `Appointment` endpoints are implemented at
+`/fhir/Appointment{,/{id}}` (read/create/update/delete/search) plus
+`GET /fhir/metadata` (`CapabilityStatement`), per the family contract
+[`agents/share/fhir.md`](../../../agents/share/fhir.md). The
+schema.org/Event → `Appointment` mapping is **best-effort** (`low`
+fidelity — see the module docs for the gaps); `Encounter` is a roadmap
+alternative. Responses are `application/fhir+json`; every non-2xx body
+is an `OperationOutcome`; search returns a `searchset` Bundle. `/fhir/*`
+sits behind the blanket auth+ABAC guard (guarded when
+`EVENT_REQUIRE_AUTH` is on; `/fhir/metadata` is public). Source:
+[`src/controllers/fhir.rs`](../src/controllers/fhir.rs),
+[`src/fhir/`](../src/fhir/).
 
 ## Response envelope
 
@@ -194,7 +203,6 @@ Error envelope:
 | 409 | Duplicate detected (on create) |
 | 422 | Validation error |
 | 500 | Internal error |
-| 501 | FHIR endpoint stub |
 
 ## Source files
 
@@ -202,5 +210,6 @@ Error envelope:
 - `src/api/rest/mod.rs` — router, OpenAPI doc, `serve`
 - `src/api/rest/handlers.rs` — all REST handlers
 - `src/api/rest/state.rs` — `AppState`
-- `src/api/fhir/mod.rs` + `handlers.rs` — FHIR stubs
+- `src/controllers/fhir.rs` — mounted FHIR R5 `Appointment` routes (`/fhir/Appointment{,/{id}}` + `/fhir/metadata`)
+- `src/fhir/` — FHIR resources, conversions, `OperationOutcome`, Bundle, `CapabilityStatement`
 - `src/api/grpc/mod.rs` — gRPC stub

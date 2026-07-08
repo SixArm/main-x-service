@@ -121,11 +121,11 @@ sensitive identifiers or party emails.
 
 ### 6.4 Duplicate detection and merging
 
-- Real-time `409 Conflict` on `POST /api/v1/events` when the blocking
+- Real-time `409 Conflict` on `POST /api/events` when the blocking
   step (name + start-date) yields a probable match above the
   threshold.
-- Explicit `POST /api/v1/events/check-duplicates`.
-- Batch `POST /api/v1/events/deduplicate`.
+- Explicit `POST /api/events/check-duplicates`.
+- Batch `POST /api/events/deduplicate`.
 - Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`).
 - Merge picks the surviving record; transfers identifiers, alternate
   names, keywords, locations, parties, and `same_as` URLs; appends the
@@ -148,7 +148,7 @@ per-offer checks (3-letter ISO 4217 currency, parseable price,
 
 Per-field masking of identifier values (often double as access tokens)
 and party emails; external party IDs stripped from the masked view.
-GDPR Article 15 export at `GET /api/v1/events/{id}/export`. Consent
+GDPR Article 15 export at `GET /api/events/{id}/export`. Consent
 records (`Consent` model) let callers grant / revoke processing /
 sharing / marketing / research consent per event. See
 [`agents/share/privacy.md`](../../../agents/share/privacy.md).
@@ -160,7 +160,15 @@ user ID, IP, user agent, timestamp.
 
 ### 6.8 FHIR R5
 
-**Stubbed.** `/fhir/Event/*` returns `501 Not Implemented` with an
-`OperationOutcome` body until the schema.org/Event → FHIR R5 mapping
-is fixed. See OQ-1.
+**Live.** A FHIR R5 `Appointment` surface is mounted at
+`/fhir/Appointment{,/{id}}` — read / create / update / delete / search
+— plus `GET /fhir/metadata` returning a `CapabilityStatement`, per the
+family contract
+[`agents/share/fhir.md`](../../../agents/share/fhir.md). Responses are
+`application/fhir+json`; every non-2xx body is an `OperationOutcome`;
+search returns a `searchset` Bundle. The schema.org/Event →
+`Appointment` mapping is **best-effort** (`low` fidelity; gaps are
+`TODO`-marked in `src/fhir/`); `Encounter` is a roadmap alternative.
+`/fhir/*` sits behind the same blanket auth + ABAC guard as `/api/*`
+when `EVENT_REQUIRE_AUTH` is on; `GET /fhir/metadata` is public.
 

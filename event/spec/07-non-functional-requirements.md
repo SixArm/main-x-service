@@ -15,7 +15,7 @@ and marked as such.
 | NFR-6 | Throughput | ≥ 1 000 req/sec per service instance; horizontal scaling via stateless app tier |
 | NFR-7 | Availability | HADR; stateless app tier; PostgreSQL replication; health checks for orchestration; graceful shutdown. Multi-region active-active is roadmap (§15) |
 | NFR-8 | i18n / locales | Multi-locale per [`agents/share/locales.md`](../../agents/share/locales.md) (46 languages); `in_language` on every Event; UTC storage + IANA `time_zone` for display. Time-zone-aware *fuzzy matching* is an open gap (service T-2) |
-| NFR-9 | Security | SSO via the [authentication entity](../../authentication/) (passwordless magic-link, RS256 JWT + JWKS for offline verification). JWT enforcement on `/api/v1/*` is **not yet implemented** (service T-8, entity ET-5) — until then the trio MUST NOT face the public internet unfronted |
+| NFR-9 | Security | SSO via the [authentication entity](../../authentication/) (passwordless magic-link, RS256 JWT + JWKS for offline verification). JWT enforcement on `/api/*` is **not yet implemented** (service T-8, entity ET-5) — until then the trio MUST NOT face the public internet unfronted |
 | NFR-10 | Auditability | 100% of CRUD / merge / link operations audited (FR-12) and streamed (FR-13); match decisions explainable per component (FR-17) |
 | NFR-11 | Privacy | Party / attendee data treated as personal data; masking on by default for public-facing reads; GDPR export ≤ 30 days statutory, target immediate via API (§12) |
 | NFR-12 | Observability | OTLP traces / metrics / logs; `traceparent` per request; Prometheus text exposition at `/metrics.prom` |

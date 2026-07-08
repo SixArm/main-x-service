@@ -52,7 +52,9 @@ from the matcher payload (only goal **titles** bridge in) — which are
 
 ## API surface
 
-Routes under `/api/v1/`; `{collection}` ∈ `{portfolios, projects,
+API URLs are version-free; select the version with the `Accepts-version` header (default `1.0`) — see [`agents/share/api-versioning.md`](../../agents/share/api-versioning.md).
+
+Routes under `/api/`; `{collection}` ∈ `{portfolios, projects,
 products, programs}` (identical controller shape each). See
 [spec §9](./spec/index.md) for the full contract. Highlights:
 

@@ -305,7 +305,11 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
     // The server-side session id (`sid`) is the durable thing; the
     // short-lived PASETO carries it so peers and signout can correlate.
     let sid = uuid::Uuid::new_v4().to_string();
-    let (access_token, _sid, exp) = crate::auth::sign_access_token(
+    // Per-session CSRF synchroniser token: stored in the session and
+    // delivered to the client in the readable `__Host-mxi_csrf` cookie,
+    // echoed back in `X-CSRF-Token` on mutating cookie-authed requests.
+    let csrf_token = crate::csrf::generate_token();
+    let (access_token, _sid, _exp) = crate::auth::sign_access_token(
         &user.pid.to_string(),
         &user.email,
         &user.name,
@@ -314,19 +318,17 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
     )
     .map_err(|e| Error::string(&e.to_string()))?;
 
-    let expires_at = chrono::DateTime::<chrono::Utc>::from_timestamp(exp, 0)
-        .unwrap_or_else(chrono::Utc::now)
-        .fixed_offset();
     // Session establishment copies the user's ABAC attributes into the
     // session payload (shared authorization-attributes.md §6), so token
-    // minting reads them from the session, not the users row.
+    // minting reads them from the session, not the users row. The session
+    // gets its own idle/absolute TTLs (independent of the ~5-min token
+    // exp) — see `sessions::Model::issue`.
     sessions::Model::issue(
         &ctx.db,
         &sid,
         user.pid,
-        expires_at,
         None,
-        sessions::session_data(&user.attributes),
+        sessions::session_data(&user.attributes, &csrf_token),
     )
     .await?;
 
@@ -347,6 +349,14 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
     response.headers_mut().insert(
         axum::http::header::SET_COOKIE,
         crate::cookie::set_session(&sid)
+            .parse()
+            .expect("valid set-cookie value"),
+    );
+    // Second Set-Cookie: the readable CSRF token (append, not insert, so
+    // it does not overwrite the session cookie).
+    response.headers_mut().append(
+        axum::http::header::SET_COOKIE,
+        crate::csrf::set_csrf(&csrf_token)
             .parse()
             .expect("valid set-cookie value"),
     );
@@ -391,6 +401,24 @@ async fn token(headers: axum::http::HeaderMap, State(ctx): State<AppContext>) ->
     if !session.is_active() {
         return unauthorized("session revoked or expired");
     }
+    // CSRF: this is a cookie-authenticated mutating request, so require
+    // the client to echo the session's CSRF synchroniser token in the
+    // `X-CSRF-Token` header (constant-time compared). A session predating
+    // CSRF has no token stored — skip the check for it (graceful; every
+    // new session carries one). A mismatch is `403`, distinct from the
+    // `401`s above.
+    if let Some(expected) = session.csrf() {
+        let provided = headers
+            .get(crate::csrf::CSRF_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default();
+        if !crate::csrf::matches(expected, provided) {
+            return Err(Error::CustomError(
+                StatusCode::FORBIDDEN,
+                ErrorDetail::new("csrf", "missing or invalid CSRF token"),
+            ));
+        }
+    }
     // Resolve the user for the token claims, then mint a fresh PASETO bound
     // to this session id. The ABAC `attrs` claim comes from the session's
     // copied attributes (shared authorization-attributes.md §6) — the
@@ -417,10 +445,15 @@ async fn token(headers: axum::http::HeaderMap, State(ctx): State<AppContext>) ->
 #[debug_handler]
 async fn me(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
     let AuthUser(claims) = auth;
-    if let Ok(session) = sessions::Model::find_by_jid(&ctx.db, &claims.sid).await
-        && !session.is_active()
-    {
-        return unauthorized("session signed out");
+    if let Ok(session) = sessions::Model::find_by_jid(&ctx.db, &claims.sid).await {
+        if !session.is_active() {
+            return unauthorized("session signed out");
+        }
+        // Slide the idle window on use (best-effort — a touch failure
+        // must not break the read).
+        if let Err(err) = session.touch(&ctx.db).await {
+            tracing::warn!(error = %err, "failed to slide session idle window");
+        }
     }
     let Ok(user) = users::Model::find_active_by_pid(&ctx.db, &claims.sub).await else {
         // No live user for this pid (never existed, or GDPR-erased). The
@@ -449,11 +482,17 @@ async fn signout(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Respon
     )
     .await;
     Metrics::global().signout_total.inc();
-    // Clear the session cookie so the browser drops it immediately.
+    // Clear the session and CSRF cookies so the browser drops them.
     let mut response = format::empty_json()?;
     response.headers_mut().insert(
         axum::http::header::SET_COOKIE,
         crate::cookie::clear_session()
+            .parse()
+            .expect("valid set-cookie value"),
+    );
+    response.headers_mut().append(
+        axum::http::header::SET_COOKIE,
+        crate::csrf::clear_csrf()
             .parse()
             .expect("valid set-cookie value"),
     );

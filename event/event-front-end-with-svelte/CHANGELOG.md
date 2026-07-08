@@ -9,9 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **De-versioned API URLs.** Dropped the `/api/v1` segment from every client/proxy/test path (now `/api/…`); the BFF proxy negotiates the API version via the `Accepts-version: 1.0` request header instead (see `agents/share/api-versioning.md`).
+
 ### Added
 
-- **Fuzzy search toggle (FR-2).** The events list page now exposes a **Fuzzy** checkbox wired into `SearchOptions.fuzzy` and the `GET /api/v1/events/search?fuzzy=…` query. Phonetic search is **not** offered: it is not a service search parameter (Soundex is internal to the matcher's name scoring), so it is deferred as spec §13 T-22.
+- **Fuzzy search toggle (FR-2).** The events list page now exposes a **Fuzzy** checkbox wired into `SearchOptions.fuzzy` and the `GET /api/events/search?fuzzy=…` query. Phonetic search is **not** offered: it is not a service search parameter (Soundex is internal to the matcher's name scoring), so it is deferred as spec §13 T-22.
 - **Tests.** New `tests/unit/form.test.ts` covering the `createForm` rune store and the Event time-window validation rules (FR-4: name + start required, end ≥ start, door ≤ start). New `EventRepository` unit tests for the `fuzzy` query param, the merge request body shape, and the per-ID merge-preview GET (FR-9). New Playwright smoke tests for the detail (FR-5), edit (FR-6), and audit route shells.
 
 ### Fixed

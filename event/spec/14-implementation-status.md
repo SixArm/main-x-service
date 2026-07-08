@@ -16,7 +16,7 @@ in [§15 Roadmap](15-roadmap.md), not here.
 | Privacy (masking, GDPR export, consent model) | ✅ |
 | Audit log + query endpoints | ✅ |
 | Event streaming | ⚠️ In-memory publisher only (ET-6) |
-| REST `/api/v1` + OpenAPI/Swagger + Prometheus | ✅ |
+| REST `/api` + OpenAPI/Swagger + Prometheus | ✅ |
 | FHIR R5 | ❌ `501` stub (service T-1, OQ-1) |
 | gRPC | ❌ Tonic stub (service T-6) |
 | AuthN/AuthZ | ❌ None (ET-5 / service T-8) |

@@ -99,9 +99,9 @@ the new weighted corroborator for child kinds.
 — each collection's two matching endpoints construct
 `MatchingEngine::new(MatchConfig::default())`:
 
-- `POST /api/v1/{collection}/match` → `engine.rank(query, candidates)`
+- `POST /api/{collection}/match` → `engine.rank(query, candidates)`
   over the request payload (no DB).
-- `POST /api/v1/{collection}/check-duplicates` → loads up to 1 000 active
+- `POST /api/{collection}/check-duplicates` → loads up to 1 000 active
   rows **from that collection only**, `match_work_items` per candidate,
   returns `is_match` hits sorted by score descending. (R-GATE makes
   cross-collection matching impossible even if rows leaked in.)

@@ -110,9 +110,9 @@ the portfolio service mounts the write-side link surface so a work item
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/v1/{collection}/{pid}/links` | Create / upsert an outbound edge (`{kind, to_ref, role?, valid_from?, valid_to?}`) |
-| GET | `/api/v1/{collection}/{pid}/links` | List this work item's outbound edges |
-| DELETE | `/api/v1/{collection}/{pid}/links/{id}` | Soft-delete (emits `unlinked`) |
+| POST | `/api/{collection}/{pid}/links` | Create / upsert an outbound edge (`{kind, to_ref, role?, valid_from?, valid_to?}`) |
+| GET | `/api/{collection}/{pid}/links` | List this work item's outbound edges |
+| DELETE | `/api/{collection}/{pid}/links/{id}` | Soft-delete (emits `unlinked`) |
 
 Writes are **optimistic** (no call to the target service) and emit
 `linked` / `unlinked` events on the bus. Links are **never** a match
@@ -134,11 +134,11 @@ collection:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/v1/{collection}/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |
-| `GET` | `/api/v1/{collection}/import/{id}` | Job status + counts + `errors_url` + `review_url` |
-| `POST` | `/api/v1/{collection}/export` | `202 {job_id}` — body: `format`, `filter`, `fields`, `include_soft_deleted`, `masking_profile` |
-| `GET` | `/api/v1/{collection}/export/{id}` | Job status + `download_url` |
-| `GET` | `/api/v1/{collection}/bulk-jobs` | List (filter by `kind`/`status`); `GET .../{id}` for one |
+| `POST` | `/api/{collection}/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |
+| `GET` | `/api/{collection}/import/{id}` | Job status + counts + `errors_url` + `review_url` |
+| `POST` | `/api/{collection}/export` | `202 {job_id}` — body: `format`, `filter`, `fields`, `include_soft_deleted`, `masking_profile` |
+| `GET` | `/api/{collection}/export/{id}` | Job status + `download_url` |
+| `GET` | `/api/{collection}/bulk-jobs` | List (filter by `kind`/`status`); `GET .../{id}` for one |
 
 Each job is scoped to one collection (one `kind`); a row whose `kind`
 disagrees with the collection is a per-row error (§7 of the shared

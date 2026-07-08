@@ -25,28 +25,28 @@ burndown views.
 `programs` — each with the identical shape below.
 
 ```text
-create   ──>  POST   /api/v1/{collection}                {WorkItem}          -> {pid, name}  (409 on duplicate)
-read     ──>  GET    /api/v1/{collection}/{pid}                              -> WorkItem
-update   ──>  PUT    /api/v1/{collection}/{pid}          {WorkItem}          -> {pid, name}
-delete   ──>  DELETE /api/v1/{collection}/{pid}                              -> 204
-list     ──>  GET    /api/v1/{collection}                                    -> [{pid, name}]  (cap 100)
-search   ──>  GET    /api/v1/{collection}/search?q=migration                -> [{pid, name}]  (ILIKE, cap 50)
-dedupe   ──>  POST   /api/v1/{collection}/check-duplicates  {query}          -> [{pid, score, ...}]
-match    ──>  POST   /api/v1/{collection}/match   {query, candidates}        -> ranked results (cross-kind → 0.0)
-batch    ──>  POST   /api/v1/{collection}/deduplicate                        -> review-queue items
-merge    ──>  POST   /api/v1/{collection}/merge   {main_pid, duplicate_pid}  -> merge record (same kind only)
-merges   ──>  GET    /api/v1/{collection}/merges/recent                      -> [merge record]
+create   ──>  POST   /api/{collection}                {WorkItem}          -> {pid, name}  (409 on duplicate)
+read     ──>  GET    /api/{collection}/{pid}                              -> WorkItem
+update   ──>  PUT    /api/{collection}/{pid}          {WorkItem}          -> {pid, name}
+delete   ──>  DELETE /api/{collection}/{pid}                              -> 204
+list     ──>  GET    /api/{collection}                                    -> [{pid, name}]  (cap 100)
+search   ──>  GET    /api/{collection}/search?q=migration                -> [{pid, name}]  (ILIKE, cap 50)
+dedupe   ──>  POST   /api/{collection}/check-duplicates  {query}          -> [{pid, score, ...}]
+match    ──>  POST   /api/{collection}/match   {query, candidates}        -> ranked results (cross-kind → 0.0)
+batch    ──>  POST   /api/{collection}/deduplicate                        -> review-queue items
+merge    ──>  POST   /api/{collection}/merge   {main_pid, duplicate_pid}  -> merge record (same kind only)
+merges   ──>  GET    /api/{collection}/merges/recent                      -> [merge record]
 
-goals    ──>  POST   /api/v1/{collection}/{pid}/goals    {Goal}              -> {pid, ...}
-tasks    ──>  POST   /api/v1/{collection}/{pid}/tasks    {Task}              -> {pid, ...}
-issues   ──>  POST   /api/v1/{collection}/{pid}/issues   {Issue}             -> {pid, ...}
-timeline ──>  GET    /api/v1/{collection}/{pid}/timeline                     -> Gantt projection
-burndown ──>  GET    /api/v1/{collection}/{pid}/burndown                     -> remaining-vs-estimate series
+goals    ──>  POST   /api/{collection}/{pid}/goals    {Goal}              -> {pid, ...}
+tasks    ──>  POST   /api/{collection}/{pid}/tasks    {Task}              -> {pid, ...}
+issues   ──>  POST   /api/{collection}/{pid}/issues   {Issue}             -> {pid, ...}
+timeline ──>  GET    /api/{collection}/{pid}/timeline                     -> Gantt projection
+burndown ──>  GET    /api/{collection}/{pid}/burndown                     -> remaining-vs-estimate series
 
-links    ──>  POST·GET·DELETE /api/v1/{collection}/{pid}/links               -> cross-service edges
-audit    ──>  GET    /api/v1/{collection}/audit/recent  ·  /{pid}/audit      -> [audit row]
-events   ──>  GET    /api/v1/{collection}/events/recent                      -> [{kind, pid, name, seq}]
-whoami   ──>  GET    /api/v1/{collection}/whoami          (Bearer PASETO)    -> verified claims (401 without)
+links    ──>  POST·GET·DELETE /api/{collection}/{pid}/links               -> cross-service edges
+audit    ──>  GET    /api/{collection}/audit/recent  ·  /{pid}/audit      -> [audit row]
+events   ──>  GET    /api/{collection}/events/recent                      -> [{kind, pid, name, seq}]
+whoami   ──>  GET    /api/{collection}/whoami          (Bearer PASETO)    -> verified claims (401 without)
 docs     ──>  GET    /api-docs/openapi.json  ·  /swagger-ui                  -> OpenAPI 3 + Swagger UI
 metrics  ──>  GET    /metrics.prom                                           -> Prometheus text (public)
 ```

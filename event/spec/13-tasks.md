@@ -64,7 +64,7 @@ Prefix `ET-` distinguishes these from per-crate task numbers.
   - **Acceptance:** decision recorded here + in service spec §6.2;
     bridge tests updated to pin the chosen path.
 - [ ] **ET-5 — SSO across the trio** (service T-8 + front-end).
-  - [ ] Service: JWT middleware on `/api/v1/*`, verifying RS256
+  - [ ] Service: JWT middleware on `/api/*`, verifying RS256
     against the authentication entity's JWKS.
   - [ ] Front-end: magic-link sign-in flow + token handling.
   - **Acceptance:** unauthenticated REST request → `401`;

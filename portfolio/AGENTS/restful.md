@@ -7,8 +7,8 @@ Source:
 Base URL in development: `http://localhost:5150`.
 
 The service exposes **four matchable collections** with the **identical**
-controller shape — `/api/v1/portfolios`, `/api/v1/projects`,
-`/api/v1/products`, `/api/v1/programs`. Below, `{collection}` stands for
+controller shape — `/api/portfolios`, `/api/projects`,
+`/api/products`, `/api/programs`. Below, `{collection}` stands for
 any of the four; every collection carries the same routes. Matching is
 **within a collection only** (the matcher's R-GATE enforces it).
 
@@ -25,12 +25,12 @@ any of the four; every collection carries the same routes. Matching is
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| POST | `/api/v1/{collection}` | `WorkItem` | `{pid, name}` |
-| GET | `/api/v1/{collection}` | — | `[{pid, name}]` (active, most-recent first, cap 100) |
-| GET | `/api/v1/{collection}/search?q=` | — | `[{pid, name}]` — `ILIKE` name match (cap 50); blank `q` → `400` |
-| GET | `/api/v1/{collection}/{pid}` | — | stored `WorkItem` |
-| PUT | `/api/v1/{collection}/{pid}` | `WorkItem` | `{pid, name}` |
-| DELETE | `/api/v1/{collection}/{pid}` | — | `{}` (soft delete) |
+| POST | `/api/{collection}` | `WorkItem` | `{pid, name}` |
+| GET | `/api/{collection}` | — | `[{pid, name}]` (active, most-recent first, cap 100) |
+| GET | `/api/{collection}/search?q=` | — | `[{pid, name}]` — `ILIKE` name match (cap 50); blank `q` → `400` |
+| GET | `/api/{collection}/{pid}` | — | stored `WorkItem` |
+| PUT | `/api/{collection}/{pid}` | `WorkItem` | `{pid, name}` |
+| DELETE | `/api/{collection}/{pid}` | — | `{}` (soft delete) |
 
 The service stamps `kind` from the collection on create (a `portfolios`
 POST is a Portfolio); a mismatched `kind` in the body is rejected. Child
@@ -41,11 +41,11 @@ collections (`projects` / `products` / `programs`) accept / require a
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| POST | `/api/v1/{collection}/match` | `{query, candidates}` | ranked `[(index, MatchResult)]` |
-| POST | `/api/v1/{collection}/check-duplicates` | `WorkItem` | `[{pid, name, score, confidence, is_match}]`, score-descending |
-| POST | `/api/v1/{collection}/deduplicate` | `{threshold?}` | batch scan over the collection's active rows → clusters of candidate duplicates |
-| POST | `/api/v1/{collection}/merge` | `{main_pid, duplicate_pid, reason?}` | `{main_pid, duplicate_pid, main}`; `422` equal pids, `404` unknown |
-| GET | `/api/v1/{collection}/merges/recent` | — | recent `merge_records` (history + transferred snapshot) |
+| POST | `/api/{collection}/match` | `{query, candidates}` | ranked `[(index, MatchResult)]` |
+| POST | `/api/{collection}/check-duplicates` | `WorkItem` | `[{pid, name, score, confidence, is_match}]`, score-descending |
+| POST | `/api/{collection}/deduplicate` | `{threshold?}` | batch scan over the collection's active rows → clusters of candidate duplicates |
+| POST | `/api/{collection}/merge` | `{main_pid, duplicate_pid, reason?}` | `{main_pid, duplicate_pid, main}`; `422` equal pids, `404` unknown |
+| GET | `/api/{collection}/merges/recent` | — | recent `merge_records` (history + transferred snapshot) |
 
 A cross-kind `query` against the wrong collection scores `0.0` for every
 candidate (R-GATE) — matching never crosses collections.
@@ -59,9 +59,9 @@ parent.
 
 | Sub-resource | Collection | Item |
 |---|---|---|
-| Goals | `GET` / `POST /api/v1/{collection}/{pid}/goals` | `GET` / `PUT` / `DELETE …/goals/{id}` |
-| Tasks | `GET` / `POST /api/v1/{collection}/{pid}/tasks` | `GET` / `PUT` / `DELETE …/tasks/{id}` |
-| Issues | `GET` / `POST /api/v1/{collection}/{pid}/issues` | `GET` / `PUT` / `DELETE …/issues/{id}` |
+| Goals | `GET` / `POST /api/{collection}/{pid}/goals` | `GET` / `PUT` / `DELETE …/goals/{id}` |
+| Tasks | `GET` / `POST /api/{collection}/{pid}/tasks` | `GET` / `PUT` / `DELETE …/tasks/{id}` |
+| Issues | `GET` / `POST /api/{collection}/{pid}/issues` | `GET` / `PUT` / `DELETE …/issues/{id}` |
 
 Goal writes also mutate the parent's `data.goals[]` payload field (the
 goals bridge), keeping the matcher's `Goals` component in sync.
@@ -70,8 +70,8 @@ goals bridge), keeping the matcher's `Goals` component in sync.
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/api/v1/{collection}/{pid}/timeline` | Gantt-shaped rows from work-item + task + goal dates |
-| GET | `/api/v1/{collection}/{pid}/burndown` | remaining-work series over the work-item timeframe |
+| GET | `/api/{collection}/{pid}/timeline` | Gantt-shaped rows from work-item + task + goal dates |
+| GET | `/api/{collection}/{pid}/burndown` | remaining-work series over the work-item timeframe |
 
 ### Cross-service links
 
@@ -81,22 +81,22 @@ link aggregator surface:
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/api/v1/{collection}/{pid}/links` | typed outbound + inbound links for the work item |
-| POST | `/api/v1/{collection}/{pid}/links` | add a typed link `{kind, target}` |
-| DELETE | `/api/v1/{collection}/{pid}/links/{id}` | remove a link |
+| GET | `/api/{collection}/{pid}/links` | typed outbound + inbound links for the work item |
+| POST | `/api/{collection}/{pid}/links` | add a typed link `{kind, target}` |
+| DELETE | `/api/{collection}/{pid}/links/{id}` | remove a link |
 
 ### Bulk import / export
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| POST | `/api/v1/{collection}/import` | `[WorkItem]` (NDJSON or array) | per-row `{pid, name}` / error |
-| GET | `/api/v1/{collection}/export` | — | full `[WorkItem]` snapshot (active rows) |
+| POST | `/api/{collection}/import` | `[WorkItem]` (NDJSON or array) | per-row `{pid, name}` / error |
+| GET | `/api/{collection}/export` | — | full `[WorkItem]` snapshot (active rows) |
 
 ### Authentication
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/api/v1/{collection}/whoami` | verified PASETO-token `Claims`; `401` without a valid token |
+| GET | `/api/{collection}/whoami` | verified PASETO-token `Claims`; `401` without a valid token |
 
 Short-lived **PASETO v4.public** tokens are verified offline against the
 auth-service's published **Ed25519 key** via the embedded
@@ -113,9 +113,9 @@ server-side.) Source of truth:
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/api/v1/{collection}/audit/recent` | recent `audit_logs` rows (all work items, cap 100) |
-| GET | `/api/v1/{collection}/{pid}/audit` | audit trail for one work item |
-| GET | `/api/v1/{collection}/events/recent` | recent `WorkItemEvent`s from the in-memory stream |
+| GET | `/api/{collection}/audit/recent` | recent `audit_logs` rows (all work items, cap 100) |
+| GET | `/api/{collection}/{pid}/audit` | audit trail for one work item |
+| GET | `/api/{collection}/events/recent` | recent `WorkItemEvent`s from the in-memory stream |
 
 Each create / update / delete (work item or sub-resource) writes a
 best-effort `audit_logs` row (durable) and publishes a
@@ -143,7 +143,7 @@ broker is roadmap.
 ## Example
 
 ```bash
-curl -s localhost:5150/api/v1/projects \
+curl -s localhost:5150/api/projects \
   -H 'content-type: application/json' \
   -d '{"kind":"Project",
        "name":"Q3 Platform Migration",
@@ -162,10 +162,10 @@ CRUD + `checkDuplicates` + timeline / burndown reads).
 
 | Route | Endpoints |
 |---|---|
-| `/{collection}` | `GET /api/v1/{collection}` |
-| `/{collection}/new` | `POST /api/v1/{collection}` |
-| `/{collection}/[pid]` | `GET`, `DELETE /api/v1/{collection}/{pid}`; `POST …/check-duplicates`; sub-resource lists |
-| `/{collection}/[pid]/edit` | `GET`, `PUT /api/v1/{collection}/{pid}` |
+| `/{collection}` | `GET /api/{collection}` |
+| `/{collection}/new` | `POST /api/{collection}` |
+| `/{collection}/[pid]` | `GET`, `DELETE /api/{collection}/{pid}`; `POST …/check-duplicates`; sub-resource lists |
+| `/{collection}/[pid]/edit` | `GET`, `PUT /api/{collection}/{pid}` |
 | `/{collection}/[pid]/board` | task list / Kanban via `…/{pid}/tasks` |
 | `/{collection}/[pid]/issues` | `…/{pid}/issues` |
 | `/{collection}/[pid]/goals` | `…/{pid}/goals` |

@@ -24,6 +24,9 @@
         <div><strong>{t("account.name")}</strong> {data.user.name}</div>
         <div><strong>{t("account.email")}</strong> {data.user.email}</div>
         <div><strong>{t("account.id")}</strong> <code>{data.user.pid}</code></div>
+        <p>
+            <small><a href="/admin/attributes">Manage user attributes (admin)</a></small>
+        </p>
         <form method="POST" action="?/signout" use:enhance>
             <button class="button" type="submit">{t("account.signout")}</button>
         </form>

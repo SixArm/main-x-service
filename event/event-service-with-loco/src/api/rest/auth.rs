@@ -19,10 +19,10 @@
 //! valid bearer token on every route under [`API_PREFIX`] except the
 //! public [`PUBLIC_API_PATHS`] allow-list. It is **off by default**:
 //! unset/blank/junk ⇒ today's behaviour, where the extractor is opt-in
-//! per handler and `GET /api/v1/whoami` proves end-to-end verification.
+//! per handler and `GET /api/whoami` proves end-to-end verification.
 //! The flag is read once at [`AppState`] construction, so changing it
-//! requires a restart. The `/fhir/*` `501` stubs sit outside the
-//! `/api/v1` scope and stay public. Activation is an operations
+//! requires a restart. The `/fhir/*` surface is guarded on the same
+//! terms (except the public `/fhir/metadata`). Activation is an operations
 //! decision once the SSO token flow is live; see
 //! `agents/share/jwt-enforcement.md` for the family-wide contract.
 //!
@@ -96,19 +96,28 @@ pub fn bearer_claims(
         .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))
 }
 
-/// The API prefix under which blanket enforcement applies. Only paths
-/// under this prefix are ever gated; everything else — loco's
-/// `/_health` and `/_ping`, the `OpenAPI` doc `/api-docs/openapi.json`,
-/// the Swagger UI at `/swagger-ui*`, the Prometheus scrape
-/// `/metrics.prom`, and the `/fhir/*` `501 Not Implemented` stubs —
-/// is outside the enforcement scope and always public.
-pub const API_PREFIX: &str = "/api/v1";
+/// The API prefix under which blanket enforcement applies. Paths under
+/// this prefix (and under [`FHIR_PREFIX`]) are gated; everything else —
+/// loco's `/_health` and `/_ping`, the `OpenAPI` doc
+/// `/api-docs/openapi.json`, the Swagger UI at `/swagger-ui*`, and the
+/// Prometheus scrape `/metrics.prom` — is outside the enforcement scope
+/// and always public.
+pub const API_PREFIX: &str = "/api";
 
-/// API paths that stay public even when blanket enforcement is on: the
-/// liveness probe, so orchestration needs no bearer token. This is the
-/// complete allow-list inside [`API_PREFIX`]; every other `/api/v1/*`
-/// route requires a valid bearer token when enforcement is on.
-pub const PUBLIC_API_PATHS: &[&str] = &["/api/v1/health"];
+/// The FHIR surface prefix, guarded on the same terms as [`API_PREFIX`]
+/// (fhir.md §8): every `/fhir/*` route requires a valid bearer token when
+/// enforcement is on, except the public [`PUBLIC_API_PATHS`] entries
+/// (`/fhir/metadata` capability discovery). The FHIR write path carries
+/// PHI, so it must not be public.
+pub const FHIR_PREFIX: &str = "/fhir";
+
+/// Paths that stay public even when blanket enforcement is on: the
+/// liveness probe (orchestration needs no token) and the FHIR
+/// `CapabilityStatement` (capability discovery, fhir.md §8). This is the
+/// complete allow-list inside [`API_PREFIX`] / [`FHIR_PREFIX`]; every
+/// other guarded route requires a valid bearer token when enforcement is
+/// on.
+pub const PUBLIC_API_PATHS: &[&str] = &["/api/health", "/fhir/metadata"];
 
 /// Lenient boolean parse for the enforcement flag: `1`/`true`/`yes`/
 /// `on` (case-insensitive, surrounding whitespace ignored) ⇒ `true`;
@@ -131,9 +140,16 @@ pub fn require_auth_from_env() -> bool {
 }
 
 /// Whether `path` is under the enforced [`API_PREFIX`]. Segment-aware:
-/// `/api/v1` and `/api/v1/...` match; nothing else does.
+/// `/api` and `/api/...` match; nothing else does.
 fn is_api_path(path: &str) -> bool {
     path.strip_prefix(API_PREFIX)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
+/// Whether `path` is under the FHIR [`FHIR_PREFIX`]. Segment-aware:
+/// `/fhir` and `/fhir/...` match; nothing else does.
+fn is_fhir_path(path: &str) -> bool {
+    path.strip_prefix(FHIR_PREFIX)
         .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
 }
 
@@ -200,8 +216,9 @@ pub fn policy_from_env() -> Policy {
 ///
 /// # Errors
 ///
-/// `401` when enforcement is on, the path is under [`API_PREFIX`] and
-/// not in [`PUBLIC_API_PATHS`], and the request carries no valid bearer
+/// `401` when enforcement is on, the path is under [`API_PREFIX`] or
+/// [`FHIR_PREFIX`] and not in [`PUBLIC_API_PATHS`], and the request
+/// carries no valid bearer
 /// token (missing / malformed / expired / tampered). `403` when the
 /// token is valid but the ABAC policy denies the derived action (the
 /// message names the deciding rule, per
@@ -214,7 +231,10 @@ pub fn enforce(
     verifier: &Verifier,
     policy: &Policy,
 ) -> Result<(), (StatusCode, String)> {
-    if !require_auth || !is_api_path(path) || PUBLIC_API_PATHS.contains(&path) {
+    if !require_auth
+        || (!is_api_path(path) && !is_fhir_path(path))
+        || PUBLIC_API_PATHS.contains(&path)
+    {
         return Ok(());
     }
     let claims = bearer_claims(headers, verifier)?;
@@ -267,13 +287,13 @@ where
     }
 }
 
-/// `GET /api/v1/whoami` — echo the verified claims of the bearer token.
+/// `GET /api/whoami` — echo the verified claims of the bearer token.
 /// Returns `401` when the token is missing, malformed, or fails
 /// verification. Useful for confirming peer PASETO verification end to
 /// end.
 #[utoipa::path(
     get,
-    path = "/api/v1/whoami",
+    path = "/api/whoami",
     tag = "auth",
     responses(
         (status = 200, description = "Verified token claims"),
@@ -464,7 +484,7 @@ mod tests {
         Policy::default_policy()
     }
 
-    /// Enforcement off ⇒ a protected `/api/v1` path passes with no
+    /// Enforcement off ⇒ a protected `/api` path passes with no
     /// token (today's default behaviour is unchanged) — for reads and
     /// mutations alike (no authn and no authz when the flag is off).
     #[test]
@@ -475,7 +495,7 @@ mod tests {
                 enforce(
                     false,
                     &method,
-                    "/api/v1/events",
+                    "/api/events",
                     &HeaderMap::new(),
                     &verifier,
                     &policy
@@ -486,22 +506,22 @@ mod tests {
         }
     }
 
-    /// Enforcement on ⇒ the allow-listed `/api/v1/health` and every
-    /// out-of-scope path (loco health/ping, `OpenAPI` doc, Swagger UI,
-    /// Prometheus scrape, FHIR `501` stubs) still pass without a token.
+    /// Enforcement on ⇒ the allow-listed `/api/health`, the FHIR
+    /// `CapabilityStatement` (`/fhir/metadata`), and every out-of-scope
+    /// path (loco health/ping, `OpenAPI` doc, Swagger UI, Prometheus
+    /// scrape) still pass without a token.
     #[test]
     fn test_enforce_on_allows_public_and_out_of_scope_paths() {
         let (verifier, policy) = (verifier(), policy());
         for path in [
-            "/api/v1/health", // allow-listed inside /api/v1
-            "/_health",       // loco default, outside /api/v1
-            "/_ping",         // loco default, outside /api/v1
+            "/api/health", // allow-listed inside /api
+            "/fhir/metadata", // FHIR capability discovery (fhir.md §8)
+            "/_health",       // loco default, outside /api
+            "/_ping",         // loco default, outside /api
             "/api-docs/openapi.json",
             "/swagger-ui",
             "/swagger-ui/index.html",
             "/metrics.prom",
-            "/fhir/Event", // 501 stub surface, outside /api/v1
-            "/fhir/Event/00000000-0000-0000-0000-000000000000",
         ] {
             assert!(
                 enforce(
@@ -518,13 +538,39 @@ mod tests {
         }
     }
 
+    /// Enforcement on ⇒ the FHIR resource surface (now a real API, not a
+    /// `501` stub) is guarded like `/api/*`: no token ⇒ `401`, and a
+    /// valid token ⇒ a read passes (fhir.md §8; regression guard for the
+    /// event `/fhir/*` blanket-guard fix).
+    #[test]
+    fn test_enforce_on_guards_fhir_resource_paths() {
+        let (verifier, policy) = (verifier(), policy());
+        for path in [
+            "/fhir/Appointment",
+            "/fhir/Appointment/00000000-0000-0000-0000-000000000000",
+        ] {
+            assert_eq!(
+                enforce(true, &Method::GET, path, &HeaderMap::new(), &verifier, &policy)
+                    .unwrap_err()
+                    .0,
+                StatusCode::UNAUTHORIZED,
+                "{path} must require a token when enforcement is on"
+            );
+            let token = sign(10_000_000_000);
+            assert!(
+                enforce(true, &Method::GET, path, &bearer(&token), &verifier, &policy).is_ok(),
+                "{path} should pass with a valid token"
+            );
+        }
+    }
+
     /// Enforcement on, protected path, no token ⇒ `401`.
     #[test]
     fn test_enforce_on_protected_without_token_is_401() {
         let err = enforce(
             true,
             &Method::GET,
-            "/api/v1/events",
+            "/api/events",
             &HeaderMap::new(),
             &verifier(),
             &policy(),
@@ -541,7 +587,7 @@ mod tests {
             enforce(
                 true,
                 &Method::GET,
-                "/api/v1/events",
+                "/api/events",
                 &bearer(&token),
                 &verifier(),
                 &policy()
@@ -557,7 +603,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::GET,
-            "/api/v1/events",
+            "/api/events",
             &bearer(&token),
             &verifier(),
             &policy(),
@@ -575,7 +621,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::GET,
-            "/api/v1/events",
+            "/api/events",
             &bearer(&token),
             &verifier(),
             &policy(),
@@ -591,39 +637,39 @@ mod tests {
     #[test]
     fn test_derive_action_matrix() {
         for method in [Method::GET, Method::HEAD, Method::OPTIONS] {
-            assert_eq!(derive_action(&method, "/api/v1/events"), Action::Read);
+            assert_eq!(derive_action(&method, "/api/events"), Action::Read);
         }
         assert_eq!(
-            derive_action(&Method::DELETE, "/api/v1/events/1"),
+            derive_action(&Method::DELETE, "/api/events/1"),
             Action::Delete
         );
         for path in [
-            "/api/v1/events/merge",
-            "/api/v1/events/deduplicate",
-            "/api/v1/events/import",
+            "/api/events/merge",
+            "/api/events/deduplicate",
+            "/api/events/import",
         ] {
             assert_eq!(derive_action(&Method::POST, path), Action::Destructive);
         }
         assert_eq!(
-            derive_action(&Method::POST, "/api/v1/events"),
+            derive_action(&Method::POST, "/api/events"),
             Action::Write
         );
         assert_eq!(
-            derive_action(&Method::POST, "/api/v1/events/check-duplicates"),
+            derive_action(&Method::POST, "/api/events/check-duplicates"),
             Action::Write
         );
         assert_eq!(
-            derive_action(&Method::PUT, "/api/v1/events/1"),
+            derive_action(&Method::PUT, "/api/events/1"),
             Action::Write
         );
         assert_eq!(
-            derive_action(&Method::PATCH, "/api/v1/events/1"),
+            derive_action(&Method::PATCH, "/api/events/1"),
             Action::Write
         );
         // GET on a destructive-suffixed path is still a read — only
         // POST consults the suffix list.
         assert_eq!(
-            derive_action(&Method::GET, "/api/v1/events/merge"),
+            derive_action(&Method::GET, "/api/events/merge"),
             Action::Read
         );
     }
@@ -638,7 +684,7 @@ mod tests {
             enforce(
                 true,
                 &Method::GET,
-                "/api/v1/events",
+                "/api/events",
                 &bearer(&token),
                 &verifier,
                 &policy
@@ -648,7 +694,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::POST,
-            "/api/v1/events",
+            "/api/events",
             &bearer(&token),
             &verifier,
             &policy,
@@ -668,7 +714,7 @@ mod tests {
                 enforce(
                     true,
                     &method,
-                    "/api/v1/events",
+                    "/api/events",
                     &bearer(&token),
                     &verifier,
                     &policy
@@ -680,7 +726,7 @@ mod tests {
         let delete = enforce(
             true,
             &Method::DELETE,
-            "/api/v1/events/1",
+            "/api/events/1",
             &bearer(&token),
             &verifier,
             &policy,
@@ -690,7 +736,7 @@ mod tests {
         let merge = enforce(
             true,
             &Method::POST,
-            "/api/v1/events/merge",
+            "/api/events/merge",
             &bearer(&token),
             &verifier,
             &policy,
@@ -709,14 +755,14 @@ mod tests {
             enforce(
                 true,
                 &Method::DELETE,
-                "/api/v1/events/1",
+                "/api/events/1",
                 &bearer(&token),
                 &verifier,
                 &policy
             )
             .is_ok()
         );
-        for path in ["/api/v1/events/merge", "/api/v1/events/deduplicate"] {
+        for path in ["/api/events/merge", "/api/events/deduplicate"] {
             assert!(
                 enforce(
                     true,
@@ -738,12 +784,12 @@ mod tests {
         let (verifier, policy) = (verifier(), policy());
         let token = sign_with_attrs(10_000_000_000, &[("svc", &["true"])]);
         for (method, path) in [
-            (Method::GET, "/api/v1/events"),
-            (Method::POST, "/api/v1/events"),
-            (Method::PUT, "/api/v1/events/1"),
-            (Method::DELETE, "/api/v1/events/1"),
-            (Method::POST, "/api/v1/events/merge"),
-            (Method::POST, "/api/v1/events/deduplicate"),
+            (Method::GET, "/api/events"),
+            (Method::POST, "/api/events"),
+            (Method::PUT, "/api/events/1"),
+            (Method::DELETE, "/api/events/1"),
+            (Method::POST, "/api/events/merge"),
+            (Method::POST, "/api/events/deduplicate"),
         ] {
             assert!(
                 enforce(true, &method, path, &bearer(&token), &verifier, &policy).is_ok(),
@@ -771,7 +817,7 @@ mod tests {
         let err = enforce(
             true,
             &Method::POST,
-            "/api/v1/events",
+            "/api/events",
             &bearer(&denied),
             &verifier,
             &policy,
@@ -783,7 +829,7 @@ mod tests {
             enforce(
                 true,
                 &Method::POST,
-                "/api/v1/events",
+                "/api/events",
                 &bearer(&allowed),
                 &verifier,
                 &policy
@@ -800,7 +846,7 @@ mod tests {
         let no_token = enforce(
             true,
             &Method::POST,
-            "/api/v1/events",
+            "/api/events",
             &HeaderMap::new(),
             &verifier,
             &policy,
@@ -811,7 +857,7 @@ mod tests {
         let denied = enforce(
             true,
             &Method::POST,
-            "/api/v1/events",
+            "/api/events",
             &bearer(&token),
             &verifier,
             &policy,

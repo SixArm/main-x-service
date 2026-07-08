@@ -78,6 +78,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes()
             .add_route(things_routes())
+            .add_route(crate::controllers::fhir::routes())
             .add_route(metrics_routes())
     }
 
@@ -111,11 +112,17 @@ impl Hooks for App {
         let state =
             AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
         ctx.shared_store.insert(state.clone());
+        // Durable event bus Phase 3: start the outbox relay loop (a no-op
+        // unless the `outbox` transport and `THING_EVENT_RELAY` are set).
+        crate::relay::spawn(ctx.db.clone());
         let router = router
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .layer(axum::middleware::from_fn_with_state(
                 state,
                 crate::api::rest::auth::require_auth_mw,
+            ))
+            .layer(axum::middleware::from_fn(
+                crate::api::rest::version::require_version_mw,
             ))
             .layer(tower_http::cors::CorsLayer::permissive());
         Ok(router)

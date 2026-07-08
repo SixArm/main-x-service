@@ -37,7 +37,8 @@ PASETO v4 public token verification (Ed25519, published key) + blanket
 Matching is **within a collection only** — a project never matches a
 product (enforced by the matcher's `kind` gate, §5/§9.2).
 Deferred (§13): Tantivy full-text/fuzzy search, search-blocked dedup
-candidates, durable event bus Phases 2–3 (outbox → Fluvio), privacy,
+candidates, the durable event bus's Fluvio broker sink (Phase 2 outbox +
+Phase 3 relay/retention landed), privacy,
 front-end merge action, bulk import/export,
 gRPC, and the deferred `posts` / `comments` / `members` collaboration
 sub-resources. (The paseto-keys-over-HTTP fetch at boot landed
@@ -109,7 +110,7 @@ Child collections (`projects` / `products` / `programs`) additionally
 carry `portfolio_ref` → parent portfolio pid; the `portfolios` collection
 does not.
 
-1. `POST /api/v1/{collection}` — create; `kind` is fixed by the
+1. `POST /api/{collection}` — create; `kind` is fixed by the
    collection (server-stamped / rejected if mismatched), `name` required,
    `identifiers` structurally checked per scheme (canonical UUID for
    `Uuid`; external PM-tool id shapes for `JiraProjectKey` / `AsanaGid` /
@@ -121,29 +122,29 @@ does not.
    create returns `409 Conflict` with candidate matches (within this
    collection only) when duplicates are found. Rules in
    [`src/validation.rs`](../src/validation.rs).
-2. `GET /api/v1/{collection}` — list active (cap 100), `{pid, name}`.
-   `GET /api/v1/{collection}/search?q=` — case-insensitive name search
+2. `GET /api/{collection}` — list active (cap 100), `{pid, name}`.
+   `GET /api/{collection}/search?q=` — case-insensitive name search
    (Postgres `ILIKE`, cap 50; blank `q` → `400`).
-3. `GET /api/v1/{collection}/{pid}` — return the stored `WorkItem`.
-4. `PUT /api/v1/{collection}/{pid}` — replace the payload (`422` if `name`
+3. `GET /api/{collection}/{pid}` — return the stored `WorkItem`.
+4. `PUT /api/{collection}/{pid}` — replace the payload (`422` if `name`
    is blank, or any `goals` / `identifiers` / `in_language` /
    `portfolio_ref` entry is malformed).
-5. `DELETE /api/v1/{collection}/{pid}` — soft-delete.
-6. `POST /api/v1/{collection}/match` — rank an explicit `{query,
+5. `DELETE /api/{collection}/{pid}` — soft-delete.
+6. `POST /api/{collection}/match` — rank an explicit `{query,
    candidates}` set (no persistence). Candidates of a different `kind`
    from the query gate to `0.0` (R-GATE).
-7. `POST /api/v1/{collection}/check-duplicates` — match a query against
+7. `POST /api/{collection}/check-duplicates` — match a query against
    stored active records **in this collection**; return those above
    threshold, ranked.
-   `POST /api/v1/{collection}/deduplicate` — batch scan of active rows
+   `POST /api/{collection}/deduplicate` — batch scan of active rows
    in this collection into the review queue (status `Pending`/`Confirmed`/
    `Rejected`/`AutoMerged`).
-8. `POST /api/v1/{collection}/merge` — fold a duplicate into a survivor
+8. `POST /api/{collection}/merge` — fold a duplicate into a survivor
    **of the same kind** (union payload fields, former-name alias,
    soft-delete the duplicate, `merge_records` history + transferred
    snapshot, `Replaces` link from survivor → duplicate, `Merged` event);
    `422` equal pids or cross-kind merge, `404` unknown.
-   `GET /api/v1/{collection}/merges/recent` — merge history.
+   `GET /api/{collection}/merges/recent` — merge history.
 9. Operational sub-resource CRUD on **any** work item (separate tables
    keyed by the parent `(kind, pid)`):
    - **Goals** — `…/{collection}/{pid}/goals` (also part of the matcher
@@ -157,20 +158,20 @@ does not.
    Full CRUD on each; every write audits + emits a `created`/`updated`/
    `deleted` event scoped to the sub-resource and its parent. (Deferred
    §13: `posts` / `comments` / `members` collaboration sub-resources.)
-10. Derived read views — `GET /api/v1/{collection}/{pid}/timeline`
+10. Derived read views — `GET /api/{collection}/{pid}/timeline`
    (goals-with-target-date milestones + task date ranges → Gantt) and
-   `GET /api/v1/{collection}/{pid}/burndown` (remaining-vs-estimate over
+   `GET /api/{collection}/{pid}/burndown` (remaining-vs-estimate over
    time from task estimate/remaining snapshots). Read-only projections;
    never persisted as their own row.
 11. Cross-service links — `POST`/`GET`/`DELETE
-   /api/v1/{collection}/{pid}/links` (§9.7), emitting `linked` /
+   /api/{collection}/{pid}/links` (§9.7), emitting `linked` /
    `unlinked`.
-12. `GET /api/v1/{collection}/audit/recent` + `/{pid}/audit` — audit-log
-   query; `GET /api/v1/{collection}/events/recent` — in-memory event
+12. `GET /api/{collection}/audit/recent` + `/{pid}/audit` — audit-log
+   query; `GET /api/{collection}/events/recent` — in-memory event
    stream. Each create/update/delete/merge (work item and sub-resource)
    writes an `audit_logs` row and publishes a `created`/`updated`/
    `deleted`/`merged` (and `linked`/`unlinked`) event.
-13. `GET /api/v1/{collection}/whoami` — echo verified bearer-token claims
+13. `GET /api/{collection}/whoami` — echo verified bearer-token claims
    (`401` without a valid token); proves offline PASETO verification.
 14. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3 document
    and a Swagger UI page rendering it.
@@ -219,7 +220,11 @@ standalone aggregator builds the queryable graph.
 
 ## 9. API surface
 
-Raw loco JSON under `/api/v1/`. `{collection}` ∈ `{portfolios, projects,
+API URLs are version-free; a client selects the representation version
+with the `Accepts-version` request header (default `1.0`) — see
+[`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
+
+Raw loco JSON under `/api/`. `{collection}` ∈ `{portfolios, projects,
 products, programs}`. `404` for unknown `pid`; `422` for a validation
 failure (blank `name`, a malformed `goals` / `identifiers` / `in_language`
 / `portfolio_ref` entry — family convention, via `Error::CustomError(
@@ -231,25 +236,25 @@ for a malformed body; `409 Conflict` for a real-time create duplicate
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/v1/{collection}` | Create (`409` on duplicate) → `{pid, name}` |
-| GET | `/api/v1/{collection}` | List active (cap 100) |
-| GET | `/api/v1/{collection}/search?q=` | Case-insensitive name search (`ILIKE`, cap 50) |
-| GET | `/api/v1/{collection}/{pid}` | Fetch the stored `WorkItem` |
-| PUT | `/api/v1/{collection}/{pid}` | Replace payload |
-| DELETE | `/api/v1/{collection}/{pid}` | Soft-delete |
+| POST | `/api/{collection}` | Create (`409` on duplicate) → `{pid, name}` |
+| GET | `/api/{collection}` | List active (cap 100) |
+| GET | `/api/{collection}/search?q=` | Case-insensitive name search (`ILIKE`, cap 50) |
+| GET | `/api/{collection}/{pid}` | Fetch the stored `WorkItem` |
+| PUT | `/api/{collection}/{pid}` | Replace payload |
+| DELETE | `/api/{collection}/{pid}` | Soft-delete |
 
-Concretely the four collections are `/api/v1/portfolios`,
-`/api/v1/projects`, `/api/v1/products`, `/api/v1/programs`.
+Concretely the four collections are `/api/portfolios`,
+`/api/projects`, `/api/products`, `/api/programs`.
 
 ### 9.2 Match / dedupe / merge (within a collection)
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/v1/{collection}/match` | Rank `{query, candidates}` (no persistence; cross-kind → `0.0`) |
-| POST | `/api/v1/{collection}/check-duplicates` | Match a query vs stored active records in this collection |
-| POST | `/api/v1/{collection}/deduplicate` | Batch scan this collection's active rows → review queue |
-| POST | `/api/v1/{collection}/merge` | Merge a duplicate into a same-kind survivor (`422` equal pids / cross-kind, `404` unknown) |
-| GET | `/api/v1/{collection}/merges/recent` | Merge-history records |
+| POST | `/api/{collection}/match` | Rank `{query, candidates}` (no persistence; cross-kind → `0.0`) |
+| POST | `/api/{collection}/check-duplicates` | Match a query vs stored active records in this collection |
+| POST | `/api/{collection}/deduplicate` | Batch scan this collection's active rows → review queue |
+| POST | `/api/{collection}/merge` | Merge a duplicate into a same-kind survivor (`422` equal pids / cross-kind, `404` unknown) |
+| GET | `/api/{collection}/merges/recent` | Merge-history records |
 
 The matcher's **R-GATE** (different `kind` ⇒ `0.0`) makes matching
 within-collection only; the controller never compares across collections.
@@ -258,9 +263,9 @@ within-collection only; the controller never compares across collections.
 
 | Resource | Base path | Notable fields |
 |---|---|---|
-| Goals | `/api/v1/{collection}/{pid}/goals` | title, target_date (also in payload via `data.goals[]`) |
-| Tasks | `/api/v1/{collection}/{pid}/tasks` | title, assignee_ref, status, goal_id?, parent_task_id?, estimate, remaining, due_date |
-| Issues | `/api/v1/{collection}/{pid}/issues` | title, kind, severity, status, assignee_ref |
+| Goals | `/api/{collection}/{pid}/goals` | title, target_date (also in payload via `data.goals[]`) |
+| Tasks | `/api/{collection}/{pid}/tasks` | title, assignee_ref, status, goal_id?, parent_task_id?, estimate, remaining, due_date |
+| Issues | `/api/{collection}/{pid}/issues` | title, kind, severity, status, assignee_ref |
 
 Each base path supports `POST` (create), `GET` (list), `GET /{sub_pid}`
 (fetch), `PUT /{sub_pid}` (update), `DELETE /{sub_pid}` (soft-delete).
@@ -270,16 +275,16 @@ Each base path supports `POST` (create), `GET` (list), `GET /{sub_pid}`
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/v1/{collection}/{pid}/timeline` | Goals-milestone + task date ranges → Gantt |
-| GET | `/api/v1/{collection}/{pid}/burndown` | Remaining-vs-estimate over time |
+| GET | `/api/{collection}/{pid}/timeline` | Goals-milestone + task date ranges → Gantt |
+| GET | `/api/{collection}/{pid}/burndown` | Remaining-vs-estimate over time |
 
 ### 9.5 Audit / events / docs / metrics
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/v1/{collection}/audit/recent` · `/{pid}/audit` | Audit-log query |
-| GET | `/api/v1/{collection}/events/recent` | In-memory event stream |
-| GET | `/api/v1/{collection}/whoami` | Verified bearer-token claims (`401` without one) |
+| GET | `/api/{collection}/audit/recent` · `/{pid}/audit` | Audit-log query |
+| GET | `/api/{collection}/events/recent` | In-memory event stream |
+| GET | `/api/{collection}/whoami` | Verified bearer-token claims (`401` without one) |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (root path, public under auth enforcement) |
 
@@ -341,9 +346,9 @@ partition rule, §5).
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/v1/{collection}/{pid}/links` | Create / upsert an outbound edge; emits `linked` |
-| GET | `/api/v1/{collection}/{pid}/links` | List this work item's outbound edges |
-| DELETE | `/api/v1/{collection}/{pid}/links/{id}` | Soft-delete an edge; emits `unlinked` |
+| POST | `/api/{collection}/{pid}/links` | Create / upsert an outbound edge; emits `linked` |
+| GET | `/api/{collection}/{pid}/links` | List this work item's outbound edges |
+| DELETE | `/api/{collection}/{pid}/links/{id}` | Soft-delete an edge; emits `unlinked` |
 
 The write is **optimistic** — it stores the assertion and emits an event;
 it does **not** call the target service. Verification status is the
@@ -355,11 +360,11 @@ The five uniform endpoints per collection
 ([`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md) §4):
 
 ```
-POST /api/v1/{collection}/import         202 {job_id}
-GET  /api/v1/{collection}/import/{id}     status + counts + errors_url + review_url
-POST /api/v1/{collection}/export         202 {job_id}
-GET  /api/v1/{collection}/export/{id}     status + download_url
-GET  /api/v1/{collection}/bulk-jobs       list (filter by kind/status)
+POST /api/{collection}/import         202 {job_id}
+GET  /api/{collection}/import/{id}     status + counts + errors_url + review_url
+POST /api/{collection}/export         202 {job_id}
+GET  /api/{collection}/export/{id}     status + download_url
+GET  /api/{collection}/bulk-jobs       list (filter by kind/status)
 ```
 
 **Stable upsert key** = a deterministic external PM identifier
@@ -424,7 +429,7 @@ dedupe + merge, the sub-resource CRUD, the timeline/burndown views,
 the `409` real-time create duplicate, the cross-collection isolation
 (a project query never matches a product), the audit/event trail, `whoami`
 (no token → `401`), blanket enforcement (with `PORTFOLIO_REQUIRE_AUTH=1`
-in-test: un-authed `GET /api/v1/projects` → `401`, public
+in-test: un-authed `GET /api/projects` → `401`, public
 `GET /api-docs/openapi.json` → `200`; `#[serial]`), and OpenAPI/Swagger —
 these need Postgres, so they are `#[ignore]`-gated; run with
 `cargo test -- --ignored` and a `DATABASE_URL`.
@@ -472,10 +477,29 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   `/audit/recent`, `/{pid}/audit`, `/events/recent`. **Phase 1** of the
   durable event bus (canonical versioned `Envelope` + `EventPublisher`
   seam + `InMemoryPublisher` ring buffer; frozen `EventView` projection);
-  Phases 2–3 (outbox → Fluvio) remain infra-gated roadmap, designed in
+  Phase 2 (transactional outbox) + Phase 3 (relay + retention) are landed
+  below; the Fluvio broker sink is the remaining infra-gated follow-up,
+  designed in
   [`agents/share/event-bus.md`](../../../agents/share/event-bus.md).
+- [x] **Durable event bus — Phase 3 (relay + retention).** `src/relay.rs`:
+  the `EventSink` trait (the bus seam), a working no-broker **`LoggingSink`**
+  default, `drain_once` (`unpublished` → `sink.send` → `mark_published`,
+  at-least-once, per-pid order preserved on a send failure), and
+  `purge_published` (retention — **enforced**: deletes `published_at <
+  now() - INTERVAL '<n> days'`). A background loop (`relay::spawn`, started
+  in `App::after_routes`) ticks every `PORTFOLIO_EVENT_RELAY_INTERVAL_SECS`
+  (default 5, floored at 1) and purges every N ticks using
+  `PORTFOLIO_EVENT_RETENTION_DAYS` (default 7) — **gated by
+  `PORTFOLIO_EVENT_TRANSPORT=outbox` AND `PORTFOLIO_EVENT_RELAY`** (truthy
+  `1`/`true`/`yes`/`on`), so it is a no-op by default. Tests: DB-free
+  `LoggingSink`/capturing-sink send + config defaults; the drain/ack seams
+  (`unpublished`/`mark_published`) are DB-gated via the outbox suite.
+  **Broker-gated follow-up:** a real **`FluvioSink`** (`impl EventSink`
+  behind a `fluvio` cargo feature) — the trait is the seam, so the drain
+  loop is unchanged when it lands
+  ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §5, §8).
 - [ ] Cross-service links — `m20220101_000005_entity_links` migration +
-  `POST`/`GET`/`DELETE /api/v1/{collection}/{pid}/links`; emit `linked` /
+  `POST`/`GET`/`DELETE /api/{collection}/{pid}/links`; emit `linked` /
   `unlinked`; optimistic write (no cross-service call); never a matcher
   signal. Contract:
   [`agents/share/cross-service-linking.md`](../../../agents/share/cross-service-linking.md).
@@ -545,8 +569,9 @@ record merge + cross-service links + OpenAPI/Swagger + Prometheus +
 offline PASETO v4 public verification + blanket `/api/*` enforcement (auth
 source of truth, superseding the RS256-JWT model:
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
-Next (deferred, §13): Tantivy full-text/fuzzy search, durable event bus
-Phases 2–3 (outbox → Fluvio), privacy,
+Next (deferred, §13): Tantivy full-text/fuzzy search, the durable event
+bus's Fluvio broker sink (Phase 2 outbox + Phase 3 relay/retention
+landed), privacy,
 front-end merge action, bulk import/export, the `posts` / `comments` /
 `members` collaboration sub-resources, gRPC. (Done since: the
 paseto-keys-over-HTTP fetch at boot, 2026-07-04 —

@@ -34,6 +34,49 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `401` remains missing/bad credential. DB-free unit tests pin the
   family §7 matrix. Flag off ⇒ behaviour-neutral.
 
+### Added — test/ci: DB-backed enforcement "activation proof" (2026-07-06)
+
+- New `tests/enforcement.rs` (its own binary, so the enforcement-on
+  `OnceLock`s are isolated from the enforcement-off request suite) boots
+  the real router with `CASE_REQUIRE_AUTH=1` and mints in-process
+  PASETO v4.public tokens (throwaway Ed25519 key) to pin the full matrix
+  over the HTTP stack against Postgres: public path open, protected path
+  `401` without a token, `403` for a write without `access=write`
+  (default deny-mutation), `200` for a read (default allow-read) and for
+  a write with `access=write`. `#[ignore]`d (needs a database).
+- CI now runs the DB-gated suites: the test step uses
+  `cargo test --all-features --all -- --include-ignored` (previously
+  `cargo test` silently skipped every `#[ignore]`d request/enforcement
+  test, so they never actually ran). The case service is the family
+  reference for this pattern; the activation playbook is in
+  `agents/share/jwt-enforcement.md`.
+
+### Added — auth: key-rotation refresh loop (2026-07-05)
+
+- The PASETO key set is now **re-fetched periodically** (verifier 0.8
+  `ReloadableVerifier`), so a key rotation at the auth-service is picked
+  up **without restarting** this service. `auth::verifier()` is now a
+  reloadable holder (the guard and extractors read `current()` per
+  request); `auth::spawn_key_refresh` (spawned in
+  `app.rs::after_routes`) polls `CASE_PASETO_KEYS_URL` every
+  `CASE_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables) and swaps
+  in the new key set. A failed fetch keeps the current keys (a transient
+  auth-service outage never locks callers out). A no-op when
+  `CASE_PASETO_KEYS_URL` is unset. Family reference for the pattern.
+
+### Added — authz: hot-reloadable ABAC policy (2026-07-05)
+
+- The ABAC policy is now **hot-reloadable** (verifier 0.7
+  `ReloadablePolicy`). `auth::policy()` returns the reloadable holder;
+  the guard and `authorize_record` read `policy().current()` per
+  request. `auth::reload_policy()` re-reads `CASE_ABAC_POLICY` /
+  `CASE_ABAC_POLICY_FILE` and swaps the live policy (malformed ⇒ the
+  built-in default, never unprotected). `auth::spawn_policy_watcher`
+  (spawned in `app.rs::after_routes`) polls `CASE_ABAC_POLICY_FILE`'s
+  mtime every 15 s and reloads on change — operators can edit the
+  policy file with **no restart**. A no-op when the file var is unset.
+  The case service is the family reference for this pattern.
+
 ### Added — authz: record-level resource attributes (2026-07-05)
 
 - Record-level ABAC (this crate is the family reference for
@@ -56,6 +99,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   the resource-attribute mapping (incl. `Custom` lowercasing and absent
   fields) and an end-to-end policy decision (writer denied on a closed
   case, allowed on an open one, admin overrides).
+- **Environment attributes** (verifier 0.4 → 0.5). The record-level
+  pass now also supplies request context via
+  `Policy::evaluate_with_context`: `auth::request_env_attrs` derives
+  `env.hour` / `env.after_hours` (UTC) at the service edge (the engine
+  stays deterministic), so a deployment can add e.g. "deny write when
+  `env.after_hours=true` unless `access=admin`". Verifier 0.5 also adds
+  `$sub`/`$email` value templates for ownership rules
+  (`resource.owner: ["$sub"]`). DB-free test for the working-hours
+  derivation.
+- **Mask-on-allow obligation** (verifier 0.5 → 0.6). `authorize_record`
+  now returns the decision's **obligations**, and `GET /api/cases/{pid}`
+  honours a `mask` obligation by returning a **redacted** case
+  (`mask_case` drops `subjects` / `identifiers` / `same_as` / case
+  number, keeping the descriptive shell). A policy can thus attach
+  `"obligations": ["mask"]` to a conditional read (e.g. cross-department
+  access), turning ABAC into the driver for the case service's masking.
+  DB-free test for the redaction.
 
 ### Added
 

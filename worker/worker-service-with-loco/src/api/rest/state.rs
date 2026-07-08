@@ -76,7 +76,8 @@ impl AppState {
         let worker_repository = Arc::new(
             SeaOrmWorkerRepository::new(db.clone())
                 .with_event_publisher(event_publisher.clone())
-                .with_audit_log(audit_log.clone()),
+                .with_audit_log(audit_log.clone())
+                .with_transport(crate::streaming::transport()),
         ) as Arc<dyn WorkerRepository>;
 
         let worker_matcher = Arc::new(matcher) as Arc<dyn WorkerMatcher>;

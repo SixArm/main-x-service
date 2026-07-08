@@ -69,10 +69,25 @@ course-matcher = "0.6.1"
 async-trait = "0.1"
 mimalloc = "0.1.52"
 
+# Offline PASETO v4.public verification of authentication-service tokens
+# against its published Ed25519 key set (`/.well-known/paseto-keys`) — no
+# shared secret, no per-request introspection hop (local path — the
+# monorepo's 0.2 PASETO verifier). The `fetch` feature adds the boot-time
+# HTTP key-set fetch (`Verifier::from_paseto_keys_url`) used when
+# `COURSE_PASETO_KEYS_URL` is set.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.27"
 criterion = { version = "0.5", features = ["html_reports"] }
+
+# Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
+# the bearer-verification path is exercised without the auth service or
+# any network dependency.
+ed25519-dalek = { version = "2.2" }
+rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
+base64 = { version = "0.22" }
 
 [[bench]]
 name = "matching_bench"

@@ -123,6 +123,10 @@ impl Hooks for App {
         let enforcement_verifier = state.verifier.clone();
         // Make the state retrievable by request handlers via the shared store.
         ctx.shared_store.insert(state);
+        // Durable event bus Phase 3: spawn the outbox relay loop. A no-op
+        // unless `WORKER_EVENT_TRANSPORT=outbox` AND `WORKER_EVENT_RELAY`
+        // are both set, so the default `memory` transport is unchanged.
+        crate::relay::spawn(ctx.db.clone());
         // Mount Swagger UI, then the blanket auth-enforcement middleware
         // (spec §13 T-1b: default-off, gated by `WORKER_REQUIRE_AUTH` read
         // here at construction — restart to change; the ABAC policy from
@@ -137,6 +141,9 @@ impl Hooks for App {
             enforcement_verifier,
             std::sync::Arc::new(auth::policy_from_env()),
         )
+        .layer(axum::middleware::from_fn(
+            crate::api::rest::version::require_version_mw,
+        ))
         .layer(tower_http::cors::CorsLayer::permissive());
         Ok(router)
     }

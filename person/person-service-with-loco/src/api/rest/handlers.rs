@@ -18,6 +18,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use authentication_verifier::Action;
+
+use super::auth::{MaybeAuthUser, authorize_record, person_resource_attrs};
 use super::state::AppState;
 use crate::api::ApiResponse;
 use crate::models::Person;
@@ -175,9 +178,30 @@ pub async fn create_person(
         (status = 500, description = "Internal server error")
     )
 )]
-pub async fn get_person(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
+pub async fn get_person(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
+) -> impl IntoResponse {
     match state.person_repository.get_by_id(&id).await {
-        Ok(Some(person)) => (StatusCode::OK, Json(ApiResponse::success(person))),
+        Ok(Some(person)) => {
+            // Record-level ABAC: gate the read on the specific record's
+            // attributes; honour a `mask` obligation by masking.
+            match authorize_record(&caller, Action::Read, &person_resource_attrs(&person)) {
+                Ok(obligations) => {
+                    let body = if obligations.iter().any(|o| o == "mask") {
+                        crate::privacy::mask_person(&person)
+                    } else {
+                        person
+                    };
+                    (StatusCode::OK, Json(ApiResponse::success(body)))
+                }
+                Err((status, reason)) => (
+                    status,
+                    Json(ApiResponse::<Person>::error("FORBIDDEN", reason)),
+                ),
+            }
+        }
         Ok(None) => {
             let error = ApiResponse::<Person>::error(
                 "NOT_FOUND",
@@ -213,6 +237,7 @@ pub async fn get_person(State(state): State<AppState>, Path(id): Path<Uuid>) -> 
 pub async fn update_person(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
     Json(mut payload): Json<Person>,
 ) -> impl IntoResponse {
     // Validate
@@ -234,6 +259,35 @@ pub async fn update_person(
 
     // Ensure ID in path matches payload
     payload.id = id;
+
+    // Record-level ABAC on the *stored* record (e.g. deny modifying a
+    // deceased person's record). Load it first for the resource attrs.
+    match state.person_repository.get_by_id(&id).await {
+        Ok(Some(existing)) => {
+            if let Err((status, reason)) =
+                authorize_record(&caller, Action::Write, &person_resource_attrs(&existing))
+            {
+                return (
+                    status,
+                    Json(ApiResponse::<Person>::error("FORBIDDEN", reason)),
+                );
+            }
+        }
+        Ok(None) => {
+            let error = ApiResponse::<Person>::error(
+                "NOT_FOUND",
+                format!("Person with id '{id}' not found"),
+            );
+            return (StatusCode::NOT_FOUND, Json(error));
+        }
+        Err(e) => {
+            let error = ApiResponse::<Person>::error(
+                "DATABASE_ERROR",
+                format!("Failed to retrieve person: {e}"),
+            );
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
+        }
+    }
 
     match state.person_repository.update(&payload).await {
         Ok(person) => {
@@ -270,7 +324,31 @@ pub async fn update_person(
 pub async fn delete_person(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
 ) -> impl IntoResponse {
+    // Record-level ABAC on the stored record before deleting.
+    match state.person_repository.get_by_id(&id).await {
+        Ok(Some(person)) => {
+            if let Err((status, reason)) =
+                authorize_record(&caller, Action::Delete, &person_resource_attrs(&person))
+            {
+                return (status, Json(ApiResponse::<()>::error("FORBIDDEN", reason)));
+            }
+        }
+        Ok(None) => {
+            let error =
+                ApiResponse::<()>::error("NOT_FOUND", format!("Person with id '{id}' not found"));
+            return (StatusCode::NOT_FOUND, Json(error));
+        }
+        Err(e) => {
+            let error = ApiResponse::<()>::error(
+                "DATABASE_ERROR",
+                format!("Failed to retrieve person: {e}"),
+            );
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
+        }
+    }
+
     match state.person_repository.delete(&id).await {
         Ok(()) => {
             // Remove from search index
@@ -829,20 +907,19 @@ pub async fn merge_persons(
     // Merge data from duplicate into main
     let (merged, transferred) = merge_duplicate_into_main(&main, &duplicate);
 
-    // Update main person
-    if let Err(e) = state.person_repository.update(&merged).await {
+    // Apply the merge atomically: the survivor's row updates and the
+    // duplicate's soft-delete commit in one transaction, and (under the
+    // outbox transport) a `Merged` + `Deleted` outbox row are enqueued on
+    // that same transaction. The repository also publishes the in-memory
+    // `Merged`/`Deleted` events, so the handler no longer publishes them.
+    if let Err(e) = state.person_repository.merge(&merged, &duplicate.id).await {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse::<crate::models::MergeResponse>::error(
                 "DATABASE_ERROR",
-                format!("Failed to update main person: {e}"),
+                format!("Failed to merge persons: {e}"),
             )),
         );
-    }
-
-    // Soft-delete the duplicate
-    if let Err(e) = state.person_repository.delete(&duplicate.id).await {
-        tracing::error!("Failed to soft-delete duplicate person: {}", e);
     }
 
     // Remove duplicate from search index
@@ -854,16 +931,6 @@ pub async fn merge_persons(
     if let Err(e) = state.search_engine.index_person(&merged) {
         tracing::warn!("Failed to update search index for merged person: {}", e);
     }
-
-    // Publish merge event
-    state
-        .event_publisher
-        .publish(crate::streaming::PersonEvent::Merged {
-            source_id: duplicate.id,
-            target_id: merged.id,
-            timestamp: Utc::now(),
-        })
-        .ok();
 
     // Create merge record
     let merge_record = crate::models::MergeRecord {

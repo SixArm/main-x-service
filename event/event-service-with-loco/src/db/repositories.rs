@@ -5,13 +5,15 @@
 use super::convert::{offset_to_ts, ts_to_offset};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, NotSet, QueryFilter,
-    QueryOrder, QuerySelect, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, NotSet,
+    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::Result;
+use crate::db::outbox::OutboxInsert;
+use crate::streaming::{EventKind, EventTransport};
 use crate::models::{
     Address, Event, EventAttendanceMode, EventLink, EventStatus, EventType, Identifier,
     IdentifierType, IdentifierUse, LinkType, Location, Offer, OfferAvailability, Party, PartyKind,
@@ -50,6 +52,20 @@ pub trait EventRepository: Send + Sync {
     /// [`Error::Validation`](crate::Error::Validation) if the event
     /// cannot be re-read after the update.
     async fn update(&self, event: &Event) -> Result<Event>;
+    /// Merge the `duplicate_id` record into `survivor`: apply the
+    /// survivor's parent + child row updates and soft-delete the
+    /// duplicate **in one transaction**, so the whole merge commits (or
+    /// rolls back) atomically. Under the outbox transport this enqueues a
+    /// `Merged` outbox row for the survivor (carrying the duplicate's pid
+    /// via `merged_from`) and a `Deleted` outbox row for the duplicate on
+    /// the same transaction. Returns the reloaded survivor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction or any query fails, or
+    /// [`Error::Validation`](crate::Error::Validation) if the survivor
+    /// cannot be re-read after the merge.
+    async fn merge(&self, survivor: &Event, duplicate_id: &Uuid) -> Result<Event>;
     /// Soft-delete an event by id.
     ///
     /// # Errors
@@ -79,17 +95,56 @@ pub struct SeaOrmEventRepository {
     event_publisher: Option<std::sync::Arc<dyn crate::streaming::EventProducer>>,
     /// Optional audit-log repository for write trails.
     audit_log: Option<std::sync::Arc<super::audit::AuditLogRepository>>,
+    /// Which event transport is active (durable event bus, Phase 2).
+    /// [`EventTransport::Memory`] (default) keeps the legacy post-commit
+    /// ring-buffer publish; [`EventTransport::Outbox`] additionally writes
+    /// one `event_outbox` row **inside** each write's transaction.
+    transport: EventTransport,
 }
 
 impl SeaOrmEventRepository {
-    /// Construct a repository over `db` with no publisher or audit log.
+    /// Construct a repository over `db` with no publisher or audit log,
+    /// and the default [`EventTransport::Memory`] transport (behaviour
+    /// unchanged from before the outbox landed).
     #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
             db,
             event_publisher: None,
             audit_log: None,
+            transport: EventTransport::Memory,
         }
+    }
+
+    /// Builder: select the event transport (see [`EventTransport`]).
+    /// `AppState` wires this from `EVENT_EVENT_TRANSPORT` via
+    /// [`crate::streaming::transport`].
+    #[must_use]
+    pub fn with_transport(mut self, transport: EventTransport) -> Self {
+        self.transport = transport;
+        self
+    }
+
+    /// When the outbox transport is active, enqueue one `event_outbox`
+    /// row for `kind` applied to `event` **on `conn`** — pass the open
+    /// `&DatabaseTransaction` so the row commits with the entity write
+    /// (the outbox atomicity guarantee). A no-op under
+    /// [`EventTransport::Memory`].
+    ///
+    /// The `ConnectionTrait` generic lives here on a concrete method (not
+    /// on the object-safe [`EventRepository`] trait), which is how a
+    /// `dyn`-trait repository threads the outbox insert into its own
+    /// transaction.
+    async fn enqueue_outbox<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        event: &Event,
+        kind: EventKind,
+    ) -> Result<()> {
+        if self.transport.is_outbox() {
+            OutboxInsert::for_event(event, kind)?.insert_on(conn).await?;
+        }
+        Ok(())
     }
 
     /// Builder: attach an event-stream publisher.
@@ -762,6 +817,90 @@ fn parse_offer_availability(s: &str) -> Option<OfferAvailability> {
     serde_json::from_value(serde_json::Value::String(s.to_string())).ok()
 }
 
+/// Apply an event's parent-row update and wholesale child-row
+/// replacement on `conn`. Shared by [`EventRepository::update`] and
+/// [`EventRepository::merge`]: preserves `created_*`, stamps
+/// `updated_at` to now, deletes every child row for the event, then
+/// re-inserts them from the domain model. Runs on the caller's
+/// connection/transaction so it shares that commit boundary.
+async fn apply_update_rows<C: ConnectionTrait>(conn: &C, event: &Event) -> Result<()> {
+    // Update the events row (preserving created_*; updating updated_*).
+    let rows = to_rows(event);
+    let mut row = rows.event_row;
+    row.created_at = NotSet;
+    row.created_by = NotSet;
+    row.updated_at = Set(OffsetDateTime::now_utc());
+    row.update(conn).await?;
+
+    // Replace child rows wholesale.
+    event_identifiers::Entity::delete_many()
+        .filter(event_identifiers::Column::EventId.eq(event.id))
+        .exec(conn)
+        .await?;
+    event_locations::Entity::delete_many()
+        .filter(event_locations::Column::EventId.eq(event.id))
+        .exec(conn)
+        .await?;
+    event_parties::Entity::delete_many()
+        .filter(event_parties::Column::EventId.eq(event.id))
+        .exec(conn)
+        .await?;
+    event_offers::Entity::delete_many()
+        .filter(event_offers::Column::EventId.eq(event.id))
+        .exec(conn)
+        .await?;
+    event_links::Entity::delete_many()
+        .filter(event_links::Column::EventId.eq(event.id))
+        .exec(conn)
+        .await?;
+    event_sub_events::Entity::delete_many()
+        .filter(event_sub_events::Column::EventId.eq(event.id))
+        .exec(conn)
+        .await?;
+    event_text_values::Entity::delete_many()
+        .filter(event_text_values::Column::EventId.eq(event.id))
+        .exec(conn)
+        .await?;
+
+    for r in rows.identifiers {
+        r.insert(conn).await?;
+    }
+    for r in rows.locations {
+        r.insert(conn).await?;
+    }
+    for r in rows.parties {
+        r.insert(conn).await?;
+    }
+    for r in rows.offers {
+        r.insert(conn).await?;
+    }
+    for r in rows.links {
+        r.insert(conn).await?;
+    }
+    for r in rows.sub_events {
+        r.insert(conn).await?;
+    }
+    for r in rows.text_values {
+        r.insert(conn).await?;
+    }
+    Ok(())
+}
+
+/// Soft-delete the event `id` on `conn` by stamping `deleted_at` /
+/// `deleted_by` and leaving every other column (and the child rows)
+/// in place. Factored from [`EventRepository::delete`]'s soft-delete
+/// so [`EventRepository::merge`] can reuse it on its own transaction.
+async fn apply_soft_delete_row<C: ConnectionTrait>(conn: &C, id: &Uuid) -> Result<()> {
+    let row = events::ActiveModel {
+        id: Set(*id),
+        deleted_at: Set(Some(OffsetDateTime::now_utc())),
+        deleted_by: Set(Some("system".into())),
+        ..Default::default()
+    };
+    row.update(conn).await?;
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // EventRepository impl
 // ---------------------------------------------------------------------------
@@ -852,6 +991,13 @@ impl EventRepository for SeaOrmEventRepository {
             r.insert(&txn).await?;
         }
 
+        // Durable event bus (Phase 2): under the outbox transport, write
+        // the `event_outbox` row **inside this same transaction**, before
+        // the commit, so the entity rows and the event commit atomically
+        // (or roll back together). A no-op under the memory transport,
+        // which keeps the post-commit ring-buffer publish below.
+        self.enqueue_outbox(&txn, event, EventKind::Created).await?;
+
         txn.commit().await?;
 
         // Reload children and reassemble the canonical domain `Event`
@@ -899,65 +1045,12 @@ impl EventRepository for SeaOrmEventRepository {
         let old = self.get_by_id(&event.id).await?;
         let txn = self.db.begin().await?;
 
-        // Update the events row (preserving created_*; updating updated_*).
-        let rows = to_rows(event);
-        let mut row = rows.event_row;
-        row.created_at = NotSet;
-        row.created_by = NotSet;
-        row.updated_at = Set(OffsetDateTime::now_utc());
-        row.update(&txn).await?;
+        // Parent-row update + wholesale child-row replacement, shared
+        // with `merge` (see `apply_update_rows`).
+        apply_update_rows(&txn, event).await?;
 
-        // Replace child rows wholesale.
-        event_identifiers::Entity::delete_many()
-            .filter(event_identifiers::Column::EventId.eq(event.id))
-            .exec(&txn)
-            .await?;
-        event_locations::Entity::delete_many()
-            .filter(event_locations::Column::EventId.eq(event.id))
-            .exec(&txn)
-            .await?;
-        event_parties::Entity::delete_many()
-            .filter(event_parties::Column::EventId.eq(event.id))
-            .exec(&txn)
-            .await?;
-        event_offers::Entity::delete_many()
-            .filter(event_offers::Column::EventId.eq(event.id))
-            .exec(&txn)
-            .await?;
-        event_links::Entity::delete_many()
-            .filter(event_links::Column::EventId.eq(event.id))
-            .exec(&txn)
-            .await?;
-        event_sub_events::Entity::delete_many()
-            .filter(event_sub_events::Column::EventId.eq(event.id))
-            .exec(&txn)
-            .await?;
-        event_text_values::Entity::delete_many()
-            .filter(event_text_values::Column::EventId.eq(event.id))
-            .exec(&txn)
-            .await?;
-
-        for r in rows.identifiers {
-            r.insert(&txn).await?;
-        }
-        for r in rows.locations {
-            r.insert(&txn).await?;
-        }
-        for r in rows.parties {
-            r.insert(&txn).await?;
-        }
-        for r in rows.offers {
-            r.insert(&txn).await?;
-        }
-        for r in rows.links {
-            r.insert(&txn).await?;
-        }
-        for r in rows.sub_events {
-            r.insert(&txn).await?;
-        }
-        for r in rows.text_values {
-            r.insert(&txn).await?;
-        }
+        // Outbox row shares the update transaction (see `create`).
+        self.enqueue_outbox(&txn, event, EventKind::Updated).await?;
 
         txn.commit().await?;
 
@@ -988,6 +1081,87 @@ impl EventRepository for SeaOrmEventRepository {
         Ok(result)
     }
 
+    async fn merge(&self, survivor: &Event, duplicate_id: &Uuid) -> Result<Event> {
+        // Snapshots for the audit trail: the survivor's pre-image for the
+        // UPDATE row, the duplicate's pre-image for the DELETE row (and to
+        // build the duplicate's `Deleted` outbox envelope).
+        let old_survivor = self.get_by_id(&survivor.id).await?;
+        let old_duplicate = self.get_by_id(duplicate_id).await?;
+
+        // The whole merge — survivor row updates + duplicate soft-delete +
+        // both outbox rows — commits (or rolls back) under one transaction.
+        let txn = self.db.begin().await?;
+
+        // Apply the survivor's parent + child rows (shared with `update`).
+        apply_update_rows(&txn, survivor).await?;
+
+        // Soft-delete the duplicate (shared with `delete`).
+        apply_soft_delete_row(&txn, duplicate_id).await?;
+
+        // Durable event bus (Phase 2): a `Merged` outbox row for the
+        // survivor (carrying the duplicate's pid via `merged_from`, so a
+        // merge-repointing consumer can move edges off the duplicate) and a
+        // `Deleted` outbox row for the duplicate — both inside this
+        // transaction. A no-op under the memory transport.
+        if self.transport.is_outbox() {
+            OutboxInsert::for_merge(survivor, duplicate_id)?
+                .insert_on(&txn)
+                .await?;
+            if let Some(dup) = old_duplicate.as_ref() {
+                OutboxInsert::for_event(dup, EventKind::Deleted)?
+                    .insert_on(&txn)
+                    .await?;
+            }
+        }
+
+        txn.commit().await?;
+
+        let result = self
+            .get_by_id(&survivor.id)
+            .await?
+            .ok_or_else(|| crate::Error::Validation("Event not found after merge".into()))?;
+
+        // Post-commit in-memory stream (memory transport keeps this): a
+        // `Merged` for the survivor and a `Deleted` for the duplicate.
+        self.publish_event(crate::streaming::EventEvent::Merged {
+            source_id: *duplicate_id,
+            target_id: result.id,
+            timestamp: chrono::Utc::now(),
+        });
+        self.publish_event(crate::streaming::EventEvent::Deleted {
+            event_id: *duplicate_id,
+            timestamp: chrono::Utc::now(),
+        });
+
+        // Audit rows, as the old flow did: an UPDATE trail for the survivor
+        // and a DELETE trail for the duplicate.
+        if let (Some(old), Ok(new_json)) = (old_survivor, serde_json::to_value(&result))
+            && let Ok(old_json) = serde_json::to_value(&old)
+        {
+            self.log_audit(
+                "UPDATE",
+                result.id,
+                Some(old_json),
+                Some(new_json),
+                &AuditContext::default(),
+            )
+            .await;
+        }
+        if let Some(dup) = old_duplicate
+            && let Ok(dup_json) = serde_json::to_value(&dup)
+        {
+            self.log_audit(
+                "DELETE",
+                *duplicate_id,
+                Some(dup_json),
+                None,
+                &AuditContext::default(),
+            )
+            .await;
+        }
+        Ok(result)
+    }
+
     async fn delete(&self, id: &Uuid) -> Result<()> {
         // Capture the pre-image for the DELETE audit `old_values`.
         let old = self.get_by_id(id).await?;
@@ -1001,7 +1175,21 @@ impl EventRepository for SeaOrmEventRepository {
             deleted_by: Set(Some("system".into())),
             ..Default::default()
         };
-        row.update(&self.db).await?;
+        // Unlike create/update, the soft-delete is a single row update
+        // with no existing transaction. Under the outbox transport we
+        // open one here so the tombstone write and the `deleted` outbox
+        // row commit atomically; the memory transport keeps the plain,
+        // tx-free update.
+        if self.transport.is_outbox() {
+            let txn = self.db.begin().await?;
+            row.update(&txn).await?;
+            if let Some(old) = old.as_ref() {
+                self.enqueue_outbox(&txn, old, EventKind::Deleted).await?;
+            }
+            txn.commit().await?;
+        } else {
+            row.update(&self.db).await?;
+        }
         self.publish_event(crate::streaming::EventEvent::Deleted {
             event_id: *id,
             timestamp: chrono::Utc::now(),
@@ -1062,5 +1250,67 @@ impl EventRepository for SeaOrmEventRepository {
             }
         }
         Ok(events)
+    }
+}
+
+/// DB-gated (`#[ignore]`) atomicity tests for the outbox write path.
+/// They require a migrated `PostgreSQL` via `DATABASE_URL` and are skipped
+/// by a bare `cargo test`; run with
+/// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE
+/// under a bare `cargo test --lib`.
+#[cfg(test)]
+mod tests {
+    use super::{EventRepository, SeaOrmEventRepository};
+    use crate::db::models::event_outbox;
+    use crate::models::Event;
+    use crate::streaming::EventTransport;
+    use chrono::{TimeZone, Utc};
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    async fn connect() -> sea_orm::DatabaseConnection {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        sea_orm::Database::connect(&url)
+            .await
+            .expect("connect to DATABASE_URL")
+    }
+
+    /// Merge writes, in one transaction: a `merged` outbox row for the
+    /// survivor carrying the duplicate's pid in `merged_from`, plus a
+    /// `deleted` outbox row for the duplicate.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn merge_enqueues_merged_with_merged_from_and_deleted() {
+        let db = connect().await;
+        let repo = SeaOrmEventRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+
+        let start = Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap();
+        let survivor = repo.create(&Event::new("Survivor", start)).await.unwrap();
+        let duplicate = repo.create(&Event::new("Duplicate", start)).await.unwrap();
+
+        let merged = repo.merge(&survivor, &duplicate.id).await.unwrap();
+        assert_eq!(merged.id, survivor.id);
+
+        // Survivor: exactly one `merged` row, carrying the duplicate pid.
+        let merged_rows = event_outbox::Entity::find()
+            .filter(event_outbox::Column::EntityPid.eq(survivor.id))
+            .filter(event_outbox::Column::Kind.eq("merged"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(merged_rows.len(), 1, "one merged outbox row for survivor");
+        assert_eq!(
+            merged_rows[0].payload["merged_from"],
+            serde_json::json!(duplicate.id.to_string()),
+            "merged row carries the duplicate's pid"
+        );
+
+        // Duplicate: a `deleted` row.
+        let deleted_rows = event_outbox::Entity::find()
+            .filter(event_outbox::Column::EntityPid.eq(duplicate.id))
+            .filter(event_outbox::Column::Kind.eq("deleted"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(deleted_rows.len(), 1, "one deleted outbox row for duplicate");
     }
 }

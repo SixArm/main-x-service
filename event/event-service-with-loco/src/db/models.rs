@@ -810,3 +810,53 @@ pub mod event_text_values {
     }
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+// ============================================================================
+// event_outbox
+// ============================================================================
+
+/// `SeaORM` entity for the `event_outbox` table — the transactional-outbox
+/// hand-off buffer for the durable event bus (Phase 2;
+/// `agents/share/event-bus.md` §3). One row is written **in the same
+/// transaction** as the entity mutation, so a committed change always has
+/// its event and vice versa; a relay worker (Phase 3, roadmap) drains
+/// unpublished rows to Fluvio and stamps `published_at`.
+pub mod event_outbox {
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
+
+    /// One persisted outbox row: a canonical envelope awaiting relay to
+    /// the durable bus.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+    #[sea_orm(table_name = "event_outbox")]
+    pub struct Model {
+        /// Auto-increment pk; also the global relay order (`ORDER BY id`).
+        #[sea_orm(primary_key)]
+        pub id: i64,
+        /// Envelope id — the consumer dedup key.
+        #[sea_orm(unique)]
+        pub event_id: Uuid,
+        /// The entity name (`event`).
+        pub entity: String,
+        /// The record pid — the bus partition key.
+        pub entity_pid: Uuid,
+        /// The change kind: `created` / `updated` / `deleted` / `merged`.
+        pub kind: String,
+        /// When the change occurred (stamped at enqueue).
+        pub occurred_at: TimeDateTimeWithTimeZone,
+        /// The acting user pid, or `None` when unauthenticated.
+        pub actor: Option<String>,
+        /// The envelope schema version.
+        pub schema_version: i32,
+        /// The full canonical envelope as JSONB.
+        pub payload: Json,
+        /// `None` until the relay ships the row to the bus.
+        pub published_at: Option<TimeDateTimeWithTimeZone>,
+    }
+
+    /// `SeaORM` relations for the outbox entity (none defined).
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}

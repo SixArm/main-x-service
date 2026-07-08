@@ -12,9 +12,16 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+/// Bearer-token authentication extractor + `whoami` endpoint + blanket
+/// enforcement middleware.
+pub mod auth;
+pub mod fhir;
 pub mod handlers;
 pub mod state;
+/// Header-based API versioning (`Accepts-version`) middleware + helper.
+pub mod version;
 
+pub use fhir::fhir_routes;
 pub use state::AppState;
 
 #[derive(OpenApi)]
@@ -106,6 +113,8 @@ pub struct ApiDoc;
 pub fn create_router(state: AppState) -> Router {
     let api_routes = Router::new()
         .route("/health", get(handlers::health))
+        // Auth — echo verified bearer-token claims.
+        .route("/whoami", get(auth::whoami))
         // Course list + create.
         .route(
             "/courses",
@@ -144,7 +153,7 @@ pub fn create_router(state: AppState) -> Router {
         // Audit (T-9, FR-14 + FR-17).
         .route("/courses/{id}/audit", get(handlers::audit_for_course))
         .route("/audit/recent", get(handlers::audit_recent))
-        .with_state(state);
+        .with_state(state.clone());
 
     Router::new()
         .nest("/api", api_routes)
@@ -152,6 +161,16 @@ pub fn create_router(state: AppState) -> Router {
         // alongside the docs. Public — no bearer token needed to scrape.
         .route("/metrics.prom", get(handlers::metrics_prom))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        // Blanket auth enforcement (default-off; scoped to /api + /fhir by
+        // `auth::enforce`); layered inside CORS so preflights pass.
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            auth::require_auth_mw,
+        ))
+        // Header-based API versioning (`Accepts-version`): negotiates the
+        // version for `/api/*` and stamps it on the response
+        // (`agents/share/api-versioning.md`).
+        .layer(axum::middleware::from_fn(version::require_version_mw))
         .layer(CorsLayer::permissive())
 }
 
@@ -166,6 +185,7 @@ pub fn courses_routes() -> loco_rs::controller::Routes {
     Routes::new()
         .prefix("/api")
         .add("/health", get(handlers::health))
+        .add("/whoami", get(auth::whoami))
         .add(
             "/courses",
             get(handlers::not_implemented).post(handlers::create_course),

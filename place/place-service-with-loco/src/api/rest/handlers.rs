@@ -438,7 +438,10 @@ pub async fn merge_places(
     };
 
     let transferred = serde_json::to_value(&dup).ok();
-    if let Err(e) = state.place_repository.soft_delete(&dup.id).await {
+    // Soft-delete the duplicate and, under the outbox transport, atomically
+    // enqueue the `Merged` (survivor, carrying the duplicate's pid) and
+    // `Deleted` (duplicate) outbox rows in one transaction.
+    if let Err(e) = state.place_repository.merge(&main, &dup.id).await {
         return (
             status_for(&e),
             Json(ApiResponse::error("error", e.to_string())),

@@ -11,6 +11,15 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Canonical durable-bus envelope + transport selector (event-bus.md
+/// §4/§7). Sits alongside the legacy [`CourseEvent`] in-memory publisher.
+pub mod envelope;
+
+// The envelope's lowercase `EventKind` is deliberately NOT re-exported
+// here (it would clash with the legacy PascalCase [`EventKind`] below);
+// reach it via `crate::streaming::envelope::EventKind`.
+pub use envelope::{ENTITY, Envelope, EventTransport, EventView, SCHEMA_VERSION, transport};
+
 /// One event in the Course stream. The `kind` discriminator names the
 /// CRUD operation; payload is whatever the handler stored at the time.
 #[derive(Debug, Clone, Serialize, Deserialize)]

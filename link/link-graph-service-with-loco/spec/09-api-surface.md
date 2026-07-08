@@ -9,7 +9,7 @@ HTTP surface.
 
 | Tier | Surface |
 |---|---|
-| REST (loco.rs controllers on Axum) | Read endpoints under `/api/v1/*`, registered as a loco `Routes` table. |
+| REST (loco.rs controllers on Axum) | Read endpoints under `/api/*`, registered as a loco `Routes` table. |
 | Ops (loco built-ins) | `GET /_health` (DB + queue readiness) and `GET /_ping` (liveness), for orchestration probes, outside `/api`. |
 | gRPC (Tonic) | Out of MVP scope. |
 | Docs | Swagger UI at `/swagger-ui`, raw OpenAPI 3 JSON at `/api-docs/openapi.json` (utoipa). |
@@ -22,21 +22,21 @@ FR-17).
 ### 9.1 Read endpoints
 
 ```
-GET /api/v1/neighbors/{ref}?kind=&direction=out|in|both&depth=1
+GET /api/neighbors/{ref}?kind=&direction=out|in|both&depth=1
         Edges incident to {ref}. {ref} is the EntityRef URN
         (e.g. person:0c4f…), URL-encoded. `depth` is capped (§16).
         → { success, data: { ref, edges: [...], as_of }, error }
 
-GET /api/v1/edges?from=&to=&kind=&status=
+GET /api/edges?from=&to=&kind=&status=
         Filtered edge list (any subset of the four filters).
         → { success, data: { edges: [...], as_of }, error }
 
-GET /api/v1/single-view/{ref}
+GET /api/single-view/{ref}
         Golden-record walk: same_identity unification + affiliations
         (person → worker → org employer derivation).
         → { success, data: { identity_refs: [...], affiliations: [...], as_of }, error }
 
-GET /api/v1/health/freshness
+GET /api/health/freshness
         Per-entity-topic last-consumed occurred_at + lag-versus-now.
         → { success, data: { topics: [{ entity, last_occurred_at, lag_seconds }], as_of }, error }
 ```
@@ -56,7 +56,7 @@ GET /api/v1/health/freshness
 
 ### 9.3 Health
 
-`GET /api/v1/health/freshness` is the service's own envelope-wrapped
+`GET /api/health/freshness` is the service's own envelope-wrapped
 freshness endpoint (the eventual-consistency window made queryable);
 the loco `/_health` / `/_ping` pair serves container orchestration.
 

@@ -17,7 +17,7 @@ use event_service::{api::ApiResponse, models::Event};
 use serde_json::json;
 use tower::ServiceExt;
 
-/// `GET /api/v1/health` returns 200 and names the service.
+/// `GET /api/health` returns 200 and names the service.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
 async fn health_check_returns_healthy() {
@@ -25,7 +25,7 @@ async fn health_check_returns_healthy() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/v1/health")
+                .uri("/api/health")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -41,7 +41,7 @@ async fn health_check_returns_healthy() {
 }
 
 /// Creating an event mints a fresh id and the record reads back
-/// identically via `GET /api/v1/events/{id}`.
+/// identically via `GET /api/events/{id}`.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
 async fn create_event_round_trip() {
@@ -65,7 +65,7 @@ async fn create_event_round_trip() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/events")
+                .uri("/api/events")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&payload).unwrap()))
                 .unwrap(),
@@ -85,7 +85,7 @@ async fn create_event_round_trip() {
     let get = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/v1/events/{}", event.id))
+                .uri(format!("/api/events/{}", event.id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -101,23 +101,47 @@ async fn create_event_round_trip() {
     assert_eq!(fetched.name, title);
 }
 
-/// The FHIR R5 surface is a stub: `GET /fhir/Event/{id}` is routed and
-/// returns `501 Not Implemented` with an `OperationOutcome` body (spec
-/// §6.8) — not a `404`.
+/// The FHIR R5 `Appointment` surface is live (the same handlers the loco
+/// production router serves): `GET /fhir/metadata` returns a `200`
+/// `CapabilityStatement`, and an unknown `GET /fhir/Appointment/{id}`
+/// returns `404` with an `OperationOutcome` body — no more `501` stub.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
-async fn fhir_event_returns_501_not_implemented() {
+async fn fhir_appointment_surface_is_live() {
     let app = common::create_test_router().await;
-    let response = app
+
+    // Capability discovery is a real CapabilityStatement.
+    let meta = app
+        .clone()
         .oneshot(
             Request::builder()
-                .uri("/fhir/Event/00000000-0000-0000-0000-000000000000")
+                .uri("/fhir/metadata")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+    assert_eq!(meta.status(), StatusCode::OK);
+    let meta_body = axum::body::to_bytes(meta.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let meta_s = String::from_utf8(meta_body.to_vec()).unwrap();
+    assert!(
+        meta_s.contains("CapabilityStatement"),
+        "expected CapabilityStatement, got {meta_s}"
+    );
+
+    // An unknown Appointment id is a real 404 OperationOutcome (not 501).
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/fhir/Appointment/00000000-0000-0000-0000-000000000000")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
@@ -147,7 +171,7 @@ async fn validation_rejects_missing_name() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/events")
+                .uri("/api/events")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&payload).unwrap()))
                 .unwrap(),

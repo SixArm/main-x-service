@@ -22,8 +22,11 @@
 //!   [`Verifier::from_paseto_keys_url`]; on success the fetched key set
 //!   wins over `CASE_PASETO_KEYS` (`tracing::info!`), on failure the
 //!   service logs a `tracing::warn!` and falls back to the env path
-//!   below — the service always boots. There is no refresh loop; a
-//!   rotation-triggered refetch is a future spec item.
+//!   below — the service always boots. The key set is then **re-fetched
+//!   periodically** ([`spawn_key_refresh`]) so a key rotation is picked
+//!   up without a restart (interval `CASE_PASETO_KEYS_REFRESH_SECS`,
+//!   default 1 h; `0` disables; keeps the current keys on a failed
+//!   fetch).
 //! - `CASE_PASETO_KEYS` — the Ed25519 key set (JSON, OKP/Ed25519
 //!   JWK form) the auth service publishes at `/.well-known/paseto-keys`.
 //!   Absent ⇒ an empty key set, so every token is rejected (the service
@@ -69,9 +72,11 @@
 //! change required.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
-use authentication_verifier::{Action, Claims, Policy, Verifier};
+use authentication_verifier::{
+    Action, Claims, Policy, ReloadablePolicy, ReloadableVerifier, Verifier,
+};
 use axum::extract::FromRequestParts;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
@@ -96,41 +101,89 @@ const DEFAULT_ISSUER: &str = "authentication-service";
 /// Default audience expected in tokens (`aud`).
 const DEFAULT_AUDIENCE: &str = "main-x-service";
 
-/// The process-wide token verifier, seeded by [`init`] at boot (or, if
-/// [`init`] never ran — e.g. in unit tests — built lazily from the
-/// environment on first use). Shared behind an `Arc` and read-only.
-static VERIFIER: OnceLock<Arc<Verifier>> = OnceLock::new();
+/// The process-wide **hot-reloadable** token verifier. Lazily built from
+/// the environment on first use ([`build_from_env`]); [`init`] swaps in
+/// the boot-time fetched key set, and [`spawn_key_refresh`] swaps in a
+/// re-fetched key set periodically (**key rotation without a restart**).
+static VERIFIER: OnceLock<ReloadableVerifier> = OnceLock::new();
 
-/// The process-wide token verifier (see [`VERIFIER`] and the module
-/// docs). Shared behind an `Arc` and read-only.
+/// The process-wide reloadable token verifier. Read the active snapshot
+/// with `verifier().current()` per request; it is swapped by [`init`]
+/// (boot fetch) and [`spawn_key_refresh`] (periodic re-fetch).
 #[must_use]
-pub fn verifier() -> &'static Arc<Verifier> {
-    VERIFIER.get_or_init(|| Arc::new(build_from_env()))
+pub fn verifier() -> &'static ReloadableVerifier {
+    VERIFIER.get_or_init(|| ReloadableVerifier::new(build_from_env()))
 }
 
 /// Seed the process-wide [`verifier`] before the app serves traffic
 /// (called from `App::after_routes`). When `CASE_PASETO_KEYS_URL` is set
-/// (non-blank) the published key set is fetched over HTTP **once** — no
-/// refresh loop — and, on success, wins over the `CASE_PASETO_KEYS` env
-/// key set; on fetch failure, or with the URL unset/blank, the verifier
-/// is built from the environment exactly as before, so the service
-/// always boots. Idempotent: a no-op when the verifier is already built.
+/// (non-blank) the published key set is fetched over HTTP **once at boot**
+/// and, on success, swapped in over the env-built one; on fetch failure,
+/// or with the URL unset/blank, the env-built verifier stands, so the
+/// service always boots. Idempotent enough to call once at boot.
 pub async fn init() {
-    if VERIFIER.get().is_some() {
-        return;
-    }
-    let verifier = match std::env::var("CASE_PASETO_KEYS_URL")
+    if let Some(url) = std::env::var("CASE_PASETO_KEYS_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
     {
-        Some(url) => {
-            let issuer = env_or("CASE_TOKEN_ISSUER", DEFAULT_ISSUER);
-            let audience = env_or("CASE_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
-            fetch_or(url.trim(), &issuer, &audience, build_from_env()).await
-        }
-        None => build_from_env(),
+        let issuer = env_or("CASE_TOKEN_ISSUER", DEFAULT_ISSUER);
+        let audience = env_or("CASE_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+        // `fetch_or` keeps the env-built verifier as the fallback on a
+        // failed fetch, so the service always has a usable verifier.
+        let fetched = fetch_or(url.trim(), &issuer, &audience, build_from_env()).await;
+        verifier().store(fetched);
+    }
+}
+
+/// Default key-set refresh interval (seconds) when
+/// `CASE_PASETO_KEYS_REFRESH_SECS` is unset. One hour — key rotation is
+/// infrequent, so a slow poll suffices.
+const KEY_REFRESH_DEFAULT_SECS: u64 = 3600;
+
+/// Spawn a background task that periodically re-fetches the published
+/// key set from `CASE_PASETO_KEYS_URL` and swaps it into the live
+/// [`verifier`], so a **key rotation** at the auth-service is picked up
+/// **without restarting** this service. On a failed fetch it keeps the
+/// current key set (a transient auth-service outage never locks callers
+/// out). Interval from `CASE_PASETO_KEYS_REFRESH_SECS` (default
+/// [`KEY_REFRESH_DEFAULT_SECS`]); **`0` disables** the loop.
+///
+/// A no-op when `CASE_PASETO_KEYS_URL` is unset (env-supplied keys have
+/// nothing to re-fetch). Call once at boot (`app.rs::after_routes`).
+pub fn spawn_key_refresh() {
+    let Some(url) = std::env::var("CASE_PASETO_KEYS_URL")
+        .ok()
+        .map(|u| u.trim().to_string())
+        .filter(|u| !u.is_empty())
+    else {
+        return;
     };
-    let _ = VERIFIER.set(Arc::new(verifier));
+    let secs = std::env::var("CASE_PASETO_KEYS_REFRESH_SECS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .unwrap_or(KEY_REFRESH_DEFAULT_SECS);
+    if secs == 0 {
+        return; // explicitly disabled
+    }
+    let issuer = env_or("CASE_TOKEN_ISSUER", DEFAULT_ISSUER);
+    let audience = env_or("CASE_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(secs));
+        ticker.tick().await; // the first tick is immediate — skip it
+        loop {
+            ticker.tick().await;
+            match Verifier::from_paseto_keys_url(&url, &issuer, &audience).await {
+                Ok(fetched) => {
+                    tracing::info!(keys = fetched.key_count(), "refreshed PASETO key set");
+                    verifier().store(fetched);
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "PASETO key-set refresh failed; keeping current keys");
+                }
+            }
+        }
+    });
+    tracing::info!(secs, "polling CASE_PASETO_KEYS_URL for key rotation");
 }
 
 /// Build a verifier by fetching the published key set from `url`
@@ -249,14 +302,77 @@ pub fn policy_from_env() -> Policy {
     }
 }
 
-/// The process-wide ABAC policy, read once from `CASE_ABAC_POLICY` /
-/// `CASE_ABAC_POLICY_FILE` (else the built-in default) and cached.
-/// Mirrors [`require_auth`]: a process-wide `OnceLock` built from the
-/// environment — restart to change.
+/// The process-wide **hot-reloadable** ABAC policy, initialised from
+/// `CASE_ABAC_POLICY` / `CASE_ABAC_POLICY_FILE` (else the built-in
+/// default). Read the active snapshot with `policy().current()` per
+/// request; swap it at runtime with [`reload_policy`] (e.g. from the
+/// policy-file watcher in `app.rs`) — **no restart needed**.
 #[must_use]
-pub fn policy() -> &'static Policy {
-    static POLICY: OnceLock<Policy> = OnceLock::new();
-    POLICY.get_or_init(policy_from_env)
+pub fn policy() -> &'static ReloadablePolicy {
+    static POLICY: OnceLock<ReloadablePolicy> = OnceLock::new();
+    POLICY.get_or_init(|| ReloadablePolicy::new(policy_from_env()))
+}
+
+/// Re-read the ABAC policy from the environment (`CASE_ABAC_POLICY` /
+/// `CASE_ABAC_POLICY_FILE`, same rules and default-fallback as
+/// [`policy_from_env`]) and swap it into the live [`policy`] holder.
+/// Called by the policy-file watcher (`app.rs`) when the file changes;
+/// a malformed policy falls back to the built-in default (never leaves
+/// the service unprotected) and warn-logs. New requests see the new
+/// policy immediately; in-flight ones finish against their snapshot.
+pub fn reload_policy() {
+    policy().store(policy_from_env());
+    tracing::info!("ABAC policy reloaded");
+}
+
+/// How often the policy-file watcher polls for a change (seconds).
+const POLICY_WATCH_SECS: u64 = 15;
+
+/// Spawn a background task that hot-reloads the ABAC policy when the
+/// `CASE_ABAC_POLICY_FILE` changes on disk — so operators can edit the
+/// policy file and have it take effect without a restart. It polls the
+/// file's mtime every [`POLICY_WATCH_SECS`] and calls [`reload_policy`]
+/// on a change (mtime-poll, not an OS notify, to stay dependency-light).
+///
+/// A no-op when `CASE_ABAC_POLICY_FILE` is unset — an inline
+/// `CASE_ABAC_POLICY` (or the built-in default) has nothing to watch,
+/// and env vars do not change at runtime. Call once at boot
+/// (`app.rs::after_routes`).
+pub fn spawn_policy_watcher() {
+    let Some(path) = std::env::var("CASE_ABAC_POLICY_FILE")
+        .ok()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+    else {
+        return;
+    };
+    tokio::spawn(async move {
+        let mut last = file_mtime(&path);
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(POLICY_WATCH_SECS));
+        // The first tick fires immediately; skip it so we react only to
+        // subsequent changes, not the initial state we already loaded.
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            let now = file_mtime(&path);
+            if now != last {
+                last = now;
+                reload_policy();
+            }
+        }
+    });
+    tracing::info!(
+        secs = POLICY_WATCH_SECS,
+        "watching CASE_ABAC_POLICY_FILE for changes"
+    );
+}
+
+/// The last-modified time of `path`, or `None` if it cannot be read
+/// (missing file, permission error, or a platform without mtime).
+fn file_mtime(path: &str) -> Option<std::time::SystemTime> {
+    std::fs::metadata(path)
+        .and_then(|meta| meta.modified())
+        .ok()
 }
 
 /// The blanket-enforcement decision: authentication, then ABAC
@@ -373,12 +489,45 @@ fn priority_token(priority: &Priority) -> String {
     .to_string()
 }
 
+/// Environment attributes for the current request, for the `env.*`
+/// policy namespace (`authorization-attributes.md` §10). Derived here —
+/// not in the pure engine — so the clock stays at the service edge and
+/// the engine stays deterministic:
+///
+/// | Env key | Meaning |
+/// |---|---|
+/// | `env.hour` | Current UTC hour, `0`–`23`. |
+/// | `env.after_hours` | `true` outside 08:00–17:59 UTC, else `false`. |
+///
+/// A deployment can then write e.g. "deny write when
+/// `env.after_hours=true` unless `access=admin`". With no `env.*` rule
+/// these attributes are inert.
+#[must_use]
+pub fn request_env_attrs() -> BTreeMap<String, Vec<String>> {
+    use chrono::Timelike;
+    env_attrs_at(chrono::Utc::now().hour())
+}
+
+/// Pure derivation of the environment attributes for a given UTC `hour`
+/// (`0`–`23`), split out of [`request_env_attrs`] so it is unit-testable
+/// without a clock.
+#[must_use]
+fn env_attrs_at(hour: u32) -> BTreeMap<String, Vec<String>> {
+    let after_hours = !(8..18).contains(&hour);
+    let mut env = BTreeMap::new();
+    env.insert("hour".to_string(), vec![hour.to_string()]);
+    env.insert("after_hours".to_string(), vec![after_hours.to_string()]);
+    env
+}
+
 /// **Record-level** authorization for a handler that has loaded the
 /// target case: evaluate the policy with the case's resource attributes
-/// ([`case_resource_attrs`]). A finer, second pass on top of the coarse
+/// ([`case_resource_attrs`]) and the request's environment attributes
+/// ([`request_env_attrs`]). A finer, second pass on top of the coarse
 /// blanket guard — the guard already required a valid token and a
 /// coarse (entity-level) allow before the handler ran; this refines the
-/// decision with attributes of the *specific* record.
+/// decision with attributes of the *specific* record and the request
+/// context.
 ///
 /// Gated on the same `CASE_REQUIRE_AUTH` flag as the blanket guard:
 /// when enforcement is **off** this is a no-op (behaviour-neutral, no
@@ -389,22 +538,31 @@ fn priority_token(priority: &Priority) -> String {
 ///
 /// `401` if enforcement is on but no verified claims are present (should
 /// not happen behind the blanket guard — fail safe). `403` if the policy
-/// denies the action given the record's attributes (the message names
-/// the deciding rule).
+/// denies the action given the record's / request's attributes (the
+/// message names the deciding rule).
+/// On an **allow**, returns the decision's **obligations** — advisory
+/// instructions the handler must honour, e.g. `["mask"]` (return the
+/// masked view). When enforcement is off the vec is empty (no authz).
 pub fn authorize_record(
     caller: &MaybeAuthUser,
     action: Action,
     resource: &BTreeMap<String, Vec<String>>,
-) -> Result<(), (StatusCode, String)> {
+) -> Result<Vec<String>, (StatusCode, String)> {
     if !require_auth() {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let claims = caller
         .claims()
         .ok_or((StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
-    let decision = policy().evaluate_with_resource(claims, action, ENTITY, resource);
+    let decision = policy().current().evaluate_with_context(
+        claims,
+        action,
+        ENTITY,
+        resource,
+        &request_env_attrs(),
+    );
     if decision.allowed {
-        Ok(())
+        Ok(decision.obligations)
     } else {
         Err((StatusCode::FORBIDDEN, decision.reason))
     }
@@ -487,7 +645,9 @@ impl<S: Send + Sync> FromRequestParts<S> for AuthUser {
     type Rejection = (StatusCode, String);
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        bearer_claims(&parts.headers, verifier()).map(AuthUser)
+        // Snapshot the current (hot-reloadable) verifier for this request.
+        let verifier = verifier().current();
+        bearer_claims(&parts.headers, &verifier).map(AuthUser)
     }
 }
 
@@ -519,7 +679,8 @@ impl<S: Send + Sync> FromRequestParts<S> for MaybeAuthUser {
     type Rejection = std::convert::Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Self(bearer_claims(&parts.headers, verifier()).ok()))
+        let verifier = verifier().current();
+        Ok(Self(bearer_claims(&parts.headers, &verifier).ok()))
     }
 }
 
@@ -1160,6 +1321,28 @@ mod tests {
                     )
                 })
                 .collect(),
+        }
+    }
+
+    /// The environment-attribute derivation flags working vs after
+    /// hours from a UTC hour (`authorization-attributes.md` §10).
+    #[test]
+    fn env_attrs_at_flags_after_hours() {
+        for hour in 8..18 {
+            let env = env_attrs_at(hour);
+            assert_eq!(
+                env["after_hours"],
+                vec!["false".to_string()],
+                "{hour}:00 is working hours"
+            );
+            assert_eq!(env["hour"], vec![hour.to_string()]);
+        }
+        for hour in [0, 7, 18, 22, 23] {
+            assert_eq!(
+                env_attrs_at(hour)["after_hours"],
+                vec!["true".to_string()],
+                "{hour}:00 is after hours"
+            );
         }
     }
 

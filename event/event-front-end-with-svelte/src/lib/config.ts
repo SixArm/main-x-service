@@ -5,7 +5,7 @@
 // event service. The browser never holds a token (see
 // `agents/share/authentication-sessions.md`). Sign-in is the app's own
 // `/signin` (per-app magic-link login), not a cross-origin token handoff.
-// The client's existing `/api/v1/...` paths are forwarded verbatim by the
+// The client's existing `/api/...` paths are forwarded verbatim by the
 // proxy.
 
 /**

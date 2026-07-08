@@ -1,4 +1,8 @@
-//! API layer: REST (Axum), gRPC (Tonic stub), and FHIR (stub).
+//! API layer: REST (Axum) and gRPC (Tonic stub).
+//!
+//! (FHIR R5 lives in [`crate::fhir`] + [`crate::controllers::fhir`], not
+//! here — the earlier `api::fhir` `501` stub was removed once the real
+//! `Appointment` surface landed.)
 //!
 //! This module defines the uniform JSON response envelope used by the
 //! REST handlers — [`ApiResponse`](crate::api::ApiResponse) (success or
@@ -20,8 +24,6 @@
 //! assert_eq!(err.error.unwrap().code, "NOT_FOUND");
 //! ```
 
-/// FHIR R5 API — currently a stub returning `OperationOutcome`.
-pub mod fhir;
 /// gRPC API (Tonic) — currently a stub.
 pub mod grpc;
 /// REST API (Axum): router, handlers, routes, shared state.

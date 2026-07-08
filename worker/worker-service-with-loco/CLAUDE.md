@@ -354,6 +354,8 @@ Configuration via environment variables or `.env` file:
 | `SEARCH_INDEX_PATH`        | Tantivy index directory      | ./search_index | No       |
 | `MATCHING_THRESHOLD`       | Match score threshold        | 0.7            | No       |
 | `RUST_LOG`                 | Logging level                | info           | No       |
+| `WORKER_EVENT_TRANSPORT`   | Event bus transport: `memory` or `outbox` (durable event bus Phase 2) | memory | No |
+| `WORKER_EVENT_RETENTION_DAYS` | `event_outbox` row TTL for the Phase-3 relay (roadmap) | 7 | No |
 
 ## Testing
 

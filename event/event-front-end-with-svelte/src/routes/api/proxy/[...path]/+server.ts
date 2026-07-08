@@ -6,7 +6,7 @@
 // with `Authorization: Bearer <paseto>`. The browser thus never holds a
 // token, and pages keep using the existing client unchanged (its base URL
 // points here). The path is forwarded verbatim, so the client's existing
-// `/api/v1/...` paths flow through untouched.
+// `/api/...` paths flow through untouched.
 
 import type { RequestHandler } from "./$types";
 import { EVENT_API_URL } from "$lib/server/config";
@@ -28,6 +28,10 @@ const proxy: RequestHandler = async ({
   headers.delete("host");
   headers.delete("connection");
   headers.delete("content-length");
+
+  // Negotiate the API version via header, not the URL (URLs are
+  // version-free). See `agents/share/api-versioning.md` §6.4.
+  headers.set("accepts-version", "1.0");
 
   // Inject the server-exchanged PASETO when a session is present.
   if (locals.sessionId) {

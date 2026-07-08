@@ -229,7 +229,14 @@ don't know the transport.
 2. **Add `event_outbox`** migration + `OutboxPublisher`; switch handlers
    to write the outbox row on their existing transaction. DB-gated tests
    assert the row is written with the entity change and rolled back with
-   it.
+   it. *(Storage layer landed 2026-07-06 in the **care-pathway** service
+   as the reference: the `event_outbox` migration, the SeaORM entity, and
+   `models::event_outbox` — the pure `OutboxInsert::from_envelope`
+   envelope→row mapping (DB-free unit-tested), a `ConnectionTrait`-generic
+   `enqueue` (so a handler passes its own transaction), and the relay
+   `unpublished` / `mark_published` poll+ack. Remaining: the tx-aware
+   `OutboxPublisher` behind the seam + switching handlers onto an explicit
+   transaction.)*
 3. **Add the relay worker + `FluvioSink`** behind feature `fluvio`. A
    DB-gated integration test (or a Fluvio test container) asserts an
    enqueued row reaches the topic and is marked published.

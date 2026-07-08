@@ -1,6 +1,6 @@
 //! HTTP implementation of the Main Event Service [`Client`].
 //!
-//! Talks to the upstream REST surface at `/api/v1/events[/...]`. The
+//! Talks to the upstream REST surface at `/api/events[/...]`. The
 //! upstream service exposes a real working API (unlike Thing). The
 //! tracker stores folder-move events as schema.org Event records with
 //! `event_type = Other("FolderMove")` and packs the move-specific
@@ -226,7 +226,7 @@ impl HttpClient {
         format!("{}{}", self.base_url, path)
     }
 
-    /// Runs a `GET /api/v1/events/search` with query params `q`, maps the
+    /// Runs a `GET /api/events/search` with query params `q`, maps the
     /// folder-move events, and sorts them newest-first.
     ///
     /// # Errors
@@ -235,7 +235,7 @@ impl HttpClient {
     async fn search_raw(&self, q: &[(&str, String)]) -> Result<Vec<MoveEvent>, Error> {
         let response = self
             .http
-            .get(self.url("/api/v1/events/search"))
+            .get(self.url("/api/events/search"))
             .query(q)
             .send()
             .await
@@ -265,7 +265,7 @@ impl HttpClient {
 
 #[async_trait]
 impl Client for HttpClient {
-    /// `POST /api/v1/events` — creates a `FolderMove` event. Builds the
+    /// `POST /api/events` — creates a `FolderMove` event. Builds the
     /// full schema.org `Event` payload (most arrays empty), packing the
     /// move fields into `keywords`. Returns the projected [`MoveEvent`].
     ///
@@ -305,7 +305,7 @@ impl Client for HttpClient {
         });
         let response = self
             .http
-            .post(self.url("/api/v1/events"))
+            .post(self.url("/api/events"))
             .json(&payload)
             .send()
             .await
@@ -325,7 +325,7 @@ impl Client for HttpClient {
             .ok_or_else(|| Error::BadResponse("record returned empty data".into()))
     }
 
-    /// `GET /api/v1/events/search?event_type=FolderMove&limit=500` — all
+    /// `GET /api/events/search?event_type=FolderMove&limit=500` — all
     /// folder moves (capped at 500), newest first.
     ///
     /// # Errors
@@ -339,7 +339,7 @@ impl Client for HttpClient {
         self.search_raw(&q).await
     }
 
-    /// `GET /api/v1/events/search?event_type=FolderMove&limit=<limit>` —
+    /// `GET /api/events/search?event_type=FolderMove&limit=<limit>` —
     /// the most recent `limit` folder moves.
     ///
     /// # Errors
@@ -353,7 +353,7 @@ impl Client for HttpClient {
         self.search_raw(&q).await
     }
 
-    /// `GET /api/v1/events/search` filtered by the `folder_id=` keyword —
+    /// `GET /api/events/search` filtered by the `folder_id=` keyword —
     /// all moves for one folder, newest first.
     ///
     /// # Errors
@@ -367,7 +367,7 @@ impl Client for HttpClient {
         self.search_raw(&q).await
     }
 
-    /// `GET /api/v1/events/search` filtered by the `patient_id=` keyword —
+    /// `GET /api/events/search` filtered by the `patient_id=` keyword —
     /// all moves for one patient, newest first.
     ///
     /// # Errors

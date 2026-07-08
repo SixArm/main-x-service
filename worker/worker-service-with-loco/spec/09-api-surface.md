@@ -2,10 +2,16 @@
 
 Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 
+API URLs are version-free (`/api/workers`, not `/api/v1/workers`);
+clients select the representation version with the `Accepts-version`
+request header (default `1.0`) — see
+[`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
+Implemented by `src/api/rest/version.rs` (`require_version_mw`).
+
 | Tier | Surface |
 |---|---|
 | REST (Axum) | 15 endpoints under `/api/workers/*` + `/api/audit/*` + `/api/health` |
-| Auth (Axum) | `GET /api/v1/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
+| Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | FHIR R5 (Axum) | `Worker` CRUD + search under `/fhir/Worker` (handlers implemented and **mounted** via `fhir_routes()` in `App::routes`; pinned by `tests/api_integration_test.rs::test_fhir_worker_route_is_mounted`) |
 | gRPC (Tonic) | Stubbed |
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
@@ -28,7 +34,7 @@ implemented and **off by default**: when `WORKER_REQUIRE_AUTH` is truthy
 (`1`/`true`/`yes`/`on`; read once at router construction — restart to
 change), every route on both router surfaces requires a valid bearer
 token and returns `401` otherwise, except the public allow-list:
-`/_health`, `/_ping`, `/api/v1/health`, `/api-docs/openapi.json`,
+`/_health`, `/_ping`, `/api/health`, `/api-docs/openapi.json`,
 `/metrics.prom`, and `/swagger-ui*`. The `/fhir` surface is deliberately
 protected (worker PII).
 
@@ -53,9 +59,9 @@ controller style:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/v1/workers/{pid}/links` | create/upsert an outbound edge (`same_identity` → person, `employed_by` → organization) |
-| `GET` | `/api/v1/workers/{pid}/links` | list this worker's outbound edges |
-| `DELETE` | `/api/v1/workers/{pid}/links/{id}` | soft-delete an edge (emits `unlinked`) |
+| `POST` | `/api/workers/{pid}/links` | create/upsert an outbound edge (`same_identity` → person, `employed_by` → organization) |
+| `GET` | `/api/workers/{pid}/links` | list this worker's outbound edges |
+| `DELETE` | `/api/workers/{pid}/links/{id}` | soft-delete an edge (emits `unlinked`) |
 
 Writes are **optimistic** — the assertion is stored and a `linked` /
 `unlinked` event is published; the target service is **not** called

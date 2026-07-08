@@ -26,7 +26,7 @@ describe("ApiClient", () => {
                 jsonResponse({ success: true, data: { id: "abc" }, error: null }),
             ),
         });
-        const data = await client.get<{ id: string }>("/api/v1/events/abc");
+        const data = await client.get<{ id: string }>("/api/events/abc");
         expect(data).toEqual({ id: "abc" });
     });
 
@@ -42,7 +42,7 @@ describe("ApiClient", () => {
                 ),
             ),
         });
-        await expect(client.get("/api/v1/events/missing")).rejects.toMatchObject({
+        await expect(client.get("/api/events/missing")).rejects.toMatchObject({
             name: "ApiError",
             status: 404,
             code: "NOT_FOUND",
@@ -63,7 +63,7 @@ describe("ApiClient", () => {
             ),
         });
         try {
-            await client.post("/api/v1/events", { body: {} });
+            await client.post("/api/events", { body: {} });
             throw new Error("should have thrown");
         } catch (err) {
             expect(err).toBeInstanceOf(ApiError);
@@ -83,7 +83,7 @@ describe("ApiClient", () => {
                 return jsonResponse({ success: true, data: [], error: null });
             }),
         });
-        await client.get("/api/v1/events/search", {
+        await client.get("/api/events/search", {
             query: { q: "Smith", limit: 10, fuzzy: true, mask_sensitive: undefined },
         });
         expect(capturedUrl).toContain("q=Smith");
@@ -98,7 +98,7 @@ describe("ApiClient", () => {
             baseUrl: "http://localhost:8080",
             fetch: mockFetch(async () => new Response(null, { status: 204 })),
         });
-        const result = await client.delete("/api/v1/events/abc");
+        const result = await client.delete("/api/events/abc");
         expect(result).toBeUndefined();
     });
 });

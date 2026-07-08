@@ -56,16 +56,16 @@ and [`event-bus.md`](../../../agents/share/event-bus.md).
 
 ### 6.5 Read API
 
-- **FR-13** — `GET /api/v1/neighbors/{ref}` returns edges incident to
+- **FR-13** — `GET /api/neighbors/{ref}` returns edges incident to
   `ref`, filterable by `kind`, `direction` (`out` | `in` | `both`), and
   `depth` (capped, §16). Every response includes `as_of`.
-- **FR-14** — `GET /api/v1/edges` returns edges filtered by any of
+- **FR-14** — `GET /api/edges` returns edges filtered by any of
   `from`, `to`, `kind`, `status`. Every response includes `as_of`.
-- **FR-15** — `GET /api/v1/single-view/{ref}` returns the golden-record
+- **FR-15** — `GET /api/single-view/{ref}` returns the golden-record
   walk: follow `same_identity` to unify person ↔ worker, then collect
   affiliations (`employed_by` / `works_at` / `member_of`) for the
   unified identity. Includes `as_of`.
-- **FR-16** — `GET /api/v1/health/freshness` returns, per entity topic,
+- **FR-16** — `GET /api/health/freshness` returns, per entity topic,
   the `occurred_at` of the last consumed event and the lag versus now.
 - **FR-17** — Every graph response (FR-13/14/15) carries an `as_of`
   watermark = the read-model's freshness watermark, so callers can

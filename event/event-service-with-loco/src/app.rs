@@ -23,7 +23,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, events_routes, fhir_routes, metrics_routes},
+    api::rest::{ApiDoc, AppState, events_routes, metrics_routes},
     config::Config,
     matching::ProbabilisticMatcher,
     search::SearchEngine,
@@ -74,12 +74,13 @@ impl Hooks for App {
     }
 
     /// Register loco-native routes: the framework defaults plus this
-    /// crate's `events` and `metrics` route groups. The hand-written
-    /// Axum surface is merged separately in [`Self::after_routes`].
+    /// crate's `events`, FHIR `Appointment`, and `metrics` route groups.
+    /// The hand-written Axum surface is merged separately in
+    /// [`Self::after_routes`].
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes()
             .add_route(events_routes())
-            .add_route(fhir_routes())
+            .add_route(crate::controllers::fhir::routes())
             .add_route(metrics_routes())
     }
 
@@ -113,11 +114,18 @@ impl Hooks for App {
         let state =
             AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
         ctx.shared_store.insert(state.clone());
+        // Durable event bus Phase 3: start the outbox relay loop. A no-op
+        // unless `EVENT_EVENT_TRANSPORT=outbox` AND `EVENT_EVENT_RELAY` are
+        // set, so the default `memory` transport never spawns it.
+        crate::relay::spawn(ctx.db.clone());
         let router = router
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .layer(axum::middleware::from_fn_with_state(
                 state,
                 crate::api::rest::auth::require_auth_mw,
+            ))
+            .layer(axum::middleware::from_fn(
+                crate::api::rest::version::require_version_mw,
             ))
             .layer(tower_http::cors::CorsLayer::permissive());
         Ok(router)

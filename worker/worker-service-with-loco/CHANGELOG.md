@@ -8,6 +8,33 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed — API versioning moved from URL to header (2026-07-07)
+
+- REST URLs are now version-free (`/api/workers`, not `/api/v1/workers`).
+  API versioning is selected with the `Accepts-version` request header
+  (default `1.0`), per
+  [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
+  New `src/api/rest/version.rs` (`require_version_mw`) negotiates the
+  version on `/api/*` (unsupported explicit version ⇒ `406`; resolved
+  version echoed on the response), layered next to the auth guard on both
+  the standalone Axum `create_router` and the loco `after_routes` surfaces.
+
+### Added — authz: record-level resource attributes + obligations (2026-07-05)
+
+- Record-level ABAC (verifier 0.3 → 0.6). Beyond the coarse blanket
+  guard, `GET`/`PUT`/`DELETE /api/v1/workers/{id}` run a second, finer
+  decision after loading the record: `auth::worker_resource_attrs`
+  derives `resource.active` / `resource.deceased` / `resource.managing_org`
+  and `auth::authorize_record` calls `Policy::evaluate_with_context`
+  (gated on `WORKER_REQUIRE_AUTH`, a no-op when off). `PUT`/`DELETE`
+  evaluate the **stored** record. Deployments can write e.g. "deny
+  write on an inactive worker's record unless `access=admin`".
+- Also supplies **environment attributes** (`env.hour` / `env.after_hours`,
+  UTC) and honours the **`mask` obligation** on `GET` (returns
+  `mask_worker`). New `auth::MaybeAuthUser` extractor + module-level
+  `auth::policy()` / `require_auth()` accessors. DB-free tests for the
+  resource-attribute mapping and the working-hours derivation.
+
 ### Added — authz: ABAC policy authorization inside the blanket guard
 
 - ABAC authorization landed (spec §13 T-1b, the authorization sub-item

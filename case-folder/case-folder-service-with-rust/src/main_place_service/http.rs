@@ -1,6 +1,6 @@
 //! HTTP implementation of the Main Place Service [`Client`].
 //!
-//! Talks to the service's REST surface at `{base_url}/api/v1/places/...`
+//! Talks to the service's REST surface at `{base_url}/api/places/...`
 //! (the endpoint shape documented by the upstream crate).
 
 use async_trait::async_trait;
@@ -117,7 +117,7 @@ impl HttpClient {
 
 #[async_trait]
 impl Client for HttpClient {
-    /// `GET /api/v1/places/search?q=<query>&limit=100[&place_type=<pt>]` —
+    /// `GET /api/places/search?q=<query>&limit=100[&place_type=<pt>]` —
     /// free-text name search, optionally filtered by place type.
     ///
     /// # Errors
@@ -130,7 +130,7 @@ impl Client for HttpClient {
         }
         let response = self
             .http
-            .get(self.url("/api/v1/places/search"))
+            .get(self.url("/api/places/search"))
             .query(&q)
             .send()
             .await
@@ -157,7 +157,7 @@ impl Client for HttpClient {
             .collect())
     }
 
-    /// `GET /api/v1/places/{id}` — look up a place by UUID. A `404` maps
+    /// `GET /api/places/{id}` — look up a place by UUID. A `404` maps
     /// to `Ok(None)`.
     ///
     /// # Errors
@@ -166,7 +166,7 @@ impl Client for HttpClient {
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Place>, Error> {
         let response = self
             .http
-            .get(self.url(&format!("/api/v1/places/{id}")))
+            .get(self.url(&format!("/api/places/{id}")))
             .send()
             .await
             .map_err(|e| Error::Transport(e.to_string()))?;
@@ -186,7 +186,7 @@ impl Client for HttpClient {
         Ok(body.data.map(PlaceDto::into_place))
     }
 
-    /// `POST /api/v1/places` — registers a new place. When `capacity` is
+    /// `POST /api/places` — registers a new place. When `capacity` is
     /// set it is written to both `maximum_attendee_capacity` and
     /// `capacity` so either upstream representation round-trips.
     ///
@@ -211,7 +211,7 @@ impl Client for HttpClient {
         }
         let response = self
             .http
-            .post(self.url("/api/v1/places"))
+            .post(self.url("/api/places"))
             .json(&payload)
             .send()
             .await

@@ -19,11 +19,21 @@ pub mod app;
 pub mod config;
 pub mod db;
 pub mod error;
+/// HL7 FHIR R5 **non-standard** `Basic` (`code = course`) representation:
+/// resource wire types, DTO↔resource conversions, and search-parameter
+/// parsing for the mounted `/fhir` endpoints. Non-standard because no FHIR R5
+/// resource models an educational course (see the module docs).
+pub mod fhir;
 pub mod matching;
 /// Process-wide Prometheus metrics, served at `/metrics.prom`.
 pub mod metrics;
 pub mod models;
 pub mod privacy;
+/// Durable event bus **Phase 3** — the `course_outbox` relay worker
+/// (drains unpublished rows to an [`relay::EventSink`], stamps
+/// `published_at`, purges old rows). A no-op unless
+/// `COURSE_EVENT_TRANSPORT=outbox` and `COURSE_EVENT_RELAY` are set.
+pub mod relay;
 pub mod search;
 pub mod streaming;
 pub mod validation;

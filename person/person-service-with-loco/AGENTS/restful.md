@@ -84,6 +84,8 @@ is [`api::rest::handlers::metrics_prom`](../src/api/rest/handlers.rs).
 
 ## RESTful API Endpoints
 
+API URLs are version-free; select the version with the `Accepts-version` header (default `1.0`) — see [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
+
 ### Health
 
 | Method | Path | Description |

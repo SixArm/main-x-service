@@ -18,6 +18,7 @@ mod m20241228_000007_expand_organizations_ods;
 mod m20241228_000008_create_ods_tables;
 mod m20241228_000009_create_codesystem_tables;
 mod m20260608_000001_add_worker_persistence_fields;
+mod m20260708_000001_create_event_outbox;
 
 pub struct Migrator;
 
@@ -35,6 +36,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20241228_000008_create_ods_tables::Migration),
             Box::new(m20241228_000009_create_codesystem_tables::Migration),
             Box::new(m20260608_000001_add_worker_persistence_fields::Migration),
+            Box::new(m20260708_000001_create_event_outbox::Migration),
         ]
     }
 }

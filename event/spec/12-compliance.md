@@ -26,7 +26,7 @@ clinic encounter or a political hearing.
 |---|---|
 | GDPR Art. 5 (minimisation) | Adapter drops party emails / attendee lists from matcher projection; matcher never scores `local_id`; no party data in logs (matcher forbids `Debug`-formatting records into traces) |
 | GDPR Art. 9 (special category) | Masking on by default for public-facing reads; consent records per Event (`DataProcessing`, `DataSharing`, `Marketing`, `Research`) |
-| GDPR Art. 15 (access) | `GET /api/v1/events/{id}/export` |
+| GDPR Art. 15 (access) | `GET /api/events/{id}/export` |
 | GDPR Art. 17 (erasure) | Soft delete + consent revocation; erasure-vs-audit-retention tension is EOQ-4 |
 | GDPR Art. 30 (records of processing) | `audit_log` with old/new JSON, user ID, IP, user agent, timestamp |
 | UK DPA 2018 | Same controls as GDPR rows above; UK-specific lawful-basis documentation is a deployment-side artefact |

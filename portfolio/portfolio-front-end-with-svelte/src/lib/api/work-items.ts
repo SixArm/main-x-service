@@ -40,11 +40,11 @@ export class WorkItemRepository {
 
   /** The base path for this collection. */
   private base(): string {
-    return `/api/v1/${this.collection}`;
+    return `/api/${this.collection}`;
   }
 
   /**
-   * List active work items in this collection. `GET /api/v1/{collection}`.
+   * List active work items in this collection. `GET /api/{collection}`.
    * @param portfolioRef Optional parent portfolio pid (child collections)
    *   to roll up only that portfolio's children.
    * @returns Lightweight `{pid, name}` refs for the list page.
@@ -58,7 +58,7 @@ export class WorkItemRepository {
 
   /**
    * Name search within this collection.
-   * `GET /api/v1/{collection}/search?q=`.
+   * `GET /api/{collection}/search?q=`.
    * @param q The case-insensitive substring to match.
    * @returns Matching refs.
    */
@@ -70,7 +70,7 @@ export class WorkItemRepository {
 
   /**
    * Fetch one full work item by persistent id.
-   * `GET /api/v1/{collection}/{pid}`.
+   * `GET /api/{collection}/{pid}`.
    * @param pid Persistent id (URL-encoded into the path).
    * @returns The full {@link WorkItem} record.
    */
@@ -79,7 +79,7 @@ export class WorkItemRepository {
   }
 
   /**
-   * Create a work item. `POST /api/v1/{collection}`.
+   * Create a work item. `POST /api/{collection}`.
    * @param record The work-item payload (matcher `WorkItem` shape).
    * @returns The created `{pid, name}` ref.
    */
@@ -88,7 +88,7 @@ export class WorkItemRepository {
   }
 
   /**
-   * Replace a work item. `PUT /api/v1/{collection}/{pid}`.
+   * Replace a work item. `PUT /api/{collection}/{pid}`.
    * @param pid Persistent id (URL-encoded into the path).
    * @param record The full replacement payload.
    * @returns The updated `{pid, name}` ref.
@@ -101,7 +101,7 @@ export class WorkItemRepository {
   }
 
   /**
-   * Soft-delete a work item. `DELETE /api/v1/{collection}/{pid}`. The
+   * Soft-delete a work item. `DELETE /api/{collection}/{pid}`. The
    * service returns an empty body, hence `void`.
    * @param pid Persistent id (URL-encoded into the path).
    */
@@ -111,7 +111,7 @@ export class WorkItemRepository {
 
   /**
    * Match a query against the stored work items in this collection.
-   * `POST /api/v1/{collection}/check-duplicates`.
+   * `POST /api/{collection}/check-duplicates`.
    * @param query A work-item payload to score against existing records.
    * @returns Scored candidate refs (score + confidence + match flag).
    */
@@ -123,7 +123,7 @@ export class WorkItemRepository {
 
   /**
    * Merge a confirmed duplicate into a surviving work item (same
-   * collection). `POST /api/v1/{collection}/merge`.
+   * collection). `POST /api/{collection}/merge`.
    * @param mainPid The survivor's pid.
    * @param duplicatePid The duplicate's pid (soft-deleted on success).
    * @param reason Optional operator note recorded in the merge history.

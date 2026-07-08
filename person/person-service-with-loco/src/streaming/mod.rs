@@ -19,8 +19,12 @@ use crate::models::Person;
 
 /// Event consumer interface (stub) for reading the stream.
 pub mod consumer;
+/// The canonical durable-bus [`Envelope`] + transport selector (Phase 2).
+pub mod envelope;
 /// In-process and (future) Fluvio event publishers.
 pub mod producer;
+
+pub use envelope::{ENTITY, Envelope, EventKind, EventTransport, EventView, SCHEMA_VERSION, transport};
 
 /// A domain event describing one mutation to a person record.
 ///

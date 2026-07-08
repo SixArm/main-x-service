@@ -24,29 +24,31 @@ plus derived timeline / burndown views. Projects / Products / Programs sit
 
 ## API
 
-Routes are under `/api/v1/`. `{collection}` is one of `portfolios`,
+API URLs are version-free; select the version with the `Accepts-version` header (default `1.0`) — see [`agents/share/api-versioning.md`](../../agents/share/api-versioning.md).
+
+Routes are under `/api/`. `{collection}` is one of `portfolios`,
 `projects`, `products`, `programs` — each with the **identical** shape
 below.
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/v1/{collection}` | Create (`409` on real-time duplicate) |
-| GET | `/api/v1/{collection}` | List |
-| GET | `/api/v1/{collection}/{pid}` | Fetch |
-| PUT | `/api/v1/{collection}/{pid}` | Update |
-| DELETE | `/api/v1/{collection}/{pid}` | Soft-delete |
-| GET | `/api/v1/{collection}/search?q=` | Case-insensitive name search (`ILIKE`, cap 50) |
-| POST | `/api/v1/{collection}/match` | Rank `{query, candidates}` (cross-kind → `0.0`) |
-| POST | `/api/v1/{collection}/check-duplicates` | Match a query vs stored records in this collection |
-| POST | `/api/v1/{collection}/deduplicate` | Batch scan → review queue |
-| POST | `/api/v1/{collection}/merge` | Merge a duplicate into a same-kind survivor |
-| GET | `/api/v1/{collection}/merges/recent` | Merge-history records |
-| * | `/api/v1/{collection}/{pid}/goals` · `/tasks` · `/issues` | Operational sub-resource CRUD |
-| GET | `/api/v1/{collection}/{pid}/timeline` · `/burndown` | Derived Gantt / burndown views |
-| POST·GET·DELETE | `/api/v1/{collection}/{pid}/links` | Cross-service entity links |
-| GET | `/api/v1/{collection}/audit/recent` · `/{pid}/audit` | Audit-log query |
-| GET | `/api/v1/{collection}/events/recent` | In-memory event stream |
-| GET | `/api/v1/{collection}/whoami` | Verified PASETO-token claims (`401` without one) |
+| POST | `/api/{collection}` | Create (`409` on real-time duplicate) |
+| GET | `/api/{collection}` | List |
+| GET | `/api/{collection}/{pid}` | Fetch |
+| PUT | `/api/{collection}/{pid}` | Update |
+| DELETE | `/api/{collection}/{pid}` | Soft-delete |
+| GET | `/api/{collection}/search?q=` | Case-insensitive name search (`ILIKE`, cap 50) |
+| POST | `/api/{collection}/match` | Rank `{query, candidates}` (cross-kind → `0.0`) |
+| POST | `/api/{collection}/check-duplicates` | Match a query vs stored records in this collection |
+| POST | `/api/{collection}/deduplicate` | Batch scan → review queue |
+| POST | `/api/{collection}/merge` | Merge a duplicate into a same-kind survivor |
+| GET | `/api/{collection}/merges/recent` | Merge-history records |
+| * | `/api/{collection}/{pid}/goals` · `/tasks` · `/issues` | Operational sub-resource CRUD |
+| GET | `/api/{collection}/{pid}/timeline` · `/burndown` | Derived Gantt / burndown views |
+| POST·GET·DELETE | `/api/{collection}/{pid}/links` | Cross-service entity links |
+| GET | `/api/{collection}/audit/recent` · `/{pid}/audit` | Audit-log query |
+| GET | `/api/{collection}/events/recent` | In-memory event stream |
+| GET | `/api/{collection}/whoami` | Verified PASETO-token claims (`401` without one) |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (root path, public under auth enforcement) |
 
@@ -73,34 +75,34 @@ export DATABASE_URL=postgres://loco:loco@localhost:5432/portfolio_service_develo
 cargo loco start        # migrations auto-run in development
 
 # Create a portfolio (the umbrella kind)
-curl -s localhost:5150/api/v1/portfolios -H 'content-type: application/json' \
+curl -s localhost:5150/api/portfolios -H 'content-type: application/json' \
   -d '{"name":"Digital Transformation Portfolio",
        "goals":[{"title":"Modernise core systems","target_date":"2026-12-01"}]}'
 
 # Create a project under that portfolio (carries portfolio_ref)
-curl -s localhost:5150/api/v1/projects -H 'content-type: application/json' \
+curl -s localhost:5150/api/projects -H 'content-type: application/json' \
   -d '{"name":"EHR Migration","portfolio_ref":"<portfolio-pid>",
        "code":"EHR-2026"}'
 
 # Name search within a collection
-curl -s 'localhost:5150/api/v1/projects/search?q=migration'
+curl -s 'localhost:5150/api/projects/search?q=migration'
 
 # Match an explicit query against candidates (no persistence; same kind)
-curl -s localhost:5150/api/v1/projects/match -H 'content-type: application/json' \
+curl -s localhost:5150/api/projects/match -H 'content-type: application/json' \
   -d '{"query":{"name":"EHR Migration"},"candidates":[{"name":"EHR Migration Project"}]}'
 
 # Merge a duplicate into a survivor (the survivor is `main_pid`; same kind)
-curl -s localhost:5150/api/v1/projects/merge -H 'content-type: application/json' \
+curl -s localhost:5150/api/projects/merge -H 'content-type: application/json' \
   -d '{"main_pid":"<survivor-uuid>","duplicate_pid":"<duplicate-uuid>"}'
 
 # Add a task to any work item
-curl -s localhost:5150/api/v1/projects/<pid>/tasks -H 'content-type: application/json' \
+curl -s localhost:5150/api/projects/<pid>/tasks -H 'content-type: application/json' \
   -d '{"title":"Provision staging cluster","status":"Todo","estimate":8,"remaining":8}'
 
 # Authenticated request: present a short-lived PASETO v4.public token
 # minted by the auth-service (front-ends use a BFF + cookie session; the
 # BFF holds the session and supplies this bearer server-side).
-curl -s localhost:5150/api/v1/projects/whoami \
+curl -s localhost:5150/api/projects/whoami \
   -H 'authorization: Bearer <paseto-v4.public-from-authentication-service>'
 ```
 
@@ -128,8 +130,10 @@ in-memory event streaming (durable-bus Phase 1) + OpenAPI/Swagger +
 Prometheus metrics + offline PASETO v4.public verification (published
 Ed25519 key) + blanket `/api/*` auth enforcement (off by default, gated by
 `PORTFOLIO_REQUIRE_AUTH`) + payload validation. Deferred (see
-[spec §13](./spec/index.md)): Tantivy full-text/fuzzy search, durable
-event bus Phases 2–3 (outbox → Fluvio), privacy, front-end merge action,
+[spec §13](./spec/index.md)): Tantivy full-text/fuzzy search, the durable
+event bus's Fluvio broker sink (Phase 2 outbox + Phase 3 relay/retention
+have landed; `src/relay.rs`, gated by `PORTFOLIO_EVENT_TRANSPORT=outbox` +
+`PORTFOLIO_EVENT_RELAY`), privacy, front-end merge action,
 bulk import/export, the `posts` / `comments` / `members` collaboration
 sub-resources, gRPC. Auth credentials are issued by the central
 [authentication-service](../../authentication/authentication-service-with-loco):

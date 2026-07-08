@@ -19,6 +19,9 @@ pub mod audit;
 pub mod convert;
 /// SeaORM entity models.
 pub mod models;
+/// Transactional-outbox write + relay helpers (durable event bus,
+/// Phase 2).
+pub mod outbox;
 /// Repository trait and SeaORM implementation.
 pub mod repositories;
 /// Schema/table definitions.

@@ -23,10 +23,10 @@ parent portfolio, and a portfolio detail page rolls up its children.
 
 | Collection | Endpoint base | Kind |
 |---|---|---|
-| Portfolios | `/api/v1/portfolios` | `Portfolio` (umbrella) |
-| Projects | `/api/v1/projects` | `Project` (child) |
-| Products | `/api/v1/products` | `Product` (child) |
-| Programs | `/api/v1/programs` | `Program` (child) |
+| Portfolios | `/api/portfolios` | `Portfolio` (umbrella) |
+| Projects | `/api/projects` | `Project` (child) |
+| Products | `/api/products` | `Product` (child) |
+| Programs | `/api/programs` | `Program` (child) |
 
 ## Routes
 
@@ -91,7 +91,7 @@ pnpm dev                 # http://localhost:5173
 
 | Var | Default | Purpose |
 |---|---|---|
-| `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Portfolio service REST base URL (`/api/v1/{collection}/...`). |
+| `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Portfolio service REST base URL (`/api/{collection}/...`). |
 | `VITE_AUTH_FRONTEND_URL` | `http://localhost:5173` | Central authentication front-end base URL. "Sign in" redirects to `${VITE_AUTH_FRONTEND_URL}/signin?return_to=…`; the magic-link establishes a server-side session and sets an httpOnly cookie — the browser holds no token, and this app's BFF supplies a short-lived PASETO v4.public bearer server-side (see `agents/share/authentication-sessions.md`; RS256/JWKS not used). |
 
 ## How it works
@@ -110,7 +110,7 @@ page additionally rolls up its child projects / products / programs.
 
 A work item is also a **project-management workspace**: its operational
 sub-resources (goals, tasks, issues) live in the service under
-`/api/v1/{collection}/{pid}/…` and are **not** part of the matching
+`/api/{collection}/{pid}/…` and are **not** part of the matching
 surface (except goal titles). The board / issues / timeline / burndown /
 goals views consume those endpoints.
 

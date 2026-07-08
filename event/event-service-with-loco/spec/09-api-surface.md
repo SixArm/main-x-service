@@ -4,9 +4,9 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 
 | Tier | Surface |
 |---|---|
-| REST (Axum) | 15 endpoints under `/api/v1/events/*` + `/api/v1/audit/*` + `/api/v1/health` |
-| Auth (Axum) | `GET /api/v1/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
-| FHIR R5 (Axum) | `501 Not Implemented` stub (see §6.8) |
+| REST (Axum) | 15 endpoints under `/api/events/*` + `/api/audit/*` + `/api/health` |
+| Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
+| FHIR R5 (Axum) | Live `Appointment` surface — `/fhir/Appointment{,/{id}}` (read/create/update/delete/search) + `GET /fhir/metadata` (`CapabilityStatement`); `application/fhir+json`, `OperationOutcome` errors, searchset Bundle (see §6.8) |
 | gRPC (Tonic) | Stubbed |
 | Web UI | None in this crate (backend-only loco service, no view tier). The operator UI is the sibling [`event-front-end-with-svelte`](../../event-front-end-with-svelte/spec/index.md). |
 | Docs | Swagger UI at `/swagger-ui` |
@@ -36,11 +36,11 @@ Either way the service **always boots**.
 
 Blanket enforcement is implemented **default-off**: when
 `EVENT_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
-case-insensitive), every `/api/v1/*` route requires a valid bearer
-token except the public `/api/v1/health`. Root-level `/_health`,
-`/_ping`, `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`,
-and the `/fhir/*` `501 Not Implemented` stubs sit outside the
-`/api/v1` scope and stay public. The flag is read once at
+case-insensitive), every `/api/*` **and** `/fhir/*` route requires a
+valid bearer token except the public `/api/health` and
+`GET /fhir/metadata`. Root-level `/_health`, `/_ping`,
+`/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom` sit
+outside the enforced scope and stay public. The flag is read once at
 construction — restart to change. Family contract:
 [jwt-enforcement](../../../agents/share/jwt-enforcement.md).
 
@@ -67,18 +67,18 @@ export masking + audit). This section declares only the **event-specific**
 bits; the shared doc is the source of truth for everything else.
 
 The five endpoints (shared doc §4) mount under the event resource, under
-the same `/api/v1/events/*` prefix as the CRUD surface:
+the same `/api/events/*` prefix as the CRUD surface:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/v1/events/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |
-| `GET` | `/api/v1/events/import/{id}` | Job status + counts + `errors_url` + `review_url` |
-| `POST` | `/api/v1/events/export` | `202 {job_id}` — body: `format`, `filter`, `fields`, `include_soft_deleted`, `masking_profile` |
-| `GET` | `/api/v1/events/export/{id}` | Job status + `download_url` |
-| `GET` | `/api/v1/events/bulk-jobs` | List (filter by `kind`/`status`); `GET .../{id}` for one |
+| `POST` | `/api/events/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |
+| `GET` | `/api/events/import/{id}` | Job status + counts + `errors_url` + `review_url` |
+| `POST` | `/api/events/export` | `202 {job_id}` — body: `format`, `filter`, `fields`, `include_soft_deleted`, `masking_profile` |
+| `GET` | `/api/events/export/{id}` | Job status + `download_url` |
+| `GET` | `/api/events/bulk-jobs` | List (filter by `kind`/`status`); `GET .../{id}` for one |
 
 This is distinct from the per-record iCalendar import/export of §13 T-7
-(`POST /api/v1/events/import.ics`, `GET /api/v1/events/{id}.ics`): T-7 is a
+(`POST /api/events/import.ics`, `GET /api/events/{id}.ics`): T-7 is a
 single-record format converter, this is the bulk multi-row job machinery.
 
 **Stable key(s) for upsert** (shared doc §6, §10). A row upserts in place

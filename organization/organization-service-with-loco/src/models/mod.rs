@@ -10,6 +10,10 @@
 pub mod _entities;
 /// Audit-trail recording and query helpers over the `audit_logs` entity.
 pub mod audit_logs;
+/// Durable event-bus Phase-2 transactional-outbox write + relay helpers
+/// over the `event_outbox` entity (`OutboxInsert::from_envelope`,
+/// `insert_on`, `recent`, relay poll/ack).
+pub mod event_outbox;
 /// Merge-history recording and query helpers over the `merge_records` entity.
 pub mod merge_records;
 /// CRUD/search helpers over the `organizations` entity (stored payload).

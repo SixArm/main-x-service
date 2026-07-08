@@ -52,14 +52,23 @@ export async function signup(
 }
 
 /** Exchange the opaque session id for a short-lived PASETO (server-to-
- *  server; sends the session as a `Cookie` header). `null` if invalid. */
-async function exchangeToken(
+ *  server; sends the session as a `Cookie` header). `POST /token` is
+ *  cookie-authed and mutating, so it requires the session's CSRF
+ *  synchroniser token echoed in `X-CSRF-Token` — the BFF holds it (from
+ *  the `__Host-mxi_csrf` cookie captured at verify) and forwards it here.
+ *  `null` if invalid. */
+export async function exchangeToken(
   fetchFn: FetchFn,
   sid: string,
+  csrf: string | null,
 ): Promise<string | null> {
+  const headers: Record<string, string> = {
+    cookie: `${SESSION_COOKIE}=${sid}`,
+  };
+  if (csrf) headers["x-csrf-token"] = csrf;
   const res = await fetchFn(`${AUTH_API_URL}/api/auth/token`, {
     method: "POST",
-    headers: { cookie: `${SESSION_COOKIE}=${sid}` },
+    headers,
   });
   if (!res.ok) return null;
   const body = (await res.json()) as { token?: string };
@@ -71,8 +80,9 @@ async function exchangeToken(
 export async function currentUser(
   fetchFn: FetchFn,
   sid: string,
+  csrf: string | null,
 ): Promise<CurrentUser | null> {
-  const token = await exchangeToken(fetchFn, sid);
+  const token = await exchangeToken(fetchFn, sid, csrf);
   if (!token) return null;
   const res = await fetchFn(`${AUTH_API_URL}/api/auth/me`, {
     headers: { authorization: `Bearer ${token}` },
@@ -82,8 +92,12 @@ export async function currentUser(
 }
 
 /** Revoke the session server-side (best-effort) before the cookie clear. */
-export async function signout(fetchFn: FetchFn, sid: string): Promise<void> {
-  const token = await exchangeToken(fetchFn, sid);
+export async function signout(
+  fetchFn: FetchFn,
+  sid: string,
+  csrf: string | null,
+): Promise<void> {
+  const token = await exchangeToken(fetchFn, sid, csrf);
   if (!token) return;
   await fetchFn(`${AUTH_API_URL}/api/auth/signout`, {
     method: "POST",

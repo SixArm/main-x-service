@@ -42,7 +42,7 @@ pub struct HealthResponse {
 
 #[utoipa::path(
     get,
-    path = "/api/v1/health",
+    path = "/api/health",
     tag = "health",
     responses((status = 200, description = "Service is healthy", body = HealthResponse))
 )]
@@ -59,7 +59,7 @@ pub async fn health_check() -> impl IntoResponse {
 /// Prometheus metrics endpoint (text-exposition format).
 ///
 /// Renders [`crate::metrics::METRICS`] for scraping. Mounted at the
-/// root (`/metrics.prom`) — not under `/api/v1` — so a default
+/// root (`/metrics.prom`) — not under `/api` — so a default
 /// Prometheus scrape config (`metrics_path: /metrics.prom`) finds it.
 #[utoipa::path(
     get,
@@ -94,7 +94,7 @@ pub struct CreateEventRequest {
 
 #[utoipa::path(
     post,
-    path = "/api/v1/events",
+    path = "/api/events",
     tag = "events",
     request_body = Event,
     responses(
@@ -106,7 +106,7 @@ pub struct CreateEventRequest {
 )]
 /// `POST /events` — create one event.
 ///
-/// Serves HTTP `POST /api/v1/events`. The flow is: validate the body,
+/// Serves HTTP `POST /api/events`. The flow is: validate the body,
 /// mint a `Uuid` when the payload's `id` is nil, run duplicate
 /// detection via [`check_duplicates_internal`], persist through the
 /// repository (which also streams a `Created` event and writes an
@@ -199,7 +199,7 @@ pub async fn create_event(
 
 #[utoipa::path(
     get,
-    path = "/api/v1/events/{id}",
+    path = "/api/events/{id}",
     tag = "events",
     params(("id" = Uuid, Path, description = "Event UUID")),
     responses(
@@ -209,7 +209,7 @@ pub async fn create_event(
 )]
 /// `GET /events/{id}` — fetch one non-deleted event by `id`.
 ///
-/// Serves HTTP `GET /api/v1/events/{id}`. Returns the event in a
+/// Serves HTTP `GET /api/events/{id}`. Returns the event in a
 /// success envelope on a hit.
 ///
 /// # Errors
@@ -239,7 +239,7 @@ pub async fn get_event(State(state): State<AppState>, Path(id): Path<Uuid>) -> i
 
 #[utoipa::path(
     put,
-    path = "/api/v1/events/{id}",
+    path = "/api/events/{id}",
     tag = "events",
     params(("id" = Uuid, Path, description = "Event UUID")),
     request_body = Event,
@@ -250,7 +250,7 @@ pub async fn get_event(State(state): State<AppState>, Path(id): Path<Uuid>) -> i
 )]
 /// `PUT /events/{id}` — replace one event.
 ///
-/// Serves HTTP `PUT /api/v1/events/{id}`. Validates the body, forces
+/// Serves HTTP `PUT /api/events/{id}`. Validates the body, forces
 /// the payload's `id` to the path `id` (the path is authoritative, so
 /// a mismatched body id cannot retarget the write), replaces the event
 /// and its child rows through the repository, re-indexes for search,
@@ -301,7 +301,7 @@ pub async fn update_event(
 
 #[utoipa::path(
     delete,
-    path = "/api/v1/events/{id}",
+    path = "/api/events/{id}",
     tag = "events",
     params(("id" = Uuid, Path, description = "Event UUID")),
     responses(
@@ -311,7 +311,7 @@ pub async fn update_event(
 )]
 /// `DELETE /events/{id}` — soft-delete one event.
 ///
-/// Serves HTTP `DELETE /api/v1/events/{id}`. Marks the event inactive
+/// Serves HTTP `DELETE /api/events/{id}`. Marks the event inactive
 /// (soft delete — the row is retained for the audit trail) and removes
 /// it from the search index, then returns `204 No Content`. Idempotent
 /// in spirit: deleting an already-deleted id still reports success.
@@ -395,14 +395,14 @@ pub struct SearchResponse {
 
 #[utoipa::path(
     get,
-    path = "/api/v1/events/search",
+    path = "/api/events/search",
     tag = "search",
     params(SearchQuery),
     responses((status = 200, description = "Search results", body = SearchResponse))
 )]
 /// `GET /events/search` — full-text / fuzzy search over events.
 ///
-/// Serves HTTP `GET /api/v1/events/search`. Runs a full-text or (when
+/// Serves HTTP `GET /api/events/search`. Runs a full-text or (when
 /// `fuzzy`) a fuzzy title search against the Tantivy index for
 /// `offset + limit` hits, hydrates each hit id from the repository,
 /// then applies the optional post-filters in `params`:
@@ -546,14 +546,14 @@ pub struct MatchResultsResponse {
 
 #[utoipa::path(
     post,
-    path = "/api/v1/events/match",
+    path = "/api/events/match",
     tag = "matching",
     request_body = MatchRequest,
     responses((status = 200, description = "Match results", body = MatchResultsResponse))
 )]
 /// `POST /events/match` — find candidate matches for a probe event.
 ///
-/// Serves HTTP `POST /api/v1/events/match`. Gathers blocking candidates
+/// Serves HTTP `POST /api/events/match`. Gathers blocking candidates
 /// via [`blocking_candidates`] (search index hits sharing a similar
 /// name on the same `start_date` day), scores each against the probe
 /// with the configured matcher, drops anything below `threshold`
@@ -687,14 +687,14 @@ fn to_match_response(m: crate::matching::MatchResult) -> MatchResponse {
 
 #[utoipa::path(
     post,
-    path = "/api/v1/events/check-duplicates",
+    path = "/api/events/check-duplicates",
     tag = "deduplication",
     request_body = Event,
     responses((status = 200, description = "Duplicate check result", body = DuplicateCheckResponse))
 )]
 /// `POST /events/check-duplicates` — explicit duplicate check.
 ///
-/// Serves HTTP `POST /api/v1/events/check-duplicates`. Runs the same
+/// Serves HTTP `POST /api/events/check-duplicates`. Runs the same
 /// name + date blocking + scoring as `create_event` (via
 /// [`check_duplicates_internal`]) but *without* persisting anything,
 /// so a client can pre-flight a create. Always returns `200` with a
@@ -809,7 +809,7 @@ fn merge_event_data(
 
 #[utoipa::path(
     post,
-    path = "/api/v1/events/merge",
+    path = "/api/events/merge",
     tag = "deduplication",
     request_body = crate::models::MergeRequest,
     responses(
@@ -819,7 +819,7 @@ fn merge_event_data(
 )]
 /// `POST /events/merge` — merge a duplicate event into a surviving one.
 ///
-/// Serves HTTP `POST /api/v1/events/merge`. Loads both the `main` and
+/// Serves HTTP `POST /api/events/merge`. Loads both the `main` and
 /// `duplicate` events, then unions the duplicate's data onto main:
 /// identifiers, alternate names, keywords, `Location` entries
 /// (each `Location` variant compared by value equality), `Party`
@@ -839,12 +839,13 @@ fn merge_event_data(
 ///
 /// - `404 Not Found` — either the `main` or the `duplicate` id has no
 ///   active event.
-/// - `500 Internal Server Error` — a repository fetch or the `update`
-///   of the merged main event failed.
+/// - `500 Internal Server Error` — a repository fetch or the atomic
+///   `merge` (survivor update + duplicate soft-delete) failed.
 ///
-/// The duplicate soft-delete, index updates, and event publish are
-/// best-effort after the main update succeeds: failures there are
-/// logged but do not change the `200` result.
+/// The `merge` is transactional (survivor update + duplicate soft-delete
+/// + outbox rows commit together). The search-index updates afterwards
+/// are best-effort: failures there are logged but do not change the
+/// `200` result.
 ///
 /// # Panics
 ///
@@ -906,36 +907,33 @@ pub async fn merge_events(
 
     let (merged, transferred) = merge_event_data(&main, &duplicate);
 
-    if let Err(e) = state.event_repository.update(&merged).await {
+    // Persist the survivor's updates and soft-delete the duplicate
+    // atomically in one transaction; the repository enqueues the `Merged`
+    // (+`merged_from`) and `Deleted` outbox rows and publishes the
+    // in-memory `Merged`/`Deleted` stream events.
+    if let Err(e) = state
+        .event_repository
+        .merge(&merged, &duplicate.id)
+        .await
+    {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse::<crate::models::MergeResponse>::error(
                 "DATABASE_ERROR",
-                format!("Failed to update main event: {e}"),
+                format!("Failed to merge events: {e}"),
             )),
         );
     }
 
-    // Post-update steps are best-effort: the survivor is already saved,
-    // so failures here are logged but do not fail the merge response.
-    if let Err(e) = state.event_repository.delete(&duplicate.id).await {
-        tracing::error!("Failed to soft-delete duplicate event: {}", e);
-    }
+    // Post-merge search-index updates are best-effort: the merge is
+    // already committed, so failures here are logged but do not fail the
+    // merge response.
     if let Err(e) = state.search_engine.delete_event(&duplicate.id.to_string()) {
         tracing::warn!("Failed to remove duplicate from search index: {}", e);
     }
     if let Err(e) = state.search_engine.index_event(&merged) {
         tracing::warn!("Failed to update search index for merged event: {}", e);
     }
-
-    state
-        .event_publisher
-        .publish(crate::streaming::EventEvent::Merged {
-            source_id: duplicate.id,
-            target_id: merged.id,
-            timestamp: chrono::Utc::now(),
-        })
-        .ok();
 
     let merge_record = crate::models::MergeRecord {
         id: Uuid::new_v4(),
@@ -962,14 +960,14 @@ pub async fn merge_events(
 
 #[utoipa::path(
     post,
-    path = "/api/v1/events/deduplicate",
+    path = "/api/events/deduplicate",
     tag = "deduplication",
     request_body = crate::models::BatchDeduplicationRequest,
     responses((status = 200, description = "Deduplication results", body = crate::models::BatchDeduplicationResponse))
 )]
 /// `POST /events/deduplicate` — batch duplicate scan.
 ///
-/// Serves HTTP `POST /api/v1/events/deduplicate`. Lists up to 1000
+/// Serves HTTP `POST /api/events/deduplicate`. Lists up to 1000
 /// active events and scores each against the up-to-`max_candidates`
 /// events that follow it (an upper-triangular pairwise sweep, so each
 /// unordered pair is considered once). A `seen` set keyed on the
@@ -1083,7 +1081,7 @@ pub async fn batch_deduplicate(
 
 #[utoipa::path(
     get,
-    path = "/api/v1/events/{id}/export",
+    path = "/api/events/{id}/export",
     tag = "privacy",
     params(("id" = Uuid, Path, description = "Event UUID")),
     responses(
@@ -1093,7 +1091,7 @@ pub async fn batch_deduplicate(
 )]
 /// `GET /events/{id}/export` — GDPR right-of-access export.
 ///
-/// Serves HTTP `GET /api/v1/events/{id}/export`. Returns the full,
+/// Serves HTTP `GET /api/events/{id}/export`. Returns the full,
 /// *unmasked* event data as a JSON document via
 /// [`export_event_data`](crate::privacy::export_event_data) — this is
 /// the data-subject access path, so it intentionally returns complete
@@ -1131,7 +1129,7 @@ pub async fn export_event_data(
 
 #[utoipa::path(
     get,
-    path = "/api/v1/events/{id}/masked",
+    path = "/api/events/{id}/masked",
     tag = "privacy",
     params(("id" = Uuid, Path, description = "Event UUID")),
     responses(
@@ -1141,7 +1139,7 @@ pub async fn export_event_data(
 )]
 /// `GET /events/{id}/masked` — privacy-masked view of one event.
 ///
-/// Serves HTTP `GET /api/v1/events/{id}/masked`. Returns the event with
+/// Serves HTTP `GET /api/events/{id}/masked`. Returns the event with
 /// sensitive fields redacted by [`mask_event`](crate::privacy::mask_event):
 /// identifier values (which often double as access tokens — only the
 /// last few characters survive), party emails, and external party ids.
@@ -1197,14 +1195,14 @@ fn default_audit_limit() -> i64 {
 
 #[utoipa::path(
     get,
-    path = "/api/v1/events/{id}/audit",
+    path = "/api/events/{id}/audit",
     tag = "audit",
     params(("id" = Uuid, Path, description = "Event UUID"), AuditLogQuery),
     responses((status = 200, description = "Audit logs retrieved"))
 )]
 /// `GET /events/{id}/audit` — audit trail for one event.
 ///
-/// Serves HTTP `GET /api/v1/events/{id}/audit`. Returns the audit-log
+/// Serves HTTP `GET /api/events/{id}/audit`. Returns the audit-log
 /// rows for the `"Event"` entity with the given `id`, newest first,
 /// capped at 500 rows. An unknown id simply yields an empty list (no
 /// `404`), since absence of audit history is a valid answer.
@@ -1238,14 +1236,14 @@ pub async fn get_event_audit_logs(
 
 #[utoipa::path(
     get,
-    path = "/api/v1/audit/recent",
+    path = "/api/audit/recent",
     tag = "audit",
     params(AuditLogQuery),
     responses((status = 200, description = "Recent audit logs retrieved"))
 )]
 /// `GET /audit/recent` — recent system-wide audit activity.
 ///
-/// Serves HTTP `GET /api/v1/audit/recent`. Returns the most recent
+/// Serves HTTP `GET /api/audit/recent`. Returns the most recent
 /// audit-log rows across all entities, newest first, capped at 500.
 ///
 /// # Errors
@@ -1286,14 +1284,14 @@ pub struct UserAuditLogQuery {
 
 #[utoipa::path(
     get,
-    path = "/api/v1/audit/user",
+    path = "/api/audit/user",
     tag = "audit",
     params(UserAuditLogQuery),
     responses((status = 200, description = "User audit logs retrieved"))
 )]
 /// `GET /audit/user` — audit trail for one acting user.
 ///
-/// Serves HTTP `GET /api/v1/audit/user`. Returns audit-log rows whose
+/// Serves HTTP `GET /api/audit/user`. Returns audit-log rows whose
 /// acting `user_id` matches the query parameter, newest first, capped
 /// at 500 rows.
 ///

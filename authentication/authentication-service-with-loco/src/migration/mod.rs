@@ -20,6 +20,8 @@ mod m20220101_000005_auth_rate_limits;
 mod m20220101_000006_users_attributes;
 /// `sessions.data` column — session payload JSONB (holds copied `attrs`).
 mod m20220101_000007_sessions_data;
+/// `sessions` idle/absolute TTL columns + active-session partial index.
+mod m20220101_000008_sessions_ttls;
 
 /// loco/`SeaORM` migrator that runs every migration in order.
 pub struct Migrator;
@@ -38,6 +40,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000005_auth_rate_limits::Migration),
             Box::new(m20220101_000006_users_attributes::Migration),
             Box::new(m20220101_000007_sessions_data::Migration),
+            Box::new(m20220101_000008_sessions_ttls::Migration),
             // inject-above (do not remove this comment)
         ]
     }

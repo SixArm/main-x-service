@@ -18,6 +18,49 @@ export const SESSION_COOKIE_OPTIONS = {
 } as const;
 
 /**
+ * The CSRF synchroniser-token cookie. The auth service sets it
+ * (`__Host-mxi_csrf`, readable) alongside the session at establishment;
+ * the BFF re-hosts it on THIS origin as **httpOnly** (the browser never
+ * needs it — browser↔BFF CSRF is SvelteKit's native form-action origin
+ * check), and echoes it in the `X-CSRF-Token` header when it calls the
+ * auth service's cookie-authed `POST /api/auth/token`.
+ */
+export const CSRF_COOKIE = "__Host-mxi_csrf";
+
+/** Cookie attributes for the BFF-hosted CSRF token (httpOnly here). */
+export const CSRF_COOKIE_OPTIONS = SESSION_COOKIE_OPTIONS;
+
+/** Value of the named cookie in one raw `Set-Cookie` line, or `null`. */
+function parseCookie(setCookie: string, name: string): string | null {
+  const prefix = `${name}=`;
+  const segment = setCookie
+    .split(";")
+    .map((s) => s.trim())
+    .find((s) => s.startsWith(prefix));
+  if (!segment) return null;
+  const value = segment.slice(prefix.length);
+  return value.length > 0 ? value : null;
+}
+
+/** All `Set-Cookie` lines of an upstream response (undici-aware). */
+function setCookieLines(response: Response): string[] {
+  const headers = response.headers as Headers & {
+    getSetCookie?: () => string[];
+  };
+  return headers.getSetCookie?.() ?? [response.headers.get("set-cookie") ?? ""];
+}
+
+/** The CSRF token set by the auth service on an upstream response (from
+ *  its `__Host-mxi_csrf` `Set-Cookie`), or `null` when absent. */
+export function csrfFromResponse(response: Response): string | null {
+  for (const line of setCookieLines(response)) {
+    const token = parseCookie(line, CSRF_COOKIE);
+    if (token) return token;
+  }
+  return null;
+}
+
+/**
  * Extract the `__Host-mxi_session` value from a raw `Set-Cookie` header
  * line emitted by the authentication service (so the BFF can re-host the
  * session id on its own origin). Returns `null` when absent/empty.

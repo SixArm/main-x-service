@@ -43,7 +43,7 @@ Current tests:
 
 - `health_check_returns_healthy`
 - `create_event_round_trip`
-- `fhir_event_returns_501_not_implemented`
+- `fhir_appointment_surface_is_live`
 - `validation_rejects_missing_name`
 
 Shared helpers live in `tests/common/mod.rs` — `create_test_app_state()` (async) builds an `AppState` with a per-test tempdir search index.

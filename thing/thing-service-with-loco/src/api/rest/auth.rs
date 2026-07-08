@@ -106,11 +106,26 @@ pub fn bearer_claims(
 /// outside the enforcement scope and always public.
 pub const API_PREFIX: &str = "/api";
 
-/// API paths that stay public even when blanket enforcement is on: the
-/// liveness probe, so orchestration needs no bearer token. This is the
-/// complete allow-list inside [`API_PREFIX`]; every other `/api/*`
-/// route requires a valid bearer token when enforcement is on.
-pub const PUBLIC_API_PATHS: &[&str] = &["/api/health"];
+/// The FHIR surface prefix, guarded on the same terms as [`API_PREFIX`]
+/// (fhir.md §8): every `/fhir/*` route requires a valid bearer token when
+/// enforcement is on, except the public [`PUBLIC_API_PATHS`] allow-list
+/// (`/fhir/metadata` capability discovery).
+pub const FHIR_PREFIX: &str = "/fhir";
+
+/// The prefixes under which blanket enforcement applies: the native REST
+/// API and the FHIR surface. Only paths under one of these are ever
+/// gated; root-level paths (loco's `/_health`/`/_ping`, the `OpenAPI` doc
+/// `/api-docs/openapi.json`, the Swagger UI `/swagger-ui*`, and the
+/// Prometheus scrape `/metrics.prom`) sit outside the scope and are
+/// always public.
+pub const GUARDED_PREFIXES: [&str; 2] = [API_PREFIX, FHIR_PREFIX];
+
+/// Guarded paths that stay public even when blanket enforcement is on:
+/// the liveness probe (so orchestration needs no bearer token) and the
+/// FHIR `CapabilityStatement` (capability discovery, fhir.md §8). This is
+/// the complete allow-list inside [`GUARDED_PREFIXES`]; every other
+/// guarded route requires a valid bearer token when enforcement is on.
+pub const PUBLIC_API_PATHS: &[&str] = &["/api/health", "/fhir/metadata"];
 
 /// Lenient boolean parse for the enforcement flag: `1`/`true`/`yes`/
 /// `on` (case-insensitive, surrounding whitespace ignored) ⇒ `true`;
@@ -132,11 +147,14 @@ pub fn require_auth_from_env() -> bool {
     parse_bool(&std::env::var("THING_REQUIRE_AUTH").unwrap_or_default())
 }
 
-/// Whether `path` is under the enforced [`API_PREFIX`]. Segment-aware:
-/// `/api` and `/api/...` match; `/api-docs/openapi.json` does not.
-fn is_api_path(path: &str) -> bool {
-    path.strip_prefix(API_PREFIX)
-        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+/// Whether `path` is under one of the enforced [`GUARDED_PREFIXES`].
+/// Segment-aware: `/api` / `/api/...` and `/fhir` / `/fhir/...` match;
+/// `/api-docs/openapi.json` does not.
+fn is_guarded_path(path: &str) -> bool {
+    GUARDED_PREFIXES.iter().any(|prefix| {
+        path.strip_prefix(prefix)
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+    })
 }
 
 /// Derive the request's ABAC action from its HTTP method and path (per
@@ -217,7 +235,7 @@ pub fn enforce(
     verifier: &Verifier,
     policy: &Policy,
 ) -> Result<(), (StatusCode, String)> {
-    if !require_auth || !is_api_path(path) || PUBLIC_API_PATHS.contains(&path) {
+    if !require_auth || !is_guarded_path(path) || PUBLIC_API_PATHS.contains(&path) {
         return Ok(());
     }
     let claims = bearer_claims(headers, verifier)?;
@@ -497,6 +515,7 @@ mod tests {
         let (verifier, policy) = (verifier(), policy());
         for path in [
             "/api/health",            // allow-listed inside /api
+            "/fhir/metadata",         // FHIR capability discovery, allow-listed
             "/_health",               // loco default, outside /api
             "/_ping",                 // loco default, outside /api
             "/api-docs/openapi.json", // /api-docs is not under /api/
@@ -532,6 +551,48 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+    }
+
+    /// Enforcement on, the FHIR surface is guarded like `/api`: a
+    /// `/fhir/Device` read with no token is `401`, while `/fhir/metadata`
+    /// stays public.
+    #[test]
+    fn test_enforce_on_guards_fhir_surface() {
+        let (verifier, policy) = (verifier(), policy());
+        let err = enforce(
+            true,
+            &Method::GET,
+            "/fhir/Device",
+            &HeaderMap::new(),
+            &verifier,
+            &policy,
+        )
+        .unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+        assert!(
+            enforce(
+                true,
+                &Method::GET,
+                "/fhir/metadata",
+                &HeaderMap::new(),
+                &verifier,
+                &policy
+            )
+            .is_ok()
+        );
+        // A valid token lets a FHIR read through.
+        let token = sign(10_000_000_000);
+        assert!(
+            enforce(
+                true,
+                &Method::GET,
+                "/fhir/Device",
+                &bearer(&token),
+                &verifier,
+                &policy
+            )
+            .is_ok()
+        );
     }
 
     /// Enforcement on, protected path, valid token ⇒ a read passes.

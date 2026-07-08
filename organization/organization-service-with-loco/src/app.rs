@@ -29,7 +29,7 @@ use std::path::Path;
 
 use crate::{
     auth, controllers,
-    models::_entities::{audit_logs, merge_records, organizations},
+    models::_entities::{audit_logs, event_outbox, merge_records, organizations},
 };
 
 /// Blanket auth-enforcement middleware: authentication (PASETO bearer)
@@ -107,6 +107,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::organizations::routes())
+            .add_route(controllers::fhir::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }
@@ -118,14 +119,24 @@ impl Hooks for App {
     /// # Errors
     ///
     /// Never (returns `Ok`); the signature is loco's.
-    async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
+    async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         // Seed the verifier before serving so `enforce()`/`AuthUser`
         // consult the boot-fetched key set from the first request on.
         auth::init_from_env().await;
+        // Durable event bus Phase 3: start the outbox relay loop. A no-op
+        // unless `ORGANIZATION_EVENT_TRANSPORT=outbox` AND
+        // `ORGANIZATION_EVENT_RELAY` are set, so the default `memory`
+        // transport never spawns it.
+        crate::relay::spawn(ctx.db.clone());
         // Blanket auth enforcement, gated by `ORGANIZATION_REQUIRE_AUTH`
         // (off by default). The layer is added unconditionally; the flag
-        // is read per request inside the middleware.
-        Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
+        // is read per request inside the middleware. Header-based API
+        // versioning (`Accepts-version`) is layered alongside it.
+        Ok(router
+            .layer(axum::middleware::from_fn(require_auth_mw))
+            .layer(axum::middleware::from_fn(
+                crate::version::require_version_mw,
+            )))
     }
 
     /// Register background-queue workers. None are registered.
@@ -155,6 +166,7 @@ impl Hooks for App {
     ///
     /// Propagates any truncate failure.
     async fn truncate(ctx: &AppContext) -> Result<()> {
+        truncate_table(&ctx.db, event_outbox::Entity).await?;
         truncate_table(&ctx.db, merge_records::Entity).await?;
         truncate_table(&ctx.db, audit_logs::Entity).await?;
         truncate_table(&ctx.db, organizations::Entity).await?;

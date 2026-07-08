@@ -21,6 +21,8 @@ type, so there is no separate model or adapter to drift.
 
 ## API surface
 
+API URLs are version-free; select the version with the `Accepts-version` header (default `1.0`) — see [`agents/share/api-versioning.md`](../../agents/share/api-versioning.md).
+
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/api/cases` | Create (body: `Case`; blank `title` → `422`) → `{pid, title}` |

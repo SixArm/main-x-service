@@ -20,7 +20,7 @@ use tower::ServiceExt; // for `oneshot` and `ready`
 
 use worker_service::{api::ApiResponse, models::Worker};
 
-/// `GET /api/v1/health` returns 200 with the service name and "healthy".
+/// `GET /api/health` returns 200 with the service name and "healthy".
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL database"]
 async fn test_health_check() {
@@ -29,7 +29,7 @@ async fn test_health_check() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/v1/health")
+                .uri("/api/health")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -47,7 +47,7 @@ async fn test_health_check() {
     assert!(body_str.contains("worker-service"));
 }
 
-/// `POST /api/v1/workers` creates a worker and returns it in the response.
+/// `POST /api/workers` creates a worker and returns it in the response.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL database"]
 async fn test_create_worker() {
@@ -70,7 +70,7 @@ async fn test_create_worker() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/workers")
+                .uri("/api/workers")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&worker_json).unwrap()))
                 .unwrap(),
@@ -118,7 +118,7 @@ async fn test_create_and_get_worker() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/workers")
+                .uri("/api/workers")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&worker_json).unwrap()))
                 .unwrap(),
@@ -140,7 +140,7 @@ async fn test_create_and_get_worker() {
     let get_response = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/v1/workers/{worker_id}"))
+                .uri(format!("/api/workers/{worker_id}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -186,7 +186,7 @@ async fn test_update_worker() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/workers")
+                .uri("/api/workers")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&worker_json).unwrap()))
                 .unwrap(),
@@ -208,7 +208,7 @@ async fn test_update_worker() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/v1/workers/{}", worker.id))
+                .uri(format!("/api/workers/{}", worker.id))
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&worker).unwrap()))
                 .unwrap(),
@@ -253,7 +253,7 @@ async fn test_delete_worker() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/workers")
+                .uri("/api/workers")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&worker_json).unwrap()))
                 .unwrap(),
@@ -274,7 +274,7 @@ async fn test_delete_worker() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(format!("/api/v1/workers/{}", worker.id))
+                .uri(format!("/api/workers/{}", worker.id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -287,7 +287,7 @@ async fn test_delete_worker() {
     let get_response = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/v1/workers/{}", worker.id))
+                .uri(format!("/api/workers/{}", worker.id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -323,7 +323,7 @@ async fn test_search_workers() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/workers")
+                .uri("/api/workers")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&worker_json).unwrap()))
                 .unwrap(),
@@ -340,7 +340,7 @@ async fn test_search_workers() {
     let search_response = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/v1/workers/search?q={family_name}&limit=10"))
+                .uri(format!("/api/workers/search?q={family_name}&limit=10"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -368,7 +368,7 @@ async fn test_get_worker_not_found() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/v1/workers/00000000-0000-0000-0000-000000000001")
+                .uri("/api/workers/00000000-0000-0000-0000-000000000001")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -378,12 +378,12 @@ async fn test_get_worker_not_found() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
-/// The FHIR route `GET /fhir/Worker/{id}` is mounted on the router.
+/// The FHIR route `GET /fhir/Practitioner/{id}` is mounted on the router.
 ///
 /// Un-gated: drives a malformed UUID so the `Path<Uuid>` extractor rejects the
 /// request with `400 Bad Request` *before* any database access. A `400` proves
 /// the path matched a registered handler — a missing route would yield a
-/// route-level `404` with an empty body. Pins spec §13 T-9 / entity T-1 (the
+/// route-level `404` with an empty body. Pins spec §13 T-9 / T-12 (the
 /// FHIR surface is reachable) without a live database.
 #[tokio::test]
 async fn test_fhir_worker_route_is_mounted() {
@@ -392,7 +392,7 @@ async fn test_fhir_worker_route_is_mounted() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/fhir/Worker/not-a-uuid")
+                .uri("/fhir/Practitioner/not-a-uuid")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -403,7 +403,7 @@ async fn test_fhir_worker_route_is_mounted() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
-/// `GET /fhir/Worker/{id}` for an unknown id returns a FHIR `OperationOutcome`.
+/// `GET /fhir/Practitioner/{id}` for an unknown id returns a FHIR `OperationOutcome`.
 ///
 /// DB-gated: a valid-but-absent UUID reaches the handler, which queries the
 /// repository and returns a FHIR-conformant `404` (resourceType
@@ -416,7 +416,7 @@ async fn test_fhir_worker_not_found_returns_operation_outcome() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/fhir/Worker/00000000-0000-0000-0000-000000000001")
+                .uri("/fhir/Practitioner/00000000-0000-0000-0000-000000000001")
                 .body(Body::empty())
                 .unwrap(),
         )

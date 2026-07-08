@@ -26,7 +26,7 @@ use std::path::Path;
 #[allow(unused_imports)]
 use crate::{
     auth, controllers,
-    models::_entities::{audit_logs, merge_records, work_items},
+    models::_entities::{audit_logs, event_outbox, merge_records, work_items},
     tasks,
     workers::downloader::DownloadWorker,
 };
@@ -94,17 +94,25 @@ impl Hooks for App {
             .add_route(controllers::metrics::routes())
     }
 
-    async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
+    async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         // Seed the process-wide PASETO verifier before the app serves
         // traffic: when `PORTFOLIO_PASETO_KEYS_URL` is set the published
         // key set is fetched over HTTP once at boot (fetch failure falls
         // back to the `PORTFOLIO_PASETO_KEYS` env path — the service
         // always boots).
         auth::init().await;
+        // Durable event bus Phase 3: start the outbox relay loop. A no-op
+        // unless `PORTFOLIO_EVENT_TRANSPORT=outbox` AND `PORTFOLIO_EVENT_RELAY`
+        // are set, so the default `memory` transport never spawns it.
+        crate::relay::spawn(ctx.db.clone());
         // Blanket JWT enforcement layer. Added unconditionally; the
         // `PORTFOLIO_REQUIRE_AUTH` flag is read per request and the layer is a
         // near-noop when the flag is off (the default).
-        Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
+        Ok(router
+            .layer(axum::middleware::from_fn(require_auth_mw))
+            .layer(axum::middleware::from_fn(
+                crate::version::require_version_mw,
+            )))
     }
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue.register(DownloadWorker::build(ctx)).await?;
@@ -116,6 +124,7 @@ impl Hooks for App {
         // tasks-inject (do not remove)
     }
     async fn truncate(ctx: &AppContext) -> Result<()> {
+        truncate_table(&ctx.db, event_outbox::Entity).await?;
         truncate_table(&ctx.db, merge_records::Entity).await?;
         truncate_table(&ctx.db, audit_logs::Entity).await?;
         truncate_table(&ctx.db, work_items::Entity).await?;

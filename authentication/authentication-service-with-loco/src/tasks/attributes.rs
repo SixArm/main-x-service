@@ -195,6 +195,107 @@ pub fn validate_value(value: &str) -> std::result::Result<(), String> {
     }
 }
 
+/// A per-deployment **attribute vocabulary** — the optional allow-set of
+/// attribute **keys** and, per key, the allowed **values**. Configured
+/// via `AUTH_ATTRIBUTE_VOCABULARY` (inline JSON) or
+/// `AUTH_ATTRIBUTE_VOCABULARY_FILE` (path), e.g.
+/// `{ "access": ["read","write","admin"], "dept": ["cardiology","oncology"], "svc": ["true"] }`.
+///
+/// It exists to catch **typos at assignment time**: without it,
+/// `dept=cardiolgy` is a syntactically-valid attribute that silently
+/// grants nothing; with it, the assignment is rejected. A key mapping to
+/// an **empty** value list allows the key with **any** value. When
+/// unconfigured the vocabulary is **unrestricted** — assignment keeps
+/// today's behaviour (only the lowercase-token shape check applies).
+#[derive(Debug, Clone, Default)]
+pub struct AttributeVocabulary {
+    /// `None` ⇒ unrestricted; `Some(map)` ⇒ allowed keys → allowed
+    /// values (empty list ⇒ any value for that key).
+    allowed: Option<BTreeMap<String, Vec<String>>>,
+}
+
+impl AttributeVocabulary {
+    /// An unrestricted vocabulary (the default when nothing is
+    /// configured): every shape-valid key/value is accepted.
+    #[must_use]
+    pub fn unrestricted() -> Self {
+        Self { allowed: None }
+    }
+
+    /// Parse a vocabulary from its JSON object form (`{ "<key>":
+    /// ["<value>", …], … }`).
+    ///
+    /// # Errors
+    ///
+    /// The underlying [`serde_json::Error`] when the document is not a
+    /// JSON object of string → string-array.
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        let map: BTreeMap<String, Vec<String>> = serde_json::from_str(json)?;
+        Ok(Self { allowed: Some(map) })
+    }
+
+    /// Check that setting `key` to `values` is permitted by the
+    /// vocabulary. Unrestricted ⇒ always `Ok`. Otherwise the key must be
+    /// listed, and — when that key's allowed-value list is non-empty —
+    /// every value must be in it.
+    ///
+    /// # Errors
+    ///
+    /// A human-readable message naming the offending key or value and,
+    /// for a value, the allowed set.
+    pub fn check(&self, key: &str, values: &[String]) -> std::result::Result<(), String> {
+        let Some(allowed) = &self.allowed else {
+            return Ok(());
+        };
+        let Some(allowed_values) = allowed.get(key) else {
+            return Err(format!(
+                "attribute key `{key}` is not in the configured vocabulary (AUTH_ATTRIBUTE_VOCABULARY)"
+            ));
+        };
+        if allowed_values.is_empty() {
+            return Ok(()); // key allowed, any value
+        }
+        for value in values {
+            if !allowed_values.contains(value) {
+                return Err(format!(
+                    "value `{value}` is not allowed for `{key}` (allowed: {})",
+                    allowed_values.join(", ")
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The process-wide attribute vocabulary, read once from
+/// `AUTH_ATTRIBUTE_VOCABULARY` (inline JSON) / `_FILE` (path). Unset or
+/// unparsable ⇒ [`AttributeVocabulary::unrestricted`] (warn-logged on a
+/// parse error) — assignment always works, matching the policy-load
+/// posture. Read once; restart to change.
+#[must_use]
+pub fn vocabulary() -> &'static AttributeVocabulary {
+    use std::sync::OnceLock;
+    static VOCAB: OnceLock<AttributeVocabulary> = OnceLock::new();
+    VOCAB.get_or_init(|| {
+        let source = std::env::var("AUTH_ATTRIBUTE_VOCABULARY")
+            .ok()
+            .filter(|v| !v.trim().is_empty())
+            .or_else(|| {
+                let path = std::env::var("AUTH_ATTRIBUTE_VOCABULARY_FILE")
+                    .ok()
+                    .filter(|v| !v.trim().is_empty())?;
+                std::fs::read_to_string(path.trim()).ok()
+            });
+        match source {
+            Some(json) => AttributeVocabulary::from_json(&json).unwrap_or_else(|error| {
+                tracing::warn!(%error, "AUTH_ATTRIBUTE_VOCABULARY invalid; no vocabulary restriction applied");
+                AttributeVocabulary::unrestricted()
+            }),
+            None => AttributeVocabulary::unrestricted(),
+        }
+    })
+}
+
 /// Apply a parsed [`AttrCommand`] to an attribute map, returning the new
 /// map. Pure and total: `Show` returns the map unchanged; `Set` replaces
 /// (or inserts) one key; `Unset` removes one key (no-op if absent);
@@ -311,6 +412,14 @@ impl Task for UserAttributes {
             return Ok(());
         }
 
+        // Enforce the configured attribute vocabulary on a `set` (catches
+        // typos like `dept=cardiolgy`). Unset/clear need no check.
+        if let AttrCommand::Set { key, values } = &command {
+            vocabulary()
+                .check(key, values)
+                .map_err(|e| Error::string(&e))?;
+        }
+
         let after = apply(before.clone(), &command);
         let pid = user.pid;
         let email = user.email.clone();
@@ -396,6 +505,42 @@ mod tests {
             parse_values("cardiology").unwrap(),
             vec!["cardiology".to_string()]
         );
+    }
+
+    fn vals(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn attribute_vocabulary_enforces_keys_and_values() {
+        let vocab = super::AttributeVocabulary::from_json(
+            r#"{ "access": ["read", "write", "admin"], "dept": ["cardiology", "oncology"], "svc": [] }"#,
+        )
+        .expect("vocabulary parses");
+
+        // Known key + allowed value ⇒ ok.
+        assert!(vocab.check("access", &vals(&["write"])).is_ok());
+        assert!(vocab.check("dept", &vals(&["cardiology"])).is_ok());
+        // `svc` maps to an empty list ⇒ any value allowed.
+        assert!(vocab.check("svc", &vals(&["true"])).is_ok());
+
+        // Unknown key ⇒ rejected (the typo-catching case).
+        assert!(vocab.check("departmnt", &vals(&["cardiology"])).is_err());
+        // Known key, disallowed value ⇒ rejected (`dept=cardiolgy`).
+        assert!(vocab.check("dept", &vals(&["cardiolgy"])).is_err());
+        // One bad value among good ones still rejects.
+        assert!(
+            vocab
+                .check("access", &vals(&["write", "superuser"]))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn unrestricted_vocabulary_allows_anything() {
+        let vocab = super::AttributeVocabulary::unrestricted();
+        assert!(vocab.check("anything", &vals(&["at", "all"])).is_ok());
+        assert!(vocab.check("access", &vals(&["write"])).is_ok());
     }
 
     #[test]

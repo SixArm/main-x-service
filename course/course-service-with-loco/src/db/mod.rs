@@ -10,8 +10,8 @@
 mod convert;
 use convert::{offset_to_ts, ts_to_offset};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, Database, DatabaseConnection, EntityTrait,
-    QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, Database, DatabaseConnection,
+    EntityTrait, QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -19,6 +19,9 @@ use uuid::Uuid;
 
 use crate::Result;
 use crate::config::DatabaseConfig;
+use crate::db::outbox::OutboxInsert;
+use crate::streaming::EventTransport;
+use crate::streaming::envelope::EventKind;
 use crate::models::{
     Course, CourseIdentifier, CourseInstance, CourseInstanceStatus, CourseLink, CourseMode,
     CourseStatus, EducationalLevel, IdentifierType, InteractivityType, LearningResourceType,
@@ -27,6 +30,7 @@ use crate::models::{
 
 pub mod audit;
 pub mod models;
+pub mod outbox;
 
 use models::{
     course_credentials, course_identifiers, course_instance_instructors, course_instance_languages,
@@ -87,6 +91,15 @@ pub trait CourseRepository: Send + Sync {
     /// `main`. The handler is responsible for the actual data
     /// transfer + soft-delete of the duplicate.
     async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord>;
+
+    /// Apply the merged `survivor`'s parent + child row updates and
+    /// soft-delete the `duplicate_id` record **in one transaction**, so
+    /// the whole merge commits (or rolls back) atomically. Under the
+    /// outbox transport this enqueues a `Merged` outbox row for the
+    /// survivor (carrying the duplicate's pid via `merged_from`) and a
+    /// `Deleted` outbox row for the duplicate on the same transaction.
+    /// Returns the reloaded survivor.
+    async fn merge(&self, survivor: &Course, duplicate_id: &Uuid) -> Result<Course>;
 }
 
 /// SeaORM-backed [`CourseRepository`] implementation over a `PostgreSQL`
@@ -94,13 +107,55 @@ pub trait CourseRepository: Send + Sync {
 pub struct SeaOrmCourseRepository {
     /// The shared `SeaORM` connection pool.
     db: DatabaseConnection,
+    /// Which event transport is active (durable event bus, Phase 2).
+    /// [`EventTransport::Memory`] (default) keeps only the post-commit
+    /// in-memory publish (done by the handlers); [`EventTransport::Outbox`]
+    /// additionally writes one `course_outbox` row **inside** each write's
+    /// transaction.
+    transport: EventTransport,
 }
 
 impl SeaOrmCourseRepository {
-    /// Wrap an existing connection pool in a repository.
+    /// Wrap an existing connection pool in a repository, with the default
+    /// [`EventTransport::Memory`] transport (behaviour unchanged from
+    /// before the outbox landed).
     #[must_use]
     pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+        Self {
+            db,
+            transport: EventTransport::Memory,
+        }
+    }
+
+    /// Builder: select the event transport (see [`EventTransport`]).
+    /// `AppState` wires this from `COURSE_EVENT_TRANSPORT` via
+    /// [`crate::streaming::transport`].
+    #[must_use]
+    pub fn with_transport(mut self, transport: EventTransport) -> Self {
+        self.transport = transport;
+        self
+    }
+
+    /// When the outbox transport is active, enqueue one `course_outbox`
+    /// row for `kind` applied to `course` **on `conn`** — pass the open
+    /// `&DatabaseTransaction` so the row commits with the entity write
+    /// (the outbox atomicity guarantee). A no-op under
+    /// [`EventTransport::Memory`].
+    ///
+    /// The `ConnectionTrait` generic lives here on a concrete method (not
+    /// on the object-safe [`CourseRepository`] trait), which is how a
+    /// `dyn`-trait repository threads the outbox insert into its own
+    /// transaction.
+    async fn enqueue_outbox<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        course: &Course,
+        kind: EventKind,
+    ) -> Result<()> {
+        if self.transport.is_outbox() {
+            OutboxInsert::for_event(course, kind)?.insert_on(conn).await?;
+        }
+        Ok(())
     }
 }
 
@@ -115,6 +170,12 @@ impl CourseRepository for SeaOrmCourseRepository {
         insert_identifiers(&txn, course.id, &course.identifiers).await?;
         insert_links(&txn, course.id, &course.links).await?;
         insert_course_collections(&txn, course).await?;
+        // Durable event bus (Phase 2): under the outbox transport, write
+        // the `course_outbox` row **inside this same transaction**, before
+        // the commit, so the entity rows and the event commit atomically
+        // (or roll back together). A no-op under the memory transport,
+        // which keeps the post-commit in-memory publish in the handler.
+        self.enqueue_outbox(&txn, course, EventKind::Created).await?;
         txn.commit().await.map_err(|e| map_db(&e))?;
         // Re-read through the normal hydrate path so the returned value
         // reflects exactly what was persisted (defaults, ordering, etc).
@@ -154,25 +215,9 @@ impl CourseRepository for SeaOrmCourseRepository {
             return Err(crate::Error::NotFound);
         }
         let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-        let active = to_course_active(course, true)?;
-        active.update(&txn).await.map_err(|e| map_db(&e))?;
-        // Child collections are replace-not-merge: delete the existing
-        // rows then re-insert from the incoming course, so the persisted
-        // state mirrors the request body exactly (PUT semantics).
-        course_identifiers::Entity::delete_many()
-            .filter(course_identifiers::Column::CourseId.eq(course.id))
-            .exec(&txn)
-            .await
-            .map_err(|e| map_db(&e))?;
-        course_links::Entity::delete_many()
-            .filter(course_links::Column::CourseId.eq(course.id))
-            .exec(&txn)
-            .await
-            .map_err(|e| map_db(&e))?;
-        delete_course_collections(&txn, course.id).await?;
-        insert_identifiers(&txn, course.id, &course.identifiers).await?;
-        insert_links(&txn, course.id, &course.links).await?;
-        insert_course_collections(&txn, course).await?;
+        apply_course_update(&txn, course).await?;
+        // Outbox row shares the update transaction (see `create`).
+        self.enqueue_outbox(&txn, course, EventKind::Updated).await?;
         txn.commit().await.map_err(|e| map_db(&e))?;
         self.get_by_id(&course.id)
             .await?
@@ -191,7 +236,21 @@ impl CourseRepository for SeaOrmCourseRepository {
         active.active = Set(false);
         active.deleted_at = Set(Some(OffsetDateTime::now_utc()));
         active.updated_at = Set(OffsetDateTime::now_utc());
-        active.update(&self.db).await.map_err(|e| map_db(&e))?;
+        // Under the outbox transport, open a transaction so the tombstone
+        // write and the `deleted` outbox row commit atomically; the memory
+        // transport keeps the plain, tx-free update. The domain course is
+        // reloaded (still visible pre-delete) to build the deleted envelope.
+        if self.transport.is_outbox() {
+            let old = self.get_by_id(id).await?;
+            let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
+            active.update(&txn).await.map_err(|e| map_db(&e))?;
+            if let Some(old) = old.as_ref() {
+                self.enqueue_outbox(&txn, old, EventKind::Deleted).await?;
+            }
+            txn.commit().await.map_err(|e| map_db(&e))?;
+        } else {
+            active.update(&self.db).await.map_err(|e| map_db(&e))?;
+        }
         Ok(())
     }
 
@@ -327,6 +386,91 @@ impl CourseRepository for SeaOrmCourseRepository {
         active.insert(&self.db).await.map_err(|e| map_db(&e))?;
         Ok(rec.clone())
     }
+
+    async fn merge(&self, survivor: &Course, duplicate_id: &Uuid) -> Result<Course> {
+        // Reload the duplicate's pre-image so its `Deleted` outbox envelope
+        // carries the record's name (needed for the operator projection).
+        let old_duplicate = self.get_by_id(duplicate_id).await?;
+
+        // The whole merge — survivor row updates + duplicate soft-delete +
+        // both outbox rows — commits (or rolls back) under one transaction.
+        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
+
+        // Apply the survivor's parent + child rows (shared with `update`).
+        apply_course_update(&txn, survivor).await?;
+
+        // Soft-delete the duplicate (shared shape with `soft_delete`).
+        apply_course_soft_delete(&txn, *duplicate_id).await?;
+
+        // Durable event bus (Phase 2): a `Merged` outbox row for the
+        // survivor (carrying the duplicate's pid via `merged_from`, so a
+        // merge-repointing consumer can move edges off the duplicate) and a
+        // `Deleted` outbox row for the duplicate — both inside this
+        // transaction. A no-op under the memory transport.
+        if self.transport.is_outbox() {
+            OutboxInsert::for_merge(survivor, duplicate_id)?
+                .insert_on(&txn)
+                .await?;
+            if let Some(dup) = old_duplicate.as_ref() {
+                OutboxInsert::for_event(dup, EventKind::Deleted)?
+                    .insert_on(&txn)
+                    .await?;
+            }
+        }
+
+        txn.commit().await.map_err(|e| map_db(&e))?;
+
+        self.get_by_id(&survivor.id)
+            .await?
+            .ok_or(crate::Error::NotFound)
+    }
+}
+
+/// Apply the merged `course`'s parent-row update + wholesale child-row
+/// replacement on `conn`. Shared by [`CourseRepository::update`] and
+/// [`CourseRepository::merge`]: updates the `courses` row (stamping
+/// `updated_at`), then replaces the identifier / link / text-value /
+/// credential child rows from the incoming course (PUT semantics). Runs
+/// on the caller's connection/transaction so it shares that commit
+/// boundary.
+async fn apply_course_update<C: ConnectionTrait>(conn: &C, course: &Course) -> Result<()> {
+    let active = to_course_active(course, true)?;
+    active.update(conn).await.map_err(|e| map_db(&e))?;
+    // Child collections are replace-not-merge: delete the existing rows
+    // then re-insert from the incoming course, so the persisted state
+    // mirrors the request body exactly.
+    course_identifiers::Entity::delete_many()
+        .filter(course_identifiers::Column::CourseId.eq(course.id))
+        .exec(conn)
+        .await
+        .map_err(|e| map_db(&e))?;
+    course_links::Entity::delete_many()
+        .filter(course_links::Column::CourseId.eq(course.id))
+        .exec(conn)
+        .await
+        .map_err(|e| map_db(&e))?;
+    delete_course_collections(conn, course.id).await?;
+    insert_identifiers(conn, course.id, &course.identifiers).await?;
+    insert_links(conn, course.id, &course.links).await?;
+    insert_course_collections(conn, course).await?;
+    Ok(())
+}
+
+/// Soft-delete the course `id` on `conn` by stamping `deleted_at` /
+/// `updated_at` and flipping `active` off, leaving every other column in
+/// place. Factored so [`CourseRepository::merge`] can reuse it on its own
+/// transaction (a partial UPDATE via `..Default::default()`).
+async fn apply_course_soft_delete<C: ConnectionTrait>(conn: &C, id: Uuid) -> Result<()> {
+    let now = OffsetDateTime::now_utc();
+    let active = courses::ActiveModel {
+        id: Set(id),
+        active: Set(false),
+        deleted_at: Set(Some(now)),
+        updated_at: Set(now),
+        ..Default::default()
+    };
+    active.update(conn).await.map_err(|e| map_db(&e))?;
+    Ok(())
 }
 
 /// Pull an instance's schedule start date for FR-10 in-memory sorting.
@@ -976,5 +1120,84 @@ mod tests {
         assert!(matches!(active.course_code, Set(Some(ref c)) if c == "CS101"));
         assert!(matches!(active.number_of_credits, Set(Some(3))));
         assert!(matches!(active.status, Set(ref s) if s == "published"));
+    }
+}
+
+/// DB-gated (`#[ignore]`) atomicity tests for the outbox write path.
+/// They require a migrated `PostgreSQL` via `DATABASE_URL` and are skipped
+/// by a bare `cargo test`; run with
+/// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE
+/// under a bare `cargo test --lib`.
+#[cfg(test)]
+mod outbox_atomicity_tests {
+    use super::{CourseRepository, SeaOrmCourseRepository};
+    use crate::db::models::course_outbox;
+    use crate::models::Course;
+    use crate::streaming::EventTransport;
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    async fn connect() -> sea_orm::DatabaseConnection {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        sea_orm::Database::connect(&url)
+            .await
+            .expect("connect to DATABASE_URL")
+    }
+
+    /// Create writes a `created` outbox row in the same transaction as the
+    /// entity insert (under the outbox transport).
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn create_enqueues_a_created_outbox_row() {
+        let db = connect().await;
+        let repo = SeaOrmCourseRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+
+        let course = repo.create(&Course::new("Intro to CS")).await.unwrap();
+
+        let rows = course_outbox::Entity::find()
+            .filter(course_outbox::Column::EntityPid.eq(course.id))
+            .filter(course_outbox::Column::Kind.eq("created"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1, "one created outbox row for the new course");
+    }
+
+    /// Merge writes, in one transaction: a `merged` outbox row for the
+    /// survivor carrying the duplicate's pid in `merged_from`, plus a
+    /// `deleted` outbox row for the duplicate.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn merge_enqueues_merged_with_merged_from_and_deleted() {
+        let db = connect().await;
+        let repo = SeaOrmCourseRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+
+        let survivor = repo.create(&Course::new("Survivor")).await.unwrap();
+        let duplicate = repo.create(&Course::new("Duplicate")).await.unwrap();
+
+        let merged = repo.merge(&survivor, &duplicate.id).await.unwrap();
+        assert_eq!(merged.id, survivor.id);
+
+        // Survivor: exactly one `merged` row, carrying the duplicate pid.
+        let merged_rows = course_outbox::Entity::find()
+            .filter(course_outbox::Column::EntityPid.eq(survivor.id))
+            .filter(course_outbox::Column::Kind.eq("merged"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(merged_rows.len(), 1, "one merged outbox row for survivor");
+        assert_eq!(
+            merged_rows[0].payload["merged_from"],
+            serde_json::json!(duplicate.id.to_string()),
+            "merged row carries the duplicate's pid"
+        );
+
+        // Duplicate: a `deleted` row.
+        let deleted_rows = course_outbox::Entity::find()
+            .filter(course_outbox::Column::EntityPid.eq(duplicate.id))
+            .filter(course_outbox::Column::Kind.eq("deleted"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(deleted_rows.len(), 1, "one deleted outbox row for duplicate");
     }
 }

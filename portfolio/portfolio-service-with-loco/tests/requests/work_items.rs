@@ -1,4 +1,4 @@
-//! Request-level integration tests over the `/api/v1/{collection}`
+//! Request-level integration tests over the `/api/{collection}`
 //! endpoints (spec §6 / §9), in the loco testing style
 //! (`loco_rs::testing`, as in the authentication-service sibling).
 //!
@@ -38,12 +38,12 @@ fn apollo_project() -> Value {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
-// Pins the create happy path: `POST /api/v1/projects` returns 200, echoes
+// Pins the create happy path: `POST /api/projects` returns 200, echoes
 // the name, and mints a UUID pid; the row is then fetchable.
 async fn can_create_and_fetch_a_project() {
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
-            .post("/api/v1/projects")
+            .post("/api/projects")
             .json(&apollo_project())
             .await;
         assert_eq!(response.status_code(), 200, "create should succeed");
@@ -55,7 +55,7 @@ async fn can_create_and_fetch_a_project() {
             .to_string();
         uuid::Uuid::parse_str(&pid).expect("pid should be a UUID");
 
-        let fetched = request.get(&format!("/api/v1/projects/{pid}")).await;
+        let fetched = request.get(&format!("/api/projects/{pid}")).await;
         assert_eq!(fetched.status_code(), 200);
         assert_eq!(fetched.json::<Value>()["name"], "Apollo platform migration");
     })
@@ -69,7 +69,7 @@ async fn can_create_and_fetch_a_project() {
 async fn create_rejects_blank_name() {
     request::<App, _, _>(|request, _ctx| async move {
         let body = json!({ "kind": "Project", "name": "  " });
-        let response = request.post("/api/v1/projects").json(&body).await;
+        let response = request.post("/api/projects").json(&body).await;
         assert_eq!(response.status_code(), 422);
     })
     .await;
@@ -82,7 +82,7 @@ async fn create_rejects_blank_name() {
 async fn create_rejects_mismatched_kind() {
     request::<App, _, _>(|request, _ctx| async move {
         let body = json!({ "kind": "Product", "name": "Apollo" });
-        let response = request.post("/api/v1/projects").json(&body).await;
+        let response = request.post("/api/projects").json(&body).await;
         assert_eq!(response.status_code(), 422);
     })
     .await;
@@ -94,7 +94,7 @@ async fn create_rejects_mismatched_kind() {
 // Pins the unknown-collection contract: an unknown segment is `404`.
 async fn unknown_collection_is_404() {
     request::<App, _, _>(|request, _ctx| async move {
-        let response = request.get("/api/v1/widgets").await;
+        let response = request.get("/api/widgets").await;
         assert_eq!(response.status_code(), 404);
     })
     .await;
@@ -107,7 +107,7 @@ async fn unknown_collection_is_404() {
 async fn unknown_pid_is_404() {
     request::<App, _, _>(|request, _ctx| async move {
         let pid = uuid::Uuid::new_v4();
-        let response = request.get(&format!("/api/v1/projects/{pid}")).await;
+        let response = request.get(&format!("/api/projects/{pid}")).await;
         assert_eq!(response.status_code(), 404);
     })
     .await;
@@ -121,7 +121,7 @@ async fn unknown_pid_is_404() {
 async fn check_duplicates_finds_a_deterministic_twin() {
     request::<App, _, _>(|request, _ctx| async move {
         let created = request
-            .post("/api/v1/projects")
+            .post("/api/projects")
             .json(&apollo_project())
             .await;
         assert_eq!(created.status_code(), 200);
@@ -132,7 +132,7 @@ async fn check_duplicates_finds_a_deterministic_twin() {
             "identifiers": [{ "scheme": "JiraProjectKey", "value": "apollo" }]
         });
         let dup = request
-            .post("/api/v1/projects/check-duplicates")
+            .post("/api/projects/check-duplicates")
             .json(&query)
             .await;
         assert_eq!(dup.status_code(), 200);
@@ -151,7 +151,7 @@ async fn check_duplicates_finds_a_deterministic_twin() {
 // Pins that `/whoami` is `401` without a bearer token.
 async fn whoami_requires_a_token() {
     request::<App, _, _>(|request, _ctx| async move {
-        let response = request.get("/api/v1/projects/whoami").await;
+        let response = request.get("/api/projects/whoami").await;
         assert_eq!(response.status_code(), 401);
     })
     .await;

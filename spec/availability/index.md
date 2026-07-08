@@ -101,12 +101,12 @@ connectivity?) probes, and for container `HEALTHCHECK` directives.
 | `GET /_health` | loco services (organization, care-pathway, case, authentication) | loco's built-in readiness check (verifies DB/queue) |
 | `GET /_ping` | loco services | loco's lightweight liveness ping |
 | `GET /api/health` | legacy Axum services (Dockerfile `HEALTHCHECK`) | service health check |
-| `GET /api/v1/health` | event-service and some compose health probes | versioned health check |
+| `GET /api/health` | event-service and some compose health probes | versioned health check |
 
 This split is **accepted drift**: the loco services use loco's
 conventional `/_health` + `/_ping`; the older Axum services predate the
 conversion and keep `/api/health` (the event-service mounts under
-`/api/v1`). Orchestrator probes and load-balancer checks must target
+`/api`). Orchestrator probes and load-balancer checks must target
 the endpoint the specific service actually exposes.
 
 The container `HEALTHCHECK` runs `curl --fail` against the health

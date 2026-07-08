@@ -55,6 +55,12 @@ pub mod api;
 pub mod app;
 /// Service configuration loaded from the environment.
 pub mod config;
+/// Loco-idiomatic controllers (the mounted HL7 FHIR R5 surface).
+pub mod controllers;
+/// HL7 FHIR R5 interop: `Device` resource + envelope wire types, DTO ⇄
+/// resource conversions, and search-parameter parsing for the mounted
+/// `/fhir` endpoints.
+pub mod fhir;
 /// PostgreSQL persistence: connection pool, repository, audit log.
 pub mod db;
 /// Crate-level error type and result alias.
@@ -69,6 +75,10 @@ pub mod metrics;
 pub mod models;
 /// Privacy controls: per-field masking and GDPR export.
 pub mod privacy;
+/// Durable event bus **Phase 3** relay: drains the `event_outbox` to an
+/// [`EventSink`](relay::EventSink), acks published rows, and purges old
+/// ones. Off unless the `outbox` transport and `THING_EVENT_RELAY` are set.
+pub mod relay;
 /// Tantivy-backed full-text search engine.
 pub mod search;
 /// Event-streaming publisher for CRUD/merge operations.
