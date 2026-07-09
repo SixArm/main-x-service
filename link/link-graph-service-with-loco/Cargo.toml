@@ -1,0 +1,55 @@
+[workspace]
+
+[package]
+name = "link-graph-service"
+version = "0.1.0"
+edition = "2024"
+publish = false
+default-run = "link-graph-service"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace.dependencies]
+loco-rs = { version = "0.16" }
+
+[dependencies]
+loco-rs = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1" }
+tokio = { version = "1.52", default-features = false, features = [
+  "rt-multi-thread",
+] }
+async-trait = { version = "0.1" }
+axum = { version = "0.8" }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+migration = { path = "migration" }
+sea-orm = { version = "1.1", features = [
+  "sqlx-sqlite",
+  "sqlx-postgres",
+  "runtime-tokio-rustls",
+  "macros",
+  "with-chrono",
+] }
+chrono = { version = "0.4" }
+uuid = { version = "1.23", features = ["v4", "serde"] }
+mimalloc = { version = "0.1.52" }
+
+# The one shared cross-service-linking contract: EntityType / EntityRef
+# (URN parse/Display/serde as a single TEXT column) + the closed v1
+# EdgeKind registry. Depended-on rather than re-copied (see spec §5.1 /
+# §13 T-2/T-3 deviation note).
+entity-ref = { path = "../entity-ref-rust-crate" }
+
+[[bin]]
+name = "link-graph-service"
+path = "src/bin/main.rs"
+required-features = []
+
+[dev-dependencies]
+loco-rs = { workspace = true, features = ["testing"] }
+serial_test = { version = "3.5.0" }
+tokio = { version = "1.52", default-features = false, features = [
+  "macros",
+  "rt-multi-thread",
+] }
