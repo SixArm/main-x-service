@@ -28,7 +28,6 @@ use crate::fhir::resources::{FhirBundle, FhirOperationOutcome, FhirPlanDefinitio
 use crate::fhir::search::FhirPlanSearchParams;
 use crate::fhir::{from_fhir_plan_definition, status_for, to_fhir_plan_definition};
 use crate::metrics::Metrics;
-use crate::models::audit_logs::Model as AuditModel;
 use crate::models::care_pathways::Model as PathwayModel;
 use crate::streaming;
 
@@ -91,20 +90,6 @@ fn validate_fhir(pathway: &care_pathway_matcher::CarePathway) -> Option<Response
             issue,
         },
     ))
-}
-
-/// Best-effort audit write (never fails the request), mirroring the native
-/// controller's audit path.
-async fn audit(
-    ctx: &AppContext,
-    entity_pid: uuid::Uuid,
-    action: &str,
-    actor: Option<&str>,
-    snapshot: Option<serde_json::Value>,
-) {
-    if let Err(err) = AuditModel::record(&ctx.db, entity_pid, action, actor, snapshot).await {
-        tracing::warn!(error = %err, action, "failed to write audit log (fhir)");
-    }
 }
 
 /// `GET /fhir/PlanDefinition/{id}` — render a stored care pathway as a FHIR
@@ -174,14 +159,8 @@ async fn create(
         }
     };
     Metrics::global().care_pathway_created_total.inc();
-    audit(
-        &ctx,
-        model.pid,
-        "created",
-        caller.actor(),
-        Some(model.data.clone()),
-    )
-    .await;
+    // Audit is written inside `create_and_emit` (in the outbox transaction
+    // under `outbox`; best-effort under `memory`) — see `streaming`.
     let pid = model.pid.to_string();
     let resource =
         to_fhir_plan_definition(&pathway, &pid, true, Some(model.updated_at.to_rfc3339()));
@@ -244,14 +223,7 @@ async fn update(
         }
     };
     Metrics::global().care_pathway_updated_total.inc();
-    audit(
-        &ctx,
-        updated.pid,
-        "updated",
-        caller.actor(),
-        Some(updated.data.clone()),
-    )
-    .await;
+    // Audit is written inside `update_and_emit` — see `streaming`.
     let resource = to_fhir_plan_definition(
         &pathway,
         &updated.pid.to_string(),
@@ -276,18 +248,15 @@ async fn remove(
         );
     };
     // Soft-delete + `Deleted` event, atomic under the active transport.
-    let entity_pid = match streaming::delete_and_emit(&ctx.db, model, caller.actor()).await {
-        Ok((pid, _name)) => pid,
-        Err(e) => {
-            return fhir_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "exception",
-                e.to_string(),
-            );
-        }
-    };
+    if let Err(e) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await {
+        return fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        );
+    }
     Metrics::global().care_pathway_deleted_total.inc();
-    audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
+    // Audit is written inside `delete_and_emit` — see `streaming`.
     fhir_response(StatusCode::NO_CONTENT, Vec::new(), None)
 }
 
