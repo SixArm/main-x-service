@@ -97,18 +97,29 @@ pub async fn get_fhir_worker(State(state): State<AppState>, Path(id): Path<Uuid>
             StatusCode::NOT_FOUND,
             &FhirOperationOutcome::not_found("Practitioner", &id.to_string()),
         ),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "database-error", &e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "database-error",
+            &e.to_string(),
+        ),
     }
 }
 
 /// `POST /fhir/Practitioner` — parses the FHIR body into the internal model
 /// (`400` invalid outcome on failure), assigns a UUID if absent, persists,
 /// indexes, and returns the created resource (`201`) with a `Location` header.
-pub async fn create_fhir_worker(State(state): State<AppState>, body: axum::body::Bytes) -> Response {
+pub async fn create_fhir_worker(
+    State(state): State<AppState>,
+    body: axum::body::Bytes,
+) -> Response {
     let fhir_worker: FhirWorker = match serde_json::from_slice(&body) {
         Ok(f) => f,
         Err(e) => {
-            return fhir_error(StatusCode::BAD_REQUEST, "structure", &format!("invalid FHIR JSON: {e}"));
+            return fhir_error(
+                StatusCode::BAD_REQUEST,
+                "structure",
+                &format!("invalid FHIR JSON: {e}"),
+            );
         }
     };
     match from_fhir_worker(&fhir_worker) {
@@ -136,7 +147,11 @@ pub async fn create_fhir_worker(State(state): State<AppState>, body: axum::body:
                         ),
                     }
                 }
-                Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "database-error", &e.to_string()),
+                Err(e) => fhir_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "database-error",
+                    &e.to_string(),
+                ),
             }
         }
         Err(e) => fhir_error(StatusCode::BAD_REQUEST, "invalid", &e.to_string()),
@@ -153,7 +168,11 @@ pub async fn update_fhir_worker(
     let fhir_worker: FhirWorker = match serde_json::from_slice(&body) {
         Ok(f) => f,
         Err(e) => {
-            return fhir_error(StatusCode::BAD_REQUEST, "structure", &format!("invalid FHIR JSON: {e}"));
+            return fhir_error(
+                StatusCode::BAD_REQUEST,
+                "structure",
+                &format!("invalid FHIR JSON: {e}"),
+            );
         }
     };
     match from_fhir_worker(&fhir_worker) {
@@ -166,7 +185,11 @@ pub async fn update_fhir_worker(
                     }
                     fhir_json(StatusCode::OK, &to_fhir_worker(&updated_worker))
                 }
-                Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "database-error", &e.to_string()),
+                Err(e) => fhir_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "database-error",
+                    &e.to_string(),
+                ),
             }
         }
         Err(e) => fhir_error(StatusCode::BAD_REQUEST, "invalid", &e.to_string()),
@@ -178,7 +201,11 @@ pub async fn update_fhir_worker(
 pub async fn delete_fhir_worker(State(state): State<AppState>, Path(id): Path<Uuid>) -> Response {
     match state.worker_repository.delete(&id).await {
         Ok(()) => fhir_response(StatusCode::NO_CONTENT, Vec::new(), None),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "database-error", &e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "database-error",
+            &e.to_string(),
+        ),
     }
 }
 
@@ -242,7 +269,11 @@ pub async fn search_fhir_workers(
             });
             fhir_json(StatusCode::OK, &bundle)
         }
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "search-error", &e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "search-error",
+            &e.to_string(),
+        ),
     }
 }
 

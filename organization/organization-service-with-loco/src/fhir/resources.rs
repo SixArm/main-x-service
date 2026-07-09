@@ -78,7 +78,11 @@ pub struct FhirMeta {
     #[serde(rename = "versionId", skip_serializing_if = "Option::is_none", default)]
     pub version_id: Option<String>,
     /// Last-updated instant (the row's `updated_at`).
-    #[serde(rename = "lastUpdated", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        rename = "lastUpdated",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub last_updated: Option<String>,
 }
 
@@ -117,7 +121,11 @@ pub struct FhirAddress {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub state: Option<String>,
     /// Postal / ZIP code.
-    #[serde(rename = "postalCode", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        rename = "postalCode",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub postal_code: Option<String>,
     /// Country.
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -196,10 +204,7 @@ impl FhirBundle {
         let entry = resources
             .into_iter()
             .map(|r| FhirBundleEntry {
-                full_url: format!(
-                    "Organization/{}",
-                    r.id.clone().unwrap_or_default()
-                ),
+                full_url: format!("Organization/{}", r.id.clone().unwrap_or_default()),
                 resource: r,
             })
             .collect::<Vec<_>>();

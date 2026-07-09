@@ -89,11 +89,7 @@ impl FhirCourseSearchParams {
 
 /// Case-insensitive substring of `name` over the course's name + aliases.
 fn name_matches(course: &Course, name: &str) -> bool {
-    contains_ci(&course.name, name)
-        || course
-            .alternate_names
-            .iter()
-            .any(|a| contains_ci(a, name))
+    contains_ci(&course.name, name) || course.alternate_names.iter().any(|a| contains_ci(a, name))
 }
 
 /// Match an `identifier` token against `course_code` or any
@@ -101,8 +97,8 @@ fn name_matches(course: &Course, name: &str) -> bool {
 /// matches both parts; a bare `value` matches any identifier with that value.
 fn identifier_matches(course: &Course, token: &str) -> bool {
     let (system, value) = split_token(token);
-    let code_hit = course.course_code.as_deref() == Some(value)
-        && system.is_none_or(|s| s == SYS_COURSE_CODE);
+    let code_hit =
+        course.course_code.as_deref() == Some(value) && system.is_none_or(|s| s == SYS_COURSE_CODE);
     let ident_hit = course.identifiers.iter().any(|id| {
         id.value == value && system.is_none_or(|s| scheme_to_system(&id.property_id) == s)
     });

@@ -26,7 +26,9 @@ pub mod envelope;
 /// Producer implementations (in-memory publisher).
 pub mod producer;
 
-pub use envelope::{ENTITY, Envelope, EventKind, EventTransport, EventView, SCHEMA_VERSION, transport};
+pub use envelope::{
+    ENTITY, Envelope, EventKind, EventTransport, EventView, SCHEMA_VERSION, transport,
+};
 
 /// A streamed domain event describing one change to an event record.
 #[derive(Debug, Clone, Serialize, Deserialize)]

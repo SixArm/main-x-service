@@ -14,7 +14,9 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute_unprepared(include_str!("../../migrations/2024122800000007_expand_organizations_ods/up.sql"))
+            .execute_unprepared(include_str!(
+                "../../migrations/2024122800000007_expand_organizations_ods/up.sql"
+            ))
             .await?;
         Ok(())
     }
@@ -22,7 +24,9 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute_unprepared(include_str!("../../migrations/2024122800000007_expand_organizations_ods/down.sql"))
+            .execute_unprepared(include_str!(
+                "../../migrations/2024122800000007_expand_organizations_ods/down.sql"
+            ))
             .await?;
         Ok(())
     }

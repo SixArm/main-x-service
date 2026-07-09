@@ -57,14 +57,14 @@ pub mod app;
 pub mod config;
 /// Loco-idiomatic controllers (the mounted HL7 FHIR R5 surface).
 pub mod controllers;
-/// HL7 FHIR R5 interop: `Device` resource + envelope wire types, DTO ⇄
-/// resource conversions, and search-parameter parsing for the mounted
-/// `/fhir` endpoints.
-pub mod fhir;
 /// PostgreSQL persistence: connection pool, repository, audit log.
 pub mod db;
 /// Crate-level error type and result alias.
 pub mod error;
+/// HL7 FHIR R5 interop: `Device` resource + envelope wire types, DTO ⇄
+/// resource conversions, and search-parameter parsing for the mounted
+/// `/fhir` endpoints.
+pub mod fhir;
 /// Matching engine: per-component similarity functions, the weighted
 /// scorer, and the adapter to the canonical `thing-matcher` crate.
 pub mod matching;

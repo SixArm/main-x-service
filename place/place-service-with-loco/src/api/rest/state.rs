@@ -54,8 +54,7 @@ impl AppState {
         // `memory`); `outbox` additionally writes an `event_outbox` row on
         // each write's transaction (durable event bus, Phase 2).
         let place_repository: Arc<dyn PlaceRepository> = Arc::new(
-            SeaOrmPlaceRepository::new(db.clone())
-                .with_transport(crate::streaming::transport()),
+            SeaOrmPlaceRepository::new(db.clone()).with_transport(crate::streaming::transport()),
         );
         let audit_log = Arc::new(AuditLogRepository::new(db.clone()));
         let event_publisher: Arc<dyn EventPublisher> = Arc::new(InMemoryEventPublisher::new());

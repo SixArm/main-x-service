@@ -137,7 +137,11 @@ async fn read_resource(state: &AppState, id: &str, resource_type: &str) -> Respo
             "not-found",
             &format!("{resource_type} with id '{id}' not found"),
         ),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", &e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            &e.to_string(),
+        ),
     }
 }
 
@@ -185,12 +189,18 @@ pub async fn create_fhir_patient(
                 Ok(bytes) => {
                     fhir_response(StatusCode::CREATED, bytes, Some(format!("Patient/{pid}")))
                 }
-                Err(e) => {
-                    fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", &e.to_string())
-                }
+                Err(e) => fhir_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "exception",
+                    &e.to_string(),
+                ),
             }
         }
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", &e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            &e.to_string(),
+        ),
     }
 }
 
@@ -227,7 +237,11 @@ pub async fn update_fhir_patient(
             let resource = to_fhir_patient(&updated);
             fhir_json(StatusCode::OK, &resource)
         }
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", &e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            &e.to_string(),
+        ),
     }
 }
 
@@ -242,7 +256,11 @@ pub async fn delete_fhir_patient(
     };
     match state.person_repository.delete(&id).await {
         Ok(()) => fhir_response(StatusCode::NO_CONTENT, Vec::new(), None),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", &e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            &e.to_string(),
+        ),
     }
 }
 
@@ -290,7 +308,13 @@ async fn search_resource(
         .min(MAX_SEARCH_COUNT);
     let ids = match state.search_engine.search(query, limit) {
         Ok(ids) => ids,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", &e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                &e.to_string(),
+            );
+        }
     };
     let mut entries = Vec::new();
     for id_str in &ids {
@@ -440,7 +464,11 @@ mod tests {
         assert_eq!(alias.resource_type, "Person");
         assert_eq!(alias.id, patient.id);
         assert_eq!(
-            alias.name.as_ref().and_then(|n| n.first()).and_then(|n| n.family.clone()),
+            alias
+                .name
+                .as_ref()
+                .and_then(|n| n.first())
+                .and_then(|n| n.family.clone()),
             Some("Smith".to_string())
         );
     }
@@ -511,7 +539,10 @@ mod tests {
             "birthdate",
             "gender",
         ] {
-            assert!(params.contains(&expected), "missing search param {expected}");
+            assert!(
+                params.contains(&expected),
+                "missing search param {expected}"
+            );
         }
     }
 }

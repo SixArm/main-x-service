@@ -24,7 +24,9 @@ pub mod envelope;
 /// In-process and (future) Fluvio event publishers.
 pub mod producer;
 
-pub use envelope::{ENTITY, Envelope, EventKind, EventTransport, EventView, SCHEMA_VERSION, transport};
+pub use envelope::{
+    ENTITY, Envelope, EventKind, EventTransport, EventView, SCHEMA_VERSION, transport,
+};
 
 /// A domain event describing one mutation to a person record.
 ///

@@ -80,7 +80,10 @@ impl FhirLocationSearchParams {
         }
         if let Some(ref city) = self.address_city
             && !contains_ci(
-                place.address.as_ref().and_then(|a| a.address_locality.as_deref()),
+                place
+                    .address
+                    .as_ref()
+                    .and_then(|a| a.address_locality.as_deref()),
                 city,
             )
         {
@@ -88,7 +91,10 @@ impl FhirLocationSearchParams {
         }
         if let Some(ref pc) = self.address_postalcode
             && !contains_ci(
-                place.address.as_ref().and_then(|a| a.postal_code.as_deref()),
+                place
+                    .address
+                    .as_ref()
+                    .and_then(|a| a.postal_code.as_deref()),
                 pc,
             )
         {
@@ -126,7 +132,10 @@ fn identifier_matches(place: &Place, token: &str) -> bool {
         pairs.push(("urn:mxi:place:branchcode".to_string(), branch.as_str()));
     }
     for id in &place.identifiers {
-        pairs.push((identifier_type_to_system(&id.identifier_type), id.value.as_str()));
+        pairs.push((
+            identifier_type_to_system(&id.identifier_type),
+            id.value.as_str(),
+        ));
     }
 
     pairs.iter().any(|(sys, val)| {

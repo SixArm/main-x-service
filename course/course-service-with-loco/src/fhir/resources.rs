@@ -94,7 +94,11 @@ pub struct FhirMeta {
     #[serde(rename = "versionId", skip_serializing_if = "Option::is_none", default)]
     pub version_id: Option<String>,
     /// Last-updated instant (the record's `updated_at`).
-    #[serde(rename = "lastUpdated", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        rename = "lastUpdated",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub last_updated: Option<String>,
     /// Asserted profiles — carries the non-standard course profile URL.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -161,7 +165,11 @@ pub struct FhirExtension {
     /// The extension definition URL (a `urn:mxi:course:*` namespace).
     pub url: String,
     /// The string value.
-    #[serde(rename = "valueString", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        rename = "valueString",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub value_string: Option<String>,
 }
 

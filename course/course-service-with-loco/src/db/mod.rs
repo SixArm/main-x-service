@@ -20,13 +20,13 @@ use uuid::Uuid;
 use crate::Result;
 use crate::config::DatabaseConfig;
 use crate::db::outbox::OutboxInsert;
-use crate::streaming::EventTransport;
-use crate::streaming::envelope::EventKind;
 use crate::models::{
     Course, CourseIdentifier, CourseInstance, CourseInstanceStatus, CourseLink, CourseMode,
     CourseStatus, EducationalLevel, IdentifierType, InteractivityType, LearningResourceType,
     LinkType, MergeRecord, Schedule,
 };
+use crate::streaming::EventTransport;
+use crate::streaming::envelope::EventKind;
 
 pub mod audit;
 pub mod models;
@@ -153,7 +153,9 @@ impl SeaOrmCourseRepository {
         kind: EventKind,
     ) -> Result<()> {
         if self.transport.is_outbox() {
-            OutboxInsert::for_event(course, kind)?.insert_on(conn).await?;
+            OutboxInsert::for_event(course, kind)?
+                .insert_on(conn)
+                .await?;
         }
         Ok(())
     }
@@ -175,7 +177,8 @@ impl CourseRepository for SeaOrmCourseRepository {
         // the commit, so the entity rows and the event commit atomically
         // (or roll back together). A no-op under the memory transport,
         // which keeps the post-commit in-memory publish in the handler.
-        self.enqueue_outbox(&txn, course, EventKind::Created).await?;
+        self.enqueue_outbox(&txn, course, EventKind::Created)
+            .await?;
         txn.commit().await.map_err(|e| map_db(&e))?;
         // Re-read through the normal hydrate path so the returned value
         // reflects exactly what was persisted (defaults, ordering, etc).
@@ -217,7 +220,8 @@ impl CourseRepository for SeaOrmCourseRepository {
         let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
         apply_course_update(&txn, course).await?;
         // Outbox row shares the update transaction (see `create`).
-        self.enqueue_outbox(&txn, course, EventKind::Updated).await?;
+        self.enqueue_outbox(&txn, course, EventKind::Updated)
+            .await?;
         txn.commit().await.map_err(|e| map_db(&e))?;
         self.get_by_id(&course.id)
             .await?
@@ -1198,6 +1202,10 @@ mod outbox_atomicity_tests {
             .all(&db)
             .await
             .unwrap();
-        assert_eq!(deleted_rows.len(), 1, "one deleted outbox row for duplicate");
+        assert_eq!(
+            deleted_rows.len(),
+            1,
+            "one deleted outbox row for duplicate"
+        );
     }
 }

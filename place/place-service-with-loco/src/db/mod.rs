@@ -23,7 +23,6 @@ use uuid::Uuid;
 use crate::Result;
 use crate::config::DatabaseConfig;
 use crate::db::outbox::OutboxInsert;
-use crate::streaming::envelope::{EventKind, EventTransport};
 use crate::models::address::PostalAddress;
 use crate::models::amenity::AmenityFeature;
 use crate::models::geo::GeoCoordinates;
@@ -32,6 +31,7 @@ use crate::models::merge::MergeRecord;
 use crate::models::opening_hours::{DayOfWeek, OpeningHoursSpecification};
 use crate::models::place::Place;
 use crate::models::place_type::PlaceType;
+use crate::streaming::envelope::{EventKind, EventTransport};
 use models::{
     place_amenity_features, place_identifiers, place_keywords, place_merge_records,
     place_opening_hours, places,
@@ -167,7 +167,9 @@ impl SeaOrmPlaceRepository {
         kind: EventKind,
     ) -> Result<()> {
         if self.transport.is_outbox() {
-            OutboxInsert::for_place(place, kind)?.insert_on(conn).await?;
+            OutboxInsert::for_place(place, kind)?
+                .insert_on(conn)
+                .await?;
         }
         Ok(())
     }
@@ -357,7 +359,8 @@ impl PlaceRepository for SeaOrmPlaceRepository {
             let place = self.hydrate(row).await?;
             let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
             active.update(&txn).await.map_err(|e| map_db(&e))?;
-            self.enqueue_outbox(&txn, &place, EventKind::Deleted).await?;
+            self.enqueue_outbox(&txn, &place, EventKind::Deleted)
+                .await?;
             txn.commit().await.map_err(|e| map_db(&e))?;
         } else {
             active.update(&self.db).await.map_err(|e| map_db(&e))?;
@@ -738,7 +741,11 @@ mod tests {
             .all(&db)
             .await
             .unwrap();
-        assert_eq!(created_rows.len(), 1, "one created outbox row for the place");
+        assert_eq!(
+            created_rows.len(),
+            1,
+            "one created outbox row for the place"
+        );
     }
 
     /// Merge writes, in one transaction: a `merged` outbox row for the
@@ -777,6 +784,10 @@ mod tests {
             .all(&db)
             .await
             .unwrap();
-        assert_eq!(deleted_rows.len(), 1, "one deleted outbox row for duplicate");
+        assert_eq!(
+            deleted_rows.len(),
+            1,
+            "one deleted outbox row for duplicate"
+        );
     }
 }

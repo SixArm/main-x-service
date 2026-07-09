@@ -74,7 +74,11 @@ fn fhir_error(status: StatusCode, code: &str, message: impl Into<String>) -> Res
 /// keep the `Result` small (`clippy::result_large_err`).
 fn parse_id(id: &str) -> Result<Uuid, Box<Response>> {
     Uuid::parse_str(id).map_err(|_| {
-        Box::new(fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Device/{id} not found")))
+        Box::new(fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("Device/{id} not found"),
+        ))
     })
 }
 
@@ -98,8 +102,16 @@ async fn read(Path(id): Path<String>, State(state): State<AppState>) -> Response
     };
     match state.thing_repository.get_by_id(&uuid).await {
         Ok(Some(thing)) => fhir_json(StatusCode::OK, &to_fhir_device(&thing)),
-        Ok(None) => fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Device/{id} not found")),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Ok(None) => fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("Device/{id} not found"),
+        ),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
@@ -107,7 +119,11 @@ async fn read(Path(id): Path<String>, State(state): State<AppState>) -> Response
 /// the normalized, validated record, or a `400`/`422` `OperationOutcome`.
 fn parse_and_validate(body: &Bytes) -> Result<crate::models::thing::Thing, Box<Response>> {
     let fhir: FhirDevice = serde_json::from_slice(body).map_err(|e| {
-        Box::new(fhir_error(StatusCode::BAD_REQUEST, "structure", format!("invalid FHIR JSON: {e}")))
+        Box::new(fhir_error(
+            StatusCode::BAD_REQUEST,
+            "structure",
+            format!("invalid FHIR JSON: {e}"),
+        ))
     })?;
     let mut thing = from_fhir_device(&fhir)
         .map_err(|msg| Box::new(fhir_error(StatusCode::BAD_REQUEST, "invalid", msg)))?;
@@ -136,7 +152,13 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
     };
     let stored = match state.thing_repository.create(&thing).await {
         Ok(s) => s,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     let _ = state.search_engine.index_thing(&stored);
     let _ = state
@@ -152,18 +174,18 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
     let resource = to_fhir_device(&stored);
     match serde_json::to_vec(&resource) {
         Ok(bytes) => fhir_response(StatusCode::CREATED, bytes, Some(format!("Device/{pid}"))),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
 /// `PUT /fhir/Device/{id}` — replace from a FHIR payload. `200` with the
 /// updated resource; `404` unknown id; `400`/`422` invalid FHIR. Audits +
 /// emits an `Updated` event.
-async fn update(
-    Path(id): Path<String>,
-    State(state): State<AppState>,
-    body: Bytes,
-) -> Response {
+async fn update(Path(id): Path<String>, State(state): State<AppState>, body: Bytes) -> Response {
     let uuid = match parse_id(&id) {
         Ok(u) => u,
         Err(resp) => return *resp,
@@ -175,14 +197,30 @@ async fn update(
     let old = match state.thing_repository.get_by_id(&uuid).await {
         Ok(Some(t)) => t,
         Ok(None) => {
-            return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Device/{id} not found"));
+            return fhir_error(
+                StatusCode::NOT_FOUND,
+                "not-found",
+                format!("Device/{id} not found"),
+            );
         }
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     thing.id = uuid;
     let stored = match state.thing_repository.update(&thing).await {
         Ok(s) => s,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     let _ = state.search_engine.delete_thing(&uuid.to_string());
     let _ = state.search_engine.index_thing(&stored);
@@ -213,17 +251,35 @@ async fn remove(Path(id): Path<String>, State(state): State<AppState>) -> Respon
     let old = match state.thing_repository.get_by_id(&uuid).await {
         Ok(Some(t)) => t,
         Ok(None) => {
-            return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Device/{id} not found"));
+            return fhir_error(
+                StatusCode::NOT_FOUND,
+                "not-found",
+                format!("Device/{id} not found"),
+            );
         }
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     if let Err(e) = state.thing_repository.soft_delete(&uuid).await {
-        return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string());
+        return fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        );
     }
     let _ = state.search_engine.delete_thing(&uuid.to_string());
     let _ = state
         .event_publisher
-        .publish(ThingEvent::new(EventKind::ThingDeleted, uuid, serde_json::json!({})))
+        .publish(ThingEvent::new(
+            EventKind::ThingDeleted,
+            uuid,
+            serde_json::json!({}),
+        ))
         .await;
     if let Ok(v) = serde_json::to_value(&old) {
         let _ = state
@@ -243,7 +299,13 @@ async fn search(
 ) -> Response {
     let rows = match state.thing_repository.list(FHIR_SEARCH_SCAN_CAP, 0).await {
         Ok(rows) => rows,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     if rows.len() as u64 == FHIR_SEARCH_SCAN_CAP {
         tracing::warn!(
@@ -338,8 +400,18 @@ mod tests {
             .iter()
             .map(|p| p["name"].as_str().expect("param name"))
             .collect();
-        for expected in ["_id", "_lastUpdated", "_count", "identifier", "type", "manufacturer"] {
-            assert!(params.contains(&expected), "missing search param {expected}");
+        for expected in [
+            "_id",
+            "_lastUpdated",
+            "_count",
+            "identifier",
+            "type",
+            "manufacturer",
+        ] {
+            assert!(
+                params.contains(&expected),
+                "missing search param {expected}"
+            );
         }
     }
 

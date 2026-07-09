@@ -514,7 +514,7 @@ mod tests {
     fn test_enforce_on_allows_public_and_out_of_scope_paths() {
         let (verifier, policy) = (verifier(), policy());
         for path in [
-            "/api/health", // allow-listed inside /api
+            "/api/health",    // allow-listed inside /api
             "/fhir/metadata", // FHIR capability discovery (fhir.md §8)
             "/_health",       // loco default, outside /api
             "/_ping",         // loco default, outside /api
@@ -550,15 +550,30 @@ mod tests {
             "/fhir/Appointment/00000000-0000-0000-0000-000000000000",
         ] {
             assert_eq!(
-                enforce(true, &Method::GET, path, &HeaderMap::new(), &verifier, &policy)
-                    .unwrap_err()
-                    .0,
+                enforce(
+                    true,
+                    &Method::GET,
+                    path,
+                    &HeaderMap::new(),
+                    &verifier,
+                    &policy
+                )
+                .unwrap_err()
+                .0,
                 StatusCode::UNAUTHORIZED,
                 "{path} must require a token when enforcement is on"
             );
             let token = sign(10_000_000_000);
             assert!(
-                enforce(true, &Method::GET, path, &bearer(&token), &verifier, &policy).is_ok(),
+                enforce(
+                    true,
+                    &Method::GET,
+                    path,
+                    &bearer(&token),
+                    &verifier,
+                    &policy
+                )
+                .is_ok(),
                 "{path} should pass with a valid token"
             );
         }
@@ -650,18 +665,12 @@ mod tests {
         ] {
             assert_eq!(derive_action(&Method::POST, path), Action::Destructive);
         }
-        assert_eq!(
-            derive_action(&Method::POST, "/api/events"),
-            Action::Write
-        );
+        assert_eq!(derive_action(&Method::POST, "/api/events"), Action::Write);
         assert_eq!(
             derive_action(&Method::POST, "/api/events/check-duplicates"),
             Action::Write
         );
-        assert_eq!(
-            derive_action(&Method::PUT, "/api/events/1"),
-            Action::Write
-        );
+        assert_eq!(derive_action(&Method::PUT, "/api/events/1"), Action::Write);
         assert_eq!(
             derive_action(&Method::PATCH, "/api/events/1"),
             Action::Write

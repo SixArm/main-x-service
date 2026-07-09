@@ -25,11 +25,11 @@ use super::models::{
 };
 use crate::Result;
 use crate::db::outbox::OutboxInsert;
-use crate::streaming::{EventKind, EventTransport};
 use crate::models::{
     Address, ContactPoint, ContactPointSystem, DocumentType, EmergencyContact, HumanName,
     Identifier, IdentityDocument, Worker, WorkerLink, WorkerType,
 };
+use crate::streaming::{EventKind, EventTransport};
 
 /// The full set of `SeaORM` `ActiveModel`s produced from one [`Worker`]: the
 /// core row plus its name / identifier / address / contact / link child rows.
@@ -157,10 +157,7 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
 /// # Errors
 ///
 /// Returns an error if any update/delete/insert query fails.
-async fn apply_worker_row_replacement<C: ConnectionTrait>(
-    conn: &C,
-    worker: &Worker,
-) -> Result<()> {
+async fn apply_worker_row_replacement<C: ConnectionTrait>(conn: &C, worker: &Worker) -> Result<()> {
     let update_model = workers::ActiveModel {
         id: Set(worker.id),
         active: Set(worker.active),
@@ -1049,7 +1046,8 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // commit, so the entity rows and the event commit atomically (or roll
         // back together). A no-op under the memory transport, which keeps the
         // post-commit ring-buffer publish below.
-        self.enqueue_outbox(&txn, worker, EventKind::Created).await?;
+        self.enqueue_outbox(&txn, worker, EventKind::Created)
+            .await?;
 
         // Commit closes the transaction boundary: everything above is now
         // durable. The reload + event + audit steps below run post-commit and
@@ -1209,7 +1207,8 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         insert_extra_collections(&txn, worker).await?;
 
         // Outbox row shares the update transaction (see `create`).
-        self.enqueue_outbox(&txn, worker, EventKind::Updated).await?;
+        self.enqueue_outbox(&txn, worker, EventKind::Updated)
+            .await?;
 
         txn.commit().await?;
 
@@ -1523,6 +1522,10 @@ mod tests {
             .all(&db)
             .await
             .unwrap();
-        assert_eq!(deleted_rows.len(), 1, "one deleted outbox row for duplicate");
+        assert_eq!(
+            deleted_rows.len(),
+            1,
+            "one deleted outbox row for duplicate"
+        );
     }
 }

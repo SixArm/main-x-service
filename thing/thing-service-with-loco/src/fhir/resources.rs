@@ -46,7 +46,11 @@ pub struct FhirDevice {
     pub manufacturer: Option<String>,
     /// Model number (approximate mapping from the domain
     /// `disambiguating_description`).
-    #[serde(rename = "modelNumber", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        rename = "modelNumber",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub model_number: Option<String>,
     /// Free-text notes (carries the domain `description`).
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -86,7 +90,11 @@ pub struct FhirMeta {
     #[serde(rename = "versionId", skip_serializing_if = "Option::is_none", default)]
     pub version_id: Option<String>,
     /// Last-updated instant (the record's `updated_at`).
-    #[serde(rename = "lastUpdated", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        rename = "lastUpdated",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub last_updated: Option<String>,
 }
 

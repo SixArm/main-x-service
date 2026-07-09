@@ -223,8 +223,7 @@ pub fn from_fhir_basic(fhir: &FhirBasic) -> Result<Course, String> {
         if system == Some(SYS_COURSE_CODE) {
             course.course_code = Some(value);
         } else {
-            let scheme =
-                system.map_or(IdentifierType::Custom(String::new()), system_to_scheme);
+            let scheme = system.map_or(IdentifierType::Custom(String::new()), system_to_scheme);
             course.identifiers.push(CourseIdentifier {
                 property_id: scheme,
                 value,
@@ -295,7 +294,10 @@ mod tests {
         let basic = to_fhir_basic(&course);
         assert_eq!(basic.resource_type, resources::RESOURCE_TYPE);
         assert_eq!(basic.id.as_deref(), Some(course.id.to_string().as_str()));
-        assert_eq!(basic.code.coding[0].code.as_deref(), Some(resources::RESOURCE_CODE));
+        assert_eq!(
+            basic.code.coding[0].code.as_deref(),
+            Some(resources::RESOURCE_CODE)
+        );
 
         let back = from_fhir_basic(&basic).expect("valid resource");
         assert_eq!(back.name, course.name);

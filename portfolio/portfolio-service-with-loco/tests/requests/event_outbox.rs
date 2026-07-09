@@ -72,7 +72,11 @@ async fn outbox_create_writes_work_item_and_one_event_atomically() {
             .all(&ctx.db)
             .await
             .expect("load outbox rows");
-        assert_eq!(rows.len(), 1, "exactly one event_outbox row for the work item");
+        assert_eq!(
+            rows.len(),
+            1,
+            "exactly one event_outbox row for the work item"
+        );
         assert_eq!(rows[0].kind, "created");
         assert_eq!(rows[0].entity, "work_item");
         assert_eq!(rows[0].event_id, env.event_id);

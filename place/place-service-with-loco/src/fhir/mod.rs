@@ -164,7 +164,14 @@ fn from_fhir_address(addr: &FhirAddress) -> PostalAddress {
 pub fn to_fhir_location(place: &Place, last_updated: Option<String>) -> FhirLocation {
     let mut fhir = FhirLocation::new();
     fhir.id = Some(place.id.to_string());
-    fhir.status = Some(if place.is_deleted { "inactive" } else { "active" }.to_string());
+    fhir.status = Some(
+        if place.is_deleted {
+            "inactive"
+        } else {
+            "active"
+        }
+        .to_string(),
+    );
     fhir.meta = last_updated.map(|lu| FhirMeta {
         version_id: None,
         last_updated: Some(lu),
@@ -332,7 +339,11 @@ mod tests {
         ];
         for kind in kinds {
             let system = identifier_type_to_system(&kind);
-            assert_eq!(system_to_identifier_type(&system), kind, "round-trip {kind:?}");
+            assert_eq!(
+                system_to_identifier_type(&system),
+                kind,
+                "round-trip {kind:?}"
+            );
         }
     }
 

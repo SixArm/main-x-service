@@ -911,11 +911,7 @@ pub async fn merge_events(
     // atomically in one transaction; the repository enqueues the `Merged`
     // (+`merged_from`) and `Deleted` outbox rows and publishes the
     // in-memory `Merged`/`Deleted` stream events.
-    if let Err(e) = state
-        .event_repository
-        .merge(&merged, &duplicate.id)
-        .await
-    {
+    if let Err(e) = state.event_repository.merge(&merged, &duplicate.id).await {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse::<crate::models::MergeResponse>::error(
