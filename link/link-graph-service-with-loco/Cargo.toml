@@ -41,6 +41,11 @@ mimalloc = { version = "0.1.52" }
 # §13 T-2/T-3 deviation note).
 entity-ref = { path = "../entity-ref-rust-crate" }
 
+# Offline PASETO v4.public verification + the shared ABAC engine, for
+# case<->person governance (spec T-16/T-19; design §10). Env-supplied key
+# set only (no `fetch` feature — boot-time URL fetch is a follow-up).
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
+
 [[bin]]
 name = "link-graph-service"
 path = "src/bin/main.rs"

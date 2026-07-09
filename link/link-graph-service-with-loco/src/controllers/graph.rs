@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 use entity_ref::{EdgeKind, EntityRef};
 
+use crate::auth::{self, MaybeAuthUser};
 use crate::envelope;
 use crate::events::entity_from_topic;
 use crate::graph::{self, EdgeStatus};
@@ -157,6 +158,7 @@ async fn collect_neighbors(
 async fn neighbors(
     Path(ref_urn): Path<String>,
     Query(params): Query<NeighborsParams>,
+    caller: MaybeAuthUser,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let Ok(start) = ref_urn.parse::<EntityRef>() else {
@@ -178,6 +180,10 @@ async fn neighbors(
     }
 
     let rows = collect_neighbors(&ctx.db, start, kind, direction, depth).await?;
+    // Governance: conceal high-sensitivity case↔person edges from callers
+    // without case-read authorisation (design §10).
+    let may = auth::may_see_governed(caller.claims());
+    let rows = auth::conceal_governed(rows, may, |m| EdgeKind::from_token(&m.kind));
     let as_of = consumer_offsets::Model::watermark(&ctx.db).await?;
     envelope::ok(NeighborsData {
         r#ref: start.to_string(),
@@ -190,6 +196,7 @@ async fn neighbors(
 #[debug_handler]
 async fn edges_list(
     Query(params): Query<EdgesParams>,
+    caller: MaybeAuthUser,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let from = match parse_opt_ref(params.from.as_deref()) {
@@ -216,6 +223,11 @@ async fn edges_list(
     };
 
     let rows = edges::Model::filter(&ctx.db, from.as_ref(), to.as_ref(), kind, status).await?;
+    // Governance: a caller without case-read authorisation cannot see (or
+    // learn of) subject_of edges — even a direct `?kind=subject_of` query
+    // returns an empty list rather than revealing them (design §10).
+    let may = auth::may_see_governed(caller.claims());
+    let rows = auth::conceal_governed(rows, may, |m| EdgeKind::from_token(&m.kind));
     let as_of = consumer_offsets::Model::watermark(&ctx.db).await?;
     envelope::ok(EdgesData { edges: rows, as_of })
 }
@@ -224,6 +236,7 @@ async fn edges_list(
 #[debug_handler]
 async fn single_view(
     Path(ref_urn): Path<String>,
+    caller: MaybeAuthUser,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let Ok(start) = ref_urn.parse::<EntityRef>() else {
@@ -231,8 +244,10 @@ async fn single_view(
     };
     let views = edges::Model::all_views(&ctx.db).await?;
     let view = graph::single_view(start, &views);
-    let affiliations = view
-        .affiliations
+    // Governance: drop any subject_of affiliation the caller may not see,
+    // so `single-view` never surfaces a concealed case↔person link (§10).
+    let may = auth::may_see_governed(caller.claims());
+    let affiliations = auth::conceal_governed(view.affiliations, may, |e| Some(e.kind))
         .iter()
         .map(|e| AffiliationDto {
             from: e.from_ref.to_string(),

@@ -14,6 +14,31 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — case↔person governance + PASETO auth (spec T-16/T-19 / design §10) (2026-07-09)
+
+- `src/auth.rs` — offline **PASETO v4.public** verification via
+  `authentication-verifier` (env key set `LINK_GRAPH_PASETO_KEYS`,
+  fail-closed on a missing key set), a `MaybeAuthUser` extractor, and the
+  shared **ABAC** policy (`LINK_GRAPH_ABAC_POLICY[_FILE]`, else the
+  built-in default).
+- **Governance concealment** (the load-bearing §10 invariant): a
+  `subject_of` (case↔person) edge asserts a person is the subject of a
+  government case, so an unauthorised caller must not learn it exists.
+  `may_see_governed` grants it only to a caller the ABAC policy allows to
+  `read` `case` (unauthenticated ⇒ denied); `conceal_governed` strips
+  governed edges from `neighbors` / `edges` / `single-view`, so even a
+  direct `?kind=subject_of` returns an empty list rather than revealing
+  the edge. Keyed on the registry's `Sensitivity::High`, so a future
+  high-sensitivity kind is covered automatically.
+- Gated on `LINK_GRAPH_REQUIRE_AUTH` (family default-off; a deployment
+  handling real case data MUST enable it). Unit tests for the decision +
+  concealment logic; DB-gated `tests/governance.rs` (own binary) proves
+  end-to-end that an unauthorised caller sees affiliations but not the
+  case↔person edge.
+- Deferred (spec §13): audit of governed reads (T-17), masking parity
+  (T-18), and the blanket `/api/*` guard for affiliation edges (only the
+  edge-level case↔person concealment is wired).
+
 ### Added — merge repointing (spec T-9 / design §5.3) (2026-07-09)
 
 - A `merged{merged_from}` event now **repoints** every edge referencing

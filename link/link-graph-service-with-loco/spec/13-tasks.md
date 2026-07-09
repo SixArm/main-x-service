@@ -78,9 +78,16 @@
 
 ### Governance (`case ↔ person`)
 
-- [ ] T-16: Access control on every read path that could surface a
+- [x] T-16: Access control on every read path that could surface a
   `subject_of` / `about` edge (incl. `single-view`), with concealment of
-  existence to unauthorised callers (§6 FR-18/20, §12).
+  existence to unauthorised callers (§6 FR-18/20, §12). *(Done:
+  `auth::is_governed` (keyed on the registry's `Sensitivity::High`),
+  `auth::may_see_governed` (ABAC `read`/`case` decision on the verified
+  claims; unauthenticated ⇒ denied), and `auth::conceal_governed` strip
+  governed edges from `neighbors` / `edges` / `single-view` — a direct
+  `?kind=subject_of` returns an empty list rather than revealing them.
+  Gated on `LINK_GRAPH_REQUIRE_AUTH`. Unit + DB-gated `tests/governance.rs`.
+  Audit of governed reads (T-17) + masking parity (T-18) still pending.)*
 - [ ] T-17: Audit every read/write touching governed edges to
   `audit_log` (§6 FR-19).
 - [ ] T-18: Privacy masking parity with the case service on graph
@@ -88,11 +95,17 @@
 
 ### Auth, hardening, observability
 
-- [ ] T-19: Offline PASETO v4.public verification via
+- [x] T-19: Offline PASETO v4.public verification via
   `authentication-verifier` (NFR-10, per
   [authentication-sessions.md](../../../agents/share/authentication-sessions.md)),
   coordinated with the family-wide auth rollout
   ([jwt-enforcement.md](../../../agents/share/jwt-enforcement.md)).
+  *(Done: `src/auth.rs` — env-configured `Verifier` (`LINK_GRAPH_PASETO_KEYS`,
+  fail-closed empty key set), `MaybeAuthUser` extractor, ABAC `policy()`
+  from `LINK_GRAPH_ABAC_POLICY[_FILE]`. Used by T-16 governance. Deferred:
+  the blanket `/api/*` guard protecting affiliation edges (only the
+  edge-level case↔person concealment is wired), key-rotation refresh, and
+  the boot-time keys-over-HTTP fetch.)*
 - [ ] T-20: Reconciliation worker — diff read-model vs each service's
   authoritative `entity_links` (bulk-read or replay); emit divergence
   metric; repair (§6 FR-21, design §8).

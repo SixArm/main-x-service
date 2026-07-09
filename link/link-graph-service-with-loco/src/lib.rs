@@ -34,6 +34,7 @@
 #![deny(missing_docs)]
 
 pub mod app;
+pub mod auth;
 pub mod controllers;
 pub mod envelope;
 pub mod events;
