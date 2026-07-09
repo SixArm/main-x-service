@@ -46,8 +46,13 @@
 - [x] T-8: Presence oracle — `created` / `deleted` → `entity_presence`;
   recompute incident-edge `status` (§6 FR-8/9/10). `graph::edge_status`
   + `edges::Model::recompute_status_for`.
-- [ ] T-9: Merge repointing handler — `merged{pid, merged_from}` rewrites
-  edges centrally, re-canonicalises, de-duplicates (§6 FR-12).
+- [x] T-9: Merge repointing handler — `merged{pid, merged_from}` rewrites
+  edges centrally, re-canonicalises, de-duplicates (§6 FR-12). *(Done:
+  pure `graph::repoint` (endpoint swap + re-canonicalise + self-loop
+  drop, unit-tested) + `edges::Model::repoint_all` (per-edge repoint,
+  de-dup against an existing canonical edge, status recompute) wired into
+  the `apply_event` `merged` branch, which also marks the duplicate's
+  presence deleted. DB-gated repoint + de-dup tests.)*
 
 ### Integrity (interim)
 

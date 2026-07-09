@@ -128,6 +128,32 @@ pub fn canonical(from: EntityRef, to: EntityRef, kind: EdgeKind) -> (EntityRef, 
     }
 }
 
+/// Repoint one edge from a merged-away record onto the merge survivor
+/// (spec §5.3 / §6 FR-12). Any endpoint equal to `merged_from` is
+/// replaced with `survivor`, then the edge is re-canonicalised (a
+/// symmetric edge may need re-ordering after the swap).
+///
+/// Returns `None` when the edge collapses to a **self-loop** — both
+/// endpoints become the survivor — which the caller drops, since a
+/// record is never linked to itself (e.g. the merged duplicate's own
+/// `same_identity` edge to the survivor). Otherwise returns the new
+/// canonical `(from, to, directed)`.
+#[must_use]
+pub fn repoint(
+    from: EntityRef,
+    to: EntityRef,
+    kind: EdgeKind,
+    merged_from: EntityRef,
+    survivor: EntityRef,
+) -> Option<(EntityRef, EntityRef, bool)> {
+    let new_from = if from == merged_from { survivor } else { from };
+    let new_to = if to == merged_from { survivor } else { to };
+    if new_from == new_to {
+        return None;
+    }
+    Some(canonical(new_from, new_to, kind))
+}
+
 /// Derive an edge's [`EdgeStatus`] from the presence of its two
 /// endpoints (spec §6 FR-9/10).
 ///
@@ -330,6 +356,47 @@ mod tests {
         // Starting from the worker gives the same unified view.
         let from_worker = single_view(worker, &edges);
         assert_eq!(from_worker.identity_refs, vec![person, worker]);
+    }
+
+    #[test]
+    fn repoint_moves_a_directed_edge_onto_the_survivor() {
+        let old = r(EntityType::Person, 1);
+        let new = r(EntityType::Person, 2);
+        let org = r(EntityType::Organization, 9);
+        // works_at old->org, old merged into new  =>  works_at new->org.
+        let got = repoint(old, org, EdgeKind::WorksAt, old, new);
+        assert_eq!(got, Some((new, org, true)));
+        // The other endpoint repoints too.
+        let got = repoint(org, old, EdgeKind::WorksAt, old, new);
+        assert_eq!(got, Some((org, new, true)));
+    }
+
+    #[test]
+    fn repoint_re_canonicalises_a_symmetric_edge() {
+        // same_identity worker:5 <-> person:5 is stored person-first.
+        // Merge worker:5 into worker:1 (still "worker:1" > "person:5"),
+        // so the survivor pair re-canonicalises person-first again.
+        let person = r(EntityType::Person, 5);
+        let worker_old = r(EntityType::Worker, 5);
+        let worker_new = r(EntityType::Worker, 1);
+        let got = repoint(
+            person,
+            worker_old,
+            EdgeKind::SameIdentity,
+            worker_old,
+            worker_new,
+        );
+        assert_eq!(got, Some((person, worker_new, false)), "still URN-ordered");
+    }
+
+    #[test]
+    fn repoint_drops_a_self_loop() {
+        // An edge directly connecting the merged-away ref and the survivor
+        // collapses to a self-loop and is dropped.
+        let old = r(EntityType::Person, 1);
+        let new = r(EntityType::Person, 2);
+        assert_eq!(repoint(old, new, EdgeKind::WorksAt, old, new), None);
+        assert_eq!(repoint(new, old, EdgeKind::WorksAt, old, new), None);
     }
 
     #[test]

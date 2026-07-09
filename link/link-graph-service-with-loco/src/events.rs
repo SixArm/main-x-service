@@ -3,10 +3,11 @@
 //! [`apply_event`] is the single function a future bus consumer (or the
 //! DB-gated integration tests) calls to fold one event envelope into the
 //! read-model: `created`/`deleted` → presence, `linked` → edge upsert,
-//! `unlinked` → edge removal. Every consumed event advances the per-topic
-//! freshness watermark. The actual Fluvio consumer, idempotency via
-//! `processed_events`, merge-repointing, and lazy verify-on-read are
-//! v1-deferred (spec §13 T-6/T-9/T-10).
+//! `unlinked` → edge removal, `merged` → central edge repointing onto the
+//! survivor (spec §13 T-9 / design §5.3). Every consumed event advances
+//! the per-topic freshness watermark. The actual Fluvio consumer,
+//! idempotency via `processed_events`, and lazy verify-on-read are
+//! v1-deferred (spec §13 T-6/T-10).
 
 use chrono::{DateTime, FixedOffset, Utc};
 use loco_rs::prelude::*;
@@ -97,6 +98,15 @@ pub struct UnlinkedEvent {
     pub to_ref: Option<EntityRef>,
 }
 
+/// The `merged` event `data` shape (event-bus.md §4): the survivor is the
+/// envelope's `entity`+`pid`; `merged_from` is the retired duplicate's
+/// pid (same entity type).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct MergedEvent {
+    /// The public UUID of the record that was merged away (the duplicate).
+    pub merged_from: Uuid,
+}
+
 /// The bus topic name for an entity (`mxi.<entity>.events`).
 #[must_use]
 pub fn topic_for(entity: &str) -> String {
@@ -149,9 +159,22 @@ pub async fn apply_event<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Resu
             edges::Model::apply_unlinked(db, ev.edge_id).await?;
         }
         "merged" => {
-            // Merge-repointing is v1-deferred (spec §13 T-9); the event is
-            // acknowledged (watermark advanced) but not yet projected.
-            tracing::debug!(pid = %envelope.pid, "merged event: repointing deferred (T-9)");
+            // Merge-repointing (spec §13 T-9 / design §5.3): the survivor
+            // is this envelope's ref; rewrite every edge referencing the
+            // merged-away duplicate onto the survivor, centrally.
+            if let Some(survivor) = presence_ref(&envelope) {
+                let ev: MergedEvent = serde_json::from_value(envelope.data.clone())?;
+                let merged_from = EntityRef::new(survivor.entity_type, ev.merged_from);
+                // The duplicate is retired; record it and move its edges.
+                entity_presence::Model::mark(db, &merged_from, false, seq).await?;
+                let repointed = edges::Model::repoint_all(db, &merged_from, &survivor).await?;
+                // The survivor is alive; edges now pointing at it may leave
+                // `dangling` for `verified`/`unverified`.
+                edges::Model::recompute_status_for(db, &survivor).await?;
+                tracing::debug!(%survivor, %merged_from, repointed, "merge repointed edges");
+            } else {
+                tracing::warn!(entity = %envelope.entity, "merged: unknown entity token; skipped");
+            }
         }
         other => {
             tracing::trace!(kind = other, "event kind ignored for graph state");

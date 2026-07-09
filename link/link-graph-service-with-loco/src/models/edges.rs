@@ -132,6 +132,89 @@ impl Model {
         Ok(res.rows_affected)
     }
 
+    /// Repoint every edge referencing a merged-away record onto the merge
+    /// survivor (spec §5.3 / §6 FR-12 — the central fix-up "one aggregator
+    /// helps" with). For each edge touching `merged_from`: swap that
+    /// endpoint for `survivor`, re-canonicalise ([`graph::repoint`]), then
+    /// - **drop** it if it collapsed to a self-loop, or
+    /// - **drop** it if the repointed (from, to, kind) already exists on
+    ///   another edge (de-duplication), or
+    /// - otherwise **update** its endpoints, `directed`, and status.
+    ///
+    /// Returns the number of edges changed (updated or dropped).
+    ///
+    /// # Errors
+    ///
+    /// When a query, update, or delete fails.
+    pub async fn repoint_all<C: ConnectionTrait>(
+        db: &C,
+        merged_from: &EntityRef,
+        survivor: &EntityRef,
+    ) -> ModelResult<u64> {
+        let mf = merged_from.to_string();
+        let rows = Entity::find()
+            .filter(
+                Condition::any()
+                    .add(Column::FromRef.eq(mf.as_str()))
+                    .add(Column::ToRef.eq(mf.as_str())),
+            )
+            .all(db)
+            .await?;
+
+        let mut changed = 0u64;
+        for row in rows {
+            let (Ok(from), Ok(to)) = (
+                row.from_ref.parse::<EntityRef>(),
+                row.to_ref.parse::<EntityRef>(),
+            ) else {
+                continue;
+            };
+            let Some(kind) = EdgeKind::from_token(&row.kind) else {
+                continue;
+            };
+
+            match graph::repoint(from, to, kind, *merged_from, *survivor) {
+                // Self-loop after repoint ⇒ drop the edge.
+                None => {
+                    Entity::delete_by_id(row.edge_id).exec(db).await?;
+                    changed += 1;
+                }
+                Some((new_from, new_to, directed)) => {
+                    // De-dup: a different edge already holds this canonical
+                    // (from, to, kind) ⇒ drop this one rather than collide.
+                    let duplicate = Entity::find()
+                        .filter(
+                            Condition::all()
+                                .add(Column::FromRef.eq(new_from.to_string()))
+                                .add(Column::ToRef.eq(new_to.to_string()))
+                                .add(Column::Kind.eq(kind.as_str()))
+                                .add(Column::EdgeId.ne(row.edge_id)),
+                        )
+                        .one(db)
+                        .await?;
+                    if duplicate.is_some() {
+                        Entity::delete_by_id(row.edge_id).exec(db).await?;
+                        changed += 1;
+                        continue;
+                    }
+                    // Repoint in place, recomputing status against the new
+                    // endpoints' presence.
+                    let from_alive = entity_presence::Model::alive(db, &new_from).await?;
+                    let to_alive = entity_presence::Model::alive(db, &new_to).await?;
+                    let status = graph::edge_status(from_alive, to_alive);
+                    let mut am: edges::ActiveModel = row.into();
+                    am.from_ref = ActiveValue::set(new_from.to_string());
+                    am.to_ref = ActiveValue::set(new_to.to_string());
+                    am.directed = ActiveValue::set(directed);
+                    am.status = ActiveValue::set(status.as_str().to_string());
+                    am.update(db).await?;
+                    changed += 1;
+                }
+            }
+        }
+        Ok(changed)
+    }
+
     /// Recompute the integrity status of every edge incident to `r` from
     /// current endpoint presence, and persist any change (spec §6
     /// FR-10 — a target deleted after the edge formed flips it to

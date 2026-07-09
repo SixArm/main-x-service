@@ -293,3 +293,103 @@ async fn bad_requests_are_rejected() {
     })
     .await;
 }
+
+/// Build a `merged` envelope: `merged_from` (the duplicate) folds into
+/// the survivor named by `entity`+`pid`.
+fn merged_env(entity: &str, survivor_pid: Uuid, merged_from: Uuid, seq: i64) -> Envelope {
+    serde_json::from_value(json!({
+        "entity": entity,
+        "pid": survivor_pid.to_string(),
+        "kind": "merged",
+        "seq": seq,
+        "occurred_at": "2026-07-09T12:00:00Z",
+        "data": { "merged_from": merged_from.to_string() }
+    }))
+    .unwrap()
+}
+
+/// A `merged` event repoints the duplicate's edges onto the survivor
+/// (spec §5.3 / T-9): the edge follows the merge, and querying the
+/// survivor surfaces it while the merged-away ref has none.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn merged_repoints_edges_onto_the_survivor() {
+    request::<App, _, _>(|request, ctx| async move {
+        let dup = format!("person:{}", u(1)); // the duplicate
+        let survivor = format!("person:{}", u(2));
+        let org = format!("organization:{}", u(9));
+        // The duplicate works_at org.
+        apply_event(
+            &ctx.db,
+            linked_env(u(600), &dup, &org, "works_at", "operator", 1),
+        )
+        .await
+        .unwrap();
+
+        // person:1 is merged into person:2.
+        apply_event(&ctx.db, merged_env("person", u(2), u(1), 2))
+            .await
+            .unwrap();
+
+        // The survivor now carries the edge...
+        let body: Value = request
+            .get(&format!("/api/neighbors/{survivor}"))
+            .await
+            .json();
+        let edges = body["data"]["edges"].as_array().unwrap();
+        assert_eq!(edges.len(), 1, "edge repointed to the survivor");
+        assert_eq!(edges[0]["from_ref"], survivor);
+        assert_eq!(edges[0]["to_ref"], org);
+
+        // ...and the merged-away ref carries none.
+        let gone: Value = request.get(&format!("/api/neighbors/{dup}")).await.json();
+        assert_eq!(
+            gone["data"]["edges"].as_array().unwrap().len(),
+            0,
+            "the duplicate has no edges after the merge"
+        );
+    })
+    .await;
+}
+
+/// Repointing de-duplicates: when the duplicate and the survivor both
+/// have the same affiliation, the merge leaves exactly one edge.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn merged_dedups_a_colliding_edge() {
+    request::<App, _, _>(|request, ctx| async move {
+        let dup = format!("person:{}", u(1));
+        let survivor = format!("person:{}", u(2));
+        let org = format!("organization:{}", u(9));
+        // Both the duplicate and the survivor already work_at the org.
+        apply_event(
+            &ctx.db,
+            linked_env(u(700), &dup, &org, "works_at", "operator", 1),
+        )
+        .await
+        .unwrap();
+        apply_event(
+            &ctx.db,
+            linked_env(u(701), &survivor, &org, "works_at", "operator", 2),
+        )
+        .await
+        .unwrap();
+
+        apply_event(&ctx.db, merged_env("person", u(2), u(1), 3))
+            .await
+            .unwrap();
+
+        let body: Value = request
+            .get(&format!("/api/neighbors/{survivor}"))
+            .await
+            .json();
+        assert_eq!(
+            body["data"]["edges"].as_array().unwrap().len(),
+            1,
+            "the colliding edge was de-duplicated, not doubled"
+        );
+    })
+    .await;
+}

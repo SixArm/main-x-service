@@ -14,6 +14,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — merge repointing (spec T-9 / design §5.3) (2026-07-09)
+
+- A `merged{merged_from}` event now **repoints** every edge referencing
+  the merged-away duplicate onto the survivor, centrally (the "one
+  aggregator helps" fix-up). Previously `merged` was acknowledged but not
+  projected, so a record merge orphaned the duplicate's edges (they
+  degraded to `dangling`). Pieces:
+  - `graph::repoint` — pure endpoint-swap + re-canonicalise, returning
+    `None` when the edge collapses to a self-loop (dropped). Unit-tested
+    (directed repoint, symmetric re-canonicalisation, self-loop).
+  - `edges::Model::repoint_all` — per-edge repoint with **de-duplication**
+    (drop a repointed edge that collides with an existing canonical
+    edge) and status recompute against the survivor's presence.
+  - `apply_event` `merged` branch: marks the duplicate's presence
+    `deleted`, repoints, then recomputes incident status.
+  - DB-gated `tests/graph_endpoints.rs`: repoint-onto-survivor and
+    collision-de-dup.
+
+## [Unreleased]
+
 - Build-out is enumerated as unchecked tasks in
   [`spec/13-tasks.md`](./spec/13-tasks.md) (T-1 … T-28), ordered after
   the design rollout: contracts → `same_identity` backbone → reads →
