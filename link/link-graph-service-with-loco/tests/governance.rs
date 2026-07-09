@@ -14,7 +14,9 @@
 
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, apply_event};
+use link_graph_service::models::_entities::audit_log;
 use loco_rs::testing::prelude::*;
+use sea_orm::EntityTrait;
 use serde_json::{Value, json};
 use serial_test::serial;
 use uuid::Uuid;
@@ -94,6 +96,14 @@ async fn governed_edges_are_concealed_from_an_unauthorised_caller() {
             0,
             "the case's own subject_of edge is concealed"
         );
+
+        // The governed WRITE was audited (apply_linked, no actor); the
+        // concealed reads surfaced nothing, so no read_edge row exists.
+        let audits = audit_log::Entity::find().all(&ctx.db).await.unwrap();
+        assert_eq!(audits.len(), 1, "only the subject_of apply_linked audited");
+        assert_eq!(audits[0].action, "apply_linked");
+        assert_eq!(audits[0].edge_kind.as_deref(), Some("subject_of"));
+        assert!(audits[0].actor.is_none(), "a bus-driven write has no actor");
     })
     .await;
 }

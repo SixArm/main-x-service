@@ -153,6 +153,19 @@ pub async fn apply_event<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Resu
             let ev: LinkedEvent = serde_json::from_value(envelope.data.clone())?;
             let source_event_id = envelope.event_id.unwrap_or(ev.edge_id);
             edges::Model::apply_linked(db, &ev, source_event_id, occurred_at).await?;
+            // Governed (case↔person) links are audited on write too, with
+            // no actor (bus-driven) — design §10.
+            if crate::auth::is_governed(ev.edge_kind) {
+                crate::models::audit_log::Model::record(
+                    db,
+                    &crate::models::audit_log::AuditContext::default(),
+                    "apply_linked",
+                    ev.edge_kind.as_str(),
+                    &ev.from_ref.to_string(),
+                    &ev.to_ref.to_string(),
+                )
+                .await?;
+            }
         }
         "unlinked" => {
             let ev: UnlinkedEvent = serde_json::from_value(envelope.data.clone())?;

@@ -88,8 +88,15 @@
   `?kind=subject_of` returns an empty list rather than revealing them.
   Gated on `LINK_GRAPH_REQUIRE_AUTH`. Unit + DB-gated `tests/governance.rs`.
   Audit of governed reads (T-17) + masking parity (T-18) still pending.)*
-- [ ] T-17: Audit every read/write touching governed edges to
-  `audit_log` (§6 FR-19).
+- [x] T-17: Audit every read/write touching governed edges to
+  `audit_log` (§6 FR-19). *(Done: the `audit_log` table (§10.4) +
+  `models::audit_log` (`AuditContext` + `record`). Reads audit each
+  governed edge **surfaced** post-concealment — `read_edge` on
+  `neighbors`/`edges`, `read_single_view` on `single-view` — with the
+  caller `sub` + `User-Agent`; a concealed read audits nothing. Writes
+  audit `apply_linked` for governed `subject_of` edges (no actor —
+  bus-driven). DB-gated test pins the write-audit row. `user_ip` capture
+  (ConnectInfo) deferred.)*
 - [ ] T-18: Privacy masking parity with the case service on graph
   responses (§6 FR-20).
 

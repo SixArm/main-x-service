@@ -14,6 +14,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — governance audit trail (spec T-17 / design §10) (2026-07-09)
+
+- New `audit_log` table (§10.4) + `models::audit_log` — every read/write
+  touching a governed `subject_of` (case↔person) edge is recorded, so the
+  aggregator's access trail matches the case service's.
+  - **Reads** audit each governed edge actually **surfaced** (post
+    concealment): `read_edge` on `neighbors`/`edges`, `read_single_view`
+    on `single-view`, stamped with the caller `sub` and `User-Agent`. A
+    concealed read audits nothing (the edge was not disclosed).
+  - **Writes** audit `apply_linked` for governed edges (no actor —
+    bus-driven).
+  - DB-gated `tests/governance.rs` pins the write-audit row; `user_ip`
+    capture (ConnectInfo) is deferred.
+
 ### Added — case↔person governance + PASETO auth (spec T-16/T-19 / design §10) (2026-07-09)
 
 - `src/auth.rs` — offline **PASETO v4.public** verification via

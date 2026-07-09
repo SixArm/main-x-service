@@ -6,6 +6,8 @@
 use std::collections::{HashMap, HashSet};
 
 use axum::extract::Query;
+use axum::http::HeaderMap;
+use axum::http::header::USER_AGENT;
 use chrono::{DateTime, FixedOffset, Utc};
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -17,7 +19,37 @@ use crate::auth::{self, MaybeAuthUser};
 use crate::envelope;
 use crate::events::entity_from_topic;
 use crate::graph::{self, EdgeStatus};
+use crate::models::audit_log::{self, AuditContext};
 use crate::models::{consumer_offsets, edges};
+
+/// Build the governance-audit context for a request: the caller `sub`
+/// (when a valid token was presented) and the `User-Agent` header.
+fn audit_context<'a>(caller: &'a MaybeAuthUser, headers: &'a HeaderMap) -> AuditContext<'a> {
+    AuditContext {
+        actor: caller.claims().map(|c| c.sub.as_str()),
+        user_ip: None,
+        user_agent: headers.get(USER_AGENT).and_then(|v| v.to_str().ok()),
+    }
+}
+
+/// Audit every governed (`subject_of`) edge **surfaced** in a read
+/// response (design §10). Called on the post-concealment rows, so it
+/// only fires when a governed edge was actually returned to the caller —
+/// a concealed read audits nothing.
+async fn audit_surfaced_edges(
+    db: &DatabaseConnection,
+    ctx: &AuditContext<'_>,
+    action: &str,
+    rows: &[edges::Model],
+) -> ModelResult<()> {
+    for row in rows {
+        if EdgeKind::from_token(&row.kind).is_some_and(auth::is_governed) {
+            audit_log::Model::record(db, ctx, action, &row.kind, &row.from_ref, &row.to_ref)
+                .await?;
+        }
+    }
+    Ok(())
+}
 
 /// The maximum `neighbors` traversal depth in v1 (spec §9.2 / §16).
 pub const MAX_DEPTH: u32 = 2;
@@ -159,6 +191,7 @@ async fn neighbors(
     Path(ref_urn): Path<String>,
     Query(params): Query<NeighborsParams>,
     caller: MaybeAuthUser,
+    headers: HeaderMap,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let Ok(start) = ref_urn.parse::<EntityRef>() else {
@@ -184,6 +217,8 @@ async fn neighbors(
     // without case-read authorisation (design §10).
     let may = auth::may_see_governed(caller.claims());
     let rows = auth::conceal_governed(rows, may, |m| EdgeKind::from_token(&m.kind));
+    let audit = audit_context(&caller, &headers);
+    audit_surfaced_edges(&ctx.db, &audit, "read_edge", &rows).await?;
     let as_of = consumer_offsets::Model::watermark(&ctx.db).await?;
     envelope::ok(NeighborsData {
         r#ref: start.to_string(),
@@ -197,6 +232,7 @@ async fn neighbors(
 async fn edges_list(
     Query(params): Query<EdgesParams>,
     caller: MaybeAuthUser,
+    headers: HeaderMap,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let from = match parse_opt_ref(params.from.as_deref()) {
@@ -228,6 +264,8 @@ async fn edges_list(
     // returns an empty list rather than revealing them (design §10).
     let may = auth::may_see_governed(caller.claims());
     let rows = auth::conceal_governed(rows, may, |m| EdgeKind::from_token(&m.kind));
+    let audit = audit_context(&caller, &headers);
+    audit_surfaced_edges(&ctx.db, &audit, "read_edge", &rows).await?;
     let as_of = consumer_offsets::Model::watermark(&ctx.db).await?;
     envelope::ok(EdgesData { edges: rows, as_of })
 }
@@ -237,6 +275,7 @@ async fn edges_list(
 async fn single_view(
     Path(ref_urn): Path<String>,
     caller: MaybeAuthUser,
+    headers: HeaderMap,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let Ok(start) = ref_urn.parse::<EntityRef>() else {
@@ -247,7 +286,23 @@ async fn single_view(
     // Governance: drop any subject_of affiliation the caller may not see,
     // so `single-view` never surfaces a concealed case↔person link (§10).
     let may = auth::may_see_governed(caller.claims());
-    let affiliations = auth::conceal_governed(view.affiliations, may, |e| Some(e.kind))
+    let affs = auth::conceal_governed(view.affiliations, may, |e| Some(e.kind));
+    // Audit each governed affiliation actually surfaced (design §10).
+    let audit = audit_context(&caller, &headers);
+    for e in &affs {
+        if auth::is_governed(e.kind) {
+            audit_log::Model::record(
+                &ctx.db,
+                &audit,
+                "read_single_view",
+                e.kind.as_str(),
+                &e.from_ref.to_string(),
+                &e.to_ref.to_string(),
+            )
+            .await?;
+        }
+    }
+    let affiliations = affs
         .iter()
         .map(|e| AffiliationDto {
             from: e.from_ref.to_string(),
