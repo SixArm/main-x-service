@@ -145,9 +145,9 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     (`2xx`, `linked` event published, row in `entity_links`), lists it
     via `GET`, deletes it (`unlinked` event, `deleted_at` set); a matcher
     unit test asserts an `entity_links` row never alters a match score.
-- [ ] **T-10 — Bulk import / export.** *(rollout step 1 done 2026-07-10;
-  steps 2–5 remain)* Person is the family **reference entity** for this
-  capability. See §9.2, §10.5 and
+- [ ] **T-10 — Bulk import / export.** *(rollout steps 1 & 3 done
+  2026-07-10; steps 2, 4, 5 remain)* Person is the family **reference
+  entity** for this capability. See §9.2, §10.5 and
   [bulk import/export](../../../agents/share/bulk-import-export.md).
   - [x] **Step 1 (JSONL reference core).**
     - [x] Migration `m20260710_000002_create_bulk_jobs` — `bulk_jobs`
@@ -192,9 +192,35 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   - [ ] **Step 2** — CSV codec (flattening per §9.2: dotted single-nested,
     JSON-in-cell arrays) + keyless/unmatched rows → duplicate detection →
     review queue with `provenance = import`.
-  - [ ] **Step 3** — export masking + gating: `masking_profile` (masked
-    default, full gated), `include_soft_deleted` gated; single-record
-    GDPR export becomes the `filter = one pid` special case.
+  - [x] **Step 3** — export masking + gating *(done 2026-07-10)*:
+    `bulk::MaskingProfile` (`masked` default / `full`); `ExportParams`
+    gains `masking_profile` + `include_soft_deleted`. `process_export_job`
+    masks every record via `privacy::mask_person` under the default
+    `Masked` profile (a default export never reveals more than the masked
+    read view), returns the row count for the audit, and **rejects**
+    `include_soft_deleted=true` as `Error::Validation` (not-yet-supported
+    — the repository cannot list soft-deleted rows without a larger
+    change, so the flag is refused, never leaked/ignored). The
+    `POST /api/persons/export` handler accepts `masking_profile` (default
+    `masked`; unknown ⇒ `400`) and `include_soft_deleted` (default
+    `false`) and gates the **privileged** paths (`full` OR
+    `include_soft_deleted`) behind elevated authorisation via
+    `auth::authorize_record` (destructive action; no-op when
+    `PERSON_REQUIRE_AUTH` is off, else `403` unless `access=admin` /
+    `svc=true`); the default masked, active-only export stays open to any
+    authorised caller. Per-export audit (`audit_export` →
+    `AuditLogRepository::log_export`, `EXPORT` action) records actor,
+    filter (`q`/`limit`/`offset`), format, masking profile,
+    `include_soft_deleted`, and row count — even for a zero-row export.
+    **Acceptance met:** DB-free unit tests (masking applied for `Masked` /
+    skipped for `Full`; the privileged-path gate decision;
+    `MaskingProfile` round-trip) + DB-gated `#[ignore]` tests (default
+    export ⇒ masked JSONL + `EXPORT` audit row; `Full` ⇒ unmasked;
+    `include_soft_deleted=true` rejected). `cargo test --lib` green (185
+    passed, 8 ignored); `cargo build`, `cargo clippy --all-targets
+    --all-features`, migration clippy all clean (0). **Deferred:** a real
+    soft-deleted-record export query, and folding the single-record GDPR
+    export into the `filter = one pid` special case.
   - [ ] **Step 4** — Parquet **export-only**, feature-gated.
   - [ ] **Step 5** — S3-compatible artifact store; roll the contract to
     the other entities.

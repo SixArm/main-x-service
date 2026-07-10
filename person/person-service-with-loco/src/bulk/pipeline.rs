@@ -16,11 +16,16 @@
 //! row goes through the repository, which emits its normal event + audit.
 //!
 //! **Export**: honour the person list/search filter, streaming matching
-//! records to a JSONL buffer.
+//! records to a JSONL buffer. By default (the [`MaskingProfile::Masked`]
+//! profile) every record is run through [`crate::privacy::mask_person`]
+//! before encoding, so a bulk export never reveals more than the masked
+//! read view (§8); the privileged [`MaskingProfile::Full`] profile leaves
+//! records unmasked and is gated at the handler.
 //!
 //! Deferred (noted, not built): keyless-row → duplicate-detection →
-//! review-queue routing (a keyless row simply creates in step 1);
-//! export masking profiles + `include_soft_deleted` gating.
+//! review-queue routing (a keyless row simply creates in step 1); a real
+//! soft-deleted-record export query (`include_soft_deleted = true` is
+//! rejected as not-yet-supported rather than leaking or ignoring it).
 
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 use uuid::Uuid;
@@ -29,8 +34,10 @@ use crate::Result;
 use crate::db::PersonRepository;
 use crate::db::models::person_identifiers;
 use crate::models::Person;
+use crate::privacy::mask_person;
 use crate::search::SearchEngine;
 
+use super::MaskingProfile;
 use super::error_report::ErrorRow;
 use super::jsonl;
 use super::stable_key::{StableKey, resolve_stable_key};
@@ -62,7 +69,8 @@ pub struct ImportOutcome {
     pub errors: Vec<ErrorRow>,
 }
 
-/// Parameters for an export run — the person list/search filter (§4).
+/// Parameters for an export run — the person list/search filter (§4)
+/// plus the §8 privacy controls.
 #[derive(Debug, Clone)]
 pub struct ExportParams {
     /// Optional family-name search query; when set, uses the repository's
@@ -72,6 +80,14 @@ pub struct ExportParams {
     pub limit: u64,
     /// Offset for the unfiltered listing path.
     pub offset: u64,
+    /// Masking profile applied to every exported record (§8). Defaults to
+    /// [`MaskingProfile::Masked`]; [`MaskingProfile::Full`] is privileged.
+    pub masking_profile: MaskingProfile,
+    /// Whether to include soft-deleted records (§8). Defaults to `false`
+    /// (active-only). `true` is privileged **and** not yet supported by
+    /// the repository, so [`process_export_job`] rejects it rather than
+    /// silently leaking or ignoring it.
+    pub include_soft_deleted: bool,
 }
 
 impl Default for ExportParams {
@@ -80,7 +96,33 @@ impl Default for ExportParams {
             query: None,
             limit: 10_000,
             offset: 0,
+            masking_profile: MaskingProfile::Masked,
+            include_soft_deleted: false,
         }
+    }
+}
+
+/// Whether an export request needs **elevated authorisation** (§8): the
+/// unmasked [`MaskingProfile::Full`] profile or soft-deleted inclusion.
+/// The default (masked, active-only) export is not privileged. Pure, so
+/// the handler and its tests share one definition of "privileged".
+#[must_use]
+pub fn export_requires_elevation(
+    masking_profile: MaskingProfile,
+    include_soft_deleted: bool,
+) -> bool {
+    masking_profile.is_full() || include_soft_deleted
+}
+
+/// Apply the export masking profile to a batch of records (§8): the
+/// default [`MaskingProfile::Masked`] runs each record through
+/// [`mask_person`]; [`MaskingProfile::Full`] returns them unchanged. Pure
+/// and DB-free so it is unit-testable without a database.
+#[must_use]
+pub fn apply_masking(records: Vec<Person>, masking_profile: MaskingProfile) -> Vec<Person> {
+    match masking_profile {
+        MaskingProfile::Full => records,
+        MaskingProfile::Masked => records.iter().map(mask_person).collect(),
     }
 }
 
@@ -226,27 +268,40 @@ pub async fn process_import_job(
     Ok(outcome)
 }
 
-/// Run an export, returning the JSONL byte buffer of matching records.
+/// Run an export, returning the JSONL byte buffer of matching records
+/// **and** the number of records exported (for the audit row, §8).
 ///
 /// Uses the repository's family-name `search` when `params.query` is set,
-/// else pages active records via `list_active`. Masking profiles and
-/// soft-deleted inclusion are deferred (step 3); this returns the normal
-/// read view.
+/// else pages active records via `list_active`. Every record is then run
+/// through [`apply_masking`] per `params.masking_profile`, so the default
+/// (`Masked`) export never reveals more than the masked read view;
+/// `Full` leaves records unmasked (gated at the handler).
 ///
 /// # Errors
 ///
-/// Returns an error if the underlying repository query or JSONL encode
-/// fails.
+/// Returns [`crate::Error::Validation`] when `params.include_soft_deleted`
+/// is `true` — the repository cannot express a soft-deleted listing
+/// without a larger change, so rather than silently leaking or ignoring
+/// the flag the export is rejected as not-yet-supported. Also returns an
+/// error if the underlying repository query or JSONL encode fails.
 pub async fn process_export_job(
     repo: &dyn PersonRepository,
     params: &ExportParams,
-) -> Result<Vec<u8>> {
+) -> Result<(Vec<u8>, u64)> {
+    if params.include_soft_deleted {
+        return Err(crate::Error::Validation(
+            "include_soft_deleted=true is not yet supported for export".to_string(),
+        ));
+    }
     let records = if let Some(q) = params.query.as_ref().filter(|q| !q.trim().is_empty()) {
         repo.search(q).await?
     } else {
         repo.list_active(params.limit, params.offset).await?
     };
-    jsonl::encode(&records)
+    let records = apply_masking(records, params.masking_profile);
+    let rows = u64::try_from(records.len()).unwrap_or(u64::MAX);
+    let bytes = jsonl::encode(&records)?;
+    Ok((bytes, rows))
 }
 
 /// DB-gated (`#[ignore]`) tests for the import/export pipeline. They
@@ -256,7 +311,9 @@ pub async fn process_export_job(
 /// under a bare `cargo test --lib`.
 #[cfg(test)]
 mod db_tests {
-    use super::{ExportParams, ImportParams, process_export_job, process_import_job};
+    use super::{
+        ExportParams, ImportParams, MaskingProfile, process_export_job, process_import_job,
+    };
     use crate::bulk::jsonl;
     use crate::db::{PersonRepository, SeaOrmPersonRepository};
     use crate::models::{Gender, HumanName, Identifier, IdentifierType, Person};
@@ -366,10 +423,13 @@ mod db_tests {
 
         let created = repo.create(&person("Exported")).await.unwrap();
 
-        let bytes = process_export_job(
+        // Default profile is Masked, so use Full here to round-trip the
+        // record unchanged.
+        let (bytes, rows) = process_export_job(
             &repo,
             &ExportParams {
                 query: Some("Exported".to_string()),
+                masking_profile: MaskingProfile::Full,
                 ..ExportParams::default()
             },
         )
@@ -378,6 +438,11 @@ mod db_tests {
 
         let lines = jsonl::split_lines(&bytes).unwrap();
         assert!(!lines.is_empty(), "export produced at least one line");
+        assert_eq!(
+            rows,
+            u64::try_from(lines.len()).unwrap(),
+            "returned row count matches the encoded lines"
+        );
         let parsed: Vec<Person> = lines
             .iter()
             .map(|l| jsonl::parse_line(l).unwrap())
@@ -386,5 +451,172 @@ mod db_tests {
             parsed.iter().any(|p| p.id == created.id),
             "the created record round-trips through the export"
         );
+    }
+
+    /// A **default** (masked) export redacts a sensitive field, and the
+    /// worker's audit path writes an export audit row (§8). A **full**
+    /// export (privileged) leaves the field intact.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn export_masks_by_default_and_full_is_unmasked_and_audited() {
+        use crate::db::{AuditContext, AuditLogRepository};
+        use crate::models::{Identifier, IdentifierType};
+
+        let db = connect().await;
+        let repo = SeaOrmPersonRepository::new(db.clone());
+        let audit = AuditLogRepository::new(db.clone());
+
+        let mut p = person("MaskedExport");
+        p.tax_id = Some("123-45-6789".to_string());
+        p.identifiers.push(Identifier::new(
+            IdentifierType::SSN,
+            "http://hl7.org/fhir/sid/us-ssn".to_string(),
+            "123-45-6789".to_string(),
+        ));
+        let created = repo.create(&p).await.unwrap();
+
+        let find = |bytes: &[u8], id| -> Person {
+            jsonl::split_lines(bytes)
+                .unwrap()
+                .iter()
+                .map(|l| jsonl::parse_line(l).unwrap())
+                .find(|x: &Person| x.id == id)
+                .expect("exported record present")
+        };
+
+        // Default (Masked): the tax id is redacted.
+        let (masked_bytes, masked_rows) = process_export_job(
+            &repo,
+            &ExportParams {
+                query: Some("MaskedExport".to_string()),
+                ..ExportParams::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert!(masked_rows >= 1);
+        assert_eq!(
+            find(&masked_bytes, created.id).tax_id.as_deref(),
+            Some("***-**-6789"),
+            "default export masks the tax id"
+        );
+
+        // Full (privileged): the tax id is intact.
+        let (full_bytes, _) = process_export_job(
+            &repo,
+            &ExportParams {
+                query: Some("MaskedExport".to_string()),
+                masking_profile: MaskingProfile::Full,
+                ..ExportParams::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            find(&full_bytes, created.id).tax_id.as_deref(),
+            Some("123-45-6789"),
+            "full export leaves the tax id unmasked"
+        );
+
+        // The per-export audit row is written even for a query export.
+        let job_id = uuid::Uuid::new_v4();
+        let details = serde_json::json!({
+            "kind": "export", "format": "jsonl", "masking_profile": "masked",
+            "include_soft_deleted": false, "rows_total": masked_rows,
+        });
+        audit
+            .log_export(
+                "PersonBulkExport",
+                job_id,
+                details,
+                &AuditContext::default(),
+            )
+            .await
+            .unwrap();
+        let logs = audit
+            .get_logs_for_entity("PersonBulkExport", job_id, 10)
+            .await
+            .unwrap();
+        assert_eq!(logs.len(), 1, "one export audit row");
+        assert_eq!(logs[0].action, "EXPORT");
+    }
+
+    /// `include_soft_deleted=true` is rejected as not-yet-supported rather
+    /// than leaking or silently ignoring the flag (§8).
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn export_rejects_include_soft_deleted() {
+        let db = connect().await;
+        let repo = SeaOrmPersonRepository::new(db.clone());
+        let err = process_export_job(
+            &repo,
+            &ExportParams {
+                include_soft_deleted: true,
+                ..ExportParams::default()
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, crate::Error::Validation(_)));
+    }
+}
+
+/// DB-free unit tests for the pure export helpers (masking + the
+/// privileged-path gate decision).
+#[cfg(test)]
+mod unit_tests {
+    use super::{ExportParams, MaskingProfile, apply_masking, export_requires_elevation};
+    use crate::models::{Gender, HumanName, Person};
+
+    fn person_with_tax(tax: &str) -> Person {
+        let mut p = Person::new(
+            HumanName {
+                use_type: None,
+                family: "Doe".to_string(),
+                given: vec!["Jane".to_string()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Female,
+        );
+        p.tax_id = Some(tax.to_string());
+        p
+    }
+
+    /// `Masked` (the default) redacts the tax id; `Full` leaves it intact.
+    #[test]
+    fn masking_applies_for_masked_and_skips_for_full() {
+        let people = vec![person_with_tax("123-45-6789")];
+
+        let masked = apply_masking(people.clone(), MaskingProfile::Masked);
+        assert_eq!(
+            masked[0].tax_id.as_deref(),
+            Some("***-**-6789"),
+            "Masked profile redacts the tax id"
+        );
+
+        let full = apply_masking(people, MaskingProfile::Full);
+        assert_eq!(
+            full[0].tax_id.as_deref(),
+            Some("123-45-6789"),
+            "Full profile leaves the tax id intact"
+        );
+
+        // The default profile is Masked.
+        assert_eq!(
+            ExportParams::default().masking_profile,
+            MaskingProfile::Masked
+        );
+        assert!(!ExportParams::default().include_soft_deleted);
+    }
+
+    /// Only the unmasked `Full` profile or soft-deleted inclusion needs
+    /// elevation; the default (masked, active-only) does not.
+    #[test]
+    fn elevation_required_only_for_full_or_soft_deleted() {
+        assert!(!export_requires_elevation(MaskingProfile::Masked, false));
+        assert!(export_requires_elevation(MaskingProfile::Full, false));
+        assert!(export_requires_elevation(MaskingProfile::Masked, true));
+        assert!(export_requires_elevation(MaskingProfile::Full, true));
     }
 }

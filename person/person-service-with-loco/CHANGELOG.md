@@ -8,6 +8,43 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — bulk export: rollout step 3 — masking + gating + audit (2026-07-10)
+
+- Bulk **export** now honours the §8 privacy contract
+  ([bulk-import-export.md](../../agents/share/bulk-import-export.md) §8):
+  a `masking_profile` (`masked` default / `full`) and an
+  `include_soft_deleted` flag (default `false`), plus a per-export audit
+  row on every run. Import, CSV, and Parquet are untouched (other steps).
+- New `bulk::MaskingProfile` (`masked` | `full`, default `masked`, wire
+  tokens `masked`/`full`). `ExportParams` gains `masking_profile` and
+  `include_soft_deleted`.
+- `process_export_job` now maps every record through
+  `privacy::mask_person` under the default `Masked` profile before
+  encoding, so a default export never reveals more than the masked read
+  view; `Full` leaves records unmasked. It returns the row count for the
+  audit and **rejects** `include_soft_deleted=true` as
+  `Error::Validation` ("not yet supported") — the repository cannot
+  express a soft-deleted listing without a larger change, so the flag is
+  refused rather than leaked or silently ignored.
+- `POST /api/persons/export` accepts `masking_profile` (default `masked`)
+  and `include_soft_deleted` (default `false`); an unknown profile token
+  is a `400`. The **privileged** paths (`full` OR `include_soft_deleted`)
+  are gated behind elevated authorisation via person's existing
+  record-level guard (`auth::authorize_record` with a `destructive`
+  action): a no-op when `PERSON_REQUIRE_AUTH` is off, else `403` unless
+  the ABAC policy allows it (`access=admin` / `svc=true` by default). The
+  default masked, active-only export stays open to any authorised caller.
+- The export audit row (worker `audit_export`) now records actor, the
+  filter (`q`/`limit`/`offset`), format, masking profile,
+  `include_soft_deleted`, and the row count — written even for a zero-row
+  export via the new `AuditLogRepository::log_export` (`EXPORT` action).
+- Tests: DB-free unit — masking applied for `Masked` / skipped for `Full`
+  (`apply_masking`), the privileged-path gate decision
+  (`export_requires_elevation`), and `MaskingProfile` round-trip;
+  DB-gated `#[ignore]` — a default export returns masked JSONL and writes
+  an `EXPORT` audit row, a `Full` export returns unmasked, and
+  `include_soft_deleted=true` is rejected.
+
 ### Added — bulk import/export: rollout step 1 (2026-07-10)
 
 - Person is the **reference entity** for the family-wide bulk

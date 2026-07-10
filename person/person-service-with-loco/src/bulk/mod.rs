@@ -19,9 +19,17 @@
 //! - [`worker`] — the loco `BackgroundWorker` that drains `bulk_jobs`.
 //! - [`handlers`] — the REST surface (§4).
 //!
+//! Export masking + `include_soft_deleted` gating (rollout step 3) are
+//! implemented: an export defaults to the **masked** read view
+//! ([`MaskingProfile::Masked`]) and only an elevated caller may request
+//! the **full** (unmasked) profile or soft-deleted inclusion; every
+//! export is audited.
+//!
 //! Deferred to later rollout steps (noted, not built): CSV + Parquet
-//! formats, export masking profiles + `include_soft_deleted` gating,
-//! keyless-row → duplicate-review routing, and the S3 artifact store.
+//! formats, keyless-row → duplicate-review routing, the S3 artifact
+//! store, and a real soft-deleted-record export query (today
+//! `include_soft_deleted = true` is rejected as not-yet-supported rather
+//! than silently leaking or ignoring the flag).
 
 /// The per-row error report (§7).
 pub mod error_report;
@@ -100,6 +108,52 @@ impl BulkFormat {
     }
 }
 
+/// The masking profile of an **export** job
+/// (`agents/share/bulk-import-export.md` §8).
+///
+/// [`Masked`](MaskingProfile::Masked) (the default) runs every exported
+/// record through [`crate::privacy::mask_person`] so a bulk export never
+/// reveals more than the masked read view. [`Full`](MaskingProfile::Full)
+/// leaves records unmasked and requires elevated authorisation (§8) — a
+/// full extract of personal data must never be reachable by a caller who
+/// could only read masked records one at a time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MaskingProfile {
+    /// Redact sensitive fields (the default read view).
+    #[default]
+    Masked,
+    /// Leave records unmasked (privileged — elevated authorisation).
+    Full,
+}
+
+impl MaskingProfile {
+    /// The persisted lowercase token (`masked` / `full`).
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MaskingProfile::Masked => "masked",
+            MaskingProfile::Full => "full",
+        }
+    }
+
+    /// Parse the wire token; `None` for anything but `masked` / `full`.
+    #[must_use]
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "masked" => Some(MaskingProfile::Masked),
+            "full" => Some(MaskingProfile::Full),
+            _ => None,
+        }
+    }
+
+    /// Whether this is the privileged (unmasked) profile.
+    #[must_use]
+    pub fn is_full(self) -> bool {
+        matches!(self, MaskingProfile::Full)
+    }
+}
+
 /// The lifecycle status of a bulk job.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -145,7 +199,18 @@ impl JobStatus {
 
 #[cfg(test)]
 mod tests {
-    use super::{BulkFormat, BulkKind, JobStatus};
+    use super::{BulkFormat, BulkKind, JobStatus, MaskingProfile};
+
+    #[test]
+    fn masking_profile_round_trips_and_defaults_masked() {
+        for p in [MaskingProfile::Masked, MaskingProfile::Full] {
+            assert_eq!(MaskingProfile::parse(p.as_str()), Some(p));
+        }
+        assert_eq!(MaskingProfile::parse("nope"), None);
+        assert_eq!(MaskingProfile::default(), MaskingProfile::Masked);
+        assert!(MaskingProfile::Full.is_full());
+        assert!(!MaskingProfile::Masked.is_full());
+    }
 
     #[test]
     fn kind_round_trips() {
