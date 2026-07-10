@@ -25,6 +25,8 @@
 pub mod api;
 /// Loco application hooks (boot, routes, migrations).
 pub mod app;
+/// Bulk import/export — async `bg_pg` jobs, JSONL codec, artifact store.
+pub mod bulk;
 /// Configuration structs and environment/`.env` loading.
 pub mod config;
 /// PostgreSQL persistence: SeaORM entities, repositories, audit log.

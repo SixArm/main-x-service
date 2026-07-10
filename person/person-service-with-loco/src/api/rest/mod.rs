@@ -61,6 +61,11 @@ pub use state::AppState;
         handlers::get_person_audit_logs,
         handlers::get_recent_audit_logs,
         handlers::get_user_audit_logs,
+        crate::bulk::handlers::import_person,
+        crate::bulk::handlers::export_person,
+        crate::bulk::handlers::get_import_job,
+        crate::bulk::handlers::get_export_job,
+        crate::bulk::handlers::list_bulk_jobs,
     ),
     components(
         schemas(
@@ -97,6 +102,9 @@ pub use state::AppState;
             handlers::DuplicateCheckResponse,
             handlers::AuditLogQuery,
             handlers::UserAuditLogQuery,
+            crate::bulk::handlers::JobAccepted,
+            crate::bulk::handlers::ExportRequest,
+            crate::bulk::handlers::BulkJobView,
         )
     ),
     tags(
@@ -108,6 +116,7 @@ pub use state::AppState;
         (name = "deduplication", description = "Duplicate detection, review, and merge endpoints"),
         (name = "privacy", description = "Data masking, export, and consent endpoints"),
         (name = "audit", description = "Audit log query endpoints"),
+        (name = "bulk", description = "Bulk import/export endpoints"),
     )
 )]
 pub struct ApiDoc;
@@ -221,6 +230,29 @@ pub fn persons_routes() -> loco_rs::controller::Routes {
         )
         .add("/persons/merge", post(handlers::merge_persons))
         .add("/persons/deduplicate", post(handlers::batch_deduplicate))
+        // Bulk import/export (agents/share/bulk-import-export.md §4). The
+        // static bulk paths precede the `{id}` routes so they are not
+        // shadowed. `/persons/import` is a declared destructive POST.
+        .add(
+            "/persons/import",
+            post(crate::bulk::handlers::import_person),
+        )
+        .add(
+            "/persons/export",
+            post(crate::bulk::handlers::export_person),
+        )
+        .add(
+            "/persons/import/{id}",
+            get(crate::bulk::handlers::get_import_job),
+        )
+        .add(
+            "/persons/export/{id}",
+            get(crate::bulk::handlers::get_export_job),
+        )
+        .add(
+            "/persons/bulk-jobs",
+            get(crate::bulk::handlers::list_bulk_jobs),
+        )
         .add("/persons/{id}/export", get(handlers::export_person_data))
         .add("/persons/{id}/masked", get(handlers::get_person_masked))
         .add("/persons/{id}/audit", get(handlers::get_person_audit_logs))

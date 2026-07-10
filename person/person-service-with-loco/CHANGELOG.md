@@ -8,6 +8,49 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — bulk import/export: rollout step 1 (2026-07-10)
+
+- Person is the **reference entity** for the family-wide bulk
+  import/export capability
+  ([bulk-import-export.md](../../agents/share/bulk-import-export.md) §3–§7,
+  §10; rollout step 1). Async, job-based, driven by a Postgres-backed
+  background worker (`bg_pg`); **JSONL** is the lossless reference format.
+- New `bulk_jobs` table (migration `m20260710_000002_create_bulk_jobs`;
+  `UNIQUE(entity, kind, idempotency_key)`), SeaORM entity
+  (`db::models::bulk_jobs`), and persistence helpers (`db::bulk_jobs`:
+  `create`/`set_input_url`/`set_status`/`finish_import`/`finish_export`/
+  `find_by_id`/`list_recent`).
+- New `bulk` module: `store` (the `ArtifactStore` trait +
+  `LocalFsArtifactStore` for dev/test, `PERSON_BULK_ARTIFACT_DIR`; S3 is
+  the deployment backend, deferred), `jsonl` (streaming codec — one
+  person wire record per line), `stable_key` (person's upsert key —
+  §10.1: a strong scheme-scoped identifier (SSN/TAX/NPI/PPN) → `tax_id` →
+  record `pid`), `error_report` (§7 per-row `row_number/field/code/message`
+  → CSV), `pipeline` (the testable `process_import_job` /
+  `process_export_job` core), and `worker` (the `BulkJobWorker` adapter,
+  registered in `connect_workers`).
+- Import (§6): per row parse → validate (the single-create validators, so
+  the same `422` reasons) → **upsert in place** when the stable key
+  matches an existing record (idempotent re-import), else create; invalid
+  rows are skipped into the downloadable error report, never aborting the
+  load; each written row emits its normal event + audit via the repository.
+- Export (§8): honours the person list/search filter, streams matching
+  records to a JSONL artifact, and writes an export audit row.
+- Endpoints (`bulk::handlers`, mounted on `persons_routes`, in OpenAPI):
+  `POST /api/persons/import` (multipart, `202 {job_id}`, `dry_run`
+  supported; a declared destructive POST),
+  `POST /api/persons/export` (JSON filter, `202 {job_id}`),
+  `GET /api/persons/import/{id}` + `GET /api/persons/export/{id}` (status +
+  counts + `errors_url`/`download_url`), `GET /api/persons/bulk-jobs`.
+- Tests: DB-free unit (JSONL round-trip, stable-key precedence,
+  error-report shape, store round-trip, enum round-trips — 16 tests) plus
+  DB-gated `#[ignore]` pipeline tests (create-then-idempotent-upsert with
+  error report, dry-run commits nothing, export JSONL round-trip).
+- **Deferred** (rollout steps 2–5, noted not built): CSV + Parquet
+  formats, export masking profiles + `include_soft_deleted` gating,
+  keyless-row → duplicate-review routing, S3 artifact store, other
+  entities.
+
 ### Added — cross-service links: `same_identity` write side (2026-07-10)
 
 - Person is the **reference originator** of the cross-service

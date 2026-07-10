@@ -16,6 +16,8 @@ use crate::config::DatabaseConfig;
 
 /// Audit-log repository for the HIPAA-style trail.
 pub mod audit;
+/// `bulk_jobs` persistence helpers (bulk import/export).
+pub mod bulk_jobs;
 /// chrono <-> time conversions at the persistence boundary.
 pub mod convert;
 /// Cross-service entity-link write-side persistence (`same_identity`).
