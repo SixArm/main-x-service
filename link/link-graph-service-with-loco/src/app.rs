@@ -99,7 +99,9 @@ impl Hooks for App {
     /// Assemble the route table: loco's default routes (`/_health`,
     /// `/_ping`, …) plus the read-only graph controller (spec §9).
     fn routes(_ctx: &AppContext) -> AppRoutes {
-        AppRoutes::with_default_routes().add_route(controllers::graph::routes())
+        AppRoutes::with_default_routes()
+            .add_route(controllers::graph::routes())
+            .add_route(controllers::docs::routes())
     }
 
     /// Wrap the router in the blanket read-guard layer. The

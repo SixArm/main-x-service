@@ -40,3 +40,4 @@ pub mod envelope;
 pub mod events;
 pub mod graph;
 pub mod models;
+pub mod openapi;

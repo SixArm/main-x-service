@@ -14,6 +14,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — OpenAPI 3 + Swagger UI (spec T-15) (2026-07-10)
+
+- `src/openapi.rs` — a hand-written OpenAPI 3.0.3 document (dependency-light,
+  no `utoipa`, matching the sibling services) covering the four read
+  endpoints (`neighbors` / `edges` / `single-view` / `health/freshness`)
+  and their enveloped schemas (`Edge`, `Affiliation`, `TopicFreshness`,
+  the `{success,data,error}` envelopes, each carrying `as_of`).
+- `controllers::docs` serves `GET /api-docs/openapi.json` (the spec) and
+  `GET /swagger-ui` (a CDN-loaded Swagger UI page). Both are already in
+  `auth::is_public_path`, so the blanket read guard never gates the docs.
+- Unit tests: well-formedness + all four endpoints documented + every
+  edge-returning response enveloped with `as_of`.
+
 ### Added — end-to-end concealment proof (spec T-16 / design §10) (2026-07-10)
 
 - New DB-gated `tests/concealment.rs` (own binary) mints real

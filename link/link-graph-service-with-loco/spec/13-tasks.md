@@ -73,8 +73,14 @@
   unification + affiliation walk (`person → worker → org`); `as_of`
   (§6 FR-15). `graph::single_view`.
 - [x] T-14: `GET /api/health/freshness` — per-topic lag (§6 FR-16).
-- [ ] T-15: OpenAPI via utoipa derives + Swagger UI at `/swagger-ui`;
-  raw spec at `/api-docs/openapi.json`.
+- [x] T-15: OpenAPI + Swagger UI at `/swagger-ui`; raw spec at
+  `/api-docs/openapi.json`. *(Done: a **hand-written** OpenAPI 3.0.3 doc
+  (`src/openapi.rs::spec`) covering the four read endpoints + the
+  enveloped schemas — dependency-light, no `utoipa`, matching the sibling
+  services; served by `controllers::docs` (JSON + a CDN-loaded Swagger UI
+  page). Both paths are in `auth::is_public_path`, so the blanket guard
+  never gates the docs. Unit-tested for well-formedness + endpoint
+  coverage.)*
 
 ### Governance (`case ↔ person`)
 
