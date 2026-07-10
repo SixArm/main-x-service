@@ -103,6 +103,26 @@ impl AuditLogRepository {
         .await
     }
 
+    /// Record an `EXPORT`: stores the export `details` (actor, filter,
+    /// format, masking profile, `include_soft_deleted`, row count) as the
+    /// new-values snapshot, with no prior snapshot. Used for the bulk
+    /// export compliance trail (`bulk-import-export.md` §8) — a bulk
+    /// extract of personal data is itself an audited event.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the audit row insert fails.
+    pub async fn log_export(
+        &self,
+        entity_type: &str,
+        entity_id: Uuid,
+        details: JsonValue,
+        ctx: &AuditContext,
+    ) -> Result<()> {
+        self.log_action("EXPORT", entity_type, entity_id, None, Some(details), ctx)
+            .await
+    }
+
     /// Insert one audit row. Shared backend for the typed `log_*` helpers.
     ///
     /// Stamps a fresh UUID and the current UTC time; `old_values` /

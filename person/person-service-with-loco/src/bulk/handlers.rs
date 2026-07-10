@@ -28,11 +28,15 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use authentication_verifier::Action;
+use std::collections::BTreeMap;
+
 use crate::api::ApiResponse;
 use crate::api::rest::AppState;
-use crate::api::rest::auth::MaybeAuthUser;
+use crate::api::rest::auth::{MaybeAuthUser, authorize_record};
+use crate::bulk::pipeline::export_requires_elevation;
 use crate::bulk::worker::{BulkJobArgs, BulkJobWorker};
-use crate::bulk::{BulkFormat, BulkKind};
+use crate::bulk::{BulkFormat, BulkKind, MaskingProfile};
 use crate::db::bulk_jobs::{self, NewBulkJob};
 
 /// `202 Accepted` body for a submitted bulk job.
@@ -42,7 +46,8 @@ pub struct JobAccepted {
     pub job_id: Uuid,
 }
 
-/// Export request body: the person list/search filter (§4).
+/// Export request body: the person list/search filter (§4) plus the §8
+/// privacy controls.
 #[derive(Debug, Default, Deserialize, ToSchema)]
 pub struct ExportRequest {
     /// File format; defaults to `jsonl` (the only supported value).
@@ -57,6 +62,14 @@ pub struct ExportRequest {
     /// Offset for the unfiltered listing path.
     #[serde(default)]
     pub offset: Option<u64>,
+    /// Masking profile: `masked` (default) or `full` (§8). `full` is
+    /// privileged and requires elevated authorisation.
+    #[serde(default)]
+    pub masking_profile: Option<String>,
+    /// Include soft-deleted records (§8). Defaults to `false`; `true` is
+    /// privileged **and** not yet supported (rejected by the worker).
+    #[serde(default)]
+    pub include_soft_deleted: Option<bool>,
 }
 
 /// A bulk job as returned by the status/list endpoints. Mirrors the row
@@ -273,6 +286,42 @@ pub async fn export_person(
         return (status, Json(remap(body)));
     }
 
+    // Parse the masking profile (default masked); an unknown token → 400.
+    let masking_profile = match req.masking_profile.as_deref() {
+        None => MaskingProfile::Masked,
+        Some(s) => match MaskingProfile::parse(s) {
+            Some(p) => p,
+            None => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(ApiResponse::<JobAccepted>::error(
+                        "UNSUPPORTED_MASKING_PROFILE",
+                        format!("masking_profile '{s}' is not supported; use 'masked' or 'full'"),
+                    )),
+                );
+            }
+        },
+    };
+    let include_soft_deleted = req.include_soft_deleted.unwrap_or(false);
+
+    // Gate the privileged paths — the unmasked `full` profile OR
+    // soft-deleted inclusion (§8) — behind **elevated authorisation**,
+    // reusing person's record-level guard (`authorize_record`): a no-op
+    // when `PERSON_REQUIRE_AUTH` is off; otherwise the ABAC policy must
+    // allow a `destructive` action (`access=admin` / `svc=true` under the
+    // default policy). A default (masked, active-only) export skips this
+    // and stays open to any authorised caller.
+    if export_requires_elevation(masking_profile, include_soft_deleted)
+        && let Err((status, msg)) = authorize_record(&caller, Action::Destructive, &BTreeMap::new())
+    {
+        let code = if status == StatusCode::UNAUTHORIZED {
+            "UNAUTHORIZED"
+        } else {
+            "FORBIDDEN"
+        };
+        return (status, Json(ApiResponse::<JobAccepted>::error(code, msg)));
+    }
+
     let mut params = serde_json::Map::new();
     if let Some(q) = req.q {
         params.insert("q".to_string(), serde_json::Value::String(q));
@@ -283,6 +332,14 @@ pub async fn export_person(
     if let Some(offset) = req.offset {
         params.insert("offset".to_string(), serde_json::json!(offset));
     }
+    params.insert(
+        "masking_profile".to_string(),
+        serde_json::Value::String(masking_profile.as_str().to_string()),
+    );
+    params.insert(
+        "include_soft_deleted".to_string(),
+        serde_json::json!(include_soft_deleted),
+    );
 
     let created = bulk_jobs::create(
         &state.db,

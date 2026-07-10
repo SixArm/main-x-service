@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::api::rest::AppState;
 use crate::bulk::pipeline::{ExportParams, ImportParams, process_export_job, process_import_job};
-use crate::bulk::{BulkKind, JobStatus, error_report, jsonl};
+use crate::bulk::{BulkKind, JobStatus, MaskingProfile, error_report};
 use crate::db::bulk_jobs;
 
 /// The loco background worker that runs one bulk job.
@@ -120,12 +120,12 @@ async fn run_import(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
     Ok(())
 }
 
-/// Run an export job: run the pipeline, write the JSONL output artifact,
-/// record the row count, and write an export audit row.
+/// Run an export job: run the pipeline (applying the masking profile),
+/// write the JSONL output artifact, record the row count, and write an
+/// export audit row (§8).
 async fn run_export(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<()> {
     let params = export_params_from_json(&job.params);
-    let bytes = process_export_job(state.person_repository.as_ref(), &params).await?;
-    let rows_total = u64::try_from(jsonl::split_lines(&bytes)?.len()).unwrap_or(u64::MAX);
+    let (bytes, rows_total) = process_export_job(state.person_repository.as_ref(), &params).await?;
 
     let result_url = state
         .bulk_store
@@ -133,13 +133,16 @@ async fn run_export(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
 
     // A bulk extract of personal data is itself a compliance event (§8):
     // audit it even for a zero-row export.
-    audit_export(state, job, rows_total).await;
+    audit_export(state, job, &params, rows_total).await;
 
     bulk_jobs::finish_export(&state.db, job.id, rows_total, result_url).await?;
     Ok(())
 }
 
-/// Derive [`ExportParams`] from a job's stored `params` JSON.
+/// Derive [`ExportParams`] from a job's stored `params` JSON, including
+/// the §8 privacy controls (`masking_profile`, `include_soft_deleted`).
+/// An unrecognised `masking_profile` token falls back to the default
+/// (`masked`) — the safe direction.
 fn export_params_from_json(params: &serde_json::Value) -> ExportParams {
     let defaults = ExportParams::default();
     ExportParams {
@@ -155,11 +158,27 @@ fn export_params_from_json(params: &serde_json::Value) -> ExportParams {
             .get("offset")
             .and_then(serde_json::Value::as_u64)
             .unwrap_or(defaults.offset),
+        masking_profile: params
+            .get("masking_profile")
+            .and_then(serde_json::Value::as_str)
+            .and_then(MaskingProfile::parse)
+            .unwrap_or(defaults.masking_profile),
+        include_soft_deleted: params
+            .get("include_soft_deleted")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(defaults.include_soft_deleted),
     }
 }
 
-/// Write an audit row for a completed export (actor, filter, row count).
-async fn audit_export(state: &AppState, job: &bulk_jobs::Model, rows_total: u64) {
+/// Write an audit row for a completed export (§8): actor, the filter
+/// (query / limit / offset), format, masking profile,
+/// `include_soft_deleted`, and the row count — even for a zero-row export.
+async fn audit_export(
+    state: &AppState,
+    job: &bulk_jobs::Model,
+    params: &ExportParams,
+    rows_total: u64,
+) {
     let ctx = crate::db::AuditContext {
         user_id: job.actor.clone().or_else(|| Some("system".to_string())),
         ip_address: None,
@@ -168,12 +187,18 @@ async fn audit_export(state: &AppState, job: &bulk_jobs::Model, rows_total: u64)
     let summary = serde_json::json!({
         "kind": "export",
         "format": job.format,
-        "filter": job.params,
+        "filter": {
+            "q": params.query,
+            "limit": params.limit,
+            "offset": params.offset,
+        },
+        "masking_profile": params.masking_profile.as_str(),
+        "include_soft_deleted": params.include_soft_deleted,
         "rows_total": rows_total,
     });
     if let Err(e) = state
         .audit_log
-        .log_create("PersonBulkExport", job.id, summary, &ctx)
+        .log_export("PersonBulkExport", job.id, summary, &ctx)
         .await
     {
         tracing::error!("failed to write bulk-export audit row: {e}");
