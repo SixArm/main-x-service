@@ -33,8 +33,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   source is configured (`LINK_GRAPH_RECONCILE_SECS`, default 300). The
   authoritative source is the case service's new `GET /api/cases/links`.
   A DB-free unit test pins that the case bulk-links JSON deserializes into
-  the aggregator's `LinkedEvent` (the cross-service seam). Other services
-  follow as they gain a bulk-links endpoint.
+  the aggregator's `LinkedEvent` (the cross-service seam). `after_routes`
+  now spawns one worker per entity that configures a source.
+- **Person source** (2026-07-10): the person service's `same_identity`
+  edges are reconciled too — `after_routes` iterates `["case", "person"]`,
+  and a second seam unit test pins that person's `GET /api/persons/links`
+  (`same_identity` person→worker) deserializes into `LinkedEvent`.
 
 ### Added — Prometheus metrics (spec T-21) (2026-07-10)
 

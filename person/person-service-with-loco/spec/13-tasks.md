@@ -292,3 +292,39 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     `cargo test --lib` green (160 passed, 2 ignored); `cargo clippy
     --lib --tests` clean. Default (no `PERSON_EVENT_RELAY`) ⇒ no relay
     loop, behaviour unchanged.
+
+
+- [x] **T-22 — Cross-service links: `same_identity` write side.**
+  *(done 2026-07-10)* Per
+  [cross-service-linking.md](../../../agents/share/cross-service-linking.md)
+  §4.1/§4.2/§9 (rollout step 2 — the backbone edge), person is the
+  reference originator of the `same_identity` (person ↔ worker) edge;
+  worker's symmetric side is the follow-up.
+  - [x] Migration `m20260710_000001_create_entity_links` — `entity_links`
+    table (§4.1 schema) with the idempotent-upsert
+    `UNIQUE(from_pid, kind, to_ref, valid_from) NULLS NOT DISTINCT` index
+    and the `from_pid` active index; registered in the migrator.
+  - [x] SeaORM entity `db::models::entity_links`; persistence
+    `db::entity_links` (`upsert` — idempotent, revives a soft-deleted
+    row; `list_active`; `find_active`; `list_all_active(since)`;
+    `soft_delete`). Depends on the shared `entity-ref` crate.
+  - [x] `api::rest::links`: `validate_edge` (DB-free — accepts only
+    `same_identity` person → worker), the operator `LinkView` and the
+    canonical §4.2 `EdgeDetail`, and the handlers `create_link` /
+    `list_links` / `delete_link` / **`bulk_links`**
+    (`GET /api/persons/links[?since=]` → `{ "edges": [EdgeDetail…] }`),
+    mounted on both router surfaces. Writes gated at the person
+    record-level (`authorize_record`) and audited (`person_link`).
+  - **Deferred:** cross-service `linked`/`unlinked` **event** emission —
+    the durable `Envelope` has no link kind / `data` and the in-memory
+    `PersonEvent::Linked` carries only person `Uuid`s, so neither carries
+    the §4.2 edge `data` without a cross-cutting refactor; the bulk
+    endpoint is the aggregator's sync path (§8).
+  - **Acceptance:** six DB-free `validate_edge` unit tests (accept
+    `same_identity` person→worker; reject `subject_of`,
+    `same_identity`→non-worker, non-`same_identity` kind, malformed ref,
+    unknown kind) + a DB-gated `#[ignore]` round-trip (upsert →
+    idempotent re-upsert → bulk-list asserts the canonical
+    `edge_id`/`edge_kind`/`from_ref=person:<id>` shape → soft-delete).
+    Met: `cargo test --lib` green (166 passed, 3 ignored); `cargo build`
+    and `cargo clippy --all-targets --all-features` clean (0).

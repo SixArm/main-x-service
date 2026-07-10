@@ -379,6 +379,17 @@ affiliation posture:
      axum-style services with no event bus. Their `same_identity`
      write-side therefore **awaits their own event infrastructure**; the
      contract and the emit pattern are now proven on case.
+   - **✅ person `same_identity` write-side landed 2026-07-10**
+     ([`person/person-service-with-loco`](../../person/person-service-with-loco):
+     `entity_links` migration, `POST`/`GET`/`DELETE
+     /api/persons/{id}/links`, idempotent upsert, plus the aggregator's
+     reconciliation pull `GET /api/persons/links[?since=]` returning the
+     canonical §4.2 `{ "edges": [EdgeDetail…] }`; `validate_edge` accepts
+     only `same_identity` person → worker; person record-level authz +
+     audit; depends on the `entity-ref` crate). The bulk endpoint is the
+     sync path — cross-service `linked`/`unlinked` **event** emission is
+     deferred (person's durable `Envelope` has no link kind/`data`).
+     **Worker's symmetric side is the remaining follow-up.**
 3. **Aggregator.** Stand up `link-graph-service-with-loco` consuming the
    in-memory→outbox stream; `neighbors` + `single-view` reads; lazy
    verify-on-read (§5.1).

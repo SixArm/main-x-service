@@ -8,6 +8,38 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — cross-service links: `same_identity` write side (2026-07-10)
+
+- Person is the **reference originator** of the cross-service
+  `same_identity` (person ↔ worker) backbone edge
+  ([cross-service-linking.md](../../agents/share/cross-service-linking.md)
+  §4.1/§4.2/§9, rollout step 2). New `entity_links` table (migration
+  `m20260710_000001_create_entity_links`; `UNIQUE(from_pid, kind, to_ref,
+  valid_from) NULLS NOT DISTINCT` for idempotent upsert), SeaORM entity
+  (`db::models::entity_links`), and persistence (`db::entity_links`:
+  `upsert` — idempotent, revives a soft-deleted row; `list_active`;
+  `find_active`; `list_all_active(since)`; `soft_delete`).
+- Endpoints (`api::rest::links`, mounted on both router surfaces):
+  `POST /api/persons/{id}/links` (validate → upsert → best-effort audit),
+  `GET /api/persons/{id}/links`, `DELETE /api/persons/{id}/links/{link_id}`,
+  and the aggregator's reconciliation pull
+  **`GET /api/persons/links[?since=<rfc3339>]`** returning
+  `{ "edges": [EdgeDetail…] }` in the canonical §4.2 shape (`edge_id` /
+  `edge_kind` / `from_ref = person:<id>`). Depends on the shared
+  `entity-ref` crate.
+- Validation (`validate_edge`, DB-free, unit-tested): accepts **only**
+  `same_identity` person → worker; `422` for a non-`same_identity` kind
+  (`subject_of` / `works_at`), a `same_identity` to a non-worker, an
+  unknown kind, or a malformed `to_ref`. Writes are authorised at the
+  person record-level (`authorize_record`) and audited (`person_link`
+  create/delete).
+- **Deferred:** cross-service `linked`/`unlinked` **event** emission —
+  neither the durable `Envelope` (no link kind / no `data`) nor the
+  in-memory `PersonEvent::Linked` (person `Uuid`s only) can carry the
+  §4.2 edge `data` without a cross-cutting refactor; the bulk endpoint is
+  the aggregator's sync path (§8). Worker's symmetric side is the
+  follow-up.
+
 ### Added — authz: record-level resource attributes + obligations (2026-07-05)
 
 - Record-level ABAC (verifier 0.3 → 0.6). Beyond the coarse blanket
