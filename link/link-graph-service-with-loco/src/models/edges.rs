@@ -5,7 +5,7 @@
 use chrono::{DateTime, FixedOffset};
 use loco_rs::prelude::*;
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ActiveValue, Condition, ConnectionTrait};
+use sea_orm::{ActiveValue, Condition, ConnectionTrait, PaginatorTrait};
 use uuid::Uuid;
 
 use entity_ref::{EdgeKind, EntityRef};
@@ -326,5 +326,29 @@ impl Model {
     pub async fn all_views<C: ConnectionTrait>(db: &C) -> ModelResult<Vec<EdgeView>> {
         let rows = Entity::find().all(db).await?;
         Ok(rows.iter().filter_map(Model::to_view).collect())
+    }
+
+    /// Count edges in each integrity [`EdgeStatus`], for the
+    /// `link_graph_edges{status}` metric gauge (spec §9 / T-21).
+    ///
+    /// # Errors
+    ///
+    /// When a count query fails.
+    pub async fn count_by_status<C: ConnectionTrait>(
+        db: &C,
+    ) -> ModelResult<Vec<(EdgeStatus, u64)>> {
+        let mut out = Vec::with_capacity(3);
+        for status in [
+            EdgeStatus::Unverified,
+            EdgeStatus::Verified,
+            EdgeStatus::Dangling,
+        ] {
+            let n = Entity::find()
+                .filter(Column::Status.eq(status.as_str()))
+                .count(db)
+                .await?;
+            out.push((status, n));
+        }
+        Ok(out)
     }
 }

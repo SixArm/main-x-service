@@ -393,3 +393,32 @@ async fn merged_dedups_a_colliding_edge() {
     })
     .await;
 }
+
+/// `GET /metrics.prom` renders the Prometheus registry, including the
+/// edge-status gauge refreshed from the DB at scrape time.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn metrics_endpoint_reports_edge_status_gauge() {
+    request::<App, _, _>(|request, ctx| async move {
+        let person = format!("person:{}", u(1));
+        let org = format!("organization:{}", u(2));
+        apply_event(
+            &ctx.db,
+            linked_env(u(800), &person, &org, "works_at", "operator", 1),
+        )
+        .await
+        .unwrap();
+
+        let resp = request.get("/metrics.prom").await;
+        assert_eq!(resp.status_code(), 200);
+        let body = resp.text();
+        assert!(body.contains("link_graph_events_processed_total"));
+        // The single edge has no observed presence yet, so it is unverified.
+        assert!(
+            body.contains("link_graph_edges{status=\"unverified\"} 1"),
+            "unverified gauge; body was:\n{body}"
+        );
+    })
+    .await;
+}

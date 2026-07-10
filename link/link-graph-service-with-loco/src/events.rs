@@ -137,6 +137,7 @@ pub async fn apply_event<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Resu
         .occurred_at
         .unwrap_or_else(|| Utc::now().fixed_offset());
     let seq = envelope.seq.unwrap_or(0);
+    crate::metrics::Metrics::event_processed(&envelope.kind);
 
     match envelope.kind.as_str() {
         "created" | "deleted" => {

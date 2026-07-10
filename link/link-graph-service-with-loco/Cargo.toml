@@ -34,6 +34,7 @@ sea-orm = { version = "1.1", features = [
 chrono = { version = "0.4" }
 uuid = { version = "1.23", features = ["v4", "serde"] }
 mimalloc = { version = "0.1.52" }
+prometheus = { version = "0.13" }
 
 # The one shared cross-service-linking contract: EntityType / EntityRef
 # (URN parse/Display/serde as a single TEXT column) + the closed v1

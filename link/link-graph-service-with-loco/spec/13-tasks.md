@@ -139,8 +139,15 @@
 - [ ] T-20: Reconciliation worker — diff read-model vs each service's
   authoritative `entity_links` (bulk-read or replay); emit divergence
   metric; repair (§6 FR-21, design §8).
-- [ ] T-21: Prometheus `/metrics.prom` — consumer lag, edge counts by
-  `status`, divergence, processed counters (§6 FR-22).
+- [x] T-21: Prometheus `/metrics.prom` — consumer lag, edge counts by
+  `status`, processed counters (§6 FR-22). *(Done: `src/metrics.rs` — a
+  process-wide registry with `link_graph_events_processed_total{kind}`
+  (incremented in `apply_event`) and two gauges refreshed from the DB at
+  scrape time, `link_graph_edges{status}` + `link_graph_consumer_lag_seconds
+  {entity}`; served at the root `GET /metrics.prom` (public — in
+  `is_public_path`). Unit test (render) + DB-gated endpoint test.
+  Reconciliation **divergence** is deferred with the reconciliation worker,
+  T-20.)*
 - [ ] T-22: Tracing + OpenTelemetry OTLP wiring; loco `/_health` /
   `/_ping`; graceful shutdown; Podman health check; non-root container.
 - [ ] T-23: Flip transport to the durable bus per entity as Fluvio

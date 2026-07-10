@@ -39,6 +39,7 @@ pub mod controllers;
 pub mod envelope;
 pub mod events;
 pub mod graph;
+pub mod metrics;
 pub mod models;
 pub mod openapi;
 pub mod probe;

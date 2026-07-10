@@ -14,6 +14,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — Prometheus metrics (spec T-21) (2026-07-10)
+
+- `src/metrics.rs` — a process-wide registry served at the root
+  `GET /metrics.prom` (public, in `is_public_path`; Prometheus
+  text-exposition format):
+  - `link_graph_events_processed_total{kind}` — counter, incremented in
+    `apply_event` for each folded event.
+  - `link_graph_edges{status}` — gauge, edge count by integrity status,
+    refreshed from the DB (`edges::Model::count_by_status`) at scrape time.
+  - `link_graph_consumer_lag_seconds{entity}` — gauge, freshness watermark
+    vs now, per entity topic, refreshed at scrape time.
+- Adds `prometheus`. Unit test (render output) + DB-gated endpoint test.
+  Reconciliation divergence is deferred with the reconciliation worker (T-20).
+
 ### Added — lazy verify-on-read (spec T-10 / design §5.1) (2026-07-10)
 
 - `src/probe.rs` — the interim integrity path until the durable bus feeds

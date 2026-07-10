@@ -102,6 +102,7 @@ impl Hooks for App {
         AppRoutes::with_default_routes()
             .add_route(controllers::graph::routes())
             .add_route(controllers::docs::routes())
+            .add_route(controllers::metrics::routes())
     }
 
     /// Wrap the router in the blanket read-guard layer. The
