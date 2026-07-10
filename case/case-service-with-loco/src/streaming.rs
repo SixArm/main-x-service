@@ -36,6 +36,7 @@ use uuid::Uuid;
 
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::cases::Model as CaseModel;
+use crate::models::entity_links::{Model as EntityLinkModel, NewEdge};
 use crate::models::event_outbox::{Model as OutboxRow, OutboxInsert};
 
 /// Envelope schema version (§4). Bumped only on a breaking change to the
@@ -62,6 +63,12 @@ pub enum EventKind {
     Deleted,
     /// A duplicate was merged into this (surviving) record.
     Merged,
+    /// A cross-service outbound edge was asserted (`entity_links` write —
+    /// `agents/share/cross-service-linking.md` §4.2). The edge detail
+    /// rides in the envelope's [`Envelope::data`].
+    Linked,
+    /// A cross-service outbound edge was withdrawn (soft-deleted).
+    Unlinked,
 }
 
 /// The canonical, versioned event envelope (event-bus design §4).
@@ -94,6 +101,12 @@ pub struct Envelope {
     pub actor: Option<String>,
     /// The record's denormalised label at the time of the event.
     pub name: String,
+    /// Optional structured event detail. Absent (and omitted from the
+    /// wire) for the CRUD events, so their shape is byte-identical to
+    /// before; carries the cross-service edge detail (§4.2) on
+    /// `linked`/`unlinked`. Additive — does not bump [`SCHEMA_VERSION`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
 }
 
 /// The operator-facing projection of an [`Envelope`] (§4).
@@ -197,7 +210,9 @@ fn next_seq() -> u64 {
 }
 
 /// Build an [`Envelope`] for a change, assigning a fresh `event_id` and
-/// the next per-process `seq`.
+/// the next per-process `seq`. Carries no structured [`Envelope::data`]
+/// (the CRUD events); see [`envelope_with_data`] for the
+/// `linked`/`unlinked` events.
 fn envelope(kind: EventKind, pid: &str, name: &str, actor: Option<&str>) -> Envelope {
     Envelope {
         event_id: Uuid::new_v4(),
@@ -208,6 +223,22 @@ fn envelope(kind: EventKind, pid: &str, name: &str, actor: Option<&str>) -> Enve
         seq: next_seq(),
         actor: actor.map(str::to_string),
         name: name.to_string(),
+        data: None,
+    }
+}
+
+/// Build an [`Envelope`] carrying structured [`Envelope::data`] — the
+/// cross-service edge detail on `linked`/`unlinked` (§4.2).
+fn envelope_with_data(
+    kind: EventKind,
+    pid: &str,
+    name: &str,
+    actor: Option<&str>,
+    data: serde_json::Value,
+) -> Envelope {
+    Envelope {
+        data: Some(data),
+        ..envelope(kind, pid, name, actor)
     }
 }
 
@@ -543,6 +574,127 @@ pub async fn merge_and_emit(
     }
 }
 
+/// The §4.2 `data` payload for a `linked` event — the full edge detail,
+/// with `from_ref` reconstructed as this crate's `case:<from_pid>` URN.
+fn edge_data(link: &EntityLinkModel) -> serde_json::Value {
+    serde_json::json!({
+        "edge_id": link.id,
+        "from_ref": format!("{ENTITY}:{}", link.from_pid),
+        "to_ref": link.to_ref,
+        "edge_kind": link.kind,
+        "role": link.role,
+        "confidence": link.confidence,
+        "provenance": link.provenance,
+        "valid_from": link.valid_from,
+        "valid_to": link.valid_to,
+    })
+}
+
+/// The §4.2 `data` payload for an `unlinked` event — the edge id plus the
+/// refs, so a consumer can remove the edge without re-deriving it.
+fn unlink_data(link: &EntityLinkModel) -> serde_json::Value {
+    serde_json::json!({
+        "edge_id": link.id,
+        "from_ref": format!("{ENTITY}:{}", link.from_pid),
+        "to_ref": link.to_ref,
+        "edge_kind": link.kind,
+    })
+}
+
+/// Assert a cross-service outbound edge and emit its `linked` event,
+/// atomically under the active transport (see [`create_and_emit`] for the
+/// two paths). `name` is the originating case's title (the envelope's
+/// denormalised label); the envelope `pid` is the case pid (`from` side)
+/// and the edge detail rides in the envelope's `data` (§4.2). The upsert
+/// is idempotent (§4.1), so a re-assert re-emits `linked` for the same
+/// stable `edge_id`. Audits the write as the `linked` action.
+///
+/// # Errors
+///
+/// When the upsert (or, for `outbox`, the transaction / outbox / audit
+/// insert) fails; the transaction rolls back all writes on any error.
+pub async fn link_and_emit(
+    db: &DatabaseConnection,
+    edge: &NewEdge,
+    name: &str,
+    actor: Option<&str>,
+) -> ModelResult<EntityLinkModel> {
+    let from_pid = edge.from_pid.to_string();
+    match transport() {
+        EventTransport::Memory => {
+            let link = EntityLinkModel::upsert(db, edge).await?;
+            let data = edge_data(&link);
+            publisher().publish(envelope_with_data(
+                EventKind::Linked,
+                &from_pid,
+                name,
+                actor,
+                data.clone(),
+            ));
+            audit_best_effort(db, edge.from_pid, "linked", actor, Some(data)).await;
+            Ok(link)
+        }
+        EventTransport::Outbox => {
+            let txn = db.begin().await?;
+            let link = EntityLinkModel::upsert(&txn, edge).await?;
+            let data = edge_data(&link);
+            let env = envelope_with_data(EventKind::Linked, &from_pid, name, actor, data.clone());
+            OutboxPublisher.publish(&txn, &env).await?;
+            AuditModel::record(&txn, edge.from_pid, "linked", actor, Some(data)).await?;
+            txn.commit().await?;
+            Ok(link)
+        }
+    }
+}
+
+/// Withdraw (soft-delete) a cross-service outbound edge and emit its
+/// `unlinked` event, atomically under the active transport. Consumes the
+/// loaded `link`; `name` is the originating case's title. Audits the
+/// withdrawal as the `unlinked` action.
+///
+/// # Errors
+///
+/// When the soft-delete (or, for `outbox`, the transaction / outbox /
+/// audit insert) fails.
+pub async fn unlink_and_emit(
+    db: &DatabaseConnection,
+    link: EntityLinkModel,
+    name: &str,
+    actor: Option<&str>,
+) -> ModelResult<()> {
+    let from_pid_str = link.from_pid.to_string();
+    let from_pid = link.from_pid;
+    let data = unlink_data(&link);
+    match transport() {
+        EventTransport::Memory => {
+            link.into_active_model().soft_delete(db).await?;
+            publisher().publish(envelope_with_data(
+                EventKind::Unlinked,
+                &from_pid_str,
+                name,
+                actor,
+                data.clone(),
+            ));
+            audit_best_effort(db, from_pid, "unlinked", actor, Some(data)).await;
+        }
+        EventTransport::Outbox => {
+            let txn = db.begin().await?;
+            link.into_active_model().soft_delete(&txn).await?;
+            let env = envelope_with_data(
+                EventKind::Unlinked,
+                &from_pid_str,
+                name,
+                actor,
+                data.clone(),
+            );
+            OutboxPublisher.publish(&txn, &env).await?;
+            AuditModel::record(&txn, from_pid, "unlinked", actor, Some(data)).await?;
+            txn.commit().await?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -596,6 +748,52 @@ mod tests {
         assert_eq!(value["kind"], "updated");
         assert_eq!(value["pid"], "pid-9");
         assert_eq!(value["name"], "Tax credit overpayment");
+    }
+
+    /// A CRUD envelope carries no `data` and omits the field from the wire
+    /// entirely (`skip_serializing_if`), so existing event shapes are
+    /// byte-identical after the additive `data` field.
+    #[test]
+    fn crud_envelope_omits_data_on_the_wire() {
+        let env = envelope(EventKind::Created, "pid-1", "Housing benefit appeal", None);
+        assert!(env.data.is_none());
+        let value = serde_json::to_value(&env).expect("serialize");
+        assert!(
+            !value.as_object().unwrap().contains_key("data"),
+            "data must be absent for CRUD events"
+        );
+    }
+
+    /// A `linked` envelope carries structured `data` (the edge detail),
+    /// serializes it, and round-trips — while its `EventView` projection
+    /// still exposes exactly the four frozen keys (edge detail is not
+    /// leaked to the operator stream).
+    #[test]
+    fn linked_envelope_carries_data_but_projection_stays_frozen() {
+        let data = serde_json::json!({ "edge_id": "e1", "edge_kind": "subject_of" });
+        let env = envelope_with_data(
+            EventKind::Linked,
+            "case-pid",
+            "Housing benefit appeal",
+            Some("user-1"),
+            data.clone(),
+        );
+        let value = serde_json::to_value(&env).expect("serialize");
+        assert_eq!(value["kind"], "linked");
+        assert_eq!(value["data"]["edge_kind"], "subject_of");
+        let back: Envelope = serde_json::from_value(value).expect("round-trip");
+        assert_eq!(back.data, Some(data));
+
+        // The operator projection is unchanged: exactly {kind,name,pid,seq}.
+        let view = serde_json::to_value(EventView::from(&env)).expect("view");
+        let mut keys: Vec<&str> = view
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["kind", "name", "pid", "seq"]);
     }
 
     /// Pins the in-memory publisher: published envelopes read back newest

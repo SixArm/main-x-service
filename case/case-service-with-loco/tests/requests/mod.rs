@@ -3,4 +3,5 @@
 //! suite in [`event_outbox`].
 
 mod cases;
+mod entity_links;
 mod event_outbox;
