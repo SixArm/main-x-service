@@ -86,7 +86,10 @@
   claims; unauthenticated ⇒ denied), and `auth::conceal_governed` strip
   governed edges from `neighbors` / `edges` / `single-view` — a direct
   `?kind=subject_of` returns an empty list rather than revealing them.
-  Gated on `LINK_GRAPH_REQUIRE_AUTH`. Unit + DB-gated `tests/governance.rs`.
+  Gated on `LINK_GRAPH_REQUIRE_AUTH`. Unit tests + DB-gated
+  `tests/concealment.rs` (minted tokens + a restrictive policy: a
+  `dept=cases` caller sees the `subject_of` edge and is audited; a
+  `dept=hr` caller has it concealed).
   Audit of governed reads (T-17) + masking parity (T-18) still pending.)*
 - [x] T-17: Audit every read/write touching governed edges to
   `audit_log` (§6 FR-19). *(Done: the `audit_log` table (§10.4) +

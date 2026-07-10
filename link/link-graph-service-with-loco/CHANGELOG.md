@@ -14,6 +14,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — end-to-end concealment proof (spec T-16 / design §10) (2026-07-10)
+
+- New DB-gated `tests/concealment.rs` (own binary) mints real
+  PASETO v4.public tokens against a throwaway key set and installs a
+  **restrictive ABAC policy** (any authenticated caller may read the
+  aggregator, but `case`-read needs `dept=cases`). It proves the
+  load-bearing §10 invariant end-to-end: a `dept=cases` caller sees the
+  `subject_of` edge **and that read is audited** (`read_edge` with the
+  caller `sub`), while a `dept=hr` caller — who still passes the blanket
+  guard — has the same edge **concealed** (an affiliation stays visible
+  to both, and the concealed read audits nothing). This closes the
+  token-minting follow-up flagged with the blanket guard; concealment is
+  now unit- **and** integration-tested.
+
 ### Added — blanket `/api/*` read guard (spec §9.4 / T-19) (2026-07-10)
 
 - `auth::enforce` + `auth::is_public_path` + the `require_auth_mw` layer
