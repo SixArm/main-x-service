@@ -14,6 +14,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — reconciliation core (spec T-20 / design §8) (2026-07-10)
+
+- `src/reconcile.rs` — the "cost of two sources of truth" pass: diff the
+  read-model `edges` against a service's authoritative `entity_links`,
+  emit a divergence metric, and repair.
+  - Pure `diff` (missing/extra by `edge_id`) — unit-tested.
+  - `AuthoritativeSource` trait (mockable) so the logic is testable
+    without a live service.
+  - `reconcile` sets the `link_graph_reconciliation_divergence` gauge
+    (design §8 SLO) and repairs the read-model (upsert missing via
+    `apply_linked`, remove extra via `apply_unlinked`).
+  - DB-gated `tests/reconcile.rs` with a mock source: adds a missing
+    edge, removes an extra one, converges to 0 on re-run.
+- Deferred: the real source (a bulk-links endpoint per service + the HTTP
+  pull) and the periodic scheduling (a loco worker around `reconcile`).
+
 ### Added — Prometheus metrics (spec T-21) (2026-07-10)
 
 - `src/metrics.rs` — a process-wide registry served at the root

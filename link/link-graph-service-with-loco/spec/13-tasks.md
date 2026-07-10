@@ -136,9 +136,17 @@
   always `Read`; per-record case↔person concealment (§10) stacks on top.
   Unit + DB-gated tests. Deferred: key-rotation refresh and the boot-time
   keys-over-HTTP fetch.)*
-- [ ] T-20: Reconciliation worker — diff read-model vs each service's
+- [~] T-20: Reconciliation — diff read-model vs each service's
   authoritative `entity_links` (bulk-read or replay); emit divergence
-  metric; repair (§6 FR-21, design §8).
+  metric; repair (§6 FR-21, design §8). *(Core done: `src/reconcile.rs` —
+  the pure `diff` (missing/extra by `edge_id`, unit-tested), the
+  `AuthoritativeSource` trait (mockable), and `reconcile` (diff → set the
+  `link_graph_reconciliation_divergence` gauge → repair: upsert missing,
+  remove extra). DB-gated `tests/reconcile.rs` with a mock source (adds
+  missing, removes extra, converges to 0). Deferred: the **real** source —
+  a bulk-links read endpoint per service (case has the per-record write
+  side today; a global list is next) + the HTTP pull — and the periodic
+  scheduling (a loco worker/task wrapper around `reconcile`).)*
 - [x] T-21: Prometheus `/metrics.prom` — consumer lag, edge counts by
   `status`, processed counters (§6 FR-22). *(Done: `src/metrics.rs` — a
   process-wide registry with `link_graph_events_processed_total{kind}`

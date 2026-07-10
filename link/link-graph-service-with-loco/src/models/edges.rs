@@ -328,6 +328,20 @@ impl Model {
         Ok(rows.iter().filter_map(Model::to_view).collect())
     }
 
+    /// The `edge_id` of every stored edge, for reconciliation (spec T-20 /
+    /// design §8). v1 scans the table; a paged/replay diff is a future
+    /// optimisation.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn all_edge_ids<C: ConnectionTrait>(
+        db: &C,
+    ) -> ModelResult<std::collections::HashSet<Uuid>> {
+        let rows = Entity::find().all(db).await?;
+        Ok(rows.into_iter().map(|r| r.edge_id).collect())
+    }
+
     /// Count edges in each integrity [`EdgeStatus`], for the
     /// `link_graph_edges{status}` metric gauge (spec §9 / T-21).
     ///
