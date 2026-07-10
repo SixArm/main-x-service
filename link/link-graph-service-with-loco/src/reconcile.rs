@@ -16,7 +16,8 @@ use std::collections::HashSet;
 use async_trait::async_trait;
 use chrono::Utc;
 use loco_rs::prelude::*;
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseConnection};
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::events::LinkedEvent;
@@ -110,6 +111,84 @@ where
     Ok(count)
 }
 
+/// The bulk-links response shape from a service's `GET /…/links` — the
+/// canonical §4.2 edge list, each row deserializing straight into a
+/// [`LinkedEvent`] (`edge_id` / `edge_kind` field names, `from_ref` URN).
+#[derive(Debug, Deserialize)]
+struct BulkLinksResponse {
+    edges: Vec<LinkedEvent>,
+}
+
+/// The **real** authoritative source: a one-shot `GET` to a service's
+/// bulk-links endpoint (design §8), optionally bearer-authenticated. The
+/// URL comes from `LINK_GRAPH_RECONCILE_URL_<ENTITY>` and the token from
+/// `LINK_GRAPH_RECONCILE_TOKEN`.
+pub struct HttpAuthoritativeSource {
+    url: String,
+    token: Option<String>,
+}
+
+impl HttpAuthoritativeSource {
+    /// Build from the environment for `entity` (e.g. `case`), or `None`
+    /// when no `LINK_GRAPH_RECONCILE_URL_<ENTITY>` is configured.
+    #[must_use]
+    pub fn from_env_for(entity: &str) -> Option<Self> {
+        let url = std::env::var(format!(
+            "LINK_GRAPH_RECONCILE_URL_{}",
+            entity.to_ascii_uppercase()
+        ))
+        .ok()
+        .filter(|s| !s.trim().is_empty())?;
+        let token = std::env::var("LINK_GRAPH_RECONCILE_TOKEN")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
+        Some(Self { url, token })
+    }
+}
+
+#[async_trait]
+impl AuthoritativeSource for HttpAuthoritativeSource {
+    async fn fetch_all(&self) -> ModelResult<Vec<LinkedEvent>> {
+        let mut request = reqwest::Client::new().get(&self.url);
+        if let Some(token) = &self.token {
+            request = request.bearer_auth(token);
+        }
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ModelError::Any(Box::new(e)))?
+            .error_for_status()
+            .map_err(|e| ModelError::Any(Box::new(e)))?;
+        let body: BulkLinksResponse = response
+            .json()
+            .await
+            .map_err(|e| ModelError::Any(Box::new(e)))?;
+        Ok(body.edges)
+    }
+}
+
+/// Run reconciliation periodically against `source` until the process
+/// exits — the "worker" wiring (design §8). The interval is
+/// `LINK_GRAPH_RECONCILE_SECS` (default 300); the first tick is skipped so
+/// boot is not blocked. A failed pass is logged and retried next tick.
+/// Spawned from `App::after_routes` only when a source is configured.
+pub async fn run_periodic<S: AuthoritativeSource>(db: DatabaseConnection, source: S) {
+    let secs = std::env::var("LINK_GRAPH_RECONCILE_SECS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .filter(|s| *s > 0)
+        .unwrap_or(300);
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(secs));
+    interval.tick().await; // consume the immediate first tick
+    loop {
+        interval.tick().await;
+        match reconcile(&db, &source).await {
+            Ok(n) => tracing::info!(divergence = n, "reconciliation pass complete"),
+            Err(error) => tracing::warn!(%error, "reconciliation pass failed"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,5 +231,31 @@ mod tests {
         let d = diff(&readmodel, &[edge(5)]);
         assert_eq!(d.count(), 0);
         assert!(d.missing.is_empty() && d.extra.is_empty());
+    }
+
+    #[test]
+    fn bulk_response_deserializes_the_case_bulk_links_shape() {
+        // Exactly the JSON the case service's GET /api/cases/links emits
+        // (its `EdgeDetail`): the cross-service integration contract. If
+        // this parses, the HttpAuthoritativeSource can consume case.
+        let json = serde_json::json!({
+            "edges": [{
+                "edge_id": "0c4f1e2a-0000-4000-8000-000000000010",
+                "from_ref": "case:0c4f1e2a-0000-4000-8000-000000000001",
+                "to_ref": "person:0c4f1e2a-0000-4000-8000-000000000002",
+                "edge_kind": "subject_of",
+                "role": null,
+                "confidence": null,
+                "provenance": "operator",
+                "valid_from": null,
+                "valid_to": null
+            }]
+        });
+        let parsed: BulkLinksResponse = serde_json::from_value(json).unwrap();
+        assert_eq!(parsed.edges.len(), 1);
+        assert_eq!(parsed.edges[0].edge_kind, EdgeKind::SubjectOf);
+        assert_eq!(parsed.edges[0].from_ref.entity_type, EntityType::Case);
+        assert_eq!(parsed.edges[0].to_ref.entity_type, EntityType::Person);
+        assert_eq!(parsed.edges[0].provenance, "operator");
     }
 }

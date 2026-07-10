@@ -27,8 +27,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     `apply_linked`, remove extra via `apply_unlinked`).
   - DB-gated `tests/reconcile.rs` with a mock source: adds a missing
     edge, removes an extra one, converges to 0 on re-run.
-- Deferred: the real source (a bulk-links endpoint per service + the HTTP
-  pull) and the periodic scheduling (a loco worker around `reconcile`).
+- **Now live** (2026-07-10): `HttpAuthoritativeSource` — a bearer-authed
+  `GET` of `LINK_GRAPH_RECONCILE_URL_<ENTITY>` parsing the canonical §4.2
+  edge list — plus `run_periodic`, spawned from `after_routes` when a
+  source is configured (`LINK_GRAPH_RECONCILE_SECS`, default 300). The
+  authoritative source is the case service's new `GET /api/cases/links`.
+  A DB-free unit test pins that the case bulk-links JSON deserializes into
+  the aggregator's `LinkedEvent` (the cross-service seam). Other services
+  follow as they gain a bulk-links endpoint.
 
 ### Added — Prometheus metrics (spec T-21) (2026-07-10)
 

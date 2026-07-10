@@ -140,3 +140,33 @@ async fn upsert_is_idempotent() {
     })
     .await;
 }
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// GET /api/cases/links returns every active edge in the canonical §4.2
+// shape (edge_id / edge_kind / from_ref=case:<pid>), for reconciliation.
+async fn bulk_links_returns_the_canonical_edge_shape() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let pid = create_case(&request).await;
+        let to_ref = "person:0c4f1e2a-0000-4000-8000-000000000009";
+        let created = request
+            .post(&format!("/api/cases/{pid}/links"))
+            .json(&json!({ "kind": "subject_of", "to_ref": to_ref }))
+            .await;
+        assert_eq!(created.status_code(), 200, "link create should succeed");
+
+        let body: Value = request.get("/api/cases/links").await.json();
+        let edges = body["edges"].as_array().expect("edges array");
+        assert_eq!(edges.len(), 1, "one active edge across all cases");
+        let e = &edges[0];
+        // Canonical §4.2 field names — deserializable as the aggregator's
+        // LinkedEvent (edge_id/edge_kind, not the LinkView id/kind).
+        assert!(e["edge_id"].is_string());
+        assert_eq!(e["edge_kind"], "subject_of");
+        assert_eq!(e["from_ref"], format!("case:{pid}"));
+        assert_eq!(e["to_ref"], to_ref);
+        assert_eq!(e["provenance"], "operator");
+    })
+    .await;
+}

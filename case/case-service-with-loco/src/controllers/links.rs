@@ -99,6 +99,49 @@ impl LinkView {
     }
 }
 
+/// The canonical §4.2 edge detail — **the same shape the `linked` /
+/// `unlinked` events carry** (`edge_id` / `edge_kind` field names, `from_ref`
+/// as `case:<pid>`), so the link-graph aggregator deserializes it directly
+/// into its `LinkedEvent` for reconciliation (design §8). Distinct from the
+/// operator-facing [`LinkView`] (`id` / `kind`).
+#[derive(Debug, Serialize)]
+struct EdgeDetail {
+    edge_id: String,
+    from_ref: String,
+    to_ref: String,
+    edge_kind: String,
+    role: Option<String>,
+    confidence: Option<f64>,
+    provenance: String,
+    valid_from: Option<String>,
+    valid_to: Option<String>,
+}
+
+impl EdgeDetail {
+    fn of(m: &EntityLinkModel) -> Self {
+        Self {
+            edge_id: m.id.to_string(),
+            from_ref: format!("case:{}", m.from_pid),
+            to_ref: m.to_ref.clone(),
+            edge_kind: m.kind.clone(),
+            role: m.role.clone(),
+            confidence: m.confidence,
+            provenance: m.provenance.clone(),
+            valid_from: m.valid_from.map(|d| d.to_string()),
+            valid_to: m.valid_to.map(|d| d.to_string()),
+        }
+    }
+}
+
+/// Query params for the bulk-links endpoint.
+#[derive(Debug, Deserialize)]
+struct BulkParams {
+    /// Optional RFC3339 lower bound on `created_at` for an incremental
+    /// pull; absent ⇒ a full replay.
+    #[serde(default)]
+    since: Option<String>,
+}
+
 /// Validate an incoming edge: `to_ref` must parse as an [`EntityRef`],
 /// `kind` must be a known [`EdgeKind`], and the kind must **permit** a
 /// `case → <to_ref.entity_type>` endpoint pair (§9). For the case
@@ -251,11 +294,38 @@ async fn delete_link(
     format::empty_json()
 }
 
+/// `GET /api/cases/links[?since=<rfc3339>]` — every active outbound edge
+/// across all cases, in the canonical §4.2 shape, for the link-graph
+/// aggregator's reconciliation (design §8). Read-only; gated by the
+/// blanket guard's read action (a bulk read of high-sensitivity
+/// `subject_of` edges — finer per-caller authorisation is a §10 follow-up).
+///
+/// # Errors
+///
+/// `422` when `since` is not valid RFC3339; a DB error on the query.
+#[debug_handler]
+async fn bulk_links(
+    axum::extract::Query(params): axum::extract::Query<BulkParams>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let since = match params.since.as_deref() {
+        None => None,
+        Some(s) => Some(
+            chrono::DateTime::parse_from_rfc3339(s)
+                .map_err(|e| unprocessable(&format!("invalid `since` (want RFC3339): {e}")))?,
+        ),
+    };
+    let rows = EntityLinkModel::list_all_active(&ctx.db, since).await?;
+    let edges: Vec<EdgeDetail> = rows.iter().map(EdgeDetail::of).collect();
+    format::json(serde_json::json!({ "edges": edges }))
+}
+
 /// Build the cross-service link routes, mounted under the case prefix.
 /// Registered alongside the CRUD routes in `app.rs`.
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/cases")
+        .add("/links", get(bulk_links))
         .add("/{pid}/links", post(create_link))
         .add("/{pid}/links", get(list_links))
         .add("/{pid}/links/{id}", delete(delete_link))
