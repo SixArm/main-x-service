@@ -43,3 +43,4 @@ pub mod metrics;
 pub mod models;
 pub mod openapi;
 pub mod probe;
+pub mod reconcile;

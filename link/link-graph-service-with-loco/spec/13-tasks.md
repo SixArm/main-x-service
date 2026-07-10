@@ -136,9 +136,21 @@
   always `Read`; per-record case↔person concealment (§10) stacks on top.
   Unit + DB-gated tests. Deferred: key-rotation refresh and the boot-time
   keys-over-HTTP fetch.)*
-- [ ] T-20: Reconciliation worker — diff read-model vs each service's
+- [x] T-20: Reconciliation — diff read-model vs each service's
   authoritative `entity_links` (bulk-read or replay); emit divergence
-  metric; repair (§6 FR-21, design §8).
+  metric; repair (§6 FR-21, design §8). *(`src/reconcile.rs`: the pure
+  `diff` (missing/extra by `edge_id`, unit-tested), the
+  `AuthoritativeSource` trait, `reconcile` (diff → set the
+  `link_graph_reconciliation_divergence` gauge → repair: upsert missing /
+  remove extra), the **`HttpAuthoritativeSource`** (a bearer-authed `GET`
+  of `LINK_GRAPH_RECONCILE_URL_<ENTITY>` → the canonical §4.2 edge list),
+  and `run_periodic` — spawned from `after_routes` when a source is
+  configured (interval `LINK_GRAPH_RECONCILE_SECS`, default 300). The
+  authoritative source is the **case** service's `GET /api/cases/links`
+  (its `entity_links` bulk read). DB-gated `tests/reconcile.rs` (mock
+  source) + a unit test pinning that the case bulk-links JSON deserializes
+  into the aggregator's `LinkedEvent` (the cross-service seam). Now **live**
+  for case; other services follow as they gain a bulk-links endpoint.)*
 - [x] T-21: Prometheus `/metrics.prom` — consumer lag, edge counts by
   `status`, processed counters (§6 FR-22). *(Done: `src/metrics.rs` — a
   process-wide registry with `link_graph_events_processed_total{kind}`

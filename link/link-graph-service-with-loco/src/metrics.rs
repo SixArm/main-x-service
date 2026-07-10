@@ -16,7 +16,7 @@
 
 use std::sync::OnceLock;
 
-use prometheus::{Encoder, IntCounterVec, IntGaugeVec, Opts, Registry, TextEncoder};
+use prometheus::{Encoder, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder};
 
 /// Content type for the Prometheus text-exposition format.
 pub const CONTENT_TYPE: &str = "text/plain; version=0.0.4";
@@ -34,6 +34,10 @@ pub struct Metrics {
     /// Per-entity consumer lag in seconds (now − last consumed
     /// `occurred_at`); refreshed at scrape time.
     pub consumer_lag_seconds: IntGaugeVec,
+    /// Edges that diverged between the read-model and a service's
+    /// authoritative `entity_links` at the last reconciliation pass
+    /// (design §8 SLO — steady-state ~0). Set by [`crate::reconcile`].
+    pub reconciliation_divergence: IntGauge,
 }
 
 impl Metrics {
@@ -63,6 +67,11 @@ impl Metrics {
             &["entity"],
         )
         .expect("static gauge-vec opts are always valid");
+        let reconciliation_divergence = IntGauge::new(
+            "link_graph_reconciliation_divergence",
+            "Edges diverging between the read-model and authoritative entity_links at the last reconciliation.",
+        )
+        .expect("static gauge opts are always valid");
 
         registry
             .register(Box::new(events_processed_total.clone()))
@@ -73,12 +82,16 @@ impl Metrics {
         registry
             .register(Box::new(consumer_lag_seconds.clone()))
             .expect("registering a fresh collector cannot fail");
+        registry
+            .register(Box::new(reconciliation_divergence.clone()))
+            .expect("registering a fresh collector cannot fail");
 
         Self {
             registry,
             events_processed_total,
             edges,
             consumer_lag_seconds,
+            reconciliation_divergence,
         }
     }
 

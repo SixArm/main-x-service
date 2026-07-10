@@ -10,7 +10,7 @@
 
 use loco_rs::prelude::*;
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ConnectionTrait, QueryOrder, prelude::Date};
+use sea_orm::{ConnectionTrait, QueryOrder, prelude::Date, prelude::DateTimeWithTimeZone};
 use uuid::Uuid;
 
 pub use super::_entities::entity_links::{self, ActiveModel, Entity, Model};
@@ -128,6 +128,30 @@ impl Model {
             .one(db)
             .await?;
         row.ok_or_else(|| ModelError::EntityNotFound)
+    }
+
+    /// Every **active** outbound edge across all cases, oldest first — the
+    /// authoritative set the link-graph aggregator reconciles against
+    /// (`GET /api/cases/links`, design §8). `since` (on `created_at`)
+    /// bounds an incremental pull; `None` is a full replay.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn list_all_active<C: ConnectionTrait>(
+        db: &C,
+        since: Option<DateTimeWithTimeZone>,
+    ) -> ModelResult<Vec<Self>> {
+        let mut query =
+            entity_links::Entity::find().filter(entity_links::Column::DeletedAt.is_null());
+        if let Some(since) = since {
+            query = query.filter(entity_links::Column::CreatedAt.gte(since));
+        }
+        let rows = query
+            .order_by_asc(entity_links::Column::CreatedAt)
+            .all(db)
+            .await?;
+        Ok(rows)
     }
 }
 

@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — cross-service entity links: bulk-read for reconciliation (2026-07-10)
+
+- `GET /api/cases/links[?since=<rfc3339>]` — every active outbound edge
+  across all cases, in the **canonical §4.2 shape** (`edge_id` /
+  `edge_kind` field names, `from_ref` = `case:<pid>`; distinct from the
+  operator-facing `LinkView`), so the link-graph aggregator deserializes
+  it straight into its `LinkedEvent` for reconciliation (design §8). Read
+  gated by the blanket guard; `since` bounds an incremental pull.
+  `EntityLink::list_all_active`. DB-gated test pins the shape. (A bulk
+  read of high-sensitivity `subject_of` edges — finer per-caller
+  authorisation is a §10 follow-up.)
+
 ### Added — cross-service entity links: write side (`subject_of` case → person) (2026-07-10)
 
 - Landed the **write side** of cross-service entity linking

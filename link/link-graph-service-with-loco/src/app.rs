@@ -1,10 +1,11 @@
 //! loco.rs application wiring: the [`App`] `Hooks` implementation that
 //! registers routes and the truncate lifecycle for `link-graph-service`.
 //!
-//! Read-only to the world: only the graph read controllers are mounted
-//! (plus loco's default `/_health` / `/_ping`). Bus consumption,
-//! reconciliation, auth enforcement, metrics, and `OpenAPI` are
-//! v1-deferred (spec §13).
+//! Read-only to the world: the graph read controllers, `OpenAPI`/Swagger,
+//! and Prometheus metrics are mounted (plus loco's default `/_health` /
+//! `/_ping`); `after_routes` adds the blanket read guard and spawns the
+//! periodic reconciliation worker when a source is configured. The live
+//! **Fluvio bus consumer** is the remaining v1-deferred piece (spec §13).
 
 use async_trait::async_trait;
 use axum::{
@@ -30,6 +31,7 @@ use std::path::Path;
 use crate::auth;
 use crate::controllers;
 use crate::models::_entities::{audit_log, consumer_offsets, edges, entity_presence};
+use crate::reconcile;
 
 /// Blanket read-guard middleware (spec §9.4 / T-19). Delegates to the pure
 /// [`auth::enforce`]: with `LINK_GRAPH_REQUIRE_AUTH` off, or on a public
@@ -113,7 +115,14 @@ impl Hooks for App {
     /// # Errors
     ///
     /// Infallible here; the signature is loco's.
-    async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
+    async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
+        // Periodic reconciliation (design §8): pull each configured
+        // service's authoritative entity_links and repair the read-model.
+        // Spawned only when a source is configured
+        // (`LINK_GRAPH_RECONCILE_URL_CASE`); a no-op otherwise.
+        if let Some(source) = reconcile::HttpAuthoritativeSource::from_env_for("case") {
+            tokio::spawn(reconcile::run_periodic(ctx.db.clone(), source));
+        }
         Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
     }
 
