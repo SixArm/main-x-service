@@ -258,4 +258,28 @@ mod tests {
         assert_eq!(parsed.edges[0].to_ref.entity_type, EntityType::Person);
         assert_eq!(parsed.edges[0].provenance, "operator");
     }
+
+    #[test]
+    fn bulk_response_deserializes_the_person_same_identity_shape() {
+        // The person service's GET /api/persons/links emits the same
+        // canonical shape for its same_identity (person → worker) edges.
+        let json = serde_json::json!({
+            "edges": [{
+                "edge_id": "0c4f1e2a-0000-4000-8000-000000000010",
+                "from_ref": "person:0c4f1e2a-0000-4000-8000-000000000001",
+                "to_ref": "worker:0c4f1e2a-0000-4000-8000-000000000002",
+                "edge_kind": "same_identity",
+                "role": null,
+                "confidence": 1.0,
+                "provenance": "operator",
+                "valid_from": null,
+                "valid_to": null
+            }]
+        });
+        let parsed: BulkLinksResponse = serde_json::from_value(json).unwrap();
+        assert_eq!(parsed.edges[0].edge_kind, EdgeKind::SameIdentity);
+        assert_eq!(parsed.edges[0].from_ref.entity_type, EntityType::Person);
+        assert_eq!(parsed.edges[0].to_ref.entity_type, EntityType::Worker);
+        assert_eq!(parsed.edges[0].confidence, Some(1.0));
+    }
 }

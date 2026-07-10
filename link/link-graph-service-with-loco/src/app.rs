@@ -118,10 +118,13 @@ impl Hooks for App {
     async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         // Periodic reconciliation (design §8): pull each configured
         // service's authoritative entity_links and repair the read-model.
-        // Spawned only when a source is configured
-        // (`LINK_GRAPH_RECONCILE_URL_CASE`); a no-op otherwise.
-        if let Some(source) = reconcile::HttpAuthoritativeSource::from_env_for("case") {
-            tokio::spawn(reconcile::run_periodic(ctx.db.clone(), source));
+        // One worker per entity that sets `LINK_GRAPH_RECONCILE_URL_<ENTITY>`
+        // (case ships `subject_of`, person ships `same_identity`); a no-op
+        // for any entity without a configured source.
+        for entity in ["case", "person"] {
+            if let Some(source) = reconcile::HttpAuthoritativeSource::from_env_for(entity) {
+                tokio::spawn(reconcile::run_periodic(ctx.db.clone(), source));
+            }
         }
         Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
     }

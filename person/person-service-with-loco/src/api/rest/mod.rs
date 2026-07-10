@@ -21,6 +21,8 @@ use utoipa_swagger_ui::SwaggerUi;
 pub mod auth;
 /// REST endpoint handler functions.
 pub mod handlers;
+/// Cross-service entity-link endpoints (`same_identity` write side).
+pub mod links;
 /// Route grouping helpers.
 pub mod routes;
 /// Shared [`AppState`] definition.
@@ -141,6 +143,15 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/persons/merge", post(handlers::merge_persons))
         .route("/persons/deduplicate", post(handlers::batch_deduplicate))
+        // Cross-service entity links (§4.1): the aggregator's bulk
+        // reconciliation pull (static — must precede the `{id}` routes),
+        // then a person's outbound-edge create/list/withdraw.
+        .route("/persons/links", get(links::bulk_links))
+        .route(
+            "/persons/{id}/links",
+            post(links::create_link).get(links::list_links),
+        )
+        .route("/persons/{id}/links/{link_id}", delete(links::delete_link))
         // Privacy
         .route("/persons/{id}/export", get(handlers::export_person_data))
         .route("/persons/{id}/masked", get(handlers::get_person_masked))
@@ -182,11 +193,19 @@ pub fn create_router(state: AppState) -> Router {
 /// integration tests. The root `/metrics.prom` route is [`metrics_routes`].
 #[must_use]
 pub fn persons_routes() -> loco_rs::controller::Routes {
-    use loco_rs::prelude::{Routes, get, post};
+    use loco_rs::prelude::{Routes, delete, get, post};
     Routes::new()
         .prefix("/api")
         .add("/health", get(handlers::health_check))
         .add("/whoami", get(auth::whoami))
+        // Cross-service entity links (§4.1): bulk reconciliation pull
+        // (static, before `{id}`), then per-person create/list/withdraw.
+        .add("/persons/links", get(links::bulk_links))
+        .add(
+            "/persons/{id}/links",
+            post(links::create_link).get(links::list_links),
+        )
+        .add("/persons/{id}/links/{link_id}", delete(links::delete_link))
         .add("/persons", post(handlers::create_person))
         .add(
             "/persons/{id}",

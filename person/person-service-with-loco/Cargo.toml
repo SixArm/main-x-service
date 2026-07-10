@@ -80,6 +80,12 @@ prometheus = "0.13"
 # Sibling matcher crate (canonical reference algorithm; reached via adapter)
 person-matcher = { version = "0.6.1", path = "../person-matcher-rust-crate" }
 
+# Shared cross-service-linking contract: the EntityRef URN value type and
+# the §9 EdgeKind registry (agents/share/cross-service-linking.md §3, §9).
+# Used by the entity-links write side to parse/validate `to_ref` and the
+# `kind`/endpoint pair (`same_identity` person → worker).
+entity-ref = { path = "../../link/entity-ref-rust-crate" }
+
 # Security
 argon2 = "0.5"
 # Offline PASETO v4.public verification of authentication-service tokens

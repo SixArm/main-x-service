@@ -18,6 +18,8 @@ use crate::config::DatabaseConfig;
 pub mod audit;
 /// chrono <-> time conversions at the persistence boundary.
 pub mod convert;
+/// Cross-service entity-link write-side persistence (`same_identity`).
+pub mod entity_links;
 /// SeaORM entity (ActiveModel/Model) definitions.
 pub mod models;
 /// Transactional-outbox write + relay surface (durable event bus, Phase 2).
