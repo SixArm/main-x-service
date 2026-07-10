@@ -42,6 +42,9 @@ const DEFAULT_AUDIENCE: &str = "main-x-service";
 /// ABAC policy) to see this crate's governed `subject_of` edges — the same
 /// `case` gate the case service applies to the underlying record (§10).
 const GOVERNED_ENTITY: &str = "case";
+/// The aggregator's own entity, as seen by the blanket read guard's ABAC
+/// decision (the `entity` pseudo-attribute in policy `when` clauses).
+const GRAPH_ENTITY: &str = "link_graph";
 
 /// Read an env var, falling back to `default` when unset/blank.
 fn env_or(name: &str, default: &str) -> String {
@@ -220,6 +223,48 @@ pub fn conceal_governed<T>(
         .collect()
 }
 
+/// Paths that stay public even when enforcement is on: the loco health /
+/// ping probes and (once they land) the `OpenAPI` doc, Swagger UI, and
+/// Prometheus metrics.
+#[must_use]
+pub fn is_public_path(path: &str) -> bool {
+    path == "/_health"
+        || path == "/_ping"
+        || path == "/api-docs/openapi.json"
+        || path.starts_with("/swagger-ui")
+        || path == "/metrics.prom"
+}
+
+/// The blanket read guard (spec §9.4 / T-19): when enforcement is on,
+/// every non-public request needs a valid bearer token (`401`) whose
+/// `attrs` the ABAC policy grants `read` on the aggregator (`403`). The
+/// service is read-only, so the action is always [`Action::Read`];
+/// governed-edge concealment (§10) stacks on top of this in the handlers.
+/// Pure (flag + verifier + policy passed in), so it is unit-testable
+/// without the process globals.
+///
+/// # Errors
+///
+/// `401` for a missing/invalid token; `403` when the policy denies read.
+pub fn enforce(
+    require_auth: bool,
+    path: &str,
+    headers: &HeaderMap,
+    verifier: &Verifier,
+    policy: &Policy,
+) -> Result<(), (StatusCode, String)> {
+    if !require_auth || is_public_path(path) {
+        return Ok(());
+    }
+    let claims = bearer_claims(headers, verifier)?;
+    let decision = policy.evaluate(&claims, Action::Read, GRAPH_ENTITY);
+    if decision.allowed {
+        Ok(())
+    } else {
+        Err((StatusCode::FORBIDDEN, decision.reason))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291,5 +336,32 @@ mod tests {
                 .evaluate(&authed, Action::Read, GOVERNED_ENTITY)
                 .allowed
         );
+    }
+
+    /// An empty (no-keys) verifier — rejects every token; enough to pin the
+    /// flag-off / public-path / missing-token branches of `enforce`.
+    fn empty_verifier() -> Verifier {
+        Verifier::from_paseto_keys_value(
+            &serde_json::json!({ "keys": [] }),
+            DEFAULT_ISSUER,
+            DEFAULT_AUDIENCE,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn enforce_allows_when_off_or_on_a_public_path() {
+        let (v, p, empty) = (empty_verifier(), Policy::default_policy(), HeaderMap::new());
+        // Flag off ⇒ allow (dev default), even a protected path, no token.
+        assert!(enforce(false, "/api/edges", &empty, &v, &p).is_ok());
+        // Flag on but a public path ⇒ allow without a token.
+        assert!(enforce(true, "/_health", &empty, &v, &p).is_ok());
+    }
+
+    #[test]
+    fn enforce_on_rejects_a_protected_path_without_a_token() {
+        let (v, p, empty) = (empty_verifier(), Policy::default_policy(), HeaderMap::new());
+        let err = enforce(true, "/api/edges", &empty, &v, &p).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
     }
 }

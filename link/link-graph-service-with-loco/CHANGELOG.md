@@ -14,6 +14,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — blanket `/api/*` read guard (spec §9.4 / T-19) (2026-07-10)
+
+- `auth::enforce` + `auth::is_public_path` + the `require_auth_mw` layer
+  (`app.rs::after_routes`): when `LINK_GRAPH_REQUIRE_AUTH` is on, every
+  non-public request needs a valid bearer token (`401`) whose `attrs` the
+  ABAC policy grants `read` on the aggregator (`403`). The service is
+  read-only, so the action is always `Read`. This protects **affiliation**
+  edges (previously served to anyone under enforcement); the per-record
+  `case↔person` concealment (§10) stacks on top for authenticated callers.
+  Off by default (behaviour-neutral until a deployment activates it).
+- Unit tests (flag-off / public-path / missing-token) + the DB-gated
+  `tests/governance.rs` reworked to assert an unauthenticated read is
+  `401` at the guard while a governed write still audits. (The
+  end-to-end *concealment* path for an authenticated-but-not-case-authorised
+  caller stays unit-covered; a token-minting DB test is a follow-up.)
+- `audit_log` added to the test-harness `truncate` list.
+
 ### Added — governance audit trail (spec T-17 / design §10) (2026-07-09)
 
 - New `audit_log` table (§10.4) + `models::audit_log` — every read/write

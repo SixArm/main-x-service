@@ -17,7 +17,7 @@ use link_graph_service::events::{Envelope, apply_event};
 use link_graph_service::models::_entities::audit_log;
 use loco_rs::testing::prelude::*;
 use sea_orm::EntityTrait;
-use serde_json::{Value, json};
+use serde_json::json;
 use serial_test::serial;
 use uuid::Uuid;
 
@@ -48,8 +48,8 @@ fn linked_env(edge_id: Uuid, from: &str, to: &str, edge_kind: &str, seq: i64) ->
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test governance -- --ignored`"]
-async fn governed_edges_are_concealed_from_an_unauthorised_caller() {
-    // Activate governance BEFORE the app boots (read once into a OnceLock).
+async fn enforcement_blocks_unauthenticated_reads_and_audits_governed_writes() {
+    // Activate enforcement BEFORE the app boots (read once into a OnceLock).
     // `set_var` is `unsafe` in edition 2024; single-threaded test setup.
     unsafe {
         std::env::set_var("LINK_GRAPH_REQUIRE_AUTH", "1");
@@ -58,47 +58,37 @@ async fn governed_edges_are_concealed_from_an_unauthorised_caller() {
     request::<App, _, _>(|request, ctx| async move {
         let case = format!("case:{}", u(1));
         let person = format!("person:{}", u(2));
-        let worker = format!("worker:{}", u(3));
-        let org = format!("organization:{}", u(4));
 
-        // A governed case↔person edge and an ordinary affiliation.
+        // A governed case↔person write is audited on the apply seam
+        // (bus-driven; independent of the read guard).
         apply_event(&ctx.db, linked_env(u(10), &case, &person, "subject_of", 1))
             .await
             .unwrap();
-        apply_event(&ctx.db, linked_env(u(11), &worker, &org, "employed_by", 2))
-            .await
-            .unwrap();
 
-        // No bearer token ⇒ unauthorised. `/edges` hides the subject_of
-        // edge but still shows the affiliation.
-        let body: Value = request.get("/api/edges").await.json();
-        let edges = body["data"]["edges"].as_array().unwrap();
-        assert_eq!(edges.len(), 1, "only the non-governed edge is visible");
-        assert_eq!(edges[0]["kind"], "employed_by");
-        assert!(
-            !edges.iter().any(|e| e["kind"] == "subject_of"),
-            "the case↔person edge must not appear"
-        );
-
-        // Even a direct kind filter conceals existence (empty, not 403).
-        let direct: Value = request.get("/api/edges?kind=subject_of").await.json();
-        assert_eq!(direct["success"], true);
+        // With enforcement on, the blanket guard (spec §9.4 / T-19) rejects
+        // an unauthenticated read of any protected path at 401 — before any
+        // handler runs, so nothing (not even affiliation edges) leaks.
+        assert_eq!(request.get("/api/edges").await.status_code(), 401);
         assert_eq!(
-            direct["data"]["edges"].as_array().unwrap().len(),
-            0,
-            "a direct subject_of query reveals nothing"
+            request
+                .get(&format!("/api/neighbors/{case}"))
+                .await
+                .status_code(),
+            401
+        );
+        assert_eq!(
+            request
+                .get(&format!("/api/single-view/{person}"))
+                .await
+                .status_code(),
+            401
         );
 
-        // Neighbors of the case conceals the edge too.
-        let nbrs: Value = request.get(&format!("/api/neighbors/{case}")).await.json();
-        assert_eq!(
-            nbrs["data"]["edges"].as_array().unwrap().len(),
-            0,
-            "the case's own subject_of edge is concealed"
-        );
+        // A public path stays open even under enforcement.
+        assert_eq!(request.get("/_health").await.status_code(), 200);
 
         // The governed WRITE was audited (apply_linked, no actor); the
-        // concealed reads surfaced nothing, so no read_edge row exists.
+        // blocked reads produced no read audit.
         let audits = audit_log::Entity::find().all(&ctx.db).await.unwrap();
         assert_eq!(audits.len(), 1, "only the subject_of apply_linked audited");
         assert_eq!(audits[0].action, "apply_linked");

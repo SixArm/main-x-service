@@ -109,10 +109,14 @@
   ([jwt-enforcement.md](../../../agents/share/jwt-enforcement.md)).
   *(Done: `src/auth.rs` — env-configured `Verifier` (`LINK_GRAPH_PASETO_KEYS`,
   fail-closed empty key set), `MaybeAuthUser` extractor, ABAC `policy()`
-  from `LINK_GRAPH_ABAC_POLICY[_FILE]`. Used by T-16 governance. Deferred:
-  the blanket `/api/*` guard protecting affiliation edges (only the
-  edge-level case↔person concealment is wired), key-rotation refresh, and
-  the boot-time keys-over-HTTP fetch.)*
+  from `LINK_GRAPH_ABAC_POLICY[_FILE]`; used by T-16 governance. The
+  **blanket read guard** (§9.4) is now wired: `auth::enforce` +
+  `is_public_path` + the `require_auth_mw` layer in `app.rs::after_routes`,
+  gated on `LINK_GRAPH_REQUIRE_AUTH` — every non-public read needs a valid
+  token (401) the ABAC policy grants `read` (403); read-only ⇒ action
+  always `Read`; per-record case↔person concealment (§10) stacks on top.
+  Unit + DB-gated tests. Deferred: key-rotation refresh and the boot-time
+  keys-over-HTTP fetch.)*
 - [ ] T-20: Reconciliation worker — diff read-model vs each service's
   authoritative `entity_links` (bulk-read or replay); emit divergence
   metric; repair (§6 FR-21, design §8).

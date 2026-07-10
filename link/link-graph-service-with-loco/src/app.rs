@@ -7,6 +7,12 @@
 //! v1-deferred (spec §13).
 
 use async_trait::async_trait;
+use axum::{
+    Router as AxumRouter,
+    extract::Request,
+    middleware::Next,
+    response::{IntoResponse, Response},
+};
 use loco_rs::{
     Result,
     app::{AppContext, Hooks, Initializer},
@@ -21,8 +27,29 @@ use loco_rs::{
 use migration::Migrator;
 use std::path::Path;
 
+use crate::auth;
 use crate::controllers;
-use crate::models::_entities::{consumer_offsets, edges, entity_presence};
+use crate::models::_entities::{audit_log, consumer_offsets, edges, entity_presence};
+
+/// Blanket read-guard middleware (spec §9.4 / T-19). Delegates to the pure
+/// [`auth::enforce`]: with `LINK_GRAPH_REQUIRE_AUTH` off, or on a public
+/// path, it passes through; otherwise a valid bearer token is required
+/// (`401`) and the token's `attrs` must satisfy the ABAC policy for a
+/// `read` on the aggregator (`403`). The per-record `case↔person`
+/// concealment (§10) stacks on top of this in the handlers.
+async fn require_auth_mw(req: Request, next: Next) -> Response {
+    let path = req.uri().path().to_string();
+    match auth::enforce(
+        auth::require_auth(),
+        &path,
+        req.headers(),
+        auth::verifier(),
+        auth::policy(),
+    ) {
+        Ok(()) => next.run(req).await,
+        Err((status, msg)) => (status, msg).into_response(),
+    }
+}
 
 /// The loco.rs application hooks for `link-graph-service`.
 pub struct App;
@@ -75,6 +102,18 @@ impl Hooks for App {
         AppRoutes::with_default_routes().add_route(controllers::graph::routes())
     }
 
+    /// Wrap the router in the blanket read-guard layer. The
+    /// `LINK_GRAPH_REQUIRE_AUTH` flag is read per request inside
+    /// [`require_auth_mw`], so the layer is a no-op until a deployment
+    /// activates enforcement.
+    ///
+    /// # Errors
+    ///
+    /// Infallible here; the signature is loco's.
+    async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
+        Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
+    }
+
     /// Register background workers — none in the v1 core (the bus
     /// consumer and reconciliation worker are deferred, spec §13).
     ///
@@ -101,6 +140,7 @@ impl Hooks for App {
         truncate_table(&ctx.db, edges::Entity).await?;
         truncate_table(&ctx.db, entity_presence::Entity).await?;
         truncate_table(&ctx.db, consumer_offsets::Entity).await?;
+        truncate_table(&ctx.db, audit_log::Entity).await?;
         Ok(())
     }
 
