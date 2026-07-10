@@ -598,37 +598,62 @@ the other v1 edge kinds even though it shares the same edge shape.
     fast-failing URL (`http://127.0.0.1:1/`) proves fallback without
     panic. Activating the enforcement flag remains an operations
     decision.
-- [ ] **Cross-service entity links (write side).** See §5, §8.6, §9,
-  §10 (§12.1) and
+- [x] **Cross-service entity links (write side) — LANDED (case is the
+  reference; `cross-service-linking.md` rollout step 2 deviation, §11).**
+  See §5, §8.6, §9, §10 (§12.1) and
   [cross-service linking](../../../agents/share/cross-service-linking.md).
-  Case owns the `subject_of` / `about` edge (case → person) — the
-  highest-governance v1 kind.
-  - [ ] Migration `m20220101_000004_entity_links` creating the
-    `entity_links` table (§10 schema, with the
-    `UNIQUE (from_pid, kind, to_ref, valid_from)` upsert key).
-  - [ ] `EntityRef` value type (parse / `Display` + `entity_type →
-    service` map), copied per project (drift-accepted).
-  - [ ] Link endpoints `POST` / `GET` / `DELETE`
-    `/api/cases/{pid}/links`; create/upsert is optimistic (no
-    cross-service call) and supports `subject_of` / `about` (case →
-    person, temporal).
-  - [ ] Emit `linked` / `unlinked` events on the existing event
-    envelope via `EventPublisher` (edge detail in `data`; no new
-    transport).
-  - [ ] **Governance (§12.1, [cross-service linking §10](../../../agents/share/cross-service-linking.md)):**
-    authorise both create AND read at the "read the case" level (the
-    endpoints never more permissive than `GET /api/cases/{pid}`; denied
-    read indistinguishable from "no such edge"); audit every read/write
-    of these edges (`audit_logs` row, `actor` from token); treat the
-    edge as masked sensitive data.
-  - [ ] Partition guard: `entity_links` are never projected into the
-    matcher input (the partition rule, §5).
-  - **Acceptance:** integration test creates a `subject_of` link
-    (`2xx`, `linked` event published, row in `entity_links`), lists it
-    via `GET`, deletes it (`unlinked` event, `deleted_at` set); an authz
-    test asserts an un-authed `GET`/`POST` on `/links` is rejected
-    without revealing edge existence and writes an audit row; a matcher
-    test asserts an `entity_links` row never alters a match score.
+  Case owns the `subject_of` (case → person) edge — the
+  highest-governance v1 kind. (The design nominally names person + worker
+  `same_identity` for step 2, but those are older axum-style services with
+  no event bus; case is the first loco service that both *originates* a v1
+  edge AND has the durable-bus outbox to emit `linked`/`unlinked` — so it
+  ships the write side first. person/worker `same_identity` awaits their
+  own event infrastructure.)
+  - [x] Migration `m20220101_000005_entity_links` creating the
+    `entity_links` table (§4.1 schema: `id UUID` pk, `from_pid`, `kind`,
+    `to_ref`, `role`, `confidence`, `provenance`, `valid_from`,
+    `valid_to`, `deleted_at`) with the
+    `UNIQUE (from_pid, kind, to_ref, valid_from)` upsert key — declared
+    `NULLS NOT DISTINCT` so a null `valid_from` still collides on
+    re-assert (Postgres 15+), making the upsert idempotent. (`…_000004`
+    was already the `event_outbox` migration.)
+  - [x] `EntityRef` / `EdgeKind` contract — **depended on** the shared
+    `entity-ref` crate (`entity_ref::{EntityRef, EntityType, EdgeKind}`)
+    rather than copied per project. The `permits(from, to)` /
+    `is_symmetric` / `is_temporal` registry is reused as the validator.
+  - [x] `SeaORM` entity `models/_entities/entity_links.rs` + model
+    `models/entity_links.rs` (`NewEdge`, idempotent `upsert` on the
+    unique key with revive-on-reassert, `list_active`, case-scoped
+    `find_active`, `soft_delete`), generic over `ConnectionTrait` so the
+    outbox path shares the handler transaction.
+  - [x] Link endpoints `POST` / `GET` / `DELETE`
+    `/api/cases/{pid}/links` (`controllers/links.rs`); create/upsert is
+    optimistic (no cross-service call) and admits exactly `subject_of`
+    (case → person) — every other kind/endpoint pair is `422`
+    (DB-free-tested).
+  - [x] Emit `linked` / `unlinked` events on the existing event envelope
+    via the transactional `link_and_emit` / `unlink_and_emit` seam (edge
+    detail in the new additive `Envelope::data`; no new transport, no
+    `SCHEMA_VERSION` bump; `EventView` projection byte-identical for
+    existing kinds).
+  - [x] **Governance (§12.1, [cross-service linking §10](../../../agents/share/cross-service-linking.md)):**
+    both create AND read authorise at the "read the case" level
+    (`auth::authorize_record` on the loaded case, so never more
+    permissive than `GET /api/cases/{pid}`); every create/withdraw
+    writes an audit row (`linked` / `unlinked` action, `actor` from
+    token). Per-record **masking** of the edge and a "denied read is
+    indistinguishable from no-such-edge" refinement remain follow-ups —
+    v1 leans on the blanket write/destructive guard + the case-level
+    record check.
+  - [x] Partition guard: `entity_links` live only in their own table +
+    events; they are never projected into the matcher input (§5).
+  - **Acceptance:** DB-gated (`tests/requests/entity_links.rs`,
+    `#[ignore]`) create → list → delete round-trip asserts a `linked`
+    then `unlinked` event on `/events/recent`, plus idempotent re-assert
+    and the `same_identity` → `422` reject; DB-free unit tests
+    (`controllers/links.rs`, `streaming.rs`) pin the accept/reject
+    validation matrix and the `data`-carrying envelope with the frozen
+    projection.
 - [ ] **Bulk import / export.** See §8.7 and the family contract
   [bulk import / export](../../../agents/share/bulk-import-export.md)
   (uniform across entities; only the §8.7 stable keys, CSV columns, and

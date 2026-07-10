@@ -84,11 +84,7 @@ impl FhirPlanSearchParams {
 /// Case-insensitive substring of `name` over the pathway's name and
 /// alternate names.
 fn name_matches(pathway: &CarePathway, name: &str) -> bool {
-    contains_ci(&pathway.name, name)
-        || pathway
-            .alternate_names
-            .iter()
-            .any(|a| contains_ci(a, name))
+    contains_ci(&pathway.name, name) || pathway.alternate_names.iter().any(|a| contains_ci(a, name))
 }
 
 /// Match an `identifier` token: `system|value` matches both parts; a bare

@@ -26,7 +26,7 @@ use std::path::Path;
 #[allow(unused_imports)]
 use crate::{
     auth, controllers,
-    models::_entities::{audit_logs, cases, merge_records},
+    models::_entities::{audit_logs, cases, entity_links, merge_records},
     tasks,
     workers::downloader::DownloadWorker,
 };
@@ -97,6 +97,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::cases::routes())
+            .add_route(controllers::links::routes())
             .add_route(controllers::fhir::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
@@ -141,6 +142,7 @@ impl Hooks for App {
         // tasks-inject (do not remove)
     }
     async fn truncate(ctx: &AppContext) -> Result<()> {
+        truncate_table(&ctx.db, entity_links::Entity).await?;
         truncate_table(&ctx.db, merge_records::Entity).await?;
         truncate_table(&ctx.db, audit_logs::Entity).await?;
         truncate_table(&ctx.db, cases::Entity).await?;

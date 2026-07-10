@@ -73,7 +73,11 @@ fn fhir_error(status: StatusCode, code: &str, message: impl Into<String>) -> Res
 /// so the `Result` stays small (`clippy::result_large_err`).
 fn parse_id(id: &str) -> Result<Uuid, Box<Response>> {
     Uuid::parse_str(id).map_err(|_| {
-        Box::new(fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Location/{id} not found")))
+        Box::new(fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("Location/{id} not found"),
+        ))
     })
 }
 
@@ -103,8 +107,16 @@ async fn read(Path(id): Path<String>, State(state): State<AppState>) -> Response
             let resource = to_fhir_location(&place, Some(place.updated_at.to_rfc3339()));
             fhir_json(StatusCode::OK, &resource)
         }
-        Ok(None) => fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Location/{id} not found")),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Ok(None) => fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("Location/{id} not found"),
+        ),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
@@ -117,7 +129,11 @@ async fn read(Path(id): Path<String>, State(state): State<AppState>) -> Response
 /// [`Place`]: crate::models::place::Place
 fn parse_and_validate(body: &[u8]) -> Result<crate::models::place::Place, Box<Response>> {
     let fhir: FhirLocation = serde_json::from_slice(body).map_err(|e| {
-        Box::new(fhir_error(StatusCode::BAD_REQUEST, "structure", format!("invalid FHIR JSON: {e}")))
+        Box::new(fhir_error(
+            StatusCode::BAD_REQUEST,
+            "structure",
+            format!("invalid FHIR JSON: {e}"),
+        ))
     })?;
     let mut place = from_fhir_location(&fhir)
         .map_err(|msg| Box::new(fhir_error(StatusCode::BAD_REQUEST, "invalid", msg)))?;
@@ -146,7 +162,13 @@ async fn create(State(state): State<AppState>, body: axum::body::Bytes) -> Respo
     };
     let stored = match state.place_repository.create(&place).await {
         Ok(s) => s,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     let _ = state.search_engine.index_place(&stored);
     let _ = state
@@ -162,7 +184,11 @@ async fn create(State(state): State<AppState>, body: axum::body::Bytes) -> Respo
     let resource = to_fhir_location(&stored, Some(stored.updated_at.to_rfc3339()));
     match serde_json::to_vec(&resource) {
         Ok(bytes) => fhir_response(StatusCode::CREATED, bytes, Some(format!("Location/{pid}"))),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
@@ -185,12 +211,30 @@ async fn update(
     place.id = uuid;
     let old = match state.place_repository.get_by_id(&uuid).await {
         Ok(Some(p)) => p,
-        Ok(None) => return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Location/{id} not found")),
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Ok(None) => {
+            return fhir_error(
+                StatusCode::NOT_FOUND,
+                "not-found",
+                format!("Location/{id} not found"),
+            );
+        }
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     let stored = match state.place_repository.update(&place).await {
         Ok(s) => s,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     let _ = state.search_engine.delete_place(&uuid.to_string());
     let _ = state.search_engine.index_place(&stored);
@@ -223,16 +267,36 @@ async fn remove(Path(id): Path<String>, State(state): State<AppState>) -> Respon
     };
     let old = match state.place_repository.get_by_id(&uuid).await {
         Ok(Some(p)) => p,
-        Ok(None) => return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Location/{id} not found")),
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Ok(None) => {
+            return fhir_error(
+                StatusCode::NOT_FOUND,
+                "not-found",
+                format!("Location/{id} not found"),
+            );
+        }
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     if let Err(e) = state.place_repository.soft_delete(&uuid).await {
-        return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string());
+        return fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        );
     }
     let _ = state.search_engine.delete_place(&uuid.to_string());
     let _ = state
         .event_publisher
-        .publish(PlaceEvent::new(EventKind::PlaceDeleted, uuid, serde_json::json!({})))
+        .publish(PlaceEvent::new(
+            EventKind::PlaceDeleted,
+            uuid,
+            serde_json::json!({}),
+        ))
         .await;
     if let Ok(v) = serde_json::to_value(&old)
         && let Err(err) = state
@@ -254,7 +318,13 @@ async fn search(
 ) -> Response {
     let rows = match state.place_repository.list(FHIR_SEARCH_SCAN_CAP, 0).await {
         Ok(rows) => rows,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     if rows.len() as u64 == FHIR_SEARCH_SCAN_CAP {
         tracing::warn!(
@@ -361,7 +431,10 @@ mod tests {
             "address-city",
             "address-postalcode",
         ] {
-            assert!(params.contains(&want.to_string()), "missing search param {want}");
+            assert!(
+                params.contains(&want.to_string()),
+                "missing search param {want}"
+            );
         }
     }
 }

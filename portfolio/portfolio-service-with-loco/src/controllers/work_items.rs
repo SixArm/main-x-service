@@ -198,19 +198,6 @@ fn score_desc(a: f64, b: f64) -> std::cmp::Ordering {
     b.partial_cmp(&a).unwrap_or(std::cmp::Ordering::Equal)
 }
 
-/// Best-effort audit write: log on failure but never fail the request.
-async fn audit(
-    ctx: &AppContext,
-    entity_pid: uuid::Uuid,
-    action: &str,
-    actor: Option<&str>,
-    snapshot: Option<serde_json::Value>,
-) {
-    if let Err(err) = AuditModel::record(&ctx.db, entity_pid, action, actor, snapshot).await {
-        tracing::warn!(error = %err, action, "failed to write audit log");
-    }
-}
-
 /// Create a work item in `{collection}`. `POST /api/{collection}`.
 ///
 /// # Errors
@@ -228,14 +215,7 @@ async fn create(
     validate(collection, &wi)?;
     let model =
         streaming::create_and_emit(&ctx.db, collection.kind_str(), &wi, caller.actor()).await?;
-    audit(
-        &ctx,
-        model.pid,
-        "created",
-        caller.actor(),
-        Some(model.data.clone()),
-    )
-    .await;
+    // Audit is written inside `create_and_emit` (see `streaming`).
     Metrics::global().work_item_created_total.inc();
     format::json(WorkItemRef::of(&model))
 }
@@ -271,14 +251,7 @@ async fn update(
     validate(collection, &wi)?;
     let model = WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), &pid).await?;
     let updated = streaming::update_and_emit(&ctx.db, model, &wi, caller.actor()).await?;
-    audit(
-        &ctx,
-        updated.pid,
-        "updated",
-        caller.actor(),
-        Some(updated.data.clone()),
-    )
-    .await;
+    // Audit is written inside `update_and_emit` (see `streaming`).
     Metrics::global().work_item_updated_total.inc();
     format::json(WorkItemRef::of(&updated))
 }
@@ -296,8 +269,8 @@ async fn remove(
 ) -> Result<Response> {
     let collection = resolve(&collection)?;
     let model = WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), &pid).await?;
-    let (entity_pid, _name) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
-    audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
+    let (_entity_pid, _name) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
+    // Audit is written inside `delete_and_emit` (see `streaming`).
     Metrics::global().work_item_deleted_total.inc();
     format::empty_json()
 }
@@ -434,7 +407,8 @@ async fn merge(
     let outcome = merge_work_items(&main.to_work_item()?, &duplicate.to_work_item()?);
 
     let (merged, dup_pid, _dup_name) =
-        streaming::merge_and_emit(&ctx.db, main, duplicate, &outcome.merged, caller.actor()).await?;
+        streaming::merge_and_emit(&ctx.db, main, duplicate, &outcome.merged, caller.actor())
+            .await?;
 
     if let Err(err) = MergeRecordModel::record(
         &ctx.db,
@@ -448,15 +422,8 @@ async fn merge(
     {
         tracing::warn!(error = %err, "failed to write merge record");
     }
-    audit(
-        &ctx,
-        merged.pid,
-        "merged",
-        caller.actor(),
-        Some(merged.data.clone()),
-    )
-    .await;
-    audit(&ctx, dup_pid, "merged_into", caller.actor(), None).await;
+    // The two audit entries (survivor "merged", duplicate "merged_into")
+    // are written inside `merge_and_emit` (see `streaming`).
     Metrics::global().work_item_merged_total.inc();
 
     format::json(serde_json::json!({

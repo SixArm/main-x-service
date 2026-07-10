@@ -84,9 +84,7 @@ fn identifier_matches(case: &Case, token: &str) -> bool {
         .split_once('|')
         .map_or((None, token), |(s, v)| (Some(s), v));
 
-    let hit = |sys: &str, val: &str| -> bool {
-        val == value && system.is_none_or(|s| s == sys)
-    };
+    let hit = |sys: &str, val: &str| -> bool { val == value && system.is_none_or(|s| s == sys) };
 
     if let Some(ref number) = case.case_number
         && hit(CASE_NUMBER_SYSTEM, number)

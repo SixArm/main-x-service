@@ -1,46 +1,75 @@
 ## 14. Implementation Status
 
-**Spec-only; no code yet.**
-
-This service exists as a specification, scaffolded from the canonical
+**v1 core implemented (2026-07-09).** The read-model core compiles
+clean, is clippy-clean (`--all-targets --all-features`), and is
+unit-tested (`cargo test --lib`, 15 tests). Built from the canonical
 design doc
 [`cross-service-linking.md`](../../../agents/share/cross-service-linking.md)
-(it is the §4.3 read-model aggregator) and the
+(this is its §4.3 read-model aggregator) and the
 [`event-bus.md`](../../../agents/share/event-bus.md) §9 consumer model.
-No Rust crate, no `Cargo.toml`, no migrations, no controllers, no tests
-have been written. Every task in §13 is unchecked.
 
-### 14.1 Upstream prerequisites (not in this crate)
+### 14.1 What is implemented
 
-This service consumes contracts that are themselves at design / rollout
-stage:
+- **Scaffold** — loco.rs crate (`Cargo.toml`, `src/lib.rs` +
+  `src/bin/main.rs` with the family lint header, `src/app.rs` `Hooks`,
+  `config/{development,test,production}.yaml`, the `migration/` bridge
+  crate). Read-only to the world; no write controllers. Depends on the
+  sibling **[`entity-ref`](../../entity-ref-rust-crate)** crate for the
+  shared `EntityType` / `EntityRef` / `EdgeKind` / `Sensitivity`
+  contracts (the T-2/T-3 "copy" is superseded — see §13).
+- **Persistence** — three derived-read-model tables with hand-written
+  SQL bridged via `include_str!`: `edges` (+ `edges_from` / `edges_to` /
+  `edges_status` indexes), `entity_presence`, `consumer_offsets` (§10.1
+  /§10.2/§10.3). SeaORM entities under `src/models/_entities/`.
+  `with-chrono` time types (§10.5, OQ-5).
+- **Pure projection logic** (`src/graph.rs`, DB-free, fully unit-tested)
+  — `canonical` (symmetric ordering, FR-6), `edge_status`
+  (unverified/verified/dangling lifecycle, FR-9), `single_view`
+  (same-identity unification + affiliation walk, FR-15), plus
+  `EdgeStatus` / `Provenance` value types.
+- **Apply seam** (`src/events.rs`) — `apply_event(db, envelope)`
+  dispatches `created`/`deleted` → presence (+ incident-edge status
+  recompute, FR-10), `linked` → canonical edge upsert, `unlinked` →
+  edge removal, `merged` → acknowledged (repointing deferred). Typed
+  `LinkedEvent` / `UnlinkedEvent` decode (closed-registry `edge_kind`
+  validation) with DB-free tests. Every consumed event advances the
+  per-topic freshness watermark.
+- **Read API** (`src/controllers/graph.rs`, enveloped
+  `{success,data,error}` + `as_of`) — `GET /api/neighbors/{ref}`
+  (bounded BFS, `kind`/`direction`/`depth≤2`), `GET /api/edges`
+  (from/to/kind/status), `GET /api/single-view/{ref}`,
+  `GET /api/health/freshness`. `400` on malformed ref / unknown kind /
+  over-cap depth. Loco `/_health` + `/_ping` retained.
+- **Tests** — un-gated unit suite (§11.1) + `#[ignore]`d DB-gated
+  request suite (`tests/graph_endpoints.rs`, §11.2).
+
+### 14.2 Deferred (unchecked in §13)
+
+The Fluvio bus consumer loop + `processed_events` idempotency (T-6),
+merge-repointing (T-9), lazy verify-on-read (T-10), OpenAPI/Swagger
+(T-15), `case ↔ person` governance / audit / masking (T-16..18),
+offline PASETO auth (T-19), the reconciliation worker (T-20),
+Prometheus `/metrics.prom` + OTLP (T-21/22), the durable-bus flip
+(T-23), and the bus/governance/bench test tiers (T-26..28). The
+`apply_event` seam is the integration point a future bus consumer will
+call.
+
+### 14.3 Upstream prerequisites (not in this crate)
 
 - The **durable event bus** ([event-bus.md](../../../agents/share/event-bus.md))
-  is a design doc; today's transport is in-memory and volatile, which is
-  why the integrity story has the interim **lazy verify-on-read** path
-  (§6 FR-11). Until topics go durable, replay-based rebuild (§7 NFR-4)
-  and event-driven verification are partial.
-- The **`linked` / `unlinked` events** and per-service **`entity_links`**
+  is still a design doc; today's transport is in-memory and volatile,
+  hence the interim **lazy verify-on-read** path (§6 FR-11) remains
+  deferred.
+- The **`linked` / `unlinked` events** + per-service **`entity_links`**
   write-side (design §4.1/§4.2) must land in **person** + **worker**
   first (the `same_identity` backbone, design §11 step 2) before this
-  aggregator has anything to consume.
-- The **`EntityRef`** value type and **edge-kind registry** are shared
-  *contracts* copied per project (design §3, §9); this crate copies them
-  (T-2, T-3) rather than depending on a shared package.
+  aggregator consumes real traffic. The `apply_event` seam and the
+  DB-gated tests already exercise the projection against synthetic
+  envelopes.
 
-### 14.2 Build order
+### 14.4 Family registration
 
-Per design §11: contracts (T-1..T-4) → consume/project the
-`same_identity` backbone (T-5..T-9) → interim verify (T-10) → reads
-(T-11..T-15) → affiliations + `case ↔ person` governance (T-16..T-18) →
-hardening / durable-bus flip (T-19..T-23). The in-memory default and
-lazy verify-on-read mean the aggregator can stand up before every
-topic is durable.
-
-### 14.3 Family registration
-
-When the crate is scaffolded, register it in the repo-root
-[`AGENTS.md`](../../../AGENTS.md) service-crate table and
-[`agents/share/overview.md`](../../../agents/share/overview.md) so the
-umbrella docs reflect the new cross-cutting service. (Tracked as a
-follow-up to T-1.)
+Registered in the repo-root
+[`AGENTS.md`](../../../AGENTS.md) and
+[`agents/share/overview.md`](../../../agents/share/overview.md)
+"Cross-cutting services" tables.

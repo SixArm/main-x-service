@@ -79,12 +79,18 @@ impl FhirOrgSearchParams {
             return false;
         }
         if let Some(ref city) = self.address_city
-            && !contains_ci(org.address.as_ref().and_then(|a| a.locality.as_deref()), city)
+            && !contains_ci(
+                org.address.as_ref().and_then(|a| a.locality.as_deref()),
+                city,
+            )
         {
             return false;
         }
         if let Some(ref pc) = self.address_postalcode
-            && !contains_ci(org.address.as_ref().and_then(|a| a.postal_code.as_deref()), pc)
+            && !contains_ci(
+                org.address.as_ref().and_then(|a| a.postal_code.as_deref()),
+                pc,
+            )
         {
             return false;
         }

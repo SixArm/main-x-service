@@ -42,10 +42,7 @@ fn apollo_project() -> Value {
 // the name, and mints a UUID pid; the row is then fetchable.
 async fn can_create_and_fetch_a_project() {
     request::<App, _, _>(|request, _ctx| async move {
-        let response = request
-            .post("/api/projects")
-            .json(&apollo_project())
-            .await;
+        let response = request.post("/api/projects").json(&apollo_project()).await;
         assert_eq!(response.status_code(), 200, "create should succeed");
         let body: Value = response.json();
         assert_eq!(body["name"], "Apollo platform migration");
@@ -120,10 +117,7 @@ async fn unknown_pid_is_404() {
 // shared Jira key is returned by check-duplicates (score 1.0).
 async fn check_duplicates_finds_a_deterministic_twin() {
     request::<App, _, _>(|request, _ctx| async move {
-        let created = request
-            .post("/api/projects")
-            .json(&apollo_project())
-            .await;
+        let created = request.post("/api/projects").json(&apollo_project()).await;
         assert_eq!(created.status_code(), 200);
 
         let query = json!({

@@ -33,6 +33,7 @@ fn created_envelope(model: &CaseModel) -> Envelope {
         seq: 1,
         actor: None,
         name: model.title.clone(),
+        data: None,
     }
 }
 

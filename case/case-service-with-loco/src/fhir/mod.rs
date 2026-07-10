@@ -203,8 +203,14 @@ pub fn to_fhir_task(case: &Case, id: &str, last_updated: Option<String>) -> Fhir
         last_updated: Some(lu),
     });
     fhir.description = Some(case.title.clone());
-    fhir.status = case.status.as_ref().map(|s| case_status_to_fhir(s).to_string());
-    fhir.priority = case.priority.as_ref().map(|p| priority_to_fhir(p).to_string());
+    fhir.status = case
+        .status
+        .as_ref()
+        .map(|s| case_status_to_fhir(s).to_string());
+    fhir.priority = case
+        .priority
+        .as_ref()
+        .map(|p| priority_to_fhir(p).to_string());
     fhir.code = case.case_type.as_ref().map(|t| FhirCodeableConcept {
         coding: vec![FhirCoding {
             system: Some(CASE_TYPE_SYSTEM.to_string()),
@@ -215,12 +221,11 @@ pub fn to_fhir_task(case: &Case, id: &str, last_updated: Option<String>) -> Fhir
     let mut identifier = Vec::new();
     // Agency-scoped case number, carrying agency in `assigner`.
     if let Some(ref number) = case.case_number {
-        let assigner = (case.agency_id.is_some() || case.agency_name.is_some()).then(|| {
-            FhirReference {
+        let assigner =
+            (case.agency_id.is_some() || case.agency_name.is_some()).then(|| FhirReference {
                 reference: case.agency_id.clone(),
                 display: case.agency_name.clone(),
-            }
-        });
+            });
         identifier.push(FhirIdentifier {
             system: Some(CASE_NUMBER_SYSTEM.to_string()),
             value: Some(number.clone()),

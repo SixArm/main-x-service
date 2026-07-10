@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — event bus: audit now joins the outbox transaction (2026-07-09)
+
+- Under the `outbox` transport, the `audit_logs` write now rides the
+  **same transaction** as the entity mutation and its `event_outbox` row
+  (`agents/share/event-bus.md` §3 — the three "can never disagree"). It
+  was previously a best-effort side channel written *after* the
+  transaction committed, so a crash or audit failure could leave a
+  committed change + event with no audit row. `AuditModel::record` is now
+  generic over `ConnectionTrait`; the `create/update/delete/merge_and_emit`
+  functions own the audit write (strict/in-txn under `outbox`, best-effort
+  logged under `memory`), and both the native and FHIR controllers no
+  longer audit separately. New DB-gated `tests/outbox_audit.rs` drives
+  `create_and_emit` under `outbox` and asserts entity + event + audit all
+  commit together.
+
 ### Added — authz: ABAC policy authorization inside the blanket guard (2026-07-05)
 
 - ABAC authorization landed (supersedes the earlier per-crate

@@ -71,7 +71,11 @@ fn fhir_error(status: StatusCode, code: &str, message: impl Into<String>) -> Res
 
 /// A `404` `OperationOutcome` for an unknown / unparseable id.
 fn not_found(id: &str) -> Response {
-    fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Appointment/{id} not found"))
+    fhir_error(
+        StatusCode::NOT_FOUND,
+        "not-found",
+        format!("Appointment/{id} not found"),
+    )
 }
 
 /// Run the native validators over `event`, returning a `422`
@@ -86,7 +90,11 @@ fn validate(event: &crate::models::Event) -> Option<Response> {
         .map(|e| format!("{}: {}", e.field, e.message))
         .collect::<Vec<_>>()
         .join("; ");
-    Some(fhir_error(StatusCode::UNPROCESSABLE_ENTITY, "processing", msg))
+    Some(fhir_error(
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "processing",
+        msg,
+    ))
 }
 
 /// `GET /fhir/Appointment/{id}` — render a stored event as a FHIR
@@ -98,7 +106,11 @@ async fn read(Path(id): Path<String>, State(state): State<AppState>) -> Response
     match state.event_repository.get_by_id(&uuid).await {
         Ok(Some(event)) => fhir_json(StatusCode::OK, &to_fhir_appointment(&event)),
         Ok(None) => not_found(&id),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
@@ -109,7 +121,13 @@ async fn read(Path(id): Path<String>, State(state): State<AppState>) -> Response
 async fn create(State(state): State<AppState>, body: axum::body::Bytes) -> Response {
     let fhir: FhirAppointment = match serde_json::from_slice(&body) {
         Ok(f) => f,
-        Err(e) => return fhir_error(StatusCode::BAD_REQUEST, "structure", format!("invalid FHIR JSON: {e}")),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::BAD_REQUEST,
+                "structure",
+                format!("invalid FHIR JSON: {e}"),
+            );
+        }
     };
     let event = match from_fhir_appointment(&fhir) {
         Ok(event) => event,
@@ -126,11 +144,23 @@ async fn create(State(state): State<AppState>, body: axum::body::Bytes) -> Respo
             let pid = stored.id.to_string();
             let resource = to_fhir_appointment(&stored);
             match serde_json::to_vec(&resource) {
-                Ok(bytes) => fhir_response(StatusCode::CREATED, bytes, Some(format!("Appointment/{pid}"))),
-                Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+                Ok(bytes) => fhir_response(
+                    StatusCode::CREATED,
+                    bytes,
+                    Some(format!("Appointment/{pid}")),
+                ),
+                Err(e) => fhir_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "exception",
+                    e.to_string(),
+                ),
             }
         }
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
@@ -148,7 +178,13 @@ async fn update(
     };
     let fhir: FhirAppointment = match serde_json::from_slice(&body) {
         Ok(f) => f,
-        Err(e) => return fhir_error(StatusCode::BAD_REQUEST, "structure", format!("invalid FHIR JSON: {e}")),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::BAD_REQUEST,
+                "structure",
+                format!("invalid FHIR JSON: {e}"),
+            );
+        }
     };
     let mut event = match from_fhir_appointment(&fhir) {
         Ok(event) => event,
@@ -160,7 +196,13 @@ async fn update(
     match state.event_repository.get_by_id(&uuid).await {
         Ok(Some(_)) => {}
         Ok(None) => return not_found(&id),
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     }
     // The path is authoritative: force the record id so a mismatched
     // body cannot retarget the write.
@@ -172,7 +214,11 @@ async fn update(
             }
             fhir_json(StatusCode::OK, &to_fhir_appointment(&stored))
         }
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
@@ -185,10 +231,20 @@ async fn remove(Path(id): Path<String>, State(state): State<AppState>) -> Respon
     match state.event_repository.get_by_id(&uuid).await {
         Ok(Some(_)) => {}
         Ok(None) => return not_found(&id),
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     }
     if let Err(e) = state.event_repository.delete(&uuid).await {
-        return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string());
+        return fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        );
     }
     if let Err(e) = state.search_engine.delete_event(&uuid.to_string()) {
         tracing::warn!("Failed to delete event from search index (fhir): {}", e);
@@ -204,9 +260,19 @@ async fn search(
     Query(params): Query<FhirAppointmentSearchParams>,
     State(state): State<AppState>,
 ) -> Response {
-    let rows = match state.event_repository.list_active(FHIR_SEARCH_SCAN_CAP, 0).await {
+    let rows = match state
+        .event_repository
+        .list_active(FHIR_SEARCH_SCAN_CAP, 0)
+        .await
+    {
         Ok(rows) => rows,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     if rows.len() as u64 == FHIR_SEARCH_SCAN_CAP {
         tracing::warn!(
@@ -293,10 +359,7 @@ pub fn routes() -> Routes {
 /// production instead of the old `501` stub.
 pub fn axum_router(state: AppState) -> axum::Router {
     axum::Router::new()
-        .route(
-            "/Appointment",
-            axum::routing::post(create).get(search),
-        )
+        .route("/Appointment", axum::routing::post(create).get(search))
         .route(
             "/Appointment/{id}",
             axum::routing::get(read).put(update).delete(remove),

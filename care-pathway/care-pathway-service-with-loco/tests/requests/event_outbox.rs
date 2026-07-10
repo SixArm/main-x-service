@@ -48,7 +48,9 @@ async fn outbox_create_writes_pathway_and_one_event_atomically() {
 
         // One transaction spanning the entity insert and the outbox insert.
         let txn = ctx.db.begin().await.expect("begin tx");
-        let model = PathwayModel::create(&txn, &pathway).await.expect("create pathway");
+        let model = PathwayModel::create(&txn, &pathway)
+            .await
+            .expect("create pathway");
         let env = created_envelope(&model);
         OutboxInsert::from_envelope(&env, chrono::Utc::now().into())
             .expect("map envelope")
@@ -70,7 +72,11 @@ async fn outbox_create_writes_pathway_and_one_event_atomically() {
             .all(&ctx.db)
             .await
             .expect("load outbox rows");
-        assert_eq!(rows.len(), 1, "exactly one event_outbox row for the pathway");
+        assert_eq!(
+            rows.len(),
+            1,
+            "exactly one event_outbox row for the pathway"
+        );
         assert_eq!(rows[0].kind, "created");
         assert_eq!(rows[0].entity, "care_pathway");
         assert_eq!(rows[0].event_id, env.event_id);
@@ -94,7 +100,9 @@ async fn outbox_failure_rolls_back_both_writes() {
         let pathway = CarePathway::new("Rollback Sepsis Pathway");
 
         let txn = ctx.db.begin().await.expect("begin tx");
-        let model = PathwayModel::create(&txn, &pathway).await.expect("create pathway");
+        let model = PathwayModel::create(&txn, &pathway)
+            .await
+            .expect("create pathway");
         let env = created_envelope(&model);
         OutboxInsert::from_envelope(&env, chrono::Utc::now().into())
             .expect("map envelope")

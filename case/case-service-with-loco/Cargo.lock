@@ -591,6 +591,7 @@ dependencies = [
  "case-matcher",
  "chrono",
  "ed25519-dalek",
+ "entity-ref",
  "include_dir",
  "insta",
  "loco-rs",
@@ -1258,6 +1259,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c3d16f6dc9dc43a9a2fd5bce09b6cf8df250dcf77cffdaa66be21c527e2d05c"
 dependencies = [
  "regex",
+]
+
+[[package]]
+name = "entity-ref"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 2.0.18",
+ "uuid",
 ]
 
 [[package]]

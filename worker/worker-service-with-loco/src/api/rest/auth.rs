@@ -757,18 +757,12 @@ mod tests {
         ] {
             assert_eq!(derive_action(&Method::POST, path), Action::Destructive);
         }
-        assert_eq!(
-            derive_action(&Method::POST, "/api/workers"),
-            Action::Write
-        );
+        assert_eq!(derive_action(&Method::POST, "/api/workers"), Action::Write);
         assert_eq!(
             derive_action(&Method::POST, "/api/workers/check-duplicates"),
             Action::Write
         );
-        assert_eq!(
-            derive_action(&Method::PUT, "/api/workers/1"),
-            Action::Write
-        );
+        assert_eq!(derive_action(&Method::PUT, "/api/workers/1"), Action::Write);
         assert_eq!(
             derive_action(&Method::PATCH, "/api/workers/1"),
             Action::Write

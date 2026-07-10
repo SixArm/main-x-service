@@ -922,7 +922,8 @@ impl PersonRepository for SeaOrmPersonRepository {
         // the commit, so the entity rows and the event commit atomically
         // (or roll back together). A no-op under the memory transport,
         // which keeps the post-commit in-memory publish below.
-        self.enqueue_outbox(&txn, person, EventKind::Created).await?;
+        self.enqueue_outbox(&txn, person, EventKind::Created)
+            .await?;
 
         txn.commit().await?;
 
@@ -1001,7 +1002,8 @@ impl PersonRepository for SeaOrmPersonRepository {
         apply_update_rows(&txn, person).await?;
 
         // Outbox row shares the update transaction (see `create`).
-        self.enqueue_outbox(&txn, person, EventKind::Updated).await?;
+        self.enqueue_outbox(&txn, person, EventKind::Updated)
+            .await?;
 
         txn.commit().await?;
 
@@ -1098,7 +1100,9 @@ impl PersonRepository for SeaOrmPersonRepository {
 
         // Audit rows: an UPDATE trail for the survivor and a DELETE trail
         // for the duplicate.
-        if let Some(old_json) = old_survivor.as_ref().and_then(|p| serde_json::to_value(p).ok())
+        if let Some(old_json) = old_survivor
+            .as_ref()
+            .and_then(|p| serde_json::to_value(p).ok())
             && let Ok(new_json) = serde_json::to_value(&result)
         {
             self.log_audit(
@@ -1309,6 +1313,10 @@ mod tests {
             .all(&db)
             .await
             .unwrap();
-        assert_eq!(deleted_rows.len(), 1, "one deleted outbox row for duplicate");
+        assert_eq!(
+            deleted_rows.len(),
+            1,
+            "one deleted outbox row for duplicate"
+        );
     }
 }

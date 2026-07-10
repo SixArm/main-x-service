@@ -118,10 +118,7 @@ pub async fn drain_once<S: EventSink + ?Sized>(
 /// # Errors
 ///
 /// When the delete query fails.
-pub async fn purge_published(
-    db: &DatabaseConnection,
-    retention_days: i64,
-) -> crate::Result<u64> {
+pub async fn purge_published(db: &DatabaseConnection, retention_days: i64) -> crate::Result<u64> {
     let cutoff = time::OffsetDateTime::now_utc() - time::Duration::days(retention_days.max(0));
     let res = OutboxEntity::delete_many()
         .filter(OutboxColumn::PublishedAt.is_not_null())
@@ -182,7 +179,11 @@ pub fn spawn(db: DatabaseConnection) {
     }
     let interval = interval_secs();
     let retention = retention_days();
-    tracing::info!(interval_secs = interval, retention_days = retention, "starting course-outbox relay");
+    tracing::info!(
+        interval_secs = interval,
+        retention_days = retention,
+        "starting course-outbox relay"
+    );
     tokio::spawn(async move {
         let sink = LoggingSink;
         let mut ticks: u64 = 0;
@@ -193,7 +194,9 @@ pub fn spawn(db: DatabaseConnection) {
             ticks = ticks.wrapping_add(1);
             if ticks.is_multiple_of(PURGE_EVERY_TICKS) {
                 match purge_published(&db, retention).await {
-                    Ok(n) if n > 0 => tracing::info!(purged = n, "relay purged old published outbox rows"),
+                    Ok(n) if n > 0 => {
+                        tracing::info!(purged = n, "relay purged old published outbox rows");
+                    }
                     Ok(_) => {}
                     Err(err) => tracing::warn!(error = %err, "relay retention purge failed"),
                 }
@@ -219,7 +222,10 @@ mod tests {
             key: &str,
             _payload: &serde_json::Value,
         ) -> Result<(), SinkError> {
-            self.0.lock().unwrap().push((entity.to_string(), key.to_string()));
+            self.0
+                .lock()
+                .unwrap()
+                .push((entity.to_string(), key.to_string()));
             Ok(())
         }
     }
@@ -251,7 +257,10 @@ mod tests {
                 .await
                 .unwrap();
         });
-        assert_eq!(sink.0.lock().unwrap().as_slice(), &[("course".to_string(), "pid-9".to_string())]);
+        assert_eq!(
+            sink.0.lock().unwrap().as_slice(),
+            &[("course".to_string(), "pid-9".to_string())]
+        );
     }
 
     /// Config parsers: relay off by default; interval floors at 1; retention

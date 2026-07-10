@@ -161,30 +161,10 @@ async fn create(
     // active transport (`streaming::create_and_emit`); `outbox` writes the
     // row and its `event_outbox` row on one transaction.
     let model = streaming::create_and_emit(&ctx.db, &case, caller.actor()).await?;
-    audit(
-        &ctx,
-        model.pid,
-        "created",
-        caller.actor(),
-        Some(model.data.clone()),
-    )
-    .await;
+    // Audit is written by `streaming::create_and_emit` (atomic with the
+    // entity + event under `outbox`, best-effort under `memory`).
     Metrics::global().case_created_total.inc();
     format::json(CaseRef::of(&model))
-}
-
-/// Best-effort audit write: log on failure but never fail the request.
-/// `actor` is the verified caller `sub` when a token was presented.
-async fn audit(
-    ctx: &AppContext,
-    entity_pid: uuid::Uuid,
-    action: &str,
-    actor: Option<&str>,
-    snapshot: Option<serde_json::Value>,
-) {
-    if let Err(err) = AuditModel::record(&ctx.db, entity_pid, action, actor, snapshot).await {
-        tracing::warn!(error = %err, action, "failed to write audit log");
-    }
 }
 
 /// Map a record-level authorization rejection (`(status, reason)`) to a
@@ -279,14 +259,7 @@ async fn update(
     )
     .map_err(record_rejection)?;
     let updated = streaming::update_and_emit(&ctx.db, model, &case, caller.actor()).await?;
-    audit(
-        &ctx,
-        updated.pid,
-        "updated",
-        caller.actor(),
-        Some(updated.data.clone()),
-    )
-    .await;
+    // Audit is written by `streaming::update_and_emit` (see `create`).
     Metrics::global().case_updated_total.inc();
     format::json(CaseRef::of(&updated))
 }
@@ -315,8 +288,8 @@ async fn remove(
         &crate::auth::case_resource_attrs(&model.to_case()?),
     )
     .map_err(record_rejection)?;
-    let (entity_pid, _title) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
-    audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
+    // Audit is written by `streaming::delete_and_emit` (see `create`).
+    streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
     Metrics::global().case_deleted_total.inc();
     format::empty_json()
 }
@@ -477,15 +450,8 @@ async fn merge(
     {
         tracing::warn!(error = %err, "failed to write merge record");
     }
-    audit(
-        &ctx,
-        merged.pid,
-        "merged",
-        caller.actor(),
-        Some(merged.data.clone()),
-    )
-    .await;
-    audit(&ctx, dup_pid, "merged_into", caller.actor(), None).await;
+    // Both audit rows (`merged` + `merged_into`) are written by
+    // `streaming::merge_and_emit` (see `create`).
     Metrics::global().case_merged_total.inc();
 
     format::json(serde_json::json!({

@@ -378,7 +378,11 @@ mod tests {
         ];
         for kind in kinds {
             let system = identifier_type_to_system(kind);
-            assert_eq!(system_to_identifier_type(&system), kind, "round-trip {kind:?}");
+            assert_eq!(
+                system_to_identifier_type(&system),
+                kind,
+                "round-trip {kind:?}"
+            );
         }
     }
 
@@ -455,7 +459,10 @@ mod tests {
         assert_eq!(back.end_date, event.end_date);
         assert_eq!(back.event_status, EventStatus::Completed);
         assert_eq!(back.identifiers.len(), 1);
-        assert_eq!(back.identifiers[0].identifier_type, IdentifierType::TicketNumber);
+        assert_eq!(
+            back.identifiers[0].identifier_type,
+            IdentifierType::TicketNumber
+        );
         assert_eq!(back.identifiers[0].value, "T-42");
         assert_eq!(back.organizers.len(), 1);
         assert_eq!(back.organizers[0].name, "Cal Performances");

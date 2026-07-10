@@ -64,12 +64,10 @@ pub fn system_to_scheme(system: &str) -> IdentifierScheme {
         "urn:mxi:org:naics" => IdentifierScheme::Naics,
         "urn:mxi:org:isicv4" => IdentifierScheme::IsicV4,
         "urn:mxi:org:sic" => IdentifierScheme::Sic,
-        other => other
-            .strip_prefix("urn:mxi:org:custom:")
-            .map_or_else(
-                || IdentifierScheme::Custom(other.to_string()),
-                |label| IdentifierScheme::Custom(label.to_string()),
-            ),
+        other => other.strip_prefix("urn:mxi:org:custom:").map_or_else(
+            || IdentifierScheme::Custom(other.to_string()),
+            |label| IdentifierScheme::Custom(label.to_string()),
+        ),
     }
 }
 

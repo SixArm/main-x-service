@@ -13,12 +13,12 @@ use uuid::Uuid;
 
 use crate::Result;
 use crate::db::outbox::OutboxInsert;
-use crate::streaming::{EventKind, EventTransport};
 use crate::models::{
     Address, Event, EventAttendanceMode, EventLink, EventStatus, EventType, Identifier,
     IdentifierType, IdentifierUse, LinkType, Location, Offer, OfferAvailability, Party, PartyKind,
     Place, VirtualLocation,
 };
+use crate::streaming::{EventKind, EventTransport};
 
 use super::models::{
     event_identifiers, event_links, event_locations, event_offers, event_parties, event_sub_events,
@@ -142,7 +142,9 @@ impl SeaOrmEventRepository {
         kind: EventKind,
     ) -> Result<()> {
         if self.transport.is_outbox() {
-            OutboxInsert::for_event(event, kind)?.insert_on(conn).await?;
+            OutboxInsert::for_event(event, kind)?
+                .insert_on(conn)
+                .await?;
         }
         Ok(())
     }
@@ -1311,6 +1313,10 @@ mod tests {
             .all(&db)
             .await
             .unwrap();
-        assert_eq!(deleted_rows.len(), 1, "one deleted outbox row for duplicate");
+        assert_eq!(
+            deleted_rows.len(),
+            1,
+            "one deleted outbox row for duplicate"
+        );
     }
 }

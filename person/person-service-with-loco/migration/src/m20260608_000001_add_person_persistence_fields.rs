@@ -14,7 +14,9 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute_unprepared(include_str!("../../migrations/2026060800000001_add_person_persistence_fields/up.sql"))
+            .execute_unprepared(include_str!(
+                "../../migrations/2026060800000001_add_person_persistence_fields/up.sql"
+            ))
             .await?;
         Ok(())
     }
@@ -22,7 +24,9 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute_unprepared(include_str!("../../migrations/2026060800000001_add_person_persistence_fields/down.sql"))
+            .execute_unprepared(include_str!(
+                "../../migrations/2026060800000001_add_person_persistence_fields/down.sql"
+            ))
             .await?;
         Ok(())
     }

@@ -9,6 +9,66 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — cross-service entity links: write side (`subject_of` case → person) (2026-07-10)
+
+- Landed the **write side** of cross-service entity linking
+  (`agents/share/cross-service-linking.md` §4.1, §4.2). Case is the
+  **reference** originator (rollout step 2, with a documented deviation:
+  the design nominally names person + worker for `same_identity`, but
+  those are older axum services with no event bus — case is the first
+  loco service that both originates a v1 edge AND has the durable-bus
+  outbox to emit `linked`/`unlinked`).
+  - New `entity_links` table (`migration/…_000005_entity_links`: `id`
+    UUID pk, `from_pid`, `kind`, `to_ref`, `role`, `confidence`,
+    `provenance`, `valid_from`, `valid_to`, `deleted_at`) with the
+    `UNIQUE (from_pid, kind, to_ref, valid_from)` upsert key declared
+    `NULLS NOT DISTINCT` (idempotent even for a null `valid_from`).
+  - New endpoints under the case prefix (`controllers/links.rs`):
+    `POST` / `GET` / `DELETE /api/cases/{pid}/links`. The write is
+    **optimistic** — it stores the assertion and emits an event, never
+    calling the target service. Validation admits **exactly**
+    `subject_of` (case → person); every other kind or endpoint pair is
+    `422`.
+  - Depends on the shared `entity-ref` crate
+    (`entity_ref::{EntityRef, EntityType, EdgeKind}`) for the URN format
+    + edge-kind registry (its `permits(from, to)` is the validator),
+    rather than copying it per project.
+  - Emits `linked` / `unlinked` on the existing event envelope via a new
+    transactional `link_and_emit` / `unlink_and_emit` seam (same
+    memory/outbox switch as the CRUD `*_and_emit`). The `Envelope` gained
+    an **additive** `data: Option<Value>` field
+    (`skip_serializing_if = "none"`) carrying the edge detail
+    `{ edge_id, from_ref, to_ref, edge_kind, role, confidence,
+    provenance, valid_from, valid_to }`; CRUD events omit it, so their
+    wire shape and the frozen `EventView` projection are unchanged, and
+    `SCHEMA_VERSION` does not bump.
+  - Governance (§10): create AND read authorise at the "read the case"
+    level (`auth::authorize_record` on the loaded case) and every
+    create/withdraw writes a `linked` / `unlinked` audit row. Per-record
+    masking + "denied read indistinguishable from no-such-edge" remain
+    follow-ups (spec §13).
+  - Tests: DB-free unit (validation accept/reject matrix; `data`-carrying
+    envelope with the frozen projection) + DB-gated
+    (`tests/requests/entity_links.rs`, `#[ignore]`) create → list →
+    delete round-trip asserting `linked` then `unlinked`, idempotent
+    re-assert, and the `same_identity` → `422` reject.
+
+### Changed — event bus: audit now joins the outbox transaction (2026-07-09)
+
+- Under the `outbox` transport, the `audit_logs` write now rides the
+  **same transaction** as the entity mutation and its `event_outbox` row
+  (`agents/share/event-bus.md` §3 — the three "can never disagree"). It
+  was previously a best-effort side channel written *after* the
+  transaction committed, so a crash or audit failure could leave a
+  committed change + event with no audit row. `AuditModel::record` is now
+  generic over `ConnectionTrait`; the `create/update/delete/merge_and_emit`
+  functions own the audit write (strict/in-txn under `outbox`, best-effort
+  logged under `memory`), and the native + FHIR controllers no longer audit
+  separately. New DB-gated `tests/outbox_audit.rs` drives `create_and_emit`
+  under `outbox` and asserts entity + event + audit all commit together.
+  (The `merge_records` history row stays a best-effort side channel — it
+  is merge metadata, not the §3 audit trail.)
+
 ### Added — authz: ABAC policy authorization inside the blanket guard (2026-07-05)
 
 - ABAC authorization landed (supersedes the earlier per-crate

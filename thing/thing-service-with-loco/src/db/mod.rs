@@ -120,7 +120,9 @@ impl SeaOrmThingRepository {
         kind: EventKind,
     ) -> Result<()> {
         if self.transport.is_outbox() {
-            OutboxInsert::for_event(thing, kind)?.insert_on(conn).await?;
+            OutboxInsert::for_event(thing, kind)?
+                .insert_on(conn)
+                .await?;
         }
         Ok(())
     }
@@ -297,7 +299,8 @@ impl ThingRepository for SeaOrmThingRepository {
             let thing = self.hydrate(row).await?;
             let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
             active.update(&txn).await.map_err(|e| map_db(&e))?;
-            self.enqueue_outbox(&txn, &thing, EventKind::Deleted).await?;
+            self.enqueue_outbox(&txn, &thing, EventKind::Deleted)
+                .await?;
             txn.commit().await.map_err(|e| map_db(&e))?;
         } else {
             active.update(&self.db).await.map_err(|e| map_db(&e))?;
@@ -646,6 +649,10 @@ mod outbox_tests {
             .all(&db)
             .await
             .unwrap();
-        assert_eq!(deleted_rows.len(), 1, "one deleted outbox row for duplicate");
+        assert_eq!(
+            deleted_rows.len(),
+            1,
+            "one deleted outbox row for duplicate"
+        );
     }
 }

@@ -124,14 +124,7 @@ async fn create(
     // ring buffer, or one transaction spanning the row + `event_outbox`).
     let model = streaming::create_and_emit(&ctx.db, &org, caller.actor()).await?;
     Metrics::global().organization_created_total.inc();
-    audit(
-        &ctx,
-        model.pid,
-        "created",
-        caller.actor(),
-        Some(model.data.clone()),
-    )
-    .await;
+    // Audit is written by `streaming::create_and_emit` (atomic under outbox).
     format::json(OrgRef::of(&model))
 }
 
@@ -168,14 +161,7 @@ async fn update(
     // Replace + `Updated` event, atomic under the active transport.
     let updated = streaming::update_and_emit(&ctx.db, model, &org, caller.actor()).await?;
     Metrics::global().organization_updated_total.inc();
-    audit(
-        &ctx,
-        updated.pid,
-        "updated",
-        caller.actor(),
-        Some(updated.data.clone()),
-    )
-    .await;
+    // Audit is written by `streaming::update_and_emit` (atomic under outbox).
     format::json(OrgRef::of(&updated))
 }
 
@@ -195,26 +181,11 @@ async fn remove(
     let model = OrgModel::find_by_pid(&ctx.db, &pid)
         .await
         .map_err(http_err)?;
-    // Soft-delete + `Deleted` event, atomic under the active transport.
-    // The helper captures the name before delete so the event has a label.
-    let (entity_pid, _name) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
+    // Soft-delete + `Deleted` event + audit, atomic under the active
+    // transport (audit is written by `streaming::delete_and_emit`).
+    streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
     Metrics::global().organization_deleted_total.inc();
-    audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
     format::empty_json()
-}
-
-/// Best-effort audit write: log on failure but never fail the request.
-/// `actor` is the verified caller `sub` when a token was presented.
-async fn audit(
-    ctx: &AppContext,
-    entity_pid: uuid::Uuid,
-    action: &str,
-    actor: Option<&str>,
-    snapshot: Option<serde_json::Value>,
-) {
-    if let Err(err) = AuditModel::record(&ctx.db, entity_pid, action, actor, snapshot).await {
-        tracing::warn!(error = %err, action, "failed to write audit log");
-    }
 }
 
 /// List active organizations (capped at 100).
@@ -376,15 +347,8 @@ async fn merge(
     {
         tracing::warn!(error = %err, "failed to write merge record");
     }
-    audit(
-        &ctx,
-        merged.pid,
-        "merged",
-        caller.actor(),
-        Some(merged.data.clone()),
-    )
-    .await;
-    audit(&ctx, dup_pid, "merged_into", caller.actor(), None).await;
+    // Audit (survivor "merged" + duplicate "merged_into") is written by
+    // `streaming::merge_and_emit` (atomic under outbox).
 
     format::json(serde_json::json!({
         "main_pid": merged.pid.to_string(),

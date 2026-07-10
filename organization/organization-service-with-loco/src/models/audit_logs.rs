@@ -1,7 +1,7 @@
 //! `audit_logs` model — record and query the CRUD audit trail.
 
 use loco_rs::prelude::*;
-use sea_orm::{QueryOrder, QuerySelect};
+use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
 /// Re-export the generated entity types so callers use a single
@@ -13,8 +13,7 @@ impl ActiveModelBehavior for super::_entities::audit_logs::ActiveModel {}
 
 /// Recording and query helpers for the audit trail.
 impl Model {
-    /// Record one audit entry. Best-effort — callers log but don't fail
-    /// the request if auditing errors.
+    /// Record one audit entry.
     ///
     /// - `entity_pid`: the organization the action concerns.
     /// - `action`: the verb (`created`/`updated`/`deleted`/`merged`/…).
@@ -22,11 +21,18 @@ impl Model {
     /// - `snapshot`: the record's payload after the action (`None` for
     ///   deletes, where there is nothing to capture).
     ///
+    /// Generic over [`ConnectionTrait`] so it runs either on the pooled
+    /// `&DatabaseConnection` (the best-effort side-channel path, `memory`
+    /// transport) **or** on a `&DatabaseTransaction` — under the `outbox`
+    /// transport the audit row is written in the *same* transaction as the
+    /// entity mutation and its `event_outbox` row, so the three can never
+    /// disagree (`agents/share/event-bus.md` §3).
+    ///
     /// # Errors
     ///
     /// When the insert fails.
-    pub async fn record(
-        db: &DatabaseConnection,
+    pub async fn record<C: ConnectionTrait>(
+        db: &C,
         entity_pid: Uuid,
         action: &str,
         actor: Option<&str>,

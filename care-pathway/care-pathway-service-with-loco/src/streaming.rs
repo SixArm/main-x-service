@@ -35,6 +35,7 @@ use sea_orm::{ConnectionTrait, DatabaseConnection, IntoActiveModel, TransactionT
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::models::audit_logs::Model as AuditModel;
 use crate::models::care_pathways::Model as PathwayModel;
 use crate::models::event_outbox::{Model as OutboxRow, OutboxInsert};
 
@@ -311,7 +312,11 @@ impl OutboxPublisher {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn recent(self, db: &DatabaseConnection, limit: usize) -> ModelResult<Vec<EventView>> {
+    pub async fn recent(
+        self,
+        db: &DatabaseConnection,
+        limit: usize,
+    ) -> ModelResult<Vec<EventView>> {
         OutboxRow::recent(db, u64::try_from(limit).unwrap_or(u64::MAX)).await
     }
 }
@@ -330,16 +335,34 @@ pub async fn recent_events(db: &DatabaseConnection, limit: usize) -> ModelResult
     }
 }
 
+/// Best-effort audit on the pooled connection — the `memory`-transport
+/// side channel. A failure is logged, never fatal: the request already
+/// succeeded and audit is secondary here. (Under `outbox` the audit row
+/// is written *inside* the transaction instead — `AuditModel::record(&txn,
+/// …)?` — so entity + event + audit commit or roll back together, per
+/// `event-bus.md` §3.)
+async fn audit_best_effort(
+    db: &DatabaseConnection,
+    entity_pid: Uuid,
+    action: &str,
+    actor: Option<&str>,
+    snapshot: Option<serde_json::Value>,
+) {
+    if let Err(err) = AuditModel::record(db, entity_pid, action, actor, snapshot).await {
+        tracing::warn!(error = %err, action, "failed to write audit log");
+    }
+}
+
 /// Create a care pathway and emit its `Created` event, atomically under
 /// the active transport. `memory`: insert on `db`, then push to the ring
 /// buffer (today's behaviour). `outbox`: open one transaction, insert the
-/// row **and** the `event_outbox` row on it, then commit — so a crash can
-/// never persist one without the other.
+/// row, the `event_outbox` row, **and** the audit row on it, then commit —
+/// so a crash can never persist one without the others.
 ///
 /// # Errors
 ///
-/// When the insert (or, for `outbox`, the transaction / outbox insert)
-/// fails; the transaction rolls back both writes on any error.
+/// When the insert (or, for `outbox`, the transaction / outbox / audit
+/// insert) fails; the transaction rolls back all writes on any error.
 pub async fn create_and_emit(
     db: &DatabaseConnection,
     pathway: &CarePathway,
@@ -354,13 +377,21 @@ pub async fn create_and_emit(
                 &model.name,
                 actor,
             );
+            audit_best_effort(db, model.pid, "created", actor, Some(model.data.clone())).await;
             Ok(model)
         }
         EventTransport::Outbox => {
             let txn = db.begin().await?;
             let model = PathwayModel::create(&txn, pathway).await?;
-            let env = envelope(EventKind::Created, &model.pid.to_string(), &model.name, actor);
+            let env = envelope(
+                EventKind::Created,
+                &model.pid.to_string(),
+                &model.name,
+                actor,
+            );
             OutboxPublisher.publish(&txn, &env).await?;
+            // Audit joins the same transaction — atomic with entity + event.
+            AuditModel::record(&txn, model.pid, "created", actor, Some(model.data.clone())).await?;
             txn.commit().await?;
             Ok(model)
         }
@@ -390,6 +421,14 @@ pub async fn update_and_emit(
                 &updated.name,
                 actor,
             );
+            audit_best_effort(
+                db,
+                updated.pid,
+                "updated",
+                actor,
+                Some(updated.data.clone()),
+            )
+            .await;
             Ok(updated)
         }
         EventTransport::Outbox => {
@@ -402,6 +441,14 @@ pub async fn update_and_emit(
                 actor,
             );
             OutboxPublisher.publish(&txn, &env).await?;
+            AuditModel::record(
+                &txn,
+                updated.pid,
+                "updated",
+                actor,
+                Some(updated.data.clone()),
+            )
+            .await?;
             txn.commit().await?;
             Ok(updated)
         }
@@ -426,12 +473,14 @@ pub async fn delete_and_emit(
         EventTransport::Memory => {
             model.into_active_model().soft_delete(db).await?;
             publish_with_actor(EventKind::Deleted, &pid.to_string(), &name, actor);
+            audit_best_effort(db, pid, "deleted", actor, None).await;
         }
         EventTransport::Outbox => {
             let txn = db.begin().await?;
             model.into_active_model().soft_delete(&txn).await?;
             let env = envelope(EventKind::Deleted, &pid.to_string(), &name, actor);
             OutboxPublisher.publish(&txn, &env).await?;
+            AuditModel::record(&txn, pid, "deleted", actor, None).await?;
             txn.commit().await?;
         }
     }
@@ -470,6 +519,8 @@ pub async fn merge_and_emit(
                 actor,
             );
             publish_with_actor(EventKind::Deleted, &dup_pid.to_string(), &dup_name, actor);
+            audit_best_effort(db, merged.pid, "merged", actor, Some(merged.data.clone())).await;
+            audit_best_effort(db, dup_pid, "merged_into", actor, None).await;
             Ok((merged, dup_pid, dup_name))
         }
         EventTransport::Outbox => {
@@ -488,6 +539,10 @@ pub async fn merge_and_emit(
             OutboxPublisher.publish(&txn, &merged_env).await?;
             let deleted_env = envelope(EventKind::Deleted, &dup_pid.to_string(), &dup_name, actor);
             OutboxPublisher.publish(&txn, &deleted_env).await?;
+            // Both audit rows join the same transaction as the merge.
+            AuditModel::record(&txn, merged.pid, "merged", actor, Some(merged.data.clone()))
+                .await?;
+            AuditModel::record(&txn, dup_pid, "merged_into", actor, None).await?;
             txn.commit().await?;
             Ok((merged, dup_pid, dup_name))
         }

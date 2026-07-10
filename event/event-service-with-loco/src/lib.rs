@@ -57,13 +57,13 @@ pub mod app;
 pub mod config;
 /// Loco-idiomatic controllers (the FHIR R5 `Appointment` surface).
 pub mod controllers;
-/// FHIR R5 interop: `Appointment` resource structs, `Event` ⇄ resource
-/// conversions, and search-parameter parsing for the `/fhir` endpoints.
-pub mod fhir;
 /// PostgreSQL persistence (SeaORM entities, repositories, audit log).
 pub mod db;
 /// Crate-wide error type and [`Result`] alias.
 pub mod error;
+/// FHIR R5 interop: `Appointment` resource structs, `Event` ⇄ resource
+/// conversions, and search-parameter parsing for the `/fhir` endpoints.
+pub mod fhir;
 /// Matching strategies, scoring, and the canonical-matcher bridge.
 pub mod matching;
 /// Prometheus metric registry and text exposition.

@@ -1,0 +1,78 @@
+[workspace]
+
+[package]
+name = "link-graph-service"
+version = "0.1.0"
+edition = "2024"
+publish = false
+default-run = "link-graph-service"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace.dependencies]
+loco-rs = { version = "0.16" }
+
+[dependencies]
+loco-rs = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1" }
+tokio = { version = "1.52", default-features = false, features = [
+  "rt-multi-thread",
+] }
+async-trait = { version = "0.1" }
+axum = { version = "0.8" }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+migration = { path = "migration" }
+sea-orm = { version = "1.1", features = [
+  "sqlx-sqlite",
+  "sqlx-postgres",
+  "runtime-tokio-rustls",
+  "macros",
+  "with-chrono",
+] }
+chrono = { version = "0.4" }
+uuid = { version = "1.23", features = ["v4", "serde"] }
+mimalloc = { version = "0.1.52" }
+prometheus = { version = "0.13" }
+
+# The one shared cross-service-linking contract: EntityType / EntityRef
+# (URN parse/Display/serde as a single TEXT column) + the closed v1
+# EdgeKind registry. Depended-on rather than re-copied (see spec §5.1 /
+# §13 T-2/T-3 deviation note).
+entity-ref = { path = "../entity-ref-rust-crate" }
+
+# Offline PASETO v4.public verification + the shared ABAC engine, for
+# case<->person governance (spec T-16/T-19; design §10). Env-supplied key
+# set only (no `fetch` feature — boot-time URL fetch is a follow-up).
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
+
+# Lazy verify-on-read (spec T-10 / design §5.1): a one-shot GET to a
+# record's source service to resolve unknown presence. Only the status
+# code is used. Behaviour is gated by the LINK_GRAPH_LAZY_VERIFY flag.
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+] }
+
+[[bin]]
+name = "link-graph-service"
+path = "src/bin/main.rs"
+required-features = []
+
+[dev-dependencies]
+loco-rs = { workspace = true, features = ["testing"] }
+serial_test = { version = "3.5.0" }
+tokio = { version = "1.52", default-features = false, features = [
+  "macros",
+  "rt-multi-thread",
+] }
+# Mint PASETO v4.public tokens + a matching Ed25519 key set in-process, so
+# the case↔person concealment can be proved end-to-end with real bearer
+# tokens (tests/concealment.rs) without the auth service.
+ed25519-dalek = { version = "2.2" }
+rusty_paseto = { version = "0.10", default-features = false, features = [
+  "v4_public",
+  "serde_json",
+] }
+sha2 = { version = "0.10" }
+base64 = { version = "0.22" }

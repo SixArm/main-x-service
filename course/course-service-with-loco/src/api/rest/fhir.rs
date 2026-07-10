@@ -100,7 +100,12 @@ async fn record_create(state: &AppState, course: &Course) {
     let new_json = serde_json::to_value(course).unwrap_or(Value::Null);
     if let Err(e) = state
         .audit_log
-        .log_create("Course", course.id, new_json.clone(), &AuditContext::default())
+        .log_create(
+            "Course",
+            course.id,
+            new_json.clone(),
+            &AuditContext::default(),
+        )
         .await
     {
         tracing::warn!("audit_log.log_create failed (fhir): {e}");
@@ -114,11 +119,19 @@ async fn record_create(state: &AppState, course: &Course) {
 /// Audit + event side effects for an update (mirrors the native
 /// `record_update`); failures are logged and swallowed.
 async fn record_update(state: &AppState, old: Option<&Course>, new_value: &Course) {
-    let old_json = old.map_or(Value::Null, |v| serde_json::to_value(v).unwrap_or(Value::Null));
+    let old_json = old.map_or(Value::Null, |v| {
+        serde_json::to_value(v).unwrap_or(Value::Null)
+    });
     let new_json = serde_json::to_value(new_value).unwrap_or(Value::Null);
     if let Err(e) = state
         .audit_log
-        .log_update("Course", new_value.id, old_json, new_json.clone(), &AuditContext::default())
+        .log_update(
+            "Course",
+            new_value.id,
+            old_json,
+            new_json.clone(),
+            &AuditContext::default(),
+        )
         .await
     {
         tracing::warn!("audit_log.log_update failed (fhir): {e}");
@@ -150,12 +163,24 @@ async fn record_delete(state: &AppState, old: &Course) {
 /// `Basic`, or a `404` `OperationOutcome` when the id is unknown.
 async fn read(Path(id): Path<String>, State(state): State<AppState>) -> Response {
     let Ok(uuid) = Uuid::parse_str(&id) else {
-        return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Basic/{id} not found"));
+        return fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("Basic/{id} not found"),
+        );
     };
     match state.course_repository.get_by_id(&uuid).await {
         Ok(Some(course)) => fhir_json(StatusCode::OK, &to_fhir_basic(&course)),
-        Ok(None) => fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Basic/{id} not found")),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Ok(None) => fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("Basic/{id} not found"),
+        ),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
@@ -166,7 +191,13 @@ async fn read(Path(id): Path<String>, State(state): State<AppState>) -> Response
 async fn create(State(state): State<AppState>, body: Bytes) -> Response {
     let fhir: FhirBasic = match serde_json::from_slice(&body) {
         Ok(f) => f,
-        Err(e) => return fhir_error(StatusCode::BAD_REQUEST, "structure", format!("invalid FHIR JSON: {e}")),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::BAD_REQUEST,
+                "structure",
+                format!("invalid FHIR JSON: {e}"),
+            );
+        }
     };
     let course = match from_fhir_basic(&fhir) {
         Ok(c) => c,
@@ -178,7 +209,13 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
     }
     let created = match state.course_repository.create(&course).await {
         Ok(c) => c,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     if let Err(e) = state.search_engine.index_course(&created) {
         tracing::warn!("indexing course after fhir create failed: {e}");
@@ -189,7 +226,11 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
     let resource = to_fhir_basic(&created);
     match serde_json::to_vec(&resource) {
         Ok(bytes) => fhir_response(StatusCode::CREATED, bytes, Some(format!("Basic/{pid}"))),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
@@ -198,11 +239,21 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
 /// Audits + emits an `Updated` event + increments metrics.
 async fn update(Path(id): Path<String>, State(state): State<AppState>, body: Bytes) -> Response {
     let Ok(uuid) = Uuid::parse_str(&id) else {
-        return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Basic/{id} not found"));
+        return fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("Basic/{id} not found"),
+        );
     };
     let fhir: FhirBasic = match serde_json::from_slice(&body) {
         Ok(f) => f,
-        Err(e) => return fhir_error(StatusCode::BAD_REQUEST, "structure", format!("invalid FHIR JSON: {e}")),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::BAD_REQUEST,
+                "structure",
+                format!("invalid FHIR JSON: {e}"),
+            );
+        }
     };
     let mut course = match from_fhir_basic(&fhir) {
         Ok(c) => c,
@@ -213,13 +264,28 @@ async fn update(Path(id): Path<String>, State(state): State<AppState>, body: Byt
     if !errs.is_empty() {
         return fhir_validation_error(&errs);
     }
-    let prior = state.course_repository.get_by_id(&uuid).await.ok().flatten();
+    let prior = state
+        .course_repository
+        .get_by_id(&uuid)
+        .await
+        .ok()
+        .flatten();
     let updated = match state.course_repository.update(&course).await {
         Ok(c) => c,
         Err(crate::Error::NotFound) => {
-            return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Basic/{id} not found"));
+            return fhir_error(
+                StatusCode::NOT_FOUND,
+                "not-found",
+                format!("Basic/{id} not found"),
+            );
         }
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     if let Err(e) = state.search_engine.delete_course(&uuid.to_string()) {
         tracing::warn!("removing prior course segment after fhir update failed: {e}");
@@ -236,19 +302,45 @@ async fn update(Path(id): Path<String>, State(state): State<AppState>, body: Byt
 /// Audits + emits a `Deleted` event + increments metrics.
 async fn remove(Path(id): Path<String>, State(state): State<AppState>) -> Response {
     let Ok(uuid) = Uuid::parse_str(&id) else {
-        return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Basic/{id} not found"));
+        return fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("Basic/{id} not found"),
+        );
     };
     let prior = match state.course_repository.get_by_id(&uuid).await {
         Ok(Some(c)) => c,
-        Ok(None) => return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Basic/{id} not found")),
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Ok(None) => {
+            return fhir_error(
+                StatusCode::NOT_FOUND,
+                "not-found",
+                format!("Basic/{id} not found"),
+            );
+        }
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     match state.course_repository.soft_delete(&uuid).await {
         Ok(()) => {}
         Err(crate::Error::NotFound) => {
-            return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Basic/{id} not found"));
+            return fhir_error(
+                StatusCode::NOT_FOUND,
+                "not-found",
+                format!("Basic/{id} not found"),
+            );
         }
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     }
     if let Err(e) = state.search_engine.delete_course(&uuid.to_string()) {
         tracing::warn!("removing course segment after fhir soft-delete failed: {e}");
@@ -260,13 +352,25 @@ async fn remove(Path(id): Path<String>, State(state): State<AppState>) -> Respon
 
 /// `GET /fhir/Basic?<params>` — a `searchset` `Bundle` of matching courses.
 /// In-memory filter over active rows (capped), then the `_count` page size.
-async fn search(Query(params): Query<FhirCourseSearchParams>, State(state): State<AppState>) -> Response {
+async fn search(
+    Query(params): Query<FhirCourseSearchParams>,
+    State(state): State<AppState>,
+) -> Response {
     let rows = match state.course_repository.list(FHIR_SEARCH_SCAN_CAP, 0).await {
         Ok(rows) => rows,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     if rows.len() as u64 == FHIR_SEARCH_SCAN_CAP {
-        tracing::warn!(cap = FHIR_SEARCH_SCAN_CAP, "fhir search scan hit the row cap; results may be truncated");
+        tracing::warn!(
+            cap = FHIR_SEARCH_SCAN_CAP,
+            "fhir search scan hit the row cap; results may be truncated"
+        );
     }
     let limit = params.limit();
     let mut resources = Vec::new();
@@ -387,12 +491,25 @@ mod tests {
             .iter()
             .map(|p| p["name"].as_str().unwrap())
             .collect();
-        for expected in ["_id", "_lastUpdated", "_count", "identifier", "code", "name"] {
-            assert!(params.contains(&expected), "capability missing search param {expected}");
+        for expected in [
+            "_id",
+            "_lastUpdated",
+            "_count",
+            "identifier",
+            "code",
+            "name",
+        ] {
+            assert!(
+                params.contains(&expected),
+                "capability missing search param {expected}"
+            );
         }
 
         // The non-standard nature is stated in the server documentation.
         let doc_text = doc["rest"][0]["documentation"].as_str().unwrap();
-        assert!(doc_text.contains("NON-STANDARD"), "capability must label the surface non-standard");
+        assert!(
+            doc_text.contains("NON-STANDARD"),
+            "capability must label the surface non-standard"
+        );
     }
 }

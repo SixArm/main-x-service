@@ -365,6 +365,20 @@ affiliation posture:
    as the other rollout steps land. No behaviour yet.
 2. **Backbone.** Add `entity_links` write-side + `linked`/`unlinked` events
    to **person** and **worker**; ship `same_identity`.
+   - **Partial / reordered — ✅ case `subject_of` write-side landed
+     2026-07-10** as the **reference implementation**
+     ([`case/case-service-with-loco`](../../case/case-service-with-loco):
+     `entity_links` migration, `POST`/`GET`/`DELETE
+     /api/cases/{pid}/links`, idempotent upsert, `linked`/`unlinked` on
+     the additive `Envelope.data` via the transactional emit seam, §10
+     read-the-case authz + audit, depends on the `entity-ref` crate). This
+     deviates from the nominal step-2 wording (person + worker
+     `same_identity` first): case is the first **loco** service that both
+     *originates* a v1 edge (§9) AND already has the durable-bus
+     outbox/streaming to emit the events, whereas person/worker are older
+     axum-style services with no event bus. Their `same_identity`
+     write-side therefore **awaits their own event infrastructure**; the
+     contract and the emit pattern are now proven on case.
 3. **Aggregator.** Stand up `link-graph-service-with-loco` consuming the
    in-memory→outbox stream; `neighbors` + `single-view` reads; lazy
    verify-on-read (§5.1).

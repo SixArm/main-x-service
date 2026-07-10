@@ -742,10 +742,7 @@ mod tests {
         ] {
             assert_eq!(derive_action(&Method::POST, path), Action::Destructive);
         }
-        assert_eq!(
-            derive_action(&Method::POST, "/api/projects"),
-            Action::Write
-        );
+        assert_eq!(derive_action(&Method::POST, "/api/projects"), Action::Write);
         assert_eq!(
             derive_action(&Method::POST, "/api/projects/check-duplicates"),
             Action::Write

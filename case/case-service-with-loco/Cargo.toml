@@ -49,6 +49,11 @@ prometheus = { version = "0.13" }
 # Canonical matching algorithm — embedded and used directly as the API DTO.
 case-matcher = { path = "../case-matcher-rust-crate" }
 
+# Cross-service entity-linking contract (EntityRef URN + EdgeKind registry).
+# Case owns the `subject_of` (case → person) edge; the write side depends on
+# this shared crate rather than copy-adapting it (per-task decision).
+entity-ref = { path = "../../link/entity-ref-rust-crate" }
+
 # Offline PASETO v4.public verification against the authentication-service Ed25519 keys (local path; monorepo 0.2 verifier).
 # The `fetch` feature adds `Verifier::from_paseto_keys_url` for the boot-time key-set fetch (`CASE_PASETO_KEYS_URL`).
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }

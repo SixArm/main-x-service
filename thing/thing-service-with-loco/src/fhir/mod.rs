@@ -95,7 +95,14 @@ pub fn system_to_scheme(system: &str) -> IdentifierType {
 pub fn to_fhir_device(thing: &Thing) -> FhirDevice {
     let mut fhir = FhirDevice::new();
     fhir.id = Some(thing.id.to_string());
-    fhir.status = Some(if thing.is_deleted { "inactive" } else { "active" }.to_string());
+    fhir.status = Some(
+        if thing.is_deleted {
+            "inactive"
+        } else {
+            "active"
+        }
+        .to_string(),
+    );
     fhir.meta = Some(FhirMeta {
         version_id: None,
         last_updated: Some(thing.updated_at.to_rfc3339()),
@@ -125,7 +132,8 @@ pub fn to_fhir_device(thing: &Thing) -> FhirDevice {
         text: Some(t),
     });
     fhir.manufacturer.clone_from(&thing.owner);
-    fhir.model_number.clone_from(&thing.disambiguating_description);
+    fhir.model_number
+        .clone_from(&thing.disambiguating_description);
     fhir.note = thing
         .description
         .clone()

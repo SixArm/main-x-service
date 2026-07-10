@@ -1,0 +1,42 @@
+# Loco configuration file — link-graph-service (development).
+
+# Application logging configuration
+logger:
+  enable: true
+  pretty_backtrace: true
+  level: debug
+  format: compact
+
+# Web server configuration
+server:
+  port: 5160
+  binding: localhost
+  host: http://localhost
+  middlewares:
+
+# Worker Configuration
+workers:
+  mode: BackgroundQueue
+
+# Queue Configuration
+queue:
+  kind: Postgres
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/link_graph_service_development") }}
+  dangerously_flush: false
+
+# Database Configuration
+database:
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5432/link_graph_service_development") }}
+  enable_logging: false
+  connect_timeout: {{ get_env(name="DB_CONNECT_TIMEOUT", default="500") }}
+  idle_timeout: {{ get_env(name="DB_IDLE_TIMEOUT", default="500") }}
+  min_connections: {{ get_env(name="DB_MIN_CONNECTIONS", default="1") }}
+  max_connections: {{ get_env(name="DB_MAX_CONNECTIONS", default="1") }}
+  auto_migrate: true
+  dangerously_truncate: false
+  dangerously_recreate: false
+
+# Cache provider: in-memory (loco `cache_inmem`, enabled by default).
+cache:
+  kind: InMem
+  max_capacity: 33554432 # 32MiB (default if not specified)

@@ -29,6 +29,8 @@ const fn kind_token(kind: EventKind) -> &'static str {
         EventKind::Updated => "updated",
         EventKind::Deleted => "deleted",
         EventKind::Merged => "merged",
+        EventKind::Linked => "linked",
+        EventKind::Unlinked => "unlinked",
     }
 }
 
@@ -204,6 +206,7 @@ mod tests {
             seq: 7,
             actor: Some("user-1".to_string()),
             name: "Housing benefit appeal".to_string(),
+            data: None,
         }
     }
 
@@ -244,8 +247,8 @@ mod tests {
         // Merge and delete are the two kinds beyond create/update; pin the
         // merged mapping (the merge handler emits merged + deleted).
         let pid = "0c4f1e2a-0000-4000-8000-000000000001";
-        let row =
-            OutboxInsert::from_envelope(&an_envelope(EventKind::Merged, pid), an_instant()).unwrap();
+        let row = OutboxInsert::from_envelope(&an_envelope(EventKind::Merged, pid), an_instant())
+            .unwrap();
         assert_eq!(row.kind, "merged");
         assert_eq!(row.payload["kind"], "merged");
     }
@@ -253,9 +256,8 @@ mod tests {
     #[test]
     fn from_envelope_maps_a_deleted_event() {
         let pid = "0c4f1e2a-0000-4000-8000-000000000002";
-        let row =
-            OutboxInsert::from_envelope(&an_envelope(EventKind::Deleted, pid), an_instant())
-                .unwrap();
+        let row = OutboxInsert::from_envelope(&an_envelope(EventKind::Deleted, pid), an_instant())
+            .unwrap();
         assert_eq!(row.kind, "deleted");
         assert_eq!(row.entity_pid, Uuid::parse_str(pid).unwrap());
     }
@@ -263,8 +265,11 @@ mod tests {
     #[test]
     fn from_envelope_rejects_a_non_uuid_pid() {
         assert!(
-            OutboxInsert::from_envelope(&an_envelope(EventKind::Created, "not-a-uuid"), an_instant())
-                .is_err()
+            OutboxInsert::from_envelope(
+                &an_envelope(EventKind::Created, "not-a-uuid"),
+                an_instant()
+            )
+            .is_err()
         );
     }
 

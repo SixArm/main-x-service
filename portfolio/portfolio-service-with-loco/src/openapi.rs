@@ -289,9 +289,7 @@ mod tests {
     #[test]
     fn spec_documents_whoami_with_bearer_security() {
         let s = spec();
-        assert!(
-            s["paths"]["/api/{collection}/whoami"]["get"]["security"][0]["bearer"].is_array()
-        );
+        assert!(s["paths"]["/api/{collection}/whoami"]["get"]["security"][0]["bearer"].is_array());
         assert_eq!(
             s["components"]["securitySchemes"]["bearer"]["scheme"],
             "bearer"

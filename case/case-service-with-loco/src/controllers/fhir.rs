@@ -41,7 +41,6 @@ use crate::fhir::resources::{FhirBundle, FhirOperationOutcome, FhirTask};
 use crate::fhir::search::FhirTaskSearchParams;
 use crate::fhir::{from_fhir_task, to_fhir_task};
 use crate::metrics::Metrics;
-use crate::models::audit_logs::Model as AuditModel;
 use crate::models::cases::Model as CaseModel;
 use crate::streaming;
 
@@ -82,20 +81,6 @@ fn fhir_error(status: StatusCode, code: &str, message: impl Into<String>) -> Res
     fhir_json(status, &FhirOperationOutcome::error(code, message))
 }
 
-/// Best-effort audit write (never fails the request), mirroring the native
-/// controller's audit path.
-async fn audit(
-    ctx: &AppContext,
-    entity_pid: uuid::Uuid,
-    action: &str,
-    actor: Option<&str>,
-    snapshot: Option<serde_json::Value>,
-) {
-    if let Err(err) = AuditModel::record(&ctx.db, entity_pid, action, actor, snapshot).await {
-        tracing::warn!(error = %err, action, "failed to write audit log (fhir)");
-    }
-}
-
 /// `GET /fhir/Task/{id}` — render a stored case as a FHIR `Task`, or a
 /// `404` `OperationOutcome` when the id is unknown.
 ///
@@ -104,13 +89,27 @@ async fn audit(
 /// DEFERRED gap (see the module doc).
 async fn read(Path(id): Path<String>, State(ctx): State<AppContext>) -> Response {
     let Ok(model) = CaseModel::find_by_pid(&ctx.db, &id).await else {
-        return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Task/{id} not found"));
+        return fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("Task/{id} not found"),
+        );
     };
     let case = match model.to_case() {
         Ok(case) => case,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
-    let resource = to_fhir_task(&case, &model.pid.to_string(), Some(model.updated_at.to_rfc3339()));
+    let resource = to_fhir_task(
+        &case,
+        &model.pid.to_string(),
+        Some(model.updated_at.to_rfc3339()),
+    );
     fhir_json(StatusCode::OK, &resource)
 }
 
@@ -124,7 +123,13 @@ async fn create(
 ) -> Response {
     let fhir: FhirTask = match serde_json::from_slice(&body) {
         Ok(f) => f,
-        Err(e) => return fhir_error(StatusCode::BAD_REQUEST, "structure", format!("invalid FHIR JSON: {e}")),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::BAD_REQUEST,
+                "structure",
+                format!("invalid FHIR JSON: {e}"),
+            );
+        }
     };
     let case = match from_fhir_task(&fhir) {
         Ok(case) => case,
@@ -134,15 +139,26 @@ async fn create(
     // native controller, so FHIR need not know the transport).
     let model = match streaming::create_and_emit(&ctx.db, &case, caller.actor()).await {
         Ok(m) => m,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     Metrics::global().case_created_total.inc();
-    audit(&ctx, model.pid, "created", caller.actor(), Some(model.data.clone())).await;
+    // Audit is written by `streaming::create_and_emit` (atomic with the
+    // entity + event under `outbox`, best-effort under `memory`).
     let pid = model.pid.to_string();
     let resource = to_fhir_task(&case, &pid, Some(model.updated_at.to_rfc3339()));
     match serde_json::to_vec(&resource) {
         Ok(bytes) => fhir_response(StatusCode::CREATED, bytes, Some(format!("Task/{pid}"))),
-        Err(e) => fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
@@ -157,22 +173,42 @@ async fn update(
 ) -> Response {
     let fhir: FhirTask = match serde_json::from_slice(&body) {
         Ok(f) => f,
-        Err(e) => return fhir_error(StatusCode::BAD_REQUEST, "structure", format!("invalid FHIR JSON: {e}")),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::BAD_REQUEST,
+                "structure",
+                format!("invalid FHIR JSON: {e}"),
+            );
+        }
     };
     let case = match from_fhir_task(&fhir) {
         Ok(case) => case,
         Err(msg) => return fhir_error(StatusCode::BAD_REQUEST, "invalid", msg),
     };
     let Ok(model) = CaseModel::find_by_pid(&ctx.db, &id).await else {
-        return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Task/{id} not found"));
+        return fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("Task/{id} not found"),
+        );
     };
     let updated = match streaming::update_and_emit(&ctx.db, model, &case, caller.actor()).await {
         Ok(m) => m,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     Metrics::global().case_updated_total.inc();
-    audit(&ctx, updated.pid, "updated", caller.actor(), Some(updated.data.clone())).await;
-    let resource = to_fhir_task(&case, &updated.pid.to_string(), Some(updated.updated_at.to_rfc3339()));
+    // Audit is written by `streaming::update_and_emit` (see `create`).
+    let resource = to_fhir_task(
+        &case,
+        &updated.pid.to_string(),
+        Some(updated.updated_at.to_rfc3339()),
+    );
     fhir_json(StatusCode::OK, &resource)
 }
 
@@ -184,14 +220,21 @@ async fn remove(
     caller: MaybeAuthUser,
 ) -> Response {
     let Ok(model) = CaseModel::find_by_pid(&ctx.db, &id).await else {
-        return fhir_error(StatusCode::NOT_FOUND, "not-found", format!("Task/{id} not found"));
+        return fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("Task/{id} not found"),
+        );
     };
-    let entity_pid = match streaming::delete_and_emit(&ctx.db, model, caller.actor()).await {
-        Ok((pid, _title)) => pid,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
-    };
+    // Audit is written by `streaming::delete_and_emit` (see `create`).
+    if let Err(e) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await {
+        return fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        );
+    }
     Metrics::global().case_deleted_total.inc();
-    audit(&ctx, entity_pid, "deleted", caller.actor(), None).await;
     fhir_response(StatusCode::NO_CONTENT, Vec::new(), None)
 }
 
@@ -208,7 +251,13 @@ async fn search(
 ) -> Response {
     let rows = match CaseModel::list(&ctx.db, FHIR_SEARCH_SCAN_CAP).await {
         Ok(rows) => rows,
-        Err(e) => return fhir_error(StatusCode::INTERNAL_SERVER_ERROR, "exception", e.to_string()),
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
     };
     if rows.len() as u64 == FHIR_SEARCH_SCAN_CAP {
         tracing::warn!(
@@ -222,7 +271,11 @@ async fn search(
         let Ok(case) = model.to_case() else { continue };
         let pid = model.pid.to_string();
         if params.matches(&case, &pid) {
-            resources.push(to_fhir_task(&case, &pid, Some(model.updated_at.to_rfc3339())));
+            resources.push(to_fhir_task(
+                &case,
+                &pid,
+                Some(model.updated_at.to_rfc3339()),
+            ));
             if resources.len() >= limit {
                 break;
             }
@@ -302,7 +355,14 @@ mod tests {
             .collect();
         assert_eq!(
             names,
-            ["_id", "_lastUpdated", "_count", "identifier", "status", "priority"]
+            [
+                "_id",
+                "_lastUpdated",
+                "_count",
+                "identifier",
+                "status",
+                "priority"
+            ]
         );
     }
 }
