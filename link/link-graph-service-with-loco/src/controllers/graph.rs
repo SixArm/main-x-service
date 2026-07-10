@@ -21,6 +21,21 @@ use crate::events::entity_from_topic;
 use crate::graph::{self, EdgeStatus};
 use crate::models::audit_log::{self, AuditContext};
 use crate::models::{consumer_offsets, edges};
+use crate::probe;
+
+/// The distinct, parseable endpoint refs of a set of edge rows — the
+/// candidates for lazy verify-on-read.
+fn endpoints_of(rows: &[edges::Model]) -> Vec<EntityRef> {
+    rows.iter()
+        .flat_map(|m| {
+            [
+                m.from_ref.parse::<EntityRef>().ok(),
+                m.to_ref.parse::<EntityRef>().ok(),
+            ]
+        })
+        .flatten()
+        .collect()
+}
 
 /// Build the governance-audit context for a request: the caller `sub`
 /// (when a valid token was presented) and the `User-Agent` header.
@@ -212,7 +227,15 @@ async fn neighbors(
         return envelope::bad_request(&format!("depth exceeds cap of {MAX_DEPTH}"));
     }
 
-    let rows = collect_neighbors(&ctx.db, start, kind, direction, depth).await?;
+    let mut rows = collect_neighbors(&ctx.db, start, kind, direction, depth).await?;
+    // Lazy verify-on-read (T-10): resolve any unknown endpoint presence and
+    // recompute status, then re-read so the response reflects it.
+    if probe::enabled()
+        && probe::verify_unknown(&ctx.db, &probe::HttpPresenceProbe, &endpoints_of(&rows)).await?
+            > 0
+    {
+        rows = collect_neighbors(&ctx.db, start, kind, direction, depth).await?;
+    }
     // Governance: conceal high-sensitivity case↔person edges from callers
     // without case-read authorisation (design §10).
     let may = auth::may_see_governed(caller.claims());
@@ -258,7 +281,15 @@ async fn edges_list(
         },
     };
 
-    let rows = edges::Model::filter(&ctx.db, from.as_ref(), to.as_ref(), kind, status).await?;
+    let mut rows = edges::Model::filter(&ctx.db, from.as_ref(), to.as_ref(), kind, status).await?;
+    // Lazy verify-on-read (T-10): resolve unknown endpoint presence, then
+    // re-filter so the response reflects any status change.
+    if probe::enabled()
+        && probe::verify_unknown(&ctx.db, &probe::HttpPresenceProbe, &endpoints_of(&rows)).await?
+            > 0
+    {
+        rows = edges::Model::filter(&ctx.db, from.as_ref(), to.as_ref(), kind, status).await?;
+    }
     // Governance: a caller without case-read authorisation cannot see (or
     // learn of) subject_of edges — even a direct `?kind=subject_of` query
     // returns an empty list rather than revealing them (design §10).

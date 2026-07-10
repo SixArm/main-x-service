@@ -56,10 +56,20 @@
 
 ### Integrity (interim)
 
-- [ ] T-10: Lazy verify-on-read client — one-shot `GET /{id}` to the
-  source service via the `entity_type → service` map; cache verdict in
-  `entity_presence`; supersede per-entity as topics go durable (§6
-  FR-11, design §5.1).
+- [x] T-10: Lazy verify-on-read client — one-shot `GET /{id}` to the
+  source service; cache verdict in `entity_presence`; supersede per-entity
+  as topics go durable (§6 FR-11, design §5.1). *(Done: `src/probe.rs` —
+  the `PresenceProbe` trait (mockable) + `HttpPresenceProbe` (one-shot
+  `GET`: 2xx⇒alive, 404⇒absent, else unknown), the per-entity URL
+  **template** from `LINK_GRAPH_PROBE_URL_<ENTITY>` (`{id}` substituted —
+  no hardcoded hosts/paths), and `verify_unknown` which probes only
+  unknown endpoints, caches the verdict, and recomputes incident edge
+  status. Wired into `neighbors` / `edges` behind `LINK_GRAPH_LAZY_VERIFY`
+  (off by default; re-reads only when something resolved). Unit tests
+  (URL resolution) + DB-gated `tests/lazy_verify.rs` with a mock probe
+  (alive⇒verified, absent⇒dangling, idempotent second call). The real
+  HTTP path is compile-checked. `single-view` is not wired — its response
+  carries no status.)*
 
 ### Read API
 

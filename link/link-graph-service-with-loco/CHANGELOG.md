@@ -14,6 +14,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — lazy verify-on-read (spec T-10 / design §5.1) (2026-07-10)
+
+- `src/probe.rs` — the interim integrity path until the durable bus feeds
+  presence via events. When a read surfaces an edge whose endpoint
+  presence is unknown, the aggregator can resolve it with a one-shot `GET`
+  to the source service, cache the verdict in `entity_presence`, and
+  recompute the incident edge status (`unverified` → `verified` /
+  `dangling`) — so status settles on first read even before the bus is
+  live. Pieces:
+  - `PresenceProbe` trait (mockable) + `HttpPresenceProbe` (`2xx`⇒alive,
+    `404`⇒absent, else unknown; `reqwest`).
+  - Per-entity URL **template** from `LINK_GRAPH_PROBE_URL_<ENTITY>`
+    (`{id}` substituted) — no hardcoded service hosts or plural paths; an
+    entity with no template is skipped.
+  - `verify_unknown` probes only unknown endpoints (deduped), caches, and
+    recomputes status.
+  - Wired into `neighbors` / `edges` behind `LINK_GRAPH_LAZY_VERIFY` (off
+    by default; re-reads only when something resolved). `single-view` is
+    not wired (its response carries no status).
+  - Unit tests (URL resolution) + DB-gated `tests/lazy_verify.rs` with a
+    mock probe (alive⇒verified, absent⇒dangling, idempotent). The real
+    HTTP path is compile-checked.
+
 ### Added — OpenAPI 3 + Swagger UI (spec T-15) (2026-07-10)
 
 - `src/openapi.rs` — a hand-written OpenAPI 3.0.3 document (dependency-light,
