@@ -145,34 +145,59 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     (`2xx`, `linked` event published, row in `entity_links`), lists it
     via `GET`, deletes it (`unlinked` event, `deleted_at` set); a matcher
     unit test asserts an `entity_links` row never alters a match score.
-- [ ] **T-10 — Bulk import / export.**
-  See §9.2, §10.5 and
+- [ ] **T-10 — Bulk import / export.** *(rollout step 1 done 2026-07-10;
+  steps 2–5 remain)* Person is the family **reference entity** for this
+  capability. See §9.2, §10.5 and
   [bulk import/export](../../../agents/share/bulk-import-export.md).
-  - [ ] Migration creating the `bulk_jobs` table (shared doc §3 schema,
-    with the `UNIQUE (entity, kind, idempotency_key)` key).
-  - [ ] The five endpoints (§9.2): `POST`/`GET` `/api/persons/import`,
-    `POST`/`GET` `/api/persons/export`, `GET /api/persons/bulk-jobs`.
-  - [ ] `bg_pg` worker draining jobs `queued → running →
-    completed | completed_with_errors | failed`, with progress updates.
-  - [ ] JSONL (lossless reference) + CSV (flattening per §9.2: dotted
-    single-nested, JSON-in-cell arrays) codecs; Parquet **export-only**,
-    feature-gated.
-  - [ ] Per-row pipeline reusing the single-create validators + matcher +
-    review queue: upsert by stable key (national/health identifier or
-    `pid`, §9.2); keyless / unmatched rows → duplicate detection →
-    review queue with `provenance = import`; events + audit not bypassed.
-  - [ ] Downloadable per-row error report
-    (`row_number, source_line, field, code, message`); one bad row never
-    aborts the load; counts reconcile
-    (`rows_total = created + upserted + to_review + errored`).
-  - [ ] Export masking + audit: `masking_profile` (masked default, full
-    gated), `include_soft_deleted` gated, every export audited (even
-    zero-row); single-record GDPR export becomes the `filter = one pid`
-    special case.
-  - **Acceptance:** integration tests cover idempotent re-import (same
-    file re-upserts to the same state), the per-row error report, a
-    keyless dedupe-to-review row (`provenance = import`), masked vs full
-    export, and that a zero-row export still writes an audit record.
+  - [x] **Step 1 (JSONL reference core).**
+    - [x] Migration `m20260710_000002_create_bulk_jobs` — `bulk_jobs`
+      table (shared doc §3 schema, `UNIQUE (entity, kind,
+      idempotency_key)` + `(kind, status, created_at)` index);
+      registered. SeaORM entity `db::models::bulk_jobs`; persistence
+      `db::bulk_jobs` (`create`, `set_input_url`, `set_status`,
+      `finish_import`, `finish_export`, `find_by_id`, `list_recent`).
+    - [x] The five endpoints (`bulk::handlers`, mounted on
+      `persons_routes`, in OpenAPI): `POST /api/persons/import`
+      (multipart, `202 {job_id}`, `dry_run`), `POST /api/persons/export`
+      (JSON filter, `202`), `GET /api/persons/import/{id}` +
+      `GET /api/persons/export/{id}` (status + counts +
+      `errors_url`/`download_url`), `GET /api/persons/bulk-jobs`.
+    - [x] `bg_pg` worker `bulk::worker::BulkJobWorker` (registered in
+      `connect_workers`) draining `queued → running →
+      completed | completed_with_errors | failed`; a thin adapter over
+      the pure-ish `bulk::pipeline`.
+    - [x] JSONL codec (`bulk::jsonl`, the lossless reference — person
+      wire type per line, streaming). Artifact store abstraction
+      (`bulk::store::ArtifactStore` + `LocalFsArtifactStore`,
+      `PERSON_BULK_ARTIFACT_DIR`; S3 = deployment, deferred).
+    - [x] **Stable key** (§10.1, `bulk::stable_key`): a strong
+      scheme-scoped identifier (SSN/TAX/NPI/PPN) → `tax_id` → record
+      `pid`. Per-row pipeline reuses the single-create validators;
+      upsert-in-place on a stable-key match (idempotent re-import), else
+      create; events + audit not bypassed (via the repository).
+    - [x] Downloadable per-row error report
+      (`row_number, field, code, message`; `bulk::error_report` → CSV);
+      one bad row never aborts the load; counts reconcile
+      (`rows_total = created + upserted + errored`; `to_review` = 0 until
+      step 2).
+    - [x] Export honours the person list/search filter and writes an
+      export audit row (even zero-row).
+    - **Acceptance:** DB-free unit (JSONL round-trip, stable-key
+      precedence, error-report shape, store round-trip, enum
+      round-trips) + DB-gated `#[ignore]` pipeline tests (create → idempotent
+      re-upsert with error report; dry-run commits nothing; export JSONL
+      round-trip). Met: `cargo test --lib` green (182 passed, 6 ignored);
+      `cargo build`, `cargo clippy --all-targets --all-features`, and the
+      migration clippy all clean (0).
+  - [ ] **Step 2** — CSV codec (flattening per §9.2: dotted single-nested,
+    JSON-in-cell arrays) + keyless/unmatched rows → duplicate detection →
+    review queue with `provenance = import`.
+  - [ ] **Step 3** — export masking + gating: `masking_profile` (masked
+    default, full gated), `include_soft_deleted` gated; single-record
+    GDPR export becomes the `filter = one pid` special case.
+  - [ ] **Step 4** — Parquet **export-only**, feature-gated.
+  - [ ] **Step 5** — S3-compatible artifact store; roll the contract to
+    the other entities.
 - [x] **T-11 — FHIR R5 API** (`Patient` primary + `Person` alias) — adopt
   the family contract *(done 2026-07-07)*. **Done:** reconciled the
   unmounted `src/api/fhir/` prototype to the standard — `resourceType`

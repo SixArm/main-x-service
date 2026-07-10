@@ -10,6 +10,7 @@ use authentication_verifier::Verifier;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 
+use crate::bulk::store::{ArtifactStore, LocalFsArtifactStore};
 use crate::config::Config;
 use crate::db::{AuditLogRepository, PersonRepository, SeaOrmPersonRepository};
 use crate::matching::{PersonMatcher, ProbabilisticMatcher};
@@ -48,6 +49,12 @@ pub struct AppState {
     /// [`AppState::with_verifier`] can swap in a replacement (e.g. one
     /// built from a freshly fetched key set).
     pub verifier: Arc<Verifier>,
+
+    /// Artifact store for bulk import/export jobs (uploaded input,
+    /// export output, per-row error report). Built from the environment
+    /// (`PERSON_BULK_ARTIFACT_DIR`) as a local-filesystem store for
+    /// dev/test; an S3-compatible store is the deployment backend.
+    pub bulk_store: Arc<dyn ArtifactStore>,
 }
 
 impl AppState {
@@ -92,6 +99,7 @@ impl AppState {
             matcher: person_matcher,
             config: Arc::new(config),
             verifier: Arc::new(verifier_from_env()),
+            bulk_store: Arc::new(LocalFsArtifactStore::from_env()) as Arc<dyn ArtifactStore>,
         }
     }
 

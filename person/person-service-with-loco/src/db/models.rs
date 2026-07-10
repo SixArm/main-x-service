@@ -1116,3 +1116,68 @@ pub mod entity_links {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+// ============================================================================
+// Bulk import/export job models
+// ============================================================================
+
+/// The `bulk_jobs` table: one async bulk import/export operation, drained
+/// by a `bg_pg` worker (`agents/share/bulk-import-export.md` §3).
+pub mod bulk_jobs {
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
+
+    /// One bulk-job row: kind + format + status, per-row counts, and the
+    /// artifact references (input, result, error report).
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+    #[sea_orm(table_name = "bulk_jobs")]
+    pub struct Model {
+        /// Application-assigned primary key (the job id).
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// `import` or `export`.
+        pub kind: String,
+        /// The entity name (`person`).
+        pub entity: String,
+        /// File format token (`jsonl`).
+        pub format: String,
+        /// `queued|running|completed|completed_with_errors|failed`.
+        pub status: String,
+        /// Free-form job parameters (dry-run flag, export filter, …).
+        pub params: Json,
+        /// Total record rows seen, once known.
+        pub rows_total: Option<i64>,
+        /// Rows processed so far.
+        pub rows_processed: i64,
+        /// Rows inserted as new records.
+        pub rows_created: i64,
+        /// Rows upserted onto an existing record (idempotent re-import).
+        pub rows_upserted: i64,
+        /// Rows routed to the duplicate review queue (deferred; always 0).
+        pub rows_to_review: i64,
+        /// Rows that failed validation/parse/persist.
+        pub rows_errored: i64,
+        /// Acting user pid (bearer `sub`), if any.
+        pub actor: Option<String>,
+        /// Client-supplied idempotency key, if any.
+        pub idempotency_key: Option<String>,
+        /// Artifact reference for the uploaded source file.
+        pub input_url: Option<String>,
+        /// Artifact reference for the export output / import receipt.
+        pub result_url: Option<String>,
+        /// Artifact reference for the downloadable per-row error report.
+        pub error_report_url: Option<String>,
+        /// Creation timestamp.
+        pub created_at: TimeDateTimeWithTimeZone,
+        /// Last-update timestamp.
+        pub updated_at: TimeDateTimeWithTimeZone,
+        /// Artifact + row TTL, if set.
+        pub expires_at: Option<TimeDateTimeWithTimeZone>,
+    }
+
+    /// `SeaORM` relations for the bulk-jobs entity (none defined).
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}

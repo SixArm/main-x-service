@@ -13,7 +13,7 @@ use axum::Router as AxumRouter;
 use loco_rs::{
     Result,
     app::{AppContext, Hooks},
-    bgworker::Queue,
+    bgworker::{BackgroundWorker, Queue},
     boot::{BootResult, StartMode, create_app},
     config::Config as LocoConfig,
     controller::AppRoutes,
@@ -111,7 +111,12 @@ impl Hooks for App {
         Ok(router)
     }
 
-    async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {
+    async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
+        // Bulk import/export jobs drain on the Postgres-backed queue
+        // (`bg_pg`); the worker is a thin adapter over `crate::bulk::pipeline`.
+        queue
+            .register(crate::bulk::worker::BulkJobWorker::build(ctx))
+            .await?;
         Ok(())
     }
 

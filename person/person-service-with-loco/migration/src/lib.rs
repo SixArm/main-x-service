@@ -17,6 +17,7 @@ mod m20260603_000001_rename_patient_tables_to_person;
 mod m20260608_000001_add_person_persistence_fields;
 mod m20260708_000001_create_event_outbox;
 mod m20260710_000001_create_entity_links;
+mod m20260710_000002_create_bulk_jobs;
 
 pub struct Migrator;
 
@@ -33,6 +34,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260608_000001_add_person_persistence_fields::Migration),
             Box::new(m20260708_000001_create_event_outbox::Migration),
             Box::new(m20260710_000001_create_entity_links::Migration),
+            Box::new(m20260710_000002_create_bulk_jobs::Migration),
         ]
     }
 }
