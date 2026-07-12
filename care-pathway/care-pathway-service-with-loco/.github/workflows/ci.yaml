@@ -81,22 +81,15 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-      - name: Run cargo test (DB-free + default suite)
+      # `--include-ignored` runs BOTH the default (DB-free) tests and the
+      # `#[ignore]`-gated request suite (which needs the Postgres service
+      # above) in one pass, so the DB-backed tests actually execute in CI
+      # rather than being silently skipped (H-4; spec §13 T-4).
+      - name: Run cargo test (incl. DB-gated request suite)
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all-features --all
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/care_pathway_service_test
-      # The request-level integration tests are `#[ignore]`-gated (they
-      # need the Postgres service above). The provisioned database is only
-      # actually exercised when `-- --ignored` is passed, so run them in a
-      # dedicated step (spec §13 T-4: "wiring a DB-backed run into CI").
-      - name: Run cargo test (DB-backed, ignored request suite)
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-features --all -- --ignored
+          args: --all-features --all -- --include-ignored
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/care_pathway_service_test
 

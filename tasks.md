@@ -38,13 +38,23 @@
   aggregator, auth stack. Keep it one page + one diagram.
   *Verify:* no named file/module in the doc is absent from the tree.
 
-- [ ] **H-4 (M)** Roll CI `--include-ignored` to every service CI.
+- [x] **H-4 (M)** Roll CI `--include-ignored` to every service CI. *(done 2026-07-12)*
   Case's `.github/workflows/ci.yaml` test job is the pattern (Postgres
   service + `cargo test --all-features --all -- --include-ignored`).
   Apply to the other nine service crates' workflows (and link-graph).
   Check each service's `config/test.yaml` DB name matches its CI env.
   *Verify:* per-crate workflow lints (yamllint or careful review); the
   DB-gated suites at least compile locally (`cargo test --no-run`).
+  *Result:* all 12 services now run `--include-ignored` against a Postgres
+  service with a matching DB name. Category A (`ci.yaml` + PG: authentication,
+  organization, portfolio) got `-- --include-ignored`; care-pathway's two
+  test steps consolidated into one `--include-ignored` run; Category B
+  (`test.yml`: person, worker, event) had `--test api_integration_test`
+  replaced with `--all-features --all -- --include-ignored`; Category C
+  (course, place, thing had no PG test job) got a new self-contained
+  `test.yml`; link-graph (no workflow at all) got a full `ci.yaml`. All
+  workflows YAML-validated; no `[features]` section anywhere so
+  `--all-features` enables nothing new.
 
 - [ ] **H-5 (M)** Release hygiene: cut CHANGELOG releases for crates with
   large `[Unreleased]` sections (person, case, care-pathway, organization,

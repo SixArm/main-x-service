@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - main
-      - main
   pull_request:
 
 env:
@@ -58,12 +57,12 @@ jobs:
 
     permissions:
       contents: read
-    
+
     services:
       postgres:
         image: postgres
         env:
-          POSTGRES_DB: authentication_service_test
+          POSTGRES_DB: link_graph_service_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:
@@ -82,14 +81,38 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-      - name: Run cargo test
+      # `--include-ignored` runs BOTH the default (DB-free) tests and the
+      # `#[ignore]`d DB-backed suites against the Postgres service, so the
+      # request tests actually execute in CI rather than being skipped (H-4).
+      - name: Run cargo test (incl. DB-gated)
         uses: actions-rs/cargo@v1
         with:
           command: test
-          # `--include-ignored` runs BOTH the default (DB-free) tests and
-          # the `#[ignore]`d DB-backed suites against the Postgres service,
-          # so request/enforcement tests actually execute in CI (H-4).
           args: --all-features --all -- --include-ignored
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/authentication_service_test
-          
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/link_graph_service_test
+
+  migration:
+    name: Clippy Migration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev libssl-dev
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-migration-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run Clippy on migration crate
+        run: cargo clippy --manifest-path migration/Cargo.toml --all-targets --all-features -- -D warnings

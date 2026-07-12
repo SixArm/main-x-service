@@ -99,13 +99,18 @@ jobs:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/event_service_test
         run: sea-orm-cli migrate up
 
-      - name: Run integration tests
+      # `--include-ignored` runs BOTH the default (DB-free) tests and the
+      # `#[ignore]`d DB-backed request/enforcement suites against the
+      # Postgres service, so they actually execute in CI (H-4). Replaces the
+      # single `--test api_integration_test` run, which skipped ignored tests
+      # and other test binaries.
+      - name: Run tests (incl. DB-gated + enforcement)
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/event_service_test
           SEARCH_INDEX_PATH: /tmp/test_index
           MATCHING_THRESHOLD: 0.7
           RUST_LOG: info
-        run: cargo test --test api_integration_test --verbose
+        run: cargo test --all-features --all --verbose -- --include-ignored
 
   test-summary:
     name: Test Summary
