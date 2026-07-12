@@ -85,7 +85,10 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all-features --all
+          # `--include-ignored` runs BOTH the default (DB-free) tests and
+          # the `#[ignore]`d DB-backed suites against the Postgres service,
+          # so request/enforcement tests actually execute in CI (H-4).
+          args: --all-features --all -- --include-ignored
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/portfolio_service_test
 
