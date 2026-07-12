@@ -8,6 +8,19 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-G1: authorise + audit the governed bulk-links read.**
+  `GET /api/persons/links` returned **every** `same_identity`
+  (person → worker) edge — identity-linking PII — with only the coarse
+  blanket-read gate and no audit. It now authorises the cross-person dump
+  as a privileged governed read (`authorize_record(Action::Destructive,
+  …)`, which the default policy admits only for `svc=true` peers or
+  `admin`) and writes an audit row on every surfacing. Unit test pins the
+  `Destructive` classification (a downgrade to `Read` would reopen the
+  leak); the full 401/403/200 behaviour is proven e2e on the case service's
+  identical gate (`bulk_links_requires_elevated_authority`).
+
 ### Added — bulk export: rollout step 3 — masking + gating + audit (2026-07-10)
 
 - Bulk **export** now honours the §8 privacy contract

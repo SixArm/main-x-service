@@ -18,6 +18,8 @@
 //! refinement are follow-ups (spec §13); v1 leans on the blanket
 //! write/destructive guard plus the case-level record check.
 
+use std::collections::BTreeMap;
+
 use authentication_verifier::Action;
 use axum::http::StatusCode;
 use entity_ref::{EdgeKind, EntityRef, EntityType};
@@ -26,6 +28,7 @@ use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::MaybeAuthUser;
+use crate::models::audit_logs::Model as AuditModel;
 use crate::models::cases::Model as CaseModel;
 use crate::models::entity_links::{Model as EntityLinkModel, NewEdge};
 use crate::streaming;
@@ -294,20 +297,43 @@ async fn delete_link(
     format::empty_json()
 }
 
+/// Authorise the cross-case **bulk** governed read (SEC-G1 / design §10).
+/// Unlike the per-`{pid}` endpoints there is no single case to key on, so a
+/// dump of **every** `subject_of` (case → person) edge is treated as a
+/// privileged read: [`Action::Destructive`], which the built-in default
+/// policy grants only to a machine peer (`svc=true`) or an `admin` caller.
+/// A deployment can grant a dedicated reconcile identity via policy. A
+/// no-op when `CASE_REQUIRE_AUTH` is off (the family default-off posture —
+/// tracked as SEC-G8), matching every other authorisation in the service.
+fn authorize_bulk(caller: &MaybeAuthUser) -> Result<()> {
+    let resource: BTreeMap<String, Vec<String>> =
+        BTreeMap::from([("governed".to_string(), vec!["subject_of".to_string()])]);
+    crate::auth::authorize_record(caller, Action::Destructive, &resource)
+        .map_err(record_rejection)?;
+    Ok(())
+}
+
 /// `GET /api/cases/links[?since=<rfc3339>]` — every active outbound edge
 /// across all cases, in the canonical §4.2 shape, for the link-graph
-/// aggregator's reconciliation (design §8). Read-only; gated by the
-/// blanket guard's read action (a bulk read of high-sensitivity
-/// `subject_of` edges — finer per-caller authorisation is a §10 follow-up).
+/// aggregator's reconciliation (design §8).
+///
+/// This surfaces **all** high-sensitivity `subject_of` (case → person)
+/// edges at once, so it is gated as a privileged governed read
+/// ([`authorize_bulk`], SEC-G1): a default read-only caller is refused
+/// (`403` when enforcement is on) even though the blanket guard's coarse
+/// read action would admit it. Every surfacing is audited (§10).
 ///
 /// # Errors
 ///
-/// `422` when `since` is not valid RFC3339; a DB error on the query.
+/// `403`/`401` when the caller is not authorised for the governed bulk
+/// read; `422` when `since` is not valid RFC3339; a DB error on the query.
 #[debug_handler]
 async fn bulk_links(
     axum::extract::Query(params): axum::extract::Query<BulkParams>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
 ) -> Result<Response> {
+    authorize_bulk(&caller)?;
     let since = match params.since.as_deref() {
         None => None,
         Some(s) => Some(
@@ -317,6 +343,20 @@ async fn bulk_links(
     };
     let rows = EntityLinkModel::list_all_active(&ctx.db, since).await?;
     let edges: Vec<EdgeDetail> = rows.iter().map(EdgeDetail::of).collect();
+    // Governance §10: audit every bulk surfacing of subject_of edges. There
+    // is no single case, so the entity_pid is nil (a system/bulk marker).
+    AuditModel::record(
+        &ctx.db,
+        uuid::Uuid::nil(),
+        "links_bulk_read",
+        caller.actor(),
+        Some(serde_json::json!({
+            "kind": "subject_of",
+            "count": edges.len(),
+            "since": params.since,
+        })),
+    )
+    .await?;
     format::json(serde_json::json!({ "edges": edges }))
 }
 

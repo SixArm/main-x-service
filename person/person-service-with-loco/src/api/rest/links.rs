@@ -26,6 +26,8 @@
 //! **bulk endpoint** ([`bulk_links`]) is the aggregator's sync path
 //! (design §8), so the deliverable does not block on the event shape.
 
+use std::collections::BTreeMap;
+
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -383,17 +385,49 @@ pub async fn delete_link(
     }
 }
 
+/// Authorise the cross-person **bulk** governed read (SEC-G1). Unlike the
+/// per-`{id}` endpoints there is no single person to key on, so a dump of
+/// **every** `same_identity` (person → worker) edge — identity-linking PII
+/// — is treated as a privileged read: [`Action::Destructive`], which the
+/// built-in default policy grants only to a machine peer (`svc=true`) or an
+/// `admin` caller (a deployment can grant a dedicated reconcile identity).
+/// A no-op when `PERSON_REQUIRE_AUTH` is off (family default-off posture).
+fn authorize_bulk(caller: &MaybeAuthUser) -> std::result::Result<(), (StatusCode, String)> {
+    let (action, resource) = governed_bulk_authz();
+    authorize_record(caller, action, &resource).map(|_| ())
+}
+
+/// The action + resource attributes the governed bulk read authorizes
+/// with. Pure, so the security-critical classification — that a bulk dump
+/// is [`Action::Destructive`] (default-deny), **not** [`Action::Read`]
+/// (default-allow) — is unit-tested without a policy/DB (SEC-G1).
+fn governed_bulk_authz() -> (Action, BTreeMap<String, Vec<String>>) {
+    (
+        Action::Destructive,
+        BTreeMap::from([("governed".to_string(), vec!["same_identity".to_string()])]),
+    )
+}
+
 /// `GET /api/persons/links[?since=<rfc3339>]` — every active outbound
 /// edge across all persons, in the canonical §4.2 shape, for the
-/// link-graph aggregator's reconciliation (design §8). Read-only; gated
-/// by the blanket guard's read action.
+/// link-graph aggregator's reconciliation (design §8).
+///
+/// Surfaces **all** `same_identity` (person → worker) edges at once, so it
+/// is gated as a privileged governed read ([`authorize_bulk`], SEC-G1): a
+/// default read-only caller is refused (`403` when enforcement is on),
+/// unlike the blanket guard's coarse read action. Every surfacing is
+/// audited.
 ///
 /// Returns `{ "edges": [EdgeDetail…] }`. `422` when `since` is not valid
 /// RFC3339.
 pub async fn bulk_links(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
     Query(params): Query<BulkParams>,
 ) -> Response {
+    if let Err(r) = authorize_bulk(&caller) {
+        return rejection(r);
+    }
     let since = match params.since.as_deref() {
         None => None,
         Some(s) => match chrono::DateTime::parse_from_rfc3339(s) {
@@ -412,6 +446,20 @@ pub async fn bulk_links(
     match entity_links::list_all_active(&state.db, since).await {
         Ok(rows) => {
             let edges: Vec<EdgeDetail> = rows.iter().map(EdgeDetail::of).collect();
+            // Audit every bulk surfacing of same_identity edges. There is no
+            // single person, so the entity id is nil (a system/bulk marker).
+            if let Err(e) = state
+                .audit_log
+                .log_export(
+                    "person_links_bulk",
+                    Uuid::nil(),
+                    json!({ "kind": "same_identity", "count": edges.len(), "since": params.since }),
+                    &audit_ctx(&caller),
+                )
+                .await
+            {
+                tracing::warn!("failed to audit person bulk-links read: {e}");
+            }
             (StatusCode::OK, Json(json!({ "edges": edges }))).into_response()
         }
         Err(e) => db_error(&e),
@@ -433,6 +481,23 @@ mod tests {
             validate_edge("same_identity", WORKER).expect("same_identity person→worker");
         assert_eq!(kind, EdgeKind::SameIdentity);
         assert_eq!(to.entity_type, EntityType::Worker);
+    }
+
+    /// SEC-G1: the governed bulk-links read must be classified as a
+    /// privileged `Destructive` action (default-deny), NOT `Read`
+    /// (default-allow). A downgrade here reopens the mass PII leak, so pin
+    /// it. (The full 401/403/200 behaviour is proven e2e by the case
+    /// service's `bulk_links_requires_elevated_authority`, which shares this
+    /// `authorize_record(Destructive)` gate.)
+    #[test]
+    fn governed_bulk_read_is_classified_destructive() {
+        let (action, resource) = governed_bulk_authz();
+        assert_eq!(
+            action,
+            Action::Destructive,
+            "must not be Read (default-allow)"
+        );
+        assert_eq!(resource["governed"], vec!["same_identity".to_string()]);
     }
 
     /// `subject_of` (case → person) is not a person-originated edge.

@@ -168,3 +168,56 @@ async fn enforcement_on_gates_the_real_stack() {
     })
     .await;
 }
+
+/// SEC-G1: `GET /api/cases/links` dumps every high-sensitivity
+/// `subject_of` (case → person) edge across all cases. It must NOT be
+/// reachable by a default read-only caller — only an authorised reconcile
+/// peer (`svc=true` under the default policy). Before the fix this handler
+/// took no caller and any token (or none, with enforcement off) got the
+/// full governed edge list.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test enforcement -- --ignored`"]
+async fn bulk_links_requires_elevated_authority() {
+    let (keys, kid) = keys_and_kid();
+    unsafe {
+        std::env::set_var("CASE_REQUIRE_AUTH", "1");
+        std::env::set_var("CASE_PASETO_KEYS", keys.to_string());
+    }
+
+    request::<App, _, _>(|request, _ctx| async move {
+        // No token ⇒ 401 (blanket guard).
+        assert_eq!(
+            request.get("/api/cases/links").await.status_code(),
+            401,
+            "governed bulk read without a token is 401"
+        );
+
+        // Default caller (attrs {}) ⇒ 403: the blanket guard's coarse read
+        // admits it, but the handler classifies a bulk governed dump as a
+        // privileged (Destructive) read that the default policy denies.
+        let (rk, rv) = auth_header(&mint(&kid, &[]));
+        assert_eq!(
+            request
+                .get("/api/cases/links")
+                .add_header(rk, rv)
+                .await
+                .status_code(),
+            403,
+            "a default read-only caller must NOT receive the governed edge dump"
+        );
+
+        // Machine reconcile peer (svc=true) ⇒ 200.
+        let (sk, sv) = auth_header(&mint(&kid, &[("svc", &["true"])]));
+        assert_eq!(
+            request
+                .get("/api/cases/links")
+                .add_header(sk, sv)
+                .await
+                .status_code(),
+            200,
+            "an authorised reconcile peer (svc) may read the bulk edges"
+        );
+    })
+    .await;
+}

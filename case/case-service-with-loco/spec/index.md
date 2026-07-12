@@ -484,6 +484,15 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-G1 (security): authorise + audit the governed bulk-links read.**
+  `GET /api/cases/links` dumped every `subject_of` (case → person) edge
+  with only the coarse blanket-read gate and no audit — a cross-case
+  enumeration of the highest-governance §12 edge. It now authorises the
+  bulk dump as a privileged governed read
+  (`authorize_record(Action::Destructive, …)`; default policy admits only
+  `svc`/`admin`) and writes a `links_bulk_read` audit row. DB-gated
+  `bulk_links_requires_elevated_authority` (401/403/200). (Repo tasks.md
+  Phase 5 SEC-G1.)
 - [x] Title search — `GET /search?q=` Postgres `ILIKE` on the
   denormalised `title` (cap 50, wildcards escaped). Tantivy full-text /
   fuzzy search over the JSONB payload remains deferred.
