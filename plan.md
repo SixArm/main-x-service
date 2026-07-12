@@ -175,6 +175,77 @@ files from C-deploy:
   endpoints (complementing Swagger).
 - A `seed` loco task (or SQL) loading the sample data for demos.
 
+### Theme F — Security hardening & assurance
+
+Driven by a **repo-wide security audit (2026-07-12)** that read the auth
+stack, the offline verifier + ABAC engine, every entity service's guard /
+masking / query layer, the matcher libraries + validators, and the bulk /
+cross-service-linking / concurrency / secrets surfaces. The full findings
+are enumerated as **Phase 5 (SEC-\*)** in [tasks.md](tasks.md); the shape:
+
+- **F-authn. Token & session integrity.** The single worst finding is a
+  **committed dev signing seed** (`DEV_SEED`) that `load_seed()` falls back
+  to with no environment guard — a prod deploy that forgets
+  `TOKEN_PRIVATE_KEY_SEED` signs PASETOs anyone can forge (`attrs:{access:
+  [admin]}`). Plus: an unauthenticated `/api/auth/audit/recent` leaking
+  registered emails, the magic-link token logged unconditionally, a
+  non-atomic (racy) single-use magic-link consume, timing-based account
+  enumeration, rate-limit email-canonicalization bombing, incomplete GDPR
+  erasure (email survives in `auth_events`), and stale-privilege token
+  minting (session `attrs` snapshot never re-read on admin revoke).
+- **F-authz. Verifier & ABAC edges.** `from_paseto_keys_url` accepts
+  `http://` with no timeout/size cap (MITM key injection); a **vacuous-
+  negation** escalation where a `!`-negated `resource.`/`env.` condition
+  matches on the coarse (no-record) guard path because the namespace is
+  absent there; malformed-key-entry load abort. These process attacker-
+  controlled tokens, so they need a forgery + fuzz + policy-property suite.
+- **F-guard. Read-path masking & guard consistency.** Masking/record-level
+  authz is enforced on single-record GET but **bypassed** on `list` /
+  `search` / `check_duplicates` / FHIR / bulk paths (case, person). Two
+  bulk-links endpoints (**case `subject_of`**, person `same_identity`) dump
+  every high-sensitivity edge with only the coarse gate. `LIKE`-wildcard
+  injection in the three repo-based searches (person/worker/event lack the
+  `escape_like` the loco services have). Prefix-gated guards
+  (event/thing/course) vs the safer deny-unless-public shape. All authz is
+  inert while `<ENTITY>_REQUIRE_AUTH` defaults off — so the shipped default
+  is wide open; activation must be a tracked release gate.
+- **F-data. Bulk / linking / concurrency integrity.** A **critical
+  reconcile bug** (link-graph diffs the *global* read-model against *one*
+  entity's edges → each entity pass deletes the others' edges; the graph
+  never converges). Bulk import with no byte/row caps (OOM DoS), a
+  SELECT-then-INSERT upsert race defeating idempotency, artifact IDOR + no
+  TTL + unconfined `file://` paths, merge TOCTOU (unlocked read before the
+  write tx) and a person self-merge that tombstones the record, and a relay
+  that double-ships (no `FOR UPDATE SKIP LOCKED`, no consumer `event_id`
+  dedupe). Mostly correctness-and-integrity work with a security blast
+  radius.
+- **F-input. Unverified input, false matches & fuzzing.** No length or
+  array-cardinality caps anywhere → unbounded O(n·m) Jaro-Winkler /
+  Levenshtein / Jaccard DoS (five loco services set no body limit at all).
+  A systemic **false-deterministic-match** class: short-circuits that key
+  on a post-normalization string with no empty guard let two records
+  sharing only blank/punctuation values score a spurious `1.0` identity
+  (passport, place name+postcode, thing URL/sameAs, national-ID sentinels,
+  …). One real `i64` overflow **panic** in portfolio date math. These pure
+  functions are ideal fuzz/property targets (never-panic, score ∈ [0,1],
+  symmetric, identical⇒1.0, no-spurious-identity).
+- **F-assurance. Supply-chain & test infrastructure.** `cargo audit` /
+  `cargo deny` / CodeQL run in only **3 of 12** services and there is no
+  repo `deny.toml`; `proptest` covers only the 5 older matchers and there
+  is **no `cargo-fuzz`** anywhere; three crate roots miss
+  `#![forbid(unsafe_code)]`. Roll dependency-scanning family-wide, add a
+  fuzz harness, and write `agents/share/security.md` (audit summary +
+  invariants + secret-handling rules + the activation gate).
+
+**Priority:** the four critical/near-critical items — F-authn `DEV_SEED`
+guard, F-data reconcile scoping, and the F-guard governed-edge leak — lead,
+ahead of the rest of the program where a deployment is (or is about to be)
+exposed to untrusted callers. Every SEC-\* code fix is a three-part change
+(crate spec §13 + code + security test) with the crate CHANGELOG, same as
+the rest of the program; the audit's "recommended tests" become the test
+half of each task, satisfying the "improve tests (fuzzing, races, unverified
+inputs)" mandate directly.
+
 ## 3. Sequencing
 
 **Phase 1 — Truth & hygiene (do first, cheap, unblocks everything):**
@@ -197,6 +268,17 @@ commands actually run).
 
 Docs tasks inside each phase may interleave with code tasks; a tutorial
 must not be written against behaviour that Phase 2/3 is about to change.
+
+**Phase 5 — Security hardening (Theme F) interleaves, criticals first.**
+The audit-driven SEC-\* tasks are not a strict fifth wall after Phase 4:
+the four critical/near-critical fixes (SEC-A1 `DEV_SEED` prod guard, SEC-B1
+reconcile scoping, SEC-G1 governed-edge leak, SEC-B5 merge TOCTOU/self-
+merge) should land **before** any enforced/exposed deployment and ahead of
+new-capability work that would build on the affected surfaces. The
+supply-chain infra (SEC-I1 dependency scanning, SEC-I3 `forbid(unsafe)`) is
+cheap and should land in Phase 1 alongside the other hygiene tasks. The
+remaining SEC items slot next to the capability work they touch (F-input
+with A-search/A-privacy; F-data with A-bulk/A-link; F-guard with B-auth).
 
 ## 4. Working agreements (for the executing session)
 
@@ -243,3 +325,11 @@ must not be written against behaviour that Phase 2/3 is about to change.
 - `same_identity` symmetric writes (person and worker both asserting) are
   by design (aggregator canonicalises + dedupes) — don't "fix" the
   duplication at the write side.
+- **Security (Theme F)**: most authz/masking controls are gated behind a
+  default-**off** `<ENTITY>_REQUIRE_AUTH` flag, so the audit's findings are
+  reachable with no token at all in the default config — treat "enforcement
+  off" as the threat model, not an excuse. Several F-data items (reconcile
+  scoping, merge TOCTOU/self-merge, upsert race) are **correctness** bugs
+  with a security blast radius; fix them as bugs even independent of the
+  auth posture. The `DEV_SEED` fallback (SEC-A1) is the one finding that is
+  catastrophic *regardless* of any flag — do it first.

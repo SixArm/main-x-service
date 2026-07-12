@@ -253,19 +253,266 @@
   + case) or documented bulk-import of EX-1 fixtures — pick one,
   reference it from TUT-1/2/4.
 
+## Phase 5 — Security hardening (audit-driven, 2026-07-12)
+
+> From the repo-wide security audit (plan.md Theme F). Severity: 🔴 critical
+> · 🟠 high · 🟡 medium · ⚪ low. Each code task is three-part (crate spec
+> §13 + code + **security test**) + CHANGELOG; the audit's "recommended
+> tests" ARE the test half (this is where the "improve tests — fuzzing,
+> races, unverified inputs" mandate lands). Criticals (SEC-A1, SEC-B1,
+> SEC-G1, SEC-B5) lead; SEC-I1/I3 are cheap Phase-1 hygiene. File:line
+> anchors are from `main` at audit time — re-verify before editing.
+
+### F-authn — token & session integrity (authentication-service)
+
+- [ ] **SEC-A1 (S) 🔴** DEV_SEED prod guard. `load_seed()`
+  (`src/auth/mod.rs:211-233`) silently falls back to the committed
+  `DEV_SEED` → forgeable tokens. Refuse to boot/serve when the resolved
+  seed equals `DEV_SEED` and the loco environment is `production` (or no
+  `TOKEN_PRIVATE_KEY_*` is set outside development). *Test:* boot in
+  production with no key env ⇒ hard error; dev ⇒ still boots.
+- [ ] **SEC-A2 (S) 🟠** Gate `GET /api/auth/audit/recent`
+  (`controllers/auth.rs:514-518`, route `:605`) — it is unauthenticated and
+  returns raw `auth_events` emails/outcomes (account enumeration). Require
+  auth (admin) and/or strip emails. *Test:* unauth ⇒ 401/redacted; pins the
+  anti-enumeration contract.
+- [ ] **SEC-A3 (S) 🟠** Magic-link token logging (`controllers/auth.rs:127-132`)
+  emits the full login URL+token at `info` in every env. Log the token only
+  in `development` (env/level gate). *Test:* tracing-capture asserts no token
+  at `info` in production.
+- [ ] **SEC-A4 (S) 🟡** Atomic single-use magic-link consume: replace
+  SELECT-then-clear (`controllers/auth.rs:284-298`, `models/users.rs:254-283`)
+  with `UPDATE … WHERE magic_link_token=$1 RETURNING`. *Test:* two concurrent
+  redemptions ⇒ exactly one 200, one 401 (DB-gated).
+- [ ] **SEC-A5 (S) 🟡** Constant-work signup: always run one Argon2 hash so
+  existing-vs-new email latency does not distinguish (`controllers/auth.rs:167-197`).
+  *Test:* both paths perform equivalent hashing work.
+- [ ] **SEC-A6 (S) 🟡** Rate-limit email canonicalization + case-consistent
+  `find_by_email` (`rate_limit.rs:60-62`, `models/users.rs:438-471`) —
+  plus-address/dot variants bomb one inbox and spawn duplicate accounts.
+  *Test:* `victim+1@…`/`v.ictim@gmail.com`/`Victim@…` collapse to one bucket.
+- [ ] **SEC-A7 (S) 🟡** GDPR erasure completeness (`models/users.rs:606-614`):
+  scrub the subject email from `auth_events` and `sessions.user_agent`, not
+  just `users`. *Test:* after `DELETE /account`, email absent everywhere.
+- [ ] **SEC-A8 (M) 🟡** Privilege-revocation latency: `POST /token` mints
+  from a session `attrs` snapshot (`controllers/auth.rs:430-437`,
+  `models/sessions.rs:224-229`) never refreshed on admin revoke. Re-read
+  attrs (or invalidate sessions) on privilege change. *Test:* clearing
+  `access=admin` stops the session minting admin tokens.
+- [ ] **SEC-A9 (M) ⚪** Store only **hashes** of magic-link token / session
+  `jid` / CSRF token (migrations `_000001`/`_000002`, `sessions.data.csrf`) —
+  they are bearer-equivalent secrets at rest today. *Test:* DB holds no
+  usable plaintext credential.
+- [ ] **SEC-A10 (S) ⚪** CSRF origin backstop: warn/deny when
+  `AUTH_ALLOWED_ORIGINS` unset in production; reject a legacy no-`csrf`
+  session on `POST /token` (`controllers/auth.rs:377-410`). *Test:* no-csrf
+  session cannot bypass both CSRF and origin checks.
+
+### F-authz — verifier & ABAC (authentication-verifier)
+
+- [ ] **SEC-V1 (S) 🟡** `from_paseto_keys_url` (`src/lib.rs:460-474`): enforce
+  `https://`, a request timeout, and a response-size cap (MITM key injection
+  / boot-hang / OOM). *Test:* `http://` rejected; oversized/hanging body errors.
+- [ ] **SEC-V2 (M) 🟡** Vacuous-negation escalation (`src/abac.rs:223-293`):
+  a `!`-negated `resource.`/`env.` condition matches on the coarse
+  `evaluate` path because the namespace is absent there. Treat absent
+  namespace as non-matching for negated conditions (fail-closed), or warn at
+  policy-load when a rule negates a `resource.`/`env.` value. *Test:*
+  `{allow,[write],when:{"env.network":["!untrusted"]}}` is **denied** on the
+  coarse path (currently allows).
+- [ ] **SEC-V3 (S) ⚪** Key-set load resilience (`src/lib.rs:279-300`): a
+  single malformed Ed25519 entry aborts the whole load; skip+warn instead,
+  and define dup-`kid` policy. *Test:* mixed valid/invalid entries still load
+  the valid keys.
+- [ ] **SEC-V4 (M) 🟠 (tests)** Forgery + fuzz + policy-property suite:
+  cross-key forgery (valid sig, honest `kid`) ⇒ Err; missing-`exp` ⇒
+  Malformed; `exp==now` reject / `nbf==now` accept; token-parser fuzz (never
+  panics); policy proptest (first-match, negation involution, default
+  decision, `resource.`/`env.` disjointness). Adds `proptest` +
+  `cargo-fuzz` targets to the crate.
+
+### F-guard — read-path masking & guard consistency (entity services)
+
+- [ ] **SEC-G1 (M) 🔴/🟠** Governed bulk-links leak: `GET /api/cases/links`
+  (`case/src/controllers/links.rs:306-321`) dumps every `subject_of` edge
+  with only the coarse gate + no audit; person twin
+  (`person/src/api/rest/links.rs:393-419`, `same_identity` PII). Add
+  per-record authz + audit, or restrict to an authorised reconcile caller
+  (`svc`). *Test:* coarse/default caller receives zero governed edges;
+  mirrors the aggregator's concealment.
+- [ ] **SEC-G2 (M) 🟠** Case FHIR read/search (`case/src/controllers/fhir.rs:90,248`)
+  take no caller — apply record-level ABAC + the `mask` obligation like
+  native `get_one`. *Test:* masked/denied read on `/fhir/Task/{id}` + search.
+- [ ] **SEC-G3 (M) 🟠** Masking-on-every-read: case `list`/`search`/
+  `check_duplicates` (`cases.rs:307,324,370`) and person `search_persons`
+  (`api/rest/handlers.rs:427-465`, currently client-param driven) must honour
+  record-level authz/mask, not just single GET. *Test:* a mask-only policy
+  redacts on **every** read path (get/list/search/check-dup/FHIR/export).
+- [ ] **SEC-G4 (S) 🟡** Add `escape_like` to the three repo-based searches
+  (person `db/repositories.rs:1181`, worker `:1388`, event `:1218`) — raw
+  `%{q}%` allows `LIKE`-wildcard injection/DoS. *Test:* `q="%"`/`"_"`/`"a\%b"`
+  match literally (port the loco `escape_like` test).
+- [ ] **SEC-G5 (M) 🟡** Guard-all for event/thing/course (`auth.rs` prefix-gate
+  → deny-unless-public), plus a guard-bypass matrix test across all services
+  (trailing slash, `%2e`, case, `//`, `/../`). *Test:* guard decision and the
+  actually-routed handler agree; no reachable path the guard treats as public.
+- [ ] **SEC-G6 (S) 🟡** Destructive-action classification robust to path
+  variants: `derive_action` uses `path.ends_with("/merge"|…)` — a trailing
+  slash downgrades to `write`. Normalize before matching. *Test:*
+  `POST /api/cases/merge/` (and any router-accepted variant) ⇒ `destructive`
+  ⇒ `access=write` gets 403.
+- [ ] **SEC-G7 (S) ⚪** Bound person `search_persons` `offset`
+  (`handlers.rs:436-441`) — unbounded `offset+limit` forces the index to
+  materialise arbitrarily many hits. *Test:* large offset clamped/rejected.
+- [ ] **SEC-G8 (S) 🟡** Default-off exposure pin: an explicit per-service test
+  documenting that with `<ENTITY>_REQUIRE_AUTH` off, audit / bulk-links / PII
+  reads are open — so activation is a **tracked release gate**, not an
+  accident (feeds OPS-1 runbook).
+
+### F-data — bulk / linking / concurrency integrity
+
+- [ ] **SEC-B1 (M) 🔴** link-graph reconcile cross-entity scoping: it diffs
+  the **global** read-model (`reconcile.rs:95`, `models/edges.rs:338-343`,
+  `all_edge_ids`) against **one** entity's edges, so each entity pass deletes
+  the others' edges and the graph never converges. Scope the diff to the
+  source entity. *Test:* a `case` reconcile leaves `same_identity` edges
+  intact; both passes twice converge (this test fails today).
+- [ ] **SEC-B2 (M) 🟠** person bulk import caps: byte cap + row cap + true
+  streaming (`bulk/handlers.rs:175`, `bulk/jsonl.rs:57-65`, `pipeline.rs:188`)
+  — currently 3× resident, unbounded ⇒ OOM DoS; export `limit` also uncapped.
+  *Test:* oversized upload ⇒ 413/422 pre-materialisation; fuzz `parse_line`
+  (random bytes / truncated UTF-8 / giant line) never panics.
+- [ ] **SEC-B3 (M) 🟠** person bulk upsert idempotency race: SELECT-then-
+  INSERT with no `ON CONFLICT` and no `UNIQUE(system,value)`
+  (`pipeline.rs:216,236-246`, `db/repositories.rs:883-890`) ⇒ two workers
+  duplicate a record. Add the unique index + `ON CONFLICT`/advisory lock.
+  *Test:* two concurrent imports of one stable key ⇒ exactly one row.
+- [ ] **SEC-B4 (M) 🟠** person bulk artifact hardening (`bulk/store.rs:75-99`,
+  `db/bulk_jobs.rs:94`, `handlers.rs:403-471`): set + enforce `expires_at`
+  TTL; ownership check on job GET (IDOR/BOLA); confine store path (reject
+  `..`/absolute `file://`). *Tests:* cross-actor job GET ⇒ 403/404; `..`
+  rejected; expired artifact unreadable.
+- [ ] **SEC-B5 (M) 🔴/🟠** Merge TOCTOU + self-merge: case
+  (`controllers/cases.rs:429`) and person (`handlers.rs:854-905`,
+  `repositories.rs:1053-1064`) read main+duplicate **before/outside** the
+  write tx (no `FOR UPDATE`) ⇒ lost update / data fanned into two survivors;
+  person has **no self-merge guard** (merges a record into itself and
+  tombstones it). Add `SELECT … FOR UPDATE` + in-tx re-validate + a
+  `main==duplicate` 422 guard (case already has the latter). *Tests:*
+  concurrent-merge race lands data in exactly one survivor; person self-merge
+  ⇒ 422.
+- [ ] **SEC-B6 (M) 🟠** Relay exactly-once: `SELECT … WHERE published_at IS
+  NULL` has no `FOR UPDATE SKIP LOCKED` (case `relay.rs:91`, person `:93`)
+  and no consumer `event_id` dedupe (person consumer is `todo!()`), so >1
+  instance double-ships. Add `SKIP LOCKED` + a `processed_events`
+  idempotency table (aligns with BUS-2). *Test:* two concurrent drains send
+  each row once; replayed `event_id` ignored.
+- [ ] **SEC-B7 (S) 🟡** link-graph reconcile peer trust
+  (`reconcile.rs:94-155`): `LINK_GRAPH_RECONCILE_TOKEN` is optional (unauth
+  pull) and returned edges are applied directly. Require the token for a
+  remote source; validate each edge's endpoint types via `EdgeKind::permits`
+  before `apply_linked`. *Test:* remote source without a token refused;
+  ill-typed edge rejected.
+- [ ] **SEC-B8 (S) 🟡** Bulk audit gaps: import runs with
+  `AuditContext::default()` (no actor/ip) and writes no job-level audit row
+  (`bulk/worker.rs:86-121`); export audit is best-effort and delivers the
+  artifact even if `log_export` fails (`worker.rs:199-206`). Thread real
+  actor context; write a job-level import audit; make export audit block
+  delivery. *Tests:* import/export audited with actor; export fails closed on
+  audit error.
+- [ ] **SEC-B9 (S) 🟡** Wire the idempotency key (`db/bulk_jobs.rs:48,61`
+  hardcode `None`; the `UNIQUE(entity,kind,idempotency_key)` never fires):
+  read a client key and dedupe a retried submit. *Test:* re-submit with the
+  same key returns the same job, no re-run.
+- [ ] **SEC-B10 (S) 🟡** person merge audit in-tx (`repositories.rs:1082,1108-1128`
+  writes post-commit) — match case's in-tx threading so a crash after commit
+  cannot lose the merge audit. *Test:* merge audit present atomically.
+- [ ] **SEC-B11 (S) ⚪** link-graph `freshness` authz (`controllers/graph.rs:353-367`
+  — unauth liveness oracle) + non-redirecting probe client + host allowlist
+  (`probe.rs:98` SSRF-via-redirect). *Tests:* freshness gated; probe refuses
+  a redirect.
+
+### F-input — unverified input, false matches & fuzzing (validators + matchers)
+
+- [ ] **SEC-M1 (M) 🟠** Input-size caps: per-field length + array-cardinality
+  caps in every service `validate`/`problems` → `422` **before** persist;
+  set `limit_payload` on the five loco services that set none (course, org,
+  care-pathway, case, portfolio) and lower the 5 MB cap. Closes the O(n·m)
+  Jaro-Winkler/Levenshtein/Jaccard DoS amplified ×scan-cap. *Tests:*
+  over-length field / over-cardinality array ⇒ 422 before the matcher runs.
+- [ ] **SEC-M2 (M) 🟠** False-deterministic-match empty guards: add a
+  post-normalization empty check to every string-keyed short-circuit —
+  passport (person `matcher.rs:2170`, worker `:1817`), place
+  `name_and_postcode_match` (`:975-989`), thing `same_canonical_url`/
+  `shares_same_as` (`:827,:808`), person/worker demographic fallback
+  (`:1317`/`:1011`), course/care-pathway R-1 code (`:223`/`:239`), event
+  `name_and_start_date_match` (`:914`), case/portfolio trivial `"/"`/`"0"`
+  cases. *Tests (proptest):* two records sharing only a blank/whitespace/
+  punctuation value MUST NOT deterministically match.
+- [ ] **SEC-M3 (S) 🟠** Reject sentinel national IDs (all-zeros) in
+  `ie_ihi`/`es_tsi`/`dk_cpr` (person `identifiers.rs:349,301,1090`; worker
+  `matcher.rs:1779`) — match the `nl_bsn` posture (`:741`). *Test:* all-zero
+  placeholder IDs do not short-circuit to 1.0.
+- [ ] **SEC-M4 (S) 🟡** portfolio `days_from_civil` (`normalize.rs:98,128`,
+  reached via `matcher.rs:407`): `year` parsed as unbounded `i64`,
+  `era*146_097` overflows ⇒ panic(debug)/wrap(release). Bound/guard the
+  parsed year. *Test:* fuzz the date string; huge year ⇒ `None`, never panics.
+- [ ] **SEC-M5 (S) 🟡** organization identifier validation
+  (`controllers/organizations.rs:90-98` validates only `name`): enforce
+  LEI/DUNS/GLN/VAT check-digit/length before store, since they drive the
+  matcher's deterministic short-circuit. *Tests:* bad check digit ⇒ 422.
+- [ ] **SEC-M6 (M) 🟠 (tests/infra)** Matcher fuzz + property harness: add
+  `proptest` to the five newer matchers (course, organization, care-pathway,
+  case, portfolio — the older five already have it) and `cargo-fuzz` targets
+  for the pure functions. Invariants: **never panics**, **score ∈ [0,1]**,
+  **symmetric**, **identical ⇒ 1.0**, **no spurious identity**, Soundex shape
+  `[A-Z][0-9]{3}` or `None`. (Pairs with SEC-I2.)
+
+### F-assurance — supply-chain & test infrastructure
+
+- [ ] **SEC-I1 (M) 🟠** Roll `security.yml` (`cargo audit` + `cargo deny` +
+  dependency-review; person's is the pattern) to the **9** services + the
+  matcher/library crates that lack it, and add a repo-root `deny.toml`
+  (advisories + licenses + source/ban rules). *Verify:* each workflow lints;
+  `cargo deny check` passes locally.
+- [ ] **SEC-I2 (M) 🟡** `cargo-fuzz` scaffolding: a `fuzz/` crate per matcher
+  (+ auth-verifier token parser + person bulk `parse_line`) with the SEC-M6
+  targets; a short CI smoke run + an optional nightly longer run. Depends:
+  SEC-M6 targets.
+- [ ] **SEC-I3 (S) ⚪** Add `#![forbid(unsafe_code)]` to the three crate roots
+  missing it (care-pathway-matcher `src/main.rs`, case-folder `src/lib.rs` +
+  `src/bin/main.rs`). *Verify:* builds clean; grep shows full coverage.
+- [ ] **SEC-I4 (M) 🟡** `agents/share/security.md`: the audit summary, the
+  cross-cutting invariants (never-panic / masking-on-every-read / fail-closed
+  authz / secret-handling / no-secret-in-logs), the `*_REQUIRE_AUTH`
+  activation gate, and the threat model. Wire into `agents/share/index.md`
+  and the compliance docs. Feeds OPS-1 runbooks.
+
 ---
 
 ## Suggested execution order (flattened)
 
-H-1 → H-4 → H-2 → H-3 → H-5 →
+**Security criticals FIRST** (before any exposed/enforced deployment):
+SEC-A1 → SEC-B1 → SEC-G1 → SEC-B5 → then the F-authz forgery/fuzz proof
+SEC-V4. Cheap security hygiene lands with Phase 1: SEC-I1, SEC-I3.
+
+H-1 → H-4 → **SEC-A1 → SEC-B1 → SEC-G1 → SEC-B5** → SEC-I1 → SEC-I3 →
+H-2 → H-3 → H-5 →
 S-1 → P-1 → AU-1 → AU-2 → AU-3 → S-2..S-4 (parallelizable) →
 P-2..P-4 (parallelizable) → PG-1 →
+(F-input with search/privacy: SEC-M1 → SEC-M2 → SEC-M3 → SEC-M4 → SEC-M5 →
+SEC-M6 → SEC-I2) →
+(F-guard with B-auth: SEC-G2..G8) → (F-authn remainder: SEC-A2..A10) →
+(F-authz remainder: SEC-V1..V3) →
 LNK-1 → LNK-2 → LNK-3 → BLK-1 → BLK-2 → BLK-3 → BLK-4 → BLK-5 →
+(F-data with A-bulk/A-link: SEC-B2 → SEC-B3 → SEC-B4 → SEC-B6 → SEC-B7 →
+SEC-B8 → SEC-B9 → SEC-B10 → SEC-B11) →
 BUS-1 → BUS-2 → BUS-3 →
-DEP-1 → DEP-2 → OPS-1 → FE-1..FE-4 →
+DEP-1 → DEP-2 → OPS-1 (+ SEC-I4, SEC-G8) → FE-1..FE-4 →
 EX-1..EX-4 → TUT-1..TUT-6 → LNK-4 (spec-first, last).
 
-Parallelization note: S-2/S-3/S-4, P-2/P-3/P-4, AU-1's five services, and
-BLK-5's two services are good one-subagent-per-crate fan-outs — give each
-agent the reference-crate paths and the green gate verbatim, then
-re-verify independently before committing (see plan.md §4).
+Parallelization note: S-2/S-3/S-4, P-2/P-3/P-4, AU-1's five services,
+BLK-5's two services, and the per-matcher SEC-M2/M6 + SEC-I1 rollouts are
+good one-subagent-per-crate fan-outs — give each agent the reference-crate
+paths and the green gate verbatim, then re-verify independently before
+committing (see plan.md §4).
