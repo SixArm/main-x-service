@@ -151,6 +151,20 @@
   source) + a unit test pinning that the case bulk-links JSON deserializes
   into the aggregator's `LinkedEvent` (the cross-service seam). Now **live**
   for case; other services follow as they gain a bulk-links endpoint.)*
+  - [x] **SEC-B1 (security fix): scope reconciliation to the source
+    entity.** `reconcile` diffed the source's edges against the **global**
+    read-model (`all_edge_ids`), so each per-entity pass marked every
+    *other* entity's edges as "extra" and deleted them — the case and person
+    passes wiped each other's edges and the graph never converged.
+    `AuthoritativeSource` now declares its `entity()`, and `reconcile` diffs
+    only the read-model edges whose canonical `from_ref` is owned by that
+    entity (`edges::Model::edge_ids_from_entity`, exact `<entity>:` prefix so
+    `course`/`courseinstance` and the `_` in `care_pathway` don't collide).
+    Correct for both live sources: `subject_of` (from=case) and canonical
+    `same_identity` (person < worker ⇒ from=person). DB-gated
+    `reconcile_is_scoped_to_the_source_entity` proves a case pass leaves a
+    person `same_identity` edge intact; pure `from_ref_scoping_*` unit tests.
+    (Repo tasks.md Phase 5 SEC-B1.)
 - [x] T-21: Prometheus `/metrics.prom` — consumer lag, edge counts by
   `status`, processed counters (§6 FR-22). *(Done: `src/metrics.rs` — a
   process-wide registry with `link_graph_events_processed_total{kind}`
