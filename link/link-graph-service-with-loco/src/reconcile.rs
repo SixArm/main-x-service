@@ -20,6 +20,8 @@ use sea_orm::{ConnectionTrait, DatabaseConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
+use entity_ref::EntityType;
+
 use crate::events::LinkedEvent;
 use crate::metrics::Metrics;
 use crate::models::edges;
@@ -30,6 +32,12 @@ use crate::models::edges;
 /// testable with a mock.
 #[async_trait]
 pub trait AuthoritativeSource: Send + Sync {
+    /// The entity this source is authoritative for. Reconciliation is
+    /// **scoped** to this entity's edges (SEC-B1): a source only ever adds
+    /// or removes edges originating from its own entity, so a per-entity
+    /// pass never deletes another entity's edges.
+    fn entity(&self) -> EntityType;
+
     /// Fetch every active authoritative edge (bulk read or topic replay).
     ///
     /// # Errors
@@ -92,7 +100,11 @@ where
     S: AuthoritativeSource + ?Sized,
 {
     let authoritative = source.fetch_all().await?;
-    let readmodel_ids = edges::Model::all_edge_ids(db).await?;
+    // Scope the read-model side to THIS source's entity (SEC-B1). Diffing
+    // against `all_edge_ids` would mark every other entity's edges as
+    // "extra" and delete them, so each per-entity pass would wipe the rest
+    // of the graph.
+    let readmodel_ids = edges::Model::edge_ids_from_entity(db, source.entity()).await?;
     let divergence = diff(&readmodel_ids, &authoritative);
     let count = divergence.count();
 
@@ -124,30 +136,37 @@ struct BulkLinksResponse {
 /// URL comes from `LINK_GRAPH_RECONCILE_URL_<ENTITY>` and the token from
 /// `LINK_GRAPH_RECONCILE_TOKEN`.
 pub struct HttpAuthoritativeSource {
+    entity: EntityType,
     url: String,
     token: Option<String>,
 }
 
 impl HttpAuthoritativeSource {
     /// Build from the environment for `entity` (e.g. `case`), or `None`
-    /// when no `LINK_GRAPH_RECONCILE_URL_<ENTITY>` is configured.
+    /// when `entity` is not a known type or no
+    /// `LINK_GRAPH_RECONCILE_URL_<ENTITY>` is configured.
     #[must_use]
     pub fn from_env_for(entity: &str) -> Option<Self> {
+        let entity = EntityType::from_token(entity)?;
         let url = std::env::var(format!(
             "LINK_GRAPH_RECONCILE_URL_{}",
-            entity.to_ascii_uppercase()
+            entity.as_str().to_ascii_uppercase()
         ))
         .ok()
         .filter(|s| !s.trim().is_empty())?;
         let token = std::env::var("LINK_GRAPH_RECONCILE_TOKEN")
             .ok()
             .filter(|s| !s.trim().is_empty());
-        Some(Self { url, token })
+        Some(Self { entity, url, token })
     }
 }
 
 #[async_trait]
 impl AuthoritativeSource for HttpAuthoritativeSource {
+    fn entity(&self) -> EntityType {
+        self.entity
+    }
+
     async fn fetch_all(&self) -> ModelResult<Vec<LinkedEvent>> {
         let mut request = reqwest::Client::new().get(&self.url);
         if let Some(token) = &self.token {

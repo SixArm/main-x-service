@@ -373,12 +373,16 @@
 
 ### F-data — bulk / linking / concurrency integrity
 
-- [ ] **SEC-B1 (M) 🔴** link-graph reconcile cross-entity scoping: it diffs
-  the **global** read-model (`reconcile.rs:95`, `models/edges.rs:338-343`,
-  `all_edge_ids`) against **one** entity's edges, so each entity pass deletes
-  the others' edges and the graph never converges. Scope the diff to the
-  source entity. *Test:* a `case` reconcile leaves `same_identity` edges
-  intact; both passes twice converge (this test fails today).
+- [x] **SEC-B1 (M) 🔴** link-graph reconcile cross-entity scoping. *(done 2026-07-12)*
+  It diffed the **global** read-model (`all_edge_ids`) against **one**
+  entity's edges, so each entity pass deleted the others' edges and the
+  graph never converged. `AuthoritativeSource` now declares `entity()`;
+  `reconcile` diffs only `edges::Model::edge_ids_from_entity(source.entity())`
+  (exact `<entity>:` `from_ref` prefix — correct for `subject_of` from=case
+  and canonical `same_identity` from=person). DB-gated
+  `reconcile_is_scoped_to_the_source_entity` (case pass leaves the person
+  edge intact) + pure `from_ref_scoping_*` unit tests. Green: lib tests +
+  `test --no-run` (DB-gated) + clippy + fmt.
 - [ ] **SEC-B2 (M) 🟠** person bulk import caps: byte cap + row cap + true
   streaming (`bulk/handlers.rs:175`, `bulk/jsonl.rs:57-65`, `pipeline.rs:188`)
   — currently 3× resident, unbounded ⇒ OOM DoS; export `limit` also uncapped.

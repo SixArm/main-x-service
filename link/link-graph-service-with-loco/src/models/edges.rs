@@ -8,7 +8,7 @@ use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, Condition, ConnectionTrait, PaginatorTrait};
 use uuid::Uuid;
 
-use entity_ref::{EdgeKind, EntityRef};
+use entity_ref::{EdgeKind, EntityRef, EntityType};
 
 use crate::events::LinkedEvent;
 use crate::graph::{self, EdgeStatus, EdgeView};
@@ -342,6 +342,37 @@ impl Model {
         Ok(rows.into_iter().map(|r| r.edge_id).collect())
     }
 
+    /// The `edge_id` of every stored edge **originating from** `entity`
+    /// (its canonical `from_ref` is a `<entity>:…` URN), for **entity-
+    /// scoped** reconciliation (SEC-B1 / design §8).
+    ///
+    /// Reconciliation diffs one service's authoritative edges against the
+    /// read-model; it must only ever consider the edges that service is
+    /// authoritative for. Diffing against the *global* set makes every
+    /// other entity's edges look "extra" and deletes them (a per-entity
+    /// pass wipes the graph). Because a directed edge's owner is its
+    /// from-side, and a symmetric `same_identity` edge canonicalises its
+    /// `from_ref` to the lexicographically-smaller URN (`person` < `worker`,
+    /// so the person-asserted edge canonicalises to `person:…`), scoping by
+    /// the canonical `from_ref` entity correctly selects exactly the source
+    /// service's edges for the two live sources (`case` `subject_of`,
+    /// `person` `same_identity`). v1 scans the table like [`all_edge_ids`].
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn edge_ids_from_entity<C: ConnectionTrait>(
+        db: &C,
+        entity: EntityType,
+    ) -> ModelResult<std::collections::HashSet<Uuid>> {
+        let rows = Entity::find().all(db).await?;
+        Ok(rows
+            .into_iter()
+            .filter(|r| from_ref_is_entity(&r.from_ref, entity))
+            .map(|r| r.edge_id)
+            .collect())
+    }
+
     /// Count edges in each integrity [`EdgeStatus`], for the
     /// `link_graph_edges{status}` metric gauge (spec §9 / T-21).
     ///
@@ -364,5 +395,52 @@ impl Model {
             out.push((status, n));
         }
         Ok(out)
+    }
+}
+
+/// True when a stored `from_ref` URN (`<type>:<uuid>`) is owned by
+/// `entity` — an exact `"<entity>:"` prefix match. The trailing colon
+/// disambiguates sibling tokens (`course:` vs `courseinstance:`), and an
+/// exact string compare (not SQL `LIKE`) avoids `_` in `care_pathway`
+/// acting as a wildcard. Used to scope reconciliation to one entity (SEC-B1).
+fn from_ref_is_entity(from_ref: &str, entity: EntityType) -> bool {
+    let mut prefix = String::with_capacity(entity.as_str().len() + 1);
+    prefix.push_str(entity.as_str());
+    prefix.push(':');
+    from_ref.starts_with(&prefix)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::from_ref_is_entity;
+    use entity_ref::EntityType;
+
+    #[test]
+    fn from_ref_scoping_matches_only_the_owning_entity() {
+        assert!(from_ref_is_entity("case:0c4f-…", EntityType::Case));
+        assert!(from_ref_is_entity("person:abcd-…", EntityType::Person));
+        // A different entity's URN is not selected — this is the SEC-B1
+        // guarantee: a case reconcile never scoops up person edges.
+        assert!(!from_ref_is_entity("person:abcd-…", EntityType::Case));
+        assert!(!from_ref_is_entity("case:0c4f-…", EntityType::Person));
+    }
+
+    #[test]
+    fn from_ref_scoping_disambiguates_sibling_tokens() {
+        // `course:` must not match a `courseinstance:` URN (prefix trap)…
+        assert!(!from_ref_is_entity("courseinstance:x", EntityType::Course));
+        assert!(from_ref_is_entity(
+            "courseinstance:x",
+            EntityType::CourseInstance
+        ));
+        // …and the `_` in `care_pathway` is a literal, not a LIKE wildcard.
+        assert!(from_ref_is_entity(
+            "care_pathway:x",
+            EntityType::CarePathway
+        ));
+        assert!(!from_ref_is_entity(
+            "careXpathway:x",
+            EntityType::CarePathway
+        ));
     }
 }

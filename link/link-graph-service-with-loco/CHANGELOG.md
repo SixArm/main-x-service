@@ -14,6 +14,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **Security (SEC-B1): reconciliation is now scoped to the source entity.**
+  `reconcile` diffed a service's authoritative edges against the **global**
+  read-model, so every other entity's edges looked "extra" and were deleted
+  — each per-entity pass (`case`, `person`) wiped the other's edges and the
+  graph never converged (a critical data-loss bug). `AuthoritativeSource`
+  now declares `entity()`, and `reconcile` diffs only the read-model edges
+  originating from that entity (`Model::edge_ids_from_entity`, exact
+  `<entity>:` `from_ref` prefix). Correct for both live sources
+  (`subject_of` from=case; canonical `same_identity` from=person). New
+  DB-gated `reconcile_is_scoped_to_the_source_entity` test + pure
+  prefix-matching unit tests (`course` vs `courseinstance`, literal `_` in
+  `care_pathway`).
+
 ### Added — reconciliation core (spec T-20 / design §8) (2026-07-10)
 
 - `src/reconcile.rs` — the "cost of two sources of truth" pass: diff the
