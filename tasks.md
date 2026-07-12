@@ -14,12 +14,14 @@
 
 ## Phase 1 — Truth & hygiene
 
-- [ ] **H-1 (S)** Pin the Rust toolchain.
+- [x] **H-1 (S)** Pin the Rust toolchain. *(done 2026-07-12)*
   Add a repo-root `rust-toolchain.toml` (stable, pinned minor) so rustfmt
   drift cannot recur. Run `cargo fmt --check` across all crates after
   pinning; fix any residue in one `Style:` commit.
   *Verify:* `cargo fmt --check` clean in every crate listed by
   `find . -name Cargo.toml -not -path '*/target/*'`.
+  *Result:* pinned `1.96.1` (+ rustfmt/clippy, minimal profile); all 37
+  crates already `fmt --check`-clean, so no `Style:` fixup was needed.
 
 - [ ] **H-2 (M)** Make `agents/share/overview.md` honest: replace the
   "What every crate provides" list with a per-crate **capability matrix**

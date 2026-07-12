@@ -1,0 +1,14 @@
+# Pin the Rust toolchain for the whole Main X Index repository.
+#
+# Every crate in this tree (services, matchers, libraries, migrations)
+# inherits this pin, so `cargo build`, `cargo clippy`, and especially
+# `cargo fmt` produce identical results on every machine and in CI. It
+# exists because a rustfmt version drift caused repo-wide formatting churn;
+# pinning the exact toolchain prevents that from recurring.
+#
+# Bump deliberately (in one commit, re-running `cargo fmt` across all
+# crates) rather than letting `rustup` float.
+[toolchain]
+channel = "1.96.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
