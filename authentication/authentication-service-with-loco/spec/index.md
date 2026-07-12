@@ -498,6 +498,13 @@ that subject, while the operator-facing system feed stays open.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-A1 (security): refuse the dev signing seed in production.**
+      `load_seed()` fell back to the committed `DEV_SEED` with no
+      environment guard, so a prod deploy missing `TOKEN_PRIVATE_KEY_SEED`
+      would sign forgeable PASETOs. Now the `DEV_SEED` fallback is refused
+      when `LOCO_ENV`/`RUST_ENV` = `production` (`load_keys()` errors →
+      `keys()` boot-panics); dev/test still fall back. Pure
+      `dev_seed_fallback` + unit test. (Repo tasks.md Phase 5 SEC-A1.)
 - [x] Rework `tests/requests/auth.rs` + snapshots for the magic-link /
       signout / me / JWKS surface (drop password-flow tests). Done:
       assertion-based tests covering signup / magic-link / redeem

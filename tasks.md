@@ -265,12 +265,14 @@
 
 ### F-authn — token & session integrity (authentication-service)
 
-- [ ] **SEC-A1 (S) 🔴** DEV_SEED prod guard. `load_seed()`
-  (`src/auth/mod.rs:211-233`) silently falls back to the committed
-  `DEV_SEED` → forgeable tokens. Refuse to boot/serve when the resolved
-  seed equals `DEV_SEED` and the loco environment is `production` (or no
-  `TOKEN_PRIVATE_KEY_*` is set outside development). *Test:* boot in
-  production with no key env ⇒ hard error; dev ⇒ still boots.
+- [x] **SEC-A1 (S) 🔴** DEV_SEED prod guard. *(done 2026-07-12)* `load_seed()`
+  (`src/auth/mod.rs`) silently fell back to the committed `DEV_SEED` →
+  forgeable tokens. Now `dev_seed_fallback(is_production)` refuses the
+  fallback when `LOCO_ENV`/`RUST_ENV` = `production`, so `load_keys()`
+  errors and `keys()` boot-panics with guidance; dev/test still boot on
+  `DEV_SEED`. Unit test `dev_seed_fallback_refused_in_production`
+  (env-free, pure helper — edition-2024 + `forbid(unsafe)` rules out
+  `set_var` in tests). Green: lib tests + clippy + fmt.
 - [ ] **SEC-A2 (S) 🟠** Gate `GET /api/auth/audit/recent`
   (`controllers/auth.rs:514-518`, route `:605`) — it is unauthenticated and
   returns raw `auth_events` emails/outcomes (account enumeration). Require
@@ -453,10 +455,12 @@
   `ie_ihi`/`es_tsi`/`dk_cpr` (person `identifiers.rs:349,301,1090`; worker
   `matcher.rs:1779`) — match the `nl_bsn` posture (`:741`). *Test:* all-zero
   placeholder IDs do not short-circuit to 1.0.
-- [ ] **SEC-M4 (S) 🟡** portfolio `days_from_civil` (`normalize.rs:98,128`,
-  reached via `matcher.rs:407`): `year` parsed as unbounded `i64`,
-  `era*146_097` overflows ⇒ panic(debug)/wrap(release). Bound/guard the
-  parsed year. *Test:* fuzz the date string; huge year ⇒ `None`, never panics.
+- [x] **SEC-M4 (S) 🟡** portfolio `days_from_civil` overflow. *(done 2026-07-12)*
+  `iso_date_to_days` parsed `year` as unbounded `i64`, so a crafted date
+  overflowed `era*146_097` (panic debug / wrap release) via the timeframe
+  component. Year now bounded to ISO `0..=9999`; out-of-range ⇒ `None`.
+  Test `iso_date_year_is_bounded_and_never_overflows` (incl. `i64::MAX`
+  year). Green: lib tests + clippy + fmt.
 - [ ] **SEC-M5 (S) 🟡** organization identifier validation
   (`controllers/organizations.rs:90-98` validates only `name`): enforce
   LEI/DUNS/GLN/VAT check-digit/length before store, since they drive the

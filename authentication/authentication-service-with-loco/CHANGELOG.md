@@ -10,6 +10,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-A1: refuse the built-in `DEV_SEED` signing key in production.**
+  `load_seed()` fell back to the committed development Ed25519 seed
+  whenever `TOKEN_PRIVATE_KEY_SEED` / `TOKEN_PRIVATE_KEY_FILE` were unset,
+  with no environment guard — a production deploy that forgot the variable
+  would sign PASETOs anyone could forge (e.g. `attrs.access = ["admin"]`),
+  defeating the whole federation's auth. When the loco environment is
+  `production` (`LOCO_ENV`/`RUST_ENV`), the dev-seed fallback is now
+  refused: `load_keys()` errors and the service fails to boot
+  (`keys()` panics with actionable guidance) instead of serving with a
+  publicly-known key. Development/test still fall back to `DEV_SEED` so
+  local runs stay offline. Pure `dev_seed_fallback` helper + unit test
+  `dev_seed_fallback_refused_in_production`.
+
 ### Added
 
 - **CSRF synchroniser token** on cookie-authenticated mutating requests
