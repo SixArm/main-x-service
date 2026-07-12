@@ -335,13 +335,16 @@
 
 ### F-guard — read-path masking & guard consistency (entity services)
 
-- [ ] **SEC-G1 (M) 🔴/🟠** Governed bulk-links leak: `GET /api/cases/links`
-  (`case/src/controllers/links.rs:306-321`) dumps every `subject_of` edge
-  with only the coarse gate + no audit; person twin
-  (`person/src/api/rest/links.rs:393-419`, `same_identity` PII). Add
-  per-record authz + audit, or restrict to an authorised reconcile caller
-  (`svc`). *Test:* coarse/default caller receives zero governed edges;
-  mirrors the aggregator's concealment.
+- [x] **SEC-G1 (M) 🔴/🟠** Governed bulk-links leak. *(done 2026-07-12)*
+  `GET /api/cases/links` dumped every `subject_of` edge (and the person
+  twin `GET /api/persons/links` every `same_identity` edge) with only the
+  coarse gate + no audit. Both handlers now authorise the cross-record dump
+  as a privileged governed read (`authorize_record(Action::Destructive,…)`
+  — default policy admits only `svc`/`admin`) and audit each surfacing.
+  Case: DB-gated `bulk_links_requires_elevated_authority` (401/403/200 in
+  `tests/enforcement.rs`). Person: unit test pins the `Destructive`
+  classification (shares case's e2e-proven gate). Green: both crates' lib
+  tests + clippy + fmt (+ case `test --no-run` DB-gated).
 - [ ] **SEC-G2 (M) 🟠** Case FHIR read/search (`case/src/controllers/fhir.rs:90,248`)
   take no caller — apply record-level ABAC + the `mask` obligation like
   native `get_one`. *Test:* masked/denied read on `/fhir/Task/{id}` + search.

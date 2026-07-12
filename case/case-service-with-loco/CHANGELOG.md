@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-G1: authorise + audit the governed bulk-links read.**
+  `GET /api/cases/links` returned **every** `subject_of` (case → person)
+  edge across all cases with only the coarse blanket-read gate and no audit
+  — so a default read-only caller (or, with enforcement off, anyone) could
+  enumerate which persons are subjects of which government cases, exactly
+  the §10 governance the aggregator conceals. The handler now authorises
+  the cross-case dump as a privileged governed read
+  (`authorize_record(Action::Destructive, …)` — the default policy admits
+  only `svc=true` machine peers or `admin`; a deployment can grant a
+  dedicated reconcile identity) and writes a `links_bulk_read` audit row on
+  every surfacing. DB-gated `bulk_links_requires_elevated_authority`
+  (401 no-token / 403 default caller / 200 `svc`) in `tests/enforcement.rs`.
+
 ### Added — cross-service entity links: bulk-read for reconciliation (2026-07-10)
 
 - `GET /api/cases/links[?since=<rfc3339>]` — every active outbound edge
