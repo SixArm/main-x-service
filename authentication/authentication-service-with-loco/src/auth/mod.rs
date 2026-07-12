@@ -205,9 +205,27 @@ fn jwk_for(kid: &str, public: &[u8; 32]) -> serde_json::Value {
     })
 }
 
+/// True when the service is running in the `production` loco environment.
+///
+/// Loco selects the production config via `LOCO_ENV=production` (the older
+/// `RUST_ENV` is accepted as a fallback signal). We key the [`DEV_SEED`]
+/// refusal on this so a production deploy that forgets to set a real signing
+/// seed fails closed instead of silently signing forgeable tokens (SEC-A1).
+fn is_production_env() -> bool {
+    ["LOCO_ENV", "RUST_ENV"]
+        .iter()
+        .filter_map(|k| std::env::var(k).ok())
+        .any(|v| v.trim().eq_ignore_ascii_case("production"))
+}
+
 /// Resolve the primary signing seed: `TOKEN_PRIVATE_KEY_SEED` (inline
 /// base64url 32 bytes) → `TOKEN_PRIVATE_KEY_FILE` (a file holding the same)
-/// → the built-in [`DEV_SEED`].
+/// → the built-in [`DEV_SEED`] (development/test only).
+///
+/// In production ([`is_production_env`]) the `DEV_SEED` fallback is
+/// **refused** with an error: the committed dev seed is public, so signing
+/// with it would let anyone forge a valid PASETO (e.g. `attrs.access =
+/// ["admin"]`). Boot fails via [`keys`] rather than serving with a known key.
 fn load_seed() -> Result<[u8; 32], AuthError> {
     let b64 = if let Ok(seed) = std::env::var("TOKEN_PRIVATE_KEY_SEED") {
         Some(seed)
@@ -229,8 +247,23 @@ fn load_seed() -> Result<[u8; 32], AuthError> {
                 .try_into()
                 .map_err(|_| AuthError::Keys("seed is not 32 bytes".to_string()))
         }
-        None => Ok(DEV_SEED),
+        None => dev_seed_fallback(is_production_env()),
     }
+}
+
+/// The [`DEV_SEED`] fallback decision, factored out as a pure function so it
+/// is unit-testable without mutating process env (forbidden under edition
+/// 2024 + `#![forbid(unsafe_code)]`). Refuses the fallback in production.
+fn dev_seed_fallback(is_production: bool) -> Result<[u8; 32], AuthError> {
+    if is_production {
+        return Err(AuthError::Keys(
+            "refusing to sign with the built-in development seed in production: \
+             set TOKEN_PRIVATE_KEY_SEED (base64url 32-byte Ed25519 seed) or \
+             TOKEN_PRIVATE_KEY_FILE"
+                .to_string(),
+        ));
+    }
+    Ok(DEV_SEED)
 }
 
 /// Resolve additional verify-only public keys from
@@ -461,6 +494,23 @@ mod tests {
     // Build a deterministic key set from the dev seed (no env, no files).
     fn dev_keys() -> AuthKeys {
         build_keys(&DEV_SEED, &[]).expect("build dev keys")
+    }
+
+    // SEC-A1: the built-in DEV_SEED must NOT be usable as a signing key in
+    // production — a deploy that forgets TOKEN_PRIVATE_KEY_SEED would
+    // otherwise sign forgeable tokens. In production the fallback errors
+    // (boot fails via `keys()`); in dev/test it still yields DEV_SEED so
+    // local runs and this suite work offline.
+    #[test]
+    fn dev_seed_fallback_refused_in_production() {
+        assert!(
+            dev_seed_fallback(true).is_err(),
+            "DEV_SEED must be refused in production"
+        );
+        assert_eq!(
+            dev_seed_fallback(false).expect("dev/test allows the dev seed"),
+            DEV_SEED,
+        );
     }
 
     // A second, throwaway seed distinct from the dev seed.

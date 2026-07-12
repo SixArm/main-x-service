@@ -10,6 +10,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **Security (SEC-M4): year bound in `normalize::iso_date_to_days`.** The
+  year was parsed as an unbounded `i64`, so a crafted date such as
+  `"99999999999999-01-01"` overflowed the `era * 146_097` term in
+  `days_from_civil` (panic in debug, wrap in release) when the timeframe
+  component parsed an attacker-supplied `start_date` / `target_date`. The
+  year is now bounded to the ISO-8601 `0..=9999` range; out-of-range years
+  return `None` (treated as an absent date). Regression test
+  `iso_date_year_is_bounded_and_never_overflows`. Upholds the crate's
+  "no panic in library code" rule.
+
 ## [0.1.0] - 2026-06-18
 
 ### Added

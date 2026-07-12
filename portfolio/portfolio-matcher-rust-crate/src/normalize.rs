@@ -95,7 +95,15 @@ pub fn iso_date_to_days(s: &str) -> Option<i64> {
         return None;
     }
     let mut parts = t.split('-');
-    let year: i64 = parts.next()?.parse().ok()?;
+    // Bound the year to the ISO-8601 4-digit range. An unbounded `i64` year
+    // would overflow the `era * 146_097` term in `days_from_civil` (panic in
+    // debug, wrap in release) on a crafted value like `"99999999999999-01-01"`
+    // (SEC-M4). Project timeframes never need years outside `0..=9999`.
+    let year: i64 = parts
+        .next()?
+        .parse()
+        .ok()
+        .filter(|v| (0..=9999).contains(v))?;
     // Month / day default to 1 when omitted; reject out-of-range values.
     let month: i64 = match parts.next() {
         Some(m) => m.parse().ok().filter(|v| (1..=12).contains(v))?,
@@ -222,5 +230,17 @@ mod tests {
         assert_eq!(iso_date_to_days("2024-00-01"), None);
         assert_eq!(iso_date_to_days("2024-01-32"), None);
         assert_eq!(iso_date_to_days("2024-01-01-01"), None);
+    }
+
+    // SEC-M4: an out-of-range year must be rejected, not overflow the
+    // `era * 146_097` term in `days_from_civil` (panic in debug / wrap in
+    // release). The 4-digit ISO boundary is honoured; anything past it is
+    // `None`, and a pathological value never panics.
+    #[test]
+    fn iso_date_year_is_bounded_and_never_overflows() {
+        assert!(iso_date_to_days("9999-12-31").is_some()); // upper ISO bound ok
+        assert_eq!(iso_date_to_days("10000-01-01"), None); // just past the bound
+        assert_eq!(iso_date_to_days("99999999999999-01-01"), None); // would overflow
+        assert_eq!(iso_date_to_days("9223372036854775807-01-01"), None); // i64::MAX
     }
 }
