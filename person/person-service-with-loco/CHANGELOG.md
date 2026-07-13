@@ -10,6 +10,33 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-B4: bulk artifact hardening — path confinement, IDOR, and TTL.**
+  Three holes in the bulk job/artifact surface:
+  - **Arbitrary file read.** `LocalFsArtifactStore::get` stripped a
+    `file://` prefix and read **any** absolute path, so a crafted
+    reference (`file:///etc/passwd`) or a `..`-escaping key could read
+    outside the store. `get` now resolves and **confines** the path to the
+    store's canonicalised base (rejecting escapes), and both `put` and
+    `get` validate keys with `is_safe_key` (no `..`, absolute, or drive/
+    backslash components).
+  - **IDOR / BOLA on job status.** `GET /api/persons/import/{id}` and
+    `/export/{id}` returned **any** job by id — including its
+    `download_url` / `errors_url` — to any caller. The status handler now
+    takes the caller and returns `404` unless the caller **owns** the job
+    (`is_job_owner`: the job's `actor` equals their token `sub`) or is
+    **elevated** (an `access=admin` / `svc=true` token the ABAC policy
+    would allow a `destructive` action). Off by nature when
+    `PERSON_REQUIRE_AUTH` is off (no identity to check).
+  - **No retention.** Jobs were created with `expires_at = NULL`, so an
+    export of personal data was retrievable forever. `create` now stamps
+    `expires_at = created_at + BULK_ARTIFACT_TTL_SECS` (7 days) and the
+    status handler treats an expired job as `404` (`artifact_expired`), so
+    a stale download URL is never handed out. Physical artifact deletion
+    (an object-store sweep) is a follow-up.
+  Pure cores (`is_safe_key`, `is_job_owner`, `artifact_expired`,
+  store-confinement) are unit-tested, including the outside-the-base
+  `file://` refusal.
+
 - **SEC-B2: bound bulk import/export against an OOM DoS.** `POST
   /api/persons/import` read the whole multipart upload into memory
   unbounded (`field.bytes()`), the pipeline materialised every row before

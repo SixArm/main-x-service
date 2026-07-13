@@ -73,6 +73,16 @@ pub const MAX_IMPORT_ROWS: usize = 1_000_000;
 /// export can never be asked to buffer an unbounded result set.
 pub const MAX_EXPORT_ROWS: u64 = 1_000_000;
 
+/// SEC-B4 — the lifetime, in seconds, of a bulk job and its artifacts.
+///
+/// Set as `expires_at = created_at + this` when a job is created; a job (and
+/// its download / error-report URL) is treated as **gone** once past this,
+/// so a stale export of personal data is not indefinitely retrievable. 7
+/// days is a generous window for an operator to collect a result. Physical
+/// artifact deletion (a sweep of the object store) is a follow-up; the
+/// expiry gate at the status handler stops the reference being handed out.
+pub const BULK_ARTIFACT_TTL_SECS: i64 = 7 * 24 * 60 * 60;
+
 /// The kind of a bulk job.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

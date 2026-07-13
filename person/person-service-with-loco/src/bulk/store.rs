@@ -75,10 +75,63 @@ impl LocalFsArtifactStore {
     fn path_for(&self, key: &str) -> PathBuf {
         self.base.join(key)
     }
+
+    /// Resolve a `get` reference to a **confined** path (SEC-B4). A
+    /// `file://` reference must, once resolved, live under this store's base
+    /// directory; anything else (`file:///etc/passwd`, a `..`-escape) is
+    /// rejected rather than read. A bare (non-`file://`) reference is
+    /// treated as a key and validated with [`is_safe_key`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Internal`] if the reference is unsafe or escapes the
+    /// base directory.
+    fn resolve_get_path(&self, reference: &str) -> Result<PathBuf> {
+        let candidate = if let Some(stripped) = reference.strip_prefix("file://") {
+            Path::new(stripped).to_path_buf()
+        } else {
+            if !is_safe_key(reference) {
+                return Err(Error::Internal(format!(
+                    "refusing unsafe artifact reference: {reference}"
+                )));
+            }
+            self.path_for(reference)
+        };
+        // Confine to the base: compare canonicalised absolute paths so a
+        // symlink or `..` cannot escape. The base is canonicalised with a
+        // raw fallback so a not-yet-created base still yields a usable root.
+        let base_abs = std::fs::canonicalize(&self.base).unwrap_or_else(|_| self.base.clone());
+        let resolved = std::fs::canonicalize(&candidate).unwrap_or_else(|_| candidate.clone());
+        if resolved.starts_with(&base_abs) {
+            Ok(resolved)
+        } else {
+            Err(Error::Internal(format!(
+                "artifact reference escapes the store base: {reference}"
+            )))
+        }
+    }
+}
+
+/// Whether `key` is a safe relative artifact key (SEC-B4): non-empty, not
+/// absolute, no parent (`..`) component, and no Windows drive prefix or
+/// backslash. Pure, so `put`/`get` and their tests share one definition.
+#[must_use]
+pub fn is_safe_key(key: &str) -> bool {
+    use std::path::Component;
+    if key.is_empty() || key.contains('\\') {
+        return false;
+    }
+    let path = Path::new(key);
+    path.components().all(|c| matches!(c, Component::Normal(_)))
 }
 
 impl ArtifactStore for LocalFsArtifactStore {
     fn put(&self, key: &str, bytes: &[u8]) -> Result<String> {
+        if !is_safe_key(key) {
+            return Err(Error::Internal(format!(
+                "refusing unsafe artifact key: {key}"
+            )));
+        }
         let path = self.path_for(key);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
@@ -91,10 +144,7 @@ impl ArtifactStore for LocalFsArtifactStore {
     }
 
     fn get(&self, reference: &str) -> Result<Vec<u8>> {
-        let path = reference.strip_prefix("file://").map_or_else(
-            || self.path_for(reference),
-            |stripped| Path::new(stripped).to_path_buf(),
-        );
+        let path = self.resolve_get_path(reference)?;
         std::fs::read(&path).map_err(|e| Error::Internal(format!("read artifact {reference}: {e}")))
     }
 }
@@ -118,5 +168,47 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = LocalFsArtifactStore::new(dir.path());
         assert!(store.get("file:///no/such/artifact").is_err());
+    }
+
+    #[test]
+    fn is_safe_key_rejects_traversal_and_absolute() {
+        use super::is_safe_key;
+        assert!(is_safe_key("jobs/abc/input.jsonl"));
+        assert!(is_safe_key("input.jsonl"));
+        // Traversal, absolute, current-dir, and Windows-ish forms are unsafe.
+        assert!(!is_safe_key("../secret"));
+        assert!(!is_safe_key("jobs/../../etc/passwd"));
+        assert!(!is_safe_key("/etc/passwd"));
+        assert!(!is_safe_key("./x"));
+        assert!(!is_safe_key(""));
+        assert!(!is_safe_key("a\\b"));
+    }
+
+    #[test]
+    fn put_rejects_an_unsafe_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalFsArtifactStore::new(dir.path());
+        assert!(store.put("../escape.txt", b"x").is_err());
+        assert!(store.put("/tmp/escape.txt", b"x").is_err());
+    }
+
+    #[test]
+    fn get_refuses_a_reference_outside_the_base() {
+        // A real file outside the store base must not be readable through a
+        // crafted file:// reference (SEC-B4 arbitrary-read guard).
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(outside.path(), b"top secret").unwrap();
+        let outside_ref = format!("file://{}", outside.path().display());
+
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalFsArtifactStore::new(dir.path());
+        assert!(
+            store.get(&outside_ref).is_err(),
+            "a file:// reference outside the base must be refused"
+        );
+
+        // A legitimately stored artifact still round-trips.
+        let ok_ref = store.put("jobs/x/out.jsonl", b"mine").unwrap();
+        assert_eq!(store.get(&ok_ref).unwrap(), b"mine");
     }
 }

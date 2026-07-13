@@ -71,6 +71,9 @@ impl NewBulkJob {
 /// Returns [`crate::Error::Database`] if the insert fails.
 pub async fn create(db: &DatabaseConnection, job: NewBulkJob) -> Result<Model> {
     let now = OffsetDateTime::now_utc();
+    // SEC-B4: stamp a retention deadline so a stale export of personal data
+    // is not indefinitely retrievable (enforced at the status handler).
+    let expires_at = now + time::Duration::seconds(crate::bulk::BULK_ARTIFACT_TTL_SECS);
     let model = bulk_jobs::ActiveModel {
         id: Set(Uuid::new_v4()),
         kind: Set(job.kind.as_str().to_string()),
@@ -91,7 +94,7 @@ pub async fn create(db: &DatabaseConnection, job: NewBulkJob) -> Result<Model> {
         error_report_url: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
-        expires_at: Set(None),
+        expires_at: Set(Some(expires_at)),
     };
     Ok(model.insert(db).await?)
 }
