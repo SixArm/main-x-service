@@ -62,6 +62,15 @@ impl NewBulkJob {
             input_url: None,
         }
     }
+
+    /// Attach a client-supplied idempotency key (SEC-B9), trimmed; a blank
+    /// key is treated as absent. A retried submit carrying the same key
+    /// dedupes to the same job (`create_or_get_idempotent`).
+    #[must_use]
+    pub fn with_idempotency_key(mut self, key: Option<String>) -> Self {
+        self.idempotency_key = key.map(|k| k.trim().to_string()).filter(|k| !k.is_empty());
+        self
+    }
 }
 
 /// Insert a new `queued` bulk job and return its persisted row.
@@ -106,6 +115,64 @@ pub async fn create(db: &DatabaseConnection, job: NewBulkJob) -> Result<Model> {
 /// Returns [`crate::Error::Database`] if the query fails.
 pub async fn find_by_id(db: &DatabaseConnection, id: Uuid) -> Result<Option<Model>> {
     Ok(bulk_jobs::Entity::find_by_id(id).one(db).await?)
+}
+
+/// Find an existing job for this entity + `kind` bearing `idempotency_key`
+/// (SEC-B9), or `None`. Matches the `UNIQUE (entity, kind, idempotency_key)`
+/// constraint so a retried submit resolves to the original job.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn find_by_idempotency_key(
+    db: &DatabaseConnection,
+    kind: BulkKind,
+    key: &str,
+) -> Result<Option<Model>> {
+    use sea_orm::{ColumnTrait, QueryFilter};
+    Ok(bulk_jobs::Entity::find()
+        .filter(bulk_jobs::Column::Entity.eq(crate::streaming::ENTITY))
+        .filter(bulk_jobs::Column::Kind.eq(kind.as_str()))
+        .filter(bulk_jobs::Column::IdempotencyKey.eq(key))
+        .one(db)
+        .await?)
+}
+
+/// Create a job **idempotently** (SEC-B9): if it carries an idempotency key
+/// that already names a job (this entity + kind), return that existing job
+/// (`reused = true`) instead of inserting a duplicate — so a retried submit
+/// neither re-runs the work nor creates a second row. A key-less job always
+/// inserts. The `UNIQUE (entity, kind, idempotency_key)` constraint backstops
+/// the check-then-insert race: on a unique violation the existing row is
+/// re-fetched and returned.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query/insert fails for a reason
+/// other than a losing idempotency race.
+pub async fn create_or_get_idempotent(
+    db: &DatabaseConnection,
+    job: NewBulkJob,
+) -> Result<(Model, bool)> {
+    if let Some(key) = job.idempotency_key.clone() {
+        if let Some(existing) = find_by_idempotency_key(db, job.kind, &key).await? {
+            return Ok((existing, true));
+        }
+        let kind = job.kind;
+        return match create(db, job).await {
+            Ok(model) => Ok((model, false)),
+            Err(insert_err) => {
+                // Possible unique-violation race: a concurrent submit with
+                // the same key won. Re-check and return the winner.
+                if let Some(existing) = find_by_idempotency_key(db, kind, &key).await? {
+                    Ok((existing, true))
+                } else {
+                    Err(insert_err)
+                }
+            }
+        };
+    }
+    Ok((create(db, job).await?, false))
 }
 
 /// List the most recent bulk jobs (newest first), capped at `limit`.
@@ -212,4 +279,103 @@ async fn load_active(db: &DatabaseConnection, id: Uuid) -> Result<bulk_jobs::Act
 /// Saturating `u64` → `i64` for count columns.
 fn i64_of(n: u64) -> i64 {
     i64::try_from(n).unwrap_or(i64::MAX)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NewBulkJob;
+
+    /// SEC-B9: the idempotency key is trimmed, and a blank/whitespace key is
+    /// treated as absent (so it never dedupes against another blank).
+    #[test]
+    fn with_idempotency_key_trims_and_drops_blank() {
+        let none = NewBulkJob::export(serde_json::json!({}), None);
+        assert_eq!(
+            none.clone().with_idempotency_key(None).idempotency_key,
+            None
+        );
+        assert_eq!(
+            none.clone()
+                .with_idempotency_key(Some("   ".to_string()))
+                .idempotency_key,
+            None,
+            "a blank key is treated as absent"
+        );
+        assert_eq!(
+            none.with_idempotency_key(Some("  abc-123  ".to_string()))
+                .idempotency_key,
+            Some("abc-123".to_string()),
+            "a real key is trimmed"
+        );
+    }
+}
+
+/// DB-gated (`#[ignore]`) tests for the bulk-jobs helpers. They need a
+/// migrated `PostgreSQL` via `DATABASE_URL`; a bare `cargo test` skips them
+/// but they MUST compile under `cargo test --no-run`.
+#[cfg(test)]
+mod db_tests {
+    use super::{NewBulkJob, create, create_or_get_idempotent, find_by_id};
+    use crate::bulk::BulkKind;
+    use sea_orm::DatabaseConnection;
+    use uuid::Uuid;
+
+    async fn connect() -> DatabaseConnection {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        sea_orm::Database::connect(&url)
+            .await
+            .expect("connect to DATABASE_URL")
+    }
+
+    /// SEC-B9: re-submitting with the same idempotency key returns the same
+    /// job (reused) and creates no second row; a different key is a new job.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn idempotent_resubmit_returns_the_same_job() {
+        let db = connect().await;
+        let key = format!("idem-{}", Uuid::new_v4());
+
+        let first = NewBulkJob::export(serde_json::json!({}), Some("actor".to_string()))
+            .with_idempotency_key(Some(key.clone()));
+        let (job1, reused1) = create_or_get_idempotent(&db, first).await.unwrap();
+        assert!(!reused1, "first submit creates the job");
+
+        // Same key ⇒ same job, marked reused, no new row.
+        let retry = NewBulkJob::export(serde_json::json!({}), Some("actor".to_string()))
+            .with_idempotency_key(Some(key.clone()));
+        let (job2, reused2) = create_or_get_idempotent(&db, retry).await.unwrap();
+        assert!(reused2, "retried submit is deduped");
+        assert_eq!(job1.id, job2.id, "same job id returned");
+
+        // A different key is a distinct job.
+        let other = NewBulkJob::export(serde_json::json!({}), Some("actor".to_string()))
+            .with_idempotency_key(Some(format!("idem-{}", Uuid::new_v4())));
+        let (job3, reused3) = create_or_get_idempotent(&db, other).await.unwrap();
+        assert!(!reused3);
+        assert_ne!(job3.id, job1.id);
+
+        // Ground truth: both deduped submits point at the one persisted row.
+        assert!(find_by_id(&db, job1.id).await.unwrap().is_some());
+    }
+
+    /// A key-less submit always creates a fresh job (never deduped).
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn keyless_submit_is_never_deduped() {
+        let db = connect().await;
+        let (a, _) = create_or_get_idempotent(
+            &db,
+            NewBulkJob::import(serde_json::json!({ "dry_run": true }), None),
+        )
+        .await
+        .unwrap();
+        let b = create(
+            &db,
+            NewBulkJob::import(serde_json::json!({ "dry_run": true }), None),
+        )
+        .await
+        .unwrap();
+        assert_eq!(a.kind, BulkKind::Import.as_str());
+        assert_ne!(a.id, b.id, "key-less jobs are always distinct");
+    }
 }

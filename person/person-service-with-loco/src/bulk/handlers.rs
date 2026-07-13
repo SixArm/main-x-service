@@ -19,7 +19,7 @@
 use axum::{
     Json,
     extract::{Multipart, Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
 use loco_rs::app::AppContext;
@@ -187,6 +187,16 @@ fn actor_of(caller: &MaybeAuthUser) -> Option<String> {
     caller.claims().map(|c| c.sub.clone())
 }
 
+/// The client-supplied idempotency key from the `Idempotency-Key` request
+/// header (SEC-B9), if present and valid UTF-8. A retried submit carrying the
+/// same key dedupes to the original job.
+fn idempotency_key_of(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("idempotency-key")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string)
+}
+
 /// `POST /api/persons/import` — accept a multipart JSONL upload, enqueue
 /// an import job, and return `202 {job_id}`.
 #[utoipa::path(
@@ -203,8 +213,10 @@ pub async fn import_person(
     State(state): State<AppState>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
+    headers: HeaderMap,
     mut multipart: Multipart,
 ) -> impl IntoResponse {
+    let idempotency_key = idempotency_key_of(&headers);
     let mut file_bytes: Option<Vec<u8>> = None;
     let mut format_field: Option<String> = None;
     let mut dry_run = false;
@@ -274,7 +286,16 @@ pub async fn import_person(
         );
     };
 
-    match enqueue_import(&state, &ctx, &bytes, dry_run, actor_of(&caller)).await {
+    match enqueue_import(
+        &state,
+        &ctx,
+        &bytes,
+        dry_run,
+        actor_of(&caller),
+        idempotency_key,
+    )
+    .await
+    {
         Ok(job_id) => (
             StatusCode::ACCEPTED,
             Json(ApiResponse::success(JobAccepted { job_id })),
@@ -287,19 +308,30 @@ pub async fn import_person(
 }
 
 /// Store the input, insert the `queued` job, and enqueue the worker.
+///
+/// SEC-B9: when `idempotency_key` names an existing import job, the retried
+/// submit resolves to that job — the uploaded bytes are **not** re-stored and
+/// the worker is **not** re-enqueued, so the work runs exactly once.
 async fn enqueue_import(
     state: &AppState,
     ctx: &AppContext,
     bytes: &[u8],
     dry_run: bool,
     actor: Option<String>,
+    idempotency_key: Option<String>,
 ) -> Result<Uuid, String> {
-    let job = bulk_jobs::create(
+    let (job, reused) = bulk_jobs::create_or_get_idempotent(
         &state.db,
-        NewBulkJob::import(serde_json::json!({ "dry_run": dry_run }), actor),
+        NewBulkJob::import(serde_json::json!({ "dry_run": dry_run }), actor)
+            .with_idempotency_key(idempotency_key),
     )
     .await
     .map_err(|e| e.to_string())?;
+
+    if reused {
+        // Retried submit: return the original job without re-running.
+        return Ok(job.id);
+    }
 
     // Store the uploaded input under the job id, then record it.
     let input_url = state
@@ -333,8 +365,10 @@ pub async fn export_person(
     State(state): State<AppState>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
+    headers: HeaderMap,
     Json(req): Json<ExportRequest>,
 ) -> impl IntoResponse {
+    let idempotency_key = idempotency_key_of(&headers);
     if let Err((status, body)) = require_jsonl(req.format.as_deref()) {
         return (status, Json(remap(body)));
     }
@@ -394,26 +428,35 @@ pub async fn export_person(
         serde_json::json!(include_soft_deleted),
     );
 
-    let created = bulk_jobs::create(
+    let created = bulk_jobs::create_or_get_idempotent(
         &state.db,
-        NewBulkJob::export(serde_json::Value::Object(params), actor_of(&caller)),
+        NewBulkJob::export(serde_json::Value::Object(params), actor_of(&caller))
+            .with_idempotency_key(idempotency_key),
     )
     .await;
 
     match created {
-        Ok(job) => match BulkJobWorker::perform_later(&ctx, BulkJobArgs { job_id: job.id }).await {
-            Ok(()) => (
-                StatusCode::ACCEPTED,
-                Json(ApiResponse::success(JobAccepted { job_id: job.id })),
-            ),
-            Err(e) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<JobAccepted>::error(
-                    "BULK_ENQUEUE_FAILED",
-                    e.to_string(),
-                )),
-            ),
-        },
+        // SEC-B9: a retried submit resolves to the original job and is not
+        // re-enqueued (the work runs exactly once).
+        Ok((job, true)) => (
+            StatusCode::ACCEPTED,
+            Json(ApiResponse::success(JobAccepted { job_id: job.id })),
+        ),
+        Ok((job, false)) => {
+            match BulkJobWorker::perform_later(&ctx, BulkJobArgs { job_id: job.id }).await {
+                Ok(()) => (
+                    StatusCode::ACCEPTED,
+                    Json(ApiResponse::success(JobAccepted { job_id: job.id })),
+                ),
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ApiResponse::<JobAccepted>::error(
+                        "BULK_ENQUEUE_FAILED",
+                        e.to_string(),
+                    )),
+                ),
+            }
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse::<JobAccepted>::error(
