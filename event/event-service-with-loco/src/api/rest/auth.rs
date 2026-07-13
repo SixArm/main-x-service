@@ -16,8 +16,11 @@
 //! When `EVENT_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 //! case-insensitive), the [`enforce`] decision — wired as the
 //! [`require_auth_mw`] middleware on both router surfaces — requires a
-//! valid bearer token on every route under [`API_PREFIX`] except the
-//! public [`PUBLIC_API_PATHS`] allow-list. It is **off by default**:
+//! valid bearer token on **every** route except the public
+//! [`is_public_path`] allow-list (health/ping, OpenAPI/Swagger,
+//! Prometheus metrics, `/api/health`, and the FHIR `/fhir/metadata`
+//! capability statement) — **deny-unless-public**, so a route mounted
+//! outside `/api` or `/fhir` is guarded too. It is **off by default**:
 //! unset/blank/junk ⇒ today's behaviour, where the extractor is opt-in
 //! per handler and `GET /api/whoami` proves end-to-end verification.
 //! The flag is read once at [`AppState`] construction, so changing it
@@ -96,28 +99,24 @@ pub fn bearer_claims(
         .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))
 }
 
-/// The API prefix under which blanket enforcement applies. Paths under
-/// this prefix (and under [`FHIR_PREFIX`]) are gated; everything else —
-/// loco's `/_health` and `/_ping`, the `OpenAPI` doc
-/// `/api-docs/openapi.json`, the Swagger UI at `/swagger-ui*`, and the
-/// Prometheus scrape `/metrics.prom` — is outside the enforcement scope
-/// and always public.
-pub const API_PREFIX: &str = "/api";
-
-/// The FHIR surface prefix, guarded on the same terms as [`API_PREFIX`]
-/// (fhir.md §8): every `/fhir/*` route requires a valid bearer token when
-/// enforcement is on, except the public [`PUBLIC_API_PATHS`] entries
-/// (`/fhir/metadata` capability discovery). The FHIR write path carries
-/// PHI, so it must not be public.
-pub const FHIR_PREFIX: &str = "/fhir";
-
-/// Paths that stay public even when blanket enforcement is on: the
-/// liveness probe (orchestration needs no token) and the FHIR
-/// `CapabilityStatement` (capability discovery, fhir.md §8). This is the
-/// complete allow-list inside [`API_PREFIX`] / [`FHIR_PREFIX`]; every
-/// other guarded route requires a valid bearer token when enforcement is
-/// on.
-pub const PUBLIC_API_PATHS: &[&str] = &["/api/health", "/fhir/metadata"];
+/// Paths that stay public even when blanket enforcement is on
+/// (**deny-unless-public**): loco's `/_health` and `/_ping` liveness
+/// probes, the `OpenAPI` doc `/api-docs/openapi.json`, the Swagger UI at
+/// `/swagger-ui*`, the Prometheus scrape `/metrics.prom`, the
+/// `/api/health` check, and the FHIR `CapabilityStatement`
+/// `/fhir/metadata` (capability discovery, fhir.md §8). Every **other**
+/// route — regardless of prefix — requires a valid bearer token when
+/// enforcement is on; the FHIR write path carries PHI, so it must not be
+/// public.
+fn is_public_path(path: &str) -> bool {
+    path == "/_health"
+        || path == "/_ping"
+        || path == "/api-docs/openapi.json"
+        || path.starts_with("/swagger-ui")
+        || path == "/metrics.prom"
+        || path == "/api/health"
+        || path == "/fhir/metadata"
+}
 
 /// Lenient boolean parse for the enforcement flag: `1`/`true`/`yes`/
 /// `on` (case-insensitive, surrounding whitespace ignored) ⇒ `true`;
@@ -139,20 +138,6 @@ pub fn require_auth_from_env() -> bool {
     parse_bool(&std::env::var("EVENT_REQUIRE_AUTH").unwrap_or_default())
 }
 
-/// Whether `path` is under the enforced [`API_PREFIX`]. Segment-aware:
-/// `/api` and `/api/...` match; nothing else does.
-fn is_api_path(path: &str) -> bool {
-    path.strip_prefix(API_PREFIX)
-        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
-}
-
-/// Whether `path` is under the FHIR [`FHIR_PREFIX`]. Segment-aware:
-/// `/fhir` and `/fhir/...` match; nothing else does.
-fn is_fhir_path(path: &str) -> bool {
-    path.strip_prefix(FHIR_PREFIX)
-        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
-}
-
 /// Derive the request's ABAC action from its HTTP method and path (per
 /// `authorization-attributes.md` §2): `GET`/`HEAD`/`OPTIONS` ⇒ `Read`;
 /// `DELETE` ⇒ `Delete`; a `POST` whose path ends with a
@@ -160,6 +145,11 @@ fn is_fhir_path(path: &str) -> bool {
 /// `POST`/`PUT`/`PATCH` (and any unrecognised method) ⇒ `Write`.
 #[must_use]
 pub fn derive_action(method: &Method, path: &str) -> Action {
+    // SEC-G6: normalise a trailing slash before the destructive-suffix
+    // check, so `POST /api/events/merge/` (and `//`) is still classified as
+    // `Destructive` rather than silently downgraded to `Write` — which would
+    // let an `access=write` (non-admin) caller reach a destructive op.
+    let path = path.trim_end_matches('/');
     match *method {
         Method::GET | Method::HEAD | Method::OPTIONS => Action::Read,
         Method::DELETE => Action::Delete,
@@ -216,9 +206,8 @@ pub fn policy_from_env() -> Policy {
 ///
 /// # Errors
 ///
-/// `401` when enforcement is on, the path is under [`API_PREFIX`] or
-/// [`FHIR_PREFIX`] and not in [`PUBLIC_API_PATHS`], and the request
-/// carries no valid bearer
+/// `401` when enforcement is on, the path is not public
+/// ([`is_public_path`]), and the request carries no valid bearer
 /// token (missing / malformed / expired / tampered). `403` when the
 /// token is valid but the ABAC policy denies the derived action (the
 /// message names the deciding rule, per
@@ -231,10 +220,7 @@ pub fn enforce(
     verifier: &Verifier,
     policy: &Policy,
 ) -> Result<(), (StatusCode, String)> {
-    if !require_auth
-        || (!is_api_path(path) && !is_fhir_path(path))
-        || PUBLIC_API_PATHS.contains(&path)
-    {
+    if !require_auth || is_public_path(path) {
         return Ok(());
     }
     let claims = bearer_claims(headers, verifier)?;
@@ -538,6 +524,31 @@ mod tests {
         }
     }
 
+    /// SEC-G5 (deny-unless-public): enforcement on, a non-public path
+    /// **outside** `/api` and `/fhir`, no token ⇒ `401`. A route mounted
+    /// off the API prefixes must still be guarded — the old prefix-gate
+    /// let these through unauthenticated.
+    #[test]
+    fn test_enforce_on_guards_non_api_non_public_paths_is_401() {
+        let (verifier, policy) = (verifier(), policy());
+        for path in ["/", "/admin", "/secret", "/foo/bar"] {
+            assert_eq!(
+                enforce(
+                    true,
+                    &Method::GET,
+                    path,
+                    &HeaderMap::new(),
+                    &verifier,
+                    &policy
+                )
+                .unwrap_err()
+                .0,
+                StatusCode::UNAUTHORIZED,
+                "{path} must require a token when enforcement is on"
+            );
+        }
+    }
+
     /// Enforcement on ⇒ the FHIR resource surface (now a real API, not a
     /// `501` stub) is guarded like `/api/*`: no token ⇒ `401`, and a
     /// valid token ⇒ a read passes (fhir.md §8; regression guard for the
@@ -681,6 +692,20 @@ mod tests {
             derive_action(&Method::GET, "/api/events/merge"),
             Action::Read
         );
+        // SEC-G6: a trailing slash must NOT downgrade a destructive POST to
+        // Write (a non-admin `access=write` caller must not reach merge).
+        for path in [
+            "/api/events/merge/",
+            "/api/events/merge//",
+            "/api/events/deduplicate/",
+            "/api/events/import/",
+        ] {
+            assert_eq!(
+                derive_action(&Method::POST, path),
+                Action::Destructive,
+                "{path} must stay Destructive"
+            );
+        }
     }
 
     /// ABAC default policy, empty `attrs` ⇒ GET allowed, POST `403`

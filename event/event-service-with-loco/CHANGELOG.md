@@ -10,6 +10,23 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-G5: switch the blanket auth guard from prefix-gate to guard-all
+  (deny-unless-public).** `enforce` previously returned `Ok` (bypassing auth)
+  for any path **not** under `/api` or `/fhir`, so a route mounted outside
+  those prefixes was silently unguarded (allow-unless-in-prefix). It now
+  denies unless the path is in an explicit public allow-list (new
+  `is_public_path`: `/_health`, `/_ping`, `/api-docs/openapi.json`,
+  `/swagger-ui*`, `/metrics.prom`, `/api/health`, `/fhir/metadata`). Removed
+  the now-unused `is_api_path` / `is_fhir_path` / `PUBLIC_API_PATHS` /
+  `API_PREFIX` / `FHIR_PREFIX`. New test
+  `test_enforce_on_guards_non_api_non_public_paths_is_401` pins `/`,
+  `/admin`, `/secret`, `/foo/bar` ⇒ `401` when enforcement is on.
+- **SEC-G6: normalise a trailing slash in `derive_action`.** A destructive
+  named POST was classified via `path.ends_with(suffix)`, so
+  `POST /api/events/merge/` (trailing slash) fell through to `Write`, letting
+  an `access=write` (non-admin) caller reach a destructive op. `derive_action`
+  now `trim_end_matches('/')`s the path first, so `/merge/` and `/merge//`
+  still classify as `Destructive`. Pinned in `test_derive_action_matrix`.
 - **SEC-B6: relay claims outbox rows with `FOR UPDATE SKIP LOCKED`.** The
   Phase-3 relay drained via a plain unlocked `SELECT … WHERE published_at IS
   NULL`, so with more than one instance every relay would **double-ship** the

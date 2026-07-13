@@ -11,6 +11,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-G5: blanket guard switched from prefix-gate to guard-all
+  (deny-unless-public).** `auth::enforce` previously returned `Ok`
+  (bypassing auth) for any path **not** under `/api` and **not** under
+  `/fhir`, leaving out-of-prefix routes (`/`, `/admin`, …) unguarded when
+  enforcement was on. It now denies by default: only the small
+  `is_public_path` allow-list (`/_health`, `/_ping`,
+  `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`, `/api/health`,
+  `/fhir/metadata`) is public; every other route requires a valid bearer
+  token. Removed the now-dead `API_PREFIX` / `FHIR_PREFIX` /
+  `PUBLIC_API_PATHS` constants and the `is_api_path` / `is_fhir_path`
+  helpers.
+- **SEC-G6: trailing-slash normalisation in `derive_action`.** A path is
+  now `trim_end_matches('/')`-normalised before the destructive-suffix
+  check, so `POST /api/courses/merge/` (and `//`) stays `Destructive`
+  rather than being silently downgraded to `Write` — which would let a
+  non-admin `access=write` caller reach a destructive op.
 - **SEC-B6: relay claims outbox rows with `FOR UPDATE SKIP LOCKED`.** The
   Phase-3 relay drained via a plain unlocked `SELECT … WHERE published_at IS
   NULL`, so with more than one instance every relay would **double-ship** the
