@@ -42,8 +42,8 @@ pub struct AppState {
     /// [`super::auth::require_auth_from_env`]) — **off by default**;
     /// restart the service to change it. When on, the
     /// [`super::auth::require_auth_mw`] middleware requires a valid
-    /// PASETO bearer token on every `/api/*` route except the public
-    /// allow-list ([`super::auth::PUBLIC_API_PATHS`]).
+    /// PASETO bearer token on every route except the public
+    /// allow-list (`super::auth::is_public_path`).
     pub require_auth: bool,
     /// ABAC policy evaluated on verified tokens when blanket
     /// enforcement is on. Read once from `THING_ABAC_POLICY` /

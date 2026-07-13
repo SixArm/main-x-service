@@ -255,6 +255,11 @@ fn is_public_path(path: &str) -> bool {
 /// `POST`/`PUT`/`PATCH` (and any unrecognised method) ⇒ `Write`.
 #[must_use]
 pub fn derive_action(method: &Method, path: &str) -> Action {
+    // SEC-G6: normalise a trailing slash before the destructive-suffix
+    // check, so `POST /api/cases/merge/` (and `//`) is still classified as
+    // `Destructive` rather than silently downgraded to `Write` — which would
+    // let an `access=write` (non-admin) caller reach a destructive op.
+    let path = path.trim_end_matches('/');
     match *method {
         Method::GET | Method::HEAD | Method::OPTIONS => Action::Read,
         Method::DELETE => Action::Delete,
@@ -1040,6 +1045,20 @@ mod tests {
             derive_action(&Method::GET, "/api/cases/merge"),
             Action::Read
         );
+        // SEC-G6: a trailing slash must NOT downgrade a destructive POST to
+        // Write (a non-admin `access=write` caller must not reach merge).
+        for path in [
+            "/api/cases/merge/",
+            "/api/cases/merge//",
+            "/api/cases/deduplicate/",
+            "/api/cases/import/",
+        ] {
+            assert_eq!(
+                derive_action(&Method::POST, path),
+                Action::Destructive,
+                "{path} must stay Destructive"
+            );
+        }
     }
 
     /// ABAC default policy, empty `attrs` ⇒ GET allowed, POST `403`

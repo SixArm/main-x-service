@@ -371,15 +371,20 @@
   contains-pattern; unit test `escape_like_neutralises_wildcards` in all
   three (ports the loco `escape_like` test). Green: lib test + clippy
   `-D warnings` + fmt per crate.
-- [ ] **SEC-G5 (M) 🟡** Guard-all for event/thing/course (`auth.rs` prefix-gate
-  → deny-unless-public), plus a guard-bypass matrix test across all services
-  (trailing slash, `%2e`, case, `//`, `/../`). *Test:* guard decision and the
-  actually-routed handler agree; no reachable path the guard treats as public.
-- [ ] **SEC-G6 (S) 🟡** Destructive-action classification robust to path
-  variants: `derive_action` uses `path.ends_with("/merge"|…)` — a trailing
-  slash downgrades to `write`. Normalize before matching. *Test:*
-  `POST /api/cases/merge/` (and any router-accepted variant) ⇒ `destructive`
-  ⇒ `access=write` gets 403.
+- [x] **SEC-G5 (M) 🟡** Guard-all for event/thing/course. *(done 2026-07-13)*
+  Their `enforce` was **allow-unless-in-prefix** (any non-`/api`/non-`/fhir`
+  path unguarded); now **deny-unless-public** via a `is_public_path`
+  allow-list (matching the case reference), and the dead prefix consts/helpers
+  removed. Guard-bypass test per crate: enforcement on + no token ⇒ `401` for
+  `/`, `/admin`, `/secret`, `/foo/bar`. (The other 8 services are already
+  guard-all. A percent-encoded/normalisation matrix vs the router is a
+  deeper follow-up.)
+- [~] **SEC-G6 (S) 🟡** Destructive-action classification robust to a
+  trailing slash. *(case + event + thing + course done 2026-07-13)*
+  `derive_action` now `trim_end_matches('/')`-normalises the path before the
+  destructive-suffix check, so `POST …/merge/` stays `Destructive` (was
+  downgraded to `Write`). Test per crate. **Remaining:** roll the same
+  one-liner to the other loco/axum services' `derive_action` (mechanical).
 - [ ] **SEC-G7 (S) ⚪** Bound person `search_persons` `offset`
   (`handlers.rs:436-441`) — unbounded `offset+limit` forces the index to
   materialise arbitrarily many hits. *Test:* large offset clamped/rejected.

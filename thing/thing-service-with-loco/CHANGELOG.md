@@ -10,6 +10,22 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-G5: blanket guard is now guard-all (deny-unless-public).** The
+  `enforce` decision previously only gated paths under `/api` or `/fhir`,
+  silently allowing any out-of-prefix route (e.g. `/`, `/admin`) through
+  with no token when enforcement was on. It now denies every path except an
+  explicit public allow-list (`is_public_path`: `/_health`, `/_ping`,
+  `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`, `/api/health`,
+  `/fhir/metadata`). The now-unused prefix helpers (`API_PREFIX`,
+  `FHIR_PREFIX`, `GUARDED_PREFIXES`, `is_guarded_path`, `PUBLIC_API_PATHS`)
+  were removed.
+- **SEC-G6: trailing-slash normalisation in `derive_action`.** A trailing
+  slash (`/api/things/merge/`, `//`) no longer downgrades a destructive
+  named POST (`/merge`, `/deduplicate`, `/import`) to `Write`, which would
+  have let a non-admin `access=write` caller reach a destructive op; the
+  path is `trim_end_matches('/')`-normalised before the suffix check so it
+  stays `Destructive`.
+
 - **SEC-B6: relay claims outbox rows with `FOR UPDATE SKIP LOCKED`.** The
   Phase-3 relay drained via a plain unlocked `SELECT … WHERE published_at IS
   NULL`, so with more than one instance every relay would **double-ship** the

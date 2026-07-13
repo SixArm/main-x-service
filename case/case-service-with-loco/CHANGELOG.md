@@ -11,6 +11,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-G6: trailing slash can no longer downgrade a destructive POST.**
+  `derive_action` classified `POST …/merge` etc. via `path.ends_with`,
+  so `POST /api/cases/merge/` (trailing slash) fell through to `Write` —
+  a non-admin `access=write` caller could reach a destructive op. The
+  path is now `trim_end_matches('/')`-normalised before the suffix check.
+  Test extends `derive_action_matrix` with the trailing-slash cases.
+
 - **SEC-G2/G3: record-level authorization + masking on every read path.**
   Record-level ABAC + the `mask` obligation were enforced only on the native
   `GET /api/cases/{pid}`; `list`, `search`, `check-duplicates`, and the FHIR
