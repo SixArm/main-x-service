@@ -504,6 +504,13 @@ only by that subject.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-A4 (security): atomic single-use magic-link consume.** Redemption
+      was `find_by_magic_token` (SELECT) + `clear_magic_link` (UPDATE), so two
+      concurrent redemptions both passed the read and each minted a session.
+      `Model::consume_magic_token` now clears-and-returns in one
+      `UPDATE … WHERE magic_link_token=$1 AND not-expired RETURNING *`, so
+      exactly one concurrent redemption wins (loser ⇒ `401`). DB-gated
+      `concurrent_magic_link_redemptions_only_one_wins`. (Repo tasks.md SEC-A4.)
 - [x] **SEC-A1 (security): refuse the dev signing seed in production.**
       `load_seed()` fell back to the committed `DEV_SEED` with no
       environment guard, so a prod deploy missing `TOKEN_PRIVATE_KEY_SEED`

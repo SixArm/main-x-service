@@ -12,6 +12,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-A4: atomic single-use magic-link consume.** Redemption was a
+  `find_by_magic_token` (SELECT) followed by a separate `clear_magic_link`
+  (UPDATE), so two concurrent requests with the same token both passed the
+  read and each minted a session — the link was not single-use under
+  concurrency. New `Model::consume_magic_token` does the clear-and-return in
+  **one** `UPDATE users SET magic_link_token=NULL … WHERE magic_link_token=$1
+  AND magic_link_expiration >= now() RETURNING *`, so exactly one concurrent
+  redemption wins and the other gets `401`. DB-gated test
+  `concurrent_magic_link_redemptions_only_one_wins`.
 - **SEC-A2: admin-gate `GET /api/auth/audit/recent`.** The system-wide
   audit trail was unauthenticated and returned registered **emails** plus
   outcome markers (`created`/`existing`, `unknown_email`/`issued`), an
