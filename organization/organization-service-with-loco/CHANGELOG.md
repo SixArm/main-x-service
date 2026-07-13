@@ -11,6 +11,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-G6: trailing slash can no longer downgrade a destructive POST.**
+  `derive_action` classified `/merge` / `/deduplicate` / `/import` via
+  `path.ends_with`, so a trailing slash (`POST …/merge/`) fell through to
+  `Write` — a non-admin `access=write` caller could reach a destructive op.
+  The path is now `trim_end_matches('/')`-normalised first. Test extended.
+
 - **SEC-B6: relay claims outbox rows with `FOR UPDATE SKIP LOCKED`.** The
   Phase-3 relay drained via a plain unlocked `SELECT … WHERE published_at IS
   NULL`, so with more than one instance every relay would **double-ship** the
