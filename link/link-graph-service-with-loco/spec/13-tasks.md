@@ -70,6 +70,17 @@
   (alive⇒verified, absent⇒dangling, idempotent second call). The real
   HTTP path is compile-checked. `single-view` is not wired — its response
   carries no status.)*
+  - [x] **SEC-B11 (security fix): non-redirecting probe + freshness guard
+    pin.** The probe used `reqwest::get` (follows redirects) — a source
+    service could `3xx` to an internal address and the aggregator would
+    follow it (SSRF-via-redirect). It now uses a shared **non-redirecting**
+    client (`redirect::Policy::none()`); a `3xx` ⇒ `Unknown`
+    (`outcome_from_status`), so the only host contacted is the
+    operator-configured `LINK_GRAPH_PROBE_URL_<ENTITY>` template (that config
+    is the host allow-list). Plus a regression test pinning
+    `GET /api/health/freshness` is not a public path and stays behind the
+    blanket guard (`401` when enforcement is on). (Repo tasks.md Phase 5
+    SEC-B11.)
 
 ### Read API
 

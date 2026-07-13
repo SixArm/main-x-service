@@ -502,10 +502,16 @@
   merge audit and an audit failure rolls the whole merge back (was
   best-effort post-commit). DB-gated test asserts both rows present after a
   merge.
-- [ ] **SEC-B11 (S) ⚪** link-graph `freshness` authz (`controllers/graph.rs:353-367`
-  — unauth liveness oracle) + non-redirecting probe client + host allowlist
-  (`probe.rs:98` SSRF-via-redirect). *Tests:* freshness gated; probe refuses
-  a redirect.
+- [x] **SEC-B11 (S) ⚪** link-graph `freshness` authz + non-redirecting probe.
+  *(done 2026-07-13)* The probe now uses a shared **non-redirecting** reqwest
+  client (`redirect::Policy::none()`); a `3xx` ⇒ `Unknown`
+  (`outcome_from_status`), closing SSRF-via-redirect — the only host
+  contacted is the operator-configured `LINK_GRAPH_PROBE_URL_<ENTITY>`
+  template, which *is* the host allow-list (no separate list needed once
+  redirects are off). Freshness was already behind the blanket guard (not in
+  `is_public_path`); added a regression test pinning it stays guarded (`401`
+  when enforcement on) so it can't be mistaken for a public health probe.
+  Pure status-mapping + freshness-guard tests.
 
 ### F-input — unverified input, false matches & fuzzing (validators + matchers)
 
