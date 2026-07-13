@@ -10,6 +10,13 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-B6: relay claims outbox rows with `FOR UPDATE SKIP LOCKED`.** The
+  Phase-3 relay drained via a plain unlocked `SELECT … WHERE published_at IS
+  NULL`, so with more than one instance every relay would **double-ship** the
+  same rows. `drain_once` now runs in a transaction and `unpublished` claims
+  rows with `FOR UPDATE SKIP LOCKED` (a second relay skips locked rows; the
+  lock releases on commit). Delivery stays at-least-once (consumers dedupe on
+  `event_id`).
 - **SEC-G4: escape `LIKE` wildcards in the repository name search.** The
   fallback `search` (`db/repositories.rs`) built its pattern as
   `format!("%{}%", query.to_lowercase())` with no escaping, so `%` matched

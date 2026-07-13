@@ -424,15 +424,15 @@
   (96) + no-run + clippy + fmt. *(Residual: a deterministic concurrent-race
   integration test, and the case `memory` (dev, non-transactional)
   path — both follow-ups.)*
-- [~] **SEC-B6 (M) 🟠** Relay exactly-once. *(case + person done 2026-07-13)*
+- [x] **SEC-B6 (M) 🟠** Relay exactly-once. *(all 10 services done 2026-07-13)*
   `drain_once` now runs in a transaction and `unpublished` claims rows with
   `FOR UPDATE SKIP LOCKED`, so >1 relay instance can't double-ship (a second
-  instance skips the locked rows). Done in **case** + **person** (green).
-  **Remaining:** roll the same one-line change to the other 8 loco services'
-  `relay.rs`/outbox (mechanical); consumer-side `event_id` dedupe
-  (`processed_events`) is the aggregator's job — folds into BUS-2. A
-  deterministic two-concurrent-drain test needs a dual-connection harness
-  (follow-up).
+  instance skips the locked rows; lock releases on commit). Rolled to **all
+  ten** loco/axum services (case, person, worker, place, thing, event,
+  course, organization, care-pathway, portfolio) — each green (lib + clippy
+  + fmt). Consumer-side `event_id` dedupe (`processed_events`) is the
+  aggregator's job — folds into BUS-2; a deterministic two-concurrent-drain
+  test needs a dual-connection harness (follow-up).
 - [ ] **SEC-B7 (S) 🟡** link-graph reconcile peer trust
   (`reconcile.rs:94-155`): `LINK_GRAPH_RECONCILE_TOKEN` is optional (unauth
   pull) and returned edges are applied directly. Require the token for a

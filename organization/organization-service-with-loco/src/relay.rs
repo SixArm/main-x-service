@@ -89,7 +89,10 @@ pub async fn drain_once<S: EventSink + ?Sized>(
     sink: &S,
     batch: u64,
 ) -> ModelResult<usize> {
-    let rows = OutboxRow::unpublished(db, batch).await?;
+    // SEC-B6: claim rows under a transaction with FOR UPDATE SKIP LOCKED
+    // (in `unpublished`) so parallel relay instances can't double-ship.
+    let txn = sea_orm::TransactionTrait::begin(db).await?;
+    let rows = OutboxRow::unpublished(&txn, batch).await?;
     let mut published: Vec<i32> = Vec::with_capacity(rows.len());
     for row in &rows {
         match sink
@@ -106,8 +109,9 @@ pub async fn drain_once<S: EventSink + ?Sized>(
         }
     }
     if !published.is_empty() {
-        OutboxRow::mark_published(db, &published).await?;
+        OutboxRow::mark_published(&txn, &published).await?;
     }
+    txn.commit().await?;
     Ok(published.len())
 }
 
