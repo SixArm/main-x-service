@@ -437,9 +437,10 @@ pub async fn export_person(
 )]
 pub async fn get_import_job(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    job_status(&state, id, BulkKind::Import).await
+    job_status(&state, &caller, id, BulkKind::Import).await
 }
 
 /// `GET /api/persons/export/{id}` — export job status + `download_url`.
@@ -455,29 +456,81 @@ pub async fn get_import_job(
 )]
 pub async fn get_export_job(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    job_status(&state, id, BulkKind::Export).await
+    job_status(&state, &caller, id, BulkKind::Export).await
 }
 
-/// Shared status lookup: load the job, confirming it is of `expect` kind.
+/// Pure retention check (SEC-B4): has an artifact whose deadline is
+/// `expires_at` passed, as of `now`? A `None` deadline (legacy rows) never
+/// expires. Shared by the handler and its tests.
+fn artifact_expired(expires_at: Option<time::OffsetDateTime>, now: time::OffsetDateTime) -> bool {
+    expires_at.is_some_and(|exp| now >= exp)
+}
+
+/// Whether `job` has passed its retention deadline as of `now` (SEC-B4).
+fn job_is_expired(job: &bulk_jobs::Model, now: time::OffsetDateTime) -> bool {
+    artifact_expired(job.expires_at, now)
+}
+
+/// Pure ownership check (SEC-B4 IDOR/BOLA): does the caller identified by
+/// `caller_sub` own a job whose `job_actor` is given? An unowned job
+/// (`job_actor = None`) is never owned by anyone. Shared by the handler
+/// and its tests so the exact comparison is pinned.
+fn is_job_owner(caller_sub: &str, job_actor: Option<&str>) -> bool {
+    job_actor == Some(caller_sub)
+}
+
+/// Whether `caller` may view `job` (SEC-B4 IDOR/BOLA guard). When auth
+/// enforcement is off there is no caller identity and visibility is
+/// unchanged. When on, a caller may see a job they **own**
+/// ([`is_job_owner`]) or one they are **elevated** enough to reach (an
+/// `access=admin` / `svc=true` token that the ABAC policy would allow a
+/// `destructive` action) — mirroring the export-elevation gate so
+/// operators/service peers keep full visibility.
+fn caller_may_view_job(caller: &MaybeAuthUser, job: &bulk_jobs::Model) -> bool {
+    let Some(claims) = caller.claims() else {
+        // No verified identity (enforcement off, or a public/unauthenticated
+        // read that the blanket guard already permitted) — unchanged.
+        return true;
+    };
+    is_job_owner(&claims.sub, job.actor.as_deref())
+        || authorize_record(caller, Action::Destructive, &BTreeMap::new()).is_ok()
+}
+
+/// Shared status lookup: load the job, confirming it is of `expect` kind,
+/// that the caller may view it (SEC-B4 ownership), and that it has not
+/// expired (SEC-B4 TTL). Ownership and expiry failures both return `404`
+/// so a cross-actor probe cannot even learn the job exists.
 async fn job_status(
     state: &AppState,
+    caller: &MaybeAuthUser,
     id: Uuid,
     expect: BulkKind,
 ) -> (StatusCode, Json<ApiResponse<BulkJobView>>) {
-    match bulk_jobs::find_by_id(&state.db, id).await {
-        Ok(Some(job)) if job.kind == expect.as_str() => (
-            StatusCode::OK,
-            Json(ApiResponse::success(BulkJobView::from(job))),
-        ),
-        Ok(_) => (
+    let not_found = || {
+        (
             StatusCode::NOT_FOUND,
             Json(ApiResponse::<BulkJobView>::error(
                 "NOT_FOUND",
                 format!("{} job '{id}' not found", expect.as_str()),
             )),
-        ),
+        )
+    };
+    match bulk_jobs::find_by_id(&state.db, id).await {
+        Ok(Some(job)) if job.kind == expect.as_str() => {
+            if !caller_may_view_job(caller, &job)
+                || job_is_expired(&job, time::OffsetDateTime::now_utc())
+            {
+                return not_found();
+            }
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(BulkJobView::from(job))),
+            )
+        }
+        Ok(_) => not_found(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse::<BulkJobView>::error(
@@ -536,7 +589,7 @@ fn remap(body: Json<ApiResponse<()>>) -> ApiResponse<JobAccepted> {
 
 #[cfg(test)]
 mod tests {
-    use super::exceeds_cap;
+    use super::{artifact_expired, exceeds_cap, is_job_owner};
 
     /// SEC-B2: the pre-materialisation byte-cap boundary. A chunk that keeps
     /// the running total at or under `max` is accepted; the chunk that
@@ -552,5 +605,46 @@ mod tests {
         // Saturating add: a pathological length near usize::MAX must not
         // wrap around to a small total and slip under the cap.
         assert!(exceeds_cap(1, usize::MAX, 100));
+    }
+
+    /// SEC-B4: a job is expired once `now` reaches its deadline; a job with
+    /// no deadline (legacy rows) never expires.
+    #[test]
+    fn artifact_expired_only_at_or_past_the_deadline() {
+        let t0 = time::OffsetDateTime::UNIX_EPOCH;
+        let deadline = t0 + time::Duration::seconds(100);
+        assert!(!artifact_expired(Some(deadline), t0), "before the deadline");
+        assert!(
+            !artifact_expired(Some(deadline), deadline - time::Duration::seconds(1)),
+            "one second before"
+        );
+        assert!(
+            artifact_expired(Some(deadline), deadline),
+            "at the deadline"
+        );
+        assert!(
+            artifact_expired(Some(deadline), deadline + time::Duration::seconds(1)),
+            "past the deadline"
+        );
+        assert!(
+            !artifact_expired(None, deadline),
+            "a job with no deadline never expires"
+        );
+    }
+
+    /// SEC-B4: the IDOR/BOLA ownership comparison. A caller owns only a job
+    /// whose `actor` is exactly their `sub`; a different actor or an unowned
+    /// (actorless) job is not owned.
+    #[test]
+    fn is_job_owner_requires_an_exact_actor_match() {
+        assert!(is_job_owner("actor-a", Some("actor-a")), "own job");
+        assert!(
+            !is_job_owner("actor-a", Some("actor-b")),
+            "another actor's job is not owned (IDOR)"
+        );
+        assert!(
+            !is_job_owner("actor-a", None),
+            "an actorless job is owned by no one"
+        );
     }
 }

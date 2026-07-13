@@ -5,6 +5,17 @@ tick the box when an automated test or clearly described manual check
 confirms the criterion is met. Tasks small enough to land in a single
 PR; split larger tasks (`T-12a`, `T-12b`).
 
+- [x] **SEC-B4 (security): bulk artifact hardening.** (1) `LocalFsArtifactStore`
+  now **confines** `get` to the store's canonicalised base and validates
+  keys with `is_safe_key` (no `..`/absolute), closing an arbitrary-file
+  read via a crafted `file://` reference. (2) `GET /import|export/{id}`
+  now returns `404` unless the caller **owns** the job (`is_job_owner`:
+  `actor == sub`) or is elevated (`access=admin`/`svc=true`), closing an
+  IDOR/BOLA on the status + download URL. (3) `create` stamps
+  `expires_at = created_at + BULK_ARTIFACT_TTL_SECS` (7 days) and the
+  status handler treats an expired job as `404` (`artifact_expired`).
+  Object-store artifact sweep deferred. (Repo tasks.md Phase 5 SEC-B4.)
+
 - [x] **SEC-B2 (security): bound bulk import/export against OOM.** The
   import upload is read chunk-by-chunk and rejected `413` past
   `MAX_IMPORT_BYTES` (64 MiB) before materialisation (`read_field_capped`

@@ -426,11 +426,18 @@
   (`pipeline.rs:216,236-246`, `db/repositories.rs:883-890`) ⇒ two workers
   duplicate a record. Add the unique index + `ON CONFLICT`/advisory lock.
   *Test:* two concurrent imports of one stable key ⇒ exactly one row.
-- [ ] **SEC-B4 (M) 🟠** person bulk artifact hardening (`bulk/store.rs:75-99`,
-  `db/bulk_jobs.rs:94`, `handlers.rs:403-471`): set + enforce `expires_at`
-  TTL; ownership check on job GET (IDOR/BOLA); confine store path (reject
-  `..`/absolute `file://`). *Tests:* cross-actor job GET ⇒ 403/404; `..`
-  rejected; expired artifact unreadable.
+- [~] **SEC-B4 (M) 🟠** person bulk artifact hardening. *(store confinement +
+  IDOR + TTL done 2026-07-13; object-store sweep deferred)* (1) store `get`
+  **confined** to the canonicalised base + `is_safe_key` on `put`/`get`
+  (rejects `..`/absolute/`file://`-escape → closes arbitrary-file read);
+  (2) job-status GET returns `404` unless the caller **owns** the job
+  (`is_job_owner`, `actor == sub`) or is elevated (`access=admin`/`svc=true`)
+  → closes IDOR/BOLA on status + download URL; (3) `create` stamps
+  `expires_at = created_at + BULK_ARTIFACT_TTL_SECS` (7 days), status handler
+  `404`s an expired job (`artifact_expired`). Pure cores unit-tested incl.
+  the outside-the-base `file://` refusal. **Deferred:** physical artifact
+  deletion (object-store TTL sweep) — the expiry gate stops the reference
+  being handed out.
 - [x] **SEC-B5 (M) 🔴/🟠** Merge TOCTOU + self-merge. *(done 2026-07-13)*
   person `POST /merge` had **no self-merge guard** (merged a record into
   itself → tombstoned + data loss) — now `422` before any fetch
