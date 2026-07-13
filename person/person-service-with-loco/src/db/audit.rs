@@ -7,8 +7,8 @@
 //! the audit REST endpoints (per-entity, recent, per-user history).
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set,
 };
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
@@ -155,6 +155,40 @@ impl AuditLogRepository {
         new_values: Option<JsonValue>,
         ctx: &AuditContext,
     ) -> Result<()> {
+        self.log_action_on(
+            &self.db,
+            action,
+            entity_type,
+            entity_id,
+            old_values,
+            new_values,
+            ctx,
+        )
+        .await
+    }
+
+    /// SEC-B10: insert one audit row on an arbitrary connection `conn` —
+    /// which may be a `&DatabaseTransaction`, so a caller can write the audit
+    /// **inside** the same transaction as the entity change and have both
+    /// commit (or roll back) atomically. A crash after the entity commit can
+    /// then no longer lose the audit row.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the audit row insert fails.
+    // Mirrors the private `log_action` field list plus the target connection;
+    // the audit row genuinely has this many independent columns.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn log_action_on<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        action: &str,
+        entity_type: &str,
+        entity_id: Uuid,
+        old_values: Option<JsonValue>,
+        new_values: Option<JsonValue>,
+        ctx: &AuditContext,
+    ) -> Result<()> {
         let new_audit = audit_log::ActiveModel {
             id: Set(Uuid::new_v4()),
             timestamp: Set(time::OffsetDateTime::now_utc()),
@@ -168,9 +202,64 @@ impl AuditLogRepository {
             user_agent: Set(ctx.user_agent.clone()),
         };
 
-        new_audit.insert(&self.db).await?;
+        new_audit.insert(conn).await?;
 
         Ok(())
+    }
+
+    /// SEC-B10: transaction-scoped `UPDATE` audit — like [`log_update`], but
+    /// inserted on `conn` (e.g. `&DatabaseTransaction`) so it commits
+    /// atomically with the entity change.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the audit row insert fails.
+    pub async fn log_update_on<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        entity_type: &str,
+        entity_id: Uuid,
+        old_values: JsonValue,
+        new_values: JsonValue,
+        ctx: &AuditContext,
+    ) -> Result<()> {
+        self.log_action_on(
+            conn,
+            "UPDATE",
+            entity_type,
+            entity_id,
+            Some(old_values),
+            Some(new_values),
+            ctx,
+        )
+        .await
+    }
+
+    /// SEC-B10: transaction-scoped `DELETE` audit — like [`log_delete`], but
+    /// inserted on `conn` (e.g. `&DatabaseTransaction`) so it commits
+    /// atomically with the entity change.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the audit row insert fails.
+    pub async fn log_delete_on<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        entity_type: &str,
+        entity_id: Uuid,
+        old_values: JsonValue,
+        ctx: &AuditContext,
+    ) -> Result<()> {
+        self.log_action_on(
+            conn,
+            "DELETE",
+            entity_type,
+            entity_id,
+            Some(old_values),
+            None,
+            ctx,
+        )
+        .await
     }
 
     /// Return up to `limit` audit rows for one entity, newest first.

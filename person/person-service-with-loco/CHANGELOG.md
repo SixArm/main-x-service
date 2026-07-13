@@ -10,6 +10,18 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-B10: write the person merge audit in-transaction.** `merge` wrote
+  its `UPDATE` (survivor) and `DELETE` (duplicate) audit rows **after**
+  `txn.commit()`, best-effort — a crash between the commit and the audit
+  writes left a durable merge with **no audit trail** (and an audit-insert
+  error was only logged). The audit rows are now written on the merge
+  transaction (`AuditLogRepository::log_update_on` / `log_delete_on`, new
+  connection-generic helpers) **before** commit, so the merge and its audit
+  commit atomically; an audit failure now rolls the whole merge back. The
+  survivor's new-value snapshot is its applied payload (matching
+  `apply_update_rows`). *Test (DB-gated):* after a merge, the survivor
+  `UPDATE` and duplicate `DELETE` audit rows are present.
+
 - **SEC-B9: wire the idempotency key so a retried submit dedupes.** The
   `bulk_jobs` table carried a `UNIQUE (entity, kind, idempotency_key)`
   constraint, but both submit handlers hardcoded `idempotency_key = None`,

@@ -490,9 +490,13 @@
   migration needed — the constraint already existed, just never fired). Blank
   key ⇒ absent; key-less ⇒ always creates. DB-gated same-key/keyless tests +
   pure key-trim test.
-- [ ] **SEC-B10 (S) 🟡** person merge audit in-tx (`repositories.rs:1082,1108-1128`
-  writes post-commit) — match case's in-tx threading so a crash after commit
-  cannot lose the merge audit. *Test:* merge audit present atomically.
+- [x] **SEC-B10 (S) 🟡** person merge audit in-tx. *(done 2026-07-13)* The
+  merge `UPDATE` (survivor) + `DELETE` (duplicate) audit rows are written on
+  the merge transaction (new connection-generic `log_update_on`/
+  `log_delete_on`) **before** commit, so a crash after commit cannot lose the
+  merge audit and an audit failure rolls the whole merge back (was
+  best-effort post-commit). DB-gated test asserts both rows present after a
+  merge.
 - [ ] **SEC-B11 (S) ⚪** link-graph `freshness` authz (`controllers/graph.rs:353-367`
   — unauth liveness oracle) + non-redirecting probe client + host allowlist
   (`probe.rs:98` SSRF-via-redirect). *Tests:* freshness gated; probe refuses
