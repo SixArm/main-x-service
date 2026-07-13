@@ -5,6 +5,14 @@ tick the box when an automated test or clearly described manual check
 confirms the criterion is met. Tasks small enough to land in a single
 PR; split larger tasks (`T-12a`, `T-12b`).
 
+- [x] **SEC-B8 (security): bulk audit gaps.** A successful import now writes
+  a job-level `IMPORT` audit row (`log_import`) with the acting operator +
+  reconciled counts; the export audit is written **before** the job finishes
+  and its error **propagates**, so a failed audit blocks delivery (`failed`,
+  no `download_url`). Actor threaded into both (fallback `system` only when
+  no caller). Pure summary builders unit-tested. **Deferred:** per-row audit
+  actor threading (needs a repo-signature change). (Repo tasks.md SEC-B8.)
+
 - [x] **SEC-B3 (security): serialise bulk upsert (create-create race).**
   The per-row find→create/update now runs under a transaction-scoped
   advisory lock on the stable key (`pg_advisory_xact_lock(hashtext(key))`,

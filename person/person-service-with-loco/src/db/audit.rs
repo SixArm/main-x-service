@@ -123,6 +123,25 @@ impl AuditLogRepository {
             .await
     }
 
+    /// Record a job-level **bulk import** audit row (SEC-B8): a bulk load of
+    /// personal data is itself an audited event, distinct from the per-row
+    /// create/update audit. `details` carries the reconciled job summary
+    /// (counts, dry-run, actor), and `ctx` the acting operator.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the audit row insert fails.
+    pub async fn log_import(
+        &self,
+        entity_type: &str,
+        entity_id: Uuid,
+        details: JsonValue,
+        ctx: &AuditContext,
+    ) -> Result<()> {
+        self.log_action("IMPORT", entity_type, entity_id, None, Some(details), ctx)
+            .await
+    }
+
     /// Insert one audit row. Shared backend for the typed `log_*` helpers.
     ///
     /// Stamps a fresh UUID and the current UTC time; `old_values` /

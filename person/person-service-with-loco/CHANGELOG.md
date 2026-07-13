@@ -10,6 +10,26 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-B8: bulk audit gaps — job-level import audit + fail-closed export.**
+  A bulk import wrote **no job-level audit row** (only per-row create/update
+  audit), and the export audit was **best-effort** — `log_export` errors
+  were swallowed and the artifact was delivered anyway, so a bulk extract of
+  personal data could complete with no audit trail. Now:
+  - a successful import writes a job-level `IMPORT` audit row
+    (`AuditLogRepository::log_import`) carrying the acting operator (from the
+    job's `actor`) and the reconciled counts / dry-run flag;
+  - the export audit is written **before** the job is finished and its error
+    **propagates**, so a failed audit marks the job `failed` and the
+    `download_url` is never surfaced — the extract is not retrievable
+    without its audit trail;
+  - the acting operator is threaded into both audit rows (falling back to
+    `system` only when the job had no authenticated caller).
+  The audit summaries (`import_audit_summary` / `export_audit_summary`) are
+  pure and unit-tested (actor, counts, filter, masking profile present).
+  Threading the real actor into each **per-row** create/update audit
+  (currently a default `system` context) needs a repository-signature change
+  and remains a follow-up.
+
 - **SEC-B3: serialise bulk upsert to close a create-create race.** The
   import pipeline did a SELECT-then-INSERT with no locking, so two
   concurrent importers of the same stable key both missed in

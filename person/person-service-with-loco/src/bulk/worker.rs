@@ -13,7 +13,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::api::rest::AppState;
-use crate::bulk::pipeline::{ExportParams, ImportParams, process_export_job, process_import_job};
+use crate::bulk::pipeline::{
+    ExportParams, ImportOutcome, ImportParams, process_export_job, process_import_job,
+};
 use crate::bulk::{BulkKind, JobStatus, MaskingProfile, error_report};
 use crate::db::bulk_jobs;
 
@@ -117,6 +119,25 @@ async fn run_import(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
     };
 
     bulk_jobs::finish_import(&state.db, job.id, &outcome, error_report_url).await?;
+
+    // SEC-B8: a bulk load of personal data is itself an audited event —
+    // write a job-level import audit row carrying the acting operator and the
+    // reconciled counts (best-effort; the rows are already committed with
+    // their own per-row audit, so an audit-write failure must not fail the
+    // whole import — it is logged instead).
+    let ctx = actor_audit_context(job);
+    if let Err(e) = state
+        .audit_log
+        .log_import(
+            "PersonBulkImport",
+            job.id,
+            import_audit_summary(&job.format, job.actor.as_deref(), dry_run, &outcome),
+            &ctx,
+        )
+        .await
+    {
+        tracing::error!("failed to write bulk-import audit row: {e}");
+    }
     Ok(())
 }
 
@@ -131,9 +152,12 @@ async fn run_export(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
         .bulk_store
         .put(&format!("jobs/{}/export.jsonl", job.id), &bytes)?;
 
-    // A bulk extract of personal data is itself a compliance event (§8):
-    // audit it even for a zero-row export.
-    audit_export(state, job, &params, rows_total).await;
+    // SEC-B8: a bulk extract of personal data is a compliance event (§8) and
+    // the audit **gates delivery** — it is written (even for a zero-row
+    // export) *before* the job is finished, and a failure to audit propagates
+    // so the job goes `failed` and the `download_url` is never surfaced. A
+    // bulk export must never be retrievable without its audit trail.
+    audit_export(state, job, &params, rows_total).await?;
 
     bulk_jobs::finish_export(&state.db, job.id, rows_total, result_url).await?;
     Ok(())
@@ -172,23 +196,54 @@ fn export_params_from_json(params: &serde_json::Value) -> ExportParams {
     }
 }
 
-/// Write an audit row for a completed export (§8): actor, the filter
-/// (query / limit / offset), format, masking profile,
-/// `include_soft_deleted`, and the row count — even for a zero-row export.
-async fn audit_export(
-    state: &AppState,
-    job: &bulk_jobs::Model,
-    params: &ExportParams,
-    rows_total: u64,
-) {
-    let ctx = crate::db::AuditContext {
+/// The [`AuditContext`](crate::db::AuditContext) for a bulk job: the acting
+/// operator from the job's `actor` (bearer `sub`), falling back to a
+/// `"system"` actor when the job was created without an authenticated
+/// caller (SEC-B8 — a real actor is threaded whenever one exists).
+fn actor_audit_context(job: &bulk_jobs::Model) -> crate::db::AuditContext {
+    crate::db::AuditContext {
         user_id: job.actor.clone().or_else(|| Some("system".to_string())),
         ip_address: None,
         user_agent: None,
-    };
-    let summary = serde_json::json!({
+    }
+}
+
+/// Build the job-level **import** audit summary (SEC-B8): the reconciled
+/// counts, the dry-run flag, and the actor. Takes primitives (not the whole
+/// row) so it is unit-testable without constructing a `SeaORM` model.
+fn import_audit_summary(
+    format: &str,
+    actor: Option<&str>,
+    dry_run: bool,
+    outcome: &ImportOutcome,
+) -> serde_json::Value {
+    serde_json::json!({
+        "kind": "import",
+        "format": format,
+        "dry_run": dry_run,
+        "actor": actor,
+        "rows_total": outcome.rows_total,
+        "rows_created": outcome.rows_created,
+        "rows_upserted": outcome.rows_upserted,
+        "rows_to_review": outcome.rows_to_review,
+        "rows_errored": outcome.rows_errored,
+    })
+}
+
+/// Build the job-level **export** audit summary (§8): actor, the filter
+/// (query / limit / offset), format, masking profile,
+/// `include_soft_deleted`, and the row count. Takes primitives so it is
+/// unit-testable without constructing a `SeaORM` model.
+fn export_audit_summary(
+    format: &str,
+    actor: Option<&str>,
+    params: &ExportParams,
+    rows_total: u64,
+) -> serde_json::Value {
+    serde_json::json!({
         "kind": "export",
-        "format": job.format,
+        "format": format,
+        "actor": actor,
         "filter": {
             "q": params.query,
             "limit": params.limit,
@@ -197,12 +252,85 @@ async fn audit_export(
         "masking_profile": params.masking_profile.as_str(),
         "include_soft_deleted": params.include_soft_deleted,
         "rows_total": rows_total,
-    });
-    if let Err(e) = state
+    })
+}
+
+/// Write the audit row for a completed export (§8), even for a zero-row
+/// export. SEC-B8: the caller runs this **before** finishing the job and
+/// propagates its error, so an audit failure blocks delivery of the export
+/// artifact (the job goes `failed`, no `download_url`).
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the audit row insert fails.
+async fn audit_export(
+    state: &AppState,
+    job: &bulk_jobs::Model,
+    params: &ExportParams,
+    rows_total: u64,
+) -> crate::Result<()> {
+    let ctx = actor_audit_context(job);
+    let summary = export_audit_summary(&job.format, job.actor.as_deref(), params, rows_total);
+    state
         .audit_log
         .log_export("PersonBulkExport", job.id, summary, &ctx)
         .await
-    {
-        tracing::error!("failed to write bulk-export audit row: {e}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ExportParams, ImportOutcome, export_audit_summary, import_audit_summary};
+
+    /// SEC-B8: the import audit summary carries the real actor and the
+    /// reconciled counts (not a `system`/empty default).
+    #[test]
+    fn import_audit_summary_carries_actor_and_counts() {
+        let outcome = ImportOutcome {
+            rows_total: 5,
+            rows_created: 3,
+            rows_upserted: 1,
+            rows_to_review: 0,
+            rows_errored: 1,
+            errors: vec![],
+        };
+        let s = import_audit_summary("jsonl", Some("actor-42"), false, &outcome);
+        assert_eq!(s["kind"], "import");
+        assert_eq!(s["actor"], "actor-42");
+        assert_eq!(s["dry_run"], false);
+        assert_eq!(s["rows_total"], 5);
+        assert_eq!(s["rows_created"], 3);
+        assert_eq!(s["rows_upserted"], 1);
+        assert_eq!(s["rows_errored"], 1);
+    }
+
+    /// A dry-run import is recorded as such, and an actorless (system) job
+    /// records a null actor rather than fabricating one.
+    #[test]
+    fn import_audit_summary_marks_dry_run_and_null_actor() {
+        let s = import_audit_summary("jsonl", None, true, &ImportOutcome::default());
+        assert_eq!(s["dry_run"], true);
+        assert!(s["actor"].is_null(), "no actor ⇒ null, not fabricated");
+    }
+
+    /// SEC-B8: the export audit summary carries the actor, the filter, and
+    /// the masking profile / soft-deleted flag (the compliance-relevant
+    /// facts of a personal-data extract).
+    #[test]
+    fn export_audit_summary_carries_actor_filter_and_profile() {
+        let params = ExportParams {
+            query: Some("Smith".to_string()),
+            limit: 25,
+            offset: 5,
+            ..ExportParams::default()
+        };
+        let s = export_audit_summary("jsonl", Some("actor-7"), &params, 42);
+        assert_eq!(s["kind"], "export");
+        assert_eq!(s["actor"], "actor-7");
+        assert_eq!(s["filter"]["q"], "Smith");
+        assert_eq!(s["filter"]["limit"], 25);
+        assert_eq!(s["filter"]["offset"], 5);
+        assert_eq!(s["masking_profile"], "masked");
+        assert_eq!(s["include_soft_deleted"], false);
+        assert_eq!(s["rows_total"], 42);
     }
 }
