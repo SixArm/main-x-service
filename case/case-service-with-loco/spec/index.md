@@ -484,6 +484,11 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-M1 (security): input-size caps close the O(n·m) matcher DoS.**
+  `validation::problems` now `422`s oversized payloads *before* store/match:
+  scalar text fields capped at `MAX_TEXT_LEN` = 1024 chars, arrays at
+  `MAX_ARRAY_LEN` = 256 entries, per-array string entries at
+  `MAX_ITEM_LEN` = 512 chars (report-everything, `src/validation.rs`).
 - [x] **SEC-B5 (security): lock merge participants against a concurrent
   race.** The merge handler already `422`s `main == duplicate`; the
   `outbox` merge path (`streaming::merge_and_emit`) now also locks both

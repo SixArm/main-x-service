@@ -60,6 +60,29 @@ use care_pathway_matcher::{
     CarePathway, CodeSystem, ConditionCode, IdentifierScheme, PathwayIdentifier,
 };
 
+/// Maximum length, in Unicode scalar values, of any single free-text
+/// field (`name`, `pathway_code`, `provider_id`, `provider_name`).
+///
+/// The matcher runs O(n·m) string similarity (Jaro-Winkler) over these
+/// fields, so an unbounded string is a CPU/memory denial-of-service —
+/// amplified by the `check-duplicates` scan over every stored record.
+/// Oversized input is rejected here (a `422`) before it is stored or
+/// matched.
+pub const MAX_TEXT_LEN: usize = 1024;
+
+/// Maximum number of entries in any array field (`alternate_names`,
+/// `condition_codes`, `interventions`, `keywords`, `identifiers`,
+/// `same_as`, `in_language`).
+///
+/// The matcher runs O(n·m) Jaccard over these arrays, so an unbounded
+/// array is a denial-of-service in the same way as [`MAX_TEXT_LEN`].
+pub const MAX_ARRAY_LEN: usize = 256;
+
+/// Maximum length, in Unicode scalar values, of any single string entry
+/// inside an array field (e.g. one `keywords` entry, one
+/// `condition_codes[i].code`).
+pub const MAX_ITEM_LEN: usize = 512;
+
 /// Collect every validation problem for `pathway`. An empty vector means
 /// the payload is valid.
 ///
@@ -72,6 +95,10 @@ pub fn problems(pathway: &CarePathway) -> Vec<String> {
     if pathway.name.trim().is_empty() {
         out.push("name is required".to_string());
     }
+    // Input-size caps (SEC-M1): reject oversized payloads *before* the
+    // O(n·m) matcher scores them — a single huge string or array is a
+    // CPU/memory DoS, amplified by the `check-duplicates` scan.
+    size_problems(pathway, &mut out);
     for (i, code) in pathway.condition_codes.iter().enumerate() {
         if let Some(problem) = condition_code_problem(i, code) {
             out.push(problem);
@@ -90,6 +117,74 @@ pub fn problems(pathway: &CarePathway) -> Vec<String> {
         }
     }
     out
+}
+
+/// Push a problem for every field, array, or array entry that exceeds an
+/// input-size cap (SEC-M1). Collects *all* over-cap problems (never
+/// aborts early), matching the aggregate-everything contract of
+/// [`problems`].
+fn size_problems(pathway: &CarePathway, out: &mut Vec<String>) {
+    text_cap(out, "name", &pathway.name);
+    if let Some(v) = &pathway.pathway_code {
+        text_cap(out, "pathway_code", v);
+    }
+    if let Some(v) = &pathway.provider_id {
+        text_cap(out, "provider_id", v);
+    }
+    if let Some(v) = &pathway.provider_name {
+        text_cap(out, "provider_name", v);
+    }
+
+    string_array_caps(out, "alternate_names", &pathway.alternate_names);
+    string_array_caps(out, "interventions", &pathway.interventions);
+    string_array_caps(out, "keywords", &pathway.keywords);
+    string_array_caps(out, "same_as", &pathway.same_as);
+    string_array_caps(out, "in_language", &pathway.in_language);
+
+    array_len_cap(out, "condition_codes", pathway.condition_codes.len());
+    for (i, cc) in pathway.condition_codes.iter().enumerate() {
+        if cc.code.chars().count() > MAX_ITEM_LEN {
+            out.push(format!(
+                "condition_codes[{i}].code: exceeds {MAX_ITEM_LEN} characters"
+            ));
+        }
+    }
+    array_len_cap(out, "identifiers", pathway.identifiers.len());
+    for (i, id) in pathway.identifiers.iter().enumerate() {
+        if id.value.chars().count() > MAX_ITEM_LEN {
+            out.push(format!(
+                "identifiers[{i}].value: exceeds {MAX_ITEM_LEN} characters"
+            ));
+        }
+    }
+}
+
+/// Push a problem when a single free-text `field` exceeds [`MAX_TEXT_LEN`]
+/// Unicode scalar values.
+fn text_cap(out: &mut Vec<String>, field: &str, value: &str) {
+    if value.chars().count() > MAX_TEXT_LEN {
+        out.push(format!("{field}: exceeds {MAX_TEXT_LEN} characters"));
+    }
+}
+
+/// Push a cardinality problem (over [`MAX_ARRAY_LEN`] entries) plus a
+/// per-entry length problem (over [`MAX_ITEM_LEN`] characters) for a
+/// string array `field`.
+fn string_array_caps(out: &mut Vec<String>, field: &str, items: &[String]) {
+    array_len_cap(out, field, items.len());
+    for (i, item) in items.iter().enumerate() {
+        if item.chars().count() > MAX_ITEM_LEN {
+            out.push(format!("{field}[{i}]: exceeds {MAX_ITEM_LEN} characters"));
+        }
+    }
+}
+
+/// Push a cardinality problem when an array `field` has more than
+/// [`MAX_ARRAY_LEN`] entries.
+fn array_len_cap(out: &mut Vec<String>, field: &str, len: usize) {
+    if len > MAX_ARRAY_LEN {
+        out.push(format!("{field}: exceeds {MAX_ARRAY_LEN} entries"));
+    }
 }
 
 /// Return a problem string for one `identifiers[i]`, or `None` when it is
@@ -595,5 +690,60 @@ mod tests {
         assert!(problems.iter().any(|m| m.contains("condition_codes[0]")));
         assert!(problems.iter().any(|m| m.contains("identifiers[0]")));
         assert!(problems.iter().any(|m| m.contains("in_language[0]")));
+    }
+
+    /// SEC-M1: a single free-text field over [`MAX_TEXT_LEN`] characters
+    /// is reported as exactly one size problem.
+    #[test]
+    fn oversized_text_field_is_one_problem() {
+        let p = CarePathway {
+            name: "x".repeat(MAX_TEXT_LEN + 1),
+            ..CarePathway::new("placeholder")
+        };
+        let problems = problems(&p);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("name: exceeds"));
+        assert!(problems[0].contains("characters"));
+    }
+
+    /// SEC-M1: an array over [`MAX_ARRAY_LEN`] entries is reported as
+    /// exactly one cardinality problem.
+    #[test]
+    fn oversized_array_is_one_problem() {
+        let p = CarePathway {
+            keywords: vec!["ok".to_string(); MAX_ARRAY_LEN + 1],
+            ..CarePathway::new("Valid name")
+        };
+        let problems = problems(&p);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("keywords: exceeds"));
+        assert!(problems[0].contains("entries"));
+    }
+
+    /// SEC-M1: a single array entry over [`MAX_ITEM_LEN`] characters is
+    /// reported as exactly one size problem, tagged with its index.
+    #[test]
+    fn oversized_array_item_is_one_problem() {
+        let p = CarePathway {
+            keywords: vec!["ok".to_string(), "x".repeat(MAX_ITEM_LEN + 1)],
+            ..CarePathway::new("Valid name")
+        };
+        let problems = problems(&p);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("keywords[1]: exceeds"));
+        assert!(problems[0].contains("characters"));
+    }
+
+    /// SEC-M1: a large-but-within-caps record (fields sized exactly at
+    /// the caps) is accepted — the caps reject only what exceeds them.
+    #[test]
+    fn within_caps_large_record_has_no_problems() {
+        let p = CarePathway {
+            name: "x".repeat(MAX_TEXT_LEN),
+            keywords: vec!["x".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN],
+            interventions: vec!["x".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN],
+            ..CarePathway::new("placeholder")
+        };
+        assert!(problems(&p).is_empty(), "{:?}", problems(&p));
     }
 }

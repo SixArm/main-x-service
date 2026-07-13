@@ -447,12 +447,18 @@
 
 ### F-input — unverified input, false matches & fuzzing (validators + matchers)
 
-- [ ] **SEC-M1 (M) 🟠** Input-size caps: per-field length + array-cardinality
-  caps in every service `validate`/`problems` → `422` **before** persist;
-  set `limit_payload` on the five loco services that set none (course, org,
-  care-pathway, case, portfolio) and lower the 5 MB cap. Closes the O(n·m)
-  Jaro-Winkler/Levenshtein/Jaccard DoS amplified ×scan-cap. *Tests:*
-  over-length field / over-cardinality array ⇒ 422 before the matcher runs.
+- [~] **SEC-M1 (M) 🟠** Input-size caps. *(case + care-pathway + portfolio
+  validators done 2026-07-13; residuals below)* Per-field length +
+  array-cardinality caps in `validate`/`problems` → `422` **before** persist,
+  closing the O(n·m) Jaro-Winkler/Levenshtein/Jaccard DoS. **Done** (shared
+  caps `MAX_TEXT_LEN=1024` chars / `MAX_ARRAY_LEN=256` entries /
+  `MAX_ITEM_LEN=512` chars, incl. struct-array inner strings; false/oversized
+  unit tests + within-caps pin; each crate green): case, care-pathway,
+  portfolio. **Remaining:** course + organization have no `validation.rs`
+  (add one), the 5 older axum services (person/worker/place/thing/event
+  `validation/mod.rs`), and the coarse `limit_payload` body-cap backstop on
+  the 5 uncapped loco configs (+ lower the others' 5 MB) — the config change
+  carries loco-boot risk best validated by running the app.
 - [x] **SEC-M2 (M) 🟠** False-deterministic-match empty guards. *(done 2026-07-13)*
   A post-normalization empty/trivial-value guard added to every string-keyed
   deterministic short-circuit across **all 9 matchers**, each with a

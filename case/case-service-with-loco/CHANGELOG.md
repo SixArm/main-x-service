@@ -11,6 +11,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-M1: input-size caps close the O(n·m) matcher DoS.** The matcher
+  runs O(n·m) character-level string similarity (Jaro-Winkler /
+  Levenshtein) and O(n·m) Jaccard over a payload's text fields and arrays,
+  so an unbounded single string or array was a CPU/memory DoS — amplified
+  across the `check-duplicates` scan. `validation::problems` now rejects
+  oversized input with a `422` *before* the record is stored or matched:
+  each scalar text field (`title`, `case_number`, `agency_id`,
+  `agency_name`) is capped at `MAX_TEXT_LEN` = 1024 chars; each array
+  (`alternate_titles`, `subjects`, `keywords`, `identifiers`, `same_as`,
+  `in_language`) at `MAX_ARRAY_LEN` = 256 entries; and each string entry
+  within an array at `MAX_ITEM_LEN` = 512 chars. Violations are collected
+  (report-everything), not short-circuited.
 - **SEC-B5: lock merge participants against a concurrent-merge race
   (TOCTOU).** The merge handler already rejects `main == duplicate`
   (`422`), but `main`/`duplicate` were read (unlocked) before the write

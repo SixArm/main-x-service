@@ -9,6 +9,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security — input-size caps on payload validation (SEC-M1) (2026-07-13)
+
+- `src/validation.rs` now rejects oversized `CarePathway` payloads before
+  they are stored or matched. The matcher runs O(n·m) Jaro-Winkler and
+  Jaccard over the payload's text fields and arrays, so an unbounded
+  string or array is a CPU/memory DoS — amplified by the
+  `check-duplicates` scan over every stored record. New named caps
+  enforced in the `problems` entrypoint (collecting *all* over-cap
+  problems, surfaced as one `422`): `MAX_TEXT_LEN = 1024` per single
+  free-text field (`name`, `pathway_code`, `provider_id`,
+  `provider_name`; counted in Unicode scalar values), `MAX_ARRAY_LEN =
+  256` per array (`alternate_names`, `condition_codes`, `interventions`,
+  `keywords`, `identifiers`, `same_as`, `in_language`), and
+  `MAX_ITEM_LEN = 512` per string entry inside an array (including
+  `condition_codes[i].code` and `identifiers[i].value`). Messages such as
+  `"name: exceeds 1024 characters"`, `"keywords: exceeds 256 entries"`,
+  `"keywords[3]: exceeds 512 characters"`. All existing format checks are
+  unchanged. New DB-free unit tests cover an oversized field, array,
+  and array entry (one problem each) plus a large-but-within-caps record
+  (zero problems).
+
 ### Changed — event bus: audit now joins the outbox transaction (2026-07-08)
 
 - Under the `outbox` transport, the `audit_logs` write now rides the

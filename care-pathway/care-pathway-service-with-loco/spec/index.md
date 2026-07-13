@@ -368,6 +368,12 @@ access controls added later.
   params: `_id`, `_lastUpdated`, `_count`, `identifier`, `name`, `status`.
   Tests: DTO↔`PlanDefinition` round-trip, each interaction, search→Bundle,
   `OperationOutcome` on 404/400/422, `CapabilityStatement` matches routes.
+- [x] **Input-size caps (SEC-M1).** `src/validation.rs` rejects oversized
+  payloads before storage/matching (the O(n·m) matcher over unbounded
+  text/arrays is a DoS, amplified by `check-duplicates`): `MAX_TEXT_LEN`
+  1024 per free-text field, `MAX_ARRAY_LEN` 256 per array, `MAX_ITEM_LEN`
+  512 per string array entry — all collected as `422` problems. DB-free
+  tests for oversized field/array/entry + a within-caps large record.
 
 ## 14. Implementation status
 

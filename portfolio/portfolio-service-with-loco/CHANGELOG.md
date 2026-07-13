@@ -9,6 +9,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security — SEC-M1: input-size caps on the validation entrypoint (2026-07-13)
+
+- `src/validation.rs` now rejects oversized `WorkItem` payloads before the
+  record is stored or matched, closing a CPU/memory denial-of-service
+  vector: the matcher runs `O(n·m)` string similarity (Jaro-Winkler /
+  Soundex) and Jaccard over the payload's text fields and arrays, so a
+  single huge string or huge array is a DoS (amplified by the
+  check-duplicates scan). New named caps enforced (all problems collected,
+  never aborting early, surfaced as `422`): `MAX_TEXT_LEN = 1024`
+  Unicode scalar values per scalar text field (`name`, `code`,
+  `owner_org_id`, `owner_org_name`, `lead_ref`, `portfolio_ref`,
+  `start_date`, `target_date`, `in_language`); `MAX_ARRAY_LEN = 256`
+  entries per array (`alternate_names`, `goals`, `keywords`, `tags`,
+  `identifiers`, `same_as`, `relationships`); `MAX_ITEM_LEN = 512` per
+  string entry inside an array (each entry, plus `goals[i].title`,
+  `identifiers[i].value`, `relationships[i].work_item_id`). The `kind`
+  discriminator is an enum, not free text, so it is not capped. New unit
+  tests cover oversized single field, oversized array, oversized array
+  item, and a within-caps large-but-valid record.
+
 ### Changed — event bus: audit now joins the outbox transaction (2026-07-09)
 
 - Under the `outbox` transport, the `audit_logs` write now rides the
