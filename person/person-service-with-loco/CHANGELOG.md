@@ -10,6 +10,20 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-B9: wire the idempotency key so a retried submit dedupes.** The
+  `bulk_jobs` table carried a `UNIQUE (entity, kind, idempotency_key)`
+  constraint, but both submit handlers hardcoded `idempotency_key = None`,
+  so it never fired — a client that retried a bulk submit (network blip,
+  proxy retry) silently ran the import/export **again**, duplicating work
+  and, for imports, re-processing every row. Now `POST
+  /api/persons/import` and `/export` read an **`Idempotency-Key`** request
+  header; `create_or_get_idempotent` returns the original job (no re-store,
+  no re-enqueue) when the key already names one, and the unique constraint
+  backstops the check-then-insert race (on violation the winner is
+  re-fetched). A blank key is treated as absent; a key-less submit always
+  creates. *Tests:* DB-gated same-key re-submit ⇒ same job id / one row /
+  not re-run; key-less ⇒ always distinct; pure key-trim/blank test.
+
 - **SEC-B8: bulk audit gaps — job-level import audit + fail-closed export.**
   A bulk import wrote **no job-level audit row** (only per-row create/update
   audit), and the export audit was **best-effort** — `log_export` errors

@@ -5,6 +5,14 @@ tick the box when an automated test or clearly described manual check
 confirms the criterion is met. Tasks small enough to land in a single
 PR; split larger tasks (`T-12a`, `T-12b`).
 
+- [x] **SEC-B9 (security): wire the idempotency key.** Both submit handlers
+  read an `Idempotency-Key` header; `create_or_get_idempotent` returns the
+  original job (no re-store/re-enqueue) when the key already names one,
+  backstopped by the `UNIQUE (entity, kind, idempotency_key)` constraint on
+  the check-then-insert race. Blank key ⇒ absent; key-less ⇒ always creates.
+  DB-gated same-key/keyless tests + pure key-trim test. (Repo tasks.md
+  SEC-B9.)
+
 - [x] **SEC-B8 (security): bulk audit gaps.** A successful import now writes
   a job-level `IMPORT` audit row (`log_import`) with the acting operator +
   reconciled counts; the export audit is written **before** the job finishes

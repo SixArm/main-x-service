@@ -482,10 +482,14 @@
   **Deferred:** threading the real actor into each **per-row** create/update
   audit — needs a `PersonRepository::create/update` signature change (they
   build a default `system` `AuditContext` today).
-- [ ] **SEC-B9 (S) 🟡** Wire the idempotency key (`db/bulk_jobs.rs:48,61`
-  hardcode `None`; the `UNIQUE(entity,kind,idempotency_key)` never fires):
-  read a client key and dedupe a retried submit. *Test:* re-submit with the
-  same key returns the same job, no re-run.
+- [x] **SEC-B9 (S) 🟡** Wire the idempotency key. *(done 2026-07-13)* Both
+  submit handlers read an `Idempotency-Key` header;
+  `create_or_get_idempotent` returns the original job (no re-store /
+  re-enqueue) when the key already names one, backstopped by the existing
+  `UNIQUE(entity,kind,idempotency_key)` on the check-then-insert race (no
+  migration needed — the constraint already existed, just never fired). Blank
+  key ⇒ absent; key-less ⇒ always creates. DB-gated same-key/keyless tests +
+  pure key-trim test.
 - [ ] **SEC-B10 (S) 🟡** person merge audit in-tx (`repositories.rs:1082,1108-1128`
   writes post-commit) — match case's in-tx threading so a crash after commit
   cannot lose the merge audit. *Test:* merge audit present atomically.
