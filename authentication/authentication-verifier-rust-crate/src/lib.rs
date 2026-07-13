@@ -462,14 +462,57 @@ impl Verifier {
         issuer: &str,
         audience: &str,
     ) -> Result<Self, VerifyError> {
-        let body = reqwest::get(url)
+        // SEC-V1: hard cap on the key-set body so a hostile endpoint can't
+        // OOM the peer. A published key set is a few hundred bytes.
+        const MAX_KEYS_BYTES: usize = 64 * 1024;
+        // SEC-V1: only fetch the key set over TLS. A plaintext (`http://`) or
+        // silently-downgraded fetch lets a network attacker inject their own
+        // Ed25519 public key, which is full **token forgery**. Reject a
+        // non-`https` URL outright, and forbid redirects so an `https` URL
+        // cannot be bounced to `http`.
+        if !url
+            .trim()
+            .get(..8)
+            .is_some_and(|s| s.eq_ignore_ascii_case("https://"))
+        {
+            return Err(VerifyError::Fetch(format!(
+                "key-set URL must be https:// (refusing to fetch {url})"
+            )));
+        }
+        let client = reqwest::Client::builder()
+            // SEC-V1: bound boot time so a hung/slow key endpoint can't stall
+            // startup indefinitely.
+            .timeout(std::time::Duration::from_secs(10))
+            // SEC-V1: no redirects, so an https→http (or cross-host) bounce
+            // can't defeat the scheme check above.
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|e| VerifyError::Fetch(e.to_string()))?;
+        let mut response = client
+            .get(url)
+            .send()
             .await
             .map_err(|e| VerifyError::Fetch(e.to_string()))?
             .error_for_status()
-            .map_err(|e| VerifyError::Fetch(e.to_string()))?
-            .json::<serde_json::Value>()
-            .await
             .map_err(|e| VerifyError::Fetch(e.to_string()))?;
+
+        // SEC-V1: read the body with the hard size cap (above) so a hostile
+        // endpoint can't OOM the peer with an unbounded response.
+        let mut buf: Vec<u8> = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| VerifyError::Fetch(e.to_string()))?
+        {
+            if buf.len() + chunk.len() > MAX_KEYS_BYTES {
+                return Err(VerifyError::Fetch(format!(
+                    "key set exceeds the {MAX_KEYS_BYTES}-byte limit"
+                )));
+            }
+            buf.extend_from_slice(&chunk);
+        }
+        let body: serde_json::Value =
+            serde_json::from_slice(&buf).map_err(|e| VerifyError::Fetch(e.to_string()))?;
         Self::from_paseto_keys_value(&body, issuer, audience)
     }
 }
@@ -844,5 +887,116 @@ mod tests {
             holder.current().verify(&token).is_err(),
             "new requests see the latest key set"
         );
+    }
+
+    // A DIFFERENT (attacker) seed → a keypair the published key set does NOT
+    // contain. Signing with it while stamping the honest `kid` is the forgery
+    // attempt the SEC-V4 test below must reject.
+    const ATTACKER_SEED: [u8; 32] = [
+        9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+        9, 9,
+    ];
+
+    fn attacker_sign_payload(kid: &str, payload: &str) -> String {
+        let keypair = SigningKey::from_bytes(&ATTACKER_SEED).to_keypair_bytes();
+        let key = Key::<64>::from(keypair);
+        let private = PasetoAsymmetricPrivateKey::<V4, Public>::from(&key);
+        let footer = format!(r#"{{"kid":"{kid}"}}"#);
+        let mut builder = Paseto::<V4, Public>::builder();
+        builder.set_payload(Payload::from(payload));
+        builder.set_footer(Footer::from(footer.as_str()));
+        builder.try_sign(&private).expect("attacker sign")
+    }
+
+    /// SEC-V4 (the previously-missing forgery path): a token **validly signed
+    /// by an attacker key** but stamped with the *honest* published `kid`
+    /// must be rejected. The verifier selects the honest public key by `kid`,
+    /// then the Ed25519 signature check fails — proving `kid` selection can't
+    /// be abused to verify a token the honest key never signed.
+    #[test]
+    fn cross_key_forgery_with_honest_kid_is_rejected() {
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
+        let payload = serde_json::to_string(&claims(3600)).unwrap();
+        let forged = attacker_sign_payload(KID, &payload);
+        assert!(matches!(
+            verifier.verify(&forged),
+            Err(VerifyError::Paseto(_))
+        ));
+    }
+
+    /// SEC-V4: a token whose payload omits the required `exp` claim must be
+    /// rejected (not treated as never-expiring) — `exp` is a non-`Option`
+    /// field, so deserialization fails after the signature verifies.
+    #[test]
+    fn token_missing_exp_is_rejected() {
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
+        let now = 1_900_000_000_i64;
+        let payload = serde_json::json!({
+            "sub": "11111111-1111-1111-1111-111111111111",
+            "email": "alice@example.com",
+            "name": "Alice",
+            "iss": ISSUER,
+            "aud": AUDIENCE,
+            // no "exp"
+            "iat": now,
+            "sid": "22222222-2222-2222-2222-222222222222",
+        })
+        .to_string();
+        let token = sign_payload(KID, &payload);
+        assert!(verifier.verify(&token).is_err(), "missing exp must reject");
+    }
+
+    /// SEC-V4 (parser robustness / fuzz-lite): the verifier must only ever
+    /// return `Err` — never panic — on arbitrary / malformed / truncated
+    /// input. Pairs with `#![forbid(unsafe_code)]`.
+    #[test]
+    fn malformed_tokens_never_panic() {
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
+        let valid = sign(KID, &claims(3600));
+        let mut cases: Vec<String> = vec![
+            String::new(),
+            ".".into(),
+            "....".into(),
+            "v4".into(),
+            "v4.public".into(),
+            "v4.public.".into(),
+            "v4.public.!!!!".into(),
+            "v4.local.deadbeef".into(),
+            "v3.public.deadbeef".into(),
+            "v4.public.YWJj.YWJj".into(),
+            format!("v4.public.{}", "A".repeat(10_000)),
+            format!("{valid}.extrasegment"),
+            valid[..valid.len() / 2].to_string(),
+            "🔥.🔥.🔥".into(),
+        ];
+        // A valid token with a wildly oversized footer.
+        cases.push(sign_payload(
+            &"k".repeat(5_000),
+            &serde_json::to_string(&claims(3600)).unwrap(),
+        ));
+        for c in cases {
+            // The contract: an `Err`, and above all no panic / no unwind.
+            let _ = verifier.verify(&c);
+        }
+    }
+
+    /// SEC-V1: the `fetch` path refuses a non-`https` key-set URL outright
+    /// (before any network I/O), so a plaintext / downgraded fetch can't
+    /// inject attacker keys. No network needed — the scheme check fails fast.
+    #[cfg(feature = "fetch")]
+    #[tokio::test]
+    async fn non_https_keys_url_is_refused() {
+        for url in [
+            "http://auth.example.com/.well-known/paseto-keys",
+            "ftp://x",
+            "//x",
+            "auth",
+        ] {
+            let r = Verifier::from_paseto_keys_url(url, ISSUER, AUDIENCE).await;
+            assert!(
+                matches!(r, Err(VerifyError::Fetch(_))),
+                "non-https URL {url:?} must be refused"
+            );
+        }
     }
 }
