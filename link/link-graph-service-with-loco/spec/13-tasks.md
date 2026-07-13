@@ -165,6 +165,18 @@
     `reconcile_is_scoped_to_the_source_entity` proves a case pass leaves a
     person `same_identity` edge intact; pure `from_ref_scoping_*` unit tests.
     (Repo tasks.md Phase 5 SEC-B1.)
+  - [x] **SEC-B7 (security fix): authenticate the source + validate its
+    edges.** `HttpAuthoritativeSource::from_env_for` refuses to build an
+    **unauthenticated remote** source: a non-loopback URL requires
+    `LINK_GRAPH_RECONCILE_TOKEN` (`source_auth_ok`/`is_loopback_url`,
+    fail-closed on an unparseable URL); only a loopback URL may be token-less.
+    Before applying each authoritative edge, `reconcile` validates it with
+    `edge_valid_for_source`: it must originate from the source's own entity
+    **and** its endpoint types must be permitted for its kind
+    (`EdgeKind::permits`), so a compromised/buggy source cannot inject a
+    cross-typed or foreign-origin edge (ill-typed edges are skipped and stay
+    visible as divergence). Pure helpers unit-tested. (Repo tasks.md Phase 5
+    SEC-B7.)
 - [x] T-21: Prometheus `/metrics.prom` — consumer lag, edge counts by
   `status`, processed counters (§6 FR-22). *(Done: `src/metrics.rs` — a
   process-wide registry with `link_graph_events_processed_total{kind}`

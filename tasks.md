@@ -465,12 +465,17 @@
   + fmt). Consumer-side `event_id` dedupe (`processed_events`) is the
   aggregator's job — folds into BUS-2; a deterministic two-concurrent-drain
   test needs a dual-connection harness (follow-up).
-- [ ] **SEC-B7 (S) 🟡** link-graph reconcile peer trust
-  (`reconcile.rs:94-155`): `LINK_GRAPH_RECONCILE_TOKEN` is optional (unauth
-  pull) and returned edges are applied directly. Require the token for a
-  remote source; validate each edge's endpoint types via `EdgeKind::permits`
-  before `apply_linked`. *Test:* remote source without a token refused;
-  ill-typed edge rejected.
+- [x] **SEC-B7 (S) 🟡** link-graph reconcile peer trust. *(done 2026-07-13)*
+  `HttpAuthoritativeSource::from_env_for` refuses an **unauthenticated
+  remote** source — a non-loopback URL requires `LINK_GRAPH_RECONCILE_TOKEN`
+  (`source_auth_ok`/`is_loopback_url`, fail-closed on an unparseable URL);
+  only a loopback URL may be token-less. Before `apply_linked`, `reconcile`
+  validates each edge via `edge_valid_for_source`: it must originate from the
+  source's own entity AND its endpoint types must be permitted for its kind
+  (`EdgeKind::permits`), so a compromised/buggy source can't inject a
+  cross-typed or foreign-origin edge (ill-typed edges skipped, stay as
+  divergence). Pure helpers unit-tested (remote-needs-token, loopback-ok,
+  ill-typed + foreign-origin rejected).
 - [~] **SEC-B8 (S) 🟡** Bulk audit gaps. *(job-level audit + fail-closed
   export + actor threading done 2026-07-13; per-row actor deferred)* A
   successful import now writes a job-level `IMPORT` audit row (`log_import`)
