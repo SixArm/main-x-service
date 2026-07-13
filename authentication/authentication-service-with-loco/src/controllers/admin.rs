@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     auth::{AuthUser, Claims},
-    models::{auth_events::Model as AuthEvent, users},
+    models::{auth_events::Model as AuthEvent, sessions, users},
     tasks::attributes::{validate_key, validate_value},
 };
 
@@ -163,6 +163,13 @@ async fn replace_attributes(
         .into_active_model()
         .set_attributes(&ctx.db, users::attributes_to_value(&body.attributes))
         .await?;
+    // SEC-A8: a live session snapshotted the OLD attributes (per
+    // authorization-attributes.md §6, attrs are copied into the session at
+    // establishment and minted into the token from there), so it would keep
+    // issuing tokens with the stale attributes until its absolute TTL.
+    // Revoke the user's sessions so the change takes effect now — the next
+    // login copies the new attributes into a fresh session.
+    sessions::Model::revoke_all_for_user(&ctx.db, target_pid).await?;
 
     AuthEvent::record_attribute_assignment_best_effort(
         &ctx.db,

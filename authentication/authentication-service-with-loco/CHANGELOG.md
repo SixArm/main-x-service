@@ -12,6 +12,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-A7: complete the GDPR erasure.** `DELETE /api/auth/account`
+  tombstoned `users.email`/`name` and revoked sessions, but the subject's
+  email survived in the audit trail (`auth_events.email`, including
+  pre-account `unknown_email` rows) and in `sessions.user_agent`, and the
+  terminal `account_erased` audit row was written *with* the email. Erasure
+  now also `AuthEvent::scrub_subject_email` (NULLs the email on every audit
+  row matched by pid OR normalised email) and
+  `sessions::Model::scrub_user_agent_for_user`, and records `account_erased`
+  with only the pid. `account_erasure_…` request test extended.
+- **SEC-A8: revoke sessions on an attribute change (privilege-revocation
+  latency).** A session snapshots the user's ABAC attributes at
+  establishment and mints them into the PASETO, so removing `access=admin`
+  did **not** downgrade a live session — it kept issuing admin tokens until
+  its absolute TTL (up to 12 h). The admin API (`PUT …/attributes`) and the
+  `user_attributes` CLI task now `revoke_all_for_user` after a change, so it
+  takes effect on the next login (which copies the new attributes). Admin
+  request test extended.
 - **SEC-A4: atomic single-use magic-link consume.** Redemption was a
   `find_by_magic_token` (SELECT) followed by a separate `clear_magic_link`
   (UPDATE), so two concurrent requests with the same token both passed the

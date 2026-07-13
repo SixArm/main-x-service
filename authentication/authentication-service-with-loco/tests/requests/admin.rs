@@ -86,6 +86,19 @@ async fn admin_can_replace_and_show_user_attributes() {
             .unwrap()
             .pid;
 
+        // SEC-A8: give the target a live session that snapshotted the OLD
+        // (empty) attributes — it must be revoked by the attribute change.
+        use authentication_service::models::sessions;
+        sessions::Model::issue(
+            &ctx.db,
+            "a8-target-session",
+            target_pid,
+            Some("test-agent".to_string()),
+            serde_json::json!({}),
+        )
+        .await
+        .expect("issue a target session");
+
         // PUT replaces the whole map.
         let (k, v) = auth_header(&admin_token);
         let put = request
@@ -96,6 +109,16 @@ async fn admin_can_replace_and_show_user_attributes() {
             }))
             .await;
         assert_eq!(put.status_code(), 200, "admin PUT should succeed");
+
+        // SEC-A8: the attribute change revoked the target's sessions, so the
+        // stale-attribute session can no longer mint tokens.
+        let target_sessions = sessions::Model::find_all_by_user_pid(&ctx.db, target_pid)
+            .await
+            .expect("target sessions should query");
+        assert!(
+            target_sessions.iter().all(|s| !s.is_active()),
+            "SEC-A8: an attribute change must revoke the target's sessions"
+        );
 
         // Persisted.
         let updated = users::Model::find_by_email(&ctx.db, "target@loco.com")

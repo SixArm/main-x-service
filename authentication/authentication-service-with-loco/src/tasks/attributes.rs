@@ -426,6 +426,13 @@ impl Task for UserAttributes {
         user.into_active_model()
             .set_attributes(&ctx.db, users::attributes_to_value(&after))
             .await?;
+        // SEC-A8: revoke the user's sessions so an attribute change takes
+        // effect immediately (a live session would otherwise keep minting
+        // tokens with the old attributes it snapshotted). Matches the admin
+        // HTTP API. No-op when the change was a no-op (before == after).
+        if before != after {
+            crate::models::sessions::Model::revoke_all_for_user(&ctx.db, pid).await?;
+        }
 
         // Durable audit row for the assignment (best-effort — never
         // fails the task). Actor is `cli`; values are omitted (see
