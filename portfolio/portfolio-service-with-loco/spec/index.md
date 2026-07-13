@@ -453,6 +453,13 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   `identifiers` shapes; blank goal titles; BCP-47 `in_language` syntax;
   child-kind `portfolio_ref` shape — all problems reported together) +
   real-time create duplicate detection (`409`, within-collection).
+- [x] **SEC-M1 — input-size caps in `src/validation.rs`** (2026-07-13).
+  Bound every scalar text field (`MAX_TEXT_LEN = 1024` chars), every array
+  (`MAX_ARRAY_LEN = 256` entries), and every string entry inside an array
+  (`MAX_ITEM_LEN = 512` chars, incl. `goals[i].title` /
+  `identifiers[i].value` / `relationships[i].work_item_id`) → `422`,
+  before store/match, to close the matcher's `O(n·m)` CPU/memory DoS
+  vector (amplified by check-duplicates). `kind` is an enum, not capped.
 - [ ] Matching — embed `portfolio-matcher` (`MatchingEngine::new(
   MatchConfig::default())`); `POST /match`, `POST /check-duplicates`
   (scan this collection's active rows), `POST /deduplicate` (batch →

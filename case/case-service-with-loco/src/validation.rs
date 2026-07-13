@@ -13,8 +13,30 @@
 //!   `YYYY-MM-DD` (a real calendar date; e.g. `2024`, `2024-01-31`).
 //! - **`identifiers[i].value`** — must not be blank.
 //! - **`subjects[i]` / `keywords[i]`** — each entry must not be blank.
+//! - **Input-size caps (SEC-M1)** — every scalar text field, array
+//!   cardinality, and per-entry string length is bounded, so a single
+//!   huge string or huge array cannot be used as a CPU/memory `DoS`
+//!   against the matcher's O(n·m) Jaro-Winkler / Levenshtein / Jaccard
+//!   scoring (amplified across the `check-duplicates` scan). Oversized
+//!   input is rejected with a `422` *before* the record is stored or
+//!   matched.
 
 use case_matcher::Case;
+
+/// Maximum length, in Unicode scalar values (`.chars().count()`), of any
+/// single scalar text field (`title`, `case_number`, `agency_id`,
+/// `agency_name`). Bounds the per-field cost of the matcher's
+/// character-level string comparisons.
+const MAX_TEXT_LEN: usize = 1024;
+
+/// Maximum number of entries in any array field (`alternate_titles`,
+/// `subjects`, `keywords`, `identifiers`, `same_as`, `in_language`).
+/// Bounds the O(n·m) Jaccard / overlap work the matcher does over arrays.
+const MAX_ARRAY_LEN: usize = 256;
+
+/// Maximum length, in Unicode scalar values (`.chars().count()`), of any
+/// single string entry inside an array field.
+const MAX_ITEM_LEN: usize = 512;
 
 /// Collect every validation problem for `case`. An empty vector means
 /// the payload is valid.
@@ -35,22 +57,83 @@ pub fn problems(case: &Case) -> Vec<String> {
             "opened_date: {date:?} is not a valid ISO-8601 date"
         ));
     }
+
+    // Input-size caps (SEC-M1): scalar text fields.
+    check_text(&mut out, "title", &case.title);
+    if let Some(v) = &case.case_number {
+        check_text(&mut out, "case_number", v);
+    }
+    if let Some(v) = &case.agency_id {
+        check_text(&mut out, "agency_id", v);
+    }
+    if let Some(v) = &case.agency_name {
+        check_text(&mut out, "agency_name", v);
+    }
+
+    // Input-size caps (SEC-M1): array cardinality.
+    check_array(&mut out, "alternate_titles", case.alternate_titles.len());
+    check_array(&mut out, "subjects", case.subjects.len());
+    check_array(&mut out, "keywords", case.keywords.len());
+    check_array(&mut out, "identifiers", case.identifiers.len());
+    check_array(&mut out, "same_as", case.same_as.len());
+    check_array(&mut out, "in_language", case.in_language.len());
+
+    // Per-entry blank checks (existing) + size caps (SEC-M1).
     for (i, ident) in case.identifiers.iter().enumerate() {
         if ident.value.trim().is_empty() {
             out.push(format!("identifiers[{i}]: value must not be blank"));
         }
+        check_item(&mut out, "identifiers", i, &ident.value);
     }
     for (i, subject) in case.subjects.iter().enumerate() {
         if subject.trim().is_empty() {
             out.push(format!("subjects[{i}]: must not be blank"));
         }
+        check_item(&mut out, "subjects", i, subject);
     }
     for (i, keyword) in case.keywords.iter().enumerate() {
         if keyword.trim().is_empty() {
             out.push(format!("keywords[{i}]: must not be blank"));
         }
+        check_item(&mut out, "keywords", i, keyword);
     }
+    for (i, title) in case.alternate_titles.iter().enumerate() {
+        check_item(&mut out, "alternate_titles", i, title);
+    }
+    for (i, url) in case.same_as.iter().enumerate() {
+        check_item(&mut out, "same_as", i, url);
+    }
+    for (i, lang) in case.in_language.iter().enumerate() {
+        check_item(&mut out, "in_language", i, lang);
+    }
+
     out
+}
+
+/// Push a problem when a scalar text `field` exceeds [`MAX_TEXT_LEN`]
+/// Unicode scalar values.
+fn check_text(out: &mut Vec<String>, field: &str, value: &str) {
+    if value.chars().count() > MAX_TEXT_LEN {
+        out.push(format!("{field}: exceeds {MAX_TEXT_LEN} characters"));
+    }
+}
+
+/// Push a problem when an array `field` holds more than [`MAX_ARRAY_LEN`]
+/// entries.
+fn check_array(out: &mut Vec<String>, field: &str, len: usize) {
+    if len > MAX_ARRAY_LEN {
+        out.push(format!("{field}: exceeds {MAX_ARRAY_LEN} entries"));
+    }
+}
+
+/// Push a problem when the `index`-th entry of an array `field` exceeds
+/// [`MAX_ITEM_LEN`] Unicode scalar values.
+fn check_item(out: &mut Vec<String>, field: &str, index: usize, value: &str) {
+    if value.chars().count() > MAX_ITEM_LEN {
+        out.push(format!(
+            "{field}[{index}]: exceeds {MAX_ITEM_LEN} characters"
+        ));
+    }
 }
 
 /// Accept an ISO-8601 calendar date as either a bare year (`YYYY`) or a
@@ -241,5 +324,58 @@ mod tests {
         assert!(p.iter().any(|m| m.contains("title is required")));
         assert!(p.iter().any(|m| m.contains("opened_date")));
         assert!(p.iter().any(|m| m.contains("identifiers[1]")));
+    }
+
+    /// SEC-M1: an oversized scalar text field is exactly one problem.
+    #[test]
+    fn oversized_text_field_is_a_problem() {
+        let case = Case::new("x".repeat(MAX_TEXT_LEN + 1));
+        assert_eq!(
+            problems(&case),
+            vec![format!("title: exceeds {MAX_TEXT_LEN} characters")]
+        );
+    }
+
+    /// SEC-M1: an over-long array is exactly one problem (its entries are
+    /// each within `MAX_ITEM_LEN`).
+    #[test]
+    fn oversized_array_is_a_problem() {
+        let case = Case {
+            subjects: vec!["ok".to_string(); MAX_ARRAY_LEN + 1],
+            ..Case::new("Housing benefit appeal")
+        };
+        assert_eq!(
+            problems(&case),
+            vec![format!("subjects: exceeds {MAX_ARRAY_LEN} entries")]
+        );
+    }
+
+    /// SEC-M1: an oversized single entry inside an array is exactly one
+    /// problem, reported with its index.
+    #[test]
+    fn oversized_array_item_is_a_problem() {
+        let case = Case {
+            subjects: vec!["ok".into(), "x".repeat(MAX_ITEM_LEN + 1)],
+            ..Case::new("Housing benefit appeal")
+        };
+        assert_eq!(
+            problems(&case),
+            vec![format!("subjects[1]: exceeds {MAX_ITEM_LEN} characters")]
+        );
+    }
+
+    /// SEC-M1: a large-but-within-caps record (every field at exactly its
+    /// limit) is accepted — the caps reject only what exceeds them.
+    #[test]
+    fn within_caps_large_record_has_no_problems() {
+        let case = Case {
+            title: "x".repeat(MAX_TEXT_LEN),
+            alternate_titles: vec!["a".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN],
+            subjects: vec!["s".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN],
+            keywords: vec!["k".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN],
+            identifiers: vec![ident(&"i".repeat(MAX_ITEM_LEN)); MAX_ARRAY_LEN],
+            ..Case::new("placeholder")
+        };
+        assert!(problems(&case).is_empty());
     }
 }
