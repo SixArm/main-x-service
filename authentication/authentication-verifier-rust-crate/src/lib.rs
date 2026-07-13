@@ -465,18 +465,16 @@ impl Verifier {
         // SEC-V1: hard cap on the key-set body so a hostile endpoint can't
         // OOM the peer. A published key set is a few hundred bytes.
         const MAX_KEYS_BYTES: usize = 64 * 1024;
-        // SEC-V1: only fetch the key set over TLS. A plaintext (`http://`) or
-        // silently-downgraded fetch lets a network attacker inject their own
-        // Ed25519 public key, which is full **token forgery**. Reject a
-        // non-`https` URL outright, and forbid redirects so an `https` URL
-        // cannot be bounced to `http`.
-        if !url
-            .trim()
-            .get(..8)
-            .is_some_and(|s| s.eq_ignore_ascii_case("https://"))
-        {
+        // SEC-V1: only fetch the key set over TLS — a plaintext (`http://`)
+        // or silently-downgraded fetch lets a network attacker inject their
+        // own Ed25519 public key, which is full **token forgery**. The one
+        // exception is a **loopback** host (`127.0.0.1` / `::1` / `localhost`),
+        // which is not reachable by a network attacker and is where dev/CI
+        // key servers run. Redirects are forbidden below so an `https` URL
+        // can't be bounced to plaintext.
+        if !url_scheme_is_permitted(url) {
             return Err(VerifyError::Fetch(format!(
-                "key-set URL must be https:// (refusing to fetch {url})"
+                "key-set URL must be https:// (or http:// on loopback); refusing to fetch {url}"
             )));
         }
         let client = reqwest::Client::builder()
@@ -570,6 +568,26 @@ impl ReloadableVerifier {
             .inner
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = std::sync::Arc::new(verifier);
+    }
+}
+
+/// Whether a key-set URL may be fetched (SEC-V1): `https` to any host, or
+/// `http` only to a **loopback** host (`127.0.0.1` / `::1` / `localhost`),
+/// which a network attacker cannot intercept and where dev/CI key servers
+/// run. Any other scheme, a non-loopback `http` host, or an unparseable URL
+/// is refused. Pure, so it is unit-tested without network access.
+#[cfg(feature = "fetch")]
+fn url_scheme_is_permitted(url: &str) -> bool {
+    let Ok(parsed) = reqwest::Url::parse(url.trim()) else {
+        return false;
+    };
+    match parsed.scheme() {
+        "https" => true,
+        "http" => matches!(
+            parsed.host_str(),
+            Some("127.0.0.1" | "::1" | "[::1]" | "localhost")
+        ),
+        _ => false,
     }
 }
 
@@ -998,5 +1016,23 @@ mod tests {
                 "non-https URL {url:?} must be refused"
             );
         }
+    }
+
+    /// SEC-V1 scheme policy (pure): `https` anywhere is permitted; `http` is
+    /// permitted only to a loopback host (where dev/CI key servers run);
+    /// everything else — non-loopback `http`, other schemes, garbage — is
+    /// refused. This loopback exception is why the services' own
+    /// `http://127.0.0.1` key-fetch tests keep working.
+    #[cfg(feature = "fetch")]
+    #[test]
+    fn url_scheme_policy_allows_https_and_loopback_http_only() {
+        assert!(url_scheme_is_permitted("https://auth.example.com/keys"));
+        assert!(url_scheme_is_permitted("http://127.0.0.1:8080/keys"));
+        assert!(url_scheme_is_permitted("http://localhost:3000/keys"));
+        assert!(url_scheme_is_permitted("http://[::1]:9000/keys"));
+        assert!(!url_scheme_is_permitted("http://auth.example.com/keys"));
+        assert!(!url_scheme_is_permitted("http://10.0.0.5/keys"));
+        assert!(!url_scheme_is_permitted("ftp://x"));
+        assert!(!url_scheme_is_permitted("not a url"));
     }
 }

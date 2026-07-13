@@ -14,12 +14,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - **SEC-V1: harden `from_paseto_keys_url` (the `fetch` path).** It used a
   bare `reqwest::get` with no scheme check, timeout, redirect policy, or
-  body cap. It now (a) refuses any non-`https://` URL outright — a plaintext
+  body cap. It now (a) requires `https://` for any real host — a plaintext
   or downgraded fetch lets a network attacker inject Ed25519 keys, i.e. full
-  token forgery; (b) forbids redirects so an `https` URL can't be bounced to
-  `http`; (c) sets a 10 s request timeout so a hung endpoint can't stall
-  boot; (d) reads the body under a 64 KiB cap so a hostile response can't OOM
-  the peer. Test `non_https_keys_url_is_refused`.
+  token forgery — while permitting `http://` **only to a loopback host**
+  (`127.0.0.1` / `::1` / `localhost`, not MITM-able, where dev/CI key servers
+  run); (b) forbids redirects so an `https` URL can't be bounced to `http`;
+  (c) sets a 10 s request timeout so a hung endpoint can't stall boot; (d)
+  reads the body under a 64 KiB cap so a hostile response can't OOM the peer.
+  Tests `non_https_keys_url_is_refused` +
+  `url_scheme_policy_allows_https_and_loopback_http_only`.
 - **SEC-V2: no vacuous match for negated `resource.`/`env.` conditions.** A
   `!`-negated `resource.`/`env.` condition matched *vacuously* when the
   namespace was absent (e.g. the coarse guard path with no record/env), so
