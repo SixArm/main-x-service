@@ -482,12 +482,19 @@
   (`controllers/organizations.rs:90-98` validates only `name`): enforce
   LEI/DUNS/GLN/VAT check-digit/length before store, since they drive the
   matcher's deterministic short-circuit. *Tests:* bad check digit ⇒ 422.
-- [ ] **SEC-M6 (M) 🟠 (tests/infra)** Matcher fuzz + property harness: add
-  `proptest` to the five newer matchers (course, organization, care-pathway,
-  case, portfolio — the older five already have it) and `cargo-fuzz` targets
-  for the pure functions. Invariants: **never panics**, **score ∈ [0,1]**,
-  **symmetric**, **identical ⇒ 1.0**, **no spurious identity**, Soundex shape
-  `[A-Z][0-9]{3}` or `None`. (Pairs with SEC-I2.)
+- [x] **SEC-M6 (M) 🟠 (tests/infra)** Matcher property harness. *(proptest done
+  2026-07-13; cargo-fuzz = SEC-I2, still pending)* Added `proptest = "1.11"`
+  (dev-dep) + property tests to the five newer matchers (course,
+  organization, care-pathway, case, portfolio — the older five already had
+  it). Invariants pinned per crate: **never panics** (engine + pure helpers
+  on arbitrary UTF-8), **score ∈ [0,1]** & finite, **symmetric**,
+  **identical ⇒ is_match / ≥ threshold**, Soundex shape `[A-Z][0-9]{3}`/None;
+  portfolio also pins the **kind gate** (cross-kind ⇒ 0.0) and an
+  `iso_date_to_days` no-overflow property (reinforces SEC-M4). The symmetry
+  property surfaced a **real bug** in course `provider_score` (asymmetric on
+  a one-sided empty `provider_id`) — fixed to require both sides non-empty
+  (three-part). Each crate independently re-verified green. cargo-fuzz
+  targets remain as SEC-I2.
 
 ### F-assurance — supply-chain & test infrastructure
 

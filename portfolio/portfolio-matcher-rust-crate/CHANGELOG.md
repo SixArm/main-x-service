@@ -10,6 +10,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **SEC-M6 — property-based tests.** Added `proptest` (dev-dependency) and
+  `tests/property_tests.rs`, proving the matcher and its pure helpers are
+  well-behaved on arbitrary input rather than only hand-picked examples:
+  - `score_is_finite_and_bounded` — the engine never panics and every
+    `score` is a real number in `[0.0, 1.0]` (never `NaN`).
+  - `matching_is_symmetric_same_kind` — `match_work_items(a, b)` equals
+    `match_work_items(b, a)` in score, `is_match`, and confidence for
+    same-kind records.
+  - `kind_gate_blocks_all_cross_kind_pairs` — the **kind gate**: any pair of
+    different `kind` always scores `0.0`, never matches, and sets
+    `kind_gate_blocked` with every component `None`.
+  - `identical_clone_matches_itself` — reflexivity: a clone of any
+    well-formed record clears the threshold (`is_match`).
+  - `pure_helpers_never_panic` / `iso_date_never_overflows` — `fold`,
+    `code`, `url`, `fold_set`, `iso_date_to_days`, and `soundex` never panic
+    on arbitrary strings; `iso_date_to_days` never overflows on adversarial
+    long-year date strings (guards the SEC-M4 fix).
+
+  Tests + dev-dependency only — no weights, thresholds, or matching
+  behaviour changed.
+
 ### Security
 
 - **SEC-M2 — a bare root `same_as` URL no longer forces a deterministic

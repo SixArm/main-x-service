@@ -25,6 +25,9 @@ unicode-normalization = "0.1"
 thiserror = "2.0"
 mimalloc = "0.1.52"
 
+[dev-dependencies]
+proptest = "1.11"
+
 [profile.release]
 opt-level = 3
 lto = true

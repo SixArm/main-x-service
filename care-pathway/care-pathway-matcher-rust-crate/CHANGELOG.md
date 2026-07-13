@@ -10,6 +10,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- SEC-M6: property-based tests (`tests/property_tests.rs`, `proptest`
+  dev-dependency) proving the matcher never panics and its scores stay
+  well-behaved on arbitrary input. Invariants: the pure normalise /
+  phonetic helpers never panic on arbitrary strings; every
+  `match_care_pathways` score is finite and within `[0.0, 1.0]` (never
+  NaN); matching is symmetric (score, `is_match`, and `confidence`
+  invariant under argument swap); and an identical clone of a well-formed
+  pathway matches itself. Tests-only; no behaviour, weight, or threshold
+  change.
+
 ### Security
 
 - SEC-M2: the provider-scoped deterministic rule (R-1) now requires the
