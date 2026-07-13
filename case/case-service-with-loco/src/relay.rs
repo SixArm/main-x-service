@@ -23,6 +23,7 @@
 use std::time::Duration;
 
 use loco_rs::prelude::*;
+use sea_orm::TransactionTrait;
 
 use crate::models::_entities::event_outbox::Column as OutboxColumn;
 use crate::models::event_outbox::{self, Model as OutboxRow};
@@ -88,7 +89,15 @@ pub async fn drain_once<S: EventSink + ?Sized>(
     sink: &S,
     batch: u64,
 ) -> ModelResult<usize> {
-    let rows = OutboxRow::unpublished(db, batch).await?;
+    // SEC-B6: run the whole drain in one transaction and claim the rows with
+    // `FOR UPDATE SKIP LOCKED` (in `unpublished`), so two parallel relay
+    // instances never grab the same rows and double-ship. The lock is held
+    // across the send window; on commit the published rows are acked and any
+    // row left unpublished (a send that failed, or was never reached) is
+    // released and retried next tick. Delivery stays at-least-once (consumers
+    // dedupe on `event_id`); the lock removes the duplicate-per-instance case.
+    let txn = db.begin().await?;
+    let rows = OutboxRow::unpublished(&txn, batch).await?;
     let mut published: Vec<i32> = Vec::with_capacity(rows.len());
     for row in &rows {
         match sink
@@ -105,8 +114,9 @@ pub async fn drain_once<S: EventSink + ?Sized>(
         }
     }
     if !published.is_empty() {
-        OutboxRow::mark_published(db, &published).await?;
+        OutboxRow::mark_published(&txn, &published).await?;
     }
+    txn.commit().await?;
     Ok(published.len())
 }
 

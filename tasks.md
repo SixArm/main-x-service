@@ -424,12 +424,15 @@
   (96) + no-run + clippy + fmt. *(Residual: a deterministic concurrent-race
   integration test, and the case `memory` (dev, non-transactional)
   path — both follow-ups.)*
-- [ ] **SEC-B6 (M) 🟠** Relay exactly-once: `SELECT … WHERE published_at IS
-  NULL` has no `FOR UPDATE SKIP LOCKED` (case `relay.rs:91`, person `:93`)
-  and no consumer `event_id` dedupe (person consumer is `todo!()`), so >1
-  instance double-ships. Add `SKIP LOCKED` + a `processed_events`
-  idempotency table (aligns with BUS-2). *Test:* two concurrent drains send
-  each row once; replayed `event_id` ignored.
+- [~] **SEC-B6 (M) 🟠** Relay exactly-once. *(case + person done 2026-07-13)*
+  `drain_once` now runs in a transaction and `unpublished` claims rows with
+  `FOR UPDATE SKIP LOCKED`, so >1 relay instance can't double-ship (a second
+  instance skips the locked rows). Done in **case** + **person** (green).
+  **Remaining:** roll the same one-line change to the other 8 loco services'
+  `relay.rs`/outbox (mechanical); consumer-side `event_id` dedupe
+  (`processed_events`) is the aggregator's job — folds into BUS-2. A
+  deterministic two-concurrent-drain test needs a dual-connection harness
+  (follow-up).
 - [ ] **SEC-B7 (S) 🟡** link-graph reconcile peer trust
   (`reconcile.rs:94-155`): `LINK_GRAPH_RECONCILE_TOKEN` is optional (unauth
   pull) and returned edges are applied directly. Require the token for a

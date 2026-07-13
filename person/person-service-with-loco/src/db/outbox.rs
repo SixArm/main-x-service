@@ -178,20 +178,25 @@ impl Model {
     }
 
     /// The Phase-3 relay poll: the oldest unpublished rows in id order,
-    /// capped at `limit`. (The relay wraps this in a transaction with
-    /// `FOR UPDATE SKIP LOCKED` so parallel relays don't double-ship; the
-    /// ordering + `published_at IS NULL` filter is the shared shape.)
-    /// Unused until the Fluvio relay lands (roadmap).
+    /// capped at `limit`, **claimed** with `FOR UPDATE SKIP LOCKED`
+    /// (SEC-B6). Must be called inside a transaction (the relay's): the row
+    /// lock is what stops two parallel relay instances from both selecting
+    /// and double-shipping the same rows — the second instance skips the
+    /// locked rows.
     ///
     /// # Errors
     ///
     /// Returns [`Error::Database`](crate::Error::Database) if the query
     /// fails.
-    pub async fn unpublished(db: &DatabaseConnection, limit: u64) -> Result<Vec<Self>> {
+    pub async fn unpublished<C: ConnectionTrait>(db: &C, limit: u64) -> Result<Vec<Self>> {
         let rows = event_outbox::Entity::find()
             .filter(event_outbox::Column::PublishedAt.is_null())
             .order_by_asc(event_outbox::Column::Id)
             .limit(limit)
+            .lock_with_behavior(
+                sea_orm::sea_query::LockType::Update,
+                sea_orm::sea_query::LockBehavior::SkipLocked,
+            )
             .all(db)
             .await?;
         Ok(rows)

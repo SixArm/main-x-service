@@ -11,6 +11,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-B6: relay claims outbox rows with `FOR UPDATE SKIP LOCKED`.** The
+  Phase-3 relay drained via a plain unlocked `SELECT … WHERE published_at IS
+  NULL`, so with more than one instance (stateless horizontal scaling) every
+  relay would select and **double-ship** the same rows. `drain_once` now runs
+  in a transaction and `Model::unpublished` claims rows with `FOR UPDATE SKIP
+  LOCKED`, so a second relay skips the locked rows; the lock is held across
+  the send window and released on commit (unpublished rows retry next tick).
+  Delivery stays at-least-once (consumers dedupe on `event_id`).
 - **SEC-M1: input-size caps close the O(n·m) matcher DoS.** The matcher
   runs O(n·m) character-level string similarity (Jaro-Winkler /
   Levenshtein) and O(n·m) Jaccard over a payload's text fields and arrays,
