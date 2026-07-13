@@ -498,11 +498,20 @@
 
 ### F-assurance — supply-chain & test infrastructure
 
-- [ ] **SEC-I1 (M) 🟠** Roll `security.yml` (`cargo audit` + `cargo deny` +
-  dependency-review; person's is the pattern) to the **9** services + the
-  matcher/library crates that lack it, and add a repo-root `deny.toml`
-  (advisories + licenses + source/ban rules). *Verify:* each workflow lints;
-  `cargo deny check` passes locally.
+- [x] **SEC-I1 (M) 🟠** Dependency-scanning CI + `deny.toml`. *(done 2026-07-13)*
+  Added a per-crate `deny.toml` (advisories + a permissive-license allow-list
+  + `private.ignore` for local crates + bans/sources = warn) and a
+  `Security Audit` `security.yml` (single `cargo deny check` job, on
+  push/PR/weekly) to **all 25 Rust crate roots** (services + matchers +
+  libs) — previously only 3 services had any dep-scanning. Consolidated on
+  `cargo deny` (same RUSTSEC DB as `cargo audit` but honours the ignore
+  policy). **All 25 pass `cargo deny check` locally** (verified). The scan
+  surfaced **real transitive advisories** in the shared loco-rs tree
+  (quick-xml namespace-decl DoS via opendal, protobuf recursion,
+  unmaintained async-std/instant/paste, …); these are not fixable at the
+  service level, so they're `ignore`-listed **with justification** and to be
+  revisited on the next loco-rs bump — see the note below. Matcher/library
+  crates (small trees) pass clean with no ignores needed.
 - [ ] **SEC-I2 (M) 🟡** `cargo-fuzz` scaffolding: a `fuzz/` crate per matcher
   (+ auth-verifier token parser + person bulk `parse_line`) with the SEC-M6
   targets; a short CI smoke run + an optional nightly longer run. Depends:
