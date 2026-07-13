@@ -16,6 +16,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **Security (SEC-B7): authenticate the reconcile source and validate its
+  edges.** `HttpAuthoritativeSource::from_env_for` built a source even when
+  `LINK_GRAPH_RECONCILE_TOKEN` was unset — an **unauthenticated pull** from a
+  remote host whose returned edges were then applied to the graph directly.
+  Now a **remote** URL requires a token (`from_env_for` refuses and returns
+  `None`, logging a warning; only a **loopback** URL may be token-less for
+  dev/test — `source_auth_ok` / `is_loopback_url`, fail-closed on an
+  unparseable URL). And before applying each authoritative edge, `reconcile`
+  validates it with `edge_valid_for_source`: the edge must originate from the
+  source's own entity **and** its endpoint types must be permitted for its
+  kind by the closed registry (`EdgeKind::permits`), so a compromised or
+  buggy source cannot inject a cross-typed or foreign-origin edge (ill-typed
+  edges are skipped and stay visible as divergence). Pure helpers
+  unit-tested.
+
 - **Security (SEC-B1): reconciliation is now scoped to the source entity.**
   `reconcile` diffed a service's authoritative edges against the **global**
   read-model, so every other entity's edges looked "extra" and were deleted

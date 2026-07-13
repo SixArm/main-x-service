@@ -115,6 +115,22 @@ where
     // Repair the read-model to match the authoritative source.
     let observed_at = Utc::now().fixed_offset();
     for ev in &divergence.missing {
+        // SEC-B7: validate each authoritative edge's endpoint types (and
+        // that it originates from this source's own entity) before applying
+        // it — a compromised or buggy source must not be able to inject a
+        // cross-typed or foreign-origin edge into the graph. Ill-typed edges
+        // are skipped (and stay "missing", so a persistently bad source keeps
+        // showing as divergence) rather than corrupting the read-model.
+        if !edge_valid_for_source(ev, source.entity()) {
+            tracing::warn!(
+                edge_id = %ev.edge_id,
+                kind = ?ev.edge_kind,
+                from = %ev.from_ref,
+                to = %ev.to_ref,
+                "reconcile: rejecting an ill-typed or foreign-origin authoritative edge"
+            );
+            continue;
+        }
         edges::Model::apply_linked(db, ev, ev.edge_id, observed_at).await?;
     }
     for id in &divergence.extra {
@@ -143,8 +159,11 @@ pub struct HttpAuthoritativeSource {
 
 impl HttpAuthoritativeSource {
     /// Build from the environment for `entity` (e.g. `case`), or `None`
-    /// when `entity` is not a known type or no
-    /// `LINK_GRAPH_RECONCILE_URL_<ENTITY>` is configured.
+    /// when `entity` is not a known type, no
+    /// `LINK_GRAPH_RECONCILE_URL_<ENTITY>` is configured, or (SEC-B7) the
+    /// URL names a **remote** host but no `LINK_GRAPH_RECONCILE_TOKEN` is
+    /// set — an unauthenticated pull from a remote source is refused, since
+    /// its edges are applied directly to the graph.
     #[must_use]
     pub fn from_env_for(entity: &str) -> Option<Self> {
         let entity = EntityType::from_token(entity)?;
@@ -157,8 +176,55 @@ impl HttpAuthoritativeSource {
         let token = std::env::var("LINK_GRAPH_RECONCILE_TOKEN")
             .ok()
             .filter(|s| !s.trim().is_empty());
+        if !source_auth_ok(&url, token.is_some()) {
+            tracing::warn!(
+                %url,
+                "refusing an unauthenticated remote reconcile source: set \
+                 LINK_GRAPH_RECONCILE_TOKEN (only a loopback URL may be token-less)"
+            );
+            return None;
+        }
         Some(Self { entity, url, token })
     }
+}
+
+/// SEC-B7: whether a reconcile source `url` may be used with the given token
+/// presence. A **loopback** URL (dev/test) may be token-less; any other host
+/// requires a bearer token, since a remote source's edges are applied to the
+/// graph unverified-by-origin otherwise. Pure, so it is unit-testable.
+#[must_use]
+fn source_auth_ok(url: &str, has_token: bool) -> bool {
+    has_token || is_loopback_url(url)
+}
+
+/// Whether `url`'s host is a loopback address (`127.0.0.1`, `::1`,
+/// `localhost`). A parse failure or missing host is treated as **not**
+/// loopback (fail-closed → a token is then required).
+#[must_use]
+fn is_loopback_url(url: &str) -> bool {
+    reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| {
+            u.host_str().map(|h| {
+                let h = h.trim_start_matches('[').trim_end_matches(']');
+                h == "127.0.0.1" || h == "::1" || h.eq_ignore_ascii_case("localhost")
+            })
+        })
+        .unwrap_or(false)
+}
+
+/// SEC-B7: whether an authoritative `ev` is well-formed for a source that is
+/// authoritative for `source_entity`. An edge must **originate** from the
+/// source's own entity (a source is only authoritative for its own outbound
+/// edges) and its endpoint types must be **permitted** for its kind by the
+/// closed registry (`EdgeKind::permits`), so a compromised or buggy source
+/// cannot inject cross-typed or foreign-origin edges. Pure and testable.
+#[must_use]
+fn edge_valid_for_source(ev: &LinkedEvent, source_entity: EntityType) -> bool {
+    ev.from_ref.entity_type == source_entity
+        && ev
+            .edge_kind
+            .permits(ev.from_ref.entity_type, ev.to_ref.entity_type)
 }
 
 #[async_trait]
@@ -300,5 +366,49 @@ mod tests {
         assert_eq!(parsed.edges[0].from_ref.entity_type, EntityType::Person);
         assert_eq!(parsed.edges[0].to_ref.entity_type, EntityType::Worker);
         assert_eq!(parsed.edges[0].confidence, Some(1.0));
+    }
+
+    /// SEC-B7: a remote reconcile source must carry a token; only a loopback
+    /// URL may be token-less.
+    #[test]
+    fn source_auth_requires_a_token_for_remote_hosts() {
+        // Remote host: token required.
+        assert!(!super::source_auth_ok(
+            "https://links.example.com/api",
+            false
+        ));
+        assert!(super::source_auth_ok("https://links.example.com/api", true));
+        // Loopback (dev/test): token optional.
+        assert!(super::source_auth_ok(
+            "http://127.0.0.1:5150/api/links",
+            false
+        ));
+        assert!(super::source_auth_ok(
+            "http://localhost:5150/api/links",
+            false
+        ));
+        assert!(super::source_auth_ok("http://[::1]:5150/api/links", false));
+        // Unparseable / hostless: fail closed (a token is required).
+        assert!(!super::is_loopback_url("not a url"));
+        assert!(!super::source_auth_ok("not a url", false));
+    }
+
+    /// SEC-B7: an authoritative edge is applied only if it originates from
+    /// the source's entity and its endpoint types are permitted for its kind.
+    #[test]
+    fn edge_validity_enforces_origin_and_endpoint_types() {
+        // A well-typed case → person `subject_of` from the case source.
+        let ok = edge(1);
+        assert!(super::edge_valid_for_source(&ok, EntityType::Case));
+
+        // Same edge, but claimed by a source authoritative for a different
+        // entity (person) — its `from_ref` is a case, so it is rejected.
+        assert!(!super::edge_valid_for_source(&ok, EntityType::Person));
+
+        // An ill-typed edge: `same_identity` only permits person↔worker, so
+        // a case→person `same_identity` is refused even from the case source.
+        let mut ill = edge(2);
+        ill.edge_kind = EdgeKind::SameIdentity;
+        assert!(!super::edge_valid_for_source(&ill, EntityType::Case));
     }
 }
