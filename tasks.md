@@ -453,19 +453,22 @@
   care-pathway, case, portfolio) and lower the 5 MB cap. Closes the O(n·m)
   Jaro-Winkler/Levenshtein/Jaccard DoS amplified ×scan-cap. *Tests:*
   over-length field / over-cardinality array ⇒ 422 before the matcher runs.
-- [ ] **SEC-M2 (M) 🟠** False-deterministic-match empty guards: add a
-  post-normalization empty check to every string-keyed short-circuit —
-  passport (person `matcher.rs:2170`, worker `:1817`), place
-  `name_and_postcode_match` (`:975-989`), thing `same_canonical_url`/
-  `shares_same_as` (`:827,:808`), person/worker demographic fallback
-  (`:1317`/`:1011`), course/care-pathway R-1 code (`:223`/`:239`), event
-  `name_and_start_date_match` (`:914`), case/portfolio trivial `"/"`/`"0"`
-  cases. *Tests (proptest):* two records sharing only a blank/whitespace/
-  punctuation value MUST NOT deterministically match.
-- [ ] **SEC-M3 (S) 🟠** Reject sentinel national IDs (all-zeros) in
-  `ie_ihi`/`es_tsi`/`dk_cpr` (person `identifiers.rs:349,301,1090`; worker
-  `matcher.rs:1779`) — match the `nl_bsn` posture (`:741`). *Test:* all-zero
-  placeholder IDs do not short-circuit to 1.0.
+- [~] **SEC-M2 (M) 🟠** False-deterministic-match empty guards. *(person +
+  worker done 2026-07-13; other matchers remain)* Add a post-normalization
+  empty check to every string-keyed short-circuit. **Done:** passport
+  (person/worker `passport_books_share_pair`) + demographic fallback
+  (non-empty normalised names) with false-match unit tests. **Remaining:**
+  place `name_and_postcode_match` (`:975-989`), thing `same_canonical_url`/
+  `shares_same_as` (`:827,:808`), course/care-pathway R-1 code
+  (`:223`/`:239`), event `name_and_start_date_match` (`:914`),
+  case/portfolio trivial `"/"`/`"0"` cases. *Tests (proptest):* two records
+  sharing only a blank/whitespace/punctuation value MUST NOT match.
+- [x] **SEC-M3 (S) 🟠** Reject sentinel national IDs (all-zeros). *(done 2026-07-13)*
+  `parse_ie_ihi`/`parse_es_tsi`/`parse_dk_cpr` in both the person- and
+  worker-matcher `identifiers.rs` now reject an all-zeros placeholder (via
+  a shared `is_sentinel_zeros` helper), matching the `nl_bsn` posture, so a
+  `"0000000"` sentinel shared by two records cannot short-circuit to 1.0.
+  Unit test `format_only_parsers_reject_all_zeros_sentinels` in both crates.
 - [x] **SEC-M4 (S) 🟡** portfolio `days_from_civil` overflow. *(done 2026-07-12)*
   `iso_date_to_days` parsed `year` as unbounded `i64`, so a crafted date
   overflowed `era*146_097` (panic debug / wrap release) via the timeframe

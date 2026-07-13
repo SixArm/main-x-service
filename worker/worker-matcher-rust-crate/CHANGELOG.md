@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security — false-identity-match guards (SEC-M2 / SEC-M3)
+
+- **Empty passport pair no longer matches.** `passport_books_share_pair`
+  skips a pair whose country or number is blank, so a crafted
+  `{"country":"","number":""}` (a deserialized `PassportBook` bypassing
+  `PassportBook::new`) on two different workers no longer short-circuits to
+  a 1.0 identity match.
+- **Blank names no longer satisfy the demographic fallback.** The
+  deterministic demographic tuple now requires both names to have a
+  non-empty normalised form.
+- **All-zeros national-ID sentinels rejected** in the format-only parsers
+  `parse_ie_ihi`, `parse_es_tsi`, `parse_dk_cpr`. New unit tests pin all
+  three guards.
+
 ### Documented — organisation-level identifiers are permanently out of scope
 
 - Spec §2 now records, under a new "Out of scope (permanently):

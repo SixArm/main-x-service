@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security — false-identity-match guards (SEC-M2 / SEC-M3)
+
+- **Empty passport pair no longer matches.** `passport_books_share_pair`
+  now skips a pair whose country or number is blank. `PassportBook` is
+  deserialized with public fields (bypassing `PassportBook::new`, which
+  rejects empties), so a crafted `{"country":"","number":""}` on two
+  different people would otherwise deterministically short-circuit to a
+  1.0 identity match.
+- **Blank names no longer satisfy the demographic fallback.** The
+  deterministic demographic tuple now requires both names to have a
+  **non-empty normalised form**, so two records sharing only a
+  blank/punctuation name (normalising to `""`) plus a DOB no longer match.
+- **All-zeros national-ID sentinels rejected.** The format-only (no
+  check-digit) parsers `parse_ie_ihi`, `parse_es_tsi`, `parse_dk_cpr` now
+  reject an all-zeros placeholder (mirroring the check-digit schemes),
+  so a `"0000000"` sentinel shared by two people cannot short-circuit to
+  a 1.0 match. New unit tests pin all three guards.
+
 ### Changed — date handling on `chrono` (0.6.0)
 
 - Bumped to 0.6.0. The crate's date handling is fully on `chrono`
