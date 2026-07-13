@@ -179,6 +179,45 @@ async fn can_redeem_magic_link_for_access_token() {
     .await;
 }
 
+/// SEC-A4: two **concurrent** redemptions of the same magic link must not
+/// both succeed. The atomic `consume_magic_token` (a single `UPDATE … WHERE
+/// token=$1 RETURNING`) lets exactly one win; the other gets `401`. Before
+/// the fix, the SELECT-then-UPDATE let both pass the read and mint a session.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn concurrent_magic_link_redemptions_only_one_wins() {
+    request::<App, _, _>(|request, ctx| async move {
+        seed::<App>(&ctx).await.unwrap();
+
+        let payload = serde_json::json!({ "email": "user1@example.com" });
+        assert_eq!(
+            request
+                .post("/api/auth/magic-link")
+                .json(&payload)
+                .await
+                .status_code(),
+            200
+        );
+        let token = users::Model::find_by_email(&ctx.db, "user1@example.com")
+            .await
+            .expect("seeded user should exist")
+            .magic_link_token
+            .expect("magic link token should be generated");
+
+        let url = format!("/api/auth/magic-link/{token}");
+        let (first, second) = tokio::join!(async { request.get(&url).await }, async {
+            request.get(&url).await
+        },);
+        let codes = [first.status_code().as_u16(), second.status_code().as_u16()];
+        assert!(
+            codes.contains(&200) && codes.contains(&401),
+            "exactly one concurrent redemption must win, got {codes:?}"
+        );
+    })
+    .await;
+}
+
 /// Pins that an unknown/invalid magic-link token is rejected with 401
 /// (same status as expired/consumed — no distinguishing leak).
 #[tokio::test]

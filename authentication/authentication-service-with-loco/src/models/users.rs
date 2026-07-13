@@ -21,6 +21,7 @@ use std::collections::BTreeMap;
 use async_trait::async_trait;
 use chrono::{Duration, offset::Local};
 use loco_rs::{auth::jwt, hash, prelude::*};
+use sea_orm::FromQueryResult;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use uuid::Uuid;
@@ -244,6 +245,34 @@ impl Model {
             .one(db)
             .await?;
         user.ok_or_else(|| ModelError::EntityNotFound)
+    }
+
+    /// Atomically **consume** a magic-link token (SEC-A4): a single `UPDATE`
+    /// clears the token + expiration and `RETURNING`s the row, but only when
+    /// the token exists AND is unexpired. Because it is one statement, two
+    /// concurrent redemptions of the same link race on it — exactly one gets
+    /// a row (the winner), the other gets none — so a magic link is truly
+    /// single-use even under concurrency. The prior `find_by_magic_token`
+    /// (SELECT) + `clear_magic_link` (UPDATE) let both concurrent requests
+    /// pass the read and each mint a session.
+    ///
+    /// # Errors
+    ///
+    /// [`ModelError::EntityNotFound`] when the token is unknown, expired, or
+    /// already consumed (all map to the same `401` at the controller).
+    pub async fn consume_magic_token(db: &DatabaseConnection, token: &str) -> ModelResult<Self> {
+        let stmt = sea_orm::Statement::from_sql_and_values(
+            db.get_database_backend(),
+            "UPDATE users \
+             SET magic_link_token = NULL, magic_link_expiration = NULL, updated_at = now() \
+             WHERE magic_link_token = $1 AND magic_link_expiration >= now() \
+             RETURNING *",
+            [token.into()],
+        );
+        match db.query_one(stmt).await? {
+            Some(row) => Model::from_query_result(&row, "").map_err(ModelError::from),
+            None => Err(ModelError::EntityNotFound),
+        }
     }
 
     /// finds a user by the magic token and verify and token expiration

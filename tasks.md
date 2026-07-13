@@ -284,10 +284,12 @@
   at `info` in every env. Now gated to `Environment::Development` only via
   pure `log_magic_link_url`; other envs log the issuance without the token.
   Unit test `magic_link_url_logged_only_in_development`.
-- [ ] **SEC-A4 (S) 🟡** Atomic single-use magic-link consume: replace
-  SELECT-then-clear (`controllers/auth.rs:284-298`, `models/users.rs:254-283`)
-  with `UPDATE … WHERE magic_link_token=$1 RETURNING`. *Test:* two concurrent
-  redemptions ⇒ exactly one 200, one 401 (DB-gated).
+- [x] **SEC-A4 (S) 🟡** Atomic single-use magic-link consume. *(done 2026-07-13)*
+  Replaced SELECT-then-clear with `Model::consume_magic_token` — one
+  `UPDATE … WHERE magic_link_token=$1 AND not-expired RETURNING *` (via
+  `query_one` + `FromQueryResult`), so concurrent redemptions can't both win.
+  DB-gated `concurrent_magic_link_redemptions_only_one_wins` (exactly one 200,
+  one 401). Green: lib (71) + `test --no-run` + clippy + fmt.
 - [ ] **SEC-A5 (S) 🟡** Constant-work signup: always run one Argon2 hash so
   existing-vs-new email latency does not distinguish (`controllers/auth.rs:167-197`).
   *Test:* both paths perform equivalent hashing work.

@@ -298,7 +298,10 @@ async fn request_magic_link(
 /// session cookie + issue a PASETO, and record the session for revocation.
 #[debug_handler]
 async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
-    let Ok(user) = users::Model::find_by_magic_token(&ctx.db, &token).await else {
+    // SEC-A4: atomically consume the token — the clear-and-return is a single
+    // UPDATE, so two concurrent redemptions of the same link cannot both
+    // succeed (only one gets a row; the loser gets `EntityNotFound` → 401).
+    let Ok(user) = users::Model::consume_magic_token(&ctx.db, &token).await else {
         // Unknown / expired / already-consumed token — all map to the
         // same 401. We never log the token itself.
         AuthEvent::record_best_effort(
@@ -312,7 +315,7 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
         return unauthorized("invalid or expired magic link");
     };
 
-    let user = user.into_active_model().clear_magic_link(&ctx.db).await?;
+    // The token is already cleared by `consume_magic_token`.
     let user = if user.email_verified_at.is_none() {
         user.into_active_model().verified(&ctx.db).await?
     } else {
