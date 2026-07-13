@@ -1385,7 +1385,13 @@ impl WorkerRepository for SeaOrmWorkerRepository {
 
     async fn search(&self, query: &str) -> Result<Vec<Worker>> {
         // Case-insensitive substring match on family name via SQL LIKE.
-        let search_pattern = format!("%{}%", query.to_lowercase());
+        // SEC-G4: escape the caller's `LIKE` metacharacters (`%`, `_`, `\`)
+        // before wrapping in the `%…%` contains-pattern, so a query of
+        // `%` (matches every row) or `_`×N (an expensive scan) is treated
+        // literally, not as a wildcard. The value is a bound parameter
+        // (no SQL injection); this closes the wildcard-injection / DoS
+        // vector. Postgres `LIKE` uses `\` as the escape char.
+        let search_pattern = format!("%{}%", escape_like(&query.to_lowercase()));
 
         // First collect distinct matching worker IDs, then hydrate each.
         let worker_ids: Vec<Uuid> = worker_names::Entity::find()
@@ -1440,9 +1446,31 @@ impl WorkerRepository for SeaOrmWorkerRepository {
 /// bare `cargo test`; run with
 /// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE under a
 /// bare `cargo test --lib`.
+/// Escape SQL `LIKE` wildcards (`\`, `%`, `_`) so a user query matches
+/// literally inside a `%…%` contains-pattern (SEC-G4). The backslash is
+/// escaped first so it cannot re-enable a following wildcard. Postgres
+/// `LIKE` uses `\` as the default escape character.
+fn escape_like(q: &str) -> String {
+    q.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{SeaOrmWorkerRepository, WorkerRepository};
+    use super::{SeaOrmWorkerRepository, WorkerRepository, escape_like};
+    /// SEC-G4: `LIKE` wildcards in a search query are neutralised so they
+    /// match literally and cannot scan every row (`%`) or force pathological
+    /// work (`_`). Pure, DB-free.
+    #[test]
+    fn escape_like_neutralises_wildcards() {
+        assert_eq!(escape_like("smith"), "smith");
+        assert_eq!(escape_like("100%"), "100\\%");
+        assert_eq!(escape_like("a_b"), "a\\_b");
+        // Backslash is escaped first so it can't re-enable a wildcard.
+        assert_eq!(escape_like("a\\%"), "a\\\\\\%");
+    }
+
     use crate::db::models::event_outbox;
     use crate::models::{Gender, HumanName, Worker};
     use crate::streaming::EventTransport;

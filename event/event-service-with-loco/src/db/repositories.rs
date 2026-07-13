@@ -1215,7 +1215,13 @@ impl EventRepository for SeaOrmEventRepository {
         // Case-insensitive substring match: lower-case both sides and
         // wrap the query in `%…%`. The pattern is bound as `$1` so the
         // user text is never interpolated into the SQL string.
-        let pattern = format!("%{}%", query.to_lowercase());
+        // SEC-G4: escape the caller's `LIKE` metacharacters (`%`, `_`, `\`)
+        // before wrapping in the `%…%` contains-pattern, so a query of
+        // `%` (matches every row) or `_`×N (an expensive scan) is treated
+        // literally, not as a wildcard. The value is a bound parameter
+        // (no SQL injection); this closes the wildcard-injection / DoS
+        // vector. Postgres `LIKE` uses `\` as the escape char.
+        let pattern = format!("%{}%", escape_like(&query.to_lowercase()));
         // First pass: project just the matching ids (excluding
         // soft-deleted rows) to keep the scan cheap.
         let event_ids: Vec<Uuid> = events::Entity::find()
@@ -1260,9 +1266,31 @@ impl EventRepository for SeaOrmEventRepository {
 /// by a bare `cargo test`; run with
 /// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE
 /// under a bare `cargo test --lib`.
+/// Escape SQL `LIKE` wildcards (`\`, `%`, `_`) so a user query matches
+/// literally inside a `%…%` contains-pattern (SEC-G4). The backslash is
+/// escaped first so it cannot re-enable a following wildcard. Postgres
+/// `LIKE` uses `\` as the default escape character.
+fn escape_like(q: &str) -> String {
+    q.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{EventRepository, SeaOrmEventRepository};
+    use super::{EventRepository, SeaOrmEventRepository, escape_like};
+    /// SEC-G4: `LIKE` wildcards in a search query are neutralised so they
+    /// match literally and cannot scan every row (`%`) or force pathological
+    /// work (`_`). Pure, DB-free.
+    #[test]
+    fn escape_like_neutralises_wildcards() {
+        assert_eq!(escape_like("smith"), "smith");
+        assert_eq!(escape_like("100%"), "100\\%");
+        assert_eq!(escape_like("a_b"), "a\\_b");
+        // Backslash is escaped first so it can't re-enable a wildcard.
+        assert_eq!(escape_like("a\\%"), "a\\\\\\%");
+    }
+
     use crate::db::models::event_outbox;
     use crate::models::Event;
     use crate::streaming::EventTransport;

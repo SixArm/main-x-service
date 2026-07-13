@@ -1206,7 +1206,13 @@ impl PersonRepository for SeaOrmPersonRepository {
     /// SQL `LIKE` search over lowercased family name; resolves each
     /// matched person id to a full record. (Tantivy is the richer path.)
     async fn search(&self, query: &str) -> Result<Vec<Person>> {
-        let search_pattern = format!("%{}%", query.to_lowercase());
+        // SEC-G4: escape the caller's `LIKE` metacharacters (`%`, `_`, `\`)
+        // before wrapping in the `%…%` contains-pattern, so a query of `%`
+        // (matches every row) or `_`×N (forces an expensive scan) is treated
+        // literally rather than as a wildcard. The value is already a bound
+        // parameter (no SQL injection); this closes the wildcard-injection /
+        // DoS vector. Postgres `LIKE` treats `\` as the escape char.
+        let search_pattern = format!("%{}%", escape_like(&query.to_lowercase()));
 
         let person_ids: Vec<Uuid> = person_names::Entity::find()
             .filter(Expr::cust_with_values(
@@ -1257,13 +1263,35 @@ impl PersonRepository for SeaOrmPersonRepository {
 /// by a bare `cargo test`; run with
 /// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE
 /// under a bare `cargo test --lib`.
+/// Escape SQL `LIKE` wildcards (`\`, `%`, `_`) so a user query matches
+/// literally inside a `%…%` contains-pattern (SEC-G4). The backslash is
+/// escaped first so it cannot re-enable a following wildcard. Postgres
+/// `LIKE` uses `\` as the default escape character.
+fn escape_like(q: &str) -> String {
+    q.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{PersonRepository, SeaOrmPersonRepository};
+    use super::{PersonRepository, SeaOrmPersonRepository, escape_like};
     use crate::db::models::event_outbox;
     use crate::models::{Gender, HumanName, Person};
     use crate::streaming::EventTransport;
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    /// SEC-G4: `LIKE` wildcards in a search query are neutralised so they
+    /// match literally and cannot scan every row (`%`) or force pathological
+    /// work (`_`). Pure, DB-free.
+    #[test]
+    fn escape_like_neutralises_wildcards() {
+        assert_eq!(escape_like("smith"), "smith");
+        assert_eq!(escape_like("100%"), "100\\%");
+        assert_eq!(escape_like("a_b"), "a\\_b");
+        // Backslash is escaped first so it can't re-enable a wildcard.
+        assert_eq!(escape_like("a\\%"), "a\\\\\\%");
+    }
 
     async fn connect() -> sea_orm::DatabaseConnection {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
