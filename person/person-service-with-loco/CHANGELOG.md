@@ -10,6 +10,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-B3: serialise bulk upsert to close a create-create race.** The
+  import pipeline did a SELECT-then-INSERT with no locking, so two
+  concurrent importers of the same stable key both missed in
+  `find_existing` and both `create`d — duplicating the record. A
+  `UNIQUE(system,value)` is the wrong tool (the registry intentionally
+  permits duplicate identifiers — dedup is a workflow). Instead, the per-row
+  find→create/update now runs under a **transaction-scoped advisory lock**
+  on the stable key (`pg_advisory_xact_lock(hashtext(key))`,
+  `import_upsert_locked`): a second importer of the same key blocks until
+  the first commits, then observes the just-written record and upserts it in
+  place. Dry-run classification stays lock-free (it commits nothing).
+  *Test (DB-gated):* two concurrent imports of one SSN key ⇒ exactly one
+  distinct person owns the identifier, one create + one upsert; plus a pure
+  test that the lock-key string is collision-free across kinds/boundaries.
+
 - **SEC-B4: bulk artifact hardening — path confinement, IDOR, and TTL.**
   Three holes in the bulk job/artifact surface:
   - **Arbitrary file read.** `LocalFsArtifactStore::get` stripped a

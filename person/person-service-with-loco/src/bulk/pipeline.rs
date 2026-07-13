@@ -27,7 +27,10 @@
 //! soft-deleted-record export query (`include_soft_deleted = true` is
 //! rejected as not-yet-supported rather than leaking or ignoring it).
 
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait, QueryFilter,
+    Statement, TransactionTrait,
+};
 use uuid::Uuid;
 
 use crate::Result;
@@ -171,6 +174,63 @@ async fn find_existing(
     }
 }
 
+/// The lock string for a [`StableKey`] — a stable, collision-resistant
+/// rendering hashed by Postgres into the advisory-lock keyspace (SEC-B3).
+/// The `\0` separator keeps `system`/`value` boundaries unambiguous.
+fn stable_key_lock_string(key: &StableKey) -> String {
+    match key {
+        StableKey::Pid(id) => format!("person-pid:{id}"),
+        StableKey::Identifier { system, value } => format!("person-id:{system}\u{0}{value}"),
+    }
+}
+
+/// SEC-B3 — the idempotent per-row upsert, serialised across concurrent
+/// importers by a **transaction-scoped advisory lock** on the row's stable
+/// key. Without this, two importers of the same stable key both SELECT-miss
+/// in [`find_existing`] and both `create`, duplicating the record (the
+/// registry intentionally permits duplicate identifiers — dedup is a
+/// workflow — so a `UNIQUE(system,value)` constraint is the wrong tool).
+///
+/// A guard transaction takes `pg_advisory_xact_lock(hashtext(key))` and
+/// holds it across find → create/update → commit, so a second importer of
+/// the same key blocks until the first commits and then observes the
+/// just-written record and upserts it in place. The repository's own
+/// create/update transactions commit within this window; the lock (not the
+/// connection) provides the mutual exclusion. Returns `(saved, was_upsert)`.
+async fn import_upsert_locked(
+    db: &DatabaseConnection,
+    repo: &dyn PersonRepository,
+    person: &mut Person,
+) -> Result<(Person, bool)> {
+    let key = resolve_stable_key(person);
+    let guard = db.begin().await?;
+    guard
+        .execute(Statement::from_sql_and_values(
+            DatabaseBackend::Postgres,
+            "SELECT pg_advisory_xact_lock(hashtext($1)::bigint)",
+            [stable_key_lock_string(&key).into()],
+        ))
+        .await?;
+
+    let existing = find_existing(db, repo, person).await?;
+    let result = if let Some(existing) = existing {
+        // Upsert in place: keep the existing record's pid so the stable key
+        // maps to one record across re-imports and concurrent importers.
+        person.id = existing.id;
+        repo.update(person).await.map(|saved| (saved, true))
+    } else {
+        if person.id == Uuid::nil() {
+            person.id = Uuid::new_v4();
+        }
+        repo.create(person).await.map(|saved| (saved, false))
+    };
+    // Commit the guard to release the advisory lock only after the write has
+    // committed, so a waiter observes the row. On a write error the guard is
+    // dropped (rolled back) and the lock releases anyway.
+    guard.commit().await?;
+    result
+}
+
 /// Run a full import over a JSONL byte buffer, returning the reconciled
 /// [`ImportOutcome`] (including the per-row error report).
 ///
@@ -222,40 +282,32 @@ pub async fn process_import_job(
             continue;
         }
 
-        let existing = match find_existing(db, repo, &person).await {
-            Ok(existing) => existing,
-            Err(e) => {
-                outcome
-                    .errors
-                    .push(ErrorRow::database(row_number, e.to_string()));
-                outcome.rows_errored += 1;
-                continue;
-            }
-        };
-
         if params.dry_run {
-            if existing.is_some() {
-                outcome.rows_upserted += 1;
-            } else {
-                outcome.rows_created += 1;
+            // Classify only; no lock/write. A concurrent create between this
+            // read and a later real run is immaterial — dry-run commits
+            // nothing.
+            match find_existing(db, repo, &person).await {
+                Ok(existing) => {
+                    if existing.is_some() {
+                        outcome.rows_upserted += 1;
+                    } else {
+                        outcome.rows_created += 1;
+                    }
+                }
+                Err(e) => {
+                    outcome
+                        .errors
+                        .push(ErrorRow::database(row_number, e.to_string()));
+                    outcome.rows_errored += 1;
+                }
             }
             continue;
         }
 
-        let (written, was_upsert) = if let Some(existing) = existing {
-            // Upsert in place: keep the existing record's pid so the
-            // stable key maps to one record across re-imports.
-            person.id = existing.id;
-            (repo.update(&person).await, true)
-        } else {
-            if person.id == Uuid::nil() {
-                person.id = Uuid::new_v4();
-            }
-            (repo.create(&person).await, false)
-        };
-
-        match written {
-            Ok(saved) => {
+        // SEC-B3: find + create/update under a stable-key advisory lock so
+        // concurrent importers of the same key produce exactly one record.
+        match import_upsert_locked(db, repo, &mut person).await {
+            Ok((saved, was_upsert)) => {
                 if let Err(e) = search.index_person(&saved) {
                     tracing::warn!("bulk import: failed to index person {}: {}", saved.id, e);
                 }
@@ -404,6 +456,75 @@ mod db_tests {
         assert_eq!(second.rows_created, 0, "re-import creates nothing");
         assert_eq!(second.rows_upserted, 2, "re-import upserts both");
         assert_eq!(second.rows_errored, 1);
+    }
+
+    /// SEC-B3: two concurrent imports of the **same** stable key must
+    /// produce exactly one record — the advisory lock serialises the
+    /// find→create/update so the second importer upserts the first's row
+    /// instead of racing it into a duplicate.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn concurrent_imports_of_one_stable_key_yield_one_record() {
+        use crate::db::models::person_identifiers;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        let db = connect().await;
+        let system = "http://hl7.org/fhir/sid/us-ssn".to_string();
+        let value = format!("SSN-{}", uuid::Uuid::new_v4());
+
+        let mut p = person("Concurrent");
+        p.identifiers.push(Identifier::new(
+            IdentifierType::SSN,
+            system.clone(),
+            value.clone(),
+        ));
+        let input = jsonl::encode(std::slice::from_ref(&p)).unwrap();
+
+        // Two importers racing the identical single-row file on a shared pool.
+        let spawn_import = |db: sea_orm::DatabaseConnection, input: Vec<u8>| {
+            tokio::spawn(async move {
+                let repo = SeaOrmPersonRepository::new(db.clone());
+                let dir = tempfile::tempdir().unwrap();
+                let search = SearchEngine::new(dir.path()).unwrap();
+                let out = process_import_job(&db, &repo, &search, &input, &ImportParams::default())
+                    .await
+                    .unwrap();
+                // Keep the temp index alive until the job finishes.
+                drop(dir);
+                (out.rows_created, out.rows_upserted, out.rows_errored)
+            })
+        };
+        let h1 = spawn_import(db.clone(), input.clone());
+        let h2 = spawn_import(db.clone(), input.clone());
+        let (a, b) = tokio::join!(h1, h2);
+        let (c1, u1, e1) = a.unwrap();
+        let (c2, u2, e2) = b.unwrap();
+
+        assert_eq!(e1 + e2, 0, "no row errors");
+        assert_eq!(
+            c1 + c2,
+            1,
+            "exactly one importer created the record (got {c1} + {c2})"
+        );
+        assert_eq!(
+            u1 + u2,
+            1,
+            "the other importer upserted it (got {u1} + {u2})"
+        );
+
+        // Ground truth: exactly one distinct person owns that identifier.
+        let rows = person_identifiers::Entity::find()
+            .filter(person_identifiers::Column::System.eq(system))
+            .filter(person_identifiers::Column::Value.eq(value))
+            .all(&db)
+            .await
+            .unwrap();
+        let distinct: std::collections::HashSet<_> = rows.iter().map(|r| r.person_id).collect();
+        assert_eq!(
+            distinct.len(),
+            1,
+            "exactly one person may own the stable-key identifier"
+        );
     }
 
     #[tokio::test]
@@ -630,6 +751,40 @@ mod unit_tests {
         assert!(export_requires_elevation(MaskingProfile::Full, false));
         assert!(export_requires_elevation(MaskingProfile::Masked, true));
         assert!(export_requires_elevation(MaskingProfile::Full, true));
+    }
+
+    /// SEC-B3: the advisory-lock key string distinguishes stable-key kinds
+    /// and keeps `system`/`value` boundaries unambiguous, so two different
+    /// keys cannot collide onto the same lock.
+    #[test]
+    fn stable_key_lock_string_is_distinct_per_key() {
+        use super::stable_key_lock_string;
+        use crate::bulk::stable_key::StableKey;
+        use uuid::Uuid;
+
+        let pid = Uuid::from_u128(1);
+        let by_pid = stable_key_lock_string(&StableKey::Pid(pid));
+        assert!(by_pid.starts_with("person-pid:"));
+
+        let a = stable_key_lock_string(&StableKey::Identifier {
+            system: "sys".into(),
+            value: "abc".into(),
+        });
+        let b = stable_key_lock_string(&StableKey::Identifier {
+            system: "sys".into(),
+            value: "abd".into(),
+        });
+        assert_ne!(a, b, "different values must yield different lock keys");
+        // The `\0` separator prevents ("sy","stemabc") aliasing ("sys","temabc").
+        let split_a = stable_key_lock_string(&StableKey::Identifier {
+            system: "sys".into(),
+            value: "temabc".into(),
+        });
+        let split_b = stable_key_lock_string(&StableKey::Identifier {
+            system: "sy".into(),
+            value: "stemabc".into(),
+        });
+        assert_ne!(split_a, split_b, "boundary must be unambiguous");
     }
 
     /// SEC-B2: a caller-supplied export `limit` is clamped to the ceiling,
