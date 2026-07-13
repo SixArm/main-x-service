@@ -270,7 +270,11 @@ fn deterministic_match(a: &WorkItem, b: &WorkItem) -> bool {
     // R-2 — any same_as URL overlaps (folded + trailing-slash-trimmed).
     for au in &a.same_as {
         let an = normalize::url(au);
-        if an.is_empty() {
+        // SEC-M2: skip trivial / non-identity URLs — empty, or a bare
+        // root `"/"` (`normalize::url` deliberately keeps a lone slash
+        // non-empty) — so two different work items sharing only `"/"` do
+        // not short-circuit to a certain match.
+        if an.is_empty() || an == "/" {
             continue;
         }
         for bu in &b.same_as {
@@ -596,6 +600,30 @@ mod tests {
         b.same_as = vec!["  https://pm.example.com/p/APOLLO/  ".into()];
         let r = engine.match_work_items(&a, &b);
         assert!((r.score - 1.0).abs() < 1e-9);
+    }
+
+    // SEC-M2: a bare root `same_as` URL (`"/"`, which `normalize::url`
+    // deliberately keeps non-empty) is not identity evidence — two
+    // DIFFERENT work items sharing only `"/"` must NOT short-circuit,
+    // while a real shared URL still does.
+    #[test]
+    fn trivial_root_same_as_does_not_short_circuit() {
+        let engine = MatchingEngine::default_config();
+        let mut root_a = project("Alpha");
+        let mut root_b = project("Omega");
+        root_a.same_as = vec!["/".into()];
+        root_b.same_as = vec!["/".into()];
+        assert!(!deterministic_match(&root_a, &root_b));
+        let r = engine.match_work_items(&root_a, &root_b);
+        assert!(!r.breakdown.deterministic_match);
+        assert!(!r.is_match, "got {}", r.score);
+
+        // Positive control: a real shared identity URL still short-circuits.
+        let mut url_a = project("Alpha");
+        let mut url_b = project("Omega");
+        url_a.same_as = vec!["https://pm.example.com/p/APOLLO".into()];
+        url_b.same_as = vec!["https://pm.example.com/p/APOLLO".into()];
+        assert!(deterministic_match(&url_a, &url_b));
     }
 
     // Pins the goals component: shared goal titles (folded) score 1.0.

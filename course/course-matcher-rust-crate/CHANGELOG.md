@@ -9,6 +9,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-M2: provider-scoped deterministic rule (R-1) no longer
+  short-circuits on an empty course code.** The R-1 rule in
+  `deterministic_match` (`src/matcher.rs`) previously guarded that
+  `provider_id` was non-empty but not the course code itself, so two
+  DIFFERENT courses sharing a provider whose codes both normalise to
+  `""` (e.g. `"-"` or `"  "`) would falsely pin to a `1.0` identity
+  match. R-1 now additionally requires the normalised code to be
+  non-empty (both `provider_id` and the normalised `course_code` must be
+  present). Same bug class as the person-matcher `passport_books_share_pair`
+  fix. Added a regression test; no weights/thresholds changed.
+
 ### Fixed
 
 - Formatting drift in `src/matcher.rs` (two spots not rustfmt-formatted);

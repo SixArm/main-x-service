@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-M2 (High): empty-URL deterministic false positive.** The two
+  URL/`sameAs` deterministic short-circuits in `src/matcher.rs`
+  (`same_canonical_url`, `shares_same_as`) keyed on a normalised URL string
+  with no empty guard, so a value that normalises to empty (whitespace, or a
+  bare `#fragment`) made `"" == ""` fire, spuriously pinning two *different*
+  things to a 1.0 identity match. Both short-circuits now ignore values whose
+  normalised form is empty: `same_canonical_url` returns `false` when the
+  normalised `url` is empty, and `shares_same_as` skips empty normalised
+  `sameAs` entries so a shared degenerate value is not evidence. Behaviour on
+  real URLs is unchanged; no weights or thresholds altered. (Same bug class as
+  person-matcher's `passport_books_share_pair` fix.)
+
 ### Added — tags (operator labels) as a supporting match signal
 
 - Spec-only addition (§3.1, §3.4, §3.7, §5.9.2, §5.10, §6.8): a

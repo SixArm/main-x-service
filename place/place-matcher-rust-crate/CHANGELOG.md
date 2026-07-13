@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-M2 (High): empty-normalisation guard on the `name` + `postcode`
+  deterministic short-circuit.** The `name_and_postcode_match` rule
+  (`src/matcher.rs`) compared normalised name and postcode with no
+  post-normalisation empty check, so two unrelated places whose name and
+  postcode both normalise to the empty string (e.g. `name="."`,
+  `postcode=" "`) satisfied `"" == ""` twice and short-circuited to a
+  spurious `1.0` identity match. The rule now returns `false` when either
+  the normalised name OR the normalised postcode is empty — a value that
+  normalises to empty is not identity evidence. Same bug class as the
+  person-matcher `passport_books_share_pair` fix. No weight/threshold or
+  other behaviour change.
+
 ### Fixed
 
 - Formatting drift in `src/matcher.rs` (one test's builder chain was not

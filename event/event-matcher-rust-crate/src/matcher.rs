@@ -915,7 +915,12 @@ fn name_and_start_date_match(e1: &Event, e2: &Event) -> bool {
     let (Some(n1), Some(n2)) = (&e1.name, &e2.name) else {
         return false;
     };
-    if Normalizer::normalize_name(n1) != Normalizer::normalize_name(n2) {
+    let norm1 = Normalizer::normalize_name(n1);
+    let norm2 = Normalizer::normalize_name(n2);
+    // Guard against empty-name matches (SEC-M2): a name that normalises to an
+    // empty string (e.g. "###", "  ") must not satisfy the name leg, else two
+    // unrelated events could deterministically match on an empty name.
+    if norm1.is_empty() || norm1 != norm2 {
         return false;
     }
     let (Some(sd1), Some(sd2)) = (&e1.start_date, &e2.start_date) else {
@@ -1291,6 +1296,21 @@ mod tests {
     fn deterministic_rejects_when_start_date_missing_and_no_shared_id() {
         let a = Event::builder().name("X").build();
         let b = Event::builder().name("X").build();
+        assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
+    }
+
+    #[test]
+    fn deterministic_rejects_when_name_normalises_to_empty() {
+        // SEC-M2: two DIFFERENT events whose only shared field is a name that
+        // normalises to empty (plus the same start_date) must NOT match.
+        let a = Event::builder()
+            .name("###")
+            .start_date("2024-09-10T09:00:00Z")
+            .build();
+        let b = Event::builder()
+            .name("  ")
+            .start_date("2024-09-10T09:00:00Z")
+            .build();
         assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 

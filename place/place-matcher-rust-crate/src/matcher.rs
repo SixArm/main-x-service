@@ -972,11 +972,20 @@ fn score_place_ids(p1: &Place, p2: &Place) -> Option<f64> {
 /// `false`. Names are compared via [`Normalizer::normalize_name`] and
 /// postcodes via [`Normalizer::normalize_postcode`], so cosmetic
 /// differences (case, punctuation, internal spacing) do not block a match.
+///
+/// A value that normalises to the empty string (e.g. `"."`, `"--"`, or a
+/// whitespace-only postcode) is NOT identity evidence: if either the
+/// normalised name OR the normalised postcode is empty, the rule does not
+/// fire. Without this guard two unrelated places whose name and postcode
+/// both normalise to `""` would spuriously satisfy `"" == ""` twice and
+/// short-circuit to a false 1.0 identity match (SEC-M2).
 fn name_and_postcode_match(p1: &Place, p2: &Place) -> bool {
     let (Some(n1), Some(n2)) = (&p1.name, &p2.name) else {
         return false;
     };
-    if Normalizer::normalize_name(n1) != Normalizer::normalize_name(n2) {
+    let name1 = Normalizer::normalize_name(n1);
+    let name2 = Normalizer::normalize_name(n2);
+    if name1.is_empty() || name1 != name2 {
         return false;
     }
     let (Some(pc1), Some(pc2)) = (
@@ -985,7 +994,9 @@ fn name_and_postcode_match(p1: &Place, p2: &Place) -> bool {
     ) else {
         return false;
     };
-    Normalizer::normalize_postcode(pc1) == Normalizer::normalize_postcode(pc2)
+    let postcode1 = Normalizer::normalize_postcode(pc1);
+    let postcode2 = Normalizer::normalize_postcode(pc2);
+    !postcode1.is_empty() && postcode1 == postcode2
 }
 
 #[cfg(test)]
@@ -1329,6 +1340,31 @@ mod tests {
     fn deterministic_rejects_when_postcode_missing_and_no_shared_id() {
         let a = Place::builder().name("X").build();
         let b = Place::builder().name("X").build();
+        assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
+    }
+
+    #[test]
+    fn deterministic_reject_blank_name_and_postcode() {
+        // Two clearly-different places whose only shared values are a name
+        // and postcode that both normalise to the empty string ("." → "",
+        // whitespace-only postcode → ""). An empty normalisation is not
+        // identity evidence, so the deterministic rule must NOT fire (SEC-M2).
+        let a = Place::builder()
+            .name(".")
+            .address(Address::new().with_postcode(" "))
+            .latitude(51.5)
+            .longitude(-0.1)
+            .build();
+        let b = Place::builder()
+            .name("--")
+            .address(Address::new().with_postcode("   "))
+            .latitude(40.7)
+            .longitude(-74.0)
+            .build();
+        // Sanity: both names and both postcodes normalise to empty.
+        assert_eq!(Normalizer::normalize_name("."), "");
+        assert_eq!(Normalizer::normalize_name("--"), "");
+        assert_eq!(Normalizer::normalize_postcode(" "), "");
         assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 

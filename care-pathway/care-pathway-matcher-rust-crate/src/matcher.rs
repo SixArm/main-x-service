@@ -242,10 +242,16 @@ fn deterministic_match(a: &CarePathway, b: &CarePathway) -> bool {
         a.pathway_code.as_deref(),
         b.pathway_code.as_deref(),
     ) && !ap.is_empty() // empty provider id is not a real scope
-        && ap == bp // identical provider scope
-        && normalize::pathway_code(ac) == normalize::pathway_code(bc)
+        && ap == bp
+    // identical provider scope
     {
-        return true;
+        // A code that normalises to empty (blank or punctuation-only,
+        // e.g. "-") carries no identity and must never match another
+        // empty code, so require the normalised code to be non-empty.
+        let an = normalize::pathway_code(ac);
+        if !an.is_empty() && an == normalize::pathway_code(bc) {
+            return true;
+        }
     }
 
     // R-2 — any same_as URL overlaps (case-folded). Two records pointing
@@ -495,6 +501,26 @@ mod tests {
         assert_eq!(pathway_code_score(&a, &b), None);
         // Same provider → short-circuits.
         b.provider_id = Some("trust-1".into());
+        assert!(deterministic_match(&a, &b));
+    }
+
+    // SEC-M2: two DIFFERENT pathways sharing a provider but with codes that
+    // normalise to empty (punctuation-only "-" and whitespace "  ") must
+    // NOT deterministically match — an empty code carries no identity. A
+    // real shared provider+code still short-circuits (positive control).
+    #[test]
+    fn empty_pathway_code_does_not_short_circuit_within_provider() {
+        let mut a = CarePathway::new("Acute Stroke Care Pathway");
+        let mut b = CarePathway::new("Diabetes Management Pathway");
+        a.provider_id = Some("trust-1".into());
+        b.provider_id = Some("trust-1".into());
+        // Both codes normalise to "" → no spurious identity match.
+        a.pathway_code = Some("-".into());
+        b.pathway_code = Some("  ".into());
+        assert!(!deterministic_match(&a, &b));
+        // A real shared code within the same provider still fires.
+        a.pathway_code = Some("STROKE-01".into());
+        b.pathway_code = Some("stroke 01".into());
         assert!(deterministic_match(&a, &b));
     }
 

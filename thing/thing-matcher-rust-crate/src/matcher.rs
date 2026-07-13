@@ -804,7 +804,10 @@ fn shares_identifier(thing1: &Thing, thing2: &Thing) -> bool {
 ///
 /// One side is collected into a `BTreeSet` of normalised URLs so the other
 /// side can be probed in `O(log n)` lookups; the set is deterministic.
-/// Empty on either side trivially returns `false`.
+/// Empty on either side trivially returns `false`. Entries whose normalised
+/// form is empty (blank or fragment-only values such as `"   "` or `"#x"`)
+/// are skipped, so two records that share only such a degenerate value do
+/// not spuriously match.
 fn shares_same_as(thing1: &Thing, thing2: &Thing) -> bool {
     if thing1.same_as.is_empty() || thing2.same_as.is_empty() {
         return false;
@@ -813,9 +816,11 @@ fn shares_same_as(thing1: &Thing, thing2: &Thing) -> bool {
         .same_as
         .iter()
         .map(|s| Normalizer::normalize_url(s))
+        .filter(|s| !s.is_empty())
         .collect();
     for s in &thing2.same_as {
-        if set1.contains(&Normalizer::normalize_url(s)) {
+        let norm = Normalizer::normalize_url(s);
+        if !norm.is_empty() && set1.contains(&norm) {
             return true;
         }
     }
@@ -823,13 +828,21 @@ fn shares_same_as(thing1: &Thing, thing2: &Thing) -> bool {
 }
 
 /// `true` iff both things have a `url` and the two normalise to the same
-/// canonical string. A thing missing its `url` can never canonical-URL-match.
+/// non-empty canonical string. A thing missing its `url` can never
+/// canonical-URL-match. A `url` whose normalised form is empty (blank or
+/// fragment-only, e.g. `"   "` or `"#top"`) is treated as no signal, so two
+/// unrelated things sharing only such a degenerate value do not match.
 fn same_canonical_url(thing1: &Thing, thing2: &Thing) -> bool {
     // Both URLs must be present; otherwise there is nothing to compare.
     let (Some(u1), Some(u2)) = (thing1.url.as_ref(), thing2.url.as_ref()) else {
         return false;
     };
-    Normalizer::normalize_url(u1) == Normalizer::normalize_url(u2)
+    let n1 = Normalizer::normalize_url(u1);
+    // A value that normalises to empty carries no identity; never match on it.
+    if n1.is_empty() {
+        return false;
+    }
+    n1 == Normalizer::normalize_url(u2)
 }
 
 #[cfg(test)]
@@ -1164,6 +1177,32 @@ mod tests {
     fn deterministic_rejects_when_no_shared_identity_signal() {
         let a = Thing::builder().name("X").build();
         let b = Thing::builder().name("X").build();
+        assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
+    }
+
+    /// SEC-M2: a `url` that normalises to empty (blank or fragment-only) must
+    /// not deterministically match two clearly-different things. Without the
+    /// empty guard `"" == ""` would spuriously pin a 1.0 identity match.
+    #[test]
+    fn deterministic_rejects_empty_normalized_url() {
+        let a = Thing::builder().name("Eiffel Tower").url("   ").build();
+        let b = Thing::builder()
+            .name("Pride and Prejudice")
+            .url("#")
+            .build();
+        assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
+    }
+
+    /// SEC-M2: a `sameAs` value that normalises to empty must not be shared
+    /// evidence. Two unrelated things whose only common `sameAs` is a blank /
+    /// fragment-only value must not deterministically match.
+    #[test]
+    fn deterministic_rejects_empty_normalized_same_as() {
+        let a = Thing::builder().name("Big Ben").add_same_as("   ").build();
+        let b = Thing::builder()
+            .name("Pride and Prejudice")
+            .add_same_as("#section")
+            .build();
         assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
