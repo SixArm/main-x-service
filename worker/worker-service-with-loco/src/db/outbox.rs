@@ -167,6 +167,10 @@ impl Model {
         let rows = event_outbox::Entity::find()
             .order_by_desc(event_outbox::Column::Id)
             .limit(limit)
+            .lock_with_behavior(
+                sea_orm::sea_query::LockType::Update,
+                sea_orm::sea_query::LockBehavior::SkipLocked,
+            )
             .all(db)
             .await?;
         let views = rows
@@ -187,7 +191,7 @@ impl Model {
     ///
     /// Returns [`Error::Database`](crate::Error::Database) if the query
     /// fails.
-    pub async fn unpublished(db: &DatabaseConnection, limit: u64) -> Result<Vec<Self>> {
+    pub async fn unpublished<C: ConnectionTrait>(db: &C, limit: u64) -> Result<Vec<Self>> {
         let rows = event_outbox::Entity::find()
             .filter(event_outbox::Column::PublishedAt.is_null())
             .order_by_asc(event_outbox::Column::Id)

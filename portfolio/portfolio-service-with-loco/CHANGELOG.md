@@ -9,6 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-B6: relay claims outbox rows with `FOR UPDATE SKIP LOCKED`.** The
+  Phase-3 relay drained via a plain unlocked `SELECT … WHERE published_at IS
+  NULL`, so with more than one instance every relay would **double-ship** the
+  same rows. `drain_once` now runs in a transaction and `unpublished` claims
+  rows with `FOR UPDATE SKIP LOCKED` (a second relay skips locked rows; the
+  lock releases on commit). Delivery stays at-least-once (consumers dedupe on
+  `event_id`).
+
 ### Security — SEC-M1: input-size caps on the validation entrypoint (2026-07-13)
 
 - `src/validation.rs` now rejects oversized `WorkItem` payloads before the
