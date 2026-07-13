@@ -379,12 +379,13 @@
   `/`, `/admin`, `/secret`, `/foo/bar`. (The other 8 services are already
   guard-all. A percent-encoded/normalisation matrix vs the router is a
   deeper follow-up.)
-- [~] **SEC-G6 (S) 🟡** Destructive-action classification robust to a
-  trailing slash. *(case + event + thing + course done 2026-07-13)*
-  `derive_action` now `trim_end_matches('/')`-normalises the path before the
-  destructive-suffix check, so `POST …/merge/` stays `Destructive` (was
-  downgraded to `Write`). Test per crate. **Remaining:** roll the same
-  one-liner to the other loco/axum services' `derive_action` (mechanical).
+- [x] **SEC-G6 (S) 🟡** Destructive-action classification robust to a
+  trailing slash. *(all 10 services done 2026-07-13)* `derive_action` now
+  `trim_end_matches('/')`-normalises the path before the destructive-suffix
+  check, so `POST …/merge/` stays `Destructive` (was downgraded to `Write`,
+  which an `access=write` non-admin caller could exploit). Rolled to all ten
+  services (case, event, thing, course, care-pathway, portfolio, place,
+  organization, worker, person) with a trailing-slash test per crate.
 - [ ] **SEC-G7 (S) ⚪** Bound person `search_persons` `offset`
   (`handlers.rs:436-441`) — unbounded `offset+limit` forces the index to
   materialise arbitrarily many hits. *Test:* large offset clamped/rejected.

@@ -119,6 +119,11 @@ pub fn require_auth_from_env() -> bool {
 /// `POST`/`PUT`/`PATCH` (and any unrecognised method) ⇒ `Write`.
 #[must_use]
 pub fn derive_action(method: &Method, path: &str) -> Action {
+    // SEC-G6: normalise a trailing slash before the destructive-suffix
+    // check, so `POST …/merge/` stays `Destructive` rather than being
+    // downgraded to `Write` (which an `access=write` non-admin caller
+    // could exploit to reach a destructive op).
+    let path = path.trim_end_matches('/');
     match *method {
         Method::GET | Method::HEAD | Method::OPTIONS => Action::Read,
         Method::DELETE => Action::Delete,
@@ -641,6 +646,19 @@ mod tests {
             "/api/places/import",
         ] {
             assert_eq!(derive_action(&Method::POST, path), Action::Destructive);
+        }
+        // SEC-G6: a trailing slash must not downgrade a destructive POST.
+        for path in [
+            "/api/x/merge/",
+            "/api/x/merge//",
+            "/api/x/deduplicate/",
+            "/api/x/import/",
+        ] {
+            assert_eq!(
+                derive_action(&Method::POST, path),
+                Action::Destructive,
+                "{path}"
+            );
         }
         assert_eq!(derive_action(&Method::POST, "/api/places"), Action::Write);
         assert_eq!(
