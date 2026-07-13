@@ -353,10 +353,14 @@
   (`api/rest/handlers.rs:427-465`, currently client-param driven) must honour
   record-level authz/mask, not just single GET. *Test:* a mask-only policy
   redacts on **every** read path (get/list/search/check-dup/FHIR/export).
-- [ ] **SEC-G4 (S) 🟡** Add `escape_like` to the three repo-based searches
-  (person `db/repositories.rs:1181`, worker `:1388`, event `:1218`) — raw
-  `%{q}%` allows `LIKE`-wildcard injection/DoS. *Test:* `q="%"`/`"_"`/`"a\%b"`
-  match literally (port the loco `escape_like` test).
+- [x] **SEC-G4 (S) 🟡** `escape_like` in the repo-based searches. *(done 2026-07-13)*
+  person / worker / event `db/repositories.rs::search` built `format!("%{}%",
+  query.to_lowercase())` with no escaping (raw `%`/`_` = wildcard
+  injection / scan-everything DoS; already a bound param so not SQLi). Each
+  now escapes `\`/`%`/`_` via a per-crate `escape_like` helper before the
+  contains-pattern; unit test `escape_like_neutralises_wildcards` in all
+  three (ports the loco `escape_like` test). Green: lib test + clippy
+  `-D warnings` + fmt per crate.
 - [ ] **SEC-G5 (M) 🟡** Guard-all for event/thing/course (`auth.rs` prefix-gate
   → deny-unless-public), plus a guard-bypass matrix test across all services
   (trailing slash, `%2e`, case, `//`, `/../`). *Test:* guard decision and the

@@ -10,6 +10,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-G4: escape `LIKE` wildcards in the repository name search.** The
+  fallback `search` (`db/repositories.rs`) built its pattern as
+  `format!("%{}%", query.to_lowercase())` with no escaping, so a query of
+  `%` matched every row and `_`×N forced expensive scans (wildcard
+  injection / DoS — the value was already a bound parameter, so not SQL
+  injection). It now escapes `\`/`%`/`_` via a new `escape_like` helper
+  before wrapping in the contains-pattern. Unit test
+  `escape_like_neutralises_wildcards`.
+
 - **SEC-B5: reject self-merge and lock merge participants (TOCTOU).**
   `POST /api/persons/merge` had **no self-merge guard**: `main ==
   duplicate` applied the survivor and then soft-deleted the *same* id,

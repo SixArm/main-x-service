@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-G4: escape `LIKE` wildcards in the repository name search.** The
+  fallback `search` (`db/repositories.rs`) built its pattern as
+  `format!("%{}%", query.to_lowercase())` with no escaping, so `%` matched
+  every row and `_`×N forced expensive scans (wildcard injection / DoS;
+  the value was already a bound parameter). It now escapes `\`/`%`/`_` via
+  a new `escape_like` helper. Unit test `escape_like_neutralises_wildcards`.
+
 ### Changed — API versioning moved from URL to header (2026-07-07)
 
 - REST URLs are now version-free (`/api/workers`, not `/api/v1/workers`).
