@@ -568,6 +568,19 @@ pub fn authorize_record(
     }
 }
 
+/// Read-visibility of one `case` within a **list / search** result
+/// (SEC-G2/G3): `Some(obligations)` when the caller may read it (the
+/// obligations, e.g. `["mask"]`, tell the handler whether to redact),
+/// `None` when the record-level policy denies — in which case the record
+/// must be **omitted** from the result so an unauthorised caller never even
+/// learns it exists (§10/§12 governance; a denied read is indistinguishable
+/// from no-such-record). A no-op — always `Some(empty)` — when enforcement
+/// is off, so the default open posture is unchanged.
+#[must_use]
+pub fn read_visibility(caller: &MaybeAuthUser, case: &Case) -> Option<Vec<String>> {
+    authorize_record(caller, Action::Read, &case_resource_attrs(case)).ok()
+}
+
 /// Read env var `name`, treating unset/blank as absent and falling back
 /// to `default`. Used for the issuer/audience so a blank value doesn't
 /// override the sensible default.

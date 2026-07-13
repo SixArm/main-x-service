@@ -11,6 +11,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-G2/G3: record-level authorization + masking on every read path.**
+  Record-level ABAC + the `mask` obligation were enforced only on the native
+  `GET /api/cases/{pid}`; `list`, `search`, `check-duplicates`, and the FHIR
+  `read` / `search` took no caller and surfaced cases (pid + title, or the
+  full `Task` incl. the sensitive `Task.for` subject) to anyone behind the
+  blanket guard. Now `list` / `search` / `check-duplicates` **omit** cases
+  the caller may not read (a denied record is indistinguishable from
+  no-such-record, §10/§12), FHIR `read` returns `403` on deny and honours the
+  `mask` obligation like the native GET, and FHIR `search` filters + masks
+  per record. New shared `auth::read_visibility` helper; `mask_case` is now
+  `pub(crate)`. DB-gated `tests/masking.rs` proves a `dept=blocked`
+  (deny-read) caller cannot discover a case via list / native GET / FHIR
+  read, while an ordinary caller sees it on every path.
+
 - **SEC-B6: relay claims outbox rows with `FOR UPDATE SKIP LOCKED`.** The
   Phase-3 relay drained via a plain unlocked `SELECT … WHERE published_at IS
   NULL`, so with more than one instance (stateless horizontal scaling) every
