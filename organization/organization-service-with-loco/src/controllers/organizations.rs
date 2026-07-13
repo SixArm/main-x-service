@@ -83,18 +83,24 @@ struct ScoredRef {
 ///
 /// Family convention: validation failures are `422 Unprocessable
 /// Entity` (loco's `bad_request` is reserved for malformed requests).
+/// Delegates to [`crate::validation::problems`], which collects the blank
+/// `name` rule, the non-blank `identifiers[i].value` rule, and the SEC-M1
+/// input-size caps, and joins every problem into one response so the
+/// operator sees them all at once.
 ///
 /// # Errors
 ///
-/// `Error::CustomError(422)` when `name` is blank.
+/// `Error::CustomError(422)` when the payload has any validation problem.
 fn validate(org: &Organization) -> Result<()> {
-    if org.name.trim().is_empty() {
-        return Err(Error::CustomError(
+    let problems = crate::validation::problems(org);
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        Err(Error::CustomError(
             StatusCode::UNPROCESSABLE_ENTITY,
-            ErrorDetail::new("unprocessable_entity", "name is required"),
-        ));
+            ErrorDetail::new("unprocessable_entity", &problems.join("; ")),
+        ))
     }
-    Ok(())
 }
 
 /// Map model-layer errors to HTTP errors: an unknown `pid` is `404

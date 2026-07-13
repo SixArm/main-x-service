@@ -43,5 +43,7 @@ pub mod openapi;
 pub mod relay;
 /// In-memory event stream published on every CRUD action.
 pub mod streaming;
+/// Field-level validation for incoming `Organization` payloads (→ `422`).
+pub mod validation;
 /// Header-based API versioning (`Accepts-version`) for the REST surface.
 pub mod version;

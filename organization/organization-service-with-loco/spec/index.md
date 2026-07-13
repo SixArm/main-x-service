@@ -211,6 +211,15 @@ personal data — honour GDPR when the privacy layer lands (§13).
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-M1 (security): input-size caps on the `Organization` payload.**
+  New `src/validation.rs` (`problems`) bounds every scalar text field
+  (`MAX_TEXT_LEN = 1024`, incl. nested `address.*`), array cardinality
+  (`MAX_ARRAY_LEN = 256`), and per-entry length (`MAX_ITEM_LEN = 512`),
+  keeping the blank-`name` / non-blank-`identifiers[i].value` rules — all
+  collected into one `422` before the record is stored or matched, closing
+  the O(n·m) matcher `DoS`. Controller `validate` delegates to it. Unit
+  tested. (Repo tasks.md Phase 5 SEC-M1.)
+
 - [x] Event streaming + audit log on CRUD. **Phase 1 (in-memory
   envelope + `EventPublisher` seam) implemented** per
   [`agents/share/event-bus.md`](../../../agents/share/event-bus.md):
