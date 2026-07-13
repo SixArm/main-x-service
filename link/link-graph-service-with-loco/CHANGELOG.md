@@ -16,6 +16,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **Security (SEC-B11): non-redirecting presence probe + freshness guard
+  pin.** The lazy verify-on-read probe used `reqwest::get`, which **follows
+  redirects** — a probed source service could return a `3xx` to an internal
+  address (cloud metadata, another service) and the aggregator would follow
+  it (SSRF-via-redirect). The probe now uses a shared **non-redirecting**
+  client (`redirect::Policy::none()`); a `3xx` maps to `Unknown`
+  (`outcome_from_status`), so the only host ever contacted is the
+  operator-configured `LINK_GRAPH_PROBE_URL_<ENTITY>` template — that config
+  *is* the host allow-list. Separately, a regression test pins that
+  `GET /api/health/freshness` (an operational consumer-lag oracle) is **not**
+  a public path and stays behind the blanket read guard (`401` without a
+  token when enforcement is on), so it can't be mistaken for a public health
+  probe and silently exposed. Pure helpers unit-tested.
+
 - **Security (SEC-B7): authenticate the reconcile source and validate its
   edges.** `HttpAuthoritativeSource::from_env_for` built a source even when
   `LINK_GRAPH_RECONCILE_TOKEN` was unset — an **unauthenticated pull** from a

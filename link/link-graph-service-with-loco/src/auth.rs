@@ -364,4 +364,23 @@ mod tests {
         let err = enforce(true, "/api/edges", &empty, &v, &p).unwrap_err();
         assert_eq!(err.0, StatusCode::UNAUTHORIZED);
     }
+
+    /// SEC-B11: `/api/health/freshness` is an operational liveness oracle,
+    /// **not** a public health probe — it must stay behind the blanket guard
+    /// so a future edit can't silently expose consumer-lag telemetry. It is
+    /// not on the public allow-list, and with enforcement on it needs a token.
+    #[test]
+    fn freshness_is_guarded_not_public() {
+        assert!(
+            !is_public_path("/api/health/freshness"),
+            "freshness must not be a public path"
+        );
+        let (v, p, empty) = (empty_verifier(), Policy::default_policy(), HeaderMap::new());
+        let err = enforce(true, "/api/health/freshness", &empty, &v, &p).unwrap_err();
+        assert_eq!(
+            err.0,
+            StatusCode::UNAUTHORIZED,
+            "freshness requires a token when enforcement is on"
+        );
+    }
 }

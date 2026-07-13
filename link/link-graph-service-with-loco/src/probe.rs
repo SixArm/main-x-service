@@ -84,9 +84,44 @@ pub fn enabled() -> bool {
     })
 }
 
-/// The real HTTP probe: a one-shot `GET` to the configured URL — `2xx` ⇒
-/// [`ProbeOutcome::Alive`], `404` ⇒ [`ProbeOutcome::Absent`], anything
-/// else (or no template / network error) ⇒ [`ProbeOutcome::Unknown`].
+/// Map a probe response status to an outcome (SEC-B11): `2xx` ⇒
+/// [`ProbeOutcome::Alive`], `404` ⇒ [`ProbeOutcome::Absent`], anything else
+/// ⇒ [`ProbeOutcome::Unknown`]. Crucially a **3xx redirect** maps to
+/// `Unknown` — the probe client does not follow redirects (see
+/// [`no_redirect_client`]), so a source service cannot steer the probe to an
+/// arbitrary host (SSRF-via-redirect). Pure, so it is unit-testable.
+#[must_use]
+fn outcome_from_status(status: reqwest::StatusCode) -> ProbeOutcome {
+    if status.is_success() {
+        ProbeOutcome::Alive
+    } else if status == reqwest::StatusCode::NOT_FOUND {
+        ProbeOutcome::Absent
+    } else {
+        // 3xx (redirects — NOT followed), 4xx (except 404), 5xx.
+        ProbeOutcome::Unknown
+    }
+}
+
+/// The shared, **non-redirecting** HTTP client for presence probes
+/// (SEC-B11). Disabling redirects closes the SSRF-via-redirect vector: the
+/// only host ever contacted is the one in the operator-configured
+/// `LINK_GRAPH_PROBE_URL_<ENTITY>` template — a source service returning a
+/// `3xx` to an internal address (cloud metadata, another service) can no
+/// longer make the aggregator follow it. Built once and reused.
+fn no_redirect_client() -> &'static reqwest::Client {
+    static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .expect("build the non-redirecting presence-probe client")
+    })
+}
+
+/// The real HTTP probe: a one-shot, **non-redirecting** `GET` to the
+/// configured URL — `2xx` ⇒ [`ProbeOutcome::Alive`], `404` ⇒
+/// [`ProbeOutcome::Absent`], anything else (a `3xx` redirect, other status,
+/// no template, or a network error) ⇒ [`ProbeOutcome::Unknown`].
 pub struct HttpPresenceProbe;
 
 #[async_trait]
@@ -95,10 +130,9 @@ impl PresenceProbe for HttpPresenceProbe {
         let Some(url) = probe_url(r) else {
             return ProbeOutcome::Unknown;
         };
-        match reqwest::get(&url).await {
-            Ok(resp) if resp.status().is_success() => ProbeOutcome::Alive,
-            Ok(resp) if resp.status() == reqwest::StatusCode::NOT_FOUND => ProbeOutcome::Absent,
-            _ => ProbeOutcome::Unknown,
+        match no_redirect_client().get(&url).send().await {
+            Ok(resp) => outcome_from_status(resp.status()),
+            Err(_) => ProbeOutcome::Unknown,
         }
     }
 }
@@ -176,5 +210,52 @@ mod tests {
             substitute_id("http://x/none", &r(EntityType::Thing, 1)),
             "http://x/none"
         );
+    }
+
+    /// SEC-B11: a `3xx` redirect maps to `Unknown` (the client does not
+    /// follow it), closing SSRF-via-redirect; `2xx`⇒Alive, `404`⇒Absent, and
+    /// other errors ⇒ Unknown.
+    #[test]
+    fn outcome_from_status_treats_redirects_as_unknown() {
+        use super::outcome_from_status;
+        use reqwest::StatusCode;
+        assert_eq!(outcome_from_status(StatusCode::OK), ProbeOutcome::Alive);
+        assert_eq!(
+            outcome_from_status(StatusCode::NO_CONTENT),
+            ProbeOutcome::Alive
+        );
+        assert_eq!(
+            outcome_from_status(StatusCode::NOT_FOUND),
+            ProbeOutcome::Absent
+        );
+        // Redirects are NOT followed → Unknown (the SSRF-via-redirect guard).
+        assert_eq!(
+            outcome_from_status(StatusCode::MOVED_PERMANENTLY),
+            ProbeOutcome::Unknown
+        );
+        assert_eq!(
+            outcome_from_status(StatusCode::FOUND),
+            ProbeOutcome::Unknown
+        );
+        assert_eq!(
+            outcome_from_status(StatusCode::TEMPORARY_REDIRECT),
+            ProbeOutcome::Unknown
+        );
+        // Server / other client errors are inconclusive, not Absent.
+        assert_eq!(
+            outcome_from_status(StatusCode::INTERNAL_SERVER_ERROR),
+            ProbeOutcome::Unknown
+        );
+        assert_eq!(
+            outcome_from_status(StatusCode::UNAUTHORIZED),
+            ProbeOutcome::Unknown
+        );
+    }
+
+    /// The probe client builds and disables redirect-following.
+    #[test]
+    fn no_redirect_client_builds() {
+        // Smoke: constructing the shared client must not panic.
+        let _ = super::no_redirect_client();
     }
 }
