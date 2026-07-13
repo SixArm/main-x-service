@@ -351,14 +351,18 @@
   `tests/enforcement.rs`). Person: unit test pins the `Destructive`
   classification (shares case's e2e-proven gate). Green: both crates' lib
   tests + clippy + fmt (+ case `test --no-run` DB-gated).
-- [ ] **SEC-G2 (M) 🟠** Case FHIR read/search (`case/src/controllers/fhir.rs:90,248`)
-  take no caller — apply record-level ABAC + the `mask` obligation like
-  native `get_one`. *Test:* masked/denied read on `/fhir/Task/{id}` + search.
-- [ ] **SEC-G3 (M) 🟠** Masking-on-every-read: case `list`/`search`/
-  `check_duplicates` (`cases.rs:307,324,370`) and person `search_persons`
-  (`api/rest/handlers.rs:427-465`, currently client-param driven) must honour
-  record-level authz/mask, not just single GET. *Test:* a mask-only policy
-  redacts on **every** read path (get/list/search/check-dup/FHIR/export).
+- [x] **SEC-G2 (M) 🟠** Case FHIR read/search authz + mask. *(done 2026-07-13)*
+  Both now take a caller and apply record-level ABAC + the `mask` obligation
+  like native `get_one`: FHIR `read` → `403` on deny + masked Task on the
+  `mask` obligation; FHIR `search` omits denied cases + masks the rest.
+  DB-gated `tests/masking.rs` (denied caller gets `403` on `/fhir/Task/{id}`).
+- [~] **SEC-G3 (M) 🟠** Masking-on-every-read. *(case done 2026-07-13; person remains)*
+  Case `list`/`search`/`check_duplicates` now **omit** cases the caller may
+  not read (concealment) via the shared `auth::read_visibility`; DB-gated
+  `tests/masking.rs` proves the list conceals a denied case. **Remaining:**
+  person `search_persons` (`api/rest/handlers.rs`) is still driven by the
+  client `mask_sensitive` param, not record-level authz — a mask-only policy
+  there is bypassed by omitting the param.
 - [x] **SEC-G4 (S) 🟡** `escape_like` in the repo-based searches. *(done 2026-07-13)*
   person / worker / event `db/repositories.rs::search` built `format!("%{}%",
   query.to_lowercase())` with no escaping (raw `%`/`_` = wildcard

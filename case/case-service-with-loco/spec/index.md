@@ -484,6 +484,13 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-G2/G3 (security): record-level authz + masking on every read.**
+  `list` / `search` / `check-duplicates` now omit cases a caller may not
+  read (concealment, §10/§12), and FHIR `read` / `search` apply the same
+  record-level ABAC + `mask` obligation as the native `GET /{pid}` (they
+  previously took no caller). Shared `auth::read_visibility`; `mask_case`
+  now `pub(crate)`; DB-gated `tests/masking.rs` proves the concealment on
+  list / native GET / FHIR read. (Repo tasks.md Phase 5 SEC-G2/G3.)
 - [x] **SEC-M1 (security): input-size caps close the O(n·m) matcher DoS.**
   `validation::problems` now `422`s oversized payloads *before* store/match:
   scalar text fields capped at `MAX_TEXT_LEN` = 1024 chars, arrays at

@@ -186,7 +186,7 @@ fn record_rejection((status, reason): (StatusCode, String)) -> Error {
 /// and the agency `case_number` — keeping the descriptive shell (title,
 /// type, status, …). Case data is personal data, so a policy can attach
 /// the `mask` obligation to a conditional read (e.g. cross-department).
-fn mask_case(case: &Case) -> Case {
+pub(crate) fn mask_case(case: &Case) -> Case {
     let mut masked = case.clone();
     masked.subjects = Vec::new();
     masked.identifiers = Vec::new();
@@ -304,9 +304,18 @@ async fn remove(
 ///
 /// A DB error when the query fails.
 #[debug_handler]
-async fn list(State(ctx): State<AppContext>) -> Result<Response> {
+async fn list(State(ctx): State<AppContext>, caller: MaybeAuthUser) -> Result<Response> {
     let rows = CaseModel::list(&ctx.db, 100).await?;
-    let refs: Vec<CaseRef> = rows.iter().map(CaseRef::of).collect();
+    // SEC-G3: drop rows the caller may not read, so the list never leaks the
+    // existence (pid + title) of a concealed case. No-op when enforcement off.
+    let refs: Vec<CaseRef> = rows
+        .iter()
+        .filter(|row| {
+            row.to_case()
+                .is_ok_and(|c| crate::auth::read_visibility(&caller, &c).is_some())
+        })
+        .map(CaseRef::of)
+        .collect();
     format::json(refs)
 }
 
@@ -324,13 +333,22 @@ async fn list(State(ctx): State<AppContext>) -> Result<Response> {
 async fn search(
     axum::extract::Query(params): axum::extract::Query<SearchParams>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
 ) -> Result<Response> {
     let q = params.q.unwrap_or_default();
     if q.trim().is_empty() {
         return bad_request("query parameter `q` is required");
     }
     let rows = CaseModel::search(&ctx.db, q.trim(), 50).await?;
-    let refs: Vec<CaseRef> = rows.iter().map(CaseRef::of).collect();
+    // SEC-G3: drop rows the caller may not read (same concealment as `list`).
+    let refs: Vec<CaseRef> = rows
+        .iter()
+        .filter(|row| {
+            row.to_case()
+                .is_ok_and(|c| crate::auth::read_visibility(&caller, &c).is_some())
+        })
+        .map(CaseRef::of)
+        .collect();
     format::json(refs)
 }
 
@@ -369,6 +387,7 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
 #[debug_handler]
 async fn check_duplicates(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Json(query): Json<Case>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
@@ -383,6 +402,11 @@ async fn check_duplicates(
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
         let candidate = row.to_case()?;
+        // SEC-G3: a caller must not discover a concealed case via dedup —
+        // skip candidates they may not read.
+        if crate::auth::read_visibility(&caller, &candidate).is_none() {
+            continue;
+        }
         let r = engine.match_cases(&query, &candidate);
         if r.is_match {
             hits.push(ScoredRef {

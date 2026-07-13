@@ -12,18 +12,19 @@
 //! controller (§8). These routes sit behind the blanket auth+ABAC guard
 //! (`/fhir/*` is not on the public allow-list).
 //!
-//! ## Subject sensitivity (DEFERRED masking)
+//! ## Subject sensitivity (record-level authz + masking — SEC-G2)
 //!
 //! A case's subject person (`Task.for`) is **high-sensitivity**: it
 //! inherits the `case ↔ person` (`subject_of`) governance of
 //! [fhir.md §8](../../../../agents/share/fhir.md) and
 //! [cross-service-linking.md §10](../../../../agents/share/cross-service-linking.md),
 //! under which an unauthorised caller must not even learn the edge exists.
-//! The case service has **no field-masking layer implemented today**, so —
-//! consistent with the crate's existing deferred privacy layer — masking
-//! the `for` reference on FHIR read/search for unauthorised callers is a
-//! documented **DEFERRED** gap, tracked by the spec §13 FHIR task. The
-//! blanket guard still gates every `/fhir/*` path.
+//! FHIR `read` and `search` now apply **record-level ABAC + the `mask`
+//! obligation** exactly like the native `GET /api/cases/{pid}` (SEC-G2): a
+//! denied `read` returns `403` (read) or omits the record (search), and a
+//! `mask`-obligation allow renders a redacted `Task` (empty `for` /
+//! identifiers). This closes the earlier gap where these paths took no
+//! caller and returned the full Task to anyone behind the blanket guard.
 
 use axum::{
     body::Body,
@@ -36,7 +37,10 @@ use loco_rs::controller::Routes;
 use loco_rs::prelude::{delete, get, post, put};
 use serde::Serialize;
 
+use authentication_verifier::Action;
+
 use crate::auth::MaybeAuthUser;
+use crate::controllers::cases::mask_case;
 use crate::fhir::resources::{FhirBundle, FhirOperationOutcome, FhirTask};
 use crate::fhir::search::FhirTaskSearchParams;
 use crate::fhir::{from_fhir_task, to_fhir_task};
@@ -84,10 +88,14 @@ fn fhir_error(status: StatusCode, code: &str, message: impl Into<String>) -> Res
 /// `GET /fhir/Task/{id}` — render a stored case as a FHIR `Task`, or a
 /// `404` `OperationOutcome` when the id is unknown.
 ///
-/// **Subject sensitivity:** the rendered `Task.for` reference is
-/// high-sensitivity; masking it for unauthorised callers is a documented
-/// DEFERRED gap (see the module doc).
-async fn read(Path(id): Path<String>, State(ctx): State<AppContext>) -> Response {
+/// **Subject sensitivity (SEC-G2):** record-level ABAC + the `mask`
+/// obligation are applied here (like the native GET) — a denied caller gets
+/// `403` and a `mask`-obligation allow redacts the `Task.for` reference.
+async fn read(
+    Path(id): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Response {
     let Ok(model) = CaseModel::find_by_pid(&ctx.db, &id).await else {
         return fhir_error(
             StatusCode::NOT_FOUND,
@@ -104,6 +112,30 @@ async fn read(Path(id): Path<String>, State(ctx): State<AppContext>) -> Response
                 e.to_string(),
             );
         }
+    };
+    // SEC-G2: apply record-level ABAC + the `mask` obligation on the FHIR
+    // read just like the native `GET /api/cases/{pid}` — this path took no
+    // caller and returned the full Task (incl. the sensitive `Task.for`
+    // subject reference) to anyone.
+    let obligations = match crate::auth::authorize_record(
+        &caller,
+        Action::Read,
+        &crate::auth::case_resource_attrs(&case),
+    ) {
+        Ok(obligations) => obligations,
+        Err((status, reason)) => {
+            let code = if status == StatusCode::FORBIDDEN {
+                "forbidden"
+            } else {
+                "login"
+            };
+            return fhir_error(status, code, reason);
+        }
+    };
+    let case = if obligations.iter().any(|o| o == "mask") {
+        mask_case(&case)
+    } else {
+        case
     };
     let resource = to_fhir_task(
         &case,
@@ -242,12 +274,13 @@ async fn remove(
 /// In-memory filter over active rows (capped), then the `_count` page
 /// size. Supported params: see [`FhirTaskSearchParams`].
 ///
-/// **Subject sensitivity:** each rendered `Task.for` reference is
-/// high-sensitivity; masking it for unauthorised callers is a documented
-/// DEFERRED gap (see the module doc).
+/// **Subject sensitivity (SEC-G2):** each result is filtered by record-level
+/// ABAC (denied cases are omitted) and rendered with the `mask` obligation
+/// honoured (redacted `Task.for` / identifiers).
 async fn search(
     Query(params): Query<FhirTaskSearchParams>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
 ) -> Response {
     let rows = match CaseModel::list(&ctx.db, FHIR_SEARCH_SCAN_CAP).await {
         Ok(rows) => rows,
@@ -269,10 +302,21 @@ async fn search(
     let mut resources = Vec::new();
     for model in &rows {
         let Ok(case) = model.to_case() else { continue };
+        // SEC-G2: drop cases the caller may not read (a denied record is
+        // omitted, not surfaced), and honour the `mask` obligation on the
+        // rest — the search matched on the real fields, then renders masked.
+        let Some(obligations) = crate::auth::read_visibility(&caller, &case) else {
+            continue;
+        };
         let pid = model.pid.to_string();
         if params.matches(&case, &pid) {
+            let rendered = if obligations.iter().any(|o| o == "mask") {
+                mask_case(&case)
+            } else {
+                case
+            };
             resources.push(to_fhir_task(
-                &case,
+                &rendered,
                 &pid,
                 Some(model.updated_at.to_rfc3339()),
             ));
