@@ -219,17 +219,24 @@ fn deterministic_match(a: &Course, b: &Course) -> bool {
     // R-1 — same provider + same normalised course_code. The `let …
     // && …` chain requires all four fields present before comparing;
     // `!ap.is_empty()` guards against two records that both carry a
-    // blank provider id accidentally matching.
+    // blank provider id accidentally matching, and `!ac_norm.is_empty()`
+    // guards against two records whose codes both normalise to "" (e.g.
+    // "-" or "  ") — an empty code is not an identity, so it must never
+    // short-circuit to 1.0 (SEC-M2).
     if let (Some(ap), Some(bp), Some(ac), Some(bc)) = (
         a.provider_id.as_deref(),
         b.provider_id.as_deref(),
         a.course_code.as_deref(),
         b.course_code.as_deref(),
-    ) && !ap.is_empty()
-        && ap == bp
-        && normalize::course_code(ac) == normalize::course_code(bc)
-    {
-        return true;
+    ) {
+        let ac_norm = normalize::course_code(ac);
+        if !ap.is_empty()
+            && ap == bp
+            && !ac_norm.is_empty()
+            && ac_norm == normalize::course_code(bc)
+        {
+            return true;
+        }
     }
 
     // R-2 — any same_as URL overlaps (case-folded host+path).
@@ -509,6 +516,27 @@ mod tests {
         b.course_code = Some("CS 101".into());
         let r = engine.match_courses(&a, &b);
         assert!((r.score - 1.0).abs() < 1e-9);
+    }
+
+    // SEC-M2: R-1 must NOT fire when the course codes both normalise to
+    // "" (e.g. "-" and "  "). Two DIFFERENT courses that merely share a
+    // provider and carry blank/punctuation-only codes must not
+    // deterministically short-circuit to a spurious 1.0 identity match.
+    #[test]
+    fn same_provider_empty_normalised_codes_do_not_short_circuit() {
+        let mut a = Course::new("Linear Algebra");
+        let mut b = Course::new("Tudor History 1485-1603");
+        a.provider_id = Some("prov-1".into());
+        b.provider_id = Some("prov-1".into());
+        a.course_code = Some("-".into());
+        b.course_code = Some("  ".into());
+        // Both codes normalise to "": R-1 must be skipped.
+        assert!(!deterministic_match(&a, &b));
+        let engine = MatchingEngine::default_config();
+        let r = engine.match_courses(&a, &b);
+        assert!(!r.breakdown.deterministic_match);
+        assert!(r.score < 1.0, "expected < 1.0, got {}", r.score);
+        assert!(!r.is_match);
     }
 
     // Pins that two unrelated titles score well below 0.5 and don't match.

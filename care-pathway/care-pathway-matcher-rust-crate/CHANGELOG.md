@@ -10,6 +10,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- SEC-M2: the provider-scoped deterministic rule (R-1) now requires the
+  normalised pathway code to be non-empty before short-circuiting. Two
+  different pathways sharing a provider with blank / punctuation-only
+  codes (e.g. `"-"`, `"  "` — both normalise to `""`) no longer
+  spuriously match to a 1.0 identity. Same fix class as person-matcher's
+  `passport_books_share_pair`.
+
 ### Fixed
 
 - Formatting drift in `src/matcher.rs` (two spots not rustfmt-formatted);

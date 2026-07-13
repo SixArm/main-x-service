@@ -453,16 +453,19 @@
   care-pathway, case, portfolio) and lower the 5 MB cap. Closes the O(n·m)
   Jaro-Winkler/Levenshtein/Jaccard DoS amplified ×scan-cap. *Tests:*
   over-length field / over-cardinality array ⇒ 422 before the matcher runs.
-- [~] **SEC-M2 (M) 🟠** False-deterministic-match empty guards. *(person +
-  worker done 2026-07-13; other matchers remain)* Add a post-normalization
-  empty check to every string-keyed short-circuit. **Done:** passport
-  (person/worker `passport_books_share_pair`) + demographic fallback
-  (non-empty normalised names) with false-match unit tests. **Remaining:**
-  place `name_and_postcode_match` (`:975-989`), thing `same_canonical_url`/
-  `shares_same_as` (`:827,:808`), course/care-pathway R-1 code
-  (`:223`/`:239`), event `name_and_start_date_match` (`:914`),
-  case/portfolio trivial `"/"`/`"0"` cases. *Tests (proptest):* two records
-  sharing only a blank/whitespace/punctuation value MUST NOT match.
+- [x] **SEC-M2 (M) 🟠** False-deterministic-match empty guards. *(done 2026-07-13)*
+  A post-normalization empty/trivial-value guard added to every string-keyed
+  deterministic short-circuit across **all 9 matchers**, each with a
+  false-match unit test (two different records sharing only a
+  blank/punctuation/trivial value MUST NOT match) + preserved positive test:
+  person/worker passport `passport_books_share_pair` + demographic fallback
+  (non-empty normalised names); place `name_and_postcode_match`; thing
+  `same_canonical_url` + `shares_same_as` (skip empty); event
+  `name_and_start_date_match`; course + care-pathway R-1 provider-scoped
+  code (require non-empty normalised code); case R-0 identifier
+  (`is_trivial_identifier`: empty / `"0"` / all-zeros UUID) + R-2 `same_as`
+  `"/"`; portfolio R-2 `same_as` `"/"`. Each crate re-verified independently
+  green (test + clippy `-D warnings` + fmt).
 - [x] **SEC-M3 (S) 🟠** Reject sentinel national IDs (all-zeros). *(done 2026-07-13)*
   `parse_ie_ihi`/`parse_es_tsi`/`parse_dk_cpr` in both the person- and
   worker-matcher `identifiers.rs` now reject an all-zeros placeholder (via

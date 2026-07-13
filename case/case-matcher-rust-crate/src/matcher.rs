@@ -244,6 +244,21 @@ fn agency_key(c: &Case) -> Option<&str> {
         .filter(|s| !s.is_empty())
 }
 
+/// SEC-M2: decide whether a normalised identifier value is *trivial* and
+/// therefore not identity evidence.
+///
+/// A value is trivial when it carries no alphanumeric character that is
+/// anything other than `'0'` — i.e. it is empty / punctuation-only, the
+/// sentinel `"0"`, or an all-zeros UUID
+/// (`"00000000-0000-0000-0000-000000000000"`). Such placeholders must not
+/// let two *different* cases short-circuit to a certain match.
+///
+/// `s` is the already-folded value. Returns `true` when the value is
+/// trivial (skip it), `false` when it is a real identifier.
+fn is_trivial_identifier(s: &str) -> bool {
+    !s.chars().any(|c| c.is_alphanumeric() && c != '0')
+}
+
 /// Decide whether the deterministic short-circuit fires for `a` vs `b`.
 ///
 /// Returns `true` if any of the three rules below hold, in which case the
@@ -265,8 +280,11 @@ fn deterministic_match(a: &Case, b: &Case) -> bool {
         }
         // Fold the value so case / whitespace / Unicode form differences
         // do not defeat the comparison; skip values that fold to empty.
+        // SEC-M2: also skip *trivial* sentinels — a placeholder id like
+        // `"0"` or an all-zeros UUID is not identity evidence, so two
+        // different cases carrying it must not deterministically match.
         let av = normalize::fold(&ai.value);
-        if av.is_empty() {
+        if is_trivial_identifier(&av) {
             continue;
         }
         for bi in &b.identifiers {
@@ -298,7 +316,10 @@ fn deterministic_match(a: &Case, b: &Case) -> bool {
     // entry); a shared one is as conclusive as a shared identifier.
     for au in &a.same_as {
         let an = normalize::url(au);
-        if an.is_empty() {
+        // SEC-M2: skip trivial / non-identity URLs — empty, or a bare
+        // root `"/"` (`normalize::url` deliberately keeps a lone slash) —
+        // so two different cases sharing only `"/"` do not short-circuit.
+        if an.is_empty() || an == "/" {
             continue;
         }
         for bu in &b.same_as {
@@ -561,6 +582,73 @@ mod tests {
         b.same_as = vec!["  https://courts.example.gov/case/CV-2024-001234  ".into()];
         let r = engine.match_cases(&a, &b);
         assert!((r.score - 1.0).abs() < 1e-9);
+    }
+
+    // SEC-M2: a *trivial* shared identifier (the sentinel `"0"` or an
+    // all-zeros UUID) is not identity evidence — two DIFFERENT cases that
+    // carry only such a placeholder must NOT deterministically match.
+    #[test]
+    fn trivial_zero_identifier_does_not_short_circuit() {
+        let engine = MatchingEngine::default_config();
+        let mut zero_a = Case::new("Alpha");
+        let mut zero_b = Case::new("Omega");
+        zero_a
+            .identifiers
+            .push(ident(IdentifierScheme::Docket, "0"));
+        zero_b
+            .identifiers
+            .push(ident(IdentifierScheme::Docket, "0"));
+        assert!(!deterministic_match(&zero_a, &zero_b));
+        let r = engine.match_cases(&zero_a, &zero_b);
+        assert!(!r.breakdown.deterministic_match);
+        assert!(!r.is_match, "got {}", r.score);
+
+        // An all-zeros UUID is likewise a placeholder, not identity.
+        let mut uuid_a = Case::new("Alpha");
+        let mut uuid_b = Case::new("Omega");
+        let zeros = "00000000-0000-0000-0000-000000000000";
+        uuid_a
+            .identifiers
+            .push(ident(IdentifierScheme::Uuid, zeros));
+        uuid_b
+            .identifiers
+            .push(ident(IdentifierScheme::Uuid, zeros));
+        assert!(!deterministic_match(&uuid_a, &uuid_b));
+
+        // Positive control: a real shared id still short-circuits.
+        let mut real_a = Case::new("Alpha");
+        let mut real_b = Case::new("Omega");
+        real_a
+            .identifiers
+            .push(ident(IdentifierScheme::Docket, "CV-2024-001234"));
+        real_b
+            .identifiers
+            .push(ident(IdentifierScheme::Docket, "CV-2024-001234"));
+        assert!(deterministic_match(&real_a, &real_b));
+    }
+
+    // SEC-M2: a bare root `same_as` URL (`"/"`, which `normalize::url`
+    // deliberately keeps non-empty) is not identity evidence — two
+    // DIFFERENT cases sharing only `"/"` must NOT short-circuit, while a
+    // real shared URL still does.
+    #[test]
+    fn trivial_root_same_as_does_not_short_circuit() {
+        let engine = MatchingEngine::default_config();
+        let mut root_a = Case::new("Alpha");
+        let mut root_b = Case::new("Omega");
+        root_a.same_as = vec!["/".into()];
+        root_b.same_as = vec!["/".into()];
+        assert!(!deterministic_match(&root_a, &root_b));
+        let r = engine.match_cases(&root_a, &root_b);
+        assert!(!r.breakdown.deterministic_match);
+        assert!(!r.is_match, "got {}", r.score);
+
+        // Positive control: a real shared identity URL still short-circuits.
+        let mut url_a = Case::new("Alpha");
+        let mut url_b = Case::new("Omega");
+        url_a.same_as = vec!["https://courts.example.gov/case/CV-2024-001234".into()];
+        url_b.same_as = vec!["https://courts.example.gov/case/CV-2024-001234".into()];
+        assert!(deterministic_match(&url_a, &url_b));
     }
 
     // Pins the subjects component: a shared subject (folded, so case

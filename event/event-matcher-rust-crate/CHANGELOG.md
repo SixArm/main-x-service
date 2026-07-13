@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-M2** — the deterministic `name_and_start_date_match` short-circuit
+  now guards against empty normalised names: a `name` that normalises to an
+  empty string (e.g. `"###"`, `"  "`) no longer satisfies the name leg, so
+  two unrelated events sharing only an empty name plus a start_date can no
+  longer deterministically match. Added a regression test.
+
 ### Fixed
 
 - Formatting drift in `examples/location_matching.rs` and

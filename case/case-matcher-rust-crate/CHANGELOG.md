@@ -10,6 +10,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-M2 — trivial/sentinel values no longer force a deterministic
+  match.** The deterministic short-circuits in `src/matcher.rs` now skip
+  non-identity placeholder values so two *different* cases cannot pin to
+  `1.0` on shared junk:
+  - `R-0` (globally-unique identifiers) skips a *trivial* value — one with
+    no alphanumeric character other than `'0'`, i.e. empty/punctuation-only,
+    the sentinel `"0"`, or an all-zeros UUID — via the new
+    `is_trivial_identifier` guard.
+  - `R-2` (`same_as` URL overlap) skips a bare root `"/"` (which
+    `normalize::url` intentionally keeps non-empty) in addition to the
+    empty case.
+  - Added `trivial_zero_identifier_does_not_short_circuit` and
+    `trivial_root_same_as_does_not_short_circuit` tests (each keeps a
+    positive control that a real shared id/URL still matches). No weights,
+    thresholds, or probabilistic behaviour changed.
+
 ### Changed
 
 - **Docs/CI harmonization pass** (no behavioural change):

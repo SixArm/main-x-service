@@ -10,6 +10,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-M2 — a bare root `same_as` URL no longer forces a deterministic
+  match.** `normalize::url("/")` returns `"/"` (non-empty by design), so
+  two different work items sharing only `same_as=["/"]` short-circuited to
+  `1.0`. The `R-2` `same_as` overlap in `src/matcher.rs` now skips a value
+  that is empty-after-normalization or a bare `"/"` root, so such a
+  placeholder is not treated as identity evidence. Added the
+  `trivial_root_same_as_does_not_short_circuit` test (with a positive
+  control that a real shared URL still matches). No weights, thresholds, or
+  probabilistic behaviour changed.
+
 ### Fixed
 
 - **Security (SEC-M4): year bound in `normalize::iso_date_to_days`.** The
