@@ -336,7 +336,8 @@ async fn magic_link_issuance_is_rate_limited() {
 
 /// Pins the audit trail: signup and an unknown-email request both write
 /// `auth_events` rows (the latter with the `unknown_email` outcome), the
-/// rows never carry token-like material, and `/audit/recent` surfaces them.
+/// rows never carry token-like material, and the system-wide
+/// `/audit/recent` read endpoint is admin-gated (`401` without a token).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -388,22 +389,17 @@ async fn auth_events_are_recorded_and_queryable() {
             "audit detail must not leak token-like material"
         );
 
-        // The read endpoint surfaces them, newest first.
+        // SEC-A2: the system-wide read endpoint is now admin-gated — an
+        // unauthenticated caller is refused (`401`), so the emails + outcome
+        // markers can't be used as an account-enumeration oracle. (The
+        // model-level assertions above already prove the rows exist and
+        // carry the expected data; the admin-authorised read path is
+        // exercised by the admin controller's own tests.)
         let recent = request.get("/api/auth/audit/recent").await;
-        assert_eq!(recent.status_code(), 200, "/audit/recent should be public");
-        let body: serde_json::Value = serde_json::from_str(&recent.text()).unwrap();
-        let events = body.as_array().expect("audit/recent returns an array");
-        assert!(
-            events
-                .iter()
-                .any(|e| e["event"] == "signup" && e["email"] == signup_email),
-            "audit/recent should include the signup event"
-        );
-        assert!(
-            events
-                .iter()
-                .any(|e| e["event"] == "magic_link_requested" && e["detail"] == "unknown_email"),
-            "audit/recent should include the unknown_email magic-link event"
+        assert_eq!(
+            recent.status_code(),
+            401,
+            "/audit/recent must require a bearer token (SEC-A2)"
         );
 
         rate_limit::reset(&ctx.db).await.ok();

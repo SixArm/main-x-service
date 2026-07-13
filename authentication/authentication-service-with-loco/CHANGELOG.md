@@ -12,6 +12,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-A2: admin-gate `GET /api/auth/audit/recent`.** The system-wide
+  audit trail was unauthenticated and returned registered **emails** plus
+  outcome markers (`created`/`existing`, `unknown_email`/`issued`), an
+  account-enumeration oracle (trigger a signup, read back the outcome by
+  timing) that undid the always-`200` anti-enumeration contract. It now
+  requires a PASETO bearer with `access=admin` (`401` no token / `403`
+  non-admin); a subject's own trail stays reachable via the gated
+  `GET /api/auth/account/audit`. Supersedes the "left open" §12 decision.
+  Unit test `recent_audit_requires_admin`; the DB-gated request test now
+  pins the `401`.
+- **SEC-A3: log the magic-link token/URL only in development.**
+  `deliver_magic_link` wrote the full verify URL (embedding the live login
+  token — a ~5-minute account-takeover primitive) at `info` in every
+  environment. It is now emitted only when the loco environment is
+  `Development` (where there is no SMTP and the console is authoritative);
+  elsewhere the issuance is logged without the token. Pure gate
+  `log_magic_link_url` + unit test `magic_link_url_logged_only_in_development`.
+
 - **SEC-A1: refuse the built-in `DEV_SEED` signing key in production.**
   `load_seed()` fell back to the committed development Ed25519 seed
   whenever `TOKEN_PRIVATE_KEY_SEED` / `TOKEN_PRIVATE_KEY_FILE` were unset,

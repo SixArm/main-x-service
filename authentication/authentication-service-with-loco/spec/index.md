@@ -488,13 +488,19 @@ catalog.
   the already-issued bearer token verifies cryptographically until `exp`
   (bounded by the short TTL).
 
-**Audit gating decision.** The system-wide
-`GET /api/auth/audit/recent` is left **unauthenticated** (family
-convention; mirrors the sibling care-pathway `/audit/recent`; rows carry
-no tokens or secrets). The GDPR right-of-access requirement is met
-instead by the bearer-gated per-subject `GET /api/auth/account/audit`,
-so a subject's own audit trail (and export) is reachable **only** by
-that subject, while the operator-facing system feed stays open.
+**Audit gating decision (revised — SEC-A2, 2026-07-13).** The system-wide
+`GET /api/auth/audit/recent` is now **admin-gated** (a valid PASETO bearer
+whose attributes include `access=admin`; `401` without a token, `403` for a
+non-admin). Although the rows carry no tokens or secrets, they DO carry
+registered **emails** plus outcome markers (`created`/`existing`,
+`unknown_email`/`issued`, `rate_limited`), which — left unauthenticated —
+form an **account-enumeration oracle**: an attacker triggers a signup for a
+target email and reads back the outcome, undoing the always-`200`
+anti-enumeration contract the unauthenticated endpoints preserve. (This
+supersedes the earlier "left open, mirrors care-pathway" decision.) The
+GDPR right-of-access requirement is still met by the session/bearer-gated
+per-subject `GET /api/auth/account/audit` — a subject's own trail reachable
+only by that subject.
 
 ## 13. Tasks (live work queue)
 

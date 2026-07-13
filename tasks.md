@@ -273,15 +273,17 @@
   `DEV_SEED`. Unit test `dev_seed_fallback_refused_in_production`
   (env-free, pure helper — edition-2024 + `forbid(unsafe)` rules out
   `set_var` in tests). Green: lib tests + clippy + fmt.
-- [ ] **SEC-A2 (S) 🟠** Gate `GET /api/auth/audit/recent`
-  (`controllers/auth.rs:514-518`, route `:605`) — it is unauthenticated and
-  returns raw `auth_events` emails/outcomes (account enumeration). Require
-  auth (admin) and/or strip emails. *Test:* unauth ⇒ 401/redacted; pins the
-  anti-enumeration contract.
-- [ ] **SEC-A3 (S) 🟠** Magic-link token logging (`controllers/auth.rs:127-132`)
-  emits the full login URL+token at `info` in every env. Log the token only
-  in `development` (env/level gate). *Test:* tracing-capture asserts no token
-  at `info` in production.
+- [x] **SEC-A2 (S) 🟠** Gate `GET /api/auth/audit/recent`. *(done 2026-07-13)*
+  Was unauthenticated + returned `auth_events` emails/outcomes (an
+  enumeration oracle via timing). Now requires a PASETO bearer with
+  `access=admin` (`401`/`403`); `recent_audit` takes `AuthUser` +
+  `claims_have_admin`. Unit test `recent_audit_requires_admin`; DB-gated
+  request test pins the `401`; spec §12 decision superseded.
+- [x] **SEC-A3 (S) 🟠** Magic-link token logging. *(done 2026-07-13)*
+  `deliver_magic_link` logged the full verify URL (embedding the live token)
+  at `info` in every env. Now gated to `Environment::Development` only via
+  pure `log_magic_link_url`; other envs log the issuance without the token.
+  Unit test `magic_link_url_logged_only_in_development`.
 - [ ] **SEC-A4 (S) 🟡** Atomic single-use magic-link consume: replace
   SELECT-then-clear (`controllers/auth.rs:284-298`, `models/users.rs:254-283`)
   with `UPDATE … WHERE magic_link_token=$1 RETURNING`. *Test:* two concurrent
