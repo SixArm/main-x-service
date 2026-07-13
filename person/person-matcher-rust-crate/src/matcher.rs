@@ -1318,12 +1318,24 @@ impl MatchingEngine {
             (Some(f1), Some(f2)) => {
                 // Normalise both sides (case, accents, whitespace) before
                 // exact comparison — this is an equality test, not fuzzy.
-                Normalizer::normalize_name(f1) == Normalizer::normalize_name(f2)
+                // SEC-M2: a name that normalises to empty (blank /
+                // punctuation-only) is NOT evidence, so require a non-empty
+                // normal form — else two records sharing only a blank name
+                // would agree here.
+                let (n1, n2) = (
+                    Normalizer::normalize_name(f1),
+                    Normalizer::normalize_name(f2),
+                );
+                !n1.is_empty() && n1 == n2
             }
             _ => false,
         } && match (&person1.family_name, &person2.family_name) {
             (Some(l1), Some(l2)) => {
-                Normalizer::normalize_name(l1) == Normalizer::normalize_name(l2)
+                let (n1, n2) = (
+                    Normalizer::normalize_name(l1),
+                    Normalizer::normalize_name(l2),
+                );
+                !n1.is_empty() && n1 == n2
             }
             _ => false,
         };
@@ -2170,6 +2182,13 @@ where
 fn passport_books_share_pair(a: &[PassportBook], b: &[PassportBook]) -> bool {
     for ba in a {
         for bb in b {
+            // SEC-M2: a blank country or number is not identity evidence.
+            // `PassportBook` is deserialized with public fields, so a
+            // payload of `{"country":"","number":""}` on both records would
+            // otherwise short-circuit two *different* people to a 1.0 match.
+            if ba.country.trim().is_empty() || ba.number.trim().is_empty() {
+                continue;
+            }
             if ba.country == bb.country && ba.number == bb.number {
                 return true;
             }
@@ -2647,6 +2666,52 @@ mod tests {
             .gender(Gender::Male)
             .build();
         assert!(MatchingEngine::default_config().deterministic_match(&p, &p.clone()));
+    }
+
+    /// SEC-M2: two DIFFERENT people who share only a blank / punctuation
+    /// name (which normalises to empty) plus a DOB must NOT deterministically
+    /// match — an empty normalised name is not identity evidence.
+    #[test]
+    fn deterministic_demographics_reject_blank_names() {
+        let a = Person::builder()
+            .given_name("   ")
+            .family_name("--")
+            .date_of_birth(dob(1980, 5, 15))
+            .gender(Gender::Male)
+            .build();
+        let b = Person::builder()
+            .given_name(".")
+            .family_name("  ")
+            .date_of_birth(dob(1980, 5, 15))
+            .gender(Gender::Male)
+            .build();
+        assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
+    }
+
+    /// SEC-M2: a blank passport book (empty country + number) — reachable
+    /// only by deserializing a crafted payload, since `PassportBook::new`
+    /// rejects it — must NOT short-circuit two different people to a match.
+    #[test]
+    fn deterministic_reject_blank_passport_pair() {
+        let blank = || PassportBook {
+            country: String::new(),
+            number: String::new(),
+            issued: None,
+            expires: None,
+        };
+        let a = Person::builder()
+            .given_name("John")
+            .family_name("Smith")
+            .date_of_birth(dob(1980, 5, 15))
+            .passport_books(vec![blank()])
+            .build();
+        let b = Person::builder()
+            .given_name("Jane")
+            .family_name("Doe")
+            .date_of_birth(dob(1990, 1, 1))
+            .passport_books(vec![blank()])
+            .build();
+        assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
     /// Gender is permissive in the demographic tuple: when one side omits

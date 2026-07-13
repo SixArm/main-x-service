@@ -314,7 +314,20 @@ pub fn parse_es_tsi(s: &str) -> Option<String> {
     if !(10..=20).contains(&cleaned.len()) {
         return None;
     }
+    if is_sentinel_zeros(&cleaned) {
+        return None;
+    }
     Some(cleaned)
+}
+
+/// True when `s` is a non-empty run of only `'0'` characters — an all-zeros
+/// placeholder / sentinel value. Format-only national-ID parsers (no check
+/// digit) must reject these (SEC-M3): two records both carrying a
+/// `"0000000"` placeholder would otherwise deterministically match to a
+/// 1.0 identity, merging two different people. Mirrors the explicit
+/// all-zeros rejection the check-digit schemes (e.g. NL BSN) already have.
+fn is_sentinel_zeros(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b == b'0')
 }
 
 /// Parse an Éire (Ireland) IHI (Individual Health Identifier).
@@ -348,7 +361,7 @@ pub fn parse_es_tsi(s: &str) -> Option<String> {
 #[must_use]
 pub fn parse_ie_ihi(s: &str) -> Option<String> {
     let digits: String = s.chars().filter(char::is_ascii_digit).collect();
-    if digits.len() == 7 {
+    if digits.len() == 7 && !is_sentinel_zeros(&digits) {
         Some(digits)
     } else {
         None
@@ -1089,7 +1102,7 @@ pub fn parse_cz_rc(s: &str) -> Option<String> {
 #[must_use]
 pub fn parse_dk_cpr(s: &str) -> Option<String> {
     let digits: String = s.chars().filter(char::is_ascii_digit).collect();
-    if digits.len() == 10 {
+    if digits.len() == 10 && !is_sentinel_zeros(&digits) {
         Some(digits)
     } else {
         None
@@ -2942,6 +2955,23 @@ mod tests {
     #[test]
     fn nl_bsn_rejects_all_zeros() {
         assert_eq!(parse_nl_bsn("000000000"), None);
+    }
+
+    /// SEC-M3: the format-only (no check digit) national-ID parsers reject
+    /// an all-zeros placeholder, so two records both carrying a `"0000000"`
+    /// sentinel do not deterministically match to a 1.0 identity. A valid
+    /// non-zero value of the same length still parses.
+    #[test]
+    fn format_only_parsers_reject_all_zeros_sentinels() {
+        assert_eq!(parse_ie_ihi("0000000"), None); // 7 zeros
+        assert_eq!(parse_ie_ihi("1234567"), Some("1234567".to_string()));
+        assert_eq!(parse_dk_cpr("0000000000"), None); // 10 zeros
+        assert_eq!(parse_dk_cpr("0101011234"), Some("0101011234".to_string()));
+        assert_eq!(parse_es_tsi("0000000000"), None); // 10 zeros (min len)
+        assert_eq!(parse_es_tsi("ES01234567"), Some("ES01234567".to_string()));
+        assert!(is_sentinel_zeros("000"));
+        assert!(!is_sentinel_zeros(""));
+        assert!(!is_sentinel_zeros("001"));
     }
 
     /// Anything other than 9 digits rejects — guards the NL BSN length invariant.
