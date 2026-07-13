@@ -128,6 +128,36 @@ impl Model {
         Ok(rows)
     }
 
+    /// GDPR erasure (SEC-A7): NULL out the `email` column on **every** audit
+    /// row for this subject — matched exactly as [`for_subject`](Self::for_subject)
+    /// (by `user_pid` OR the normalised `email`) so pre-account
+    /// `unknown_email`-style rows are scrubbed too. The event names, pids,
+    /// and outcome markers stay (a non-PII audit trail); only the address is
+    /// removed. Returns the number of rows scrubbed.
+    ///
+    /// # Errors
+    ///
+    /// When the update fails.
+    pub async fn scrub_subject_email(
+        db: &DatabaseConnection,
+        user_pid: Uuid,
+        email: &str,
+    ) -> ModelResult<u64> {
+        let res = auth_events::Entity::update_many()
+            .col_expr(
+                auth_events::Column::Email,
+                sea_orm::sea_query::Expr::value(Option::<String>::None),
+            )
+            .filter(
+                Condition::any()
+                    .add(auth_events::Column::UserPid.eq(user_pid))
+                    .add(auth_events::Column::Email.eq(normalise_email(email))),
+            )
+            .exec(db)
+            .await?;
+        Ok(res.rows_affected)
+    }
+
     /// Most-recent authentication events, newest first, capped at `limit`.
     ///
     /// # Errors

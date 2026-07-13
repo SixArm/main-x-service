@@ -201,6 +201,29 @@ impl Model {
         Ok(revoked)
     }
 
+    /// GDPR erasure (SEC-A7): NULL out the `user_agent` (a retained fragment
+    /// of PII) on **every** session of `user_pid`. Revocation alone only sets
+    /// `revoked_at` and leaves the user-agent string behind. Returns the
+    /// number of rows scrubbed.
+    ///
+    /// # Errors
+    ///
+    /// When the update fails.
+    pub async fn scrub_user_agent_for_user(
+        db: &DatabaseConnection,
+        user_pid: Uuid,
+    ) -> ModelResult<u64> {
+        let res = sessions::Entity::update_many()
+            .col_expr(
+                sessions::Column::UserAgent,
+                sea_orm::sea_query::Expr::value(Option::<String>::None),
+            )
+            .filter(sessions::Column::UserPid.eq(user_pid))
+            .exec(db)
+            .await?;
+        Ok(res.rows_affected)
+    }
+
     /// True when the session is valid: not revoked, and `now` is before
     /// both its idle and absolute expiries (shared
     /// `authentication-sessions.md` §3). A row predating the TTL reshape

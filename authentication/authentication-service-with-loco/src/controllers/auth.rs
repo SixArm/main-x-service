@@ -618,14 +618,15 @@ async fn delete_account(auth: AuthUser, State(ctx): State<AppContext>) -> Result
     // a session that outlives the anonymisation.
     sessions::Model::revoke_all_for_user(&ctx.db, pid).await?;
     user.into_active_model().erase(&ctx.db).await?;
-    AuthEvent::record_best_effort(
-        &ctx.db,
-        "account_erased",
-        Some(&email),
-        Some(pid),
-        Some("ok"),
-    )
-    .await;
+    // SEC-A7: erasing the `users` row is not enough — the subject's email
+    // also survives in the audit trail (`auth_events.email`, incl. pre-account
+    // `unknown_email` rows) and in `sessions.user_agent`. Scrub both so the
+    // GDPR erasure is complete.
+    AuthEvent::scrub_subject_email(&ctx.db, pid, &email).await?;
+    sessions::Model::scrub_user_agent_for_user(&ctx.db, pid).await?;
+    // The final `account_erased` audit row carries only the pid — writing the
+    // email here would re-introduce the address we just scrubbed.
+    AuthEvent::record_best_effort(&ctx.db, "account_erased", None, Some(pid), Some("ok")).await;
 
     format::empty_json()
 }

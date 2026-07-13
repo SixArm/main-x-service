@@ -297,14 +297,18 @@
   `find_by_email` (`rate_limit.rs:60-62`, `models/users.rs:438-471`) —
   plus-address/dot variants bomb one inbox and spawn duplicate accounts.
   *Test:* `victim+1@…`/`v.ictim@gmail.com`/`Victim@…` collapse to one bucket.
-- [ ] **SEC-A7 (S) 🟡** GDPR erasure completeness (`models/users.rs:606-614`):
-  scrub the subject email from `auth_events` and `sessions.user_agent`, not
-  just `users`. *Test:* after `DELETE /account`, email absent everywhere.
-- [ ] **SEC-A8 (M) 🟡** Privilege-revocation latency: `POST /token` mints
-  from a session `attrs` snapshot (`controllers/auth.rs:430-437`,
-  `models/sessions.rs:224-229`) never refreshed on admin revoke. Re-read
-  attrs (or invalidate sessions) on privilege change. *Test:* clearing
-  `access=admin` stops the session minting admin tokens.
+- [x] **SEC-A7 (S) 🟡** GDPR erasure completeness. *(done 2026-07-13)*
+  Erasure now scrubs the subject's email from `auth_events`
+  (`AuthEvent::scrub_subject_email`, pid OR normalised-email match) and
+  `sessions.user_agent` (`scrub_user_agent_for_user`), and writes
+  `account_erased` without the email. Extended `account_erasure_…` request
+  test asserts no `auth_events` row retains the email + user_agent scrubbed.
+- [x] **SEC-A8 (M) 🟡** Privilege-revocation latency. *(done 2026-07-13)*
+  The admin attribute API (`PUT …/attributes`) and the `user_attributes` CLI
+  task now `sessions::Model::revoke_all_for_user` after a change, so a
+  session that snapshotted the old attrs can't keep minting stale-attribute
+  tokens until its absolute TTL — the next login copies fresh attrs. Extended
+  admin request test asserts the target's sessions are revoked after the PUT.
 - [ ] **SEC-A9 (M) ⚪** Store only **hashes** of magic-link token / session
   `jid` / CSRF token (migrations `_000001`/`_000002`, `sessions.data.csrf`) —
   they are bearer-equivalent secrets at rest today. *Test:* DB holds no

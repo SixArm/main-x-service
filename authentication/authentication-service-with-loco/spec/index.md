@@ -504,6 +504,17 @@ only by that subject.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-A7 (security): complete GDPR erasure.** Account erasure now
+      scrubs the subject's email from `auth_events` (`scrub_subject_email`,
+      pid OR normalised-email match) and `sessions.user_agent`
+      (`scrub_user_agent_for_user`), and writes the terminal `account_erased`
+      row without the email. (Repo tasks.md SEC-A7.)
+- [x] **SEC-A8 (security): revoke sessions on attribute change.** The admin
+      attribute API + the `user_attributes` CLI task now
+      `revoke_all_for_user` after a change, so a session that snapshotted the
+      old ABAC attributes can't keep minting stale-attribute tokens until its
+      absolute TTL — the next login re-copies fresh attributes. (Repo
+      tasks.md SEC-A8.)
 - [x] **SEC-A4 (security): atomic single-use magic-link consume.** Redemption
       was `find_by_magic_token` (SELECT) + `clear_magic_link` (UPDATE), so two
       concurrent redemptions both passed the read and each minted a session.

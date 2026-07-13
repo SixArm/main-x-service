@@ -570,13 +570,18 @@ async fn account_erasure_soft_deletes_anonymises_revokes_and_audits() {
             "the original email must no longer resolve to the account"
         );
 
-        // All sessions are revoked.
+        // All sessions are revoked, and — SEC-A7 — their `user_agent` (a
+        // retained PII fragment) is scrubbed, not just left behind.
         let sessions = sessions::Model::find_all_by_user_pid(&ctx.db, pid)
             .await
             .expect("sessions should query");
         assert!(
             sessions.iter().all(|s| !s.is_active()),
             "every session must be revoked after erasure"
+        );
+        assert!(
+            sessions.iter().all(|s| s.user_agent.is_none()),
+            "SEC-A7: every session's user_agent must be scrubbed"
         );
 
         // An account_erased audit row was written.
@@ -586,6 +591,13 @@ async fn account_erasure_soft_deletes_anonymises_revokes_and_audits() {
         assert!(
             events.iter().any(|e| e.event == "account_erased"),
             "an account_erased audit row must be recorded; got {events:?}"
+        );
+        // SEC-A7: the subject's email must not survive anywhere in the audit
+        // trail — every remaining row has its `email` scrubbed to NULL (and
+        // the terminal `account_erased` row was written without it).
+        assert!(
+            events.iter().all(|e| e.email.is_none()),
+            "SEC-A7: no auth_events row may retain the erased email; got {events:?}"
         );
 
         // Post-erasure: /me and export treat the subject as gone (401),
