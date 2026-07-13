@@ -12,6 +12,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Property-based tests (SEC-M6).** Added `proptest` (dev-dependency,
+  `1.11`) and `tests/property_tests.rs` proving the matcher and its pure
+  helpers are robust on arbitrary UTF-8: the match engine (plus
+  `match_one_to_many` / `rank` / `find_matches`) and the pure helpers
+  (`normalize::{fold,legal_name,domain,fold_set}`, `phonetic::{soundex,same}`,
+  `IdentifierScheme::is_deterministic`) **never panic**; `score` is always
+  in `[0.0, 1.0]` and never NaN; matching is **symmetric** (score,
+  `is_match`, `confidence`, deterministic flag); an identical clone of a
+  well-formed organization **self-matches** (score ≥ threshold); `soundex`
+  returns `Some` iff an ASCII-alpha anchor is present (code always four
+  chars); and `Confidence::classify` is monotonic. Tests + dev-dep only —
+  no library behaviour, weight, or threshold change.
+
 - **Relationships component (spec-only; code follow-up tracked in spec §23).**
   Specced a typed organization-to-organization relationship signal:
   `relationships: Vec<RelationshipRef>` on `Organization`,

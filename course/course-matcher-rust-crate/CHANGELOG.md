@@ -9,6 +9,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **SEC-M6: `provider_score` is now symmetric.** The structured-id branch
+  guarded only side `a`'s `provider_id` non-empty, so a degenerate
+  one-sided empty id (`Some("")`) scored `0.0` in one direction but fell
+  through to the name fallback (`None`) in the other — a
+  direction-dependent result surfaced by the new symmetry property test.
+  It now requires **both** sides' `provider_id` non-empty (mirroring
+  `course_code_score`); a blank id is treated as "no structured id" in
+  both directions. Unit test `provider_score_is_symmetric_with_one_sided_empty_id`;
+  the `matching_is_symmetric` property now runs over blank-provider cases.
+
+### Testing
+
+- **SEC-M6: property-based tests.** Added `tests/proptests.rs`
+  (`proptest = "1.11"`, dev-dependency only) proving the matcher is
+  robust on adversarial / arbitrary input. Invariants pinned over the
+  public surface: the engine and every pure helper
+  (`normalize::fold` / `course_code` / `fold_set`, `phonetic::soundex` /
+  `same`) never panic on arbitrary UTF-8; `MatchResult::score` is always
+  finite and in `[0.0, 1.0]` (never NaN); matching is symmetric
+  (`match(a,b) == match(b,a)` on score / `is_match` / confidence); an
+  identical clone of a well-formed course self-matches above threshold;
+  and `soundex` output is `None` or a well-formed `[A-Z][0-9]{3}` code.
+  Tests only — no library behaviour, weights, or thresholds changed.
+
 ### Security
 
 - **SEC-M2: provider-scoped deterministic rule (R-1) no longer

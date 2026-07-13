@@ -44,6 +44,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **SEC-M6 — property-based tests.** New `tests/proptests.rs` (dev-only,
+  `proptest = "1.11"`) drives many random inputs to prove the matcher is
+  well-behaved: the engine never panics and `MatchResult::score` (and every
+  breakdown sub-score) is finite and in `[0.0, 1.0]` (never `NaN`);
+  `match_cases` is symmetric in argument order (score, `is_match`,
+  confidence); an identical clone of a well-formed case matches itself;
+  the pure helpers (`fold` / `case_number` / `url` / `fold_set` /
+  `phonetic::soundex` / `phonetic::same` / `Confidence::classify`) never
+  panic on arbitrary UTF-8 / floats; and `soundex` returns `None` or a
+  `[A-Z][0-9]{3}` code. Tests + dev-dependency only — no behaviour,
+  weights, or thresholds changed.
 - Tests for previously-uncovered spec'd behaviour: the Soundex `+0.05`
   title bonus integration (§9), `alternate_titles` contribution and
   symmetry (§9), the `keywords` Jaccard component end-to-end (§13), and

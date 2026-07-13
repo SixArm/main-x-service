@@ -344,8 +344,13 @@ fn course_code_score(a: &Course, b: &Course) -> Option<f64> {
 /// at all, so the component is skipped rather than scored zero.
 fn provider_score(a: &Course, b: &Course) -> Option<f64> {
     // Structured id is authoritative: exact equality decides 1.0 / 0.0.
+    // Both sides must carry a NON-EMPTY id — guarding only one side made the
+    // component asymmetric (a one-sided empty `provider_id` scored 0.0 in one
+    // direction but fell through to the name fallback in the other), which a
+    // symmetry property test surfaced (SEC-M6). Mirrors `course_code_score`.
     if let (Some(ap), Some(bp)) = (a.provider_id.as_deref(), b.provider_id.as_deref())
         && !ap.is_empty()
+        && !bp.is_empty()
     {
         return Some(if ap == bp { 1.0 } else { 0.0 });
     }
@@ -772,6 +777,25 @@ mod tests {
     fn provider_score_none_when_no_provider_info() {
         let a = Course::new("A");
         let b = Course::new("B");
+        assert_eq!(provider_score(&a, &b), None);
+    }
+
+    /// SEC-M6: `provider_score` must be symmetric even when one side carries
+    /// a degenerate empty `provider_id`. A blank id is treated as "no
+    /// structured id" (falling through to the name fallback) in BOTH
+    /// directions, rather than scoring 0.0 one way and `None` the other.
+    #[test]
+    fn provider_score_is_symmetric_with_one_sided_empty_id() {
+        let mut a = Course::new("A");
+        let mut b = Course::new("B");
+        a.provider_id = Some("ror-1".into());
+        b.provider_id = Some(String::new()); // degenerate empty id
+        assert_eq!(
+            provider_score(&a, &b),
+            provider_score(&b, &a),
+            "an empty provider_id on one side must not make the score direction-dependent"
+        );
+        // With no provider_name fallback either, both directions are None.
         assert_eq!(provider_score(&a, &b), None);
     }
 
