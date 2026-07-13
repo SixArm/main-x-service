@@ -10,6 +10,37 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-V1: harden `from_paseto_keys_url` (the `fetch` path).** It used a
+  bare `reqwest::get` with no scheme check, timeout, redirect policy, or
+  body cap. It now (a) refuses any non-`https://` URL outright — a plaintext
+  or downgraded fetch lets a network attacker inject Ed25519 keys, i.e. full
+  token forgery; (b) forbids redirects so an `https` URL can't be bounced to
+  `http`; (c) sets a 10 s request timeout so a hung endpoint can't stall
+  boot; (d) reads the body under a 64 KiB cap so a hostile response can't OOM
+  the peer. Test `non_https_keys_url_is_refused`.
+- **SEC-V2: no vacuous match for negated `resource.`/`env.` conditions.** A
+  `!`-negated `resource.`/`env.` condition matched *vacuously* when the
+  namespace was absent (e.g. the coarse guard path with no record/env), so
+  an `allow` rule like `{when:{"env.network":["!untrusted"]}}` silently
+  granted every authenticated caller. An absent namespaced attribute now
+  biases to the **safe** outcome by effect: an `allow` rule does **not**
+  match (no silent grant), a `deny` rule still matches (fail-closed). Subject-
+  attribute negation is unchanged. Test
+  `negated_allow_does_not_match_vacuously_when_namespace_absent`.
+
+### Security — tests (SEC-V4)
+
+- Added the previously-missing **cross-key forgery** test: a token validly
+  signed by an *attacker* key but stamped with the honest published `kid` is
+  rejected (`Paseto` error) — proving `kid` selection can't verify a token
+  the honest key never signed.
+- Added `token_missing_exp_is_rejected` (a payload without `exp` is refused,
+  not treated as never-expiring) and `malformed_tokens_never_panic` (the
+  verifier only ever returns `Err`, never panics, on arbitrary / truncated /
+  oversized input).
+
 ### Fixed
 
 - Formatting drift in `src/lib.rs` (six spots not rustfmt-formatted);

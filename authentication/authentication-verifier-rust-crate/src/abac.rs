@@ -222,6 +222,10 @@ impl Rule {
         }
         self.when.iter().all(|(key, wanted)| {
             let have = values_for(claims, entity, resource, env, key);
+            // A `resource.` / `env.` key whose value set is ABSENT — e.g. on
+            // the coarse guard path where no record / environment was loaded.
+            let namespaced_absent =
+                have.is_empty() && (key.starts_with("resource.") || key.starts_with("env."));
             wanted.iter().any(|want| {
                 let (negate, raw) = match want.strip_prefix('!') {
                     Some(rest) => (true, rest),
@@ -232,6 +236,15 @@ impl Rule {
                 // can compare an attribute to the caller's identity
                 // (e.g. `resource.owner: ["$sub"]` = owned by the caller).
                 let resolved = resolve_template(claims, raw);
+                if negate && namespaced_absent {
+                    // SEC-V2: a **negated** `resource.`/`env.` condition must
+                    // not match *vacuously* when the namespace is absent (an
+                    // attacker's token has no resource/env, so `!untrusted`
+                    // is not evidence). Bias by effect to the SAFE outcome:
+                    // an `allow` rule must NOT match (no silent grant on the
+                    // coarse path), a `deny` rule MUST match (fail-closed).
+                    return self.effect == Effect::Deny;
+                }
                 have.contains(&resolved) != negate
             })
         })
@@ -1045,9 +1058,53 @@ mod tests {
                 .allowed
         );
         // No resource attr at all ⇒ also "does not have public" ⇒ deny.
+        // (A `deny` rule still fires when the namespaced attr is absent —
+        // fail-closed, SEC-V2.)
         assert!(
             !policy
                 .evaluate_with_resource(&anyone, Action::Read, "case", &BTreeMap::new())
+                .allowed
+        );
+    }
+
+    /// SEC-V2: a **negated** `resource.`/`env.` condition on an **allow**
+    /// rule must NOT match vacuously when the namespace is absent (the
+    /// coarse guard path), or any authenticated caller would silently gain
+    /// the grant. Mirror of the deny-rule fail-closed case above.
+    #[test]
+    fn negated_allow_does_not_match_vacuously_when_namespace_absent() {
+        let policy = Policy::from_json(
+            r#"{ "rules": [
+                { "effect": "allow", "actions": ["write"], "when": { "env.network": ["!untrusted"] } }
+            ] }"#,
+        )
+        .expect("policy parses");
+        let anyone = claims_with_attrs(&[]);
+        // Coarse path: no env supplied ⇒ the allow must NOT fire ⇒ the
+        // default (deny-mutation) governs. Before the fix this ALLOWED.
+        assert!(!policy.evaluate(&anyone, Action::Write, "case").allowed);
+        assert!(
+            !policy
+                .evaluate_with_context(
+                    &anyone,
+                    Action::Write,
+                    "case",
+                    &BTreeMap::new(),
+                    &BTreeMap::new()
+                )
+                .allowed
+        );
+        // But when env IS supplied and is trusted (network=trusted, not
+        // "untrusted"), the negated condition legitimately matches ⇒ allow.
+        assert!(
+            policy
+                .evaluate_with_context(
+                    &anyone,
+                    Action::Write,
+                    "case",
+                    &BTreeMap::new(),
+                    &resource(&[("network", &["trusted"])]),
+                )
                 .allowed
         );
     }

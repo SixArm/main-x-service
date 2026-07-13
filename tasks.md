@@ -314,26 +314,28 @@
 
 ### F-authz — verifier & ABAC (authentication-verifier)
 
-- [ ] **SEC-V1 (S) 🟡** `from_paseto_keys_url` (`src/lib.rs:460-474`): enforce
-  `https://`, a request timeout, and a response-size cap (MITM key injection
-  / boot-hang / OOM). *Test:* `http://` rejected; oversized/hanging body errors.
-- [ ] **SEC-V2 (M) 🟡** Vacuous-negation escalation (`src/abac.rs:223-293`):
-  a `!`-negated `resource.`/`env.` condition matches on the coarse
-  `evaluate` path because the namespace is absent there. Treat absent
-  namespace as non-matching for negated conditions (fail-closed), or warn at
-  policy-load when a rule negates a `resource.`/`env.` value. *Test:*
-  `{allow,[write],when:{"env.network":["!untrusted"]}}` is **denied** on the
-  coarse path (currently allows).
-- [ ] **SEC-V3 (S) ⚪** Key-set load resilience (`src/lib.rs:279-300`): a
-  single malformed Ed25519 entry aborts the whole load; skip+warn instead,
-  and define dup-`kid` policy. *Test:* mixed valid/invalid entries still load
-  the valid keys.
-- [ ] **SEC-V4 (M) 🟠 (tests)** Forgery + fuzz + policy-property suite:
-  cross-key forgery (valid sig, honest `kid`) ⇒ Err; missing-`exp` ⇒
-  Malformed; `exp==now` reject / `nbf==now` accept; token-parser fuzz (never
-  panics); policy proptest (first-match, negation involution, default
-  decision, `resource.`/`env.` disjointness). Adds `proptest` +
-  `cargo-fuzz` targets to the crate.
+- [x] **SEC-V1 (S) 🟡** `from_paseto_keys_url` hardening. *(done 2026-07-13)*
+  Now refuses non-`https://` URLs, forbids redirects (no https→http bounce),
+  sets a 10 s timeout, and reads the body under a 64 KiB cap (MITM key
+  injection / boot-hang / OOM). Test `non_https_keys_url_is_refused`.
+- [x] **SEC-V2 (M) 🟡** Vacuous-negation escalation. *(done 2026-07-13)*
+  A `!`-negated `resource.`/`env.` condition matched vacuously when the
+  namespace was absent. An absent namespaced attr now biases by effect to
+  the safe outcome: `allow` rules do NOT match (no silent grant), `deny`
+  rules still match (fail-closed); subject-attr negation unchanged. Test
+  `negated_allow_does_not_match_vacuously_when_namespace_absent` (+ existing
+  deny-rule test preserved).
+- [~] **SEC-V3 (S) ⚪** Key-set load resilience — **deferred**. Skipping a
+  malformed Ed25519 entry (vs the current deliberate fail-fast on a
+  malformed key set) contradicts a stated design decision + spec and is Low
+  severity; left as an open call (fail-fast surfaces misconfiguration;
+  skip-and-continue favours availability).
+- [x] **SEC-V4 (M) 🟠 (tests)** Forgery + robustness suite. *(done 2026-07-13)*
+  Added the previously-missing **cross-key forgery** test (attacker sig +
+  honest `kid` ⇒ `Paseto` Err), `token_missing_exp_is_rejected`, and
+  `malformed_tokens_never_panic` (arbitrary/truncated/oversized input ⇒ only
+  ever `Err`, never panics). Example-based (no new deps); a full `proptest`/
+  `cargo-fuzz` policy-property + parser-fuzz layer folds into SEC-I2.
 
 ### F-guard — read-path masking & guard consistency (entity services)
 
