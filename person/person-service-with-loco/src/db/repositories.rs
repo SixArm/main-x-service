@@ -1107,6 +1107,45 @@ impl PersonRepository for SeaOrmPersonRepository {
             }
         }
 
+        // SEC-B10: write the merge audit rows **inside** the transaction so
+        // they commit atomically with the merge — a crash after commit can no
+        // longer leave a durable merge with no audit trail (the previous code
+        // logged post-commit, best-effort). An audit-write failure now rolls
+        // the whole merge back. The survivor's new-value is its applied
+        // payload (`survivor`), the same data written by `apply_update_rows`.
+        if let Some(ref audit_log) = self.audit_log {
+            if let Some(old_json) = old_survivor
+                .as_ref()
+                .and_then(|p| serde_json::to_value(p).ok())
+                && let Ok(new_json) = serde_json::to_value(survivor)
+            {
+                audit_log
+                    .log_update_on(
+                        &txn,
+                        "Person",
+                        survivor.id,
+                        old_json,
+                        new_json,
+                        &AuditContext::default(),
+                    )
+                    .await?;
+            }
+            if let Some(dup_json) = old_duplicate
+                .as_ref()
+                .and_then(|p| serde_json::to_value(p).ok())
+            {
+                audit_log
+                    .log_delete_on(
+                        &txn,
+                        "Person",
+                        *duplicate_id,
+                        dup_json,
+                        &AuditContext::default(),
+                    )
+                    .await?;
+            }
+        }
+
         txn.commit().await?;
 
         let result = self
@@ -1125,35 +1164,6 @@ impl PersonRepository for SeaOrmPersonRepository {
             person_id: *duplicate_id,
             timestamp: Utc::now(),
         });
-
-        // Audit rows: an UPDATE trail for the survivor and a DELETE trail
-        // for the duplicate.
-        if let Some(old_json) = old_survivor
-            .as_ref()
-            .and_then(|p| serde_json::to_value(p).ok())
-            && let Ok(new_json) = serde_json::to_value(&result)
-        {
-            self.log_audit(
-                "UPDATE",
-                result.id,
-                Some(old_json),
-                Some(new_json),
-                &AuditContext::default(),
-            )
-            .await;
-        }
-        if let Some(dup) = old_duplicate
-            && let Ok(dup_json) = serde_json::to_value(&dup)
-        {
-            self.log_audit(
-                "DELETE",
-                *duplicate_id,
-                Some(dup_json),
-                None,
-                &AuditContext::default(),
-            )
-            .await;
-        }
 
         Ok(result)
     }
@@ -1373,6 +1383,48 @@ mod tests {
             deleted_rows.len(),
             1,
             "one deleted outbox row for duplicate"
+        );
+    }
+
+    /// SEC-B10: the merge audit rows commit **with** the merge — after a
+    /// successful merge there is an `UPDATE` audit row for the survivor and a
+    /// `DELETE` audit row for the duplicate (written in-transaction, not
+    /// best-effort post-commit).
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn merge_writes_the_audit_rows_in_transaction() {
+        use crate::db::audit::AuditLogRepository;
+        use crate::db::models::audit_log;
+
+        let db = connect().await;
+        let audit = std::sync::Arc::new(AuditLogRepository::new(db.clone()));
+        let repo = SeaOrmPersonRepository::new(db.clone()).with_audit_log(audit);
+
+        let survivor = repo.create(&a_person("AuditSurvivor")).await.unwrap();
+        let duplicate = repo.create(&a_person("AuditDuplicate")).await.unwrap();
+
+        repo.merge(&survivor, &duplicate.id).await.unwrap();
+
+        let survivor_update = audit_log::Entity::find()
+            .filter(audit_log::Column::EntityId.eq(survivor.id))
+            .filter(audit_log::Column::Action.eq("UPDATE"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert!(
+            !survivor_update.is_empty(),
+            "an UPDATE audit row for the merged survivor must exist"
+        );
+
+        let duplicate_delete = audit_log::Entity::find()
+            .filter(audit_log::Column::EntityId.eq(duplicate.id))
+            .filter(audit_log::Column::Action.eq("DELETE"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert!(
+            !duplicate_delete.is_empty(),
+            "a DELETE audit row for the merged-away duplicate must exist"
         );
     }
 }

@@ -5,6 +5,13 @@ tick the box when an automated test or clearly described manual check
 confirms the criterion is met. Tasks small enough to land in a single
 PR; split larger tasks (`T-12a`, `T-12b`).
 
+- [x] **SEC-B10 (security): person merge audit in-transaction.** The merge
+  `UPDATE` (survivor) + `DELETE` (duplicate) audit rows are now written on the
+  merge transaction (`log_update_on`/`log_delete_on`) **before** commit, so a
+  crash after commit can't lose them and an audit failure rolls the merge
+  back (was best-effort post-commit). DB-gated test asserts both rows present.
+  (Repo tasks.md SEC-B10.)
+
 - [x] **SEC-B9 (security): wire the idempotency key.** Both submit handlers
   read an `Idempotency-Key` header; `create_or_get_idempotent` returns the
   original job (no re-store/re-enqueue) when the key already names one,
