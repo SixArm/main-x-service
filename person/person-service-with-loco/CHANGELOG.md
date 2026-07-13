@@ -10,6 +10,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-B5: reject self-merge and lock merge participants (TOCTOU).**
+  `POST /api/persons/merge` had **no self-merge guard**: `main ==
+  duplicate` applied the survivor and then soft-deleted the *same* id,
+  tombstoning the record and destroying its data — now rejected with `422`
+  before any fetch (integration test `test_merge_into_self_is_rejected`).
+  Separately, the merged payload was computed from **unlocked** reads, so
+  two concurrent merges of the same duplicate could both see it active and
+  fan its data into different survivors; the repository merge transaction
+  now locks both participant rows `FOR UPDATE` (in id order, so opposing
+  merges can't deadlock) and re-checks the duplicate is still active,
+  making the loser fail closed instead of double-applying.
 - **SEC-G1: authorise + audit the governed bulk-links read.**
   `GET /api/persons/links` returned **every** `same_identity`
   (person → worker) edge — identity-linking PII — with only the coarse

@@ -1057,6 +1057,34 @@ impl PersonRepository for SeaOrmPersonRepository {
         // both outbox rows — commits (or rolls back) under one transaction.
         let txn = self.db.begin().await?;
 
+        // SEC-B5 (TOCTOU): the merged payload was computed from unlocked
+        // reads, so lock both participant rows `FOR UPDATE` before writing
+        // and re-validate under the lock. Two concurrent merges of the same
+        // duplicate would otherwise both see it active and fan its data into
+        // two different survivors; the row lock serialises them and the
+        // active re-check makes the loser fail closed instead of
+        // double-applying. Lock in id order so the two directions cannot
+        // deadlock.
+        let mut lock_ids = [survivor.id, *duplicate_id];
+        lock_ids.sort();
+        for id in lock_ids {
+            persons::Entity::find_by_id(id)
+                .lock_exclusive()
+                .one(&txn)
+                .await?;
+        }
+        let duplicate_still_active = persons::Entity::find_by_id(*duplicate_id)
+            .filter(persons::Column::DeletedAt.is_null())
+            .one(&txn)
+            .await?
+            .is_some();
+        if !duplicate_still_active {
+            txn.rollback().await?;
+            return Err(crate::Error::Validation(format!(
+                "duplicate person {duplicate_id} is no longer active (already merged or deleted)"
+            )));
+        }
+
         // Apply the survivor's parent + child rows (shared with `update`).
         apply_update_rows(&txn, survivor).await?;
 

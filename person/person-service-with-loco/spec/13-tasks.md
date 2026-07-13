@@ -5,6 +5,14 @@ tick the box when an automated test or clearly described manual check
 confirms the criterion is met. Tasks small enough to land in a single
 PR; split larger tasks (`T-12a`, `T-12b`).
 
+- [x] **SEC-B5 (security): reject self-merge + lock merge participants.**
+  `POST /merge` now rejects `main == duplicate` with `422` before any
+  fetch (a self-merge tombstoned the record and lost its data);
+  integration test `test_merge_into_self_is_rejected`. The repository
+  `merge` transaction also locks both participant rows `FOR UPDATE`
+  (id-ordered) and re-checks the duplicate is still active, closing the
+  concurrent-merge TOCTOU. (Repo tasks.md Phase 5 SEC-B5.)
+
 - [x] **T-1a — Flip peer verification to PASETO v4.public.** *(done
   2026-07-04)* Per
   [authentication-sessions.md](../../../agents/share/authentication-sessions.md)

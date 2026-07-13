@@ -11,6 +11,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-B5: lock merge participants against a concurrent-merge race
+  (TOCTOU).** The merge handler already rejects `main == duplicate`
+  (`422`), but `main`/`duplicate` were read (unlocked) before the write
+  transaction, so two concurrent merges of the same duplicate could both
+  see it active and fan its data into different survivors. The `outbox`
+  merge path now locks both participant rows `FOR UPDATE` (in pid order, so
+  opposing merges can't deadlock) and re-checks the duplicate is still
+  active before writing, failing the loser closed (`streaming::merge_and_emit`).
 - **SEC-G1: authorise + audit the governed bulk-links read.**
   `GET /api/cases/links` returned **every** `subject_of` (case → person)
   edge across all cases with only the coarse blanket-read gate and no audit

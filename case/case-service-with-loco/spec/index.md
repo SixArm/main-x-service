@@ -484,6 +484,13 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-B5 (security): lock merge participants against a concurrent
+  race.** The merge handler already `422`s `main == duplicate`; the
+  `outbox` merge path (`streaming::merge_and_emit`) now also locks both
+  participant rows `FOR UPDATE` (pid-ordered, deadlock-free) and re-checks
+  the duplicate is still active before writing, so two concurrent merges of
+  the same duplicate cannot both apply (the loser fails closed). (Repo
+  tasks.md Phase 5 SEC-B5.)
 - [x] **SEC-G1 (security): authorise + audit the governed bulk-links read.**
   `GET /api/cases/links` dumped every `subject_of` (case → person) edge
   with only the coarse blanket-read gate and no audit — a cross-case

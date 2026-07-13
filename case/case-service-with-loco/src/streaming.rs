@@ -29,13 +29,16 @@ use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
 use case_matcher::Case;
-use loco_rs::prelude::ModelResult;
-use sea_orm::{ConnectionTrait, DatabaseConnection, IntoActiveModel, TransactionTrait};
+use loco_rs::prelude::{ModelError, ModelResult};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, IntoActiveModel, QueryFilter,
+    QuerySelect, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::models::audit_logs::Model as AuditModel;
-use crate::models::cases::Model as CaseModel;
+use crate::models::cases::{Model as CaseModel, cases};
 use crate::models::entity_links::{Model as EntityLinkModel, NewEdge};
 use crate::models::event_outbox::{Model as OutboxRow, OutboxInsert};
 
@@ -550,6 +553,31 @@ pub async fn merge_and_emit(
         }
         EventTransport::Outbox => {
             let txn = db.begin().await?;
+            // SEC-B5 (TOCTOU): `main`/`duplicate` were read (unlocked) in the
+            // handler before this transaction. Lock both rows `FOR UPDATE`
+            // (pid order, so opposing merges cannot deadlock) and re-check
+            // the duplicate is still active before writing, so two
+            // concurrent merges of the same duplicate cannot both fan its
+            // data into different survivors — the loser fails closed.
+            let mut lock_pids = [main.pid, dup_pid];
+            lock_pids.sort();
+            for pid in lock_pids {
+                cases::Entity::find()
+                    .filter(cases::Column::Pid.eq(pid))
+                    .lock_exclusive()
+                    .one(&txn)
+                    .await?;
+            }
+            let duplicate_active = cases::Entity::find()
+                .filter(cases::Column::Pid.eq(dup_pid))
+                .filter(cases::Column::DeletedAt.is_null())
+                .one(&txn)
+                .await?
+                .is_some();
+            if !duplicate_active {
+                txn.rollback().await?;
+                return Err(ModelError::EntityNotFound);
+            }
             let merged = main
                 .into_active_model()
                 .update_data(&txn, merged_case)
