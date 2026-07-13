@@ -471,13 +471,17 @@
   remote source; validate each edge's endpoint types via `EdgeKind::permits`
   before `apply_linked`. *Test:* remote source without a token refused;
   ill-typed edge rejected.
-- [ ] **SEC-B8 (S) 🟡** Bulk audit gaps: import runs with
-  `AuditContext::default()` (no actor/ip) and writes no job-level audit row
-  (`bulk/worker.rs:86-121`); export audit is best-effort and delivers the
-  artifact even if `log_export` fails (`worker.rs:199-206`). Thread real
-  actor context; write a job-level import audit; make export audit block
-  delivery. *Tests:* import/export audited with actor; export fails closed on
-  audit error.
+- [~] **SEC-B8 (S) 🟡** Bulk audit gaps. *(job-level audit + fail-closed
+  export + actor threading done 2026-07-13; per-row actor deferred)* A
+  successful import now writes a job-level `IMPORT` audit row (`log_import`)
+  with the actor + reconciled counts; the export audit is written **before**
+  `finish_export` and its error **propagates**, so a failed audit marks the
+  job `failed` and never surfaces `download_url` (fail-closed delivery). The
+  actor is threaded into both rows (fallback `system` only when the job had
+  no caller). Pure `import_audit_summary`/`export_audit_summary` unit-tested.
+  **Deferred:** threading the real actor into each **per-row** create/update
+  audit — needs a `PersonRepository::create/update` signature change (they
+  build a default `system` `AuditContext` today).
 - [ ] **SEC-B9 (S) 🟡** Wire the idempotency key (`db/bulk_jobs.rs:48,61`
   hardcode `None`; the `UNIQUE(entity,kind,idempotency_key)` never fires):
   read a client key and dedupe a retried submit. *Test:* re-submit with the
