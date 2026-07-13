@@ -27,8 +27,10 @@ use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use loco_rs::environment::Environment;
+
 use crate::{
-    auth::AuthUser,
+    auth::{AuthUser, Claims},
     mailers::auth::Emailer,
     metrics::Metrics,
     models::{auth_events::Model as AuthEvent, sessions, users},
@@ -123,16 +125,31 @@ async fn deliver_magic_link(ctx: &AppContext, user: &users::Model, locale: &str,
     let Some(token) = user.magic_link_token.as_ref() else {
         return;
     };
-    let link = format!("{frontend}/verify?token={token}");
-    tracing::info!(
-        email = %user.email,
-        locale = %locale,
-        magic_link = %link,
-        "magic link issued (dev: open the link, or GET /api/auth/magic-link/{{token}})"
-    );
-    if let Err(err) = Emailer::send_magic_link(ctx, user, locale, frontend).await {
-        tracing::debug!(error = %err, "magic link email not sent; console log above is authoritative");
+    // SEC-A3: the magic-link URL embeds the live login token — a ~5-minute
+    // account-takeover primitive if it reaches logs. Emit the token ONLY in
+    // development (no SMTP there, so the console log is the authoritative
+    // way to open the link); in every other environment log the issuance
+    // without the token/URL. The email path still delivers it to the user.
+    if log_magic_link_url(&ctx.environment) {
+        let link = format!("{frontend}/verify?token={token}");
+        tracing::info!(
+            email = %user.email,
+            locale = %locale,
+            magic_link = %link,
+            "magic link issued (dev: open the link, or GET /api/auth/magic-link/{{token}})"
+        );
+    } else {
+        tracing::info!(email = %user.email, locale = %locale, "magic link issued");
     }
+    if let Err(err) = Emailer::send_magic_link(ctx, user, locale, frontend).await {
+        tracing::debug!(error = %err, "magic link email not sent");
+    }
+}
+
+/// Whether the magic-link **token/URL** may be written to the log — only in
+/// the `development` environment (SEC-A3). Pure, so the gate is unit-tested.
+fn log_magic_link_url(env: &Environment) -> bool {
+    matches!(env, Environment::Development)
 }
 
 /// Create a passwordless account and send a magic link. To avoid
@@ -503,18 +520,39 @@ async fn signout(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Respon
 /// response shape is documented in the `OpenAPI` document (the
 /// `AuthEvent` schema).
 ///
-/// Left **open** (no bearer), mirroring how the sibling care-pathway
-/// service exposes `/audit/recent`: the rows carry no tokens or secrets,
-/// only event names, normalised emails, subject pids, and outcome
-/// markers. The GDPR right-of-access requirement (T-9) is satisfied
-/// instead by the bearer-gated per-subject `GET /api/auth/account/audit`
-/// — a subject's *own* audit trail is reachable only by that subject —
-/// so this system-wide view can stay open for operators. See service
-/// spec §12 for the recorded decision.
+/// **Admin-gated** (SEC-A2). The rows carry registered **emails** plus
+/// outcome markers (`created` vs `existing`, `unknown_email` vs `issued`,
+/// `rate_limited`). Left open, this system-wide trail is an
+/// account-enumeration oracle — an attacker triggers a signup for a target
+/// email and reads back the outcome by timing — which would undo the
+/// always-`200` anti-enumeration contract the unauthenticated endpoints
+/// carefully preserve. It now requires a valid PASETO bearer whose
+/// attributes include `access=admin` (`401` without a token, `403` for a
+/// non-admin). A subject's *own* trail stays reachable via the
+/// session-gated `GET /api/auth/account/audit` (GDPR right-of-access, T-9).
 #[debug_handler]
-async fn recent_audit(State(ctx): State<AppContext>) -> Result<Response> {
+async fn recent_audit(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
+    let AuthUser(claims) = auth;
+    if !claims_have_admin(&claims) {
+        return Err(Error::CustomError(
+            StatusCode::FORBIDDEN,
+            ErrorDetail::new(
+                "forbidden",
+                "admin attribute required (access=admin) to read the system-wide audit trail",
+            ),
+        ));
+    }
     let rows = AuthEvent::recent(&ctx.db, 100).await?;
     format::json(rows)
+}
+
+/// Whether `claims` carry the `access=admin` attribute. Pure, unit-tested;
+/// mirrors the admin controller's gate (SEC-A2).
+fn claims_have_admin(claims: &Claims) -> bool {
+    claims
+        .attrs
+        .get("access")
+        .is_some_and(|values| values.iter().any(|v| v == "admin"))
 }
 
 /// Resolve the live, non-erased user for an authenticated request, or a
@@ -610,9 +648,58 @@ pub fn routes() -> Routes {
 
 #[cfg(test)]
 mod tests {
-    use super::choose_frontend;
+    use super::{choose_frontend, claims_have_admin, log_magic_link_url};
+    use crate::auth::Claims;
+    use loco_rs::environment::Environment;
+    use std::collections::BTreeMap;
 
     const DEFAULT: &str = "http://localhost:5173";
+
+    fn claims_with_access(values: &[&str]) -> Claims {
+        let mut attrs = BTreeMap::new();
+        if !values.is_empty() {
+            attrs.insert(
+                "access".to_string(),
+                values.iter().map(|v| (*v).to_string()).collect(),
+            );
+        }
+        Claims {
+            sub: "11111111-1111-1111-1111-111111111111".to_string(),
+            email: "a@example.com".to_string(),
+            name: "A".to_string(),
+            iss: "authentication-service".to_string(),
+            aud: "main-x-service".to_string(),
+            exp: 0,
+            iat: 0,
+            nbf: None,
+            sid: "test-sid".to_string(),
+            scope: Vec::new(),
+            roles: Vec::new(),
+            attrs,
+        }
+    }
+
+    /// SEC-A2: only an `access=admin` caller may read the system-wide audit
+    /// trail; write-tier and attribute-less callers are refused.
+    #[test]
+    fn recent_audit_requires_admin() {
+        assert!(claims_have_admin(&claims_with_access(&["admin"])));
+        assert!(claims_have_admin(&claims_with_access(&["write", "admin"])));
+        assert!(!claims_have_admin(&claims_with_access(&["write"])));
+        assert!(!claims_have_admin(&claims_with_access(&[])));
+    }
+
+    /// SEC-A3: the magic-link token/URL is logged ONLY in development, so it
+    /// never lands in production (or test) logs.
+    #[test]
+    fn magic_link_url_logged_only_in_development() {
+        assert!(log_magic_link_url(&Environment::Development));
+        assert!(!log_magic_link_url(&Environment::Production));
+        assert!(!log_magic_link_url(&Environment::Test));
+        assert!(!log_magic_link_url(&Environment::Any(
+            "staging".to_string()
+        )));
+    }
 
     fn allowlist() -> Vec<String> {
         vec![
