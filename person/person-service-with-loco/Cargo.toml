@@ -103,6 +103,7 @@ assertables = "10"
 tokio-test = "0.4"
 mockall = "0.13"
 tempfile = "3.27"
+proptest = "1.11"
 
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
 # the bearer-verification path is exercised without the auth service or

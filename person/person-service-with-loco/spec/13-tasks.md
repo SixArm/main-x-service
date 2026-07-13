@@ -5,6 +5,16 @@ tick the box when an automated test or clearly described manual check
 confirms the criterion is met. Tasks small enough to land in a single
 PR; split larger tasks (`T-12a`, `T-12b`).
 
+- [x] **SEC-B2 (security): bound bulk import/export against OOM.** The
+  import upload is read chunk-by-chunk and rejected `413` past
+  `MAX_IMPORT_BYTES` (64 MiB) before materialisation (`read_field_capped`
+  / `exceeds_cap`); the pipeline rejects a load over `MAX_IMPORT_ROWS`
+  (1M) via `split_lines_capped`; a caller `limit` is clamped to
+  `MAX_EXPORT_ROWS` (1M) via `clamp_export_limit`. proptest fuzzes the
+  JSONL parse boundary (never panics on random / truncated-UTF-8 / giant
+  input). True end-to-end streaming deferred. (Repo tasks.md Phase 5
+  SEC-B2.)
+
 - [x] **SEC-B5 (security): reject self-merge + lock merge participants.**
   `POST /merge` now rejects `main == duplicate` with `422` before any
   fetch (a self-merge tombstoned the record and lost its data);

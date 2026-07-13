@@ -64,6 +64,26 @@ pub fn split_lines(input: &[u8]) -> Result<Vec<String>> {
         .collect())
 }
 
+/// Like [`split_lines`], but reject the whole load when the non-blank row
+/// count exceeds `max` (SEC-B2 row cap). Bounds the per-job work so a file
+/// of millions of tiny lines cannot enqueue millions of per-row database
+/// round-trips.
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] if `input` is not valid UTF-8 (via
+/// [`split_lines`]) or if the row count exceeds `max`.
+pub fn split_lines_capped(input: &[u8], max: usize) -> Result<Vec<String>> {
+    let lines = split_lines(input)?;
+    if lines.len() > max {
+        return Err(Error::Validation(format!(
+            "bulk import exceeds the row cap: {} rows > {max}",
+            lines.len()
+        )));
+    }
+    Ok(lines)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{encode, parse_line, split_lines, to_line};
@@ -119,5 +139,67 @@ mod tests {
     #[test]
     fn parse_line_rejects_garbage() {
         assert!(parse_line("not json").is_err());
+    }
+
+    #[test]
+    fn split_lines_capped_rejects_over_the_cap() {
+        // Three non-blank lines; a cap of 2 rejects, a cap of 3 accepts.
+        let bytes = b"{}\n{}\n{}\n";
+        assert!(super::split_lines_capped(bytes, 2).is_err());
+        assert_eq!(super::split_lines_capped(bytes, 3).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn split_lines_capped_ignores_blanks_when_counting() {
+        // Blank lines don't count toward the cap.
+        let bytes = b"\n{}\n  \n{}\n\n";
+        assert_eq!(super::split_lines_capped(bytes, 2).unwrap().len(), 2);
+    }
+
+    // SEC-B2 fuzz: the JSONL codec's parse boundary must never panic on
+    // adversarial input — arbitrary strings, random bytes (incl. invalid /
+    // truncated UTF-8), and a pathologically long single line. A malformed
+    // row is an `Err`, never a crash.
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn parse_line_never_panics(s in ".*") {
+            let _ = parse_line(&s);
+        }
+
+        #[test]
+        fn split_lines_never_panics_on_random_bytes(
+            bytes in proptest::collection::vec(any::<u8>(), 0..4096)
+        ) {
+            let _ = split_lines(&bytes);
+        }
+
+        #[test]
+        fn split_lines_capped_never_panics_on_random_bytes(
+            bytes in proptest::collection::vec(any::<u8>(), 0..4096),
+            cap in 0usize..64,
+        ) {
+            let _ = super::split_lines_capped(&bytes, cap);
+        }
+    }
+
+    #[test]
+    fn parse_line_handles_a_giant_line_without_panicking() {
+        // A single 2 MiB line of one repeated byte: malformed JSON, but the
+        // parser must return an error rather than blow the stack or panic.
+        let giant = "a".repeat(2 * 1024 * 1024);
+        assert!(parse_line(&giant).is_err());
+        // And a giant *valid-UTF-8* buffer with no newline is one line.
+        assert_eq!(split_lines(giant.as_bytes()).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn split_lines_handles_truncated_utf8_without_panicking() {
+        // A leading valid line, then a truncated multi-byte sequence: the
+        // whole buffer is invalid UTF-8, so split_lines returns Err.
+        let mut bytes = b"{}\n".to_vec();
+        bytes.push(0xF0); // start of a 4-byte sequence, then EOF
+        assert!(split_lines(&bytes).is_err());
     }
 }

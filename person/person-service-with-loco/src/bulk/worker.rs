@@ -150,10 +150,12 @@ fn export_params_from_json(params: &serde_json::Value) -> ExportParams {
             .get("q")
             .and_then(serde_json::Value::as_str)
             .map(ToString::to_string),
-        limit: params
-            .get("limit")
-            .and_then(serde_json::Value::as_u64)
-            .unwrap_or(defaults.limit),
+        limit: crate::bulk::pipeline::clamp_export_limit(
+            params
+                .get("limit")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(defaults.limit),
+        ),
         offset: params
             .get("offset")
             .and_then(serde_json::Value::as_u64)
