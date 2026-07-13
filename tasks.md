@@ -522,11 +522,13 @@
   caps `MAX_TEXT_LEN=1024` chars / `MAX_ARRAY_LEN=256` entries /
   `MAX_ITEM_LEN=512` chars, incl. struct-array inner strings; false/oversized
   unit tests + within-caps pin; each crate green): case, care-pathway,
-  portfolio. **Remaining:** course + organization have no `validation.rs`
-  (add one), the 5 older axum services (person/worker/place/thing/event
-  `validation/mod.rs`), and the coarse `limit_payload` body-cap backstop on
-  the 5 uncapped loco configs (+ lower the others' 5 MB) — the config change
-  carries loco-boot risk best validated by running the app.
+  portfolio, **organization** *(new `src/validation.rs`, done 2026-07-13)*.
+  **Remaining:** course (has a 433-line `validation/mod.rs` — weave caps
+  into `validate_course`/`validate_instance`), the 5 older axum services
+  (person/worker/place/thing/event `validation/mod.rs`), and the coarse
+  `limit_payload` body-cap backstop on the 5 uncapped loco configs (+ lower
+  the others' 5 MB) — the config change carries loco-boot risk best
+  validated by running the app.
 - [x] **SEC-M2 (M) 🟠** False-deterministic-match empty guards. *(done 2026-07-13)*
   A post-normalization empty/trivial-value guard added to every string-keyed
   deterministic short-circuit across **all 9 matchers**, each with a

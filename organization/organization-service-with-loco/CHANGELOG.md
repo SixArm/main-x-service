@@ -11,6 +11,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-M1: input-size caps on the `Organization` payload.** The service
+  stores the matcher's `Organization` verbatim and scored it with only a
+  blank-`name` check — a single multi-megabyte string field or a huge array
+  could be used as a CPU/memory `DoS` against the matcher's O(n·m)
+  Jaro-Winkler / Levenshtein / Jaccard scoring, amplified across the
+  `check-duplicates` scan. A new `src/validation.rs` (`problems`, mirroring
+  the case-service reference) now bounds every scalar text field
+  (`MAX_TEXT_LEN = 1024` chars — incl. the nested `address.*` sub-fields),
+  array cardinality (`MAX_ARRAY_LEN = 256`), and per-entry string length
+  (`MAX_ITEM_LEN = 512`), and keeps the blank-`name` /
+  non-blank-`identifiers[i].value` rules — all collected into one `422`
+  *before* the record is stored or matched. The controller's `validate`
+  delegates to it. Unit tests cover blank/oversized text, oversized array,
+  oversized array item, nested address, multi-problem reporting, and a
+  within-caps large record.
+
 - **SEC-G6: trailing slash can no longer downgrade a destructive POST.**
   `derive_action` classified `/merge` / `/deduplicate` / `/import` via
   `path.ends_with`, so a trailing slash (`POST …/merge/`) fell through to
