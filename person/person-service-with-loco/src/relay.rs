@@ -23,7 +23,7 @@
 
 use std::time::Duration;
 
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait};
 
 use crate::Result;
 use crate::db::models::event_outbox::{self, Column as OutboxColumn};
@@ -90,7 +90,14 @@ pub async fn drain_once<S: EventSink + ?Sized>(
     sink: &S,
     batch: u64,
 ) -> Result<usize> {
-    let rows = OutboxRow::unpublished(db, batch).await?;
+    // SEC-B6: run the drain in one transaction and claim rows with `FOR
+    // UPDATE SKIP LOCKED` (in `unpublished`), so two parallel relay
+    // instances never grab the same rows and double-ship. The lock is held
+    // across the send window; on commit the published rows are acked and any
+    // unpublished row is released and retried next tick. Delivery stays
+    // at-least-once (consumers dedupe on `event_id`).
+    let txn = db.begin().await?;
+    let rows = OutboxRow::unpublished(&txn, batch).await?;
     let mut published: Vec<i64> = Vec::with_capacity(rows.len());
     for row in &rows {
         match sink
@@ -107,8 +114,9 @@ pub async fn drain_once<S: EventSink + ?Sized>(
         }
     }
     if !published.is_empty() {
-        OutboxRow::mark_published(db, &published).await?;
+        OutboxRow::mark_published(&txn, &published).await?;
     }
+    txn.commit().await?;
     Ok(published.len())
 }
 
