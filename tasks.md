@@ -421,11 +421,16 @@
   panic); boundary `exceeds_cap` unit-tested incl. saturating-add overflow.
   **Deferred:** true end-to-end streaming (never buffering the whole file,
   so the caps can rise) — the caps make the current buffered path safe.
-- [ ] **SEC-B3 (M) 🟠** person bulk upsert idempotency race: SELECT-then-
-  INSERT with no `ON CONFLICT` and no `UNIQUE(system,value)`
-  (`pipeline.rs:216,236-246`, `db/repositories.rs:883-890`) ⇒ two workers
-  duplicate a record. Add the unique index + `ON CONFLICT`/advisory lock.
-  *Test:* two concurrent imports of one stable key ⇒ exactly one row.
+- [x] **SEC-B3 (M) 🟠** person bulk upsert idempotency race. *(done
+  2026-07-13)* The per-row find→create/update runs under a
+  transaction-scoped advisory lock on the stable key
+  (`pg_advisory_xact_lock(hashtext(key))`, `import_upsert_locked`), so two
+  concurrent importers of one key produce exactly one record (the second
+  upserts the first's). **Chose advisory lock over `UNIQUE(system,value)`**:
+  the registry permits duplicate identifiers by design (dedup is a
+  workflow), so a hard uniqueness constraint would reject legitimate data.
+  DB-gated test: two concurrent imports of one SSN key ⇒ one distinct owner,
+  one create + one upsert; plus a pure lock-key collision test.
 - [~] **SEC-B4 (M) 🟠** person bulk artifact hardening. *(store confinement +
   IDOR + TTL done 2026-07-13; object-store sweep deferred)* (1) store `get`
   **confined** to the canonicalised base + `is_safe_key` on `put`/`get`

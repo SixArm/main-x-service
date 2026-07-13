@@ -5,6 +5,15 @@ tick the box when an automated test or clearly described manual check
 confirms the criterion is met. Tasks small enough to land in a single
 PR; split larger tasks (`T-12a`, `T-12b`).
 
+- [x] **SEC-B3 (security): serialise bulk upsert (create-create race).**
+  The per-row find→create/update now runs under a transaction-scoped
+  advisory lock on the stable key (`pg_advisory_xact_lock(hashtext(key))`,
+  `import_upsert_locked`), so two concurrent importers of the same key
+  produce exactly one record (the second upserts the first's row). A
+  `UNIQUE(system,value)` was rejected — the registry permits duplicate
+  identifiers by design (dedup is a workflow). DB-gated concurrency test +
+  pure lock-key test. (Repo tasks.md Phase 5 SEC-B3.)
+
 - [x] **SEC-B4 (security): bulk artifact hardening.** (1) `LocalFsArtifactStore`
   now **confines** `get` to the store's canonicalised base and validates
   keys with `is_safe_key` (no `..`/absolute), closing an arbitrary-file
