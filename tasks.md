@@ -401,15 +401,19 @@
   TTL; ownership check on job GET (IDOR/BOLA); confine store path (reject
   `..`/absolute `file://`). *Tests:* cross-actor job GET ⇒ 403/404; `..`
   rejected; expired artifact unreadable.
-- [ ] **SEC-B5 (M) 🔴/🟠** Merge TOCTOU + self-merge: case
-  (`controllers/cases.rs:429`) and person (`handlers.rs:854-905`,
-  `repositories.rs:1053-1064`) read main+duplicate **before/outside** the
-  write tx (no `FOR UPDATE`) ⇒ lost update / data fanned into two survivors;
-  person has **no self-merge guard** (merges a record into itself and
-  tombstones it). Add `SELECT … FOR UPDATE` + in-tx re-validate + a
-  `main==duplicate` 422 guard (case already has the latter). *Tests:*
-  concurrent-merge race lands data in exactly one survivor; person self-merge
-  ⇒ 422.
+- [x] **SEC-B5 (M) 🔴/🟠** Merge TOCTOU + self-merge. *(done 2026-07-13)*
+  person `POST /merge` had **no self-merge guard** (merged a record into
+  itself → tombstoned + data loss) — now `422` before any fetch
+  (`test_merge_into_self_is_rejected`; case already had the guard).
+  Both merges read main+duplicate **unlocked** before the write tx; the
+  person repository `merge` and the case `outbox` `merge_and_emit` now lock
+  both participant rows `FOR UPDATE` (id-ordered, deadlock-free) and
+  re-check the duplicate is still active before writing, so concurrent
+  merges of the same duplicate can't both apply (loser fails closed).
+  Green: person lib (186) + integration compile + clippy + fmt; case lib
+  (96) + no-run + clippy + fmt. *(Residual: a deterministic concurrent-race
+  integration test, and the case `memory` (dev, non-transactional)
+  path — both follow-ups.)*
 - [ ] **SEC-B6 (M) 🟠** Relay exactly-once: `SELECT … WHERE published_at IS
   NULL` has no `FOR UPDATE SKIP LOCKED` (case `relay.rs:91`, person `:93`)
   and no consumer `event_id` dedupe (person consumer is `todo!()`), so >1

@@ -855,6 +855,20 @@ pub async fn merge_persons(
     State(state): State<AppState>,
     Json(req): Json<crate::models::MergeRequest>,
 ) -> impl IntoResponse {
+    // SEC-B5: a record cannot be merged into itself. Without this guard,
+    // `main == duplicate` applies the survivor and then soft-deletes the
+    // *same* id, tombstoning the record and destroying its data. Reject
+    // before any fetch (mirrors the case service's equal-pid `422`).
+    if req.main_person_id == req.duplicate_person_id {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(ApiResponse::<crate::models::MergeResponse>::error(
+                "INVALID_MERGE",
+                "main_person_id and duplicate_person_id must differ".to_string(),
+            )),
+        );
+    }
+
     // Fetch both persons
     let main = match state.person_repository.get_by_id(&req.main_person_id).await {
         Ok(Some(p)) => p,

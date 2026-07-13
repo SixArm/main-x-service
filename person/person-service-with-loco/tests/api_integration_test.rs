@@ -384,3 +384,43 @@ async fn test_get_person_not_found() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
+
+/// SEC-B5: `POST /api/persons/merge` with `main == duplicate` is rejected
+/// with `422` — merging a record into itself would apply the survivor and
+/// then soft-delete the same id, destroying the record. The guard runs
+/// before any fetch, so no rows need to exist.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn test_merge_into_self_is_rejected() {
+    let app = common::create_test_router().await;
+
+    let same = "11111111-1111-1111-1111-111111111111";
+    let merge_json = json!({
+        "main_person_id": same,
+        "duplicate_person_id": same,
+        "merge_reason": "self-merge guard test"
+    });
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/persons/merge")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&merge_json).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+    assert!(
+        body_str.contains("INVALID_MERGE") || body_str.contains("must differ"),
+        "expected the self-merge rejection reason, got: {body_str}"
+    );
+}
