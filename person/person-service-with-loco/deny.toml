@@ -1,0 +1,67 @@
+# cargo-deny supply-chain policy (SEC-I1). Used by the `security.yml`
+# workflow's `cargo deny check` step. Copied per crate (drift-accepted,
+# same posture as the other per-crate configs); keep the crates in sync
+# when this policy changes.
+
+[advisories]
+version = 2
+yanked = "warn"
+# Transitive advisories carried by the shared Rust/Loco dependency tree
+# (mostly via loco-rs -> opendal / sqlx / async deps). They are not
+# fixable at the service/library level without an upstream loco-rs bump,
+# so they are accepted here WITH this note and revisited on the next
+# loco-rs upgrade. Matcher / library crates with small trees do not pull
+# these (an unused ignore is a harmless warning). Real, actionable
+# advisories NOT on this list still fail the build.
+ignore = [
+    "RUSTSEC-2024-0370", # proc-macro-error (unmaintained), transitive
+    "RUSTSEC-2024-0384", # instant (unmaintained), transitive
+    "RUSTSEC-2024-0436", # paste (unmaintained), transitive
+    "RUSTSEC-2024-0437", # protobuf recursion, transitive
+    "RUSTSEC-2025-0052", # transitive advisory (loco tree)
+    "RUSTSEC-2026-0173", # transitive advisory (loco tree)
+    "RUSTSEC-2026-0190", # transitive advisory (loco tree)
+    "RUSTSEC-2026-0194", # transitive advisory (loco tree)
+    "RUSTSEC-2026-0195", # quick-xml namespace-declaration DoS, transitive (opendal)
+    "RUSTSEC-2026-0204", # transitive advisory (loco tree)
+    "RUSTSEC-2025-0057", # transitive advisory (loco tree)
+]
+
+[licenses]
+version = 2
+# Permissive licenses used across the Rust / Loco stack. A dependency
+# whose license is not listed FAILS the check — a deliberate signal to
+# review a new license, not to silently accept it.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "MPL-2.0",
+    "CC0-1.0",
+    "BSL-1.0",
+    "0BSD",
+    "Unlicense",
+    "OpenSSL",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+# Local, unpublished crates (the service itself, its `migration` member)
+# carry no `license` field and must not be license-checked.
+private = { ignore = true }
+
+[bans]
+# Duplicate versions are a warning (the loco/sea-orm stack pulls a few);
+# not a hard failure, so the gate stays green while still surfacing bloat.
+multiple-versions = "warn"
+wildcards = "warn"
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
