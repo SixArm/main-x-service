@@ -10,6 +10,30 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-B2: bound bulk import/export against an OOM DoS.** `POST
+  /api/persons/import` read the whole multipart upload into memory
+  unbounded (`field.bytes()`), the pipeline materialised every row before
+  processing, and `export` had no ceiling on the requested `limit` — an
+  oversized or unbounded (chunked) upload, or a giant export, could exhaust
+  memory. Now:
+  - the upload is read **chunk-by-chunk** and rejected with `413 Payload
+    Too Large` the moment the running total exceeds `MAX_IMPORT_BYTES`
+    (64 MiB), so it is never fully materialised (`read_field_capped` /
+    `exceeds_cap`, unit-tested boundary incl. saturating-add overflow);
+  - the import pipeline rejects a load whose non-blank row count exceeds
+    `MAX_IMPORT_ROWS` (1,000,000) via `jsonl::split_lines_capped`, marking
+    the job `failed` before any per-row database work;
+  - a caller-supplied export `limit` is clamped to `MAX_EXPORT_ROWS`
+    (1,000,000) at the worker's param mapping and again in the pipeline's
+    listing path (`clamp_export_limit`).
+  - **Fuzz:** proptest pins that the JSONL parse boundary (`parse_line` /
+    `split_lines` / `split_lines_capped`) never panics on arbitrary
+    strings, random bytes (incl. invalid / truncated UTF-8), or a
+    pathologically long single line.
+  True end-to-end streaming (never buffering the whole file, so the caps
+  can rise) remains a follow-up; the caps make the current buffered path
+  safe. (`proptest` added as a dev-dependency.)
+
 - **SEC-G6: trailing slash can no longer downgrade a destructive POST.**
   `derive_action` classified `/merge` / `/deduplicate` / `/import` via
   `path.ends_with`, so a trailing slash (`POST …/merge/`) fell through to

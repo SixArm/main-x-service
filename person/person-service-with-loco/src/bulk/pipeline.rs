@@ -114,6 +114,15 @@ pub fn export_requires_elevation(
     masking_profile.is_full() || include_soft_deleted
 }
 
+/// Clamp a caller-supplied export `limit` to [`crate::bulk::MAX_EXPORT_ROWS`]
+/// (SEC-B2), so an export can never be asked to buffer an unbounded result
+/// set. Pure, so the worker's param mapping and its tests share one
+/// definition of the ceiling.
+#[must_use]
+pub fn clamp_export_limit(requested: u64) -> u64 {
+    requested.min(crate::bulk::MAX_EXPORT_ROWS)
+}
+
 /// Apply the export masking profile to a batch of records (§8): the
 /// default [`MaskingProfile::Masked`] runs each record through
 /// [`mask_person`]; [`MaskingProfile::Full`] returns them unchanged. Pure
@@ -182,7 +191,7 @@ pub async fn process_import_job(
     input: &[u8],
     params: &ImportParams,
 ) -> Result<ImportOutcome> {
-    let lines = jsonl::split_lines(input)?;
+    let lines = jsonl::split_lines_capped(input, crate::bulk::MAX_IMPORT_ROWS)?;
     let mut outcome = ImportOutcome::default();
 
     for (idx, line) in lines.iter().enumerate() {
@@ -296,7 +305,10 @@ pub async fn process_export_job(
     let records = if let Some(q) = params.query.as_ref().filter(|q| !q.trim().is_empty()) {
         repo.search(q).await?
     } else {
-        repo.list_active(params.limit, params.offset).await?
+        // Defence-in-depth: clamp again here so the listing path is bounded
+        // even if a caller reaches it via an unclamped param (SEC-B2).
+        repo.list_active(clamp_export_limit(params.limit), params.offset)
+            .await?
     };
     let records = apply_masking(records, params.masking_profile);
     let rows = u64::try_from(records.len()).unwrap_or(u64::MAX);
@@ -618,5 +630,20 @@ mod unit_tests {
         assert!(export_requires_elevation(MaskingProfile::Full, false));
         assert!(export_requires_elevation(MaskingProfile::Masked, true));
         assert!(export_requires_elevation(MaskingProfile::Full, true));
+    }
+
+    /// SEC-B2: a caller-supplied export `limit` is clamped to the ceiling,
+    /// so an export can never be asked to buffer an unbounded result set.
+    #[test]
+    fn export_limit_is_clamped_to_the_ceiling() {
+        use super::clamp_export_limit;
+        use crate::bulk::MAX_EXPORT_ROWS;
+        assert_eq!(clamp_export_limit(10), 10, "under the cap is unchanged");
+        assert_eq!(clamp_export_limit(MAX_EXPORT_ROWS), MAX_EXPORT_ROWS);
+        assert_eq!(
+            clamp_export_limit(u64::MAX),
+            MAX_EXPORT_ROWS,
+            "an absurd limit is clamped to the ceiling"
+        );
     }
 }

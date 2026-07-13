@@ -36,8 +36,50 @@ use crate::api::rest::AppState;
 use crate::api::rest::auth::{MaybeAuthUser, authorize_record};
 use crate::bulk::pipeline::export_requires_elevation;
 use crate::bulk::worker::{BulkJobArgs, BulkJobWorker};
-use crate::bulk::{BulkFormat, BulkKind, MaskingProfile};
+use crate::bulk::{BulkFormat, BulkKind, MAX_IMPORT_BYTES, MaskingProfile};
 use crate::db::bulk_jobs::{self, NewBulkJob};
+
+/// Outcome of reading a multipart field under a byte cap (SEC-B2).
+enum CappedRead {
+    /// The field was read in full (within the cap).
+    Ok(Vec<u8>),
+    /// The running total exceeded the cap before the field ended — the
+    /// upload is rejected without being fully materialised.
+    TooLarge,
+    /// The multipart stream errored mid-field.
+    Read(String),
+}
+
+/// Would appending a `chunk_len`-byte chunk to a buffer already `have`
+/// bytes long push the running total past `max`? The pure boundary used by
+/// [`read_field_capped`] (SEC-B2). Uses a saturating add so a hostile
+/// length near `usize::MAX` trips the cap rather than overflowing.
+fn exceeds_cap(have: usize, chunk_len: usize, max: usize) -> bool {
+    have.saturating_add(chunk_len) > max
+}
+
+/// Read a multipart field chunk-by-chunk, bailing the instant the running
+/// byte total exceeds `max` (SEC-B2). This is the pre-materialisation
+/// guard: an oversized or unbounded (chunked-transfer) upload never gets
+/// fully buffered in memory.
+async fn read_field_capped(
+    mut field: axum::extract::multipart::Field<'_>,
+    max: usize,
+) -> CappedRead {
+    let mut buf = Vec::new();
+    loop {
+        match field.chunk().await {
+            Ok(Some(chunk)) => {
+                if exceeds_cap(buf.len(), chunk.len(), max) {
+                    return CappedRead::TooLarge;
+                }
+                buf.extend_from_slice(&chunk);
+            }
+            Ok(None) => return CappedRead::Ok(buf),
+            Err(e) => return CappedRead::Read(e.to_string()),
+        }
+    }
+}
 
 /// `202 Accepted` body for a submitted bulk job.
 #[derive(Debug, Serialize, ToSchema)]
@@ -172,9 +214,20 @@ pub async fn import_person(
             Ok(Some(field)) => {
                 let name = field.name().unwrap_or("").to_string();
                 match name.as_str() {
-                    "file" => match field.bytes().await {
-                        Ok(b) => file_bytes = Some(b.to_vec()),
-                        Err(e) => {
+                    "file" => match read_field_capped(field, MAX_IMPORT_BYTES).await {
+                        CappedRead::Ok(b) => file_bytes = Some(b),
+                        CappedRead::TooLarge => {
+                            return (
+                                StatusCode::PAYLOAD_TOO_LARGE,
+                                Json(ApiResponse::<JobAccepted>::error(
+                                    "IMPORT_TOO_LARGE",
+                                    format!(
+                                        "uploaded file exceeds the {MAX_IMPORT_BYTES}-byte import cap"
+                                    ),
+                                )),
+                            );
+                        }
+                        CappedRead::Read(e) => {
                             return (
                                 StatusCode::BAD_REQUEST,
                                 Json(ApiResponse::<JobAccepted>::error(
@@ -478,5 +531,26 @@ fn remap(body: Json<ApiResponse<()>>) -> ApiResponse<JobAccepted> {
         success: false,
         data: None,
         error,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::exceeds_cap;
+
+    /// SEC-B2: the pre-materialisation byte-cap boundary. A chunk that keeps
+    /// the running total at or under `max` is accepted; the chunk that
+    /// crosses it trips the cap; and a hostile near-`usize::MAX` length trips
+    /// it via the saturating add rather than overflowing.
+    #[test]
+    fn exceeds_cap_trips_only_past_the_ceiling() {
+        // Exactly at the cap is fine; one more byte is not.
+        assert!(!exceeds_cap(90, 10, 100), "reaching the cap exactly is ok");
+        assert!(exceeds_cap(91, 10, 100), "crossing the cap is rejected");
+        assert!(!exceeds_cap(0, 100, 100), "a single full-cap chunk is ok");
+        assert!(exceeds_cap(0, 101, 100), "a single over-cap chunk trips");
+        // Saturating add: a pathological length near usize::MAX must not
+        // wrap around to a small total and slip under the cap.
+        assert!(exceeds_cap(1, usize::MAX, 100));
     }
 }

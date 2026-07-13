@@ -410,11 +410,17 @@
   `reconcile_is_scoped_to_the_source_entity` (case pass leaves the person
   edge intact) + pure `from_ref_scoping_*` unit tests. Green: lib tests +
   `test --no-run` (DB-gated) + clippy + fmt.
-- [ ] **SEC-B2 (M) 🟠** person bulk import caps: byte cap + row cap + true
-  streaming (`bulk/handlers.rs:175`, `bulk/jsonl.rs:57-65`, `pipeline.rs:188`)
-  — currently 3× resident, unbounded ⇒ OOM DoS; export `limit` also uncapped.
-  *Test:* oversized upload ⇒ 413/422 pre-materialisation; fuzz `parse_line`
-  (random bytes / truncated UTF-8 / giant line) never panics.
+- [~] **SEC-B2 (M) 🟠** person bulk import caps. *(caps + fuzz done
+  2026-07-13; true streaming deferred)* Import upload read chunk-by-chunk
+  and rejected `413` past `MAX_IMPORT_BYTES` (64 MiB) **before**
+  materialisation (`read_field_capped`/`exceeds_cap`); pipeline rejects a
+  load over `MAX_IMPORT_ROWS` (1M) via `split_lines_capped`; export `limit`
+  clamped to `MAX_EXPORT_ROWS` (1M) via `clamp_export_limit` (worker mapping
+  + pipeline listing path). proptest fuzzes `parse_line`/`split_lines`/
+  `split_lines_capped` (random bytes / truncated UTF-8 / 2 MiB line never
+  panic); boundary `exceeds_cap` unit-tested incl. saturating-add overflow.
+  **Deferred:** true end-to-end streaming (never buffering the whole file,
+  so the caps can rise) — the caps make the current buffered path safe.
 - [ ] **SEC-B3 (M) 🟠** person bulk upsert idempotency race: SELECT-then-
   INSERT with no `ON CONFLICT` and no `UNIQUE(system,value)`
   (`pipeline.rs:216,236-246`, `db/repositories.rs:883-890`) ⇒ two workers

@@ -48,6 +48,31 @@ pub mod worker;
 
 use serde::{Deserialize, Serialize};
 
+/// SEC-B2 — the maximum size, in bytes, of an uploaded **import** artifact.
+///
+/// The upload is read chunk-by-chunk and rejected with `413 Payload Too
+/// Large` the moment the running total exceeds this, so an oversized (or
+/// unbounded / chunked-transfer) upload can never be fully materialised in
+/// memory — the pre-materialisation guard against an out-of-memory
+/// denial-of-service. 64 MiB is a
+/// generous ceiling for a JSONL person load (tens of thousands of records)
+/// while staying comfortably bounded.
+pub const MAX_IMPORT_BYTES: usize = 64 * 1024 * 1024;
+
+/// SEC-B2 — the maximum number of record rows in a single **import**.
+///
+/// Even within [`MAX_IMPORT_BYTES`], a file of millions of tiny lines would
+/// enqueue millions of per-row validate + database round-trips. The import
+/// pipeline rejects the whole job (marking it `failed`) when the non-blank
+/// row count exceeds this, bounding the per-job work.
+pub const MAX_IMPORT_ROWS: usize = 1_000_000;
+
+/// SEC-B2 — the maximum number of records a single **export** may
+/// materialise. A caller-supplied `limit` is clamped to this
+/// ([`pipeline::clamp_export_limit`](pipeline::clamp_export_limit)), so an
+/// export can never be asked to buffer an unbounded result set.
+pub const MAX_EXPORT_ROWS: u64 = 1_000_000;
+
 /// The kind of a bulk job.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
