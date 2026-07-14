@@ -17,7 +17,7 @@
 //!   (amplified across the `check-duplicates` scan). Oversized input is
 //!   rejected with a `422` *before* the record is stored or matched.
 
-use organization_matcher::Organization;
+use organization_matcher::{IdentifierScheme, Organization};
 
 /// Maximum length, in Unicode scalar values (`.chars().count()`), of any
 /// single scalar text field (`name`, `legal_name`, `url`, `jurisdiction`,
@@ -74,10 +74,13 @@ pub fn problems(org: &Organization) -> Vec<String> {
     check_array(&mut out, "same_as", org.same_as.len());
     check_array(&mut out, "keywords", org.keywords.len());
 
-    // Per-entry blank checks (existing intent) + size caps (SEC-M1).
+    // Per-entry blank checks (existing intent) + size caps (SEC-M1) +
+    // check-digit/format validation of the deterministic schemes (SEC-M5).
     for (i, ident) in org.identifiers.iter().enumerate() {
         if ident.value.trim().is_empty() {
             out.push(format!("identifiers[{i}]: value must not be blank"));
+        } else if let Some(msg) = identifier_problem(&ident.scheme, &ident.value) {
+            out.push(format!("identifiers[{i}]: {msg}"));
         }
         check_item(&mut out, "identifiers", i, &ident.value);
     }
@@ -125,6 +128,113 @@ fn check_item(out: &mut Vec<String>, field: &str, index: usize, value: &str) {
             "{field}[{index}]: exceeds {MAX_ITEM_LEN} characters"
         ));
     }
+}
+
+/// SEC-M5 — validate an identifier `value` against its `scheme`'s
+/// check-digit / length rules, returning a problem message when malformed.
+///
+/// Only the **deterministic** schemes that drive the matcher's
+/// short-circuit-to-`1.0` are validated (LEI, DUNS, GLN, VAT): a malformed
+/// value in one of these could otherwise be stored and produce a false
+/// deterministic match. Every other scheme is unconstrained here (`None`).
+#[must_use]
+fn identifier_problem(scheme: &IdentifierScheme, value: &str) -> Option<String> {
+    match scheme {
+        IdentifierScheme::Lei => {
+            (!is_valid_lei(value.trim())).then(|| "invalid LEI (expect 20 alphanumeric chars with a valid ISO 7064 MOD 97-10 check)".to_string())
+        }
+        IdentifierScheme::Duns => (!is_valid_duns(value))
+            .then(|| "invalid DUNS (expect 9 digits)".to_string()),
+        IdentifierScheme::Gln => (!is_valid_gln(value))
+            .then(|| "invalid GLN (expect 13 digits with a valid GS1 check digit)".to_string()),
+        IdentifierScheme::Vat => (!is_valid_vat(value))
+            .then(|| "invalid VAT number (expect a 2-letter country prefix followed by 2–13 alphanumerics)".to_string()),
+        _ => None,
+    }
+}
+
+/// Keep only the ASCII digits of `s` (drops spaces, hyphens, dots).
+fn digits_only(s: &str) -> String {
+    s.chars().filter(char::is_ascii_digit).collect()
+}
+
+/// LEI (ISO 17442): 20 chars, `[A-Z0-9]`, with a valid ISO 7064 MOD 97-10
+/// check (the final 2 characters). Case-insensitive on input.
+#[must_use]
+fn is_valid_lei(s: &str) -> bool {
+    let s = s.to_ascii_uppercase();
+    s.len() == 20
+        && s.bytes()
+            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit())
+        && iso7064_mod97_10_ok(&s)
+}
+
+/// ISO 7064 MOD 97-10 checksum: letters map `A`=10 … `Z`=35; the whole
+/// string, read as a base-10 number, must be `≡ 1 (mod 97)`. Computed
+/// digit-by-digit so no big integer is needed.
+#[must_use]
+fn iso7064_mod97_10_ok(s: &str) -> bool {
+    let mut rem: u32 = 0;
+    for c in s.chars() {
+        if c.is_ascii_digit() {
+            rem = (rem * 10 + (c as u32 - '0' as u32)) % 97;
+        } else if c.is_ascii_uppercase() {
+            rem = (rem * 100 + (c as u32 - 'A' as u32 + 10)) % 97;
+        } else {
+            return false;
+        }
+    }
+    rem == 1
+}
+
+/// DUNS: exactly 9 digits (hyphens / spaces tolerated on input). D&B
+/// publishes no standard public check digit, so this is a length/charset
+/// check only.
+#[must_use]
+fn is_valid_duns(s: &str) -> bool {
+    let d = digits_only(s);
+    d.len() == 9 && d.len() == s.trim().chars().filter(|c| !matches!(c, ' ' | '-')).count()
+}
+
+/// GLN (GS1): 13 digits with a valid GS1 mod-10 check digit (hyphens /
+/// spaces tolerated on input).
+#[must_use]
+fn is_valid_gln(s: &str) -> bool {
+    let d = digits_only(s);
+    if d.len() != 13 || d.len() != s.trim().chars().filter(|c| !matches!(c, ' ' | '-')).count() {
+        return false;
+    }
+    let bytes: Vec<u8> = d.bytes().map(|b| b - b'0').collect();
+    gs1_check_digit(&bytes[..12]) == bytes[12]
+}
+
+/// The GS1 mod-10 check digit for the first 12 digits of a 13-digit code:
+/// weight the digits `3,1,3,1,…` from the right, sum, and take
+/// `(10 - sum mod 10) mod 10`.
+#[must_use]
+fn gs1_check_digit(first12: &[u8]) -> u8 {
+    let mut sum: u32 = 0;
+    for (i, d) in first12.iter().rev().enumerate() {
+        let weight = if i % 2 == 0 { 3 } else { 1 };
+        sum += weight * u32::from(*d);
+    }
+    u8::try_from((10 - (sum % 10)) % 10).unwrap_or(0)
+}
+
+/// VAT: a 2-letter ISO country prefix followed by 2–13 alphanumerics
+/// (spaces tolerated). Per-country check-digit validation is deferred —
+/// each member state has its own algorithm — so this is a format gate that
+/// rejects obvious garbage while accepting well-formed numbers.
+#[must_use]
+fn is_valid_vat(s: &str) -> bool {
+    let compact: String = s.chars().filter(|c| !c.is_whitespace()).collect();
+    let bytes = compact.as_bytes();
+    if bytes.len() < 4 || bytes.len() > 15 {
+        return false;
+    }
+    bytes[0].is_ascii_alphabetic()
+        && bytes[1].is_ascii_alphabetic()
+        && bytes[2..].iter().all(u8::is_ascii_alphanumeric)
 }
 
 #[cfg(test)]
@@ -243,6 +353,82 @@ mod tests {
             ..Organization::new("placeholder")
         };
         assert!(problems(&org).is_empty());
+    }
+
+    /// SEC-M5: LEI check-digit validation (ISO 7064 MOD 97-10). The
+    /// synthetic all-digit values are hand-verifiable: `…098` = 98 ≡ 1
+    /// (mod 97) is valid; `…097` = 97 ≡ 0 is not.
+    #[test]
+    fn lei_check_digit_is_validated() {
+        assert!(is_valid_lei("00000000000000000098"));
+        assert!(!is_valid_lei("00000000000000000097"), "97 ≡ 0 (mod 97)");
+        assert!(
+            !is_valid_lei("5299 0T8BM49AURSDO55"),
+            "space breaks the charset"
+        );
+        assert!(!is_valid_lei("ABC123"), "wrong length");
+    }
+
+    /// SEC-M5: GLN GS1 mod-10 check digit. `5901234123457` is the classic
+    /// valid GS1 example (check digit 7).
+    #[test]
+    fn gln_check_digit_is_validated() {
+        assert!(is_valid_gln("5901234123457"));
+        assert!(is_valid_gln("5-901234-123457"), "hyphens tolerated");
+        assert!(!is_valid_gln("5901234123450"), "wrong check digit");
+        assert!(!is_valid_gln("123"), "wrong length");
+    }
+
+    /// SEC-M5: DUNS is a 9-digit length/charset check (no public check digit).
+    #[test]
+    fn duns_length_is_validated() {
+        assert!(is_valid_duns("123456789"));
+        assert!(is_valid_duns("12-345-6789"), "hyphens tolerated");
+        assert!(!is_valid_duns("12345"), "too short");
+        assert!(!is_valid_duns("1234567890"), "too long");
+        assert!(!is_valid_duns("12345678X"), "non-digit");
+    }
+
+    /// SEC-M5: VAT is a format gate (2-letter country prefix + 2–13 alnum).
+    #[test]
+    fn vat_format_is_validated() {
+        assert!(is_valid_vat("DE123456789"));
+        assert!(is_valid_vat("GB 999 9973 12"), "spaces tolerated");
+        assert!(!is_valid_vat("1234567"), "no country prefix");
+        assert!(!is_valid_vat("D1"), "too short");
+    }
+
+    /// SEC-M5: a malformed deterministic identifier surfaces as one indexed
+    /// problem; a well-formed one is accepted; a non-deterministic scheme is
+    /// unconstrained.
+    #[test]
+    fn bad_deterministic_identifier_is_a_problem() {
+        let bad = Organization {
+            identifiers: vec![OrgIdentifier {
+                scheme: IdentifierScheme::Gln,
+                value: "5901234123450".into(), // bad GS1 check digit
+            }],
+            ..Organization::new("Acme")
+        };
+        let p = problems(&bad);
+        assert_eq!(p.len(), 1);
+        assert!(p[0].contains("identifiers[0]") && p[0].contains("GLN"));
+
+        let good = Organization {
+            identifiers: vec![OrgIdentifier {
+                scheme: IdentifierScheme::Gln,
+                value: "5901234123457".into(),
+            }],
+            ..Organization::new("Acme")
+        };
+        assert!(problems(&good).is_empty());
+
+        // A non-deterministic scheme (Wikidata) is not check-digit validated.
+        let other = Organization {
+            identifiers: vec![ident("anything-goes")],
+            ..Organization::new("Acme")
+        };
+        assert!(problems(&other).is_empty());
     }
 
     /// The report-everything contract: multiple problems are collected in
