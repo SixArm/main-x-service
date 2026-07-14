@@ -3,6 +3,15 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
+- [x] **SEC-M1 (security): input-size caps on the `Worker` payload.**
+  `validate_worker` bounds scalar text (`MAX_TEXT_LEN = 1024`), string-array
+  cardinality + per-entry (`MAX_ARRAY_LEN = 256` / `MAX_ITEM_LEN = 512`), and
+  the inner text + cardinality of the nested collections (names,
+  `additional_names`, identifiers, addresses, telecom, documents,
+  emergency_contacts, photo, tax_id, marital_status) → field-scoped `422`
+  before persist/match, closing the O(n·m) matcher `DoS`. Factored into
+  `worker_size_caps`/`cap_*`. Unit tested. (Repo tasks.md Phase 5 SEC-M1.)
+
 - [x] **T-1a — Offline PASETO v4.public peer verification.** *(done
   2026-07-04)* Per
   [authentication-sessions](../../../agents/share/authentication-sessions.md)
