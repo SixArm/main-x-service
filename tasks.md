@@ -326,10 +326,14 @@
   `jid` / CSRF token (migrations `_000001`/`_000002`, `sessions.data.csrf`) —
   they are bearer-equivalent secrets at rest today. *Test:* DB holds no
   usable plaintext credential.
-- [ ] **SEC-A10 (S) ⚪** CSRF origin backstop: warn/deny when
-  `AUTH_ALLOWED_ORIGINS` unset in production; reject a legacy no-`csrf`
-  session on `POST /token` (`controllers/auth.rs:377-410`). *Test:* no-csrf
-  session cannot bypass both CSRF and origin checks.
+- [x] **SEC-A10 (S) 🟡** CSRF origin backstop. *(done 2026-07-14)* Pure
+  `csrf_token_gate(is_production, origin_ok, session_csrf, provided_csrf)` in
+  `controllers/auth.rs`: a token-carrying session must echo `X-CSRF-Token`; a
+  legacy no-`csrf` session must prove same-origin (`AUTH_ALLOWED_ORIGINS`) and
+  is refused in production without it, so it can no longer bypass both checks.
+  Unset allow-list in production warns once (`warn_missing_allowed_origins`).
+  *Test:* `csrf_gate_matrix` — no-csrf session cannot bypass both CSRF and
+  origin checks in production.
 
 ### F-authz — verifier & ABAC (authentication-verifier)
 
