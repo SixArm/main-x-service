@@ -16,9 +16,15 @@ pub use super::_entities::sessions::{self, ActiveModel, Entity, Model};
 /// per-session **CSRF** synchroniser token under `csrf` (shared
 /// `authentication-sessions.md` §4). Pure, so the copy shape is
 /// unit-testable DB-free.
+///
+/// SEC-A9: `csrf` is the **plaintext** synchroniser token (the value put
+/// in the readable `__Host-mxi_csrf` cookie); only its **hash** is stored
+/// here, so the database never holds the usable CSRF token. Validation
+/// therefore compares `hash(presented)` against this stored hash
+/// (`crate::secret_hash`, [`Model::csrf`]).
 #[must_use]
 pub fn session_data(attributes: &serde_json::Value, csrf: &str) -> serde_json::Value {
-    serde_json::json!({ "attrs": attributes, "csrf": csrf })
+    serde_json::json!({ "attrs": attributes, "csrf": crate::secret_hash::hash(csrf) })
 }
 
 impl ActiveModelBehavior for super::_entities::sessions::ActiveModel {}
@@ -95,7 +101,11 @@ impl Model {
                 DEFAULT_ABSOLUTE_TTL_SECS,
             ));
         let session = sessions::ActiveModel {
-            jid: ActiveValue::set(jid.to_string()),
+            // SEC-A9: `jid` is the opaque session id the client presents (the
+            // cookie value + PASETO `sid` claim); the DB stores only its hash,
+            // so a read at rest yields nothing replayable. Lookups hash the
+            // presented id the same way (`find_by_jid`).
+            jid: ActiveValue::set(crate::secret_hash::hash(jid)),
             user_pid: ActiveValue::set(user_pid),
             expires_at: ActiveValue::set(absolute),
             revoked_at: ActiveValue::set(None),
@@ -144,10 +154,12 @@ impl Model {
     ///
     /// When the session does not exist or the query fails.
     pub async fn find_by_jid(db: &DatabaseConnection, jid: &str) -> ModelResult<Self> {
+        // SEC-A9: the DB stores the hash of the session id, so match on the
+        // hash of the presented (cookie / `sid`-claim) value.
         let session = sessions::Entity::find()
             .filter(
                 model::query::condition()
-                    .eq(sessions::Column::Jid, jid)
+                    .eq(sessions::Column::Jid, crate::secret_hash::hash(jid))
                     .build(),
             )
             .one(db)
@@ -332,8 +344,11 @@ mod tests {
         assert_eq!(attrs["access"], vec!["write"]);
         assert_eq!(attrs["svc"], vec!["true"]);
         assert_eq!(attrs.len(), 2);
-        // The CSRF token also round-trips through the session payload.
-        assert_eq!(session.csrf(), Some("csrf-tok"));
+        // SEC-A9: `session_data` stores the *hash* of the CSRF token, not the
+        // plaintext — the DB never holds the usable synchroniser token.
+        let stored = session.csrf().expect("csrf stored");
+        assert_eq!(stored, crate::secret_hash::hash("csrf-tok"));
+        assert_ne!(stored, "csrf-tok", "the plaintext csrf must not be stored");
     }
 
     #[test]

@@ -22,6 +22,8 @@ mod m20220101_000006_users_attributes;
 mod m20220101_000007_sessions_data;
 /// `sessions` idle/absolute TTL columns + active-session partial index.
 mod m20220101_000008_sessions_ttls;
+/// SEC-A9: hash the magic-link token / session `jid` / CSRF token at rest.
+mod m20220101_000009_hash_credentials_at_rest;
 
 /// loco/`SeaORM` migrator that runs every migration in order.
 pub struct Migrator;
@@ -41,6 +43,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000006_users_attributes::Migration),
             Box::new(m20220101_000007_sessions_data::Migration),
             Box::new(m20220101_000008_sessions_ttls::Migration),
+            Box::new(m20220101_000009_hash_credentials_at_rest::Migration),
             // inject-above (do not remove this comment)
         ]
     }

@@ -280,13 +280,16 @@ impl Model {
     /// [`ModelError::EntityNotFound`] when the token is unknown, expired, or
     /// already consumed (all map to the same `401` at the controller).
     pub async fn consume_magic_token(db: &DatabaseConnection, token: &str) -> ModelResult<Self> {
+        // SEC-A9: the DB stores the token's hash, so match on the hash of the
+        // presented plaintext.
+        let hashed = crate::secret_hash::hash(token);
         let stmt = sea_orm::Statement::from_sql_and_values(
             db.get_database_backend(),
             "UPDATE users \
              SET magic_link_token = NULL, magic_link_expiration = NULL, updated_at = now() \
              WHERE magic_link_token = $1 AND magic_link_expiration >= now() \
              RETURNING *",
-            [token.into()],
+            [hashed.into()],
         );
         match db.query_one(stmt).await? {
             Some(row) => Model::from_query_result(&row, "").map_err(ModelError::from),
@@ -300,10 +303,12 @@ impl Model {
     ///
     /// When could not find user by the given token or DB query error ot token expired
     pub async fn find_by_magic_token(db: &DatabaseConnection, token: &str) -> ModelResult<Self> {
+        // SEC-A9: the DB stores the token's hash; match on the hash of the
+        // presented plaintext.
         let user = users::Entity::find()
             .filter(
                 query::condition()
-                    .eq(users::Column::MagicLinkToken, token)
+                    .eq(users::Column::MagicLinkToken, crate::secret_hash::hash(token))
                     .build(),
             )
             .one(db)
@@ -599,12 +604,19 @@ impl ActiveModel {
     /// # Errors
     /// - Returns an error if database update fails
     pub async fn create_magic_link(mut self, db: &DatabaseConnection) -> ModelResult<Model> {
-        let random_str = hash::random_string(MAGIC_LINK_LENGTH as usize);
+        // SEC-A9: the plaintext token is what gets emailed to the user; the
+        // database stores only its hash. Generate the plaintext, persist
+        // `hash(plaintext)`, then hand the caller back a model carrying the
+        // *plaintext* (for the email/log) — so the usable token is never read
+        // back out of the DB.
+        let plaintext = hash::random_string(MAGIC_LINK_LENGTH as usize);
         let expired = Local::now() + Duration::minutes(MAGIC_LINK_EXPIRATION_MIN.into());
 
-        self.magic_link_token = ActiveValue::set(Some(random_str));
+        self.magic_link_token = ActiveValue::set(Some(crate::secret_hash::hash(&plaintext)));
         self.magic_link_expiration = ActiveValue::set(Some(expired.into()));
-        self.update(db).await.map_err(ModelError::from)
+        let mut model = self.update(db).await.map_err(ModelError::from)?;
+        model.magic_link_token = Some(plaintext);
+        Ok(model)
     }
 
     /// Verifies and invalidates the magic link after successful authentication.

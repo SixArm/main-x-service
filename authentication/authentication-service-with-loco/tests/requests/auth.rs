@@ -21,6 +21,7 @@
 
 use authentication_service::{app::App, models::users};
 use loco_rs::testing::prelude::*;
+use sea_orm::IntoActiveModel;
 use serial_test::serial;
 
 use super::prepare_data;
@@ -190,26 +191,34 @@ async fn can_redeem_magic_link_for_access_token() {
         let response = request.post("/api/auth/magic-link").json(&payload).await;
         assert_eq!(response.status_code(), 200);
 
+        // SEC-A9: the DB stores only the *hash* of the magic-link token, so
+        // obtain the usable plaintext the way the mailer does — from the model
+        // `create_magic_link` returns — then redeem it over HTTP.
         let user = users::Model::find_by_email(&ctx.db, "user1@example.com")
             .await
             .expect("seeded user should exist");
+        let user_pid = user.pid;
         let token = user
+            .into_active_model()
+            .create_magic_link(&ctx.db)
+            .await
+            .expect("mint magic link")
             .magic_link_token
-            .expect("magic link token should be generated");
+            .expect("create_magic_link returns the plaintext token in-memory");
 
         let redeem = request.get(&format!("/api/auth/magic-link/{token}")).await;
         assert_eq!(redeem.status_code(), 200, "Redemption should succeed");
 
         let body: serde_json::Value = serde_json::from_str(&redeem.text()).unwrap();
         assert_eq!(body["email"], "user1@example.com");
-        assert_eq!(body["pid"], user.pid.to_string());
+        assert_eq!(body["pid"], user_pid.to_string());
         assert_eq!(body["is_verified"], true, "redemption verifies the email");
         let access_token = body["token"].as_str().expect("token should be a string");
 
         // The issued token is a valid RS256 JWT for this service.
         let claims = authentication_service::auth::verify_token(access_token)
             .expect("issued token should verify against the local key");
-        assert_eq!(claims.sub, user.pid.to_string());
+        assert_eq!(claims.sub, user_pid.to_string());
         assert_eq!(claims.email, "user1@example.com");
 
         // Magic links are single-use (spec §6): the second redemption fails.
@@ -239,11 +248,17 @@ async fn concurrent_magic_link_redemptions_only_one_wins() {
                 .status_code(),
             200
         );
+        // SEC-A9: the DB stores only the hash, so mint via the model to get
+        // the usable plaintext, then race two redemptions of it.
         let token = users::Model::find_by_email(&ctx.db, "user1@example.com")
             .await
             .expect("seeded user should exist")
+            .into_active_model()
+            .create_magic_link(&ctx.db)
+            .await
+            .expect("mint magic link")
             .magic_link_token
-            .expect("magic link token should be generated");
+            .expect("create_magic_link returns the plaintext token in-memory");
 
         let url = format!("/api/auth/magic-link/{token}");
         let (first, second) = tokio::join!(async { request.get(&url).await }, async {
