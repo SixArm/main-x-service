@@ -144,15 +144,20 @@
   reconcile the five older crates' dormant `fluvio` Cargo deps (use or
   remove). Depends: BUS-1, BUS-2.
 
-- [ ] **LNK-1 (M)** Envelope `data` field + `Linked`/`Unlinked` kinds in
-  **person** (case's `src/streaming.rs` is the pattern; person's envelope
-  is `src/streaming/envelope.rs`). Must stay additive —
-  `skip_serializing_if = "Option::is_none"`; existing byte-identical
-  wire-shape tests must keep passing. Then emit person's `linked` /
-  `unlinked` events from the links handlers (currently deferred — see
-  `src/api/rest/links.rs` module doc).
-  *Verify:* green gate; the §4.2 `data` matches the aggregator's
-  `LinkedEvent` (add a seam unit test like link-graph's).
+- [x] **LNK-1 (M)** Envelope `data` field + `Linked`/`Unlinked` kinds in
+  **person**. *(done 2026-07-14)* `EventKind` gained `Linked`/`Unlinked`
+  (+ tokens); `Envelope` gained an additive `data: Option<Value>`
+  (`skip_serializing_if` — the CRUD/merge wire shape stays byte-identical,
+  pinned by `crud_envelope_omits_data_on_the_wire`) carrying the §4.2 edge
+  detail, plus a `for_link` constructor. The links handlers now emit:
+  `create_link` → `linked`, `delete_link` → `unlinked`, transport-aware —
+  under `outbox` the edge mutation + its event commit in one transaction
+  (the outbox guarantee), under `memory` the in-memory
+  `PersonEvent::Linked`/`Unlinked` (lossy dev signal). *Verified:* the seam
+  unit test `for_link_carries_edge_detail_data` (data matches the
+  aggregator's `LinkedEvent`) + token/frozen-shape tests + a DB-gated
+  `linked_event_is_enqueued_to_the_outbox`; person lib + clippy + fmt clean.
+  Follow-up: the same for **worker** (its envelope mirrors person's).
 - [x] **LNK-2 (M)** **Worker** `same_identity` write-side. *(done 2026-07-14)*
   Mirrors person's (`entity_links` migration + `NULLS NOT DISTINCT` upsert
   key, SeaORM entity, `src/db/entity_links.rs` persistence, `validate_edge`

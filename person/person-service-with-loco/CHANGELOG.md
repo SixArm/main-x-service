@@ -8,6 +8,27 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — cross-service `linked` / `unlinked` events (LNK-1)
+
+- Person now **emits** its cross-service link events on the durable event
+  envelope (previously deferred). `EventKind` gained `Linked` / `Unlinked`,
+  and `Envelope` gained an **additive** `data: Option<Value>` field
+  (`skip_serializing_if = "Option::is_none"`, so the existing CRUD/merge
+  wire shape is byte-identical) carrying the §4.2 edge detail (`edge_id` /
+  `from_ref` / `to_ref` / `edge_kind` / `role` / `confidence` /
+  `provenance` / `valid_from` / `valid_to`) that the link-graph aggregator
+  deserialises into its `LinkedEvent`.
+  - `POST /api/persons/{id}/links` emits `linked`; `DELETE …/{link_id}`
+    emits `unlinked`. Under `PERSON_EVENT_TRANSPORT=outbox` the edge upsert
+    (or soft-delete) and its event are enqueued in **one transaction** —
+    the outbox guarantee (no committed edge without its event); under
+    `memory` (dev) the in-memory `PersonEvent::Linked`/`Unlinked` is
+    published as a lossy signal (it carries only the two `Uuid`s).
+  - Tests: `kind_tokens_match_the_serde_form` (linked/unlinked),
+    `crud_envelope_omits_data_on_the_wire` (frozen CRUD shape),
+    `for_link_carries_edge_detail_data` (the aggregator seam), and a
+    DB-gated `linked_event_is_enqueued_to_the_outbox`. (Repo tasks.md LNK-1.)
+
 ### Added — cross-service affiliation edges (LNK-3)
 
 - The person link endpoints now originate the **`works_at` / `member_of`**

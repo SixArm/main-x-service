@@ -240,10 +240,16 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     extended `validate_edge`'s permit set from `same_identity`-only to
     `{same_identity, works_at, member_of}`, relying on `EdgeKind::permits`
     for the endpoint check; accept/reject matrix unit-tested.
-  - [ ] Emit `linked` / `unlinked` events on the existing event
-    envelope via `EventProducer` (edge detail in `data`; no new transport).
-    **Still deferred** (the envelope has no link kind + `data` yet; the
-    bulk endpoint is the sync path).
+  - [x] Emit `linked` / `unlinked` events on the existing event
+    envelope (LNK-1, 2026-07-14): `EventKind` gained `Linked`/`Unlinked` and
+    `Envelope` an additive `data` field (`skip_serializing_if` — the CRUD
+    wire shape stays byte-identical) carrying the §4.2 edge detail. Under
+    `outbox` the edge upsert + its `linked`/`unlinked` envelope commit in one
+    transaction (the outbox guarantee); under `memory` the in-memory
+    `PersonEvent::Linked`/`Unlinked` is published (lossy dev signal). Unit
+    tests pin the tokens, the frozen CRUD shape, and the `for_link` data
+    shape; a DB-gated `linked_event_is_enqueued_to_the_outbox` pins the
+    transactional enqueue.
   - [ ] Partition guard in `src/matching/adapter.rs`: `entity_links` are
     never projected into the matcher input. **Still open.**
   - **Acceptance:** the `validate_edge` accept/reject matrix (incl. the new
