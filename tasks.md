@@ -290,9 +290,14 @@
   `query_one` + `FromQueryResult`), so concurrent redemptions can't both win.
   DB-gated `concurrent_magic_link_redemptions_only_one_wins` (exactly one 200,
   one 401). Green: lib (71) + `test --no-run` + clippy + fmt.
-- [ ] **SEC-A5 (S) 🟡** Constant-work signup: always run one Argon2 hash so
-  existing-vs-new email latency does not distinguish (`controllers/auth.rs:167-197`).
-  *Test:* both paths perform equivalent hashing work.
+- [x] **SEC-A5 (S) 🟡** Constant-work signup. *(done 2026-07-14)*
+  `create_passwordless` returns `EntityAlreadyExists` before its Argon2 hash,
+  so only the new-account path paid the deliberately-slow hash — a timing
+  oracle for enumeration despite the always-`200` response. The
+  existing-email branch now runs one equivalent Argon2 hash
+  (`constant_work_hash`, discarded), so both paths perform one hash and
+  signup latency is indistinguishable between new and existing. Unit test
+  pins that a real `$argon2` hash is performed (fresh per call).
 - [ ] **SEC-A6 (S) 🟡** Rate-limit email canonicalization + case-consistent
   `find_by_email` (`rate_limit.rs:60-62`, `models/users.rs:438-471`) —
   plus-address/dot variants bomb one inbox and spawn duplicate accounts.

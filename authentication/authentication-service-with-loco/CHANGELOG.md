@@ -12,6 +12,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-A5: constant-work signup timing (defeat timing enumeration).**
+  `create_passwordless` returns `EntityAlreadyExists` **before** its Argon2
+  hash, so `signup` paid for the one deliberately-slow hash only on the
+  **new-account** path — the already-registered path returned measurably
+  faster, a timing oracle for account enumeration despite the identical
+  always-`200` response. The existing-email branch now runs one equivalent
+  Argon2 hash (`constant_work_hash`, discarded), so signup latency is
+  indistinguishable between a new and an existing email. Unit-tested that
+  the helper performs a real `$argon2` hash (and a fresh one per call).
+
 - **SEC-A7: complete the GDPR erasure.** `DELETE /api/auth/account`
   tombstoned `users.email`/`name` and revoked sessions, but the subject's
   email survived in the audit trail (`auth_events.email`, including

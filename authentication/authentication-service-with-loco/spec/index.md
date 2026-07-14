@@ -504,6 +504,15 @@ only by that subject.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-A5 (security): constant-work signup timing.** `create_passwordless`
+      returns `EntityAlreadyExists` before its Argon2 hash, so only the
+      new-account signup path paid the deliberately-slow hash — a timing
+      oracle for account enumeration. The existing-email branch now runs one
+      equivalent Argon2 hash (`constant_work_hash`, discarded) so signup
+      latency is indistinguishable between a new and an existing email. Unit
+      test pins that a real `$argon2` hash is performed. (Repo tasks.md
+      Phase 5 SEC-A5.)
+
 - [x] **SEC-A7 (security): complete GDPR erasure.** Account erasure now
       scrubs the subject's email from `auth_events` (`scrub_subject_email`,
       pid OR normalised-email match) and `sessions.user_agent`

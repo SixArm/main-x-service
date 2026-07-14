@@ -152,6 +152,21 @@ fn log_magic_link_url(env: &Environment) -> bool {
     matches!(env, Environment::Development)
 }
 
+/// SEC-A5 — perform one Argon2 password hash and discard it.
+///
+/// `signup`'s **new-account** path pays for exactly one deliberately-slow
+/// Argon2 hash (inside `create_passwordless`, to fill the unusable
+/// `password` column). The **already-registered** path skips that work, so
+/// it returns measurably faster — a **timing oracle for account
+/// enumeration** despite the identical always-`200` response. Running one
+/// equivalent hash on the existing-email path keeps signup latency
+/// indistinguishable between a new and an existing email. Returns the hash
+/// so the work is observable to a test; the caller discards it.
+#[must_use]
+fn constant_work_hash() -> String {
+    loco_rs::hash::hash_password(&uuid::Uuid::new_v4().to_string()).unwrap_or_default()
+}
+
 /// Create a passwordless account and send a magic link. To avoid
 /// leaking whether an email is already registered, an existing email
 /// still receives a fresh link and the response is always 200.
@@ -185,6 +200,11 @@ async fn signup(
         match users::Model::create_passwordless(&ctx.db, &params.email, &name).await {
             Ok(user) => (user, false),
             Err(ModelError::EntityAlreadyExists) => {
+                // SEC-A5: the new-account path just paid for one Argon2 hash
+                // in `create_passwordless`; run an equivalent hash here so
+                // the already-registered branch is not measurably faster (a
+                // timing oracle for account enumeration).
+                let _ = constant_work_hash();
                 if let Ok(user) = users::Model::find_by_email(&ctx.db, &params.email).await {
                     (user, true)
                 } else {
@@ -652,10 +672,30 @@ pub fn routes() -> Routes {
 
 #[cfg(test)]
 mod tests {
-    use super::{choose_frontend, claims_have_admin, log_magic_link_url};
+    use super::{choose_frontend, claims_have_admin, constant_work_hash, log_magic_link_url};
     use crate::auth::Claims;
     use loco_rs::environment::Environment;
     use std::collections::BTreeMap;
+
+    /// SEC-A5: the constant-work hash performs a **real** Argon2 hash (a
+    /// `$argon2` PHC string), so the already-registered signup branch pays
+    /// the same deliberately-slow cost as the new-account path and cannot be
+    /// distinguished by latency. Two calls hash distinct random inputs, so
+    /// (with Argon2's random salt) they never collide — proving actual work
+    /// ran, not a cached/constant return.
+    #[test]
+    fn constant_work_hash_performs_a_real_argon2_hash() {
+        let h = constant_work_hash();
+        assert!(
+            h.starts_with("$argon2"),
+            "expected an argon2 PHC hash, got {h:?}"
+        );
+        assert_ne!(
+            constant_work_hash(),
+            h,
+            "each call must perform a fresh Argon2 hash"
+        );
+    }
 
     const DEFAULT: &str = "http://localhost:5173";
 
