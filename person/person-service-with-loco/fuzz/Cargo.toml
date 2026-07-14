@@ -1,0 +1,27 @@
+[package]
+name = "person-service-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.person-service]
+path = ".."
+
+# cargo-fuzz scaffolding for the person bulk-import parsers (SEC-I2 / SEC-B2).
+# `bulk::jsonl` reads attacker-supplied uploaded file bytes, so the line
+# splitters and per-line JSON parser are prime never-panic targets. Run on
+# nightly: `cargo +nightly fuzz run parse_line`. Not a member of any parent
+# workspace, so it never affects the crate's normal build/test/clippy.
+
+[[bin]]
+name = "parse_line"
+path = "fuzz_targets/parse_line.rs"
+test = false
+doc = false
+bench = false

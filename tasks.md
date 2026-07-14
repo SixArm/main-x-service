@@ -651,8 +651,11 @@
   parser: header / footer `kid` / signature over an arbitrary token) and
   `policy` (`Policy::from_json` + `evaluate_with_context` — the ABAC parser +
   rule evaluator), both pinning golden rule #5 (no panics); verified clean at
-  `verify` 11.1M / `policy` 6.6M execs. **Remaining:** person bulk
-  `parse_line`, and a short CI smoke run.
+  `verify` 11.1M / `policy` 6.6M execs. Plus the **person bulk** `parse_line`
+  target (`bulk::jsonl` split + per-line JSON parse over attacker-supplied
+  upload bytes; verified clean, 173k execs). **Remaining:** only a short CI
+  smoke run (all fuzz *targets* are now in place — every matcher, the
+  auth-verifier, and the bulk parser).
 - [x] **SEC-I3 (S) ⚪** Add `#![forbid(unsafe_code)]` to every crate root
   missing it. *(done 2026-07-14)* The three named roots (care-pathway-matcher
   `src/main.rs`, case-folder `src/lib.rs` + `src/bin/main.rs`) **plus** the 12

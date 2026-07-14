@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — cargo-fuzz harness (SEC-I2 / SEC-B2)
+
+- A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with a
+  `parse_line` libFuzzer target over the bulk-import JSONL parsers
+  (`bulk::jsonl::split_lines` / `split_lines_capped` over raw upload bytes,
+  and `parse_line` over the whole blob plus each split line). These turn
+  **attacker-supplied uploaded file bytes** into `Person` records before any
+  validation, so the target pins that the slice-then-deserialize path never
+  panics on hostile input — complementing the existing
+  `parse_line_never_panics` proptest with coverage-guided search. Run on
+  nightly: `cargo +nightly fuzz run parse_line` (see `fuzz/README.md`). The
+  `fuzz/` crate is standalone (not a workspace member), so it never affects
+  the crate's normal stable build/test/clippy. Verified: `cargo +nightly fuzz
+  build` compiles it and a short campaign runs clean (173k execs, no panics).
+
 ### Security
 
 - **SEC-G3: record-level read authz on `search_persons`.** The person
