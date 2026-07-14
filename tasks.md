@@ -603,10 +603,17 @@
   service level, so they're `ignore`-listed **with justification** and to be
   revisited on the next loco-rs bump — see the note below. Matcher/library
   crates (small trees) pass clean with no ignores needed.
-- [ ] **SEC-I2 (M) 🟡** `cargo-fuzz` scaffolding: a `fuzz/` crate per matcher
-  (+ auth-verifier token parser + person bulk `parse_line`) with the SEC-M6
-  targets; a short CI smoke run + an optional nightly longer run. Depends:
-  SEC-M6 targets.
+- [~] **SEC-I2 (M) 🟡** `cargo-fuzz` scaffolding. *(reference done
+  2026-07-14; roll pending)* **person-matcher** has a `fuzz/` cargo-fuzz
+  crate with three libFuzzer targets mirroring the SEC-M6 invariants:
+  `match_persons` (JSON deserialize → engine; finite score ∈ [0,1], both
+  orders), `normalizer` (pure string helpers, never-panic), `scorer` (pure
+  similarities, finite ∈ [0,1]). Standalone crate (not a workspace member) so
+  it never touches the stable build; verified `cargo +nightly fuzz build`
+  compiles all three + short campaigns run clean (~360k/~930k execs, no
+  panics); `fuzz/README.md` documents run + roll-out. **Remaining:** roll the
+  same shape to the other 9 matchers (+ auth-verifier token parser + person
+  bulk `parse_line`) and add a short CI smoke run.
 - [x] **SEC-I3 (S) ⚪** Add `#![forbid(unsafe_code)]` to every crate root
   missing it. *(done 2026-07-14)* The three named roots (care-pathway-matcher
   `src/main.rs`, case-folder `src/lib.rs` + `src/bin/main.rs`) **plus** the 12
