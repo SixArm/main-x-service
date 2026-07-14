@@ -246,6 +246,7 @@ mod tests {
             actor: Some("user-1".to_string()),
             name: "John Smith".to_string(),
             merged_from: None,
+            data: None,
         }
     }
 

@@ -41,6 +41,12 @@ pub enum EventKind {
     Deleted,
     /// A duplicate was merged into this (surviving) record.
     Merged,
+    /// A cross-service outbound edge was asserted (LNK-1;
+    /// `cross-service-linking.md` §4.2). The edge detail rides in
+    /// [`Envelope::data`].
+    Linked,
+    /// A cross-service outbound edge was withdrawn (LNK-1).
+    Unlinked,
 }
 
 impl EventKind {
@@ -52,6 +58,8 @@ impl EventKind {
             EventKind::Updated => "updated",
             EventKind::Deleted => "deleted",
             EventKind::Merged => "merged",
+            EventKind::Linked => "linked",
+            EventKind::Unlinked => "unlinked",
         }
     }
 }
@@ -89,6 +97,14 @@ pub struct Envelope {
     /// from the duplicate onto the survivor.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub merged_from: Option<String>,
+    /// For a `Linked` / `Unlinked` event (LNK-1), the §4.2 edge detail
+    /// (`edge_id` / `from_ref` / `to_ref` / `edge_kind` / `role` /
+    /// `confidence` / `provenance` / `valid_from` / `valid_to`) the
+    /// link-graph aggregator deserialises into its `LinkedEvent`; `None`
+    /// for CRUD/merge events. Additive and `skip_serializing_if` so the
+    /// existing CRUD/merge wire shape is byte-identical.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub data: Option<serde_json::Value>,
 }
 
 /// The fixed entity name, used as the deserialize default for
@@ -122,6 +138,7 @@ impl Envelope {
             actor: None,
             name: worker.full_name(),
             merged_from: None,
+            data: None,
         }
     }
 
@@ -135,6 +152,34 @@ impl Envelope {
         Self {
             merged_from: Some(merged_from.to_string()),
             ..Self::for_event(survivor, EventKind::Merged)
+        }
+    }
+
+    /// Build a `Linked` / `Unlinked` cross-service link envelope (LNK-1):
+    /// the envelope `pid` is the originating worker (the edge's `from`
+    /// side), `name` its denormalised label, `actor` the causing bearer
+    /// `sub` (when known), and `data` the §4.2 edge detail the aggregator
+    /// consumes. `kind` must be [`EventKind::Linked`] or
+    /// [`EventKind::Unlinked`].
+    #[must_use]
+    pub fn for_link(
+        from_pid: &str,
+        name: &str,
+        actor: Option<&str>,
+        kind: EventKind,
+        data: serde_json::Value,
+    ) -> Self {
+        Self {
+            event_id: Uuid::new_v4(),
+            schema_version: SCHEMA_VERSION,
+            entity: ENTITY,
+            kind,
+            pid: from_pid.to_string(),
+            seq: next_seq(),
+            actor: actor.map(str::to_string),
+            name: name.to_string(),
+            merged_from: None,
+            data: Some(data),
         }
     }
 }
@@ -279,6 +324,57 @@ mod tests {
         assert_eq!(EventKind::Updated.token(), "updated");
         assert_eq!(EventKind::Deleted.token(), "deleted");
         assert_eq!(EventKind::Merged.token(), "merged");
+        assert_eq!(EventKind::Linked.token(), "linked");
+        assert_eq!(EventKind::Unlinked.token(), "unlinked");
+    }
+
+    /// LNK-1: a CRUD/merge envelope has no `data`, and `skip_serializing_if`
+    /// omits the key entirely, so the existing wire shape is byte-identical.
+    #[test]
+    fn crud_envelope_omits_data_on_the_wire() {
+        let env = super::Envelope::for_event(&a_worker(), EventKind::Created);
+        assert!(env.data.is_none());
+        let json = serde_json::to_value(&env).unwrap();
+        assert!(
+            json.get("data").is_none(),
+            "the `data` key must be absent for a CRUD event"
+        );
+    }
+
+    /// LNK-1: a `for_link` envelope carries the §4.2 edge detail in `data`
+    /// and uses the link kind — the shape the aggregator's `LinkedEvent`
+    /// deserialises (the cross-service seam).
+    #[test]
+    fn for_link_carries_edge_detail_data() {
+        let edge = serde_json::json!({
+            "edge_id": "0c4f1e2a-0000-4000-8000-000000000010",
+            "from_ref": "worker:0c4f1e2a-0000-4000-8000-000000000001",
+            "to_ref": "person:0c4f1e2a-0000-4000-8000-000000000002",
+            "edge_kind": "same_identity",
+            "role": null, "confidence": 1.0, "provenance": "operator",
+            "valid_from": null, "valid_to": null
+        });
+        let env = super::Envelope::for_link(
+            "0c4f1e2a-0000-4000-8000-000000000001",
+            "John Smith",
+            Some("11111111-1111-1111-1111-111111111111"),
+            EventKind::Linked,
+            edge.clone(),
+        );
+        assert_eq!(env.kind, EventKind::Linked);
+        assert_eq!(env.pid, "0c4f1e2a-0000-4000-8000-000000000001");
+        assert_eq!(
+            env.actor.as_deref(),
+            Some("11111111-1111-1111-1111-111111111111")
+        );
+        // The edge detail round-trips through the envelope's serialized form.
+        let json = serde_json::to_value(&env).unwrap();
+        assert_eq!(json["kind"], "linked");
+        assert_eq!(json["data"]["edge_kind"], "same_identity");
+        assert_eq!(
+            json["data"]["to_ref"],
+            "person:0c4f1e2a-0000-4000-8000-000000000002"
+        );
     }
 
     #[test]

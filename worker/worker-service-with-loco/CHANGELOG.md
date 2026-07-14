@@ -8,6 +8,23 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — cross-service `linked` / `unlinked` events (LNK-1)
+
+- Worker now **emits** its cross-service link events on the durable event
+  envelope (previously deferred), mirroring person. `EventKind` gained
+  `Linked` / `Unlinked`, and `Envelope` gained an **additive**
+  `data: Option<Value>` field (`skip_serializing_if = "Option::is_none"`,
+  so the existing CRUD/merge wire shape is byte-identical) carrying the §4.2
+  edge detail the link-graph aggregator deserialises into its `LinkedEvent`.
+  - `POST /api/workers/{id}/links` emits `linked`; `DELETE …/{link_id}`
+    emits `unlinked`. Under `WORKER_EVENT_TRANSPORT=outbox` the edge upsert
+    (or soft-delete) and its event are enqueued in **one transaction** (the
+    outbox guarantee); under `memory` (dev) the in-memory
+    `WorkerEvent::Linked`/`Unlinked` is published as a lossy signal.
+  - Tests: token, frozen-CRUD-shape, and `for_link` edge-detail (aggregator
+    seam) unit tests, plus a DB-gated `linked_event_is_enqueued_to_the_outbox`.
+    (Repo tasks.md LNK-1.)
+
 ### Added — cross-service `employed_by` affiliation edge (LNK-3)
 
 - The worker link endpoints now originate the **`employed_by`** affiliation
