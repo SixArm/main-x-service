@@ -366,6 +366,39 @@ async fn test_search_persons() {
     assert!(body_str.contains(&family_name));
 }
 
+/// SEC-G7: `GET /api/persons/search` with an out-of-bound pagination
+/// `offset` is rejected with `400` — the search engine is never asked to
+/// materialise `offset + limit` hits for an unbounded offset.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn test_search_rejects_out_of_bound_offset() {
+    let app = common::create_test_router().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/persons/search?q=anything&offset=1000000000")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        response.status(),
+        StatusCode::BAD_REQUEST,
+        "an offset past the SEC-G7 cap must be rejected before searching"
+    );
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+    assert!(
+        body_str.contains("OFFSET_TOO_LARGE"),
+        "expected the OFFSET_TOO_LARGE error code, got: {body_str}"
+    );
+}
+
 /// `GET /api/persons/{id}` for an unknown id returns 404.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]

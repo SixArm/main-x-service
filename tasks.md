@@ -390,9 +390,12 @@
   which an `access=write` non-admin caller could exploit). Rolled to all ten
   services (case, event, thing, course, care-pathway, portfolio, place,
   organization, worker, person) with a trailing-slash test per crate.
-- [ ] **SEC-G7 (S) ⚪** Bound person `search_persons` `offset`
-  (`handlers.rs:436-441`) — unbounded `offset+limit` forces the index to
-  materialise arbitrarily many hits. *Test:* large offset clamped/rejected.
+- [x] **SEC-G7 (S) ⚪** Bound person `search_persons` `offset`. *(done
+  2026-07-14)* `GET /api/persons/search` rejects `offset > MAX_SEARCH_OFFSET`
+  (10 000) with `400 OFFSET_TOO_LARGE` before asking the index for
+  `offset + limit` hits (unbounded offset ⇒ index materialises arbitrarily
+  many hits; the add could also overflow — now `saturating_add`). Pure
+  `search_offset_within_bound` unit test + DB-gated `400` integration test.
 - [ ] **SEC-G8 (S) 🟡** Default-off exposure pin: an explicit per-service test
   documenting that with `<ENTITY>_REQUIRE_AUTH` off, audit / bulk-links / PII
   reads are open — so activation is a **tracked release gate**, not an
