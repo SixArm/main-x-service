@@ -37,6 +37,13 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   identifiers by design (dedup is a workflow). DB-gated concurrency test +
   pure lock-key test. (Repo tasks.md Phase 5 SEC-B3.)
 
+- [x] **SEC-G7 (security): bound the `search_persons` pagination offset.**
+  `GET /api/persons/search` now rejects `offset > MAX_SEARCH_OFFSET` (10 000)
+  with `400 OFFSET_TOO_LARGE` before asking the index for `offset + limit`
+  hits (unbounded offset ⇒ CPU/memory `DoS`; the add could also overflow —
+  now `saturating_add`). Pure `search_offset_within_bound` unit-tested +
+  DB-gated `400` integration test. (Repo tasks.md Phase 5 SEC-G7.)
+
 - [x] **SEC-M1 (security): input-size caps on the `Person` payload.**
   `validate_person` now bounds every scalar text field (`MAX_TEXT_LEN =
   1024`), string-array cardinality + per-entry length (`MAX_ARRAY_LEN = 256`

@@ -10,6 +10,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-G7: bound the `search_persons` pagination offset.** `GET
+  /api/persons/search` asked the search engine for `offset + limit` hits
+  with an **unbounded** `offset`, so a caller passing a huge `offset` forced
+  the index to materialise arbitrarily many results (a CPU/memory `DoS`),
+  and `offset + limit` could overflow. The handler now rejects
+  `offset > MAX_SEARCH_OFFSET` (10 000) with `400 OFFSET_TOO_LARGE` **before**
+  searching, and computes the total with `saturating_add`. Deep pagination
+  beyond the cap is unsupported (narrow the query / use cursor pagination).
+  Pure `search_offset_within_bound` unit-tested; DB-gated integration test
+  asserts the `400`.
+
 - **SEC-M1: input-size caps on the `Person` payload.** The validator
   enforced format/required rules but capped no field's *size*, so a single
   multi-megabyte text field or a huge array could be a CPU/memory `DoS`

@@ -398,6 +398,21 @@ fn default_limit() -> usize {
     10
 }
 
+/// SEC-G7 — the maximum accepted pagination `offset` for
+/// [`search_persons`]. The search engine is asked for `offset + limit`
+/// hits, so an unbounded `offset` would force the index to collect
+/// arbitrarily many results (a CPU/memory `DoS`). Deep pagination beyond
+/// this is unsupported — a caller that needs it should narrow the query
+/// (cursor pagination is the correct tool). 10 000 is far past any real UI
+/// page depth.
+const MAX_SEARCH_OFFSET: usize = 10_000;
+
+/// SEC-G7 — is a pagination `offset` within the accepted bound? Pure, so
+/// the handler and its tests share one definition.
+fn search_offset_within_bound(offset: usize) -> bool {
+    offset <= MAX_SEARCH_OFFSET
+}
+
 /// Paginated search results body.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SearchResponse {
@@ -431,9 +446,22 @@ pub async fn search_persons(
     // Limit to max 100 results
     let limit = params.limit.min(100);
 
+    // SEC-G7: reject an out-of-bound pagination offset before asking the
+    // search engine for `offset + limit` hits — an unbounded offset would
+    // force the index to materialise arbitrarily many results (CPU/memory
+    // DoS), and the addition below could also overflow.
+    if !search_offset_within_bound(params.offset) {
+        let error = ApiResponse::<SearchResponse>::error(
+            "OFFSET_TOO_LARGE",
+            format!("offset must not exceed {MAX_SEARCH_OFFSET}; narrow the query instead"),
+        );
+        return (StatusCode::BAD_REQUEST, Json(error));
+    }
+
     // Perform search using search engine
-    // Request more results to handle pagination offset
-    let total_needed = params.offset + limit;
+    // Request more results to handle pagination offset. `saturating_add`
+    // belts-and-braces the (already bounded) offset against overflow.
+    let total_needed = params.offset.saturating_add(limit);
     let person_ids = if params.fuzzy {
         state.search_engine.fuzzy_search(&params.q, total_needed)
     } else {
@@ -1299,5 +1327,21 @@ pub async fn get_user_audit_logs(
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MAX_SEARCH_OFFSET, search_offset_within_bound};
+
+    /// SEC-G7: a pagination offset at or under the cap is accepted; anything
+    /// past it (up to `usize::MAX`) is rejected, so the search engine is
+    /// never asked to materialise an unbounded number of hits.
+    #[test]
+    fn search_offset_bound_accepts_only_up_to_the_cap() {
+        assert!(search_offset_within_bound(0));
+        assert!(search_offset_within_bound(MAX_SEARCH_OFFSET));
+        assert!(!search_offset_within_bound(MAX_SEARCH_OFFSET + 1));
+        assert!(!search_offset_within_bound(usize::MAX));
     }
 }
