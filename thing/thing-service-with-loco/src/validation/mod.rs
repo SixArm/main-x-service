@@ -118,6 +118,9 @@ pub fn validate_thing(thing: &Thing) -> Vec<ValidationError> {
         }
     }
 
+    // SEC-M1 input-size caps (additive; no field here has a stricter bound).
+    thing_size_caps(&mut errors, thing);
+
     errors
 }
 
@@ -146,6 +149,116 @@ pub fn normalize_thing(thing: &mut Thing) {
     thing.alternate_names = dedupe(thing.alternate_names.iter().map(|s| s.trim().to_string()));
     thing.same_as = dedupe(thing.same_as.iter().map(|s| normalize_url(s)));
     thing.images = dedupe(thing.images.iter().map(|s| normalize_url(s)));
+}
+
+/// SEC-M1 — maximum length, in Unicode scalar values (`.chars().count()`),
+/// of any single scalar text field. Bounds the per-field cost of the
+/// matcher's character-level string comparisons (Jaro-Winkler / Soundex on
+/// name / description / URLs) so one huge string cannot be a CPU/memory
+/// `DoS`, amplified across the `check-duplicates` / `deduplicate` scans.
+const MAX_TEXT_LEN: usize = 1024;
+/// SEC-M1 — maximum number of entries in any array field. Bounds the O(n·m)
+/// best-pair / list work the matcher does over `same_as` / `images` /
+/// `identifiers`.
+const MAX_ARRAY_LEN: usize = 256;
+/// SEC-M1 — maximum length of any single string entry inside an array.
+const MAX_ITEM_LEN: usize = 512;
+
+/// SEC-M1: push an error when a scalar text `field` exceeds [`MAX_TEXT_LEN`]
+/// Unicode scalar values.
+fn cap_text(errors: &mut Vec<ValidationError>, field: &str, value: &str) {
+    if value.chars().count() > MAX_TEXT_LEN {
+        errors.push(ValidationError {
+            field: field.to_string(),
+            message: format!("must not exceed {MAX_TEXT_LEN} characters"),
+        });
+    }
+}
+
+/// SEC-M1: [`cap_text`] for an optional field; a no-op when absent.
+fn cap_opt_text(errors: &mut Vec<ValidationError>, field: &str, value: Option<&String>) {
+    if let Some(v) = value {
+        cap_text(errors, field, v);
+    }
+}
+
+/// SEC-M1: push an error when an array `field` holds more than
+/// [`MAX_ARRAY_LEN`] entries.
+fn cap_array(errors: &mut Vec<ValidationError>, field: &str, len: usize) {
+    if len > MAX_ARRAY_LEN {
+        errors.push(ValidationError {
+            field: field.to_string(),
+            message: format!("must not exceed {MAX_ARRAY_LEN} entries"),
+        });
+    }
+}
+
+/// SEC-M1: push an error when the string at field path `field` exceeds
+/// [`MAX_ITEM_LEN`] Unicode scalar values.
+fn cap_named_item(errors: &mut Vec<ValidationError>, field: &str, value: &str) {
+    if value.chars().count() > MAX_ITEM_LEN {
+        errors.push(ValidationError {
+            field: field.to_string(),
+            message: format!("must not exceed {MAX_ITEM_LEN} characters"),
+        });
+    }
+}
+
+/// SEC-M1: cap the cardinality of a string array and the length of each
+/// entry (`field[index]` on overflow) — the common shape for the `Thing`
+/// list fields (`alternate_names`, `images`, `same_as`).
+fn cap_string_array(errors: &mut Vec<ValidationError>, field: &str, values: &[String]) {
+    cap_array(errors, field, values.len());
+    for (i, v) in values.iter().enumerate() {
+        cap_named_item(errors, &format!("{field}[{i}]"), v);
+    }
+}
+
+/// SEC-M1: cap the identifier array cardinality and each identifier's inner
+/// text (`value` / optional `name` / `url`) at [`MAX_ITEM_LEN`]. The
+/// `value` emptiness check is a separate lower bound in [`validate_thing`];
+/// this only adds the upper bound.
+fn cap_identifiers(errors: &mut Vec<ValidationError>, identifiers: &[ThingIdentifier]) {
+    cap_array(errors, "identifiers", identifiers.len());
+    for (i, id) in identifiers.iter().enumerate() {
+        cap_named_item(errors, &format!("identifiers[{i}].value"), &id.value);
+        if let Some(name) = &id.name {
+            cap_named_item(errors, &format!("identifiers[{i}].name"), name);
+        }
+        if let Some(url) = &id.url {
+            cap_named_item(errors, &format!("identifiers[{i}].url"), url);
+        }
+    }
+}
+
+/// SEC-M1: apply the input-size caps to a [`Thing`]'s scalar text fields,
+/// string arrays, and identifier array. Factored out of [`validate_thing`]
+/// to keep that function within the clippy line budget. No field here has a
+/// pre-existing stricter bound, so these caps are purely additive.
+fn thing_size_caps(errors: &mut Vec<ValidationError>, thing: &Thing) {
+    cap_text(errors, "name", &thing.name);
+    cap_opt_text(errors, "description", thing.description.as_ref());
+    cap_opt_text(
+        errors,
+        "disambiguating_description",
+        thing.disambiguating_description.as_ref(),
+    );
+    cap_opt_text(errors, "additional_type", thing.additional_type.as_ref());
+    cap_opt_text(errors, "url", thing.url.as_ref());
+    cap_opt_text(
+        errors,
+        "main_entity_of_page",
+        thing.main_entity_of_page.as_ref(),
+    );
+    cap_opt_text(errors, "owner", thing.owner.as_ref());
+    cap_opt_text(errors, "subject_of", thing.subject_of.as_ref());
+    cap_opt_text(errors, "potential_action", thing.potential_action.as_ref());
+
+    cap_string_array(errors, "alternate_names", &thing.alternate_names);
+    cap_string_array(errors, "images", &thing.images);
+    cap_string_array(errors, "same_as", &thing.same_as);
+
+    cap_identifiers(errors, &thing.identifiers);
 }
 
 /// Push a `must be an http(s) URL` error for `field` when an optional URL is
@@ -514,6 +627,65 @@ mod tests {
         assert_eq!(
             thing.alternate_names,
             vec!["A".to_string(), "B".to_string()]
+        );
+    }
+
+    /// SEC-M1: an oversized scalar text field (`name`) yields a cap error.
+    #[test]
+    fn test_cap_oversized_scalar_text() {
+        let thing = Thing::new(&"x".repeat(MAX_TEXT_LEN + 1));
+        let errors = validate_thing(&thing);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "name" && e.message.contains("must not exceed")),
+            "expected a name cap error, got: {errors:?}"
+        );
+    }
+
+    /// SEC-M1: an over-long array (`same_as`) yields a cardinality error.
+    #[test]
+    fn test_cap_over_long_array() {
+        let mut thing = Thing::new("X");
+        // Valid http(s) URLs so only the cardinality cap fires.
+        thing.same_as = vec!["https://example.com".to_string(); MAX_ARRAY_LEN + 1];
+        let errors = validate_thing(&thing);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "same_as" && e.message.contains("must not exceed")),
+            "expected a same_as cardinality error, got: {} errors",
+            errors.len()
+        );
+    }
+
+    /// SEC-M1: an oversized array entry yields an indexed cap error.
+    #[test]
+    fn test_cap_oversized_array_entry() {
+        let mut thing = Thing::new("X");
+        thing.alternate_names = vec!["ok".into(), "x".repeat(MAX_ITEM_LEN + 1)];
+        let errors = validate_thing(&thing);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "alternate_names[1]" && e.message.contains("must not exceed")),
+            "expected an alternate_names[1] cap error, got: {errors:?}"
+        );
+    }
+
+    /// SEC-M1: a record filled right up to the caps produces no cap errors.
+    #[test]
+    fn test_within_caps_large_record_ok() {
+        let mut thing = Thing::new(&"x".repeat(MAX_TEXT_LEN));
+        thing.alternate_names = vec!["a".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN];
+        thing.same_as = vec!["https://example.com".to_string(); MAX_ARRAY_LEN];
+        thing.images = vec!["https://example.com/i.png".to_string(); MAX_ARRAY_LEN];
+        // SKU format is unconstrained; value within the per-item cap.
+        thing.identifiers = vec![ThingIdentifier::sku(&"s".repeat(MAX_ITEM_LEN)); MAX_ARRAY_LEN];
+        let errors = validate_thing(&thing);
+        assert!(
+            !errors.iter().any(|e| e.message.contains("must not exceed")),
+            "expected no cap errors, got: {errors:?}"
         );
     }
 }

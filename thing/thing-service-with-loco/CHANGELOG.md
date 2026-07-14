@@ -10,6 +10,20 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-M1: input-size caps on the `Thing` payload.** The validator
+  enforced format/required rules but capped no field's *size*, so a single
+  multi-megabyte text field or a huge array could be a CPU/memory `DoS`
+  against the matcher's O(n·m) string / Jaccard scoring, amplified across
+  the `check-duplicates` / `deduplicate` scan. `validate_thing` now also
+  bounds every scalar text field (`MAX_TEXT_LEN = 1024`: `name`,
+  `description`, `disambiguating_description`, `additional_type`, `url`,
+  `main_entity_of_page`, `owner`, `subject_of`, `potential_action`),
+  string-array cardinality + per-entry length (`MAX_ARRAY_LEN = 256` /
+  `MAX_ITEM_LEN = 512`: `alternate_names`, `images`, `same_as`), and the
+  `identifiers` cardinality + each identifier's `value` / `name` / `url` —
+  field-scoped `422`s *before* persist/match. Factored into
+  `thing_size_caps` / `cap_*` helpers. Unit tested.
+
 - **SEC-G5: blanket guard is now guard-all (deny-unless-public).** The
   `enforce` decision previously only gated paths under `/api` or `/fhir`,
   silently allowing any out-of-prefix route (e.g. `/`, `/admin`) through
