@@ -44,6 +44,20 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   **tracked release gate** (see `agents/share/security.md` §4). (Repo
   tasks.md Phase 5 SEC-G8.)
 
+- [x] **SEC-G3 (security): record-level read authz on `search_persons`.**
+  The person search page was masked **only** by the client `mask_sensitive`
+  query param, so a mask-only ABAC policy was defeated simply by omitting the
+  param (and a deny had no effect) — the aggregate read revealed more than the
+  equivalent single `GET /api/persons/{id}` (breaks `security.md` invariant
+  #5). Search now runs `auth::read_visibility` (= `authorize_record(Read).ok()`,
+  the case-service idiom) on every hit: a denied record is **omitted**
+  (concealed, so its existence never leaks — not a whole-page `403`), and a
+  `mask` obligation returns the masked view even when the client did not ask;
+  the `mask_sensitive` convenience still masks on request. No-op when
+  `PERSON_REQUIRE_AUTH` is off (pre-SEC-G3 behaviour preserved). The
+  per-result decision is the pure `search_result_disposition`, unit-tested for
+  the full omit/mask/full matrix. (Repo tasks.md Phase 5 SEC-G3.)
+
 - [x] **SEC-G7 (security): bound the `search_persons` pagination offset.**
   `GET /api/persons/search` now rejects `offset > MAX_SEARCH_OFFSET` (10 000)
   with `400 OFFSET_TOO_LARGE` before asking the index for `offset + limit`

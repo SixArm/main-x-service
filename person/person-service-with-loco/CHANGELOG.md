@@ -10,6 +10,28 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-G3: record-level read authz on `search_persons`.** The person
+  search results were masked **only** by the client-supplied
+  `mask_sensitive` query param — so a deployment whose ABAC policy grants a
+  *masked* read (a `mask` obligation) was bypassed by simply omitting the
+  param, and a policy that *denied* the read had no effect on search. An
+  aggregate read could therefore reveal more than the equivalent single
+  `GET /api/persons/{id}` (violating `agents/share/security.md` invariant
+  #5, "masking on every read path"). `GET /api/persons/search` now applies
+  record-level authorization to **every** hit via the new
+  `auth::read_visibility` (= `authorize_record(Read).ok()`, the same idiom
+  the case service uses): a record the caller may not read is **omitted**
+  from the page (concealed — its existence never leaks, rather than
+  `403`-ing the whole page), and a `mask` obligation returns the masked
+  view even when the client did not request masking. The `mask_sensitive`
+  convenience still masks on request. It is a **no-op when
+  `PERSON_REQUIRE_AUTH` is off** (the shipped default), so behaviour is
+  unchanged until enforcement is activated. The per-result
+  omit/mask/full decision is the pure `search_result_disposition`,
+  unit-tested across the matrix (denied ⇒ omit; readable + `mask`
+  obligation ⇒ masked without the client param; readable + no obligation ⇒
+  full unless the client asked). (Repo tasks.md Phase 5 SEC-G3.)
+
 - **SEC-G8: default-off exposure pin.** A new unit test
   (`default_off_exposes_sensitive_reads_activation_is_a_release_gate`)
   documents explicitly that with `PERSON_REQUIRE_AUTH` off (the shipped

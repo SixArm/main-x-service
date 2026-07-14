@@ -385,13 +385,18 @@
   like native `get_one`: FHIR `read` → `403` on deny + masked Task on the
   `mask` obligation; FHIR `search` omits denied cases + masks the rest.
   DB-gated `tests/masking.rs` (denied caller gets `403` on `/fhir/Task/{id}`).
-- [~] **SEC-G3 (M) 🟠** Masking-on-every-read. *(case done 2026-07-13; person remains)*
-  Case `list`/`search`/`check_duplicates` now **omit** cases the caller may
-  not read (concealment) via the shared `auth::read_visibility`; DB-gated
-  `tests/masking.rs` proves the list conceals a denied case. **Remaining:**
-  person `search_persons` (`api/rest/handlers.rs`) is still driven by the
-  client `mask_sensitive` param, not record-level authz — a mask-only policy
-  there is bypassed by omitting the param.
+- [x] **SEC-G3 (M) 🟠** Masking-on-every-read. *(case done 2026-07-13; person
+  done 2026-07-14)* Case `list`/`search`/`check_duplicates` **omit** cases the
+  caller may not read (concealment) via the shared `auth::read_visibility`;
+  DB-gated `tests/masking.rs` proves the list conceals a denied case. Person
+  `search_persons` (`api/rest/handlers.rs`) now runs `auth::read_visibility`
+  on every hit too: a denied record is omitted (concealed), a `mask`
+  obligation masks even without the client `mask_sensitive` param (closing the
+  bypass), and the param still masks on request; no-op when
+  `PERSON_REQUIRE_AUTH` is off. Pure `search_result_disposition` unit test
+  pins the omit/mask/full matrix. (Person `check_duplicates`/`match` return
+  match candidates, not a record dump; a concealment pass there is an optional
+  follow-up if a deployment needs it.)
 - [x] **SEC-G4 (S) 🟡** `escape_like` in the repo-based searches. *(done 2026-07-13)*
   person / worker / event `db/repositories.rs::search` built `format!("%{}%",
   query.to_lowercase())` with no escaping (raw `%`/`_` = wildcard
