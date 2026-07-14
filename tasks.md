@@ -593,9 +593,12 @@
   (+ auth-verifier token parser + person bulk `parse_line`) with the SEC-M6
   targets; a short CI smoke run + an optional nightly longer run. Depends:
   SEC-M6 targets.
-- [ ] **SEC-I3 (S) ⚪** Add `#![forbid(unsafe_code)]` to the three crate roots
-  missing it (care-pathway-matcher `src/main.rs`, case-folder `src/lib.rs` +
-  `src/bin/main.rs`). *Verify:* builds clean; grep shows full coverage.
+- [x] **SEC-I3 (S) ⚪** Add `#![forbid(unsafe_code)]` to every crate root
+  missing it. *(done 2026-07-14)* The three named roots (care-pathway-matcher
+  `src/main.rs`, case-folder `src/lib.rs` + `src/bin/main.rs`) **plus** the 12
+  SeaORM `migration/src/lib.rs` roots — the only remaining gaps a full grep
+  surfaced. Now **every** `src/lib.rs` / `src/main.rs` / `src/bin/main.rs` in
+  the workspace forbids `unsafe`. Builds clean; grep shows full coverage.
 - [ ] **SEC-I4 (M) 🟡** `agents/share/security.md`: the audit summary, the
   cross-cutting invariants (never-panic / masking-on-every-read / fail-closed
   authz / secret-handling / no-secret-in-logs), the `*_REQUIRE_AUTH`

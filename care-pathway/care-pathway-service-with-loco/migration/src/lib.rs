@@ -5,6 +5,8 @@
 //! the `CarePathway` payload as JSONB), `audit_logs` (the CRUD trail), and
 //! `merge_records` (the merge history).
 
+// SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
+#![forbid(unsafe_code)]
 #![allow(elided_lifetimes_in_paths)]
 pub use sea_orm_migration::prelude::*;
 mod m20220101_000001_care_pathways;

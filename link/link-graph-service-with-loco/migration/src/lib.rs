@@ -8,6 +8,8 @@
 //! `audit_log` (§10.4). The `processed_events` idempotency table (§10.3)
 //! is deferred with the Fluvio bus consumer.
 
+// SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
+#![forbid(unsafe_code)]
 #![allow(elided_lifetimes_in_paths)]
 pub use sea_orm_migration::prelude::*;
 

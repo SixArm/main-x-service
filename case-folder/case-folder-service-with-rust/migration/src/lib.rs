@@ -1,3 +1,5 @@
+// SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
+#![forbid(unsafe_code)]
 #![allow(elided_lifetimes_in_paths, clippy::wildcard_imports)]
 //! Database migrations crate.
 //!
