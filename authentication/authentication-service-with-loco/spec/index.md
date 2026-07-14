@@ -504,6 +504,15 @@ only by that subject.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-A6 (security): rate-limit canonicalisation + case-consistent
+      email.** `rate_limit::normalize_key` folds `+tag` and Gmail dots (plus
+      trim/lowercase) so lookalikes of one inbox share a throttle bucket;
+      `users::find_by_email`/`create_passwordless` are case-insensitive
+      (`LOWER(email)` + `normalize_email` store) so a case variant is the same
+      account, not a duplicate. Bucket folds aggressively (throttle-only);
+      identity is case-only. Pure key tests + a DB-gated case-variant signup
+      test. (Repo tasks.md Phase 5 SEC-A6.)
+
 - [x] **SEC-A5 (security): constant-work signup timing.** `create_passwordless`
       returns `EntityAlreadyExists` before its Argon2 hash, so only the
       new-account signup path paid the deliberately-slow hash — a timing

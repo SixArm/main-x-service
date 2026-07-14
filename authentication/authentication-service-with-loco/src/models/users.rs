@@ -22,6 +22,7 @@ use async_trait::async_trait;
 use chrono::{Duration, offset::Local};
 use loco_rs::{auth::jwt, hash, prelude::*};
 use sea_orm::FromQueryResult;
+use sea_orm::sea_query::Expr;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use uuid::Uuid;
@@ -30,6 +31,19 @@ use uuid::Uuid;
 /// `Entity` / `Model`) so callers use `users::Model` etc. through this
 /// domain module rather than reaching into `_entities`.
 pub use super::_entities::users::{self, ActiveModel, Entity, Model};
+
+/// SEC-A6 — canonicalise an email for **account identity**: trim + lowercase.
+///
+/// Email addresses are treated case-insensitively, so `Victim@X.com` and
+/// `victim@x.com` are the **same** account. This is deliberately case-only —
+/// `+tag` sub-addressing and Gmail dot-folding are **not** applied here,
+/// because those are provider-specific and must not silently merge two
+/// distinct addresses into one account. (The rate limiter folds those into
+/// one throttle *bucket*; see `crate::rate_limit::normalize_key`.)
+#[must_use]
+pub fn normalize_email(email: &str) -> String {
+    email.trim().to_lowercase()
+}
 
 /// Length (chars) of a generated magic-link token.
 pub const MAGIC_LINK_LENGTH: i8 = 32;
@@ -216,12 +230,17 @@ impl Model {
     ///
     /// When could not find user by the given token or DB query error
     pub async fn find_by_email(db: &DatabaseConnection, email: &str) -> ModelResult<Self> {
+        // SEC-A6: email is case-insensitive — look up `LOWER(email)` against
+        // the normalised (trimmed + lowercased) input, so `Victim@x` and
+        // `victim@x` resolve to the **same** account and no case variant can
+        // spawn a duplicate. (Account identity is case-only: `+tag` / Gmail
+        // dot folding is deliberately NOT applied here — those are the
+        // throttle bucket's concern, not identity; see `rate_limit`.)
         let user = users::Entity::find()
-            .filter(
-                model::query::condition()
-                    .eq(users::Column::Email, email)
-                    .build(),
-            )
+            .filter(Expr::cust_with_values(
+                "LOWER(email) = ?",
+                [normalize_email(email)],
+            ))
             .one(db)
             .await?;
         user.ok_or_else(|| ModelError::EntityNotFound)
@@ -471,12 +490,12 @@ impl Model {
     ) -> ModelResult<Self> {
         let txn = db.begin().await?;
 
+        // SEC-A6: store and match the email case-insensitively so a case
+        // variant of an existing address is treated as the same account
+        // (routed to the existing-email path), never inserted as a duplicate.
+        let email = normalize_email(email);
         if users::Entity::find()
-            .filter(
-                model::query::condition()
-                    .eq(users::Column::Email, email)
-                    .build(),
-            )
+            .filter(Expr::cust_with_values("LOWER(email) = ?", [email.clone()]))
             .one(&txn)
             .await?
             .is_some()
@@ -487,7 +506,7 @@ impl Model {
         let unusable = hash::hash_password(&Uuid::new_v4().to_string())
             .map_err(|e| ModelError::Any(e.into()))?;
         let user = users::ActiveModel {
-            email: ActiveValue::set(email.to_string()),
+            email: ActiveValue::set(email),
             password: ActiveValue::set(unusable),
             name: ActiveValue::set(name.to_string()),
             ..Default::default()

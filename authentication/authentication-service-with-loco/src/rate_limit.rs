@@ -53,12 +53,39 @@ pub const WINDOW: Duration = Duration::from_mins(5);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RetryAfter(pub Duration);
 
-/// Normalise an email for keying: trim surrounding whitespace and lowercase.
-/// This collapses trivially-distinct spellings (`Alice@X.com `,
-/// `alice@x.com`) onto a single bucket so they share one quota.
+/// Normalise an email into a **throttle bucket** key (SEC-A6).
+///
+/// The point of the key is to stop an attacker email-bombing one victim (or
+/// spawning quota) by dressing the same inbox up in trivially-distinct
+/// spellings. It therefore folds aggressively — this only ever *tightens*
+/// the quota (lookalikes share it), never loosens it, and it does **not**
+/// decide account identity (that stays case-only; see `users::find_by_email`):
+///
+/// - trim + lowercase (`Alice@X.com ` → `alice@x.com`);
+/// - strip a `+tag` sub-address from the local part
+///   (`victim+1@x` → `victim@x`) — the sub-addressing convention every
+///   provider that honours it routes to the same inbox;
+/// - for Gmail (`gmail.com` / `googlemail.com`), fold `.` in the local part
+///   (`v.ictim@gmail.com` → `victim@gmail.com`) — Gmail ignores dots, so a
+///   dotted spelling reaches the same victim.
+///
+/// So `victim+1@gmail.com`, `v.ictim@gmail.com`, and `Victim@gmail.com` all
+/// key to `victim@gmail.com`.
 #[must_use]
 pub fn normalize_key(email: &str) -> String {
-    email.trim().to_lowercase()
+    let email = email.trim().to_lowercase();
+    let Some((local, domain)) = email.rsplit_once('@') else {
+        // Not an `local@domain` shape — key on the whole trimmed/lowered
+        // string rather than inventing structure.
+        return email;
+    };
+    // Drop a `+tag` sub-address.
+    let mut local = local.split('+').next().unwrap_or(local).to_string();
+    // Gmail folds dots in the local part to the same inbox.
+    if matches!(domain, "gmail.com" | "googlemail.com") {
+        local = local.replace('.', "");
+    }
+    format!("{local}@{domain}")
 }
 
 /// Record a request for `key` and decide whether it is allowed, using the
@@ -207,5 +234,43 @@ mod tests {
     #[test]
     fn normalize_key_trims_and_lowercases() {
         assert_eq!(normalize_key("  Alice@Example.COM "), "alice@example.com");
+    }
+
+    /// SEC-A6: plus-address, Gmail dot, and case variants of the same inbox
+    /// collapse to a single throttle bucket, so an attacker cannot bypass
+    /// the per-email cap to email-bomb one victim.
+    #[test]
+    fn normalize_key_collapses_plus_dot_and_case_variants() {
+        let canonical = "victim@gmail.com";
+        for variant in [
+            "victim+1@gmail.com",
+            "victim+anything@gmail.com",
+            "v.ictim@gmail.com",
+            "v.i.c.t.i.m@gmail.com",
+            "Victim@Gmail.com",
+            "  victim+tag@googlemail.com  ", // googlemail folds too (→ gmail-style local)
+        ] {
+            let got = normalize_key(variant);
+            // googlemail keeps its own domain; assert the local part folds.
+            let want = if variant.contains("googlemail") {
+                "victim@googlemail.com"
+            } else {
+                canonical
+            };
+            assert_eq!(got, want, "variant {variant:?} should fold to {want}");
+        }
+    }
+
+    /// Non-Gmail providers keep their dots (dots are significant there), and
+    /// a non-email-shaped key is passed through trimmed/lowered.
+    #[test]
+    fn normalize_key_keeps_dots_for_non_gmail_and_passes_through_non_email() {
+        assert_eq!(normalize_key("v.ictim@example.com"), "v.ictim@example.com");
+        // Plus-tag stripping still applies at every provider.
+        assert_eq!(
+            normalize_key("v.ictim+x@example.com"),
+            "v.ictim@example.com"
+        );
+        assert_eq!(normalize_key("  NotAnEmail "), "notanemail");
     }
 }
