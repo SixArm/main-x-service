@@ -28,6 +28,33 @@ impl ValidationError {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Input-size caps (SEC-M1)
+// ---------------------------------------------------------------------------
+//
+// The service stores the event verbatim and scores it with O(n·m)
+// string / Jaccard / time-window work (amplified across the
+// `check-duplicates` / `deduplicate` scans). Without per-field size caps a
+// single huge string or huge array is a CPU / memory DoS, so every scalar
+// text field, array cardinality, and per-entry string length is bounded
+// here — oversized input is rejected with a `422` before the record is
+// stored or matched. These caps only *add* errors; existing rules and
+// messages are unchanged.
+
+/// Maximum length, in Unicode scalar values (`.chars().count()`), of any
+/// single scalar text field (`name`, `description`, `url`, …). Bounds the
+/// per-field cost of the matcher's character-level string comparisons.
+const MAX_TEXT_LEN: usize = 1024;
+
+/// Maximum number of entries in any array field (`keywords`, `location`,
+/// `organizers`, `identifiers`, …). Bounds the O(n·m) Jaccard / overlap /
+/// best-pair work the matcher does over arrays.
+const MAX_ARRAY_LEN: usize = 256;
+
+/// Maximum length, in Unicode scalar values (`.chars().count()`), of any
+/// single string entry inside an array field.
+const MAX_ITEM_LEN: usize = 512;
+
 /// Validate an event, collecting every error rather than returning early.
 #[must_use]
 pub fn validate_event(event: &Event) -> Vec<ValidationError> {
@@ -115,6 +142,9 @@ pub fn validate_event(event: &Event) -> Vec<ValidationError> {
     for (i, offer) in event.offers.iter().enumerate() {
         errors.extend(validate_offer(offer, &format!("offers[{i}]")));
     }
+
+    // ---- Input-size caps (SEC-M1) --------------------------------------
+    event_size_caps(&mut errors, event);
 
     errors
 }
@@ -384,6 +414,203 @@ fn is_iso8601_duration(s: &str) -> bool {
 /// Surface-level check for ISO 639-1 codes: 2 ASCII letters.
 fn is_valid_language_code(s: &str) -> bool {
     s.len() == 2 && s.chars().all(|c| c.is_ascii_alphabetic())
+}
+
+// ---------------------------------------------------------------------------
+// Input-size cap helpers (SEC-M1)
+// ---------------------------------------------------------------------------
+
+/// Push an error when a scalar text `field` exceeds [`MAX_TEXT_LEN`]
+/// Unicode scalar values.
+fn cap_text(errs: &mut Vec<ValidationError>, field: &str, value: &str) {
+    if value.chars().count() > MAX_TEXT_LEN {
+        errs.push(ValidationError::new(
+            field.to_string(),
+            format!("exceeds {MAX_TEXT_LEN} characters"),
+        ));
+    }
+}
+
+/// Cap an optional scalar text `field` when present ([`cap_text`]).
+fn cap_opt_text(errs: &mut Vec<ValidationError>, field: &str, value: Option<&String>) {
+    if let Some(v) = value {
+        cap_text(errs, field, v);
+    }
+}
+
+/// Push an error when an array `field` holds more than [`MAX_ARRAY_LEN`]
+/// entries.
+fn cap_array(errs: &mut Vec<ValidationError>, field: &str, len: usize) {
+    if len > MAX_ARRAY_LEN {
+        errs.push(ValidationError::new(
+            field.to_string(),
+            format!("exceeds {MAX_ARRAY_LEN} entries"),
+        ));
+    }
+}
+
+/// Push an error when the `index`-th entry of array `field` exceeds
+/// [`MAX_ITEM_LEN`] Unicode scalar values.
+fn cap_item(errs: &mut Vec<ValidationError>, field: &str, index: usize, value: &str) {
+    if value.chars().count() > MAX_ITEM_LEN {
+        errs.push(ValidationError::new(
+            format!("{field}[{index}]"),
+            format!("exceeds {MAX_ITEM_LEN} characters"),
+        ));
+    }
+}
+
+/// Cap a `Vec<String>` array `field` on both cardinality ([`cap_array`])
+/// and per-entry length ([`cap_item`]).
+fn cap_string_array(errs: &mut Vec<ValidationError>, field: &str, values: &[String]) {
+    cap_array(errs, field, values.len());
+    for (i, v) in values.iter().enumerate() {
+        cap_item(errs, field, i, v);
+    }
+}
+
+/// Apply every SEC-M1 input-size cap to `event`. Factored out of
+/// [`validate_event`] (and split into per-group sub-helpers) so no single
+/// function trips clippy's `too_many_lines`.
+fn event_size_caps(errs: &mut Vec<ValidationError>, event: &Event) {
+    cap_event_scalars(errs, event);
+    cap_event_string_arrays(errs, event);
+    cap_event_identifiers(errs, event);
+    cap_event_locations(errs, event);
+    cap_event_parties(errs, event);
+    cap_event_references(errs, event);
+    cap_event_offers(errs, event);
+    // Non-text collections: cardinality only (no inner strings to cap).
+    cap_array(errs, "sub_events", event.sub_events.len());
+    cap_array(errs, "links", event.links.len());
+}
+
+/// Cap the top-level scalar text fields of an [`Event`].
+fn cap_event_scalars(errs: &mut Vec<ValidationError>, event: &Event) {
+    cap_text(errs, "name", &event.name);
+    cap_opt_text(errs, "description", event.description.as_ref());
+    cap_opt_text(
+        errs,
+        "disambiguating_description",
+        event.disambiguating_description.as_ref(),
+    );
+    cap_opt_text(errs, "url", event.url.as_ref());
+    cap_opt_text(errs, "duration", event.duration.as_ref());
+    cap_opt_text(errs, "time_zone", event.time_zone.as_ref());
+    cap_opt_text(errs, "typical_age_range", event.typical_age_range.as_ref());
+}
+
+/// Cap the `Vec<String>` array fields of an [`Event`].
+fn cap_event_string_arrays(errs: &mut Vec<ValidationError>, event: &Event) {
+    cap_string_array(errs, "alternate_names", &event.alternate_names);
+    cap_string_array(errs, "image", &event.image);
+    cap_string_array(errs, "same_as", &event.same_as);
+    cap_string_array(errs, "keywords", &event.keywords);
+    // `in_language`: each entry is already bounded to 2 chars by
+    // `is_valid_language_code` (a stricter per-entry bound), so only the
+    // array cardinality needs a cap here.
+    cap_array(errs, "in_language", event.in_language.len());
+}
+
+/// Cap the identifier array (cardinality + inner `system` / `value` /
+/// `assigner` text).
+fn cap_event_identifiers(errs: &mut Vec<ValidationError>, event: &Event) {
+    cap_array(errs, "identifiers", event.identifiers.len());
+    for (i, id) in event.identifiers.iter().enumerate() {
+        cap_text(errs, &format!("identifiers[{i}].system"), &id.system);
+        cap_text(errs, &format!("identifiers[{i}].value"), &id.value);
+        cap_opt_text(
+            errs,
+            &format!("identifiers[{i}].assigner"),
+            id.assigner.as_ref(),
+        );
+    }
+}
+
+/// Cap the location array (cardinality + per-variant inner text).
+fn cap_event_locations(errs: &mut Vec<ValidationError>, event: &Event) {
+    cap_array(errs, "location", event.location.len());
+    for (i, loc) in event.location.iter().enumerate() {
+        cap_location(errs, &format!("location[{i}]"), loc);
+    }
+}
+
+/// Cap the inner text of one [`Location`] variant.
+fn cap_location(errs: &mut Vec<ValidationError>, prefix: &str, loc: &Location) {
+    match loc {
+        Location::Place(place) => {
+            cap_text(errs, &format!("{prefix}.name"), &place.name);
+            cap_opt_text(errs, &format!("{prefix}.url"), place.url.as_ref());
+            if let Some(addr) = &place.address {
+                cap_address(errs, &format!("{prefix}.address"), addr);
+            }
+        }
+        Location::PostalAddress(addr) => cap_address(errs, prefix, addr),
+        Location::Virtual(v) => {
+            cap_opt_text(errs, &format!("{prefix}.name"), v.name.as_ref());
+            cap_text(errs, &format!("{prefix}.url"), &v.url);
+        }
+        Location::Text { value } => cap_text(errs, &format!("{prefix}.value"), value),
+    }
+}
+
+/// Cap the optional text fields of an [`Address`].
+fn cap_address(errs: &mut Vec<ValidationError>, prefix: &str, addr: &Address) {
+    cap_opt_text(errs, &format!("{prefix}.line1"), addr.line1.as_ref());
+    cap_opt_text(errs, &format!("{prefix}.line2"), addr.line2.as_ref());
+    cap_opt_text(errs, &format!("{prefix}.city"), addr.city.as_ref());
+    cap_opt_text(errs, &format!("{prefix}.state"), addr.state.as_ref());
+    cap_opt_text(
+        errs,
+        &format!("{prefix}.postal_code"),
+        addr.postal_code.as_ref(),
+    );
+    cap_opt_text(errs, &format!("{prefix}.country"), addr.country.as_ref());
+}
+
+/// Cap every party role-list (cardinality + inner `name` / `email` /
+/// `url` text).
+fn cap_event_parties(errs: &mut Vec<ValidationError>, event: &Event) {
+    for (field, parties) in [
+        ("organizers", &event.organizers),
+        ("performers", &event.performers),
+        ("attendees", &event.attendees),
+        ("sponsors", &event.sponsors),
+        ("funders", &event.funders),
+        ("contributors", &event.contributors),
+    ] {
+        cap_array(errs, field, parties.len());
+        for (i, party) in parties.iter().enumerate() {
+            cap_text(errs, &format!("{field}[{i}].name"), &party.name);
+            cap_opt_text(errs, &format!("{field}[{i}].email"), party.email.as_ref());
+            cap_opt_text(errs, &format!("{field}[{i}].url"), party.url.as_ref());
+        }
+    }
+}
+
+/// Cap the reference lists `about` / `works` (cardinality + inner `name`
+/// / `url` / `kind` text).
+fn cap_event_references(errs: &mut Vec<ValidationError>, event: &Event) {
+    for (field, refs) in [("about", &event.about), ("works", &event.works)] {
+        cap_array(errs, field, refs.len());
+        for (i, r) in refs.iter().enumerate() {
+            cap_text(errs, &format!("{field}[{i}].name"), &r.name);
+            cap_opt_text(errs, &format!("{field}[{i}].url"), r.url.as_ref());
+            cap_opt_text(errs, &format!("{field}[{i}].kind"), r.kind.as_ref());
+        }
+    }
+}
+
+/// Cap the offer array (cardinality + inner `name` / `price` / `url`
+/// text). `price_currency` is left uncapped — [`validate_offer`] already
+/// bounds it to exactly 3 characters (a stricter check).
+fn cap_event_offers(errs: &mut Vec<ValidationError>, event: &Event) {
+    cap_array(errs, "offers", event.offers.len());
+    for (i, offer) in event.offers.iter().enumerate() {
+        cap_opt_text(errs, &format!("offers[{i}].name"), offer.name.as_ref());
+        cap_opt_text(errs, &format!("offers[{i}].price"), offer.price.as_ref());
+        cap_opt_text(errs, &format!("offers[{i}].url"), offer.url.as_ref());
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -668,5 +895,66 @@ mod tests {
         assert_eq!(std.city.as_deref(), Some("New York"));
         assert_eq!(std.state.as_deref(), Some("NY"));
         assert_eq!(std.country.as_deref(), Some("US"));
+    }
+
+    // ---- Input-size caps (SEC-M1) --------------------------------------
+
+    /// An oversized scalar text field yields a cap error on that field.
+    #[test]
+    fn oversized_scalar_text_is_capped() {
+        let mut event = Event::new("Test", start());
+        event.description = Some("x".repeat(MAX_TEXT_LEN + 1));
+        let errors = validate_event(&event);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "description" && e.message.contains("exceeds")),
+            "expected a description cap error, got {errors:?}"
+        );
+    }
+
+    /// An over-long array yields a cardinality cap error on that field.
+    #[test]
+    fn overlong_array_is_capped() {
+        let mut event = Event::new("Test", start());
+        event.keywords = vec!["k".to_string(); MAX_ARRAY_LEN + 1];
+        let errors = validate_event(&event);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "keywords" && e.message.contains("entries")),
+            "expected a keywords cardinality error, got {errors:?}"
+        );
+    }
+
+    /// An oversized array entry yields an indexed per-entry cap error.
+    #[test]
+    fn oversized_array_entry_is_capped() {
+        let mut event = Event::new("Test", start());
+        event.keywords = vec!["ok".to_string(), "x".repeat(MAX_ITEM_LEN + 1)];
+        let errors = validate_event(&event);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "keywords[1]" && e.message.contains("characters")),
+            "expected a keywords[1] cap error, got {errors:?}"
+        );
+    }
+
+    /// A large record whose fields sit exactly at the caps produces no
+    /// cap errors (boundary values are allowed; only strictly-over is
+    /// rejected).
+    #[test]
+    fn within_caps_large_record_has_no_cap_errors() {
+        let mut event = Event::new("x".repeat(MAX_TEXT_LEN), start());
+        event.description = Some("d".repeat(MAX_TEXT_LEN));
+        event.alternate_names = vec!["a".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN];
+        event.keywords = vec!["k".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN];
+        event.same_as = vec!["s".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN];
+        let errors = validate_event(&event);
+        assert!(
+            !errors.iter().any(|e| e.message.contains("exceeds")),
+            "unexpected cap errors: {errors:?}"
+        );
     }
 }

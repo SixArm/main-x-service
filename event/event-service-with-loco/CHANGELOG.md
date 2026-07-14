@@ -10,6 +10,23 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-M1: input-size caps on the `Event` payload.** The validator
+  enforced format/time-window rules but capped no field's *size*, so a
+  single multi-megabyte text field or a huge array could be a CPU/memory
+  `DoS` against the matcher's O(n·m) string / Jaccard scoring, amplified
+  across the `check-duplicates` / `deduplicate` scan. `validate_event` now
+  also bounds every scalar text field (`MAX_TEXT_LEN = 1024`: `name`,
+  `description`, `disambiguating_description`, `url`, `duration`,
+  `time_zone`, `typical_age_range`), string-array cardinality + per-entry
+  length (`MAX_ARRAY_LEN = 256` / `MAX_ITEM_LEN = 512`: `alternate_names`,
+  `image`, `same_as`, `keywords`), and the inner text + cardinality of the
+  nested object arrays (`identifiers`, the `location` union, the six party
+  lists, `about`/`works` references, `offers`, `sub_events`, `links`) —
+  field-scoped `422`s *before* persist/match. `offers[i].price_currency`
+  (3-char) and `in_language` (2-char) keep their stricter existing bounds;
+  time-window checks are untouched. Factored into `event_size_caps` /
+  per-group `cap_*` helpers. Unit tested.
+
 - **SEC-G5: switch the blanket auth guard from prefix-gate to guard-all
   (deny-unless-public).** `enforce` previously returned `Ok` (bypassing auth)
   for any path **not** under `/api` or `/fhir`, so a route mounted outside
