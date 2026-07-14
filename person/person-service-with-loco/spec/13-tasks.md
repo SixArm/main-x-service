@@ -37,6 +37,15 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   identifiers by design (dedup is a workflow). DB-gated concurrency test +
   pure lock-key test. (Repo tasks.md Phase 5 SEC-B3.)
 
+- [x] **SEC-M1 (security): input-size caps on the `Person` payload.**
+  `validate_person` now bounds every scalar text field (`MAX_TEXT_LEN =
+  1024`), string-array cardinality + per-entry length (`MAX_ARRAY_LEN = 256`
+  / `MAX_ITEM_LEN = 512`), and the inner text + cardinality of the nested
+  collections (names, `additional_names`, identifiers, addresses, telecom,
+  documents, emergency_contacts, photo, tax_id, marital_status) → field-scoped
+  `422` before persist/match, closing the O(n·m) matcher `DoS`. Factored into
+  `person_size_caps`/`cap_*`. Unit tested. (Repo tasks.md Phase 5 SEC-M1.)
+
 - [x] **SEC-B4 (security): bulk artifact hardening.** (1) `LocalFsArtifactStore`
   now **confines** `get` to the store's canonicalised base and validates
   keys with `is_safe_key` (no `..`/absolute), closing an arbitrary-file
