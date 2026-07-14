@@ -12,6 +12,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-A10: CSRF origin backstop on `POST /api/auth/token`.** The
+  cookie-authenticated token exchange required a matching `X-CSRF-Token`
+  only when the session carried a synchroniser token; a **legacy**
+  session predating CSRF (no stored token) skipped the check entirely,
+  and the `Origin` allow-list was only enforced when `AUTH_ALLOWED_ORIGINS`
+  happened to be set — so a legacy session could bypass **both** the CSRF
+  and the origin checks. Now the decision is a single pure
+  `csrf_token_gate(is_production, origin_ok, session_csrf, provided_csrf)`:
+  a token-carrying session must echo its token (constant-time compared);
+  a legacy session must instead prove same-origin (an `Origin` on the
+  allow-list) and is **refused in production** without that proof —
+  development stays permissive. When the allow-list is unset in
+  production the service warns once (`warn_missing_allowed_origins`) that
+  the backstop is off. A `csrf_gate_matrix` unit test pins the full grid,
+  including that a matching origin does not excuse a bad token and that the
+  legacy-session bypass is closed in production. (Repo tasks.md Phase 5
+  SEC-A10.)
+
 - **SEC-A6: canonicalise the rate-limit bucket + case-consistent email
   identity.** Two related abuses: the per-email throttle keyed on the
   lowercased-but-otherwise-raw email, so `victim+1@gmail.com` /

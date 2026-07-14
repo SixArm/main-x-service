@@ -167,6 +167,53 @@ fn constant_work_hash() -> String {
     loco_rs::hash::hash_password(&uuid::Uuid::new_v4().to_string()).unwrap_or_default()
 }
 
+/// SEC-A10 — the CSRF decision for `POST /token` once the session is loaded.
+/// Pure, so the full matrix is unit-tested.
+///
+/// - A session that carries a CSRF **synchroniser token** must echo it in
+///   `X-CSRF-Token` (constant-time compared) — the primary defence.
+/// - A **legacy** session (predating CSRF, no stored token) cannot do the
+///   double-submit check, so it must instead prove **same-origin** (an
+///   `Origin` on the `AUTH_ALLOWED_ORIGINS` allow-list, `origin_ok`). Without
+///   that proof it is trusted only in development; in production it is
+///   refused, so a legacy session can no longer bypass **both** the CSRF and
+///   the origin checks.
+fn csrf_token_gate(
+    is_production: bool,
+    origin_ok: bool,
+    session_csrf: Option<&str>,
+    provided_csrf: &str,
+) -> std::result::Result<(), (StatusCode, &'static str)> {
+    if let Some(expected) = session_csrf {
+        if crate::csrf::matches(expected, provided_csrf) {
+            Ok(())
+        } else {
+            Err((StatusCode::FORBIDDEN, "missing or invalid CSRF token"))
+        }
+    } else if origin_ok || !is_production {
+        Ok(())
+    } else {
+        Err((
+            StatusCode::FORBIDDEN,
+            "CSRF token required (legacy session; set AUTH_ALLOWED_ORIGINS)",
+        ))
+    }
+}
+
+/// SEC-A10 — warn (once) that the `Origin` CSRF backstop is off because
+/// `AUTH_ALLOWED_ORIGINS` is unset in production. A production deployment
+/// should set it so cross-origin `POST /token` callers are rejected even
+/// with `SameSite` cookies.
+fn warn_missing_allowed_origins() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        tracing::warn!(
+            "AUTH_ALLOWED_ORIGINS is unset in production: the Origin CSRF backstop \
+             on POST /api/auth/token is disabled. Set it to your front-end origins."
+        );
+    });
+}
+
 /// Create a passwordless account and send a magic link. To avoid
 /// leaking whether an email is already registered, an existing email
 /// still receives a fresh link and the response is always 200.
@@ -408,24 +455,38 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
 /// `__Host-mxi_session` cookie and forwards the returned PASETO as a bearer
 /// to the entity services, so the browser never sees a token.
 ///
-/// CSRF: a light `Origin` allow-list (env `AUTH_ALLOWED_ORIGINS`,
-/// comma-separated) backstops the `SameSite=Lax` cookie; unset ⇒ permissive
-/// (dev). Full double-submit CSRF is a follow-up.
+/// CSRF (SEC-A10): a session carrying a synchroniser token must echo it in
+/// `X-CSRF-Token` (`csrf_token_gate`, the primary defence). An `Origin`
+/// allow-list (env `AUTH_ALLOWED_ORIGINS`, comma-separated) backstops the
+/// `SameSite=Lax` cookie and is the sole proof a legacy (token-less) session
+/// can offer — such a session is refused in production without it, so it
+/// cannot bypass both the CSRF and the origin checks. Unset allow-list stays
+/// permissive in development and warns once in production.
 #[debug_handler]
 async fn token(headers: axum::http::HeaderMap, State(ctx): State<AppContext>) -> Result<Response> {
-    // CSRF backstop: reject a cross-origin caller when an allow-list is set.
-    if let Some(allowed) = std::env::var("AUTH_ALLOWED_ORIGINS")
+    // SEC-A10: compute the origin decision once. `origin_ok` = an `Origin`
+    // header present on the `AUTH_ALLOWED_ORIGINS` allow-list; `false` when
+    // no allow-list is configured (an origin can't be *proven*).
+    let allowed_origins = std::env::var("AUTH_ALLOWED_ORIGINS")
         .ok()
-        .filter(|s| !s.trim().is_empty())
-    {
-        let origin = headers
-            .get(axum::http::header::ORIGIN)
-            .and_then(|v| v.to_str().ok());
-        let ok = origin.is_some_and(|o| allowed.split(',').map(str::trim).any(|a| a == o));
-        if !ok {
-            return unauthorized("origin not allowed");
-        }
+        .filter(|s| !s.trim().is_empty());
+    let request_origin = headers
+        .get(axum::http::header::ORIGIN)
+        .and_then(|v| v.to_str().ok());
+    let origin_ok = allowed_origins.as_deref().is_some_and(|list| {
+        request_origin.is_some_and(|o| list.split(',').map(str::trim).any(|a| a == o))
+    });
+    let is_production = matches!(ctx.environment, Environment::Production);
+
+    // Backstop: when an allow-list is set, reject a disallowed origin outright.
+    if allowed_origins.is_some() && !origin_ok {
+        return unauthorized("origin not allowed");
     }
+    // Warn (once) if the backstop is off in production.
+    if is_production && allowed_origins.is_none() {
+        warn_missing_allowed_origins();
+    }
+
     // Read the opaque session id from the httpOnly cookie.
     let Some(sid) = headers
         .get(axum::http::header::COOKIE)
@@ -441,23 +502,20 @@ async fn token(headers: axum::http::HeaderMap, State(ctx): State<AppContext>) ->
     if !session.is_active() {
         return unauthorized("session revoked or expired");
     }
-    // CSRF: this is a cookie-authenticated mutating request, so require
-    // the client to echo the session's CSRF synchroniser token in the
-    // `X-CSRF-Token` header (constant-time compared). A session predating
-    // CSRF has no token stored — skip the check for it (graceful; every
-    // new session carries one). A mismatch is `403`, distinct from the
-    // `401`s above.
-    if let Some(expected) = session.csrf() {
-        let provided = headers
-            .get(crate::csrf::CSRF_HEADER)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or_default();
-        if !crate::csrf::matches(expected, provided) {
-            return Err(Error::CustomError(
-                StatusCode::FORBIDDEN,
-                ErrorDetail::new("csrf", "missing or invalid CSRF token"),
-            ));
-        }
+    // SEC-A10: this is a cookie-authenticated mutating request. A session
+    // that carries a CSRF synchroniser token must echo it in `X-CSRF-Token`;
+    // a legacy session with no stored token must instead prove same-origin
+    // (and is refused in production without an allow-list) so it cannot
+    // bypass both the CSRF and the origin checks. A failure is `403`,
+    // distinct from the `401`s above.
+    let provided = headers
+        .get(crate::csrf::CSRF_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    if let Err((status, reason)) =
+        csrf_token_gate(is_production, origin_ok, session.csrf(), provided)
+    {
+        return Err(Error::CustomError(status, ErrorDetail::new("csrf", reason)));
     }
     // Resolve the user for the token claims, then mint a fresh PASETO bound
     // to this session id. The ABAC `attrs` claim comes from the session's
@@ -672,10 +730,45 @@ pub fn routes() -> Routes {
 
 #[cfg(test)]
 mod tests {
-    use super::{choose_frontend, claims_have_admin, constant_work_hash, log_magic_link_url};
+    use super::{
+        choose_frontend, claims_have_admin, constant_work_hash, csrf_token_gate,
+        log_magic_link_url,
+    };
+    use axum::http::StatusCode;
     use crate::auth::Claims;
     use loco_rs::environment::Environment;
     use std::collections::BTreeMap;
+
+    /// SEC-A10: the `POST /token` CSRF gate. A session with a synchroniser
+    /// token must echo it; a legacy (token-less) session must prove
+    /// same-origin, and — critically — **cannot bypass both** the CSRF and
+    /// the origin checks in production.
+    #[test]
+    fn csrf_gate_matrix() {
+        // A token-carrying session: correct token allows, wrong/absent 403.
+        assert!(csrf_token_gate(true, false, Some("tok"), "tok").is_ok());
+        assert_eq!(
+            csrf_token_gate(true, false, Some("tok"), "wrong").unwrap_err().0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            csrf_token_gate(true, true, Some("tok"), "").unwrap_err().0,
+            StatusCode::FORBIDDEN,
+            "a matching origin does not excuse a bad CSRF token"
+        );
+
+        // Legacy (token-less) session — the SEC-A10 bypass being closed:
+        // production + no proven origin ⇒ rejected.
+        assert_eq!(
+            csrf_token_gate(true, false, None, "").unwrap_err().0,
+            StatusCode::FORBIDDEN,
+            "legacy session with no CSRF token and no allowed origin must be refused in production"
+        );
+        // Legacy session with a proven same-origin ⇒ allowed.
+        assert!(csrf_token_gate(true, true, None, "").is_ok());
+        // Development stays permissive for a legacy session.
+        assert!(csrf_token_gate(false, false, None, "").is_ok());
+    }
 
     /// SEC-A5: the constant-work hash performs a **real** Argon2 hash (a
     /// `$argon2` PHC string), so the already-registered signup branch pays

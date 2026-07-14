@@ -504,6 +504,19 @@ only by that subject.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-A10 (security): CSRF origin backstop on `POST /token`.** The
+      token exchange only required `X-CSRF-Token` when the session carried a
+      synchroniser token, and only enforced the `Origin` allow-list when
+      `AUTH_ALLOWED_ORIGINS` was set — so a **legacy** (token-less) session
+      could bypass *both* checks. The decision is now a single pure
+      `csrf_token_gate(is_production, origin_ok, session_csrf, provided_csrf)`:
+      a token-carrying session must echo it (constant-time compare); a legacy
+      session must instead prove same-origin and is refused in production
+      without it (dev stays permissive). Unset allow-list in production warns
+      once (`warn_missing_allowed_origins`). `csrf_gate_matrix` unit test pins
+      the grid (matching origin does not excuse a bad token; the legacy bypass
+      is closed in production). (Repo tasks.md Phase 5 SEC-A10.)
+
 - [x] **SEC-A6 (security): rate-limit canonicalisation + case-consistent
       email.** `rate_limit::normalize_key` folds `+tag` and Gmail dots (plus
       trim/lowercase) so lookalikes of one inbox share a throttle bucket;
