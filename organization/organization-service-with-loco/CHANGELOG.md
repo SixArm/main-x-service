@@ -11,6 +11,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-M5: check-digit / format validation of deterministic identifiers.**
+  The service stored any `identifiers[i].value` verbatim and validated only
+  that it was non-blank — but LEI / DUNS / GLN / VAT drive the matcher's
+  **deterministic short-circuit to `1.0`**, so a malformed value in one of
+  those could be stored and produce a **false deterministic match**.
+  `validation::problems` now validates the deterministic schemes before
+  store (`identifier_problem`): **LEI** (ISO 17442 — 20 alphanumerics + ISO
+  7064 MOD 97-10 check), **GLN** (13 digits + GS1 mod-10 check digit),
+  **DUNS** (9 digits — no public check digit), and **VAT** (2-letter country
+  prefix + 2–13 alphanumerics; per-country check digits deferred). A bad
+  value is a field-scoped `422`. Non-deterministic schemes are unconstrained.
+  Pure check-digit helpers unit-tested with hand-verifiable values.
+
 - **SEC-M1: input-size caps on the `Organization` payload.** The service
   stores the matcher's `Organization` verbatim and scored it with only a
   blank-`name` check — a single multi-megabyte string field or a huge array

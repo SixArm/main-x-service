@@ -558,10 +558,15 @@
   component. Year now bounded to ISO `0..=9999`; out-of-range ⇒ `None`.
   Test `iso_date_year_is_bounded_and_never_overflows` (incl. `i64::MAX`
   year). Green: lib tests + clippy + fmt.
-- [ ] **SEC-M5 (S) 🟡** organization identifier validation
-  (`controllers/organizations.rs:90-98` validates only `name`): enforce
-  LEI/DUNS/GLN/VAT check-digit/length before store, since they drive the
-  matcher's deterministic short-circuit. *Tests:* bad check digit ⇒ 422.
+- [x] **SEC-M5 (S) 🟡** organization identifier validation. *(done
+  2026-07-14)* `validation::problems` (`identifier_problem`) validates the
+  deterministic schemes before store: **LEI** (ISO 17442, 20 alnum + ISO
+  7064 MOD 97-10), **GLN** (13 digits + GS1 mod-10 check digit), **DUNS**
+  (9 digits — no public check digit), **VAT** (2-letter country prefix +
+  2–13 alnum; per-country check digits deferred). A bad value ⇒ field-scoped
+  `422`; non-deterministic schemes unconstrained. Pure check-digit helpers
+  unit-tested with hand-verifiable values (GS1 `5901234123457`; ISO 7064
+  synthetic `…098`).
 - [x] **SEC-M6 (M) 🟠 (tests/infra)** Matcher property harness. *(proptest done
   2026-07-13; cargo-fuzz = SEC-I2, still pending)* Added `proptest = "1.11"`
   (dev-dep) + property tests to the five newer matchers (course,

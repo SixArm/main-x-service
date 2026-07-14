@@ -211,6 +211,15 @@ personal data — honour GDPR when the privacy layer lands (§13).
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-M5 (security): check-digit / format validation of deterministic
+  identifiers.** `validation::problems` now validates LEI (ISO 17442 + ISO
+  7064 MOD 97-10), GLN (13 digits + GS1 mod-10), DUNS (9 digits), and VAT
+  (country-prefix format) before store, since they drive the matcher's
+  deterministic short-circuit — a malformed one could produce a false
+  deterministic match. A bad value is a field-scoped `422`; non-deterministic
+  schemes are unconstrained. Pure check-digit helpers unit-tested. (Repo
+  tasks.md Phase 5 SEC-M5.)
+
 - [x] **SEC-M1 (security): input-size caps on the `Organization` payload.**
   New `src/validation.rs` (`problems`) bounds every scalar text field
   (`MAX_TEXT_LEN = 1024`, incl. nested `address.*`), array cardinality
