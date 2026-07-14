@@ -19,6 +19,8 @@ use utoipa_swagger_ui::SwaggerUi;
 pub mod auth;
 /// REST endpoint handler implementations.
 pub mod handlers;
+/// Cross-service entity-link write-side endpoints (`same_identity`).
+pub mod links;
 /// Loco route-group registration (`workers_routes`, `fhir_routes`, `metrics_routes`).
 pub mod routes;
 /// Shared [`AppState`] carried by every handler.
@@ -163,6 +165,15 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/workers/merge", post(handlers::merge_workers))
         .route("/workers/deduplicate", post(handlers::batch_deduplicate))
+        // Cross-service entity links (§4.1): the aggregator's bulk
+        // reconciliation pull (static — must precede the `{id}` routes),
+        // then a worker's outbound-edge create/list/withdraw.
+        .route("/workers/links", get(links::bulk_links))
+        .route(
+            "/workers/{id}/links",
+            post(links::create_link).get(links::list_links),
+        )
+        .route("/workers/{id}/links/{link_id}", delete(links::delete_link))
         // Privacy
         .route("/workers/{id}/export", get(handlers::export_worker_data))
         .route("/workers/{id}/masked", get(handlers::get_worker_masked))
@@ -209,11 +220,19 @@ pub fn create_router(state: AppState) -> Router {
 /// integration tests. The root `/metrics.prom` route is [`metrics_routes`].
 #[must_use]
 pub fn workers_routes() -> loco_rs::controller::Routes {
-    use loco_rs::prelude::{Routes, get, post};
+    use loco_rs::prelude::{Routes, delete, get, post};
     Routes::new()
         .prefix("/api")
         .add("/health", get(handlers::health_check))
         .add("/whoami", get(auth::whoami))
+        // Cross-service entity links (§4.1): bulk reconciliation pull
+        // (static, before `{id}`), then per-worker create/list/withdraw.
+        .add("/workers/links", get(links::bulk_links))
+        .add(
+            "/workers/{id}/links",
+            post(links::create_link).get(links::list_links),
+        )
+        .add("/workers/{id}/links/{link_id}", delete(links::delete_link))
         .add("/workers", post(handlers::create_worker))
         .add(
             "/workers/{id}",

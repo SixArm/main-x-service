@@ -119,9 +119,9 @@ impl Hooks for App {
         // Periodic reconciliation (design §8): pull each configured
         // service's authoritative entity_links and repair the read-model.
         // One worker per entity that sets `LINK_GRAPH_RECONCILE_URL_<ENTITY>`
-        // (case ships `subject_of`, person ships `same_identity`); a no-op
-        // for any entity without a configured source.
-        for entity in ["case", "person"] {
+        // (case ships `subject_of`; person + worker ship the two directions of
+        // `same_identity`); a no-op for any entity without a configured source.
+        for entity in ["case", "person", "worker"] {
             if let Some(source) = reconcile::HttpAuthoritativeSource::from_env_for(entity) {
                 tokio::spawn(reconcile::run_periodic(ctx.db.clone(), source));
             }

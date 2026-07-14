@@ -121,6 +121,26 @@ impl AuditLogRepository {
         .await
     }
 
+    /// Records an `EXPORT` action, storing the export `details` (actor,
+    /// filter, format, masking profile, row count) as the new-values
+    /// snapshot, with no prior snapshot. Used for the bulk export/read
+    /// compliance trail (`bulk-import-export.md` §8, cross-service-linking
+    /// §8) — a bulk extract of personal data is itself an audited event.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying audit-row insert fails.
+    pub async fn log_export(
+        &self,
+        entity_type: &str,
+        entity_id: Uuid,
+        details: JsonValue,
+        actor: &AuditActor<'_>,
+    ) -> Result<()> {
+        self.log_action("EXPORT", entity_type, entity_id, None, Some(details), actor)
+            .await
+    }
+
     /// Inserts one audit row. Shared implementation behind the typed
     /// `log_create`/`log_update`/`log_delete` helpers; stamps a fresh UUID and
     /// the current UTC time so callers never supply identity or timing.

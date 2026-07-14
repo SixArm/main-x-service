@@ -8,6 +8,36 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — cross-service `same_identity` write-side (LNK-2)
+
+- Worker now originates the **`same_identity`** cross-service edge
+  (worker → person, the inverse direction of person's person → worker),
+  mirroring the person reference
+  ([cross-service-linking.md](../../../agents/share/cross-service-linking.md)
+  §4.1/§4.2). New `entity_links` table (migration
+  `2026071000000001_create_entity_links`, idempotent upsert on
+  `(from_pid, kind, to_ref, valid_from) NULLS NOT DISTINCT`), persistence
+  (`src/db/entity_links.rs`: upsert/list/find/bulk/soft-delete over
+  `crate::db::models::entity_links`), and endpoints in
+  `src/api/rest/links.rs` on **both** router surfaces:
+  - `POST /api/workers/{id}/links` — validate + optimistic upsert (no
+    cross-service call); `GET` lists a worker's active edges; `DELETE
+    /api/workers/{id}/links/{link_id}` soft-deletes.
+  - `GET /api/workers/links` — the aggregator's reconciliation pull
+    (canonical §4.2 `EdgeDetail`, `{ "edges": [...] }`), gated as a
+    **governed** read (`Action::Destructive`, SEC-G1) so a default
+    read-only caller cannot dump every identity link.
+  - `validate_edge` accepts **only** `same_identity` worker → person and
+    rejects any other kind, a non-person target, or a malformed `to_ref`
+    (pure, unit-tested matrix); depends on the shared `entity-ref` crate.
+  - Record-level authz reuses `authorize_record` (no-op when
+    `WORKER_REQUIRE_AUTH` is off); every mutation + bulk read writes a
+    best-effort audit row (a new `AuditLogRepository::log_export` was added
+    for the bulk surfacing). Cross-service `linked`/`unlinked` **event**
+    emission is deferred (as on person); the bulk endpoint is the sync
+    path. The link-graph aggregator adds worker to its reconcile list + a
+    seam test in the same change.
+
 ### Security
 
 - **SEC-M1: input-size caps on the `Worker` payload.** The validator

@@ -368,6 +368,34 @@ mod tests {
         assert_eq!(parsed.edges[0].confidence, Some(1.0));
     }
 
+    #[test]
+    fn bulk_response_deserializes_the_worker_same_identity_shape() {
+        // LNK-2: the worker service's GET /api/workers/links emits the same
+        // canonical §4.2 shape for the WORKER side of the symmetric
+        // same_identity edge (worker → person) — the inverse direction of the
+        // person seam above. Both directions deserialize into a LinkedEvent,
+        // and the aggregator canonicalises the pair (graph.rs), so the
+        // symmetric double-assert is deduped.
+        let json = serde_json::json!({
+            "edges": [{
+                "edge_id": "0c4f1e2a-0000-4000-8000-000000000010",
+                "from_ref": "worker:0c4f1e2a-0000-4000-8000-000000000002",
+                "to_ref": "person:0c4f1e2a-0000-4000-8000-000000000001",
+                "edge_kind": "same_identity",
+                "role": null,
+                "confidence": 1.0,
+                "provenance": "operator",
+                "valid_from": null,
+                "valid_to": null
+            }]
+        });
+        let parsed: BulkLinksResponse = serde_json::from_value(json).unwrap();
+        assert_eq!(parsed.edges[0].edge_kind, EdgeKind::SameIdentity);
+        assert_eq!(parsed.edges[0].from_ref.entity_type, EntityType::Worker);
+        assert_eq!(parsed.edges[0].to_ref.entity_type, EntityType::Person);
+        assert_eq!(parsed.edges[0].confidence, Some(1.0));
+    }
+
     /// SEC-B7: a remote reconcile source must carry a token; only a loopback
     /// URL may be token-less.
     #[test]

@@ -162,6 +162,15 @@
   source) + a unit test pinning that the case bulk-links JSON deserializes
   into the aggregator's `LinkedEvent` (the cross-service seam). Now **live**
   for case; other services follow as they gain a bulk-links endpoint.)*
+  - [x] **LNK-2: worker reconcile source.** `after_routes` now spawns a
+    source for **worker** too (`["case", "person", "worker"]`), so with
+    `LINK_GRAPH_RECONCILE_URL_WORKER` set the aggregator pulls the worker
+    service's authoritative `same_identity` edges (worker → person, the
+    inverse of person's direction) via the generic `HttpAuthoritativeSource`;
+    `edge_valid_for_source` already accepts a worker-origin `same_identity`
+    edge and `graph.rs` dedupes the symmetric pair. Seam test
+    `bulk_response_deserializes_the_worker_same_identity_shape` pins the
+    `GET /api/workers/links` body → `LinkedEvent`.
   - [x] **SEC-B1 (security fix): scope reconciliation to the source
     entity.** `reconcile` diffed the source's edges against the **global**
     read-model (`all_edge_ids`), so each per-entity pass marked every
