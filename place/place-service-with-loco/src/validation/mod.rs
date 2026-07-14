@@ -44,6 +44,145 @@ pub struct ValidationError {
     pub message: String,
 }
 
+/// SEC-M1 — maximum length, in Unicode scalar values (`.chars().count()`),
+/// of any single scalar text field. Bounds the per-field cost of the
+/// matcher's character-level string comparisons so one huge string cannot be
+/// a CPU/memory `DoS`, amplified across the `check-duplicates`/`deduplicate`
+/// scans.
+const MAX_TEXT_LEN: usize = 1024;
+/// SEC-M1 — maximum number of entries in any array field. Bounds the O(n·m)
+/// Jaccard / overlap work the matcher does over arrays.
+const MAX_ARRAY_LEN: usize = 256;
+/// SEC-M1 — maximum length of any single string entry inside an array.
+const MAX_ITEM_LEN: usize = 512;
+
+/// SEC-M1: push an error when a scalar text `field` exceeds [`MAX_TEXT_LEN`].
+fn cap_text(errors: &mut Vec<ValidationError>, field: &str, value: &str) {
+    if value.chars().count() > MAX_TEXT_LEN {
+        errors.push(ValidationError {
+            field: field.to_string(),
+            message: format!("Must not exceed {MAX_TEXT_LEN} characters"),
+        });
+    }
+}
+
+/// [`cap_text`] for an optional field; a no-op when the value is absent.
+fn cap_opt_text(errors: &mut Vec<ValidationError>, field: &str, value: Option<&String>) {
+    if let Some(v) = value {
+        cap_text(errors, field, v);
+    }
+}
+
+/// SEC-M1: push an error when array `field` holds more than [`MAX_ARRAY_LEN`]
+/// entries.
+fn cap_array(errors: &mut Vec<ValidationError>, field: &str, len: usize) {
+    if len > MAX_ARRAY_LEN {
+        errors.push(ValidationError {
+            field: field.to_string(),
+            message: format!("Must not exceed {MAX_ARRAY_LEN} entries"),
+        });
+    }
+}
+
+/// SEC-M1: push an error when the `index`-th entry of array `field` exceeds
+/// [`MAX_ITEM_LEN`]. The field path is indexed so the caller can point at the
+/// offending entry.
+fn cap_item(errors: &mut Vec<ValidationError>, field: &str, index: usize, value: &str) {
+    if value.chars().count() > MAX_ITEM_LEN {
+        errors.push(ValidationError {
+            field: format!("{field}[{index}]"),
+            message: format!("Must not exceed {MAX_ITEM_LEN} characters"),
+        });
+    }
+}
+
+/// SEC-M1: cap the cardinality of a string array and the length of each entry
+/// — the common shape for the `Place` list fields.
+fn cap_string_array(errors: &mut Vec<ValidationError>, field: &str, values: &[String]) {
+    cap_array(errors, field, values.len());
+    for (i, v) in values.iter().enumerate() {
+        cap_item(errors, field, i, v);
+    }
+}
+
+/// SEC-M1: cap the nested [`PostalAddress`](crate::models::address::PostalAddress)
+/// text fields, dotted under `address.*`.
+fn place_address_caps(errors: &mut Vec<ValidationError>, place: &Place) {
+    if let Some(addr) = &place.address {
+        cap_opt_text(
+            errors,
+            "address.street_address",
+            addr.street_address.as_ref(),
+        );
+        cap_opt_text(
+            errors,
+            "address.address_locality",
+            addr.address_locality.as_ref(),
+        );
+        cap_opt_text(
+            errors,
+            "address.address_region",
+            addr.address_region.as_ref(),
+        );
+        cap_opt_text(
+            errors,
+            "address.address_country",
+            addr.address_country.as_ref(),
+        );
+        cap_opt_text(errors, "address.postal_code", addr.postal_code.as_ref());
+    }
+}
+
+/// SEC-M1: cap the `identifiers` array cardinality plus each identifier's
+/// `value` string.
+fn place_identifier_caps(errors: &mut Vec<ValidationError>, place: &Place) {
+    cap_array(errors, "identifiers", place.identifiers.len());
+    for (i, id) in place.identifiers.iter().enumerate() {
+        cap_item(errors, "identifiers", i, &id.value);
+    }
+}
+
+/// SEC-M1: cap the `amenity_features` array cardinality plus each feature's
+/// `name` and optional `value`.
+fn place_amenity_caps(errors: &mut Vec<ValidationError>, place: &Place) {
+    cap_array(errors, "amenity_features", place.amenity_features.len());
+    for (i, feature) in place.amenity_features.iter().enumerate() {
+        cap_item(errors, "amenity_features.name", i, &feature.name);
+        if let Some(v) = &feature.value {
+            cap_item(errors, "amenity_features.value", i, v);
+        }
+    }
+}
+
+/// SEC-M1: apply the input-size caps to a [`Place`]'s scalar text fields,
+/// string arrays, and struct-array cardinality. Split out of
+/// [`validate_place`] to keep that function within the line budget.
+///
+/// Skipped (already bounded by a stricter existing rule, left untouched):
+/// `global_location_number` (exactly 13 digits), and each
+/// `opening_hours` entry's `opens`/`closes` (exactly 5 chars via
+/// [`time_is_valid`]) — so only `opening_hours` cardinality is capped here.
+/// Numeric fields (geo lat/lon/elevation, capacity) carry no text and are not
+/// capped. The `place_type` `Other(String)` enum payload is not a plain text
+/// field and is left uncapped.
+fn place_size_caps(errors: &mut Vec<ValidationError>, place: &Place) {
+    cap_text(errors, "name", &place.name);
+    cap_opt_text(errors, "alternate_name", place.alternate_name.as_ref());
+    cap_opt_text(errors, "description", place.description.as_ref());
+    cap_opt_text(errors, "telephone", place.telephone.as_ref());
+    cap_opt_text(errors, "fax_number", place.fax_number.as_ref());
+    cap_opt_text(errors, "url", place.url.as_ref());
+    cap_opt_text(errors, "branch_code", place.branch_code.as_ref());
+
+    cap_string_array(errors, "keywords", &place.keywords);
+
+    place_address_caps(errors, place);
+    place_identifier_caps(errors, place);
+    place_amenity_caps(errors, place);
+
+    cap_array(errors, "opening_hours", place.opening_hours.len());
+}
+
 /// Validate a place, returning all validation errors.
 ///
 /// Checks (each independent, all reported): non-empty name; latitude in
@@ -170,6 +309,9 @@ pub fn validate_place(place: &Place) -> Vec<ValidationError> {
             });
         }
     }
+
+    // SEC-M1 input-size caps (additive; independent of the checks above).
+    place_size_caps(&mut errors, place);
 
     errors
 }
@@ -611,5 +753,59 @@ mod tests {
         assert_eq!(title_case("hello world"), "Hello World");
         assert_eq!(title_case("SAN FRANCISCO"), "San Francisco");
         assert_eq!(title_case(""), "");
+    }
+
+    /// SEC-M1: an oversized scalar text field (here `description`) is capped.
+    #[test]
+    fn test_size_cap_oversized_text() {
+        let mut place = Place::new("Test");
+        place.description = Some("x".repeat(MAX_TEXT_LEN + 1));
+        let errors = validate_place(&place);
+        assert!(
+            errors.iter().any(|e| e.field == "description"),
+            "Errors: {errors:?}"
+        );
+    }
+
+    /// SEC-M1: an over-long array (here `keywords`) is flagged on cardinality.
+    #[test]
+    fn test_size_cap_array_cardinality() {
+        let mut place = Place::new("Test");
+        place.keywords = vec!["k".to_string(); MAX_ARRAY_LEN + 1];
+        let errors = validate_place(&place);
+        assert!(
+            errors.iter().any(|e| e.field == "keywords"),
+            "Errors: {errors:?}"
+        );
+    }
+
+    /// SEC-M1: an oversized array entry is flagged with an indexed field path.
+    #[test]
+    fn test_size_cap_oversized_array_entry() {
+        let mut place = Place::new("Test");
+        place.keywords = vec!["ok".to_string(), "y".repeat(MAX_ITEM_LEN + 1)];
+        let errors = validate_place(&place);
+        assert!(
+            errors.iter().any(|e| e.field == "keywords[1]"),
+            "Errors: {errors:?}"
+        );
+    }
+
+    /// SEC-M1: a large-but-within-caps record produces no cap errors.
+    #[test]
+    fn test_size_cap_within_bounds_ok() {
+        let mut place = Place::new(&"x".repeat(MAX_TEXT_LEN));
+        place.description = Some("y".repeat(MAX_TEXT_LEN));
+        place.branch_code = Some("z".repeat(MAX_TEXT_LEN));
+        place.keywords = vec!["k".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN];
+        place.address = Some(PostalAddress {
+            street_address: Some("s".repeat(MAX_TEXT_LEN)),
+            address_locality: Some("Town".into()),
+            address_region: None,
+            address_country: None,
+            postal_code: None,
+        });
+        let errors = validate_place(&place);
+        assert!(errors.is_empty(), "Errors: {errors:?}");
     }
 }
