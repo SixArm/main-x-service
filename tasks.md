@@ -633,21 +633,22 @@
   service level, so they're `ignore`-listed **with justification** and to be
   revisited on the next loco-rs bump — see the note below. Matcher/library
   crates (small trees) pass clean with no ignores needed.
-- [~] **SEC-I2 (M) 🟡** `cargo-fuzz` scaffolding. *(reference + 4 matchers
-  done 2026-07-14; roll continuing)* Each covered matcher has a standalone
+- [~] **SEC-I2 (M) 🟡** `cargo-fuzz` scaffolding. *(all 9 matchers done
+  2026-07-14; non-matcher roll + CI pending)* Each matcher has a standalone
   `fuzz/` cargo-fuzz crate (not a workspace member, so it never touches the
-  stable build) with three libFuzzer targets mirroring the SEC-M6 invariants:
+  stable build) with libFuzzer targets mirroring the SEC-M6 invariants:
   `match_<entity>` (JSON deserialize → engine; finite score ∈ [0,1], both
-  orders), `normalizer` (pure string helpers, never-panic), `scorer` (pure
-  similarities, finite ∈ [0,1]); `fuzz/README.md` documents run + roll-out.
-  **Done:** person (reference), **worker / place / thing / event** — each
-  verified `cargo +nightly fuzz build` (cargo-fuzz 0.13.2, nightly) + short
-  campaigns run clean (millions of execs each, no panics/crashes; e.g. place
-  `match_places` 2.7M runs, worker `match_workers` 3.35M). **Remaining:** the
-  5 Group-B matchers whose pure helpers are exposed differently
-  (course / organization / care-pathway / case / portfolio — `match_<entity>`
-  target at least), the auth-verifier token parser, person bulk `parse_line`,
-  and a short CI smoke run.
+  orders) plus the pure-helper targets that crate exposes; `fuzz/README.md`
+  documents run + roll-out. **Done — all 9:** person (reference),
+  **worker / place / thing / event** (3 targets: match + `normalizer` +
+  `scorer`), and **course / organization / care-pathway / case / portfolio**
+  (2 targets: match + `normalize` — these expose their similarity primitives
+  only through the engine, no public `Scorer`). Each verified `cargo +nightly
+  fuzz build` (cargo-fuzz 0.13.2, nightly) + short campaigns run clean
+  (millions of execs each, no panics/crashes; e.g. place `match_places` 2.7M,
+  worker `match_workers` 3.35M, case `match_cases` 2.37M). **Remaining:** the
+  auth-verifier token parser, person bulk `parse_line`, and a short CI smoke
+  run.
 - [x] **SEC-I3 (S) ⚪** Add `#![forbid(unsafe_code)]` to every crate root
   missing it. *(done 2026-07-14)* The three named roots (care-pathway-matcher
   `src/main.rs`, case-folder `src/lib.rs` + `src/bin/main.rs`) **plus** the 12

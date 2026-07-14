@@ -1,0 +1,36 @@
+[package]
+name = "portfolio-matcher-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+
+[dependencies.portfolio-matcher]
+path = ".."
+
+# cargo-fuzz scaffolding for the work_item matcher (SEC-I2), mirroring the
+# person-matcher reference. This crate exposes its pure helpers as free
+# functions in the `normalize` module (no `Scorer` struct), so it carries two
+# targets: the engine over deserialized input, and the pure normalizers. Run
+# on nightly: `cargo +nightly fuzz run match_work_items`. Not a member of any parent
+# workspace, so it never affects the matcher's normal build/test/clippy.
+
+[[bin]]
+name = "match_work_items"
+path = "fuzz_targets/match_work_items.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "normalize"
+path = "fuzz_targets/normalize.rs"
+test = false
+doc = false
+bench = false
