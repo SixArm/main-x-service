@@ -396,10 +396,16 @@
   `offset + limit` hits (unbounded offset ⇒ index materialises arbitrarily
   many hits; the add could also overflow — now `saturating_add`). Pure
   `search_offset_within_bound` unit test + DB-gated `400` integration test.
-- [ ] **SEC-G8 (S) 🟡** Default-off exposure pin: an explicit per-service test
-  documenting that with `<ENTITY>_REQUIRE_AUTH` off, audit / bulk-links / PII
-  reads are open — so activation is a **tracked release gate**, not an
-  accident (feeds OPS-1 runbook).
+- [x] **SEC-G8 (S) 🟡** Default-off exposure pin. *(done 2026-07-14)* Added a
+  named unit test
+  (`default_off_exposes_sensitive_reads_activation_is_a_release_gate`) to the
+  two services the audit flagged for the bulk-links + audit exposure — **case**
+  (PII / audit / governed `subject_of`) and **person** (PII / GDPR export /
+  audit / `same_identity`) — pinning that with `<ENTITY>_REQUIRE_AUTH` off
+  those reads are open without a token, so activation is a **tracked release
+  gate** (framed in `agents/share/security.md` §4 from SEC-I4). The generic
+  flag-off `enforce` pin already exists family-wide; this adds the explicit,
+  sensitive-path-named form on the flagged services. Feeds OPS-1 runbook.
 
 ### F-data — bulk / linking / concurrency integrity
 

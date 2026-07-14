@@ -661,6 +661,33 @@ mod tests {
         }
     }
 
+    /// SEC-G8 — the default-off **exposure pin**. With `PERSON_REQUIRE_AUTH`
+    /// off (the shipped default), the most sensitive reads — a person's PII,
+    /// the GDPR export, the audit trail, and the `same_identity`
+    /// cross-service links — are **open without a token**. This is by design
+    /// (see `agents/share/security.md` §4), but it means **activation is a
+    /// tracked release gate**: a deployment exposed to untrusted callers
+    /// MUST set the flag before it is reachable. This test documents that
+    /// exposure explicitly so flipping the default cannot happen silently.
+    #[test]
+    fn default_off_exposes_sensitive_reads_activation_is_a_release_gate() {
+        let (verifier, policy) = (verifier(), policy());
+        let no_token = HeaderMap::new();
+        let pid = "0c4f1e2a-0000-4000-8000-000000000001";
+        for path in [
+            format!("/api/persons/{pid}"),        // a person's PII
+            format!("/api/persons/{pid}/export"), // GDPR export
+            format!("/api/persons/{pid}/audit"),  // audit trail
+            "/api/audit/recent".to_string(),      // system-wide audit
+            format!("/api/persons/{pid}/links"),  // same_identity cross-service links
+        ] {
+            assert!(
+                enforce(false, &Method::GET, &path, &no_token, &verifier, &policy).is_ok(),
+                "SEC-G8: with the flag OFF, {path} is open without a token (activation is the gate)"
+            );
+        }
+    }
+
     /// Enforcement on ⇒ every allow-listed public path (health/ping,
     /// `OpenAPI` doc, Swagger UI, Prometheus metrics) still passes
     /// without a token.
