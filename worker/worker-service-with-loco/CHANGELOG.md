@@ -10,6 +10,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-M1: input-size caps on the `Worker` payload.** The validator
+  enforced format/required rules but capped no field's *size*, so a single
+  multi-megabyte text field or a huge array could be a CPU/memory `DoS`
+  against the matcher's O(n·m) Jaro-Winkler / Levenshtein / Jaccard
+  scoring, amplified across the `check-duplicates` / `deduplicate` scan.
+  `validate_worker` now also bounds every scalar text field
+  (`MAX_TEXT_LEN = 1024`), string-array cardinality + per-entry length
+  (`MAX_ARRAY_LEN = 256` / `MAX_ITEM_LEN = 512`), and the inner text +
+  cardinality of the nested collections (names + `additional_names`,
+  `identifiers`, `addresses`, `telecom`, `documents`,
+  `emergency_contacts` incl. their nested telecom/address, `photo`,
+  `tax_id`, `marital_status`) — field-scoped `422`s *before*
+  persist/match. Factored into `worker_size_caps` / `cap_*` helpers. Unit
+  tested.
+
 - **SEC-G6: trailing slash can no longer downgrade a destructive POST.**
   `derive_action` classified `/merge` / `/deduplicate` / `/import` via
   `path.ends_with`, so a trailing slash (`POST …/merge/`) fell through to

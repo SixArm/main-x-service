@@ -16,7 +16,27 @@
 //! assert_eq!(normalize_phone("(555) 123-4567", "1"), "+15551234567");
 //! ```
 
-use crate::models::{Address, ContactPoint, ContactPointSystem, IdentityDocument, Worker};
+use crate::models::{
+    Address, ContactPoint, ContactPointSystem, EmergencyContact, HumanName, Identifier,
+    IdentityDocument, Worker,
+};
+
+/// Maximum length, in Unicode scalar values (`.chars().count()`), of any
+/// single scalar text field (`name.family`, `tax_id`, `marital_status`, and
+/// the text fields of nested structs). Bounds the per-field cost of the
+/// matcher's character-level string comparisons (SEC-M1 input-size caps).
+const MAX_TEXT_LEN: usize = 1024;
+
+/// Maximum number of entries in any array field (`identifiers`, `telecom`,
+/// `addresses`, `documents`, `emergency_contacts`, `additional_names`,
+/// `links`, `photo`, and the name-component arrays). Bounds the O(n·m)
+/// Jaccard / overlap work the matcher does over arrays (SEC-M1 input-size
+/// caps).
+const MAX_ARRAY_LEN: usize = 256;
+
+/// Maximum length, in Unicode scalar values (`.chars().count()`), of any
+/// single string entry inside an array field (SEC-M1 input-size caps).
+const MAX_ITEM_LEN: usize = 512;
 
 /// A single validation failure: the dotted `field` path that failed and a
 /// human-readable `message`. Serializable so it can be returned in API errors.
@@ -123,7 +143,182 @@ pub fn validate_worker(worker: &Worker) -> Vec<ValidationError> {
         }
     }
 
+    // Input-size caps (SEC-M1): bound every scalar text field, array
+    // cardinality, and per-entry string length so a single huge string or
+    // array cannot be used as a CPU/memory DoS against the matcher's O(n·m)
+    // scoring (amplified across check-duplicates / deduplicate scans).
+    worker_size_caps(&mut errors, worker);
+
     errors
+}
+
+/// Applies SEC-M1 input-size caps to every scalar text field and array
+/// reachable on `worker`, pushing a [`ValidationError`] for each field that
+/// exceeds [`MAX_TEXT_LEN`], [`MAX_ARRAY_LEN`], or [`MAX_ITEM_LEN`]. Factored
+/// out of [`validate_worker`] to keep that function under the line cap.
+fn worker_size_caps(errs: &mut Vec<ValidationError>, worker: &Worker) {
+    // Top-level scalar text.
+    cap_opt_text(errs, "tax_id", worker.tax_id.as_ref());
+    cap_opt_text(errs, "marital_status", worker.marital_status.as_ref());
+
+    // Names (primary + additional).
+    cap_human_name(errs, "name", &worker.name);
+    cap_array(errs, "additional_names", worker.additional_names.len());
+    for (i, n) in worker.additional_names.iter().enumerate() {
+        cap_human_name(errs, &format!("additional_names[{i}]"), n);
+    }
+
+    // Simple Vec<String> array.
+    cap_string_array(errs, "photo", &worker.photo);
+
+    // Struct arrays: cardinality + inner text.
+    cap_array(errs, "identifiers", worker.identifiers.len());
+    for (i, id) in worker.identifiers.iter().enumerate() {
+        cap_identifier(errs, i, id);
+    }
+    cap_array(errs, "telecom", worker.telecom.len());
+    for (i, cp) in worker.telecom.iter().enumerate() {
+        cap_text(errs, &format!("telecom[{i}].value"), &cp.value);
+    }
+    cap_array(errs, "addresses", worker.addresses.len());
+    for (i, a) in worker.addresses.iter().enumerate() {
+        cap_address(errs, &format!("addresses[{i}]"), a);
+    }
+    cap_array(errs, "documents", worker.documents.len());
+    for (i, d) in worker.documents.iter().enumerate() {
+        cap_document(errs, i, d);
+    }
+    cap_array(errs, "emergency_contacts", worker.emergency_contacts.len());
+    for (i, ec) in worker.emergency_contacts.iter().enumerate() {
+        cap_emergency_contact(errs, i, ec);
+    }
+
+    // `links` carries only a Uuid + enum (no text); cap cardinality only.
+    cap_array(errs, "links", worker.links.len());
+}
+
+/// Caps the text and component arrays of a [`HumanName`] under `prefix`.
+fn cap_human_name(errs: &mut Vec<ValidationError>, prefix: &str, name: &HumanName) {
+    cap_text(errs, &format!("{prefix}.family"), &name.family);
+    cap_string_array(errs, &format!("{prefix}.given"), &name.given);
+    cap_string_array(errs, &format!("{prefix}.prefix"), &name.prefix);
+    cap_string_array(errs, &format!("{prefix}.suffix"), &name.suffix);
+}
+
+/// Caps the text fields of the `index`-th [`Identifier`].
+fn cap_identifier(errs: &mut Vec<ValidationError>, index: usize, id: &Identifier) {
+    cap_text(errs, &format!("identifiers[{index}].system"), &id.system);
+    cap_text(errs, &format!("identifiers[{index}].value"), &id.value);
+    cap_opt_text(
+        errs,
+        &format!("identifiers[{index}].assigner"),
+        id.assigner.as_ref(),
+    );
+}
+
+/// Caps the optional text fields of an [`Address`] under `prefix`.
+fn cap_address(errs: &mut Vec<ValidationError>, prefix: &str, addr: &Address) {
+    cap_opt_text(errs, &format!("{prefix}.line1"), addr.line1.as_ref());
+    cap_opt_text(errs, &format!("{prefix}.line2"), addr.line2.as_ref());
+    cap_opt_text(errs, &format!("{prefix}.city"), addr.city.as_ref());
+    cap_opt_text(errs, &format!("{prefix}.state"), addr.state.as_ref());
+    cap_opt_text(
+        errs,
+        &format!("{prefix}.postal_code"),
+        addr.postal_code.as_ref(),
+    );
+    cap_opt_text(errs, &format!("{prefix}.country"), addr.country.as_ref());
+}
+
+/// Caps the text fields of the `index`-th [`IdentityDocument`].
+fn cap_document(errs: &mut Vec<ValidationError>, index: usize, doc: &IdentityDocument) {
+    cap_text(errs, &format!("documents[{index}].number"), &doc.number);
+    cap_opt_text(
+        errs,
+        &format!("documents[{index}].issuing_country"),
+        doc.issuing_country.as_ref(),
+    );
+    cap_opt_text(
+        errs,
+        &format!("documents[{index}].issuing_authority"),
+        doc.issuing_authority.as_ref(),
+    );
+}
+
+/// Caps the text fields (and nested telecom / address) of the `index`-th
+/// [`EmergencyContact`].
+fn cap_emergency_contact(errs: &mut Vec<ValidationError>, index: usize, ec: &EmergencyContact) {
+    cap_text(errs, &format!("emergency_contacts[{index}].name"), &ec.name);
+    cap_text(
+        errs,
+        &format!("emergency_contacts[{index}].relationship"),
+        &ec.relationship,
+    );
+    cap_array(
+        errs,
+        &format!("emergency_contacts[{index}].telecom"),
+        ec.telecom.len(),
+    );
+    for (j, cp) in ec.telecom.iter().enumerate() {
+        cap_text(
+            errs,
+            &format!("emergency_contacts[{index}].telecom[{j}].value"),
+            &cp.value,
+        );
+    }
+    if let Some(addr) = &ec.address {
+        cap_address(errs, &format!("emergency_contacts[{index}].address"), addr);
+    }
+}
+
+/// Pushes an error when a scalar text `field` exceeds [`MAX_TEXT_LEN`] Unicode
+/// scalar values.
+fn cap_text(errs: &mut Vec<ValidationError>, field: &str, value: &str) {
+    if value.chars().count() > MAX_TEXT_LEN {
+        errs.push(ValidationError {
+            field: field.to_string(),
+            message: format!("Exceeds maximum length of {MAX_TEXT_LEN} characters"),
+        });
+    }
+}
+
+/// Pushes an error when an optional scalar text `field`, if present, exceeds
+/// [`MAX_TEXT_LEN`] Unicode scalar values.
+fn cap_opt_text(errs: &mut Vec<ValidationError>, field: &str, value: Option<&String>) {
+    if let Some(v) = value {
+        cap_text(errs, field, v);
+    }
+}
+
+/// Pushes an error when an array `field` holds more than [`MAX_ARRAY_LEN`]
+/// entries.
+fn cap_array(errs: &mut Vec<ValidationError>, field: &str, len: usize) {
+    if len > MAX_ARRAY_LEN {
+        errs.push(ValidationError {
+            field: field.to_string(),
+            message: format!("Exceeds maximum of {MAX_ARRAY_LEN} entries"),
+        });
+    }
+}
+
+/// Pushes an error when the `index`-th entry of an array `field` exceeds
+/// [`MAX_ITEM_LEN`] Unicode scalar values (reported as `field[index]`).
+fn cap_item(errs: &mut Vec<ValidationError>, field: &str, index: usize, value: &str) {
+    if value.chars().count() > MAX_ITEM_LEN {
+        errs.push(ValidationError {
+            field: format!("{field}[{index}]"),
+            message: format!("Exceeds maximum length of {MAX_ITEM_LEN} characters"),
+        });
+    }
+}
+
+/// Caps both the cardinality of a `Vec<String>` `field` and the length of each
+/// of its entries.
+fn cap_string_array(errs: &mut Vec<ValidationError>, field: &str, values: &[String]) {
+    cap_array(errs, field, values.len());
+    for (i, v) in values.iter().enumerate() {
+        cap_item(errs, field, i, v);
+    }
 }
 
 /// Validates one contact point under the given field `prefix`: the value must
@@ -671,5 +866,85 @@ mod tests {
         assert_eq!(std.city.as_deref(), Some("San Francisco"));
         assert_eq!(std.state.as_deref(), Some("CALIFORNIA"));
         assert_eq!(std.country.as_deref(), Some("UNITED STATES"));
+    }
+
+    /// Builds a minimally valid worker for exercising the size caps.
+    fn capped_worker() -> Worker {
+        Worker::new(
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Male,
+        )
+    }
+
+    /// SEC-M1: an oversized scalar text field produces a length-cap error.
+    #[test]
+    fn test_cap_oversized_scalar_text() {
+        let mut worker = capped_worker();
+        worker.tax_id = Some("x".repeat(MAX_TEXT_LEN + 1));
+        let errors = validate_worker(&worker);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "tax_id" && e.message.contains("maximum length")),
+            "Oversized tax_id should produce a length-cap error"
+        );
+    }
+
+    /// SEC-M1: an over-long array produces a cardinality-cap error.
+    #[test]
+    fn test_cap_over_long_array() {
+        let mut worker = capped_worker();
+        worker.photo = vec!["p".to_string(); MAX_ARRAY_LEN + 1];
+        let errors = validate_worker(&worker);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "photo" && e.message.contains("maximum of")),
+            "Over-long photo array should produce a cardinality-cap error"
+        );
+    }
+
+    /// SEC-M1: a single oversized array entry produces an indexed length-cap error.
+    #[test]
+    fn test_cap_oversized_array_entry() {
+        let mut worker = capped_worker();
+        worker.photo = vec!["ok".into(), "x".repeat(MAX_ITEM_LEN + 1)];
+        let errors = validate_worker(&worker);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "photo[1]" && e.message.contains("maximum length")),
+            "Oversized array entry should produce an indexed length-cap error"
+        );
+    }
+
+    /// SEC-M1: a large record with every field exactly at its cap produces no
+    /// cap errors (the boundary is inclusive).
+    #[test]
+    fn test_cap_within_limits_ok() {
+        let mut worker = Worker::new(
+            HumanName {
+                use_type: None,
+                family: "x".repeat(MAX_TEXT_LEN),
+                given: vec!["y".repeat(MAX_ITEM_LEN)],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Male,
+        );
+        worker.tax_id = Some("a".repeat(MAX_TEXT_LEN));
+        worker.marital_status = Some("m".repeat(MAX_TEXT_LEN));
+        worker.photo = vec!["p".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN];
+        let errors = validate_worker(&worker);
+        assert!(
+            errors.is_empty(),
+            "A within-caps record should produce no errors, got {errors:?}"
+        );
     }
 }
