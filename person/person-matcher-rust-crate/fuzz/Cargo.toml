@@ -1,0 +1,42 @@
+[package]
+name = "person-matcher-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+
+[dependencies.person-matcher]
+path = ".."
+
+# Reference cargo-fuzz scaffolding for the matcher family (SEC-I2). Run a
+# target on nightly: `cargo +nightly fuzz run match_persons`. The targets
+# mirror the crate's proptest invariants (never-panic; score in [0,1]) with
+# coverage-guided input. This crate is not a member of any parent workspace,
+# so it never affects the matcher's normal build/test/clippy.
+
+[[bin]]
+name = "match_persons"
+path = "fuzz_targets/match_persons.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "normalizer"
+path = "fuzz_targets/normalizer.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "scorer"
+path = "fuzz_targets/scorer.rs"
+test = false
+doc = false
+bench = false
