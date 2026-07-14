@@ -224,25 +224,32 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     domain-specific symbols (e.g. `patient`, `mpi`) absent from
     `src/db/`. Met: a grep of `src/db/` finds zero `patient` / `mpi`
     symbols and `cargo check --lib` is clean.
-- [ ] **T-9 — Cross-service entity links (write side).**
+- [~] **T-9 — Cross-service entity links (write side).**
   See §5.4, §8.6, §9.1, §10.4 and
   [cross-service linking](../../../agents/share/cross-service-linking.md).
-  - [ ] Migration creating the `entity_links` table (§10.4 schema, with
+  **`same_identity` landed 2026-07-10 (T-22); `works_at` / `member_of`
+  affiliations landed 2026-07-14 (LNK-3).**
+  - [x] Migration creating the `entity_links` table (§10.4 schema, with
     the `UNIQUE (from_pid, kind, to_ref, valid_from)` upsert key).
-  - [ ] `EntityRef` value type (parse / `Display` + `entity_type → service`
-    map), copied per project (drift-accepted).
-  - [ ] Link endpoints: `POST` / `GET` / `DELETE`
+  - [x] `EntityRef` value type (parse / `Display` + `entity_type → service`
+    map) — used via the shared `entity-ref` crate.
+  - [x] Link endpoints: `POST` / `GET` / `DELETE`
     `/api/persons/{pid}/links`; create/upsert is optimistic (no
     cross-service call) and supports `same_identity` (person ↔ worker)
-    and `works_at` / `member_of` (person → organization, temporal).
+    and `works_at` / `member_of` (person → organization, temporal). LNK-3
+    extended `validate_edge`'s permit set from `same_identity`-only to
+    `{same_identity, works_at, member_of}`, relying on `EdgeKind::permits`
+    for the endpoint check; accept/reject matrix unit-tested.
   - [ ] Emit `linked` / `unlinked` events on the existing event
     envelope via `EventProducer` (edge detail in `data`; no new transport).
+    **Still deferred** (the envelope has no link kind + `data` yet; the
+    bulk endpoint is the sync path).
   - [ ] Partition guard in `src/matching/adapter.rs`: `entity_links` are
-    never projected into the matcher input.
-  - **Acceptance:** integration test creates a `works_at` link
-    (`2xx`, `linked` event published, row in `entity_links`), lists it
-    via `GET`, deletes it (`unlinked` event, `deleted_at` set); a matcher
-    unit test asserts an `entity_links` row never alters a match score.
+    never projected into the matcher input. **Still open.**
+  - **Acceptance:** the `validate_edge` accept/reject matrix (incl. the new
+    affiliation cases) is unit-tested (green). The published-event
+    integration + the matcher-partition unit test remain (with the two open
+    boxes above).
 - [ ] **T-10 — Bulk import / export.** *(rollout steps 1 & 3 done
   2026-07-10; steps 2, 4, 5 remain)* Person is the family **reference
   entity** for this capability. See §9.2, §10.5 and

@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — cross-service `employed_by` affiliation edge (LNK-3)
+
+- The worker link endpoints now originate the **`employed_by`** affiliation
+  edge (worker → organization, temporal, carrying a `role` job title) in
+  addition to the `same_identity` backbone. `validate_edge`'s permit set went
+  from `same_identity`-only to `{same_identity, employed_by}`, relying on the
+  shared `entity-ref` registry's `EdgeKind::permits` for the endpoint check —
+  so `employed_by` requires an **organization** target and person-originated
+  `works_at`/`member_of` + case-originated `subject_of` are still rejected on
+  the worker side. No schema or endpoint change (the `entity_links` table +
+  endpoints + bulk pull are unchanged and already generic over kind).
+  Accept/reject matrix unit-tested (`accepts_employed_by_worker_to_org`,
+  `rejects_employed_by_to_non_org`, `rejects_kinds_worker_does_not_originate`).
+  (Repo tasks.md LNK-3.)
+
 ### Added — cross-service `same_identity` write-side (LNK-2)
 
 - Worker now originates the **`same_identity`** cross-service edge

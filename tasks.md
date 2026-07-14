@@ -168,10 +168,17 @@
   (194 pass, 7 links) + clippy + fmt clean; aggregator lib tests (41 pass)
   + clippy clean. Follow-ups: worker `employed_by` (LNK-3), `linked`/
   `unlinked` events (LNK-1-style), matcher-partition guard test.
-- [ ] **LNK-3 (M)** Affiliation edges: `works_at`/`member_of` on person,
-  `employed_by` (with `role`) on worker — same tables, extend each
-  `validate_edge` permit set per the §9 registry; bulk endpoints already
-  generic. Depends: LNK-2.
+- [x] **LNK-3 (M)** Affiliation edges. *(done 2026-07-14)* `works_at` /
+  `member_of` on **person** (→ organization) and `employed_by` (with `role`)
+  on **worker** (→ organization). Each `validate_edge` permit set extended
+  from `same_identity`-only to include the affiliation kinds (person
+  `{same_identity, works_at, member_of}`, worker `{same_identity,
+  employed_by}`), relying on the shared `entity-ref` `EdgeKind::permits` for
+  the endpoint check; same tables / endpoints / generic bulk pull unchanged.
+  Accept/reject matrices unit-tested per crate (affiliation → non-org
+  rejected; cross-originated kinds rejected). *Verified:* person + worker
+  `cargo test --lib links` (9 each) + clippy clean. Follow-ups (shared with
+  LNK-2): `linked`/`unlinked` events + matcher-partition guard test.
 - [ ] **LNK-4 (L)** Cross-service `same_identity` **matcher + review
   queue** (design §5.2, roadmap): a job comparing person↔worker records
   (reuse matcher components), emitting `matcher_suggested` edges

@@ -46,17 +46,20 @@ use crate::db::entity_links::{self, NewEdge};
 use crate::db::models::entity_links::Model as EntityLinkModel;
 
 /// Body of `POST /api/persons/{id}/links`: the edge to assert from this
-/// person. `to_ref` is the far record's `EntityRef` URN (for v1 a
-/// `worker:<uuid>`); `kind` is an edge-kind token (§9). `provenance`
-/// defaults to `operator`.
+/// person. `to_ref` is the far record's `EntityRef` URN (a `worker:<uuid>`
+/// for `same_identity`, an `organization:<uuid>` for `works_at` /
+/// `member_of`); `kind` is an edge-kind token (§9). `provenance` defaults
+/// to `operator`.
 #[derive(Debug, Deserialize)]
 pub struct LinkRequest {
-    /// The edge kind token (§9); for v1 person originates only
-    /// `same_identity`.
+    /// The edge kind token (§9); person originates `same_identity`,
+    /// `works_at`, or `member_of` (see `validate_edge`).
     pub kind: String,
     /// The far record's `EntityRef` URN, e.g. `worker:<uuid>`.
     pub to_ref: String,
-    /// Optional role label (unused by `same_identity`).
+    /// Optional role label — unused by person's edge kinds (`role` is an
+    /// `employed_by` field, which is worker-originated); person's
+    /// `works_at` / `member_of` affiliations carry only the temporal window.
     #[serde(default)]
     pub role: Option<String>,
     /// Optional confidence in `[0.0, 1.0]` (defaults to unset).
@@ -175,33 +178,47 @@ pub struct BulkParams {
     pub since: Option<String>,
 }
 
+/// The edge kinds person may **originate** (§9 registry): the
+/// `same_identity` backbone (person → worker) and — LNK-3 — the
+/// `works_at` / `member_of` affiliations (person → organization).
+/// `employed_by` is worker-originated, `subject_of` is case-originated, so
+/// they are not in this set.
+const PERMITTED_KINDS: [EdgeKind; 3] = [
+    EdgeKind::SameIdentity,
+    EdgeKind::WorksAt,
+    EdgeKind::MemberOf,
+];
+
 /// Validate an incoming edge: `to_ref` must parse as an [`EntityRef`],
-/// `kind` must be a known [`EdgeKind`], and — for v1 — the kind must be
-/// `same_identity` with a `person → worker` endpoint pair (§9). Rejects
-/// (with a message the handler surfaces as `422`): a non-`same_identity`
-/// kind (e.g. `subject_of`, `works_at`), a `same_identity` pointing at a
-/// non-worker, an unknown kind, and a malformed `to_ref`. Pure and
-/// DB-free, so the accept/reject matrix is unit-tested without a database.
+/// `kind` must be a known [`EdgeKind`] that person may originate
+/// ([`PERMITTED_KINDS`] — `same_identity` person → worker, `works_at` /
+/// `member_of` person → organization), and its endpoint pair must be
+/// permitted by the §9 registry ([`EdgeKind::permits`]). Rejects (with a
+/// message the handler surfaces as `422`): a kind person does not originate
+/// (e.g. `employed_by`, `subject_of`), an edge pointing at the wrong target
+/// type, an unknown kind, and a malformed `to_ref`. Pure and DB-free, so the
+/// accept/reject matrix is unit-tested without a database.
 ///
 /// # Errors
 ///
 /// Returns a human-readable reason when the ref is malformed, the kind is
-/// unknown, the kind is not `same_identity`, or the endpoint pair is not
-/// `person → worker`.
+/// unknown, the kind is not one person originates, or the endpoint pair is
+/// not permitted for the kind.
 pub fn validate_edge(kind: &str, to_ref: &str) -> Result<(EdgeKind, EntityRef), String> {
     let to = to_ref
         .parse::<EntityRef>()
         .map_err(|e| format!("invalid to_ref: {e}"))?;
     let edge_kind =
         EdgeKind::from_token(kind).ok_or_else(|| format!("unknown edge kind: {kind:?}"))?;
-    if edge_kind != EdgeKind::SameIdentity {
+    if !PERMITTED_KINDS.contains(&edge_kind) {
         return Err(format!(
-            "person originates only `same_identity` edges, not `{edge_kind}`"
+            "person does not originate `{edge_kind}` edges (allowed: same_identity, works_at, member_of)"
         ));
     }
     if !edge_kind.permits(EntityType::Person, to.entity_type) {
         return Err(format!(
-            "edge kind `{edge_kind}` does not permit person → {} (same_identity links person ↔ worker)",
+            "edge kind `{edge_kind}` does not permit person → {} \
+             (same_identity → worker, works_at/member_of → organization)",
             to.entity_type
         ));
     }
@@ -474,13 +491,33 @@ mod tests {
     const PERSON: &str = "person:0c4f1e2a-0000-4000-8000-000000000001";
     const ORG: &str = "organization:0c4f1e2a-0000-4000-8000-000000000002";
 
-    /// The one accepted combination: `same_identity` person → worker.
+    /// The `same_identity` backbone: person → worker.
     #[test]
     fn accepts_same_identity_person_to_worker() {
         let (kind, to) =
             validate_edge("same_identity", WORKER).expect("same_identity person→worker");
         assert_eq!(kind, EdgeKind::SameIdentity);
         assert_eq!(to.entity_type, EntityType::Worker);
+    }
+
+    /// LNK-3: the `works_at` / `member_of` affiliations, person → organization.
+    #[test]
+    fn accepts_works_at_and_member_of_person_to_org() {
+        let (kind, to) = validate_edge("works_at", ORG).expect("works_at person→org");
+        assert_eq!(kind, EdgeKind::WorksAt);
+        assert_eq!(to.entity_type, EntityType::Organization);
+
+        let (kind, to) = validate_edge("member_of", ORG).expect("member_of person→org");
+        assert_eq!(kind, EdgeKind::MemberOf);
+        assert_eq!(to.entity_type, EntityType::Organization);
+    }
+
+    /// An affiliation requires an organization target — a worker / person
+    /// target is rejected by the endpoint check.
+    #[test]
+    fn rejects_affiliation_to_non_org() {
+        assert!(validate_edge("works_at", WORKER).is_err());
+        assert!(validate_edge("member_of", PERSON).is_err());
     }
 
     /// SEC-G1: the governed bulk-links read must be classified as a
@@ -514,12 +551,12 @@ mod tests {
         assert!(validate_edge("same_identity", ORG).is_err());
     }
 
-    /// `works_at` (person → org) is a real registry kind but not shipped
-    /// on the person side in v1 — rejected as a non-`same_identity` kind.
+    /// Kinds person does not originate (worker-originated `employed_by`,
+    /// case-originated `subject_of`) are rejected before the endpoint check.
     #[test]
-    fn rejects_non_same_identity_kind() {
-        assert!(validate_edge("works_at", ORG).is_err());
-        assert!(validate_edge("member_of", ORG).is_err());
+    fn rejects_kinds_person_does_not_originate() {
+        assert!(validate_edge("employed_by", ORG).is_err());
+        assert!(validate_edge("subject_of", PERSON).is_err());
     }
 
     /// A malformed `to_ref` (not a valid `EntityRef` URN) is rejected.
