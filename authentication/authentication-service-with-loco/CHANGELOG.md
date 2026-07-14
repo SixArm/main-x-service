@@ -12,6 +12,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-A6: canonicalise the rate-limit bucket + case-consistent email
+  identity.** Two related abuses: the per-email throttle keyed on the
+  lowercased-but-otherwise-raw email, so `victim+1@gmail.com` /
+  `v.ictim@gmail.com` / `Victim@…` were *different* buckets — an attacker
+  could email-bomb one inbox around the cap; and `find_by_email` /
+  `create_passwordless` compared the email **case-sensitively**, so
+  `Victim@x` and `victim@x` spawned *duplicate* accounts. Now:
+  - `rate_limit::normalize_key` folds aggressively (trim + lowercase, strip
+    `+tag`, Gmail/`googlemail` dot-folding) so lookalikes of one inbox share
+    a single throttle bucket. This only tightens the quota and does **not**
+    decide identity.
+  - `users::find_by_email` and `create_passwordless` are **case-insensitive**
+    (`LOWER(email)` compare + emails stored normalised via
+    `normalize_email`), so a case variant resolves to the same account and
+    never inserts a duplicate. Case-only on purpose — `+tag`/dot folding is
+    the throttle bucket's job, not account identity's.
+  Pure `normalize_key` tests pin the plus/dot/case collapse (and that
+  non-Gmail dots are preserved); a DB-gated request test pins that
+  case-variant signups yield exactly one lowercased account.
+
 - **SEC-A5: constant-work signup timing (defeat timing enumeration).**
   `create_passwordless` returns `EntityAlreadyExists` **before** its Argon2
   hash, so `signup` paid for the one deliberately-slow hash only on the

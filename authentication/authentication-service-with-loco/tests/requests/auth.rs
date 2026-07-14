@@ -90,6 +90,46 @@ async fn signup_with_existing_email_still_returns_200() {
     .await;
 }
 
+/// SEC-A6: signup is case-insensitive on the email — a case variant of an
+/// existing address is the **same** account, never a duplicate, and
+/// `find_by_email` resolves any case to it.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn signup_is_case_insensitive_and_does_not_duplicate_accounts() {
+    request::<App, _, _>(|request, ctx| async move {
+        // First signup with a mixed-case address.
+        let first = request
+            .post("/api/auth/signup")
+            .json(&serde_json::json!({ "email": "Victim@Example.com", "name": "one" }))
+            .await;
+        assert_eq!(first.status_code(), 200);
+
+        // Second signup with a different case of the same address.
+        let second = request
+            .post("/api/auth/signup")
+            .json(&serde_json::json!({ "email": "victim@example.com", "name": "two" }))
+            .await;
+        assert_eq!(second.status_code(), 200, "case variant must still be 200");
+
+        // Exactly one account exists, found by any case, stored lowercased.
+        for lookup in [
+            "Victim@Example.com",
+            "victim@example.com",
+            "VICTIM@EXAMPLE.COM",
+        ] {
+            let user = users::Model::find_by_email(&ctx.db, lookup)
+                .await
+                .unwrap_or_else(|_| panic!("find_by_email should resolve {lookup}"));
+            assert_eq!(
+                user.email, "victim@example.com",
+                "email is stored normalised (lowercased)"
+            );
+        }
+    })
+    .await;
+}
+
 /// Pins that requesting a magic link for a known account issues a token
 /// and returns 200 (the sign-in request path).
 #[tokio::test]

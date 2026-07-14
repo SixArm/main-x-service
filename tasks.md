@@ -298,10 +298,18 @@
   (`constant_work_hash`, discarded), so both paths perform one hash and
   signup latency is indistinguishable between new and existing. Unit test
   pins that a real `$argon2` hash is performed (fresh per call).
-- [ ] **SEC-A6 (S) 🟡** Rate-limit email canonicalization + case-consistent
-  `find_by_email` (`rate_limit.rs:60-62`, `models/users.rs:438-471`) —
-  plus-address/dot variants bomb one inbox and spawn duplicate accounts.
-  *Test:* `victim+1@…`/`v.ictim@gmail.com`/`Victim@…` collapse to one bucket.
+- [x] **SEC-A6 (S) 🟡** Rate-limit email canonicalization + case-consistent
+  `find_by_email`. *(done 2026-07-14)* `rate_limit::normalize_key` folds the
+  throttle bucket aggressively — trim + lowercase, strip `+tag`, Gmail/
+  `googlemail` dot-folding — so `victim+1@gmail.com` / `v.ictim@gmail.com` /
+  `Victim@…` collapse to one bucket (throttle-only; never loosens the quota).
+  `users::find_by_email` + `create_passwordless` are now case-insensitive
+  (`LOWER(email)` compare + `normalize_email` store), so a case variant is
+  the same account, not a duplicate. **Deliberately case-only for identity**
+  — `+tag`/dot folding is confined to the throttle bucket, not account
+  identity (the security-clean subset; provider-specific folding must not
+  merge distinct accounts). Pure key-collapse tests + a DB-gated
+  case-variant signup test (one lowercased account).
 - [x] **SEC-A7 (S) 🟡** GDPR erasure completeness. *(done 2026-07-13)*
   Erasure now scrubs the subject's email from `auth_events`
   (`AuthEvent::scrub_subject_email`, pid OR normalised-email match) and
