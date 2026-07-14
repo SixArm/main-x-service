@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 use authentication_verifier::Action;
 
-use super::auth::{MaybeAuthUser, authorize_record, person_resource_attrs};
+use super::auth::{MaybeAuthUser, authorize_record, person_resource_attrs, read_visibility};
 use super::state::AppState;
 use crate::api::ApiResponse;
 use crate::models::Person;
@@ -413,6 +413,44 @@ fn search_offset_within_bound(offset: usize) -> bool {
     offset <= MAX_SEARCH_OFFSET
 }
 
+/// SEC-G3 — how a single search hit should appear in the page, given the
+/// caller's record-level read visibility and the client's `mask_sensitive`
+/// request. Pure, so the concealment/masking decision is unit-tested apart
+/// from the DB/search machinery.
+#[derive(Debug, PartialEq, Eq)]
+enum ResultDisposition {
+    /// The caller may not read this record: omit it from the page so its
+    /// existence is never revealed (concealment).
+    Omit,
+    /// Include the record, but masked (a `mask` obligation or the client's
+    /// `mask_sensitive` request).
+    Masked,
+    /// Include the full record.
+    Full,
+}
+
+/// Decide a search hit's disposition. `visibility` is
+/// [`read_visibility`]'s result: `None` ⇒ denied (omit); `Some(obligations)`
+/// ⇒ readable, masked if an obligation is `mask` **or** the client asked to
+/// mask. When `PERSON_REQUIRE_AUTH` is off, `read_visibility` yields
+/// `Some(vec![])`, so this collapses to "mask iff the client asked" —
+/// exactly the pre-SEC-G3 behaviour.
+fn search_result_disposition(
+    visibility: Option<&[String]>,
+    mask_sensitive: bool,
+) -> ResultDisposition {
+    match visibility {
+        None => ResultDisposition::Omit,
+        Some(obligations) => {
+            if mask_sensitive || obligations.iter().any(|o| o == "mask") {
+                ResultDisposition::Masked
+            } else {
+                ResultDisposition::Full
+            }
+        }
+    }
+}
+
 /// Paginated search results body.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SearchResponse {
@@ -442,6 +480,7 @@ pub struct SearchResponse {
 pub async fn search_persons(
     State(state): State<AppState>,
     Query(params): Query<SearchQuery>,
+    caller: MaybeAuthUser,
 ) -> impl IntoResponse {
     // Limit to max 100 results
     let limit = params.limit.min(100);
@@ -486,10 +525,25 @@ pub async fn search_persons(
 
                 match state.person_repository.get_by_id(&person_id).await {
                     Ok(Some(person)) => {
-                        if params.mask_sensitive {
-                            persons.push(crate::privacy::mask_person(&person));
-                        } else {
-                            persons.push(person);
+                        // SEC-G3: record-level read authz on every result, so
+                        // an aggregate read never reveals more than the
+                        // equivalent single `GET`. A denied record is
+                        // **omitted** (concealed) — an unauthorised caller
+                        // never learns it exists; a `mask` obligation (or the
+                        // client's `mask_sensitive` param) returns the masked
+                        // view. No-op when `PERSON_REQUIRE_AUTH` is off, so
+                        // this preserves today's behaviour until enforcement
+                        // is switched on.
+                        let visibility = read_visibility(&caller, &person);
+                        match search_result_disposition(
+                            visibility.as_deref(),
+                            params.mask_sensitive,
+                        ) {
+                            ResultDisposition::Omit => {} // concealed
+                            ResultDisposition::Masked => {
+                                persons.push(crate::privacy::mask_person(&person));
+                            }
+                            ResultDisposition::Full => persons.push(person),
                         }
                     }
                     Ok(None) => {
@@ -1332,7 +1386,9 @@ pub async fn get_user_audit_logs(
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_SEARCH_OFFSET, search_offset_within_bound};
+    use super::{
+        MAX_SEARCH_OFFSET, ResultDisposition, search_offset_within_bound, search_result_disposition,
+    };
 
     /// SEC-G7: a pagination offset at or under the cap is accepted; anything
     /// past it (up to `usize::MAX`) is rejected, so the search engine is
@@ -1343,5 +1399,53 @@ mod tests {
         assert!(search_offset_within_bound(MAX_SEARCH_OFFSET));
         assert!(!search_offset_within_bound(MAX_SEARCH_OFFSET + 1));
         assert!(!search_offset_within_bound(usize::MAX));
+    }
+
+    /// SEC-G3: the per-result concealment/masking decision.
+    #[test]
+    fn search_result_disposition_conceals_masks_and_preserves_client_param() {
+        // Denied read ⇒ omit the record entirely (concealment), regardless
+        // of the client's mask request.
+        assert_eq!(
+            search_result_disposition(None, false),
+            ResultDisposition::Omit
+        );
+        assert_eq!(
+            search_result_disposition(None, true),
+            ResultDisposition::Omit
+        );
+
+        // Readable with no obligation:
+        //  - flag off / no mask policy + client didn't ask ⇒ full record
+        //    (pre-SEC-G3 behaviour preserved).
+        assert_eq!(
+            search_result_disposition(Some(&[]), false),
+            ResultDisposition::Full
+        );
+        //  - client asked to mask ⇒ masked (the existing convenience).
+        assert_eq!(
+            search_result_disposition(Some(&[]), true),
+            ResultDisposition::Masked
+        );
+
+        // A `mask` obligation masks even when the client did NOT ask — the
+        // SEC-G3 bypass being closed (a mask-only policy can no longer be
+        // defeated by omitting `mask_sensitive`).
+        let mask = ["mask".to_string()];
+        assert_eq!(
+            search_result_disposition(Some(&mask), false),
+            ResultDisposition::Masked
+        );
+        assert_eq!(
+            search_result_disposition(Some(&mask), true),
+            ResultDisposition::Masked
+        );
+
+        // An unrelated obligation does not force masking on its own.
+        let other = ["audit".to_string()];
+        assert_eq!(
+            search_result_disposition(Some(&other), false),
+            ResultDisposition::Full
+        );
     }
 }

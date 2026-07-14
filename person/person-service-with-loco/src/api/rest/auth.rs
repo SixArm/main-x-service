@@ -441,6 +441,20 @@ pub fn authorize_record(
     }
 }
 
+/// SEC-G3 — **read visibility** of one person for an aggregate read
+/// (`search`), mirroring the case service's reference helper. Returns
+/// `Some(obligations)` when the caller may read the record (with any
+/// `mask` obligation to honour), or `None` when the policy denies the
+/// read — in which case the record must be **omitted** from the result
+/// so an unauthorised caller never even learns it exists (rather than
+/// `403`-ing the whole page). A no-op-`Some(vec![])` when
+/// `PERSON_REQUIRE_AUTH` is off, so the aggregate paths keep today's
+/// behaviour until enforcement is switched on.
+#[must_use]
+pub fn read_visibility(caller: &MaybeAuthUser, person: &Person) -> Option<Vec<String>> {
+    authorize_record(caller, Action::Read, &person_resource_attrs(person)).ok()
+}
+
 /// `GET /api/whoami` — echo the verified claims of the bearer token.
 /// Returns `401` when the token is missing, malformed, or fails
 /// verification. Useful for confirming peer PASETO verification end to
