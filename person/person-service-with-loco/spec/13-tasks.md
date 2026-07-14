@@ -37,6 +37,13 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   identifiers by design (dedup is a workflow). DB-gated concurrency test +
   pure lock-key test. (Repo tasks.md Phase 5 SEC-B3.)
 
+- [x] **SEC-G8 (security): default-off exposure pin.** A named unit test
+  pins that with `PERSON_REQUIRE_AUTH` off (the shipped default) the
+  sensitive reads — a person's PII, GDPR export, audit trail, and
+  `same_identity` links — are open without a token, so activation is a
+  **tracked release gate** (see `agents/share/security.md` §4). (Repo
+  tasks.md Phase 5 SEC-G8.)
+
 - [x] **SEC-G7 (security): bound the `search_persons` pagination offset.**
   `GET /api/persons/search` now rejects `offset > MAX_SEARCH_OFFSET` (10 000)
   with `400 OFFSET_TOO_LARGE` before asking the index for `offset + limit`

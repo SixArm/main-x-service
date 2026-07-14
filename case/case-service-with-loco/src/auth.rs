@@ -908,6 +908,33 @@ mod tests {
         }
     }
 
+    /// SEC-G8 — the default-off **exposure pin**. With `CASE_REQUIRE_AUTH`
+    /// off (the shipped default), the most sensitive reads — the audit
+    /// trail, the governed `subject_of` cross-service links (§10), and a
+    /// single case's PII — are **open without a token**. This is by design
+    /// (see `agents/share/security.md` §4), but it means **activation is a
+    /// tracked release gate**: a deployment exposed to untrusted callers
+    /// MUST set the flag before it is reachable. This test documents that
+    /// exposure explicitly so flipping the default cannot happen silently.
+    #[test]
+    fn default_off_exposes_sensitive_reads_activation_is_a_release_gate() {
+        let (keys, _) = test_keys_and_kid();
+        let verifier = Verifier::from_paseto_keys_value(&keys, ISSUER, AUDIENCE).unwrap();
+        let policy = policy();
+        let no_token = HeaderMap::new();
+        for path in [
+            "/api/cases/0c4f1e2a-0000-4000-8000-000000000001", // a case's PII
+            "/api/cases/0c4f1e2a-0000-4000-8000-000000000001/audit", // audit trail
+            "/api/cases/audit/recent",                         // system-wide audit
+            "/api/cases/0c4f1e2a-0000-4000-8000-000000000001/links", // governed subject_of
+        ] {
+            assert!(
+                enforce(false, &Method::GET, path, &no_token, &verifier, &policy).is_ok(),
+                "SEC-G8: with the flag OFF, {path} is open without a token (activation is the gate)"
+            );
+        }
+    }
+
     /// Enforcement on ⇒ the public paths (health/ping, `OpenAPI`,
     /// Swagger UI, Prometheus metrics) still pass without a token.
     #[test]

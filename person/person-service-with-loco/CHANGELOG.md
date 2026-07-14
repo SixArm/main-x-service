@@ -10,6 +10,16 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-G8: default-off exposure pin.** A new unit test
+  (`default_off_exposes_sensitive_reads_activation_is_a_release_gate`)
+  documents explicitly that with `PERSON_REQUIRE_AUTH` off (the shipped
+  default) the most sensitive reads — a person's PII, the GDPR export, the
+  audit trail, and the `same_identity` cross-service links — are **open
+  without a token**. This exposure is by design
+  (`agents/share/security.md` §4), but the test pins it so activation is
+  understood as a **tracked release gate** and the default cannot be flipped
+  to "secure" silently by assumption.
+
 - **SEC-G7: bound the `search_persons` pagination offset.** `GET
   /api/persons/search` asked the search engine for `offset + limit` hits
   with an **unbounded** `offset`, so a caller passing a huge `offset` forced

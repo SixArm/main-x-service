@@ -484,6 +484,13 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-G8 (security): default-off exposure pin.** A named unit test
+  pins that with `CASE_REQUIRE_AUTH` off (the shipped default) the sensitive
+  reads — a case's PII, the audit trail, and the governed `subject_of` links
+  (§10) — are open without a token, so activation is a **tracked release
+  gate** (see `agents/share/security.md` §4) and the default can't be flipped
+  to "secure" silently. (Repo tasks.md Phase 5 SEC-G8.)
+
 - [x] **SEC-G2/G3 (security): record-level authz + masking on every read.**
   `list` / `search` / `check-duplicates` now omit cases a caller may not
   read (concealment, §10/§12), and FHIR `read` / `search` apply the same

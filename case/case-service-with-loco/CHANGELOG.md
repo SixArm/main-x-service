@@ -11,6 +11,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-G8: default-off exposure pin.** A new unit test
+  (`default_off_exposes_sensitive_reads_activation_is_a_release_gate`)
+  documents explicitly that with `CASE_REQUIRE_AUTH` off (the shipped
+  default) the most sensitive reads — a case's PII, the audit trail, and
+  the governed `subject_of` cross-service links (§10) — are **open without a
+  token**. This exposure is by design (`agents/share/security.md` §4), but
+  the test pins it so activation is understood as a **tracked release gate**
+  and the default cannot be flipped to "secure" silently by assumption.
+
 - **SEC-G6: trailing slash can no longer downgrade a destructive POST.**
   `derive_action` classified `POST …/merge` etc. via `path.ends_with`,
   so `POST /api/cases/merge/` (trailing slash) fell through to `Write` —
