@@ -1,5 +1,14 @@
 ## 13. Tasks
 
+- [x] **SEC-M1 (security): input-size caps on the `Course` payload.**
+  `validate_course`/`validate_instance` now bound every scalar text field
+  (`MAX_TEXT_LEN = 1024`), string-array cardinality + per-entry length
+  (`MAX_ARRAY_LEN = 256` / `MAX_ITEM_LEN = 512`), and the cardinality of the
+  language/struct lists (`identifiers`, `syllabus_sections`, `instances`,
+  `links`) → field-scoped `422` before persist/match, closing the O(n·m)
+  matcher `DoS`. Caps factored into `course_size_caps`/`cap_*`. `course_code`
+  keeps FR-22, BCP-47 entries keep FR-24. Unit tested. (Repo tasks.md Phase 5
+  SEC-M1.)
 - [x] T-1: Scaffold skeleton (Cargo.toml, src/, migrations, Dockerfile, docker-compose, spec, AGENTS docs).
 - [x] T-2: SeaORM entity modules in `db/models.rs` matching the migration schema.
 - [x] T-3: `SeaOrmCourseRepository` CRUD + soft-delete (courses + identifiers + links round-trip; transactional). Audit-log writes landed with T-9.
