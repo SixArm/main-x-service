@@ -18,7 +18,9 @@
 //! assert_eq!(normalize_phone("(555) 123-4567", "1"), "+15551234567");
 //! ```
 
-use crate::models::{Address, ContactPoint, ContactPointSystem, IdentityDocument, Person};
+use crate::models::{
+    Address, ContactPoint, ContactPointSystem, HumanName, IdentityDocument, Person,
+};
 use chrono::Utc;
 
 /// A single validation failure: the offending field path and a
@@ -29,6 +31,172 @@ pub struct ValidationError {
     pub field: String,
     /// Human-readable explanation suitable for an API response.
     pub message: String,
+}
+
+/// SEC-M1 — maximum length, in Unicode scalar values (`.chars().count()`),
+/// of any single scalar text field. Bounds the per-field cost of the
+/// matcher's character-level string comparisons (Jaro-Winkler /
+/// Levenshtein) so one huge string cannot be a CPU/memory `DoS` (amplified
+/// across the `check-duplicates` / `deduplicate` scan).
+const MAX_TEXT_LEN: usize = 1024;
+/// SEC-M1 — maximum number of entries in any array field. Bounds the
+/// O(n·m) Jaccard / overlap work the matcher does over arrays.
+const MAX_ARRAY_LEN: usize = 256;
+/// SEC-M1 — maximum length of any single string entry inside an array.
+const MAX_ITEM_LEN: usize = 512;
+
+/// SEC-M1: push an error when a scalar text `field` exceeds [`MAX_TEXT_LEN`].
+fn cap_text(errs: &mut Vec<ValidationError>, field: &str, value: &str) {
+    if value.chars().count() > MAX_TEXT_LEN {
+        errs.push(ValidationError {
+            field: field.to_string(),
+            message: format!("must not exceed {MAX_TEXT_LEN} characters"),
+        });
+    }
+}
+
+/// [`cap_text`] for an optional field; a no-op when absent.
+fn cap_opt_text(errs: &mut Vec<ValidationError>, field: &str, value: Option<&String>) {
+    if let Some(v) = value {
+        cap_text(errs, field, v);
+    }
+}
+
+/// SEC-M1: push an error when an array `field` holds more than
+/// [`MAX_ARRAY_LEN`] entries.
+fn cap_array(errs: &mut Vec<ValidationError>, field: &str, len: usize) {
+    if len > MAX_ARRAY_LEN {
+        errs.push(ValidationError {
+            field: field.to_string(),
+            message: format!("must not exceed {MAX_ARRAY_LEN} entries"),
+        });
+    }
+}
+
+/// SEC-M1: push an error when the `index`-th entry of array `field` exceeds
+/// [`MAX_ITEM_LEN`]; the field is reported as `field[index]`.
+fn cap_item(errs: &mut Vec<ValidationError>, field: &str, index: usize, value: &str) {
+    if value.chars().count() > MAX_ITEM_LEN {
+        errs.push(ValidationError {
+            field: format!("{field}[{index}]"),
+            message: format!("must not exceed {MAX_ITEM_LEN} characters"),
+        });
+    }
+}
+
+/// SEC-M1: cap the cardinality of a string array and the length of each
+/// entry — the common shape for the person's `Vec<String>` fields.
+fn cap_string_array(errs: &mut Vec<ValidationError>, field: &str, values: &[String]) {
+    cap_array(errs, field, values.len());
+    for (i, v) in values.iter().enumerate() {
+        cap_item(errs, field, i, v);
+    }
+}
+
+/// SEC-M1: apply the caps to a [`HumanName`]'s scalar + array fields
+/// (used for both the primary `name` and each `additional_names` entry).
+fn cap_human_name(errs: &mut Vec<ValidationError>, prefix: &str, name: &HumanName) {
+    cap_text(errs, &format!("{prefix}.family"), &name.family);
+    cap_string_array(errs, &format!("{prefix}.given"), &name.given);
+    cap_string_array(errs, &format!("{prefix}.prefix"), &name.prefix);
+    cap_string_array(errs, &format!("{prefix}.suffix"), &name.suffix);
+}
+
+/// SEC-M1: cap each optional text component of an [`Address`].
+fn cap_address(errs: &mut Vec<ValidationError>, prefix: &str, addr: &Address) {
+    cap_opt_text(errs, &format!("{prefix}.line1"), addr.line1.as_ref());
+    cap_opt_text(errs, &format!("{prefix}.line2"), addr.line2.as_ref());
+    cap_opt_text(errs, &format!("{prefix}.city"), addr.city.as_ref());
+    cap_opt_text(errs, &format!("{prefix}.state"), addr.state.as_ref());
+    cap_opt_text(
+        errs,
+        &format!("{prefix}.postal_code"),
+        addr.postal_code.as_ref(),
+    );
+    cap_opt_text(errs, &format!("{prefix}.country"), addr.country.as_ref());
+}
+
+/// SEC-M1: cap a telecom list's cardinality and each contact `value`.
+fn cap_contacts(errs: &mut Vec<ValidationError>, prefix: &str, telecom: &[ContactPoint]) {
+    cap_array(errs, prefix, telecom.len());
+    for (i, cp) in telecom.iter().enumerate() {
+        cap_text(errs, &format!("{prefix}[{i}].value"), &cp.value);
+    }
+}
+
+/// SEC-M1: apply the input-size caps to every scalar text field and array
+/// reachable on a [`Person`]. Split out of [`validate_person`] to keep that
+/// function within clippy's `too_many_lines` budget.
+fn person_size_caps(errs: &mut Vec<ValidationError>, person: &Person) {
+    // Names
+    cap_human_name(errs, "name", &person.name);
+    cap_array(errs, "additional_names", person.additional_names.len());
+    for (i, n) in person.additional_names.iter().enumerate() {
+        cap_human_name(errs, &format!("additional_names[{i}]"), n);
+    }
+
+    // Scalar optionals
+    cap_opt_text(errs, "tax_id", person.tax_id.as_ref());
+    cap_opt_text(errs, "marital_status", person.marital_status.as_ref());
+
+    // Photo references
+    cap_string_array(errs, "photo", &person.photo);
+
+    // Telecom
+    cap_contacts(errs, "telecom", &person.telecom);
+
+    // Identifiers
+    cap_array(errs, "identifiers", person.identifiers.len());
+    for (i, id) in person.identifiers.iter().enumerate() {
+        cap_text(errs, &format!("identifiers[{i}].system"), &id.system);
+        cap_text(errs, &format!("identifiers[{i}].value"), &id.value);
+        cap_opt_text(
+            errs,
+            &format!("identifiers[{i}].assigner"),
+            id.assigner.as_ref(),
+        );
+    }
+
+    // Addresses
+    cap_array(errs, "addresses", person.addresses.len());
+    for (i, addr) in person.addresses.iter().enumerate() {
+        cap_address(errs, &format!("addresses[{i}]"), addr);
+    }
+
+    // Documents
+    cap_array(errs, "documents", person.documents.len());
+    for (i, doc) in person.documents.iter().enumerate() {
+        cap_text(errs, &format!("documents[{i}].number"), &doc.number);
+        cap_opt_text(
+            errs,
+            &format!("documents[{i}].issuing_country"),
+            doc.issuing_country.as_ref(),
+        );
+        cap_opt_text(
+            errs,
+            &format!("documents[{i}].issuing_authority"),
+            doc.issuing_authority.as_ref(),
+        );
+    }
+
+    // Emergency contacts
+    cap_array(errs, "emergency_contacts", person.emergency_contacts.len());
+    for (i, ec) in person.emergency_contacts.iter().enumerate() {
+        cap_text(errs, &format!("emergency_contacts[{i}].name"), &ec.name);
+        cap_text(
+            errs,
+            &format!("emergency_contacts[{i}].relationship"),
+            &ec.relationship,
+        );
+        cap_contacts(
+            errs,
+            &format!("emergency_contacts[{i}].telecom"),
+            &ec.telecom,
+        );
+        if let Some(addr) = ec.address.as_ref() {
+            cap_address(errs, &format!("emergency_contacts[{i}].address"), addr);
+        }
+    }
 }
 
 /// Validate a person record, returning every error found.
@@ -120,6 +288,9 @@ pub fn validate_person(person: &Person) -> Vec<ValidationError> {
             });
         }
     }
+
+    // SEC-M1 input-size caps (scalar text + array cardinality + per-entry).
+    person_size_caps(&mut errors, person);
 
     errors
 }
@@ -680,5 +851,101 @@ mod tests {
         assert_eq!(std.city.as_deref(), Some("San Francisco"));
         assert_eq!(std.state.as_deref(), Some("CALIFORNIA"));
         assert_eq!(std.country.as_deref(), Some("UNITED STATES"));
+    }
+
+    /// SEC-M1: an oversized scalar text field (family name over
+    /// `MAX_TEXT_LEN`) yields a cap error on that exact field.
+    #[test]
+    fn test_cap_oversized_scalar_text() {
+        let person = Person::new(
+            HumanName {
+                use_type: None,
+                family: "x".repeat(MAX_TEXT_LEN + 1),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Male,
+        );
+        let errors = validate_person(&person);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "name.family" && e.message.contains("exceed")),
+            "Oversized family name should produce a cap error on name.family"
+        );
+    }
+
+    /// SEC-M1: an over-long array (photo cardinality over `MAX_ARRAY_LEN`)
+    /// yields a cardinality error on the array field.
+    #[test]
+    fn test_cap_over_long_array() {
+        let mut person = Person::new(
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Male,
+        );
+        person.photo = vec!["ok".to_string(); MAX_ARRAY_LEN + 1];
+        let errors = validate_person(&person);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "photo" && e.message.contains("entries")),
+            "Over-long photo array should produce a cardinality cap error"
+        );
+    }
+
+    /// SEC-M1: an oversized single array entry yields an indexed error.
+    #[test]
+    fn test_cap_oversized_array_entry() {
+        let mut person = Person::new(
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Male,
+        );
+        person.photo = vec!["ok".into(), "x".repeat(MAX_ITEM_LEN + 1)];
+        let errors = validate_person(&person);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "photo[1]" && e.message.contains("exceed")),
+            "Oversized photo entry should produce an indexed cap error"
+        );
+    }
+
+    /// SEC-M1: a large-but-within-caps record (fields exactly at their
+    /// limits) yields NO cap errors.
+    #[test]
+    fn test_cap_within_limits_no_error() {
+        let mut person = Person::new(
+            HumanName {
+                use_type: None,
+                family: "x".repeat(MAX_TEXT_LEN),
+                given: vec!["g".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Male,
+        );
+        person.tax_id = Some("t".repeat(MAX_TEXT_LEN));
+        person.marital_status = Some("m".repeat(MAX_TEXT_LEN));
+        person.photo = vec!["p".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN];
+        let errors = validate_person(&person);
+        assert!(
+            !errors
+                .iter()
+                .any(|e| e.message.contains("exceed") || e.message.contains("entries")),
+            "A record with fields exactly at their caps should produce no cap errors, got {errors:?}"
+        );
     }
 }

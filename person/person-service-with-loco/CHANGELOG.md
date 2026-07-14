@@ -10,6 +10,22 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-M1: input-size caps on the `Person` payload.** The validator
+  enforced format/required rules but capped no field's *size*, so a single
+  multi-megabyte text field or a huge array could be a CPU/memory `DoS`
+  against the matcher's O(n·m) Jaro-Winkler / Levenshtein / Jaccard scoring,
+  amplified across the `check-duplicates` / `deduplicate` scan.
+  `validate_person` now also bounds every scalar text field
+  (`MAX_TEXT_LEN = 1024`), string-array cardinality + per-entry length
+  (`MAX_ARRAY_LEN = 256` / `MAX_ITEM_LEN = 512`), and the inner text +
+  cardinality of the nested collections (names, `additional_names`,
+  `identifiers`, `addresses`, `telecom`, `documents`,
+  `emergency_contacts`, `photo`, `tax_id`, `marital_status`) — returning
+  field-scoped `422`s *before* the record is stored or matched. The caps
+  are factored into `person_size_caps` / `cap_*` helpers. Unit tested
+  (oversized text / array / array-item + a within-caps large record
+  accepted).
+
 - **SEC-B10: write the person merge audit in-transaction.** `merge` wrote
   its `UPDATE` (survivor) and `DELETE` (duplicate) audit rows **after**
   `txn.commit()`, best-effort — a crash between the commit and the audit
