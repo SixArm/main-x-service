@@ -10,6 +10,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — cargo-fuzz harness (SEC-I2)
+
+- A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with two
+  coverage-guided libFuzzer targets over the crate's two attacker-controlled
+  parse surfaces, pinning golden rule #5 (no panics; every failure is a
+  handled error): `verify` (`Verifier::verify` over an arbitrary token —
+  exercises the full `v4.public` structural parse: header, authenticated
+  footer base64url/JSON `kid` decode, key selection, Ed25519 signature check,
+  with the verifier built from a real key so the `kid`-found branch is
+  reachable) and `policy` (`Policy::from_json` over arbitrary UTF-8, then
+  `evaluate_with_context` for every action against a fixed subject / resource
+  / environment — exercises the policy parser plus rule matching, negation,
+  `$sub`/`$email` templates, and the `resource.`/`env.` namespaces). Run on
+  nightly: `cargo +nightly fuzz run <target>` (see `fuzz/README.md`). The
+  `fuzz/` crate is standalone (not a workspace member) and uses only default
+  offline features, so it never affects the crate's normal stable
+  build/test/clippy. Verified: `cargo +nightly fuzz build` compiles both, and
+  short campaigns run clean — `verify` 11.1M execs, `policy` 6.6M execs, no
+  panics/crashes.
+
 ### Security
 
 - **SEC-V1: harden `from_paseto_keys_url` (the `fetch` path).** It used a

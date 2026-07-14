@@ -646,9 +646,13 @@
   only through the engine, no public `Scorer`). Each verified `cargo +nightly
   fuzz build` (cargo-fuzz 0.13.2, nightly) + short campaigns run clean
   (millions of execs each, no panics/crashes; e.g. place `match_places` 2.7M,
-  worker `match_workers` 3.35M, case `match_cases` 2.37M). **Remaining:** the
-  auth-verifier token parser, person bulk `parse_line`, and a short CI smoke
-  run.
+  worker `match_workers` 3.35M, case `match_cases` 2.37M). **Also done:** the
+  **auth-verifier** `fuzz/` crate — `verify` (the PASETO `v4.public` token
+  parser: header / footer `kid` / signature over an arbitrary token) and
+  `policy` (`Policy::from_json` + `evaluate_with_context` — the ABAC parser +
+  rule evaluator), both pinning golden rule #5 (no panics); verified clean at
+  `verify` 11.1M / `policy` 6.6M execs. **Remaining:** person bulk
+  `parse_line`, and a short CI smoke run.
 - [x] **SEC-I3 (S) ⚪** Add `#![forbid(unsafe_code)]` to every crate root
   missing it. *(done 2026-07-14)* The three named roots (care-pathway-matcher
   `src/main.rs`, case-folder `src/lib.rs` + `src/bin/main.rs`) **plus** the 12
