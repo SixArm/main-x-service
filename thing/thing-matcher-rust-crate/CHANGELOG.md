@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — cargo-fuzz harness (SEC-I2)
+
+- A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with
+  three coverage-guided libFuzzer targets, adopting the person-matcher
+  reference scaffolding: `match_things` (deserialize a JSON `[thing_a, thing_b]`
+  tuple → `MatchingEngine::match_things`; finite score in `[0,1]`, both orders),
+  `normalizer` (the pure `Normalizer` helpers — name / free text / URL / phonetic — over arbitrary
+  UTF-8, never-panic), and `scorer` (the pure `Scorer` similarities;
+  finite in `[0,1]`). Run on nightly: `cargo +nightly fuzz run <target>`
+  (see `fuzz/README.md`). The `fuzz/` crate is standalone (not a workspace
+  member), so it never affects the crate’s normal stable build/test/clippy.
+  Verified: `cargo +nightly fuzz build` compiles all three targets and
+  short time-boxed campaigns run clean (millions of execs, no panics).
+
 ### Security
 
 - **SEC-M2 (High): empty-URL deterministic false positive.** The two
