@@ -166,10 +166,16 @@ clearly described manual check confirms the acceptance criterion.
     `GET /api/workers/links` (SEC-G1 `Action::Destructive`), both router
     surfaces. Record-level authz (`authorize_record`) + best-effort audit
     (`worker_link` / `worker_links_bulk` via the new `log_export`).
-  - [ ] Emit `linked` / `unlinked` on the existing event envelope via the
-    existing `EventProducer` (envelope `entity` = `worker`, edge detail in
-    `data`). **Still deferred** (as on person — the envelope has no link
-    kind + `data` payload yet; the bulk endpoint is the sync path).
+  - [x] Emit `linked` / `unlinked` on the existing event envelope (LNK-1,
+    2026-07-14, mirroring person): `EventKind` gained `Linked`/`Unlinked`
+    and `Envelope` an additive `data` field (`skip_serializing_if` — the
+    CRUD wire shape stays byte-identical) carrying the §4.2 edge detail.
+    Under `outbox` the edge mutation + its `linked`/`unlinked` envelope
+    commit in one transaction (the outbox guarantee); under `memory` the
+    in-memory `WorkerEvent::Linked`/`Unlinked` is published (lossy dev
+    signal). Unit tests pin the tokens, the frozen CRUD shape, and the
+    `for_link` data shape; a DB-gated `linked_event_is_enqueued_to_the_outbox`
+    pins the transactional enqueue.
   - [ ] **Matcher-adapter partition guard:** assert in
     `src/matching/adapter.rs` that `entity_links` is never projected into
     matcher input (the partition rule, §5.1). **Still open.**

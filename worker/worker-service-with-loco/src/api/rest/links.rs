@@ -17,14 +17,16 @@
 //! `WORKER_REQUIRE_AUTH` is off). Each mutation writes a best-effort
 //! audit row.
 //!
-//! **Cross-service `linked`/`unlinked` event emission is deferred** (see
-//! [`crate::streaming`]): the durable [`Envelope`](crate::streaming::Envelope)
-//! has no link kind + no `data` payload, and the in-memory
-//! [`WorkerEvent::Linked`](crate::streaming::WorkerEvent) carries only
-//! worker `Uuid`s (no `to_ref` / `edge_kind` / provenance), so neither
-//! can carry the §4.2 edge `data` without a cross-cutting refactor. The
-//! **bulk endpoint** ([`bulk_links`]) is the aggregator's sync path
-//! (design §8), so the deliverable does not block on the event shape.
+//! **Cross-service `linked`/`unlinked` events are emitted** (LNK-1): the
+//! durable [`Envelope`](crate::streaming::Envelope) gained
+//! [`EventKind::Linked`](crate::streaming::EventKind)/`Unlinked` + an
+//! additive `data` field carrying the §4.2 edge detail, so under the
+//! `outbox` transport the edge upsert and its `linked` (or `unlinked`)
+//! event commit in one transaction (the outbox guarantee); under `memory`
+//! the in-memory [`WorkerEvent::Linked`](crate::streaming::WorkerEvent) is
+//! published as a lossy dev signal (it carries only the two `Uuid`s). The
+//! **bulk endpoint** ([`bulk_links`]) remains the aggregator's sync
+//! reconciliation path (design §8).
 
 use std::collections::BTreeMap;
 
@@ -39,12 +41,18 @@ use uuid::Uuid;
 
 use authentication_verifier::Action;
 
+use sea_orm::TransactionTrait;
+use time::OffsetDateTime;
+
 use super::auth::{MaybeAuthUser, authorize_record, worker_resource_attrs};
 use super::state::AppState;
 use crate::db::AuditContext;
 use crate::db::audit::AuditActor;
 use crate::db::entity_links::{self, NewEdge};
 use crate::db::models::entity_links::Model as EntityLinkModel;
+use crate::db::outbox::OutboxInsert;
+use crate::models::Worker;
+use crate::streaming::{Envelope, EventKind, EventTransport, WorkerEvent, transport};
 
 /// Body of `POST /api/workers/{id}/links`: the edge to assert from this
 /// worker. `to_ref` is the far record's `EntityRef` URN (a `person:<uuid>`
@@ -268,14 +276,120 @@ fn rejection((status, reason): (StatusCode, String)) -> Response {
     (status, Json(json!({ "error": reason }))).into_response()
 }
 
+/// LNK-1: publish the in-memory `WorkerEvent::Linked` / `Unlinked` dev
+/// signal for `link` on the `memory` transport. This is **lossy** — the
+/// in-memory enum carries only two `Uuid`s, not the edge kind or the
+/// target's entity type — so it exists for the `/events/recent` dev view;
+/// the link-graph aggregator consumes the durable (`outbox`) path, which
+/// carries the full §4.2 edge detail in the envelope `data`.
+fn publish_in_memory(state: &AppState, link: &EntityLinkModel, kind: EventKind) {
+    let Ok(to) = link.to_ref.parse::<EntityRef>() else {
+        return;
+    };
+    let now = chrono::Utc::now();
+    let event = match kind {
+        EventKind::Linked => WorkerEvent::Linked {
+            worker_id: link.from_pid,
+            linked_id: to.id,
+            timestamp: now,
+        },
+        EventKind::Unlinked => WorkerEvent::Unlinked {
+            worker_id: link.from_pid,
+            unlinked_id: to.id,
+            timestamp: now,
+        },
+        _ => return,
+    };
+    if let Err(e) = state.event_publisher.publish(event) {
+        tracing::warn!("failed to publish in-memory worker link event: {e}");
+    }
+}
+
+/// LNK-1: durably enqueue a `Linked` / `Unlinked` envelope carrying the
+/// §4.2 edge `data`, **on the given transaction** so the event commits
+/// atomically with the edge mutation (the outbox guarantee). `kind` is
+/// [`EventKind::Linked`] or [`EventKind::Unlinked`].
+async fn enqueue_link_event<C: sea_orm::ConnectionTrait>(
+    txn: &C,
+    worker: &Worker,
+    link: &EntityLinkModel,
+    actor: Option<&str>,
+    kind: EventKind,
+) -> crate::Result<()> {
+    let data = serde_json::to_value(EdgeDetail::of(link))
+        .map_err(|e| crate::Error::Streaming(format!("failed to serialize edge detail: {e}")))?;
+    let env = Envelope::for_link(
+        &link.from_pid.to_string(),
+        &worker.full_name(),
+        actor,
+        kind,
+        data,
+    );
+    OutboxInsert::from_envelope(&env, OffsetDateTime::now_utc())?
+        .insert_on(txn)
+        .await?;
+    Ok(())
+}
+
+/// Upsert an outbound edge and emit its `linked` event on the active
+/// transport (LNK-1). Under `outbox` the upsert and the §4.2 `linked`
+/// envelope are enqueued in one transaction; under `memory` it upserts and
+/// publishes the in-memory dev signal ([`publish_in_memory`]).
+async fn upsert_and_emit(
+    state: &AppState,
+    worker: &Worker,
+    edge: &NewEdge,
+    actor: Option<&str>,
+) -> crate::Result<EntityLinkModel> {
+    match transport() {
+        EventTransport::Memory => {
+            let link = entity_links::upsert(&state.db, edge).await?;
+            publish_in_memory(state, &link, EventKind::Linked);
+            Ok(link)
+        }
+        EventTransport::Outbox => {
+            let txn = state.db.begin().await?;
+            let link = entity_links::upsert(&txn, edge).await?;
+            enqueue_link_event(&txn, worker, &link, actor, EventKind::Linked).await?;
+            txn.commit().await?;
+            Ok(link)
+        }
+    }
+}
+
+/// Soft-delete an outbound edge and emit its `unlinked` event on the active
+/// transport (LNK-1), mirroring [`upsert_and_emit`].
+async fn soft_delete_and_emit(
+    state: &AppState,
+    worker: &Worker,
+    row: EntityLinkModel,
+    actor: Option<&str>,
+) -> crate::Result<EntityLinkModel> {
+    match transport() {
+        EventTransport::Memory => {
+            let deleted = entity_links::soft_delete(&state.db, row).await?;
+            publish_in_memory(state, &deleted, EventKind::Unlinked);
+            Ok(deleted)
+        }
+        EventTransport::Outbox => {
+            let txn = state.db.begin().await?;
+            // Capture the edge detail before the row is consumed by the delete.
+            let deleted = entity_links::soft_delete(&txn, row).await?;
+            enqueue_link_event(&txn, worker, &deleted, actor, EventKind::Unlinked).await?;
+            txn.commit().await?;
+            Ok(deleted)
+        }
+    }
+}
+
 /// Create / upsert an outbound edge from a worker.
 /// `POST /api/workers/{id}/links`.
 ///
 /// Loads the worker (`404` if unknown), authorises at the worker-write
 /// level, validates the edge (`422` otherwise), idempotently upserts the
-/// `entity_links` row, writes a best-effort audit row, and responds `200`
-/// with the stored [`LinkView`]. (Cross-service event emission is
-/// deferred — see the module docs.)
+/// `entity_links` row, emits its `linked` event (LNK-1; durably under the
+/// `outbox` transport), writes a best-effort audit row, and responds `200`
+/// with the stored [`LinkView`].
 pub async fn create_link(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -315,7 +429,11 @@ pub async fn create_link(
         valid_from: req.valid_from,
         valid_to: req.valid_to,
     };
-    let link = match entity_links::upsert(&state.db, &edge).await {
+    // LNK-1: upsert the edge and emit its `linked` event on the active
+    // transport (durably + atomically under `outbox`; in-memory under
+    // `memory`).
+    let actor_sub = caller.claims().map(|c| c.sub.as_str());
+    let link = match upsert_and_emit(&state, &worker, &edge, actor_sub).await {
         Ok(row) => row,
         Err(e) => return db_error(&e),
     };
@@ -365,9 +483,9 @@ pub async fn list_links(
 ///
 /// Loads the worker (`404` if unknown), authorises at the worker-delete
 /// level, finds the worker-scoped active edge (`404` if
-/// unknown/withdrawn/other worker), soft-deletes it, writes a best-effort
-/// audit row, and responds `200` with an empty JSON body. (Cross-service
-/// event emission is deferred — see the module docs.)
+/// unknown/withdrawn/other worker), soft-deletes it, emits its `unlinked`
+/// event (LNK-1; durably under the `outbox` transport), writes a
+/// best-effort audit row, and responds `200` with an empty JSON body.
 pub async fn delete_link(
     State(state): State<AppState>,
     Path((id, link_id)): Path<(Uuid, Uuid)>,
@@ -393,7 +511,10 @@ pub async fn delete_link(
         Err(e) => return db_error(&e),
     };
     let old_values = serde_json::to_value(EdgeDetail::of(&row)).ok();
-    match entity_links::soft_delete(&state.db, row).await {
+    // LNK-1: soft-delete the edge and emit its `unlinked` event on the
+    // active transport (durably + atomically under `outbox`).
+    let actor_sub = caller.claims().map(|c| c.sub.as_str());
+    match soft_delete_and_emit(&state, &worker, row, actor_sub).await {
         Ok(deleted) => {
             let ctx = audit_ctx(&caller);
             if let Some(old_values) = old_values
@@ -633,5 +754,65 @@ mod tests {
             !after.iter().any(|m| m.id == created.id),
             "soft-deleted edge is gone from the active set"
         );
+    }
+
+    /// LNK-1 (DB-gated): the `outbox` emit path enqueues a `linked`
+    /// `event_outbox` row **transactionally** with the edge upsert, carrying
+    /// the §4.2 edge detail in the envelope payload's `data` — the shape the
+    /// link-graph aggregator consumes off the bus.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL to a migrated Postgres"]
+    async fn linked_event_is_enqueued_to_the_outbox() {
+        use crate::db::models::event_outbox;
+        use crate::models::{Gender, HumanName};
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, TransactionTrait};
+
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+        let db = sea_orm::Database::connect(&url).await.expect("connect");
+        let from_pid = Uuid::new_v4();
+        let to_ref = format!("person:{}", Uuid::new_v4());
+        let (kind, to) = validate_edge("same_identity", &to_ref).expect("valid");
+        let edge = NewEdge {
+            from_pid,
+            kind: kind.as_str().to_string(),
+            to_ref: to.to_string(),
+            role: None,
+            confidence: Some(1.0),
+            provenance: "operator".to_string(),
+            valid_from: None,
+            valid_to: None,
+        };
+        let worker = Worker::new(
+            HumanName {
+                use_type: None,
+                family: "Smith".to_string(),
+                given: vec!["John".to_string()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Male,
+        );
+
+        // The `outbox` path: upsert + enqueue the `linked` envelope in one txn.
+        let txn = db.begin().await.expect("begin");
+        let link = entity_links::upsert(&txn, &edge).await.expect("upsert");
+        enqueue_link_event(&txn, &worker, &link, Some("actor-1"), EventKind::Linked)
+            .await
+            .expect("enqueue linked event");
+        txn.commit().await.expect("commit");
+
+        // A `linked` outbox row exists for this originating worker, carrying
+        // the §4.2 edge detail in its payload `data`.
+        let rows = event_outbox::Entity::find()
+            .filter(event_outbox::Column::EntityPid.eq(from_pid))
+            .filter(event_outbox::Column::Kind.eq("linked"))
+            .all(&db)
+            .await
+            .expect("query outbox");
+        let row = rows.first().expect("a linked outbox row for the worker");
+        assert_eq!(row.payload["kind"], "linked");
+        assert_eq!(row.payload["data"]["edge_kind"], "same_identity");
+        assert_eq!(row.payload["data"]["to_ref"], to_ref);
+        assert_eq!(row.actor.as_deref(), Some("actor-1"));
     }
 }

@@ -157,7 +157,9 @@
   unit test `for_link_carries_edge_detail_data` (data matches the
   aggregator's `LinkedEvent`) + token/frozen-shape tests + a DB-gated
   `linked_event_is_enqueued_to_the_outbox`; person lib + clippy + fmt clean.
-  Follow-up: the same for **worker** (its envelope mirrors person's).
+  **Worker mirror landed the same day** (identical change on worker's
+  envelope + `WorkerEvent`; worker lib 198 pass + clippy + fmt clean), so
+  both person and worker now emit `linked`/`unlinked`.
 - [x] **LNK-2 (M)** **Worker** `same_identity` write-side. *(done 2026-07-14)*
   Mirrors person's (`entity_links` migration + `NULLS NOT DISTINCT` upsert
   key, SeaORM entity, `src/db/entity_links.rs` persistence, `validate_edge`
