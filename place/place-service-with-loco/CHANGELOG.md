@@ -10,6 +10,22 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Security
 
+- **SEC-M1: input-size caps on the `Place` payload.** The validator
+  enforced format/range rules but capped no field's *size*, so a single
+  multi-megabyte text field or a huge array could be a CPU/memory `DoS`
+  against the matcher's O(n·m) string / Jaccard scoring, amplified across
+  the `check-duplicates` / `deduplicate` scan. `validate_place` now also
+  bounds every scalar text field (`MAX_TEXT_LEN = 1024`: `name`,
+  `alternate_name`, `description`, `telephone`, `fax_number`, `url`,
+  `branch_code`, and the nested `address.*`), string-array cardinality +
+  per-entry length (`MAX_ARRAY_LEN = 256` / `MAX_ITEM_LEN = 512`:
+  `keywords`), and the inner text + cardinality of the struct arrays
+  (`identifiers`, `amenity_features`, `opening_hours`) — field-scoped
+  `422`s *before* persist/match. `global_location_number` (GLN 13-digit)
+  and `opening_hours` times (5-char) keep their stricter existing bounds;
+  geo lat/lon range checks are untouched. Factored into `place_size_caps`
+  / `cap_*` helpers. Unit tested.
+
 - **SEC-G6: trailing slash can no longer downgrade a destructive POST.**
   `derive_action` classified `/merge` / `/deduplicate` / `/import` via
   `path.ends_with`, so a trailing slash (`POST …/merge/`) fell through to
