@@ -142,29 +142,41 @@ clearly described manual check confirms the acceptance criterion.
     `404`) and `test_fhir_worker_not_found_returns_operation_outcome`
     (DB-gated; a valid-but-absent id returns a FHIR `OperationOutcome`
     `404`). Closes entity-level task T-1.
-- [ ] **T-10 — Cross-service entity links (write side).** Implements
+- [~] **T-10 — Cross-service entity links (write side).** Implements
   domain model §5.4, architecture §8.6, API §9.1, persistence §10.3 —
   per [cross-service linking](../../../agents/share/cross-service-linking.md)
   (rollout §11 step 2, the `same_identity` backbone + `employed_by`).
-  - [ ] Migration adding the `entity_links` table (§10.3 schema) with the
-    `UNIQUE (from_pid, kind, to_ref, valid_from)` idempotent-upsert key.
-  - [ ] Copy the `EntityRef` value type + the §9 edge-kind registry into
-    the crate (drift-accepted; `parse` / `Display` + `entity_type →
-    service` map); validate `kind` ∈ {`same_identity`, `employed_by`} and
-    the `to_ref` entity type matches the kind's endpoint.
-  - [ ] `POST` / `GET` / `DELETE /api/workers/{pid}/links` controllers
-    (optimistic upsert / list / soft-delete; **no** cross-service call).
+  **`same_identity` write-side landed 2026-07-14 (LNK-2)** — mirrors the
+  person reference (`same_identity` **worker → person**, the inverse
+  direction); the bulk endpoint is the sync reconciliation path (design §8),
+  event emission deferred as on person. `employed_by` is LNK-3.
+  - [x] Migration adding the `entity_links` table (§10.3 schema) with the
+    `UNIQUE (from_pid, kind, to_ref, valid_from) NULLS NOT DISTINCT`
+    idempotent-upsert key (`migrations/2026071000000001_create_entity_links`).
+  - [x] Depend on the shared `entity-ref` crate (`EntityRef` `parse` /
+    `Display` + `entity_type → service` map + the §9 edge-kind registry —
+    used, not copied); `validate_edge` accepts only `same_identity`
+    worker → person and rejects any other kind / non-person target /
+    malformed `to_ref` (pure, unit-tested matrix). `employed_by` is LNK-3.
+  - [x] `POST` / `GET` / `DELETE /api/workers/{pid}/links` controllers
+    (`src/api/rest/links.rs`: optimistic upsert / list / soft-delete;
+    **no** cross-service call) + the governed bulk reconciliation pull
+    `GET /api/workers/links` (SEC-G1 `Action::Destructive`), both router
+    surfaces. Record-level authz (`authorize_record`) + best-effort audit
+    (`worker_link` / `worker_links_bulk` via the new `log_export`).
   - [ ] Emit `linked` / `unlinked` on the existing event envelope via the
     existing `EventProducer` (envelope `entity` = `worker`, edge detail in
-    `data`).
+    `data`). **Still deferred** (as on person — the envelope has no link
+    kind + `data` payload yet; the bulk endpoint is the sync path).
   - [ ] **Matcher-adapter partition guard:** assert in
     `src/matching/adapter.rs` that `entity_links` is never projected into
-    matcher input (the partition rule, §5.1).
-  - **Acceptance:** integration test creates an `employed_by` edge
-    (with `role` + `valid_from`), lists it, soft-deletes it, and asserts a
-    `linked` then `unlinked` event is published; a unit test asserts the
-    matcher input excludes `entity_links` and that match scores are
-    unchanged by adding a cross-service edge.
+    matcher input (the partition rule, §5.1). **Still open.**
+  - **Acceptance:** `validate_edge` accept/reject matrix + the SEC-G1
+    `governed_bulk_read_is_classified_destructive` classification are
+    unit-tested (green); a DB-gated `round_trip_upsert_bulk_list_delete`
+    pins upsert → bulk-list → idempotent re-upsert → soft-delete. The
+    `employed_by` integration + published-event assertions + the
+    matcher-partition unit test remain (with the two open boxes above).
 - [ ] **T-11 — Bulk import / export.** Implements persistence §10.4 —
   per [bulk import / export](../../../agents/share/bulk-import-export.md)
   (the uniform contract; only Worker's stable keys + CSV columns +

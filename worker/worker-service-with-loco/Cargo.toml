@@ -89,6 +89,11 @@ argon2 = "0.5"
 # `Verifier::from_paseto_keys_url` (reqwest/rustls) for the boot-time
 # key-set fetch behind `WORKER_PASETO_KEYS_URL` (spec §13 T-1b).
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
+# Shared cross-service `EntityRef` value type + the §9 EdgeKind registry
+# (agents/share/cross-service-linking.md §3, §9). Used by the entity-links
+# write side to parse/validate `to_ref` and the `kind`/endpoint pair
+# (`same_identity` worker → person).
+entity-ref = { path = "../../link/entity-ref-rust-crate" }
 mimalloc = "0.1.52"
 
 [dev-dependencies]

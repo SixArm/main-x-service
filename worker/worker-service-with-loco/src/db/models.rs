@@ -1626,3 +1626,58 @@ pub mod event_outbox {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+// ============================================================================
+// entity_links
+// ============================================================================
+
+/// `SeaORM` entity for the `entity_links` table — the cross-service
+/// linking **write side** (`agents/share/cross-service-linking.md` §4.1).
+/// Each row is one **outbound** edge this service originates from a
+/// worker; for v1 the `same_identity` (worker ↔ person) backbone edge
+/// (§9). The write is optimistic — it stores the assertion and never
+/// calls the target service; verification is the read-model aggregator's
+/// concern. Persistence helpers (idempotent upsert, list-active,
+/// bulk-list, soft-delete) live in [`crate::db::entity_links`]; edge
+/// **validation** (parse `to_ref`, resolve the kind, check the endpoint
+/// pair) is DB-free in `api::rest::links`.
+pub mod entity_links {
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
+
+    /// One outbound cross-service edge row.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "entity_links")]
+    pub struct Model {
+        /// Edge id (also the event's `edge_id`); application-assigned.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// This service's originating worker record (its `id`).
+        pub from_pid: Uuid,
+        /// Edge kind token (§9 registry), e.g. `same_identity`.
+        pub kind: String,
+        /// The far record's `EntityRef` URN, e.g. `person:<uuid>`.
+        pub to_ref: String,
+        /// Optional role label (unused by `same_identity`).
+        pub role: Option<String>,
+        /// Optional confidence: `1.0` operator-asserted, `<1` suggested.
+        pub confidence: Option<f64>,
+        /// How the edge arose: `operator` | `import` | `matcher_suggested`.
+        pub provenance: String,
+        /// Affiliation start (nullable — `same_identity` is not temporal).
+        pub valid_from: Option<TimeDate>,
+        /// Affiliation end ("former …" once past).
+        pub valid_to: Option<TimeDate>,
+        /// Creation timestamp.
+        pub created_at: TimeDateTimeWithTimeZone,
+        /// Soft-delete timestamp (a withdrawn edge); `None` while live.
+        pub deleted_at: Option<TimeDateTimeWithTimeZone>,
+    }
+
+    /// `SeaORM` relations for the entity-links entity (none defined — the
+    /// far endpoint lives in another service, referenced only by URN).
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}

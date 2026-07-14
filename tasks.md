@@ -153,12 +153,21 @@
   `src/api/rest/links.rs` module doc).
   *Verify:* green gate; the §4.2 `data` matches the aggregator's
   `LinkedEvent` (add a seam unit test like link-graph's).
-- [ ] **LNK-2 (M)** **Worker** `same_identity` write-side: mirror
-  person's (`entity_links` migration/model, `validate_edge` accepting
-  only `same_identity` worker→person, per-record + bulk endpoints,
-  canonical `EdgeDetail`). Add worker to the aggregator's reconcile
-  entity list + a seam test. Symmetric double-assert is by design.
-  *Verify:* worker green gate; aggregator seam test green.
+- [x] **LNK-2 (M)** **Worker** `same_identity` write-side. *(done 2026-07-14)*
+  Mirrors person's (`entity_links` migration + `NULLS NOT DISTINCT` upsert
+  key, SeaORM entity, `src/db/entity_links.rs` persistence, `validate_edge`
+  accepting only `same_identity` **worker → person**, per-record
+  `POST`/`GET`/`DELETE /api/workers/{id}/links` + the governed bulk
+  `GET /api/workers/links` returning canonical `EdgeDetail`, both router
+  surfaces, record-level authz + audit incl. a new `log_export`; depends on
+  the shared `entity-ref` crate). Worker added to the aggregator's reconcile
+  list (`app.rs` `["case","person","worker"]`) + seam test
+  `bulk_response_deserializes_the_worker_same_identity_shape`. Symmetric
+  double-assert is by design (aggregator canonicalises the pair). Event
+  emission deferred (as on person). *Verified:* worker `cargo test --lib`
+  (194 pass, 7 links) + clippy + fmt clean; aggregator lib tests (41 pass)
+  + clippy clean. Follow-ups: worker `employed_by` (LNK-3), `linked`/
+  `unlinked` events (LNK-1-style), matcher-partition guard test.
 - [ ] **LNK-3 (M)** Affiliation edges: `works_at`/`member_of` on person,
   `employed_by` (with `role`) on worker — same tables, extend each
   `validate_edge` permit set per the §9 registry; bulk endpoints already

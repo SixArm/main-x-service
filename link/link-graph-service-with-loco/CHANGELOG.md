@@ -14,6 +14,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — worker reconcile source (LNK-2)
+
+- The periodic reconciliation loop (`app.rs::after_routes`) now also
+  spawns a source for **worker** (`["case", "person", "worker"]`), so once
+  `LINK_GRAPH_RECONCILE_URL_WORKER` is set the aggregator pulls the worker
+  service's authoritative `same_identity` edges (the **worker → person**
+  direction, the inverse of person's person → worker) via the generic
+  `HttpAuthoritativeSource`. The existing SEC-B7 origin/endpoint validation
+  (`edge_valid_for_source`) already accepts a worker-origin `same_identity`
+  edge, and `graph.rs` canonicalises the symmetric pair, so the by-design
+  double-assert is deduped. New seam test
+  `bulk_response_deserializes_the_worker_same_identity_shape` pins that the
+  worker service's `GET /api/workers/links` body deserializes into a
+  `LinkedEvent`. No new endpoint (read-only-to-the-world invariant holds).
+
 ### Fixed
 
 - **Security (SEC-B11): non-redirecting presence probe + freshness guard
