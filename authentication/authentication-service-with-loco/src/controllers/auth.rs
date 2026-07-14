@@ -508,12 +508,20 @@ async fn token(headers: axum::http::HeaderMap, State(ctx): State<AppContext>) ->
     // (and is refused in production without an allow-list) so it cannot
     // bypass both the CSRF and the origin checks. A failure is `403`,
     // distinct from the `401`s above.
-    let provided = headers
+    let provided_raw = headers
         .get(crate::csrf::CSRF_HEADER)
         .and_then(|v| v.to_str().ok())
         .unwrap_or_default();
+    // SEC-A9: the session stores only the *hash* of its CSRF token, so
+    // compare against the hash of the presented header. An absent/empty
+    // header stays empty (never hashed) so it can never match a real token.
+    let provided = if provided_raw.is_empty() {
+        String::new()
+    } else {
+        crate::secret_hash::hash(provided_raw)
+    };
     if let Err((status, reason)) =
-        csrf_token_gate(is_production, origin_ok, session.csrf(), provided)
+        csrf_token_gate(is_production, origin_ok, session.csrf(), &provided)
     {
         return Err(Error::CustomError(status, ErrorDetail::new("csrf", reason)));
     }

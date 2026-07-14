@@ -12,6 +12,40 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 
+- **SEC-A9: hash bearer-equivalent secrets at rest.** Three server-side
+  secrets were stored in **plaintext**, so a read at rest (leaked backup,
+  SQL-injection read, over-broad log) yielded a directly replayable
+  credential: the magic-link token (`users.magic_link_token`), the opaque
+  session id (`sessions.jid` — the value in the `__Host-mxi_session`
+  cookie and the PASETO `sid` claim), and the per-session CSRF
+  synchroniser token (`sessions.data.csrf`). The database now stores only
+  a one-way **SHA-256 hash** (new `secret_hash` module); the plaintext
+  lives only in transit (email link, cookie, header) and is never
+  persisted.
+  - A **fast, unsalted** hash is deliberate and correct here: these are
+    high-entropy CSPRNG tokens, not passwords, so brute-force is
+    infeasible regardless of hash speed, and a deterministic hash lets the
+    server look a presented token up by its hash in one indexed query.
+    Argon2 would be the *wrong* tool (salted ⇒ not lookup-able; its cost
+    buys nothing against a high-entropy input).
+  - `create_magic_link` persists `hash(plaintext)` but hands the caller a
+    model carrying the plaintext (for the email/log); `consume_magic_token`
+    / `find_by_magic_token` match on the hash of the presented token.
+    `sessions::issue` / `find_by_jid` hash the session id; `session_data`
+    stores the CSRF token's hash and `POST /token` compares the hash of
+    the presented `X-CSRF-Token`.
+  - Migration `m20220101_000009_hash_credentials_at_rest` enables
+    `pgcrypto` and hashes existing rows **in place**
+    (`encode(digest(x,'sha256'),'hex')` — the exact encoding the Rust
+    helper produces), guarded on `length <> 64`, so live magic links and
+    sessions keep working across the deploy.
+  - Tests: `secret_hash` unit vectors (empty/`abc` FIPS values, determinism,
+    lowercase-hex width); a DB-free `session_data` assertion that the CSRF
+    token is stored hashed; and DB-gated assertions that
+    `users.magic_link_token` and `sessions.jid`/`data.csrf` hold the hash,
+    not the plaintext, while `find_by_jid` and magic-link redemption still
+    resolve from the presented plaintext. (Repo tasks.md Phase 5 SEC-A9.)
+
 - **SEC-A10: CSRF origin backstop on `POST /api/auth/token`.** The
   cookie-authenticated token exchange required a matching `X-CSRF-Token`
   only when the session carried a synchroniser token; a **legacy**

@@ -504,6 +504,26 @@ only by that subject.
 
 ## 13. Tasks (live work queue)
 
+- [x] **SEC-A9 (security): hash bearer-equivalent secrets at rest.** The
+      magic-link token (`users.magic_link_token`), the opaque session id
+      (`sessions.jid` — the `__Host-mxi_session` cookie value + PASETO `sid`
+      claim), and the CSRF synchroniser token (`sessions.data.csrf`) were
+      stored in plaintext — a read at rest yielded a replayable credential.
+      The DB now stores only a one-way **SHA-256 hash** (`secret_hash`
+      module); the plaintext lives only in transit. A fast unsalted hash is
+      correct (high-entropy tokens ⇒ brute-force infeasible; deterministic ⇒
+      lookup-by-hash in one indexed query; Argon2 would be unlookup-able and
+      pointless here). `create_magic_link` stores the hash but returns the
+      plaintext in-memory for the email/log; `consume_magic_token` /
+      `find_by_magic_token` / `find_by_jid` match on the presented token's
+      hash; `session_data` stores the CSRF hash and `POST /token` compares
+      `hash(X-CSRF-Token)`. Migration `_000009` enables `pgcrypto` and hashes
+      existing rows in place (`encode(digest(x,'sha256'),'hex')`, guarded on
+      `length <> 64`) so live links/sessions survive the deploy. `secret_hash`
+      unit vectors + DB-free `session_data` hash assertion + DB-gated
+      at-rest/round-trip tests for users + sessions. (Repo tasks.md Phase 5
+      SEC-A9.)
+
 - [x] **SEC-A10 (security): CSRF origin backstop on `POST /token`.** The
       token exchange only required `X-CSRF-Token` when the session carried a
       synchroniser token, and only enforced the `Origin` allow-list when

@@ -42,6 +42,8 @@ pub mod models;
 pub mod openapi;
 /// Postgres-backed per-email sliding-window rate limiter for magic-link issuance.
 pub mod rate_limit;
+/// Hash-at-rest of bearer-equivalent secrets (SEC-A9).
+pub mod secret_hash;
 /// Loco CLI tasks.
 pub mod tasks;
 /// HTTP response view types.

@@ -153,13 +153,14 @@ src/
 ├── i18n.rs               dependency-light email copy catalog (en / cy)
 ├── openapi.rs            hand-written OpenAPI 3 document
 ├── rate_limit.rs         per-email sliding-window magic-link issuance limiter
+├── secret_hash.rs        SHA-256 hash-at-rest for bearer-equivalent secrets (magic-link token / session jid / CSRF token) — SEC-A9
 ├── models/
 │   ├── users.rs           magic-link user model (+ create_passwordless, GDPR erase + find_active_by_pid, ABAC attributes_map/attrs)
 │   ├── sessions.rs        opaque cookie session issue/revoke; session_data copies ABAC attrs at establishment; revoke_all_for_user for erasure (per the auth-sessions design)
 │   └── _entities/         generated SeaORM entities
 ├── mailers/auth.rs        magic-link mailer (prod)
 ├── tasks/attributes.rs    `user_attributes` CLI task — operator ABAC attribute assignment (set/show/unset/clear users.attributes)
-├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits, _000006_users_attributes, _000007_sessions_data, _000008_sessions_ttls
+├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits, _000006_users_attributes, _000007_sessions_data, _000008_sessions_ttls, _000009_hash_credentials_at_rest
 └── views/auth.rs          LoginResponse / CurrentResponse
 config/                    development/production/test yaml (keys/ holds only a README — no committed key files)
 ```

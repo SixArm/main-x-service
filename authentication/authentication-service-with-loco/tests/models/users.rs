@@ -359,6 +359,19 @@ async fn magic_link() {
         create_result.unwrap_err()
     );
 
+    // SEC-A9: the model handed back carries the **plaintext** token (for the
+    // email/log), of the configured length — this is the only place the
+    // usable token exists.
+    let plaintext = create_result
+        .unwrap()
+        .magic_link_token
+        .expect("create_magic_link returns the plaintext token in-memory");
+    assert_eq!(
+        plaintext.len(),
+        users::MAGIC_LINK_LENGTH as usize,
+        "Magic link plaintext length does not match expected length"
+    );
+
     let updated_user =
         Model::find_by_pid(&boot.app_context.db, "11111111-1111-1111-1111-111111111111")
             .await
@@ -369,11 +382,16 @@ async fn magic_link() {
         "Magic link token should be set after creation"
     );
 
-    let magic_link_token = updated_user.magic_link_token.unwrap();
+    // SEC-A9: the DB holds only the **hash** — never the usable plaintext.
+    let stored = updated_user.magic_link_token.unwrap();
+    assert_ne!(
+        stored, plaintext,
+        "the database must not store the plaintext magic-link token"
+    );
     assert_eq!(
-        magic_link_token.len(),
-        users::MAGIC_LINK_LENGTH as usize,
-        "Magic link token length does not match expected length"
+        stored,
+        authentication_service::secret_hash::hash(&plaintext),
+        "the stored token must be the SHA-256 hash of the plaintext"
     );
 
     assert!(

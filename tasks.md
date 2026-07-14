@@ -322,10 +322,18 @@
   session that snapshotted the old attrs can't keep minting stale-attribute
   tokens until its absolute TTL — the next login copies fresh attrs. Extended
   admin request test asserts the target's sessions are revoked after the PUT.
-- [ ] **SEC-A9 (M) ⚪** Store only **hashes** of magic-link token / session
-  `jid` / CSRF token (migrations `_000001`/`_000002`, `sessions.data.csrf`) —
-  they are bearer-equivalent secrets at rest today. *Test:* DB holds no
-  usable plaintext credential.
+- [x] **SEC-A9 (M) 🟡** Hash bearer-equivalent secrets at rest.
+  *(done 2026-07-14)* Magic-link token, session `jid` (cookie / PASETO `sid`),
+  and CSRF token (`sessions.data.csrf`) now store only a one-way SHA-256 hash
+  (new `secret_hash` module; fast unsalted hash — high-entropy tokens, so
+  deterministic lookup-by-hash, not Argon2). `create_magic_link` returns the
+  plaintext in-memory (email/log) but persists the hash; `consume_magic_token`
+  / `find_by_jid` / CSRF compare hash the presented value. Migration `_000009`
+  enables `pgcrypto` + hashes existing rows in place
+  (`encode(digest(x,'sha256'),'hex')`, guarded `length <> 64`) so live
+  links/sessions survive. *Test:* `secret_hash` vectors + DB-gated
+  `session_secrets_are_hashed_at_rest` / `magic_link` assert the DB holds no
+  usable plaintext credential while presented-plaintext lookups still resolve.
 - [x] **SEC-A10 (S) 🟡** CSRF origin backstop. *(done 2026-07-14)* Pure
   `csrf_token_gate(is_production, origin_ok, session_csrf, provided_csrf)` in
   `controllers/auth.rs`: a token-carrying session must echo `X-CSRF-Token`; a
