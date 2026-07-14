@@ -155,9 +155,11 @@ clearly described manual check confirms the acceptance criterion.
     idempotent-upsert key (`migrations/2026071000000001_create_entity_links`).
   - [x] Depend on the shared `entity-ref` crate (`EntityRef` `parse` /
     `Display` + `entity_type → service` map + the §9 edge-kind registry —
-    used, not copied); `validate_edge` accepts only `same_identity`
-    worker → person and rejects any other kind / non-person target /
-    malformed `to_ref` (pure, unit-tested matrix). `employed_by` is LNK-3.
+    used, not copied); `validate_edge` accepts `same_identity` worker →
+    person and (LNK-3, 2026-07-14) `employed_by` worker → organization,
+    rejecting any other kind / wrong target / malformed `to_ref` (pure,
+    unit-tested matrix). The `role` field carries the job title on an
+    `employed_by` edge.
   - [x] `POST` / `GET` / `DELETE /api/workers/{pid}/links` controllers
     (`src/api/rest/links.rs`: optimistic upsert / list / soft-delete;
     **no** cross-service call) + the governed bulk reconciliation pull

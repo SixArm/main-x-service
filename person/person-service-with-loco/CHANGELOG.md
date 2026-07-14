@@ -8,6 +8,22 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — cross-service affiliation edges (LNK-3)
+
+- The person link endpoints now originate the **`works_at` / `member_of`**
+  affiliation edges (person → organization, temporal) in addition to the
+  `same_identity` backbone. `validate_edge`'s permit set went from
+  `same_identity`-only to `{same_identity, works_at, member_of}`, relying on
+  the shared `entity-ref` registry's `EdgeKind::permits` for the endpoint
+  check — so `works_at`/`member_of` require an **organization** target and
+  `employed_by` (worker-originated) / `subject_of` (case-originated) are
+  still rejected on the person side. No schema or endpoint change (the
+  `entity_links` table + `POST`/`GET`/`DELETE /api/persons/{id}/links` +
+  bulk pull are unchanged and already generic over kind). Accept/reject
+  matrix unit-tested (`accepts_works_at_and_member_of_person_to_org`,
+  `rejects_affiliation_to_non_org`, `rejects_kinds_person_does_not_originate`).
+  (Repo tasks.md LNK-3.)
+
 ### Added — cargo-fuzz harness (SEC-I2 / SEC-B2)
 
 - A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with a
