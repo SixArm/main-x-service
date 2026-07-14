@@ -5,6 +5,8 @@
 //! so the SQL stays the single source of truth while loco gains a Rust
 //! `Migrator` it can run (`auto_migrate`, `cargo loco db migrate`).
 
+// SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
+#![forbid(unsafe_code)]
 #![allow(elided_lifetimes_in_paths)]
 pub use sea_orm_migration::prelude::*;
 

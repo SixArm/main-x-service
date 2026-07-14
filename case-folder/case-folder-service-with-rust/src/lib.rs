@@ -24,6 +24,10 @@
 //! API with no view/template tier. The application wiring (initializer
 //! order, mounted routes, tasks) lives in `app`.
 
+// SEC-I3: this service has no reason to reach for `unsafe`; forbid it
+// outright to match the family's other crate roots.
+#![forbid(unsafe_code)]
+
 /// Loco application wiring: the `App` struct and its `Hooks`
 /// implementation (boot, initializer order, route mounting, tasks).
 pub mod app;

@@ -5,6 +5,8 @@
 //! event-bus Phase-2 hand-off buffer) — and exposes [`Migrator`], which
 //! loco's CLI (`db migrate`) and the request-test harness run in order.
 
+// SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
+#![forbid(unsafe_code)]
 #![allow(elided_lifetimes_in_paths)]
 pub use sea_orm_migration::prelude::*;
 mod m20220101_000001_organizations;

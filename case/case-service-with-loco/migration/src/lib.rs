@@ -6,6 +6,8 @@
 //! data, so the audit trail these create is the who/what/when record over
 //! every change.
 
+// SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
+#![forbid(unsafe_code)]
 #![allow(elided_lifetimes_in_paths)]
 pub use sea_orm_migration::prelude::*;
 mod m20220101_000001_cases;

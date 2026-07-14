@@ -1,6 +1,10 @@
 //! Demo binary — a runnable walkthrough of the `care-pathway-matcher`
 //! public API. Not part of the SemVer surface.
 
+// SEC-I3: this demo has no reason to reach for `unsafe`; forbid it so the
+// crate's binary target matches the `#![forbid(unsafe_code)]` on its lib.
+#![forbid(unsafe_code)]
+
 // On MUSL static builds, swap the default allocator for mimalloc, which
 // is markedly faster than the musl libc allocator. Gated to `musl` so
 // glibc/macOS builds keep the system allocator. Demo-only; the library

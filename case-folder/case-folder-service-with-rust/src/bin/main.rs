@@ -7,6 +7,10 @@
 //! initializer order, route mounting, tasks — lives in
 //! `case_folder_service_with_rust::app`.
 
+// SEC-I3: the server binary has no reason to reach for `unsafe`; forbid it
+// so the binary target matches the crate's `src/lib.rs`.
+#![forbid(unsafe_code)]
+
 use case_folder_service_with_rust::app::App;
 use loco_rs::cli;
 use migration::Migrator;
