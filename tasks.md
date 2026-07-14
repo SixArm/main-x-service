@@ -607,11 +607,16 @@
   SeaORM `migration/src/lib.rs` roots — the only remaining gaps a full grep
   surfaced. Now **every** `src/lib.rs` / `src/main.rs` / `src/bin/main.rs` in
   the workspace forbids `unsafe`. Builds clean; grep shows full coverage.
-- [ ] **SEC-I4 (M) 🟡** `agents/share/security.md`: the audit summary, the
-  cross-cutting invariants (never-panic / masking-on-every-read / fail-closed
-  authz / secret-handling / no-secret-in-logs), the `*_REQUIRE_AUTH`
-  activation gate, and the threat model. Wire into `agents/share/index.md`
-  and the compliance docs. Feeds OPS-1 runbooks.
+- [x] **SEC-I4 (M) 🟡** `agents/share/security.md`. *(done 2026-07-14)*
+  Written: provenance (2026-07-12 audit), the audit summary by theme
+  (F-authn/authz/guard/data/input/assurance with per-item status), the 10
+  cross-cutting invariants (fail-closed secrets / never-panic / bound-input /
+  no-spurious-identity / masking-on-every-read / fail-closed-authz /
+  trusted-source-verify / concurrency-integrity / no-secret-in-logs /
+  least-authority-artifacts), the `<ENTITY>_REQUIRE_AUTH` activation gate,
+  secret-handling, the threat model, and a status snapshot. Wired into
+  `agents/share/index.md`, the root `AGENTS.md` `@`-includes, and both
+  compliance docs. Feeds OPS-1 runbooks.
 
 ---
 

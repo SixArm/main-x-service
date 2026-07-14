@@ -118,6 +118,7 @@ entity. They are not matcher-backed and have no front-end of their own.
 @agents/share/jwt.md
 @agents/share/authentication-sessions.md
 @agents/share/authorization-attributes.md
+@agents/share/security.md
 @agents/share/auditability.md
 @agents/share/cross-service-linking.md
 @agents/share/bulk-import-export.md
