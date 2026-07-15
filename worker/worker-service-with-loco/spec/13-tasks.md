@@ -176,15 +176,19 @@ clearly described manual check confirms the acceptance criterion.
     signal). Unit tests pin the tokens, the frozen CRUD shape, and the
     `for_link` data shape; a DB-gated `linked_event_is_enqueued_to_the_outbox`
     pins the transactional enqueue.
-  - [ ] **Matcher-adapter partition guard:** assert in
-    `src/matching/adapter.rs` that `entity_links` is never projected into
-    matcher input (the partition rule, §5.1). **Still open.**
+  - [x] **Matcher-adapter partition guard** (partition rule, §5.1 /
+    `cross-service-linking.md` §7): cross-service links are never a matcher
+    signal — `entity_links` are never a field on the domain `Worker` (so
+    they cannot reach `to_matcher_worker`), and the adapter also ignores the
+    within-entity `Worker.links`. Regression-guarded by the bridge test
+    `links_are_not_a_matcher_signal` (adding link data does not move the
+    match score).
   - **Acceptance:** `validate_edge` accept/reject matrix + the SEC-G1
-    `governed_bulk_read_is_classified_destructive` classification are
-    unit-tested (green); a DB-gated `round_trip_upsert_bulk_list_delete`
-    pins upsert → bulk-list → idempotent re-upsert → soft-delete. The
-    `employed_by` integration + published-event assertions + the
-    matcher-partition unit test remain (with the two open boxes above).
+    `governed_bulk_read_is_classified_destructive` classification + the
+    `linked`/`unlinked` emission (envelope + emit tests) + the
+    matcher-partition guard are unit-tested (green); a DB-gated
+    `round_trip_upsert_bulk_list_delete` + `linked_event_is_enqueued_to_the_outbox`
+    pin the DB paths. Remaining: `employed_by` end-to-end integration test.
 - [ ] **T-11 — Bulk import / export.** Implements persistence §10.4 —
   per [bulk import / export](../../../agents/share/bulk-import-export.md)
   (the uniform contract; only Worker's stable keys + CSV columns +

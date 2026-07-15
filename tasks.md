@@ -173,8 +173,9 @@
   double-assert is by design (aggregator canonicalises the pair). Event
   emission deferred (as on person). *Verified:* worker `cargo test --lib`
   (194 pass, 7 links) + clippy + fmt clean; aggregator lib tests (41 pass)
-  + clippy clean. Follow-ups: worker `employed_by` (LNK-3), `linked`/
-  `unlinked` events (LNK-1-style), matcher-partition guard test.
+  + clippy clean. Follow-ups all landed since: worker `employed_by` (LNK-3),
+  `linked`/`unlinked` events (LNK-1), and the matcher-partition guard test
+  (`links_are_not_a_matcher_signal`, both person + worker, 2026-07-15).
 - [x] **LNK-3 (M)** Affiliation edges. *(done 2026-07-14)* `works_at` /
   `member_of` on **person** (→ organization) and `employed_by` (with `role`)
   on **worker** (→ organization). Each `validate_edge` permit set extended

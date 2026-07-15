@@ -8,6 +8,18 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — matcher-partition guard test (cross-service-linking §7)
+
+- A bridge test (`tests/duplicate_detection.rs::links_are_not_a_matcher_signal`)
+  pins the partition rule: cross-service links are **never** a matcher
+  signal. Cross-service `entity_links` are structurally excluded (their own
+  table, never a field on the domain `Person`, so they never reach
+  `to_matcher_person`), and the adapter also ignores the within-entity
+  `Person.links`. The test adds link data to a record and asserts its match
+  score is unchanged — a regression guard so a future edit that routed any
+  link into the matcher input fails here. Closes the spec §13 T-9 partition
+  acceptance box.
+
 ### Added — cross-service `linked` / `unlinked` events (LNK-1)
 
 - Person now **emits** its cross-service link events on the durable event

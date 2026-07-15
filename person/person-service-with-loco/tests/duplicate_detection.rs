@@ -23,7 +23,7 @@ use person_service::matching::adapter::to_matcher_person;
 use person_service::matching::matcher_lib::{Confidence, MatchConfig, MatchingEngine};
 use person_service::models::{
     Address, AddressUse, ContactPoint, ContactPointSystem, ContactPointUse, DocumentType, Gender,
-    HumanName, Identifier, IdentifierType, IdentityDocument, Person,
+    HumanName, Identifier, IdentifierType, IdentityDocument, LinkType, Person, PersonLink,
 };
 
 // -------- builders -----------------------------------------------------------
@@ -661,4 +661,51 @@ fn strict_config_demands_more_evidence_than_lenient_for_same_pair() {
     }
     // Confirm lenient definitely catches the near-clone.
     assert!(lenient.is_match, "lenient should match a diacritic variant");
+}
+
+/// Cross-service-linking **partition rule** (`agents/share/cross-service-linking.md`
+/// §7): cross-service links are **never** a matcher signal. This is enforced
+/// structurally — cross-service `entity_links` live in their own table and
+/// are never fields on the domain `Person`, so they cannot reach
+/// `to_matcher_person`'s input — and the within-entity `Person.links` (the
+/// merge-workflow person↔person links) are likewise ignored by the adapter.
+/// This test pins the invariant as a regression guard: adding link data to a
+/// record must not move its match score, so a future edit that routed any
+/// link (within-entity or cross-service) into the matcher input would fire
+/// here.
+// Exact `==` on the scores is deliberate: link data must change *nothing*,
+// so both sides are computed from bit-identical matcher inputs and the f64s
+// are exactly equal — an epsilon compare would weaken the guard.
+#[allow(clippy::float_cmp)]
+#[test]
+fn links_are_not_a_matcher_signal() {
+    let mut a = person("Smith", "John");
+    let b = person("Smith", "John");
+
+    let before = engine()
+        .match_persons(&to_matcher_person(&a), &to_matcher_person(&b))
+        .score;
+
+    // Add a within-entity link to A (the cross-service entity_links table is
+    // not even representable on the domain model, so this is the strongest
+    // link data a `Person` can carry).
+    a.links = vec![
+        PersonLink {
+            other_person_id: Uuid::new_v4(),
+            link_type: LinkType::Replaces,
+        },
+        PersonLink {
+            other_person_id: Uuid::new_v4(),
+            link_type: LinkType::Seealso,
+        },
+    ];
+
+    let after = engine()
+        .match_persons(&to_matcher_person(&a), &to_matcher_person(&b))
+        .score;
+
+    assert_eq!(
+        before, after,
+        "a person's links must not alter the match score (partition rule §7)"
+    );
 }

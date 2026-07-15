@@ -224,11 +224,12 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     domain-specific symbols (e.g. `patient`, `mpi`) absent from
     `src/db/`. Met: a grep of `src/db/` finds zero `patient` / `mpi`
     symbols and `cargo check --lib` is clean.
-- [~] **T-9 — Cross-service entity links (write side).**
-  See §5.4, §8.6, §9.1, §10.4 and
+- [x] **T-9 — Cross-service entity links (write side).** *(complete
+  2026-07-15)* See §5.4, §8.6, §9.1, §10.4 and
   [cross-service linking](../../../agents/share/cross-service-linking.md).
   **`same_identity` landed 2026-07-10 (T-22); `works_at` / `member_of`
-  affiliations landed 2026-07-14 (LNK-3).**
+  affiliations 2026-07-14 (LNK-3); `linked`/`unlinked` events 2026-07-14
+  (LNK-1); partition guard 2026-07-15.**
   - [x] Migration creating the `entity_links` table (§10.4 schema, with
     the `UNIQUE (from_pid, kind, to_ref, valid_from)` upsert key).
   - [x] `EntityRef` value type (parse / `Display` + `entity_type → service`
@@ -250,12 +251,16 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     tests pin the tokens, the frozen CRUD shape, and the `for_link` data
     shape; a DB-gated `linked_event_is_enqueued_to_the_outbox` pins the
     transactional enqueue.
-  - [ ] Partition guard in `src/matching/adapter.rs`: `entity_links` are
-    never projected into the matcher input. **Still open.**
-  - **Acceptance:** the `validate_edge` accept/reject matrix (incl. the new
-    affiliation cases) is unit-tested (green). The published-event
-    integration + the matcher-partition unit test remain (with the two open
-    boxes above).
+  - [x] Partition guard (`agents/share/cross-service-linking.md` §7):
+    cross-service links are never a matcher signal. Enforced structurally —
+    `entity_links` live in their own table, never a field on the domain
+    `Person`, so they cannot reach `to_matcher_person`; and the adapter also
+    ignores the within-entity `Person.links`. Regression-guarded by the
+    bridge test `links_are_not_a_matcher_signal` (adding link data does not
+    move the match score).
+  - **Acceptance:** the `validate_edge` accept/reject matrix (incl. the
+    affiliation cases), the `linked`/`unlinked` emission (envelope + emit
+    tests), and the matcher-partition guard are all tested (green).
 - [ ] **T-10 — Bulk import / export.** *(rollout steps 1 & 3 done
   2026-07-10; steps 2, 4, 5 remain)* Person is the family **reference
   entity** for this capability. See §9.2, §10.5 and

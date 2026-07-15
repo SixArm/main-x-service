@@ -23,7 +23,7 @@ use worker_service::matching::adapter::to_matcher_worker;
 use worker_service::matching::matcher_lib::{Confidence, MatchConfig, MatchingEngine};
 use worker_service::models::{
     Address, AddressUse, ContactPoint, ContactPointSystem, ContactPointUse, DocumentType, Gender,
-    HumanName, Identifier, IdentifierType, IdentityDocument, Worker,
+    HumanName, Identifier, IdentifierType, IdentityDocument, LinkType, Worker, WorkerLink,
 };
 
 // -------- builders -----------------------------------------------------------
@@ -503,4 +503,51 @@ fn strict_config_matches_subset_of_lenient_config() {
         );
     }
     assert!(lenient.is_match, "lenient should match a diacritic variant");
+}
+
+/// Cross-service-linking **partition rule** (`agents/share/cross-service-linking.md`
+/// §7): cross-service links are **never** a matcher signal. This is enforced
+/// structurally — cross-service `entity_links` live in their own table and
+/// are never fields on the domain `Worker`, so they cannot reach
+/// `to_matcher_worker`'s input — and the within-entity `Worker.links` (the
+/// merge-workflow worker↔worker links) are likewise ignored by the adapter.
+/// This test pins the invariant as a regression guard: adding link data to a
+/// record must not move its match score, so a future edit that routed any
+/// link (within-entity or cross-service) into the matcher input would fire
+/// here.
+// Exact `==` on the scores is deliberate: link data must change *nothing*,
+// so both sides are computed from bit-identical matcher inputs and the f64s
+// are exactly equal — an epsilon compare would weaken the guard.
+#[allow(clippy::float_cmp)]
+#[test]
+fn links_are_not_a_matcher_signal() {
+    let mut a = worker("Smith", "John");
+    let b = worker("Smith", "John");
+
+    let before = engine()
+        .match_workers(&to_matcher_worker(&a), &to_matcher_worker(&b))
+        .score;
+
+    // Add a within-entity link to A (the cross-service entity_links table is
+    // not even representable on the domain model, so this is the strongest
+    // link data a `Worker` can carry).
+    a.links = vec![
+        WorkerLink {
+            other_worker_id: Uuid::new_v4(),
+            link_type: LinkType::Replaces,
+        },
+        WorkerLink {
+            other_worker_id: Uuid::new_v4(),
+            link_type: LinkType::Seealso,
+        },
+    ];
+
+    let after = engine()
+        .match_workers(&to_matcher_worker(&a), &to_matcher_worker(&b))
+        .score;
+
+    assert_eq!(
+        before, after,
+        "a worker's links must not alter the match score (partition rule §7)"
+    );
 }
