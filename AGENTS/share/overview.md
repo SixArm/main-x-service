@@ -84,24 +84,64 @@ Per-project decision (2026-06-02): drift between front-ends is accepted; there i
 
 ## What every crate provides
 
-- **CRUD** on the domain entity with soft-delete and full audit trail
-- **Identifier management** (multiple identifiers per record; type + system + value)
-- **Identity document management** (passport, driver's license, etc., where relevant)
-- **Contact information management** (telecom / address / email)
-- **Probabilistic matching** with weighted, configurable scoring
-- **Deterministic matching** with short-circuit rules (tax ID, document, GLN, …)
-- **Full-text search** via Tantivy with fuzzy and phonetic variants
-- **Duplicate detection** (real-time on create, batch via deduplicate scan)
-- **Record merging** with link tracking and transferred-data snapshots
-- **Data quality validation** (required fields, format checks, ranges)
-- **Address & phone normalization** at the boundary
-- **Privacy controls**: per-field masking, GDPR data export, consent records
-- **Event streaming** of every CRUD operation
-- **Audit logging** (HIPAA-style trail for who/what/when)
-- **REST API** (Axum) with OpenAPI / Swagger
-- **gRPC API** stub (Tonic) for high-throughput callers
+> **Honest capability matrix** (task H-2). Grounded by grepping the tree:
+> an ✅ means the capability has a live `src/` module in that crate **today**;
+> `–` means it does not (some are planned — see each crate's `spec/§13`).
+> This replaces an earlier "every crate provides everything" list that
+> overclaimed (it advertised Tantivy, gRPC, privacy, and bulk for all crates
+> when each is only a subset).
+
+### The common baseline (all ten entity registries)
+
+person, worker, place, thing, event, course, organization, care-pathway,
+case, and portfolio each provide:
+
+- **CRUD** on the domain entity with **soft-delete**
+- **Data-quality validation** (required fields, format/range checks) → `422`
+- **Matching** — probabilistic (weighted, configurable) **and** deterministic
+  (short-circuit rules), embedding the sibling `*-matcher` crate — plus
+  **duplicate detection** (real-time on create + batch scan) and **record
+  merge** with transferred-data snapshots
+- **Audit log** + an **in-memory event stream** of every CRUD/merge
+- **REST API** (Axum via loco) with **OpenAPI / Swagger**
+- **Offline PASETO v4.public verification** + the blanket **ABAC guard**
+  (`<ENTITY>_REQUIRE_AUTH`, default-off), via the shared
+  `authentication-verifier`
 - **Observability** (tracing + OpenTelemetry OTLP)
-- **PostgreSQL persistence** via SeaORM with migrations
+- **PostgreSQL** persistence via SeaORM + migrations
+
+### Capabilities that vary by crate
+
+| Capability | person | worker | place | thing | event | course | org | care-pathway | case | portfolio |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Full-text search via Tantivy¹ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | – | – | – |
+| Privacy masking module (`src/privacy`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | – | – | – |
+| FHIR R5 surface | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ | ✅ | ✅ | – |
+| gRPC stub (Tonic) | ✅ | ✅ | – | – | ✅ | – | – | – | – | – |
+| Durable outbox events (Phase 2)² | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ | ✅ | ✅ | ✅ |
+| Boundary normalization (phone/address) | ✅ | ✅ | ✅ | – | ✅ | – | – | – | – | – |
+| Record-level ABAC + masking obligations | ✅ | ✅ | – | – | – | – | – | – | ✅ | – |
+| Cross-service links (`entity_links` write-side) | ✅ | ✅ | – | – | – | – | – | – | ✅ | – |
+| Bulk import/export | ✅ | – | – | – | – | – | – | – | – | – |
+
+¹ organization, care-pathway, case, and portfolio do **case-insensitive
+`ILIKE` search** instead of Tantivy. ² course emits **in-memory events only**
+(no durable outbox yet); every durable-outbox service defaults to
+`<ENTITY>_EVENT_TRANSPORT=memory`.
+
+### The two cross-cutting services
+
+These are **not** entity registries and share little of the matrix above:
+
+- **authentication-service** — the central SSO provider: passwordless
+  magic-link login, Postgres cookie sessions, PASETO v4.public **issuance**
+  + `/.well-known/paseto-keys`, ABAC attribute sourcing, and an `auth_events`
+  audit trail. No matching / FHIR / Tantivy.
+- **link-graph-service** — the read-model **aggregator**, read-only to the
+  world: it consumes every entity's event stream, serves the cross-service
+  graph (`neighbors` / `single-view` / freshness), reconciles against each
+  service's `entity_links`, audits, and sits behind the blanket guard. No
+  CRUD writes / matching / FHIR.
 
 See [rust-loco-stack.md](rust-loco-stack.md) for the dependency stack.
 

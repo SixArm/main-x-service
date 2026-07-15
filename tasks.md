@@ -23,13 +23,19 @@
   *Result:* pinned `1.96.1` (+ rustfmt/clippy, minimal profile); all 37
   crates already `fmt --check`-clean, so no `Style:` fixup was needed.
 
-- [ ] **H-2 (M)** Make `agents/share/overview.md` honest: replace the
-  "What every crate provides" list with a per-crate **capability matrix**
-  (capabilities × crates, ✅ / – / planned). Ground it by grepping the
-  tree (Tantivy: only person/worker/place/thing/event/course; privacy:
-  same six; FHIR: seven + person under `src/api/fhir`; gRPC: stubs).
-  Update as later tasks land.
-  *Verify:* every ✅ has a corresponding `src/` module; no overclaims.
+- [x] **H-2 (M)** Make `agents/share/overview.md` honest. *(done 2026-07-15)*
+  Replaced the overclaiming "What every crate provides" bullet list with a
+  grounded **capability matrix**: a verified common baseline (CRUD, matching,
+  merge, audit, in-memory events, REST/OpenAPI, PASETO verify + blanket ABAC,
+  observability, Postgres) for the ten entity registries, then a ✅/– matrix
+  of the nine capabilities that **vary** by crate, plus a note on the two
+  cross-cutting services (auth, link-graph). Every cell grounded by grepping
+  the tree for the live `src/` module — Tantivy + privacy: person/worker/
+  place/thing/event/course (6); FHIR: those 5 (not course) + org/care-pathway/
+  case (8); gRPC: person/worker/event (3); durable outbox: all but course (9);
+  boundary normalization: person/worker/place/event (4); record-level ABAC +
+  cross-service links: person/worker/case (3); bulk: person (1).
+  *Verified:* every ✅ maps to an existing `src/` module (no overclaims).
 
 - [ ] **H-3 (M)** Rewrite `agents/share/architecture.md`. It still
   describes the pre-loco person layout (FHIR endpoint counts, module
