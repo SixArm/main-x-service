@@ -201,12 +201,18 @@
   rejected; cross-originated kinds rejected). *Verified:* person + worker
   `cargo test --lib links` (9 each) + clippy clean. Follow-ups (shared with
   LNK-2): `linked`/`unlinked` events + matcher-partition guard test.
-- [ ] **LNK-4 (L)** Cross-service `same_identity` **matcher + review
+- [~] **LNK-4 (L)** Cross-service `same_identity` **matcher + review
   queue** (design §5.2, roadmap): a job comparing person↔worker records
   (reuse matcher components), emitting `matcher_suggested` edges
   (confidence < 1.0) into a review surface; operator confirm promotes to
-  `operator`/1.0. **Spec it first** (link-graph §16 + a new §13 task
-  chain) — do not start coding without a spec round. Depends: LNK-1..3.
+  `operator`/1.0. **Spec round done 2026-07-15** — link-graph spec §16 OQ-9
+  (the resolved design: cross-type `IdentityProbe` comparator reusing the
+  matcher primitives; identifier+Soundex/birth-year blocking;
+  aggregator-hosted job that POSTs `matcher_suggested` edges to person's
+  links endpoint while the aggregator stays read-only-to-the-world;
+  per-service review + idempotent promotion) + the §13 task chain T-29–T-33.
+  **Coding still gated** on the OQ-9 open sub-questions (block key/threshold,
+  review-surface home, aggregator-write posture, scale). Depends: LNK-1..3.
 
 - [x] **BLK-1 (M)** Bulk I/O step 2a — **CSV** codec on person.
   *(codec + spec done 2026-07-15)* `src/bulk/csv.rs` flattens the person wire
