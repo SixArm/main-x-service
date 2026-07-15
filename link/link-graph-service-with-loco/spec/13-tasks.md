@@ -212,6 +212,32 @@
   topics go live; retire lazy verify-on-read per entity (design §5.1,
   event-bus.md §8).
 
+### Cross-service identity suggestion (LNK-4)
+
+Suggests `same_identity` (person ↔ worker) links by comparison, emitting
+`matcher_suggested` edges an operator confirms — the design is
+[§16 OQ-9](16-open-questions.md) (`cross-service-linking.md` §5.2). **Spec
+round done; the open sub-questions in OQ-9 must be pinned before T-29 code.**
+
+- [ ] T-29: Cross-type `IdentityProbe` + comparator reusing the matcher
+  crates' scoring primitives (pure, deterministic, unit-tested: a
+  person/worker sharing an NHS number / name / DOB scores high; unrelated
+  records score low; never consumes cross-service edges — §7 partition rule).
+- [ ] T-30: Candidate blocking (shared-identifier exact + `Soundex(family)` +
+  birth-year key) over the person / worker read feeds, so comparison is
+  bounded rather than O(n·m). Depends: T-29; OQ-9(a).
+- [ ] T-31: The periodic suggestion job (aggregator-hosted, mirroring the
+  reconcile worker): pull person + worker, block, compare, and POST
+  `matcher_suggested` `same_identity` edges to person's
+  `POST /api/persons/{id}/links` (bearer-authed, env-gated URL like
+  reconcile). The aggregator stays read-only to the world. Depends: T-30;
+  OQ-9(c).
+- [ ] T-32: Review + promotion — surface suggested edges; operator confirm
+  re-asserts `operator` / `1.0` (idempotent, same `edge_id`), reject
+  soft-deletes (`unlinked`). Depends: T-31; OQ-9(b).
+- [ ] T-33: Governance + tests — suggested edges are `unverified` and never
+  auto-promoted; the suggestion job is audited; scale controls (OQ-9(d)).
+
 ### Tests
 
 - [x] T-24: Un-gated unit suite (§11.1) — `cargo test --lib` (15 tests:

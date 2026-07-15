@@ -14,6 +14,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Spec — cross-service identity-suggestion matcher (LNK-4 spec round)
+
+- Specified the LNK-4 cross-service `same_identity` matcher + review queue
+  (design §16 OQ-9 + the §13 task chain T-29–T-33), the mandated spec round
+  before any coding. Resolves the load-bearing design decisions — a
+  cross-type `IdentityProbe` comparator reusing the matcher crates' scoring
+  primitives (never consuming cross-service edges, §7 partition rule);
+  identifier-exact + `Soundex(family)`/birth-year candidate blocking; an
+  aggregator-hosted periodic job that POSTs `matcher_suggested` edges to
+  person's links endpoint (so person owns the write and the aggregator stays
+  read-only to the world); and per-service review with idempotent promotion
+  to `operator`/`1.0`. Flags the open sub-questions (block key/threshold,
+  review-surface home, aggregator-write posture, scale) that must be pinned
+  before T-29. No code.
+
 ### Added — worker reconcile source (LNK-2)
 
 - The periodic reconciliation loop (`app.rs::after_routes`) now also
