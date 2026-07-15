@@ -26,6 +26,7 @@ tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"]
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+csv = "1"
 
 # Database (PostgreSQL ORM)
 sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json"] }

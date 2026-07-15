@@ -81,3 +81,49 @@ Person-specific notes:
   import may populate `entity_links`, but they are never projected into the
   matcher input.
 
+### 10.6 Bulk CSV column set (§5 flattening declaration)
+
+The **JSONL** format is the lossless reference (the person wire type, one
+object per line). The **CSV** format (`src/bulk/csv.rs`, BLK-1) flattens that
+wire type with the family-wide
+[§5 convention](../../../agents/share/bulk-import-export.md): scalars → one
+column each; the primary name (a single nested object) → dotted columns;
+arrays / arrays-of-objects → a single JSON-encoded cell. It round-trips
+losslessly against JSONL (`decode(encode(p)) == p`), matches columns **by
+header name** (operator-reordered / extra columns tolerated), and reports a
+malformed row as a per-row error (§7).
+
+Person's declared columns (export order; the export header):
+
+| Column | Source field | Rendering |
+|---|---|---|
+| `id` | `id` | scalar (UUID) |
+| `active` | `active` | `true`/`false` (blank ⇒ default `true`) |
+| `name.family` | `name.family` | scalar |
+| `name.use_type` | `name.use_type` | scalar (enum, blank ⇒ none) |
+| `name.given` | `name.given` | JSON array |
+| `name.prefix` | `name.prefix` | JSON array |
+| `name.suffix` | `name.suffix` | JSON array |
+| `gender` | `gender` | scalar (enum) |
+| `birth_date` | `birth_date` | scalar (`YYYY-MM-DD`, blank ⇒ none) |
+| `tax_id` | `tax_id` | scalar (blank ⇒ none) |
+| `deceased` | `deceased` | `true`/`false` |
+| `deceased_datetime` | `deceased_datetime` | scalar (RFC 3339, blank ⇒ none) |
+| `marital_status` | `marital_status` | scalar (blank ⇒ none) |
+| `multiple_birth` | `multiple_birth` | `true`/`false` (blank ⇒ none) |
+| `managing_organization` | `managing_organization` | scalar (UUID, blank ⇒ none) |
+| `created_at` / `updated_at` | same | scalar (RFC 3339) |
+| `identifiers` | `identifiers` | JSON array-of-objects |
+| `additional_names` | `additional_names` | JSON array-of-objects |
+| `telecom` | `telecom` | JSON array-of-objects |
+| `documents` | `documents` | JSON array-of-objects |
+| `emergency_contacts` | `emergency_contacts` | JSON array-of-objects |
+| `addresses` | `addresses` | JSON array-of-objects |
+| `photo` | `photo` | JSON array-of-strings |
+| `links` | `links` | JSON array-of-objects (within-entity person links) |
+
+CSV is inherently lossy for deep nesting, so fidelity-sensitive loads should
+prefer JSONL; the JSON-in-cell columns keep the CSV path lossless at the cost
+of embedded JSON. Wiring the codec into the async import/export pipeline (the
+`format` dispatch in the `bg_pg` worker + the export handler) and the
+keyless-row → review-queue routing are the follow-up (BLK-2).
