@@ -37,12 +37,20 @@
   cross-service links: person/worker/case (3); bulk: person (1).
   *Verified:* every ✅ maps to an existing `src/` module (no overclaims).
 
-- [ ] **H-3 (M)** Rewrite `agents/share/architecture.md`. It still
-  describes the pre-loco person layout (FHIR endpoint counts, module
-  tree). Describe the current family: loco Hooks services, the two
-  internal shapes (case-style vs person-style), outbox/relay, the
-  aggregator, auth stack. Keep it one page + one diagram.
-  *Verify:* no named file/module in the doc is absent from the tree.
+- [x] **H-3 (M)** Rewrite `agents/share/architecture.md`. *(done 2026-07-15)*
+  Replaced the pre-loco person-only layout (stale endpoint counts, a
+  person-specific module tree, no loco/outbox/aggregator/auth) with a
+  one-page family description: the 12-service family + libraries, one layered
+  request-flow diagram, the **two internal shapes** (person-style
+  `src/api/rest/` — person/worker/course + place/thing/event mid-conversion;
+  loco-style `src/controllers/` matcher-DTO-as-JSONB — organization/
+  care-pathway/case/portfolio), the cross-cutting subsystems (PASETO+ABAC
+  auth stack, in-memory→outbox→Fluvio event bus, the link-graph aggregator),
+  shared design patterns, and the create/merge/link data flows.
+  *Verified:* every named file/module (person-style tree, loco-style tree,
+  link-graph modules, migration location) checked to exist in the tree —
+  fixed one stale reference (migrations are crate-root `migration/`, not
+  `src/migration/`, except authentication).
 
 - [x] **H-4 (M)** Roll CI `--include-ignored` to every service CI. *(done 2026-07-12)*
   Case's `.github/workflows/ci.yaml` test job is the pattern (Postgres
