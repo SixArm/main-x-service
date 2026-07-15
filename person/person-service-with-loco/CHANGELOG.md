@@ -8,6 +8,25 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — bulk CSV codec (BLK-1)
+
+- A CSV codec for bulk import/export (`src/bulk/csv.rs`) alongside the
+  lossless JSONL reference, following the family-wide §5 flattening
+  convention: scalars → one column each; the primary name (single nested
+  object) → dotted columns (`name.family`, …); arrays / arrays-of-objects
+  → a single JSON-encoded cell (`identifiers`, `telecom`, `addresses`,
+  `links`, `name.given`, …). `encode(&[Person]) -> Vec<u8>` writes a header
+  + one row per person; `decode(&[u8]) -> Vec<serde_json::Result<Person>>`
+  matches columns **by header name** (operator-reordered / extra columns
+  tolerated) and returns a **per-row** result (§7 — a malformed row is an
+  `Err` in its slot, not a whole-file abort). It **round-trips losslessly**
+  against the wire type — `decode(encode(p)) == p` — proven by unit tests
+  over a fully-populated person, a sparse person, reordered/extra columns,
+  a bad-JSON-cell per-row error, and multi-row. Person's exact column set is
+  declared in spec §10.6. Adds the `csv` crate. Wiring the codec into the
+  async `bg_pg` import/export pipeline (the `format` dispatch + export
+  handler) + keyless-row → review-queue routing is the follow-up (BLK-2).
+
 ### Added — matcher-partition guard test (cross-service-linking §7)
 
 - A bridge test (`tests/duplicate_detection.rs::links_are_not_a_matcher_signal`)

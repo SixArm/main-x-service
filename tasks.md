@@ -208,10 +208,18 @@
   `operator`/1.0. **Spec it first** (link-graph §16 + a new §13 task
   chain) — do not start coding without a spec round. Depends: LNK-1..3.
 
-- [ ] **BLK-1 (M)** Bulk I/O step 2a — **CSV** import/export on person:
-  the §5 flattening convention (scalars → columns; nested-single →
-  dotted; arrays → JSON-in-cell); document person's exact column set in
-  its spec (§10 declaration). Codec unit-tested round-trip.
+- [x] **BLK-1 (M)** Bulk I/O step 2a — **CSV** codec on person.
+  *(codec + spec done 2026-07-15)* `src/bulk/csv.rs` flattens the person wire
+  type per §5 (scalars → columns; primary name → dotted `name.*`; arrays →
+  JSON-in-cell) and **round-trips losslessly** against JSONL
+  (`decode(encode(p)) == p`); columns matched by header (reordered/extra
+  tolerated); per-row `Err` on a malformed row (§7). Person's exact column
+  set declared in spec §10.6; adds the `csv` crate. Unit-tested: fully-
+  populated + sparse round-trip, reordered/extra columns, bad-JSON-cell
+  per-row error, multi-row, header. *Verified:* `cargo test bulk::csv`
+  (6 pass) + clippy clean. **Remaining wiring (folded into BLK-2):** the
+  `bg_pg` worker/export `format` dispatch that makes CSV a usable end-to-end
+  import/export format.
 - [ ] **BLK-2 (M)** Bulk I/O step 2b — keyless-row → duplicate-detection
   → **review-queue** routing on person import (`provenance = import`),
   reusing the existing matcher + review queue. Depends: BLK-1 optional,

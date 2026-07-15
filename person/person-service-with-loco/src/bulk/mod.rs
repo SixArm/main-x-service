@@ -31,6 +31,8 @@
 //! `include_soft_deleted = true` is rejected as not-yet-supported rather
 //! than silently leaking or ignoring the flag).
 
+/// CSV codec — the operator/spreadsheet format (§5 flattening).
+pub mod csv;
 /// The per-row error report (§7).
 pub mod error_report;
 /// REST handlers for the bulk import/export surface (§4).
