@@ -13,10 +13,25 @@ the ward whiteboard and touchscreen client.
 > medical device, not assured for clinical use. Synthetic data only.
 > See [spec/regulatory](../spec/regulatory.md).
 
-**Status: specification round — implementation queued.** The
-cross-cutting spec ([../spec/](../spec/index.md)) is complete; the
-code lands per the phased task queue in
-[../spec/tasks.md](../spec/tasks.md) (PF-T1 onward).
+**Status: implemented (PF-T1–T14, 2026-07-18).** Builds, 64 DB-free
+unit tests pass, clippy-pedantic clean, verified end-to-end against
+Postgres 18. Remaining in [../spec/tasks.md](../spec/tasks.md):
+PF-T17 (request-test suite) and the front-end (PF-T15/T16).
+
+## Quick start
+
+```bash
+# Postgres 18 with a loco user, then:
+export DATABASE_URL=postgres://loco:loco@localhost:5432/patient_flow_service_development
+cargo run -- db migrate       # create the schema
+cargo run -- task seed        # synthetic demo hospital (5 wards, 76 beds)
+cargo run -- start            # serve on :5150
+curl localhost:5150/api/at-a-glance | jq .site_tiles
+```
+
+Upstream lookups default to **stub mode** (no sibling services
+needed); events default to the in-memory transport; auth enforcement
+defaults **off** (`PATIENT_FLOW_REQUIRE_AUTH` is the activation gate).
 
 ## What it answers
 

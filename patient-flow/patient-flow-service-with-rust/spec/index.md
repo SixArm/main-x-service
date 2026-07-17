@@ -31,9 +31,29 @@ tracing + OTLP, Podman.
 - **Identifiers**: public UUID `pid` on every owned record; EntityRef
   URNs for all upstream references.
 
+## Edition-specific implementation notes
+
+- **Layout**: `src/{app,auth,clients,metrics,openapi,streaming,
+  validation,version}.rs`, `src/flow/` (pure core), `src/models/`
+  (+`_entities/`), `src/controllers/{topology,stays,bed_requests,
+  boards,audits,docs,metrics}.rs`, `src/tasks/seed.rs`, crate-root
+  `migration/`.
+- **Migration gotcha**: loco's `create_table` helper **pluralizes**
+  table names via `cruet::to_plural` — every patient-flow table name
+  is already plural so this is a no-op, except `event_outbox`, whose
+  migration is written as explicit SQL to keep the exact name the
+  SeaORM entity declares. (The sibling services' copied
+  `event_outbox` migrations share this hazard.)
+- **Clients**: one `src/clients.rs` module (mode-switched `stub` /
+  `http` via `PATIENT_FLOW_UPSTREAM_MODE`, default `stub`) rather
+  than per-service trait modules — patient-flow needs only
+  display-name resolution.
+- **`/events/recent`** reads the in-memory ring under the `memory`
+  transport and the `event_outbox` table under `outbox`.
+
 ## Delivery
 
-The queue is [../../spec/tasks.md](../../spec/tasks.md): PF-T1–T4
-skeleton/topology, PF-T5–T8 bed states + journey, PF-T9–T11 demand +
-reads + capacity, PF-T12–T13 IPC + virtual ward, PF-T14 auth
-surface. Tests per [../../spec/testing.md](../../spec/testing.md).
+The queue is [../../spec/tasks.md](../../spec/tasks.md): PF-T1–T14
+**delivered 2026-07-18** (see the phase note there); open: PF-T17
+request-test suite, PF-T15/T16 front-end. Tests per
+[../../spec/testing.md](../../spec/testing.md).
