@@ -94,6 +94,7 @@ front-end) and are not part of the entity trio tables above.
 | Project | Purpose | Editions |
 |---|---|---|
 | [case-folder](case-folder/spec/index.md) | NHS paper case-note folder location tracking ("where is the folder for NHS Number X right now?") — barcode/QR/RFID move audit trail | [service-with-rust](case-folder/case-folder-service-with-rust/spec/index.md) (Loco JSON API) · [front-end-with-svelte](case-folder/case-folder-front-end-with-svelte/spec/index.md) (SvelteKit + SVAR + Lily) |
+| [patient-flow](patient-flow/spec/index.md) | NHS hospital patient flow & bed management ("which beds are free, where is patient X, who is discharge-ready?") — live bed state machine, digital ward whiteboards + touchscreen bed cards, SAFER/Red2Green/EDD inpatient journey, bed requests & rule-checked allocation, infection control, virtual wards, hospital-at-a-glance capacity, DTOC tracking. Owns operational state; references person / worker / place / organization identities by EntityRef. **Spec round landed 2026-07-17; implementation queued (PF-T*)** | [service-with-rust](patient-flow/patient-flow-service-with-rust/spec/index.md) (Loco JSON API) · [front-end-with-svelte](patient-flow/patient-flow-front-end-with-svelte/spec/index.md) (SvelteKit whiteboard/kiosk client) |
 
 ### Cross-cutting services
 
