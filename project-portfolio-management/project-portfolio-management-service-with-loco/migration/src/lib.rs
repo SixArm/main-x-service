@@ -14,6 +14,7 @@ mod m20220101_000001_work_items;
 mod m20220101_000002_audit_logs;
 mod m20220101_000003_merge_records;
 mod m20220101_000004_event_outbox;
+mod m20220101_000005_governance;
 
 /// The crate's migrator: drives the ordered migration set for the loco
 /// CLI / boot-time migration.
@@ -30,6 +31,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000002_audit_logs::Migration),
             Box::new(m20220101_000003_merge_records::Migration),
             Box::new(m20220101_000004_event_outbox::Migration),
+            Box::new(m20220101_000005_governance::Migration),
             // inject-above (do not remove this comment)
         ]
     }

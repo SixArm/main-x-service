@@ -1,8 +1,10 @@
 ## 13. Tasks
 
-Live entity-level work queue. The entity is **spec-only; no code
-exists yet** (§14), so every task below is **unchecked** — this is the
-build-out backlog. Tasks that belong to one subproject's internals
+Live entity-level work queue. (Historical header — the trio has been
+**implemented** since 2026-06-19; per-crate work now lives in each
+subproject's own spec §13. The unchecked items below are the original
+build-out backlog kept for trace; the PPM feature catalogue and its
+delivery state live in [15-roadmap.md](15-roadmap.md).) Tasks that belong to one subproject's internals
 migrate into that crate's spec §13 once the crate is scaffolded; they
 are listed here while the trio is being stood up. Each task has an
 acceptance criterion; tick the box when an automated test or clearly

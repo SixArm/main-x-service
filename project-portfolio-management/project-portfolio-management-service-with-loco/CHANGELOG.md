@@ -9,6 +9,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- 2026-07-18 — **PPM Phase A: the governance core** (T-PPM-A;
+  PPM-1/3/10/12 from the entity roadmap). Work-intake `proposals`
+  pipeline with matcher-backed duplicate-demand detection and
+  promote-to-work-item (`provenance=intake`); strictly ordered
+  phase-gate reviews (g0_concept…g5_benefits) advancing an
+  operational `work_items.stage`, gate-lockable via the new
+  `resource.stage` record-level ABAC (`auth::authorize_record`);
+  risks (1–5 × 1–5 exposure, escalation); budget lines in integer
+  minor units + ISO-4217 with per-currency planned/actual/variance;
+  the per-item `/governance` summary. Pure rules in
+  `src/governance.rs`; every mutation audited; OpenAPI `governance`
+  tag; 4 unit + 5 DB-gated request tests, verified against
+  Postgres 18.
+
+
 ### Fixed
 
 - 2026-07-18 — **Unknown-pid reads returned 500, not 404.** loco 0.16's

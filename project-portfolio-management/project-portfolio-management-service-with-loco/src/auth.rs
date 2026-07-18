@@ -393,6 +393,59 @@ impl MaybeAuthUser {
     pub fn actor(&self) -> Option<&str> {
         self.0.as_ref().map(|c| c.sub.as_str())
     }
+
+    /// The verified [`Claims`] if a valid token was presented, for the
+    /// record-level authorization pass ([`authorize_record`]).
+    #[must_use]
+    pub fn claims(&self) -> Option<&Claims> {
+        self.0.as_ref()
+    }
+}
+
+/// The **record-level resource attributes** of a work item for the
+/// ABAC decision (`authorization-attributes.md` §9): today the
+/// phase-gate `resource.stage` (PPM-3), so a deployment can write
+/// e.g. "deny write past `g3_delivery` unless `access=admin`" purely
+/// as policy. An item with no stage yet exposes no `stage` key.
+#[must_use]
+pub fn work_item_resource_attrs(
+    stage: Option<&str>,
+) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut attrs = std::collections::BTreeMap::new();
+    if let Some(stage) = stage {
+        attrs.insert("stage".to_string(), vec![stage.to_string()]);
+    }
+    attrs
+}
+
+/// **Record-level** authorization for a handler that has loaded its
+/// target: evaluate the policy with the record's resource attributes.
+/// Gated on the same `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` flag
+/// as the blanket guard — a no-op returning no obligations when
+/// enforcement is off.
+///
+/// # Errors
+///
+/// `401` if enforcement is on but no verified claims are present
+/// (fail-safe behind the guard); `403` when the policy denies the
+/// action given the record's attributes.
+pub fn authorize_record(
+    caller: &MaybeAuthUser,
+    action: Action,
+    resource: &std::collections::BTreeMap<String, Vec<String>>,
+) -> Result<Vec<String>, (StatusCode, String)> {
+    if !require_auth() {
+        return Ok(Vec::new());
+    }
+    let claims = caller
+        .claims()
+        .ok_or((StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
+    let decision = policy().evaluate_with_resource(claims, action, ENTITY, resource);
+    if decision.allowed {
+        Ok(decision.obligations)
+    } else {
+        Err((StatusCode::FORBIDDEN, decision.reason))
+    }
 }
 
 /// Extracting a [`MaybeAuthUser`] never rejects: a valid token yields

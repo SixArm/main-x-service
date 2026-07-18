@@ -21,7 +21,7 @@ sameness evidence and operational state stay separate).
 
 **Pillar 1 — Strategic alignment & pipeline management**
 
-- **PPM-1 Work intake.** A `proposals` pipeline (draft → submitted →
+- **PPM-1 Work intake.** ✅ *Delivered 2026-07-18 (service T-PPM-A).* A `proposals` pipeline (draft → submitted →
   in-review → approved / rejected → promoted): demand records with
   sponsor, strategic rationale, rough sizing, and requested funding.
   Promotion mints the real work item with `provenance = intake` and a
@@ -34,7 +34,7 @@ sameness evidence and operational state stay separate).
   posts/comments sub-resources attach here first so brainstorming
   threads live with the idea. Ideas are deliberately schema-thin —
   the funnel is idea → proposal → work item, each step adding rigour.
-- **PPM-3 Phase-gate approvals.** A per-work-item `stage` plus
+- **PPM-3 Phase-gate approvals.** ✅ *Delivered 2026-07-18 (service T-PPM-A).* A per-work-item `stage` plus
   first-class `gate_reviews` (gate name, decision, conditions,
   approver `worker:` ref, date). Writes on a gate-locked work item are
   policy-refusable via a `resource.stage` ABAC attribute ("deny write
@@ -81,7 +81,7 @@ sameness evidence and operational state stay separate).
 
 **Pillar 3 — Value realization & governance**
 
-- **PPM-10 Budget tracking.** `budget_lines` per work item
+- **PPM-10 Budget tracking.** ✅ *Delivered 2026-07-18 (service T-PPM-A).* `budget_lines` per work item
   (capex/opex, currency amount via `bigdecimal`, period) + recorded
   actuals (manual or bulk-imported from finance) ⇒ projected-vs-actual
   variance in the dashboards, rolled up the parent-portfolio
@@ -92,13 +92,13 @@ sameness evidence and operational state stay separate).
   actuals over time ⇒ realized-vs-projected value and simple ROI
   (with PPM-10 costs). Benefits are reviewed at phase gates (PPM-3),
   closing the loop between the funding case and delivery.
-- **PPM-12 Risk management.** `risks` (probability × impact scoring,
+- **PPM-12 Risk management.** ✅ *Delivered 2026-07-18 (service T-PPM-A).* `risks` (probability × impact scoring,
   owner, mitigation, review date) alongside the existing issues;
   escalation converts a materialised risk into an issue with lineage.
   Portfolio-level rollup (exposure by severity, overdue reviews) in
   PPM-7; cross-project dependency risks ride the PPM-6 edges.
 
-**Suggested phasing** — A (governance core): PPM-1, PPM-3, PPM-12,
+**Suggested phasing** — A (governance core, ✅ service side delivered 2026-07-18): PPM-1, PPM-3, PPM-12,
 PPM-10 — intake, gates, risks, budgets give the portfolio office its
 control loop. B (visibility): PPM-6, PPM-7, PPM-8, PPM-9 — dashboards
 and capacity make the control loop observable. C (strategy): PPM-2,

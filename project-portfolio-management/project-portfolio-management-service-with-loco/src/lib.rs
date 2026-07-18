@@ -27,6 +27,8 @@ pub mod app;
 pub mod auth;
 pub mod controllers;
 pub mod data;
+/// Pure PPM governance rules (proposal pipeline, phase gates, risks, money).
+pub mod governance;
 pub mod initializers;
 pub mod merge;
 pub mod metrics;

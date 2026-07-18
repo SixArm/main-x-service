@@ -66,6 +66,7 @@ products, programs}` (identical controller shape each). See
 | Sub-resources | `/{collection}/{pid}/{goals,tasks,issues}` (full CRUD) |
 | Derived views | `GET /{collection}/{pid}/timeline` · `/burndown` |
 | Cross-service links | `POST`/`GET`/`DELETE /{collection}/{pid}/links` (emits `linked`/`unlinked`) |
+| Governance (PPM Phase A) | `POST`/`GET /proposals` (+ `/{pid}` + `submit`/`review`/`approve`/`reject`/`promote`/`duplicates`) · `/{collection}/{pid}/gate-reviews` · `/risks` (+ `/{risk_pid}` + `escalate`) · `/budget-lines` (+ `/{line_pid}/actual`) · `GET /{collection}/{pid}/governance` |
 | Audit / events | `GET /{collection}/audit/recent` · `/{pid}/audit` · `/events/recent` |
 | Auth | `GET /{collection}/whoami` (`401` without a valid token) |
 | Docs / metrics | `GET /api-docs/openapi.json` · `/swagger-ui` · `/metrics.prom` |

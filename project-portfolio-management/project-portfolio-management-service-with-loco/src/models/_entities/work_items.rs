@@ -36,6 +36,10 @@ pub struct Model {
     pub portfolio_pid: Option<Uuid>,
     /// Whether the row is active (cleared on soft-delete).
     pub active: bool,
+    /// Operational phase-gate stage: the highest gate passed
+    /// (`g0_concept` … `g5_benefits`), `None` before the first
+    /// approved gate review. Governance state, not matcher payload.
+    pub stage: Option<String>,
     /// Soft-delete timestamp; `None` while active.
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }

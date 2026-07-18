@@ -250,6 +250,16 @@ async fn update(
     let collection = resolve(&collection)?;
     validate(collection, &wi)?;
     let model = WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), &pid).await.map_err(super::model_not_found)?;
+    // Record-level ABAC (PPM-3): the item's phase-gate stage is a
+    // `resource.stage` attribute, so "deny write past gate N unless
+    // access=admin" is a policy statement. A no-op while enforcement
+    // is off.
+    crate::auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Write,
+        &crate::auth::work_item_resource_attrs(model.stage.as_deref()),
+    )
+    .map_err(super::record_rejection)?;
     let updated = streaming::update_and_emit(&ctx.db, model, &wi, caller.actor()).await?;
     // Audit is written inside `update_and_emit` (see `streaming`).
     Metrics::global().work_item_updated_total.inc();

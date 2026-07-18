@@ -570,6 +570,30 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   round; verified by a live fresh-database migrate. Every other table
   this crate creates via the helper is already plural (no-op).
 
+- [x] **T-PPM-A — Governance core (PPM-1/3/10/12; spec
+  `../spec/15-roadmap.md`), delivered 2026-07-18.** Migration
+  `…_000005_governance` (`proposals`, `gate_reviews`, `risks`,
+  `budget_lines`, + operational `work_items.stage`); pure rules in
+  `src/governance.rs` (proposal pipeline state machine, strictly
+  ordered g0–g5 gates, 1–5×1–5 risk exposure, ISO-4217 shape,
+  overflow-safe minor-unit money — all DB-free unit-tested);
+  `controllers/governance.rs` (intake pipeline
+  draft→submitted→in_review→approved/rejected→promoted with the
+  promote step minting the work item via `create_and_emit` and
+  `provenance=intake` audit; matcher-backed duplicate-demand check
+  over live work items + sibling proposals; gate reviews advancing
+  `stage`; risks with exposure-ranked list + escalate; budget lines
+  with per-currency planned/actual/variance and accumulate-actual;
+  the per-item `/governance` summary). Record-level ABAC:
+  `auth::work_item_resource_attrs` exposes `resource.stage` and
+  `auth::authorize_record` gates work-item `PUT` + gate-review
+  `POST`, so gate-locking is policy. OpenAPI `governance` tag; every
+  mutation audited. Tests: 4 pure-rule unit tests + 5 DB-gated
+  request tests (`tests/requests/governance.rs`), all green vs
+  Postgres 18. Events for governance mutations ride the audit trail
+  only for now — envelope kinds for them arrive with the Phase-B
+  dashboard work.
+
 ## 14. Implementation status
 
 **Spec-only; no code yet.** This document and the doc-set (`README.md`,
