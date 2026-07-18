@@ -1,9 +1,114 @@
 ## 15. Roadmap
 
 Roadmap items become §13 tasks when they are concrete enough to size
-and accept. The near-term roadmap **is** §13 (the entity is spec-only,
-§14); the items below are the longer arc beyond the initial trio
-build-out.
+and accept.
+
+### PPM feature roadmap (proposed 2026-07-18, with the rename)
+
+The subproject rename (`portfolio` → `project-portfolio-management`)
+repositions this trio as a **project portfolio management product**,
+not just a matchable registry of work-item identities. The catalogue
+below maps the standard PPM capability set onto what the trio already
+ships (registry CRUD + within-kind matching/merge across the four
+collections; goals / tasks / issues sub-resources; timeline + burndown
+views; audit + events; bulk import/export; cross-service people/org
+links; ABAC). Design doctrine for every item: new capabilities are
+**operational sub-resources** (tables keyed `(parent_kind,
+parent_pid)`, like goals/tasks/issues), every mutation audits + emits,
+record-level ABAC attributes gate the governance actions, and nothing
+here ever becomes a **matcher signal** (the §8 partition rule —
+sameness evidence and operational state stay separate).
+
+**Pillar 1 — Strategic alignment & pipeline management**
+
+- **PPM-1 Work intake.** A `proposals` pipeline (draft → submitted →
+  in-review → approved / rejected → promoted): demand records with
+  sponsor, strategic rationale, rough sizing, and requested funding.
+  Promotion mints the real work item with `provenance = intake` and a
+  link back to the proposal. Bonus the registry heritage makes cheap:
+  run the **matcher at intake** so a duplicate demand is flagged
+  against both existing proposals and live work items before it is
+  funded.
+- **PPM-2 Idea management.** Lightweight `ideas` (title, pitch, tags,
+  votes) convertible to proposals in one action; the roadmap's
+  posts/comments sub-resources attach here first so brainstorming
+  threads live with the idea. Ideas are deliberately schema-thin —
+  the funnel is idea → proposal → work item, each step adding rigour.
+- **PPM-3 Phase-gate approvals.** A per-work-item `stage` plus
+  first-class `gate_reviews` (gate name, decision, conditions,
+  approver `worker:` ref, date). Writes on a gate-locked work item are
+  policy-refusable via a `resource.stage` ABAC attribute ("deny write
+  past gate-3 unless `access=admin`"), making governance a policy
+  statement, not code. Approvals are audited governance events.
+- **PPM-4 Scenario planning.** `scenarios`: named candidate portfolios
+  (a set of work items / proposals + constraint knobs — budget cap,
+  capacity cap, must-include). A pure-core evaluator scores each
+  scenario against PPM-8 capacity and PPM-10 budget data (total cost,
+  demand vs capacity, alignment score) so what-if comparison is
+  arithmetic over live data, patient-flow-at-a-glance style.
+  Committing a scenario stamps the chosen items' funding state.
+- **PPM-5 OKR / objective alignment.** An org-level `objectives`
+  registry (OKRs) and a work-item → objective mapping with weights;
+  alignment rolls up per collection and per parent portfolio, so
+  "how much of the portfolio serves objective X" is a query. Work-item
+  `goals` already exist; this adds the strategic layer above them.
+
+**Pillar 2 — Execution & visibility**
+
+- **PPM-6 Roadmap & dependency views.** Timeline/Gantt exists;
+  add cross-work-item `dependencies` (finish-start edges between
+  tasks/work items, with lag) + milestone records, and derive the
+  critical path + slipping-dependency warnings in the timeline view.
+- **PPM-7 Portfolio dashboards.** A portfolio-level at-a-glance
+  endpoint (the patient-flow pattern, ETag-conditional): per-collection
+  rollups of RAG health, schedule variance (timeframe vs today), open
+  risks/issues by severity, budget variance (PPM-10), capacity
+  hot-spots (PPM-8), gate-stage distribution — plus site-tile
+  headlines for the executive view.
+- **PPM-8 Resource capacity planning.** `allocations`: person/worker
+  `EntityRef` + work item (or task) + percentage + timeframe. Rollup
+  per person against a configurable weekly capacity ⇒ over-allocation
+  detection, a capacity heatmap, and reassignment suggestions
+  (largest-slack first). People stay references — no demographics
+  copied (family doctrine), and allocations are never matcher
+  signals.
+- **PPM-9 Custom reporting.** Saved report definitions (filter +
+  field projection + grouping) executed through the existing bulk
+  export machinery (JSONL/CSV; Parquet when the family lands it), a
+  KPI/OKR snapshot endpoint for stakeholder decks, and scheduled
+  report generation as a `bg_pg` job with the artifact-store TTL
+  posture from `agents/share/bulk-import-export.md`.
+
+**Pillar 3 — Value realization & governance**
+
+- **PPM-10 Budget tracking.** `budget_lines` per work item
+  (capex/opex, currency amount via `bigdecimal`, period) + recorded
+  actuals (manual or bulk-imported from finance) ⇒ projected-vs-actual
+  variance in the dashboards, rolled up the parent-portfolio
+  hierarchy. Centralises financial oversight without becoming a
+  ledger — actuals are imported facts, not double-entry bookkeeping.
+- **PPM-11 Benefits tracking.** `benefits` per work item: category,
+  metric, baseline, target, expected realization date — then recorded
+  actuals over time ⇒ realized-vs-projected value and simple ROI
+  (with PPM-10 costs). Benefits are reviewed at phase gates (PPM-3),
+  closing the loop between the funding case and delivery.
+- **PPM-12 Risk management.** `risks` (probability × impact scoring,
+  owner, mitigation, review date) alongside the existing issues;
+  escalation converts a materialised risk into an issue with lineage.
+  Portfolio-level rollup (exposure by severity, overdue reviews) in
+  PPM-7; cross-project dependency risks ride the PPM-6 edges.
+
+**Suggested phasing** — A (governance core): PPM-1, PPM-3, PPM-12,
+PPM-10 — intake, gates, risks, budgets give the portfolio office its
+control loop. B (visibility): PPM-6, PPM-7, PPM-8, PPM-9 — dashboards
+and capacity make the control loop observable. C (strategy): PPM-2,
+PPM-4, PPM-5, PPM-11 — scenarios, OKRs, and benefits need A + B's
+data to be meaningful. Each item lands as spec §13 tasks (three-part
+rule) when accepted.
+
+### Longer arc (pre-rename roadmap)
+
+The items below predate the PPM repositioning and remain valid.
 
 - **Collaboration sub-resources.** The plan-family lineage carried
   posts, comments, and membership sub-resources; this entity ships
