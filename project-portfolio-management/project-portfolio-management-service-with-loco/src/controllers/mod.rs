@@ -2,6 +2,7 @@
 
 pub mod docs;
 pub mod governance;
+pub mod visibility;
 pub mod metrics;
 pub mod work_items;
 
@@ -31,4 +32,44 @@ pub fn record_rejection(
         "unauthorized"
     };
     loco_rs::Error::CustomError(status, loco_rs::controller::ErrorDetail::new(code, &reason))
+}
+
+/// Weak `ETag` over a serializable view (everything except `as_of`).
+#[must_use]
+pub fn etag_of<T: serde::Serialize>(value: &T) -> String {
+    use std::hash::{Hash, Hasher};
+    let json = serde_json::to_string(value).unwrap_or_default();
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    json.hash(&mut hasher);
+    format!("W/\"{:016x}\"", hasher.finish())
+}
+
+/// Serve `body` as JSON with `etag`, honouring `If-None-Match` → `304`
+/// (the patient-flow conditional-read pattern).
+///
+/// # Errors
+///
+/// When the body fails to serialize.
+pub fn conditional_json<T: serde::Serialize>(
+    headers: &axum::http::HeaderMap,
+    etag: &str,
+    body: &T,
+) -> loco_rs::Result<axum::response::Response> {
+    use axum::http::{StatusCode, header};
+    use axum::response::IntoResponse;
+    let matched = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.trim() == etag);
+    let etag_value = header::HeaderValue::from_str(etag)
+        .unwrap_or_else(|_| header::HeaderValue::from_static("W/\"0\""));
+    if matched {
+        return Ok((StatusCode::NOT_MODIFIED, [(header::ETAG, etag_value)]).into_response());
+    }
+    Ok((
+        StatusCode::OK,
+        [(header::ETAG, etag_value)],
+        axum::Json(serde_json::to_value(body).map_err(|e| loco_rs::Error::Any(e.into()))?),
+    )
+        .into_response())
 }

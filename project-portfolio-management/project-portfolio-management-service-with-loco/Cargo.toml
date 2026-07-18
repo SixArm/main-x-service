@@ -60,6 +60,8 @@ required-features = []
 
 [dev-dependencies]
 loco-rs = { workspace = true, features = ["testing"] }
+# Name the `TestServer` type in shared request-test helpers.
+axum-test = { version = "17.0.1" }
 # `#[tokio::test]` + a local ephemeral-port HTTP listener for the boot-time key-set fetch tests.
 tokio = { version = "1.52", default-features = false, features = [
   "rt-multi-thread",

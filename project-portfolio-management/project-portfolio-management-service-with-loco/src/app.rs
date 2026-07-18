@@ -26,7 +26,7 @@ use std::path::Path;
 #[allow(unused_imports)]
 use crate::{
     auth, controllers,
-    models::_entities::{audit_logs, budget_lines, event_outbox, gate_reviews, merge_records, proposals, risks, work_items},
+    models::_entities::{allocations, audit_logs, budget_lines, event_outbox, gate_reviews, merge_records, milestones, proposals, report_definitions, risks, work_item_dependencies, work_items},
     tasks,
     workers::downloader::DownloadWorker,
 };
@@ -91,6 +91,7 @@ impl Hooks for App {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::work_items::routes())
             .add_route(controllers::governance::routes())
+            .add_route(controllers::visibility::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }
@@ -125,6 +126,10 @@ impl Hooks for App {
         // tasks-inject (do not remove)
     }
     async fn truncate(ctx: &AppContext) -> Result<()> {
+        truncate_table(&ctx.db, report_definitions::Entity).await?;
+        truncate_table(&ctx.db, allocations::Entity).await?;
+        truncate_table(&ctx.db, milestones::Entity).await?;
+        truncate_table(&ctx.db, work_item_dependencies::Entity).await?;
         truncate_table(&ctx.db, budget_lines::Entity).await?;
         truncate_table(&ctx.db, risks::Entity).await?;
         truncate_table(&ctx.db, gate_reviews::Entity).await?;

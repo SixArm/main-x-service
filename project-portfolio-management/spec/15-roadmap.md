@@ -55,24 +55,24 @@ sameness evidence and operational state stay separate).
 
 **Pillar 2 — Execution & visibility**
 
-- **PPM-6 Roadmap & dependency views.** Timeline/Gantt exists;
+- **PPM-6 Roadmap & dependency views.** ✅ *Delivered 2026-07-18 (service T-PPM-B).* Timeline/Gantt exists;
   add cross-work-item `dependencies` (finish-start edges between
   tasks/work items, with lag) + milestone records, and derive the
   critical path + slipping-dependency warnings in the timeline view.
-- **PPM-7 Portfolio dashboards.** A portfolio-level at-a-glance
+- **PPM-7 Portfolio dashboards.** ✅ *Delivered 2026-07-18 (service T-PPM-B).* A portfolio-level at-a-glance
   endpoint (the patient-flow pattern, ETag-conditional): per-collection
   rollups of RAG health, schedule variance (timeframe vs today), open
   risks/issues by severity, budget variance (PPM-10), capacity
   hot-spots (PPM-8), gate-stage distribution — plus site-tile
   headlines for the executive view.
-- **PPM-8 Resource capacity planning.** `allocations`: person/worker
+- **PPM-8 Resource capacity planning.** ✅ *Delivered 2026-07-18 (service T-PPM-B).* `allocations`: person/worker
   `EntityRef` + work item (or task) + percentage + timeframe. Rollup
   per person against a configurable weekly capacity ⇒ over-allocation
   detection, a capacity heatmap, and reassignment suggestions
   (largest-slack first). People stay references — no demographics
   copied (family doctrine), and allocations are never matcher
   signals.
-- **PPM-9 Custom reporting.** Saved report definitions (filter +
+- **PPM-9 Custom reporting.** ✅ *Delivered 2026-07-18 (service T-PPM-B; synchronous runs — scheduled/bulk-artifact runs await the family bulk machinery).* Saved report definitions (filter +
   field projection + grouping) executed through the existing bulk
   export machinery (JSONL/CSV; Parquet when the family lands it), a
   KPI/OKR snapshot endpoint for stakeholder decks, and scheduled
@@ -100,7 +100,7 @@ sameness evidence and operational state stay separate).
 
 **Suggested phasing** — A (governance core, ✅ service side delivered 2026-07-18): PPM-1, PPM-3, PPM-12,
 PPM-10 — intake, gates, risks, budgets give the portfolio office its
-control loop. B (visibility): PPM-6, PPM-7, PPM-8, PPM-9 — dashboards
+control loop. B (visibility, ✅ service side delivered 2026-07-18): PPM-6, PPM-7, PPM-8, PPM-9 — dashboards
 and capacity make the control loop observable. C (strategy): PPM-2,
 PPM-4, PPM-5, PPM-11 — scenarios, OKRs, and benefits need A + B's
 data to be meaningful. Each item lands as spec §13 tasks (three-part

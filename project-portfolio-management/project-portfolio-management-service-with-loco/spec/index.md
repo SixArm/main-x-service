@@ -594,6 +594,25 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   only for now — envelope kinds for them arrive with the Phase-B
   dashboard work.
 
+- [x] **T-PPM-B — Visibility (PPM-6/7/8/9; spec
+  `../spec/15-roadmap.md`), delivered 2026-07-18.** Migration
+  `…_000006_visibility` (`work_item_dependencies`, `milestones`,
+  `allocations`, `report_definitions`); pure rules in
+  `src/visibility.rs` (flexible-date parsing `YYYY[-MM[-DD]]`,
+  DFS cycle detection, finish-start violation checks with lag, a
+  memoised longest-duration critical path, the documented RAG
+  heuristic, window-overlap capacity sums, RFC-4180 CSV escaping —
+  7 DB-free unit tests); `controllers/visibility.rs` (dependencies
+  with self/duplicate/cycle refusal; `GET
+  /portfolios/{pid}/schedule` with violations + critical path +
+  undated members; milestones with overdue flags; allocations +
+  `GET /capacity` per-person rollup flagging > 100 %; saved reports
+  run synchronously as JSON or CSV, row cap 1000; the
+  ETag-conditional `GET /at-a-glance` dashboard with per-collection
+  RAG / stage rollups and site tiles). 5 DB-gated request tests,
+  green vs Postgres 18. Scheduled/artifact report runs await the
+  family bulk machinery (roadmap).
+
 ## 14. Implementation status
 
 **Spec-only; no code yet.** This document and the doc-set (`README.md`,

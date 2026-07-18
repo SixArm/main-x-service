@@ -29,6 +29,8 @@ pub mod controllers;
 pub mod data;
 /// Pure PPM governance rules (proposal pipeline, phase gates, risks, money).
 pub mod governance;
+/// Pure PPM visibility rules (schedule math, RAG, capacity, CSV).
+pub mod visibility;
 pub mod initializers;
 pub mod merge;
 pub mod metrics;

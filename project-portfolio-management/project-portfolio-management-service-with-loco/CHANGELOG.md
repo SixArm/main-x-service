@@ -11,6 +11,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-18 — **PPM Phase B: visibility** (T-PPM-B; PPM-6/7/8/9).
+  Cross-item finish-start dependencies (cycle-refusing) + the
+  portfolio schedule view (violations, memoised critical path,
+  undated members); milestones with overdue flags; resource
+  allocations over `person:`/`worker:` URNs + the per-person
+  capacity rollup (summed percent over a window, > 100 % flagged);
+  saved report definitions run synchronously as JSON or CSV
+  (RFC-4180 escaping, row cap 1000); the ETag-conditional
+  `/api/at-a-glance` dashboard (per-collection RAG — documented
+  heuristic over materialised risks / overdue targets / budget
+  overrun / exposure / schedule violations — stage distributions,
+  and site tiles). Pure rules in `src/visibility.rs`; 7 unit + 5
+  DB-gated request tests vs Postgres 18.
+
 - 2026-07-18 — **PPM Phase A: the governance core** (T-PPM-A;
   PPM-1/3/10/12 from the entity roadmap). Work-intake `proposals`
   pipeline with matcher-backed duplicate-demand detection and

@@ -1,11 +1,15 @@
 //! `SeaORM` Entities.
 
+pub mod allocations;
 pub mod audit_logs;
 pub mod budget_lines;
-pub mod gate_reviews;
 pub mod event_outbox;
+pub mod gate_reviews;
 pub mod merge_records;
+pub mod milestones;
 pub mod prelude;
 pub mod proposals;
+pub mod report_definitions;
 pub mod risks;
+pub mod work_item_dependencies;
 pub mod work_items;

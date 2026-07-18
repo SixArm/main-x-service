@@ -3044,6 +3044,7 @@ dependencies = [
  "async-trait",
  "authentication-verifier",
  "axum",
+ "axum-test",
  "base64",
  "chrono",
  "ed25519-dalek",

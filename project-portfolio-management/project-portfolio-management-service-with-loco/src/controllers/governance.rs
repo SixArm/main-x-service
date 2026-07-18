@@ -42,7 +42,7 @@ fn refuse(message: &str) -> Error {
 /// A permitted sponsor/approver/owner reference: an EntityRef-shaped
 /// URN (`person:` / `worker:` / `organization:` + UUID). Format check
 /// only — resolution is the reader's concern.
-fn valid_ref(value: &str, schemes: &[&str]) -> bool {
+pub(crate) fn valid_ref(value: &str, schemes: &[&str]) -> bool {
     schemes.iter().any(|scheme| {
         value
             .strip_prefix(scheme)
@@ -384,7 +384,11 @@ async fn proposal_duplicates(
 
 /// Resolve `{collection}/{pid}` to the stored work item (404 on
 /// either being unknown).
-async fn find_item(ctx: &AppContext, collection: &str, pid: &str) -> Result<work_items::Model> {
+pub(crate) async fn find_item(
+    ctx: &AppContext,
+    collection: &str,
+    pid: &str,
+) -> Result<work_items::Model> {
     let collection = Collection::from_segment(collection).ok_or(Error::NotFound)?;
     WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), pid)
         .await
