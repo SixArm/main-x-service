@@ -11,6 +11,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-18 — **PPM Phase C: strategy** (T-PPM-C; PPM-2/4/5/11).
+  The idea funnel (capture / vote / dismiss / convert into a draft
+  proposal, `provenance=idea` — completing idea → proposal → work
+  item); what-if scenarios evaluated over live budgets, open risk
+  exposure, and OKR alignment (per-currency saturating sums, budget
+  cap + must-include violations; **infeasible commits refused**, the
+  committed evaluation audited); the OKR objective registry with
+  weighted (1–5) per-pair-upserting item mappings and
+  per-collection alignment rollups; benefits with minor-unit
+  financial targets or non-financial notes, accumulate-realize, and
+  per-currency **ROI in basis points** against recorded budget
+  actuals. Pure rules in `src/strategy.rs`; 3 unit + 4 DB-gated
+  request tests vs Postgres 18.
+
 - 2026-07-18 — **PPM Phase B: visibility** (T-PPM-B; PPM-6/7/8/9).
   Cross-item finish-start dependencies (cycle-refusing) + the
   portfolio schedule view (violations, memoised critical path,

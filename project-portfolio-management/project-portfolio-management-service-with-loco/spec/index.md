@@ -613,6 +613,25 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   green vs Postgres 18. Scheduled/artifact report runs await the
   family bulk machinery (roadmap).
 
+- [x] **T-PPM-C — Strategy (PPM-2/4/5/11; spec
+  `../spec/15-roadmap.md`), delivered 2026-07-18.** Migration
+  `…_000007_strategy` (`ideas`, `scenarios`, `objectives`,
+  `objective_links`, `benefits`); pure rules in `src/strategy.rs`
+  (scenario evaluation over prepared member facts — per-currency
+  saturating sums, cap + must-include violations; ROI in basis
+  points with the zero-cost guard; OKR weight bounds — 3 DB-free
+  unit tests); `controllers/strategy.rs` (the idea funnel:
+  capture / vote / dismiss / convert-to-draft-proposal with
+  `provenance=idea`; scenarios evaluated over live budgets, risks,
+  and alignment with **infeasible commits refused** and the
+  evaluation snapshot audited on commit; the OKR registry with
+  weighted per-pair-upserting item mappings and per-collection
+  alignment rollups; benefits with financial minor-unit targets or
+  non-financial notes, accumulate-realize, and per-currency ROI
+  against recorded budget actuals). 4 DB-gated request tests, green
+  vs Postgres 18. The full PPM catalogue (Phases A+B+C) is now
+  delivered service-side.
+
 ## 14. Implementation status
 
 **Spec-only; no code yet.** This document and the doc-set (`README.md`,

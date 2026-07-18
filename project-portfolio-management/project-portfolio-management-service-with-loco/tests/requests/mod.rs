@@ -5,5 +5,6 @@
 
 mod event_outbox;
 mod governance;
+mod strategy;
 mod visibility;
 mod work_items;

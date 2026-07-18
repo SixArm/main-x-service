@@ -6,5 +6,6 @@ pub mod audit_logs;
 pub mod event_outbox;
 pub mod merge_records;
 pub mod governance;
+pub mod strategy;
 pub mod visibility;
 pub mod work_items;

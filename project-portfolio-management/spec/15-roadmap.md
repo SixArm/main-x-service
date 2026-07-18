@@ -29,7 +29,7 @@ sameness evidence and operational state stay separate).
   run the **matcher at intake** so a duplicate demand is flagged
   against both existing proposals and live work items before it is
   funded.
-- **PPM-2 Idea management.** Lightweight `ideas` (title, pitch, tags,
+- **PPM-2 Idea management.** ✅ *Delivered 2026-07-18 (service T-PPM-C).* Lightweight `ideas` (title, pitch, tags,
   votes) convertible to proposals in one action; the roadmap's
   posts/comments sub-resources attach here first so brainstorming
   threads live with the idea. Ideas are deliberately schema-thin —
@@ -40,14 +40,14 @@ sameness evidence and operational state stay separate).
   policy-refusable via a `resource.stage` ABAC attribute ("deny write
   past gate-3 unless `access=admin`"), making governance a policy
   statement, not code. Approvals are audited governance events.
-- **PPM-4 Scenario planning.** `scenarios`: named candidate portfolios
+- **PPM-4 Scenario planning.** ✅ *Delivered 2026-07-18 (service T-PPM-C).* `scenarios`: named candidate portfolios
   (a set of work items / proposals + constraint knobs — budget cap,
   capacity cap, must-include). A pure-core evaluator scores each
   scenario against PPM-8 capacity and PPM-10 budget data (total cost,
   demand vs capacity, alignment score) so what-if comparison is
   arithmetic over live data, patient-flow-at-a-glance style.
   Committing a scenario stamps the chosen items' funding state.
-- **PPM-5 OKR / objective alignment.** An org-level `objectives`
+- **PPM-5 OKR / objective alignment.** ✅ *Delivered 2026-07-18 (service T-PPM-C).* An org-level `objectives`
   registry (OKRs) and a work-item → objective mapping with weights;
   alignment rolls up per collection and per parent portfolio, so
   "how much of the portfolio serves objective X" is a query. Work-item
@@ -87,7 +87,7 @@ sameness evidence and operational state stay separate).
   variance in the dashboards, rolled up the parent-portfolio
   hierarchy. Centralises financial oversight without becoming a
   ledger — actuals are imported facts, not double-entry bookkeeping.
-- **PPM-11 Benefits tracking.** `benefits` per work item: category,
+- **PPM-11 Benefits tracking.** ✅ *Delivered 2026-07-18 (service T-PPM-C).* `benefits` per work item: category,
   metric, baseline, target, expected realization date — then recorded
   actuals over time ⇒ realized-vs-projected value and simple ROI
   (with PPM-10 costs). Benefits are reviewed at phase gates (PPM-3),
@@ -101,9 +101,10 @@ sameness evidence and operational state stay separate).
 **Suggested phasing** — A (governance core, ✅ service side delivered 2026-07-18): PPM-1, PPM-3, PPM-12,
 PPM-10 — intake, gates, risks, budgets give the portfolio office its
 control loop. B (visibility, ✅ service side delivered 2026-07-18): PPM-6, PPM-7, PPM-8, PPM-9 — dashboards
-and capacity make the control loop observable. C (strategy): PPM-2,
+and capacity make the control loop observable. C (strategy, ✅ service side delivered 2026-07-18): PPM-2,
 PPM-4, PPM-5, PPM-11 — scenarios, OKRs, and benefits need A + B's
-data to be meaningful. Each item lands as spec §13 tasks (three-part
+data to be meaningful. **The whole catalogue is now delivered
+service-side; the remaining pull is the front-end views.** Each item lands as spec §13 tasks (three-part
 rule) when accepted.
 
 ### Longer arc (pre-rename roadmap)
