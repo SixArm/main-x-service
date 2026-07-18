@@ -14,11 +14,13 @@ provides the HR, manager, and employee self-service client.
 > statutory calculations are illustrative stubs; synthetic data
 > only. See [spec/regulatory](../spec/regulatory.md).
 
-**Status: not started.** The cross-cutting specification landed
-2026-07-18; the delivery queue is
-[../spec/tasks.md](../spec/tasks.md) (HCM-T1 onward).
+**Status: implemented (HCM-T1–T17, 2026-07-18).** Builds, 71 DB-free
+unit tests + 7 request tests + the enforcement persona matrix pass
+against Postgres 18, clippy-pedantic clean, live smoke verified
+(migrate → seed → org chart → payroll → benchmarks). Remaining in
+[../spec/tasks.md](../spec/tasks.md): the front-end (HCM-T18/T19).
 
-## What it will answer
+## What it answers
 
 - *Where is this vacancy in its pipeline?* — requisition +
   application state machines
@@ -30,7 +32,7 @@ provides the HR, manager, and employee self-service client.
 - *Which critical roles have no ready successor?* — the succession
   gap report
 
-## Target surface (per the cross-cutting spec)
+## Surface
 
 Requisitions / candidates / applications / interviews · onboarding
 items · employees + org-chart · time entries · leave entitlements +
@@ -40,5 +42,16 @@ succession plans · payroll runs + payslips · benchmarks · audits ·
 `/events/recent` · OpenAPI + Swagger · `/metrics.prom`.
 
 Auth enforcement defaults **off** (`HCM_REQUIRE_AUTH` is the family
-activation gate); upstream lookups will default to **stub mode**;
-events default to the in-memory transport.
+activation gate); upstream lookups default to **stub mode**; events
+default to the in-memory transport.
+
+## Quick start
+
+```bash
+# Postgres 18 with a loco user, then:
+export DATABASE_URL=postgres://loco:loco@localhost:5432/human_capital_management_service_development
+cargo run -- db migrate       # create the schema
+cargo run -- task seed        # synthetic demo org (40 employees)
+cargo run -- start            # serve on :5150
+curl "localhost:5150/api/org-chart?organization=<org-urn>" | jq .
+```
