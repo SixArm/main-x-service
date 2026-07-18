@@ -1,0 +1,204 @@
+// Typed HCM API surface over the BFF proxy, plus the family `money()`
+// formatter. Paths mirror the service routes one-to-one — the
+// Playwright suite stubs these exact paths, so drift fails loudly.
+
+import { api } from "$lib/api/client";
+import type {
+  Application,
+  Benchmark,
+  ComparisonRow,
+  Employee,
+  LeaveEntitlement,
+  LeaveRequest,
+  OnboardingItem,
+  OrgNode,
+  Payslip,
+  PayrollRun,
+  Requisition,
+  Review,
+  SuccessionEntry,
+  TrainingEnrollment,
+} from "$lib/api/types";
+
+type FetchLike = { fetch?: typeof fetch };
+
+/**
+ * Format minor units + ISO-4217 as a locale-aware money string.
+ * `null` renders as an em dash (the masked/absent state) — never 0,
+ * which would be a lie.
+ */
+export function money(
+  minor: number | null | undefined,
+  currency: string | null | undefined,
+  locale?: string,
+): string {
+  if (minor === null || minor === undefined || !currency) return "—";
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+  }).format(minor / 100);
+}
+
+/** Employees list (optionally filtered). */
+export function listEmployees(
+  filters?: { department?: string; status?: string },
+  init?: FetchLike,
+): Promise<Employee[]> {
+  const params = new URLSearchParams();
+  if (filters?.department) params.set("department", filters.department);
+  if (filters?.status) params.set("status", filters.status);
+  const qs = params.size ? `?${params}` : "";
+  return api(`/employees${qs}`, init);
+}
+
+/** One employee. */
+export function getEmployee(pid: string, init?: FetchLike): Promise<Employee> {
+  return api(`/employees/${pid}`, init);
+}
+
+/** One employee lifecycle transition. */
+export function changeStatus(pid: string, to: string): Promise<Employee> {
+  return api(`/employees/${pid}/status`, { method: "POST", body: { to } });
+}
+
+/** The manager forest for one organization. */
+export function orgChart(organization: string, init?: FetchLike): Promise<OrgNode[]> {
+  return api(`/org-chart?organization=${encodeURIComponent(organization)}`, init);
+}
+
+/** Requisitions (optionally by status). */
+export function listRequisitions(status?: string, init?: FetchLike): Promise<Requisition[]> {
+  return api(`/requisitions${status ? `?status=${status}` : ""}`, init);
+}
+
+/** One requisition. */
+export function getRequisition(pid: string, init?: FetchLike): Promise<Requisition> {
+  return api(`/requisitions/${pid}`, init);
+}
+
+/** One requisition transition. */
+export function requisitionStatus(pid: string, to: string): Promise<Requisition> {
+  return api(`/requisitions/${pid}/status`, { method: "POST", body: { to } });
+}
+
+/** A requisition's applications. */
+export function listApplications(pid: string, init?: FetchLike): Promise<Application[]> {
+  return api(`/requisitions/${pid}/applications`, init);
+}
+
+/** One application stage transition. */
+export function applicationStage(
+  pid: string,
+  body: { to: string; employee_number?: string; salary_minor?: number; salary_currency?: string },
+): Promise<{ pid: string; stage: string; employee_pid: string | null }> {
+  return api(`/applications/${pid}/stage`, { method: "POST", body });
+}
+
+/** An employee's onboarding checklist. */
+export function listOnboarding(pid: string, init?: FetchLike): Promise<OnboardingItem[]> {
+  return api(`/employees/${pid}/onboarding`, init);
+}
+
+/** Complete one checklist item. */
+export function completeItem(pid: string): Promise<OnboardingItem> {
+  return api(`/onboarding-items/${pid}/complete`, { method: "POST" });
+}
+
+/** An employee's leave balances. */
+export function listEntitlements(pid: string, init?: FetchLike): Promise<LeaveEntitlement[]> {
+  return api(`/employees/${pid}/leave-entitlements`, init);
+}
+
+/** An employee's leave requests. */
+export function listLeaveRequests(pid: string, init?: FetchLike): Promise<LeaveRequest[]> {
+  return api(`/employees/${pid}/leave-requests`, init);
+}
+
+/** Decide one leave request. */
+export function decideLeave(
+  pid: string,
+  decision: "approve" | "reject" | "cancel",
+): Promise<LeaveRequest> {
+  return api(`/leave-requests/${pid}/${decision}`, { method: "POST" });
+}
+
+/** The rota (shifts + assignments). */
+export function listShifts(
+  filters?: { department?: string; date?: string },
+  init?: FetchLike,
+): Promise<{ shift: { pid: string; department: string; starts_at: string; ends_at: string; required_headcount: number }; assignments: { pid: string; employee_pid: string }[] }[]> {
+  const params = new URLSearchParams();
+  if (filters?.department) params.set("department", filters.department);
+  if (filters?.date) params.set("date", filters.date);
+  const qs = params.size ? `?${params}` : "";
+  return api(`/shifts${qs}`, init);
+}
+
+/** An employee's reviews. */
+export function listReviews(pid: string, init?: FetchLike): Promise<Review[]> {
+  return api(`/employees/${pid}/reviews`, init);
+}
+
+/** An employee's training enrolments. */
+export function listTraining(pid: string, init?: FetchLike): Promise<TrainingEnrollment[]> {
+  return api(`/employees/${pid}/training-enrollments`, init);
+}
+
+/** Certificates expiring within the window. */
+export function expiringTraining(
+  withinDays: number,
+  init?: FetchLike,
+): Promise<{ as_of: string; horizon: string; expiring: TrainingEnrollment[] }> {
+  return api(`/training/expiring?within_days=${withinDays}`, init);
+}
+
+/** Succession plans with ranked candidates. */
+export function listSuccession(init?: FetchLike): Promise<SuccessionEntry[]> {
+  return api("/succession-plans", init);
+}
+
+/** The succession gap report. */
+export function successionGaps(init?: FetchLike): Promise<{ gaps: SuccessionEntry["plan"][] }> {
+  return api("/succession-plans/gaps", init);
+}
+
+/** Payroll runs. */
+export function listRuns(init?: FetchLike): Promise<PayrollRun[]> {
+  return api("/payroll-runs", init);
+}
+
+/** One payroll run. */
+export function getRun(pid: string, init?: FetchLike): Promise<PayrollRun> {
+  return api(`/payroll-runs/${pid}`, init);
+}
+
+/** One run action (calculate / approve / pay / reopen). */
+export function runAction(
+  pid: string,
+  action: "calculate" | "approve" | "pay" | "reopen",
+): Promise<PayrollRun> {
+  return api(`/payroll-runs/${pid}/${action}`, { method: "POST" });
+}
+
+/** A run's payslips. */
+export function runPayslips(pid: string, init?: FetchLike): Promise<Payslip[]> {
+  return api(`/payroll-runs/${pid}/payslips`, init);
+}
+
+/** One employee's payslips (self-service). */
+export function employeePayslips(pid: string, init?: FetchLike): Promise<Payslip[]> {
+  return api(`/employees/${pid}/payslips`, init);
+}
+
+/** Benchmarks. */
+export function listBenchmarks(init?: FetchLike): Promise<Benchmark[]> {
+  return api("/benchmarks", init);
+}
+
+/** The benchmark comparison (flags only). */
+export function benchmarkComparison(
+  organization: string,
+  init?: FetchLike,
+): Promise<{ organization: string; rows: ComparisonRow[] }> {
+  return api(`/benchmarks/comparison?organization=${encodeURIComponent(organization)}`, init);
+}

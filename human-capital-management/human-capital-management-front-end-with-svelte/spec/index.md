@@ -27,7 +27,22 @@ and `money()` are the closest source). BFF auth per
 - **No client-held tokens**: mutations via server routes (session
   cookie + CSRF).
 
+## Edition-specific implementation notes (as landed)
+
+- **Copy source**: the patient-flow front-end (BFF proxy, session
+  flow, SPA mode) + the PPM front-end's i18n pattern (compact 48-key
+  catalogue here).
+- **Layout**: `src/lib/{i18n.svelte.ts,api/{client,types,hcm}.ts,
+  components/OrgTree.svelte,server/*}`, routes per the README table;
+  the proxy strips cookies, stamps `Accepts-version: 1.0`, and
+  carries the session→PASETO exchange seam.
+- **Masked money**: `money(null, …)` renders an em dash and the
+  employee list/profile render `common.masked` — never a fake 0.
+- **Testing**: vitest (money honesty, i18n parity, the API path
+  map); Playwright against `vite preview` with `page.route` stubs
+  mirroring the service contract (unstubbed calls 404 loudly).
+
 ## Delivery
 
-This edition is HCM-T18/T19 in
-[../../spec/tasks.md](../../spec/tasks.md). Nothing implemented yet.
+HCM-T18/T19 **delivered 2026-07-18** — see
+[../../spec/tasks.md](../../spec/tasks.md).

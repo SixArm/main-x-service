@@ -10,18 +10,20 @@ succession, payroll runs, and salary benchmarking.
 > ⚠️ **Demo software.** Not a production HR system; synthetic data
 > only. See [spec/regulatory](../spec/regulatory.md).
 
-**Status: not started.** The cross-cutting specification landed
-2026-07-18; this edition is HCM-T18/T19 in
-[../spec/tasks.md](../spec/tasks.md).
+**Status: implemented (HCM-T18/T19, 2026-07-18).** svelte-check
+clean; 5 vitest + 4 Playwright tests pass (`page.route`-stubbed —
+runs without the Rust service). Quick start: `pnpm install &&
+pnpm dev` (expects the Loco sibling on :5150; `pnpm test` /
+`pnpm exec playwright test`).
 
-## Planned stack
+## Stack
 
 SvelteKit 2 · Svelte 5 runes · TypeScript strict · SPA mode with a
 same-origin BFF proxy (session cookie → short-lived PASETO; no token
 in browser JS) · 13-locale i18n · vitest + Playwright
 (`page.route`-stubbed).
 
-## Planned views
+## Views
 
 | Area | Views |
 |---|---|

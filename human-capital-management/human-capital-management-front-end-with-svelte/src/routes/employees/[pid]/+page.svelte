@@ -1,0 +1,185 @@
+<script lang="ts">
+  import { page } from "$app/state";
+  import {
+    changeStatus,
+    completeItem,
+    employeePayslips,
+    getEmployee,
+    listEntitlements,
+    listLeaveRequests,
+    listOnboarding,
+    listReviews,
+    listTraining,
+    money,
+  } from "$lib/api/hcm";
+  import { i18n, t } from "$lib/i18n.svelte";
+  import type {
+    Employee,
+    LeaveEntitlement,
+    LeaveRequest,
+    OnboardingItem,
+    Payslip,
+    Review,
+    TrainingEnrollment,
+  } from "$lib/api/types";
+
+  let employee = $state<Employee | null>(null);
+  let onboarding = $state<OnboardingItem[]>([]);
+  let balances = $state<LeaveEntitlement[]>([]);
+  let leave = $state<LeaveRequest[]>([]);
+  let payslips = $state<Payslip[]>([]);
+  let reviews = $state<Review[]>([]);
+  let training = $state<TrainingEnrollment[]>([]);
+  let error = $state<string | null>(null);
+  let actionError = $state<string | null>(null);
+
+  const pid = $derived(page.params.pid ?? "");
+
+  async function load() {
+    try {
+      employee = await getEmployee(pid);
+      [onboarding, balances, leave, payslips, reviews, training] = await Promise.all([
+        listOnboarding(pid),
+        listEntitlements(pid),
+        listLeaveRequests(pid),
+        employeePayslips(pid),
+        listReviews(pid),
+        listTraining(pid),
+      ]);
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : String(cause);
+    }
+  }
+
+  $effect(() => {
+    if (pid) void load();
+  });
+
+  async function transition(to: string) {
+    actionError = null;
+    try {
+      await changeStatus(pid, to);
+      await load();
+    } catch (cause) {
+      actionError = cause instanceof Error ? cause.message : String(cause);
+    }
+  }
+
+  async function complete(itemPid: string) {
+    actionError = null;
+    try {
+      await completeItem(itemPid);
+      await load();
+    } catch (cause) {
+      actionError = cause instanceof Error ? cause.message : String(cause);
+    }
+  }
+</script>
+
+{#if error}
+  <p class="error" data-testid="error">{t("common.error")}: {error}</p>
+{:else if employee === null}
+  <p>{t("common.loading")}</p>
+{:else}
+  <h1>{employee.display_name} <span class="muted">({employee.employee_number})</span></h1>
+  <div class="panel" data-testid="facts">
+    <p>
+      {employee.job_title} · {employee.department} ·
+      <span class={`chip status-${employee.status}`}>{employee.status}</span>
+      · FTE {employee.fte_percent}%
+    </p>
+    <p>
+      {t("emp.salary")}:
+      {#if employee.salary_minor === null}
+        <span class="muted" data-testid="salary-masked">{t("common.masked")}</span>
+      {:else}
+        <span data-testid="salary">{money(employee.salary_minor, employee.salary_currency, i18n.locale)}</span>
+      {/if}
+    </p>
+    {#if employee.status === "onboarding"}
+      <button onclick={() => void transition("active")}>{t("common.actions")}: → active</button>
+    {/if}
+    {#if actionError}
+      <p class="error" data-testid="action-error">{actionError}</p>
+    {/if}
+  </div>
+
+  {#if onboarding.length}
+    <h2>{t("emp.onboarding")}</h2>
+    <ul class="panel">
+      {#each onboarding as item (item.pid)}
+        <li>
+          {item.name}
+          <span class="chip">{item.status}</span>
+          {#if item.mandatory}<strong>·</strong>{/if}
+          {#if item.status === "pending"}
+            <button onclick={() => void complete(item.pid)}>✓</button>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
+  <h2>{t("emp.balances")}</h2>
+  <table>
+    <tbody>
+      {#each balances as balance (balance.pid)}
+        <tr>
+          <td>{balance.kind} {balance.year}</td>
+          <td>{balance.entitled_days - balance.used_days} / {balance.entitled_days} {t("common.days")}</td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+
+  <h2>{t("wf.leaveRequests")}</h2>
+  <table>
+    <tbody>
+      {#each leave as request (request.pid)}
+        <tr>
+          <td>{request.kind}</td>
+          <td>{request.start_on} → {request.end_on} ({request.days} {t("common.days")})</td>
+          <td><span class="chip">{request.status}</span></td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+
+  <h2>{t("emp.payslips")}</h2>
+  <table>
+    <tbody>
+      {#each payslips as slip (slip.pid)}
+        <tr>
+          <td>{t("pay.gross")}: {money(slip.gross_minor, slip.currency, i18n.locale)}</td>
+          <td>{t("pay.net")}: {money(slip.net_minor, slip.currency, i18n.locale)}</td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+
+  <h2>{t("emp.reviews")}</h2>
+  <table>
+    <tbody>
+      {#each reviews as review (review.pid)}
+        <tr>
+          <td><span class="chip">{review.status}</span></td>
+          <td>{review.rating ?? "—"}</td>
+          <td>{review.content ?? ""}</td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+
+  <h2>{t("emp.training")}</h2>
+  <table>
+    <tbody>
+      {#each training as enrollment (enrollment.pid)}
+        <tr>
+          <td>{enrollment.course_ref}</td>
+          <td><span class="chip">{enrollment.status}</span></td>
+          <td>{enrollment.certificate_expires_on ?? ""}</td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+{/if}

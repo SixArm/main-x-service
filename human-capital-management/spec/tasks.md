@@ -110,15 +110,30 @@ code + tests in one PR.
 
 ## Phase 8 — front-end (all HCM-R*)
 
-- [ ] HCM-T18 Scaffold `human-capital-management-front-end-with-svelte`:
+- [x] HCM-T18 Scaffold `human-capital-management-front-end-with-svelte`:
   SvelteKit 2 + Svelte 5 runes SPA, BFF proxy + session flow,
   13-locale i18n from the start, typed API client + `money()`.
   (HCM-D12)
-- [ ] HCM-T19 Views: requisition/application boards, onboarding
+- [x] HCM-T19 Views: requisition/application boards, onboarding
   tracker, team calendar + rota, employee profile + org chart,
   review + enrollment panels, payroll run screen, benchmarking
   table, HR dashboard; vitest + `page.route`-stubbed Playwright.
   (HCM-D6, HCM-D12)
+
+> HCM-T18/T19 landed 2026-07-18: SvelteKit 2 + Svelte 5 runes SPA
+> (copy-adapted from the patient-flow front-end: BFF proxy + session
+> flow + `Accepts-version` stamping) with a dependency-free 48-key ×
+> 13-locale i18n module (parity-tested, RTL for ar/ur), typed HCM
+> client + `money()` (masked/absent renders an em dash, never 0),
+> and views: HR dashboard tiles, employee list (masked salary as
+> first-class state) + profile (onboarding/balances/leave/payslips/
+> reviews/training), recursive org chart, requisition status board +
+> application pipeline with in-row hire, workforce (pending-leave
+> approvals + rota), development (gaps/succession/expiring), payroll
+> runs + run detail with lifecycle actions, benchmarks + comparison
+> flags. svelte-check 0 errors; 5 vitest (money honesty, i18n
+> parity, API path map) + 4 Playwright (page.route-stubbed,
+> unstubbed = 404-loud) green.
 
 ## Production gates (before any non-demo exposure)
 

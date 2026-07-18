@@ -1,0 +1,315 @@
+/* Human Capital Management operator UI — self-contained styles, no framework.
+   Bed-state colours are the load-bearing vocabulary (legend on the
+   whiteboard); everything else stays quiet so state reads first. */
+
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --ink: #1a2330;
+  --muted: #5b6774;
+  --line: #dde2e8;
+  --accent: #1b5fae;
+  /* Bed states */
+  --state-available: #1d8a4e;
+  --state-reserved: #b57e10;
+  --state-occupied: #35547c;
+  --state-awaiting: #c05621;
+  --state-cleaning: #0e7f8a;
+  --state-closed: #8a1d2d;
+  /* Journey */
+  --red-day: #c0392b;
+  --green-day: #1d8a4e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 3rem;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0.5rem 0 1rem;
+}
+h2 {
+  font-size: 1.1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+/* Top navigation */
+nav.top {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  gap: 1.1rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+nav.top .brand {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Panels & tables */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+th,
+td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Stat tiles */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+}
+.tile .value {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.tile .label {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* Whiteboard grid */
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.7rem;
+}
+.board-meta {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.8rem;
+}
+
+/* Bed card */
+.bed-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--muted);
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-height: 7.2rem;
+}
+.bed-card.state-available {
+  border-left-color: var(--state-available);
+}
+.bed-card.state-reserved {
+  border-left-color: var(--state-reserved);
+}
+.bed-card.state-occupied {
+  border-left-color: var(--state-occupied);
+}
+.bed-card.state-awaiting_clean {
+  border-left-color: var(--state-awaiting);
+}
+.bed-card.state-cleaning {
+  border-left-color: var(--state-cleaning);
+}
+.bed-card.state-closed {
+  border-left-color: var(--state-closed);
+  background: #faf3f4;
+}
+.bed-card .head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.bed-card .number {
+  font-weight: 700;
+}
+.bed-card .state-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.bed-card .patient {
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+.bed-card .staff {
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Chips */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.chip {
+  font-size: 0.72rem;
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--bg);
+  white-space: nowrap;
+}
+.chip.warn {
+  border-color: var(--state-awaiting);
+  color: var(--state-awaiting);
+  background: #fdf3ec;
+}
+.chip.danger {
+  border-color: var(--state-closed);
+  color: var(--state-closed);
+  background: #fbeef0;
+}
+.chip.ok {
+  border-color: var(--state-available);
+  color: var(--state-available);
+  background: #eef7f1;
+}
+.chip.red-day {
+  background: var(--red-day);
+  border-color: var(--red-day);
+  color: #fff;
+}
+.chip.green-day {
+  background: var(--green-day);
+  border-color: var(--green-day);
+  color: #fff;
+}
+.chip.infection {
+  border-color: #7a3ea1;
+  color: #7a3ea1;
+  background: #f6effa;
+}
+.chip.infection.confirmed {
+  background: #7a3ea1;
+  color: #fff;
+}
+
+/* Forms & buttons */
+button,
+.btn {
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  color: var(--ink);
+}
+button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+input,
+select {
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  background: #fff;
+}
+form.row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.error {
+  color: var(--state-closed);
+  font-size: 0.88rem;
+}
+.muted {
+  color: var(--muted);
+}
+
+/* Kiosk (wall touchscreen) mode: no chrome, bigger everything. */
+body.kiosk main {
+  max-width: none;
+  padding: 0.8rem 1rem;
+}
+body.kiosk {
+  font-size: 18px;
+}
+body.kiosk .board {
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 0.9rem;
+}
+body.kiosk .bed-card {
+  min-height: 9rem;
+  padding: 0.8rem 0.9rem;
+}
+body.kiosk button {
+  padding: 0.6rem 1rem;
+  font-size: 1rem;
+}
