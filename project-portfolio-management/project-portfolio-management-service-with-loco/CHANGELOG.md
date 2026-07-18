@@ -9,6 +9,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-07-18 — **Unknown-pid reads returned 500, not 404.** loco 0.16's
+  `IntoResponse` catch-all maps an unmapped `ModelError::EntityNotFound`
+  to a 500, so `GET /…/{pid}` with an unknown pid crashed instead of
+  404ing (the organization service was immune — its `http_err` helper
+  already mapped it; the copy-adaptors dropped it). Controller lookups
+  now route through a `model_not_found` mapping. Family-wide fix with
+  per-crate request-test pins.
+
+
 ### Changed
 
 - 2026-07-18 — **Subproject renamed**: `portfolio` →

@@ -753,3 +753,22 @@ BLK-5's two services, and the per-matcher SEC-M2/M6 + SEC-I1 rollouts are
 good one-subagent-per-crate fan-outs — give each agent the reference-crate
 paths and the green gate verbatim, then re-verify independently before
 committing (see plan.md §4).
+
+## Found 2026-07-18 (while fixing the family-wide EntityNotFound→500 bug)
+
+- [ ] **QA-CASE-MASK (M)** `case` `tests/masking.rs`
+  `read_is_concealed_on_every_path_for_a_denied_caller` fails
+  (pre-existing; reproduced at 145aa4c4 and 4de5bc11): the blocked
+  caller's `GET /api/cases` is denied by the **coarse blanket guard**
+  (plain-text 403), so the SEC-G3 expectation (200 list with the
+  record concealed) never runs — the deny-read rule matches at the
+  guard before the record-level pass. Decide the intended contract
+  (guard-level deny vs record-level concealment) and align test +
+  guard.
+- [ ] **QA-CP-FLAKE (S)** `care-pathway`
+  `require_auth_gates_api_but_not_openapi` is order-dependent: it
+  `set_var`s `CARE_PATHWAY_REQUIRE_AUTH` inside the shared request
+  binary, but a sibling test boots first and caches the flag's
+  `OnceLock` → 200 instead of 401. Passes in isolation. Move it to
+  its own test binary (the case/patient-flow enforcement-test
+  pattern).

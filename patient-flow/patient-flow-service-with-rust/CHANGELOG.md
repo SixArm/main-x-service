@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-07-18 — **Unknown-pid reads returned 500, not 404** (loco 0.16
+  does not map `ModelError::EntityNotFound`): the shared
+  `records::find_*` finders and `records::parse_pid` now return
+  `Error::NotFound` directly, so every `GET /…/{pid}` contract is an
+  honest 404. Pinned in the topology request test (ghost UUIDs +
+  malformed pid). Part of a family-wide fix (case, care-pathway,
+  project-portfolio-management; organization was already correct).
+
+
 ### Added
 
 - 2026-07-18 — PF-T17: weak-**ETag conditional GETs** on the
