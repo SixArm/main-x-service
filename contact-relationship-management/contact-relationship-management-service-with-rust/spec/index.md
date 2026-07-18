@@ -34,9 +34,32 @@ OTLP, Podman.
 - **Table names all-plural** (the loco `create_table` pluralization
   lesson); `event_outbox` as explicit SQL.
 
+## Edition-specific implementation notes (as landed)
+
+- **Layout**: `src/{app,auth,clients,metrics,openapi,streaming,
+  validation,version}.rs`, `src/rules/` (pure core: tokens,
+  lifecycle, scoring, analytics, sla, segment), `src/models/`
+  (+`_entities/`, 19 tables), `src/controllers/{relationships,sales,
+  marketing,support,dashboards,audits,docs,metrics}.rs`,
+  `src/tasks/seed.rs`, crate-root `migration/` (6, explicit SQL).
+- **Deal stages are data**, not a token table: `pipeline_stages`
+  rows with probabilities + terminal flags; stage moves validate
+  pipeline membership on the locked deal row.
+- **Consent** is enforced in the segment evaluator (structural
+  AND-gate) *and* re-checked at send time by both send paths; the
+  `consent_events` table is append-only (no `deleted_at`).
+- **Jobs**: `POST /api/nurture/advance` (idempotent per enrolment ×
+  step) and `POST /api/sla/sweep` (once per breach) are the v1
+  scheduler surface; a periodic `bg_pg` worker is the roadmap seam.
+- **Dashboards** are ETag-conditional (weak tag over the payload
+  minus `as_of`); ratios carry numerator/denominator and go `null`
+  on a zero denominator; currencies never merge.
+- **Enforcement tests** live in `tests/enforcement.rs` (own process,
+  OnceLock lesson); request tests are `#[ignore]`d — run with
+  `cargo test -- --ignored`.
+
 ## Delivery
 
 The queue is [../../spec/tasks.md](../../spec/tasks.md): CRM-T1–T16
-for this edition. Tests per
-[../../spec/testing.md](../../spec/testing.md). Nothing implemented
-yet.
+**delivered 2026-07-18**. Tests per
+[../../spec/testing.md](../../spec/testing.md).

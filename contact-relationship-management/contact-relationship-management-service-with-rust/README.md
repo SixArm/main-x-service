@@ -16,11 +16,21 @@ provides the sales, marketing, and support client.
 > (delivery is simulated); synthetic data only. See
 > [spec/regulatory](../spec/regulatory.md).
 
-**Status: not started.** The cross-cutting specification landed
-2026-07-18; the delivery queue is
-[../spec/tasks.md](../spec/tasks.md) (CRM-T1 onward).
+**Status: implemented (CRM-T1–T16, 2026-07-18).** Builds, 62 DB-free
+unit tests + 5 request tests + the enforcement matrix pass against
+Postgres 18, clippy-pedantic clean, live smoke verified (seed →
+forecast → ETag 304 → win rate). Remaining in
+[../spec/tasks.md](../spec/tasks.md): the front-end (CRM-T17/T18).
 
-## What it will answer
+## Quick start
+
+```bash
+export DATABASE_URL=postgres://loco:loco@localhost:5432/contact_relationship_management_service_development
+cargo run -- db migrate && cargo run -- task seed && cargo run -- start
+curl localhost:5150/api/forecast | jq .
+```
+
+## What it answers
 
 - *Which leads should I call first?* — score-sorted queue with the
   per-rule breakdown
@@ -32,7 +42,7 @@ provides the sales, marketing, and support client.
   flags
 - *What is this account worth?* — CLV from won deals
 
-## Target surface (per the cross-cutting spec)
+## Surface
 
 Contacts / accounts / activities + timelines · leads + scoring ·
 pipelines / stages / deals + Kanban · forecast + snapshots ·

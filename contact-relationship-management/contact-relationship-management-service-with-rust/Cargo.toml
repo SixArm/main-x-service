@@ -1,0 +1,78 @@
+[workspace]
+
+[package]
+name = "contact-relationship-management-service"
+version = "0.1.0"
+edition = "2024"
+publish = true
+default-run = "contact-relationship-management-service"
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Contact relationship management service — SFA, marketing automation, support, analytics"
+readme = "README.md"
+repository = "https://github.com/sixarm/main-x-service/contact-relationship-management-service-with-rust"
+license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
+keywords = ["crm", "sales", "marketing", "support", "sfa"]
+categories = ["development-tools", "rust-patterns"]
+include = ["src/**/*", "README.md"]
+
+[workspace.dependencies]
+loco-rs = { version = "0.16" }
+
+[dependencies]
+loco-rs = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1" }
+tokio = { version = "1.52", default-features = false, features = [
+  "rt-multi-thread",
+] }
+async-trait = { version = "0.1" }
+axum = { version = "0.8" }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+migration = { path = "migration" }
+sea-orm = { version = "1.1", features = [
+  "sqlx-sqlite",
+  "sqlx-postgres",
+  "runtime-tokio-rustls",
+  "macros",
+] }
+chrono = { version = "0.4" }
+uuid = { version = "1.23", features = ["v4", "serde"] }
+mimalloc = { version = "0.1.52" }
+prometheus = { version = "0.13" }
+# Upstream display-name lookups (`http` client mode only; stub is the
+# default). Same minimal reqwest configuration as the verifier's fetch.
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+  "json",
+] }
+
+# Cross-service entity references (EntityRef URN + entity-type registry):
+# people/workers/organizations/courses are referenced, never duplicated.
+entity-ref = { path = "../../link/entity-ref-rust-crate" }
+
+# Offline PASETO v4.public verification + the shared ABAC engine.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
+
+[[bin]]
+name = "contact-relationship-management-service"
+path = "src/bin/main.rs"
+required-features = []
+
+[dev-dependencies]
+loco-rs = { workspace = true, features = ["testing"] }
+# Name the `TestServer` type in shared request-test helpers (same
+# version loco's testing feature uses internally).
+axum-test = { version = "17.0.1" }
+tokio = { version = "1.52", default-features = false, features = [
+  "rt-multi-thread",
+  "macros",
+  "net",
+] }
+serial_test = { version = "3.5.0" }
+# Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
+# the auth path is verified without the auth service or a network.
+ed25519-dalek = { version = "2.2" }
+rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
+sha2 = { version = "0.10" }
+base64 = { version = "0.22" }
