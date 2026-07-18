@@ -29,8 +29,27 @@ closest source). BFF auth per [../../spec/auth.md](../../spec/auth.md).
 - **No client-held tokens**: mutations via server routes (session
   cookie + CSRF); read loads server-side where masking applies.
 
+## Edition-specific implementation notes (as landed)
+
+- **SPA mode** (`ssr = false`, family convention): every route loads
+  client-side through the same-origin BFF proxy
+  (`src/routes/api/proxy/[...path]/+server.ts`), which strips
+  cookies, stamps `Accepts-version: 1.0`, and carries the marked
+  PF-T18 seam for the session→PASETO exchange.
+- **Copy source**: the case front-end (dependency-light, no data
+  grid) rather than portfolio — a whiteboard is custom CSS cards,
+  not a grid. Zero runtime dependencies.
+- **Layout**: `src/lib/api/{types,client,flow}.ts`,
+  `src/lib/components/{BedCard,WardBoard}.svelte`, routes per the
+  README table; kiosk mode is a body-class + CSS variant, not a
+  separate app.
+- **Testing**: vitest + jsdom for the `BedCard` matrix;
+  Playwright against `vite preview` with the API stubbed via
+  `page.route` mirroring the endpoint contract (unstubbed calls 404
+  loudly, so contract drift fails the suite).
+
 ## Delivery
 
-PF-T15 (scaffold + routes) and PF-T16 (tests) in
-[../../spec/tasks.md](../../spec/tasks.md), after the service
-phases reach the whiteboard reads (PF-T10).
+PF-T15/T16 **delivered 2026-07-18** (see
+[../../spec/tasks.md](../../spec/tasks.md)); open: PF-T18 (BFF
+session + PASETO exchange, with auth activation).

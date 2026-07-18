@@ -11,8 +11,22 @@ API.
 > ⚠️ **Demo application.** Not a regulated medical record; synthetic
 > data only. See [spec/regulatory](../spec/regulatory.md).
 
-**Status: specification round — implementation queued** (PF-T15/T16
-in [../spec/tasks.md](../spec/tasks.md), after the service phases).
+**Status: implemented (PF-T15/T16, 2026-07-18).** SPA mode with a
+same-origin BFF proxy; `svelte-check` clean; 22 vitest component
+tests + 7 Playwright e2e specs (API stubbed via `page.route`, no
+Rust service needed). Remaining: PF-T18 (BFF session + PASETO
+exchange, for auth activation).
+
+## Quick start
+
+```bash
+npm install
+npm run dev            # UI on :5173; proxies /api/proxy/* to the service
+# point at a running service (default http://localhost:5150):
+PATIENT_FLOW_API_URL=http://localhost:5150 npm run dev
+npm test               # vitest (BedCard matrix)
+npx playwright test    # e2e (stubbed API — no backend needed)
+```
 
 ## Routes (target)
 

@@ -88,12 +88,24 @@ code + tests in one PR.
 
 ## Phase 6 — front-end (PF-R8 UI)
 
-- [ ] PF-T15 Scaffold `patient-flow-front-end-with-svelte`
-  (SvelteKit 2 + Svelte 5 runes + TS strict, BFF auth, copy-adapt
-  from portfolio front-end), routes: whiteboard (+ kiosk/touch
-  route), stay detail, at-a-glance, bed requests, locate, audits.
-- [ ] PF-T16 vitest bed-card matrix + Playwright e2e against
-  stub-mode service (admit→board→ready→discharge→clean walk).
+- [x] PF-T15 Scaffold `patient-flow-front-end-with-svelte`
+  (SvelteKit 2 + Svelte 5 runes + TS strict, SPA mode + same-origin
+  BFF proxy, copy-adapted from the case front-end — the closest
+  dependency-light sibling; drift accepted), routes: home ward list,
+  whiteboard (+ chrome-less kiosk route with `?masked=1`), stay
+  detail with SAFER/Red2Green/flag/transfer/discharge actions,
+  at-a-glance, bed-request board with ranked eligible beds +
+  allocate, locate, audits + handover filter. Landed 2026-07-18.
+- [x] PF-T16 vitest `BedCard` state × flags matrix (22 tests) +
+  Playwright e2e (7 specs) with the API stubbed via `page.route`
+  mirroring the endpoint contract (case-front-end precedent — fails
+  loud on contract drift, no Rust service needed); `svelte-check`
+  clean. Landed 2026-07-18.
+- [ ] PF-T18 BFF session + PASETO exchange: wire the family
+  magic-link session flow (copy-adapt the case front-end's
+  `signin` + `lib/server/auth.ts`) into the proxy's marked seam,
+  for when `PATIENT_FLOW_REQUIRE_AUTH` activation lands.
+  (spec auth.md)
 
 ## Production gates (P0 — design-only until a real deployment)
 
