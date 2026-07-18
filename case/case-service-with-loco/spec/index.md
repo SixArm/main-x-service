@@ -780,6 +780,18 @@ the other v1 edge kinds even though it shares the same edge shape.
     unauthorised caller neither sees the subject reference nor learns the
     edge exists).
 
+- [x] **Fix: fresh-Postgres `db migrate` failed in the `event_outbox`
+  migration (2026-07-18).** The loco `create_table` helper pluralizes
+  table names (`cruet::to_plural`: `event_outbox` → `event_outboxes`),
+  so the migration's own index DDL (`ON event_outbox`) failed and
+  rolled the whole fresh migrate back — no tables were ever created.
+  The migration is now explicit SQL creating exactly `event_outbox`
+  (matching the `SeaORM` entity), `IF NOT EXISTS`-guarded; same
+  migration name (the old form could never have applied anywhere).
+  Found and fixed family-wide from the patient-flow implementation
+  round; verified by a live fresh-database migrate. Every other table
+  this crate creates via the helper is already plural (no-op).
+
 ## 14. Implementation status
 
 Done: loco boot; cases table + migration; CRUD with `422` validation on

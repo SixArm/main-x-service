@@ -9,6 +9,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-07-18 — **Fresh-database `db migrate` failure.** The
+  `…_000004_event_outbox` migration used the loco `create_table`
+  helper, which pluralizes table names (`event_outbox` →
+  `event_outboxes`); its own index DDL then failed and rolled back
+  the entire fresh migrate (zero tables). Rewritten as explicit SQL
+  creating exactly `event_outbox`; verified against a fresh
+  Postgres 18 (all migrations apply, correct table names). Family-wide
+  fix (case, care-pathway, organization, portfolio; patient-flow
+  shipped with the explicit-SQL form).
+
+
 ### Security
 
 - **SEC-G6: trailing slash can no longer downgrade a destructive POST.**

@@ -43,7 +43,8 @@ tracing + OTLP, Podman.
   is already plural so this is a no-op, except `event_outbox`, whose
   migration is written as explicit SQL to keep the exact name the
   SeaORM entity declares. (The sibling services' copied
-  `event_outbox` migrations share this hazard.)
+  `event_outbox` migrations shared this hazard — fixed family-wide
+  2026-07-18: case, care-pathway, organization, portfolio.)
 - **Clients**: one `src/clients.rs` module (mode-switched `stub` /
   `http` via `PATIENT_FLOW_UPSTREAM_MODE`, default `stub`) rather
   than per-service trait modules — patient-flow needs only
