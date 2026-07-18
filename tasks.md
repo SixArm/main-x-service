@@ -756,19 +756,26 @@ committing (see plan.md §4).
 
 ## Found 2026-07-18 (while fixing the family-wide EntityNotFound→500 bug)
 
-- [ ] **QA-CASE-MASK (M)** `case` `tests/masking.rs`
-  `read_is_concealed_on_every_path_for_a_denied_caller` fails
-  (pre-existing; reproduced at 145aa4c4 and 4de5bc11): the blocked
-  caller's `GET /api/cases` is denied by the **coarse blanket guard**
-  (plain-text 403), so the SEC-G3 expectation (200 list with the
-  record concealed) never runs — the deny-read rule matches at the
-  guard before the record-level pass. Decide the intended contract
-  (guard-level deny vs record-level concealment) and align test +
-  guard.
-- [ ] **QA-CP-FLAKE (S)** `care-pathway`
-  `require_auth_gates_api_but_not_openapi` is order-dependent: it
-  `set_var`s `CARE_PATHWAY_REQUIRE_AUTH` inside the shared request
-  binary, but a sibling test boots first and caches the flag's
-  `OnceLock` → 200 instead of 401. Passes in isolation. Move it to
-  its own test binary (the case/patient-flow enforcement-test
-  pattern).
+- [x] **QA-CASE-MASK (M)** *(fixed 2026-07-18)* — the test was **born
+  failing** (reproduced at its birth commit c4e34443): its
+  subject-only deny rule (`dept=blocked`) matched at the coarse
+  blanket guard, 403ing the surface before the record-level
+  concealment it meant to pin could run. Contract clarified in the
+  test doc: a subject-only deny **belongs to the coarse guard**
+  (defense-in-depth); SEC-G3 concealment is the property of callers
+  who pass the guard and are denied on *specific records* via
+  `resource.*` conditions (which, per SEC-V2, never match on the
+  coarse no-record path). The test now uses a resource-scoped deny
+  (`dept=blocked` + `resource.case_type=investigation`) on an
+  Investigation-typed case — list concealment, native-GET 403, and
+  FHIR 403 all actually exercise the record-level pass. Green vs
+  Postgres 18. Bonus: the same order-dependence class was found and
+  fixed in case's shared requests binary
+  (`blanket_enforcement_gates_api_but_not_public_paths` duplicated
+  `tests/enforcement.rs` and only passed when it ran first —
+  removed; the dedicated binary owns that pin).
+- [x] **QA-CP-FLAKE (S)** *(fixed 2026-07-18)* — moved to its own
+  `tests/enforcement.rs` binary (the case / patient-flow pattern):
+  the flag is now set before the process's only boot, so the pin is
+  order-independent. Full care-pathway DB-gated suite green (1 + 22
+  + 1 across the three binaries).

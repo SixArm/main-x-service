@@ -11,6 +11,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- 2026-07-18 — **Two order/design test bugs in the DB-gated suites**
+  (QA-CASE-MASK): the SEC-G3 masking test was born failing — its
+  subject-only deny tripped the coarse blanket guard before the
+  record-level concealment it pins could run; now a resource-scoped
+  deny (`resource.case_type=investigation`) exercises the real
+  contract (guard admits, each read path conceals). And the
+  blanket-enforcement pin duplicated inside the shared requests
+  binary was order-dependent (`OnceLock`-cached flag) — removed;
+  `tests/enforcement.rs` owns it. Full suite green vs Postgres 18.
+
+
+### Fixed
+
 - 2026-07-18 — **Unknown-pid reads returned 500, not 404.** loco 0.16's
   `IntoResponse` catch-all maps an unmapped `ModelError::EntityNotFound`
   to a 500, so `GET /…/{pid}` with an unknown pid crashed instead of

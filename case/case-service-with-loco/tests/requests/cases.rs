@@ -548,38 +548,10 @@ async fn swagger_ui_is_served() {
     .await;
 }
 
-#[tokio::test]
-#[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
-// Pins the blanket-enforcement layer: with CASE_REQUIRE_AUTH on, an
-// un-authed /api/* request is 401 while the public OpenAPI doc still
-// serves 200.
-async fn blanket_enforcement_gates_api_but_not_public_paths() {
-    // With `CASE_REQUIRE_AUTH` on and no JWKS configured, an un-authed
-    // `/api/*` request must 401, while the public OpenAPI doc still serves.
-    // `require_auth()` is read once via a `OnceLock`, so set the env before
-    // the app boots; `#[serial]` keeps this isolated from other tests.
-    // SAFETY: single-threaded under `#[serial]`; no concurrent env access.
-    unsafe {
-        std::env::set_var("CASE_REQUIRE_AUTH", "1");
-    }
-    request::<App, _, _>(|request, _ctx| async move {
-        let gated = request.get("/api/cases").await;
-        assert_eq!(
-            gated.status_code(),
-            401,
-            "un-authed /api/cases should 401 when enforcement is on"
-        );
-
-        let doc = request.get("/api-docs/openapi.json").await;
-        assert_eq!(
-            doc.status_code(),
-            200,
-            "openapi.json stays public under enforcement"
-        );
-    })
-    .await;
-    unsafe {
-        std::env::remove_var("CASE_REQUIRE_AUTH");
-    }
-}
+// NOTE (QA-flake fix, 2026-07-18): the blanket-enforcement pin
+// (`CASE_REQUIRE_AUTH` on ⇒ un-authed /api/* is 401, OpenAPI stays
+// public) lives in `tests/enforcement.rs`, its **own test binary** —
+// the flag is cached in a process-wide `OnceLock` on first boot, so a
+// `set_var` inside this shared binary is a no-op once any sibling
+// test has booted the app (the duplicate here was order-dependent and
+// failed whenever it didn't run first).

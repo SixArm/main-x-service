@@ -1,10 +1,24 @@
 //! End-to-end **masking / concealment on every read path** proof (SEC-G2 /
-//! SEC-G3). With `CASE_REQUIRE_AUTH` on and an ABAC policy that **denies
-//! read** to a caller carrying `dept=blocked`, a blocked caller must not be
-//! able to discover a case through **any** read surface — the native `list`
-//! and `GET /{pid}`, and the FHIR `read` — while an ordinary caller still
-//! sees it. This pins that record-level authorization is applied
-//! consistently, not just on the single native GET the audit found guarded.
+//! SEC-G3). With `CASE_REQUIRE_AUTH` on and an ABAC policy that denies
+//! `dept=blocked` callers **read on investigation cases specifically**
+//! (a `resource.case_type`-scoped rule), a blocked caller must not be
+//! able to discover such a case through **any** read surface — the
+//! native `list` and `GET /{pid}`, and the FHIR `read` — while an
+//! ordinary caller still sees it. This pins that record-level
+//! authorization is applied consistently, not just on the single
+//! native GET the audit found guarded.
+//!
+//! The deny rule is deliberately **resource-scoped**: a subject-only
+//! deny (`dept=blocked` alone) is enforced by the **coarse blanket
+//! guard** and 403s the whole surface before any record loads — which
+//! is correct defense-in-depth but exercises the guard, not SEC-G3.
+//! Concealment is the property of callers who pass the guard and are
+//! denied on *specific records*; per SEC-V2, a non-negated
+//! `resource.*` condition never matches on the coarse (no-record)
+//! path, so the guard admits the caller and each read path must do
+//! its own record-level check. (The original version of this test
+//! used a subject-only deny and therefore never got past the guard —
+//! fixed 2026-07-18, QA-CASE-MASK.)
 //!
 //! Its **own test binary** so the process-wide `require_auth` / `policy` /
 //! `verifier` `OnceLock`s carry this test's deny-read policy without
@@ -81,12 +95,16 @@ fn auth_header(token: &str) -> (axum::http::HeaderName, axum::http::HeaderValue)
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test masking -- --ignored`"]
 async fn read_is_concealed_on_every_path_for_a_denied_caller() {
     let (keys, kid) = keys_and_kid();
-    // Deny `read` to any caller with `dept=blocked`; everyone else reads by
-    // default, and `access=write` may create. Set BEFORE the app boots (the
-    // auth OnceLocks read these on first use).
+    // Deny `read` on **investigation cases** to callers with
+    // `dept=blocked` (resource-scoped ⇒ the coarse guard admits the
+    // caller and each read path's record-level check must conceal);
+    // everyone else reads by default, and `access=write` may create.
+    // Set BEFORE the app boots (the auth OnceLocks read these on
+    // first use).
     let policy = json!({
         "rules": [
-            { "effect": "deny",  "actions": ["read"],  "when": { "dept": ["blocked"] } },
+            { "effect": "deny",  "actions": ["read"],
+              "when": { "dept": ["blocked"], "resource.case_type": ["investigation"] } },
             { "effect": "allow", "actions": ["write"], "when": { "access": ["write"] } }
         ]
     });
@@ -102,7 +120,8 @@ async fn read_is_concealed_on_every_path_for_a_denied_caller() {
         let created = request
             .post("/api/cases")
             .add_header(wk, wv)
-            .json(&json!({ "title": "Sensitive investigation", "agency_id": "dwp" }))
+            .json(&json!({ "title": "Sensitive investigation", "agency_id": "dwp",
+                            "case_type": "Investigation" }))
             .await;
         assert_eq!(created.status_code(), 200, "write caller can create");
         let body: Value = serde_json::from_str(&created.text()).unwrap();

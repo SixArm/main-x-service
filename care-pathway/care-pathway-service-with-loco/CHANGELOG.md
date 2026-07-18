@@ -11,6 +11,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- 2026-07-18 — **Order-dependent enforcement test** (QA-CP-FLAKE):
+  `require_auth_gates_api_but_not_openapi` set
+  `CARE_PATHWAY_REQUIRE_AUTH` inside the shared requests binary, but
+  the flag's `OnceLock` was cached by whichever sibling test booted
+  first — it only passed when it happened to run first. Moved to its
+  own `tests/enforcement.rs` binary (the case / patient-flow
+  pattern). Full DB-gated suite green vs Postgres 18.
+
+
+### Fixed
+
 - 2026-07-18 — **Unknown-pid reads returned 500, not 404.** loco 0.16's
   `IntoResponse` catch-all maps an unmapped `ModelError::EntityNotFound`
   to a 500, so `GET /…/{pid}` with an unknown pid crashed instead of

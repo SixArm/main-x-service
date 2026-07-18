@@ -1,5 +1,8 @@
-* TODO foo [/]
-- [ ] alpha
-- [x] bravo
+* TODO foo [2/3]
+- [X] alpha
 - [ ] charlie
+- [X] bravo
+* TODO bar [1/2]
+- [ ] a
+- [X] b
   
