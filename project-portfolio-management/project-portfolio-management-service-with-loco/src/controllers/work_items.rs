@@ -231,7 +231,7 @@ async fn get_one(
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let collection = resolve(&collection)?;
-    let model = WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), &pid).await?;
+    let model = WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), &pid).await.map_err(super::model_not_found)?;
     format::json(model.to_work_item()?)
 }
 
@@ -249,7 +249,7 @@ async fn update(
 ) -> Result<Response> {
     let collection = resolve(&collection)?;
     validate(collection, &wi)?;
-    let model = WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), &pid).await?;
+    let model = WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), &pid).await.map_err(super::model_not_found)?;
     let updated = streaming::update_and_emit(&ctx.db, model, &wi, caller.actor()).await?;
     // Audit is written inside `update_and_emit` (see `streaming`).
     Metrics::global().work_item_updated_total.inc();
@@ -268,7 +268,7 @@ async fn remove(
     caller: MaybeAuthUser,
 ) -> Result<Response> {
     let collection = resolve(&collection)?;
-    let model = WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), &pid).await?;
+    let model = WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), &pid).await.map_err(super::model_not_found)?;
     let (_entity_pid, _name) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
     // Audit is written inside `delete_and_emit` (see `streaming`).
     Metrics::global().work_item_deleted_total.inc();
@@ -401,8 +401,8 @@ async fn merge(
         ));
     }
     let kind = collection.kind_str();
-    let main = WorkItemModel::find_by_pid(&ctx.db, kind, &req.main_pid).await?;
-    let duplicate = WorkItemModel::find_by_pid(&ctx.db, kind, &req.duplicate_pid).await?;
+    let main = WorkItemModel::find_by_pid(&ctx.db, kind, &req.main_pid).await.map_err(super::model_not_found)?;
+    let duplicate = WorkItemModel::find_by_pid(&ctx.db, kind, &req.duplicate_pid).await.map_err(super::model_not_found)?;
 
     let outcome = merge_work_items(&main.to_work_item()?, &duplicate.to_work_item()?);
 

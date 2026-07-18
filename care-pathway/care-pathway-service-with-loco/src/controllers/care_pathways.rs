@@ -185,7 +185,7 @@ async fn create(
 /// `404` when no active row has that `pid`; otherwise DB/parse errors.
 #[debug_handler]
 async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
-    let model = PathwayModel::find_by_pid(&ctx.db, &pid).await?;
+    let model = PathwayModel::find_by_pid(&ctx.db, &pid).await.map_err(super::model_not_found)?;
     format::json(model.to_pathway()?)
 }
 
@@ -206,7 +206,7 @@ async fn update(
     Json(pathway): Json<CarePathway>,
 ) -> Result<Response> {
     validate(&pathway)?;
-    let model = PathwayModel::find_by_pid(&ctx.db, &pid).await?;
+    let model = PathwayModel::find_by_pid(&ctx.db, &pid).await.map_err(super::model_not_found)?;
     // Update + `Updated` event, atomic under the active transport.
     let updated = streaming::update_and_emit(&ctx.db, model, &pathway, caller.actor()).await?;
     Metrics::global().care_pathway_updated_total.inc();
@@ -229,7 +229,7 @@ async fn remove(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
 ) -> Result<Response> {
-    let model = PathwayModel::find_by_pid(&ctx.db, &pid).await?;
+    let model = PathwayModel::find_by_pid(&ctx.db, &pid).await.map_err(super::model_not_found)?;
     // Soft-delete + `Deleted` event, atomic under the active transport.
     let (_entity_pid, _name) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await?;
     Metrics::global().care_pathway_deleted_total.inc();
@@ -374,8 +374,8 @@ async fn merge(
     }
     // Both must exist and be active; either missing is the `find_by_pid`
     // `404`.
-    let main = PathwayModel::find_by_pid(&ctx.db, &req.main_pid).await?;
-    let duplicate = PathwayModel::find_by_pid(&ctx.db, &req.duplicate_pid).await?;
+    let main = PathwayModel::find_by_pid(&ctx.db, &req.main_pid).await.map_err(super::model_not_found)?;
+    let duplicate = PathwayModel::find_by_pid(&ctx.db, &req.duplicate_pid).await.map_err(super::model_not_found)?;
 
     let outcome = merge_pathways(&main.to_pathway()?, &duplicate.to_pathway()?);
 
