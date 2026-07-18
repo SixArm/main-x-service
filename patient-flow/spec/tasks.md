@@ -80,11 +80,21 @@ code + tests in one PR.
 > PF-T17); `/events/recent` reads the ring or the outbox per
 > transport.
 
-- [ ] PF-T17 Request-test suite (`tests/requests/`, Postgres,
-  `--ignored` per family convention): per-controller happy paths +
-  422s, the double-placement race, masked whiteboard render, auth
-  matrix over live routes; ETag/`updated_since` conditional GET on
-  the board reads; CI workflows. (PF-D9; spec testing.md)
+- [x] PF-T17 Request-test suite + conditional board reads — landed
+  2026-07-18. `tests/requests/{topology,flows,boards}.rs` (9 tests,
+  `--ignored`, Postgres per family convention): topology CRUD +
+  422s, the full request→allocate→admit→Red2Green→ready→discharge→
+  deep-clean journey, the **double-placement race** (two concurrent
+  admits ⇒ exactly one 200), whiteboard/at-a-glance shape, locate +
+  its `locate_read` audit pin; `tests/enforcement.rs` (own process)
+  runs the auth-activation matrix over live routes including the
+  **masked whiteboard** under an allow-with-`mask` policy. The
+  whiteboard and at-a-glance reads gained weak-**ETag conditional
+  GETs** (`If-None-Match` ⇒ `304`, tag excludes `as_of`; delivered
+  in place of the `updated_since` alternative), consumed by the
+  front-end poll and forwarded by the BFF proxy. CI workflows stay
+  deferred (nested workflows don't run in the monorepo). (PF-D9;
+  spec testing.md, whiteboard.md)
 
 ## Phase 6 — front-end (PF-R8 UI)
 
@@ -101,11 +111,15 @@ code + tests in one PR.
   mirroring the endpoint contract (case-front-end precedent — fails
   loud on contract drift, no Rust service needed); `svelte-check`
   clean. Landed 2026-07-18.
-- [ ] PF-T18 BFF session + PASETO exchange: wire the family
-  magic-link session flow (copy-adapt the case front-end's
-  `signin` + `lib/server/auth.ts`) into the proxy's marked seam,
-  for when `PATIENT_FLOW_REQUIRE_AUTH` activation lands.
-  (spec auth.md)
+- [x] PF-T18 BFF session + PASETO exchange — landed 2026-07-18,
+  copy-adapted from the case front-end: `lib/server/{session,auth}.ts`
+  (httpOnly `__Host-mxi_session` cookie helpers; magic-link request /
+  verify / signout / token-exchange calls), `/signin` (server action),
+  `/verify` (server-side token exchange → cookie → redirect),
+  `/signout`, and the proxy now exchanges `locals.sessionId` for a
+  short-lived PASETO and injects the bearer. Inert until
+  `PATIENT_FLOW_REQUIRE_AUTH` + the auth service are deployed; no
+  token ever reaches browser JS. (spec auth.md)
 
 ## Production gates (P0 — design-only until a real deployment)
 

@@ -55,6 +55,7 @@ tracing + OTLP, Podman.
 ## Delivery
 
 The queue is [../../spec/tasks.md](../../spec/tasks.md): PF-T1–T14
-**delivered 2026-07-18** (see the phase note there); open: PF-T17
-request-test suite, PF-T15/T16 front-end. Tests per
+and PF-T17 (ETag conditional board reads + the DB-gated request /
+enforcement suites — run with `cargo test -- --ignored` against
+Postgres) **delivered 2026-07-18**. Tests per
 [../../spec/testing.md](../../spec/testing.md).

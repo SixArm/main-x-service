@@ -50,6 +50,7 @@ closest source). BFF auth per [../../spec/auth.md](../../spec/auth.md).
 
 ## Delivery
 
-PF-T15/T16 **delivered 2026-07-18** (see
-[../../spec/tasks.md](../../spec/tasks.md)); open: PF-T18 (BFF
-session + PASETO exchange, with auth activation).
+PF-T15/T16 and PF-T18 (BFF session + PASETO exchange; ETag-aware
+board polling) **delivered 2026-07-18** — see
+[../../spec/tasks.md](../../spec/tasks.md). Open queue: none; later
+ideas live in the cross-cutting [roadmap](../../spec/roadmap.md).

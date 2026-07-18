@@ -19,6 +19,7 @@
     <a href="/bed-requests">Bed requests</a>
     <a href="/locate">Locate</a>
     <a href="/audits">Audits</a>
+    <a href="/signin">Sign in</a>
   </nav>
 {/if}
 

@@ -5,7 +5,7 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { BOARD_POLL_MS } from "$lib/config";
-  import { bedTransition, getWhiteboard } from "$lib/api/flow";
+  import { bedTransition, pollWhiteboard } from "$lib/api/flow";
   import type { Whiteboard } from "$lib/api/types";
   import BedCard from "./BedCard.svelte";
 
@@ -19,10 +19,15 @@
   // deliberately seeds the poll state once; refresh() owns it after.
   let board = $state(initial);
   let error = $state<string | null>(null);
+  // The last ETag seen; the poll sends If-None-Match and a 304 means
+  // "unchanged" — no body, keep the current render (PF-T17).
+  let etag: string | null = null;
 
   async function refresh() {
     try {
-      board = await getWhiteboard(wardPid);
+      const result = await pollWhiteboard(wardPid, etag);
+      etag = result.etag;
+      if (result.body) board = result.body;
       error = null;
     } catch (e) {
       error = e instanceof Error ? e.message : "refresh failed";

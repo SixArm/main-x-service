@@ -73,6 +73,11 @@ is the escalation trigger).
 
 ## Freshness
 
-Whiteboards poll (ETag/`updated_since`) in v1; server-push (SSE from
-the event stream) is roadmap. Every view carries an `as_of` timestamp
-so a wall screen is honest about staleness.
+Whiteboards poll with **weak-ETag conditional GETs** (PF-T17): the
+whiteboard and at-a-glance responses carry an `ETag` over the
+substantive content (everything except `as_of`), and a matching
+`If-None-Match` yields `304 Not Modified` — so an idle wall screen
+costs no body bandwidth. The tag is process-local; across replicas a
+mismatch causes one full refresh, never staleness. Server-push (SSE
+from the event stream) is roadmap. Every view carries an `as_of`
+timestamp so a wall screen is honest about staleness.

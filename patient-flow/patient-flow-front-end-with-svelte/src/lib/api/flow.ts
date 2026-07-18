@@ -1,6 +1,6 @@
 // Typed patient-flow API calls (all via the BFF proxy).
 
-import { api } from "./client";
+import { api, apiConditional, type Conditional } from "./client";
 import type {
   AtAGlance,
   AuditEntry,
@@ -17,6 +17,13 @@ export const getWards = (f?: typeof fetch) =>
 
 export const getWhiteboard = (wardPid: string, f?: typeof fetch) =>
   api<Whiteboard>(`/api/whiteboard/${wardPid}`, { fetch: f });
+
+/** ETag-aware whiteboard poll: `body` is `null` while nothing changed. */
+export const pollWhiteboard = (
+  wardPid: string,
+  etag: string | null,
+): Promise<Conditional<Whiteboard>> =>
+  apiConditional<Whiteboard>(`/api/whiteboard/${wardPid}`, etag);
 
 export const getAtAGlance = (f?: typeof fetch) =>
   api<AtAGlance>("/api/at-a-glance", { fetch: f });

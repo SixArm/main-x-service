@@ -61,6 +61,9 @@ required-features = []
 
 [dev-dependencies]
 loco-rs = { workspace = true, features = ["testing"] }
+# Name the `TestServer` type in shared request-test helpers (same
+# version loco's testing feature uses internally).
+axum-test = { version = "17.0.1" }
 tokio = { version = "1.52", default-features = false, features = [
   "rt-multi-thread",
   "macros",

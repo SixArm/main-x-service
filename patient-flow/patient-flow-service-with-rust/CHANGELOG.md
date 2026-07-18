@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-18 — PF-T17: weak-**ETag conditional GETs** on the
+  whiteboard and at-a-glance reads (`If-None-Match` ⇒ `304`; the tag
+  covers everything except `as_of`), and the DB-gated request-test
+  suite: `tests/requests/{topology,flows,boards}.rs` (topology CRUD +
+  422s; the full request→allocate→admit→Red2Green→ready→discharge→
+  deep-clean journey; the double-placement race — two concurrent
+  admits, exactly one 200; board shapes + the ETag 200/304/refresh
+  cycle; locate + its `locate_read` audit pin) plus
+  `tests/enforcement.rs` (auth-activation matrix over live routes:
+  401/403 splits, action gating, and the **masked whiteboard** under
+  an allow-with-`mask` policy). All 9 verified against Postgres 18.
 - 2026-07-18 — PF-T1–T14 implementation round: the full Loco service.
   Migrations for sites / wards / bays / beds / stays / transfers /
   bed_requests / red_green_days / infection_flags / audit_logs /

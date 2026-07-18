@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-18 — PF-T17/PF-T18 follow-through: the whiteboard poll is
+  now an **ETag conditional GET** (`If-None-Match`; a `304` keeps the
+  current render — an idle wall screen costs no body bandwidth; the
+  proxy forwards `etag` both ways), and the **BFF session flow**
+  landed (copy-adapted from the case front-end): `/signin` magic-link
+  request, `/verify` server-side token exchange → httpOnly
+  `__Host-mxi_session` cookie, `/signout`, and the proxy exchanges
+  the session for a short-lived PASETO bearer. Inert until
+  `PATIENT_FLOW_REQUIRE_AUTH` + the auth service are deployed; no
+  token ever reaches browser JS.
 - 2026-07-18 — PF-T15/T16 implementation round: SvelteKit 2 + Svelte
   5 runes SPA (drift-accepted, copy-adapted from the case front-end)
   with a same-origin BFF proxy (`/api/proxy/*`, `Accepts-version`

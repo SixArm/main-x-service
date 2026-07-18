@@ -2,8 +2,17 @@
 //! patient locate, and the capacity metrics snapshot. All are queries
 //! over the operational tables with an `as_of` stamp — never a second
 //! store.
+//!
+//! The whiteboard and at-a-glance reads are **conditional GETs**
+//! (PF-T17): the response carries a weak `ETag` over the substantive
+//! content (everything except `as_of`), and a matching `If-None-Match`
+//! yields `304 Not Modified` — so a wall screen polling every few
+//! seconds costs no body bandwidth while nothing changes. The tag is
+//! process-local (a `DefaultHasher` fingerprint): across replicas a
+//! tag mismatch just causes one full refresh, never staleness.
 
 use authentication_verifier::Action;
+use axum::http::{HeaderMap, StatusCode, header};
 use loco_rs::prelude::*;
 use sea_orm::QueryOrder;
 use serde::Serialize;
@@ -17,6 +26,34 @@ use crate::metrics::Metrics;
 use crate::models::_entities::{bays, bed_requests, beds, infection_flags, red_green_days, sites, stays, wards};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
+
+/// Weak `ETag` over a serializable view (everything except `as_of`).
+fn etag_of<T: Serialize>(value: &T) -> String {
+    use std::hash::{Hash, Hasher};
+    let json = serde_json::to_string(value).unwrap_or_default();
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    json.hash(&mut hasher);
+    format!("W/\"{:016x}\"", hasher.finish())
+}
+
+/// Serve `body` as JSON with `etag`, honouring `If-None-Match` → `304`.
+fn conditional_json<T: Serialize>(headers: &HeaderMap, etag: &str, body: &T) -> Result<Response> {
+    let matched = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.trim() == etag);
+    let etag_value = header::HeaderValue::from_str(etag)
+        .unwrap_or_else(|_| header::HeaderValue::from_static("W/\"0\""));
+    if matched {
+        return Ok((StatusCode::NOT_MODIFIED, [(header::ETAG, etag_value)]).into_response());
+    }
+    Ok((
+        StatusCode::OK,
+        [(header::ETAG, etag_value)],
+        axum::Json(serde_json::to_value(body).map_err(|e| Error::Any(e.into()))?),
+    )
+        .into_response())
+}
 
 /// One bed card on the ward whiteboard (spec `whiteboard.md`).
 #[allow(clippy::struct_excessive_bools)] // the card's chips are genuinely independent flags
@@ -72,6 +109,7 @@ async fn whiteboard(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     Path(ward_pid): Path<String>,
+    headers: HeaderMap,
 ) -> Result<Response> {
     let ward = records::find_ward(&ctx.db, records::parse_pid(&ward_pid)?).await?;
     let obligations = auth::authorize_record(&caller, Action::Read, &auth::ward_resource_attrs(&ward))
@@ -174,7 +212,7 @@ async fn whiteboard(
         };
         cards.push(card);
     }
-    format::json(Whiteboard {
+    let board = Whiteboard {
         ward_pid: ward.pid.to_string(),
         ward_name: ward.name,
         ward_code: ward.code,
@@ -184,7 +222,13 @@ async fn whiteboard(
         as_of: now,
         masked,
         cards,
-    })
+    };
+    // The tag covers everything except the always-changing `as_of`.
+    let mut fingerprint = serde_json::to_value(&board).map_err(|e| Error::Any(e.into()))?;
+    if let Some(map) = fingerprint.as_object_mut() {
+        map.remove("as_of");
+    }
+    conditional_json(&headers, &etag_of(&fingerprint), &board)
 }
 
 /// One ward row in the at-a-glance view (spec `capacity.md`).
@@ -352,10 +396,15 @@ async fn glance(ctx: &AppContext) -> Result<AtAGlance> {
     Ok(AtAGlance { as_of: now, wards: rows, site_tiles })
 }
 
-/// `GET /api/at-a-glance` — per-ward rows + site tiles.
+/// `GET /api/at-a-glance` — per-ward rows + site tiles (conditional).
 #[debug_handler]
-async fn at_a_glance(State(ctx): State<AppContext>) -> Result<Response> {
-    format::json(glance(&ctx).await?)
+async fn at_a_glance(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
+    let snapshot = glance(&ctx).await?;
+    let mut fingerprint = serde_json::to_value(&snapshot).map_err(|e| Error::Any(e.into()))?;
+    if let Some(map) = fingerprint.as_object_mut() {
+        map.remove("as_of");
+    }
+    conditional_json(&headers, &etag_of(&fingerprint), &snapshot)
 }
 
 /// `GET /api/capacity/metrics` — the same snapshot, flat, for

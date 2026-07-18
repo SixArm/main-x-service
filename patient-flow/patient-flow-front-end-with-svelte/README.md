@@ -14,8 +14,9 @@ API.
 **Status: implemented (PF-T15/T16, 2026-07-18).** SPA mode with a
 same-origin BFF proxy; `svelte-check` clean; 22 vitest component
 tests + 7 Playwright e2e specs (API stubbed via `page.route`, no
-Rust service needed). Remaining: PF-T18 (BFF session + PASETO
-exchange, for auth activation).
+Rust service needed). The BFF session flow (PF-T18: `/signin`
+magic-link, `/verify` cookie exchange, `/signout`, proxy PASETO
+injection) is wired and inert until auth activation.
 
 ## Quick start
 
