@@ -55,6 +55,13 @@ describe("i18n catalog", () => {
         expect(DEFAULT_LOCALE).toBe("en");
     });
 
+    it("spot-checks the PPM keys in non-Latin locales", () => {
+        expect(translate("ppm.dashboard.title", "zh")).toBe("组合仪表盘");
+        expect(translate("ppm.gov.title", "ar")).toBe("الحوكمة");
+        expect(translate("ppm.nav.proposals", "hi")).toBe("प्रस्ताव");
+        expect(translate("ppm.scenarios.title", "ur")).toBe("منظرنامہ منصوبہ بندی");
+    });
+
     it("spot-checks a non-Latin locale (Chinese)", () => {
         expect(translate("nav.cases", "zh")).toBe("案件");
         expect(translate("form.save", "zh")).toBe("保存");

@@ -5,6 +5,7 @@
   is scoped to the umbrella).
 -->
 <script lang="ts">
+  import { t } from "$lib/i18n.svelte";
   import { onMount } from "svelte";
   import { page } from "$app/state";
   import { PpmClient, type ScheduleView } from "$lib/api/ppm";
@@ -18,13 +19,13 @@
 
   onMount(async () => {
     if (collection !== "portfolios") {
-      error = "Schedules are drawn per portfolio umbrella.";
+      error = t("ppm.schedule.portfoliosOnly");
       return;
     }
     try {
       schedule = await ppm.schedule(pid);
     } catch (err) {
-      error = err instanceof Error ? err.message : "load failed";
+      error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
     }
   });
 
@@ -51,8 +52,8 @@
 
 <svelte:head><title>Schedule — PPM</title></svelte:head>
 
-<p class="small"><a href={`/${collection}/${pid}/governance`}>← governance</a></p>
-<h1>Portfolio schedule</h1>
+<p class="small"><a href={`/${collection}/${pid}/governance`}>{t("ppm.common.governance")}</a></p>
+<h1>{t("ppm.schedule.title")}</h1>
 {#if error}<p class="banner" role="alert">{error}</p>{/if}
 
 {#if schedule}
@@ -72,7 +73,7 @@
       <div class="lane">
         <span class="label small">
           <a href={`/${item.kind.toLowerCase()}s/${item.pid}/governance`}>{item.name}</a>
-          {#if item.on_critical_path}<span class="chip critical">critical</span>{/if}
+          {#if item.on_critical_path}<span class="chip critical">{t("ppm.schedule.critical")}</span>{/if}
           {#if item.stage}<span class="chip">{item.stage}</span>{/if}
         </span>
         <span class="track">
@@ -80,7 +81,7 @@
             <span class="bar" class:critical={item.on_critical_path} style={bar(item.start, item.end)}
             ></span>
           {:else}
-            <span class="small muted">undated</span>
+            <span class="small muted">{t("ppm.schedule.undated")}</span>
           {/if}
         </span>
       </div>
@@ -88,7 +89,7 @@
   </div>
 
   {#if schedule.edges.length > 0}
-    <h2>Dependencies</h2>
+    <h2>{t("ppm.schedule.dependencies")}</h2>
     <ul class="small">
       {#each schedule.edges as edge (edge.pid)}
         <li>{edge.predecessor_pid.slice(0, 8)} → {edge.successor_pid.slice(0, 8)} (+{edge.lag_days}d)</li>

@@ -62,9 +62,9 @@
 {:else if record}
   <h1>{record.name}</h1>
   <p class="small">
-    <a class="button small" href={`/${collection}/${pid}/governance`}>Governance</a>
+    <a class="button small" href={`/${collection}/${pid}/governance`}>{t("ppm.common.governance")}</a>
     {#if collection === "portfolios"}
-      <a class="button small" href={`/${collection}/${pid}/schedule`}>Schedule</a>
+      <a class="button small" href={`/${collection}/${pid}/schedule`}>{t("ppm.common.schedule")}</a>
     {/if}
   </p>
   <div class="surface stack">

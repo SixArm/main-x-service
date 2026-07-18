@@ -5,6 +5,7 @@
   duplicate-demand checks, and promote-to-work-item.
 -->
 <script lang="ts">
+  import { t } from "$lib/i18n.svelte";
   import { onMount } from "svelte";
   import { PpmClient, type DemandHit, type Proposal, money } from "$lib/api/ppm";
   import { COLLECTIONS, type Collection } from "$lib/api/types";
@@ -26,7 +27,7 @@
       proposals = await ppm.listProposals(statusFilter || undefined);
       error = null;
     } catch (err) {
-      error = err instanceof Error ? err.message : "load failed";
+      error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
     }
   }
 
@@ -38,7 +39,7 @@
       await action();
       await refresh();
     } catch (err) {
-      error = err instanceof Error ? err.message : "action failed";
+      error = err instanceof Error ? err.message : t("ppm.common.actionFailed");
     }
   }
 
@@ -79,24 +80,24 @@
 
 <svelte:head><title>Proposals — PPM</title></svelte:head>
 
-<h1>Work intake</h1>
+<h1>{t("ppm.proposals.title")}</h1>
 {#if error}<p class="banner" role="alert">{error}</p>{/if}
 
 <form class="row" onsubmit={submitNew}>
-  <input placeholder="Proposal title" bind:value={title} required />
-  <input placeholder="Summary" bind:value={summary} />
+  <input placeholder={t("ppm.proposals.formTitle")} bind:value={title} required />
+  <input placeholder={t("ppm.proposals.formSummary")} bind:value={summary} />
   <select bind:value={kindTarget} aria-label="Target collection">
     {#each COLLECTIONS as target (target)}<option value={target}>{target}</option>{/each}
   </select>
-  <input placeholder="Requested (major units)" bind:value={requested} size="12" />
+  <input placeholder={t("ppm.proposals.requested")} bind:value={requested} size="12" />
   <input bind:value={currency} size="4" aria-label="Currency" />
-  <button class="button primary" type="submit">Open proposal</button>
+  <button class="button primary" type="submit">{t("ppm.proposals.open")}</button>
 </form>
 
 <p class="row small">
-  Filter:
+  {t("ppm.proposals.filter")}
   <select bind:value={statusFilter} onchange={refresh} aria-label="Status filter">
-    <option value="">all open</option>
+    <option value="">{t("ppm.proposals.allOpen")}</option>
     {#each ["draft", "submitted", "in_review", "approved", "rejected", "promoted"] as status (status)}
       <option value={status}>{status}</option>
     {/each}
@@ -133,10 +134,10 @@
             </button>
           {/if}
           {#if proposal.status === "promoted" && proposal.promoted_work_item_pid}
-            <a href={`/${proposal.kind_target}/${proposal.promoted_work_item_pid}`}>work item</a>
+            <a href={`/${proposal.kind_target}/${proposal.promoted_work_item_pid}`}>{t("ppm.proposals.workItem")}</a>
           {:else}
             <button class="button small" onclick={() => showDuplicates(proposal.pid)}>
-              duplicates?
+              {t("ppm.proposals.duplicates")}
             </button>
           {/if}
         </td>
@@ -145,7 +146,7 @@
         <tr>
           <td colspan="5" class="small">
             {#if (duplicates[proposal.pid] ?? []).length === 0}
-              No duplicate demand found.
+              {t("ppm.proposals.noDuplicates")}
             {:else}
               {#each duplicates[proposal.pid] ?? [] as hit (hit.pid)}
                 <span class="chip">

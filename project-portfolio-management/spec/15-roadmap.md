@@ -107,8 +107,9 @@ data to be meaningful. **The whole catalogue is delivered service-side, and the
 front-end views over it landed 2026-07-18** (dashboard, intake +
 idea boards, per-item governance panel, portfolio schedule,
 scenarios, objectives, capacity, reports — see the front-end
-CHANGELOG). Locale catalogues for the new views are the remaining
-follow-up. Each item lands as spec §13 tasks (three-part
+CHANGELOG). Locale catalogues for the new views landed 2026-07-18 (98 `ppm.*`
+keys across all 13 locales, parity-tested) — the PPM catalogue is
+now complete across service, UI, and i18n. Each item lands as spec §13 tasks (three-part
 rule) when accepted.
 
 ### Longer arc (pre-rename roadmap)

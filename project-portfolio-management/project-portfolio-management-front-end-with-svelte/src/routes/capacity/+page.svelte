@@ -3,6 +3,7 @@
   a window; summed percent over 100 flags over-allocation.
 -->
 <script lang="ts">
+  import { t } from "$lib/i18n.svelte";
   import { onMount } from "svelte";
   import { PpmClient, type CapacityView } from "$lib/api/ppm";
 
@@ -17,7 +18,7 @@
       view = await ppm.capacity(from || undefined, to || undefined);
       error = null;
     } catch (err) {
-      error = err instanceof Error ? err.message : "load failed";
+      error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
     }
   }
   onMount(refresh);
@@ -25,7 +26,7 @@
 
 <svelte:head><title>Capacity — PPM</title></svelte:head>
 
-<h1>Resource capacity</h1>
+<h1>{t("ppm.capacity.title")}</h1>
 {#if error}<p class="banner" role="alert">{error}</p>{/if}
 
 <form
@@ -37,13 +38,13 @@
 >
   <label class="small">from <input type="date" bind:value={from} /></label>
   <label class="small">to <input type="date" bind:value={to} /></label>
-  <button class="button small" type="submit">Apply</button>
+  <button class="button small" type="submit">{t("ppm.capacity.apply")}</button>
 </form>
 
 {#if view}
   <p class="small muted">window: {view.from} → {view.to}</p>
   <table>
-    <thead><tr><th>Person</th><th>Allocated</th><th>Load</th><th>Allocations</th></tr></thead>
+    <thead><tr><th>{t("ppm.capacity.person")}</th><th>{t("ppm.capacity.allocated")}</th><th>{t("ppm.capacity.load")}</th><th>{t("ppm.nav.capacity")}</th></tr></thead>
     <tbody>
       {#each view.people as person (person.person_ref)}
         <tr>
@@ -67,7 +68,7 @@
     </tbody>
   </table>
   {#if view.people.length === 0}
-    <p class="small muted">No allocations yet — add them on an item's governance panel.</p>
+    <p class="small muted">{t("ppm.capacity.empty")}</p>
   {/if}
 {/if}
 

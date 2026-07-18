@@ -6,6 +6,7 @@
   add-form. Every action maps 1:1 to a service endpoint.
 -->
 <script lang="ts">
+  import { t } from "$lib/i18n.svelte";
   import { onMount } from "svelte";
   import { page } from "$app/state";
   import {
@@ -72,7 +73,7 @@
         ]);
       error = null;
     } catch (err) {
-      error = err instanceof Error ? err.message : "load failed";
+      error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
     }
   }
   onMount(refresh);
@@ -83,7 +84,7 @@
       await action();
       await refresh();
     } catch (err) {
-      error = err instanceof Error ? err.message : "action failed";
+      error = err instanceof Error ? err.message : t("ppm.common.actionFailed");
     }
   }
 
@@ -92,8 +93,8 @@
 
 <svelte:head><title>Governance — PPM</title></svelte:head>
 
-<p class="small"><a href={`/${collection}/${pid}`}>← back to the work item</a></p>
-<h1>Governance{#if summary} — {summary.name}{/if}</h1>
+<p class="small"><a href={`/${collection}/${pid}`}>{t("ppm.gov.backToItem")}</a></p>
+<h1>{t("ppm.gov.title")}{#if summary} — {summary.name}{/if}</h1>
 {#if error}<p class="banner" role="alert">{error}</p>{/if}
 
 {#if summary}
@@ -113,13 +114,13 @@
       </span>
     {/each}
     {#if collection === "portfolios"}
-      <a class="button small" href={`/${collection}/${pid}/schedule`}>Schedule</a>
+      <a class="button small" href={`/${collection}/${pid}/schedule`}>{t("ppm.common.schedule")}</a>
     {/if}
   </section>
 {/if}
 
 <details open>
-  <summary><h2>Gate journey</h2></summary>
+  <summary><h2>{t("ppm.gov.gates")}</h2></summary>
   {#if journey}
     <p class="small">
       {#each journey.reviews as review (review.pid)}
@@ -148,16 +149,16 @@
           <option>hold</option>
           <option>rejected</option>
         </select>
-        <button class="button primary small" type="submit">Record decision</button>
+        <button class="button primary small" type="submit">{t("ppm.gov.recordDecision")}</button>
       </form>
     {:else}
-      <p class="small muted">Gate journey complete.</p>
+      <p class="small muted">{t("ppm.gov.journeyComplete")}</p>
     {/if}
   {/if}
 </details>
 
 <details open>
-  <summary><h2>Risks</h2></summary>
+  <summary><h2>{t("ppm.gov.risks")}</h2></summary>
   <table>
     <thead><tr><th>Risk</th><th>P×I</th><th>Status</th><th></th></tr></thead>
     <tbody>
@@ -169,7 +170,7 @@
           <td>
             {#if risk.status === "open" || risk.status === "mitigating"}
               <button class="button danger small" onclick={() => act(() => ppm.escalateRisk(collection, pid, risk.pid))}>
-                escalate
+                {t("ppm.gov.escalate")}
               </button>
             {/if}
           </td>
@@ -193,12 +194,12 @@
     <input placeholder="New risk" bind:value={riskTitle} required />
     <label class="small">P <input type="number" min="1" max="5" bind:value={riskProbability} /></label>
     <label class="small">I <input type="number" min="1" max="5" bind:value={riskImpact} /></label>
-    <button class="button small" type="submit">Raise</button>
+    <button class="button small" type="submit">{t("ppm.gov.raise")}</button>
   </form>
 </details>
 
 <details open>
-  <summary><h2>Budget</h2></summary>
+  <summary><h2>{t("ppm.gov.budget")}</h2></summary>
   {#if budget}
     <table>
       <thead><tr><th>Line</th><th>Planned</th><th>Actual</th><th>Record actual</th></tr></thead>
@@ -261,12 +262,12 @@
     <select bind:value={lineCategory} aria-label="Category"><option>capex</option><option>opex</option></select>
     <input bind:value={lineCurrency} size="4" aria-label="Currency" />
     <input placeholder="Planned (major)" bind:value={linePlanned} size="10" required />
-    <button class="button small" type="submit">Add line</button>
+    <button class="button small" type="submit">{t("ppm.gov.addLine")}</button>
   </form>
 </details>
 
 <details open>
-  <summary><h2>Benefits</h2></summary>
+  <summary><h2>{t("ppm.gov.benefits")}</h2></summary>
   {#if benefits}
     <table>
       <thead><tr><th>Benefit</th><th>Target</th><th>Realized</th><th>Status</th><th></th></tr></thead>
@@ -302,7 +303,7 @@
                 }}
               >
                 <input name="realize" size="8" placeholder="0.00" />
-                <button class="button small" type="submit">realize</button>
+                <button class="button small" type="submit">{t("ppm.gov.realize")}</button>
               </form>
             </td>
           </tr>
@@ -344,17 +345,17 @@
       <option>quality</option><option>compliance</option><option>other</option>
     </select>
     <input placeholder="Target (major)" bind:value={benefitTarget} size="10" />
-    <button class="button small" type="submit">Declare</button>
+    <button class="button small" type="submit">{t("ppm.gov.declare")}</button>
   </form>
 </details>
 
 <details>
-  <summary><h2>Objectives</h2></summary>
+  <summary><h2>{t("ppm.gov.objectives")}</h2></summary>
   <p class="small">
     {#each mappings as mapping (mapping.objective_pid)}
       <span class="chip">{mapping.title} (w{mapping.weight})</span>
     {/each}
-    {#if mappings.length === 0}<span class="muted">No objective mappings yet.</span>{/if}
+    {#if mappings.length === 0}<span class="muted">{t("ppm.gov.noMappings")}</span>{/if}
   </p>
   <form
     class="row"
@@ -370,21 +371,21 @@
       {/each}
     </select>
     <label class="small">weight <input type="number" min="1" max="5" bind:value={mapWeight} /></label>
-    <button class="button small" type="submit">Map</button>
+    <button class="button small" type="submit">{t("ppm.gov.map")}</button>
   </form>
 </details>
 
 <details>
-  <summary><h2>Milestones</h2></summary>
+  <summary><h2>{t("ppm.gov.milestones")}</h2></summary>
   <ul>
     {#each milestones as milestone (milestone.pid)}
       <li class="small">
         {milestone.name} — {milestone.due}
-        {#if milestone.done}<span class="chip green">done</span>
-        {:else if milestone.overdue}<span class="chip red">overdue</span>
+        {#if milestone.done}<span class="chip green">{t("ppm.gov.done")}</span>
+        {:else if milestone.overdue}<span class="chip red">{t("ppm.gov.overdue")}</span>
         {:else}
           <button class="button small" onclick={() => act(() => ppm.completeMilestone(collection, pid, milestone.pid))}>
-            complete
+            {t("ppm.gov.complete")}
           </button>
         {/if}
       </li>
@@ -401,12 +402,12 @@
   >
     <input placeholder="New milestone" bind:value={milestoneName} required />
     <input type="date" bind:value={milestoneDue} required />
-    <button class="button small" type="submit">Add</button>
+    <button class="button small" type="submit">{t("ppm.gov.add")}</button>
   </form>
 </details>
 
 <details>
-  <summary><h2>Allocations</h2></summary>
+  <summary><h2>{t("ppm.gov.allocations")}</h2></summary>
   <ul>
     {#each allocations as allocation (allocation.pid)}
       <li class="small">
@@ -429,7 +430,7 @@
   >
     <input placeholder="worker:<uuid>" bind:value={allocPerson} size="42" required />
     <label class="small">% <input type="number" min="1" max="100" bind:value={allocPercent} /></label>
-    <button class="button small" type="submit">Allocate</button>
+    <button class="button small" type="submit">{t("ppm.gov.allocate")}</button>
   </form>
 </details>
 

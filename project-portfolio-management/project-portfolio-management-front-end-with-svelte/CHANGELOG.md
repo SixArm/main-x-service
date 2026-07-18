@@ -11,6 +11,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-18 — **13-locale i18n for the PPM views** (closing the
+  English-first follow-up from the catalogue-views round): 98 new
+  `ppm.*` keys — nav entries, view titles, table headers, buttons,
+  chips, and empty-state lines for the dashboard, intake board,
+  ideas, scenarios, objectives, capacity, reports, the governance
+  panel, and the schedule view — translated across all 13 locales
+  (en, cy, es, fr, de, ar, ru, hi, zh, bn, pt, id, ur) and wired
+  through `t()`. The full-coverage parity test enforces every locale
+  covers every key; new spot-checks pin PPM strings in zh/ar/hi/ur.
+  Wire tokens (statuses, gate ids, currency codes, URN placeholders)
+  stay verbatim by design, matching the untranslated collection
+  segments in the nav.
+
+
+### Added
+
 - 2026-07-18 — **PPM catalogue views** (over service Phases A–C,
   PPM-1..12; English-first — extending the 13-locale catalogues to
   these strings is a follow-up). New `PpmClient`

@@ -4,6 +4,7 @@
   English-first (locale catalogues extend as a follow-up).
 -->
 <script lang="ts">
+  import { t } from "$lib/i18n.svelte";
   import { onMount } from "svelte";
   import { PpmClient, type Dashboard } from "$lib/api/ppm";
 
@@ -15,32 +16,32 @@
     try {
       board = await ppm.dashboard();
     } catch (err) {
-      error = err instanceof Error ? err.message : "load failed";
+      error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
     }
   });
 </script>
 
 <svelte:head><title>Dashboard — PPM</title></svelte:head>
 
-<h1>Portfolio dashboard</h1>
+<h1>{t("ppm.dashboard.title")}</h1>
 {#if error}<p class="banner" role="alert">{error}</p>{/if}
 
 {#if board}
   <section class="tiles" data-testid="site-tiles">
-    <div class="tile"><strong>{board.site_tiles.work_items}</strong><span>work items</span></div>
-    <div class="tile"><strong>{board.site_tiles.proposals_open}</strong><span>open proposals</span></div>
-    <div class="tile"><strong>{board.site_tiles.materialised_risks}</strong><span>materialised risks</span></div>
-    <div class="tile"><strong>{board.site_tiles.open_risk_exposure}</strong><span>open risk exposure</span></div>
-    <div class="tile"><strong>{board.site_tiles.schedule_violations}</strong><span>schedule violations</span></div>
-    <div class="tile"><strong>{board.site_tiles.over_allocated_people}</strong><span>over-allocated people</span></div>
+    <div class="tile"><strong>{board.site_tiles.work_items}</strong><span>{t("ppm.dashboard.workItems")}</span></div>
+    <div class="tile"><strong>{board.site_tiles.proposals_open}</strong><span>{t("ppm.dashboard.openProposals")}</span></div>
+    <div class="tile"><strong>{board.site_tiles.materialised_risks}</strong><span>{t("ppm.dashboard.materialisedRisks")}</span></div>
+    <div class="tile"><strong>{board.site_tiles.open_risk_exposure}</strong><span>{t("ppm.dashboard.exposure")}</span></div>
+    <div class="tile"><strong>{board.site_tiles.schedule_violations}</strong><span>{t("ppm.dashboard.violations")}</span></div>
+    <div class="tile"><strong>{board.site_tiles.over_allocated_people}</strong><span>{t("ppm.dashboard.overAllocated")}</span></div>
   </section>
 
   <table>
     <thead>
       <tr>
-        <th>Collection</th><th>Total</th>
-        <th>Red</th><th>Amber</th><th>Green</th>
-        <th>Stages</th>
+        <th>{t("ppm.dashboard.collection")}</th><th>{t("ppm.dashboard.total")}</th>
+        <th>{t("ppm.dashboard.red")}</th><th>{t("ppm.dashboard.amber")}</th><th>{t("ppm.dashboard.green")}</th>
+        <th>{t("ppm.dashboard.stages")}</th>
       </tr>
     </thead>
     <tbody>
@@ -60,9 +61,9 @@
       {/each}
     </tbody>
   </table>
-  <p class="small muted">as of {board.as_of}</p>
+  <p class="small muted">{t("ppm.common.asOf")} {board.as_of}</p>
 {:else if !error}
-  <p>Loading…</p>
+  <p>{t("ppm.common.loading")}</p>
 {/if}
 
 <style>

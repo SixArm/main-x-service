@@ -4,6 +4,7 @@
   data, and commit the feasible winner.
 -->
 <script lang="ts">
+  import { t } from "$lib/i18n.svelte";
   import { onMount } from "svelte";
   import { PpmClient, money, type Scenario, type ScenarioEvaluation } from "$lib/api/ppm";
 
@@ -22,7 +23,7 @@
       scenarios = await ppm.listScenarios();
       error = null;
     } catch (err) {
-      error = err instanceof Error ? err.message : "load failed";
+      error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
     }
   }
   onMount(refresh);
@@ -33,7 +34,7 @@
       await action();
       await refresh();
     } catch (err) {
-      error = err instanceof Error ? err.message : "action failed";
+      error = err instanceof Error ? err.message : t("ppm.common.actionFailed");
     }
   }
 
@@ -69,15 +70,15 @@
 
 <svelte:head><title>Scenarios — PPM</title></svelte:head>
 
-<h1>Scenario planning</h1>
+<h1>{t("ppm.scenarios.title")}</h1>
 {#if error}<p class="banner" role="alert">{error}</p>{/if}
 
 <form class="row" onsubmit={create}>
-  <input placeholder="Scenario name" bind:value={name} required />
+  <input placeholder={t("ppm.scenarios.name")} bind:value={name} required />
   <input placeholder="work-item pids (space/comma separated)" bind:value={members} size="50" />
-  <input placeholder="Budget cap (major)" bind:value={cap} size="12" />
+  <input placeholder={t("ppm.scenarios.cap")} bind:value={cap} size="12" />
   <input bind:value={currency} size="4" aria-label="Currency" />
-  <button class="button primary" type="submit">Create</button>
+  <button class="button primary" type="submit">{t("ppm.scenarios.create")}</button>
 </form>
 
 <table>
@@ -99,20 +100,20 @@
               {#each evaluated.evaluation.planned_by_currency as [code, total] (code)}
                 <span class="chip">{code} {money(total)}</span>
               {/each}
-              <span class="chip">exposure {evaluated.evaluation.total_exposure}</span>
-              <span class="chip">alignment {evaluated.evaluation.total_alignment}</span>
+              <span class="chip">{t("ppm.scenarios.exposure")} {evaluated.evaluation.total_exposure}</span>
+              <span class="chip">{t("ppm.scenarios.alignment")} {evaluated.evaluation.total_alignment}</span>
               {#each evaluated.evaluation.violations as violation (violation)}
                 <span class="chip red">{violation}</span>
               {/each}
-              {#if evaluated.feasible}<span class="chip green">feasible</span>{/if}
+              {#if evaluated.feasible}<span class="chip green">{t("ppm.scenarios.feasible")}</span>{/if}
             {/if}
           {/if}
         </td>
         <td>
-          <button class="button small" onclick={() => evaluate(scenario.pid)}>Evaluate</button>
+          <button class="button small" onclick={() => evaluate(scenario.pid)}>{t("ppm.scenarios.evaluate")}</button>
           {#if scenario.status === "draft"}
             <button class="button primary small" onclick={() => act(() => ppm.commitScenario(scenario.pid))}>
-              Commit
+              {t("ppm.scenarios.commit")}
             </button>
           {/if}
         </td>

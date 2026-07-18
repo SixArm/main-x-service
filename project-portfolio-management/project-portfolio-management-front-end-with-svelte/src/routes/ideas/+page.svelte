@@ -4,6 +4,7 @@
   stage (idea → proposal → work item).
 -->
 <script lang="ts">
+  import { t } from "$lib/i18n.svelte";
   import { onMount } from "svelte";
   import { PpmClient, type Idea } from "$lib/api/ppm";
   import { COLLECTIONS, type Collection } from "$lib/api/types";
@@ -20,7 +21,7 @@
       ideas = await ppm.listIdeas();
       error = null;
     } catch (err) {
-      error = err instanceof Error ? err.message : "load failed";
+      error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
     }
   }
   onMount(refresh);
@@ -31,7 +32,7 @@
       await action();
       await refresh();
     } catch (err) {
-      error = err instanceof Error ? err.message : "action failed";
+      error = err instanceof Error ? err.message : t("ppm.common.actionFailed");
     }
   }
 
@@ -45,17 +46,17 @@
 
 <svelte:head><title>Ideas — PPM</title></svelte:head>
 
-<h1>Ideas</h1>
+<h1>{t("ppm.ideas.title")}</h1>
 {#if error}<p class="banner" role="alert">{error}</p>{/if}
 
 <form class="row" onsubmit={capture}>
-  <input placeholder="Idea title" bind:value={title} required />
-  <input placeholder="Pitch" bind:value={pitch} size="40" />
-  <button class="button primary" type="submit">Capture</button>
+  <input placeholder={t("ppm.ideas.formTitle")} bind:value={title} required />
+  <input placeholder={t("ppm.ideas.formPitch")} bind:value={pitch} size="40" />
+  <button class="button primary" type="submit">{t("ppm.ideas.capture")}</button>
 </form>
 
 <p class="row small">
-  Convert target:
+  {t("ppm.ideas.convertTarget")}
   <select bind:value={convertTarget} aria-label="Convert target">
     {#each COLLECTIONS as target (target)}<option value={target}>{target}</option>{/each}
   </select>
@@ -75,15 +76,15 @@
         class="button primary small"
         onclick={() => act(() => ppm.convertIdea(idea.pid, convertTarget))}
       >
-        To proposal
+        {t("ppm.ideas.toProposal")}
       </button>
       <button class="button danger small" onclick={() => act(() => ppm.dismissIdea(idea.pid))}>
-        Dismiss
+        {t("ppm.ideas.dismiss")}
       </button>
     </li>
   {/each}
 </ul>
-{#if ideas.length === 0 && !error}<p class="small muted">No open ideas — capture one above.</p>{/if}
+{#if ideas.length === 0 && !error}<p class="small muted">{t("ppm.ideas.empty")}</p>{/if}
 
 <style>
   .row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0.8rem 0; }

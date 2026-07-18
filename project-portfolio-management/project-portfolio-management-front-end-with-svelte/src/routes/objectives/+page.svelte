@@ -3,6 +3,7 @@
   objective alignment rollups (which items serve it, with weights).
 -->
 <script lang="ts">
+  import { t } from "$lib/i18n.svelte";
   import { onMount } from "svelte";
   import { PpmClient, type Alignment, type Objective } from "$lib/api/ppm";
 
@@ -18,7 +19,7 @@
       objectives = await ppm.listObjectives();
       error = null;
     } catch (err) {
-      error = err instanceof Error ? err.message : "load failed";
+      error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
     }
   }
   onMount(refresh);
@@ -46,13 +47,13 @@
 
 <svelte:head><title>Objectives — PPM</title></svelte:head>
 
-<h1>Objectives (OKRs)</h1>
+<h1>{t("ppm.objectives.title")}</h1>
 {#if error}<p class="banner" role="alert">{error}</p>{/if}
 
 <form class="row" onsubmit={create}>
-  <input placeholder="Objective title" bind:value={title} required />
+  <input placeholder={t("ppm.objectives.formTitle")} bind:value={title} required />
   <input placeholder="Period (e.g. 2026-H2)" bind:value={period} size="12" />
-  <button class="button primary" type="submit">Register</button>
+  <button class="button primary" type="submit">{t("ppm.objectives.register")}</button>
 </form>
 
 <ul class="objectives">
@@ -61,13 +62,13 @@
       <div>
         <strong>{objective.title}</strong>
         {#if objective.period}<span class="chip">{objective.period}</span>{/if}
-        <button class="button small" onclick={() => showAlignment(objective.pid)}>Alignment</button>
+        <button class="button small" onclick={() => showAlignment(objective.pid)}>{t("ppm.objectives.alignment")}</button>
       </div>
       {#if alignments[objective.pid]}
         {@const alignment = alignments[objective.pid]}
         {#if alignment}
           <p class="small">
-            total weight <strong>{alignment.total_weight}</strong>
+            {t("ppm.objectives.totalWeight")} <strong>{alignment.total_weight}</strong>
             {#each Object.entries(alignment.weight_by_collection) as [kind, weight] (kind)}
               <span class="chip">{kind}: {weight}</span>
             {/each}
@@ -85,7 +86,7 @@
     </li>
   {/each}
 </ul>
-<p class="small muted">Map items to objectives from each item's governance panel.</p>
+<p class="small muted">{t("ppm.objectives.mapHint")}</p>
 
 <style>
   .row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0.8rem 0; }

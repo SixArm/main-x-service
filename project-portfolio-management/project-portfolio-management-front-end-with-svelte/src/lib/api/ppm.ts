@@ -21,7 +21,13 @@ export interface Proposal {
   strategic_rationale: string | null;
   requested_minor: number | null;
   currency: string | null;
-  status: "draft" | "submitted" | "in_review" | "approved" | "rejected" | "promoted";
+  status:
+    | "draft"
+    | "submitted"
+    | "in_review"
+    | "approved"
+    | "rejected"
+    | "promoted";
   promoted_work_item_pid: string | null;
 }
 
@@ -112,7 +118,12 @@ export interface ScheduleView {
     end: string | null;
     on_critical_path: boolean;
   }[];
-  edges: { pid: string; predecessor_pid: string; successor_pid: string; lag_days: number }[];
+  edges: {
+    pid: string;
+    predecessor_pid: string;
+    successor_pid: string;
+    lag_days: number;
+  }[];
   violations: {
     edge_pid: string;
     predecessor: string;
@@ -259,7 +270,9 @@ export class PpmClient {
 
   /** Wire an {@link ApiClient} at {@link API_BASE_URL}. */
   static withFetch(fetchFn?: typeof fetch): PpmClient {
-    return new PpmClient(new ApiClient({ baseUrl: API_BASE_URL, fetch: fetchFn }));
+    return new PpmClient(
+      new ApiClient({ baseUrl: API_BASE_URL, fetch: fetchFn }),
+    );
   }
 
   // ---- dashboard ----
@@ -274,10 +287,15 @@ export class PpmClient {
   createProposal(body: unknown): Promise<{ pid: string }> {
     return this.http.post("/api/proposals", { body });
   }
-  proposalAction(pid: string, action: "submit" | "review" | "approve" | "reject"): Promise<Proposal> {
+  proposalAction(
+    pid: string,
+    action: "submit" | "review" | "approve" | "reject",
+  ): Promise<Proposal> {
     return this.http.post(`/api/proposals/${pid}/${action}`, { body: {} });
   }
-  promoteProposal(pid: string): Promise<{ work_item_pid: string; collection: Collection }> {
+  promoteProposal(
+    pid: string,
+  ): Promise<{ work_item_pid: string; collection: Collection }> {
     return this.http.post(`/api/proposals/${pid}/promote`, { body: {} });
   }
   proposalDuplicates(pid: string): Promise<DemandHit[]> {
@@ -297,8 +315,13 @@ export class PpmClient {
   dismissIdea(pid: string): Promise<Idea> {
     return this.http.post(`/api/ideas/${pid}/dismiss`, { body: {} });
   }
-  convertIdea(pid: string, kindTarget: Collection): Promise<{ proposal_pid: string }> {
-    return this.http.post(`/api/ideas/${pid}/convert`, { body: { kind_target: kindTarget } });
+  convertIdea(
+    pid: string,
+    kindTarget: Collection,
+  ): Promise<{ proposal_pid: string }> {
+    return this.http.post(`/api/ideas/${pid}/convert`, {
+      body: { kind_target: kindTarget },
+    });
   }
 
   // ---- governance panel (PPM-3/10/12 + benefits/objectives) ----
@@ -308,42 +331,89 @@ export class PpmClient {
   gateJourney(collection: Collection, pid: string): Promise<GateJourney> {
     return this.http.get(`/api/${collection}/${pid}/gate-reviews`);
   }
-  reviewGate(collection: Collection, pid: string, body: unknown): Promise<{ stage: string | null }> {
+  reviewGate(
+    collection: Collection,
+    pid: string,
+    body: unknown,
+  ): Promise<{ stage: string | null }> {
     return this.http.post(`/api/${collection}/${pid}/gate-reviews`, { body });
   }
   listRisks(collection: Collection, pid: string): Promise<Risk[]> {
     return this.http.get(`/api/${collection}/${pid}/risks`);
   }
-  createRisk(collection: Collection, pid: string, body: unknown): Promise<{ pid: string }> {
+  createRisk(
+    collection: Collection,
+    pid: string,
+    body: unknown,
+  ): Promise<{ pid: string }> {
     return this.http.post(`/api/${collection}/${pid}/risks`, { body });
   }
-  escalateRisk(collection: Collection, pid: string, riskPid: string): Promise<Risk> {
-    return this.http.post(`/api/${collection}/${pid}/risks/${riskPid}/escalate`, { body: {} });
+  escalateRisk(
+    collection: Collection,
+    pid: string,
+    riskPid: string,
+  ): Promise<Risk> {
+    return this.http.post(
+      `/api/${collection}/${pid}/risks/${riskPid}/escalate`,
+      { body: {} },
+    );
   }
   budget(collection: Collection, pid: string): Promise<BudgetBoard> {
     return this.http.get(`/api/${collection}/${pid}/budget-lines`);
   }
-  createBudgetLine(collection: Collection, pid: string, body: unknown): Promise<{ pid: string }> {
+  createBudgetLine(
+    collection: Collection,
+    pid: string,
+    body: unknown,
+  ): Promise<{ pid: string }> {
     return this.http.post(`/api/${collection}/${pid}/budget-lines`, { body });
   }
-  recordActual(collection: Collection, pid: string, linePid: string, amountMinor: number): Promise<unknown> {
-    return this.http.post(`/api/${collection}/${pid}/budget-lines/${linePid}/actual`, {
-      body: { amount_minor: amountMinor },
-    });
+  recordActual(
+    collection: Collection,
+    pid: string,
+    linePid: string,
+    amountMinor: number,
+  ): Promise<unknown> {
+    return this.http.post(
+      `/api/${collection}/${pid}/budget-lines/${linePid}/actual`,
+      {
+        body: { amount_minor: amountMinor },
+      },
+    );
   }
   benefits(collection: Collection, pid: string): Promise<BenefitBoard> {
     return this.http.get(`/api/${collection}/${pid}/benefits`);
   }
-  createBenefit(collection: Collection, pid: string, body: unknown): Promise<{ pid: string }> {
+  createBenefit(
+    collection: Collection,
+    pid: string,
+    body: unknown,
+  ): Promise<{ pid: string }> {
     return this.http.post(`/api/${collection}/${pid}/benefits`, { body });
   }
-  realizeBenefit(collection: Collection, pid: string, benefitPid: string, body: unknown): Promise<unknown> {
-    return this.http.post(`/api/${collection}/${pid}/benefits/${benefitPid}/realize`, { body });
+  realizeBenefit(
+    collection: Collection,
+    pid: string,
+    benefitPid: string,
+    body: unknown,
+  ): Promise<unknown> {
+    return this.http.post(
+      `/api/${collection}/${pid}/benefits/${benefitPid}/realize`,
+      { body },
+    );
   }
-  itemObjectives(collection: Collection, pid: string): Promise<{ objective_pid: string; title: string; weight: number }[]> {
+  itemObjectives(
+    collection: Collection,
+    pid: string,
+  ): Promise<{ objective_pid: string; title: string; weight: number }[]> {
     return this.http.get(`/api/${collection}/${pid}/objectives`);
   }
-  linkObjective(collection: Collection, pid: string, objectivePid: string, weight: number): Promise<unknown> {
+  linkObjective(
+    collection: Collection,
+    pid: string,
+    objectivePid: string,
+    weight: number,
+  ): Promise<unknown> {
     return this.http.post(`/api/${collection}/${pid}/objectives`, {
       body: { objective_pid: objectivePid, weight },
     });
@@ -351,16 +421,31 @@ export class PpmClient {
   milestones(collection: Collection, pid: string): Promise<Milestone[]> {
     return this.http.get(`/api/${collection}/${pid}/milestones`);
   }
-  createMilestone(collection: Collection, pid: string, body: unknown): Promise<{ pid: string }> {
+  createMilestone(
+    collection: Collection,
+    pid: string,
+    body: unknown,
+  ): Promise<{ pid: string }> {
     return this.http.post(`/api/${collection}/${pid}/milestones`, { body });
   }
-  completeMilestone(collection: Collection, pid: string, milestonePid: string): Promise<unknown> {
-    return this.http.post(`/api/${collection}/${pid}/milestones/${milestonePid}/complete`, { body: {} });
+  completeMilestone(
+    collection: Collection,
+    pid: string,
+    milestonePid: string,
+  ): Promise<unknown> {
+    return this.http.post(
+      `/api/${collection}/${pid}/milestones/${milestonePid}/complete`,
+      { body: {} },
+    );
   }
   allocations(collection: Collection, pid: string): Promise<Allocation[]> {
     return this.http.get(`/api/${collection}/${pid}/allocations`);
   }
-  createAllocation(collection: Collection, pid: string, body: unknown): Promise<{ pid: string }> {
+  createAllocation(
+    collection: Collection,
+    pid: string,
+    body: unknown,
+  ): Promise<{ pid: string }> {
     return this.http.post(`/api/${collection}/${pid}/allocations`, { body });
   }
 

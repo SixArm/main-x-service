@@ -91,14 +91,14 @@
       href: `/${collection}`,
       label: collection,
     })),
-    // PPM catalogue views (English-first; locale catalogues follow).
-    { href: "/dashboard", label: "dashboard" },
-    { href: "/proposals", label: "proposals" },
-    { href: "/ideas", label: "ideas" },
-    { href: "/scenarios", label: "scenarios" },
-    { href: "/objectives", label: "objectives" },
-    { href: "/capacity", label: "capacity" },
-    { href: "/reports", label: "reports" },
+    // PPM catalogue views (fully localized 2026-07-18).
+    { href: "/dashboard", label: t("ppm.nav.dashboard") },
+    { href: "/proposals", label: t("ppm.nav.proposals") },
+    { href: "/ideas", label: t("ppm.nav.ideas") },
+    { href: "/scenarios", label: t("ppm.nav.scenarios") },
+    { href: "/objectives", label: t("ppm.nav.objectives") },
+    { href: "/capacity", label: t("ppm.nav.capacity") },
+    { href: "/reports", label: t("ppm.nav.reports") },
   ];
 
   // Locale <select> handler: push the chosen value into the i18n store,
