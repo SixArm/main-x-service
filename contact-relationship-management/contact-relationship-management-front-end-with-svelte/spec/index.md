@@ -28,7 +28,23 @@ project-portfolio-management front-end's Kanban board, i18n, and
 - **No client-held tokens**: mutations via server routes (session
   cookie + CSRF).
 
+## Edition-specific implementation notes (as landed)
+
+- **Copy source**: the HCM front-end (BFF proxy, session seam, SPA
+  mode, i18n pattern; 45-key catalogue here).
+- **Deal board**: stage columns from the pipeline's stage rows;
+  the forward-move button drives `POST /deals/{pid}/stage` (a lost
+  target carries a reason); the forecast strip re-reads
+  `GET /forecast` after every move so the number is never client
+  math.
+- **Honest KPIs**: win rate renders `value` with its
+  numerator/denominator and shows a no-data state on `null`; ROI
+  likewise; masked/absent money renders an em dash.
+- **Testing**: vitest (money honesty, i18n parity, API path map);
+  Playwright over `page.route` stubs mirroring the service contract
+  (unstubbed = 404-loud).
+
 ## Delivery
 
-This edition is CRM-T17/T18 in
-[../../spec/tasks.md](../../spec/tasks.md). Nothing implemented yet.
+CRM-T17/T18 **delivered 2026-07-18** — see
+[../../spec/tasks.md](../../spec/tasks.md).

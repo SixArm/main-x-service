@@ -112,16 +112,28 @@ code + tests in one PR.
 
 ## Phase 7 — front-end (all CRM-R*)
 
-- [ ] CRM-T17 Scaffold
+- [x] CRM-T17 Scaffold
   `contact-relationship-management-front-end-with-svelte`:
   SvelteKit 2 + Svelte 5 runes SPA, BFF proxy + session flow,
   13-locale i18n from the start, typed API client + `money()`.
   (CRM-D12)
-- [ ] CRM-T18 Views: contact/account timeline, lead queue with
+- [x] CRM-T18 Views: contact/account timeline, lead queue with
   score breakdown, deal Kanban, forecast table, campaign funnel +
   ROI, nurture editor, ticket queue with SLA countdowns, KB editor,
   dashboards; vitest + `page.route`-stubbed Playwright. (CRM-D10,
   CRM-D12)
+
+> CRM-T17/T18 landed 2026-07-18: SvelteKit 2 + Svelte 5 runes SPA
+> (copy-adapted from the HCM front-end: BFF proxy + session seam)
+> with a 45-key × 13-locale i18n module (parity-tested, RTL ar/ur),
+> typed CRM client + honest `money()`, and views: KPI dashboard
+> (win rate with numerator/denominator, forecast per currency),
+> contacts + consent actions + timeline, score-sorted lead queue
+> with expandable per-rule breakdown, deal board (stage columns +
+> forward moves + forecast strip), campaigns with run-simulated +
+> funnel/ROI, ticket queue with live breach flags + status moves,
+> KB list + publish + search. svelte-check 0 errors; 5 vitest +
+> 4 Playwright (page.route-stubbed, unstubbed = 404-loud) green.
 
 ## Production gates (before any non-demo exposure)
 
