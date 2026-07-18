@@ -9,6 +9,38 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- 2026-07-18 — **PPM catalogue views** (over service Phases A–C,
+  PPM-1..12; English-first — extending the 13-locale catalogues to
+  these strings is a follow-up). New `PpmClient`
+  (`src/lib/api/ppm.ts`, the single source of PPM endpoint paths) and
+  routes: `/dashboard` (site tiles + per-collection RAG/stage
+  rollups), `/proposals` (intake board: pipeline actions,
+  matcher-backed duplicate hits, promote-to-work-item), `/ideas`
+  (capture/vote/convert), `/scenarios` (create/evaluate/commit with
+  violation chips), `/objectives` (registry + alignment rollups),
+  `/capacity` (per-person load meters, over-allocation flags),
+  `/reports` (definitions, JSON preview runs, CSV download), the
+  per-item **governance panel**
+  (`/[collection]/[pid]/governance`: summary strip, gate journey +
+  next-gate review form, risks + escalate, budget lines +
+  record-actual, benefits + realize + ROI, OKR mappings, milestones,
+  allocations), and the portfolio **schedule view**
+  (`/portfolios/[pid]/schedule`: CSS Gantt bars, critical-path
+  badges, finish-start violation banners). Nav + detail-page links.
+  Tests: PpmClient path-mapping + `money` vitest suite; 3 Playwright
+  PPM specs over a stubbed API. Verified live end-to-end through the
+  BFF proxy against the running service.
+
+### Fixed
+
+- 2026-07-18 — The Playwright smoke suite was a stale copy of the
+  case front-end's (asserting "Cases" headings, stubbing `title`
+  instead of the work-item `name`, using the case app's detail
+  routes) and had never passed against this app; rewritten against
+  the real contract — all 8 e2e specs green.
+
 ### Changed
 
 - 2026-07-18 — **Subproject renamed**: `portfolio` →

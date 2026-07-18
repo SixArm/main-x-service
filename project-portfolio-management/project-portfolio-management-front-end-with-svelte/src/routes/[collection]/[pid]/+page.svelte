@@ -61,6 +61,12 @@
   <p class="banner" role="alert">{error}</p>
 {:else if record}
   <h1>{record.name}</h1>
+  <p class="small">
+    <a class="button small" href={`/${collection}/${pid}/governance`}>Governance</a>
+    {#if collection === "portfolios"}
+      <a class="button small" href={`/${collection}/${pid}/schedule`}>Schedule</a>
+    {/if}
+  </p>
   <div class="surface stack">
     <div><strong>{t("detail.caseType")}</strong> {record.kind}</div>
     {#if record.status}

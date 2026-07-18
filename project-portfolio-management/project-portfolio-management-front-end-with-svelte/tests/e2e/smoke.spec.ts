@@ -1,25 +1,27 @@
 import { test, expect, type Page } from "@playwright/test";
 
-// Smoke tests over the four routes. The backend is stubbed so a broken
-// endpoint contract (wrong path / method) surfaces as an unhandled
-// request and a failing assertion, without needing the Rust service.
+// Smoke tests over the collection routes. The backend is stubbed so a
+// broken endpoint contract (wrong path / method / field) surfaces as
+// an unhandled request and a failing assertion, without needing the
+// Rust service. (Fixed 2026-07-18: these were stale copies of the
+// case front-end's suite — asserting "Cases" headings, stubbing
+// `title` instead of the work-item `name`, and using the case app's
+// detail routes — and had never been adapted to this app.)
 
-// Fixed pid + canned case used by both the route stubs and the assertions.
+// Fixed pid + canned work item used by stubs and assertions alike.
 const PID = "11111111-1111-4111-8111-111111111111";
 
-const CASE = {
-  title: "Housing benefit appeal",
-  case_number: "2026-HB-0042",
-  agency_id: "agency-1",
-  agency_name: "City Housing Office",
-  case_type: "Housing",
-  status: "Open",
-  priority: "Normal",
-  opened_date: "2026-01-15",
-  alternate_titles: [],
-  subjects: ["claimant-7"],
-  keywords: ["housing"],
-  identifiers: [{ scheme: "Docket", value: "HB-2026-0042" }],
+const WORK_ITEM = {
+  kind: "Project",
+  name: "Website replatform",
+  alternate_names: [],
+  code: "WEB-42",
+  status: "Active",
+  goals: [],
+  keywords: ["platform"],
+  tags: [],
+  identifiers: [],
+  relationships: [],
   same_as: [],
   in_language: ["en"],
 };
@@ -35,19 +37,19 @@ async function stubApi(page: Page) {
     // Dispatch by (path, method) mirroring the real endpoint contract; any
     // unmatched request falls through to a 404 so contract drift fails loud.
     if (path === "/api/projects" && method === "GET") {
-      return route.fulfill({ json: [{ pid: PID, title: CASE.title }] });
+      return route.fulfill({ json: [{ pid: PID, name: WORK_ITEM.name }] });
     }
     if (path === "/api/projects" && method === "POST") {
-      return route.fulfill({ json: { pid: PID, title: CASE.title } });
+      return route.fulfill({ json: { pid: PID, name: WORK_ITEM.name } });
     }
     if (path.endsWith("/check-duplicates")) {
       return route.fulfill({ json: [] });
     }
     if (path === `/api/projects/${PID}` && method === "GET") {
-      return route.fulfill({ json: CASE });
+      return route.fulfill({ json: WORK_ITEM });
     }
     if (path === `/api/projects/${PID}` && method === "PUT") {
-      return route.fulfill({ json: { pid: PID, title: CASE.title } });
+      return route.fulfill({ json: { pid: PID, name: WORK_ITEM.name } });
     }
     if (path === `/api/projects/${PID}` && method === "DELETE") {
       return route.fulfill({ status: 200, body: "" });
@@ -60,31 +62,33 @@ test.beforeEach(async ({ page }) => {
   await stubApi(page);
 });
 
-// Pins: the list route fetches and shows the seeded case title.
+// Pins: the list route fetches and shows the seeded work item.
 test("list page renders the seeded case", async ({ page }) => {
   await page.goto("/projects", { waitUntil: "networkidle" });
-  await expect(page.getByRole("heading", { name: "Cases" })).toBeVisible();
-  await expect(page.getByText("Housing benefit appeal")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Work items/ })).toBeVisible();
+  await expect(page.getByText("Website replatform")).toBeVisible();
 });
 
 // Pins: the create route renders the empty form.
 test("new page shows the create form", async ({ page }) => {
   await page.goto("/projects/new", { waitUntil: "networkidle" });
-  await expect(page.getByRole("heading", { name: "New case" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /New case/ })).toBeVisible();
 });
 
-// Pins: the detail route fetches the case and shows its title heading.
+// Pins: the detail route fetches the work item and shows its name.
 test("detail page renders the fetched case", async ({ page }) => {
-  await page.goto(`/${PID}`, { waitUntil: "networkidle" });
+  await page.goto(`/projects/${PID}`, { waitUntil: "networkidle" });
   await expect(
-    page.getByRole("heading", { name: "Housing benefit appeal" }),
+    page.getByRole("heading", { name: "Website replatform" }),
   ).toBeVisible();
+  // The governance panel is linked from the detail page (PPM views).
+  await expect(page.getByRole("link", { name: "Governance" })).toBeVisible();
 });
 
-// Pins: the edit route loads the case and renders the edit form.
+// Pins: the edit route loads the work item and renders the edit form.
 test("edit page renders the edit form", async ({ page }) => {
-  await page.goto(`/${PID}/edit`, { waitUntil: "networkidle" });
-  await expect(page.getByRole("heading", { name: "Edit case" })).toBeVisible();
+  await page.goto(`/projects/${PID}/edit`, { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: /Edit case/ })).toBeVisible();
 });
 
 // Pins: spec §6.6 — check-duplicates excludes the record itself. The stub
@@ -100,7 +104,7 @@ test("detail check-duplicates hides the record itself (self-exclusion)", async (
         // The record itself — must be filtered out (h.pid === pid).
         {
           pid: PID,
-          title: CASE.title,
+          name: WORK_ITEM.name,
           score: 1.0,
           confidence: "Certain",
           is_match: true,
@@ -108,7 +112,7 @@ test("detail check-duplicates hides the record itself (self-exclusion)", async (
         // A genuine other candidate — must remain.
         {
           pid: OTHER,
-          title: "Housing benefit review",
+          name: "Website rebuild",
           score: 0.91,
           confidence: "Probable",
           is_match: true,
@@ -116,15 +120,15 @@ test("detail check-duplicates hides the record itself (self-exclusion)", async (
       ],
     }),
   );
-  await page.goto(`/${PID}`, { waitUntil: "networkidle" });
+  await page.goto(`/projects/${PID}`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Check duplicates" }).click();
   await expect(
     page.getByRole("heading", { name: "Potential duplicates" }),
   ).toBeVisible();
   // The other candidate is listed.
-  await expect(page.getByText("Housing benefit review")).toBeVisible();
+  await expect(page.getByText("Website rebuild")).toBeVisible();
   // The record itself is not echoed back as its own duplicate. Scope to the
   // duplicates list so the page's own <h1> title is not matched.
   await expect(page.locator("h2 ~ ul a")).toHaveCount(1);
-  await expect(page.locator("h2 ~ ul a")).toHaveText("Housing benefit review");
+  await expect(page.locator("h2 ~ ul a")).toHaveText("Website rebuild");
 });

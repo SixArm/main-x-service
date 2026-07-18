@@ -91,6 +91,14 @@
       href: `/${collection}`,
       label: collection,
     })),
+    // PPM catalogue views (English-first; locale catalogues follow).
+    { href: "/dashboard", label: "dashboard" },
+    { href: "/proposals", label: "proposals" },
+    { href: "/ideas", label: "ideas" },
+    { href: "/scenarios", label: "scenarios" },
+    { href: "/objectives", label: "objectives" },
+    { href: "/capacity", label: "capacity" },
+    { href: "/reports", label: "reports" },
   ];
 
   // Locale <select> handler: push the chosen value into the i18n store,

@@ -103,8 +103,12 @@ PPM-10 — intake, gates, risks, budgets give the portfolio office its
 control loop. B (visibility, ✅ service side delivered 2026-07-18): PPM-6, PPM-7, PPM-8, PPM-9 — dashboards
 and capacity make the control loop observable. C (strategy, ✅ service side delivered 2026-07-18): PPM-2,
 PPM-4, PPM-5, PPM-11 — scenarios, OKRs, and benefits need A + B's
-data to be meaningful. **The whole catalogue is now delivered
-service-side; the remaining pull is the front-end views.** Each item lands as spec §13 tasks (three-part
+data to be meaningful. **The whole catalogue is delivered service-side, and the
+front-end views over it landed 2026-07-18** (dashboard, intake +
+idea boards, per-item governance panel, portfolio schedule,
+scenarios, objectives, capacity, reports — see the front-end
+CHANGELOG). Locale catalogues for the new views are the remaining
+follow-up. Each item lands as spec §13 tasks (three-part
 rule) when accepted.
 
 ### Longer arc (pre-rename roadmap)
