@@ -8,6 +8,16 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-07-19 — dedup-report drift: `POST /api/places/deduplicate` now returns the family's
+  person/worker-shaped report: `auto_merged` (always 0),
+  `queued_for_review`, and `review_items[]` with pair ids, score,
+  quality band, `detection_method`, lowercase `status` wire tokens,
+  and `created_at` — previously the response carried only counts,
+  so the front-end's declared report shape was aspirational.
+  Serde wire-token pin added in-file.
+
 ### Security
 
 - **SEC-M1: input-size caps on the `Place` payload.** The validator

@@ -519,6 +519,46 @@ pub struct BatchDeduplicationRequest {
     pub max_candidates: Option<u64>,
 }
 
+/// Review disposition of one queued duplicate pair. Serialized with the
+/// family's lowercase wire tokens (`pending`, `confirmed`, `rejected`,
+/// `automerged`), matching the person/worker services.
+#[derive(Debug, Clone, Serialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ReviewStatus {
+    /// Awaiting manual review.
+    Pending,
+    /// Confirmed as a duplicate — ready for merge.
+    Confirmed,
+    /// Rejected — not a duplicate.
+    Rejected,
+    /// Auto-merged (score above an auto-merge threshold).
+    AutoMerged,
+}
+
+/// One candidate duplicate pair emitted by the batch scan, mirroring the
+/// person/worker review-item shape (`detection_method` included) so the
+/// family front-ends can render one review queue. No review-decision
+/// endpoint exists yet, so every emitted item is `pending`.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ReviewQueueItem {
+    /// Server-generated review-item id.
+    pub id: Uuid,
+    /// First thing in the candidate pair.
+    pub thing_id_a: Uuid,
+    /// Second thing in the candidate pair.
+    pub thing_id_b: Uuid,
+    /// Overall match score for the pair, in `[0.0, 1.0]`.
+    pub match_score: f64,
+    /// Confidence band label (lowercased [`MatchConfidence`] variant).
+    pub match_quality: String,
+    /// How the pair was detected (always `batch_deduplication` here).
+    pub detection_method: String,
+    /// Current review state (always [`ReviewStatus::Pending`] for now).
+    pub status: ReviewStatus,
+    /// When the item was produced.
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
 /// Batch-deduplication response.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct BatchDeduplicationResponse {
@@ -526,6 +566,15 @@ pub struct BatchDeduplicationResponse {
     pub things_scanned: usize,
     /// Number of duplicate pairs found.
     pub duplicates_found: usize,
+    /// Number of pairs auto-merged. Always `0`: this service has no
+    /// auto-merge path; the field exists so the report shape matches
+    /// the person/worker services.
+    pub auto_merged: usize,
+    /// Number of pairs queued for human review (all found pairs, until
+    /// a review-decision endpoint exists).
+    pub queued_for_review: usize,
+    /// The queued candidate pairs.
+    pub review_items: Vec<ReviewQueueItem>,
 }
 
 /// Batch deduplication scan over all active things.
@@ -546,21 +595,37 @@ pub async fn deduplicate(
         .list(limit, 0)
         .await
         .unwrap_or_default();
-    let mut duplicates_found = 0usize;
-    // Upper-triangular pair iteration: j starts at i+1 so each pair is scored
-    // once and no record is compared with itself.
+    let mut review_items = Vec::new();
+    // Upper-triangular pair iteration: j starts at i+1 so each pair is
+    // scored once and no record is compared with itself. Every pair at
+    // or above the threshold becomes a pending review item (the
+    // person/worker report shape).
     for i in 0..things.len() {
         for j in (i + 1)..things.len() {
-            if state.matcher.score(&things[i], &things[j]).score >= threshold {
-                duplicates_found += 1;
+            let result = state.matcher.score(&things[i], &things[j]);
+            if result.score >= threshold {
+                review_items.push(ReviewQueueItem {
+                    id: Uuid::new_v4(),
+                    thing_id_a: things[i].id,
+                    thing_id_b: things[j].id,
+                    match_score: result.score,
+                    match_quality: confidence_label(&result.confidence).to_string(),
+                    detection_method: "batch_deduplication".to_string(),
+                    status: ReviewStatus::Pending,
+                    created_at: chrono::Utc::now(),
+                });
             }
         }
     }
+    let duplicates_found = review_items.len();
     (
         StatusCode::OK,
         Json(ApiResponse::success(BatchDeduplicationResponse {
             things_scanned: things.len(),
             duplicates_found,
+            auto_merged: 0,
+            queued_for_review: duplicates_found,
+            review_items,
         })),
     )
 }
@@ -642,5 +707,34 @@ pub async fn audit_recent(
             status_for(&e),
             Json(ApiResponse::error("error", e.to_string())),
         ),
+    }
+}
+
+#[cfg(test)]
+mod review_report_tests {
+    use super::*;
+
+    /// The review-status wire tokens are the family's lowercase form
+    /// (matching person/worker), and a report serializes the full
+    /// person-shaped item including `detection_method`.
+    #[test]
+    fn review_status_wire_tokens_are_lowercase() {
+        let value = serde_json::to_value(ReviewStatus::Pending).unwrap();
+        assert_eq!(value, serde_json::json!("pending"));
+        let value = serde_json::to_value(ReviewStatus::AutoMerged).unwrap();
+        assert_eq!(value, serde_json::json!("automerged"));
+        let item = ReviewQueueItem {
+            id: Uuid::new_v4(),
+            thing_id_a: Uuid::new_v4(),
+            thing_id_b: Uuid::new_v4(),
+            match_score: 0.91,
+            match_quality: "probable".to_string(),
+            detection_method: "batch_deduplication".to_string(),
+            status: ReviewStatus::Pending,
+            created_at: chrono::Utc::now(),
+        };
+        let value = serde_json::to_value(&item).unwrap();
+        assert_eq!(value["detection_method"], "batch_deduplication");
+        assert_eq!(value["status"], "pending");
     }
 }

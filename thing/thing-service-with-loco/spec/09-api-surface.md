@@ -59,3 +59,10 @@ token's `attrs` claim. A valid token the policy denies gets `403`
 with the deciding rule; see
 [authorization-attributes](../../../agents/share/authorization-attributes.md).
 
+> **2026-07-19 — enriched dedup report.** `POST /api/things/deduplicate`
+> now returns the family's person/worker-shaped report: alongside the
+> scan counts it carries `auto_merged` (always 0 — no auto-merge path
+> here), `queued_for_review`, and `review_items[]` (pair ids,
+> `match_score`, `match_quality`, `detection_method`, lowercase
+> `status` wire tokens, `created_at`). No review-decision endpoint
+> exists yet; every item is `pending`.

@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-07-19 — dedup-report drift: `ReviewStatus` lowered to the wire tokens (see the person entry),
+  and the i18n catalogue gains `detail.loading` (x 13 locales) so
+  the expiry page uses the family's key rather than the local
+  `common.loading` variant.
+
 ### Added
 
 - 2026-07-19 — SVAR moderate fit: new **/review** route (nav-linked): the batch-deduplication

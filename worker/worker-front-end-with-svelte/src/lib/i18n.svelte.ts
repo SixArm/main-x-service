@@ -81,6 +81,7 @@ const LOCALE_KEY = "mxi.worker.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "detail.loading": "Loading…",
     "nav.expiry": "Expiries",
     "nav.review": "Review",
     "review.run": "Run scan",
@@ -232,6 +233,7 @@ const STRINGS = {
     "grid.no": "no",
   },
   cy: {
+    "detail.loading": "Yn llwytho…",
     "nav.expiry": "Dyddiadau dod i ben",
     "nav.review": "Adolygu",
     "review.run": "Rhedeg sgan",
@@ -368,6 +370,7 @@ const STRINGS = {
     "grid.no": "nac ydy",
   },
   es: {
+    "detail.loading": "Cargando…",
     "nav.expiry": "Vencimientos",
     "nav.review": "Revisión",
     "review.run": "Ejecutar análisis",
@@ -504,6 +507,7 @@ const STRINGS = {
     "grid.no": "no",
   },
   fr: {
+    "detail.loading": "Chargement…",
     "nav.expiry": "Échéances",
     "nav.review": "Révision",
     "review.run": "Lancer l'analyse",
@@ -641,6 +645,7 @@ const STRINGS = {
     "grid.no": "non",
   },
   de: {
+    "detail.loading": "Wird geladen…",
     "nav.expiry": "Abläufe",
     "nav.review": "Überprüfung",
     "review.run": "Scan starten",
@@ -778,6 +783,7 @@ const STRINGS = {
     "grid.no": "nein",
   },
   ar: {
+    "detail.loading": "جارٍ التحميل…",
     "nav.expiry": "انتهاء الصلاحية",
     "nav.review": "المراجعة",
     "review.run": "تشغيل الفحص",
@@ -913,6 +919,7 @@ const STRINGS = {
     "grid.no": "لا",
   },
   ru: {
+    "detail.loading": "Загрузка…",
     "nav.expiry": "Сроки действия",
     "nav.review": "Проверка",
     "review.run": "Запустить проверку",
@@ -1048,6 +1055,7 @@ const STRINGS = {
     "grid.no": "нет",
   },
   hi: {
+    "detail.loading": "लोड हो रहा है…",
     "nav.expiry": "समाप्ति",
     "nav.review": "समीक्षा",
     "review.run": "स्कैन चलाएं",
@@ -1184,6 +1192,7 @@ const STRINGS = {
     "grid.no": "नहीं",
   },
   zh: {
+    "detail.loading": "加载中…",
     "nav.expiry": "到期",
     "nav.review": "审核",
     "review.run": "运行扫描",
@@ -1318,6 +1327,7 @@ const STRINGS = {
     "grid.no": "否",
   },
   bn: {
+    "detail.loading": "লোড হচ্ছে…",
     "nav.expiry": "মেয়াদোত্তীর্ণ",
     "nav.review": "পর্যালোচনা",
     "review.run": "স্ক্যান চালান",
@@ -1454,6 +1464,7 @@ const STRINGS = {
     "grid.no": "না",
   },
   pt: {
+    "detail.loading": "Carregando…",
     "nav.expiry": "Vencimentos",
     "nav.review": "Revisão",
     "review.run": "Executar varredura",
@@ -1590,6 +1601,7 @@ const STRINGS = {
     "grid.no": "não",
   },
   id: {
+    "detail.loading": "Memuat…",
     "nav.expiry": "Kedaluwarsa",
     "nav.review": "Tinjauan",
     "review.run": "Jalankan pemindaian",
@@ -1726,6 +1738,7 @@ const STRINGS = {
     "grid.no": "tidak",
   },
   ur: {
+    "detail.loading": "لوڈ ہو رہا ہے…",
     "nav.expiry": "میعاد ختم",
     "nav.review": "جائزہ",
     "review.run": "اسکین چلائیں",

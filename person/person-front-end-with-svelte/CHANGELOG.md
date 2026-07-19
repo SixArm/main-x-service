@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-07-19 — dedup-report drift: `ReviewStatus` now matches the wire: the services serialize the
+  status lowercase (`pending` / `confirmed` / `rejected` /
+  `automerged`), so the type and the review board's column ids use
+  the lowercase tokens (labels stay human-cased). The previous
+  capitalized type would have parked every live card outside the
+  columns.
+
 ### Added
 
 - 2026-07-19 — SVAR moderate fit: new **/review** route (nav-linked): the batch-deduplication

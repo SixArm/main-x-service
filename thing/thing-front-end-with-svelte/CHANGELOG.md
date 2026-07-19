@@ -9,6 +9,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-07-19 — dedup-report drift: `ReviewStatus` lowered to the wire tokens; `ReviewQueueItem`
+  gains `detection_method` and the review board's cards show it.
+
 ### Added
 
 - 2026-07-19 — SVAR moderate fit: new **/review** route (nav-linked): the batch-deduplication

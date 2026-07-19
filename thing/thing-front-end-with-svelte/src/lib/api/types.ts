@@ -293,7 +293,11 @@ export interface BatchDeduplicationResponse {
  * State of a queued duplicate pair: awaiting review (`Pending`), human
  * `Confirmed` / `Rejected`, or `AutoMerged` by the scan above threshold.
  */
-export type ReviewStatus = "Pending" | "Confirmed" | "Rejected" | "AutoMerged";
+export type ReviewStatus =
+  | "pending"
+  | "confirmed"
+  | "rejected"
+  | "automerged";
 
 /**
  * A candidate duplicate pair (`thing_id_a` / `thing_id_b`) captured by a
@@ -306,6 +310,8 @@ export interface ReviewQueueItem {
   thing_id_b: string;
   match_score: number;
   match_quality: string;
+  /** How the pair was detected (e.g. `batch_deduplication`). */
+  detection_method: string;
   status: ReviewStatus;
   created_at: string;
   reviewed_at?: string | null;

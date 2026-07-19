@@ -356,7 +356,11 @@ export interface BatchDeduplicationResponse {
 }
 
 /** Disposition of a {@link ReviewQueueItem}. */
-export type ReviewStatus = "Pending" | "Confirmed" | "Rejected" | "AutoMerged";
+export type ReviewStatus =
+  | "pending"
+  | "confirmed"
+  | "rejected"
+  | "automerged";
 
 /** A candidate duplicate pair awaiting (or having received) human review. */
 export interface ReviewQueueItem {

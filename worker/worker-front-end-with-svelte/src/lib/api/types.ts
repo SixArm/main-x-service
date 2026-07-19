@@ -395,7 +395,11 @@ export interface BatchDeduplicationResponse {
 }
 
 /** Status of a {@link ReviewQueueItem} as an operator works through it. */
-export type ReviewStatus = "Pending" | "Confirmed" | "Rejected" | "AutoMerged";
+export type ReviewStatus =
+  | "pending"
+  | "confirmed"
+  | "rejected"
+  | "automerged";
 
 /** One candidate-duplicate pair awaiting (or having had) operator review. */
 export interface ReviewQueueItem {

@@ -90,6 +90,8 @@ impl utoipa::Modify for SecurityAddon {
         handlers::DuplicateCheckResponse,
         handlers::BatchDeduplicationRequest,
         handlers::BatchDeduplicationResponse,
+        handlers::ReviewQueueItem,
+        handlers::ReviewStatus,
     )),
     modifiers(&SecurityAddon),
     tags(

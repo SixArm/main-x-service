@@ -58,6 +58,8 @@ pub use state::AppState;
         handlers::DuplicateCheckResponse,
         handlers::BatchDeduplicationRequest,
         handlers::BatchDeduplicationResponse,
+        handlers::ReviewQueueItem,
+        handlers::ReviewStatus,
     )),
     tags(
         (name = "health",   description = "Liveness probe"),

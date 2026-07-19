@@ -8,6 +8,14 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-07-19 — dedup-report drift: `POST /api/things/deduplicate` now returns the family's
+  person/worker-shaped report (see the place service entry — same
+  change): counts + `auto_merged` + `queued_for_review` +
+  `review_items[]` incl. `detection_method` and lowercase `status`
+  wire tokens. Serde pin added.
+
 ### Security
 
 - **SEC-M1: input-size caps on the `Thing` payload.** The validator

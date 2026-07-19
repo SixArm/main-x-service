@@ -64,7 +64,7 @@
 <h1>{t("nav.expiry")}</h1>
 
 {#if loading}
-    <p>{t("common.loading")}</p>
+    <p>{t("detail.loading")}</p>
 {:else if error}
     <p class="error" role="alert">{error}</p>
 {:else}

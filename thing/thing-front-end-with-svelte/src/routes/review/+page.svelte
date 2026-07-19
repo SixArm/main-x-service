@@ -33,18 +33,20 @@
         }
     }
 
+    // Column ids are the wire tokens (the services serialize the
+    // review status lowercase); labels stay human-cased.
     const columns = [
-        { id: "Pending", label: "Pending", addCard: false },
-        { id: "Confirmed", label: "Confirmed", addCard: false },
-        { id: "Rejected", label: "Rejected", addCard: false },
-        { id: "AutoMerged", label: "AutoMerged", addCard: false },
+        { id: "pending", label: "Pending", addCard: false },
+        { id: "confirmed", label: "Confirmed", addCard: false },
+        { id: "rejected", label: "Rejected", addCard: false },
+        { id: "automerged", label: "AutoMerged", addCard: false },
     ];
 
     const cards = $derived(
         items.map((item) => ({
             id: item.id,
             label: `${item.thing_id_a.slice(0, 8)} ↔ ${item.thing_id_b.slice(0, 8)}`,
-            description: `${item.match_quality} · ${item.match_score.toFixed(2)}`,
+            description: `${item.match_quality} · ${item.match_score.toFixed(2)} · ${item.detection_method}`,
             status: item.status,
         })),
     );
