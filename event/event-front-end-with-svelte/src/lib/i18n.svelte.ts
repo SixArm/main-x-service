@@ -80,6 +80,7 @@ const LOCALE_KEY = "mxi.event.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.calendar": "Calendar",
     // Layout / chrome
     brand: "Event",
     "brand.tagline": "Main X Index",
@@ -237,6 +238,7 @@ const STRINGS = {
     "results.breakdown": "Score breakdown",
   },
   cy: {
+    "nav.calendar": "Calendr",
     brand: "Digwyddiad",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Dangosfwrdd",
@@ -381,6 +383,7 @@ const STRINGS = {
     "results.breakdown": "Dadansoddiad sgôr",
   },
   es: {
+    "nav.calendar": "Calendario",
     brand: "Evento",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Panel",
@@ -526,6 +529,7 @@ const STRINGS = {
     "results.breakdown": "Desglose de puntuación",
   },
   fr: {
+    "nav.calendar": "Calendrier",
     brand: "Événement",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Tableau de bord",
@@ -671,6 +675,7 @@ const STRINGS = {
     "results.breakdown": "Détail du score",
   },
   de: {
+    "nav.calendar": "Kalender",
     brand: "Ereignis",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Übersicht",
@@ -816,6 +821,7 @@ const STRINGS = {
     "results.breakdown": "Bewertungsaufschlüsselung",
   },
   ar: {
+    "nav.calendar": "التقويم",
     brand: "حدث",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "لوحة المعلومات",
@@ -960,6 +966,7 @@ const STRINGS = {
     "results.breakdown": "تفصيل النتيجة",
   },
   ru: {
+    "nav.calendar": "Календарь",
     brand: "Событие",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Панель",
@@ -1104,6 +1111,7 @@ const STRINGS = {
     "results.breakdown": "Разбивка оценки",
   },
   hi: {
+    "nav.calendar": "कैलेंडर",
     brand: "इवेंट",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "डैशबोर्ड",
@@ -1248,6 +1256,7 @@ const STRINGS = {
     "results.breakdown": "स्कोर विवरण",
   },
   zh: {
+    "nav.calendar": "日历",
     brand: "活动",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "仪表板",
@@ -1389,6 +1398,7 @@ const STRINGS = {
     "results.breakdown": "分数明细",
   },
   bn: {
+    "nav.calendar": "ক্যালেন্ডার",
     brand: "ইভেন্ট",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "ড্যাশবোর্ড",
@@ -1533,6 +1543,7 @@ const STRINGS = {
     "results.breakdown": "স্কোর বিশ্লেষণ",
   },
   pt: {
+    "nav.calendar": "Calendário",
     brand: "Evento",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Painel",
@@ -1677,6 +1688,7 @@ const STRINGS = {
     "results.breakdown": "Detalhamento da pontuação",
   },
   id: {
+    "nav.calendar": "Kalender",
     brand: "Acara",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Dasbor",
@@ -1822,6 +1834,7 @@ const STRINGS = {
     "results.breakdown": "Rincian skor",
   },
   ur: {
+    "nav.calendar": "کیلنڈر",
     brand: "ایونٹ",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "ڈیش بورڈ",

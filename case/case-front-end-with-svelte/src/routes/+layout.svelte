@@ -88,6 +88,7 @@
   const navItems: { href: string; key: StringKey }[] = [
     { href: "/", key: "nav.cases" },
     { href: "/new", key: "nav.newCase" },
+    { href: "/board", key: "nav.board" },
   ];
 
   // Reactive: tracks the server-resolved session presence.

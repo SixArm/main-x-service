@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-19 — SVAR strong fit: new **/edd** route (nav-linked): every occupied bed's expected
+  discharge date across the estate as all-day events in the SVAR
+  Calendar (month view, read-only, `as_of`-stamped); selecting an
+  entry opens the stay detail.
+
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
   **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
   **@svar-ui/svelte-filemanager** are installed (no routes yet —

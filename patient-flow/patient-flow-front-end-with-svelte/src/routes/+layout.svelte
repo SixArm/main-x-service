@@ -52,6 +52,7 @@
     <a href="/wards">Wards</a>
     <a href="/at-a-glance">At a glance</a>
     <a href="/bed-requests">Bed requests</a>
+    <a href="/edd">EDD</a>
     <a href="/locate">Locate</a>
     <a href="/audits">Audits</a>
     <span class="spacer"></span>

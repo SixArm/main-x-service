@@ -11,6 +11,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR strong fit: new **/gantt** route (nav-linked): the selected portfolio's
+  schedule (PPM-6) in the SVAR Gantt — dated items as task bars,
+  dependency edges as links, the critical path tinted, undated items
+  listed honestly below rather than invented onto the timeline.
+  Read-only in v1. One new i18n key (`ppm.nav.gantt`) x 13.
+
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
   **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
   **@svar-ui/svelte-filemanager** are installed (no routes yet —

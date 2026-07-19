@@ -99,6 +99,7 @@
         { href: "/events/new", label: "nav.newEvent" },
         { href: "/events/match", label: "nav.matchCheck" },
         { href: "/events/merge", label: "nav.merge" },
+        { href: "/calendar", label: "nav.calendar" },
     ] as const;
 
     // Reflect the active UI locale onto <html lang> for a11y / correct

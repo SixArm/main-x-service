@@ -11,6 +11,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR strong fit: new **/calendar** route (nav-linked): Event time windows in the
+  SVAR Calendar (month view); dragging an event writes the new
+  window back through the normal update endpoint and reloads the
+  truth; selecting an event opens its detail page. One new i18n key
+  (`nav.calendar`) across all 13 locales.
+
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
   **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
   **@svar-ui/svelte-filemanager** are installed (no routes yet —

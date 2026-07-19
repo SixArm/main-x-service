@@ -11,6 +11,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR strong fit: new **/board** route (nav-linked): cases as SVAR Kanban cards,
+  one column per unit lifecycle status; dragging a card writes the
+  status change via the normal full-record PUT and reloads. The
+  refs-only list endpoint means the board loads the full records
+  behind the refs (capped at 100) — a status-bearing list endpoint
+  is the optimisation seam. One new i18n key (`nav.board`) x 13.
+
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
   **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
   **@svar-ui/svelte-filemanager** are installed (no routes yet —

@@ -92,6 +92,7 @@ export const LOCALE_KEY = "mxi.case.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "ppm.nav.gantt": "Gantt",
     // Layout / chrome
     "brand.name": "Main X · Cases",
     "nav.toggle": "Toggle navigation",
@@ -274,6 +275,7 @@ const STRINGS = {
       "Schedules are drawn per portfolio umbrella.",
   },
   cy: {
+    "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Achosion",
     "nav.toggle": "Toglo'r llywio",
     "nav.cases": "Achosion",
@@ -449,6 +451,7 @@ const STRINGS = {
       "Lluniwyd amserlenni fesul ymbarél portffolio.",
   },
   es: {
+    "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Casos",
     "nav.toggle": "Alternar navegación",
     "nav.cases": "Casos",
@@ -625,6 +628,7 @@ const STRINGS = {
       "Los cronogramas se trazan por cartera paraguas.",
   },
   fr: {
+    "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Affaires",
     "nav.toggle": "Basculer la navigation",
     "nav.cases": "Affaires",
@@ -801,6 +805,7 @@ const STRINGS = {
       "Les calendriers sont tracés par portefeuille parapluie.",
   },
   de: {
+    "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Fälle",
     "nav.toggle": "Navigation umschalten",
     "nav.cases": "Fälle",
@@ -976,6 +981,7 @@ const STRINGS = {
       "Zeitpläne werden je Portfolio-Dach gezeichnet.",
   },
   ar: {
+    "ppm.nav.gantt": "جانت",
     "brand.name": "Main X · القضايا",
     "nav.toggle": "تبديل التنقل",
     "nav.cases": "القضايا",
@@ -1148,6 +1154,7 @@ const STRINGS = {
     "ppm.schedule.portfoliosOnly": "تُرسم الجداول لكل محفظة مظلّية.",
   },
   ru: {
+    "ppm.nav.gantt": "Гант",
     "brand.name": "Main X · Дела",
     "nav.toggle": "Переключить навигацию",
     "nav.cases": "Дела",
@@ -1323,6 +1330,7 @@ const STRINGS = {
       "Графики строятся по каждому зонтичному портфелю.",
   },
   hi: {
+    "ppm.nav.gantt": "गैंट",
     "brand.name": "Main X · मामले",
     "nav.toggle": "नेविगेशन टॉगल करें",
     "nav.cases": "मामले",
@@ -1498,6 +1506,7 @@ const STRINGS = {
       "समय-सारणियाँ प्रति छत्र पोर्टफोलियो बनती हैं।",
   },
   zh: {
+    "ppm.nav.gantt": "甘特图",
     "brand.name": "Main X · 案件",
     "nav.toggle": "切换导航",
     "nav.cases": "案件",
@@ -1670,6 +1679,7 @@ const STRINGS = {
     "ppm.schedule.portfoliosOnly": "进度表按伞形组合绘制。",
   },
   bn: {
+    "ppm.nav.gantt": "গ্যান্ট",
     "brand.name": "Main X · মামলা",
     "nav.toggle": "নেভিগেশন টগল করুন",
     "nav.cases": "মামলা",
@@ -1845,6 +1855,7 @@ const STRINGS = {
       "প্রতিটি ছাতা পোর্টফোলিওর জন্য সময়সূচি আঁকা হয়।",
   },
   pt: {
+    "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Casos",
     "nav.toggle": "Alternar navegação",
     "nav.cases": "Casos",
@@ -2020,6 +2031,7 @@ const STRINGS = {
       "Os cronogramas são traçados por carteira guarda-chuva.",
   },
   id: {
+    "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Kasus",
     "nav.toggle": "Alihkan navigasi",
     "nav.cases": "Kasus",
@@ -2194,6 +2206,7 @@ const STRINGS = {
     "ppm.schedule.portfoliosOnly": "Jadwal digambar per payung portofolio.",
   },
   ur: {
+    "ppm.nav.gantt": "گینٹ",
     "brand.name": "Main X · مقدمات",
     "nav.toggle": "نیویگیشن ٹوگل کریں",
     "nav.cases": "مقدمات",

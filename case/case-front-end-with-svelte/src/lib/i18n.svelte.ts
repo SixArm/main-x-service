@@ -92,6 +92,7 @@ export const LOCALE_KEY = "mxi.case.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.board": "Board",
     // Layout / chrome
     "brand.name": "Main X · Cases",
     "nav.toggle": "Toggle navigation",
@@ -172,6 +173,7 @@ const STRINGS = {
     "form.saveFailed": "Save failed",
   },
   cy: {
+    "nav.board": "Bwrdd",
     "brand.name": "Main X · Achosion",
     "nav.toggle": "Toglo'r llywio",
     "nav.cases": "Achosion",
@@ -245,6 +247,7 @@ const STRINGS = {
     "form.saveFailed": "Methodd y cadw",
   },
   es: {
+    "nav.board": "Tablero",
     "brand.name": "Main X · Casos",
     "nav.toggle": "Alternar navegación",
     "nav.cases": "Casos",
@@ -319,6 +322,7 @@ const STRINGS = {
     "form.saveFailed": "Error al guardar",
   },
   fr: {
+    "nav.board": "Tableau",
     "brand.name": "Main X · Affaires",
     "nav.toggle": "Basculer la navigation",
     "nav.cases": "Affaires",
@@ -393,6 +397,7 @@ const STRINGS = {
     "form.saveFailed": "Échec de l'enregistrement",
   },
   de: {
+    "nav.board": "Board",
     "brand.name": "Main X · Fälle",
     "nav.toggle": "Navigation umschalten",
     "nav.cases": "Fälle",
@@ -466,6 +471,7 @@ const STRINGS = {
     "form.saveFailed": "Speichern fehlgeschlagen",
   },
   ar: {
+    "nav.board": "اللوحة",
     "brand.name": "Main X · القضايا",
     "nav.toggle": "تبديل التنقل",
     "nav.cases": "القضايا",
@@ -539,6 +545,7 @@ const STRINGS = {
     "form.saveFailed": "فشل الحفظ",
   },
   ru: {
+    "nav.board": "Доска",
     "brand.name": "Main X · Дела",
     "nav.toggle": "Переключить навигацию",
     "nav.cases": "Дела",
@@ -612,6 +619,7 @@ const STRINGS = {
     "form.saveFailed": "Сохранить не удалось",
   },
   hi: {
+    "nav.board": "बोर्ड",
     "brand.name": "Main X · मामले",
     "nav.toggle": "नेविगेशन टॉगल करें",
     "nav.cases": "मामले",
@@ -685,6 +693,7 @@ const STRINGS = {
     "form.saveFailed": "सहेजना विफल",
   },
   zh: {
+    "nav.board": "看板",
     "brand.name": "Main X · 案件",
     "nav.toggle": "切换导航",
     "nav.cases": "案件",
@@ -758,6 +767,7 @@ const STRINGS = {
     "form.saveFailed": "保存失败",
   },
   bn: {
+    "nav.board": "বোর্ড",
     "brand.name": "Main X · মামলা",
     "nav.toggle": "নেভিগেশন টগল করুন",
     "nav.cases": "মামলা",
@@ -831,6 +841,7 @@ const STRINGS = {
     "form.saveFailed": "সংরক্ষণ ব্যর্থ",
   },
   pt: {
+    "nav.board": "Quadro",
     "brand.name": "Main X · Casos",
     "nav.toggle": "Alternar navegação",
     "nav.cases": "Casos",
@@ -904,6 +915,7 @@ const STRINGS = {
     "form.saveFailed": "Falha ao guardar",
   },
   id: {
+    "nav.board": "Papan",
     "brand.name": "Main X · Kasus",
     "nav.toggle": "Alihkan navigasi",
     "nav.cases": "Kasus",
@@ -977,6 +989,7 @@ const STRINGS = {
     "form.saveFailed": "Gagal menyimpan",
   },
   ur: {
+    "nav.board": "بورڈ",
     "brand.name": "Main X · مقدمات",
     "nav.toggle": "نیویگیشن ٹوگل کریں",
     "nav.cases": "مقدمات",

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-19 — SVAR strong fit: the **/requisitions** board upgrades from custom CSS columns to
+  the SVAR Kanban: drag between status columns drives the pipeline
+  transition endpoint (the service's state machine still refuses
+  illegal moves; the reload puts the card back where the truth says
+  it belongs).
+
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
   **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
   **@svar-ui/svelte-filemanager** are installed (no routes yet —

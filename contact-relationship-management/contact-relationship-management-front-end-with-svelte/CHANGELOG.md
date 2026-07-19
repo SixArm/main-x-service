@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-19 — SVAR strong fit: the **/deals** board upgrades from custom CSS columns to the SVAR
+  Kanban: columns are the pipeline's stage rows (probability
+  labelled), drag = the stage-move API (a lost target carries a
+  reason), and the forecast strip still re-reads the derived number
+  after every move.
+
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
   **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
   **@svar-ui/svelte-filemanager** are installed (no routes yet —
