@@ -75,5 +75,20 @@ with the deciding rule; see
 > scan counts it carries `auto_merged` (always 0 — no auto-merge path
 > here), `queued_for_review`, and `review_items[]` (pair ids,
 > `match_score`, `match_quality`, `detection_method`, lowercase
-> `status` wire tokens, `created_at`). No review-decision endpoint
-> exists yet; every item is `pending`.
+> `status` wire tokens, `created_at`). (The stored-queue + decision
+> endpoints below superseded this the same day.)
+
+> **2026-07-19 — stored review queue + decision endpoints.** The batch
+> scan now **persists** its candidate pairs in a `review_queue` table
+> (migration `m20260719_000001`; normalized pair order under a UNIQUE
+> constraint, so a re-scan upserts in place: score columns refresh,
+> decided rows keep their decision, and item ids are stable across
+> scans — the scan response reports the stored rows). Two endpoints:
+> `GET /api/places/review-queue[?status=&limit=]` lists the stored
+> queue (newest first, limit cap 500; unknown status token → `422`),
+> and `POST /api/places/review-queue/{id}/decision` with
+> `{"status": "confirmed" | "rejected"}` decides a `pending` item —
+> the transition guard is first-writer-wins in SQL (`404` unknown id,
+> `422` already decided); the reviewer identity is not recorded yet (no optional-claims extractor — accepted drift from person/worker).
+> Under ABAC the decision POST derives as a `write` action (not
+> destructive-classed).

@@ -167,3 +167,16 @@ clearly described manual check confirms the acceptance criterion.
   - Done (2026-07-08): `src/relay.rs` (copy-adapted from the organization reference), `pub mod relay;` in `lib.rs`, spawn in `app.rs`. 3 DB-free unit tests (logging-sink smoke, capturing-sink contract, config defaults). `cargo test --lib` 183 passed, 2 ignored; `cargo clippy --lib --tests` clean.
   - **Remaining follow-up:** a real `FluvioSink` behind a `fluvio` cargo feature (another `impl EventSink`; the trait is the seam so the drain loop is unchanged), and flipping `PLACE_EVENT_TRANSPORT=outbox` in deployment with the search-reindex consumer. Supersedes T-3's in-memory-only Fluvio publisher note.
 
+- [x] **2026-07-19 — Stored review queue + decision endpoints.** Persist
+  the batch-dedup candidates (`review_queue` migration + the shared
+  raw-SQL `db/review_queue` module: normalized-pair upsert / list /
+  first-writer-wins decide), report stored rows from the scan, and add
+  `GET /api/places/review-queue` + `POST
+  /api/places/review-queue/{id}/decision`. Front-end `/review` board
+  loads the stored queue on mount and drag records decisions.
+  **Acceptance:** serde pins for the decision wire tokens; the person
+  crate's env-gated DB round-trip (`tests/review_queue_db.rs` — the
+  module is byte-identical family-wide) green against Postgres 18;
+  `cargo test --lib` + clippy pedantic clean; FE svelte-check / vitest /
+  Playwright green.
+

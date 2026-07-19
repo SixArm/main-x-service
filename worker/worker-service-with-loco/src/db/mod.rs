@@ -29,6 +29,7 @@ pub mod entity_links;
 pub mod models;
 /// `event_outbox` write + relay surface for the durable event bus (Phase 2).
 pub mod outbox;
+pub mod review_queue;
 /// [`repositories::WorkerRepository`] trait and its SeaORM implementation.
 pub mod repositories;
 /// Schema-definition stub retained for entity regeneration (see the module doc).

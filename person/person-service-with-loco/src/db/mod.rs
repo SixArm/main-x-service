@@ -26,6 +26,7 @@ pub mod entity_links;
 pub mod models;
 /// Transactional-outbox write + relay surface (durable event bus, Phase 2).
 pub mod outbox;
+pub mod review_queue;
 /// Repository traits and their SeaORM implementations.
 pub mod repositories;
 /// Table/column schema definitions.

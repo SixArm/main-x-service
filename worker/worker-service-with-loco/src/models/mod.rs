@@ -96,7 +96,8 @@ pub use ods::{
 };
 pub use organization::Organization;
 pub use review_queue::{
-    BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewQueueItem, ReviewStatus,
+    BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewDecision,
+    ReviewDecisionRequest, ReviewQueueItem, ReviewQueueListResponse, ReviewStatus,
 };
 pub use worker::{HumanName, LinkType, NameUse, Worker, WorkerLink, WorkerType};
 

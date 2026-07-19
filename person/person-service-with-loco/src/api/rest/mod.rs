@@ -56,6 +56,8 @@ pub use state::AppState;
         handlers::check_duplicates,
         handlers::merge_persons,
         handlers::batch_deduplicate,
+        handlers::get_review_queue,
+        handlers::review_decision,
         handlers::export_person_data,
         handlers::get_person_masked,
         handlers::get_person_audit_logs,
@@ -87,6 +89,9 @@ pub use state::AppState;
             crate::models::BatchDeduplicationResponse,
             crate::models::ReviewQueueItem,
             crate::models::ReviewStatus,
+            crate::models::ReviewDecision,
+            crate::models::ReviewDecisionRequest,
+            crate::models::ReviewQueueListResponse,
             crate::models::Consent,
             crate::models::ConsentType,
             crate::models::ConsentStatus,
@@ -152,6 +157,11 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/persons/merge", post(handlers::merge_persons))
         .route("/persons/deduplicate", post(handlers::batch_deduplicate))
+        .route("/persons/review-queue", get(handlers::get_review_queue))
+        .route(
+            "/persons/review-queue/{id}/decision",
+            post(handlers::review_decision),
+        )
         // Cross-service entity links (§4.1): the aggregator's bulk
         // reconciliation pull (static — must precede the `{id}` routes),
         // then a person's outbound-edge create/list/withdraw.
@@ -230,6 +240,11 @@ pub fn persons_routes() -> loco_rs::controller::Routes {
         )
         .add("/persons/merge", post(handlers::merge_persons))
         .add("/persons/deduplicate", post(handlers::batch_deduplicate))
+        .add("/persons/review-queue", get(handlers::get_review_queue))
+        .add(
+            "/persons/review-queue/{id}/decision",
+            post(handlers::review_decision),
+        )
         // Bulk import/export (agents/share/bulk-import-export.md §4). The
         // static bulk paths precede the `{id}` routes so they are not
         // shadowed. `/persons/import` is a declared destructive POST.

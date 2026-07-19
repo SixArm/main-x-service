@@ -170,6 +170,8 @@ denied (the body names the deciding rule).
 | POST | `/api/persons/check-duplicates` | Check for duplicates without creating |
 | POST | `/api/persons/merge` | Merge two person records |
 | POST | `/api/persons/deduplicate` | Batch deduplication scan |
+| GET | `/api/persons/review-queue` | Stored review queue (filter `status`, `limit`) |
+| POST | `/api/persons/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 
 ### Privacy
 

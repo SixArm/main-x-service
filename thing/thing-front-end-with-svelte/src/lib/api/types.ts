@@ -313,8 +313,21 @@ export interface ReviewQueueItem {
   /** How the pair was detected (e.g. `batch_deduplication`). */
   detection_method: string;
   status: ReviewStatus;
+  /** Operator who decided the item, if decided. */
+  reviewed_by?: string | null;
   created_at: string;
   reviewed_at?: string | null;
+}
+
+/** One operator verdict for a pending review item. */
+export type ReviewDecision = "confirmed" | "rejected";
+
+/** Response envelope for the stored review-queue list. */
+export interface ReviewQueueListResponse {
+  /** The stored review-queue items (newest first). */
+  items: ReviewQueueItem[];
+  /** Number of items returned. */
+  total: number;
 }
 
 // ─── Audit ───────────────────────────────────────────────────────────

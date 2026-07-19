@@ -70,3 +70,18 @@ returned here. Graph traversal (`neighbors` / `single-view`) lives in the
 separate `link-graph-service-with-loco` aggregator, not this service. See
 [cross-service linking §4.1](../../../agents/share/cross-service-linking.md).
 
+
+> **2026-07-19 — stored review queue + decision endpoints.** The batch
+> scan now **persists** its candidate pairs in a `review_queue` table
+> (migration `m20260719_000001`; normalized pair order under a UNIQUE
+> constraint, so a re-scan upserts in place: score columns refresh,
+> decided rows keep their decision, and item ids are stable across
+> scans — the scan response reports the stored rows). Two endpoints:
+> `GET /api/workers/review-queue[?status=&limit=]` lists the stored
+> queue (newest first, limit cap 500; unknown status token → `422`),
+> and `POST /api/workers/review-queue/{id}/decision` with
+> `{"status": "confirmed" | "rejected"}` decides a `pending` item —
+> the transition guard is first-writer-wins in SQL (`404` unknown id,
+> `422` already decided); the reviewer identity is the verified bearer `sub` (or absent).
+> Under ABAC the decision POST derives as a `write` action (not
+> destructive-classed).

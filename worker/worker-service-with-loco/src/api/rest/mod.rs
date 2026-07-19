@@ -56,6 +56,8 @@ pub use state::AppState;
         handlers::check_duplicates,
         handlers::merge_workers,
         handlers::batch_deduplicate,
+        handlers::get_review_queue,
+        handlers::review_decision,
         handlers::export_worker_data,
         handlers::get_worker_masked,
         handlers::get_worker_audit_logs,
@@ -82,6 +84,9 @@ pub use state::AppState;
             crate::models::BatchDeduplicationResponse,
             crate::models::ReviewQueueItem,
             crate::models::ReviewStatus,
+            crate::models::ReviewDecision,
+            crate::models::ReviewDecisionRequest,
+            crate::models::ReviewQueueListResponse,
             crate::models::Consent,
             crate::models::ConsentType,
             crate::models::ConsentStatus,
@@ -165,6 +170,11 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/workers/merge", post(handlers::merge_workers))
         .route("/workers/deduplicate", post(handlers::batch_deduplicate))
+        .route("/workers/review-queue", get(handlers::get_review_queue))
+        .route(
+            "/workers/review-queue/{id}/decision",
+            post(handlers::review_decision),
+        )
         // Cross-service entity links (§4.1): the aggregator's bulk
         // reconciliation pull (static — must precede the `{id}` routes),
         // then a worker's outbound-edge create/list/withdraw.
@@ -248,6 +258,11 @@ pub fn workers_routes() -> loco_rs::controller::Routes {
         )
         .add("/workers/merge", post(handlers::merge_workers))
         .add("/workers/deduplicate", post(handlers::batch_deduplicate))
+        .add("/workers/review-queue", get(handlers::get_review_queue))
+        .add(
+            "/workers/review-queue/{id}/decision",
+            post(handlers::review_decision),
+        )
         .add("/workers/{id}/export", get(handlers::export_worker_data))
         .add("/workers/{id}/masked", get(handlers::get_worker_masked))
         .add("/workers/{id}/audit", get(handlers::get_worker_audit_logs))

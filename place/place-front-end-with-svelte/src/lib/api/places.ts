@@ -8,6 +8,9 @@ import type {
   MergeRequest,
   MergeResponse,
   Place,
+  ReviewDecision,
+  ReviewQueueItem,
+  ReviewQueueListResponse,
 } from "./types.js";
 import { API_BASE_URL } from "$lib/config.js";
 
@@ -154,6 +157,24 @@ export class PlaceRepository {
     return this.http.post<BatchDeduplicationResponse>(
       "/api/places/deduplicate",
       { body: request },
+    );
+  }
+
+  /** Load the stored review queue (newest first). */
+  listReviewQueue(): Promise<ReviewQueueItem[]> {
+    return this.http
+      .get<ReviewQueueListResponse>("/api/places/review-queue")
+      .then((response) => response.items);
+  }
+
+  /**
+   * Decide a pending review item. Only `pending` items can be decided;
+   * the service returns 422 for anything else (first writer wins).
+   */
+  decideReview(id: string, status: ReviewDecision): Promise<ReviewQueueItem> {
+    return this.http.post<ReviewQueueItem>(
+      `/api/places/review-queue/${id}/decision`,
+      { body: { status } },
     );
   }
 

@@ -246,3 +246,16 @@ clearly described manual check confirms the acceptance criterion.
     another `impl EventSink` shipping to `mxi.thing.events`, plus
     flipping `THING_EVENT_TRANSPORT=outbox` in deployment.
 
+- [x] **2026-07-19 — Stored review queue + decision endpoints.** Persist
+  the batch-dedup candidates (`review_queue` migration + the shared
+  raw-SQL `db/review_queue` module: normalized-pair upsert / list /
+  first-writer-wins decide), report stored rows from the scan, and add
+  `GET /api/things/review-queue` + `POST
+  /api/things/review-queue/{id}/decision`. Front-end `/review` board
+  loads the stored queue on mount and drag records decisions.
+  **Acceptance:** serde pins for the decision wire tokens; the person
+  crate's env-gated DB round-trip (`tests/review_queue_db.rs` — the
+  module is byte-identical family-wide) green against Postgres 18;
+  `cargo test --lib` + clippy pedantic clean; FE svelte-check / vitest /
+  Playwright green.
+

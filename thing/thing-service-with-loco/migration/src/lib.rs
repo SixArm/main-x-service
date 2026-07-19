@@ -13,6 +13,7 @@ pub use sea_orm_migration::prelude::*;
 mod m20260608_000001_create_things;
 mod m20260608_000002_create_audit_and_merge;
 mod m20260708_000001_create_event_outbox;
+mod m20260719_000001_create_review_queue;
 
 /// The loco/SeaORM migrator for thing-service. Boot wires this into
 /// `create_app::<App, Migrator>` so migrations run on startup / via the CLI.
@@ -27,6 +28,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260608_000001_create_things::Migration),
             Box::new(m20260608_000002_create_audit_and_merge::Migration),
             Box::new(m20260708_000001_create_event_outbox::Migration),
+            Box::new(m20260719_000001_create_review_queue::Migration),
         ]
     }
 }

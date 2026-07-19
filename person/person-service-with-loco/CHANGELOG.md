@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — stored review queue + decision endpoints (2026-07-19)
+
+- `review_queue` table (migration `m20260719_000001_create_review_queue`):
+  the batch-dedup scan persists its candidate pairs (normalized pair
+  order, UNIQUE upsert — re-scans refresh scores, decided rows keep
+  their decision, ids stay stable) and the scan response now reports
+  the **stored** rows.
+- `GET /api/persons/review-queue[?status=&limit=]` — list the stored
+  queue (newest first, cap 500).
+- `POST /api/persons/review-queue/{id}/decision`
+  (`{"status": "confirmed" | "rejected"}`) — decide a `pending` item;
+  first-writer-wins in SQL, `404`/`422` on unknown/already-decided.
+- Each decision writes a `review_decision` audit row (actor = verified
+  bearer `sub`, else `system`).
+
 ### Added — bulk CSV codec (BLK-1)
 
 - A CSV codec for bulk import/export (`src/bulk/csv.rs`) alongside the

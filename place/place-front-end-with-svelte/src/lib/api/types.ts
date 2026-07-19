@@ -404,10 +404,23 @@ export interface ReviewQueueItem {
   detection_method: string;
   /** Current review disposition. */
   status: ReviewStatus;
+  /** Operator who decided the item, if decided. */
+  reviewed_by?: string | null;
   /** When the item was queued. */
   created_at: string;
   /** When the item was reviewed, if it has been. */
   reviewed_at?: string | null;
+}
+
+/** One operator verdict for a pending review item. */
+export type ReviewDecision = "confirmed" | "rejected";
+
+/** Response envelope for the stored review-queue list. */
+export interface ReviewQueueListResponse {
+  /** The stored review-queue items (newest first). */
+  items: ReviewQueueItem[];
+  /** Number of items returned. */
+  total: number;
 }
 
 // ─── Audit ───────────────────────────────────────────────────────────

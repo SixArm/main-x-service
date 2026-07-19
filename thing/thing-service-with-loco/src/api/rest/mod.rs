@@ -37,6 +37,8 @@ pub use state::AppState;
         handlers::check_duplicates,
         handlers::merge_things,
         handlers::deduplicate,
+        handlers::get_review_queue,
+        handlers::review_decision,
         handlers::export_thing_data,
         handlers::masked_thing,
         handlers::audit_for_thing,
@@ -60,6 +62,9 @@ pub use state::AppState;
         handlers::BatchDeduplicationResponse,
         handlers::ReviewQueueItem,
         handlers::ReviewStatus,
+        handlers::ReviewDecision,
+        handlers::ReviewDecisionRequest,
+        handlers::ReviewQueueListResponse,
     )),
     tags(
         (name = "health",   description = "Liveness probe"),
@@ -91,6 +96,11 @@ pub fn create_router(state: AppState) -> Router {
         .route("/things/check-duplicates", post(handlers::check_duplicates))
         .route("/things/merge", post(handlers::merge_things))
         .route("/things/deduplicate", post(handlers::deduplicate))
+        .route("/things/review-queue", get(handlers::get_review_queue))
+        .route(
+            "/things/review-queue/{id}/decision",
+            post(handlers::review_decision),
+        )
         .route(
             "/things/{id}",
             get(handlers::get_thing)
@@ -132,6 +142,11 @@ pub fn things_routes() -> loco_rs::controller::Routes {
         .add("/things/check-duplicates", post(handlers::check_duplicates))
         .add("/things/merge", post(handlers::merge_things))
         .add("/things/deduplicate", post(handlers::deduplicate))
+        .add("/things/review-queue", get(handlers::get_review_queue))
+        .add(
+            "/things/review-queue/{id}/decision",
+            post(handlers::review_decision),
+        )
         .add(
             "/things/{id}",
             get(handlers::get_thing)

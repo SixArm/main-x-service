@@ -11,6 +11,7 @@ pub mod audit;
 pub mod convert;
 pub mod models;
 pub mod outbox;
+pub mod review_queue;
 
 use convert::{offset_to_ts, ts_to_offset};
 use sea_orm::{

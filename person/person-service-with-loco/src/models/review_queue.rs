@@ -114,3 +114,54 @@ pub struct BatchDeduplicationResponse {
     /// The review queue items created
     pub review_items: Vec<ReviewQueueItem>,
 }
+
+/// One operator verdict for a `pending` review item.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ReviewDecision {
+    /// Confirm the pair as a duplicate (ready for merge).
+    Confirmed,
+    /// Reject the pair (not a duplicate).
+    Rejected,
+}
+
+/// Request body for `POST /api/persons/review-queue/{id}/decision`.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ReviewDecisionRequest {
+    /// The verdict (`confirmed` or `rejected`).
+    pub status: ReviewDecision,
+}
+
+/// Response envelope for `GET /api/persons/review-queue`.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ReviewQueueListResponse {
+    /// The stored review-queue items (newest first).
+    pub items: Vec<ReviewQueueItem>,
+    /// Number of items returned.
+    pub total: usize,
+}
+
+#[cfg(test)]
+mod review_decision_tests {
+    use super::*;
+
+    /// Decision tokens are the lowercase wire form, and only the two
+    /// operator verdicts parse — `pending` / `automerged` are refused.
+    #[test]
+    fn decision_wire_tokens() {
+        let ok: ReviewDecisionRequest =
+            serde_json::from_value(serde_json::json!({"status": "confirmed"})).unwrap();
+        assert_eq!(ok.status, ReviewDecision::Confirmed);
+        let ok: ReviewDecisionRequest =
+            serde_json::from_value(serde_json::json!({"status": "rejected"})).unwrap();
+        assert_eq!(ok.status, ReviewDecision::Rejected);
+        assert!(serde_json::from_value::<ReviewDecisionRequest>(
+            serde_json::json!({"status": "pending"})
+        )
+        .is_err());
+        assert!(serde_json::from_value::<ReviewDecisionRequest>(
+            serde_json::json!({"status": "automerged"})
+        )
+        .is_err());
+    }
+}

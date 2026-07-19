@@ -495,3 +495,17 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     `edge_id`/`edge_kind`/`from_ref=person:<id>` shape → soft-delete).
     Met: `cargo test --lib` green (166 passed, 3 ignored); `cargo build`
     and `cargo clippy --all-targets --all-features` clean (0).
+
+- [x] **2026-07-19 — Stored review queue + decision endpoints.** Persist
+  the batch-dedup candidates (`review_queue` migration + the shared
+  raw-SQL `db/review_queue` module: normalized-pair upsert / list /
+  first-writer-wins decide), report stored rows from the scan, and add
+  `GET /api/persons/review-queue` + `POST
+  /api/persons/review-queue/{id}/decision`. Front-end `/review` board
+  loads the stored queue on mount and drag records decisions.
+  **Acceptance:** serde pins for the decision wire tokens; the person
+  crate's env-gated DB round-trip (`tests/review_queue_db.rs` — the
+  module is byte-identical family-wide) green against Postgres 18;
+  `cargo test --lib` + clippy pedantic clean; FE svelte-check / vitest /
+  Playwright green.
+

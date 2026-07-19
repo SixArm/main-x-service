@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — drag-to-decide review board (2026-07-19)
+
+- 2026-07-19 — `/review` now loads the **stored** review queue on mount
+  (`GET /api/things/review-queue`, a safe read; the scan button still
+  runs the destructive-classed batch scan explicitly) and dragging a
+  pending card into Confirmed / Rejected records the decision through
+  `POST /api/things/review-queue/{id}/decision`. Illegal drags are
+  refused client-side and the reload restores the stored truth.
+- Repository gains `listReviewQueue()` / `decideReview()`; types gain
+  `ReviewDecision` + `ReviewQueueListResponse`.
+- e2e: the dashboard smoke spec now opens the hamburger dropdown before
+  asserting nav links (the nav is toggle-only at every viewport width;
+  the old spec predated that layout).
+
 ### Fixed
 
 - 2026-07-19 — dedup-report drift: `ReviewStatus` lowered to the wire tokens; `ReviewQueueItem`

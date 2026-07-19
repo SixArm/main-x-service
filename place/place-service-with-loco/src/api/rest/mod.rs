@@ -63,6 +63,8 @@ impl utoipa::Modify for SecurityAddon {
         handlers::check_duplicates,
         handlers::merge_places,
         handlers::deduplicate,
+        handlers::get_review_queue,
+        handlers::review_decision,
         handlers::export_place_data,
         handlers::masked_place,
         handlers::audit_for_place,
@@ -92,6 +94,9 @@ impl utoipa::Modify for SecurityAddon {
         handlers::BatchDeduplicationResponse,
         handlers::ReviewQueueItem,
         handlers::ReviewStatus,
+        handlers::ReviewDecision,
+        handlers::ReviewDecisionRequest,
+        handlers::ReviewQueueListResponse,
     )),
     modifiers(&SecurityAddon),
     tags(
@@ -125,6 +130,11 @@ pub fn create_router(state: AppState) -> Router {
         .route("/places/check-duplicates", post(handlers::check_duplicates))
         .route("/places/merge", post(handlers::merge_places))
         .route("/places/deduplicate", post(handlers::deduplicate))
+        .route("/places/review-queue", get(handlers::get_review_queue))
+        .route(
+            "/places/review-queue/{id}/decision",
+            post(handlers::review_decision),
+        )
         .route(
             "/places/{id}",
             get(handlers::get_place)
@@ -169,6 +179,11 @@ pub fn places_routes() -> loco_rs::controller::Routes {
         .add("/places/check-duplicates", post(handlers::check_duplicates))
         .add("/places/merge", post(handlers::merge_places))
         .add("/places/deduplicate", post(handlers::deduplicate))
+        .add("/places/review-queue", get(handlers::get_review_queue))
+        .add(
+            "/places/review-queue/{id}/decision",
+            post(handlers::review_decision),
+        )
         .add(
             "/places/{id}",
             get(handlers::get_place)

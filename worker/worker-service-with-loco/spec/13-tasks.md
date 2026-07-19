@@ -314,3 +314,17 @@ clearly described manual check confirms the acceptance criterion.
     are DB-gated-tested via the outbox suite. **Broker-gated follow-up:** a
     real **`FluvioSink`** (`impl EventSink` behind a `fluvio` cargo feature) —
     the trait is the seam, so the drain loop is unchanged when it lands.
+
+- [x] **2026-07-19 — Stored review queue + decision endpoints.** Persist
+  the batch-dedup candidates (`review_queue` migration + the shared
+  raw-SQL `db/review_queue` module: normalized-pair upsert / list /
+  first-writer-wins decide), report stored rows from the scan, and add
+  `GET /api/workers/review-queue` + `POST
+  /api/workers/review-queue/{id}/decision`. Front-end `/review` board
+  loads the stored queue on mount and drag records decisions.
+  **Acceptance:** serde pins for the decision wire tokens; the person
+  crate's env-gated DB round-trip (`tests/review_queue_db.rs` — the
+  module is byte-identical family-wide) green against Postgres 18;
+  `cargo test --lib` + clippy pedantic clean; FE svelte-check / vitest /
+  Playwright green.
+

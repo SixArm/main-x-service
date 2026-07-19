@@ -8,6 +8,19 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — stored review queue + decision endpoints (2026-07-19)
+
+- `review_queue` table (migration `m20260719_000001_create_review_queue`):
+  the batch-dedup scan persists its candidate pairs (normalized pair
+  order, UNIQUE upsert — re-scans refresh scores, decided rows keep
+  their decision, ids stay stable) and the scan response now reports
+  the **stored** rows.
+- `GET /api/workers/review-queue[?status=&limit=]` — list the stored
+  queue (newest first, cap 500).
+- `POST /api/workers/review-queue/{id}/decision`
+  (`{"status": "confirmed" | "rejected"}`) — decide a `pending` item;
+  first-writer-wins in SQL, `404`/`422` on unknown/already-decided.
+
 ### Added — matcher-partition guard test (cross-service-linking §7)
 
 - A bridge test (`tests/duplicate_detection.rs::links_are_not_a_matcher_signal`)

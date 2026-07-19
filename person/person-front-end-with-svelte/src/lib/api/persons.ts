@@ -8,6 +8,9 @@ import type {
   MergeRequest,
   MergeResponse,
   Person,
+  ReviewDecision,
+  ReviewQueueItem,
+  ReviewQueueListResponse,
 } from "./types.js";
 import { API_BASE_URL } from "$lib/config.js";
 
@@ -146,6 +149,24 @@ export class PersonRepository {
     return this.http.post<BatchDeduplicationResponse>(
       "/api/persons/deduplicate",
       { body: request },
+    );
+  }
+
+  /** Load the stored review queue (newest first). */
+  listReviewQueue(): Promise<ReviewQueueItem[]> {
+    return this.http
+      .get<ReviewQueueListResponse>("/api/persons/review-queue")
+      .then((response) => response.items);
+  }
+
+  /**
+   * Decide a pending review item. Only `pending` items can be decided;
+   * the service returns 422 for anything else (first writer wins).
+   */
+  decideReview(id: string, status: ReviewDecision): Promise<ReviewQueueItem> {
+    return this.http.post<ReviewQueueItem>(
+      `/api/persons/review-queue/${id}/decision`,
+      { body: { status } },
     );
   }
 

@@ -11,6 +11,9 @@ test.describe("Person front-end smoke", () => {
     test("dashboard renders nav and heading", async ({ page }) => {
         await page.goto("/");
         await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+        // The nav is a hamburger dropdown at every viewport width
+        // (deliberate layout design) — open it before asserting links.
+        await page.getByRole("button", { name: "Toggle navigation" }).click();
         await expect(page.getByRole("link", { name: "Persons" })).toBeVisible();
         await expect(page.getByRole("link", { name: "Match check" })).toBeVisible();
         await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();

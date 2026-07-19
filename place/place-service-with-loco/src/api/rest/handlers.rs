@@ -513,8 +513,8 @@ pub enum ReviewStatus {
 
 /// One candidate duplicate pair emitted by the batch scan, mirroring the
 /// person/worker review-item shape (`detection_method` included) so the
-/// family front-ends can render one review queue. No review-decision
-/// endpoint exists yet, so every emitted item is `pending`.
+/// family front-ends can render one review queue. Items persist in the
+/// stored `review_queue` and are decided via the decision endpoint.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ReviewQueueItem {
     /// Server-generated review-item id.
@@ -529,10 +529,14 @@ pub struct ReviewQueueItem {
     pub match_quality: String,
     /// How the pair was detected (always `batch_deduplication` here).
     pub detection_method: String,
-    /// Current review state (always [`ReviewStatus::Pending`] for now).
+    /// Current review state.
     pub status: ReviewStatus,
+    /// Reviewer identity recorded by the decision endpoint, if decided.
+    pub reviewed_by: Option<String>,
     /// When the item was produced.
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// When the decision was recorded, if decided.
+    pub reviewed_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// Batch-deduplication response.
@@ -585,23 +589,244 @@ pub async fn deduplicate(
                     match_quality: confidence_label(&result.confidence).to_string(),
                     detection_method: "batch_deduplication".to_string(),
                     status: ReviewStatus::Pending,
+                    reviewed_by: None,
                     created_at: chrono::Utc::now(),
+                    reviewed_at: None,
                 });
             }
         }
     }
+    // Persist the scan into the stored review queue: normalized-pair
+    // upsert refreshes scores on re-scan while a decided row keeps its
+    // decision (`status` is never touched on conflict). The response
+    // reports the STORED rows, so item ids are stable across scans and
+    // prior decisions show through.
+    let new_items: Vec<crate::db::review_queue::NewReviewItem> = review_items
+        .iter()
+        .map(|r| crate::db::review_queue::NewReviewItem {
+            record_id_a: r.place_id_a,
+            record_id_b: r.place_id_b,
+            match_score: r.match_score,
+            match_quality: r.match_quality.clone(),
+            detection_method: r.detection_method.clone(),
+            score_breakdown: None,
+            status: review_status_token(&r.status).to_string(),
+        })
+        .collect();
+    let rows = match crate::db::review_queue::upsert(&state.db, &new_items).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<BatchDeduplicationResponse>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to persist review queue: {e}"),
+                )),
+            );
+        }
+    };
+    let review_items: Vec<ReviewQueueItem> = rows.iter().map(review_row_to_item).collect();
     let duplicates_found = review_items.len();
+    let queued_for_review = review_items
+        .iter()
+        .filter(|r| r.status == ReviewStatus::Pending)
+        .count();
+    let auto_merged = review_items
+        .iter()
+        .filter(|r| r.status == ReviewStatus::AutoMerged)
+        .count();
     (
         StatusCode::OK,
         Json(ApiResponse::success(BatchDeduplicationResponse {
             places_scanned: places.len(),
             duplicates_found,
-            auto_merged: 0,
-            queued_for_review: duplicates_found,
+            auto_merged,
+            queued_for_review,
             review_items,
         })),
     )
 }
+
+/// One operator verdict for a `pending` review item.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ReviewDecision {
+    /// Confirm the pair as a duplicate (ready for merge).
+    Confirmed,
+    /// Reject the pair (not a duplicate).
+    Rejected,
+}
+
+/// Request body for `POST /api/places/review-queue/{id}/decision`.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ReviewDecisionRequest {
+    /// The verdict (`confirmed` or `rejected`).
+    pub status: ReviewDecision,
+}
+
+/// Query parameters for the review-queue list endpoint.
+#[derive(Debug, Deserialize)]
+pub struct ReviewQueueListQuery {
+    /// Optional status-token filter (`pending` / `confirmed` /
+    /// `rejected` / `automerged`).
+    pub status: Option<String>,
+    /// Maximum items to return (default 100, capped at 500).
+    pub limit: Option<u64>,
+}
+
+/// Response envelope for `GET /api/places/review-queue`.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ReviewQueueListResponse {
+    /// The stored review-queue items (newest first).
+    pub items: Vec<ReviewQueueItem>,
+    /// Number of items returned.
+    pub total: usize,
+}
+
+// ─── Review queue (stored) ──────────────────────────────────────────────────
+
+/// The lowercase wire token for a review status.
+fn review_status_token(status: &ReviewStatus) -> &'static str {
+    match status {
+        ReviewStatus::Pending => "pending",
+        ReviewStatus::Confirmed => "confirmed",
+        ReviewStatus::Rejected => "rejected",
+        ReviewStatus::AutoMerged => "automerged",
+    }
+}
+
+/// Parse a stored status token (unknown tokens read as `pending`).
+fn parse_review_status(token: &str) -> ReviewStatus {
+    match token {
+        "confirmed" => ReviewStatus::Confirmed,
+        "rejected" => ReviewStatus::Rejected,
+        "automerged" => ReviewStatus::AutoMerged,
+        _ => ReviewStatus::Pending,
+    }
+}
+
+/// Map a stored review-queue row onto the wire item shape.
+fn review_row_to_item(row: &crate::db::review_queue::ReviewQueueRow) -> ReviewQueueItem {
+    ReviewQueueItem {
+        id: row.id,
+        place_id_a: row.record_id_a,
+        place_id_b: row.record_id_b,
+        match_score: row.match_score,
+        match_quality: row.match_quality.clone(),
+        detection_method: row.detection_method.clone(),
+        status: parse_review_status(&row.status),
+        reviewed_by: row.reviewed_by.clone(),
+        created_at: crate::db::convert::offset_to_ts(row.created_at),
+        reviewed_at: row.reviewed_at.map(crate::db::convert::offset_to_ts),
+    }
+}
+
+/// List the stored deduplication review queue (newest first).
+#[utoipa::path(get, path = "/api/places/review-queue", tag = "matching",
+    responses(
+        (status = 200, description = "Stored review-queue items", body = ReviewQueueListResponse),
+        (status = 422, description = "Unknown status token"),
+        (status = 500, description = "Internal server error")))]
+pub async fn get_review_queue(
+    State(state): State<AppState>,
+    Query(query): Query<ReviewQueueListQuery>,
+) -> axum::response::Response {
+    if let Some(status) = query.status.as_deref()
+        && !matches!(status, "pending" | "confirmed" | "rejected" | "automerged")
+    {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(ApiResponse::<ReviewQueueListResponse>::error(
+                "INVALID_STATUS",
+                format!("unknown review status `{status}`"),
+            )),
+        )
+            .into_response();
+    }
+    match crate::db::review_queue::list(
+        &state.db,
+        query.status.as_deref(),
+        query.limit.unwrap_or(100),
+    )
+    .await
+    {
+        Ok(rows) => {
+            let items: Vec<ReviewQueueItem> = rows.iter().map(review_row_to_item).collect();
+            let total = items.len();
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(ReviewQueueListResponse { items, total })),
+            )
+                .into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<ReviewQueueListResponse>::error(
+                "DATABASE_ERROR",
+                format!("Failed to list review queue: {e}"),
+            )),
+        )
+            .into_response(),
+    }
+}
+
+/// Decide one `pending` review item (`confirmed` or `rejected`).
+///
+/// The transition guard is first-writer-wins in SQL: only a `pending`
+/// item can be decided; an already-decided item returns `422`, an
+/// unknown id `404`.
+#[utoipa::path(post, path = "/api/places/review-queue/{id}/decision", tag = "matching",
+    request_body = ReviewDecisionRequest,
+    responses(
+        (status = 200, description = "The decided item", body = ReviewQueueItem),
+        (status = 404, description = "No review item with that id"),
+        (status = 422, description = "Item already decided"),
+        (status = 500, description = "Internal server error")))]
+pub async fn review_decision(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<ReviewDecisionRequest>,
+) -> axum::response::Response {
+    let token = match req.status {
+        ReviewDecision::Confirmed => "confirmed",
+        ReviewDecision::Rejected => "rejected",
+    };
+    // No optional-claims extractor exists in this service yet (accepted
+    // drift from person/worker), so the reviewer identity is not
+    // recorded here.
+    match crate::db::review_queue::decide(&state.db, id, token, None).await {
+        Ok(crate::db::review_queue::DecideOutcome::Decided(row)) => (
+            StatusCode::OK,
+            Json(ApiResponse::success(review_row_to_item(&row))),
+        )
+            .into_response(),
+        Ok(crate::db::review_queue::DecideOutcome::NotFound) => (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse::<ReviewQueueItem>::error(
+                "NOT_FOUND",
+                format!("no review item {id}"),
+            )),
+        )
+            .into_response(),
+        Ok(crate::db::review_queue::DecideOutcome::AlreadyDecided(current)) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(ApiResponse::<ReviewQueueItem>::error(
+                "INVALID_REVIEW_TRANSITION",
+                format!("item is `{current}`; only `pending` items can be decided"),
+            )),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<ReviewQueueItem>::error(
+                "DATABASE_ERROR",
+                format!("Failed to decide review item: {e}"),
+            )),
+        )
+            .into_response(),
+    }
+}
+
 
 /// GDPR data export for one place.
 #[utoipa::path(get, path = "/api/places/{id}/export", tag = "privacy",
@@ -704,10 +929,24 @@ mod review_report_tests {
             match_quality: "probable".to_string(),
             detection_method: "batch_deduplication".to_string(),
             status: ReviewStatus::Pending,
+            reviewed_by: None,
             created_at: chrono::Utc::now(),
+            reviewed_at: None,
         };
         let value = serde_json::to_value(&item).unwrap();
         assert_eq!(value["detection_method"], "batch_deduplication");
         assert_eq!(value["status"], "pending");
     }
+    /// Only the two operator verdicts parse as decisions.
+    #[test]
+    fn decision_wire_tokens() {
+        let ok: ReviewDecisionRequest =
+            serde_json::from_value(serde_json::json!({"status": "confirmed"})).unwrap();
+        assert_eq!(ok.status, ReviewDecision::Confirmed);
+        assert!(serde_json::from_value::<ReviewDecisionRequest>(
+            serde_json::json!({"status": "pending"})
+        )
+        .is_err());
+    }
+
 }
