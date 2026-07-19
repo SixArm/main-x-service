@@ -29,7 +29,27 @@ pub fn spec() -> Value {
 fn paths() -> Value {
     let mut paths = crud_paths();
     merge_object(&mut paths, aux_paths());
+    merge_object(&mut paths, insight_paths());
     paths
+}
+
+/// The executive-insight read paths (CEO / CFO / CTO derived views;
+/// all ETag-conditional GETs with an `as_of` stamp).
+fn insight_paths() -> Value {
+    let get = |tag: &str, summary: &str| {
+        json!({ "get": { "tags": [tag], "summary": summary,
+            "responses": { "200": { "description": "Derived view (ETag-conditional; carries as_of)" },
+                           "304": { "description": "Not modified" } } } })
+    };
+    json!({
+        "/api/executive/health": get("executive", "CEO portfolio-health briefing: per-portfolio RAG rollup, overdue milestones, escalated risks, exposure, overrun currencies, staleness"),
+        "/api/executive/decisions": get("executive", "Decision log: gate reviews, scenario commits, decided proposals, merges (newest first; ?limit=)"),
+        "/api/executive/benefits": get("executive", "Benefits realization per portfolio: per-currency target vs realized (ratio only with a positive target) + non-financial status counts"),
+        "/api/financials/variance": get("financials", "Budget variance (minor units, per currency, never merged) by collection, portfolio, and category"),
+        "/api/financials/exposure": get("financials", "Per-currency estate exposure: planned / actual / remaining totals; deliberately no FX conversion"),
+        "/api/technology/dependency-risk": get("technology", "Dependency lens: top fan-out items, cross-portfolio edges, edges with a RAG-red predecessor"),
+        "/api/technology/radar": get("technology", "Technology radar from tech:<name>[:<ring>] tags; majority ring vote, ties break cautious"),
+    })
 }
 
 /// Shallow-merge the top-level keys of `src` into `dst`.

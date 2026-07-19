@@ -265,6 +265,113 @@ export function money(minor: number, currency?: string | null): string {
 }
 
 /** The PPM endpoints, bound to the configured base URL. */
+
+// ---- executive insight areas (CEO / CFO / CTO derived views) ----
+
+/** `{pid, name, kind}` reference carried by the insight views. */
+export interface InsightItemRef {
+  pid: string;
+  name: string;
+  kind: string;
+}
+
+/** One per-currency variance row (minor units; currencies never merge). */
+export interface VarianceRow {
+  currency: string;
+  planned_minor: number;
+  actual_minor: number;
+  remaining_minor: number;
+  overrun: boolean;
+  line_count: number;
+}
+
+/** `GET /api/executive/health` response. */
+export interface ExecutiveHealth {
+  as_of: string;
+  derivation: string;
+  portfolios: Array<{
+    portfolio: InsightItemRef | null;
+    status: "red" | "amber" | "green";
+    rag: { red: number; amber: number; green: number };
+    members: number;
+    overdue_milestones: number;
+    escalated_risks: number;
+    open_risk_exposure: number;
+    overrun_currencies: string[];
+    days_since_last_update: number;
+  }>;
+}
+
+/** One decision-log entry (`GET /api/executive/decisions`). */
+export interface DecisionEntry {
+  kind: "gate_review" | "scenario_commit" | "proposal" | "merge";
+  at: string;
+  decision: string;
+  subject: { pid: string; name: string | null };
+  actor?: string | null;
+  gate?: string;
+  sponsor?: string | null;
+  merged_from?: string;
+  reason?: string | null;
+  conditions?: string | null;
+}
+
+/** `GET /api/executive/benefits` response. */
+export interface ExecutiveBenefits {
+  as_of: string;
+  note: string;
+  portfolios: Array<{
+    portfolio: InsightItemRef | null;
+    benefits: number;
+    non_financial: number;
+    statuses: Record<string, number>;
+    financial: Array<{
+      currency: string;
+      target_minor: number;
+      realized_minor: number;
+      realization_ratio: number | null;
+    }>;
+  }>;
+}
+
+/** `GET /api/financials/variance` response. */
+export interface FinancialVariance {
+  as_of: string;
+  note: string;
+  by_collection: Array<{ collection: string; variance: VarianceRow[] }>;
+  by_category: Array<{ category: string; variance: VarianceRow[] }>;
+  by_portfolio: Array<{ portfolio: InsightItemRef | null; variance: VarianceRow[] }>;
+}
+
+/** `GET /api/financials/exposure` response. */
+export interface FinancialExposure {
+  as_of: string;
+  note: string;
+  currencies: Array<VarianceRow & { work_items: number }>;
+}
+
+/** `GET /api/technology/dependency-risk` response. */
+export interface DependencyRisk {
+  as_of: string;
+  edges: number;
+  top_fan_out: Array<{ item: InsightItemRef; dependents: number; rag: string | null }>;
+  cross_portfolio: Array<{ edge: string; predecessor: InsightItemRef; successor: InsightItemRef }>;
+  red_predecessor_edges: Array<{ edge: string; predecessor: InsightItemRef; successor: InsightItemRef }>;
+}
+
+/** `GET /api/technology/radar` response. */
+export interface TechnologyRadar {
+  as_of: string;
+  convention: string;
+  technologies: Array<{
+    technology: string;
+    ring: "assess" | "trial" | "adopt" | "hold" | "unclassified";
+    ring_votes: number;
+    per_collection: Record<string, number>;
+    items: InsightItemRef[];
+  }>;
+}
+
 export class PpmClient {
   constructor(private readonly http: ApiClient) {}
 
@@ -497,6 +604,29 @@ export class PpmClient {
   }
   runReport(pid: string): Promise<ReportRun> {
     return this.http.get(`/api/reports/${pid}/run`);
+  }
+
+  // ---- executive insight areas (CEO / CFO / CTO) ----
+  executiveHealth(): Promise<ExecutiveHealth> {
+    return this.http.get("/api/executive/health");
+  }
+  executiveDecisions(limit?: number): Promise<{ decisions: DecisionEntry[]; total: number; as_of: string }> {
+    return this.http.get(`/api/executive/decisions${limit ? `?limit=${limit}` : ""}`);
+  }
+  executiveBenefits(): Promise<ExecutiveBenefits> {
+    return this.http.get("/api/executive/benefits");
+  }
+  financialVariance(): Promise<FinancialVariance> {
+    return this.http.get("/api/financials/variance");
+  }
+  financialExposure(): Promise<FinancialExposure> {
+    return this.http.get("/api/financials/exposure");
+  }
+  technologyDependencyRisk(): Promise<DependencyRisk> {
+    return this.http.get("/api/technology/dependency-risk");
+  }
+  technologyRadar(): Promise<TechnologyRadar> {
+    return this.http.get("/api/technology/radar");
   }
   /** The CSV download URL for a saved report (same-origin proxy). */
   reportCsvUrl(pid: string): string {

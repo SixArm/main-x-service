@@ -117,6 +117,12 @@ match breakdown).
 /gantt                       schedule Gantt (SVAR; dependency links +
                              critical path; read-only)
 /capacity                    resource capacity rollup
+/executive                   CEO area: portfolio-health briefing,
+                             decision log, benefits realization
+/financials                  CFO area: budget variance + per-currency
+                             exposure (server-derived; no FX)
+/technology                  CTO area: technology radar + dependency
+                             risk lens
 /ideas                       idea board
 /objectives                  OKR objectives + alignment rollups
 /proposals                   work-intake proposal pipeline

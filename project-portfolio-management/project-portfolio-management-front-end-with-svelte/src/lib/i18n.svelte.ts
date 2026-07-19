@@ -92,6 +92,9 @@ export const LOCALE_KEY = "mxi.case.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "ppm.nav.executive": "Executive",
+    "ppm.nav.financials": "Financials",
+    "ppm.nav.technology": "Technology",
     "ppm.nav.gantt": "Gantt",
     // Layout / chrome
     "brand.name": "Main X · Cases",
@@ -275,6 +278,9 @@ const STRINGS = {
       "Schedules are drawn per portfolio umbrella.",
   },
   cy: {
+    "ppm.nav.executive": "Gweithredol",
+    "ppm.nav.financials": "Cyllid",
+    "ppm.nav.technology": "Technoleg",
     "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Achosion",
     "nav.toggle": "Toglo'r llywio",
@@ -451,6 +457,9 @@ const STRINGS = {
       "Lluniwyd amserlenni fesul ymbarél portffolio.",
   },
   es: {
+    "ppm.nav.executive": "Ejecutivo",
+    "ppm.nav.financials": "Finanzas",
+    "ppm.nav.technology": "Tecnología",
     "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Casos",
     "nav.toggle": "Alternar navegación",
@@ -628,6 +637,9 @@ const STRINGS = {
       "Los cronogramas se trazan por cartera paraguas.",
   },
   fr: {
+    "ppm.nav.executive": "Direction",
+    "ppm.nav.financials": "Finances",
+    "ppm.nav.technology": "Technologie",
     "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Affaires",
     "nav.toggle": "Basculer la navigation",
@@ -805,6 +817,9 @@ const STRINGS = {
       "Les calendriers sont tracés par portefeuille parapluie.",
   },
   de: {
+    "ppm.nav.executive": "Führung",
+    "ppm.nav.financials": "Finanzen",
+    "ppm.nav.technology": "Technologie",
     "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Fälle",
     "nav.toggle": "Navigation umschalten",
@@ -981,6 +996,9 @@ const STRINGS = {
       "Zeitpläne werden je Portfolio-Dach gezeichnet.",
   },
   ar: {
+    "ppm.nav.executive": "التنفيذية",
+    "ppm.nav.financials": "المالية",
+    "ppm.nav.technology": "التقنية",
     "ppm.nav.gantt": "جانت",
     "brand.name": "Main X · القضايا",
     "nav.toggle": "تبديل التنقل",
@@ -1154,6 +1172,9 @@ const STRINGS = {
     "ppm.schedule.portfoliosOnly": "تُرسم الجداول لكل محفظة مظلّية.",
   },
   ru: {
+    "ppm.nav.executive": "Руководство",
+    "ppm.nav.financials": "Финансы",
+    "ppm.nav.technology": "Технологии",
     "ppm.nav.gantt": "Гант",
     "brand.name": "Main X · Дела",
     "nav.toggle": "Переключить навигацию",
@@ -1330,6 +1351,9 @@ const STRINGS = {
       "Графики строятся по каждому зонтичному портфелю.",
   },
   hi: {
+    "ppm.nav.executive": "कार्यकारी",
+    "ppm.nav.financials": "वित्त",
+    "ppm.nav.technology": "प्रौद्योगिकी",
     "ppm.nav.gantt": "गैंट",
     "brand.name": "Main X · मामले",
     "nav.toggle": "नेविगेशन टॉगल करें",
@@ -1506,6 +1530,9 @@ const STRINGS = {
       "समय-सारणियाँ प्रति छत्र पोर्टफोलियो बनती हैं।",
   },
   zh: {
+    "ppm.nav.executive": "高管",
+    "ppm.nav.financials": "财务",
+    "ppm.nav.technology": "技术",
     "ppm.nav.gantt": "甘特图",
     "brand.name": "Main X · 案件",
     "nav.toggle": "切换导航",
@@ -1679,6 +1706,9 @@ const STRINGS = {
     "ppm.schedule.portfoliosOnly": "进度表按伞形组合绘制。",
   },
   bn: {
+    "ppm.nav.executive": "নির্বাহী",
+    "ppm.nav.financials": "আর্থিক",
+    "ppm.nav.technology": "প্রযুক্তি",
     "ppm.nav.gantt": "গ্যান্ট",
     "brand.name": "Main X · মামলা",
     "nav.toggle": "নেভিগেশন টগল করুন",
@@ -1855,6 +1885,9 @@ const STRINGS = {
       "প্রতিটি ছাতা পোর্টফোলিওর জন্য সময়সূচি আঁকা হয়।",
   },
   pt: {
+    "ppm.nav.executive": "Executivo",
+    "ppm.nav.financials": "Finanças",
+    "ppm.nav.technology": "Tecnologia",
     "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Casos",
     "nav.toggle": "Alternar navegação",
@@ -2031,6 +2064,9 @@ const STRINGS = {
       "Os cronogramas são traçados por carteira guarda-chuva.",
   },
   id: {
+    "ppm.nav.executive": "Eksekutif",
+    "ppm.nav.financials": "Keuangan",
+    "ppm.nav.technology": "Teknologi",
     "ppm.nav.gantt": "Gantt",
     "brand.name": "Main X · Kasus",
     "nav.toggle": "Alihkan navigasi",
@@ -2206,6 +2242,9 @@ const STRINGS = {
     "ppm.schedule.portfoliosOnly": "Jadwal digambar per payung portofolio.",
   },
   ur: {
+    "ppm.nav.executive": "ایگزیکٹو",
+    "ppm.nav.financials": "مالیات",
+    "ppm.nav.technology": "ٹیکنالوجی",
     "ppm.nav.gantt": "گینٹ",
     "brand.name": "Main X · مقدمات",
     "nav.toggle": "نیویگیشن ٹوگل کریں",

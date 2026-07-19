@@ -71,6 +71,68 @@ async function stubPpm(page: Page) {
     if (path === "/api/ideas" && method === "GET") return route.fulfill({ json: IDEAS });
     if (path === `/api/ideas/${IDEA}/vote` && method === "POST")
       return route.fulfill({ json: { ...IDEAS[0], votes: 5 } });
+    if (path === "/api/executive/health")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", derivation: "worst member RAG",
+        portfolios: [{
+          portfolio: { pid: "pf-1", name: "Transformation", kind: "Portfolio" },
+          status: "red", rag: { red: 1, amber: 0, green: 2 }, members: 3,
+          overdue_milestones: 1, escalated_risks: 0, open_risk_exposure: 12,
+          overrun_currencies: ["GBP"], days_since_last_update: 2,
+        }],
+      } });
+    if (path === "/api/executive/decisions")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", total: 1, returned: 1,
+        decisions: [{ kind: "gate_review", at: "2026-07-18T10:00:00Z",
+          decision: "approved", gate: "g0_concept",
+          subject: { pid: "w-1", name: "Platform rebuild" }, actor: "worker:x" }],
+      } });
+    if (path === "/api/executive/benefits")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", note: "never merged",
+        portfolios: [{
+          portfolio: { pid: "pf-1", name: "Transformation", kind: "Portfolio" },
+          benefits: 1, non_financial: 0, statuses: { planned: 1 },
+          financial: [{ currency: "GBP", target_minor: 100000,
+                        realized_minor: 25000, realization_ratio: 0.25 }],
+        }],
+      } });
+    if (path === "/api/financials/variance")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", note: "no FX conversion",
+        by_collection: [{ collection: "Project", variance: [{ currency: "GBP",
+          planned_minor: 100000, actual_minor: 150000, remaining_minor: -50000,
+          overrun: true, line_count: 1 }] }],
+        by_category: [{ category: "capex", variance: [{ currency: "GBP",
+          planned_minor: 100000, actual_minor: 150000, remaining_minor: -50000,
+          overrun: true, line_count: 1 }] }],
+        by_portfolio: [],
+      } });
+    if (path === "/api/financials/exposure")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", note: "currencies never converted",
+        currencies: [{ currency: "GBP", planned_minor: 100000,
+          actual_minor: 150000, remaining_minor: -50000, overrun: true,
+          line_count: 1, work_items: 1 }],
+      } });
+    if (path === "/api/technology/dependency-risk")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", edges: 1,
+        top_fan_out: [{ item: { pid: "w-1", name: "Platform rebuild", kind: "Project" },
+                        dependents: 2, rag: "red" }],
+        cross_portfolio: [],
+        red_predecessor_edges: [{ edge: "e-1",
+          predecessor: { pid: "w-1", name: "Platform rebuild", kind: "Project" },
+          successor: { pid: "w-2", name: "Portal", kind: "Product" } }],
+      } });
+    if (path === "/api/technology/radar")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", convention: "tech:<name>[:<ring>]",
+        technologies: [{ technology: "rust", ring: "adopt", ring_votes: 2,
+          per_collection: { Project: 1, Product: 1 },
+          items: [{ pid: "w-1", name: "Platform rebuild", kind: "Project" }] }],
+      } });
     return route.fulfill({ status: 404, json: { error: `unstubbed ${method} ${path}` } });
   });
 }
@@ -105,4 +167,29 @@ test("idea board votes", async ({ page }) => {
   await expect(page.getByText("Self-service portal")).toBeVisible();
   await page.getByRole("button", { name: "▲ 4" }).click();
   await expect(page.getByRole("button", { name: "▲ 4" })).toBeVisible(); // list re-fetch stubbed static
+});
+
+test("executive area renders health, benefits, and the decision log", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/executive");
+  await expect(page.getByTestId("exec-health").getByText("Transformation")).toBeVisible();
+  await expect(page.getByTestId("exec-health").getByText("red", { exact: true })).toBeVisible();
+  await expect(page.getByText("25%")).toBeVisible(); // realization ratio served, not computed
+  await expect(page.getByTestId("exec-decisions").getByText("gate_review · g0_concept")).toBeVisible();
+});
+
+test("financial area shows per-currency exposure with overrun highlighted", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/financials");
+  await expect(page.getByText("currencies never converted")).toBeVisible();
+  await expect(page.getByTestId("fin-exposure").getByText("GBP", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("fin-by-category").getByText("capex")).toBeVisible();
+});
+
+test("technology area renders the radar rings and dependency lens", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/technology");
+  await expect(page.getByTestId("radar-adopt").getByText("rust")).toBeVisible();
+  await expect(page.getByTestId("tech-fan-out").getByText("Platform rebuild")).toBeVisible();
+  await expect(page.getByTestId("tech-red-edges").getByText("Portal")).toBeVisible();
 });

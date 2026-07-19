@@ -40,6 +40,13 @@ describe("PpmClient paths", () => {
     await ppm.alignment("o1");
     await ppm.linkObjective("projects", "w1", "o1", 4);
     await ppm.runReport("rep1");
+    await ppm.executiveHealth();
+    await ppm.executiveDecisions(10);
+    await ppm.executiveBenefits();
+    await ppm.financialVariance();
+    await ppm.financialExposure();
+    await ppm.technologyDependencyRisk();
+    await ppm.technologyRadar();
 
     expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
       "GET http://svc/api/at-a-glance",
@@ -60,6 +67,13 @@ describe("PpmClient paths", () => {
       "GET http://svc/api/objectives/o1/alignment",
       "POST http://svc/api/projects/w1/objectives",
       "GET http://svc/api/reports/rep1/run",
+      "GET http://svc/api/executive/health",
+      "GET http://svc/api/executive/decisions?limit=10",
+      "GET http://svc/api/executive/benefits",
+      "GET http://svc/api/financials/variance",
+      "GET http://svc/api/financials/exposure",
+      "GET http://svc/api/technology/dependency-risk",
+      "GET http://svc/api/technology/radar",
     ]);
   });
 

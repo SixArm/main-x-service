@@ -632,6 +632,29 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   vs Postgres 18. The full PPM catalogue (Phases A+B+C) is now
   delivered service-side.
 
+- [x] **2026-07-19 — Executive insight areas (CEO / CFO / CTO).**
+  Seven read-only derived views over existing tables (no new
+  migrations), each ETag-conditional with `as_of` (mirroring
+  `/at-a-glance`): `GET /api/executive/health` (per-portfolio RAG
+  briefing — worst-member status, overdue milestones, escalated risks,
+  exposure, overrun currencies, staleness), `GET
+  /api/executive/decisions` (gate reviews + scenario commits + decided
+  proposals + merges, newest first), `GET /api/executive/benefits`
+  (per-portfolio per-currency target vs realized; ratio only with a
+  positive target), `GET /api/financials/variance` (minor-unit
+  variance by collection / category / portfolio, one row per currency,
+  no FX), `GET /api/financials/exposure` (per-currency estate totals,
+  deliberately no cross-currency sum), `GET
+  /api/technology/dependency-risk` (top fan-out, cross-portfolio
+  edges, RAG-red-predecessor edges), `GET /api/technology/radar`
+  (tag convention `tech:<name>[:<ring>]`, majority ring vote, cautious
+  tie-break). Pure derivations in `src/insights.rs` (unit-tested);
+  controller `src/controllers/insights.rs`; OpenAPI paths added.
+  **Acceptance:** insights unit tests + the seeded seven-view request
+  round-trip (incl. ETag 304 replay) green — full `--ignored` suite
+  24/24 vs Postgres 18; clippy pedantic clean. Front-end `/executive`,
+  `/financials`, `/technology` consume the views.
+
 ## 14. Implementation status
 
 **Implemented (MVP v0.1.0 + PPM Phases A/B/C; see §13 for the

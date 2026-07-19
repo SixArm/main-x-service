@@ -46,7 +46,7 @@ async fn find_any_item(ctx: &AppContext, pid: Uuid) -> Result<work_items::Model>
 }
 
 /// The schedule facts (parsed flexible dates) of one stored item.
-fn schedule_item(model: &work_items::Model) -> rules::ScheduleItem {
+pub(crate) fn schedule_item(model: &work_items::Model) -> rules::ScheduleItem {
     let start = model.data.get("start_date").and_then(|v| v.as_str());
     let end = model.data.get("target_date").and_then(|v| v.as_str());
     rules::ScheduleItem {
@@ -57,7 +57,7 @@ fn schedule_item(model: &work_items::Model) -> rules::ScheduleItem {
 }
 
 /// Whether the stored item is finished (Completed / Cancelled).
-fn is_finished(model: &work_items::Model) -> bool {
+pub(crate) fn is_finished(model: &work_items::Model) -> bool {
     matches!(
         model.data.get("status").and_then(|v| v.as_str()),
         Some("Completed" | "Cancelled")

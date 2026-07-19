@@ -9,6 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — executive areas (2026-07-19)
+
+- `/executive`, `/financials`, `/technology` — CEO / CFO / CTO views
+  over the service's new insight endpoints. All numbers are
+  server-derived (RAG, variance, realization ratios, radar rings); the
+  client formats with `money()` and displays the server's derivation /
+  no-FX notes verbatim. Nav + `ppm.nav.*` keys in all 13 locales;
+  client gains seven typed methods with vitest path pins; three
+  stubbed Playwright specs.
+
 ### Added
 
 - 2026-07-19 — SVAR strong fit: new **/gantt** route (nav-linked): the selected portfolio's

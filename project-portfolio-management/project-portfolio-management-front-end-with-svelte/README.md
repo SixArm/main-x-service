@@ -43,6 +43,9 @@ parent portfolio, and a portfolio detail page rolls up its children.
 | `/{collection}/[pid]/edit` | Edit |
 | `/{collection}/[pid]/governance` | Governance panel — stage / risk posture / budget variance, gate journey, risks, budget lines, benefits + ROI, OKR mappings, milestones, allocations |
 | `/{collection}/[pid]/schedule` | Portfolio schedule (portfolios only) — member timeframes, critical-path badges, finish-start violations |
+| `/executive` | CEO area: portfolio-health briefing (server-derived RAG), decision log, benefits realization |
+| `/financials` | CFO area: budget variance (category / collection / portfolio) + per-currency exposure — minor units, no FX |
+| `/technology` | CTO area: technology radar (`tech:` tags) + dependency-risk lens (fan-out, red predecessors) |
 | `/gantt` | Schedule Gantt (SVAR) — the selected portfolio's dated work items as task bars, dependency edges as links, critical path highlighted (read-only) |
 | `/capacity` | Resource capacity — per-person rollup over a window; over-allocation flagged |
 | `/ideas` | Idea board — capture, vote, dismiss, convert to a draft proposal |

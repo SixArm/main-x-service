@@ -99,6 +99,9 @@
     { href: "/scenarios", label: t("ppm.nav.scenarios") },
     { href: "/objectives", label: t("ppm.nav.objectives") },
     { href: "/gantt", label: t("ppm.nav.gantt") },
+    { href: "/executive", label: t("ppm.nav.executive") },
+    { href: "/financials", label: t("ppm.nav.financials") },
+    { href: "/technology", label: t("ppm.nav.technology") },
     { href: "/capacity", label: t("ppm.nav.capacity") },
     { href: "/reports", label: t("ppm.nav.reports") },
   ];

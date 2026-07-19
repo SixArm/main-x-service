@@ -29,6 +29,8 @@ pub mod controllers;
 pub mod data;
 /// Pure PPM governance rules (proposal pipeline, phase gates, risks, money).
 pub mod governance;
+/// Pure derivations for the executive insight areas (CEO / CFO / CTO).
+pub mod insights;
 /// Pure PPM strategy rules (scenario evaluation, OKR weights, ROI).
 pub mod strategy;
 /// Pure PPM visibility rules (schedule math, RAG, capacity, CSV).

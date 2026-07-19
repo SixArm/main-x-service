@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — executive insight areas: CEO / CFO / CTO (2026-07-19)
+
+- Seven read-only derived views over existing tables (no new
+  migrations), ETag-conditional with `as_of`:
+  `/api/executive/health` (per-portfolio RAG briefing),
+  `/api/executive/decisions` (gate reviews, scenario commits, decided
+  proposals, merges), `/api/executive/benefits` (per-currency target vs
+  realized; honest null ratios), `/api/financials/variance` (by
+  collection / category / portfolio; minor units; currencies never
+  merged), `/api/financials/exposure` (per-currency totals, no FX),
+  `/api/technology/dependency-risk` (fan-out / cross-portfolio /
+  red-predecessor edges), `/api/technology/radar`
+  (`tech:<name>[:<ring>]` tag convention, majority ring vote).
+- Pure derivations live in `src/insights.rs` with DB-free unit tests;
+  the RAG derivation is shared with `/at-a-glance`.
+
 ### Added
 
 - 2026-07-18 — **PPM Phase C: strategy** (T-PPM-C; PPM-2/4/5/11).
