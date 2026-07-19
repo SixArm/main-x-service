@@ -12,6 +12,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR DataGrid + Filter: the folder dashboard grid migrates from `wx-svelte-grid` to
+  **@svar-ui/svelte-grid**, with a **@svar-ui/svelte-filter**
+  FilterBar above it filtering every column (NHS number, patient,
+  folder, cabinet, status, last-moved). Legacy `wx-svelte-*` deps
+  removed.
+
 - 2026-07-19 — Lily Design System: the **Lily headless** component library is now a dependency,
   completing the Lily trio (ThemeSelect and LocaleSelect were
   already wired in the chrome).

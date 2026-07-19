@@ -1,4 +1,11 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
+  import { Grid, Willow as GridTheme } from "@svar-ui/svelte-grid";
+  import {
+    FilterBar,
+    Willow as FilterTheme,
+    createArrayFilter,
+  } from "@svar-ui/svelte-filter";
   import { listContacts } from "$lib/api/crm";
   import { t } from "$lib/i18n.svelte";
   import type { Contact } from "$lib/api/crm";
@@ -15,6 +22,44 @@
       }
     })();
   });
+
+  const columns = $derived([
+    { id: "display_name", header: t("common.name"), flexgrow: 1 },
+    { id: "job_title", header: t("contact.jobTitle"), width: 150 },
+    { id: "status", header: t("common.status"), width: 110 },
+    { id: "marketing_consent", header: t("contact.consent"), width: 150 },
+  ]);
+
+  const rows = $derived(
+    (contacts ?? []).map((c) => ({
+      id: c.pid,
+      display_name: c.display_name,
+      job_title: c.job_title ?? "",
+      status: c.status,
+      marketing_consent: c.marketing_consent,
+    })),
+  );
+
+  const filterFields = $derived([
+    { id: "display_name", label: t("common.name"), type: "text" },
+    { id: "status", label: t("common.status"), type: "text" },
+    { id: "marketing_consent", label: t("contact.consent"), type: "text" },
+  ]);
+  let filterRules = $state<unknown>(null);
+  const filtered = $derived(
+    filterRules
+      ? createArrayFilter(filterRules as Parameters<typeof createArrayFilter>[0])(rows)
+      : rows,
+  );
+
+  // Row selection opens the contact timeline.
+  function initGrid(api: {
+    on(action: string, cb: (ev: { id: string | number }) => void): void;
+  }) {
+    api.on("select-row", (ev) => {
+      void goto(`/contacts/${ev.id}`);
+    });
+  }
 </script>
 
 <h1>{t("nav.contacts")}</h1>
@@ -24,31 +69,29 @@
 {:else if contacts === null}
   <p>{t("common.loading")}</p>
 {:else}
-  <table data-testid="contact-table">
-    <thead>
-      <tr>
-        <th>{t("common.name")}</th>
-        <th>{t("common.status")}</th>
-        <th>{t("contact.consent")}</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each contacts as contact (contact.pid)}
-        <tr>
-          <td><a href={`/contacts/${contact.pid}`}>{contact.display_name}</a></td>
-          <td><span class="chip">{contact.status}</span></td>
-          <td><span class={`chip consent-${contact.marketing_consent}`}>{contact.marketing_consent}</span></td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+  <div data-testid="contact-table">
+    <GridTheme>
+      <FilterTheme>
+        <div class="filter-wrap">
+          <FilterBar
+            fields={filterFields}
+            onchange={({ value }: { value: unknown }) => (filterRules = value)}
+          />
+        </div>
+        <div class="grid-wrap">
+          <Grid data={filtered} {columns} select init={initGrid} />
+        </div>
+      </FilterTheme>
+    </GridTheme>
+  </div>
 {/if}
 
 <style>
-  .consent-granted {
-    color: var(--state-available, #1d8a4e);
+  .filter-wrap {
+    margin-bottom: 0.5rem;
   }
-  .consent-withdrawn {
-    color: var(--state-closed, #8a1d2d);
+  .grid-wrap {
+    height: 480px;
+    overflow: hidden;
   }
 </style>

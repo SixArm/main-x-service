@@ -11,6 +11,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR DataGrid + Filter: new **/cases** index route: the case list in the SVAR DataGrid
+  with a FilterBar (client-side title filter); row selection opens
+  the detail route.
+
 - 2026-07-19 — Lily Design System: the hand-rolled locale `<select>` is replaced by the Lily
   **LocaleSelect** (wired to the i18n store; `applyDir` off), and
   the **Lily headless** component library is now a dependency

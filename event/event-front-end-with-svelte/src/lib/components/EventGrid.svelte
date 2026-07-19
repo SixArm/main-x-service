@@ -1,5 +1,5 @@
 <!--
-  EventGrid — tabular event list backed by the SVAR (wx-svelte-grid)
+  EventGrid — tabular event list backed by the SVAR (@svar-ui/svelte-grid)
   DataGrid. Maps each Event to a flat display row, and emits the original
   Event when a row is selected.
 
@@ -12,7 +12,12 @@
     - data ($derived): display rows recomputed whenever `events` changes.
 -->
 <script lang="ts">
-    import { Grid } from "wx-svelte-grid";
+    import { Grid, Willow as GridTheme } from "@svar-ui/svelte-grid";
+    import {
+        FilterBar,
+        Willow as FilterTheme,
+        createArrayFilter,
+    } from "@svar-ui/svelte-filter";
     import { t } from "$lib/i18n.svelte.js";
     import type { Event } from "$lib/api/types.js";
 
@@ -50,6 +55,29 @@
 
     // Grid init hook: subscribe to row selection and map the selected row id
     // back to the original Event before invoking the parent callback.
+
+    // FilterBar fields — the filterable columns (the opaque `id`
+    // column is excluded; uuids filter poorly). Text contains-match
+    // per field, labels reusing the translated column headers.
+    const filterFields = $derived(
+        columns
+            .filter((c) => c.id !== "id")
+            .map((c) => ({ id: c.id, label: c.header, type: "text" })),
+    );
+
+    // The FilterBar's current rule tree; null = show everything.
+    let filterRules = $state<unknown>(null);
+
+    // Rows surviving the filter: createArrayFilter compiles the rule
+    // tree into a transform over the flattened rows.
+    const filtered = $derived(
+        filterRules
+            ? createArrayFilter(
+                  filterRules as Parameters<typeof createArrayFilter>[0],
+              )(data)
+            : data,
+    );
+
     function initGrid(api: { on(action: string, cb: (ev: { id: string | number }) => void): void }) {
         api.on("select-row", (ev) => {
             const found = events.find((e) => e.id === String(ev.id));
@@ -58,11 +86,24 @@
     }
 </script>
 
-<div class="grid-wrap">
-    <Grid {data} {columns} select init={initGrid} />
-</div>
+<GridTheme>
+    <FilterTheme>
+        <div class="filter-wrap">
+            <FilterBar
+                fields={filterFields}
+                onchange={({ value }: { value: unknown }) => (filterRules = value)}
+            />
+        </div>
+        <div class="grid-wrap">
+            <Grid data={filtered} {columns} select init={initGrid} />
+        </div>
+    </FilterTheme>
+</GridTheme>
 
 <style>
+    .filter-wrap {
+        margin-bottom: 0.5rem;
+    }
     .grid-wrap {
         height: 480px;
         border: 1px solid var(--mxi-color-border);

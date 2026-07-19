@@ -12,6 +12,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR DataGrid + Filter: **@svar-ui/svelte-grid** and **@svar-ui/svelte-filter** are
+  installed per the family convention; the auth service exposes no
+  listable resource, so no grid route is mounted (deps ready for
+  when one lands).
+
 - 2026-07-19 — Lily Design System: the hand-rolled locale `<select>` is replaced by the Lily
   **LocaleSelect** (wired to the i18n store: `value={i18n.locale}`,
   `onChange → i18n.set`, `applyDir` off — the app keeps its own

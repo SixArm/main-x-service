@@ -41,6 +41,9 @@ export const LOCALE_KEY = "mxi.crm.locale";
 // Every translatable UI string, keyed by a stable dotted key.
 const STRINGS = {
   en: {
+    "contact.jobTitle": "Job title",
+    "account.tier": "Tier",
+    "account.industry": "Industry",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "Dashboard",
     "nav.contacts": "Contacts",
@@ -88,6 +91,9 @@ const STRINGS = {
     "article.search": "Search articles",
   },
   cy: {
+    "contact.jobTitle": "Teitl swydd",
+    "account.tier": "Haen",
+    "account.industry": "Diwydiant",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "Dangosfwrdd",
     "nav.contacts": "Cysylltiadau",
@@ -135,6 +141,9 @@ const STRINGS = {
     "article.search": "Chwilio erthyglau",
   },
   es: {
+    "contact.jobTitle": "Puesto",
+    "account.tier": "Nivel",
+    "account.industry": "Sector",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "Panel",
     "nav.contacts": "Contactos",
@@ -182,6 +191,9 @@ const STRINGS = {
     "article.search": "Buscar artículos",
   },
   fr: {
+    "contact.jobTitle": "Intitulé du poste",
+    "account.tier": "Niveau",
+    "account.industry": "Secteur",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "Tableau de bord",
     "nav.contacts": "Contacts",
@@ -229,6 +241,9 @@ const STRINGS = {
     "article.search": "Rechercher des articles",
   },
   de: {
+    "contact.jobTitle": "Stellenbezeichnung",
+    "account.tier": "Stufe",
+    "account.industry": "Branche",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "Übersicht",
     "nav.contacts": "Kontakte",
@@ -276,6 +291,9 @@ const STRINGS = {
     "article.search": "Artikel suchen",
   },
   ar: {
+    "contact.jobTitle": "المسمى الوظيفي",
+    "account.tier": "الفئة",
+    "account.industry": "القطاع",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "لوحة التحكم",
     "nav.contacts": "جهات الاتصال",
@@ -323,6 +341,9 @@ const STRINGS = {
     "article.search": "بحث المقالات",
   },
   ru: {
+    "contact.jobTitle": "Должность",
+    "account.tier": "Уровень",
+    "account.industry": "Отрасль",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "Панель",
     "nav.contacts": "Контакты",
@@ -370,6 +391,9 @@ const STRINGS = {
     "article.search": "Поиск статей",
   },
   hi: {
+    "contact.jobTitle": "पद",
+    "account.tier": "स्तर",
+    "account.industry": "उद्योग",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "डैशबोर्ड",
     "nav.contacts": "संपर्क",
@@ -417,6 +441,9 @@ const STRINGS = {
     "article.search": "लेख खोजें",
   },
   zh: {
+    "contact.jobTitle": "职位",
+    "account.tier": "层级",
+    "account.industry": "行业",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "仪表盘",
     "nav.contacts": "联系人",
@@ -464,6 +491,9 @@ const STRINGS = {
     "article.search": "搜索文章",
   },
   bn: {
+    "contact.jobTitle": "পদবি",
+    "account.tier": "স্তর",
+    "account.industry": "শিল্প",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "ড্যাশবোর্ড",
     "nav.contacts": "পরিচিতি",
@@ -511,6 +541,9 @@ const STRINGS = {
     "article.search": "নিবন্ধ খুঁজুন",
   },
   pt: {
+    "contact.jobTitle": "Cargo",
+    "account.tier": "Nível",
+    "account.industry": "Setor",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "Painel",
     "nav.contacts": "Contatos",
@@ -558,6 +591,9 @@ const STRINGS = {
     "article.search": "Pesquisar artigos",
   },
   id: {
+    "contact.jobTitle": "Jabatan",
+    "account.tier": "Tingkat",
+    "account.industry": "Industri",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "Dasbor",
     "nav.contacts": "Kontak",
@@ -605,6 +641,9 @@ const STRINGS = {
     "article.search": "Cari artikel",
   },
   ur: {
+    "contact.jobTitle": "عہدہ",
+    "account.tier": "درجہ",
+    "account.industry": "صنعت",
     "brand.name": "Main X · CRM",
     "nav.dashboard": "ڈیش بورڈ",
     "nav.contacts": "رابطے",

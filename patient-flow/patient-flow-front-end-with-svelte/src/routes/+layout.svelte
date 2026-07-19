@@ -49,6 +49,7 @@
 {#if !kiosk}
   <nav class="top">
     <a class="brand" href="/">Patient Flow</a>
+    <a href="/wards">Wards</a>
     <a href="/at-a-glance">At a glance</a>
     <a href="/bed-requests">Bed requests</a>
     <a href="/locate">Locate</a>

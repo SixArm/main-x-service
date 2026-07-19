@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-19 — SVAR DataGrid + Filter: the **/employees** index upgrades from a plain table to the SVAR
+  DataGrid with a FilterBar (number / name / title / department /
+  status); masked salaries still render the translated Hidden token;
+  row selection opens the profile.
+
 - 2026-07-19 — Lily Design System: the Lily Design System lands in the chrome: the hand-rolled
   locale `<select>` is replaced by **LocaleSelect** (wired to the
   i18n store; `applyDir` off), a **ThemeSelect** offers the full

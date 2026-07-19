@@ -17,11 +17,11 @@
     "lint": "prettier --check src"
   },
   "dependencies": {
+    "@svar-ui/svelte-filter": "^2.6.0",
+    "@svar-ui/svelte-grid": "^2.7.1",
     "lily-design-system-svelte-headless": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless",
     "lily-design-system-svelte-locale-select": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-select",
-    "lily-design-system-svelte-theme-select": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select",
-    "wx-svelte-core": "^2.5.3",
-    "wx-svelte-grid": "^2.6.2"
+    "lily-design-system-svelte-theme-select": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

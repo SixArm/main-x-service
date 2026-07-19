@@ -11,6 +11,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR DataGrid + Filter: new **/organizations** index route: the organization list in the
+  SVAR DataGrid (**@svar-ui/svelte-grid**) with a
+  **@svar-ui/svelte-filter** FilterBar (client-side name filter);
+  row selection opens the detail route.
+
 - 2026-07-19 — Lily Design System: the hand-rolled locale `<select>` is replaced by the Lily
   **LocaleSelect** (wired to the i18n store; `applyDir` off), and
   the **Lily headless** component library is now a dependency

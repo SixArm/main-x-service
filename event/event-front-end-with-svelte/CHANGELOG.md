@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- 2026-07-19 — SVAR DataGrid + Filter: the events index grid migrates from `wx-svelte-grid` to
+  **@svar-ui/svelte-grid**, with a **@svar-ui/svelte-filter**
+  FilterBar above it (client-side filtering). Legacy `wx-svelte-*`
+  deps removed.
+
 ### Changed
 
 - **De-versioned API URLs.** Dropped the `/api/v1` segment from every client/proxy/test path (now `/api/…`); the BFF proxy negotiates the API version via the `Accepts-version: 1.0` request header instead (see `agents/share/api-versioning.md`).

@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- 2026-07-19 — SVAR DataGrid + Filter: the courses index grid migrates from `wx-svelte-grid` to
+  **@svar-ui/svelte-grid**, with a **@svar-ui/svelte-filter**
+  FilterBar above it (client-side filtering). Legacy `wx-svelte-*`
+  deps removed.
+
 ### Documentation
 
 - **Harmonization pass: propagated the v0.2.0 phonetic-search removal

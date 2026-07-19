@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-19 — SVAR DataGrid + Filter: new **/wards** index route (linked in the nav): the ward estate in
+  the SVAR DataGrid (**@svar-ui/svelte-grid**) with a
+  **@svar-ui/svelte-filter** FilterBar (code / ward / kind /
+  specialty); row selection opens the ward's whiteboard.
+
 - 2026-07-19 — Lily Design System: the Lily Design System lands in the chrome (non-kiosk nav only):
   a **ThemeSelect** with the full 45-theme catalogue incl. the NHS
   design-system themes (stylesheets via the `static/assets/themes`

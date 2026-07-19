@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-19 — SVAR DataGrid + Filter: SVAR index routes: **/contacts** and **/leads** and **/tickets**
+  upgrade from plain tables to the SVAR DataGrid with FilterBars
+  (the lead score breakdown and ticket status actions move to a
+  selection panel under each grid; the breach banner keeps its
+  testid), and a new **/accounts** index route (name / tier /
+  industry) joins the nav.
+
 - 2026-07-19 — Lily Design System: the Lily Design System lands in the chrome: the hand-rolled
   locale `<select>` is replaced by **LocaleSelect** (wired to the
   i18n store; `applyDir` off), a **ThemeSelect** offers the full

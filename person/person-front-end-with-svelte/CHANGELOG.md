@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- 2026-07-19 — SVAR DataGrid + Filter: the persons index grid migrates from `wx-svelte-grid` to
+  **@svar-ui/svelte-grid**, and a **@svar-ui/svelte-filter**
+  FilterBar now sits above it (client-side contains-filtering over
+  the flattened rows, every column except the opaque id). The
+  legacy `wx-svelte-*` deps are removed.
+
 ### Fixed
 
 - Prettier formatting drift across `src/` (left behind by recent

@@ -1,11 +1,20 @@
 <!--
-  Work-item list route (`/[collection]`).
+  Work-item index route (`/[collection]` — /portfolios, /projects,
+  /products, /programs).
 
-  Purpose: fetch and render the collection's work-item refs as links, with
-  a name-search box.
+  Purpose: fetch the collection's work-item refs and render them in the
+  SVAR DataGrid with a SVAR FilterBar above it (client-side filtering
+  over the loaded rows). Row selection navigates to the detail route.
 -->
 <script lang="ts">
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
+  import { Grid, Willow as GridTheme } from "@svar-ui/svelte-grid";
+  import {
+    FilterBar,
+    Willow as FilterTheme,
+    createArrayFilter,
+  } from "@svar-ui/svelte-filter";
   import { WorkItemRepository } from "$lib/api/work-items";
   import type { WorkItemRef } from "$lib/api/types";
   import { t } from "$lib/i18n.svelte";
@@ -18,8 +27,6 @@
   let items = $state<WorkItemRef[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let query = $state("");
-  let searching = $state(false);
 
   onMount(async () => {
     try {
@@ -31,17 +38,33 @@
     }
   });
 
-  async function runSearch(event: SubmitEvent) {
-    event.preventDefault();
-    error = null;
-    searching = true;
-    try {
-      items = query.trim().length > 0 ? await repo.search(query.trim()) : await repo.list();
-    } catch (err) {
-      error = err instanceof Error ? err.message : t("list.loadFailed");
-    } finally {
-      searching = false;
-    }
+  // The list endpoint returns lightweight `{pid, name}` refs, so the
+  // grid carries those two columns; `pid` stays a technical literal.
+  const columns = $derived([
+    { id: "name", header: t("form.title"), flexgrow: 1 },
+    { id: "pid", header: "pid", width: 300 },
+  ]);
+
+  const rows = $derived(items.map((r) => ({ id: r.pid, name: r.name, pid: r.pid })));
+
+  // FilterBar over the name column (contains-match, client-side).
+  const filterFields = $derived([
+    { id: "name", label: t("form.title"), type: "text" },
+  ]);
+  let filterRules = $state<unknown>(null);
+  const filtered = $derived(
+    filterRules
+      ? createArrayFilter(filterRules as Parameters<typeof createArrayFilter>[0])(rows)
+      : rows,
+  );
+
+  // Row selection navigates to the work-item detail route.
+  function initGrid(api: {
+    on(action: string, cb: (ev: { id: string | number }) => void): void;
+  }) {
+    api.on("select-row", (ev) => {
+      void goto(`/${collection}/${ev.id}`);
+    });
   }
 </script>
 
@@ -50,11 +73,6 @@
 <h1>{t("list.title")} — {collection}</h1>
 <p><a class="button" href={`/${collection}/new`}>{t("list.new")}</a></p>
 
-<form class="row" onsubmit={runSearch}>
-  <input type="search" bind:value={query} placeholder={t("list.title")} aria-label={t("list.title")} />
-  <button class="button" type="submit" disabled={searching}>{t("detail.checkDuplicates")}</button>
-</form>
-
 {#if loading}
   <p>{t("list.loading")}</p>
 {:else if error}
@@ -62,12 +80,27 @@
 {:else if items.length === 0}
   <p class="surface">{t("list.empty")} <a href={`/${collection}/new`}>{t("list.createOne")}</a>.</p>
 {:else}
-  <ul class="stack">
-    {#each items as record (record.pid)}
-      <li class="surface row">
-        <a href={`/${collection}/${record.pid}`}>{record.name}</a>
-        <code>{record.pid}</code>
-      </li>
-    {/each}
-  </ul>
+  <GridTheme>
+    <FilterTheme>
+      <div class="filter-wrap">
+        <FilterBar
+          fields={filterFields}
+          onchange={({ value }: { value: unknown }) => (filterRules = value)}
+        />
+      </div>
+      <div class="grid-wrap">
+        <Grid data={filtered} {columns} select init={initGrid} />
+      </div>
+    </FilterTheme>
+  </GridTheme>
 {/if}
+
+<style>
+  .filter-wrap {
+    margin-bottom: 0.5rem;
+  }
+  .grid-wrap {
+    height: 480px;
+    overflow: hidden;
+  }
+</style>

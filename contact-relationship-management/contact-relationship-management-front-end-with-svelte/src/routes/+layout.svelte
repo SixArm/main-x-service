@@ -38,6 +38,7 @@
 <nav class="top">
   <a class="brand" href="/">{t("brand.name")}</a>
   <a href="/contacts">{t("nav.contacts")}</a>
+  <a href="/accounts">{t("nav.accounts")}</a>
   <a href="/leads">{t("nav.leads")}</a>
   <a href="/deals">{t("nav.deals")}</a>
   <a href="/campaigns">{t("nav.campaigns")}</a>
