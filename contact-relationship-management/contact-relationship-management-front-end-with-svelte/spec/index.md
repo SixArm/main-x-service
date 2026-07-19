@@ -44,6 +44,13 @@ project-portfolio-management front-end's Kanban board, i18n, and
   Playwright over `page.route` stubs mirroring the service contract
   (unstubbed = 404-loud).
 
+- **Lily Design System** (2026-07-19): the chrome uses the Lily
+  **ThemeSelect** (45-theme catalogue incl. the NHS design-system
+  themes; stylesheets via the `static/assets/themes` symlink; choice
+  persisted to `mxi.crm.theme`) and **LocaleSelect** (wired to the i18n
+  store, `applyDir` off — the app's own effect owns `lang`/`dir`);
+  the **Lily headless** primitives are available as a dependency.
+
 ## Delivery
 
 CRM-T17/T18 **delivered 2026-07-18** — see

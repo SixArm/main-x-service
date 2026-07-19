@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-19 — Lily Design System: the Lily Design System lands in the chrome (non-kiosk nav only):
+  a **ThemeSelect** with the full 45-theme catalogue incl. the NHS
+  design-system themes (stylesheets via the `static/assets/themes`
+  symlink; persisted to `mxi.patient-flow.theme`), a standalone
+  **LocaleSelect** owning `lang`/`dir` (RTL for ar/ur; persisted to
+  `mxi.patient-flow.locale`; the i18n-ready seam — no translation
+  catalogue yet), and the **Lily headless** component library as a
+  dependency.
+
 - 2026-07-18 — PF-T17/PF-T18 follow-through: the whiteboard poll is
   now an **ETag conditional GET** (`If-None-Match`; a `304` keeps the
   current render — an idle wall screen costs no body bandwidth; the

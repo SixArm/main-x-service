@@ -22,6 +22,7 @@
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
     import { ThemeSelect } from "lily-design-system-svelte-theme-select";
+    import { LocaleSelect } from "lily-design-system-svelte-locale-select";
 
     // Lily theme catalogue offered in the theme select (incl.
     // NHS England/Scotland/Wales patient & practitioner themes). Each slug
@@ -87,12 +88,6 @@
         { href: "/signin", key: "nav.signin" },
         { href: "/signup", key: "nav.signup" },
     ];
-
-    // Locale <select> handler: push the chosen value into the i18n store,
-    // which persists it and re-renders every translated string.
-    function onLocaleChange(event: Event) {
-        i18n.set((event.currentTarget as HTMLSelectElement).value);
-    }
 </script>
 
 <div class="layout">
@@ -133,15 +128,14 @@
                 />
                 <label class="locale">
                     <span>{t("nav.locale")}</span>
-                    <select
-                        aria-label={t("nav.locale")}
+                    <LocaleSelect
+                        label={t("nav.locale")}
+                        locales={[...i18n.locales]}
+                        localeLabels={LOCALE_LABELS}
                         value={i18n.locale}
-                        onchange={onLocaleChange}
-                    >
-                        {#each i18n.locales as locale (locale)}
-                            <option value={locale}>{LOCALE_LABELS[locale]}</option>
-                        {/each}
-                    </select>
+                        applyDir={false}
+                        onChange={(code) => i18n.set(code)}
+                    />
                 </label>
                 <!-- Signed-in badge: shown only when a session is present
                      (resolved server-side from the httpOnly cookie). -->
@@ -269,7 +263,7 @@
         gap: 0.4rem;
         font-size: 0.85rem;
     }
-    .locale select {
+    .locale :global(select) {
         padding: 0.3rem 0.4rem;
         border-radius: var(--mxi-radius);
         border: 1px solid var(--mxi-color-border);

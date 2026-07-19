@@ -123,8 +123,8 @@ test("locale switcher retranslates the chrome (and ar flips direction)", async (
 }) => {
   await page.goto("/employees");
   await expect(page.locator("nav.top")).toContainText("Employees");
-  await page.locator("nav.top select").selectOption("de");
+  await page.locator("nav.top select.locale-select").selectOption("de");
   await expect(page.locator("nav.top")).toContainText("Mitarbeiter");
-  await page.locator("nav.top select").selectOption("ar");
+  await page.locator("nav.top select.locale-select").selectOption("ar");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
 });

@@ -7,6 +7,16 @@ settings:
 importers:
 
   .:
+    dependencies:
+      lily-design-system-svelte-headless:
+        specifier: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless
+        version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless
+      lily-design-system-svelte-locale-select:
+        specifier: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-select
+        version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-select(svelte@5.56.6)
+      lily-design-system-svelte-theme-select:
+        specifier: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select
+        version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select(svelte@5.56.6)
     devDependencies:
       '@playwright/test':
         specifier: ^1.49.0
@@ -721,6 +731,19 @@ packages:
   kleur@4.1.5:
     resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
     engines: {node: '>=6'}
+
+  lily-design-system-svelte-headless@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless:
+    resolution: {directory: ../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless, type: directory}
+
+  lily-design-system-svelte-locale-select@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-select:
+    resolution: {directory: ../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-select, type: directory}
+    peerDependencies:
+      svelte: ^5.0.0
+
+  lily-design-system-svelte-theme-select@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select:
+    resolution: {directory: ../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select, type: directory}
+    peerDependencies:
+      svelte: ^5.0.0
 
   locate-character@3.0.0:
     resolution: {integrity: sha512-SW13ws7BjaeJ6p7Q6CO2nchbYEc3X3J6WrmTTDto7yMPqVSZTUyY5Tjbid+Ab8gLnATtygYtiDIJGQRRn2ZOiA==}
@@ -1588,6 +1611,18 @@ snapshots:
       - utf-8-validate
 
   kleur@4.1.5: {}
+
+  lily-design-system-svelte-headless@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless:
+    dependencies:
+      aria-query: 5.3.1
+
+  lily-design-system-svelte-locale-select@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-select(svelte@5.56.6):
+    dependencies:
+      svelte: 5.56.6
+
+  lily-design-system-svelte-theme-select@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select(svelte@5.56.6):
+    dependencies:
+      svelte: 5.56.6
 
   locate-character@3.0.0: {}
 

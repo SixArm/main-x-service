@@ -20,6 +20,7 @@
     import type { LayoutData } from "./$types";
     import { i18n, t, LOCALE_LABELS, isRtl } from "$lib/i18n.svelte";
     import { ThemeSelect } from "lily-design-system-svelte-theme-select";
+    import { LocaleSelect } from "lily-design-system-svelte-locale-select";
 
     // Lily theme catalogue offered in the theme select (incl.
     // NHS England/Scotland/Wales patient & practitioner themes). Each slug
@@ -119,20 +120,19 @@
                 themeLabels={THEME_LABELS}
                 storageKey="lily-theme"
             />
-            <!-- Locale switcher: native <select>, no design-system dep. The
-                 i18n store is the single source of truth; this just calls
-                 i18n.set and reflects value={i18n.locale}. -->
+            <!-- Locale switcher: the Lily LocaleSelect. The i18n store
+                 stays the single source of truth; the select reflects
+                 value={i18n.locale} and writes back via onChange. -->
             <label class="locale">
                 <span class="locale-label">{t("chrome.language")}</span>
-                <select
-                    aria-label={t("chrome.language")}
+                <LocaleSelect
+                    label={t("chrome.language")}
+                    locales={[...i18n.locales]}
+                    localeLabels={LOCALE_LABELS}
                     value={i18n.locale}
-                    onchange={(e) => i18n.set((e.currentTarget as HTMLSelectElement).value)}
-                >
-                    {#each i18n.locales as code (code)}
-                        <option value={code}>{LOCALE_LABELS[code]}</option>
-                    {/each}
-                </select>
+                    applyDir={false}
+                    onChange={(code) => i18n.set(code)}
+                />
             </label>
             <!--
                 Session panel. `data.signedIn` is server-resolved from the
@@ -262,7 +262,7 @@
         letter-spacing: 0.04em;
         color: var(--mxi-color-muted, #666);
     }
-    .locale select {
+    .locale :global(select) {
         font: inherit;
         padding: 0.35rem 0.5rem;
         border-radius: 6px;

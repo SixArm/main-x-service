@@ -125,8 +125,8 @@ test("ticket queue flags breaches; locale switch retranslates + flips RTL", asyn
   await page.goto("/tickets");
   await expect(page.getByTestId("breached")).toBeVisible();
   await expect(page.locator("nav.top")).toContainText("Tickets");
-  await page.locator("nav.top select").selectOption("de");
+  await page.locator("nav.top select.locale-select").selectOption("de");
   await expect(page.locator("nav.top")).toContainText("Kontakte");
-  await page.locator("nav.top select").selectOption("ar");
+  await page.locator("nav.top select.locale-select").selectOption("ar");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
 });

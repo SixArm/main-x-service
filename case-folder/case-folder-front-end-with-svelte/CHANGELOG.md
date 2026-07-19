@@ -10,6 +10,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- 2026-07-19 — Lily Design System: the **Lily headless** component library is now a dependency,
+  completing the Lily trio (ThemeSelect and LocaleSelect were
+  already wired in the chrome).
+
 ### Fixed
 
 - `pnpm lint` (`eslint .`) failed on two intentionally-unused

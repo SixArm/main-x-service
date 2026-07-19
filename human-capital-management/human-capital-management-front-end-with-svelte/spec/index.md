@@ -42,6 +42,13 @@ and `money()` are the closest source). BFF auth per
   map); Playwright against `vite preview` with `page.route` stubs
   mirroring the service contract (unstubbed calls 404 loudly).
 
+- **Lily Design System** (2026-07-19): the chrome uses the Lily
+  **ThemeSelect** (45-theme catalogue incl. the NHS design-system
+  themes; stylesheets via the `static/assets/themes` symlink; choice
+  persisted to `mxi.hcm.theme`) and **LocaleSelect** (wired to the i18n
+  store, `applyDir` off — the app's own effect owns `lang`/`dir`);
+  the **Lily headless** primitives are available as a dependency.
+
 ## Delivery
 
 HCM-T18/T19 **delivered 2026-07-18** — see

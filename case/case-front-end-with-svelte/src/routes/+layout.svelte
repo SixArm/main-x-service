@@ -23,6 +23,7 @@
   import type { LayoutData } from "./$types";
   import { i18n, t, isRtl, LOCALE_LABELS, type StringKey } from "$lib/i18n.svelte";
   import { ThemeSelect } from "lily-design-system-svelte-theme-select";
+    import { LocaleSelect } from "lily-design-system-svelte-locale-select";
 
   // Lily theme catalogue offered in the theme select (incl.
   // NHS England/Scotland/Wales patient & practitioner themes). Each slug
@@ -89,12 +90,6 @@
     { href: "/new", key: "nav.newCase" },
   ];
 
-  // Locale <select> handler: push the chosen value into the i18n store,
-  // which persists it and re-renders every translated string.
-  function onLocaleChange(event: Event) {
-    i18n.set((event.currentTarget as HTMLSelectElement).value);
-  }
-
   // Reactive: tracks the server-resolved session presence.
   const signedIn = $derived(data.signedIn);
 </script>
@@ -137,11 +132,14 @@
         />
         <label class="locale">
           <span class="small muted">{t("chrome.language")}</span>
-          <select aria-label={t("chrome.language")} value={i18n.locale} onchange={onLocaleChange}>
-            {#each i18n.locales as locale (locale)}
-              <option value={locale}>{LOCALE_LABELS[locale]}</option>
-            {/each}
-          </select>
+          <LocaleSelect
+            label={t("chrome.language")}
+            locales={[...i18n.locales]}
+            localeLabels={LOCALE_LABELS}
+            value={i18n.locale}
+            applyDir={false}
+            onChange={(code) => i18n.set(code)}
+          />
         </label>
       </div>
 
@@ -283,7 +281,7 @@
     flex-direction: column;
     gap: 0.4rem;
   }
-  .locale select {
+  .locale :global(select) {
     padding: 0.3rem 0.4rem;
     border-radius: var(--mxi-radius);
     border: 1px solid var(--mxi-color-border);

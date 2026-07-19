@@ -12,6 +12,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — Lily Design System: the hand-rolled locale `<select>` is replaced by the Lily
+  **LocaleSelect** (wired to the i18n store: `value={i18n.locale}`,
+  `onChange → i18n.set`, `applyDir` off — the app keeps its own
+  `lang`/`dir` effect), and the **Lily headless** component library
+  is now a dependency alongside the existing ThemeSelect.
+
 - **Operator UI for ABAC attribute assignment** (`/admin/attributes`).
   Pick a user by pid, view their ABAC subject attributes, edit the JSON
   map, and Save (PUT) — all through the BFF (`src/lib/server/admin.ts`

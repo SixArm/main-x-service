@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-19 — Lily Design System: the Lily Design System lands in the chrome: the hand-rolled
+  locale `<select>` is replaced by **LocaleSelect** (wired to the
+  i18n store; `applyDir` off), a **ThemeSelect** offers the full
+  45-theme catalogue (stylesheets via the `static/assets/themes`
+  symlink; choice persisted to `mxi.crm.theme`), and the **Lily
+  headless** component library is a dependency.
+
 - 2026-07-18 — CRM-T17/T18 implementation round: SvelteKit 2 +
   Svelte 5 runes SPA with same-origin BFF proxy, 13-locale i18n
   (45 keys, parity-tested, RTL ar/ur), typed API client + honest

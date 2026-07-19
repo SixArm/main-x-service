@@ -11,6 +11,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — Lily Design System: the hand-rolled locale `<select>` is replaced by the Lily
+  **LocaleSelect** (wired to the i18n store; `applyDir` off), and
+  the **Lily headless** component library is now a dependency
+  alongside the existing ThemeSelect.
+
 - 2026-07-18 — **13-locale i18n for the PPM views** (closing the
   English-first follow-up from the catalogue-views round): 98 new
   `ppm.*` keys — nav entries, view titles, table headers, buttons,
