@@ -90,6 +90,8 @@ export const LOCALE_KEY = "mxi.course.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.calendar": "Calendar",
+    "nav.board": "Board",
     // Layout / chrome
     "brand.name": "Course",
     "brand.tagline": "Main X Index",
@@ -265,6 +267,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "Primary identifier",
   },
   cy: {
+    "nav.calendar": "Calendr",
+    "nav.board": "Bwrdd",
     "brand.name": "Cwrs",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Toglo'r llywio",
@@ -426,6 +430,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "Prif ddynodydd",
   },
   es: {
+    "nav.calendar": "Calendario",
+    "nav.board": "Tablero",
     "brand.name": "Curso",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alternar navegación",
@@ -587,6 +593,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "Identificador principal",
   },
   fr: {
+    "nav.calendar": "Calendrier",
+    "nav.board": "Tableau",
     "brand.name": "Cours",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Basculer la navigation",
@@ -748,6 +756,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "Identifiant principal",
   },
   de: {
+    "nav.calendar": "Kalender",
+    "nav.board": "Board",
     "brand.name": "Kurs",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Navigation umschalten",
@@ -909,6 +919,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "Primärer Bezeichner",
   },
   ar: {
+    "nav.calendar": "التقويم",
+    "nav.board": "اللوحة",
     "brand.name": "دورة",
     "brand.tagline": "Main X Index",
     "nav.toggle": "تبديل التنقل",
@@ -1069,6 +1081,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "المعرف الأساسي",
   },
   ru: {
+    "nav.calendar": "Календарь",
+    "nav.board": "Доска",
     "brand.name": "Курс",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Переключить навигацию",
@@ -1229,6 +1243,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "Основной идентификатор",
   },
   hi: {
+    "nav.calendar": "कैलेंडर",
+    "nav.board": "बोर्ड",
     "brand.name": "पाठ्यक्रम",
     "brand.tagline": "Main X Index",
     "nav.toggle": "नेविगेशन टॉगल करें",
@@ -1390,6 +1406,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "प्राथमिक पहचानकर्ता",
   },
   zh: {
+    "nav.calendar": "日历",
+    "nav.board": "看板",
     "brand.name": "课程",
     "brand.tagline": "Main X Index",
     "nav.toggle": "切换导航",
@@ -1547,6 +1565,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "主标识符",
   },
   bn: {
+    "nav.calendar": "ক্যালেন্ডার",
+    "nav.board": "বোর্ড",
     "brand.name": "কোর্স",
     "brand.tagline": "Main X Index",
     "nav.toggle": "নেভিগেশন টগল করুন",
@@ -1708,6 +1728,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "প্রাথমিক শনাক্তকারী",
   },
   pt: {
+    "nav.calendar": "Calendário",
+    "nav.board": "Quadro",
     "brand.name": "Curso",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alternar navegação",
@@ -1869,6 +1891,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "Identificador principal",
   },
   id: {
+    "nav.calendar": "Kalender",
+    "nav.board": "Papan",
     "brand.name": "Kursus",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alihkan navigasi",
@@ -2030,6 +2054,8 @@ const STRINGS = {
     "grid.primaryIdentifier": "Pengenal utama",
   },
   ur: {
+    "nav.calendar": "کیلنڈر",
+    "nav.board": "بورڈ",
     "brand.name": "کورس",
     "brand.tagline": "Main X Index",
     "nav.toggle": "نیویگیشن ٹوگل کریں",

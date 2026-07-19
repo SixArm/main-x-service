@@ -11,6 +11,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR moderate fit: new **/calendar** route (nav-linked): every course instance's
+  schedule window as an all-day span plus its concrete sessions as
+  timed events in the SVAR Calendar (read-only; courses via search,
+  instances fanned in per course); selecting an entry opens the
+  course. And a new **/board** route: courses as SVAR Kanban cards
+  by lifecycle status (draft / published / archived / retired) —
+  drag writes the status via the full-record PUT and reloads.
+  +nav.calendar/nav.board x 13 locales, and a new
+  `listInstances(id)` client method.
+
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
   **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
   **@svar-ui/svelte-filemanager** are installed (no routes yet —

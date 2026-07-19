@@ -107,6 +107,8 @@
         { href: "/courses/new", labelKey: "nav.newCourse" },
         { href: "/courses/match", labelKey: "nav.matchCheck" },
         { href: "/courses/merge", labelKey: "nav.merge" },
+        { href: "/calendar", labelKey: "nav.calendar" },
+        { href: "/board", labelKey: "nav.board" },
     ];
 </script>
 

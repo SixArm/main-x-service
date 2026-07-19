@@ -81,6 +81,9 @@ const LOCALE_KEY = "mxi.worker.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.expiry": "Expiries",
+    "nav.review": "Review",
+    "review.run": "Run scan",
     // Layout / chrome
     "brand.name": "Worker",
     "brand.tagline": "Main X Index",
@@ -229,6 +232,9 @@ const STRINGS = {
     "grid.no": "no",
   },
   cy: {
+    "nav.expiry": "Dyddiadau dod i ben",
+    "nav.review": "Adolygu",
+    "review.run": "Rhedeg sgan",
     "brand.name": "Gweithiwr",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Toglo'r llywio",
@@ -362,6 +368,9 @@ const STRINGS = {
     "grid.no": "nac ydy",
   },
   es: {
+    "nav.expiry": "Vencimientos",
+    "nav.review": "Revisión",
+    "review.run": "Ejecutar análisis",
     "brand.name": "Trabajador",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alternar navegación",
@@ -495,6 +504,9 @@ const STRINGS = {
     "grid.no": "no",
   },
   fr: {
+    "nav.expiry": "Échéances",
+    "nav.review": "Révision",
+    "review.run": "Lancer l'analyse",
     "brand.name": "Travailleur",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Basculer la navigation",
@@ -629,6 +641,9 @@ const STRINGS = {
     "grid.no": "non",
   },
   de: {
+    "nav.expiry": "Abläufe",
+    "nav.review": "Überprüfung",
+    "review.run": "Scan starten",
     "brand.name": "Mitarbeiter",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Navigation umschalten",
@@ -763,6 +778,9 @@ const STRINGS = {
     "grid.no": "nein",
   },
   ar: {
+    "nav.expiry": "انتهاء الصلاحية",
+    "nav.review": "المراجعة",
+    "review.run": "تشغيل الفحص",
     "brand.name": "العامل",
     "brand.tagline": "Main X Index",
     "nav.toggle": "تبديل التنقل",
@@ -895,6 +913,9 @@ const STRINGS = {
     "grid.no": "لا",
   },
   ru: {
+    "nav.expiry": "Сроки действия",
+    "nav.review": "Проверка",
+    "review.run": "Запустить проверку",
     "brand.name": "Работник",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Переключить навигацию",
@@ -1027,6 +1048,9 @@ const STRINGS = {
     "grid.no": "нет",
   },
   hi: {
+    "nav.expiry": "समाप्ति",
+    "nav.review": "समीक्षा",
+    "review.run": "स्कैन चलाएं",
     "brand.name": "कर्मचारी",
     "brand.tagline": "Main X Index",
     "nav.toggle": "नेविगेशन टॉगल करें",
@@ -1160,6 +1184,9 @@ const STRINGS = {
     "grid.no": "नहीं",
   },
   zh: {
+    "nav.expiry": "到期",
+    "nav.review": "审核",
+    "review.run": "运行扫描",
     "brand.name": "员工",
     "brand.tagline": "Main X Index",
     "nav.toggle": "切换导航",
@@ -1291,6 +1318,9 @@ const STRINGS = {
     "grid.no": "否",
   },
   bn: {
+    "nav.expiry": "মেয়াদোত্তীর্ণ",
+    "nav.review": "পর্যালোচনা",
+    "review.run": "স্ক্যান চালান",
     "brand.name": "কর্মী",
     "brand.tagline": "Main X Index",
     "nav.toggle": "নেভিগেশন টগল করুন",
@@ -1424,6 +1454,9 @@ const STRINGS = {
     "grid.no": "না",
   },
   pt: {
+    "nav.expiry": "Vencimentos",
+    "nav.review": "Revisão",
+    "review.run": "Executar varredura",
     "brand.name": "Trabalhador",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alternar navegação",
@@ -1557,6 +1590,9 @@ const STRINGS = {
     "grid.no": "não",
   },
   id: {
+    "nav.expiry": "Kedaluwarsa",
+    "nav.review": "Tinjauan",
+    "review.run": "Jalankan pemindaian",
     "brand.name": "Pekerja",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alihkan navigasi",
@@ -1690,6 +1726,9 @@ const STRINGS = {
     "grid.no": "tidak",
   },
   ur: {
+    "nav.expiry": "میعاد ختم",
+    "nav.review": "جائزہ",
+    "review.run": "اسکین چلائیں",
     "brand.name": "کارکن",
     "brand.tagline": "Main X Index",
     "nav.toggle": "نیویگیشن ٹوگل کریں",

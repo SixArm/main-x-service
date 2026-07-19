@@ -80,6 +80,8 @@ const LOCALE_KEY = "mxi.place.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.review": "Review",
+    "review.run": "Run scan",
     // Layout / chrome
     "brand.tagline": "Main X Index",
     "nav.toggle": "Toggle navigation",
@@ -241,6 +243,8 @@ const STRINGS = {
     "session.signOut": "Sign out",
   },
   cy: {
+    "nav.review": "Adolygu",
+    "review.run": "Rhedeg sgan",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Toglo'r llywio",
     "nav.dashboard": "Dangosfwrdd",
@@ -386,6 +390,8 @@ const STRINGS = {
     "session.signOut": "Allgofnodi",
   },
   es: {
+    "nav.review": "Revisión",
+    "review.run": "Ejecutar análisis",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alternar navegación",
     "nav.dashboard": "Panel",
@@ -531,6 +537,8 @@ const STRINGS = {
     "session.signOut": "Cerrar sesión",
   },
   fr: {
+    "nav.review": "Révision",
+    "review.run": "Lancer l'analyse",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Basculer la navigation",
     "nav.dashboard": "Tableau de bord",
@@ -676,6 +684,8 @@ const STRINGS = {
     "session.signOut": "Se déconnecter",
   },
   de: {
+    "nav.review": "Überprüfung",
+    "review.run": "Scan starten",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Navigation umschalten",
     "nav.dashboard": "Übersicht",
@@ -822,6 +832,8 @@ const STRINGS = {
     "session.signOut": "Abmelden",
   },
   ar: {
+    "nav.review": "المراجعة",
+    "review.run": "تشغيل الفحص",
     "brand.tagline": "Main X Index",
     "nav.toggle": "تبديل التنقل",
     "nav.dashboard": "لوحة المعلومات",
@@ -967,6 +979,8 @@ const STRINGS = {
     "session.signOut": "تسجيل الخروج",
   },
   ru: {
+    "nav.review": "Проверка",
+    "review.run": "Запустить проверку",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Переключить навигацию",
     "nav.dashboard": "Панель",
@@ -1113,6 +1127,8 @@ const STRINGS = {
     "session.signOut": "Выйти",
   },
   hi: {
+    "nav.review": "समीक्षा",
+    "review.run": "स्कैन चलाएं",
     "brand.tagline": "Main X Index",
     "nav.toggle": "नेविगेशन टॉगल करें",
     "nav.dashboard": "डैशबोर्ड",
@@ -1258,6 +1274,8 @@ const STRINGS = {
     "session.signOut": "साइन आउट करें",
   },
   zh: {
+    "nav.review": "审核",
+    "review.run": "运行扫描",
     "brand.tagline": "Main X Index",
     "nav.toggle": "切换导航",
     "nav.dashboard": "仪表板",
@@ -1401,6 +1419,8 @@ const STRINGS = {
     "session.signOut": "退出登录",
   },
   bn: {
+    "nav.review": "পর্যালোচনা",
+    "review.run": "স্ক্যান চালান",
     "brand.tagline": "Main X Index",
     "nav.toggle": "নেভিগেশন টগল করুন",
     "nav.dashboard": "ড্যাশবোর্ড",
@@ -1546,6 +1566,8 @@ const STRINGS = {
     "session.signOut": "সাইন আউট",
   },
   pt: {
+    "nav.review": "Revisão",
+    "review.run": "Executar varredura",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alternar navegação",
     "nav.dashboard": "Painel",
@@ -1692,6 +1714,8 @@ const STRINGS = {
     "session.signOut": "Terminar sessão",
   },
   id: {
+    "nav.review": "Tinjauan",
+    "review.run": "Jalankan pemindaian",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alihkan navigasi",
     "nav.dashboard": "Dasbor",
@@ -1837,6 +1861,8 @@ const STRINGS = {
     "session.signOut": "Keluar",
   },
   ur: {
+    "nav.review": "جائزہ",
+    "review.run": "اسکین چلائیں",
     "brand.tagline": "Main X Index",
     "nav.toggle": "نیویگیشن ٹوگل کریں",
     "nav.dashboard": "ڈیش بورڈ",

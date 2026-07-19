@@ -1,5 +1,6 @@
 import { ApiClient } from "./client.js";
 import type {
+  CourseInstance,
   AuditEntry,
   BatchDeduplicationRequest,
   BatchDeduplicationResponse,
@@ -88,6 +89,15 @@ export class CourseRepository {
    * Fetch a single course by ID.
    * @throws {ApiError} 404 when no such course exists.
    */
+  /**
+   * List a course's instances (`GET /api/courses/{id}/instances`).
+   *
+   * @returns The course's concrete offerings.
+   */
+  listInstances(id: string): Promise<CourseInstance[]> {
+    return this.http.get<CourseInstance[]>(`/api/courses/${id}/instances`);
+  }
+
   get(id: string): Promise<Course> {
     return this.http.get<Course>(`/api/courses/${id}`);
   }

@@ -90,6 +90,7 @@ export const LOCALE_KEY = "mxi.care-pathway.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.sequence": "Sequence",
     // Layout / chrome
     "brand.name": "Care Pathways",
     "brand.full": "Main X · Care Pathways",
@@ -189,6 +190,7 @@ const STRINGS = {
     "form.saveFailed": "Save failed",
   },
   cy: {
+    "nav.sequence": "Dilyniant",
     "brand.name": "Llwybrau Gofal",
     "brand.full": "Main X · Llwybrau Gofal",
     "nav.toggle": "Toglo'r llywio",
@@ -283,6 +285,7 @@ const STRINGS = {
     "form.saveFailed": "Methodd y cadw",
   },
   es: {
+    "nav.sequence": "Secuencia",
     "brand.name": "Vías de Atención",
     "brand.full": "Main X · Vías de Atención",
     "nav.toggle": "Alternar navegación",
@@ -378,6 +381,7 @@ const STRINGS = {
     "form.saveFailed": "Error al guardar",
   },
   fr: {
+    "nav.sequence": "Séquence",
     "brand.name": "Parcours de Soins",
     "brand.full": "Main X · Parcours de Soins",
     "nav.toggle": "Basculer la navigation",
@@ -473,6 +477,7 @@ const STRINGS = {
     "form.saveFailed": "Échec de l'enregistrement",
   },
   de: {
+    "nav.sequence": "Abfolge",
     "brand.name": "Versorgungspfade",
     "brand.full": "Main X · Versorgungspfade",
     "nav.toggle": "Navigation umschalten",
@@ -568,6 +573,7 @@ const STRINGS = {
     "form.saveFailed": "Speichern fehlgeschlagen",
   },
   ar: {
+    "nav.sequence": "التسلسل",
     "brand.name": "مسارات الرعاية",
     "brand.full": "Main X · مسارات الرعاية",
     "nav.toggle": "تبديل التنقل",
@@ -662,6 +668,7 @@ const STRINGS = {
     "form.saveFailed": "فشل الحفظ",
   },
   ru: {
+    "nav.sequence": "Последовательность",
     "brand.name": "Маршруты помощи",
     "brand.full": "Main X · Маршруты помощи",
     "nav.toggle": "Переключить навигацию",
@@ -756,6 +763,7 @@ const STRINGS = {
     "form.saveFailed": "Не удалось сохранить",
   },
   hi: {
+    "nav.sequence": "अनुक्रम",
     "brand.name": "देखभाल मार्ग",
     "brand.full": "Main X · देखभाल मार्ग",
     "nav.toggle": "नेविगेशन टॉगल करें",
@@ -851,6 +859,7 @@ const STRINGS = {
     "form.saveFailed": "सहेजना विफल",
   },
   zh: {
+    "nav.sequence": "顺序",
     "brand.name": "护理路径",
     "brand.full": "Main X · 护理路径",
     "nav.toggle": "切换导航",
@@ -944,6 +953,7 @@ const STRINGS = {
     "form.saveFailed": "保存失败",
   },
   bn: {
+    "nav.sequence": "ক্রম",
     "brand.name": "যত্ন পথ",
     "brand.full": "Main X · যত্ন পথ",
     "nav.toggle": "নেভিগেশন টগল করুন",
@@ -1038,6 +1048,7 @@ const STRINGS = {
     "form.saveFailed": "সংরক্ষণ ব্যর্থ",
   },
   pt: {
+    "nav.sequence": "Sequência",
     "brand.name": "Vias de Cuidados",
     "brand.full": "Main X · Vias de Cuidados",
     "nav.toggle": "Alternar navegação",
@@ -1133,6 +1144,7 @@ const STRINGS = {
     "form.saveFailed": "Falha ao guardar",
   },
   id: {
+    "nav.sequence": "Urutan",
     "brand.name": "Jalur Perawatan",
     "brand.full": "Main X · Jalur Perawatan",
     "nav.toggle": "Alihkan navigasi",
@@ -1228,6 +1240,7 @@ const STRINGS = {
     "form.saveFailed": "Gagal menyimpan",
   },
   ur: {
+    "nav.sequence": "ترتیب",
     "brand.name": "نگہداشت کے راستے",
     "brand.full": "Main X · نگہداشت کے راستے",
     "nav.toggle": "نیویگیشن ٹوگل کریں",

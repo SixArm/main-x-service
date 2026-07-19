@@ -83,6 +83,7 @@
     const navItems = [
         { href: "/", key: "nav.carePathways" as const },
         { href: "/new", key: "nav.newCarePathway" as const },
+        { href: "/sequence", key: "nav.sequence" as const },
     ];
 </script>
 

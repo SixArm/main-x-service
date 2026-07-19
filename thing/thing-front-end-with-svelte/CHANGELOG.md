@@ -11,6 +11,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR moderate fit: new **/review** route (nav-linked): the batch-deduplication
+  scan's review queue as SVAR Kanban columns (Pending / Confirmed /
+  Rejected / AutoMerged). The scan runs only on the button (POST
+  /deduplicate is destructive-classed, never a page-load side
+  effect). Read-only: the service exposes no review-decision
+  endpoint yet — that endpoint is the seam that would make the
+  columns drag targets. +nav.review/review.run x 13 locales.
+- 2026-07-19 — SVAR moderate fit *not* taken: the suggested
+  warranty/maintenance expiry calendar is data-gated — the Thing
+  model carries no date-bearing domain fields; adding them is the
+  service-side seam.
+
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
   **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
   **@svar-ui/svelte-filemanager** are installed (no routes yet —

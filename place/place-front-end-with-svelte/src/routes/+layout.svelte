@@ -89,6 +89,7 @@
         { href: "/places/new", key: "nav.newPlace" as const },
         { href: "/places/match", key: "nav.matchCheck" as const },
         { href: "/places/merge", key: "nav.merge" as const },
+        { href: "/review", key: "nav.review" as const },
     ];
 
     // Reflect the chosen locale onto <html lang> for assistive tech and CSS,

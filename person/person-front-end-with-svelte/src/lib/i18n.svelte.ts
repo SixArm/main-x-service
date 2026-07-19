@@ -83,6 +83,9 @@ export const LOCALE_KEY = "mxi.person.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.expiry": "Expiries",
+    "nav.review": "Review",
+    "review.run": "Run scan",
     // Layout / nav chrome
     brand: "Person",
     "brand.tagline": "Main X Index",
@@ -230,6 +233,9 @@ const STRINGS = {
     "matchResults.breakdown": "Score breakdown",
   },
   cy: {
+    "nav.expiry": "Dyddiadau dod i ben",
+    "nav.review": "Adolygu",
+    "review.run": "Rhedeg sgan",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Toglo'r llywio",
@@ -362,6 +368,9 @@ const STRINGS = {
     "matchResults.breakdown": "Dadansoddiad sgôr",
   },
   es: {
+    "nav.expiry": "Vencimientos",
+    "nav.review": "Revisión",
+    "review.run": "Ejecutar análisis",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alternar navegación",
@@ -495,6 +504,9 @@ const STRINGS = {
     "matchResults.breakdown": "Desglose de puntuación",
   },
   fr: {
+    "nav.expiry": "Échéances",
+    "nav.review": "Révision",
+    "review.run": "Lancer l'analyse",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Basculer la navigation",
@@ -629,6 +641,9 @@ const STRINGS = {
     "matchResults.breakdown": "Détail du score",
   },
   de: {
+    "nav.expiry": "Abläufe",
+    "nav.review": "Überprüfung",
+    "review.run": "Scan starten",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Navigation umschalten",
@@ -762,6 +777,9 @@ const STRINGS = {
     "matchResults.breakdown": "Bewertungsaufschlüsselung",
   },
   ar: {
+    "nav.expiry": "انتهاء الصلاحية",
+    "nav.review": "المراجعة",
+    "review.run": "تشغيل الفحص",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "تبديل التنقل",
@@ -894,6 +912,9 @@ const STRINGS = {
     "matchResults.breakdown": "تفصيل النتيجة",
   },
   ru: {
+    "nav.expiry": "Сроки действия",
+    "nav.review": "Проверка",
+    "review.run": "Запустить проверку",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Переключить навигацию",
@@ -1027,6 +1048,9 @@ const STRINGS = {
     "matchResults.breakdown": "Разбивка оценки",
   },
   hi: {
+    "nav.expiry": "समाप्ति",
+    "nav.review": "समीक्षा",
+    "review.run": "स्कैन चलाएं",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "नेविगेशन टॉगल करें",
@@ -1160,6 +1184,9 @@ const STRINGS = {
     "matchResults.breakdown": "स्कोर विवरण",
   },
   zh: {
+    "nav.expiry": "到期",
+    "nav.review": "审核",
+    "review.run": "运行扫描",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "切换导航",
@@ -1291,6 +1318,9 @@ const STRINGS = {
     "matchResults.breakdown": "分数明细",
   },
   bn: {
+    "nav.expiry": "মেয়াদোত্তীর্ণ",
+    "nav.review": "পর্যালোচনা",
+    "review.run": "স্ক্যান চালান",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "নেভিগেশন টগল করুন",
@@ -1424,6 +1454,9 @@ const STRINGS = {
     "matchResults.breakdown": "স্কোর বিশ্লেষণ",
   },
   pt: {
+    "nav.expiry": "Vencimentos",
+    "nav.review": "Revisão",
+    "review.run": "Executar varredura",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alternar navegação",
@@ -1556,6 +1589,9 @@ const STRINGS = {
     "matchResults.breakdown": "Detalhamento da pontuação",
   },
   id: {
+    "nav.expiry": "Kedaluwarsa",
+    "nav.review": "Tinjauan",
+    "review.run": "Jalankan pemindaian",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "Alihkan navigasi",
@@ -1689,6 +1725,9 @@ const STRINGS = {
     "matchResults.breakdown": "Rincian skor",
   },
   ur: {
+    "nav.expiry": "میعاد ختم",
+    "nav.review": "جائزہ",
+    "review.run": "اسکین چلائیں",
     brand: "Person",
     "brand.tagline": "Main X Index",
     "nav.toggle": "نیویگیشن ٹوگل کریں",

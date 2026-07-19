@@ -92,6 +92,8 @@
         { href: "/workers/new", key: "nav.newWorker" as const },
         { href: "/workers/match", key: "nav.matchCheck" as const },
         { href: "/workers/merge", key: "nav.merge" as const },
+        { href: "/review", key: "nav.review" as const },
+        { href: "/expiry", key: "nav.expiry" as const },
     ];
 
     // Reflect the active locale onto <html lang> and <html dir> so the

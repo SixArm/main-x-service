@@ -87,6 +87,8 @@ export const LOCALE_KEY = "mxi.thing.locale";
 // going through the `en`-fallback path of `translate`.
 export const STRINGS = {
   en: {
+    "nav.review": "Review",
+    "review.run": "Run scan",
     // Layout / chrome
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
@@ -227,6 +229,8 @@ export const STRINGS = {
     "identifier.add": "+ Add identifier",
   },
   cy: {
+    "nav.review": "Adolygu",
+    "review.run": "Rhedeg sgan",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Dangosfwrdd",
@@ -353,6 +357,8 @@ export const STRINGS = {
     "identifier.add": "+ Ychwanegu dynodydd",
   },
   es: {
+    "nav.review": "Revisión",
+    "review.run": "Ejecutar análisis",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Panel",
@@ -479,6 +485,8 @@ export const STRINGS = {
     "identifier.add": "+ Añadir identificador",
   },
   fr: {
+    "nav.review": "Révision",
+    "review.run": "Lancer l'analyse",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Tableau de bord",
@@ -605,6 +613,8 @@ export const STRINGS = {
     "identifier.add": "+ Ajouter un identifiant",
   },
   de: {
+    "nav.review": "Überprüfung",
+    "review.run": "Scan starten",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Übersicht",
@@ -731,6 +741,8 @@ export const STRINGS = {
     "identifier.add": "+ Bezeichner hinzufügen",
   },
   ar: {
+    "nav.review": "المراجعة",
+    "review.run": "تشغيل الفحص",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "لوحة المعلومات",
@@ -857,6 +869,8 @@ export const STRINGS = {
     "identifier.add": "+ إضافة معرّف",
   },
   ru: {
+    "nav.review": "Проверка",
+    "review.run": "Запустить проверку",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Панель",
@@ -983,6 +997,8 @@ export const STRINGS = {
     "identifier.add": "+ Добавить идентификатор",
   },
   hi: {
+    "nav.review": "समीक्षा",
+    "review.run": "स्कैन चलाएं",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "डैशबोर्ड",
@@ -1109,6 +1125,8 @@ export const STRINGS = {
     "identifier.add": "+ पहचानकर्ता जोड़ें",
   },
   zh: {
+    "nav.review": "审核",
+    "review.run": "运行扫描",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "仪表板",
@@ -1233,6 +1251,8 @@ export const STRINGS = {
     "identifier.add": "+ 添加标识符",
   },
   bn: {
+    "nav.review": "পর্যালোচনা",
+    "review.run": "স্ক্যান চালান",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "ড্যাশবোর্ড",
@@ -1359,6 +1379,8 @@ export const STRINGS = {
     "identifier.add": "+ শনাক্তকারী যোগ করুন",
   },
   pt: {
+    "nav.review": "Revisão",
+    "review.run": "Executar varredura",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Painel",
@@ -1485,6 +1507,8 @@ export const STRINGS = {
     "identifier.add": "+ Adicionar identificador",
   },
   id: {
+    "nav.review": "Tinjauan",
+    "review.run": "Jalankan pemindaian",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "Dasbor",
@@ -1611,6 +1635,8 @@ export const STRINGS = {
     "identifier.add": "+ Tambah pengenal",
   },
   ur: {
+    "nav.review": "جائزہ",
+    "review.run": "اسکین چلائیں",
     "brand.name": "Thing",
     "brand.tagline": "Main X Index",
     "nav.dashboard": "ڈیش بورڈ",

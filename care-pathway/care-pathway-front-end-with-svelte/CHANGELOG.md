@@ -11,6 +11,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR moderate fit: new **/sequence** route (nav-linked): the selected pathway's
+  interventions as ordered bars in the SVAR Gantt — explicitly a
+  **sequence view, not a schedule** (the model carries only
+  intervention order; the ordinal axis is unlabelled and each step
+  is one nominal unit; per-step durations on the service model are
+  the seam for a real timeline). The suggested status Kanban is
+  data-gated: CarePathway has no lifecycle status field.
+  +nav.sequence x 13 locales.
+
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
   **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
   **@svar-ui/svelte-filemanager** are installed (no routes yet —

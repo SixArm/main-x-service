@@ -95,6 +95,7 @@
         { href: "/things/new", key: "nav.newThing" as const },
         { href: "/things/match", key: "nav.matchCheck" as const },
         { href: "/things/merge", key: "nav.merge" as const },
+        { href: "/review", key: "nav.review" as const },
     ];
 
     // Reflect the active locale onto <html lang> for assistive tech and
