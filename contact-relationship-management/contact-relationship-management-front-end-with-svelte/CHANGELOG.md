@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
+  **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
+  **@svar-ui/svelte-filemanager** are installed (no routes yet —
+  candidate features are catalogued per project; see the roadmap).
+
 - 2026-07-19 — SVAR DataGrid + Filter: SVAR index routes: **/contacts** and **/leads** and **/tickets**
   upgrade from plain tables to the SVAR DataGrid with FilterBars
   (the lead score breakdown and ticket status actions move to a

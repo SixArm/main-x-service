@@ -11,6 +11,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
+  **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
+  **@svar-ui/svelte-filemanager** are installed (no routes yet —
+  candidate features are catalogued per project; see the roadmap).
+
 - 2026-07-19 — SVAR DataGrid + Filter: the persons index grid migrates from `wx-svelte-grid` to
   **@svar-ui/svelte-grid**, and a **@svar-ui/svelte-filter**
   FilterBar now sits above it (client-side contains-filtering over

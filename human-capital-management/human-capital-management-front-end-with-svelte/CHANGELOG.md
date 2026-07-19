@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
+  **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
+  **@svar-ui/svelte-filemanager** are installed (no routes yet —
+  candidate features are catalogued per project; see the roadmap).
+
 - 2026-07-19 — SVAR DataGrid + Filter: the **/employees** index upgrades from a plain table to the SVAR
   DataGrid with a FilterBar (number / name / title / department /
   status); masked salaries still render the translated Hidden token;

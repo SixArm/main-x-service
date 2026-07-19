@@ -41,8 +41,12 @@
     "esbuild@0.25.12": true
   },
   "dependencies": {
+    "@svar-ui/svelte-calendar": "^2.6.0",
+    "@svar-ui/svelte-filemanager": "^2.6.0",
     "@svar-ui/svelte-filter": "^2.6.0",
+    "@svar-ui/svelte-gantt": "^2.7.1",
     "@svar-ui/svelte-grid": "^2.7.1",
+    "@svar-ui/svelte-kanban": "^2.6.0",
     "lily-design-system-svelte-headless": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless",
     "lily-design-system-svelte-locale-select": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-select",
     "lily-design-system-svelte-theme-select": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-select"

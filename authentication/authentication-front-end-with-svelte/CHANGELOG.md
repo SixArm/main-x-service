@@ -12,6 +12,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
+  **@svar-ui/svelte-kanban**, **@svar-ui/svelte-gantt**, and
+  **@svar-ui/svelte-filemanager** are installed (no routes yet —
+  candidate features are catalogued per project; see the roadmap).
+
 - 2026-07-19 — SVAR DataGrid + Filter: **@svar-ui/svelte-grid** and **@svar-ui/svelte-filter** are
   installed per the family convention; the auth service exposes no
   listable resource, so no grid route is mounted (deps ready for
