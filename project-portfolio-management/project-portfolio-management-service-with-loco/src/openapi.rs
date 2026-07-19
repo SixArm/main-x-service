@@ -49,6 +49,10 @@ fn insight_paths() -> Value {
         "/api/financials/exposure": get("financials", "Per-currency estate exposure: planned / actual / remaining totals; deliberately no FX conversion"),
         "/api/technology/dependency-risk": get("technology", "Dependency lens: top fan-out items, cross-portfolio edges, edges with a RAG-red predecessor"),
         "/api/technology/radar": get("technology", "Technology radar from tech:<name>[:<ring>] tags; majority ring vote, ties break cautious"),
+        "/api/executive/alignment": get("executive", "Strategic-alignment coverage: per-collection aligned/unaligned counts, unaligned spend per currency, ranked unaligned items"),
+        "/api/technology/debt": get("technology", "Technical-debt register: risks categorised tech_debt, exposure-sorted, with status counts"),
+        "/api/technology/flow": get("technology", "Delivery-flow metrics: milestone throughput per month + median lead days (?months=, cap 24)"),
+        "/api/scenarios/compare": get("executive", "Side-by-side scenario comparison (?a=&b=): live evaluations + per-currency planned deltas, exposure/alignment deltas"),
     })
 }
 

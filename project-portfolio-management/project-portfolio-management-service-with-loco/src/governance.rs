@@ -27,6 +27,28 @@ pub const RISK_STATUSES: &[&str] = &["open", "mitigating", "closed", "materialis
 /// Budget-line categories (PPM-10).
 pub const BUDGET_CATEGORIES: &[&str] = &["capex", "opex"];
 
+/// Risk categories — the technical-debt register rides on the risk
+/// lifecycle (an uncategorised stored risk reads as `delivery`).
+pub const RISK_CATEGORIES: &[&str] = &["delivery", "tech_debt", "compliance", "security", "other"];
+
+/// Whether a work item whose current `stage` (the last approved gate)
+/// has reached `gate` — the release condition for a stage-gated
+/// funding tranche. `stage = None` (pre-gate) has reached nothing;
+/// unknown tokens have reached nothing (fail closed).
+#[must_use]
+pub fn gate_reached(stage: Option<&str>, gate: &str) -> bool {
+    let Some(gate_idx) = GATES.iter().position(|g| *g == gate) else {
+        return false;
+    };
+    match stage {
+        None => false,
+        Some(stage) => GATES
+            .iter()
+            .position(|g| *g == stage)
+            .is_some_and(|stage_idx| stage_idx >= gate_idx),
+    }
+}
+
 /// Whether `value` is in the closed set `set`.
 #[must_use]
 pub fn is_token(set: &[&str], value: &str) -> bool {
@@ -267,4 +289,16 @@ mod tests {
         assert_eq!(accumulate_actual(100, -150), Ok(-50));
         assert!(accumulate_actual(i64::MAX, 1).is_err());
     }
+    /// Tranche release: stage must have reached the tranche's gate;
+    /// pre-gate and unknown tokens fail closed.
+    #[test]
+    fn gate_reached_ordering() {
+        assert!(!gate_reached(None, "g0_concept"));
+        assert!(gate_reached(Some("g0_concept"), "g0_concept"));
+        assert!(gate_reached(Some("g2_definition"), "g1_feasibility"));
+        assert!(!gate_reached(Some("g0_concept"), "g1_feasibility"));
+        assert!(!gate_reached(Some("nonsense"), "g0_concept"));
+        assert!(!gate_reached(Some("g5_benefits"), "nonsense"));
+    }
+
 }

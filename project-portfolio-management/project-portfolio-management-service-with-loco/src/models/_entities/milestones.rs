@@ -19,6 +19,7 @@ pub struct Model {
     pub name: String,
     pub due: Date,
     pub done: bool,
+    pub done_at: Option<DateTimeWithTimeZone>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 

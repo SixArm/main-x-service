@@ -24,8 +24,8 @@ use uuid::Uuid;
 use super::visibility::{is_finished, schedule_item};
 use crate::insights;
 use crate::models::_entities::{
-    benefits, budget_lines, gate_reviews, merge_records, milestones, proposals, risks, scenarios,
-    work_items,
+    benefits, budget_lines, gate_reviews, merge_records, milestones, objective_links, proposals,
+    risks, scenarios, work_items,
 };
 use crate::models::visibility as vis_models;
 use crate::visibility as rules;
@@ -477,11 +477,19 @@ async fn financial_exposure(State(ctx): State<AppContext>, headers: HeaderMap) -
                 .collect();
             item_pids.sort_unstable();
             item_pids.dedup();
+            let held_minor: i64 = budget_rows
+                .iter()
+                .filter(|b| {
+                    b.currency == row.currency && b.gate.is_some() && b.released_at.is_none()
+                })
+                .map(|b| b.planned_minor)
+                .sum();
             serde_json::json!({
                 "currency": row.currency,
                 "planned_minor": row.planned_minor,
                 "actual_minor": row.actual_minor,
                 "remaining_minor": row.remaining_minor,
+                "held_minor": held_minor,
                 "overrun": row.overrun,
                 "line_count": row.line_count,
                 "work_items": item_pids.len(),
@@ -490,7 +498,8 @@ async fn financial_exposure(State(ctx): State<AppContext>, headers: HeaderMap) -
         .collect();
     let body = serde_json::json!({
         "as_of": chrono::Utc::now(),
-        "note": "currencies are reported separately and never converted or merged",
+        "note": "currencies are reported separately and never converted or merged; \
+                 held_minor = planned on stage-gated tranches not yet released",
         "currencies": currencies,
     });
     conditional(&headers, &body)
@@ -640,6 +649,201 @@ async fn technology_radar(State(ctx): State<AppContext>, headers: HeaderMap) -> 
     conditional(&headers, &body)
 }
 
+/// `GET /api/executive/alignment` — strategic-alignment coverage: per
+/// collection, how many live items carry at least one OKR mapping, and
+/// the unaligned items with their per-currency planned spend (the
+/// CEO's "unaligned spend" list). Ordering of the unaligned list is
+/// each item's largest single-currency planned amount (a disclosed
+/// heuristic — cross-currency amounts are never summed).
+#[debug_handler]
+async fn executive_alignment(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
+    let items = live!(work_items, &ctx.db);
+    let budget_rows = live!(budget_lines, &ctx.db);
+    let link_rows = objective_links::Entity::find()
+        .all(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    let aligned: std::collections::HashSet<Uuid> =
+        link_rows.iter().map(|l| l.work_item_pid).collect();
+
+    let mut per_collection: std::collections::BTreeMap<&str, (usize, usize)> =
+        std::collections::BTreeMap::new();
+    for item in &items {
+        let entry = per_collection.entry(item.kind.as_str()).or_default();
+        entry.0 += 1;
+        if aligned.contains(&item.pid) {
+            entry.1 += 1;
+        }
+    }
+
+    // Unaligned spend per currency + the ranked unaligned list.
+    let unaligned_lines: Vec<insights::MoneyLine> = budget_rows
+        .iter()
+        .filter(|b| !aligned.contains(&b.work_item_pid))
+        .map(|b| insights::MoneyLine {
+            currency: b.currency.clone(),
+            planned_minor: b.planned_minor,
+            actual_minor: b.actual_minor,
+        })
+        .collect();
+    let unaligned_spend = insights::variance_by_currency(&unaligned_lines);
+    let mut unaligned_items: Vec<(i64, serde_json::Value)> = items
+        .iter()
+        .filter(|i| !aligned.contains(&i.pid))
+        .map(|item| {
+            let lines: Vec<insights::MoneyLine> = budget_rows
+                .iter()
+                .filter(|b| b.work_item_pid == item.pid)
+                .map(|b| insights::MoneyLine {
+                    currency: b.currency.clone(),
+                    planned_minor: b.planned_minor,
+                    actual_minor: b.actual_minor,
+                })
+                .collect();
+            let per_currency = insights::variance_by_currency(&lines);
+            let rank = per_currency.iter().map(|r| r.planned_minor).max().unwrap_or(0);
+            (rank, serde_json::json!({
+                "item": item_ref(item),
+                "planned": per_currency
+                    .iter()
+                    .map(|r| serde_json::json!({
+                        "currency": r.currency, "planned_minor": r.planned_minor,
+                    }))
+                    .collect::<Vec<_>>(),
+            }))
+        })
+        .collect();
+    unaligned_items.sort_by_key(|(rank, _)| std::cmp::Reverse(*rank));
+    let unaligned_items: Vec<serde_json::Value> =
+        unaligned_items.into_iter().take(25).map(|(_, v)| v).collect();
+
+    let body = serde_json::json!({
+        "as_of": chrono::Utc::now(),
+        "derivation": "aligned = has at least one OKR mapping; unaligned list \
+                       ranked by largest single-currency planned amount \
+                       (currencies never summed)",
+        "by_collection": per_collection
+            .iter()
+            .map(|(kind, (total, aligned_count))| serde_json::json!({
+                "collection": kind, "total": total,
+                "aligned": aligned_count, "unaligned": total - aligned_count,
+            }))
+            .collect::<Vec<_>>(),
+        "unaligned_spend": unaligned_spend,
+        "unaligned_items": unaligned_items,
+    });
+    conditional(&headers, &body)
+}
+
+/// `GET /api/technology/debt` — the technical-debt register: risks
+/// categorised `tech_debt`, exposure-sorted, with item refs and
+/// status counts. Rides the risk lifecycle (raise / mitigate /
+/// escalate / close) — an uncategorised risk reads as `delivery` and
+/// stays off this view.
+#[debug_handler]
+async fn technology_debt(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
+    let items = live!(work_items, &ctx.db);
+    let risk_rows = live!(risks, &ctx.db);
+    let by_pid: std::collections::BTreeMap<Uuid, &work_items::Model> =
+        items.iter().map(|i| (i.pid, i)).collect();
+    let mut debt: Vec<&risks::Model> = risk_rows
+        .iter()
+        .filter(|r| r.category.as_deref() == Some("tech_debt"))
+        .collect();
+    debt.sort_by_key(|r| std::cmp::Reverse(r.probability * r.impact));
+    let mut statuses: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+    for risk in &debt {
+        *statuses.entry(risk.status.as_str()).or_default() += 1;
+    }
+    let open_exposure: i32 = debt
+        .iter()
+        .filter(|r| matches!(r.status.as_str(), "open" | "mitigating"))
+        .map(|r| r.probability * r.impact)
+        .sum();
+    let register: Vec<serde_json::Value> = debt
+        .iter()
+        .map(|risk| {
+            serde_json::json!({
+                "pid": risk.pid,
+                "title": risk.title,
+                "status": risk.status,
+                "exposure": risk.probability * risk.impact,
+                "escalated": risk.escalated_at.is_some(),
+                "owner_ref": risk.owner_ref,
+                "item": by_pid.get(&risk.work_item_pid).map(|i| item_ref(i)),
+            })
+        })
+        .collect();
+    let body = serde_json::json!({
+        "as_of": chrono::Utc::now(),
+        "note": "risks with category `tech_debt`; exposure = probability x impact",
+        "open_exposure": open_exposure,
+        "statuses": statuses,
+        "register": register,
+    });
+    conditional(&headers, &body)
+}
+
+/// Query for the flow metrics: the trailing window in months.
+#[derive(Debug, Deserialize)]
+struct FlowQuery {
+    /// Trailing months to report (default 6, cap 24).
+    months: Option<u32>,
+}
+
+/// `GET /api/technology/flow` — delivery-flow metrics from milestone
+/// completion stamps: throughput per month and the median
+/// creation-to-completion lead time. Milestones completed before the
+/// completion stamp existed are counted separately and never timed —
+/// an honest gap, not a guess.
+#[debug_handler]
+async fn technology_flow(
+    axum::extract::Query(query): axum::extract::Query<FlowQuery>,
+    State(ctx): State<AppContext>,
+    headers: HeaderMap,
+) -> Result<Response> {
+    let months = i64::from(query.months.unwrap_or(6).clamp(1, 24));
+    let now = chrono::Utc::now();
+    let window_start = now - chrono::Days::new(u64::try_from(months * 31).unwrap_or(186));
+    let milestone_rows = live!(milestones, &ctx.db);
+
+    let mut per_month: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
+    let mut lead_days: Vec<i64> = Vec::new();
+    let mut undated_completions = 0usize;
+    for milestone in milestone_rows.iter().filter(|m| m.done) {
+        match milestone.done_at {
+            Some(done_at) => {
+                let done_at = done_at.to_utc();
+                if done_at >= window_start {
+                    *per_month.entry(done_at.format("%Y-%m").to_string()).or_default() += 1;
+                    lead_days.push((done_at - milestone.created_at.to_utc()).num_days());
+                }
+            }
+            None => undated_completions += 1,
+        }
+    }
+    lead_days.sort_unstable();
+    let median_lead_days = if lead_days.is_empty() {
+        None
+    } else {
+        Some(lead_days[lead_days.len() / 2])
+    };
+    let body = serde_json::json!({
+        "as_of": now,
+        "window_months": months,
+        "derivation": "throughput = milestones completed per month (by done_at); \
+                       lead_days = done_at - created_at; completions predating \
+                       the done_at stamp are counted in undated_completions and \
+                       never timed",
+        "throughput_by_month": per_month,
+        "timed_completions": lead_days.len(),
+        "median_lead_days": median_lead_days,
+        "undated_completions": undated_completions,
+    });
+    conditional(&headers, &body)
+}
+
 /// ETag-conditional JSON response; the tag excludes `as_of` so a
 /// byte-identical estate revalidates with `304`.
 fn conditional(headers: &HeaderMap, body: &serde_json::Value) -> Result<Response> {
@@ -657,8 +861,11 @@ pub fn routes() -> Routes {
         .add("/executive/health", get(executive_health))
         .add("/executive/decisions", get(executive_decisions))
         .add("/executive/benefits", get(executive_benefits))
+        .add("/executive/alignment", get(executive_alignment))
         .add("/financials/variance", get(financial_variance))
         .add("/financials/exposure", get(financial_exposure))
         .add("/technology/dependency-risk", get(technology_dependency_risk))
         .add("/technology/radar", get(technology_radar))
+        .add("/technology/debt", get(technology_debt))
+        .add("/technology/flow", get(technology_flow))
 }

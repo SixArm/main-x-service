@@ -126,6 +126,50 @@ async function stubPpm(page: Page) {
           predecessor: { pid: "w-1", name: "Platform rebuild", kind: "Project" },
           successor: { pid: "w-2", name: "Portal", kind: "Product" } }],
       } });
+    if (path === "/api/executive/alignment")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", derivation: "aligned = has an OKR mapping",
+        by_collection: [{ collection: "Project", total: 2, aligned: 1, unaligned: 1 }],
+        unaligned_spend: [{ currency: "GBP", planned_minor: 500000,
+          actual_minor: 0, remaining_minor: 500000, overrun: false, line_count: 1 }],
+        unaligned_items: [{ item: { pid: "w-9", name: "Shadow initiative", kind: "Project" },
+          planned: [{ currency: "GBP", planned_minor: 500000 }] }],
+      } });
+    if (path === "/api/technology/debt")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", note: "risks with category tech_debt",
+        open_exposure: 16, statuses: { open: 1 },
+        register: [{ pid: "r-1", title: "Legacy adapter unmaintained",
+          status: "open", exposure: 16, escalated: false, owner_ref: null,
+          item: { pid: "w-1", name: "Platform rebuild", kind: "Project" } }],
+      } });
+    if (path === "/api/technology/flow")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", window_months: 6,
+        derivation: "throughput by done_at; lead = done_at - created_at",
+        throughput_by_month: { "2026-07": 3 }, timed_completions: 3,
+        median_lead_days: 12, undated_completions: 1,
+      } });
+    if (path.startsWith("/api/scenarios/compare"))
+      return route.fulfill({ json: {
+        a: { pid: "s-1", name: "Roomy", status: "draft", feasible: true,
+             evaluation: { planned_by_currency: [["GBP", 100000]],
+               total_exposure: 4, total_alignment: 8, violations: [] } },
+        b: { pid: "s-2", name: "Tight", status: "draft", feasible: false,
+             evaluation: { planned_by_currency: [["GBP", 100000]],
+               total_exposure: 4, total_alignment: 8,
+               violations: ["over budget cap"] } },
+        deltas: { planned_by_currency: [{ currency: "GBP", a_minor: 100000,
+          b_minor: 100000, delta_minor: 0 }], exposure: 0, alignment: 0 },
+        note: "b minus a; per-currency deltas only",
+      } });
+    if (path === "/api/scenarios" && method === "GET")
+      return route.fulfill({ json: [
+        { pid: "s-1", name: "Roomy", status: "draft", members: { work_item_pids: [] },
+          budget_cap_minor: 1000000, currency: "GBP", committed_at: null },
+        { pid: "s-2", name: "Tight", status: "draft", members: { work_item_pids: [] },
+          budget_cap_minor: 100000, currency: "GBP", committed_at: null },
+      ] });
     if (path === "/api/technology/radar")
       return route.fulfill({ json: {
         as_of: "2026-07-19T00:00:00Z", convention: "tech:<name>[:<ring>]",
@@ -176,6 +220,8 @@ test("executive area renders health, benefits, and the decision log", async ({ p
   await expect(page.getByTestId("exec-health").getByText("red", { exact: true })).toBeVisible();
   await expect(page.getByText("25%")).toBeVisible(); // realization ratio served, not computed
   await expect(page.getByTestId("exec-decisions").getByText("gate_review · g0_concept")).toBeVisible();
+  await expect(page.getByTestId("exec-alignment").getByText("Project")).toBeVisible();
+  await expect(page.getByTestId("exec-unaligned-items").getByText("Shadow initiative")).toBeVisible();
 });
 
 test("financial area shows per-currency exposure with overrun highlighted", async ({ page }) => {
@@ -192,4 +238,19 @@ test("technology area renders the radar rings and dependency lens", async ({ pag
   await expect(page.getByTestId("radar-adopt").getByText("rust")).toBeVisible();
   await expect(page.getByTestId("tech-fan-out").getByText("Platform rebuild")).toBeVisible();
   await expect(page.getByTestId("tech-red-edges").getByText("Portal")).toBeVisible();
+  await expect(page.getByTestId("tech-debt").getByText("Legacy adapter unmaintained")).toBeVisible();
+  await expect(page.getByTestId("tech-flow").getByText("2026-07")).toBeVisible();
+  await expect(page.getByText("12 days")).toBeVisible();
+});
+
+test("scenario compare renders side-by-side deltas", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/scenarios");
+  const selects = page.locator("form.compare select");
+  await selects.nth(0).selectOption({ label: "Roomy" });
+  await selects.nth(1).selectOption({ label: "Tight" });
+  await page.getByRole("button", { name: "Compare" }).click();
+  const table = page.getByTestId("scenario-compare");
+  await expect(table.getByText("Roomy")).toBeVisible();
+  await expect(table.getByText("no", { exact: true })).toBeVisible();
 });

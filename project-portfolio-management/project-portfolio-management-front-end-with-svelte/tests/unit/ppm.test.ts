@@ -47,6 +47,10 @@ describe("PpmClient paths", () => {
     await ppm.financialExposure();
     await ppm.technologyDependencyRisk();
     await ppm.technologyRadar();
+    await ppm.executiveAlignment();
+    await ppm.technologyDebt();
+    await ppm.technologyFlow(3);
+    await ppm.compareScenarios("s1", "s2");
 
     expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
       "GET http://svc/api/at-a-glance",
@@ -74,6 +78,10 @@ describe("PpmClient paths", () => {
       "GET http://svc/api/financials/exposure",
       "GET http://svc/api/technology/dependency-risk",
       "GET http://svc/api/technology/radar",
+      "GET http://svc/api/executive/alignment",
+      "GET http://svc/api/technology/debt",
+      "GET http://svc/api/technology/flow?months=3",
+      "GET http://svc/api/scenarios/compare?a=s1&b=s2",
     ]);
   });
 

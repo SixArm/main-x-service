@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — executive moderate fits (2026-07-19)
+
+- `/executive` gains the strategic-alignment section (coverage per
+  collection, unaligned spend, largest unaligned items); `/technology`
+  gains the technical-debt register and delivery-flow metrics;
+  `/scenarios` gains a side-by-side compare panel (pick two, see
+  per-currency deltas and feasibility). Client gains four typed
+  methods with vitest path pins; e2e stubs + three extended specs.
+
 ### Added — executive areas (2026-07-19)
 
 - `/executive`, `/financials`, `/technology` — CEO / CFO / CTO views

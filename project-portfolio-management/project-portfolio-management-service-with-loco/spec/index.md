@@ -655,6 +655,36 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   24/24 vs Postgres 18; clippy pedantic clean. Front-end `/executive`,
   `/financials`, `/technology` consume the views.
 
+- [x] **2026-07-19 — Executive moderate fits.** Five follow-ups to the
+  insight areas, one migration (`m20260719_000002_insight_columns`, all
+  columns nullable so existing rows keep their behaviour):
+  **stage-gated funding tranches** — `budget_lines.gate` +
+  `released_at`; a gated line is HELD (actuals `422`) until the item's
+  stage reaches the gate and `POST
+  /{collection}/{pid}/budget-lines/{line_pid}/release` succeeds
+  (`rules::gate_reached`, fail-closed; audit `budget_line_released`;
+  `financials/exposure` reports `held_minor` per currency);
+  **technical-debt register** — `risks.category`
+  (`delivery`/`tech_debt`/`compliance`/`security`/`other`, validated;
+  absent reads `delivery`) + `GET /api/technology/debt`
+  (exposure-sorted register); **delivery-flow metrics** —
+  `milestones.done_at` stamped on complete + `GET /api/technology/flow`
+  (throughput/month, median lead days; pre-stamp completions counted
+  but never timed); **strategic-alignment coverage** — `GET
+  /api/executive/alignment` (per-collection aligned/unaligned via
+  `objective_links`, unaligned spend per currency, items ranked by
+  largest single-currency planned — disclosed heuristic, currencies
+  never summed); **scenario comparison** — `GET
+  /api/scenarios/compare?a=&b=` (two live evaluations side-by-side,
+  per-currency deltas b−a, exposure/alignment deltas). The capex/opex
+  split needed no work: `BUDGET_CATEGORIES` is already the closed
+  `{capex, opex}` set and `financials/variance` already rolls up
+  by category. **Acceptance:** `gate_reached` unit pins; the seeded
+  moderate-fits request round-trip (held→release→actual lifecycle,
+  held_minor drop, debt filter, flow timing, alignment flip, compare
+  deltas) green — full `--ignored` suite 25/25 vs Postgres 18; clippy
+  pedantic clean; FE svelte-check 0, vitest 45, Playwright 12.
+
 ## 14. Implementation status
 
 **Implemented (MVP v0.1.0 + PPM Phases A/B/C; see §13 for the

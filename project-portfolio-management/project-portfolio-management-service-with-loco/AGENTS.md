@@ -65,8 +65,8 @@ products, programs}` (identical controller shape each). See
 | Merge | `POST /{collection}/merge` (`422` equal pids / cross-kind, `404` unknown) · `GET /{collection}/merges/recent` |
 | Strategy (PPM Phase C) | `/ideas` (+ `vote`/`dismiss`/`convert`) · `/scenarios` (+ `/{pid}/evaluate`/`commit`) · `/objectives` (+ `/{pid}/alignment`) · `/{collection}/{pid}/objectives` · `/{collection}/{pid}/benefits` (+ `/{b_pid}/realize`) |
 | Visibility (PPM Phase B) | `POST`/`GET /dependencies` (+ `DELETE /{pid}`) · `GET /portfolios/{pid}/schedule` · `/{collection}/{pid}/milestones` (+ `/{m_pid}/complete`) · `/{collection}/{pid}/allocations` (+ `DELETE /{a_pid}`) · `GET /capacity` · `/reports` (+ `/{pid}/run?format=json|csv`) · `GET /at-a-glance` (ETag) |
-| Governance (PPM Phase A) | `POST`/`GET /proposals` (+ `/{pid}` + `submit`/`review`/`approve`/`reject`/`promote`/`duplicates`) · `/{collection}/{pid}/gate-reviews` · `/risks` (+ `/{risk_pid}` + `escalate`) · `/budget-lines` (+ `/{line_pid}/actual`) · `GET /{collection}/{pid}/governance` |
-| Executive insights | `GET /executive/{health,decisions,benefits}` · `/financials/{variance,exposure}` · `/technology/{dependency-risk,radar}` (read-only derived views; ETag + `as_of`) |
+| Governance (PPM Phase A) | `POST`/`GET /proposals` (+ `/{pid}` + `submit`/`review`/`approve`/`reject`/`promote`/`duplicates`) · `/{collection}/{pid}/gate-reviews` · `/risks` (+ `/{risk_pid}` + `escalate`) · `/budget-lines` (+ `/{line_pid}/actual` · `/{line_pid}/release` — stage-gated tranches) · `GET /{collection}/{pid}/governance` |
+| Executive insights | `GET /executive/{health,decisions,benefits,alignment}` · `/financials/{variance,exposure}` · `/technology/{dependency-risk,radar,debt,flow}` · `/scenarios/compare?a=&b=` (read-only derived views; ETag + `as_of`) |
 | Audit / events | `GET /{collection}/audit/recent` · `/{pid}/audit` · `/events/recent` |
 | Auth | `GET /{collection}/whoami` (`401` without a valid token) |
 | Docs / metrics | `GET /api-docs/openapi.json` · `/swagger-ui` · `/metrics.prom` |

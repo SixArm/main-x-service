@@ -191,3 +191,185 @@ async fn executive_financial_and_technology_views() {
     })
     .await;
 }
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[allow(clippy::too_many_lines)] // one seeded estate, five moderate-fit views
+async fn moderate_fits_tranches_debt_flow_alignment_compare() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let project: Value = request
+            .post("/api/projects")
+            .json(&json!({ "kind": "Project", "name": "Ledger rewrite" }))
+            .await
+            .json();
+        let pid = project["pid"].as_str().expect("pid").to_string();
+
+        // ── Funding tranche: gated on g1; held until governance passes.
+        let line: Value = request
+            .post(&format!("/api/projects/{pid}/budget-lines"))
+            .json(&json!({ "category": "capex", "description": "Tranche 2",
+                            "currency": "GBP", "planned_minor": 5_000_i64,
+                            "gate": "g1_feasibility" }))
+            .await
+            .json();
+        let line_pid = line["pid"].as_str().expect("line pid").to_string();
+
+        // Actuals against a held tranche are refused.
+        let held = request
+            .post(&format!("/api/projects/{pid}/budget-lines/{line_pid}/actual"))
+            .json(&json!({ "amount_minor": 100_i64 }))
+            .await;
+        assert_eq!(held.status_code(), 422, "held tranche refuses actuals");
+
+        // Release before the gate passes is refused (pre-gate).
+        let early = request
+            .post(&format!("/api/projects/{pid}/budget-lines/{line_pid}/release"))
+            .await;
+        assert_eq!(early.status_code(), 422, "pre-gate release refused");
+
+        // Pass g0; g1 not yet reached ⇒ still refused.
+        request
+            .post(&format!("/api/projects/{pid}/gate-reviews"))
+            .json(&json!({ "gate": "g0_concept", "decision": "approved" }))
+            .await
+            .assert_status_ok();
+        let still_early = request
+            .post(&format!("/api/projects/{pid}/budget-lines/{line_pid}/release"))
+            .await;
+        assert_eq!(still_early.status_code(), 422, "g0 does not reach g1");
+
+        // Held planned shows up in the CFO exposure.
+        let exposure: Value = request.get("/api/financials/exposure").await.json();
+        assert_eq!(exposure["currencies"][0]["held_minor"], 5_000);
+
+        // Pass g1 ⇒ release succeeds exactly once; actuals then flow.
+        request
+            .post(&format!("/api/projects/{pid}/gate-reviews"))
+            .json(&json!({ "gate": "g1_feasibility", "decision": "approved" }))
+            .await
+            .assert_status_ok();
+        let released: Value = request
+            .post(&format!("/api/projects/{pid}/budget-lines/{line_pid}/release"))
+            .await
+            .json();
+        assert!(released["released_at"].is_string());
+        let again = request
+            .post(&format!("/api/projects/{pid}/budget-lines/{line_pid}/release"))
+            .await;
+        assert_eq!(again.status_code(), 422, "double release refused");
+        request
+            .post(&format!("/api/projects/{pid}/budget-lines/{line_pid}/actual"))
+            .json(&json!({ "amount_minor": 100_i64 }))
+            .await
+            .assert_status_ok();
+        let exposure: Value = request.get("/api/financials/exposure").await.json();
+        assert_eq!(exposure["currencies"][0]["held_minor"], 0);
+
+        // ── Tech-debt register: a categorised risk appears; an
+        // uncategorised one stays off the view.
+        request
+            .post(&format!("/api/projects/{pid}/risks"))
+            .json(&json!({ "title": "Legacy adapter unmaintained",
+                            "probability": 4, "impact": 4,
+                            "category": "tech_debt" }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/projects/{pid}/risks"))
+            .json(&json!({ "title": "Supplier delay", "probability": 2, "impact": 2 }))
+            .await
+            .assert_status_ok();
+        let bad = request
+            .post(&format!("/api/projects/{pid}/risks"))
+            .json(&json!({ "title": "X", "probability": 1, "impact": 1,
+                            "category": "sideways" }))
+            .await;
+        assert_eq!(bad.status_code(), 422, "unknown category refused");
+        let debt: Value = request.get("/api/technology/debt").await.json();
+        assert_eq!(debt["register"].as_array().expect("register").len(), 1);
+        assert_eq!(debt["register"][0]["exposure"], 16);
+        assert_eq!(debt["open_exposure"], 16);
+
+        // ── Flow metrics: a completed milestone is timed via done_at.
+        request
+            .post(&format!("/api/projects/{pid}/milestones"))
+            .json(&json!({ "name": "Cutover", "due": "2026-08-31" }))
+            .await
+            .assert_status_ok();
+        let listed: Value = request.get(&format!("/api/projects/{pid}/milestones")).await.json();
+        let m_pid = listed[0]["pid"].as_str().expect("milestone pid");
+        request
+            .post(&format!("/api/projects/{pid}/milestones/{m_pid}/complete"))
+            .await
+            .assert_status_ok();
+        let flow: Value = request.get("/api/technology/flow").await.json();
+        assert_eq!(flow["timed_completions"], 1);
+        assert_eq!(flow["median_lead_days"], 0);
+        assert_eq!(flow["undated_completions"], 0);
+
+        // ── Alignment coverage: the project is unaligned (with its
+        // spend listed); mapping it to an objective flips the counts.
+        let alignment: Value = request.get("/api/executive/alignment").await.json();
+        let projects = alignment["by_collection"]
+            .as_array()
+            .expect("collections")
+            .iter()
+            .find(|c| c["collection"] == "Project")
+            .expect("project row")
+            .clone();
+        assert_eq!(projects["aligned"], 0);
+        assert_eq!(alignment["unaligned_spend"][0]["currency"], "GBP");
+        assert_eq!(alignment["unaligned_items"][0]["item"]["pid"], json!(pid));
+
+        let objective: Value = request
+            .post("/api/objectives")
+            .json(&json!({ "title": "Modernise the estate", "period": "2026-H2" }))
+            .await
+            .json();
+        let objective_pid = objective["pid"].as_str().expect("objective pid");
+        request
+            .post(&format!("/api/projects/{pid}/objectives"))
+            .json(&json!({ "objective_pid": objective_pid, "weight": 4 }))
+            .await
+            .assert_status_ok();
+        let alignment: Value = request.get("/api/executive/alignment").await.json();
+        let projects = alignment["by_collection"]
+            .as_array()
+            .expect("collections")
+            .iter()
+            .find(|c| c["collection"] == "Project")
+            .expect("project row")
+            .clone();
+        assert_eq!(projects["aligned"], 1);
+        assert_eq!(projects["unaligned"], 0);
+
+        // ── Scenario compare: two scenarios over the same member, one
+        // capped into infeasibility; deltas are per-currency, b - a.
+        let roomy: Value = request
+            .post("/api/scenarios")
+            .json(&json!({ "name": "Roomy", "work_item_pids": [pid],
+                            "budget_cap_minor": 10_000, "currency": "GBP" }))
+            .await
+            .json();
+        let tight: Value = request
+            .post("/api/scenarios")
+            .json(&json!({ "name": "Tight", "work_item_pids": [pid],
+                            "budget_cap_minor": 1_000, "currency": "GBP" }))
+            .await
+            .json();
+        let compare: Value = request
+            .get(&format!(
+                "/api/scenarios/compare?a={}&b={}",
+                roomy["pid"].as_str().expect("a"),
+                tight["pid"].as_str().expect("b")
+            ))
+            .await
+            .json();
+        assert_eq!(compare["a"]["feasible"], true);
+        assert_eq!(compare["b"]["feasible"], false);
+        assert_eq!(compare["deltas"]["planned_by_currency"][0]["delta_minor"], 0);
+        assert_eq!(compare["deltas"]["exposure"], 0);
+    })
+    .await;
+}

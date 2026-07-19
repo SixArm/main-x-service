@@ -9,6 +9,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — executive moderate fits (2026-07-19)
+
+- **Stage-gated funding tranches**: `budget_lines.gate` + `released_at`
+  (migration `m20260719_000002`); a gated line is held (actuals `422`)
+  until the work item's stage reaches the gate and the new
+  `POST …/budget-lines/{line_pid}/release` succeeds (fail-closed
+  `gate_reached`; audited). `financials/exposure` reports per-currency
+  `held_minor`.
+- **Technical-debt register**: `risks.category` (validated closed set)
+  + `GET /api/technology/debt` — `tech_debt` risks, exposure-sorted.
+- **Delivery-flow metrics**: `milestones.done_at` stamped on complete +
+  `GET /api/technology/flow` — throughput/month + median lead days;
+  pre-stamp completions counted but never timed.
+- **Strategic-alignment coverage**: `GET /api/executive/alignment` —
+  aligned/unaligned per collection, unaligned spend per currency,
+  ranked unaligned items (largest single-currency planned; disclosed
+  heuristic).
+- **Scenario comparison**: `GET /api/scenarios/compare?a=&b=` — two
+  live evaluations side-by-side with per-currency deltas (b−a).
+
 ### Added — executive insight areas: CEO / CFO / CTO (2026-07-19)
 
 - Seven read-only derived views over existing tables (no new

@@ -6,12 +6,32 @@
 <script lang="ts">
   import { t } from "$lib/i18n.svelte";
   import { onMount } from "svelte";
-  import { PpmClient, money, type Scenario, type ScenarioEvaluation } from "$lib/api/ppm";
+  import {
+    PpmClient,
+    money,
+    type Scenario,
+    type ScenarioComparison,
+    type ScenarioEvaluation,
+  } from "$lib/api/ppm";
 
   const ppm = PpmClient.withFetch();
   let scenarios = $state<Scenario[]>([]);
   let evaluations = $state<Record<string, ScenarioEvaluation>>({});
   let error = $state<string | null>(null);
+
+  let compareA = $state("");
+  let compareB = $state("");
+  let comparison = $state<ScenarioComparison | null>(null);
+
+  async function runCompare() {
+    error = null;
+    comparison = null;
+    try {
+      comparison = await ppm.compareScenarios(compareA, compareB);
+    } catch (err) {
+      error = err instanceof Error ? err.message : t("ppm.common.actionFailed");
+    }
+  }
 
   let name = $state("");
   let members = $state("");
@@ -121,6 +141,71 @@
     {/each}
   </tbody>
 </table>
+
+
+<h2>Compare</h2>
+<form
+  class="compare"
+  onsubmit={(event) => {
+    event.preventDefault();
+    void runCompare();
+  }}
+>
+  <label>
+    A
+    <select bind:value={compareA}>
+      <option value="" disabled>pick…</option>
+      {#each scenarios as s (s.pid)}<option value={s.pid}>{s.name}</option>{/each}
+    </select>
+  </label>
+  <label>
+    B
+    <select bind:value={compareB}>
+      <option value="" disabled>pick…</option>
+      {#each scenarios as s (s.pid)}<option value={s.pid}>{s.name}</option>{/each}
+    </select>
+  </label>
+  <button type="submit" disabled={!compareA || !compareB || compareA === compareB}>
+    Compare
+  </button>
+</form>
+
+{#if comparison}
+  <p class="muted">{comparison.note}</p>
+  <table data-testid="scenario-compare">
+    <thead>
+      <tr><th></th><th>{comparison.a.name}</th><th>{comparison.b.name}</th><th>Delta (b − a)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Feasible</td>
+        <td>{comparison.a.feasible ? "yes" : "no"}</td>
+        <td>{comparison.b.feasible ? "yes" : "no"}</td>
+        <td>—</td>
+      </tr>
+      {#each comparison.deltas.planned_by_currency as row (row.currency)}
+        <tr>
+          <td>Planned {row.currency}</td>
+          <td>{money(row.a_minor, row.currency)}</td>
+          <td>{money(row.b_minor, row.currency)}</td>
+          <td>{money(row.delta_minor, row.currency)}</td>
+        </tr>
+      {/each}
+      <tr>
+        <td>Open exposure</td>
+        <td>{comparison.a.evaluation.total_exposure}</td>
+        <td>{comparison.b.evaluation.total_exposure}</td>
+        <td>{comparison.deltas.exposure}</td>
+      </tr>
+      <tr>
+        <td>Alignment</td>
+        <td>{comparison.a.evaluation.total_alignment}</td>
+        <td>{comparison.b.evaluation.total_alignment}</td>
+        <td>{comparison.deltas.alignment}</td>
+      </tr>
+    </tbody>
+  </table>
+{/if}
 
 <style>
   .row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0.8rem 0; }

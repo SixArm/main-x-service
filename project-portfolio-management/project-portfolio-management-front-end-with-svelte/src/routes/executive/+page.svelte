@@ -16,12 +16,14 @@
     type DecisionEntry,
     type ExecutiveBenefits,
     type ExecutiveHealth,
+    type AlignmentCoverage,
   } from "$lib/api/ppm";
 
   const ppm = PpmClient.withFetch();
   let health = $state<ExecutiveHealth | null>(null);
   let decisions = $state<DecisionEntry[] | null>(null);
   let benefits = $state<ExecutiveBenefits | null>(null);
+  let alignment = $state<AlignmentCoverage | null>(null);
   let error = $state<string | null>(null);
 
   onMount(async () => {
@@ -29,6 +31,7 @@
       health = await ppm.executiveHealth();
       decisions = (await ppm.executiveDecisions(30)).decisions;
       benefits = await ppm.executiveBenefits();
+      alignment = await ppm.executiveAlignment();
     } catch (err) {
       error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
     }
@@ -115,6 +118,47 @@
   </table>
 {/if}
 
+{#if alignment}
+  <h2>Strategic alignment</h2>
+  <p class="muted">{alignment.derivation}</p>
+  <table data-testid="exec-alignment">
+    <thead>
+      <tr><th>Collection</th><th>Total</th><th>Aligned</th><th>Unaligned</th></tr>
+    </thead>
+    <tbody>
+      {#each alignment.by_collection as row (row.collection)}
+        <tr>
+          <td><strong>{row.collection}</strong></td>
+          <td>{row.total}</td>
+          <td>{row.aligned}</td>
+          <td class:warn={row.unaligned > 0}>{row.unaligned}</td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+  {#if alignment.unaligned_spend.length > 0}
+    <h3>Unaligned spend</h3>
+    <ul data-testid="exec-unaligned-spend">
+      {#each alignment.unaligned_spend as row (row.currency)}
+        <li><strong>{money(row.planned_minor, row.currency)}</strong> planned with no objective</li>
+      {/each}
+    </ul>
+  {/if}
+  {#if alignment.unaligned_items.length > 0}
+    <h3>Largest unaligned items</h3>
+    <ul data-testid="exec-unaligned-items">
+      {#each alignment.unaligned_items as row (row.item.pid)}
+        <li>
+          {row.item.name} <span class="muted">({row.item.kind})</span>
+          {#each row.planned as line (line.currency)}
+            · {money(line.planned_minor, line.currency)}
+          {/each}
+        </li>
+      {/each}
+    </ul>
+  {/if}
+{/if}
+
 {#if decisions}
   <h2>Decision log</h2>
   <table data-testid="exec-decisions">
@@ -142,4 +186,5 @@
   .rag-red { background: #b91c1c; }
   .rag-amber { background: #b45309; }
   .rag-green { background: #15803d; }
+  td.warn { color: #b45309; font-weight: 600; }
 </style>

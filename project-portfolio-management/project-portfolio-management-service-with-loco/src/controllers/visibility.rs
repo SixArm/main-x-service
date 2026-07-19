@@ -299,6 +299,9 @@ async fn complete_milestone(
     let row_pid = milestone.pid;
     let mut active: milestones::ActiveModel = milestone.into();
     active.done = ActiveValue::set(true);
+    // Stamp the completion instant for the delivery-flow metrics
+    // (idempotent completes keep the first stamp).
+    active.done_at = ActiveValue::set(Some(chrono::Utc::now().into()));
     let row = active
         .update(&ctx.db)
         .await

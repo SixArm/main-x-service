@@ -24,6 +24,8 @@ pub struct Model {
     pub actual_minor: i64,
     pub period_start: Option<Date>,
     pub period_end: Option<Date>,
+    pub gate: Option<String>,
+    pub released_at: Option<DateTimeWithTimeZone>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 

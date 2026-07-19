@@ -372,6 +372,73 @@ export interface TechnologyRadar {
   }>;
 }
 
+
+/** `GET /api/executive/alignment` response. */
+export interface AlignmentCoverage {
+  as_of: string;
+  derivation: string;
+  by_collection: Array<{ collection: string; total: number; aligned: number; unaligned: number }>;
+  unaligned_spend: VarianceRow[];
+  unaligned_items: Array<{
+    item: InsightItemRef;
+    planned: Array<{ currency: string; planned_minor: number }>;
+  }>;
+}
+
+/** `GET /api/technology/debt` response. */
+export interface TechDebtRegister {
+  as_of: string;
+  note: string;
+  open_exposure: number;
+  statuses: Record<string, number>;
+  register: Array<{
+    pid: string;
+    title: string;
+    status: string;
+    exposure: number;
+    escalated: boolean;
+    owner_ref: string | null;
+    item: InsightItemRef | null;
+  }>;
+}
+
+/** `GET /api/technology/flow` response. */
+export interface FlowMetrics {
+  as_of: string;
+  window_months: number;
+  derivation: string;
+  throughput_by_month: Record<string, number>;
+  timed_completions: number;
+  median_lead_days: number | null;
+  undated_completions: number;
+}
+
+/** `GET /api/scenarios/compare` response. */
+export interface ScenarioComparison {
+  a: ScenarioSide;
+  b: ScenarioSide;
+  deltas: {
+    planned_by_currency: Array<{ currency: string; a_minor: number; b_minor: number; delta_minor: number }>;
+    exposure: number;
+    alignment: number;
+  };
+  note: string;
+}
+
+/** One side of a scenario comparison. */
+export interface ScenarioSide {
+  pid: string;
+  name: string;
+  status: string;
+  feasible: boolean;
+  evaluation: {
+    planned_by_currency: Array<[string, number]>;
+    total_exposure: number;
+    total_alignment: number;
+    violations: string[];
+  };
+}
+
 export class PpmClient {
   constructor(private readonly http: ApiClient) {}
 
@@ -627,6 +694,20 @@ export class PpmClient {
   }
   technologyRadar(): Promise<TechnologyRadar> {
     return this.http.get("/api/technology/radar");
+  }
+  executiveAlignment(): Promise<AlignmentCoverage> {
+    return this.http.get("/api/executive/alignment");
+  }
+  technologyDebt(): Promise<TechDebtRegister> {
+    return this.http.get("/api/technology/debt");
+  }
+  technologyFlow(months?: number): Promise<FlowMetrics> {
+    return this.http.get(`/api/technology/flow${months ? `?months=${months}` : ""}`);
+  }
+  compareScenarios(a: string, b: string): Promise<ScenarioComparison> {
+    return this.http.get(
+      `/api/scenarios/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`,
+    );
   }
   /** The CSV download URL for a saved report (same-origin proxy). */
   reportCsvUrl(pid: string): string {

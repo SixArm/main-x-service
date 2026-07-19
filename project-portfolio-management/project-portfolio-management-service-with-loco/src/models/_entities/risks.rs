@@ -25,6 +25,7 @@ pub struct Model {
     pub mitigation: Option<String>,
     pub review_date: Option<Date>,
     pub escalated_at: Option<DateTimeWithTimeZone>,
+    pub category: Option<String>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 

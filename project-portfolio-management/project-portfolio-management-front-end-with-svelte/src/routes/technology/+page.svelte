@@ -13,17 +13,23 @@
     PpmClient,
     type DependencyRisk,
     type TechnologyRadar,
+    type TechDebtRegister,
+    type FlowMetrics,
   } from "$lib/api/ppm";
 
   const ppm = PpmClient.withFetch();
   let risk = $state<DependencyRisk | null>(null);
   let radar = $state<TechnologyRadar | null>(null);
+  let debt = $state<TechDebtRegister | null>(null);
+  let flow = $state<FlowMetrics | null>(null);
   let error = $state<string | null>(null);
 
   onMount(async () => {
     try {
       risk = await ppm.technologyDependencyRisk();
       radar = await ppm.technologyRadar();
+      debt = await ppm.technologyDebt();
+      flow = await ppm.technologyFlow();
     } catch (err) {
       error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
     }
@@ -120,6 +126,58 @@
       {/each}
     </tbody>
   </table>
+{/if}
+
+{#if debt}
+  <h2>Technical-debt register</h2>
+  <p class="muted">{debt.note} · open exposure {debt.open_exposure}</p>
+  <table data-testid="tech-debt">
+    <thead>
+      <tr><th>Risk</th><th>Item</th><th>Status</th><th>Exposure</th><th>Owner</th></tr>
+    </thead>
+    <tbody>
+      {#each debt.register as row (row.pid)}
+        <tr>
+          <td>{row.title}{#if row.escalated}&nbsp;⚠{/if}</td>
+          <td>{row.item?.name ?? "—"}</td>
+          <td>{row.status}</td>
+          <td>{row.exposure}</td>
+          <td>{row.owner_ref ?? "—"}</td>
+        </tr>
+      {:else}
+        <tr><td colspan="5" class="muted">No tech_debt risks recorded.</td></tr>
+      {/each}
+    </tbody>
+  </table>
+{/if}
+
+{#if flow}
+  <h2>Delivery flow</h2>
+  <p class="muted">{flow.derivation}</p>
+  <table data-testid="tech-flow">
+    <thead>
+      <tr><th>Month</th><th>Milestones completed</th></tr>
+    </thead>
+    <tbody>
+      {#each Object.entries(flow.throughput_by_month) as [month, count] (month)}
+        <tr><td>{month}</td><td>{count}</td></tr>
+      {:else}
+        <tr><td colspan="2" class="muted">No timed completions in the window.</td></tr>
+      {/each}
+    </tbody>
+  </table>
+  <p>
+    Median lead:
+    {#if flow.median_lead_days === null}
+      <span class="muted">no timed completions</span>
+    {:else}
+      <strong>{flow.median_lead_days} days</strong>
+    {/if}
+    over {flow.timed_completions} timed completions
+    {#if flow.undated_completions > 0}
+      · {flow.undated_completions} completed before timing existed (untimed)
+    {/if}
+  </p>
 {/if}
 
 <style>

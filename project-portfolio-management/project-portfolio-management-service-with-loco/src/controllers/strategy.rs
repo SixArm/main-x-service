@@ -336,7 +336,7 @@ async fn list_scenarios(State(ctx): State<AppContext>) -> Result<Response> {
 }
 
 /// Prepare a scenario's member facts and run the pure evaluation.
-async fn evaluate(ctx: &AppContext, scenario: &scenarios::Model) -> Result<rules::Evaluation> {
+pub(crate) async fn evaluate(ctx: &AppContext, scenario: &scenarios::Model) -> Result<rules::Evaluation> {
     let work_item_pids: Vec<Uuid> = scenario
         .members
         .get("work_item_pids")
@@ -415,6 +415,83 @@ async fn evaluate(ctx: &AppContext, scenario: &scenarios::Model) -> Result<rules
             must_include,
         },
     ))
+}
+
+/// Query for `GET /api/scenarios/compare`: the two scenario pids.
+#[derive(Debug, serde::Deserialize)]
+struct CompareQuery {
+    a: String,
+    b: String,
+}
+
+/// `GET /api/scenarios/compare?a=&b=` — evaluate two scenarios live
+/// (the same evaluation the single endpoint runs; nothing persisted)
+/// and report them side by side with per-currency planned deltas
+/// (`b - a`, same-currency only — currencies never merge), exposure
+/// and alignment deltas, and both feasibility verdicts.
+#[debug_handler]
+async fn compare_scenarios(
+    axum::extract::Query(query): axum::extract::Query<CompareQuery>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let load = |pid: &str| -> Result<Uuid> {
+        Uuid::parse_str(pid).map_err(|_| Error::NotFound)
+    };
+    let (a_pid, b_pid) = (load(&query.a)?, load(&query.b)?);
+    let mut pair = Vec::new();
+    for pid in [a_pid, b_pid] {
+        let scenario = scenarios::Entity::find()
+            .filter(scenarios::Column::Pid.eq(pid))
+            .filter(scenarios::Column::DeletedAt.is_null())
+            .one(&ctx.db)
+            .await
+            .map_err(db_err)?
+            .ok_or(Error::NotFound)?;
+        let evaluation = evaluate(&ctx, &scenario).await?;
+        pair.push((scenario, evaluation));
+    }
+    let (b_side, b_eval) = pair.pop().expect("two loaded");
+    let (a_side, a_eval) = pair.pop().expect("two loaded");
+    // Per-currency planned delta (b - a); a currency present on only
+    // one side still gets a row (the other side reads 0).
+    let mut currencies: Vec<&str> = a_eval
+        .planned_by_currency
+        .iter()
+        .chain(&b_eval.planned_by_currency)
+        .map(|(c, _)| c.as_str())
+        .collect();
+    currencies.sort_unstable();
+    currencies.dedup();
+    let planned_delta: Vec<serde_json::Value> = currencies
+        .into_iter()
+        .map(|currency| {
+            let of = |eval: &rules::Evaluation| {
+                eval.planned_by_currency
+                    .iter()
+                    .find(|(c, _)| c == currency)
+                    .map_or(0, |(_, minor)| *minor)
+            };
+            let (a_minor, b_minor) = (of(&a_eval), of(&b_eval));
+            serde_json::json!({
+                "currency": currency,
+                "a_minor": a_minor,
+                "b_minor": b_minor,
+                "delta_minor": b_minor.saturating_sub(a_minor),
+            })
+        })
+        .collect();
+    format::json(serde_json::json!({
+        "a": { "pid": a_side.pid, "name": a_side.name, "status": a_side.status,
+               "feasible": a_eval.violations.is_empty(), "evaluation": a_eval },
+        "b": { "pid": b_side.pid, "name": b_side.name, "status": b_side.status,
+               "feasible": b_eval.violations.is_empty(), "evaluation": b_eval },
+        "deltas": {
+            "planned_by_currency": planned_delta,
+            "exposure": b_eval.total_exposure - a_eval.total_exposure,
+            "alignment": b_eval.total_alignment - a_eval.total_alignment,
+        },
+        "note": "b minus a; per-currency deltas only — currencies never merge",
+    }))
 }
 
 /// `GET /api/scenarios/{pid}/evaluate` — what-if arithmetic over live
@@ -834,6 +911,7 @@ pub fn routes() -> Routes {
         .add("/ideas/{pid}/convert", post(convert_idea))
         .add("/scenarios", post(create_scenario))
         .add("/scenarios", get(list_scenarios))
+        .add("/scenarios/compare", get(compare_scenarios))
         .add("/scenarios/{pid}/evaluate", get(evaluate_scenario))
         .add("/scenarios/{pid}/commit", post(commit_scenario))
         .add("/objectives", post(create_objective))

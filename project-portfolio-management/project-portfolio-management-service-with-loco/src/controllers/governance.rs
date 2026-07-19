@@ -503,6 +503,10 @@ struct RiskPayload {
     mitigation: Option<String>,
     #[serde(default)]
     review_date: Option<chrono::NaiveDate>,
+    /// Optional category (`delivery` / `tech_debt` / `compliance` /
+    /// `security` / `other`); absent reads as `delivery`.
+    #[serde(default)]
+    category: Option<String>,
 }
 
 /// `POST /api/{collection}/{pid}/risks` — raise a risk (status `open`).
@@ -527,6 +531,10 @@ async fn create_risk(
         && !valid_ref(owner, &["worker", "person"]) {
             problems.push("owner_ref must be a worker:/person: URN".to_string());
         }
+    if let Some(category) = payload.category.as_deref()
+        && !rules::is_token(rules::RISK_CATEGORIES, category) {
+            problems.push(format!("category must be one of {:?}", rules::RISK_CATEGORIES));
+        }
     if !problems.is_empty() {
         return Err(unprocessable(&problems));
     }
@@ -543,6 +551,7 @@ async fn create_risk(
         mitigation: ActiveValue::set(payload.mitigation.clone()),
         review_date: ActiveValue::set(payload.review_date),
         escalated_at: ActiveValue::set(None),
+        category: ActiveValue::set(payload.category.clone()),
         deleted_at: ActiveValue::set(None),
         ..Default::default()
     }
@@ -687,6 +696,10 @@ struct BudgetPayload {
     period_start: Option<chrono::NaiveDate>,
     #[serde(default)]
     period_end: Option<chrono::NaiveDate>,
+    /// Optional funding gate: the line is HELD (no actuals) until the
+    /// work item's stage reaches this gate and the line is released.
+    #[serde(default)]
+    gate: Option<String>,
 }
 
 /// `POST /api/{collection}/{pid}/budget-lines`.
@@ -715,6 +728,10 @@ async fn create_budget_line(
         && end < start {
             problems.push("period_end is before period_start".to_string());
         }
+    if let Some(gate) = payload.gate.as_deref()
+        && !rules::is_token(rules::GATES, gate) {
+            problems.push(format!("gate must be one of {:?}", rules::GATES));
+        }
     if !problems.is_empty() {
         return Err(unprocessable(&problems));
     }
@@ -729,6 +746,8 @@ async fn create_budget_line(
         actual_minor: ActiveValue::set(0),
         period_start: ActiveValue::set(payload.period_start),
         period_end: ActiveValue::set(payload.period_end),
+        gate: ActiveValue::set(payload.gate.clone()),
+        released_at: ActiveValue::set(None),
         deleted_at: ActiveValue::set(None),
         ..Default::default()
     }
@@ -806,6 +825,15 @@ async fn record_actual(
     if line.work_item_pid != item.pid {
         return Err(Error::NotFound);
     }
+    // A stage-gated tranche is HELD until released: no actuals may be
+    // recorded against it (funding follows governance, not vice versa).
+    if let Some(gate) = line.gate.as_deref()
+        && line.released_at.is_none()
+    {
+        return Err(refuse(&format!(
+            "budget line is held until gate `{gate}` passes and the line is released"
+        )));
+    }
     let next = rules::accumulate_actual(line.actual_minor, payload.amount_minor)
         .map_err(|e| refuse(&e))?;
     let line_pid = line.pid;
@@ -823,6 +851,52 @@ async fn record_actual(
     AuditModel::record(&ctx.db, line_pid, "budget_actual_recorded", caller.actor(), Some(snapshot))
         .await
         .ok();
+    format::json(row)
+}
+
+/// `POST /api/{collection}/{pid}/budget-lines/{line_pid}/release` —
+/// release a stage-gated funding tranche. Refused (`422`) when the
+/// line has no gate, is already released, or the work item's stage has
+/// not reached the gate (first the governance, then the money).
+#[debug_handler]
+async fn release_budget_line(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path((collection, pid, line_pid)): Path<(String, String, String)>,
+) -> Result<Response> {
+    let item = find_item(&ctx, &collection, &pid).await?;
+    let line = gov::find_budget_line(&ctx.db, gov::parse_pid(&line_pid)?).await?;
+    if line.work_item_pid != item.pid {
+        return Err(Error::NotFound);
+    }
+    let Some(gate) = line.gate.clone() else {
+        return Err(refuse("budget line has no funding gate; nothing to release"));
+    };
+    if line.released_at.is_some() {
+        return Err(refuse("budget line is already released"));
+    }
+    if !rules::gate_reached(item.stage.as_deref(), &gate) {
+        return Err(refuse(&format!(
+            "gate `{gate}` has not passed (current stage: {})",
+            item.stage.as_deref().unwrap_or("pre_gate")
+        )));
+    }
+    let line_pid = line.pid;
+    let mut active: budget_lines::ActiveModel = line.into();
+    active.released_at = ActiveValue::set(Some(chrono::Utc::now().into()));
+    let row = active
+        .update(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    AuditModel::record(
+        &ctx.db,
+        line_pid,
+        "budget_line_released",
+        caller.actor(),
+        Some(serde_json::json!({ "gate": gate })),
+    )
+    .await
+    .ok();
     format::json(row)
 }
 
@@ -885,6 +959,10 @@ pub fn routes() -> Routes {
         .add(
             "/{collection}/{pid}/budget-lines/{line_pid}/actual",
             post(record_actual),
+        )
+        .add(
+            "/{collection}/{pid}/budget-lines/{line_pid}/release",
+            post(release_budget_line),
         )
         .add("/{collection}/{pid}/governance", get(governance_summary))
 }

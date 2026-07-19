@@ -122,12 +122,13 @@ match breakdown).
 /financials                  CFO area: budget variance + per-currency
                              exposure (server-derived; no FX)
 /technology                  CTO area: technology radar + dependency
-                             risk lens
+                             risk lens + tech-debt register + flow
+                             metrics
 /ideas                       idea board
 /objectives                  OKR objectives + alignment rollups
 /proposals                   work-intake proposal pipeline
 /reports                     saved reports + CSV download
-/scenarios                   scenario planning
+/scenarios                   scenario planning + side-by-side compare
 /signin · /verify            BFF magic-link sign-in / verification
 
 Roadmap (per-work-item project-management sub-routes, §13/§15):
