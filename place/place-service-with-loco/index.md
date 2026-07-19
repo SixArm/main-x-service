@@ -29,6 +29,15 @@ curl http://localhost:5150/api/health
 REST routes mount under `/api/places/*`. See
 [`AGENTS/restful.md`](AGENTS/restful.md) for the full list. All
 endpoints return the standard `{success, data, error}` envelope.
+Duplicate handling includes a stored review queue:
+`GET /api/places/review-queue` (filter `status`, `limit`) and
+`POST /api/places/review-queue/{id}/decision` (decide a pending item,
+`confirmed` / `rejected`).
+
+An HL7 FHIR R5 surface (`src/controllers/fhir.rs`) maps places to the
+FHIR `Location` resource: `GET /fhir/metadata` (CapabilityStatement),
+`POST /fhir/Location` (create), `GET /fhir/Location` (search),
+and `GET` / `PUT` / `DELETE /fhir/Location/{id}`.
 
 Prometheus metrics are exposed at the root path `GET /metrics.prom`
 (text-exposition format, `text/plain; version=0.0.4`) — not under
@@ -90,8 +99,8 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 ## Testing
 
 ```bash
-# 125 unit tests (models, matching components, validation, privacy,
-# search, streaming, metrics, api).
+# 191+ unit tests (models, matching components, validation, privacy,
+# search, streaming, metrics, api); run for the live count.
 cargo test --lib
 
 # 14 bridge tests pinning the service ↔ canonical place-matcher

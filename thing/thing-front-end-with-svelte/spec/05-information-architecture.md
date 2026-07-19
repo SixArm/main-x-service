@@ -10,6 +10,9 @@
 | `/things/[id]` | Detail |
 | `/things/[id]/edit` | Edit |
 | `/things/[id]/audit` | Audit log |
+| `/review` | Duplicate-review board |
+| `/signin` | Magic-link sign-in (BFF) |
+| `/verify` | Magic-link verification (BFF) |
 
 ### Layout shell & navigation
 

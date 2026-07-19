@@ -10,6 +10,10 @@
 | `/courses/[id]` | Detail |
 | `/courses/[id]/edit` | Edit |
 | `/courses/[id]/audit` | Audit log |
+| `/board` | Course lifecycle Kanban board |
+| `/calendar` | CourseInstance schedule calendar |
+| `/signin` | Magic-link sign-in (BFF) |
+| `/verify` | Magic-link verification (BFF) |
 
 ### Layout shell & navigation
 

@@ -190,6 +190,6 @@ Each front-end project ships a thinner doc set:
 - `AGENTS.md` — agent guide (ground rules: Svelte 5 runes only, SPA mode, drift accepted)
 - `CHANGELOG.md` — Keep a Changelog format; v0.1.0 inaugural entry
 
-There is intentionally no `plan.md` and no `tasks.md`: plan content
+There is intentionally no **per-crate** `plan.md` or `tasks.md` (the repo root keeps cross-cutting `plan.md` / `tasks.md`): plan content
 lives in `spec.md §8–§12`, task content in `spec.md §13`, status /
 roadmap in `spec.md §14–§15`, open questions in `spec.md §16`.

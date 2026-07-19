@@ -23,15 +23,15 @@ Per-crate `spec.md`:
 
 - Professional: Enterprise-grade, high-performance, production-ready
 - RESTful API: Modern HTTP API with OpenAPI/Swagger documentation
-- gRPC API: High-performance Remote Procedure Call (RPC) framework
+- gRPC API: High-performance RPC framework (a per-crate subset — see the [overview.md](overview.md) capability matrix)
 - Data Quality: Validation, standardization, normalization, merging
 - Matching: Probabilistic and deterministic matching algorithms
-- Full-Text Search: Powered by Tantivy for fast, accurate record searches
+- Full-Text Search: Tantivy on six crates; case-insensitive `ILIKE` on the rest (see the capability matrix)
 - Duplicate Detection: Real-time and batch deduplication with review queue
 - Record Merging: Merge confirmed duplicate records with full audit trail
 - Create, read, update, delete (CRUD) records
 - Soft delete support with complete audit trails
-- Privacy: Data masking, GDPR data export, consent management
+- Privacy: Data masking, GDPR data export, consent management (a per-crate subset — see the capability matrix)
 - Event Streaming: Real-time event publishing with audit logging
 - Database Integration: PostgreSQL with SeaORM and migrations
 - Podman Ready: Multi-stage builds, Podman Compose for dev/test/prod

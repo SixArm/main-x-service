@@ -29,7 +29,7 @@ npm test               # vitest (BedCard matrix)
 npx playwright test    # e2e (stubbed API — no backend needed)
 ```
 
-## Routes (target)
+## Routes
 
 | Route | View |
 |---|---|
@@ -38,8 +38,12 @@ npx playwright test    # e2e (stubbed API — no backend needed)
 | `/stays/{pid}` | stay detail — journey, Red2Green run, flags, audit slice |
 | `/at-a-glance` | per-ward + site capacity tiles |
 | `/bed-requests` | demand queue + allocation |
+| `/edd` | EDD / discharge-readiness calendar (SVAR Calendar, month view) — read-only overview of expected discharge dates |
 | `/locate` | patient locate search |
 | `/audits` | ward-scoped handover trail |
+| `/signin` | magic-link sign-in (BFF flow) |
+| `/signout` | sign out — clears the session |
+| `/verify` | magic-link verification → cookie session |
 
 ## Stack
 

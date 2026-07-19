@@ -97,6 +97,8 @@ The Person Service is an identity-registry system that maintains a centralized r
   - `DELETE /api/persons/{id}` - Delete person (soft)
   - `GET /api/persons/search` - Search persons
   - `POST /api/persons/match` - Match person records
+  - `GET /api/persons/review-queue` - Stored dedup review queue (filter `status`, `limit`)
+  - `POST /api/persons/review-queue/{id}/decision` - Decide a pending review item (`confirmed` / `rejected`)
   - `GET /api/persons/{id}/audit` - Get audit logs
   - `GET /api/audit/recent` - Recent audit activity
   - `GET /api/audit/user` - User audit logs
@@ -418,6 +420,20 @@ curl -X POST http://localhost:8080/api/persons/match \
   }'
 ```
 
+**List the Review Queue:**
+
+```bash
+curl "http://localhost:8080/api/persons/review-queue?status=pending&limit=20"
+```
+
+**Decide a Review Item:**
+
+```bash
+curl -X POST http://localhost:8080/api/persons/review-queue/{id}/decision \
+  -H "Content-Type: application/json" \
+  -d '{ "status": "confirmed" }'
+```
+
 **Get Audit Logs:**
 
 ```bash
@@ -482,16 +498,8 @@ podman compose -f docker-compose.test.yml up --build
 
 **Current Coverage:**
 
-- Unit Tests: 24 tests covering matching, search, and core logic
-- Integration Tests: 8 tests covering full API workflows
-- Total: 32 tests
-
-**Test Breakdown:**
-
-- Matching Algorithms: 8 tests
-- Search Functionality: 5 tests
-- API Endpoints: 8 tests
-- Core Utilities: 11 tests
+- Unit Tests: 237+ tests covering matching, search, phonetic, validation, privacy, models, review queue, bulk (run `cargo test --lib` for the live count)
+- Integration Tests: 29+ tests covering full API workflows and the matcher bridge (run `cargo test --tests` for the live count)
 
 See [spec/13-tasks.md](spec/13-tasks.md) for integration testing details.
 
@@ -535,6 +543,7 @@ Helm chart and Kubernetes manifests planned for Phase 13.
 - ✅ **Non-Root Containers**: Podman containers run as non-root user
 - ✅ **Environment-Based Secrets**: No secrets in code or images
 - ✅ **CORS Configuration**: Configurable cross-origin policies
+- ✅ **Input Validation**: Comprehensive validation on create/update (`src/validation/`, returns 422)
 
 ### Planned
 
@@ -543,7 +552,6 @@ Helm chart and Kubernetes manifests planned for Phase 13.
 - ⏳ **Encryption at Rest**: Database encryption
 - ⏳ **TLS/SSL**: HTTPS enforcement
 - ⏳ **Rate Limiting**: API rate limiting
-- ⏳ **Input Validation**: Comprehensive input validation
 
 ### Compliance Standards
 

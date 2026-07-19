@@ -13,7 +13,8 @@ service.
 
 ## 2. Scope
 
-In scope: the four routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`), the
+In scope: the routes (`/`, `/care-pathways`, `/sequence`, `/new`,
+`/[pid]`, `/[pid]/edit`, `/signin`, `/verify`), the
 API client, the care-pathway form, a name-search box on the list, a
 merge-duplicate action on the detail page, a per-pathway audit-trail
 view on the detail page, and a system-wide recent-activity (event

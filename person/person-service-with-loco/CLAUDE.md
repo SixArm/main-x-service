@@ -376,21 +376,9 @@ podman compose -f docker-compose.test.yml up  # Run with Podman
 
 **Current Coverage:**
 
-- Unit Tests: 99 tests covering matching, search, phonetic, validation, privacy, models
-- Integration Tests: 7 tests covering full API workflows
+- Unit Tests: 237+ tests covering matching, search, phonetic, validation, privacy, models, review queue, bulk (run `cargo test --lib` for the live count)
+- Integration Tests: 29+ tests covering full API workflows and the matcher bridge (run `cargo test --tests` for the live count)
 - Benchmark Suites: 3 (matching, search, validation)
-- Total: 106+ tests
-
-**Test Breakdown:**
-
-- Matching (algorithms, phonetic, scoring, matchers): 52 tests
-- Validation & Normalization: 16 tests
-- Search Functionality: 13 tests
-- Privacy/Masking/Consent: 9 tests
-- Models (person, document, emergency contact): 8 tests
-- API Endpoints: 7 tests (integration)
-- Module Import: 1 test
-- Benchmarks: 3 suites (matching, search, validation)
 
 ## Deployment
 
@@ -444,7 +432,7 @@ This project was developed in 14 comprehensive phases:
 6. **Phase 11**: Docker & Deployment
 7. **Phase 12**: Documentation
 8. **Phase 13**: Advanced identity-matching features (duplicate detection, merging, deduplication, validation, privacy, emergency contacts, identity documents, phonetic matching)
-9. **Phase 14**: Compilation Fixes, Test Expansion & Documentation Update (99 unit tests, 3 benchmark suites, comprehensive AGENTS docs)
+9. **Phase 14**: Compilation Fixes, Test Expansion & Documentation Update (expanded unit-test suite, 3 benchmark suites, comprehensive AGENTS docs)
 
 See [spec.md §13](spec/13-tasks.md) for the live task queue and [spec.md §14](spec/14-implementation-status.md) for implementation status.
 

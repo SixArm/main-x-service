@@ -57,5 +57,5 @@ The matching system compares two records and returns a confidence score in `[0.0
 - **Real-time** on create — `POST /api/<plural>` returns `409 Conflict` with candidate matches when duplicates are detected
 - **Explicit** check — `POST /api/<plural>/check-duplicates` checks without creating
 - **Batch** — `POST /api/<plural>/deduplicate` scans the entire index
-- **Review queue** — items captured with status `Pending`, `Confirmed`, `Rejected`, `AutoMerged`
+- **Review queue** — candidate pairs are **persisted** in a `review_queue` table (person / worker / place / thing / organization; normalized pair order, UNIQUE upsert so re-scans refresh scores while decided rows keep their decision) with status `pending` / `confirmed` / `rejected` / `automerged` (lowercase wire tokens), listed via `GET /api/<plural>/review-queue` and decided via `POST /api/<plural>/review-queue/{id}/decision` (first-writer-wins; only `pending` items can be decided)
 - **Configurable rules** — `threshold`, `max_candidates`, `auto_merge_threshold`

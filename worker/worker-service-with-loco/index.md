@@ -97,6 +97,8 @@ The Worker Service is an identity-registry system that maintains a centralized r
   - `DELETE /api/workers/{id}` - Delete worker (soft)
   - `GET /api/workers/search` - Search workers
   - `POST /api/workers/match` - Match worker records
+  - `GET /api/workers/review-queue` - Stored dedup review queue (filter `status`, `limit`)
+  - `POST /api/workers/review-queue/{id}/decision` - Decide a pending review item (`confirmed` / `rejected`)
   - `GET /api/workers/{id}/audit` - Get audit logs
   - `GET /api/audit/recent` - Recent audit activity
   - `GET /api/audit/user` - User audit logs
@@ -482,16 +484,8 @@ podman compose -f docker-compose.test.yml up --build
 
 **Current Coverage:**
 
-- Unit Tests: 24 tests covering matching, search, and core logic
-- Integration Tests: 8 tests covering full API workflows
-- Total: 32 tests
-
-**Test Breakdown:**
-
-- Matching Algorithms: 8 tests
-- Search Functionality: 5 tests
-- API Endpoints: 8 tests
-- Core Utilities: 11 tests
+- Unit Tests: 203+ tests covering matching, search, phonetic, validation, privacy, models, review queue (run `cargo test --lib` for the live count)
+- Integration Tests: 25+ tests covering full API workflows and the matcher bridge (run `cargo test --tests` for the live count)
 
 See [spec/13-tasks.md](spec/13-tasks.md) for integration testing details.
 

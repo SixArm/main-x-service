@@ -4,16 +4,20 @@ Operator UI for the [Care Pathway Service](../care-pathway-service-with-loco):
 care-pathway **CRUD + matching + name search + merge + audit trail +
 recent activity**.
 
-SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
+SvelteKit 2 · Svelte 5 (runes) · SVAR DataGrid · Lily Design System · TypeScript strict · SPA.
 
 ## Routes
 
 | Route | Purpose |
 |---|---|
 | `/` | List care pathways + name-search box + recent-activity toggle |
+| `/care-pathways` | SVAR DataGrid index with FilterBar (client-side filtering) |
+| `/sequence` | Intervention sequence Gantt (SVAR) — the selected pathway's interventions as ordered bars on an **ordinal** axis (a sequence view, not a schedule; the model carries order only, no durations or dates) |
 | `/new` | Create |
 | `/[pid]` | Detail + delete + check-duplicates + merge + audit-trail toggle |
 | `/[pid]/edit` | Edit |
+| `/signin` | Magic-link sign-in (BFF flow against the auth service) |
+| `/verify` | Magic-link verification landing page |
 
 Auth (BFF): **Sign in** via the central authentication-service
 magic-link establishes a server-side **cookie session**

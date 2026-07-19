@@ -61,11 +61,8 @@ products, programs}` (identical controller shape each). See
 | Group | Paths |
 |---|---|
 | Work-item CRUD | `POST`/`GET` `/{collection}`, `GET`/`PUT`/`DELETE` `/{collection}/{pid}`, `GET /{collection}/search?q=` |
-| Match | `POST /{collection}/match` · `/check-duplicates` · `/deduplicate` (within-collection; R-GATE) |
+| Match | `POST /{collection}/match` · `/check-duplicates` (within-collection; R-GATE) |
 | Merge | `POST /{collection}/merge` (`422` equal pids / cross-kind, `404` unknown) · `GET /{collection}/merges/recent` |
-| Sub-resources | `/{collection}/{pid}/{goals,tasks,issues}` (full CRUD) |
-| Derived views | `GET /{collection}/{pid}/timeline` · `/burndown` |
-| Cross-service links | `POST`/`GET`/`DELETE /{collection}/{pid}/links` (emits `linked`/`unlinked`) |
 | Strategy (PPM Phase C) | `/ideas` (+ `vote`/`dismiss`/`convert`) · `/scenarios` (+ `/{pid}/evaluate`/`commit`) · `/objectives` (+ `/{pid}/alignment`) · `/{collection}/{pid}/objectives` · `/{collection}/{pid}/benefits` (+ `/{b_pid}/realize`) |
 | Visibility (PPM Phase B) | `POST`/`GET /dependencies` (+ `DELETE /{pid}`) · `GET /portfolios/{pid}/schedule` · `/{collection}/{pid}/milestones` (+ `/{m_pid}/complete`) · `/{collection}/{pid}/allocations` (+ `DELETE /{a_pid}`) · `GET /capacity` · `/reports` (+ `/{pid}/run?format=json|csv`) · `GET /at-a-glance` (ETag) |
 | Governance (PPM Phase A) | `POST`/`GET /proposals` (+ `/{pid}` + `submit`/`review`/`approve`/`reject`/`promote`/`duplicates`) · `/{collection}/{pid}/gate-reviews` · `/risks` (+ `/{risk_pid}` + `escalate`) · `/budget-lines` (+ `/{line_pid}/actual`) · `GET /{collection}/{pid}/governance` |
@@ -73,21 +70,27 @@ products, programs}` (identical controller shape each). See
 | Auth | `GET /{collection}/whoami` (`401` without a valid token) |
 | Docs / metrics | `GET /api-docs/openapi.json` · `/swagger-ui` · `/metrics.prom` |
 
-Plus loco's default `/_health`, `/_ping`. Every CRUD action (work item and
-sub-resource) writes an `audit_logs` row and publishes a
-`created`/`updated`/`deleted` (and `merged`/`linked`/`unlinked`) event.
+Plus loco's default `/_health`, `/_ping`. Every CRUD action (work item
+and phase record) writes an `audit_logs` row and publishes a
+`created`/`updated`/`deleted` (and `merged`) event.
 **Matching is within a collection only** — the matcher's R-GATE makes a
 cross-`kind` pair score `0.0`, so you never match a project against a
 product.
+
+**Deferred endpoints (spec §13 — specified, not yet wired):**
+
+- `POST /{collection}/deduplicate` — batch scan → review queue
+- `/{collection}/{pid}/{goals,tasks,issues}` — operational sub-resource CRUD
+- `GET /{collection}/{pid}/timeline` · `/burndown` — derived views
+- `POST`/`GET`/`DELETE /{collection}/{pid}/links` — cross-service entity
+  links (would emit `linked`/`unlinked`)
 
 ## MVP scope
 
 CRUD + `ILIKE` name search + matching (embed `project-portfolio-management-matcher`,
 `MatchingEngine::new(MatchConfig::default())`) across the four
 collections, real-time create duplicate detection (`409`,
-within-collection), the operational sub-resources (goals / tasks / issues)
-+ derived timeline / burndown views, record merge, cross-service entity
-links (write side), payload validation (`src/validation.rs`: UUID /
+within-collection), record merge, payload validation (`src/validation.rs`: UUID /
 PM-tool-id / URI identifier shapes; non-blank goal titles; BCP-47
 `in_language`; child-kind `portfolio_ref`), OpenAPI 3 + Swagger UI, an
 audit log + in-memory event stream (durable-bus Phase 1 — see
@@ -136,34 +139,37 @@ sub-resources, gRPC.
    [authentication-service](../../authentication/authentication-service-with-loco)
    (cookie session for humans; offline PASETO v4.public for peers).
 
-## Layout (intended, once generated)
+## Layout
 
 ```
 src/
 ├── app.rs                    loco Hooks (routes, truncate)
 ├── bin/main.rs               loco CLI entrypoint
-├── controllers/work_items.rs shared parameterised CRUD + match + check-duplicates + deduplicate + merge + audit/events + whoami (per kind)
-├── controllers/{tasks,issues,goals}.rs  sub-resource CRUD
-├── controllers/views.rs      timeline + burndown derived read views
-├── controllers/links.rs      cross-service entity links (write side)
+├── controllers/work_items.rs shared parameterised CRUD + match + check-duplicates + merge + audit/events + whoami (per kind)
+├── controllers/governance.rs PPM Phase A: proposals, gate reviews, risks, budget lines
+├── controllers/visibility.rs PPM Phase B: dependencies, schedule, milestones, allocations, capacity, reports, at-a-glance
+├── controllers/strategy.rs   PPM Phase C: ideas, scenarios, objectives, benefits
 ├── controllers/docs.rs       OpenAPI JSON + Swagger UI
 ├── controllers/metrics.rs    root /metrics.prom Prometheus endpoint
 ├── metrics.rs                process-wide Prometheus registry (per-collection counters)
 ├── auth.rs                   offline PASETO v4.public verification (AuthUser/MaybeAuthUser) via authentication-verifier
 ├── merge.rs                  pure record-merge logic (merge_work_items; cross-kind rejected)
+├── governance.rs · visibility.rs · strategy.rs   pure domain logic for the three phases
 ├── openapi.rs                OpenAPI 3 document
-├── streaming.rs              CRUD/merge/link event stream — Phase 1 durable-bus envelope + EventPublisher seam + InMemoryPublisher
+├── relay.rs                  durable-bus Phase 2 outbox relay (poll/ack loop)
+├── streaming.rs              CRUD/merge event stream — durable Envelope + EventPublisher seam (in-memory default, outbox transport)
 ├── validation.rs             name + goal-title + identifier + BCP-47 + portfolio_ref checks → 422
 ├── models/
 │   ├── work_items.rs         CRUD helpers over the stored payload (parameterised by kind)
-│   ├── {tasks,issues,goals}.rs  sub-resource helpers
-│   ├── entity_links.rs       cross-service link write-side helpers
+│   ├── governance.rs · visibility.rs · strategy.rs   phase record helpers
+│   ├── event_outbox.rs       durable-bus Phase 2 outbox enqueue + relay poll/ack
 │   ├── audit_logs.rs         audit-trail record/query helpers
 │   ├── merge_records.rs      merge-history record/query helpers
 │   └── _entities/…           SeaORM entities
-migration/src/                …_000001_portfolios, …_projects, …_products, …_programs,
-                              …_000002_audit_logs, …_000003_merge_records,
-                              …_000004_{tasks,goals,issues}, …_000005_entity_links
+migration/src/                …_000001_work_items, …_000002_audit_logs,
+                              …_000003_merge_records, …_000004_event_outbox,
+                              …_000005_governance, …_000006_visibility,
+                              …_000007_strategy
 config/                       development/production/test yaml
 ```
 </content>

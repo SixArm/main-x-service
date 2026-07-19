@@ -14,6 +14,9 @@ SvelteKit front-end for the **[Event Service](../event-service-with-loco/)** in 
 | `/events/[id]/audit` | Per-event audit log |
 | `/events/match` | Match check — score a hypothetical record against the index |
 | `/events/merge` | Merge two events (main + duplicate) |
+| `/calendar` | SVAR Calendar over the event time-window — drag an event to a new slot to reschedule it (writes back via the normal update endpoint) |
+| `/signin` | Magic-link sign-in (BFF flow against the auth service) |
+| `/verify` | Magic-link verification landing page |
 
 ## Stack
 
@@ -43,9 +46,10 @@ Open <http://localhost:5173>.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PUBLIC_API_BASE_URL` | `http://localhost:8080` | Event Service REST base URL |
+| `EVENT_API_URL` | `http://localhost:5150` | Event Service base URL (server-side only) |
+| `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL (server-side only) |
 
-Set in `.env`. Because the variable is prefixed with `PUBLIC_`, SvelteKit exposes it to the client bundle.
+Set in `.env`. Both are **server-side** variables read in `src/lib/server/config.ts` — they are never bundled into the browser. The browser talks only to the app's own origin: entity-API calls go through the same-origin `/api/proxy` BFF route, which forwards them to the Event Service with a server-injected PASETO.
 
 ## Testing
 
@@ -65,7 +69,7 @@ src/
   app.css                  - shared CSS variables + utility classes
   app.d.ts
   lib/
-    config.ts              - PUBLIC_API_BASE_URL
+    config.ts              - API_BASE_URL (same-origin /api/proxy BFF)
     api/
       types.ts             - Event, Location, Party, Offer, Identifier, MatchResult, … (mirrors the Rust models)
       client.ts            - ApiClient + ApiError (envelope-aware fetch)
@@ -108,7 +112,7 @@ The Lily file: dependency resolves to `~/git/lilydesignsystem/lily-design-system
 import Button from "lily-design-system-svelte-headless/src/lib/components/Button/Button.svelte";
 ```
 
-See the commented example in `src/routes/+layout.svelte`. The MVP currently uses styled native HTML controls; swap in Lily primitives as the design system stabilises.
+Lily's `ThemeSelect` and `LocaleSelect` components are live in `src/routes/+layout.svelte` — theme choice persists via ThemeSelect's own storage key, and LocaleSelect drives the i18n store (which sets `lang`/`dir` on `<html>`).
 
 ## SVAR DataGrid
 

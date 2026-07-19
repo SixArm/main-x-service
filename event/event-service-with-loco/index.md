@@ -562,6 +562,7 @@ Helm chart and Kubernetes manifests planned for Phase 13.
 - ✅ **Non-Root Containers**: Podman containers run as non-root user
 - ✅ **Environment-Based Secrets**: No secrets in code or images
 - ✅ **CORS Configuration**: Configurable cross-origin policies
+- ✅ **Input Validation**: Comprehensive validation on create/update (`src/validation/`, returns 422)
 
 ### Planned
 
@@ -570,7 +571,6 @@ Helm chart and Kubernetes manifests planned for Phase 13.
 - ⏳ **Encryption at Rest**: Database encryption
 - ⏳ **TLS/SSL**: HTTPS enforcement
 - ⏳ **Rate Limiting**: API rate limiting
-- ⏳ **Input Validation**: Comprehensive input validation
 
 ### Compliance Standards
 

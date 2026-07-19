@@ -18,8 +18,8 @@ plus derived timeline / burndown views. Projects / Products / Programs sit
 - Agent guide: [AGENTS.md](./AGENTS.md)
 - Sibling UI: [project-portfolio-management-front-end-with-svelte](../project-portfolio-management-front-end-with-svelte)
 
-> **Status: spec-only.** No Rust / Cargo crate has been generated yet.
-> This doc-set is the inaugural scaffold; the build queue is
+> **Status: implemented (MVP, v0.1.0).** The crate builds and tests
+> green; the remaining deferrals live in the work queue at
 > [spec §13](./spec/index.md).
 
 ## API
@@ -65,8 +65,9 @@ bridge in via `data.goals[]`).
 
 ## Quick start
 
-> Spec-only today — the commands below describe the intended shape once
-> the crate is generated (`loco new`, stripped of the auth starter).
+> The goals / tasks / issues sub-resource routes in the route contract
+> are deferred (spec §13); the commands below run against the shipped
+> crate.
 
 Requires PostgreSQL.
 
@@ -95,10 +96,6 @@ curl -s localhost:5150/api/projects/match -H 'content-type: application/json' \
 curl -s localhost:5150/api/projects/merge -H 'content-type: application/json' \
   -d '{"main_pid":"<survivor-uuid>","duplicate_pid":"<duplicate-uuid>"}'
 
-# Add a task to any work item
-curl -s localhost:5150/api/projects/<pid>/tasks -H 'content-type: application/json' \
-  -d '{"title":"Provision staging cluster","status":"Todo","estimate":8,"remaining":8}'
-
 # Authenticated request: present a short-lived PASETO v4.public token
 # minted by the auth-service (front-ends use a BFF + cookie session; the
 # BFF holds the session and supplies this bearer server-side).
@@ -122,20 +119,25 @@ cargo clippy --all-targets
 
 ## Status
 
-Spec-only scaffold. Planned: CRUD + `ILIKE` name search + matching +
-record merge across the four collections (Portfolio / Project / Product /
-Program) + operational sub-resources (goals / tasks / issues) + derived
-timeline / burndown views + cross-service entity links + audit log +
-in-memory event streaming (durable-bus Phase 1) + OpenAPI/Swagger +
+Implemented (MVP, v0.1.0): CRUD + `ILIKE` name search + within-kind
+matching + record merge + payload validation across the four collections
+(Portfolio / Project / Product / Program — one `work_items` table keyed
+by `kind`), plus the governance / visibility / strategy phases
+(proposals, gate reviews, risks, budget lines; dependencies, milestones,
+allocations, capacity, reports, at-a-glance; ideas, scenarios,
+objectives, benefits), audit log + event streaming (durable-bus Phase 2
+outbox + Phase 3 relay/retention have landed; `src/relay.rs`, gated by
+`PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=outbox` +
+`PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY`) + OpenAPI/Swagger +
 Prometheus metrics + offline PASETO v4.public verification (published
-Ed25519 key) + blanket `/api/*` auth enforcement (off by default, gated by
-`PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`) + payload validation. Deferred (see
-[spec §13](./spec/index.md)): Tantivy full-text/fuzzy search, the durable
-event bus's Fluvio broker sink (Phase 2 outbox + Phase 3 relay/retention
-have landed; `src/relay.rs`, gated by `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=outbox` +
-`PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY`), privacy, front-end merge action,
-bulk import/export, the `posts` / `comments` / `members` collaboration
-sub-resources, gRPC. Auth credentials are issued by the central
+Ed25519 key) + blanket `/api/*` auth enforcement (off by default, gated
+by `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`). Deferred (see
+[spec §13](./spec/index.md)): the operational sub-resources (goals /
+tasks / issues) + derived timeline / burndown views, `deduplicate` + the
+review queue, cross-service entity links, Tantivy full-text/fuzzy
+search, the durable bus's Fluvio broker sink, privacy, front-end merge
+action, bulk import/export, the `posts` / `comments` / `members`
+collaboration sub-resources, gRPC. Auth credentials are issued by the central
 [authentication-service](../../authentication/authentication-service-with-loco):
 the human session is a server-side cookie session, and peers verify a
 short-lived PASETO v4.public token offline. See

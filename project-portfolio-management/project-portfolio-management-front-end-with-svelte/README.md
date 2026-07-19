@@ -10,8 +10,9 @@ SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA · SVAR Svelte
 DataGrid · Lily Design System Svelte Headless · 13-locale i18n · full
 theme catalogue.
 
-> **Status: spec-only (v0.1.0).** This project is documentation first —
-> there is no `src/` yet. The build queue is [`spec/index.md`](spec/index.md) §13.
+> **Status: implemented (MVP, v0.1.0).** `pnpm run check` is 0 errors /
+> 0 warnings, the vitest suite is green, and `pnpm run build` succeeds.
+> The live work queue is [`spec/index.md`](spec/index.md) §13.
 
 ## Collections
 
@@ -34,20 +35,23 @@ parent portfolio, and a portfolio detail page rolls up its children.
 
 | Route | Purpose |
 |---|---|
-| `/` | Collection switcher (defaults to `/portfolios`) |
-| `/{collection}` | List work items (SVAR DataGrid) + name-search box + recent-activity toggle |
+| `/` | Landing — collection switcher into the four collections |
+| `/dashboard` | PPM dashboard — site tiles + per-collection RAG / stage rollups |
+| `/{collection}` | Work-item index (SVAR DataGrid + FilterBar; row selection opens the detail) |
 | `/{collection}/new` | Create |
-| `/{collection}/[pid]` | Detail + delete + check-duplicates + MatchBreakdown + merge + audit timeline (portfolio detail also rolls up its child work items) |
+| `/{collection}/[pid]` | Detail + edit / delete / check-duplicates (within the collection) |
 | `/{collection}/[pid]/edit` | Edit |
-| `/{collection}/[pid]/board` | Kanban task board (Todo / InProgress / InReview / Done / Blocked; drag = status change) |
-| `/{collection}/[pid]/issues` | Issues list (kind / severity / status) |
-| `/{collection}/[pid]/timeline` | Gantt / timeline (goal milestones + task date ranges) |
-| `/{collection}/[pid]/burndown` | Burndown chart (remaining estimate over time) |
-| `/{collection}/[pid]/goals` | Goals panel |
-
-(The collection switcher and the project-management views may ship as
-top-bar controls / detail-page tabs rather than discrete routes; the spec
-fixes the capabilities, not the URLs.)
+| `/{collection}/[pid]/governance` | Governance panel — stage / risk posture / budget variance, gate journey, risks, budget lines, benefits + ROI, OKR mappings, milestones, allocations |
+| `/{collection}/[pid]/schedule` | Portfolio schedule (portfolios only) — member timeframes, critical-path badges, finish-start violations |
+| `/gantt` | Schedule Gantt (SVAR) — the selected portfolio's dated work items as task bars, dependency edges as links, critical path highlighted (read-only) |
+| `/capacity` | Resource capacity — per-person rollup over a window; over-allocation flagged |
+| `/ideas` | Idea board — capture, vote, dismiss, convert to a draft proposal |
+| `/objectives` | OKR objectives registry + per-objective alignment rollups |
+| `/proposals` | Work-intake board — proposal pipeline (draft → … → promoted) + duplicate-demand checks + promote-to-work-item |
+| `/reports` | Saved reports — definitions, synchronous runs, CSV download |
+| `/scenarios` | Scenario planning — what-if candidate portfolios, evaluate, commit |
+| `/signin` | Magic-link sign-in (BFF flow) |
+| `/verify` | Magic-link verification landing page |
 
 ## Layout & chrome
 
@@ -79,7 +83,7 @@ full-width). The chrome area carries:
 - The sibling Lily helper repo (theme / locale selectors are `file:`
   dependencies)
 
-## Quick start (once scaffolded)
+## Quick start
 
 ```bash
 cp .env.example .env     # PUBLIC_API_BASE_URL=http://localhost:5150
@@ -111,10 +115,11 @@ page additionally rolls up its child projects / products / programs.
 A work item is also a **project-management workspace**: its operational
 sub-resources (goals, tasks, issues) live in the service under
 `/api/{collection}/{pid}/…` and are **not** part of the matching
-surface (except goal titles). The board / issues / timeline / burndown /
-goals views consume those endpoints.
+surface (except goal titles). The governance and schedule views (and the
+top-level Gantt / dashboard / capacity views) consume those and the PPM
+endpoints.
 
-## Testing (once scaffolded)
+## Testing
 
 ```bash
 pnpm run check     # svelte-check (strict, 0 errors / 0 warnings)

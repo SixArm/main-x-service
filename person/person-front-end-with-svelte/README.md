@@ -14,6 +14,10 @@ SvelteKit front-end for the **[Person Service](../person-service-with-loco/)** i
 | `/persons/[id]/audit` | Per-person audit log |
 | `/persons/match` | Match check — score a hypothetical record against the index |
 | `/persons/merge` | Merge two persons (main + duplicate) |
+| `/review` | Stored duplicate-review board — SVAR Kanban, drag-to-decide |
+| `/expiry` | Identity-document expiry calendar — SVAR Calendar |
+| `/signin` | Per-app magic-link sign-in (BFF auth page) |
+| `/verify` | Magic-link verification (BFF auth page) |
 
 The persistent layout sidebar (every route) also carries a Lily **theme switcher** and **locale switcher** (FR-11 / FR-12); selections persist to `localStorage`.
 
@@ -46,11 +50,14 @@ Open <http://localhost:5173>.
 
 ## Configuration
 
+The browser calls the same-origin BFF proxy at `/api/proxy` — there is no public API env var (see `src/lib/config.ts`). The server-side BFF reads:
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PUBLIC_API_BASE_URL` | `http://localhost:8080` | Person Service REST base URL |
+| `PERSON_API_URL` | `http://localhost:5150` | Person Service base URL — the proxy injects a server-exchanged PASETO and forwards |
+| `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link login + session→PASETO exchange |
 
-Set in `.env`. Because the variable is prefixed with `PUBLIC_`, SvelteKit exposes it to the client bundle.
+Set in `.env`. Both are read server-side in `src/lib/server/config.ts` and are never exposed to the client bundle.
 
 ## Testing
 
@@ -116,7 +123,7 @@ src/
   app.css                  - shared CSS variables + utility classes
   app.d.ts
   lib/
-    config.ts              - PUBLIC_API_BASE_URL
+    config.ts              - same-origin BFF proxy base (/api/proxy)
     api/
       types.ts             - Person, HumanName, MatchResult, … (mirrors the Rust models)
       client.ts            - ApiClient + ApiError (envelope-aware fetch)

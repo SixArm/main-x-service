@@ -100,6 +100,8 @@ src/
 ├── models/
 │   ├── organizations.rs   CRUD helpers over the stored payload
 │   └── _entities/organizations.rs  SeaORM entity
-migration/src/            m20220101_000001_organizations
+migration/src/            m20220101_000001_organizations, …_000002_audit_logs,
+                          …_000003_merge_records, …_000004_event_outbox,
+                          m20260719_000001_review_queue
 config/                   development/production/test yaml
 ```

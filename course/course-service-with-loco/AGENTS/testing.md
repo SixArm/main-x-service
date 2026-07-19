@@ -5,7 +5,7 @@
 ### Unit tests
 
 Embedded in source files via `#[cfg(test)] mod tests`. Run with
-`cargo test --lib` — 42 tests total today.
+`cargo test --lib` — 109+ tests today (run it for the live count).
 
 | Module | Tests | What's covered |
 |---|---|---|
@@ -89,7 +89,7 @@ the shared DB).
 ## Running tests
 
 ```bash
-cargo test --lib                              # 42 unit tests, no DB needed
+cargo test --lib                              # 109+ unit tests, no DB needed
 cargo test --test duplicate_detection         # 14 bridge tests, no DB needed
 cargo test --test api_integration_test -- --ignored   # 12 integration tests, DB required
 cargo bench                                   # 3 criterion benches

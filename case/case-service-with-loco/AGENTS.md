@@ -60,11 +60,14 @@ is **durable-bus Phase 1**:
 `/events/recent` returns the flat `EventView { kind, pid, name, seq }`
 projection unchanged (see
 [`agents/share/event-bus.md`](../../agents/share/event-bus.md) §4–§5).
-Deferred (spec §13): Tantivy full-text/fuzzy search (title search via
-`ILIKE` is done), search-blocked dedup candidates, durable event bus
-Phases 2–3 (transactional outbox → Fluvio), privacy, front-end merge
-action, blanket `/api/*` auth enforcement activation (the middleware is
-wired, off by default).
+The durable event bus's Phase-2 transactional outbox + relay landed
+(`models/event_outbox.rs`, `src/relay.rs`; default-off via
+`CASE_EVENT_TRANSPORT=memory`). Blanket `/api/*` auth enforcement is
+implemented, default-off via `CASE_REQUIRE_AUTH` (activation is a
+deployment decision). Deferred (spec §13): Tantivy full-text/fuzzy
+search (title search via `ILIKE` is done), search-blocked dedup
+candidates, the durable bus's Phase-3 Fluvio broker sink, privacy,
+front-end merge action.
 
 > **Auth pivot done here.** The family moved from RS256 JWT + JWKS to
 > cookie sessions + offline **PASETO v4.public** verification (published

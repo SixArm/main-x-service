@@ -105,11 +105,26 @@ match breakdown).
 
 ```
 /                            collection switcher → defaults to /portfolios
-/{collection}                list (SVAR DataGrid) + search + recent activity
+/dashboard                   PPM dashboard (site tiles + RAG / stage rollups)
+/{collection}                list (SVAR DataGrid + FilterBar)
 /{collection}/new            create form
-/{collection}/[pid]          detail + delete + check-duplicates + merge + audit
-                             (Portfolio detail also rolls up child work items)
+/{collection}/[pid]          detail + delete + check-duplicates
 /{collection}/[pid]/edit     edit form
+/{collection}/[pid]/governance  governance panel (gates, risks, budget,
+                             benefits + ROI, OKR mappings, milestones,
+                             allocations)
+/{collection}/[pid]/schedule portfolio schedule (portfolios only)
+/gantt                       schedule Gantt (SVAR; dependency links +
+                             critical path; read-only)
+/capacity                    resource capacity rollup
+/ideas                       idea board
+/objectives                  OKR objectives + alignment rollups
+/proposals                   work-intake proposal pipeline
+/reports                     saved reports + CSV download
+/scenarios                   scenario planning
+/signin · /verify            BFF magic-link sign-in / verification
+
+Roadmap (per-work-item project-management sub-routes, §13/§15):
 /{collection}/[pid]/board    Kanban task board (Todo/InProgress/InReview/Done/Blocked)
 /{collection}/[pid]/issues   issues list (kind / severity / status)
 /{collection}/[pid]/timeline Gantt / timeline (goal milestones + task date ranges)
@@ -390,7 +405,7 @@ links are **never** a match signal (entity spec §1).
 
 ## 13. Tasks (live work queue)
 
-> Spec-only at v0.1.0 — no code yet. This is the build queue; check off
+> This is the build queue for the implemented app (MVP shipped); check off
 > in three-part PRs (spec + code + test).
 
 - [ ] Scaffold the SvelteKit 2 / Svelte 5 (runes) SPA: `package.json`,
@@ -445,11 +460,7 @@ links are **never** a match signal (entity spec §1).
 
 ## 14. Implementation status
 
-**Spec-only; no code yet.** This document and the doc-set
-(`README.md`, `CLAUDE.md`, `AGENTS.md`, `CHANGELOG.md`, `index.md`)
-are the inaugural v0.1.0 deliverable. The §13 queue is the build plan;
-nothing under `src/` exists. Scaffolding (copy-adapt from a sibling
-`*-front-end-with-svelte`) is the first task.
+**Implemented (MVP, v0.1.0).** The SvelteKit app is built and verified (svelte-check clean, vitest + Playwright green): the routes in §5 are live against the sibling service via the BFF proxy, with SVAR grid / Kanban / Gantt views, Lily theme + locale chrome, and 13-locale i18n. Open §13 items (the roadmap sub-list in §5) remain unchecked.
 
 ## 15. Roadmap
 

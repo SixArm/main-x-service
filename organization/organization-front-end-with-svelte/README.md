@@ -10,9 +10,13 @@ SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
 | Route | Purpose |
 |---|---|
 | `/` | List organizations |
+| `/organizations` | SVAR grid + filter index |
 | `/new` | Create |
 | `/[pid]` | Detail + delete + check-duplicates |
 | `/[pid]/edit` | Edit |
+| `/review` | Drag-to-decide duplicate review board |
+| `/signin` | Magic-link sign-in (BFF) |
+| `/verify` | Magic-link verification (BFF) |
 
 ## Prerequisites
 

@@ -6,8 +6,9 @@ CRUD + matching (embedding the canonical project-portfolio-management-matcher) a
 operational sub-resources (goals, tasks, issues) and derived timeline /
 burndown views.
 
-> **Spec-only today.** No Rust / Cargo crate exists yet; this is the
-> inaugural doc-set. The build queue is [spec §13](./spec/index.md).
+> **Implemented (MVP, v0.1.0).** The crate exists and builds (`src/`,
+> seven migrations); the remaining deferrals live in the work queue at
+> [spec §13](./spec/index.md).
 
 ## Start here
 

@@ -178,6 +178,8 @@ denied (the body names the deciding rule).
 | POST   | `/api/workers/check-duplicates` | Check for duplicates without creating |
 | POST   | `/api/workers/merge`            | Merge two worker records              |
 | POST   | `/api/workers/deduplicate`      | Batch deduplication scan              |
+| GET | `/api/workers/review-queue` | Stored review queue (filter `status`, `limit`) |
+| POST | `/api/workers/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 
 ### Privacy
 
@@ -199,23 +201,25 @@ denied (the body names the deciding rule).
 ## FHIR R5 Endpoints
 
 > **Status:** the handlers below are implemented in
-> `src/api/fhir/handlers.rs` (wire `resourceType: "Worker"`) and are
+> `src/api/fhir/handlers.rs` (wire `resourceType: "Practitioner"`, the
+> standard FHIR R5 type per `agents/share/fhir.md` §3) and are
 > **mounted** on the loco router — `App::routes` registers
 > `workers_routes()`, `fhir_routes()`, and `metrics_routes()`, and the
-> standalone `create_router` mirrors the same `/fhir/Worker` surface for
-> the integration-test harness. Pinned by
+> standalone `create_router` mirrors the same `/fhir/Practitioner`
+> surface for the integration-test harness. Pinned by
 > `tests/api_integration_test.rs::test_fhir_worker_route_is_mounted`
 > (un-gated, asserts the route is reachable) and
 > `::test_fhir_worker_not_found_returns_operation_outcome` (DB-gated,
 > asserts a FHIR `OperationOutcome`). Closes spec §13 T-9 / entity T-1.
 
-| Method | Path                | Description         |
-| ------ | ------------------- | ------------------- |
-| GET    | `/fhir/Worker/{id}` | Get FHIR Worker     |
-| POST   | `/fhir/Worker`      | Create FHIR Worker  |
-| PUT    | `/fhir/Worker/{id}` | Update FHIR Worker  |
-| DELETE | `/fhir/Worker/{id}` | Delete FHIR Worker  |
-| GET    | `/fhir/Worker`      | Search FHIR Workers |
+| Method | Path                      | Description               |
+| ------ | ------------------------- | ------------------------- |
+| GET    | `/fhir/Practitioner/{id}` | Get FHIR Practitioner     |
+| POST   | `/fhir/Practitioner`      | Create FHIR Practitioner  |
+| PUT    | `/fhir/Practitioner/{id}` | Update FHIR Practitioner  |
+| DELETE | `/fhir/Practitioner/{id}` | Delete FHIR Practitioner  |
+| GET    | `/fhir/Practitioner`      | Search FHIR Practitioners |
+| GET    | `/fhir/metadata`          | CapabilityStatement       |
 
 **FHIR Search Parameters:** `name`, `family`, `given`, `identifier`, `birthdate`, `gender`, `_count`
 

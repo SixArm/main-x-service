@@ -21,6 +21,7 @@ session) · bilingual (English + Welsh / Cymraeg).
 | `/signup` | Create an account → emailed a magic link |
 | `/signin` | Request a magic link for an existing account |
 | `/verify?token=…` | Consume the magic link server-side → session cookie set → redirect home |
+| `/admin/attributes` | ABAC attribute-assignment admin UI (`?pid=…`) — view / replace a user's attributes; gated on an `access=admin` caller |
 
 ## Prerequisites
 
@@ -44,7 +45,8 @@ exchanges the token server-side; the auth service sets the
 
 The UI is bilingual: **English** (`en`) and **Welsh / Cymraeg** (`cy`) —
 the latter a deliberate UK public-sector Welsh-language-duty choice. Pick
-a language from the sidebar `<select>`; the choice persists to
+a language via the Lily `LocaleSelect` in the top-bar layout (a Lily
+`ThemeSelect` sits beside it for theme choice); the locale persists to
 `localStorage["mxi.auth.locale"]` and re-renders every string live. It is
 also sent as a `locale` hint on sign-up / sign-in so the **magic-link
 email** arrives in the same language. There is no i18n library — just a

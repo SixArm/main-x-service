@@ -20,6 +20,10 @@ create   ──>  POST /api/organizations          {Organization}      -> {pid, 
 read     ──>  GET  /api/organizations/{pid}                         -> Organization
 search   ──>  GET  /api/organizations/search?q=acme                 -> [{pid, name}]
 dedupe   ──>  POST /api/organizations/check-duplicates  {query}     -> [{pid, score, is_match}]
+scan     ──>  POST /api/organizations/deduplicate                   -> stored review-queue candidates
+queue    ──>  GET  /api/organizations/review-queue?status=pending   -> [review-queue items]
+decide   ──>  POST /api/organizations/review-queue/{id}/decision  {status: confirmed|rejected}
+                                                                    -> decided item (first-writer-wins)
 match    ──>  POST /api/organizations/match   {query, candidates}   -> ranked results
 merge    ──>  POST /api/organizations/merge   {main_pid, duplicate_pid, reason}
                                                                     -> {main_pid, duplicate_pid, main}

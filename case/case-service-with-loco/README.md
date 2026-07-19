@@ -61,13 +61,15 @@ identifier value, or blank `subjects` / `keywords` entry — return
 
 MVP: CRUD + `ILIKE` title search + matching, with validation, OpenAPI 3
 + Swagger UI, an audit log + in-memory event stream, record merge, and
-offline PASETO v4.public verification (published Ed25519 key). Tantivy
-full-text search, durable event bus, and privacy are tracked in
+offline PASETO v4.public verification (published Ed25519 key). The
+durable event bus's Phase-2 transactional outbox + relay have landed
+(`CASE_EVENT_TRANSPORT` defaults to `memory`); Tantivy full-text search,
+the bus's Phase-3 Fluvio broker sink, and privacy are tracked in
 [spec §13](./spec/index.md). Auth credentials are issued by the central
 [authentication-service](../../authentication/authentication-service-with-loco).
 
-> Auth pivot in progress: the family moved from RS256 JWT + JWKS to
-> cookie sessions + offline PASETO v4.public verification — see
+> Auth pivot done in this crate: the family moved from RS256 JWT + JWKS
+> to cookie sessions + offline PASETO v4.public verification — see
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 > (source of truth; RS256/JWKS decommissioned). The runtime here
 > verifies PASETO v4.public via `authentication-verifier`, with the

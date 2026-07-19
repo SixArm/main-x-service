@@ -14,6 +14,10 @@ SvelteKit front-end for the **[Worker Service](../worker-service-with-loco/)** i
 | `/workers/[id]/audit` | Per-worker audit log |
 | `/workers/match` | Match check — score a hypothetical record against the index |
 | `/workers/merge` | Merge two workers (main + duplicate) |
+| `/review` | Stored duplicate-review board — drag-to-decide |
+| `/expiry` | Credential-expiry calendar |
+| `/signin` | Per-app magic-link sign-in (BFF auth page) |
+| `/verify` | Magic-link verification (BFF auth page) |
 
 ## Stack
 
@@ -41,11 +45,14 @@ Open <http://localhost:5173>.
 
 ## Configuration
 
+The browser calls the same-origin BFF proxy at `/api/proxy` — there is no public API env var (see `src/lib/config.ts`). The server-side BFF reads:
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PUBLIC_API_BASE_URL` | `http://localhost:8080` | Worker Service REST base URL |
+| `WORKER_API_URL` | `http://localhost:5150` | Worker Service base URL — the proxy injects a server-exchanged PASETO and forwards |
+| `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link login + session→PASETO exchange |
 
-Set in `.env`. Because the variable is prefixed with `PUBLIC_`, SvelteKit exposes it to the client bundle.
+Set in `.env`. Both are read server-side in `src/lib/server/config.ts` and are never exposed to the client bundle.
 
 ## Testing
 
@@ -65,7 +72,7 @@ src/
   app.css                  - shared CSS variables + utility classes
   app.d.ts
   lib/
-    config.ts              - PUBLIC_API_BASE_URL
+    config.ts              - same-origin BFF proxy base (/api/proxy)
     api/
       types.ts             - Worker, HumanName, MatchResult, … (mirrors the Rust models)
       client.ts            - ApiClient + ApiError (envelope-aware fetch)
@@ -109,7 +116,7 @@ The Lily file: dependency resolves to `~/git/lilydesignsystem/lily-design-system
 import Button from "lily-design-system-svelte-headless/src/lib/components/Button/Button.svelte";
 ```
 
-See the commented example in `src/routes/+layout.svelte`. The MVP currently uses styled native HTML controls; swap in Lily primitives as the design system stabilises.
+The Lily **theme selector** (45 shared themes at `/assets/themes/`) and **locale selector** (13 locales) are wired live in the layout shell — `src/routes/+layout.svelte` imports and renders `ThemeSelect` and `LocaleSelect`. Lily Headless is available for further primitives as the design system stabilises.
 
 ## SVAR DataGrid
 

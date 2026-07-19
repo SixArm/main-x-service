@@ -1,11 +1,16 @@
 ## 14. Implementation Status
 
-**Spec-only; no code yet.** This entity exists, as of 2026-06-18, only
-as this entity-level specification. None of the three subprojects has
-been scaffolded; there is no matcher crate, no service crate, and no
-front-end. Every capability described in §6–§10 is a **target**, not a
-delivered feature, and the §13 task list is the build-out backlog
-(every box unchecked).
+**All three subprojects implemented** (2026-06-19; originally
+spec-only as of 2026-06-18). The matcher crate, the service crate, and
+the SvelteKit front-end are built, tested, and clippy-clean: within-kind
+matching with the hard kind gate; four REST collections over one
+`kind`-keyed `work_items` table with CRUD + matching + merge + audit +
+durable-outbox events + PASETO/ABAC auth (default-off) + the PPM
+Governance / Visibility / Strategy phases; and the operator SPA (SVAR
+grid / Kanban / Gantt, Lily chrome, 13-locale i18n). Consult each
+subproject's own spec §13/§14 for what remains open (service: operational
+sub-resources + derived views, deduplicate + review queue, links, bulk,
+Tantivy, privacy; see the tables below for per-subproject detail).
 
 ### 14.1 Delivered
 

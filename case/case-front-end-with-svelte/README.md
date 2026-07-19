@@ -10,9 +10,13 @@ SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
 | Route | Purpose |
 |---|---|
 | `/` | List cases |
+| `/cases` | SVAR DataGrid index with FilterBar (client-side filtering) |
+| `/board` | Status Kanban board (SVAR) — drag a card to another column to change status |
 | `/new` | Create |
 | `/[pid]` | Detail + delete + check-duplicates |
 | `/[pid]/edit` | Edit |
+| `/signin` | Magic-link sign-in (BFF flow against the auth service) |
+| `/verify` | Magic-link verification landing page |
 
 ## Prerequisites
 
@@ -22,7 +26,7 @@ SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
 ## Quick start
 
 ```bash
-cp .env.example .env     # PUBLIC_API_BASE_URL=http://localhost:5150
+cp .env.example .env     # CASE_API_URL / AUTH_API_URL (server-side)
 pnpm install
 pnpm dev                 # http://localhost:5173
 ```
@@ -31,28 +35,28 @@ pnpm dev                 # http://localhost:5173
 
 | Var | Default | Purpose |
 |---|---|---|
-| `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Case service REST base URL. |
-| `VITE_AUTH_FRONTEND_URL` | `http://localhost:5173` | Central authentication front-end (SSO sign-in) base URL. "Sign in" redirects to `${VITE_AUTH_FRONTEND_URL}/signin?return_to=…`; the magic-link establishes a server-side session and sets an httpOnly cookie. |
+| `CASE_API_URL` | `http://localhost:5150` | Case service base URL (server-side only; read in `src/lib/server/config.ts`). |
+| `AUTH_API_URL` | `http://localhost:5150` | Authentication service base URL (server-side only; session→PASETO exchange + magic-link flow). |
 
-## Sign in (SSO)
+Neither variable reaches the client bundle. The browser talks only to
+the app's own origin: entity-API calls go through the same-origin
+`/api/proxy` BFF route, which forwards them to the case service with a
+server-injected PASETO.
 
-The operator clicks **Sign in** in the sidebar and is sent to the central
-authentication front-end (`VITE_AUTH_FRONTEND_URL`). After the
-passwordless magic-link, the auth service establishes a **server-side
-session** and sets an **httpOnly session cookie** (`__Host-mxi_session`);
-the browser holds **no token** — there is no `localStorage`, no URL
-fragment, and no `mxi_access_token`. This app's own **SvelteKit server
-acts as a Backend-For-Frontend (BFF)**: it holds the session cookie,
-exchanges it for a short-lived **PASETO v4.public** token, and calls the
-case service server-side with that bearer. State-changing requests carry
-a **CSRF token**. See
+## Sign in (BFF magic-link)
+
+The app has its **own** `/signin` + `/verify` magic-link flow — there is
+no cross-origin redirect to the auth front-end. The operator requests a
+magic link at `/signin`; verifying it at `/verify` establishes a
+**server-side session** and sets an **httpOnly session cookie**
+(`__Host-mxi_session`); the browser holds **no token** — there is no
+`localStorage`, no URL fragment, and no `mxi_access_token`. This app's
+own **SvelteKit server acts as a Backend-For-Frontend (BFF)**: it holds
+the session cookie, exchanges it for a short-lived **PASETO v4.public**
+token, and calls the case service server-side with that bearer.
+State-changing requests carry a **CSRF token**. See
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 (source of truth; RS256/JWKS decommissioned).
-
-> Auth pivot in progress: the family moved from client-held bearer
-> tokens to the BFF + cookie-session + PASETO model above. The runtime
-> here may still reflect the old client-held flow; the BFF follow-up is
-> tracked in the spec.
 
 ## How it works
 

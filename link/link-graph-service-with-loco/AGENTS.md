@@ -33,19 +33,28 @@ in [`spec/16-open-questions.md`](spec/16-open-questions.md). There is no
 
 ## Status
 
-**Spec-only; no code yet** (see
+**Read API implemented** (see
 [`spec/14-implementation-status.md`](spec/14-implementation-status.md)).
-Do not assume any `src/`, `Cargo.toml`, migrations, or tests exist —
-they do not. The first job is §13 T-1 (scaffold), and registering the
-crate in the repo-root [`AGENTS.md`](../../AGENTS.md) +
-[`overview.md`](../../agents/share/overview.md) tables.
+The crate exists and builds: `Cargo.toml`, `src/` (the four read
+endpoints in `src/controllers/graph.rs` — `/api/neighbors/{ref}`,
+`/api/edges`, `/api/single-view/{ref}`, `/api/health/freshness` — plus
+the pure projection logic in `src/graph.rs`, the `apply_event` seam in
+`src/events.rs`, lazy verify-on-read in `src/probe.rs`, reconciliation
+in `src/reconcile.rs`, offline PASETO auth in `src/auth.rs`,
+OpenAPI/Swagger, and Prometheus `/metrics.prom`), and the
+`m20260709_000001_edges` … `_000004_audit_log` migrations. Remaining
+(see [`spec/13-tasks.md`](spec/13-tasks.md) and spec §14): the Fluvio
+bus consumer loop (T-6), graph-read privacy-masking parity with the
+case service (T-18), OTLP wiring (T-22), the durable-bus flip (T-23),
+the bus/governance/bench test tiers (T-26..28), and the cross-service
+`same_identity` matcher round (T-29..33).
 
 ## Three-part change rule
 
 A behavioural change is one PR with three parts:
 
 1. **Spec edit** — `spec/` (the relevant § + §13 task status).
-2. **Code edit** — `src/` (once the crate exists).
+2. **Code edit** — `src/`.
 3. **Test edit** — the matching tier in
    [`spec/11-testing-strategy.md`](spec/11-testing-strategy.md).
 

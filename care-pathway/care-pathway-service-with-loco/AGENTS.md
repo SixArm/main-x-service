@@ -58,11 +58,13 @@ in-memory event stream on every CRUD/merge (`models/audit_logs.rs`,
 embeds `authentication-verifier`; `/whoami` + audit `actor`), and blanket
 `/api/*` auth enforcement (`auth::enforce` + an `after_routes` middleware
 in `app.rs`) wired but **off by default** — gated by
-`CARE_PATHWAY_REQUIRE_AUTH`. Deferred
+`CARE_PATHWAY_REQUIRE_AUTH`. The durable event bus's
+Phase-2 outbox/relay landed (`models/event_outbox.rs`, `src/relay.rs`),
+default-off via `CARE_PATHWAY_EVENT_TRANSPORT` (`memory` unless set to
+`outbox`). Deferred
 (spec §13): Tantivy full-text/fuzzy search (name search via `ILIKE` is
-done), search-blocked dedup candidates, durable event bus Phases 2–3
-(outbox + Fluvio; Phase 1 in-memory envelope + `EventPublisher` seam is
-done — see `agents/share/event-bus.md`), privacy,
+done), search-blocked dedup candidates, the durable bus's Phase-3 Fluvio
+broker sink (see `agents/share/event-bus.md`), privacy,
 front-end merge
 action, terminology-server code-existence checks. The published key set
 is fetched over HTTP once at boot when `CARE_PATHWAY_PASETO_KEYS_URL` is
@@ -102,6 +104,7 @@ src/
 ├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) via authentication-verifier (RS256/JWKS decommissioned)
 ├── merge.rs               pure record-merge logic (merge_pathways)
 ├── openapi.rs             hand-written OpenAPI 3 document
+├── relay.rs               durable-bus Phase 2 outbox relay (poll/ack loop)
 ├── streaming.rs           CRUD/merge event stream — Phase 1 durable-bus
 │                          envelope (Envelope) + EventPublisher seam +
 │                          InMemoryPublisher; frozen EventView projection

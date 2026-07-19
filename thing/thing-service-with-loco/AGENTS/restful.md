@@ -144,11 +144,28 @@ API URLs are version-free; select the representation version with the `Accepts-v
 | POST   | `/api/things/check-duplicates` | Check for duplicates |
 | POST   | `/api/things/merge`       | Merge things          |
 | POST   | `/api/things/deduplicate` | Batch deduplication   |
+| GET    | `/api/things/review-queue` | Stored review queue (filter `status`, `limit`) |
+| POST   | `/api/things/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 | GET    | `/api/things/{id}/export` | GDPR data export      |
 | GET    | `/api/things/{id}/masked` | Masked thing view     |
 | GET    | `/api/things/{id}/audit`  | Audit logs            |
 | GET    | `/api/audit/recent`       | Recent audit activity |
 | GET    | `/api/audit/user`         | User audit logs       |
+
+### FHIR R5 endpoints
+
+HL7 FHIR R5 surface mapping things to the FHIR `Device` resource,
+mounted by [`src/controllers/fhir.rs`](../src/controllers/fhir.rs)
+(`routes()`, prefix `/fhir`):
+
+| Method | Path                | Description               |
+|--------|---------------------|---------------------------|
+| GET    | `/fhir/metadata`    | CapabilityStatement       |
+| POST   | `/fhir/Device`      | Create FHIR Device        |
+| GET    | `/fhir/Device`      | Search FHIR Devices       |
+| GET    | `/fhir/Device/{id}` | Get FHIR Device           |
+| PUT    | `/fhir/Device/{id}` | Update FHIR Device        |
+| DELETE | `/fhir/Device/{id}` | Delete FHIR Device (soft) |
 
 ### Auth
 

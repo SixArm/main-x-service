@@ -10,6 +10,10 @@
 | `/persons/[id]` | Detail |
 | `/persons/[id]/edit` | Edit |
 | `/persons/[id]/audit` | Audit log |
+| `/review` | Duplicate-review board (SVAR Kanban, drag-to-decide) |
+| `/expiry` | Identity-document expiry calendar (SVAR Calendar) |
+| `/signin` | Magic-link sign-in (BFF) |
+| `/verify` | Magic-link verification (BFF) |
 
 ### Layout shell & navigation
 

@@ -13,7 +13,8 @@ service.
 
 ## 2. Scope
 
-In scope: the four routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`), the
+In scope: the routes (`/`, `/cases`, `/board`, `/new`, `/[pid]`,
+`/[pid]/edit`, `/signin`, `/verify`), the
 API client, the case form, and a BFF + httpOnly-cookie session (§6.7/§6.8,
 per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 Out of scope: full-text search UI, audit views.

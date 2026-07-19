@@ -111,10 +111,14 @@ verification + blanket `/api/*` auth enforcement (off by default, gated
 by `CARE_PATHWAY_REQUIRE_AUTH`) + rich payload validation
 (ICD/SNOMED/UUID/DOI/BCP-47) + boot-time published-key fetch over HTTP
 (once, when `CARE_PATHWAY_PASETO_KEYS_URL` is set, with warn + env
-fallback). Deferred (see [spec §13](./spec/index.md)):
-Tantivy full-text/fuzzy search, search-blocked dedup candidates, durable
-event bus Phases 2–3 (outbox → Fluvio), privacy, front-end merge action,
-and a key-set refresh loop (the boot fetch runs once). Token issuance is
+fallback). The durable event bus's Phase-2 transactional outbox + relay
+have landed (`src/models/event_outbox.rs`, `src/relay.rs`,
+`src/streaming.rs`; default-off via
+`CARE_PATHWAY_EVENT_TRANSPORT=memory`). Deferred (see
+[spec §13](./spec/index.md)): Tantivy full-text/fuzzy search,
+search-blocked dedup candidates, the durable bus's Phase-3 Fluvio broker
+sink, privacy, front-end merge action, and a key-set refresh loop (the
+boot fetch runs once). Token issuance is
 provided by the central
 [authentication-service](../../authentication/authentication-service-with-loco).
 

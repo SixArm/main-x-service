@@ -26,4 +26,4 @@ Algorithms:
 - Similarity scoring algorithms
 - Confidence scoring for match quality (certain/probable/possible)
 - Configurable matching rules (threshold, max_candidates, auto_merge_threshold)
-- Review queue item generation with status tracking (Pending, Confirmed, Rejected, AutoMerged)
+- Review queue persisted in a `review_queue` table with status tracking (`pending`, `confirmed`, `rejected`, `automerged`) and confirm/reject decision endpoints (person / worker / place / thing / organization)

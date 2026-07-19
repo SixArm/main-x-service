@@ -34,6 +34,15 @@ curl http://localhost:5150/api/health
 REST routes mount under `/api/things/*`. See
 [`AGENTS/restful.md`](AGENTS/restful.md) for the full list. All
 endpoints return the standard `{success, data, error}` envelope.
+Duplicate handling includes a stored review queue:
+`GET /api/things/review-queue` (filter `status`, `limit`) and
+`POST /api/things/review-queue/{id}/decision` (decide a pending item,
+`confirmed` / `rejected`).
+
+An HL7 FHIR R5 surface (`src/controllers/fhir.rs`) maps things to the
+FHIR `Device` resource: `GET /fhir/metadata` (CapabilityStatement),
+`POST /fhir/Device` (create), `GET /fhir/Device` (search),
+and `GET` / `PUT` / `DELETE /fhir/Device/{id}`.
 
 Prometheus metrics are served outside `/api`, at the application root:
 

@@ -162,10 +162,27 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | POST   | `/api/places/check-duplicates` | Check for duplicates |
 | POST   | `/api/places/merge`       | Merge places          |
 | POST   | `/api/places/deduplicate` | Batch deduplication   |
+| GET    | `/api/places/review-queue` | Stored review queue (filter `status`, `limit`) |
+| POST   | `/api/places/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 | GET    | `/api/places/{id}/export` | GDPR data export      |
 | GET    | `/api/places/{id}/masked` | Masked place view     |
 | GET    | `/api/places/{id}/audit`  | Audit logs            |
 | GET    | `/api/audit/recent`       | Recent audit activity |
+
+### FHIR R5 Endpoints
+
+HL7 FHIR R5 surface mapping places to the FHIR `Location` resource,
+mounted by [`src/controllers/fhir.rs`](../src/controllers/fhir.rs)
+(`routes()`, prefix `/fhir`):
+
+| Method | Path                  | Description              |
+| ------ | --------------------- | ------------------------ |
+| GET    | `/fhir/metadata`      | CapabilityStatement      |
+| POST   | `/fhir/Location`      | Create FHIR Location     |
+| GET    | `/fhir/Location`      | Search FHIR Locations    |
+| GET    | `/fhir/Location/{id}` | Get FHIR Location        |
+| PUT    | `/fhir/Location/{id}` | Update FHIR Location     |
+| DELETE | `/fhir/Location/{id}` | Delete FHIR Location (soft) |
 
 ### Auth
 

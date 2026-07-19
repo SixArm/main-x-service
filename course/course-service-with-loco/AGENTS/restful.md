@@ -148,6 +148,19 @@ Blocking: by `name` (FuzzyTermQuery, multi-token) AND/OR by
 | GET | `/api/courses/{id}/audit` | Audit log for one course (and its child instances + syllabus) |
 | GET | `/api/audit/recent` | Recent audit activity |
 
+## FHIR (non-standard `Basic` surface)
+
+No FHIR R5 resource models an educational course, so the crate serves
+a **deliberately non-R5** best-effort surface wrapping a course as the
+FHIR `Basic` resource (`code = course`), per
+[`agents/share/fhir.md`](../../../agents/share/fhir.md) §3. Mounted by
+`fhir_routes()` ([`src/api/rest/fhir.rs`](../src/api/rest/fhir.rs),
+prefix `/fhir`): `GET /fhir/metadata` (CapabilityStatement, which
+states the non-standard shape explicitly), `POST /fhir/Basic` (create),
+`GET /fhir/Basic` (search), and `GET` / `PUT` / `DELETE
+/fhir/Basic/{id}`. Responses are `application/fhir+json`; every
+non-2xx body is a FHIR `OperationOutcome`.
+
 ## Response envelope
 
 ```json

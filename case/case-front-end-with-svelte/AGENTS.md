@@ -17,7 +17,9 @@ service REST API, whose request/response body is the
    No `export let`, no `$:`, events are callback props.
 2. **SPA.** `+layout.ts` sets `ssr = false` / `prerender = false`.
 3. **TypeScript strict** (`noUncheckedIndexedAccess`).
-4. **Minimal deps.** No data grid / design system — plain inputs + the
+4. **Deps in real use.** SVAR DataGrid + FilterBar (`/cases` index),
+   SVAR Kanban (`/board`), and Lily `ThemeSelect`/`LocaleSelect` (in the
+   layout) are used dependencies; forms remain plain inputs + the
    `app.css` utilities.
 5. **No envelope.** The service is loco.rs and returns **raw JSON**;
    `src/lib/api/client.ts` is the lean wrapper (get/post/put/delete).

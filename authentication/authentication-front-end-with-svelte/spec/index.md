@@ -27,7 +27,8 @@ httpOnly `__Host-mxi_session` cookie (per
 
 ## 2. Scope
 
-In scope: the four routes (`/`, `/signup`, `/signin`, `/verify`), the
+In scope: the routes (`/`, `/signup`, `/signin`, `/verify`,
+`/admin/attributes`), the
 SvelteKit server acting as a **BFF** (session cookie handling, server-side
 calls to the auth service, CSRF protection), and a dependency-free
 bilingual UI (English + Welsh; see §7 and §4). Out of scope: passwords,
@@ -64,6 +65,7 @@ using any sibling front-end.
 /signup      request magic link for a new account  (optional ?return_to=)
 /signin      request magic link for an existing account  (optional ?return_to=)
 /verify      consume ?token= server-side -> session cookie set -> redirect (return_to or /)
+/admin/attributes  ABAC attribute admin (?pid=…) — view/replace a user's attributes (access=admin)
 ```
 
 Requests that establish or use the session are handled by the **SvelteKit

@@ -32,10 +32,14 @@ Operators curating the organization registry.
 ## 5. Information architecture
 
 ```
-/            list of organizations
-/new         create form
-/[pid]       detail + delete + check-duplicates
-/[pid]/edit  edit form
+/               list of organizations
+/organizations  SVAR grid + filter index
+/new            create form
+/[pid]          detail + delete + check-duplicates
+/[pid]/edit     edit form
+/review         drag-to-decide duplicate review board (SVAR Kanban)
+/signin         magic-link sign-in (BFF)
+/verify         magic-link verification (BFF)
 ```
 
 ### Layout shell & navigation

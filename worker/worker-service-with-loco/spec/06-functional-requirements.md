@@ -156,15 +156,17 @@ system-wide, per-user.
 
 ### 6.8 FHIR R5
 
-Bidirectional `Worker` resource conversion under `/fhir/Worker`
-(handlers in `src/api/fhir/handlers.rs`; the wire `resourceType` is
-`"Worker"`). Search parameters: `name`, `family`, `given`,
+Bidirectional `Practitioner` resource conversion under
+`/fhir/Practitioner` (handlers in `src/api/fhir/handlers.rs`; the wire
+`resourceType` is `"Practitioner"` — the standard `agents/share/fhir.md`
+§3 mapping, superseding the early non-standard `Worker` shape).
+Search parameters: `name`, `family`, `given`,
 `identifier`, `birthdate`, `gender`, `_count`.
 
 **Status:** the FHIR handlers are implemented and **mounted** on the
 loco router — `App::routes` registers `fhir_routes()` alongside the
 REST and metrics route groups, and `create_router` mirrors the same
-`/fhir/Worker` surface for the integration-test harness. The mount is
+`/fhir/Practitioner` surface for the integration-test harness. The mount is
 pinned by `tests/api_integration_test.rs::test_fhir_worker_route_is_mounted`
 (un-gated, asserts the route is reachable via a `400` from the
 `Path<Uuid>` extractor) and

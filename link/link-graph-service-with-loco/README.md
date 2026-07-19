@@ -8,9 +8,10 @@ queryable, bidirectional graph of **typed links between records in
 different services**: person *is the same human as* worker, person
 *works at* organization, case *is about* person.
 
-> **Status: spec-only; no code yet.** This crate exists as a
-> specification ([`spec/`](spec/index.md), §1–§18). The build-out is
-> enumerated as unchecked tasks in [`spec/13-tasks.md`](spec/13-tasks.md).
+> **Status: read API implemented.** The read-model core and the four
+> read endpoints are live ([`spec/`](spec/index.md), §1–§18); the
+> remaining work (Fluvio consumer loop, masking parity, durable-bus
+> flip, …) is tracked in [`spec/13-tasks.md`](spec/13-tasks.md).
 
 ## What it is
 
@@ -28,7 +29,7 @@ different services**: person *is the same human as* worker, person
   dangling`), and **reconciliation** (diff the read-model against each
   service's authoritative `entity_links`, emit a divergence metric).
 
-## Read API (planned)
+## Read API
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -39,6 +40,24 @@ different services**: person *is the same human as* worker, person
 
 Every graph response carries an **`as_of`** watermark — the read-model's
 freshness, so a UI can show "graph as of 10:42:05".
+
+## Quick start
+
+Requires PostgreSQL.
+
+```bash
+export DATABASE_URL=postgres://loco:loco@localhost:5432/link_graph_service_development
+cargo loco start        # migrations auto-run in development
+
+# Edges incident to a record (both directions, depth-capped)
+curl -s 'localhost:5160/api/neighbors/person:0c4f1e2a-0000-4000-8000-000000000000?direction=both&depth=1'
+
+# Filtered edge list
+curl -s 'localhost:5160/api/edges?kind=same_identity&status=verified'
+
+# Per-entity consumer freshness (the `as_of` watermark source)
+curl -s localhost:5160/api/health/freshness
+```
 
 ## Key concepts
 

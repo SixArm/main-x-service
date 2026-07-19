@@ -20,6 +20,9 @@ matching, built on **loco.rs** and embedding the canonical
 | DELETE | `/api/organizations/{pid}` | Soft-delete |
 | POST | `/api/organizations/match` | Rank `{query, candidates}` |
 | POST | `/api/organizations/check-duplicates` | Match query vs stored orgs |
+| POST | `/api/organizations/deduplicate` | Batch-scan stored orgs pairwise; persists candidates in the stored review queue (destructive-classed under ABAC) |
+| GET | `/api/organizations/review-queue` | Stored review queue (filter `status`, `limit`) |
+| POST | `/api/organizations/review-queue/{id}/decision` | Decide a pending item (`confirmed` / `rejected`; first-writer-wins) |
 | GET | `/api/organizations/search?q=` | Case-insensitive name search (`ILIKE`) |
 | POST | `/api/organizations/merge` | Fold a duplicate into a survivor |
 | GET | `/api/organizations/merges/recent` | Merge-history records |
@@ -48,6 +51,14 @@ cargo loco start        # migrations auto-run in development
 curl -s localhost:5150/api/organizations -H 'content-type: application/json' \
   -d '{"name":"Acme, Inc.","jurisdiction":"US","url":"https://acme.com"}'
 # -> {"pid":"<uuid>","name":"Acme, Inc."}
+
+# Batch-scan stored orgs pairwise; persists candidate pairs in the review queue.
+curl -s -X POST localhost:5150/api/organizations/deduplicate
+# -> {"organizations_scanned":...,"duplicates_found":...,"queued_for_review":...,"review_items":[...]}
+
+# Decide a pending review-queue item (confirmed or rejected; first-writer-wins).
+curl -s localhost:5150/api/organizations/review-queue/<id>/decision \
+  -H 'content-type: application/json' -d '{"status":"confirmed"}'
 
 # Fold a confirmed duplicate into a survivor.
 curl -s localhost:5150/api/organizations/merge -H 'content-type: application/json' \

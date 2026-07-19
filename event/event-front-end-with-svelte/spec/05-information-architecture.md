@@ -10,6 +10,9 @@
 | `/events/[id]` | Detail |
 | `/events/[id]/edit` | Edit |
 | `/events/[id]/audit` | Audit log |
+| `/calendar` | SVAR Calendar over the event time-window; drag-to-reschedule |
+| `/signin` | Magic-link sign-in (BFF) |
+| `/verify` | Magic-link verification |
 
 ### Layout shell & navigation
 

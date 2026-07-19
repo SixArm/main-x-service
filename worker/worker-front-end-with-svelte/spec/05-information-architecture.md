@@ -10,6 +10,10 @@
 | `/workers/[id]` | Detail |
 | `/workers/[id]/edit` | Edit |
 | `/workers/[id]/audit` | Audit log |
+| `/review` | Duplicate-review board (drag-to-decide) |
+| `/expiry` | Credential-expiry calendar |
+| `/signin` | Magic-link sign-in (BFF) |
+| `/verify` | Magic-link verification (BFF) |
 
 ### Layout shell & navigation
 

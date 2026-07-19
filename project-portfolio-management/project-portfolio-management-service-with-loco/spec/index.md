@@ -634,10 +634,25 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 
 ## 14. Implementation status
 
-**Spec-only; no code yet.** This document and the doc-set (`README.md`,
-`AGENTS.md`, `CHANGELOG.md`, `index.md`) are the inaugural scaffold. No
-Rust / Cargo crate has been generated; every §13 task is unchecked. The
-canonical `WorkItem` domain model is owned by the
+**Implemented (MVP v0.1.0 + PPM Phases A/B/C; see §13 for the
+delivered-task detail).** The crate builds and tests green: four REST
+collections (portfolios / projects / products / programs) over one
+`kind`-keyed `work_items` table — CRUD + `ILIKE` search + within-kind
+matching (embedded matcher, R-GATE) + real-time create duplicate
+detection + record merge + payload validation (`422`) + audit log +
+durable-outbox events (Phase 2 outbox + Phase 3 relay/retention,
+default-off via `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=memory`)
++ offline PASETO v4.public verification with the blanket ABAC guard
+(default-off via `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`) + OpenAPI
+/ Swagger + Prometheus, plus the three PPM phases (Governance:
+proposals / gate reviews / risks / budget lines; Visibility:
+dependencies / schedule / milestones / allocations / capacity / reports
+/ at-a-glance; Strategy: ideas / scenarios / objectives / benefits).
+Still open (§13): the operational sub-resources (goals / tasks /
+issues) + derived timeline / burndown views, `deduplicate` + review
+queue, cross-service `entity_links`, bulk import/export, Tantivy,
+privacy, the collaboration sub-resources, gRPC, and the Fluvio broker
+sink. The canonical `WorkItem` domain model is owned by the
 [portfolio entity spec §5](../../spec/index.md); this crate spec
 references it.
 

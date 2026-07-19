@@ -158,8 +158,9 @@ from the environment via `Config::from_env`:
 ## Testing
 
 ```bash
-# 42 unit tests (matcher facade, search index, validation, db
-# helpers, streaming, privacy, metrics, router + handlers).
+# 109+ unit tests (matcher facade, search index, validation, db
+# helpers, streaming, privacy, metrics, router + handlers, fhir);
+# run for the live count.
 cargo test --lib
 
 # 14 bridge tests pinning the service ↔ canonical course-matcher
@@ -207,7 +208,7 @@ bring-up the integration suite expects to be migrated against.
 - **Metrics**: Prometheus `GET /metrics.prom` (T-16) — process-wide
   registry, CRUD/merge counters, reserved labelled
   `http_requests_total`.
-- **Tests**: 42 unit + 14 bridge + 12 #[ignore]-tagged integration
+- **Tests**: 109+ unit + 14 bridge + 12 #[ignore]-tagged integration
   (T-12) + 3 criterion benches (T-13).
 - **Auth**: offline PASETO v4.public bearer verification + ABAC blanket
   guard on `/api/*` and `/fhir/*` (T-15), **default-off** via
