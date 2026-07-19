@@ -13,6 +13,7 @@ mod m20220101_000001_organizations;
 mod m20220101_000002_audit_logs;
 mod m20220101_000003_merge_records;
 mod m20220101_000004_event_outbox;
+mod m20260719_000001_review_queue;
 
 /// The migration runner for this crate. Lists every migration in apply
 /// order; loco's CLI and the test harness drive it via `MigratorTrait`.
@@ -29,6 +30,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000002_audit_logs::Migration),
             Box::new(m20220101_000003_merge_records::Migration),
             Box::new(m20220101_000004_event_outbox::Migration),
+            Box::new(m20260719_000001_review_queue::Migration),
             // inject-above (do not remove this comment)
         ]
     }

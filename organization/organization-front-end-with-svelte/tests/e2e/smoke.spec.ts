@@ -38,6 +38,43 @@ async function stubApi(page: Page) {
     if (path.endsWith("/check-duplicates")) {
       return route.fulfill({ json: [] });
     }
+    if (path.endsWith("/review-queue") && method === "GET") {
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              id: "rq-1",
+              organization_id_a: PID,
+              organization_id_b: "22222222-2222-4222-8222-222222222222",
+              match_score: 0.91,
+              match_quality: "high",
+              detection_method: "batch_deduplication",
+              status: "pending",
+              reviewed_by: null,
+              created_at: "2026-07-19T00:00:00Z",
+              reviewed_at: null,
+            },
+          ],
+          total: 1,
+        },
+      });
+    }
+    if (path.endsWith("/review-queue/rq-1/decision") && method === "POST") {
+      return route.fulfill({
+        json: {
+          id: "rq-1",
+          organization_id_a: PID,
+          organization_id_b: "22222222-2222-4222-8222-222222222222",
+          match_score: 0.91,
+          match_quality: "high",
+          detection_method: "batch_deduplication",
+          status: "confirmed",
+          reviewed_by: "tester",
+          created_at: "2026-07-19T00:00:00Z",
+          reviewed_at: "2026-07-19T00:01:00Z",
+        },
+      });
+    }
     if (path === `/api/organizations/${PID}` && method === "GET") {
       return route.fulfill({ json: ORG });
     }
@@ -80,4 +117,21 @@ test("edit page renders the edit form", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Edit organization" }),
   ).toBeVisible();
+});
+
+test("review board renders the stored queue on load (no scan side effect)", async ({
+  page,
+}) => {
+  const scans: string[] = [];
+  page.on("request", (req) => {
+    if (req.url().includes("/deduplicate")) scans.push(req.url());
+  });
+  await page.goto("/review", { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
+  await expect(page.getByTestId("review-board")).toBeVisible();
+  // The stored pending card is on the board, described by quality,
+  // score, and detection method.
+  await expect(page.getByText("high · 0.91 · batch_deduplication")).toBeVisible();
+  // Loading the page must never fire the destructive-classed scan.
+  expect(scans).toHaveLength(0);
 });

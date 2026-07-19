@@ -18,3 +18,7 @@ pub mod event_outbox;
 pub mod merge_records;
 /// CRUD/search helpers over the `organizations` entity (stored payload).
 pub mod organizations;
+/// Raw-SQL persistence for the batch-deduplication review queue
+/// (normalized-pair upsert / list / first-writer-wins decide),
+/// mirroring the person/worker/place/thing registries.
+pub mod review_queue;

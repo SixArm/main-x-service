@@ -90,6 +90,8 @@ export const LOCALE_KEY = "mxi.organization.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.review": "Review",
+    "review.run": "Run scan",
     // Layout / chrome
     "brand.name": "Main X · Organizations",
     "nav.toggle": "Toggle navigation",
@@ -165,6 +167,8 @@ const STRINGS = {
     "form.addIdentifier": "+ Add identifier",
   },
   cy: {
+    "nav.review": "Adolygu",
+    "review.run": "Rhedeg sgan",
     "brand.name": "Main X · Sefydliadau",
     "nav.toggle": "Toglo'r llywio",
     "nav.organizations": "Sefydliadau",
@@ -233,6 +237,8 @@ const STRINGS = {
     "form.addIdentifier": "+ Ychwanegu dynodydd",
   },
   es: {
+    "nav.review": "Revisión",
+    "review.run": "Ejecutar análisis",
     "brand.name": "Main X · Organizaciones",
     "nav.toggle": "Alternar navegación",
     "nav.organizations": "Organizaciones",
@@ -302,6 +308,8 @@ const STRINGS = {
     "form.addIdentifier": "+ Añadir identificador",
   },
   fr: {
+    "nav.review": "Révision",
+    "review.run": "Lancer l'analyse",
     "brand.name": "Main X · Organisations",
     "nav.toggle": "Basculer la navigation",
     "nav.organizations": "Organisations",
@@ -370,6 +378,8 @@ const STRINGS = {
     "form.addIdentifier": "+ Ajouter un identifiant",
   },
   de: {
+    "nav.review": "Überprüfung",
+    "review.run": "Scan starten",
     "brand.name": "Main X · Organisationen",
     "nav.toggle": "Navigation umschalten",
     "nav.organizations": "Organisationen",
@@ -438,6 +448,8 @@ const STRINGS = {
     "form.addIdentifier": "+ Bezeichner hinzufügen",
   },
   ar: {
+    "nav.review": "المراجعة",
+    "review.run": "تشغيل الفحص",
     "brand.name": "Main X · المنظمات",
     "nav.toggle": "تبديل التنقل",
     "nav.organizations": "المنظمات",
@@ -506,6 +518,8 @@ const STRINGS = {
     "form.addIdentifier": "+ إضافة معرف",
   },
   ru: {
+    "nav.review": "Проверка",
+    "review.run": "Запустить проверку",
     "brand.name": "Main X · Организации",
     "nav.toggle": "Переключить навигацию",
     "nav.organizations": "Организации",
@@ -574,6 +588,8 @@ const STRINGS = {
     "form.addIdentifier": "+ Добавить идентификатор",
   },
   hi: {
+    "nav.review": "समीक्षा",
+    "review.run": "स्कैन चलाएं",
     "brand.name": "Main X · संगठन",
     "nav.toggle": "नेविगेशन टॉगल करें",
     "nav.organizations": "संगठन",
@@ -642,6 +658,8 @@ const STRINGS = {
     "form.addIdentifier": "+ पहचानकर्ता जोड़ें",
   },
   zh: {
+    "nav.review": "审核",
+    "review.run": "运行扫描",
     "brand.name": "Main X · 组织",
     "nav.toggle": "切换导航",
     "nav.organizations": "组织",
@@ -710,6 +728,8 @@ const STRINGS = {
     "form.addIdentifier": "+ 添加标识符",
   },
   bn: {
+    "nav.review": "পর্যালোচনা",
+    "review.run": "স্ক্যান চালান",
     "brand.name": "Main X · সংস্থা",
     "nav.toggle": "নেভিগেশন টগল করুন",
     "nav.organizations": "সংস্থা",
@@ -778,6 +798,8 @@ const STRINGS = {
     "form.addIdentifier": "+ শনাক্তকারী যোগ করুন",
   },
   pt: {
+    "nav.review": "Revisão",
+    "review.run": "Executar varredura",
     "brand.name": "Main X · Organizações",
     "nav.toggle": "Alternar navegação",
     "nav.organizations": "Organizações",
@@ -846,6 +868,8 @@ const STRINGS = {
     "form.addIdentifier": "+ Adicionar identificador",
   },
   id: {
+    "nav.review": "Tinjauan",
+    "review.run": "Jalankan pemindaian",
     "brand.name": "Main X · Organisasi",
     "nav.toggle": "Alihkan navigasi",
     "nav.organizations": "Organisasi",
@@ -914,6 +938,8 @@ const STRINGS = {
     "form.addIdentifier": "+ Tambah pengenal",
   },
   ur: {
+    "nav.review": "جائزہ",
+    "review.run": "اسکین چلائیں",
     "brand.name": "Main X · تنظیمیں",
     "nav.toggle": "نیویگیشن ٹوگل کریں",
     "nav.organizations": "تنظیمیں",

@@ -85,6 +85,7 @@
     const navItems: { href: string; key: StringKey }[] = [
         { href: "/", key: "nav.organizations" },
         { href: "/new", key: "nav.newOrganization" },
+        { href: "/review", key: "nav.review" },
     ];
 
 </script>

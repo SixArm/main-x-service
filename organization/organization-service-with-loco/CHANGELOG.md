@@ -9,6 +9,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — batch dedup + stored review queue + decision endpoints (2026-07-19)
+
+- `POST /api/organizations/deduplicate` — pairwise batch scan (up to the
+  check-duplicates cap) that **persists** candidates in the new
+  `review_queue` table (migration `m20260719_000001`; normalized-pair
+  UNIQUE upsert — re-scans refresh scores, decided rows keep their
+  decision, item ids stay stable) and reports the stored rows. Already
+  destructive-classed under ABAC.
+- `GET /api/organizations/review-queue[?status=&limit=]` — the stored
+  queue, newest first (cap 500).
+- `POST /api/organizations/review-queue/{id}/decision`
+  (`{"status": "confirmed" | "rejected"}`) — first-writer-wins decision
+  (`404`/`422` on unknown/already-decided); reviewer = verified bearer
+  `sub`; writes a `review_decision` audit row.
+- The Postgres-gated auth-gate request test now detects the process-wide
+  `OnceLock` flag cache being poisoned by an earlier test and skips
+  honestly (it previously failed the full `--ignored` suite run).
+
 ### Fixed
 
 - 2026-07-18 — **Fresh-database `db migrate` failure.** The

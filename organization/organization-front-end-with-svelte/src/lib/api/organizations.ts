@@ -2,7 +2,15 @@
 
 import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
-import type { Organization, OrgRef, ScoredRef } from "./types";
+import type {
+  BatchDeduplicationResponse,
+  Organization,
+  OrgRef,
+  ReviewDecision,
+  ReviewQueueItem,
+  ReviewQueueListResponse,
+  ScoredRef,
+} from "./types";
 
 /**
  * Resource-bound wrapper over {@link ApiClient}: one method per
@@ -81,5 +89,40 @@ export class OrganizationRepository {
     return this.http.post<ScoredRef[]>("/api/organizations/check-duplicates", {
       body: query,
     });
+  }
+
+  /**
+   * `POST /api/organizations/deduplicate` — batch-scan the stored
+   * records pairwise and persist likely duplicates in the stored
+   * review queue (a destructive-classed action; button-triggered only).
+   * @returns The scan report over the STORED rows (stable item ids).
+   */
+  deduplicate(): Promise<BatchDeduplicationResponse> {
+    return this.http.post<BatchDeduplicationResponse>(
+      "/api/organizations/deduplicate",
+      { body: {} },
+    );
+  }
+
+  /**
+   * `GET /api/organizations/review-queue` — the stored review queue,
+   * newest first.
+   */
+  listReviewQueue(): Promise<ReviewQueueItem[]> {
+    return this.http
+      .get<ReviewQueueListResponse>("/api/organizations/review-queue")
+      .then((response) => response.items);
+  }
+
+  /**
+   * `POST /api/organizations/review-queue/{id}/decision` — decide a
+   * pending review item. Only `pending` items can be decided; the
+   * service returns 422 for anything else (first writer wins).
+   */
+  decideReview(id: string, status: ReviewDecision): Promise<ReviewQueueItem> {
+    return this.http.post<ReviewQueueItem>(
+      `/api/organizations/review-queue/${encodeURIComponent(id)}/decision`,
+      { body: { status } },
+    );
   }
 }

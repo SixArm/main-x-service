@@ -106,3 +106,55 @@ export interface ScoredRef {
   confidence: string;
   is_match: boolean;
 }
+
+/// Review disposition wire tokens (family-wide lowercase form).
+export type ReviewStatus = "pending" | "confirmed" | "rejected" | "automerged";
+
+/// One operator verdict for a pending review item.
+export type ReviewDecision = "confirmed" | "rejected";
+
+/// One stored review-queue item from the batch-deduplication scan.
+export interface ReviewQueueItem {
+  /** Stable review-item id (survives re-scans). */
+  id: string;
+  /** First organization in the candidate pair (public id). */
+  organization_id_a: string;
+  /** Second organization in the candidate pair (public id). */
+  organization_id_b: string;
+  /** Overall match score for the pair, 0-1. */
+  match_score: number;
+  /** Confidence band label (matcher confidence, lowercased). */
+  match_quality: string;
+  /** How the pair was detected (`batch_deduplication`). */
+  detection_method: string;
+  /** Current review disposition. */
+  status: ReviewStatus;
+  /** Operator who decided the item, if decided. */
+  reviewed_by?: string | null;
+  /** When the pair was first queued. */
+  created_at: string;
+  /** When the decision was recorded, if decided. */
+  reviewed_at?: string | null;
+}
+
+/// Response envelope for the stored review-queue list.
+export interface ReviewQueueListResponse {
+  /** The stored review-queue items (newest first). */
+  items: ReviewQueueItem[];
+  /** Number of items returned. */
+  total: number;
+}
+
+/// Report returned by the batch-deduplication scan (stored rows).
+export interface BatchDeduplicationResponse {
+  /** Number of organizations scanned. */
+  organizations_scanned: number;
+  /** Number of duplicate pairs found. */
+  duplicates_found: number;
+  /** Auto-merged count (always 0 — no auto-merge path). */
+  auto_merged: number;
+  /** Number of stored pairs currently pending review. */
+  queued_for_review: number;
+  /** The stored candidate pairs (stable ids across re-scans). */
+  review_items: ReviewQueueItem[];
+}

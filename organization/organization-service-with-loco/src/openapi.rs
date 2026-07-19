@@ -44,6 +44,7 @@ fn merge_object(dst: &mut Value, src: Value) {
 }
 
 /// The CRUD + matching + merge paths.
+#[allow(clippy::too_many_lines)] // linear JSON path table
 fn crud_paths() -> Value {
     json!({
             "/api/organizations": {
@@ -87,6 +88,47 @@ fn crud_paths() -> Value {
                     "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Organization" } } } },
                     "responses": { "200": { "description": "Scored matches",
                         "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ScoredRef" } } } } } }
+                }
+            },
+            "/api/organizations/deduplicate": {
+                "post": {
+                    "tags": ["matching"],
+                    "summary": "Batch-scan stored organizations pairwise and persist likely duplicates in the review queue",
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                        "type": "object", "properties": { "threshold": { "type": "number", "format": "double", "nullable": true } } } } } },
+                    "responses": { "200": { "description": "Scan report over the STORED review rows (stable ids)",
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchDeduplicationResponse" } } } } }
+                }
+            },
+            "/api/organizations/review-queue": {
+                "get": {
+                    "tags": ["matching"],
+                    "summary": "List the stored deduplication review queue (newest first)",
+                    "parameters": [
+                        { "name": "status", "in": "query", "required": false, "schema": { "type": "string", "enum": ["pending", "confirmed", "rejected", "automerged"] } },
+                        { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 500 } }
+                    ],
+                    "responses": {
+                        "200": { "description": "The stored review items", "content": { "application/json": { "schema": {
+                            "type": "object", "properties": {
+                                "items": { "type": "array", "items": { "$ref": "#/components/schemas/ReviewQueueItem" } },
+                                "total": { "type": "integer" } } } } } },
+                        "422": { "description": "Unknown status token" }
+                    }
+                }
+            },
+            "/api/organizations/review-queue/{id}/decision": {
+                "post": {
+                    "tags": ["matching"],
+                    "summary": "Decide a pending review item (confirmed / rejected; first writer wins)",
+                    "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                        "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["confirmed", "rejected"] } } } } } },
+                    "responses": {
+                        "200": { "description": "The decided item", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewQueueItem" } } } },
+                        "404": { "description": "No review item with that id" },
+                        "422": { "description": "Item already decided" }
+                    }
                 }
             },
             "/api/organizations/merge": {
@@ -166,6 +208,23 @@ fn components() -> Value {
                     "pid": { "type": "string" }, "name": { "type": "string" },
                     "score": { "type": "number", "format": "double" }, "confidence": { "type": "string" },
                     "is_match": { "type": "boolean" } } },
+                "ReviewQueueItem": { "type": "object", "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "organization_id_a": { "type": "string", "format": "uuid" },
+                    "organization_id_b": { "type": "string", "format": "uuid" },
+                    "match_score": { "type": "number", "format": "double" },
+                    "match_quality": { "type": "string" },
+                    "detection_method": { "type": "string" },
+                    "status": { "type": "string", "enum": ["pending", "confirmed", "rejected", "automerged"] },
+                    "reviewed_by": { "type": "string", "nullable": true },
+                    "created_at": { "type": "string", "format": "date-time" },
+                    "reviewed_at": { "type": "string", "format": "date-time", "nullable": true } } },
+                "BatchDeduplicationResponse": { "type": "object", "properties": {
+                    "organizations_scanned": { "type": "integer" },
+                    "duplicates_found": { "type": "integer" },
+                    "auto_merged": { "type": "integer" },
+                    "queued_for_review": { "type": "integer" },
+                    "review_items": { "type": "array", "items": { "$ref": "#/components/schemas/ReviewQueueItem" } } } },
                 "MergeRequest": { "type": "object", "required": ["main_pid", "duplicate_pid"], "properties": {
                     "main_pid": { "type": "string", "format": "uuid" },
                     "duplicate_pid": { "type": "string", "format": "uuid" },

@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — drag-to-decide review board (2026-07-19)
+
+- `/review` — the stored review queue as a SVAR Kanban board
+  (Pending / Confirmed / Rejected / AutoMerged), mirroring the
+  person/worker/place/thing boards: the queue loads on mount (safe
+  GET), the destructive-classed batch scan runs only on the button,
+  and dragging a pending card into Confirmed / Rejected records the
+  decision through the decision endpoint.
+- Repository gains `deduplicate()` / `listReviewQueue()` /
+  `decideReview()`; types gain `ReviewStatus`, `ReviewDecision`,
+  `ReviewQueueItem`, `ReviewQueueListResponse`,
+  `BatchDeduplicationResponse`; nav gains Review; i18n gains
+  `nav.review` / `review.run` in all 13 locales.
+- e2e: a stubbed review-board smoke pins that loading the page renders
+  the stored queue and never fires the destructive scan.
+
 ### Added
 
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,

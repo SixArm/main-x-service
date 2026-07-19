@@ -38,6 +38,9 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | DELETE | `/api/organizations/{pid}` | Soft-delete |
 | POST | `/api/organizations/match` | Rank a `{query, candidates}` set (no persistence) |
 | POST | `/api/organizations/check-duplicates` | Match a query against stored orgs |
+| POST | `/api/organizations/deduplicate` | Batch-scan stored orgs pairwise; persist candidates in the stored review queue |
+| GET | `/api/organizations/review-queue` | Stored review queue (filter `status`, `limit`) |
+| POST | `/api/organizations/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 | POST | `/api/organizations/merge` | Merge a duplicate into a survivor (`422` equal pids, `404` unknown) |
 | GET | `/api/organizations/merges/recent` | Merge-history records |
 | GET | `/api/organizations/whoami` | Verified bearer-token claims (`401` without one) |

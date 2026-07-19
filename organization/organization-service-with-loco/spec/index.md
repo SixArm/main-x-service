@@ -70,7 +70,23 @@ are never fed to the matcher. See §8 and
    candidates}` set (no persistence).
 7. `POST /api/organizations/check-duplicates` — match a query against
    stored organizations; return the ones above threshold, ranked.
-8. `GET /metrics.prom` — Prometheus metrics in text-exposition format
+8. `POST /api/organizations/deduplicate` — batch-scan the stored
+   records pairwise (up to the §6 R-DUP scan cap) and **persist** likely
+   duplicates in the stored `review_queue` (normalized-pair upsert:
+   re-scans refresh scores, decided rows keep their decision, item ids
+   stay stable); the response reports the stored rows
+   (`organizations_scanned` / `duplicates_found` / `auto_merged` (always
+   0) / `queued_for_review` / `review_items[]`). Destructive-classed
+   under ABAC, like merge.
+9. `GET /api/organizations/review-queue[?status=&limit=]` — list the
+   stored review queue, newest first (limit cap 500; unknown status
+   token → `422`).
+10. `POST /api/organizations/review-queue/{id}/decision` — decide a
+    `pending` item (`{"status": "confirmed" | "rejected"}`);
+    first-writer-wins in SQL (`404` unknown id, `422` already decided).
+    The reviewer identity is the verified bearer `sub` when present, and
+    each decision writes a `review_decision` audit row.
+11. `GET /metrics.prom` — Prometheus metrics in text-exposition format
    (`text/plain; version=0.0.4`). Mounted at the application **root**
    (not under `/api`), public even under blanket auth enforcement.
 
@@ -157,8 +173,8 @@ per request and is **off by default**, so default behaviour is unchanged.
 [`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md):
 the request's action is derived from the HTTP method plus this crate's
 destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` — `/merge`,
-`/deduplicate`, `/import`; the latter two ahead of the dedup-scan and
-bulk-import features), and the shared engine in
+`/deduplicate`, `/import`; the dedup scan is live as of 2026-07-19,
+`/import` stays ahead of the bulk feature), and the shared engine in
 `authentication-verifier` 0.3 evaluates the policy over the token's
 `attrs` claim, first-match-wins. Configure with `ORGANIZATION_ABAC_POLICY`
 (inline JSON) or `ORGANIZATION_ABAC_POLICY_FILE` (path); unset or
@@ -386,6 +402,20 @@ personal data — honour GDPR when the privacy layer lands (§13).
   Found and fixed family-wide from the patient-flow implementation
   round; verified by a live fresh-database migrate. Every other table
   this crate creates via the helper is already plural (no-op).
+
+- [x] **2026-07-19 — Batch dedup + stored review queue + decision
+  endpoints.** `POST /deduplicate` (pairwise scan over the R-DUP cap,
+  persists candidates), the `review_queue` migration
+  (`m20260719_000001`) + raw-SQL `models/review_queue` module
+  (normalized-pair upsert / list / first-writer-wins decide — the same
+  module the person/worker/place/thing registries share), `GET
+  /review-queue`, `POST /review-queue/{id}/decision` (reviewer = bearer
+  `sub`; `review_decision` audit row), OpenAPI paths + schemas.
+  **Acceptance:** DB-free wire-token + decision serde pins; the
+  Postgres-gated request round-trip (scan → stable-id re-scan → list →
+  decide → 422 on re-decide → 404 unknown → decided status survives
+  re-scan) green — full `--ignored` suite 16/16; clippy pedantic clean.
+  The front-end `/review` drag-to-decide board consumes it.
 
 ## 14. Implementation status
 

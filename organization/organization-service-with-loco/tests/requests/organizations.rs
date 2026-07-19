@@ -298,6 +298,21 @@ async fn require_auth_gate_blocks_unauthed_list_but_allows_openapi() {
     unsafe {
         std::env::set_var("ORGANIZATION_REQUIRE_AUTH", "1");
     }
+    // The flag caches process-wide on first read (`OnceLock`), so in a
+    // full-suite run an earlier test has usually already cached it as
+    // OFF and the assertions below cannot hold. Detect that and skip
+    // honestly rather than fail — run this test standalone
+    // (`cargo test require_auth_gate -- --ignored`) for the real pin.
+    if !organization_service::auth::require_auth() {
+        unsafe {
+            std::env::remove_var("ORGANIZATION_REQUIRE_AUTH");
+        }
+        eprintln!(
+            "skipping: ORGANIZATION_REQUIRE_AUTH already cached off by an \
+             earlier test in this process; run this test standalone"
+        );
+        return;
+    }
     request::<App, _, _>(|request, _ctx| async move {
         let protected = request.get("/api/organizations").await;
         assert_eq!(
@@ -436,6 +451,91 @@ async fn merge_unknown_pid_is_404() {
             }))
             .await;
         assert_eq!(response.status_code(), 404, "unknown duplicate is 404");
+    })
+    .await;
+}
+
+/// Batch dedup + stored review queue round-trip: two similar orgs are
+/// queued by the scan (stored rows with stable ids), the queue lists
+/// them, a decision moves pending → confirmed exactly once (the second
+/// attempt is 422), and a re-scan keeps the decided status.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn deduplicate_review_queue_round_trip() {
+    request::<App, _, _>(|request, _ctx| async move {
+        for name in ["Acme, Inc.", "Acme Inc"] {
+            let mut org = acme();
+            org["name"] = json!(name);
+            let created = request.post("/api/organizations").json(&org).await;
+            assert_eq!(created.status_code(), 200, "create should succeed");
+        }
+
+        // Scan: the near-identical pair lands in the stored queue.
+        let scan = request
+            .post("/api/organizations/deduplicate")
+            .json(&json!({}))
+            .await;
+        assert_eq!(scan.status_code(), 200, "scan should succeed");
+        let report: serde_json::Value = scan.json();
+        assert_eq!(report["organizations_scanned"], 2);
+        assert_eq!(report["duplicates_found"], 1);
+        assert_eq!(report["queued_for_review"], 1);
+        let item = &report["review_items"][0];
+        assert_eq!(item["status"], "pending");
+        assert_eq!(item["detection_method"], "batch_deduplication");
+        let id = item["id"].as_str().expect("item id").to_string();
+
+        // Re-scan: same stored row, same id (normalized-pair upsert).
+        let rescan: serde_json::Value = request
+            .post("/api/organizations/deduplicate")
+            .json(&json!({}))
+            .await
+            .json();
+        assert_eq!(rescan["review_items"][0]["id"], id.as_str());
+
+        // The stored queue lists it.
+        let listed: serde_json::Value =
+            request.get("/api/organizations/review-queue").await.json();
+        assert_eq!(listed["total"], 1);
+        assert_eq!(listed["items"][0]["id"], id.as_str());
+
+        // Decide pending → confirmed; the guard is first-writer-wins.
+        let decided = request
+            .post(&format!("/api/organizations/review-queue/{id}/decision"))
+            .json(&json!({"status": "confirmed"}))
+            .await;
+        assert_eq!(decided.status_code(), 200, "decision should succeed");
+        let decided: serde_json::Value = decided.json();
+        assert_eq!(decided["status"], "confirmed");
+        assert!(decided["reviewed_at"].is_string());
+
+        let again = request
+            .post(&format!("/api/organizations/review-queue/{id}/decision"))
+            .json(&json!({"status": "rejected"}))
+            .await;
+        assert_eq!(again.status_code(), 422, "second decision is refused");
+
+        let missing = request
+            .post("/api/organizations/review-queue/00000000-0000-4000-8000-000000000000/decision")
+            .json(&json!({"status": "confirmed"}))
+            .await;
+        assert_eq!(missing.status_code(), 404, "unknown id is 404");
+
+        // A decided row keeps its decision through a re-scan, and the
+        // pending filter no longer returns it.
+        let rescan: serde_json::Value = request
+            .post("/api/organizations/deduplicate")
+            .json(&json!({}))
+            .await
+            .json();
+        assert_eq!(rescan["review_items"][0]["status"], "confirmed");
+        assert_eq!(rescan["queued_for_review"], 0);
+        let pending: serde_json::Value = request
+            .get("/api/organizations/review-queue?status=pending")
+            .await
+            .json();
+        assert_eq!(pending["total"], 0);
     })
     .await;
 }

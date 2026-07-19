@@ -79,4 +79,31 @@ describe("OrganizationRepository", () => {
       "http://svc.test/api/organizations/check-duplicates",
     );
   });
+
+  it("deduplicate() POSTs an empty-object body to the scan endpoint", async () => {
+    const { repo, calls } = spyClient();
+    await repo.deduplicate();
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.url).toBe("http://svc.test/api/organizations/deduplicate");
+    expect(calls[0]?.init.body).toBe("{}");
+  });
+
+  it("listReviewQueue() GETs the stored queue", async () => {
+    const { repo, calls } = spyClient();
+    await repo.listReviewQueue();
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/organizations/review-queue",
+    );
+  });
+
+  it("decideReview() POSTs the verdict to the item's decision path", async () => {
+    const { repo, calls } = spyClient();
+    await repo.decideReview("item-1", "confirmed");
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/organizations/review-queue/item-1/decision",
+    );
+    expect(calls[0]?.init.body).toBe(JSON.stringify({ status: "confirmed" }));
+  });
 });

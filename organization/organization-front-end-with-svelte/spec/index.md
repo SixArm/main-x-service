@@ -165,6 +165,13 @@ controls when they land.
   same-origin `/api/proxy` BFF route that injects the PASETO bearer
   server-side; the browser holds no token.
 
+- [x] **2026-07-19 — `/review` drag-to-decide board.** Stored review
+  queue as a SVAR Kanban (loads on mount via `GET /review-queue`; the
+  destructive scan stays button-only; drag pending → confirmed/rejected
+  posts the decision). Verified: svelte-check 0 errors, vitest 43
+  (repo path pins for the three new methods), Playwright 5 (stubbed
+  review-board smoke incl. a no-scan-on-load pin).
+
 ## 14. Implementation status
 
 Done: all four routes; lean client (+put/delete); repository; form;
