@@ -18,7 +18,7 @@ use crate::rules::{analytics, sla};
 
 /// Weak-ETag helper over the payload **without** `as_of` (the tag
 /// must be stable across reads of unchanged data).
-fn etag_of(value: &serde_json::Value) -> String {
+pub(crate) fn etag_of(value: &serde_json::Value) -> String {
     let mut hasher = DefaultHasher::new();
     value.to_string().hash(&mut hasher);
     format!("W/\"{:x}\"", hasher.finish())
@@ -26,7 +26,7 @@ fn etag_of(value: &serde_json::Value) -> String {
 
 /// Wrap a dashboard payload: 304 on a matching `If-None-Match`, else
 /// the payload + `as_of` with the `ETag` header.
-fn conditional(headers: &HeaderMap, payload: serde_json::Value) -> Response {
+pub(crate) fn conditional(headers: &HeaderMap, payload: serde_json::Value) -> Response {
     let tag = etag_of(&payload);
     if headers
         .get(header::IF_NONE_MATCH)

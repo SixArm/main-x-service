@@ -143,3 +143,28 @@ code + tests in one PR.
 - [ ] CRM-G2 GDPR/PECR review of the real send path (ESP adapter,
   lawful basis, unsubscribe in-message), retention schedules,
   subject-access/erasure flows ([regulatory.md](regulatory.md)).
+
+- [x] CRM-T19 (2026-07-20) **Insight views + boards.** Service: seven
+  read-only derived views in `controllers/insights.rs` (`as_of` +
+  ETag via the dashboards helpers): `/api/insights/stale-deals`
+  (days-in-stage from `deal_stage_changed` audits, derivation
+  served), `/insights/followups` (open activities with `due_on`:
+  overdue aging + next 30 days; recorder disclosed as recorder),
+  `/insights/pipeline-hygiene` (rule-disclosed findings: no amount /
+  no expected close / past expected close / no recent activity /
+  unworked leads), `/insights/executive` (period pack: won/lost with
+  per-currency won value never merged, lost reasons verbatim, leads /
+  tickets / activities / campaigns-started / consent withdrawals),
+  `/insights/forecast-trends` (stored snapshots only, no
+  interpolation), `/insights/sla` (breach register + per-assignee
+  workload, 4h at-risk window disclosed), `/insights/dpo` (consent
+  coverage verbatim + withdrawals + per-source counts +
+  duplicate-contact hygiene over shared `person_ref`; identity dedup
+  stays upstream). Front-end: `/leads/board` + `/tickets/board`
+  (drag = the existing status transitions; lifecycle machine owns
+  legality), `/followups` (overdue table + SVAR Calendar),
+  `/executive`, `/dpo`; `leadStatus` client fn; nav + i18n keys ×13.
+  **Acceptance:** the seeded insight round-trip (incl. ETag 304)
+  green — full `--ignored` suite 7/7 vs Postgres 18; clippy pedantic
+  clean; svelte-check 0; vitest 5; Playwright 9.
+

@@ -130,3 +130,127 @@ test("ticket queue flags breaches; locale switch retranslates + flips RTL", asyn
   await page.locator("nav.top select.locale-select").selectOption("ar");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
 });
+
+test("lead board renders columns with scored cards", async ({ page }) => {
+  await page.route("**/api/proxy/leads", (route) =>
+    route.fulfill({
+      json: [
+        { pid: "l1", source: "web form", display_name: "Alix Chen", email: null, score: 42, status: "new" },
+        { pid: "l2", source: "referral", display_name: "Sam Ortiz", email: null, score: 65, status: "qualified" },
+      ],
+    }),
+  );
+  await page.goto("/leads/board");
+  await expect(page.getByTestId("lead-board").getByText("Alix Chen")).toBeVisible();
+  await expect(page.getByTestId("lead-board").getByText("referral · score 65")).toBeVisible();
+});
+
+test("ticket board renders columns with SLA badges", async ({ page }) => {
+  await page.route("**/api/proxy/tickets", (route) =>
+    route.fulfill({
+      json: [
+        { pid: "t1", title: "Login broken", priority: "high", status: "open",
+          first_response_due_at: null, live_first_response_breached: true },
+      ],
+    }),
+  );
+  await page.goto("/tickets/board");
+  await expect(page.getByTestId("ticket-board").getByText("Login broken")).toBeVisible();
+  await expect(page.getByTestId("ticket-board").getByText("high · SLA breached")).toBeVisible();
+});
+
+test("follow-ups page renders overdue aging and the calendar", async ({ page }) => {
+  await page.route("**/api/proxy/insights/followups", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        note: "actor_ref is the recording actor",
+        overdue: [{ pid: "a1", kind: "call", summary: "Chase the proposal",
+          subject_kind: "deal", subject_pid: "d1", actor_ref: "worker:x",
+          due_on: "2026-07-01", overdue_days: 19 }],
+        upcoming_30d: [{ pid: "a2", kind: "meeting", summary: "QBR",
+          subject_kind: "account", subject_pid: "ac1", actor_ref: null,
+          due_on: "2026-07-28", overdue_days: null }],
+        open_by_recorder: { "worker:x": 1, unattributed: 1 },
+      },
+    }),
+  );
+  await page.goto("/followups");
+  await expect(page.getByTestId("followups-overdue").getByText("Chase the proposal")).toBeVisible();
+  await expect(page.getByTestId("followups-overdue").getByText("19")).toBeVisible();
+  await expect(page.getByTestId("followups-calendar")).toBeVisible();
+});
+
+test("executive area renders the pack, hygiene findings, and trends", async ({ page }) => {
+  await page.route("**/api/proxy/insights/executive", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        window: { from: "2026-06-20T00:00:00Z", to: "2026-07-20T00:00:00Z" },
+        deals_won: 3, deals_lost: 1,
+        won_value_by_currency_minor: { GBP: 750000 },
+        lost_reasons: { "price": 1 },
+        new_leads: 12, tickets_opened: 5, tickets_resolved: 4,
+        campaigns_started: 1, activities_logged: 40, consent_withdrawals: 2,
+        note: "per-currency won value is never merged",
+      },
+    }),
+  );
+  await page.route("**/api/proxy/insights/stale-deals", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        derivation: "stage entry = newest deal_stage_changed audit",
+        threshold_days: 14, open_deals: 2, stale_deals: 1,
+        deals: [{ pid: "d9", name: "Sleepy deal", stage: "Proposal",
+          owner_ref: null, amount_minor: 100000, currency: "GBP",
+          days_in_stage: 30, stale: true }],
+      },
+    }),
+  );
+  await page.route("**/api/proxy/insights/pipeline-hygiene", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z", threshold_days: 14,
+        findings: [{ rule: "open_deal_without_amount",
+          detail: "an open deal carries no amount (forecast blind spot)" }],
+      },
+    }),
+  );
+  await page.route("**/api/proxy/insights/forecast-trends", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        note: "stored snapshots only; no interpolated history",
+        series: [{ taken_on: "2026-07-19", totals: { GBP: 4887500 } }],
+      },
+    }),
+  );
+  await page.goto("/executive");
+  await expect(page.getByTestId("exec-won-value").getByText("£7,500.00")).toBeVisible();
+  await expect(page.getByTestId("exec-stale").getByText("Sleepy deal")).toBeVisible();
+  await expect(page.getByTestId("exec-hygiene").getByText("open_deal_without_amount")).toBeVisible();
+  await expect(page.getByTestId("exec-trends").getByText("£48,875.00")).toBeVisible();
+});
+
+test("dpo area renders coverage, sources, and duplicate hygiene", async ({ page }) => {
+  await page.route("**/api/proxy/insights/dpo", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        note: "identity dedup stays upstream in the person service",
+        contacts: 3,
+        consent_coverage: { granted: 2, withdrawn: 1 },
+        window_days: 30, withdrawals_in_window: 1,
+        consent_events_by_source: { "web form": 2, "email link": 1 },
+        duplicate_person_refs: [{ person_ref: "person:abc",
+          contacts: [{ pid: "c1", display_name: "Row One" },
+                     { pid: "c2", display_name: "Row Two" }] }],
+      },
+    }),
+  );
+  await page.goto("/dpo");
+  await expect(page.getByTestId("dpo-tiles").getByText("consent: granted")).toBeVisible();
+  await expect(page.getByTestId("dpo-sources").getByText("web form")).toBeVisible();
+  await expect(page.getByTestId("dpo-duplicates").getByText("person:abc")).toBeVisible();
+});

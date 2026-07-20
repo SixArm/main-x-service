@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — boards + insight areas (CRM-T19, 2026-07-20)
+
+- `/leads/board` and `/tickets/board` (SVAR Kanban; drag = the
+  existing status transitions, SLA/score badges), `/followups`
+  (overdue aging + SVAR Calendar), `/executive` (period pack +
+  stale deals + hygiene findings + forecast trend), `/dpo` (consent
+  coverage + sources + duplicate hygiene). `leadStatus` + seven
+  insight client functions with path pins; nav + keys in 13 locales;
+  five stubbed Playwright specs.
+
 ### Added
 
 - 2026-07-19 — SVAR strong fit: the **/deals** board upgrades from custom CSS columns to the SVAR

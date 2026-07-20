@@ -41,6 +41,10 @@ export const LOCALE_KEY = "mxi.crm.locale";
 // Every translatable UI string, keyed by a stable dotted key.
 const STRINGS = {
   en: {
+    "nav.followups": "Follow-ups",
+    "nav.executive": "Executive",
+    "nav.dpo": "DPO",
+    "common.board": "Board",
     "contact.jobTitle": "Job title",
     "account.tier": "Tier",
     "account.industry": "Industry",
@@ -91,6 +95,10 @@ const STRINGS = {
     "article.search": "Search articles",
   },
   cy: {
+    "nav.followups": "Dilyniannau",
+    "nav.executive": "Gweithredol",
+    "nav.dpo": "DPO",
+    "common.board": "Bwrdd",
     "contact.jobTitle": "Teitl swydd",
     "account.tier": "Haen",
     "account.industry": "Diwydiant",
@@ -141,6 +149,10 @@ const STRINGS = {
     "article.search": "Chwilio erthyglau",
   },
   es: {
+    "nav.followups": "Seguimientos",
+    "nav.executive": "Ejecutivo",
+    "nav.dpo": "DPO",
+    "common.board": "Tablero",
     "contact.jobTitle": "Puesto",
     "account.tier": "Nivel",
     "account.industry": "Sector",
@@ -191,6 +203,10 @@ const STRINGS = {
     "article.search": "Buscar artículos",
   },
   fr: {
+    "nav.followups": "Relances",
+    "nav.executive": "Direction",
+    "nav.dpo": "DPO",
+    "common.board": "Tableau",
     "contact.jobTitle": "Intitulé du poste",
     "account.tier": "Niveau",
     "account.industry": "Secteur",
@@ -241,6 +257,10 @@ const STRINGS = {
     "article.search": "Rechercher des articles",
   },
   de: {
+    "nav.followups": "Wiedervorlagen",
+    "nav.executive": "Führung",
+    "nav.dpo": "DPO",
+    "common.board": "Board",
     "contact.jobTitle": "Stellenbezeichnung",
     "account.tier": "Stufe",
     "account.industry": "Branche",
@@ -291,6 +311,10 @@ const STRINGS = {
     "article.search": "Artikel suchen",
   },
   ar: {
+    "nav.followups": "المتابعات",
+    "nav.executive": "التنفيذية",
+    "nav.dpo": "حماية البيانات",
+    "common.board": "اللوحة",
     "contact.jobTitle": "المسمى الوظيفي",
     "account.tier": "الفئة",
     "account.industry": "القطاع",
@@ -341,6 +365,10 @@ const STRINGS = {
     "article.search": "بحث المقالات",
   },
   ru: {
+    "nav.followups": "Напоминания",
+    "nav.executive": "Руководство",
+    "nav.dpo": "DPO",
+    "common.board": "Доска",
     "contact.jobTitle": "Должность",
     "account.tier": "Уровень",
     "account.industry": "Отрасль",
@@ -391,6 +419,10 @@ const STRINGS = {
     "article.search": "Поиск статей",
   },
   hi: {
+    "nav.followups": "फ़ॉलो-अप",
+    "nav.executive": "कार्यकारी",
+    "nav.dpo": "DPO",
+    "common.board": "बोर्ड",
     "contact.jobTitle": "पद",
     "account.tier": "स्तर",
     "account.industry": "उद्योग",
@@ -441,6 +473,10 @@ const STRINGS = {
     "article.search": "लेख खोजें",
   },
   zh: {
+    "nav.followups": "跟进",
+    "nav.executive": "高管",
+    "nav.dpo": "数据保护",
+    "common.board": "看板",
     "contact.jobTitle": "职位",
     "account.tier": "层级",
     "account.industry": "行业",
@@ -491,6 +527,10 @@ const STRINGS = {
     "article.search": "搜索文章",
   },
   bn: {
+    "nav.followups": "ফলো-আপ",
+    "nav.executive": "নির্বাহী",
+    "nav.dpo": "ডিপিও",
+    "common.board": "বোর্ড",
     "contact.jobTitle": "পদবি",
     "account.tier": "স্তর",
     "account.industry": "শিল্প",
@@ -541,6 +581,10 @@ const STRINGS = {
     "article.search": "নিবন্ধ খুঁজুন",
   },
   pt: {
+    "nav.followups": "Follow-ups",
+    "nav.executive": "Executivo",
+    "nav.dpo": "DPO",
+    "common.board": "Quadro",
     "contact.jobTitle": "Cargo",
     "account.tier": "Nível",
     "account.industry": "Setor",
@@ -591,6 +635,10 @@ const STRINGS = {
     "article.search": "Pesquisar artigos",
   },
   id: {
+    "nav.followups": "Tindak lanjut",
+    "nav.executive": "Eksekutif",
+    "nav.dpo": "DPO",
+    "common.board": "Papan",
     "contact.jobTitle": "Jabatan",
     "account.tier": "Tingkat",
     "account.industry": "Industri",
@@ -641,6 +689,10 @@ const STRINGS = {
     "article.search": "Cari artikel",
   },
   ur: {
+    "nav.followups": "فالو اپ",
+    "nav.executive": "ایگزیکٹو",
+    "nav.dpo": "ڈی پی او",
+    "common.board": "بورڈ",
     "contact.jobTitle": "عہدہ",
     "account.tier": "درجہ",
     "account.industry": "صنعت",

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — insight views (CRM-T19, 2026-07-20)
+
+- `controllers/insights.rs`: stale-deal aging (from stage-change
+  audits), follow-ups (overdue + 30-day horizon), pipeline-hygiene
+  findings, the period executive pack (per-currency won value never
+  merged), the stored forecast-trend series (no interpolation), the
+  SLA breach register + per-assignee workload, and the DPO view
+  (consent coverage + withdrawals + per-source counts +
+  duplicate-contact hygiene). All ETag-conditional with `as_of`.
+
 ### Added
 
 - 2026-07-18 — CRM-T1–T16 implementation round: full Loco service

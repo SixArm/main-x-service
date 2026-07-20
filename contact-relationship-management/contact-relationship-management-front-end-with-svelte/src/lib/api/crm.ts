@@ -178,6 +178,11 @@ export function getLead(
   return api(`/leads/${pid}`, init);
 }
 
+/** Lead status transition. */
+export function leadStatus(pid: string, to: string): Promise<Lead> {
+  return api(`/leads/${pid}/status`, { method: "POST", body: { to } });
+}
+
 /** Pipelines with stages. */
 export function listPipelines(
   init?: FetchLike,
@@ -260,4 +265,134 @@ export function slaDashboard(
   init?: FetchLike,
 ): Promise<{ open_tickets: number; by_priority: { priority: string; open: number; breached: number }[] }> {
   return api("/dashboards/sla", init);
+}
+
+// ─── Insight views (read-only derivations; as_of + ETag) ────────────
+
+/** `GET /insights/stale-deals` row. */
+export interface StaleDeal {
+  pid: string;
+  name: string;
+  stage: string | null;
+  owner_ref: string | null;
+  amount_minor: number;
+  currency: string;
+  days_in_stage: number;
+  stale: boolean;
+}
+
+/** One open follow-up (activity with a due date, not done). */
+export interface Followup {
+  pid: string;
+  kind: string;
+  summary: string;
+  subject_kind: string;
+  subject_pid: string;
+  actor_ref: string | null;
+  due_on: string;
+  overdue_days: number | null;
+}
+
+/** One rule-disclosed finding. */
+export interface Finding {
+  rule: string;
+  detail: string;
+  [key: string]: unknown;
+}
+
+/** Stale-deal aging (server derivation disclosed). */
+export function staleDeals(
+  days?: number,
+  init?: FetchLike,
+): Promise<{
+  as_of: string;
+  derivation: string;
+  threshold_days: number;
+  open_deals: number;
+  stale_deals: number;
+  deals: StaleDeal[];
+}> {
+  return api(`/insights/stale-deals${days ? `?days=${days}` : ""}`, init);
+}
+
+/** Open follow-ups: overdue + next 30 days. */
+export function followups(init?: FetchLike): Promise<{
+  as_of: string;
+  note: string;
+  overdue: Followup[];
+  upcoming_30d: Followup[];
+  open_by_recorder: Record<string, number>;
+}> {
+  return api("/insights/followups", init);
+}
+
+/** Pipeline-hygiene findings. */
+export function pipelineHygiene(
+  days?: number,
+  init?: FetchLike,
+): Promise<{ as_of: string; threshold_days: number; findings: Finding[] }> {
+  return api(`/insights/pipeline-hygiene${days ? `?days=${days}` : ""}`, init);
+}
+
+/** The period sales executive pack. */
+export function executivePack(init?: FetchLike): Promise<{
+  as_of: string;
+  window: { from: string; to: string };
+  deals_won: number;
+  deals_lost: number;
+  won_value_by_currency_minor: Record<string, number>;
+  lost_reasons: Record<string, number>;
+  new_leads: number;
+  tickets_opened: number;
+  tickets_resolved: number;
+  campaigns_started: number;
+  activities_logged: number;
+  consent_withdrawals: number;
+  note: string;
+}> {
+  return api("/insights/executive", init);
+}
+
+/** The stored forecast-snapshot series (no interpolation). */
+export function forecastTrends(init?: FetchLike): Promise<{
+  as_of: string;
+  note: string;
+  series: Array<{ taken_on: string; totals: Record<string, number> }>;
+}> {
+  return api("/insights/forecast-trends", init);
+}
+
+/** The SLA breach register + per-assignee workload. */
+export function slaRegister(init?: FetchLike): Promise<{
+  as_of: string;
+  derivation: string;
+  breaches: Array<{
+    pid: string;
+    title: string;
+    priority: string;
+    status: string;
+    assignee_ref: string | null;
+    breached: string;
+    overdue_hours: number;
+  }>;
+  workload: Array<{ assignee_ref: string; open: number; breached: number; at_risk_4h: number }>;
+}> {
+  return api("/insights/sla", init);
+}
+
+/** The DPO view: consent coverage + duplicates. */
+export function dpo(init?: FetchLike): Promise<{
+  as_of: string;
+  note: string;
+  contacts: number;
+  consent_coverage: Record<string, number>;
+  window_days: number;
+  withdrawals_in_window: number;
+  consent_events_by_source: Record<string, number>;
+  duplicate_person_refs: Array<{
+    person_ref: string;
+    contacts: Array<{ pid: string; display_name: string }>;
+  }>;
+}> {
+  return api("/insights/dpo", init);
 }

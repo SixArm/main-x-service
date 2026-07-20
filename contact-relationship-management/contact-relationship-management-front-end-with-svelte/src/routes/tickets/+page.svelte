@@ -94,6 +94,7 @@
 </script>
 
 <h1>{t("nav.tickets")}</h1>
+<p><a class="button" href="/tickets/board">{t("common.board")}</a></p>
 
 {#if error}
   <p class="error" data-testid="error">{t("common.error")}: {error}</p>

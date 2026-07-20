@@ -67,6 +67,14 @@ describe("api path map", () => {
     await crm.campaignFunnel("k1");
     await crm.listTickets();
     await crm.salesDashboard();
+    await crm.leadStatus("l1", "contacted");
+    await crm.staleDeals(7);
+    await crm.followups();
+    await crm.pipelineHygiene();
+    await crm.executivePack();
+    await crm.forecastTrends();
+    await crm.slaRegister();
+    await crm.dpo();
     expect(calls).toEqual([
       "/api/proxy/contacts",
       "/api/proxy/contacts/c1",
@@ -76,6 +84,14 @@ describe("api path map", () => {
       "/api/proxy/campaigns/k1/funnel",
       "/api/proxy/tickets",
       "/api/proxy/dashboards/sales",
+      "/api/proxy/leads/l1/status",
+      "/api/proxy/insights/stale-deals?days=7",
+      "/api/proxy/insights/followups",
+      "/api/proxy/insights/pipeline-hygiene",
+      "/api/proxy/insights/executive",
+      "/api/proxy/insights/forecast-trends",
+      "/api/proxy/insights/sla",
+      "/api/proxy/insights/dpo",
     ]);
     vi.unstubAllGlobals();
   });
