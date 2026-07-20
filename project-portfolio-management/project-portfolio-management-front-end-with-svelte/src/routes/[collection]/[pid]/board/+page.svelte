@@ -14,8 +14,10 @@
     PpmClient,
     type Burndown,
     type Sprint,
+    type SprintNote,
     type Standup,
     type Task,
+    type Velocity,
   } from "$lib/api/ppm";
   import { t } from "$lib/i18n.svelte";
 
@@ -28,6 +30,11 @@
   let selectedSprint = $state("");
   let burndown = $state<Burndown | null>(null);
   let standup = $state<Standup | null>(null);
+  let velocity = $state<Velocity | null>(null);
+  let notes = $state<SprintNote[]>([]);
+  let noteBody = $state("");
+  let noteCategory = $state("action");
+  let points = $state("");
   let error = $state<string | null>(null);
   let title = $state("");
   let sprintName = $state("");
@@ -39,12 +46,14 @@
       tasks = (await ppm.listTasks(collection, pid)).tasks;
       sprints = await ppm.listSprints(collection, pid);
       standup = await ppm.standup(collection, pid);
+      velocity = await ppm.velocity(collection, pid);
       // Default to the latest sprint so the burndown shows up unprompted.
       if (!selectedSprint && sprints.length > 0) {
         selectedSprint = sprints[0]?.pid ?? "";
       }
       if (selectedSprint) {
         burndown = await ppm.burndown(collection, pid, selectedSprint);
+        notes = await ppm.listNotes(collection, pid, selectedSprint);
       }
     } catch (err) {
       error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
@@ -78,6 +87,7 @@
       label: task.title,
       description:
         (task.assignee_ref ?? "unassigned") +
+        (task.points !== null && task.points !== undefined ? ` · ${task.points}pt` : "") +
         (task.blocked_days !== null ? ` · blocked ${task.blocked_days}d` : ""),
       status: task.status,
     })),
@@ -118,11 +128,21 @@
     if (!title.trim()) return;
     const body: Record<string, unknown> = { title: title.trim() };
     if (selectedSprint) body["sprint_pid"] = selectedSprint;
+    const parsedPoints = Number.parseInt(points, 10);
+    if (!Number.isNaN(parsedPoints)) body["points"] = parsedPoints;
     title = "";
+    points = "";
     void act(() => ppm.createTask(collection, pid, body));
   }}
 >
   <input bind:value={title} placeholder="New task title" aria-label="New task title" />
+  <input
+    bind:value={points}
+    placeholder="pts"
+    aria-label="Story points"
+    class="points"
+    inputmode="numeric"
+  />
   <button type="submit">Add task</button>
   <label>
     Sprint
@@ -200,7 +220,68 @@
   </div>
 {/if}
 
+{#if selectedSprint}
+  <h2>Retro / feedback notes</h2>
+  <form
+    class="row"
+    onsubmit={(event) => {
+      event.preventDefault();
+      if (!noteBody.trim()) return;
+      const body = { category: noteCategory, body: noteBody.trim() };
+      noteBody = "";
+      void act(() => ppm.createNote(collection, pid, selectedSprint, body));
+    }}
+  >
+    <select bind:value={noteCategory} aria-label="Note category">
+      <option value="went_well">went well</option>
+      <option value="improve">improve</option>
+      <option value="action">action</option>
+      <option value="feedback">feedback</option>
+    </select>
+    <input bind:value={noteBody} placeholder="Note" aria-label="Note body" />
+    <button type="submit">Add note</button>
+  </form>
+  <ul data-testid="sprint-notes">
+    {#each notes as note (note.pid)}
+      <li>
+        <strong>{note.category}</strong>: {note.body}
+        {#if note.task_pid}
+          <span class="muted">→ task created</span>
+        {:else if note.category === "action" || note.category === "feedback"}
+          <button
+            onclick={() =>
+              void act(() => ppm.convertNote(collection, pid, selectedSprint, note.pid))}
+          >
+            Convert to task
+          </button>
+        {/if}
+      </li>
+    {:else}
+      <li class="muted">No notes for this sprint yet.</li>
+    {/each}
+  </ul>
+{/if}
+
+{#if velocity && velocity.sprints.length > 0}
+  <h2>Velocity</h2>
+  <p class="muted">{velocity.note}</p>
+  <table data-testid="velocity">
+    <thead><tr><th>Sprint</th><th>Tasks done</th><th>Points done</th><th>Unpointed</th></tr></thead>
+    <tbody>
+      {#each velocity.sprints as row (row.sprint.pid)}
+        <tr>
+          <td>{row.sprint.name}</td>
+          <td>{row.tasks_done}</td>
+          <td>{row.points_done}</td>
+          <td>{row.unpointed_done}</td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+{/if}
+
 <style>
   .row { display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap; margin-bottom: 1rem; }
   .board-wrap { height: 480px; overflow-x: auto; }
+  input.points { width: 4rem; }
 </style>

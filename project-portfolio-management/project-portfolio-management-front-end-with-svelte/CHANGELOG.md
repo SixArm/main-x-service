@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — engineering moderate views (2026-07-20)
+
+- Board gains story-point input (+pt on cards), the per-sprint
+  retro/feedback notes panel with convert-to-task, and the velocity
+  table (team-local note shown). `/engineering` gains the DevOps
+  metrics tiles (derivation shown; unresolved incidents counted, never
+  timed) and the release register. Six typed client methods + pins;
+  e2e stubs + assertions.
+
 ### Added — engineering-team views (2026-07-20)
 
 - `/{collection}/{pid}/board` — the per-item task Kanban (drag = the

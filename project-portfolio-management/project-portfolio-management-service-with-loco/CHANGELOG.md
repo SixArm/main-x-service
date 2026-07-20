@@ -9,6 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — engineering moderate fits (2026-07-20)
+
+- Story points on tasks + `GET .../velocity` (team-local; real
+  completions only); env-configured WIP limits enforced on board moves
+  (`PROJECT_PORTFOLIO_MANAGEMENT_WIP_LIMITS`); sprint retro/feedback
+  notes with once-only action/feedback → task conversion; DevOps event
+  ingest (`/api/devops/events`) + DORA-style metrics derived only from
+  ingested events (MTTR over linked pairs; declared-cause change
+  failure) + the deploy-event release register.
+
 ### Added — engineering-team features (2026-07-20)
 
 - The spec-§13 **tasks** sub-resource (Kanban statuses, PATCH board

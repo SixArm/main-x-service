@@ -264,11 +264,11 @@ async function stubPpm(page: Page) {
       return route.fulfill({ json: {
         tasks: [
           { pid: "t-1", title: "Wire the API", description: null, status: "in_progress",
-            assignee_ref: "worker:x", sprint_pid: "sp-1",
+            assignee_ref: "worker:x", points: 5, sprint_pid: "sp-1",
             created_at: "2026-07-19T00:00:00Z", status_changed_at: "2026-07-19T01:00:00Z",
             done_at: null, blocked_days: null },
           { pid: "t-2", title: "Fix the build", description: null, status: "blocked",
-            assignee_ref: null, sprint_pid: null,
+            assignee_ref: null, points: null, sprint_pid: null,
             created_at: "2026-07-18T00:00:00Z", status_changed_at: "2026-07-18T01:00:00Z",
             done_at: null, blocked_days: 2 },
         ],
@@ -340,6 +340,39 @@ async function stubPpm(page: Page) {
         kinds: ["milestone", "demo", "release", "checkpoint"],
         milestones: [{ pid: "m-1", name: "Sprint demo", kind: "demo",
           due: "2026-07-24", done: false,
+          item: { pid: "w-1", name: "Platform rebuild", kind: "Project" } }],
+      } });
+    if (/^\/api\/projects\/w-1\/velocity$/.test(path))
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z",
+        note: "points are team-local; never compare across teams or items",
+        sprints: [{ sprint: { pid: "sp-1", name: "Sprint 1",
+          starts_on: "2026-07-13", ends_on: "2026-07-26" },
+          tasks_done: 3, points_done: 13, unpointed_done: 1 }],
+      } });
+    if (/^\/api\/projects\/w-1\/sprints\/sp-1\/notes$/.test(path) && method === "GET")
+      return route.fulfill({ json: [
+        { pid: "n-1", sprint_pid: "sp-1", category: "action",
+          body: "Automate the smoke tests", task_pid: null },
+        { pid: "n-2", sprint_pid: "sp-1", category: "went_well",
+          body: "Pairing worked", task_pid: null },
+      ] });
+    if (path === "/api/devops/metrics")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", window_months: 3,
+        derivation: "derived only from ingested devops events",
+        deploys: 8, deploys_by_month: { "2026-07": 8 },
+        deploys_by_environment: { production: 5, staging: 3 },
+        incidents: 2, incidents_by_month: { "2026-07": 2 },
+        resolved_incidents: 1, unresolved_incidents: 1,
+        median_recovery_hours: 4, declared_cause_incidents: 1,
+        change_failure_rate: 0.125,
+      } });
+    if (path === "/api/devops/releases")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z",
+        releases: [{ pid: "d-1", occurred_at: "2026-07-18T12:00:00Z",
+          environment: "production", version: "1.4.0", reference: null,
           item: { pid: "w-1", name: "Platform rebuild", kind: "Project" } }],
       } });
     if (path === "/api/scenarios" && method === "GET")
@@ -488,6 +521,9 @@ test("task board renders columns, burndown, and the standup digest", async ({ pa
   await expect(page.getByText("no ideal line, no interpolation")).toBeVisible();
   await expect(page.getByTestId("burndown")).toBeVisible();
   await expect(page.getByTestId("standup").getByText("1 blocked now")).toBeVisible();
+  await expect(page.getByTestId("sprint-notes").getByText("Automate the smoke tests")).toBeVisible();
+  await expect(page.getByTestId("sprint-notes").getByRole("button", { name: "Convert to task" })).toBeVisible();
+  await expect(page.getByTestId("velocity").getByText("13")).toBeVisible();
 });
 
 test("engineering estate area renders blocked, moscow, and delivery links", async ({ page }) => {
@@ -497,6 +533,8 @@ test("engineering estate area renders blocked, moscow, and delivery links", asyn
   await expect(page.getByTestId("eng-moscow").getByText("must (1)")).toBeVisible();
   await expect(page.getByTestId("eng-links").getByText("GitHubProjectId:42")).toBeVisible();
   await expect(page.getByTestId("eng-untracked")).toContainText("Untracked idea");
+  await expect(page.getByTestId("devops-metrics").getByText("13%")).toBeVisible();
+  await expect(page.getByTestId("devops-releases").getByText("1.4.0")).toBeVisible();
 });
 
 test("delivery calendar lists milestones with kinds", async ({ page }) => {

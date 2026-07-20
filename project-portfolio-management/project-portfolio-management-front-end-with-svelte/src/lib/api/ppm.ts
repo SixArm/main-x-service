@@ -580,6 +580,7 @@ export interface Task {
   description: string | null;
   status: "todo" | "in_progress" | "in_review" | "done" | "blocked";
   assignee_ref: string | null;
+  points: number | null;
   sprint_pid: string | null;
   created_at: string;
   status_changed_at: string;
@@ -648,6 +649,58 @@ export interface MilestoneCalendar {
     kind: string;
     due: string;
     done: boolean;
+    item: InsightItemRef | null;
+  }>;
+}
+
+
+/** One sprint retro / feedback note. */
+export interface SprintNote {
+  pid: string;
+  sprint_pid: string;
+  category: "went_well" | "improve" | "action" | "feedback";
+  body: string;
+  task_pid: string | null;
+}
+
+/** `GET .../velocity` response. */
+export interface Velocity {
+  as_of: string;
+  note: string;
+  sprints: Array<{
+    sprint: { pid: string; name: string; starts_on: string; ends_on: string };
+    tasks_done: number;
+    points_done: number;
+    unpointed_done: number;
+  }>;
+}
+
+/** `GET /api/devops/metrics` response. */
+export interface DevopsMetrics {
+  as_of: string;
+  window_months: number;
+  derivation: string;
+  deploys: number;
+  deploys_by_month: Record<string, number>;
+  deploys_by_environment: Record<string, number>;
+  incidents: number;
+  incidents_by_month: Record<string, number>;
+  resolved_incidents: number;
+  unresolved_incidents: number;
+  median_recovery_hours: number | null;
+  declared_cause_incidents: number;
+  change_failure_rate: number | null;
+}
+
+/** `GET /api/devops/releases` response. */
+export interface DevopsReleases {
+  as_of: string;
+  releases: Array<{
+    pid: string;
+    occurred_at: string;
+    environment: string | null;
+    version: string | null;
+    reference: string | null;
     item: InsightItemRef | null;
   }>;
 }
@@ -1000,6 +1053,27 @@ export class PpmClient {
   }
   milestoneCalendar(kind?: string): Promise<MilestoneCalendar> {
     return this.http.get(`/api/engineering/milestone-calendar${kind ? `?kind=${kind}` : ""}`);
+  }
+  velocity(collection: string, pid: string): Promise<Velocity> {
+    return this.http.get(`/api/${collection}/${pid}/velocity`);
+  }
+  listNotes(collection: string, pid: string, sprintPid: string): Promise<SprintNote[]> {
+    return this.http.get(`/api/${collection}/${pid}/sprints/${sprintPid}/notes`);
+  }
+  createNote(collection: string, pid: string, sprintPid: string, body: unknown): Promise<SprintNote> {
+    return this.http.post(`/api/${collection}/${pid}/sprints/${sprintPid}/notes`, { body });
+  }
+  convertNote(collection: string, pid: string, sprintPid: string, notePid: string): Promise<{ note: SprintNote; task: Task }> {
+    return this.http.post(
+      `/api/${collection}/${pid}/sprints/${sprintPid}/notes/${notePid}/convert`,
+      { body: {} },
+    );
+  }
+  devopsMetrics(months?: number): Promise<DevopsMetrics> {
+    return this.http.get(`/api/devops/metrics${months ? `?months=${months}` : ""}`);
+  }
+  devopsReleases(): Promise<DevopsReleases> {
+    return this.http.get("/api/devops/releases");
   }
   /** The CSV download URL for a saved report (same-origin proxy). */
   reportCsvUrl(pid: string): string {

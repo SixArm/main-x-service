@@ -3,6 +3,7 @@
 pub mod allocations;
 pub mod audit_logs;
 pub mod benefits;
+pub mod devops_events;
 pub mod budget_lines;
 pub mod event_outbox;
 pub mod gate_reviews;
@@ -17,6 +18,7 @@ pub mod proposals;
 pub mod report_definitions;
 pub mod risks;
 pub mod scenarios;
+pub mod sprint_notes;
 pub mod sprints;
 pub mod tasks;
 pub mod work_item_dependencies;

@@ -73,6 +73,12 @@ describe("PpmClient paths", () => {
     await ppm.engineeringMoscow();
     await ppm.engineeringDeliveryLinks();
     await ppm.milestoneCalendar("demo");
+    await ppm.velocity("projects", "w1");
+    await ppm.listNotes("projects", "w1", "s1");
+    await ppm.createNote("projects", "w1", "s1", { category: "action", body: "B" });
+    await ppm.convertNote("projects", "w1", "s1", "n1");
+    await ppm.devopsMetrics(6);
+    await ppm.devopsReleases();
 
     expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
       "GET http://svc/api/at-a-glance",
@@ -126,6 +132,12 @@ describe("PpmClient paths", () => {
       "GET http://svc/api/engineering/moscow",
       "GET http://svc/api/engineering/delivery-links",
       "GET http://svc/api/engineering/milestone-calendar?kind=demo",
+      "GET http://svc/api/projects/w1/velocity",
+      "GET http://svc/api/projects/w1/sprints/s1/notes",
+      "POST http://svc/api/projects/w1/sprints/s1/notes",
+      "POST http://svc/api/projects/w1/sprints/s1/notes/n1/convert",
+      "GET http://svc/api/devops/metrics?months=6",
+      "GET http://svc/api/devops/releases",
     ]);
   });
 

@@ -1,6 +1,6 @@
-//! `SeaORM` Entity — `tasks`. The per-work-item operational task
-//! sub-resource (spec §13): Kanban status + honest flow stamps
-//! (`status_changed_at`, first `done_at`).
+//! `SeaORM` Entity — `devops_events`. Ingested deploy / incident /
+//! recovery events: the only source the DORA-style metrics derive
+//! from (nothing is inferred from data that was never ingested).
 
 // SeaORM-generated entity shape: documented by the migration.
 #![allow(missing_docs)]
@@ -9,7 +9,7 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "tasks")]
+#[sea_orm(table_name = "devops_events")]
 pub struct Model {
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
@@ -18,15 +18,13 @@ pub struct Model {
     #[sea_orm(unique)]
     pub pid: Uuid,
     pub work_item_pid: Uuid,
-    pub sprint_pid: Option<Uuid>,
-    pub title: String,
-    pub description: Option<String>,
-    pub status: String,
-    pub assignee_ref: Option<String>,
-    pub points: Option<i32>,
-    pub status_changed_at: DateTimeWithTimeZone,
-    pub done_at: Option<DateTimeWithTimeZone>,
-    pub deleted_at: Option<DateTimeWithTimeZone>,
+    pub kind: String,
+    pub environment: Option<String>,
+    pub version: Option<String>,
+    pub reference: Option<String>,
+    pub incident_pid: Option<Uuid>,
+    pub caused_by_deploy_pid: Option<Uuid>,
+    pub occurred_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

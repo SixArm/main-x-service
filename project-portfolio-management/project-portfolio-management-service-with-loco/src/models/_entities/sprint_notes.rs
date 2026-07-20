@@ -1,6 +1,6 @@
-//! `SeaORM` Entity — `tasks`. The per-work-item operational task
-//! sub-resource (spec §13): Kanban status + honest flow stamps
-//! (`status_changed_at`, first `done_at`).
+//! `SeaORM` Entity — `sprint_notes`. Retro / feedback log entries per
+//! sprint (`went_well` / `improve` / `action` / `feedback`);
+//! convertible to tasks (`task_pid` records the conversion).
 
 // SeaORM-generated entity shape: documented by the migration.
 #![allow(missing_docs)]
@@ -9,7 +9,7 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "tasks")]
+#[sea_orm(table_name = "sprint_notes")]
 pub struct Model {
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
@@ -17,15 +17,10 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub pid: Uuid,
-    pub work_item_pid: Uuid,
-    pub sprint_pid: Option<Uuid>,
-    pub title: String,
-    pub description: Option<String>,
-    pub status: String,
-    pub assignee_ref: Option<String>,
-    pub points: Option<i32>,
-    pub status_changed_at: DateTimeWithTimeZone,
-    pub done_at: Option<DateTimeWithTimeZone>,
+    pub sprint_pid: Uuid,
+    pub category: String,
+    pub body: String,
+    pub task_pid: Option<Uuid>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 

@@ -20,6 +20,8 @@
 //! See `spec/index.md` for the living specification.
 
 #![warn(clippy::pedantic)]
+// The hand-written OpenAPI document is one large nested `json!` tree.
+#![recursion_limit = "512"]
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 

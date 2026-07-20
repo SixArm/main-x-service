@@ -13,13 +13,15 @@
 
 use axum::http::HeaderMap;
 use loco_rs::prelude::*;
-use sea_orm::{QueryOrder, QuerySelect};
+use sea_orm::{PaginatorTrait, QueryOrder, QuerySelect};
 use serde::Deserialize;
 use uuid::Uuid;
 
 use super::insights::item_ref;
 use crate::engineering as rules;
-use crate::models::_entities::{audit_logs, milestones, sprints, tasks, work_items};
+use crate::models::_entities::{
+    audit_logs, devops_events, milestones, sprint_notes, sprints, tasks, work_items,
+};
 use crate::models::audit_logs::Model as AuditModel;
 use crate::auth::MaybeAuthUser;
 
@@ -78,6 +80,7 @@ fn task_view(task: &tasks::Model) -> serde_json::Value {
         "description": task.description,
         "status": task.status,
         "assignee_ref": task.assignee_ref,
+        "points": task.points,
         "sprint_pid": task.sprint_pid,
         "created_at": task.created_at.to_utc(),
         "status_changed_at": task.status_changed_at.to_utc(),
@@ -98,6 +101,9 @@ struct TaskPayload {
     assignee_ref: Option<String>,
     #[serde(default)]
     sprint_pid: Option<Uuid>,
+    /// Optional story points (team-local; 0–100).
+    #[serde(default)]
+    points: Option<i32>,
 }
 
 /// Validate the shared task fields; returns the resolved status.
@@ -120,6 +126,11 @@ async fn validate_task(
         && !valid_person_ref(assignee)
     {
         return Err(refuse("assignee_ref must be a worker:/person: URN"));
+    }
+    if let Some(points) = payload.points
+        && !(0..=100).contains(&points)
+    {
+        return Err(refuse("points must be between 0 and 100"));
     }
     if let Some(sprint_pid) = payload.sprint_pid {
         let sprint = sprints::Entity::find()
@@ -155,6 +166,7 @@ async fn create_task(
         description: sea_orm::ActiveValue::set(payload.description.clone()),
         status: sea_orm::ActiveValue::set(status.clone()),
         assignee_ref: sea_orm::ActiveValue::set(payload.assignee_ref.clone()),
+        points: sea_orm::ActiveValue::set(payload.points),
         status_changed_at: sea_orm::ActiveValue::set(now.into()),
         done_at: sea_orm::ActiveValue::set((status == "done").then(|| now.into())),
         deleted_at: sea_orm::ActiveValue::set(None),
@@ -219,6 +231,7 @@ async fn update_task(
     active.title = sea_orm::ActiveValue::set(payload.title.clone());
     active.description = sea_orm::ActiveValue::set(payload.description.clone());
     active.assignee_ref = sea_orm::ActiveValue::set(payload.assignee_ref.clone());
+    active.points = sea_orm::ActiveValue::set(payload.points);
     active.sprint_pid = sea_orm::ActiveValue::set(payload.sprint_pid);
     let row = active
         .update(&ctx.db)
@@ -253,6 +266,26 @@ async fn move_task(
     let task = find_task(&ctx, item.pid, &t_pid).await?;
     if task.status == payload.status {
         return format::json(task_view(&task));
+    }
+    // WIP limits (env-configured, per work item board): refuse a move
+    // into a capped column that is already full. No config ⇒ no caps.
+    if let Some(limits) = rules::parse_wip_limits(
+        std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_WIP_LIMITS").ok().as_deref(),
+    ) && let Some(cap) = limits.get(payload.status.as_str())
+    {
+        let occupancy = tasks::Entity::find()
+            .filter(tasks::Column::WorkItemPid.eq(item.pid))
+            .filter(tasks::Column::Status.eq(payload.status.as_str()))
+            .filter(tasks::Column::DeletedAt.is_null())
+            .count(&ctx.db)
+            .await
+            .map_err(|e| Error::Model(ModelError::from(e)))?;
+        if usize::try_from(occupancy).unwrap_or(usize::MAX) >= *cap {
+            return Err(refuse(&format!(
+                "WIP limit reached: `{}` is capped at {cap} for this item",
+                payload.status
+            )));
+        }
     }
     let from = task.status.clone();
     let task_pid = task.pid;
@@ -484,6 +517,464 @@ async fn standup(
     conditional(&headers, &body)
 }
 
+/// Find one live sprint of one work item, or 404.
+async fn find_sprint(
+    ctx: &AppContext,
+    work_item_pid: Uuid,
+    s_pid: &str,
+) -> Result<sprints::Model> {
+    let s_pid = Uuid::parse_str(s_pid).map_err(|_| Error::NotFound)?;
+    sprints::Entity::find()
+        .filter(sprints::Column::Pid.eq(s_pid))
+        .filter(sprints::Column::DeletedAt.is_null())
+        .one(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?
+        .filter(|sprint| sprint.work_item_pid == work_item_pid)
+        .ok_or(Error::NotFound)
+}
+
+/// `POST .../sprints/{s_pid}/notes` body.
+#[derive(Debug, Deserialize)]
+struct NotePayload {
+    category: String,
+    body: String,
+}
+
+/// `POST /api/{collection}/{pid}/sprints/{s_pid}/notes` — add a retro
+/// / feedback note (`went_well` / `improve` / `action` / `feedback`).
+#[debug_handler]
+async fn create_note(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path((collection, pid, s_pid)): Path<(String, String, String)>,
+    Json(payload): Json<NotePayload>,
+) -> Result<Response> {
+    if !rules::NOTE_CATEGORIES.contains(&payload.category.as_str()) {
+        return Err(refuse(&format!(
+            "category must be one of {:?}",
+            rules::NOTE_CATEGORIES
+        )));
+    }
+    if payload.body.trim().is_empty() || payload.body.len() > crate::validation::MAX_TEXT_LEN {
+        return Err(refuse("body is required (and capped)"));
+    }
+    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let sprint = find_sprint(&ctx, item.pid, &s_pid).await?;
+    let row = sprint_notes::ActiveModel {
+        pid: sea_orm::ActiveValue::set(Uuid::new_v4()),
+        sprint_pid: sea_orm::ActiveValue::set(sprint.pid),
+        category: sea_orm::ActiveValue::set(payload.category.clone()),
+        body: sea_orm::ActiveValue::set(payload.body.clone()),
+        task_pid: sea_orm::ActiveValue::set(None),
+        deleted_at: sea_orm::ActiveValue::set(None),
+        ..Default::default()
+    }
+    .insert(&ctx.db)
+    .await
+    .map_err(|e| Error::Model(ModelError::from(e)))?;
+    AuditModel::record(&ctx.db, row.pid, "sprint_note_added", caller.actor(), None)
+        .await
+        .ok();
+    format::json(row)
+}
+
+/// `GET /api/{collection}/{pid}/sprints/{s_pid}/notes` — the sprint's
+/// notes, grouped-friendly (oldest first).
+#[debug_handler]
+async fn list_notes(
+    State(ctx): State<AppContext>,
+    Path((collection, pid, s_pid)): Path<(String, String, String)>,
+) -> Result<Response> {
+    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let sprint = find_sprint(&ctx, item.pid, &s_pid).await?;
+    let rows = sprint_notes::Entity::find()
+        .filter(sprint_notes::Column::SprintPid.eq(sprint.pid))
+        .filter(sprint_notes::Column::DeletedAt.is_null())
+        .order_by_asc(sprint_notes::Column::Id)
+        .all(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    format::json(rows)
+}
+
+/// `POST /api/{collection}/{pid}/sprints/{s_pid}/notes/{n_pid}/convert`
+/// — turn an `action` / `feedback` note into a task on the same item
+/// (once; the note records the created task). Other categories are
+/// observations, not work, and refuse.
+#[debug_handler]
+async fn convert_note(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path((collection, pid, s_pid, n_pid)): Path<(String, String, String, String)>,
+) -> Result<Response> {
+    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let sprint = find_sprint(&ctx, item.pid, &s_pid).await?;
+    let n_pid = Uuid::parse_str(&n_pid).map_err(|_| Error::NotFound)?;
+    let note = sprint_notes::Entity::find()
+        .filter(sprint_notes::Column::Pid.eq(n_pid))
+        .filter(sprint_notes::Column::DeletedAt.is_null())
+        .one(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?
+        .filter(|note| note.sprint_pid == sprint.pid)
+        .ok_or(Error::NotFound)?;
+    if !rules::CONVERTIBLE_NOTE_CATEGORIES.contains(&note.category.as_str()) {
+        return Err(refuse(&format!(
+            "only {:?} notes convert to tasks",
+            rules::CONVERTIBLE_NOTE_CATEGORIES
+        )));
+    }
+    if note.task_pid.is_some() {
+        return Err(refuse("note is already converted"));
+    }
+    let now = chrono::Utc::now();
+    let task = tasks::ActiveModel {
+        pid: sea_orm::ActiveValue::set(Uuid::new_v4()),
+        work_item_pid: sea_orm::ActiveValue::set(item.pid),
+        sprint_pid: sea_orm::ActiveValue::set(None),
+        title: sea_orm::ActiveValue::set(note.body.clone()),
+        description: sea_orm::ActiveValue::set(Some(format!(
+            "from {} note in sprint `{}`",
+            note.category, sprint.name
+        ))),
+        status: sea_orm::ActiveValue::set("todo".to_string()),
+        assignee_ref: sea_orm::ActiveValue::set(None),
+        points: sea_orm::ActiveValue::set(None),
+        status_changed_at: sea_orm::ActiveValue::set(now.into()),
+        done_at: sea_orm::ActiveValue::set(None),
+        deleted_at: sea_orm::ActiveValue::set(None),
+        ..Default::default()
+    }
+    .insert(&ctx.db)
+    .await
+    .map_err(|e| Error::Model(ModelError::from(e)))?;
+    let note_pid = note.pid;
+    let mut active: sprint_notes::ActiveModel = note.into();
+    active.task_pid = sea_orm::ActiveValue::set(Some(task.pid));
+    let updated = active
+        .update(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    AuditModel::record(
+        &ctx.db,
+        note_pid,
+        "sprint_note_converted",
+        caller.actor(),
+        Some(serde_json::json!({ "task_pid": task.pid })),
+    )
+    .await
+    .ok();
+    format::json(serde_json::json!({ "note": updated, "task": task_view(&task) }))
+}
+
+/// `GET /api/{collection}/{pid}/velocity` — per-sprint completed
+/// counts and story-point sums, from real `done_at` stamps only.
+/// Points are **team-local**: the served note says never to compare
+/// them across teams or items.
+#[debug_handler]
+async fn velocity(
+    State(ctx): State<AppContext>,
+    Path((collection, pid)): Path<(String, String)>,
+    headers: HeaderMap,
+) -> Result<Response> {
+    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let sprint_rows = sprints::Entity::find()
+        .filter(sprints::Column::WorkItemPid.eq(item.pid))
+        .filter(sprints::Column::DeletedAt.is_null())
+        .order_by_asc(sprints::Column::StartsOn)
+        .all(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    let task_rows = tasks::Entity::find()
+        .filter(tasks::Column::WorkItemPid.eq(item.pid))
+        .filter(tasks::Column::DeletedAt.is_null())
+        .all(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    let sprints_view: Vec<serde_json::Value> = sprint_rows
+        .iter()
+        .map(|sprint| {
+            let done: Vec<&tasks::Model> = task_rows
+                .iter()
+                .filter(|task| task.sprint_pid == Some(sprint.pid) && task.done_at.is_some())
+                .collect();
+            let pointed: i64 = done.iter().filter_map(|t| t.points).map(i64::from).sum();
+            let unpointed = done.iter().filter(|t| t.points.is_none()).count();
+            serde_json::json!({
+                "sprint": { "pid": sprint.pid, "name": sprint.name,
+                             "starts_on": sprint.starts_on, "ends_on": sprint.ends_on },
+                "tasks_done": done.len(),
+                "points_done": pointed,
+                "unpointed_done": unpointed,
+            })
+        })
+        .collect();
+    let body = serde_json::json!({
+        "as_of": chrono::Utc::now(),
+        "note": "points are team-local; velocity is for this item's own trend only — \
+                 never compare across teams or items",
+        "sprints": sprints_view,
+    });
+    conditional(&headers, &body)
+}
+
+// ─── DevOps events ──────────────────────────────────────────────────────────
+
+/// `POST /api/devops/events` body.
+#[derive(Debug, Deserialize)]
+struct DevopsEventPayload {
+    work_item_pid: Uuid,
+    kind: String,
+    #[serde(default)]
+    environment: Option<String>,
+    #[serde(default)]
+    version: Option<String>,
+    #[serde(default)]
+    reference: Option<String>,
+    #[serde(default)]
+    incident_pid: Option<Uuid>,
+    #[serde(default)]
+    caused_by_deploy_pid: Option<Uuid>,
+    #[serde(default)]
+    occurred_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// `POST /api/devops/events` — ingest one deploy / incident /
+/// recovery event. A `deploy` requires an `environment`; a `recovery`
+/// must reference its `incident`; an `incident` may declare the
+/// deploy that caused it. The DORA-style metrics derive **only** from
+/// events ingested here.
+#[debug_handler]
+async fn ingest_devops_event(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Json(payload): Json<DevopsEventPayload>,
+) -> Result<Response> {
+    if !rules::DEVOPS_EVENT_KINDS.contains(&payload.kind.as_str()) {
+        return Err(refuse(&format!(
+            "kind must be one of {:?}",
+            rules::DEVOPS_EVENT_KINDS
+        )));
+    }
+    let item = work_items::Entity::find()
+        .filter(work_items::Column::Pid.eq(payload.work_item_pid))
+        .filter(work_items::Column::DeletedAt.is_null())
+        .one(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?
+        .ok_or(Error::NotFound)?;
+    match payload.kind.as_str() {
+        "deploy" if payload.environment.as_deref().is_none_or(str::is_empty) => {
+            return Err(refuse("a deploy event requires an environment"));
+        }
+        "recovery" => {
+            let Some(incident_pid) = payload.incident_pid else {
+                return Err(refuse("a recovery event must reference its incident_pid"));
+            };
+            let incident = devops_events::Entity::find()
+                .filter(devops_events::Column::Pid.eq(incident_pid))
+                .one(&ctx.db)
+                .await
+                .map_err(|e| Error::Model(ModelError::from(e)))?;
+            if incident.is_none_or(|e| e.kind != "incident") {
+                return Err(refuse("incident_pid must name an ingested incident event"));
+            }
+        }
+        _ => {}
+    }
+    if payload.caused_by_deploy_pid.is_some() && payload.kind != "incident" {
+        return Err(refuse("caused_by_deploy_pid belongs on incident events"));
+    }
+    if let Some(deploy_pid) = payload.caused_by_deploy_pid {
+        let deploy = devops_events::Entity::find()
+            .filter(devops_events::Column::Pid.eq(deploy_pid))
+            .one(&ctx.db)
+            .await
+            .map_err(|e| Error::Model(ModelError::from(e)))?;
+        if deploy.is_none_or(|e| e.kind != "deploy") {
+            return Err(refuse("caused_by_deploy_pid must name an ingested deploy event"));
+        }
+    }
+    let row = devops_events::ActiveModel {
+        pid: sea_orm::ActiveValue::set(Uuid::new_v4()),
+        work_item_pid: sea_orm::ActiveValue::set(item.pid),
+        kind: sea_orm::ActiveValue::set(payload.kind.clone()),
+        environment: sea_orm::ActiveValue::set(payload.environment.clone()),
+        version: sea_orm::ActiveValue::set(payload.version.clone()),
+        reference: sea_orm::ActiveValue::set(payload.reference.clone()),
+        incident_pid: sea_orm::ActiveValue::set(payload.incident_pid),
+        caused_by_deploy_pid: sea_orm::ActiveValue::set(payload.caused_by_deploy_pid),
+        occurred_at: sea_orm::ActiveValue::set(
+            payload.occurred_at.unwrap_or_else(chrono::Utc::now).into(),
+        ),
+        ..Default::default()
+    }
+    .insert(&ctx.db)
+    .await
+    .map_err(|e| Error::Model(ModelError::from(e)))?;
+    AuditModel::record(
+        &ctx.db,
+        row.pid,
+        "devops_event_ingested",
+        caller.actor(),
+        Some(serde_json::json!({ "kind": row.kind })),
+    )
+    .await
+    .ok();
+    format::json(row)
+}
+
+/// Query for the devops metrics window.
+#[derive(Debug, Deserialize)]
+struct DevopsMetricsQuery {
+    /// Trailing months (default 3, cap 24).
+    months: Option<u32>,
+}
+
+/// `GET /api/devops/metrics?months=` — DORA-style metrics derived
+/// **only** from ingested events: deploys per month (+ per
+/// environment), incidents per month, MTTR over linked
+/// incident→recovery pairs (unresolved incidents counted, never
+/// timed), and change-failure over **declared-cause** incidents only
+/// (undeclared causation is not guessed).
+#[debug_handler]
+#[allow(clippy::too_many_lines)] // one pass over the event log
+async fn devops_metrics(
+    axum::extract::Query(query): axum::extract::Query<DevopsMetricsQuery>,
+    State(ctx): State<AppContext>,
+    headers: HeaderMap,
+) -> Result<Response> {
+    let months = i64::from(query.months.unwrap_or(3).clamp(1, 24));
+    let now = chrono::Utc::now();
+    let window_start = now - chrono::Days::new(u64::try_from(months * 31).unwrap_or(93));
+    let rows = devops_events::Entity::find()
+        .all(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    let in_window =
+        |at: chrono::DateTime<chrono::Utc>| at >= window_start && at <= now;
+
+    let mut deploys_by_month: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
+    let mut deploys_by_environment: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
+    let mut incidents_by_month: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
+    let mut deploy_count = 0usize;
+    let mut incident_count = 0usize;
+    let mut declared_cause_incidents = 0usize;
+    for row in &rows {
+        let at = row.occurred_at.to_utc();
+        if !in_window(at) {
+            continue;
+        }
+        let month = at.format("%Y-%m").to_string();
+        match row.kind.as_str() {
+            "deploy" => {
+                deploy_count += 1;
+                *deploys_by_month.entry(month).or_default() += 1;
+                if let Some(environment) = row.environment.as_deref() {
+                    *deploys_by_environment.entry(environment.to_string()).or_default() += 1;
+                }
+            }
+            "incident" => {
+                incident_count += 1;
+                *incidents_by_month.entry(month).or_default() += 1;
+                if row.caused_by_deploy_pid.is_some() {
+                    declared_cause_incidents += 1;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // MTTR: linked incident→recovery pairs whose incident is in-window.
+    let recovery_of: std::collections::BTreeMap<Uuid, chrono::DateTime<chrono::Utc>> = rows
+        .iter()
+        .filter(|row| row.kind == "recovery")
+        .filter_map(|row| row.incident_pid.map(|pid| (pid, row.occurred_at.to_utc())))
+        .collect();
+    let mut recovery_hours: Vec<i64> = Vec::new();
+    let mut unresolved = 0usize;
+    for row in rows.iter().filter(|row| row.kind == "incident") {
+        let at = row.occurred_at.to_utc();
+        if !in_window(at) {
+            continue;
+        }
+        match recovery_of.get(&row.pid) {
+            Some(recovered_at) => recovery_hours.push((*recovered_at - at).num_hours()),
+            None => unresolved += 1,
+        }
+    }
+    recovery_hours.sort_unstable();
+    let median_recovery_hours = if recovery_hours.is_empty() {
+        None
+    } else {
+        Some(recovery_hours[recovery_hours.len() / 2])
+    };
+
+    #[allow(clippy::cast_precision_loss)] // display ratio, not money math
+    let change_failure_rate = if deploy_count == 0 {
+        None
+    } else {
+        Some(declared_cause_incidents as f64 / deploy_count as f64)
+    };
+    let body = serde_json::json!({
+        "as_of": now,
+        "window_months": months,
+        "derivation": "derived only from ingested devops events; MTTR = linked \
+                       incident->recovery pairs (unresolved counted, never timed); \
+                       change_failure_rate = declared-cause incidents / deploys \
+                       (undeclared causation is not guessed)",
+        "deploys": deploy_count,
+        "deploys_by_month": deploys_by_month,
+        "deploys_by_environment": deploys_by_environment,
+        "incidents": incident_count,
+        "incidents_by_month": incidents_by_month,
+        "resolved_incidents": recovery_hours.len(),
+        "unresolved_incidents": unresolved,
+        "median_recovery_hours": median_recovery_hours,
+        "declared_cause_incidents": declared_cause_incidents,
+        "change_failure_rate": change_failure_rate,
+    });
+    conditional(&headers, &body)
+}
+
+/// `GET /api/devops/releases` — the release register: ingested deploy
+/// events newest first (version / environment / item), cap 200.
+#[debug_handler]
+async fn devops_releases(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
+    let items = live!(work_items, &ctx.db);
+    let by_pid: std::collections::BTreeMap<Uuid, &work_items::Model> =
+        items.iter().map(|i| (i.pid, i)).collect();
+    let rows = devops_events::Entity::find()
+        .filter(devops_events::Column::Kind.eq("deploy"))
+        .order_by_desc(devops_events::Column::OccurredAt)
+        .limit(200)
+        .all(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    let releases: Vec<serde_json::Value> = rows
+        .iter()
+        .map(|row| {
+            serde_json::json!({
+                "pid": row.pid,
+                "occurred_at": row.occurred_at.to_utc(),
+                "environment": row.environment,
+                "version": row.version,
+                "reference": row.reference,
+                "item": by_pid.get(&row.work_item_pid).map(|i| item_ref(i)),
+            })
+        })
+        .collect();
+    let body = serde_json::json!({
+        "as_of": chrono::Utc::now(),
+        "releases": releases,
+    });
+    conditional(&headers, &body)
+}
+
 // ─── Estate views ───────────────────────────────────────────────────────────
 
 /// `GET /api/engineering/blocked` — every blocked task estate-wide,
@@ -682,7 +1173,17 @@ pub fn routes() -> Routes {
         .add("/{collection}/{pid}/sprints", post(create_sprint))
         .add("/{collection}/{pid}/sprints", get(list_sprints))
         .add("/{collection}/{pid}/burndown", get(burndown))
+        .add("/{collection}/{pid}/velocity", get(velocity))
+        .add("/{collection}/{pid}/sprints/{s_pid}/notes", post(create_note))
+        .add("/{collection}/{pid}/sprints/{s_pid}/notes", get(list_notes))
+        .add(
+            "/{collection}/{pid}/sprints/{s_pid}/notes/{n_pid}/convert",
+            post(convert_note),
+        )
         .add("/{collection}/{pid}/standup", get(standup))
+        .add("/devops/events", post(ingest_devops_event))
+        .add("/devops/metrics", get(devops_metrics))
+        .add("/devops/releases", get(devops_releases))
         .add("/engineering/blocked", get(blocked))
         .add("/engineering/moscow", get(moscow))
         .add("/engineering/delivery-links", get(delivery_links))

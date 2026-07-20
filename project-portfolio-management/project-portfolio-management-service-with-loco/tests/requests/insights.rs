@@ -718,3 +718,213 @@ async fn engineering_tasks_sprints_and_views() {
     })
     .await;
 }
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[allow(clippy::too_many_lines)] // one seeded estate, the moderate engineering surface
+async fn engineering_moderate_points_notes_wip_devops() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let project: Value = request
+            .post("/api/projects")
+            .json(&json!({ "kind": "Project", "name": "Checkout rewrite" }))
+            .await
+            .json();
+        let pid = project["pid"].as_str().expect("pid").to_string();
+        let sprint: Value = request
+            .post(&format!("/api/projects/{pid}/sprints"))
+            .json(&json!({ "name": "Sprint A", "starts_on": "2026-07-13",
+                            "ends_on": "2026-07-26" }))
+            .await
+            .json();
+        let s_pid = sprint["pid"].as_str().expect("s pid").to_string();
+
+        // ── Points: validated; velocity counts only real completions.
+        let bad_points = request
+            .post(&format!("/api/projects/{pid}/tasks"))
+            .json(&json!({ "title": "X", "points": 500 }))
+            .await;
+        assert_eq!(bad_points.status_code(), 422);
+        let pointed: Value = request
+            .post(&format!("/api/projects/{pid}/tasks"))
+            .json(&json!({ "title": "Pay flow", "points": 5, "sprint_pid": s_pid }))
+            .await
+            .json();
+        let pointed_pid = pointed["pid"].as_str().expect("t pid").to_string();
+        request
+            .post(&format!("/api/projects/{pid}/tasks"))
+            .json(&json!({ "title": "Unpointed", "sprint_pid": s_pid }))
+            .await
+            .assert_status_ok();
+        request
+            .patch(&format!("/api/projects/{pid}/tasks/{pointed_pid}"))
+            .json(&json!({ "status": "done" }))
+            .await
+            .assert_status_ok();
+        let velocity: Value = request.get(&format!("/api/projects/{pid}/velocity")).await.json();
+        assert_eq!(velocity["sprints"][0]["tasks_done"], 1);
+        assert_eq!(velocity["sprints"][0]["points_done"], 5);
+        assert_eq!(velocity["sprints"][0]["unpointed_done"], 0);
+        assert!(velocity["note"].as_str().expect("note").contains("team-local"));
+
+        // ── Retro / feedback notes + conversion (only action/feedback).
+        let note: Value = request
+            .post(&format!("/api/projects/{pid}/sprints/{s_pid}/notes"))
+            .json(&json!({ "category": "action", "body": "Automate the smoke tests" }))
+            .await
+            .json();
+        let n_pid = note["pid"].as_str().expect("n pid").to_string();
+        let observation: Value = request
+            .post(&format!("/api/projects/{pid}/sprints/{s_pid}/notes"))
+            .json(&json!({ "category": "went_well", "body": "Pairing worked" }))
+            .await
+            .json();
+        let o_pid = observation["pid"].as_str().expect("o pid");
+        assert_eq!(
+            request
+                .post(&format!("/api/projects/{pid}/sprints/{s_pid}/notes"))
+                .json(&json!({ "category": "vibes", "body": "X" }))
+                .await
+                .status_code(),
+            422
+        );
+        let converted: Value = request
+            .post(&format!(
+                "/api/projects/{pid}/sprints/{s_pid}/notes/{n_pid}/convert"
+            ))
+            .await
+            .json();
+        assert_eq!(converted["task"]["title"], "Automate the smoke tests");
+        assert_eq!(
+            request
+                .post(&format!(
+                    "/api/projects/{pid}/sprints/{s_pid}/notes/{n_pid}/convert"
+                ))
+                .await
+                .status_code(),
+            422,
+            "double conversion refused"
+        );
+        assert_eq!(
+            request
+                .post(&format!(
+                    "/api/projects/{pid}/sprints/{s_pid}/notes/{o_pid}/convert"
+                ))
+                .await
+                .status_code(),
+            422,
+            "observations do not convert"
+        );
+
+        // ── DevOps events + metrics + releases.
+        assert_eq!(
+            request
+                .post("/api/devops/events")
+                .json(&json!({ "work_item_pid": pid, "kind": "deploy" }))
+                .await
+                .status_code(),
+            422,
+            "deploy requires an environment"
+        );
+        let deploy: Value = request
+            .post("/api/devops/events")
+            .json(&json!({ "work_item_pid": pid, "kind": "deploy",
+                            "environment": "production", "version": "1.4.0" }))
+            .await
+            .json();
+        let deploy_pid = deploy["pid"].as_str().expect("d pid").to_string();
+        let incident: Value = request
+            .post("/api/devops/events")
+            .json(&json!({ "work_item_pid": pid, "kind": "incident",
+                            "caused_by_deploy_pid": deploy_pid }))
+            .await
+            .json();
+        let incident_pid = incident["pid"].as_str().expect("i pid").to_string();
+        assert_eq!(
+            request
+                .post("/api/devops/events")
+                .json(&json!({ "work_item_pid": pid, "kind": "recovery" }))
+                .await
+                .status_code(),
+            422,
+            "recovery must reference its incident"
+        );
+        request
+            .post("/api/devops/events")
+            .json(&json!({ "work_item_pid": pid, "kind": "recovery",
+                            "incident_pid": incident_pid }))
+            .await
+            .assert_status_ok();
+
+        let metrics: Value = request.get("/api/devops/metrics").await.json();
+        assert_eq!(metrics["deploys"], 1);
+        assert_eq!(metrics["deploys_by_environment"]["production"], 1);
+        assert_eq!(metrics["incidents"], 1);
+        assert_eq!(metrics["resolved_incidents"], 1);
+        assert_eq!(metrics["unresolved_incidents"], 0);
+        assert_eq!(metrics["median_recovery_hours"], 0);
+        assert_eq!(metrics["declared_cause_incidents"], 1);
+        assert!(metrics["derivation"].as_str().expect("d").contains("not guessed"));
+
+        let releases: Value = request.get("/api/devops/releases").await.json();
+        assert_eq!(releases["releases"][0]["version"], "1.4.0");
+        assert_eq!(releases["releases"][0]["item"]["name"], "Checkout rewrite");
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn wip_limits_refuse_overfull_columns() {
+    // SAFETY: single-threaded within this #[serial] test.
+    unsafe {
+        std::env::set_var(
+            "PROJECT_PORTFOLIO_MANAGEMENT_WIP_LIMITS",
+            r#"{"in_progress": 1}"#,
+        );
+    }
+    request::<App, _, _>(|request, _ctx| async move {
+        let project: Value = request
+            .post("/api/projects")
+            .json(&json!({ "kind": "Project", "name": "WIP-limited" }))
+            .await
+            .json();
+        let pid = project["pid"].as_str().expect("pid").to_string();
+        let mut task_pids = Vec::new();
+        for title in ["First", "Second"] {
+            let task: Value = request
+                .post(&format!("/api/projects/{pid}/tasks"))
+                .json(&json!({ "title": title }))
+                .await
+                .json();
+            task_pids.push(task["pid"].as_str().expect("t pid").to_string());
+        }
+        request
+            .patch(&format!("/api/projects/{pid}/tasks/{}", task_pids[0]))
+            .json(&json!({ "status": "in_progress" }))
+            .await
+            .assert_status_ok();
+        let refused = request
+            .patch(&format!("/api/projects/{pid}/tasks/{}", task_pids[1]))
+            .json(&json!({ "status": "in_progress" }))
+            .await;
+        assert_eq!(refused.status_code(), 422, "the capped column is full");
+        assert!(refused.text().contains("WIP limit reached"));
+        // Freeing the column lets the move through.
+        request
+            .patch(&format!("/api/projects/{pid}/tasks/{}", task_pids[0]))
+            .json(&json!({ "status": "done" }))
+            .await
+            .assert_status_ok();
+        request
+            .patch(&format!("/api/projects/{pid}/tasks/{}", task_pids[1]))
+            .json(&json!({ "status": "in_progress" }))
+            .await
+            .assert_status_ok();
+    })
+    .await;
+    unsafe {
+        std::env::remove_var("PROJECT_PORTFOLIO_MANAGEMENT_WIP_LIMITS");
+    }
+}

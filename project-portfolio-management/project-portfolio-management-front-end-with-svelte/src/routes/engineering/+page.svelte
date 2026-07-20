@@ -13,6 +13,8 @@
     PpmClient,
     type BlockedWork,
     type DeliveryLinks,
+    type DevopsMetrics,
+    type DevopsReleases,
     type MoscowView,
   } from "$lib/api/ppm";
 
@@ -20,6 +22,8 @@
   let blocked = $state<BlockedWork | null>(null);
   let moscow = $state<MoscowView | null>(null);
   let links = $state<DeliveryLinks | null>(null);
+  let metrics = $state<DevopsMetrics | null>(null);
+  let releases = $state<DevopsReleases | null>(null);
   let error = $state<string | null>(null);
 
   onMount(async () => {
@@ -27,6 +31,8 @@
       blocked = await ppm.engineeringBlocked();
       moscow = await ppm.engineeringMoscow();
       links = await ppm.engineeringDeliveryLinks();
+      metrics = await ppm.devopsMetrics();
+      releases = await ppm.devopsReleases();
     } catch (err) {
       error = err instanceof Error ? err.message : t("ppm.common.loadFailed");
     }
@@ -105,6 +111,49 @@
       {/each}
     </p>
   {/if}
+{/if}
+
+{#if metrics}
+  <h2>DevOps metrics</h2>
+  <p class="muted">{metrics.derivation}</p>
+  <section class="tiles" data-testid="devops-metrics">
+    <div class="tile"><strong>{metrics.deploys}</strong><span>deploys ({metrics.window_months}mo)</span></div>
+    <div class="tile"><strong>{metrics.incidents}</strong><span>incidents</span></div>
+    <div class="tile">
+      <strong>{metrics.median_recovery_hours ?? "—"}</strong>
+      <span>median recovery (h)</span>
+    </div>
+    <div class="tile">
+      <strong>
+        {metrics.change_failure_rate === null
+          ? "—"
+          : `${(metrics.change_failure_rate * 100).toFixed(0)}%`}
+      </strong>
+      <span>declared-cause failure rate</span>
+    </div>
+  </section>
+  {#if metrics.unresolved_incidents > 0}
+    <p class="muted">{metrics.unresolved_incidents} incidents unresolved (counted, never timed).</p>
+  {/if}
+{/if}
+
+{#if releases}
+  <h2>Releases</h2>
+  <table data-testid="devops-releases">
+    <thead><tr><th>When</th><th>Version</th><th>Environment</th><th>Item</th></tr></thead>
+    <tbody>
+      {#each releases.releases as release (release.pid)}
+        <tr>
+          <td>{release.occurred_at}</td>
+          <td>{release.version ?? "—"}</td>
+          <td>{release.environment ?? "—"}</td>
+          <td>{release.item?.name ?? "—"}</td>
+        </tr>
+      {:else}
+        <tr><td colspan="4" class="muted">No deploy events ingested yet.</td></tr>
+      {/each}
+    </tbody>
+  </table>
 {/if}
 
 <style>

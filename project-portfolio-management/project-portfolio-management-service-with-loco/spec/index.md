@@ -740,6 +740,30 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   (drag-to-move Kanban + burndown + standup), `/calendar`,
   `/engineering` with svelte-check 0, vitest 45, Playwright 21.
 
+- [x] **2026-07-20 — Engineering moderate fits.** Migration
+  `m20260720_000002_engineering_moderate`: **story points** on tasks
+  (0–100, validated; team-local) + `GET .../velocity` (per-sprint done
+  counts + point sums from real `done_at` stamps; the served note says
+  never to compare across teams/items); **WIP limits** via
+  `PROJECT_PORTFOLIO_MANAGEMENT_WIP_LIMITS` JSON (per-status caps per
+  item board; a move into a full capped column is `422`; unset ⇒ no
+  caps, fail-open by design and disclosed); **sprint notes** (retro +
+  RAD feedback log: `went_well` / `improve` / `action` / `feedback`,
+  with `action`/`feedback` convertible once into a task —
+  `sprint_note_converted` audit); **`DevOps` event ingest** (`POST
+  /api/devops/events`: deploy requires environment, recovery must
+  reference its incident, incidents may declare `caused_by_deploy_pid`)
+  + `GET /api/devops/metrics` (DORA-style, **derived only from
+  ingested events**: deploys per month/environment, incidents, MTTR
+  over linked incident→recovery pairs with unresolved counted never
+  timed, change-failure over declared-cause incidents only) + `GET
+  /api/devops/releases` (the deploy-event release register).
+  **Acceptance:** WIP-limit parse pins; the seeded moderate round-trip
+  + the env-gated WIP-limit request test green — full `--ignored`
+  suite 29/29 vs Postgres 18; clippy pedantic clean; FE board gains
+  points/velocity/retro-notes, `/engineering` gains the `DevOps`
+  metrics + releases; svelte-check 0, vitest 45, Playwright 21.
+
 ## 14. Implementation status
 
 **Implemented (MVP v0.1.0 + PPM Phases A/B/C; see §13 for the

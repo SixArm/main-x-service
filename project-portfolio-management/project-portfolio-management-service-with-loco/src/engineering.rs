@@ -4,6 +4,8 @@
 //! burndown only ever counts real completion stamps, and the MoSCoW
 //! bands come from an explicit, disclosed tag convention.
 
+use std::collections::BTreeMap;
+
 use chrono::NaiveDate;
 
 /// The Kanban task statuses (board column order).
@@ -60,6 +62,40 @@ pub fn burndown(
     points
 }
 
+/// Sprint-note categories (retro + RAD feedback log). Only `action`
+/// and `feedback` notes convert to tasks.
+pub const NOTE_CATEGORIES: &[&str] = &["went_well", "improve", "action", "feedback"];
+
+/// Note categories that may convert into a task.
+pub const CONVERTIBLE_NOTE_CATEGORIES: &[&str] = &["action", "feedback"];
+
+/// `DevOps` event kinds. A `recovery` must reference its `incident`;
+/// an `incident` may declare the deploy that caused it.
+pub const DEVOPS_EVENT_KINDS: &[&str] = &["deploy", "incident", "recovery"];
+
+/// Parse the `PROJECT_PORTFOLIO_MANAGEMENT_WIP_LIMITS` JSON — a map of
+/// task status → per-item cap, e.g. `{"in_progress": 3}`. Absent /
+/// blank / unparsable / unknown-status keys / non-positive caps ⇒
+/// `None` (no limits enforced; the board says so rather than inventing
+/// caps).
+#[must_use]
+pub fn parse_wip_limits(raw: Option<&str>) -> Option<BTreeMap<String, usize>> {
+    let raw = raw?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    let parsed: BTreeMap<String, i64> = serde_json::from_str(raw).ok()?;
+    let mut limits = BTreeMap::new();
+    for (status, cap) in parsed {
+        if !TASK_STATUSES.contains(&status.as_str()) || cap < 1 {
+            return None;
+        }
+        let cap = usize::try_from(cap).ok()?;
+        limits.insert(status, cap);
+    }
+    Some(limits)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,4 +132,15 @@ mod tests {
         let long = burndown(1, &[], d("2020-01-01"), d("2030-01-01"));
         assert!(long.len() <= 367, "window truncated");
     }
+    #[test]
+    fn wip_limits_parse_or_decline() {
+        assert_eq!(parse_wip_limits(None), None);
+        assert_eq!(parse_wip_limits(Some("nonsense")), None);
+        assert_eq!(parse_wip_limits(Some(r#"{"sideways": 3}"#)), None, "unknown status refused");
+        assert_eq!(parse_wip_limits(Some(r#"{"in_progress": 0}"#)), None, "non-positive refused");
+        let limits = parse_wip_limits(Some(r#"{"in_progress": 3, "in_review": 2}"#)).unwrap();
+        assert_eq!(limits["in_progress"], 3);
+        assert_eq!(limits["in_review"], 2);
+    }
+
 }
