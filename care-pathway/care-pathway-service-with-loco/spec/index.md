@@ -404,6 +404,26 @@ access controls added later.
   run — full `--ignored` suite 23/23 vs Postgres 18; clippy pedantic
   clean.
 
+- [x] **2026-07-20 — Instance layer (operational pathways).** A new
+  operational layer over the registry: a patient **enrolled** on a
+  pathway template. Migration `m20260720_000005_instances`
+  (`pathway_instances` referencing a `person:` URN + the template pid,
+  `instance_steps`, `instance_team`, `instance_events`). Deliberately
+  **not** in the matcher payload — the registry owns pathway
+  identities. `controllers/instances.rs`: enrol (copies declared
+  steps), the `active`↔`on_hold`→terminal lifecycle (pure machine in
+  `src/instances.rs`; closing stamps `closed_on`), the review cadence
+  (`POST /review` reschedules `next_review_on` + logs a review event),
+  urgency escalation (routine/urgent/emergency; logs escalation /
+  de-escalation), step completion, the care-team roster (worker /
+  person / organization URNs + roles), and free events. Derived views:
+  `GET /api/instances/caseload` (open by setting + urgency),
+  `/overdue-reviews` (chronic review register), `/care-team-load`
+  (open load per member), and `GET /api/care-pathways/{pid}/cohort`
+  (chronic cohort by status/urgency + step completion). **Acceptance:**
+  lifecycle pure pins; the seeded instance round-trip green first run —
+  full `--ignored` suite 24/24 vs Postgres 18; clippy pedantic clean.
+
 ## 14. Implementation status
 
 Done: loco boot; care_pathways table + migration; CRUD with `422`

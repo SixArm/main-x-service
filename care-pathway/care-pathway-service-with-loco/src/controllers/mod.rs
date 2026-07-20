@@ -2,6 +2,7 @@
 
 pub mod care_pathways;
 pub mod insights;
+pub mod instances;
 pub mod docs;
 /// HL7 FHIR R5 endpoints for the `PlanDefinition` resource (`/fhir/*`).
 pub mod fhir;

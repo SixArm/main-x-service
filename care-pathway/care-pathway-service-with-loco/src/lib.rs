@@ -30,6 +30,8 @@ pub mod data;
 /// types, and search-parameter parsing for the mounted `/fhir` endpoints.
 pub mod fhir;
 pub mod initializers;
+/// Pure rules for the care-pathway instance layer.
+pub mod instances;
 pub mod merge;
 pub mod metrics;
 pub mod models;

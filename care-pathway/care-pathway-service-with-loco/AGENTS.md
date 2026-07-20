@@ -40,6 +40,9 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api/care-pathways/audit/recent` · `/{pid}/audit` | Audit-log query |
 | GET | `/api/care-pathways/events/recent` | In-memory event stream |
 | GET | `/api/care-pathways/insights/{directory,coverage,variants,providers,languages}` | Registry lenses: setting/specialty facets, condition-coverage gaps, cross-provider variants, provider directory, language coverage |
+| POST/GET | `/api/care-pathways/{pid}/instances` · `/{pid}/cohort` | Enrol a `person:` URN on a pathway; the chronic cohort view |
+| — | `/api/instances/{pid}` (+ `/status` `/review` `/urgency` `/team` `/events` `/steps/{s}/complete`) | Instance lifecycle, review cadence, urgency, care team, steps |
+| GET | `/api/instances/{caseload,overdue-reviews,care-team-load}` | Derived operational views |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (text-exposition; root path, public under auth enforcement) |
 

@@ -13,6 +13,7 @@ mod m20220101_000001_care_pathways;
 mod m20220101_000002_audit_logs;
 mod m20220101_000003_merge_records;
 mod m20220101_000004_event_outbox;
+mod m20260720_000005_instances;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -28,6 +29,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000002_audit_logs::Migration),
             Box::new(m20220101_000003_merge_records::Migration),
             Box::new(m20220101_000004_event_outbox::Migration),
+            Box::new(m20260720_000005_instances::Migration),
             // inject-above (do not remove this comment)
         ]
     }

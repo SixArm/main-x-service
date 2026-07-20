@@ -9,6 +9,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — instance layer (2026-07-20)
+
+- An operational layer over the pathway registry: patients enrolled on
+  a pathway template (`pathway_instances` + steps + care team +
+  events; migration `m20260720_000005_instances`), with an
+  active↔on_hold→terminal lifecycle, a review cadence, urgency
+  escalation, step completion, and care-team assignments. Derived
+  views: caseload by setting/urgency, the overdue-review register,
+  care-team load, and the per-pathway chronic cohort. Instance state
+  is never part of the matcher payload.
+
 ### Added — registry insight views (2026-07-20)
 
 - Five read-only derived views (`controllers/insights.rs`): setting +
