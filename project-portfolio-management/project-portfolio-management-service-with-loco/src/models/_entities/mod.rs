@@ -17,5 +17,7 @@ pub mod proposals;
 pub mod report_definitions;
 pub mod risks;
 pub mod scenarios;
+pub mod sprints;
+pub mod tasks;
 pub mod work_item_dependencies;
 pub mod work_items;

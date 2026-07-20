@@ -1,6 +1,7 @@
 //! HTTP controllers for the portfolio service.
 
 pub mod docs;
+pub mod engineering;
 pub mod governance;
 pub mod insights;
 pub mod oversight;

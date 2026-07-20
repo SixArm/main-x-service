@@ -63,6 +63,7 @@
   <h1>{record.name}</h1>
   <p class="small">
     <a class="button small" href={`/${collection}/${pid}/governance`}>{t("ppm.common.governance")}</a>
+    <a class="button small" href={`/${collection}/${pid}/board`}>{t("ppm.common.board")}</a>
     {#if collection === "portfolios"}
       <a class="button small" href={`/${collection}/${pid}/schedule`}>{t("ppm.common.schedule")}</a>
     {/if}

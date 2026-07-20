@@ -230,6 +230,10 @@ async fn portfolio_schedule(
 struct MilestonePayload {
     name: String,
     due: chrono::NaiveDate,
+    /// Optional kind (`milestone` / `demo` / `release` / `checkpoint`);
+    /// absent reads as `milestone`.
+    #[serde(default)]
+    kind: Option<String>,
 }
 
 #[debug_handler]
@@ -242,12 +246,21 @@ async fn create_milestone(
     if payload.name.trim().is_empty() || payload.name.len() > MAX_TEXT_LEN {
         return Err(unprocessable("name is required (and capped)"));
     }
+    if let Some(kind) = payload.kind.as_deref()
+        && !crate::engineering::MILESTONE_KINDS.contains(&kind)
+    {
+        return Err(unprocessable(&format!(
+            "kind must be one of {:?}",
+            crate::engineering::MILESTONE_KINDS
+        )));
+    }
     let item = super::governance::find_item(&ctx, &collection, &pid).await?;
     let row = milestones::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
         work_item_pid: ActiveValue::set(item.pid),
         name: ActiveValue::set(payload.name.clone()),
         due: ActiveValue::set(payload.due),
+        kind: ActiveValue::set(payload.kind.clone()),
         done: ActiveValue::set(false),
         deleted_at: ActiveValue::set(None),
         ..Default::default()
@@ -276,6 +289,7 @@ async fn list_milestones(
         .map(|m| {
             serde_json::json!({
                 "pid": m.pid.to_string(), "name": m.name, "due": m.due,
+                "kind": m.kind.as_deref().unwrap_or("milestone"),
                 "done": m.done, "overdue": !m.done && m.due < today,
             })
         })

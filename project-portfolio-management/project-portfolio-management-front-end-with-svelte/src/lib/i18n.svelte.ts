@@ -92,6 +92,9 @@ export const LOCALE_KEY = "mxi.case.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "ppm.nav.engineering": "Engineering",
+    "ppm.nav.calendar": "Calendar",
+    "ppm.common.board": "Board",
     "ppm.nav.board": "Board",
     "ppm.nav.auditor": "Auditor",
     "ppm.nav.compliance": "Compliance",
@@ -284,6 +287,9 @@ const STRINGS = {
       "Schedules are drawn per portfolio umbrella.",
   },
   cy: {
+    "ppm.nav.engineering": "Peirianneg",
+    "ppm.nav.calendar": "Calendr",
+    "ppm.common.board": "Bwrdd",
     "ppm.nav.board": "Bwrdd",
     "ppm.nav.auditor": "Archwilydd",
     "ppm.nav.compliance": "Cydymffurfiaeth",
@@ -469,6 +475,9 @@ const STRINGS = {
       "Lluniwyd amserlenni fesul ymbarél portffolio.",
   },
   es: {
+    "ppm.nav.engineering": "Ingeniería",
+    "ppm.nav.calendar": "Calendario",
+    "ppm.common.board": "Tablero",
     "ppm.nav.board": "Consejo",
     "ppm.nav.auditor": "Auditor",
     "ppm.nav.compliance": "Cumplimiento",
@@ -655,6 +664,9 @@ const STRINGS = {
       "Los cronogramas se trazan por cartera paraguas.",
   },
   fr: {
+    "ppm.nav.engineering": "Ingénierie",
+    "ppm.nav.calendar": "Calendrier",
+    "ppm.common.board": "Tableau",
     "ppm.nav.board": "Conseil",
     "ppm.nav.auditor": "Auditeur",
     "ppm.nav.compliance": "Conformité",
@@ -841,6 +853,9 @@ const STRINGS = {
       "Les calendriers sont tracés par portefeuille parapluie.",
   },
   de: {
+    "ppm.nav.engineering": "Engineering",
+    "ppm.nav.calendar": "Kalender",
+    "ppm.common.board": "Board",
     "ppm.nav.board": "Vorstand",
     "ppm.nav.auditor": "Prüfer",
     "ppm.nav.compliance": "Compliance",
@@ -1026,6 +1041,9 @@ const STRINGS = {
       "Zeitpläne werden je Portfolio-Dach gezeichnet.",
   },
   ar: {
+    "ppm.nav.engineering": "الهندسة",
+    "ppm.nav.calendar": "التقويم",
+    "ppm.common.board": "اللوحة",
     "ppm.nav.board": "مجلس الإدارة",
     "ppm.nav.auditor": "المدقق",
     "ppm.nav.compliance": "الامتثال",
@@ -1208,6 +1226,9 @@ const STRINGS = {
     "ppm.schedule.portfoliosOnly": "تُرسم الجداول لكل محفظة مظلّية.",
   },
   ru: {
+    "ppm.nav.engineering": "Инженерия",
+    "ppm.nav.calendar": "Календарь",
+    "ppm.common.board": "Доска",
     "ppm.nav.board": "Совет",
     "ppm.nav.auditor": "Аудитор",
     "ppm.nav.compliance": "Комплаенс",
@@ -1393,6 +1414,9 @@ const STRINGS = {
       "Графики строятся по каждому зонтичному портфелю.",
   },
   hi: {
+    "ppm.nav.engineering": "इंजीनियरिंग",
+    "ppm.nav.calendar": "कैलेंडर",
+    "ppm.common.board": "बोर्ड",
     "ppm.nav.board": "बोर्ड",
     "ppm.nav.auditor": "लेखा परीक्षक",
     "ppm.nav.compliance": "अनुपालन",
@@ -1578,6 +1602,9 @@ const STRINGS = {
       "समय-सारणियाँ प्रति छत्र पोर्टफोलियो बनती हैं।",
   },
   zh: {
+    "ppm.nav.engineering": "工程",
+    "ppm.nav.calendar": "日历",
+    "ppm.common.board": "看板",
     "ppm.nav.board": "董事会",
     "ppm.nav.auditor": "审计",
     "ppm.nav.compliance": "合规",
@@ -1760,6 +1787,9 @@ const STRINGS = {
     "ppm.schedule.portfoliosOnly": "进度表按伞形组合绘制。",
   },
   bn: {
+    "ppm.nav.engineering": "প্রকৌশল",
+    "ppm.nav.calendar": "ক্যালেন্ডার",
+    "ppm.common.board": "বোর্ড",
     "ppm.nav.board": "বোর্ড",
     "ppm.nav.auditor": "নিরীক্ষক",
     "ppm.nav.compliance": "সম্মতি",
@@ -1945,6 +1975,9 @@ const STRINGS = {
       "প্রতিটি ছাতা পোর্টফোলিওর জন্য সময়সূচি আঁকা হয়।",
   },
   pt: {
+    "ppm.nav.engineering": "Engenharia",
+    "ppm.nav.calendar": "Calendário",
+    "ppm.common.board": "Quadro",
     "ppm.nav.board": "Conselho",
     "ppm.nav.auditor": "Auditor",
     "ppm.nav.compliance": "Conformidade",
@@ -2130,6 +2163,9 @@ const STRINGS = {
       "Os cronogramas são traçados por carteira guarda-chuva.",
   },
   id: {
+    "ppm.nav.engineering": "Rekayasa",
+    "ppm.nav.calendar": "Kalender",
+    "ppm.common.board": "Papan",
     "ppm.nav.board": "Dewan",
     "ppm.nav.auditor": "Auditor",
     "ppm.nav.compliance": "Kepatuhan",
@@ -2314,6 +2350,9 @@ const STRINGS = {
     "ppm.schedule.portfoliosOnly": "Jadwal digambar per payung portofolio.",
   },
   ur: {
+    "ppm.nav.engineering": "انجینئرنگ",
+    "ppm.nav.calendar": "کیلنڈر",
+    "ppm.common.board": "بورڈ",
     "ppm.nav.board": "بورڈ",
     "ppm.nav.auditor": "آڈیٹر",
     "ppm.nav.compliance": "تعمیل",

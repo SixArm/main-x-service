@@ -36,7 +36,9 @@ PASETO v4 public token verification (Ed25519, published key) + blanket
 `/api/*` auth enforcement (off by default) + payload validation.
 Matching is **within a collection only** — a project never matches a
 product (enforced by the matcher's `kind` gate, §5/§9.2).
-Deferred (§13): Tantivy full-text/fuzzy search, search-blocked dedup
+Deferred (§13): the goals/issues sub-resource tables + the derived
+timeline view (tasks + sprints + burndown landed 2026-07-20), Tantivy
+full-text/fuzzy search, search-blocked dedup
 candidates, the durable event bus's Fluvio broker sink (Phase 2 outbox +
 Phase 3 relay/retention landed), privacy,
 front-end merge action, bulk import/export,
@@ -713,6 +715,30 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   18; clippy pedantic clean; FE `/board` `/auditor` `/compliance`
   `/risk` `/security` `/regulator` pages with svelte-check 0, vitest
   45, Playwright 18.
+
+- [x] **2026-07-20 — Engineering-team features (the §13 operational
+  core).** Migration `m20260720_000001_engineering` (`tasks` +
+  `sprints` tables, `milestones.kind`): the **tasks** sub-resource
+  (CRUD + the PATCH board move; `status_changed_at` stamped per move,
+  first entry into `done` stamps `done_at` and keeps it; PUT refuses
+  status changes so flow stamps stay true; statuses
+  todo/in_progress/in_review/done/blocked; `task_created`/`task_moved`
+  audits with from→to snapshots), **sprints** (time-boxed;
+  `ends_on >= starts_on`) + the honest **burndown**
+  (`GET .../burndown?sprint=` — remaining per day from real `done_at`
+  stamps only, derivation served, no ideal line), the **standup
+  digest** (`GET .../standup` — audit-derived last-24h), and the
+  estate views `GET /api/engineering/{blocked,moscow,delivery-links,
+  milestone-calendar}` (blocked aging; `moscow:<band>` tag convention
+  with untagged counted never guessed; external-tracker identifiers +
+  untracked list; milestone kinds milestone/demo/release/checkpoint).
+  Tasks/sprints are operational data — never fed to the matcher (the
+  §5 partition rule). Timeline view and issues/goals tables remain
+  deferred. **Acceptance:** pure burndown/MoSCoW unit pins; the seeded
+  engineering request round-trip green first run — full `--ignored`
+  suite 27/27 vs Postgres 18; clippy pedantic clean; FE board page
+  (drag-to-move Kanban + burndown + standup), `/calendar`,
+  `/engineering` with svelte-check 0, vitest 45, Playwright 21.
 
 ## 14. Implementation status
 

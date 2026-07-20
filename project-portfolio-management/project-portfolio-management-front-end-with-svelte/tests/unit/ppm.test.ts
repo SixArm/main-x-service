@@ -62,6 +62,17 @@ describe("PpmClient paths", () => {
     await ppm.riskHeatmap();
     await ppm.securityRegister();
     await ppm.regulatorExtract();
+    await ppm.listTasks("projects", "w1");
+    await ppm.createTask("projects", "w1", { title: "T" });
+    await ppm.moveTask("projects", "w1", "t1", "done");
+    await ppm.listSprints("projects", "w1");
+    await ppm.createSprint("projects", "w1", { name: "S1" });
+    await ppm.burndown("projects", "w1", "s1");
+    await ppm.standup("projects", "w1");
+    await ppm.engineeringBlocked();
+    await ppm.engineeringMoscow();
+    await ppm.engineeringDeliveryLinks();
+    await ppm.milestoneCalendar("demo");
 
     expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
       "GET http://svc/api/at-a-glance",
@@ -104,6 +115,17 @@ describe("PpmClient paths", () => {
       "GET http://svc/api/risk/heatmap",
       "GET http://svc/api/security/register",
       "GET http://svc/api/regulator/extract",
+      "GET http://svc/api/projects/w1/tasks",
+      "POST http://svc/api/projects/w1/tasks",
+      "PATCH http://svc/api/projects/w1/tasks/t1",
+      "GET http://svc/api/projects/w1/sprints",
+      "POST http://svc/api/projects/w1/sprints",
+      "GET http://svc/api/projects/w1/burndown?sprint=s1",
+      "GET http://svc/api/projects/w1/standup",
+      "GET http://svc/api/engineering/blocked",
+      "GET http://svc/api/engineering/moscow",
+      "GET http://svc/api/engineering/delivery-links",
+      "GET http://svc/api/engineering/milestone-calendar?kind=demo",
     ]);
   });
 

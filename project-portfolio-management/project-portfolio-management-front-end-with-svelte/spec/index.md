@@ -114,9 +114,13 @@ match breakdown).
                              benefits + ROI, OKR mappings, milestones,
                              allocations)
 /{collection}/[pid]/schedule portfolio schedule (portfolios only)
+/{collection}/[pid]/board    per-item task Kanban + sprints +
+                             honest burndown + standup digest
 /gantt                       schedule Gantt (SVAR; dependency links +
                              critical path; read-only)
 /capacity                    resource capacity rollup
+/engineering                 blocked aging + MoSCoW + delivery links
+/calendar                    estate milestone calendar (kind filter)
 /executive                   CEO area: portfolio-health briefing,
                              decision log, benefits realization
 /financials                  CFO area: budget variance + per-currency
@@ -137,8 +141,8 @@ match breakdown).
 /regulator                   coarse regulator extract (mask-aware)
 /signin · /verify            BFF magic-link sign-in / verification
 
-Roadmap (per-work-item project-management sub-routes, §13/§15):
-/{collection}/[pid]/board    Kanban task board (Todo/InProgress/InReview/Done/Blocked)
+Roadmap (per-work-item project-management sub-routes, §13/§15;
+the board landed 2026-07-20 and is listed above):
 /{collection}/[pid]/issues   issues list (kind / severity / status)
 /{collection}/[pid]/timeline Gantt / timeline (goal milestones + task date ranges)
 /{collection}/[pid]/burndown burndown chart (remaining estimate over time)

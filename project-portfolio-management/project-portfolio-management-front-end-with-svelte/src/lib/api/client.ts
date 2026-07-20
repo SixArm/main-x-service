@@ -118,6 +118,13 @@ export class ApiClient {
     return this.request<T>("PUT", path, opts);
   }
   /**
+   * Issue a PATCH request (partial update, e.g. a board status move).
+   * @typeParam T Expected shape of the parsed response body.
+   */
+  patch<T>(path: string, opts?: RequestOptions): Promise<T> {
+    return this.request<T>("PATCH", path, opts);
+  }
+  /**
    * Issue a DELETE request. Defaults `T` to `void` since soft-delete
    * returns an empty body.
    * @typeParam T Expected shape of the parsed response body.

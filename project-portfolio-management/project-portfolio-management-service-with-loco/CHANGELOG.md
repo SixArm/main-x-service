@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — engineering-team features (2026-07-20)
+
+- The spec-§13 **tasks** sub-resource (Kanban statuses, PATCH board
+  move with true flow stamps — `status_changed_at` per move, first
+  `done_at` kept; PUT refuses status changes), **sprints**, and the
+  honest **burndown** (real completions only, derivation served).
+- The last-24h **standup digest** (audit-derived) and the estate
+  views: blocked-work aging, the `moscow:<band>` scope cut, the
+  delivery-links panel (external tracker identifiers), and the
+  milestone calendar (`milestones.kind`:
+  milestone/demo/release/checkpoint).
+- Migration `m20260720_000001_engineering`; tasks/sprints never feed
+  the matcher (the partition rule).
+
 ### Added — oversight areas: board / auditor / compliance / CRO / CISO / regulator (2026-07-20)
 
 - Thirteen derived-view endpoints (`controllers/oversight.rs`) + the

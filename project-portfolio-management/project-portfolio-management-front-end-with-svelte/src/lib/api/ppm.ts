@@ -572,6 +572,86 @@ export interface RegulatorExtract {
   }>;
 }
 
+
+/** One task (the per-item Kanban sub-resource). */
+export interface Task {
+  pid: string;
+  title: string;
+  description: string | null;
+  status: "todo" | "in_progress" | "in_review" | "done" | "blocked";
+  assignee_ref: string | null;
+  sprint_pid: string | null;
+  created_at: string;
+  status_changed_at: string;
+  done_at: string | null;
+  blocked_days: number | null;
+}
+
+/** A time-boxed sprint. */
+export interface Sprint {
+  pid: string;
+  name: string;
+  starts_on: string;
+  ends_on: string;
+}
+
+/** `GET .../burndown` response. */
+export interface Burndown {
+  as_of: string;
+  sprint: { pid: string; name: string; starts_on: string; ends_on: string };
+  total_tasks: number;
+  derivation: string;
+  points: Array<{ date: string; remaining: number }>;
+}
+
+/** `GET .../standup` response. */
+export interface Standup {
+  as_of: string;
+  since: string;
+  item: InsightItemRef;
+  tasks_created: Array<{ at: string; task: string | null; actor: string | null }>;
+  tasks_moved: Array<{ at: string; task: string | null; actor: string | null; move: unknown }>;
+  blocked_now: Task[];
+  risks_raised_estate_wide: number;
+}
+
+/** `GET /api/engineering/blocked` response. */
+export interface BlockedWork {
+  as_of: string;
+  derivation: string;
+  blocked: Array<Task & { item: InsightItemRef | null }>;
+}
+
+/** `GET /api/engineering/moscow` response. */
+export interface MoscowView {
+  as_of: string;
+  convention: string;
+  bands: Record<string, InsightItemRef[]>;
+  untagged: number;
+}
+
+/** `GET /api/engineering/delivery-links` response. */
+export interface DeliveryLinks {
+  as_of: string;
+  schemes: string[];
+  tracked: Array<{ item: InsightItemRef; links: Array<{ scheme: string; value: string }> }>;
+  untracked: InsightItemRef[];
+}
+
+/** `GET /api/engineering/milestone-calendar` response. */
+export interface MilestoneCalendar {
+  as_of: string;
+  kinds: string[];
+  milestones: Array<{
+    pid: string;
+    name: string;
+    kind: string;
+    due: string;
+    done: boolean;
+    item: InsightItemRef | null;
+  }>;
+}
+
 export class PpmClient {
   constructor(private readonly http: ApiClient) {}
 
@@ -885,6 +965,41 @@ export class PpmClient {
   }
   regulatorExtract(): Promise<RegulatorExtract> {
     return this.http.get("/api/regulator/extract");
+  }
+  listTasks(collection: string, pid: string): Promise<{ tasks: Task[]; counts: Record<string, number> }> {
+    return this.http.get(`/api/${collection}/${pid}/tasks`);
+  }
+  createTask(collection: string, pid: string, body: unknown): Promise<Task> {
+    return this.http.post(`/api/${collection}/${pid}/tasks`, { body });
+  }
+  moveTask(collection: string, pid: string, taskPid: string, status: string): Promise<Task> {
+    return this.http.patch(`/api/${collection}/${pid}/tasks/${taskPid}`, {
+      body: { status },
+    });
+  }
+  listSprints(collection: string, pid: string): Promise<Sprint[]> {
+    return this.http.get(`/api/${collection}/${pid}/sprints`);
+  }
+  createSprint(collection: string, pid: string, body: unknown): Promise<Sprint> {
+    return this.http.post(`/api/${collection}/${pid}/sprints`, { body });
+  }
+  burndown(collection: string, pid: string, sprintPid: string): Promise<Burndown> {
+    return this.http.get(`/api/${collection}/${pid}/burndown?sprint=${sprintPid}`);
+  }
+  standup(collection: string, pid: string): Promise<Standup> {
+    return this.http.get(`/api/${collection}/${pid}/standup`);
+  }
+  engineeringBlocked(): Promise<BlockedWork> {
+    return this.http.get("/api/engineering/blocked");
+  }
+  engineeringMoscow(): Promise<MoscowView> {
+    return this.http.get("/api/engineering/moscow");
+  }
+  engineeringDeliveryLinks(): Promise<DeliveryLinks> {
+    return this.http.get("/api/engineering/delivery-links");
+  }
+  milestoneCalendar(kind?: string): Promise<MilestoneCalendar> {
+    return this.http.get(`/api/engineering/milestone-calendar${kind ? `?kind=${kind}` : ""}`);
   }
   /** The CSV download URL for a saved report (same-origin proxy). */
   reportCsvUrl(pid: string): string {

@@ -64,6 +64,31 @@ fn insight_paths() -> Value {
         "/api/risk/heatmap": get("oversight", "CRO heatmap: probability x impact cells, top risks, posture, concentration, hygiene, declared appetite + breaches"),
         "/api/security/register": get("oversight", "Security risk register + the no-security-risk-at-late-stage heuristic"),
         "/api/regulator/extract": get("oversight", "Deliberately coarse per-portfolio aggregates; ABAC mask obligation withholds names"),
+        "/api/{collection}/{pid}/tasks": {
+            "parameters": [collection_param(), { "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "get": { "tags": ["engineering"], "summary": "The item's live tasks + per-status board counts", "responses": { "200": { "description": "Tasks + counts" } } },
+            "post": { "tags": ["engineering"], "summary": "Create a task (default status todo; done on create stamps done_at)",
+                "responses": { "200": { "description": "The task" }, "422": { "description": "Validation failure" } } }
+        },
+        "/api/{collection}/{pid}/tasks/{t_pid}": {
+            "parameters": [collection_param(),
+                { "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                { "name": "t_pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "put": { "tags": ["engineering"], "summary": "Update task fields (status changes go through PATCH)", "responses": { "200": { "description": "The task" }, "422": { "description": "Validation failure" } } },
+            "patch": { "tags": ["engineering"], "summary": "Board move: {status}; stamps status_changed_at, first done stamps done_at", "responses": { "200": { "description": "The task" }, "422": { "description": "Unknown status" } } },
+            "delete": { "tags": ["engineering"], "summary": "Soft-delete the task", "responses": { "200": { "description": "Deleted" } } }
+        },
+        "/api/{collection}/{pid}/sprints": {
+            "parameters": [collection_param(), { "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "get": { "tags": ["engineering"], "summary": "The item's sprints", "responses": { "200": { "description": "Sprints" } } },
+            "post": { "tags": ["engineering"], "summary": "Create a time-boxed sprint", "responses": { "200": { "description": "The sprint" }, "422": { "description": "ends_on before starts_on" } } }
+        },
+        "/api/{collection}/{pid}/burndown": get("engineering", "Honest sprint burndown (?sprint=): remaining per day from real done_at stamps; no ideal line"),
+        "/api/{collection}/{pid}/standup": get("engineering", "Last-24h digest: tasks created/moved, current blockers (audit-derived)"),
+        "/api/engineering/blocked": get("engineering", "Estate blocked-work aging (days since entering blocked)"),
+        "/api/engineering/moscow": get("engineering", "MoSCoW scope cut from moscow:<band> tags (untagged counted, never guessed)"),
+        "/api/engineering/delivery-links": get("engineering", "External delivery-tracker identifiers per item + the untracked list"),
+        "/api/engineering/milestone-calendar": get("engineering", "Estate milestone calendar (?kind=milestone|demo|release|checkpoint)"),
         "/api/board/snapshots": { "post": { "tags": ["oversight"],
             "summary": "Capture one estate snapshot now (portfolio counts, open exposure, per-currency money)",
             "responses": { "200": { "description": "The stored snapshot row" } } } },

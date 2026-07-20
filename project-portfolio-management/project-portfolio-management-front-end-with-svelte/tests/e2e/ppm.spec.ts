@@ -260,6 +260,88 @@ async function stubPpm(page: Page) {
           spend: [{ currency: "GBP", planned_minor: 2000000, actual_minor: 900000 }],
           benefits: [{ currency: "GBP", target_minor: 750000, realized_minor: 250000 }] }],
       } });
+    if (/^\/api\/projects\/w-1\/tasks$/.test(path) && method === "GET")
+      return route.fulfill({ json: {
+        tasks: [
+          { pid: "t-1", title: "Wire the API", description: null, status: "in_progress",
+            assignee_ref: "worker:x", sprint_pid: "sp-1",
+            created_at: "2026-07-19T00:00:00Z", status_changed_at: "2026-07-19T01:00:00Z",
+            done_at: null, blocked_days: null },
+          { pid: "t-2", title: "Fix the build", description: null, status: "blocked",
+            assignee_ref: null, sprint_pid: null,
+            created_at: "2026-07-18T00:00:00Z", status_changed_at: "2026-07-18T01:00:00Z",
+            done_at: null, blocked_days: 2 },
+        ],
+        counts: { todo: 0, in_progress: 1, in_review: 0, done: 0, blocked: 1 },
+      } });
+    if (/^\/api\/projects\/w-1\/tasks\/t-1$/.test(path) && method === "PATCH")
+      return route.fulfill({ json: {
+        pid: "t-1", title: "Wire the API", description: null, status: "in_review",
+        assignee_ref: "worker:x", sprint_pid: "sp-1",
+        created_at: "2026-07-19T00:00:00Z", status_changed_at: "2026-07-19T02:00:00Z",
+        done_at: null, blocked_days: null } });
+    if (/^\/api\/projects\/w-1\/sprints$/.test(path) && method === "GET")
+      return route.fulfill({ json: [
+        { pid: "sp-1", name: "Sprint 1", starts_on: "2026-07-13", ends_on: "2026-07-26" },
+      ] });
+    if (/^\/api\/projects\/w-1\/burndown/.test(path))
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z",
+        sprint: { pid: "sp-1", name: "Sprint 1", starts_on: "2026-07-13", ends_on: "2026-07-15" },
+        total_tasks: 2,
+        derivation: "no ideal line, no interpolation",
+        points: [
+          { date: "2026-07-13", remaining: 2 },
+          { date: "2026-07-14", remaining: 1 },
+          { date: "2026-07-15", remaining: 1 },
+        ],
+      } });
+    if (/^\/api\/projects\/w-1\/standup$/.test(path))
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", since: "2026-07-18T00:00:00Z",
+        item: { pid: "w-1", name: "Platform rebuild", kind: "Project" },
+        tasks_created: [{ at: "2026-07-19T00:00:00Z", task: "Wire the API", actor: null }],
+        tasks_moved: [{ at: "2026-07-19T01:00:00Z", task: "Wire the API", actor: null,
+          move: { from: "todo", to: "in_progress" } }],
+        blocked_now: [{ pid: "t-2", title: "Fix the build", description: null,
+          status: "blocked", assignee_ref: null, sprint_pid: null,
+          created_at: "2026-07-18T00:00:00Z", status_changed_at: "2026-07-18T01:00:00Z",
+          done_at: null, blocked_days: 2 }],
+        risks_raised_estate_wide: 0,
+      } });
+    if (path === "/api/engineering/blocked")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z",
+        derivation: "age = days since the task entered blocked",
+        blocked: [{ pid: "t-2", title: "Fix the build", description: null,
+          status: "blocked", assignee_ref: null, sprint_pid: null,
+          created_at: "2026-07-18T00:00:00Z", status_changed_at: "2026-07-18T01:00:00Z",
+          done_at: null, blocked_days: 2,
+          item: { pid: "w-1", name: "Platform rebuild", kind: "Project" } }],
+      } });
+    if (path === "/api/engineering/moscow")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", convention: "tag moscow:<band>",
+        bands: { must: [{ pid: "w-1", name: "Platform rebuild", kind: "Project" }],
+                 should: [], could: [], wont: [] },
+        untagged: 3,
+      } });
+    if (path === "/api/engineering/delivery-links")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z",
+        schemes: ["JiraProjectKey", "GitHubProjectId"],
+        tracked: [{ item: { pid: "w-1", name: "Platform rebuild", kind: "Project" },
+          links: [{ scheme: "GitHubProjectId", value: "42" }] }],
+        untracked: [{ pid: "w-3", name: "Untracked idea", kind: "Product" }],
+      } });
+    if (path.startsWith("/api/engineering/milestone-calendar"))
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z",
+        kinds: ["milestone", "demo", "release", "checkpoint"],
+        milestones: [{ pid: "m-1", name: "Sprint demo", kind: "demo",
+          due: "2026-07-24", done: false,
+          item: { pid: "w-1", name: "Platform rebuild", kind: "Project" } }],
+      } });
     if (path === "/api/scenarios" && method === "GET")
       return route.fulfill({ json: [
         { pid: "s-1", name: "Roomy", status: "draft", members: { work_item_pids: [] },
@@ -396,4 +478,30 @@ test("regulator area renders coarse aggregates", async ({ page }) => {
   await page.goto("/regulator");
   await expect(page.getByRole("heading", { name: "Transformation" })).toBeVisible();
   await expect(page.getByTestId("regulator-portfolio").getByText("20,000.00 GBP")).toBeVisible();
+});
+
+test("task board renders columns, burndown, and the standup digest", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/projects/w-1/board");
+  await expect(page.getByTestId("task-board").getByText("Wire the API")).toBeVisible();
+  await expect(page.getByTestId("task-board").getByText("blocked 2d")).toBeVisible();
+  await expect(page.getByText("no ideal line, no interpolation")).toBeVisible();
+  await expect(page.getByTestId("burndown")).toBeVisible();
+  await expect(page.getByTestId("standup").getByText("1 blocked now")).toBeVisible();
+});
+
+test("engineering estate area renders blocked, moscow, and delivery links", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/engineering");
+  await expect(page.getByTestId("eng-blocked").getByText("Fix the build")).toBeVisible();
+  await expect(page.getByTestId("eng-moscow").getByText("must (1)")).toBeVisible();
+  await expect(page.getByTestId("eng-links").getByText("GitHubProjectId:42")).toBeVisible();
+  await expect(page.getByTestId("eng-untracked")).toContainText("Untracked idea");
+});
+
+test("delivery calendar lists milestones with kinds", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/calendar");
+  await expect(page.getByTestId("milestone-calendar")).toBeVisible();
+  await expect(page.getByTestId("milestone-list").getByText(/demo: Sprint demo/)).toBeVisible();
 });

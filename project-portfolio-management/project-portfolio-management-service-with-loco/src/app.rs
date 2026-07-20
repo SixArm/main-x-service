@@ -94,6 +94,7 @@ impl Hooks for App {
             .add_route(controllers::visibility::routes())
             .add_route(controllers::insights::routes())
             .add_route(controllers::oversight::routes())
+            .add_route(controllers::engineering::routes())
             .add_route(controllers::strategy::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())

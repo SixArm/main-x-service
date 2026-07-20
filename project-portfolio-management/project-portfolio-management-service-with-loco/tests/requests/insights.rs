@@ -566,3 +566,155 @@ async fn oversight_areas_round_trip() {
     })
     .await;
 }
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[allow(clippy::too_many_lines)] // one seeded estate, the engineering surface
+async fn engineering_tasks_sprints_and_views() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let project: Value = request
+            .post("/api/projects")
+            .json(&json!({ "kind": "Project", "name": "Payments revamp",
+                            "tags": ["moscow:must"],
+                            "identifiers": [{ "scheme": "GitHubProjectId", "value": "42" }] }))
+            .await
+            .json();
+        let pid = project["pid"].as_str().expect("pid").to_string();
+        request
+            .post("/api/products")
+            .json(&json!({ "kind": "Product", "name": "Untracked idea" }))
+            .await
+            .assert_status_ok();
+
+        // ── Sprint + tasks.
+        let sprint: Value = request
+            .post(&format!("/api/projects/{pid}/sprints"))
+            .json(&json!({ "name": "Sprint 1", "starts_on": "2026-07-13",
+                            "ends_on": "2026-07-26" }))
+            .await
+            .json();
+        let sprint_pid = sprint["pid"].as_str().expect("sprint pid").to_string();
+        let bad_sprint = request
+            .post(&format!("/api/projects/{pid}/sprints"))
+            .json(&json!({ "name": "Backwards", "starts_on": "2026-07-26",
+                            "ends_on": "2026-07-13" }))
+            .await;
+        assert_eq!(bad_sprint.status_code(), 422);
+
+        let task_a: Value = request
+            .post(&format!("/api/projects/{pid}/tasks"))
+            .json(&json!({ "title": "Wire the API", "sprint_pid": sprint_pid,
+                            "assignee_ref": "worker:11111111-1111-4111-8111-111111111111" }))
+            .await
+            .json();
+        let a_pid = task_a["pid"].as_str().expect("task pid").to_string();
+        assert_eq!(task_a["status"], "todo");
+        let task_b: Value = request
+            .post(&format!("/api/projects/{pid}/tasks"))
+            .json(&json!({ "title": "Ship it", "sprint_pid": sprint_pid }))
+            .await
+            .json();
+        let b_pid = task_b["pid"].as_str().expect("task pid").to_string();
+        let bad_status = request
+            .post(&format!("/api/projects/{pid}/tasks"))
+            .json(&json!({ "title": "X", "status": "sideways" }))
+            .await;
+        assert_eq!(bad_status.status_code(), 422);
+        let bad_assignee = request
+            .post(&format!("/api/projects/{pid}/tasks"))
+            .json(&json!({ "title": "X", "assignee_ref": "team:core" }))
+            .await;
+        assert_eq!(bad_assignee.status_code(), 422);
+
+        // Board moves: a -> in_progress -> blocked; b -> done (stamps).
+        request
+            .patch(&format!("/api/projects/{pid}/tasks/{a_pid}"))
+            .json(&json!({ "status": "in_progress" }))
+            .await
+            .assert_status_ok();
+        let blocked_task: Value = request
+            .patch(&format!("/api/projects/{pid}/tasks/{a_pid}"))
+            .json(&json!({ "status": "blocked" }))
+            .await
+            .json();
+        assert_eq!(blocked_task["blocked_days"], 0);
+        let done_task: Value = request
+            .patch(&format!("/api/projects/{pid}/tasks/{b_pid}"))
+            .json(&json!({ "status": "done" }))
+            .await
+            .json();
+        assert!(done_task["done_at"].is_string(), "first done stamps done_at");
+
+        // PUT refuses status changes (flow stamps stay true).
+        let sneaky = request
+            .put(&format!("/api/projects/{pid}/tasks/{a_pid}"))
+            .json(&json!({ "title": "Wire the API", "status": "done" }))
+            .await;
+        assert_eq!(sneaky.status_code(), 422);
+
+        // List + counts.
+        let listed: Value = request.get(&format!("/api/projects/{pid}/tasks")).await.json();
+        assert_eq!(listed["counts"]["blocked"], 1);
+        assert_eq!(listed["counts"]["done"], 1);
+
+        // ── Burndown: 2 tasks, one done today ⇒ ends at 1; derivation
+        // string is served.
+        let burndown: Value = request
+            .get(&format!("/api/projects/{pid}/burndown?sprint={sprint_pid}"))
+            .await
+            .json();
+        assert_eq!(burndown["total_tasks"], 2);
+        let points = burndown["points"].as_array().expect("points");
+        assert_eq!(points.len(), 14);
+        assert_eq!(points[0]["remaining"], 2, "before any completion");
+        assert_eq!(points[points.len() - 1]["remaining"], 1, "one real completion");
+        assert!(burndown["derivation"].as_str().expect("d").contains("no ideal line"));
+
+        // ── Standup digest: creations + moves + the current blocker.
+        let standup: Value = request.get(&format!("/api/projects/{pid}/standup")).await.json();
+        assert_eq!(standup["tasks_created"].as_array().expect("c").len(), 2);
+        assert!(standup["tasks_moved"].as_array().expect("m").len() >= 3);
+        assert_eq!(standup["blocked_now"][0]["title"], "Wire the API");
+
+        // ── Estate views.
+        let blocked: Value = request.get("/api/engineering/blocked").await.json();
+        assert_eq!(blocked["blocked"][0]["title"], "Wire the API");
+        assert_eq!(blocked["blocked"][0]["item"]["name"], "Payments revamp");
+
+        let moscow: Value = request.get("/api/engineering/moscow").await.json();
+        assert_eq!(moscow["bands"]["must"][0]["name"], "Payments revamp");
+        assert_eq!(moscow["untagged"], 1);
+
+        let links: Value = request.get("/api/engineering/delivery-links").await.json();
+        assert_eq!(links["tracked"][0]["links"][0]["scheme"], "GitHubProjectId");
+        assert_eq!(links["untracked"][0]["name"], "Untracked idea");
+
+        // ── Milestone kinds + the calendar.
+        request
+            .post(&format!("/api/projects/{pid}/milestones"))
+            .json(&json!({ "name": "Sprint demo", "due": "2026-07-24", "kind": "demo" }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/projects/{pid}/milestones"))
+            .json(&json!({ "name": "Plain milestone", "due": "2026-08-01" }))
+            .await
+            .assert_status_ok();
+        let bad_kind = request
+            .post(&format!("/api/projects/{pid}/milestones"))
+            .json(&json!({ "name": "X", "due": "2026-08-01", "kind": "party" }))
+            .await;
+        assert_eq!(bad_kind.status_code(), 422);
+        let calendar: Value = request
+            .get("/api/engineering/milestone-calendar?kind=demo")
+            .await
+            .json();
+        let entries = calendar["milestones"].as_array().expect("entries");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["name"], "Sprint demo");
+        let all: Value = request.get("/api/engineering/milestone-calendar").await.json();
+        assert_eq!(all["milestones"].as_array().expect("all").len(), 2);
+    })
+    .await;
+}

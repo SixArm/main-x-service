@@ -9,6 +9,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — engineering-team views (2026-07-20)
+
+- `/{collection}/{pid}/board` — the per-item task Kanban (drag = the
+  PATCH move; the service owns the flow stamps) with sprint
+  create/select, the honest burndown table (server derivation shown),
+  and the standup digest; linked from the item detail page.
+- `/calendar` — the estate milestone calendar (SVAR Calendar) with
+  kind filter; `/engineering` — blocked-work aging + MoSCoW scope +
+  delivery links. Nav + keys ×13 locales; eleven typed client methods
+  (ApiClient gains `patch`); path pins; three stubbed Playwright specs.
+
 ### Added — oversight areas (2026-07-20)
 
 - `/board`, `/auditor`, `/compliance`, `/risk`, `/security`,
