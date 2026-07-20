@@ -9,6 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — oversight areas (2026-07-20)
+
+- `/board`, `/auditor`, `/compliance`, `/risk`, `/security`,
+  `/regulator` pages over the thirteen oversight endpoints (board pack
+  + investments + take-snapshot trends; findings + filterable trail +
+  evidence-pack CSV; registers; heatmap matrix with honest no-appetite
+  note; coarse regulator extract). Nav + `ppm.nav.*` keys ×13 locales;
+  twelve typed client methods with path pins; six stubbed Playwright
+  specs.
+
 ### Added — executive moderate fits (2026-07-19)
 
 - `/executive` gains the strategic-alignment section (coverage per

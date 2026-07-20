@@ -44,7 +44,7 @@ macro_rules! live {
 /// The RAG colour of every live item, keyed by pid — the same
 /// derivation `/api/at-a-glance` uses (materialised risks, budget
 /// overrun, missed target, exposure, schedule violations).
-fn rag_by_pid(
+pub(crate) fn rag_by_pid(
     items: &[work_items::Model],
     risk_rows: &[risks::Model],
     budget_rows: &[budget_lines::Model],
@@ -109,8 +109,19 @@ fn rag_by_pid(
 }
 
 /// `{pid, name, kind}` reference for a work item.
-fn item_ref(item: &work_items::Model) -> serde_json::Value {
+pub(crate) fn item_ref(item: &work_items::Model) -> serde_json::Value {
     serde_json::json!({ "pid": item.pid, "name": item.name, "kind": item.kind })
+}
+
+/// The live risks carrying `category` (exposure-sort left to callers).
+pub(crate) fn category_risks<'r>(
+    risk_rows: &'r [risks::Model],
+    category: &str,
+) -> Vec<&'r risks::Model> {
+    risk_rows
+        .iter()
+        .filter(|r| r.category.as_deref() == Some(category))
+        .collect()
 }
 
 /// `GET /api/executive/health` — the CEO portfolio-health briefing:
@@ -222,25 +233,13 @@ async fn executive_health(State(ctx): State<AppContext>, headers: HeaderMap) -> 
     conditional(&headers, &body)
 }
 
-/// Query for the decision log: optional result cap.
-#[derive(Debug, Deserialize)]
-struct DecisionsQuery {
-    /// Maximum entries (default 50, cap 200).
-    limit: Option<usize>,
-}
-
-/// `GET /api/executive/decisions` — the chronological decision log:
-/// gate-review verdicts, scenario commits, decided proposals
-/// (approved / rejected / promoted), and record merges, newest first.
-/// Every entry is already stored by its own subsystem; this is a
-/// projection, not a new record type.
-#[debug_handler]
-async fn executive_decisions(
-    axum::extract::Query(query): axum::extract::Query<DecisionsQuery>,
-    State(ctx): State<AppContext>,
-    headers: HeaderMap,
-) -> Result<Response> {
-    let limit = query.limit.unwrap_or(50).min(200);
+/// Every recorded decision as `(instant, entry)` pairs: gate-review
+/// verdicts, scenario commits, decided proposals, and merges. Shared
+/// by the executive decision log, the board pack, and the evidence
+/// pack.
+pub(crate) async fn decision_entries(
+    ctx: &AppContext,
+) -> Result<Vec<(chrono::DateTime<chrono::Utc>, serde_json::Value)>> {
     let items = live!(work_items, &ctx.db);
     let names: std::collections::BTreeMap<Uuid, &str> =
         items.iter().map(|i| (i.pid, i.name.as_str())).collect();
@@ -302,6 +301,29 @@ async fn executive_decisions(
             "reason": merge.reason,
         })));
     }
+    Ok(entries)
+}
+
+/// Query for the decision log: optional result cap.
+#[derive(Debug, Deserialize)]
+struct DecisionsQuery {
+    /// Maximum entries (default 50, cap 200).
+    limit: Option<usize>,
+}
+
+/// `GET /api/executive/decisions` — the chronological decision log:
+/// gate-review verdicts, scenario commits, decided proposals
+/// (approved / rejected / promoted), and record merges, newest first.
+/// Every entry is already stored by its own subsystem; this is a
+/// projection, not a new record type.
+#[debug_handler]
+async fn executive_decisions(
+    axum::extract::Query(query): axum::extract::Query<DecisionsQuery>,
+    State(ctx): State<AppContext>,
+    headers: HeaderMap,
+) -> Result<Response> {
+    let limit = query.limit.unwrap_or(50).min(200);
+    let mut entries = decision_entries(&ctx).await?;
     entries.sort_by_key(|entry| std::cmp::Reverse(entry.0));
     let total = entries.len();
     let decisions: Vec<serde_json::Value> =
@@ -746,10 +768,7 @@ async fn technology_debt(State(ctx): State<AppContext>, headers: HeaderMap) -> R
     let risk_rows = live!(risks, &ctx.db);
     let by_pid: std::collections::BTreeMap<Uuid, &work_items::Model> =
         items.iter().map(|i| (i.pid, i)).collect();
-    let mut debt: Vec<&risks::Model> = risk_rows
-        .iter()
-        .filter(|r| r.category.as_deref() == Some("tech_debt"))
-        .collect();
+    let mut debt: Vec<&risks::Model> = category_risks(&risk_rows, "tech_debt");
     debt.sort_by_key(|r| std::cmp::Reverse(r.probability * r.impact));
     let mut statuses: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
     for risk in &debt {

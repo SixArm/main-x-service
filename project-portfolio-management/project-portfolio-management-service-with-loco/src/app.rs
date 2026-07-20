@@ -93,6 +93,7 @@ impl Hooks for App {
             .add_route(controllers::governance::routes())
             .add_route(controllers::visibility::routes())
             .add_route(controllers::insights::routes())
+            .add_route(controllers::oversight::routes())
             .add_route(controllers::strategy::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
@@ -109,6 +110,8 @@ impl Hooks for App {
         // unless `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=outbox` AND `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY`
         // are set, so the default `memory` transport never spawns it.
         crate::relay::spawn(ctx.db.clone());
+        // Optional estate-snapshot ticker (env-gated, default off).
+        crate::snapshots::spawn(ctx.db.clone());
         // Blanket JWT enforcement layer. Added unconditionally; the
         // `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` flag is read per request and the layer is a
         // near-noop when the flag is off (the default).

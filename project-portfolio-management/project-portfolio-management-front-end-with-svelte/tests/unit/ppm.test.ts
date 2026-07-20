@@ -51,6 +51,17 @@ describe("PpmClient paths", () => {
     await ppm.technologyDebt();
     await ppm.technologyFlow(3);
     await ppm.compareScenarios("s1", "s2");
+    await ppm.boardPack();
+    await ppm.boardInvestments();
+    await ppm.takeSnapshot();
+    await ppm.boardTrends();
+    await ppm.auditorTrail({ action: "merged" });
+    await ppm.auditorFindings();
+    await ppm.complianceRegister();
+    await ppm.complianceFindings();
+    await ppm.riskHeatmap();
+    await ppm.securityRegister();
+    await ppm.regulatorExtract();
 
     expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
       "GET http://svc/api/at-a-glance",
@@ -82,6 +93,17 @@ describe("PpmClient paths", () => {
       "GET http://svc/api/technology/debt",
       "GET http://svc/api/technology/flow?months=3",
       "GET http://svc/api/scenarios/compare?a=s1&b=s2",
+      "GET http://svc/api/board/pack",
+      "GET http://svc/api/board/investments",
+      "POST http://svc/api/board/snapshots",
+      "GET http://svc/api/board/trends",
+      "GET http://svc/api/auditor/trail?action=merged",
+      "GET http://svc/api/auditor/findings",
+      "GET http://svc/api/compliance/register",
+      "GET http://svc/api/compliance/findings",
+      "GET http://svc/api/risk/heatmap",
+      "GET http://svc/api/security/register",
+      "GET http://svc/api/regulator/extract",
     ]);
   });
 

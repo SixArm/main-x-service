@@ -9,6 +9,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — oversight areas: board / auditor / compliance / CRO / CISO / regulator (2026-07-20)
+
+- Thirteen derived-view endpoints (`controllers/oversight.rs`) + the
+  `insight_snapshots` table: the period board pack + investments +
+  stored trend snapshots (explicit POST or env-gated ticker), the
+  audit-trail explorer + segregation-of-duties findings + evidence
+  pack (JSON/CSV), compliance/security risk registers + conformance
+  findings, the CRO heatmap (posture, concentration, hygiene, declared
+  risk appetite or an honest absence), and the deliberately coarse
+  regulator extract honouring the ABAC `mask` obligation.
+
 ### Added — executive moderate fits (2026-07-19)
 
 - **Stage-gated funding tranches**: `budget_lines.gate` + `released_at`

@@ -7,6 +7,7 @@ pub mod budget_lines;
 pub mod event_outbox;
 pub mod gate_reviews;
 pub mod ideas;
+pub mod insight_snapshots;
 pub mod merge_records;
 pub mod milestones;
 pub mod objective_links;

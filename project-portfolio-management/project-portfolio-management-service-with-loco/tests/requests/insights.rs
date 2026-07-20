@@ -373,3 +373,196 @@ async fn moderate_fits_tranches_debt_flow_alignment_compare() {
     })
     .await;
 }
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[allow(clippy::too_many_lines)] // one seeded estate, all oversight views
+async fn oversight_areas_round_trip() {
+    request::<App, _, _>(|request, _ctx| async move {
+        // ── Seed: portfolio + project, gated tranche, categorised
+        // risks, milestone, benefit, scenario commit.
+        let portfolio: Value = request
+            .post("/api/portfolios")
+            .json(&json!({ "kind": "Portfolio", "name": "Oversight Estate" }))
+            .await
+            .json();
+        let pf_pid = portfolio["pid"].as_str().expect("pid").to_string();
+        let project: Value = request
+            .post("/api/projects")
+            .json(&json!({ "kind": "Project", "name": "Casework digitisation",
+                            "portfolio_ref": pf_pid }))
+            .await
+            .json();
+        let pid = project["pid"].as_str().expect("pid").to_string();
+
+        request
+            .post(&format!("/api/projects/{pid}/gate-reviews"))
+            .json(&json!({ "gate": "g0_concept", "decision": "approved" }))
+            .await
+            .assert_status_ok();
+        let line: Value = request
+            .post(&format!("/api/projects/{pid}/budget-lines"))
+            .json(&json!({ "category": "capex", "description": "Build",
+                            "currency": "GBP", "planned_minor": 4_000_i64,
+                            "gate": "g0_concept" }))
+            .await
+            .json();
+        let line_pid = line["pid"].as_str().expect("line pid");
+        request
+            .post(&format!("/api/projects/{pid}/budget-lines/{line_pid}/release"))
+            .await
+            .assert_status_ok();
+        for (title, category, prob, impact) in [
+            ("GDPR basis unclear", "compliance", 4, 5),
+            ("Unpatched edge box", "security", 5, 5),
+        ] {
+            request
+                .post(&format!("/api/projects/{pid}/risks"))
+                .json(&json!({ "title": title, "probability": prob, "impact": impact,
+                                "category": category }))
+                .await
+                .assert_status_ok();
+        }
+        request
+            .post(&format!("/api/projects/{pid}/milestones"))
+            .json(&json!({ "name": "Go-live", "due": "2026-09-30" }))
+            .await
+            .assert_status_ok();
+        let milestones: Value =
+            request.get(&format!("/api/projects/{pid}/milestones")).await.json();
+        let m_pid = milestones[0]["pid"].as_str().expect("m pid");
+        request
+            .post(&format!("/api/projects/{pid}/milestones/{m_pid}/complete"))
+            .await
+            .assert_status_ok();
+        let benefit: Value = request
+            .post(&format!("/api/projects/{pid}/benefits"))
+            .json(&json!({ "title": "Postage saved", "category": "cost_saving",
+                            "currency": "GBP", "target_minor": 2_000_i64 }))
+            .await
+            .json();
+        let b_pid = benefit["pid"].as_str().expect("b pid");
+        request
+            .post(&format!("/api/projects/{pid}/benefits/{b_pid}/realize"))
+            .json(&json!({ "amount_minor": 500_i64 }))
+            .await
+            .assert_status_ok();
+        let scenario: Value = request
+            .post("/api/scenarios")
+            .json(&json!({ "name": "Commit case", "work_item_pids": [pid],
+                            "budget_cap_minor": 100_000, "currency": "GBP" }))
+            .await
+            .json();
+        let s_pid = scenario["pid"].as_str().expect("s pid");
+        request
+            .post(&format!("/api/scenarios/{s_pid}/commit"))
+            .await
+            .assert_status_ok();
+
+        // ── Board pack: the window captures the decisions + release +
+        // milestone + realization; health reflects the estate.
+        let pack: Value = request.get("/api/board/pack").await.json();
+        assert_eq!(pack["milestones_completed"], 1);
+        assert_eq!(pack["tranches_released"]["count"], 1);
+        assert_eq!(pack["tranches_released"]["per_currency"][0]["currency"], "GBP");
+        assert_eq!(pack["benefits_realized"]["events"], 1);
+        assert_eq!(pack["benefits_realized"]["per_currency_minor"]["GBP"], 500);
+        assert!(
+            pack["decisions"].as_array().expect("decisions").iter()
+                .any(|d| d["kind"] == "scenario_commit"),
+            "scenario commit is in the pack"
+        );
+
+        // ── Board investments: commit + release both present.
+        let investments: Value = request.get("/api/board/investments").await.json();
+        let kinds: Vec<&str> = investments["investments"]
+            .as_array()
+            .expect("investments")
+            .iter()
+            .filter_map(|entry| entry["kind"].as_str())
+            .collect();
+        assert!(kinds.contains(&"scenario_commit"));
+        assert!(kinds.contains(&"tranche_release"));
+
+        // ── Snapshots + trends: capture twice, series holds both.
+        request.post("/api/board/snapshots").await.assert_status_ok();
+        request.post("/api/board/snapshots").await.assert_status_ok();
+        let trends: Value = request.get("/api/board/trends").await.json();
+        let series = trends["series"].as_array().expect("series");
+        assert_eq!(series.len(), 2);
+        assert_eq!(series[0]["body"]["portfolios"], 1);
+        assert!(series[0]["body"]["open_exposure"].as_i64().expect("exposure") >= 45);
+
+        // ── Auditor trail: filterable; the release action is recorded.
+        let trail: Value = request
+            .get("/api/auditor/trail?action=budget_line_released")
+            .await
+            .json();
+        assert_eq!(trail["returned"], 1);
+        assert!(trail["stats"]["actorless"].as_u64().expect("count") >= 1);
+
+        // ── Auditor findings: no bearer tokens in this test, so no
+        // same-actor conflicts — but actorless actions are counted.
+        let findings: Value = request.get("/api/auditor/findings").await.json();
+        assert!(findings["actorless_actions"].as_u64().expect("count") > 0);
+
+        // ── Evidence pack: JSON carries audits + decisions; CSV serves.
+        let pack: Value = request.get("/api/auditor/evidence-pack").await.json();
+        assert!(pack["audit_rows"].as_array().expect("rows").len() > 5);
+        assert!(!pack["decisions"].as_array().expect("decisions").is_empty());
+        let csv = request.get("/api/auditor/evidence-pack?format=csv").await;
+        assert_eq!(csv.status_code(), 200);
+        assert!(csv.text().starts_with("created_at,actor,action,entity_pid"));
+
+        // ── Compliance: register carries the GDPR risk; findings flag
+        // nothing yet (no overdue targets), so seed one overdue item.
+        let register: Value = request.get("/api/compliance/register").await.json();
+        assert_eq!(register["register"][0]["title"], "GDPR basis unclear");
+        assert_eq!(register["open_exposure"], 20);
+        request
+            .post("/api/products")
+            .json(&json!({ "kind": "Product", "name": "Stale product",
+                            "portfolio_ref": pf_pid, "target_date": "2020-01-01" }))
+            .await
+            .assert_status_ok();
+        let findings: Value = request.get("/api/compliance/findings").await.json();
+        assert!(
+            findings["findings"].as_array().expect("findings").iter().any(
+                |f| f["rule"] == "overdue_item_without_recent_gate_review"
+            ),
+            "the overdue, unreviewed product is a finding"
+        );
+
+        // ── CRO heatmap: cells + posture + no appetite configured.
+        let heatmap: Value = request.get("/api/risk/heatmap").await.json();
+        assert_eq!(heatmap["cells"]["p5i5"], 1);
+        assert_eq!(heatmap["cells"]["p4i5"], 1);
+        assert_eq!(heatmap["estate_open_exposure"], 45);
+        assert!(heatmap["appetite"].is_null());
+        assert_eq!(heatmap["breaches"].as_array().expect("breaches").len(), 0);
+
+        // ── CISO register: the security risk + no unreviewed-late-stage
+        // items (the project is only at g0).
+        let security: Value = request.get("/api/security/register").await.json();
+        assert_eq!(security["register"][0]["title"], "Unpatched edge box");
+        assert_eq!(
+            security["unreviewed_at_late_stage"]["items"]
+                .as_array()
+                .expect("items")
+                .len(),
+            0
+        );
+
+        // ── Regulator extract: coarse aggregates, unmasked (auth off).
+        let extract: Value = request.get("/api/regulator/extract").await.json();
+        assert_eq!(extract["masked"], false);
+        let pf = &extract["portfolios"][0];
+        assert_eq!(pf["name"], "Oversight Estate");
+        assert_eq!(pf["members"]["Project"], 1);
+        assert_eq!(pf["gate_decisions"]["approved"], 1);
+        assert_eq!(pf["spend"][0]["currency"], "GBP");
+        assert!(pf.get("owner_ref").is_none(), "no person references");
+    })
+    .await;
+}

@@ -102,6 +102,12 @@
     { href: "/executive", label: t("ppm.nav.executive") },
     { href: "/financials", label: t("ppm.nav.financials") },
     { href: "/technology", label: t("ppm.nav.technology") },
+    { href: "/board", label: t("ppm.nav.board") },
+    { href: "/auditor", label: t("ppm.nav.auditor") },
+    { href: "/compliance", label: t("ppm.nav.compliance") },
+    { href: "/risk", label: t("ppm.nav.risk") },
+    { href: "/security", label: t("ppm.nav.security") },
+    { href: "/regulator", label: t("ppm.nav.regulator") },
     { href: "/capacity", label: t("ppm.nav.capacity") },
     { href: "/reports", label: t("ppm.nav.reports") },
   ];

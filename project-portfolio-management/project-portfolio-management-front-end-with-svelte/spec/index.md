@@ -129,6 +129,12 @@ match breakdown).
 /proposals                   work-intake proposal pipeline
 /reports                     saved reports + CSV download
 /scenarios                   scenario planning + side-by-side compare
+/board                       board pack + investments + snapshot trends
+/auditor                     audit explorer + SoD findings + evidence pack
+/compliance                  compliance register + conformance findings
+/risk                        CRO heatmap + posture + appetite
+/security                    CISO register + late-stage heuristic
+/regulator                   coarse regulator extract (mask-aware)
 /signin · /verify            BFF magic-link sign-in / verification
 
 Roadmap (per-work-item project-management sub-routes, §13/§15):

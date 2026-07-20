@@ -163,6 +163,103 @@ async function stubPpm(page: Page) {
           b_minor: 100000, delta_minor: 0 }], exposure: 0, alignment: 0 },
         note: "b minus a; per-currency deltas only",
       } });
+    if (path === "/api/board/pack")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z",
+        window: { from: "2026-04-20T00:00:00Z", to: "2026-07-19T00:00:00Z" },
+        health_now: { portfolios: { red: 1, amber: 0, green: 2 }, note: "as-of-now" },
+        decisions: [{ kind: "gate_review", at: "2026-07-01T09:00:00Z",
+          decision: "approved", gate: "g1_feasibility",
+          subject: { pid: "w-1", name: "Platform rebuild" } }],
+        benefits_realized: { events: 2, per_currency_minor: { GBP: 50000 },
+          unattributed_events: 0 },
+        milestones_completed: 4,
+        tranches_released: { count: 1, per_currency: [{ currency: "GBP",
+          planned_minor: 500000, actual_minor: 0, remaining_minor: 500000,
+          overrun: false, line_count: 1 }] },
+      } });
+    if (path === "/api/board/investments")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z",
+        investments: [
+          { kind: "scenario_commit", at: "2026-07-02T09:00:00Z", name: "FY27 mix",
+            budget_cap_minor: 1000000, currency: "GBP" },
+          { kind: "tranche_release", at: "2026-07-01T09:00:00Z",
+            description: "Tranche 2", gate: "g1_feasibility",
+            planned_minor: 500000, currency: "GBP",
+            item: { pid: "w-1", name: "Platform rebuild", kind: "Project" } },
+        ],
+      } });
+    if (path === "/api/board/snapshots" && method === "POST")
+      return route.fulfill({ json: { id: 2 } });
+    if (path === "/api/board/trends")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", note: "stored snapshots only",
+        series: [{ taken_at: "2026-07-01T00:00:00Z",
+          body: { work_items: 12, portfolios: 3, open_exposure: 44, money: [] } }],
+      } });
+    if (path === "/api/auditor/trail")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", returned: 1,
+        stats: { per_day: { "2026-07-01": 1 }, distinct_actors: 1, actorless: 0 },
+        rows: [{ created_at: "2026-07-01T09:00:00Z", actor: "user:ops",
+          action: "budget_line_released", entity_pid: "11111111-1111-4111-8111-111111111111" }],
+      } });
+    if (path === "/api/auditor/findings")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", note: "audit actors only",
+        findings: [{ rule: "merge_without_reason",
+          detail: "a record merge was performed with no recorded reason" }],
+        actorless_actions: 3,
+      } });
+    if (path === "/api/compliance/register")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", note: "category compliance",
+        open_exposure: 20, statuses: { open: 1 },
+        register: [{ pid: "r-2", title: "GDPR basis unclear", status: "open",
+          exposure: 20, escalated: false, owner_ref: null,
+          item: { pid: "w-1", name: "Platform rebuild", kind: "Project" } }],
+      } });
+    if (path === "/api/compliance/findings")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", review_days: 90,
+        findings: [{ rule: "risk_past_review_date",
+          detail: "an open risk is past its scheduled review date" }],
+      } });
+    if (path === "/api/risk/heatmap")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", open_risks: 2, estate_open_exposure: 45,
+        cells: { p5i5: 1, p4i5: 1 },
+        top_risks: [{ pid: "r-3", title: "Unpatched edge box", exposure: 25,
+          category: "security", item: { pid: "w-1", name: "Platform rebuild", kind: "Project" } }],
+        posture: [{ portfolio: { pid: "pf-1", name: "Transformation", kind: "Portfolio" },
+          open_exposure: 45, escalated: 1, materialised: 0 }],
+        concentration: [{ pid: "r-3", title: "Unpatched edge box", exposure: 25 }],
+        overdue_reviews: [],
+        appetite: null,
+        appetite_note: "no risk appetite configured; no thresholds invented",
+        breaches: [],
+      } });
+    if (path === "/api/security/register")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", note: "category security",
+        open_exposure: 25, statuses: { open: 1 },
+        register: [{ pid: "r-3", title: "Unpatched edge box", status: "open",
+          exposure: 25, escalated: true, owner_ref: "worker:x",
+          item: { pid: "w-1", name: "Platform rebuild", kind: "Project" } }],
+        unreviewed_at_late_stage: { heuristic: "proxy, not proof",
+          items: [{ item: { pid: "w-2", name: "Portal", kind: "Product" }, stage: "g3_delivery" }] },
+      } });
+    if (path === "/api/regulator/extract")
+      return route.fulfill({ json: {
+        as_of: "2026-07-19T00:00:00Z", masked: false,
+        note: "deliberately coarse",
+        portfolios: [{ pid: "pf-1", name: "Transformation", stage: "g2_definition",
+          members: { Portfolio: 1, Project: 2 },
+          gate_decisions: { approved: 3 },
+          spend: [{ currency: "GBP", planned_minor: 2000000, actual_minor: 900000 }],
+          benefits: [{ currency: "GBP", target_minor: 750000, realized_minor: 250000 }] }],
+      } });
     if (path === "/api/scenarios" && method === "GET")
       return route.fulfill({ json: [
         { pid: "s-1", name: "Roomy", status: "draft", members: { work_item_pids: [] },
@@ -253,4 +350,50 @@ test("scenario compare renders side-by-side deltas", async ({ page }) => {
   const table = page.getByTestId("scenario-compare");
   await expect(table.getByText("Roomy")).toBeVisible();
   await expect(table.getByText("no", { exact: true })).toBeVisible();
+});
+
+test("board area renders the pack, investments, and trends", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/board");
+  await expect(page.getByTestId("board-tiles").getByText("milestones completed")).toBeVisible();
+  await expect(page.getByTestId("board-realized").getByText("500.00 GBP")).toBeVisible();
+  await expect(page.getByTestId("board-investments").getByText("FY27 mix")).toBeVisible();
+  await expect(page.getByTestId("board-trends").getByText("44")).toBeVisible();
+});
+
+test("auditor area renders findings and the filtered trail", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/auditor");
+  await expect(page.getByTestId("auditor-findings").getByText("merge_without_reason")).toBeVisible();
+  await expect(page.getByTestId("auditor-trail").getByText("budget_line_released")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Evidence pack (CSV)" })).toBeVisible();
+});
+
+test("compliance area renders findings and the register", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/compliance");
+  await expect(page.getByTestId("compliance-findings").getByText("risk_past_review_date")).toBeVisible();
+  await expect(page.getByTestId("compliance-register").getByText("GDPR basis unclear")).toBeVisible();
+});
+
+test("risk area renders the heatmap with an honest no-appetite note", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/risk");
+  await expect(page.getByTestId("risk-summary").getByText("45")).toBeVisible();
+  await expect(page.getByTestId("risk-appetite")).toContainText("no risk appetite configured");
+  await expect(page.getByTestId("risk-top").getByText("Unpatched edge box")).toBeVisible();
+});
+
+test("security area renders the register and the late-stage heuristic", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/security");
+  await expect(page.getByTestId("security-register").getByText("Unpatched edge box")).toBeVisible();
+  await expect(page.getByTestId("security-unreviewed").getByText("Portal")).toBeVisible();
+});
+
+test("regulator area renders coarse aggregates", async ({ page }) => {
+  await stubPpm(page);
+  await page.goto("/regulator");
+  await expect(page.getByRole("heading", { name: "Transformation" })).toBeVisible();
+  await expect(page.getByTestId("regulator-portfolio").getByText("20,000.00 GBP")).toBeVisible();
 });

@@ -439,6 +439,139 @@ export interface ScenarioSide {
   };
 }
 
+
+/** A risk-register row shared by the compliance / security views. */
+export interface RegisterRow {
+  pid: string;
+  title: string;
+  status: string;
+  exposure: number;
+  escalated: boolean;
+  owner_ref: string | null;
+  item: InsightItemRef | null;
+}
+
+/** A category risk register (`/compliance/register`, `/security/register`). */
+export interface RiskRegister {
+  as_of: string;
+  note: string;
+  open_exposure: number;
+  statuses: Record<string, number>;
+  register: RegisterRow[];
+  unreviewed_at_late_stage?: {
+    heuristic: string;
+    items: Array<{ item: InsightItemRef; stage: string | null }>;
+  };
+}
+
+/** `GET /api/board/pack` response. */
+export interface BoardPack {
+  as_of: string;
+  window: { from: string; to: string };
+  health_now: { portfolios: Record<string, number>; note: string };
+  decisions: DecisionEntry[];
+  benefits_realized: {
+    events: number;
+    per_currency_minor: Record<string, number>;
+    unattributed_events: number;
+  };
+  milestones_completed: number;
+  tranches_released: { count: number; per_currency: VarianceRow[] };
+}
+
+/** One board investment entry. */
+export interface Investment {
+  kind: "scenario_commit" | "tranche_release" | "proposal";
+  at: string;
+  name?: string;
+  title?: string;
+  description?: string;
+  gate?: string | null;
+  decision?: string;
+  planned_minor?: number;
+  requested_minor?: number | null;
+  budget_cap_minor?: number | null;
+  currency?: string | null;
+  item?: InsightItemRef | null;
+}
+
+/** `GET /api/board/trends` response. */
+export interface TrendSeries {
+  as_of: string;
+  note: string;
+  series: Array<{ taken_at: string; body: Record<string, unknown> }>;
+}
+
+/** `GET /api/auditor/trail` response. */
+export interface AuditTrail {
+  as_of: string;
+  returned: number;
+  stats: { per_day: Record<string, number>; distinct_actors: number; actorless: number };
+  rows: Array<{
+    created_at: string;
+    actor: string | null;
+    action: string;
+    entity_pid: string;
+  }>;
+}
+
+/** `GET /api/auditor/findings` response. */
+export interface AuditorFindings {
+  as_of: string;
+  note: string;
+  findings: Array<Record<string, unknown> & { rule: string; detail: string }>;
+  actorless_actions: number;
+}
+
+/** `GET /api/compliance/findings` response. */
+export interface ConformanceFindings {
+  as_of: string;
+  review_days: number;
+  findings: Array<Record<string, unknown> & { rule: string; detail: string }>;
+}
+
+/** `GET /api/risk/heatmap` response. */
+export interface RiskHeatmap {
+  as_of: string;
+  open_risks: number;
+  estate_open_exposure: number;
+  cells: Record<string, number>;
+  top_risks: Array<{
+    pid: string;
+    title: string;
+    exposure: number;
+    category: string;
+    item: InsightItemRef | null;
+  }>;
+  posture: Array<{
+    portfolio: InsightItemRef | null;
+    open_exposure: number;
+    escalated: number;
+    materialised: number;
+  }>;
+  concentration: Array<{ pid: string; title: string; exposure: number }>;
+  overdue_reviews: Array<{ pid: string; title: string; review_date: string | null }>;
+  appetite: { max_open_exposure: number | null; max_item_exposure: number | null } | null;
+  appetite_note: string;
+  breaches: Array<Record<string, unknown> & { rule: string }>;
+}
+
+/** `GET /api/regulator/extract` response. */
+export interface RegulatorExtract {
+  as_of: string;
+  masked: boolean;
+  note: string;
+  portfolios: Array<{
+    pid: string;
+    name: string | null;
+    stage: string | null;
+    members: Record<string, number>;
+    gate_decisions: Record<string, number>;
+    spend: Array<{ currency: string; planned_minor: number; actual_minor: number }>;
+    benefits: Array<{ currency: string; target_minor: number; realized_minor: number }>;
+  }>;
+}
+
 export class PpmClient {
   constructor(private readonly http: ApiClient) {}
 
@@ -708,6 +841,50 @@ export class PpmClient {
     return this.http.get(
       `/api/scenarios/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`,
     );
+  }
+  boardPack(from?: string, to?: string): Promise<BoardPack> {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const query = params.toString();
+    return this.http.get(`/api/board/pack${query ? `?${query}` : ""}`);
+  }
+  boardInvestments(): Promise<{ investments: Investment[]; as_of: string }> {
+    return this.http.get("/api/board/investments");
+  }
+  takeSnapshot(): Promise<{ id: number }> {
+    return this.http.post("/api/board/snapshots", { body: {} });
+  }
+  boardTrends(): Promise<TrendSeries> {
+    return this.http.get("/api/board/trends");
+  }
+  auditorTrail(filter?: { actor?: string; action?: string }): Promise<AuditTrail> {
+    const params = new URLSearchParams();
+    if (filter?.actor) params.set("actor", filter.actor);
+    if (filter?.action) params.set("action", filter.action);
+    const query = params.toString();
+    return this.http.get(`/api/auditor/trail${query ? `?${query}` : ""}`);
+  }
+  auditorFindings(): Promise<AuditorFindings> {
+    return this.http.get("/api/auditor/findings");
+  }
+  evidencePackUrl(): string {
+    return "/api/proxy/api/auditor/evidence-pack?format=csv";
+  }
+  complianceRegister(): Promise<RiskRegister> {
+    return this.http.get("/api/compliance/register");
+  }
+  complianceFindings(): Promise<ConformanceFindings> {
+    return this.http.get("/api/compliance/findings");
+  }
+  riskHeatmap(): Promise<RiskHeatmap> {
+    return this.http.get("/api/risk/heatmap");
+  }
+  securityRegister(): Promise<RiskRegister> {
+    return this.http.get("/api/security/register");
+  }
+  regulatorExtract(): Promise<RegulatorExtract> {
+    return this.http.get("/api/regulator/extract");
   }
   /** The CSV download URL for a saved report (same-origin proxy). */
   reportCsvUrl(pid: string): string {

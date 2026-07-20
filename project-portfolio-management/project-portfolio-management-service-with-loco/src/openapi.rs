@@ -53,6 +53,20 @@ fn insight_paths() -> Value {
         "/api/technology/debt": get("technology", "Technical-debt register: risks categorised tech_debt, exposure-sorted, with status counts"),
         "/api/technology/flow": get("technology", "Delivery-flow metrics: milestone throughput per month + median lead days (?months=, cap 24)"),
         "/api/scenarios/compare": get("executive", "Side-by-side scenario comparison (?a=&b=): live evaluations + per-currency planned deltas, exposure/alignment deltas"),
+        "/api/board/pack": get("oversight", "Board pack (?from=&to=): window decisions, benefits realized, milestones completed, tranches released + as-of-now health"),
+        "/api/board/investments": get("oversight", "Money-moving decisions: scenario commits, tranche releases, approved proposals (newest first, cap 100)"),
+        "/api/board/trends": get("oversight", "Stored estate-snapshot series (oldest first; no interpolated history)"),
+        "/api/auditor/trail": get("oversight", "Audit explorer (?actor=&action=&entity=&from=&to=&limit=): filtered rows + integrity stats"),
+        "/api/auditor/findings": get("oversight", "Segregation-of-duties + hygiene findings over recorded audit actors"),
+        "/api/auditor/evidence-pack": get("oversight", "Period evidence bundle (?from=&to=&format=json|csv): audit rows + decisions"),
+        "/api/compliance/register": get("oversight", "Compliance risk register (category=compliance, exposure-sorted)"),
+        "/api/compliance/findings": get("oversight", "Conformance findings (?review_days=): overdue-unreviewed items, ownerless escalations, overdue reviews, approver-less approvals"),
+        "/api/risk/heatmap": get("oversight", "CRO heatmap: probability x impact cells, top risks, posture, concentration, hygiene, declared appetite + breaches"),
+        "/api/security/register": get("oversight", "Security risk register + the no-security-risk-at-late-stage heuristic"),
+        "/api/regulator/extract": get("oversight", "Deliberately coarse per-portfolio aggregates; ABAC mask obligation withholds names"),
+        "/api/board/snapshots": { "post": { "tags": ["oversight"],
+            "summary": "Capture one estate snapshot now (portfolio counts, open exposure, per-currency money)",
+            "responses": { "200": { "description": "The stored snapshot row" } } } },
     })
 }
 

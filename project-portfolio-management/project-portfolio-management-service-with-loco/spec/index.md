@@ -685,6 +685,35 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   deltas) green — full `--ignored` suite 25/25 vs Postgres 18; clippy
   pedantic clean; FE svelte-check 0, vitest 45, Playwright 12.
 
+- [x] **2026-07-19/20 — Oversight areas (board / auditor / compliance /
+  CRO / CISO / regulator).** Thirteen endpoints in
+  `controllers/oversight.rs`, one new table
+  (`m20260719_000003_insight_snapshots`): `GET /api/board/pack`
+  (period-scoped decisions / realizations / completions / releases +
+  as-of-now health), `GET /api/board/investments`, `POST
+  /api/board/snapshots` + `GET /api/board/trends` (stored estate
+  snapshots only — no interpolated history; optional env-gated ticker
+  `PROJECT_PORTFOLIO_MANAGEMENT_SNAPSHOT_HOURS`, default off), `GET
+  /api/auditor/trail` (filterable explorer + integrity stats), `GET
+  /api/auditor/findings` (segregation-of-duties over recorded audit
+  actors only — never cross-identifier-space), `GET
+  /api/auditor/evidence-pack` (JSON/CSV, capped 2000), `GET
+  /api/compliance/{register,findings}` (category register +
+  rule-disclosed conformance checks), `GET /api/risk/heatmap`
+  (probability×impact cells, posture, 25%-disclosed concentration,
+  hygiene, declared appetite via
+  `PROJECT_PORTFOLIO_MANAGEMENT_RISK_APPETITE` or an honest absence),
+  `GET /api/security/register` (+ the disclosed
+  no-security-risk-at-late-stage heuristic), `GET
+  /api/regulator/extract` (deliberately coarse; honours the ABAC
+  `mask` obligation by withholding names). Persona gating = ABAC
+  policy configuration (`dept=board|audit|…`), not new code.
+  **Acceptance:** heatmap/appetite unit pins; the seeded oversight
+  request round-trip green — full `--ignored` suite 26/26 vs Postgres
+  18; clippy pedantic clean; FE `/board` `/auditor` `/compliance`
+  `/risk` `/security` `/regulator` pages with svelte-check 0, vitest
+  45, Playwright 18.
+
 ## 14. Implementation status
 
 **Implemented (MVP v0.1.0 + PPM Phases A/B/C; see §13 for the

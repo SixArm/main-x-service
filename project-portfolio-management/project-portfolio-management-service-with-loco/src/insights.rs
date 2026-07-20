@@ -143,6 +143,39 @@ pub fn fan_out(edges: &[(Uuid, Uuid)]) -> Vec<(Uuid, usize)> {
     out
 }
 
+/// Heatmap cell counts over `(probability, impact)` pairs, keyed
+/// `"p{P}i{I}"` (both clamped to 1–5 for display stability).
+#[must_use]
+pub fn heatmap_cells(pairs: &[(i32, i32)]) -> BTreeMap<String, usize> {
+    let mut cells = BTreeMap::new();
+    for (probability, impact) in pairs {
+        let key = format!("p{}i{}", probability.clamp(&1, &5), impact.clamp(&1, &5));
+        *cells.entry(key).or_default() += 1;
+    }
+    cells
+}
+
+/// A deployment's declared risk appetite (absent ⇒ no thresholds).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RiskAppetite {
+    /// Maximum tolerated estate-wide open exposure.
+    pub max_open_exposure: Option<i32>,
+    /// Maximum tolerated single-risk exposure.
+    pub max_item_exposure: Option<i32>,
+}
+
+/// Parse the `PROJECT_PORTFOLIO_MANAGEMENT_RISK_APPETITE` JSON. Absent
+/// / blank / unparsable ⇒ `None` (no appetite configured; views say so
+/// rather than inventing thresholds).
+#[must_use]
+pub fn parse_appetite(raw: Option<&str>) -> Option<RiskAppetite> {
+    let raw = raw?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    serde_json::from_str(raw).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,4 +243,21 @@ mod tests {
         assert_eq!(out[0], (a, 2));
         assert_eq!(out[1], (b, 1));
     }
+    #[test]
+    fn heatmap_clamps_and_counts() {
+        let cells = heatmap_cells(&[(1, 1), (1, 1), (9, 0)]);
+        assert_eq!(cells["p1i1"], 2);
+        assert_eq!(cells["p5i1"], 1, "out-of-range clamps for display");
+    }
+
+    #[test]
+    fn appetite_parses_or_declines() {
+        assert_eq!(parse_appetite(None), None);
+        assert_eq!(parse_appetite(Some("  ")), None);
+        assert_eq!(parse_appetite(Some("not json")), None);
+        let a = parse_appetite(Some(r#"{"max_open_exposure": 60}"#)).unwrap();
+        assert_eq!(a.max_open_exposure, Some(60));
+        assert_eq!(a.max_item_exposure, None);
+    }
+
 }

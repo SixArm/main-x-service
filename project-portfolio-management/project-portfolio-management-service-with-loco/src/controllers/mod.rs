@@ -3,6 +3,7 @@
 pub mod docs;
 pub mod governance;
 pub mod insights;
+pub mod oversight;
 pub mod strategy;
 pub mod visibility;
 pub mod metrics;

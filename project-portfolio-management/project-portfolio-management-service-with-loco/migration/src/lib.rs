@@ -18,6 +18,7 @@ mod m20220101_000005_governance;
 mod m20220101_000006_visibility;
 mod m20220101_000007_strategy;
 mod m20260719_000002_insight_columns;
+mod m20260719_000003_insight_snapshots;
 
 /// The crate's migrator: drives the ordered migration set for the loco
 /// CLI / boot-time migration.
@@ -38,6 +39,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000006_visibility::Migration),
             Box::new(m20220101_000007_strategy::Migration),
             Box::new(m20260719_000002_insight_columns::Migration),
+            Box::new(m20260719_000003_insight_snapshots::Migration),
             // inject-above (do not remove this comment)
         ]
     }

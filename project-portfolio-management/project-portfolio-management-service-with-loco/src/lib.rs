@@ -42,6 +42,8 @@ pub mod models;
 pub mod openapi;
 /// Durable event bus Phase 3: the outbox relay loop + retention purge.
 pub mod relay;
+/// Point-in-time estate snapshots (board / CRO trends).
+pub mod snapshots;
 pub mod streaming;
 pub mod tasks;
 pub mod validation;
