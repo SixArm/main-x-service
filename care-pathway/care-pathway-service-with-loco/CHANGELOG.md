@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — instance outcomes (2026-07-20)
+
+- Recorded closure `outcome` on instances + an `instance_measures`
+  table (clinical / PROM measures over time); a record-measure
+  endpoint; and `GET /api/care-pathways/{pid}/outcomes` — the
+  closed-instance outcome distribution + per-measure latest-value
+  averages, derived only from what was recorded (migration
+  `m20260720_000006_outcomes`).
+
 ### Added — instance layer (2026-07-20)
 
 - An operational layer over the pathway registry: patients enrolled on

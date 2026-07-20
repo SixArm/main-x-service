@@ -12,6 +12,10 @@ pub const URGENCY_LEVELS: &[&str] = &["routine", "urgent", "emergency"];
 pub const TEAM_ROLES: &[&str] =
     &["lead_clinician", "gp", "specialist", "nurse", "mental_health", "coordinator", "other"];
 
+/// Recorded closure outcomes (declared at close, never inferred).
+pub const OUTCOMES: &[&str] =
+    &["improved", "stable", "deteriorated", "deceased", "transferred", "not_achieved", "other"];
+
 /// Instance event kinds (recorded, not inferred).
 pub const EVENT_KINDS: &[&str] = &["note", "review", "escalation", "de_escalation", "referral"];
 

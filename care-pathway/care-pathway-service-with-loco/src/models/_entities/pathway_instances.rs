@@ -22,6 +22,7 @@ pub struct Model {
     pub next_review_on: Option<Date>,
     pub closed_on: Option<Date>,
     pub closure_reason: Option<String>,
+    pub outcome: Option<String>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 

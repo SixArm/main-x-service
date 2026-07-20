@@ -120,6 +120,31 @@ async fn instance_layer_round_trip() {
             .find(|m| m["member_ref"] == json!(worker)).expect("gp row").clone();
         assert_eq!(member["open_instances"], 1);
 
+        // ── Measures: numeric HbA1c reading, then a second lower.
+        assert_eq!(
+            request
+                .post(&format!("/api/instances/{i_pid}/measures"))
+                .json(&json!({ "name": "HbA1c" }))
+                .await
+                .status_code(),
+            422,
+            "a value is required"
+        );
+        request
+            .post(&format!("/api/instances/{i_pid}/measures"))
+            .json(&json!({ "name": "HbA1c", "value_numeric": 64.0, "unit": "mmol/mol",
+                            "recorded_on": "2026-06-01" }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{i_pid}/measures"))
+            .json(&json!({ "name": "HbA1c", "value_numeric": 52.0, "unit": "mmol/mol",
+                            "recorded_on": "2026-07-01" }))
+            .await
+            .assert_status_ok();
+        let detail: Value = request.get(&format!("/api/instances/{i_pid}")).await.json();
+        assert_eq!(detail["measures"].as_array().unwrap().len(), 2);
+
         // ── Lifecycle: hold → active → complete; then no review.
         request
             .post(&format!("/api/instances/{i_pid}/status"))
@@ -135,12 +160,23 @@ async fn instance_layer_round_trip() {
             422,
             "no self-loop"
         );
+        // A bogus outcome is refused; a valid one is recorded at close.
+        assert_eq!(
+            request
+                .post(&format!("/api/instances/{i_pid}/status"))
+                .json(&json!({ "to": "completed", "outcome": "vibes" }))
+                .await
+                .status_code(),
+            422,
+            "unknown outcome refused"
+        );
         let closed: Value = request
             .post(&format!("/api/instances/{i_pid}/status"))
-            .json(&json!({ "to": "completed", "reason": "target met" }))
+            .json(&json!({ "to": "completed", "reason": "target met", "outcome": "improved" }))
             .await
             .json();
         assert!(closed["closed_on"].is_string());
+        assert_eq!(closed["outcome"], "improved");
         assert_eq!(
             request
                 .post(&format!("/api/instances/{i_pid}/status"))
@@ -162,6 +198,19 @@ async fn instance_layer_round_trip() {
         // Caseload now empty.
         let caseload: Value = request.get("/api/instances/caseload").await.json();
         assert_eq!(caseload["open"], 0);
+
+        // ── Outcomes: one closed instance, outcome improved; the
+        // latest HbA1c (52) is the measure average.
+        let outcomes: Value = request
+            .get(&format!("/api/care-pathways/{pathway}/outcomes"))
+            .await
+            .json();
+        assert_eq!(outcomes["closed_instances"], 1);
+        assert_eq!(outcomes["outcome_distribution"]["improved"], 1);
+        let hba1c = outcomes["measure_summary"].as_array().unwrap().iter()
+            .find(|m| m["name"] == "HbA1c").expect("HbA1c summary").clone();
+        assert_eq!(hba1c["instances_with_measure"], 1);
+        assert!((hba1c["latest_value_average"].as_f64().unwrap() - 52.0).abs() < 1e-9);
     })
     .await;
 }

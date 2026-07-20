@@ -424,6 +424,18 @@ access controls added later.
   lifecycle pure pins; the seeded instance round-trip green first run —
   full `--ignored` suite 24/24 vs Postgres 18; clippy pedantic clean.
 
+- [x] **2026-07-20 — Instance outcomes.** Migration
+  `m20260720_000006_outcomes` (`pathway_instances.outcome` recorded at
+  close; `instance_measures` for recorded clinical / PROM measures).
+  Closing an instance now accepts a validated `outcome`
+  (`rules::OUTCOMES`); `POST /api/instances/{pid}/measures` records a
+  numeric or text measure; `GET /api/care-pathways/{pid}/outcomes`
+  serves the closed-instance outcome distribution (declared outcomes
+  only, unrecorded counted separately) + per-measure latest-value
+  averages. The honest, record-only basis for outcome analytics.
+  **Acceptance:** the extended instance round-trip green — full
+  `--ignored` suite green vs Postgres 18; clippy pedantic clean.
+
 ## 14. Implementation status
 
 Done: loco boot; care_pathways table + migration; CRUD with `422`

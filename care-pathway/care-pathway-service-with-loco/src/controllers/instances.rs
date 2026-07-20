@@ -14,7 +14,7 @@ use uuid::Uuid;
 use crate::auth::MaybeAuthUser;
 use crate::instances as rules;
 use crate::models::_entities::{
-    instance_events, instance_steps, instance_team, pathway_instances,
+    instance_events, instance_measures, instance_steps, instance_team, pathway_instances,
 };
 use crate::models::audit_logs::Model as Audit;
 use crate::models::care_pathways::Model as PathwayModel;
@@ -173,8 +173,14 @@ async fn get_instance(State(ctx): State<AppContext>, Path(raw): Path<String>) ->
         .order_by_desc(instance_events::Column::OccurredAt)
         .all(&ctx.db)
         .await?;
+    let measures = instance_measures::Entity::find()
+        .filter(instance_measures::Column::InstancePid.eq(instance.pid))
+        .order_by_desc(instance_measures::Column::RecordedOn)
+        .all(&ctx.db)
+        .await?;
     format::json(serde_json::json!({
-        "instance": instance, "steps": steps, "team": team, "events": events,
+        "instance": instance, "steps": steps, "team": team,
+        "events": events, "measures": measures,
     }))
 }
 
@@ -184,6 +190,10 @@ struct StatusPayload {
     to: String,
     #[serde(default)]
     reason: Option<String>,
+    /// Recorded outcome (declared at close; validated against
+    /// [`rules::OUTCOMES`]).
+    #[serde(default)]
+    outcome: Option<String>,
 }
 
 /// `POST /api/instances/{pid}/status` — the enrolment lifecycle move
@@ -195,8 +205,16 @@ async fn set_status(
     Path(raw): Path<String>,
     Json(payload): Json<StatusPayload>,
 ) -> Result<Response> {
+    if let Some(outcome) = payload.outcome.as_deref()
+        && !rules::OUTCOMES.contains(&outcome)
+    {
+        return Err(refuse(&format!("outcome must be one of {:?}", rules::OUTCOMES)));
+    }
     let instance = find_instance(&ctx, &raw).await?;
     rules::instance_transition(&instance.status, &payload.to).map_err(|r| refuse(&r))?;
+    if payload.outcome.is_some() && !rules::is_terminal(&payload.to) {
+        return Err(refuse("an outcome is only recorded when closing the instance"));
+    }
     let from = instance.status.clone();
     let instance_pid = instance.pid;
     let today = chrono::Utc::now().date_naive();
@@ -205,6 +223,7 @@ async fn set_status(
     if rules::is_terminal(&payload.to) {
         active.closed_on = ActiveValue::set(Some(today));
         active.closure_reason = ActiveValue::set(payload.reason.clone());
+        active.outcome = ActiveValue::set(payload.outcome.clone());
         active.next_review_on = ActiveValue::set(None);
     }
     let updated = active.update(&ctx.db).await?;
@@ -607,6 +626,134 @@ async fn care_team_load(State(ctx): State<AppContext>) -> Result<Response> {
     }))
 }
 
+/// `POST /api/instances/{pid}/measures` body.
+#[derive(Debug, serde::Deserialize)]
+struct MeasurePayload {
+    name: String,
+    #[serde(default)]
+    value_numeric: Option<f64>,
+    #[serde(default)]
+    value_text: Option<String>,
+    #[serde(default)]
+    unit: Option<String>,
+    #[serde(default)]
+    recorded_on: Option<chrono::NaiveDate>,
+}
+
+/// `POST /api/instances/{pid}/measures` — record a clinical / PROM
+/// measure (a numeric or text value; at least one required).
+#[debug_handler]
+async fn record_measure(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(raw): Path<String>,
+    Json(payload): Json<MeasurePayload>,
+) -> Result<Response> {
+    if payload.name.trim().is_empty() {
+        return Err(refuse("name is required"));
+    }
+    if payload.value_numeric.is_none() && payload.value_text.as_deref().is_none_or(str::is_empty) {
+        return Err(refuse("a value_numeric or value_text is required"));
+    }
+    let instance = find_instance(&ctx, &raw).await?;
+    let row = instance_measures::ActiveModel {
+        pid: ActiveValue::set(Uuid::new_v4()),
+        instance_pid: ActiveValue::set(instance.pid),
+        name: ActiveValue::set(payload.name.clone()),
+        value_numeric: ActiveValue::set(payload.value_numeric),
+        value_text: ActiveValue::set(payload.value_text.clone()),
+        unit: ActiveValue::set(payload.unit.clone()),
+        recorded_on: ActiveValue::set(
+            payload.recorded_on.unwrap_or_else(|| chrono::Utc::now().date_naive()),
+        ),
+        ..Default::default()
+    }
+    .insert(&ctx.db)
+    .await?;
+    Audit::record(&ctx.db, instance.pid, "instance_measure_recorded", caller.actor(), None)
+        .await
+        .map_err(Error::Model)?;
+    format::json(row)
+}
+
+/// `GET /api/care-pathways/{pathway}/outcomes` — outcome analytics for
+/// the pathway's **closed** instances: the recorded-outcome
+/// distribution (declared only; unrecorded counted separately) and,
+/// per recorded measure name, the count + latest-value-per-instance
+/// average (numeric measures only). Derived from what was recorded.
+#[debug_handler]
+async fn outcomes(State(ctx): State<AppContext>, Path(pathway): Path<String>) -> Result<Response> {
+    let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
+        .await
+        .map_err(|_| Error::NotFound)?;
+    let instances = pathway_instances::Entity::find()
+        .filter(pathway_instances::Column::PathwayPid.eq(template.pid))
+        .filter(pathway_instances::Column::DeletedAt.is_null())
+        .all(&ctx.db)
+        .await?;
+    let mut outcome_dist: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
+    let mut closed = 0usize;
+    for instance in &instances {
+        if rules::is_terminal(&instance.status) {
+            closed += 1;
+            let key = instance.outcome.clone().unwrap_or_else(|| "not_recorded".to_string());
+            *outcome_dist.entry(key).or_default() += 1;
+        }
+    }
+    // Per-measure: count + average of each instance's latest numeric value.
+    let instance_pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
+    let mut measure_summary: Vec<serde_json::Value> = Vec::new();
+    if !instance_pids.is_empty() {
+        let measures = instance_measures::Entity::find()
+            .filter(instance_measures::Column::InstancePid.is_in(instance_pids))
+            .all(&ctx.db)
+            .await?;
+        // (name) → per-instance latest (recorded_on, value)
+        let mut latest: std::collections::BTreeMap<
+            (String, Uuid),
+            (chrono::NaiveDate, Option<f64>),
+        > = std::collections::BTreeMap::new();
+        let mut names: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        for measure in &measures {
+            names.insert(measure.name.clone());
+            let key = (measure.name.clone(), measure.instance_pid);
+            let entry = latest.entry(key).or_insert((measure.recorded_on, measure.value_numeric));
+            if measure.recorded_on >= entry.0 {
+                *entry = (measure.recorded_on, measure.value_numeric);
+            }
+        }
+        for name in &names {
+            let values: Vec<f64> = latest
+                .iter()
+                .filter(|((n, _), _)| n == name)
+                .filter_map(|(_, (_, v))| *v)
+                .collect();
+            #[allow(clippy::cast_precision_loss)] // display average
+            let average = if values.is_empty() {
+                serde_json::Value::Null
+            } else {
+                serde_json::json!(values.iter().sum::<f64>() / values.len() as f64)
+            };
+            measure_summary.push(serde_json::json!({
+                "name": name,
+                "instances_with_measure": latest.iter().filter(|((n, _), _)| n == name).count(),
+                "latest_value_average": average,
+            }));
+        }
+    }
+    format::json(serde_json::json!({
+        "as_of": chrono::Utc::now(),
+        "pathway": { "pid": template.pid, "name": template.name },
+        "note": "outcome distribution over closed instances (declared outcomes only; \
+                 unrecorded counted separately); measure averages use each instance's \
+                 latest numeric value",
+        "closed_instances": closed,
+        "outcome_distribution": outcome_dist,
+        "measure_summary": measure_summary,
+    }))
+}
+
 /// Instance-scoped routes (prefix `/api/instances`).
 pub fn routes() -> Routes {
     Routes::new()
@@ -620,6 +767,7 @@ pub fn routes() -> Routes {
         .add("/{pid}/urgency", post(set_urgency))
         .add("/{pid}/team", post(add_team_member))
         .add("/{pid}/events", post(add_event))
+        .add("/{pid}/measures", post(record_measure))
         .add("/{pid}/steps/{step}/complete", post(complete_step))
 }
 
@@ -631,4 +779,5 @@ pub fn pathway_routes() -> Routes {
         .add("/{pathway}/instances", post(enroll))
         .add("/{pathway}/instances", get(list_for_pathway))
         .add("/{pathway}/cohort", get(cohort))
+        .add("/{pathway}/outcomes", get(outcomes))
 }
