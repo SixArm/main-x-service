@@ -154,3 +154,68 @@ test("requisition board renders SVAR Kanban columns and cards", async ({ page })
   await expect(board).toContainText("Platform Engineer");
   await expect(board).toContainText("£30,000.00");
 });
+
+test("learning area renders skills matrix, analytics, and path progress", async ({ page }) => {
+  await page.route("**/api/proxy/learning/skills-matrix", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        note: "coverage over declared proficiencies only",
+        matrix: [{ department: "engineering", skill: "Rust", employees: 2,
+          average_proficiency: 3.5, below_target: 1 }],
+        gaps: [{ employee_pid: "e2", department: "engineering", skill: "Rust",
+          proficiency: 2, target: 4 }],
+      },
+    }),
+  );
+  await page.route("**/api/proxy/learning/training-analytics", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20", horizon: "2026-10-18",
+        note: "completion rate = completed / non-failed",
+        departments: [{ department: "engineering", by_status: { completed: 1 },
+          completion_rate: { numerator: 1, denominator: 1, value: 1 }, certs_expiring: 0 }],
+      },
+    }),
+  );
+  await page.route("**/api/proxy/learning-paths", (route) =>
+    route.fulfill({ json: [{ pid: "path1", name: "Backend basics", summary: null, steps: 2 }] }),
+  );
+  await page.route("**/api/proxy/learning-paths/path1/progress", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        path: { pid: "path1", name: "Backend basics" },
+        steps: [{ course_ref: "course:a", title: "Intro", position: 0 }],
+        derivation: "a step is complete iff a completed training enrolment matches",
+        members: [{ employee_pid: "e2", display_name: "Sam Mentee",
+          completed_steps: 1, total_steps: 2 }],
+      },
+    }),
+  );
+  await page.goto("/learning");
+  await expect(page.getByTestId("skills-matrix").getByText("Rust")).toBeVisible();
+  await expect(page.getByTestId("skills-gaps").getByText(/Rust in engineering/)).toBeVisible();
+  await expect(page.getByTestId("training-analytics").getByText("100% (1/1)")).toBeVisible();
+  await expect(page.getByTestId("path-progress").getByText("Sam Mentee")).toBeVisible();
+});
+
+test("mentorship area renders load, unmatched, and stale", async ({ page }) => {
+  await page.route("**/api/proxy/learning/mentorship-overview**", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20",
+        active_pairings: 1,
+        mentor_load: [{ mentor_pid: "e1", mentor: "Ada Mentor", active_mentees: 1 }],
+        unmatched_employees: [{ pid: "e3", display_name: "Solo Dev", department: "engineering" }],
+        stale_days: 30,
+        stale_mentorships: [{ pid: "m1", mentor: "Ada Mentor", mentee: "Sam Mentee",
+          last_session: "2026-05-01" }],
+      },
+    }),
+  );
+  await page.goto("/mentorship");
+  await expect(page.getByTestId("mentor-load").getByText("Ada Mentor")).toBeVisible();
+  await expect(page.getByTestId("unmatched").getByText("Solo Dev")).toBeVisible();
+  await expect(page.getByTestId("stale-mentorships").getByText("2026-05-01")).toBeVisible();
+});

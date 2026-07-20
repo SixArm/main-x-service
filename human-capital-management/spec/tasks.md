@@ -142,3 +142,24 @@ code + tests in one PR.
 - [ ] HCM-G2 Retention schedules + subject-access/erasure flows;
   jurisdiction-correct payroll tables; equality-law review of any
   scoring ([regulatory.md](regulatory.md)).
+
+- [x] HCM-T20 (2026-07-20) **Learning & development.** Migration
+  `m20260720_000008_learning` (skills catalog + declared
+  `employee_skills`, `learning_paths` + steps + `path_enrollments`,
+  `mentorships` + `mentorship_sessions`). `controllers/learning.rs`:
+  the skills framework (catalog; declared proficiency 1–5 + optional
+  target, upsert), learning paths (ordered course steps; idempotent
+  enrolment; honest per-member **progress** — a step counts only
+  against a *completed* `training_enrollments` row for its
+  `course_ref`), and mentorships (proposed→active→completed lifecycle
+  in `rules::learning`; sessions only on an active pairing).
+  Derived views: skills matrix + gaps by department,
+  training-analytics (completion ratio = completed / non-failed +
+  cert-expiry by department), mentorship overview (active pairs,
+  mentor load, unmatched active employees, stale actives). Front-end:
+  `/learning` (matrix + gaps + analytics + path progress) and
+  `/mentorship`. **Acceptance:** proficiency / lifecycle / progress
+  pure pins; the seeded L&D round-trip green first run — full
+  `--ignored` suite 8/8 vs Postgres 18; clippy pedantic clean;
+  svelte-check 0; vitest 5; Playwright 7.
+

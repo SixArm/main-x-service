@@ -42,6 +42,8 @@
   <a href="/requisitions">{t("nav.requisitions")}</a>
   <a href="/workforce">{t("nav.workforce")}</a>
   <a href="/development">{t("nav.development")}</a>
+  <a href="/learning">{t("nav.learning")}</a>
+  <a href="/mentorship">{t("nav.mentorship")}</a>
   <a href="/payroll">{t("nav.payroll")}</a>
   <a href="/benchmarks">{t("nav.benchmarks")}</a>
   <span class="spacer"></span>

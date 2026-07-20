@@ -18,6 +18,7 @@ mod m20220101_000004_development;
 mod m20220101_000005_payroll;
 mod m20220101_000006_audit_logs;
 mod m20220101_000007_event_outbox;
+mod m20260720_000008_learning;
 
 /// The crate's migrator: drives the ordered migration set for the loco
 /// CLI / boot-time migration.
@@ -37,6 +38,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000005_payroll::Migration),
             Box::new(m20220101_000006_audit_logs::Migration),
             Box::new(m20220101_000007_event_outbox::Migration),
+            Box::new(m20260720_000008_learning::Migration),
             // inject-above (do not remove this comment)
         ]
     }

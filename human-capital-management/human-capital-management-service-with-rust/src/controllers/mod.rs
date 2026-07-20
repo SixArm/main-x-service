@@ -10,6 +10,7 @@ pub mod audits;
 pub mod development;
 pub mod docs;
 pub mod hr_core;
+pub mod learning;
 pub mod metrics;
 pub mod payroll;
 pub mod workforce;

@@ -69,6 +69,12 @@ describe("api path map", () => {
     await hcm.listRuns();
     await hcm.runPayslips("r1");
     await hcm.benchmarkComparison("organization:abc");
+    await hcm.listSkills();
+    await hcm.skillsMatrix();
+    await hcm.trainingAnalytics();
+    await hcm.listPaths();
+    await hcm.pathProgress("path1");
+    await hcm.mentorshipOverview(30);
     expect(calls).toEqual([
       "/api/proxy/employees?department=engineering",
       "/api/proxy/employees/p1",
@@ -77,6 +83,12 @@ describe("api path map", () => {
       "/api/proxy/payroll-runs",
       "/api/proxy/payroll-runs/r1/payslips",
       "/api/proxy/benchmarks/comparison?organization=organization%3Aabc",
+      "/api/proxy/skills",
+      "/api/proxy/learning/skills-matrix",
+      "/api/proxy/learning/training-analytics",
+      "/api/proxy/learning-paths",
+      "/api/proxy/learning-paths/path1/progress",
+      "/api/proxy/learning/mentorship-overview?days=30",
     ]);
     vi.unstubAllGlobals();
   });

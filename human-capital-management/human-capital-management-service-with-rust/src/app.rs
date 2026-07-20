@@ -86,6 +86,7 @@ impl Hooks for App {
             .add_route(controllers::acquisition::routes())
             .add_route(controllers::workforce::routes())
             .add_route(controllers::development::routes())
+            .add_route(controllers::learning::routes())
             .add_route(controllers::payroll::routes())
             .add_route(controllers::audits::routes())
             .add_route(controllers::docs::routes())

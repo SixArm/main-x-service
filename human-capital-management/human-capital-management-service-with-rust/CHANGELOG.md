@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — learning & development (HCM-T20, 2026-07-20)
+
+- Skills framework (catalog + declared employee proficiency 1-5 with
+  optional target), learning paths (ordered course steps +
+  per-employee enrolment with honest progress from completed training
+  enrolments), and mentorships (proposed->active->completed lifecycle
+  + session log). Derived views: the per-department skills matrix +
+  gaps, training analytics (completion ratio + cert expiry), and the
+  mentorship overview (load, unmatched, stale). Migration
+  `m20260720_000008_learning`.
+
 ### Added
 
 - 2026-07-18 — HCM-T1–T17 implementation round: full Loco service

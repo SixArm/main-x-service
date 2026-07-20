@@ -5,6 +5,7 @@
 //! re-implement them.
 
 pub mod benchmark;
+pub mod learning;
 pub mod leave;
 pub mod lifecycle;
 pub mod org;

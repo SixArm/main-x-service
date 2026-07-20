@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — learning + mentorship areas (HCM-T20, 2026-07-20)
+
+- `/learning` (skills matrix + gap list, per-department training
+  analytics, learning-path progress with a path selector) and
+  `/mentorship` (mentor load, unmatched employees, stale mentorships).
+  Six client functions with path pins; nav + keys in 13 locales; two
+  stubbed Playwright specs.
+
 ### Added
 
 - 2026-07-19 — SVAR strong fit: the **/requisitions** board upgrades from custom CSS columns to

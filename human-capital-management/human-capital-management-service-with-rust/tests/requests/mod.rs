@@ -3,6 +3,7 @@
 //! the payroll derivation in [`payroll`].
 
 mod hr;
+mod learning;
 mod payroll;
 mod workforce;
 

@@ -41,6 +41,8 @@ export const LOCALE_KEY = "mxi.hcm.locale";
 // Every translatable UI string, keyed by a stable dotted key.
 const STRINGS = {
   en: {
+    "nav.learning": "Learning",
+    "nav.mentorship": "Mentorship",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "Dashboard",
     "nav.employees": "Employees",
@@ -91,6 +93,8 @@ const STRINGS = {
     "bench.flag": "Flag",
   },
   cy: {
+    "nav.learning": "Dysgu",
+    "nav.mentorship": "Mentora",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "Dangosfwrdd",
     "nav.employees": "Gweithwyr",
@@ -141,6 +145,8 @@ const STRINGS = {
     "bench.flag": "Fflag",
   },
   es: {
+    "nav.learning": "Aprendizaje",
+    "nav.mentorship": "Mentoría",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "Panel",
     "nav.employees": "Empleados",
@@ -191,6 +197,8 @@ const STRINGS = {
     "bench.flag": "Indicador",
   },
   fr: {
+    "nav.learning": "Apprentissage",
+    "nav.mentorship": "Mentorat",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "Tableau de bord",
     "nav.employees": "Employés",
@@ -241,6 +249,8 @@ const STRINGS = {
     "bench.flag": "Indicateur",
   },
   de: {
+    "nav.learning": "Lernen",
+    "nav.mentorship": "Mentoring",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "Übersicht",
     "nav.employees": "Mitarbeiter",
@@ -291,6 +301,8 @@ const STRINGS = {
     "bench.flag": "Kennzeichen",
   },
   ar: {
+    "nav.learning": "التعلّم",
+    "nav.mentorship": "الإرشاد",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "لوحة التحكم",
     "nav.employees": "الموظفون",
@@ -341,6 +353,8 @@ const STRINGS = {
     "bench.flag": "علامة",
   },
   ru: {
+    "nav.learning": "Обучение",
+    "nav.mentorship": "Наставничество",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "Панель",
     "nav.employees": "Сотрудники",
@@ -391,6 +405,8 @@ const STRINGS = {
     "bench.flag": "Флаг",
   },
   hi: {
+    "nav.learning": "सीखना",
+    "nav.mentorship": "परामर्श",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "डैशबोर्ड",
     "nav.employees": "कर्मचारी",
@@ -441,6 +457,8 @@ const STRINGS = {
     "bench.flag": "फ्लैग",
   },
   zh: {
+    "nav.learning": "学习",
+    "nav.mentorship": "导师制",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "仪表盘",
     "nav.employees": "员工",
@@ -491,6 +509,8 @@ const STRINGS = {
     "bench.flag": "标记",
   },
   bn: {
+    "nav.learning": "শেখা",
+    "nav.mentorship": "পরামর্শদান",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "ড্যাশবোর্ড",
     "nav.employees": "কর্মচারী",
@@ -541,6 +561,8 @@ const STRINGS = {
     "bench.flag": "ফ্ল্যাগ",
   },
   pt: {
+    "nav.learning": "Aprendizagem",
+    "nav.mentorship": "Mentoria",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "Painel",
     "nav.employees": "Funcionários",
@@ -591,6 +613,8 @@ const STRINGS = {
     "bench.flag": "Indicador",
   },
   id: {
+    "nav.learning": "Pembelajaran",
+    "nav.mentorship": "Bimbingan",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "Dasbor",
     "nav.employees": "Karyawan",
@@ -641,6 +665,8 @@ const STRINGS = {
     "bench.flag": "Penanda",
   },
   ur: {
+    "nav.learning": "سیکھنا",
+    "nav.mentorship": "رہنمائی",
     "brand.name": "Main X · HCM",
     "nav.dashboard": "ڈیش بورڈ",
     "nav.employees": "ملازمین",

@@ -202,3 +202,102 @@ export function benchmarkComparison(
 ): Promise<{ organization: string; rows: ComparisonRow[] }> {
   return api(`/benchmarks/comparison?organization=${encodeURIComponent(organization)}`, init);
 }
+
+// ─── Learning & development ─────────────────────────────────────────
+
+/** The skills catalog. */
+export function listSkills(init?: FetchLike): Promise<
+  Array<{ pid: string; name: string; category: string }>
+> {
+  return api("/skills", init);
+}
+
+/** Declare (upsert) an employee's proficiency in a skill (1-5). */
+export function declareSkill(
+  employeePid: string,
+  body: { skill_pid: string; proficiency: number; target?: number },
+): Promise<unknown> {
+  return api(`/employees/${employeePid}/skills`, { method: "PUT", body });
+}
+
+/** The per-department skills matrix + gaps. */
+export function skillsMatrix(init?: FetchLike): Promise<{
+  as_of: string;
+  note: string;
+  matrix: Array<{
+    department: string;
+    skill: string | null;
+    employees: number;
+    average_proficiency: number;
+    below_target: number;
+  }>;
+  gaps: Array<{
+    employee_pid: string;
+    department: string;
+    skill: string | null;
+    proficiency: number;
+    target: number | null;
+  }>;
+}> {
+  return api("/learning/skills-matrix", init);
+}
+
+/** Per-department training analytics. */
+export function trainingAnalytics(init?: FetchLike): Promise<{
+  as_of: string;
+  horizon: string;
+  note: string;
+  departments: Array<{
+    department: string;
+    by_status: Record<string, number>;
+    completion_rate: { numerator: number; denominator: number; value: number | null };
+    certs_expiring: number;
+  }>;
+}> {
+  return api("/learning/training-analytics", init);
+}
+
+/** Learning paths with step counts. */
+export function listPaths(init?: FetchLike): Promise<
+  Array<{ pid: string; name: string; summary: string | null; steps: number }>
+> {
+  return api("/learning-paths", init);
+}
+
+/** One path's per-member honest progress. */
+export function pathProgress(pathPid: string, init?: FetchLike): Promise<{
+  as_of: string;
+  path: { pid: string; name: string };
+  steps: Array<{ course_ref: string; title: string; position: number }>;
+  derivation: string;
+  members: Array<{
+    employee_pid: string;
+    display_name: string | null;
+    completed_steps: number;
+    total_steps: number;
+  }>;
+}> {
+  return api(`/learning-paths/${pathPid}/progress`, init);
+}
+
+/** The mentorship overview (active pairs, load, unmatched, stale). */
+export function mentorshipOverview(days?: number, init?: FetchLike): Promise<{
+  as_of: string;
+  active_pairings: number;
+  mentor_load: Array<{ mentor_pid: string; mentor: string | null; active_mentees: number }>;
+  unmatched_employees: Array<{ pid: string; display_name: string; department: string }>;
+  stale_days: number;
+  stale_mentorships: Array<{
+    pid: string;
+    mentor: string | null;
+    mentee: string | null;
+    last_session: string | null;
+  }>;
+}> {
+  return api(`/learning/mentorship-overview${days ? `?days=${days}` : ""}`, init);
+}
+
+/** Change a mentorship's lifecycle status. */
+export function mentorshipStatus(pid: string, to: string): Promise<unknown> {
+  return api(`/mentorships/${pid}/status`, { method: "POST", body: { to } });
+}
