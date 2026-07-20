@@ -5,10 +5,18 @@ import { ApiClient } from "./client";
 import type {
   AuditEntry,
   CarePathway,
+  CoverageInsight,
+  DirectoryInsight,
+  InstanceDetail,
+  InstanceStatus,
+  LanguagesInsight,
   MergeResult,
   PathwayEvent,
+  PathwayInstance,
   PathwayRef,
+  ProvidersInsight,
   ScoredRef,
+  VariantsInsight,
 } from "./types";
 
 /**
@@ -166,5 +174,92 @@ export class CarePathwayRepository {
   /// sorts newest-first.
   recentEvents(): Promise<PathwayEvent[]> {
     return this.http.get<PathwayEvent[]>("/api/care-pathways/events/recent");
+  }
+
+  // -- Registry insight lenses (read-only) --------------------------------
+
+  /** `GET /api/care-pathways/insights/directory`. */
+  insightsDirectory(): Promise<DirectoryInsight> {
+    return this.http.get<DirectoryInsight>(
+      "/api/care-pathways/insights/directory",
+    );
+  }
+
+  /** `GET /api/care-pathways/insights/coverage`. */
+  insightsCoverage(): Promise<CoverageInsight> {
+    return this.http.get<CoverageInsight>(
+      "/api/care-pathways/insights/coverage",
+    );
+  }
+
+  /** `GET /api/care-pathways/insights/variants`. */
+  insightsVariants(): Promise<VariantsInsight> {
+    return this.http.get<VariantsInsight>(
+      "/api/care-pathways/insights/variants",
+    );
+  }
+
+  /** `GET /api/care-pathways/insights/providers`. */
+  insightsProviders(): Promise<ProvidersInsight> {
+    return this.http.get<ProvidersInsight>(
+      "/api/care-pathways/insights/providers",
+    );
+  }
+
+  /** `GET /api/care-pathways/insights/languages`. */
+  insightsLanguages(): Promise<LanguagesInsight> {
+    return this.http.get<LanguagesInsight>(
+      "/api/care-pathways/insights/languages",
+    );
+  }
+
+  // -- Pathway instances --------------------------------------------------
+
+  /**
+   * `GET /api/care-pathways/{pathway}/instances` — the enrolments on one
+   * pathway template.
+   * @param pathwayPid - Template pid; URL-encoded into the path.
+   */
+  listInstances(pathwayPid: string): Promise<PathwayInstance[]> {
+    return this.http.get<PathwayInstance[]>(
+      `/api/care-pathways/${encodeURIComponent(pathwayPid)}/instances`,
+    );
+  }
+
+  /**
+   * `GET /api/instances/{pid}` — one instance plus its steps / team /
+   * events / measures.
+   * @param pid - Instance pid; URL-encoded into the path.
+   */
+  getInstance(pid: string): Promise<InstanceDetail> {
+    return this.http.get<InstanceDetail>(
+      `/api/instances/${encodeURIComponent(pid)}`,
+    );
+  }
+
+  /**
+   * `POST /api/instances/{pid}/status` — move an instance to a new
+   * lifecycle status. The service's status machine refuses illegal
+   * transitions with `422`.
+   * @param pid - Instance pid; URL-encoded into the path.
+   * @param to - The target {@link InstanceStatus}.
+   * @returns The updated instance.
+   */
+  setInstanceStatus(
+    pid: string,
+    to: InstanceStatus,
+  ): Promise<PathwayInstance> {
+    return this.http.post<PathwayInstance>(
+      `/api/instances/${encodeURIComponent(pid)}/status`,
+      { body: { to } },
+    );
+  }
+
+  /**
+   * `GET /api/instances/caseload` — the derived operational caseload view
+   * across all pathways (counts by status / urgency + due reviews).
+   */
+  caseload(): Promise<unknown> {
+    return this.http.get<unknown>("/api/instances/caseload");
   }
 }

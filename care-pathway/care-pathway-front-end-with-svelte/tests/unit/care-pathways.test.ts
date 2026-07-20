@@ -176,4 +176,80 @@ describe("CarePathwayRepository", () => {
       "http://svc.test/api/care-pathways/events/recent",
     );
   });
+
+  // -- Registry insight lenses --------------------------------------------
+
+  it("insightsDirectory() GETs the directory lens", async () => {
+    const { repo, calls } = spyClient();
+    await repo.insightsDirectory();
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/care-pathways/insights/directory",
+    );
+  });
+
+  it("insightsCoverage() GETs the coverage lens", async () => {
+    const { repo, calls } = spyClient();
+    await repo.insightsCoverage();
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/care-pathways/insights/coverage",
+    );
+  });
+
+  it("insightsVariants() GETs the variants lens", async () => {
+    const { repo, calls } = spyClient();
+    await repo.insightsVariants();
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/care-pathways/insights/variants",
+    );
+  });
+
+  it("insightsProviders() GETs the providers lens", async () => {
+    const { repo, calls } = spyClient();
+    await repo.insightsProviders();
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/care-pathways/insights/providers",
+    );
+  });
+
+  it("insightsLanguages() GETs the languages lens", async () => {
+    const { repo, calls } = spyClient();
+    await repo.insightsLanguages();
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/care-pathways/insights/languages",
+    );
+  });
+
+  // -- Pathway instances --------------------------------------------------
+
+  it("listInstances() GETs the pathway's instances (pid encoded)", async () => {
+    const { repo, calls } = spyClient();
+    await repo.listInstances("p1");
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/care-pathways/p1/instances",
+    );
+  });
+
+  it("getInstance() GETs a single instance by pid", async () => {
+    const { repo, calls } = spyClient();
+    await repo.getInstance("i1");
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/instances/i1");
+  });
+
+  it("setInstanceStatus() POSTs the target status to /status", async () => {
+    const { repo, calls } = spyClient();
+    await repo.setInstanceStatus("i1", "completed");
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.url).toBe("http://svc.test/api/instances/i1/status");
+    expect(calls[0]?.init.body).toBe(JSON.stringify({ to: "completed" }));
+  });
+
+  it("caseload() GETs the derived caseload view", async () => {
+    const { repo, calls } = spyClient();
+    await repo.caseload();
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/instances/caseload");
+  });
 });

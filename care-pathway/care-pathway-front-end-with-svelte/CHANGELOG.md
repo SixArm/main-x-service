@@ -10,6 +10,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- 2026-07-20 — Reshaped to the four-SVAR-component brief plus the
+  instance layer: `/` registry SVAR DataGrid + FilterBar, `/board`
+  instance SVAR Kanban (drag → `POST /api/instances/{pid}/status`),
+  `/gantt` instance-timeline SVAR Gantt, `/insights` the five registry
+  lenses (directory / coverage / variants / providers / languages),
+  and the detail page's instances section. The intervention-sequence
+  Gantt (`/sequence`) is retained. API client + types extended for the
+  instance and insight endpoints; nav + `nav.{insights,board,gantt}`
+  keys in 13 locales. svelte-check 0, vitest 46, Playwright 6.
 
 - 2026-07-19 — SVAR moderate fit: new **/sequence** route (nav-linked): the selected pathway's
   interventions as ordered bars in the SVAR Gantt — explicitly a

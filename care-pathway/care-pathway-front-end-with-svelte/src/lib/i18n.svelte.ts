@@ -90,6 +90,10 @@ export const LOCALE_KEY = "mxi.care-pathway.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.pathways": "Pathways",
+    "nav.insights": "Insights",
+    "nav.board": "Board",
+    "nav.gantt": "Gantt",
     "nav.sequence": "Sequence",
     // Layout / chrome
     "brand.name": "Care Pathways",
@@ -190,6 +194,10 @@ const STRINGS = {
     "form.saveFailed": "Save failed",
   },
   cy: {
+    "nav.pathways": "Llwybrau",
+    "nav.insights": "Mewnwelediadau",
+    "nav.board": "Bwrdd",
+    "nav.gantt": "Gantt",
     "nav.sequence": "Dilyniant",
     "brand.name": "Llwybrau Gofal",
     "brand.full": "Main X · Llwybrau Gofal",
@@ -285,6 +293,10 @@ const STRINGS = {
     "form.saveFailed": "Methodd y cadw",
   },
   es: {
+    "nav.pathways": "Vías",
+    "nav.insights": "Análisis",
+    "nav.board": "Tablero",
+    "nav.gantt": "Gantt",
     "nav.sequence": "Secuencia",
     "brand.name": "Vías de Atención",
     "brand.full": "Main X · Vías de Atención",
@@ -381,6 +393,10 @@ const STRINGS = {
     "form.saveFailed": "Error al guardar",
   },
   fr: {
+    "nav.pathways": "Parcours",
+    "nav.insights": "Analyses",
+    "nav.board": "Tableau",
+    "nav.gantt": "Gantt",
     "nav.sequence": "Séquence",
     "brand.name": "Parcours de Soins",
     "brand.full": "Main X · Parcours de Soins",
@@ -477,6 +493,10 @@ const STRINGS = {
     "form.saveFailed": "Échec de l'enregistrement",
   },
   de: {
+    "nav.pathways": "Pfade",
+    "nav.insights": "Einblicke",
+    "nav.board": "Board",
+    "nav.gantt": "Gantt",
     "nav.sequence": "Abfolge",
     "brand.name": "Versorgungspfade",
     "brand.full": "Main X · Versorgungspfade",
@@ -573,6 +593,10 @@ const STRINGS = {
     "form.saveFailed": "Speichern fehlgeschlagen",
   },
   ar: {
+    "nav.pathways": "المسارات",
+    "nav.insights": "رؤى",
+    "nav.board": "لوحة",
+    "nav.gantt": "غانت",
     "nav.sequence": "التسلسل",
     "brand.name": "مسارات الرعاية",
     "brand.full": "Main X · مسارات الرعاية",
@@ -668,6 +692,10 @@ const STRINGS = {
     "form.saveFailed": "فشل الحفظ",
   },
   ru: {
+    "nav.pathways": "Пути",
+    "nav.insights": "Аналитика",
+    "nav.board": "Доска",
+    "nav.gantt": "Гант",
     "nav.sequence": "Последовательность",
     "brand.name": "Маршруты помощи",
     "brand.full": "Main X · Маршруты помощи",
@@ -763,6 +791,10 @@ const STRINGS = {
     "form.saveFailed": "Не удалось сохранить",
   },
   hi: {
+    "nav.pathways": "पाथवे",
+    "nav.insights": "अंतर्दृष्टि",
+    "nav.board": "बोर्ड",
+    "nav.gantt": "गैंट",
     "nav.sequence": "अनुक्रम",
     "brand.name": "देखभाल मार्ग",
     "brand.full": "Main X · देखभाल मार्ग",
@@ -859,6 +891,10 @@ const STRINGS = {
     "form.saveFailed": "सहेजना विफल",
   },
   zh: {
+    "nav.pathways": "路径",
+    "nav.insights": "洞察",
+    "nav.board": "看板",
+    "nav.gantt": "甘特",
     "nav.sequence": "顺序",
     "brand.name": "护理路径",
     "brand.full": "Main X · 护理路径",
@@ -953,6 +989,10 @@ const STRINGS = {
     "form.saveFailed": "保存失败",
   },
   bn: {
+    "nav.pathways": "পাথওয়ে",
+    "nav.insights": "অন্তর্দৃষ্টি",
+    "nav.board": "বোর্ড",
+    "nav.gantt": "গ্যান্ট",
     "nav.sequence": "ক্রম",
     "brand.name": "যত্ন পথ",
     "brand.full": "Main X · যত্ন পথ",
@@ -1048,6 +1088,10 @@ const STRINGS = {
     "form.saveFailed": "সংরক্ষণ ব্যর্থ",
   },
   pt: {
+    "nav.pathways": "Vias",
+    "nav.insights": "Insights",
+    "nav.board": "Quadro",
+    "nav.gantt": "Gantt",
     "nav.sequence": "Sequência",
     "brand.name": "Vias de Cuidados",
     "brand.full": "Main X · Vias de Cuidados",
@@ -1144,6 +1188,10 @@ const STRINGS = {
     "form.saveFailed": "Falha ao guardar",
   },
   id: {
+    "nav.pathways": "Alur",
+    "nav.insights": "Wawasan",
+    "nav.board": "Papan",
+    "nav.gantt": "Gantt",
     "nav.sequence": "Urutan",
     "brand.name": "Jalur Perawatan",
     "brand.full": "Main X · Jalur Perawatan",
@@ -1240,6 +1288,10 @@ const STRINGS = {
     "form.saveFailed": "Gagal menyimpan",
   },
   ur: {
+    "nav.pathways": "راستے",
+    "nav.insights": "بصیرت",
+    "nav.board": "بورڈ",
+    "nav.gantt": "گانٹ",
     "nav.sequence": "ترتیب",
     "brand.name": "نگہداشت کے راستے",
     "brand.full": "Main X · نگہداشت کے راستے",

@@ -16,7 +16,12 @@
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
     import { CarePathwayRepository } from "$lib/api/care-pathways";
-    import type { AuditEntry, CarePathway, ScoredRef } from "$lib/api/types";
+    import type {
+        AuditEntry,
+        CarePathway,
+        PathwayInstance,
+        ScoredRef,
+    } from "$lib/api/types";
     import { t, tf } from "$lib/i18n.svelte";
 
     const repo = CarePathwayRepository.withFetch();
@@ -40,7 +45,11 @@
     let auditLoading = $state(false);
     let auditError = $state<string | null>(null);
 
-    // Load the record on mount.
+    // The pathway's enrolled instances (`GET /{pid}/instances`). Loaded
+    // alongside the record; a failure here is non-fatal to the detail view.
+    let instances = $state<PathwayInstance[] | null>(null);
+
+    // Load the record on mount, then its instances (best-effort).
     onMount(async () => {
         try {
             pathway = await repo.get(pid);
@@ -48,6 +57,11 @@
             error = err instanceof Error ? err.message : t("detail.notFound");
         } finally {
             loading = false;
+        }
+        try {
+            instances = await repo.listInstances(pid);
+        } catch {
+            instances = [];
         }
     });
 
@@ -171,6 +185,27 @@
         {/if}
         <div><strong>{t("detail.id")}</strong> <code>{pid}</code></div>
     </div>
+
+    <!-- Enrolled instances on this pathway template (people on the pathway). -->
+    <section data-testid="pathway-instances" style="margin-top:1rem">
+        <h2>Instances</h2>
+        {#if instances === null}
+            <p>{t("detail.loading")}</p>
+        {:else if instances.length === 0}
+            <p class="surface">No instances enrolled on this pathway.</p>
+        {:else}
+            <ul class="stack">
+                {#each instances as instance (instance.pid)}
+                    <li class="surface row">
+                        <a href={`/board`}>{instance.subject_ref}</a>
+                        <span class="muted">{instance.status}</span>
+                        <span class="muted">{instance.urgency}</span>
+                        <span class="muted small">{instance.enrolled_on}</span>
+                    </li>
+                {/each}
+            </ul>
+        {/if}
+    </section>
 
     <div class="row" style="margin-top:1rem">
         <a class="button" href={`/${pid}/edit`}>{t("detail.edit")}</a>

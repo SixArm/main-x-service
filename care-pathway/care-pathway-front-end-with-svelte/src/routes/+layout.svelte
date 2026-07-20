@@ -81,8 +81,11 @@
 
     // Nav items reference i18n keys; labels are resolved reactively in markup.
     const navItems = [
-        { href: "/", key: "nav.carePathways" as const },
+        { href: "/", key: "nav.pathways" as const },
         { href: "/new", key: "nav.newCarePathway" as const },
+        { href: "/insights", key: "nav.insights" as const },
+        { href: "/board", key: "nav.board" as const },
+        { href: "/gantt", key: "nav.gantt" as const },
         { href: "/sequence", key: "nav.sequence" as const },
     ];
 </script>

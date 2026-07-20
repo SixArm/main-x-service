@@ -18,10 +18,11 @@ service REST API, whose request/response body is the
    No `export let`, no `$:`, events are callback props.
 2. **SPA.** `+layout.ts` sets `ssr = false` / `prerender = false`.
 3. **TypeScript strict** (`noUncheckedIndexedAccess`).
-4. **Deps in real use.** SVAR DataGrid + FilterBar (`/care-pathways`
-   index), SVAR Gantt (`/sequence`), and Lily
-   `ThemeSelect`/`LocaleSelect` (in the layout) are used dependencies;
-   forms remain plain inputs + the `app.css` utilities.
+4. **Deps in real use.** All four SVAR components are used: DataGrid +
+   FilterBar (`/` registry), Kanban (`/board` instance lifecycle), and
+   Gantt (`/gantt` instance timeline + `/sequence` intervention sequence); plus Lily
+   `ThemeSelect`/`LocaleSelect` (in the layout). Forms remain plain
+   inputs + the `app.css` utilities.
 5. **No envelope.** The service is loco.rs and returns **raw JSON**;
    `src/lib/api/client.ts` is the lean wrapper (get/post/put/delete).
 
@@ -34,25 +35,29 @@ src/
 │   ├── config.ts                 API_BASE_URL → same-origin BFF proxy (/api/proxy)
 │   ├── api/
 │   │   ├── client.ts             lean fetch wrapper (+ ApiError); no browser-held bearer — the BFF proxy injects the PASETO server-side
-│   │   ├── types.ts              CarePathway + ConditionCode + CodeSystem + CareSetting + IdentifierScheme + PathwayIdentifier + PathwayRef + ScoredRef + MergeResult + AuditEntry + PathwayEvent
-│   │   └── care-pathways.ts      CarePathwayRepository (CRUD + search + checkDuplicates + merge + audit + recentEvents)
+│   │   ├── types.ts              CarePathway + ConditionCode + CodeSystem + CareSetting + IdentifierScheme + PathwayIdentifier + PathwayRef + ScoredRef + MergeResult + AuditEntry + PathwayEvent + PathwayInstance/InstanceStatus/Urgency/InstanceDetail + the five insight response types
+│   │   └── care-pathways.ts      CarePathwayRepository (CRUD + search + checkDuplicates + merge + audit + recentEvents + insights{Directory,Coverage,Variants,Providers,Languages} + listInstances + getInstance + setInstanceStatus + caseload)
 │   ├── server/                   BFF-only (never bundled to the browser): auth.ts (magic-link + session→PASETO exchange), session.ts (cookie), config.ts (CARE_PATHWAY_API_URL / AUTH_API_URL)
 │   └── components/CarePathwayForm.svelte
 └── routes/
     ├── +layout.svelte / +layout.ts / +layout.server.ts   nav + session panel
-    ├── +page.svelte              list + name-search box + recent-activity toggle
+    ├── +page.svelte              registry grid (SVAR DataGrid + FilterBar); rows link to /{pid}
     ├── signin/ · verify/         per-app magic-link sign-in (BFF server routes)
     ├── api/proxy/[...path]/+server.ts   BFF proxy → care-pathway service (injects the PASETO bearer)
     ├── new/+page.svelte          create
-    ├── [pid]/+page.svelte        detail + delete + check-duplicates + merge + audit-trail toggle
-    └── [pid]/edit/+page.svelte   edit
+    ├── [pid]/+page.svelte        detail + instances + delete + check-duplicates + merge + audit-trail toggle
+    ├── [pid]/edit/+page.svelte   edit
+    ├── insights/+page.svelte     the five registry lenses as tables (directory / coverage / variants / providers / languages)
+    ├── board/+page.svelte        instance Kanban (one pathway; drag = POST /api/instances/{pid}/status)
+    ├── gantt/+page.svelte        instance timeline Gantt (one pathway; enrolled_on → next_review/closed/today)
+    └── sequence/+page.svelte     intervention-sequence Gantt (a pathway template's interventions)
 ```
 
 ## API consumption
 
 | UI action | Endpoint |
 |---|---|
-| List | `GET /api/care-pathways` |
+| List / registry grid | `GET /api/care-pathways` |
 | Search | `GET /api/care-pathways/search?q=` |
 | Recent activity | `GET /api/care-pathways/events/recent` → `PathwayEvent[]` |
 | Create | `POST /api/care-pathways` |
@@ -62,6 +67,11 @@ src/
 | Check duplicates | `POST /api/care-pathways/check-duplicates` |
 | Merge duplicate | `POST /api/care-pathways/merge` (body `{main_pid, duplicate_pid, reason?}`) |
 | Audit trail | `GET /api/care-pathways/{pid}/audit` → `AuditEntry[]` |
+| Insights (5 lenses) | `GET /api/care-pathways/insights/{directory,coverage,variants,providers,languages}` |
+| Pathway instances | `GET /api/care-pathways/{pid}/instances` → `PathwayInstance[]` |
+| Instance detail | `GET /api/instances/{pid}` → `{instance,steps,team,events,measures}` |
+| Instance status move | `POST /api/instances/{pid}/status` (body `{to}`) |
+| Caseload (board context) | `GET /api/instances/caseload` |
 
 ## Commands
 

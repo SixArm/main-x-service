@@ -202,3 +202,121 @@ export interface PathwayEvent {
   /** Per-process monotonic sequence number; used to order newest-first. */
   seq: number;
 }
+
+// ---------------------------------------------------------------------------
+// Pathway instances (a person enrolled on a pathway template).
+// Source of truth: care-pathway-service `models/_entities/pathway_instances`
+// + `controllers/instances.rs`.
+// ---------------------------------------------------------------------------
+
+/** Enrolment lifecycle status. The service's status machine gates moves. */
+export type InstanceStatus =
+  | "active"
+  | "on_hold"
+  | "completed"
+  | "discontinued";
+
+/** The four lifecycle columns rendered on the Kanban board, in order. */
+export const INSTANCE_STATUSES: InstanceStatus[] = [
+  "active",
+  "on_hold",
+  "completed",
+  "discontinued",
+];
+
+/** Clinical urgency of an enrolment. */
+export type Urgency = "routine" | "urgent" | "emergency";
+
+/**
+ * One pathway instance: a `person:<uuid>` subject enrolled on a pathway
+ * template, with a status/urgency lifecycle and review cadence.
+ */
+export interface PathwayInstance {
+  /** Persistent identifier of the instance. */
+  pid: string;
+  /** The template pathway this instance was enrolled on. */
+  pathway_pid: string;
+  /** The enrolled subject, a `person:<uuid>` URN. */
+  subject_ref: string;
+  /** Enrolment lifecycle status. */
+  status: InstanceStatus;
+  /** Clinical urgency. */
+  urgency: Urgency;
+  /** ISO date the subject was enrolled. */
+  enrolled_on: string;
+  /** ISO date of the next scheduled review (cleared on terminal status). */
+  next_review_on?: string | null;
+  /** ISO date the instance was closed, if terminal. */
+  closed_on?: string | null;
+  /** Free-text closure reason, if closed. */
+  closure_reason?: string | null;
+  /** Recorded outcome, if any. */
+  outcome?: string | null;
+}
+
+/** `GET /api/instances/{pid}` — an instance plus its related collections. */
+export interface InstanceDetail {
+  /** The instance record. */
+  instance: PathwayInstance;
+  /** Step-completion log rows. */
+  steps: unknown[];
+  /** Care-team member rows. */
+  team: unknown[];
+  /** Clinical-event rows. */
+  events: unknown[];
+  /** Recorded-measure rows. */
+  measures: unknown[];
+}
+
+// ---------------------------------------------------------------------------
+// Registry insights (five read-only lenses). The service returns dynamic
+// JSON objects, each carrying a `note` string that the UI shows verbatim.
+// Typed loosely — only the fields the UI renders are named.
+// ---------------------------------------------------------------------------
+
+/** `GET …/insights/directory`. */
+export interface DirectoryInsight {
+  as_of: string;
+  note: string;
+  total: number;
+  by_setting: Record<string, Array<{ pid: string; name: string; specialty?: string | null }>>;
+  by_specialty: Record<string, number>;
+}
+
+/** `GET …/insights/coverage`. */
+export interface CoverageInsight {
+  as_of: string;
+  note: string;
+  conditions: Array<{ condition: string; settings: string[] }>;
+  gaps: Array<{ rule: string; detail: string; condition: string }>;
+}
+
+/** `GET …/insights/variants`. */
+export interface VariantsInsight {
+  as_of: string;
+  note: string;
+  variants: Array<{
+    condition: string;
+    providers: number;
+    by_provider: Record<string, Array<{ pid: string; name: string; jurisdiction?: string | null }>>;
+  }>;
+}
+
+/** `GET …/insights/providers`. */
+export interface ProvidersInsight {
+  as_of: string;
+  note: string;
+  providers: Array<{
+    provider: string;
+    pathways: number;
+    by_setting: Record<string, number>;
+  }>;
+}
+
+/** `GET …/insights/languages`. */
+export interface LanguagesInsight {
+  as_of: string;
+  note: string;
+  by_language: Record<string, number>;
+  single_language_conditions: Array<{ condition: string; language?: string | null }>;
+}
