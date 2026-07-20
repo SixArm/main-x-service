@@ -39,6 +39,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api/care-pathways/whoami` | Verified bearer-token claims (`401` without one) |
 | GET | `/api/care-pathways/audit/recent` · `/{pid}/audit` | Audit-log query |
 | GET | `/api/care-pathways/events/recent` | In-memory event stream |
+| GET | `/api/care-pathways/insights/{directory,coverage,variants,providers,languages}` | Registry lenses: setting/specialty facets, condition-coverage gaps, cross-provider variants, provider directory, language coverage |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (text-exposition; root path, public under auth enforcement) |
 

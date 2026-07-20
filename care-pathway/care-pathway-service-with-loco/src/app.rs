@@ -105,6 +105,7 @@ impl Hooks for App {
     /// controller, and the root-level Prometheus `/metrics.prom` endpoint.
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
+            .add_route(controllers::insights::routes())
             .add_route(controllers::care_pathways::routes())
             .add_route(controllers::fhir::routes())
             .add_route(controllers::docs::routes())

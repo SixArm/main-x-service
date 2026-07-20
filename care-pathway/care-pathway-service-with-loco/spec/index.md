@@ -387,6 +387,23 @@ access controls added later.
   round; verified by a live fresh-database migrate. Every other table
   this crate creates via the helper is already plural (no-op).
 
+- [x] **2026-07-20 — Registry insight views.** Five read-only
+  derived views (`controllers/insights.rs`, prefix
+  `/api/care-pathways/insights`) over the stored `CarePathway`
+  templates, for the provider / setting / coverage lenses:
+  `GET /directory` (faceted by `care_setting` + the `specialty:<x>`
+  keyword convention), `/coverage` (per condition code, which settings
+  have a pathway + disclosed gap rules: no primary-care / no emergency
+  pathway), `/variants` (a condition offered by ≥2 providers, with the
+  `jurisdiction:<x>` facet — a comparison directory, never a match
+  signal), `/providers` (pathways per issuing provider by setting),
+  `/languages` (per-language counts + the single-language-condition
+  equity lens). No migration, no matcher change: facets come from
+  existing DTO fields plus two disclosed keyword conventions.
+  **Acceptance:** the seeded five-view request round-trip green first
+  run — full `--ignored` suite 23/23 vs Postgres 18; clippy pedantic
+  clean.
+
 ## 14. Implementation status
 
 Done: loco boot; care_pathways table + migration; CRUD with `422`

@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — registry insight views (2026-07-20)
+
+- Five read-only derived views (`controllers/insights.rs`): setting +
+  `specialty:<x>` directory, condition-coverage gaps, cross-provider
+  variants (with the `jurisdiction:<x>` facet), provider directory,
+  and language coverage. No migration, no matcher change — facets from
+  existing DTO fields + two disclosed keyword conventions.
+
 ### Fixed
 
 - 2026-07-18 — **Order-dependent enforcement test** (QA-CP-FLAKE):
