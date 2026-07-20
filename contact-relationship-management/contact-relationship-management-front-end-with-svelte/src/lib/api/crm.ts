@@ -315,15 +315,19 @@ export function staleDeals(
   return api(`/insights/stale-deals${days ? `?days=${days}` : ""}`, init);
 }
 
-/** Open follow-ups: overdue + next 30 days. */
-export function followups(init?: FetchLike): Promise<{
+/** Open follow-ups: overdue + next 30 days (optional kind filter —
+ * the renewals convention: due-dated `task` activities). */
+export function followups(
+  kind?: string,
+  init?: FetchLike,
+): Promise<{
   as_of: string;
   note: string;
   overdue: Followup[];
   upcoming_30d: Followup[];
   open_by_recorder: Record<string, number>;
 }> {
-  return api("/insights/followups", init);
+  return api(`/insights/followups${kind ? `?kind=${encodeURIComponent(kind)}` : ""}`, init);
 }
 
 /** Pipeline-hygiene findings. */
@@ -395,4 +399,153 @@ export function dpo(init?: FetchLike): Promise<{
   }>;
 }> {
   return api("/insights/dpo", init);
+}
+
+/** Relationship-cadence aging (untouched contacts/accounts). */
+export function cadence(days?: number, init?: FetchLike): Promise<{
+  as_of: string;
+  derivation: string;
+  threshold_days: number;
+  untouched_contacts: Array<{
+    pid: string;
+    display_name: string;
+    stakeholder_role: string | null;
+    days_since_touch: number;
+    has_next_touch: boolean;
+  }>;
+  untouched_accounts: Array<{
+    pid: string;
+    display_name: string;
+    stakeholder_role: string | null;
+    days_since_touch: number;
+  }>;
+  contacts_without_next_touch: number;
+}> {
+  return api(`/insights/cadence${days ? `?days=${days}` : ""}`, init);
+}
+
+/** Engagement workload (touches, kinds, recorded sentiment). */
+export function engagementWorkload(days?: number, init?: FetchLike): Promise<{
+  as_of: string;
+  window_days: number;
+  touches: number;
+  per_recorder_month: Record<string, number>;
+  per_kind: Record<string, number>;
+  sentiment: Record<string, number>;
+  note: string;
+}> {
+  return api(`/insights/engagement${days ? `?days=${days}` : ""}`, init);
+}
+
+/** Stage funnel for one pipeline (audit-derived, honest ratios). */
+export function funnel(pipelinePid: string, init?: FetchLike): Promise<{
+  as_of: string;
+  pipeline: { pid: string; name: string };
+  derivation: string;
+  stages: Array<{
+    stage: string;
+    position: number;
+    is_won: boolean;
+    is_lost: boolean;
+    entered: number;
+    conversion_from_previous: {
+      numerator: number;
+      denominator: number;
+      value: number | null;
+    } | null;
+  }>;
+}> {
+  return api(`/insights/funnel?pipeline=${encodeURIComponent(pipelinePid)}`, init);
+}
+
+/** Member-account health (+ silent list). */
+export function membersHealth(days?: number, init?: FetchLike): Promise<{
+  as_of: string;
+  derivation: string;
+  threshold_days: number;
+  silent_accounts: number;
+  accounts: Array<{
+    pid: string;
+    display_name: string;
+    tier: string;
+    stakeholder_role: string | null;
+    membership: { status: string; joined_on: string; renewal_on: string | null } | null;
+    contacts: number;
+    days_since_touch: number;
+    silent: boolean;
+    open_followups: number;
+    open_tickets: number;
+  }>;
+}> {
+  return api(`/insights/members${days ? `?days=${days}` : ""}`, init);
+}
+
+/** Per-account consent rollup (DPO). */
+export function consentByAccount(days?: number, init?: FetchLike): Promise<{
+  as_of: string;
+  window_days: number;
+  note: string;
+  accounts: Array<{
+    pid: string;
+    display_name: string;
+    consent_coverage: Record<string, number>;
+    withdrawals_in_window: number;
+  }>;
+}> {
+  return api(`/insights/consent-by-account${days ? `?days=${days}` : ""}`, init);
+}
+
+/** The declared-stakeholder register + power–interest grid. */
+export function stakeholdersView(init?: FetchLike): Promise<{
+  as_of: string;
+  note: string;
+  by_role: Record<string, Array<{
+    pid: string;
+    display_name: string;
+    marketing_consent: string;
+    influence: number | null;
+    interest: number | null;
+    days_since_touch: number;
+  }>>;
+  grid: Record<string, number>;
+  stakeholders_without_grid_scores: number;
+  undeclared_contacts: number;
+  account_roles: Array<{ pid: string; display_name: string; role: string }>;
+}> {
+  return api("/insights/stakeholders", init);
+}
+
+/** The innovation-partnership register. */
+export function partnershipsRegister(init?: FetchLike): Promise<{
+  as_of: string;
+  by_kind: Record<string, number>;
+  by_stage: Record<string, number>;
+  register: Array<{
+    pid: string;
+    account_pid: string;
+    account: string | null;
+    kind: string;
+    stage: string;
+    summary: string;
+    started_on: string | null;
+  }>;
+}> {
+  return api("/insights/partnerships", init);
+}
+
+/** Membership renewals due + the lapsed list. */
+export function membershipsView(days?: number, init?: FetchLike): Promise<{
+  as_of: string;
+  window_days: number;
+  memberships: number;
+  renewals_due: Array<{
+    pid: string;
+    account: string | null;
+    status: string;
+    joined_on: string;
+    renewal_on: string | null;
+  }>;
+  lapsed: Array<{ pid: string; account: string | null; status: string }>;
+}> {
+  return api(`/insights/memberships${days ? `?days=${days}` : ""}`, init);
 }

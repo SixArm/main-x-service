@@ -65,6 +65,9 @@ struct ActivityPayload {
     actor_ref: Option<String>,
     #[serde(default)]
     due_on: Option<chrono::NaiveDate>,
+    /// Optional recorded sentiment (`positive` / `neutral` / `negative`).
+    #[serde(default)]
+    sentiment: Option<String>,
 }
 
 /// A `{pid}` reference response.
@@ -282,6 +285,7 @@ async fn create_activity(
 ) -> Result<Response> {
     let mut problems = Problems::new();
     problems.require_token("subject_kind", tokens::ACTIVITY_SUBJECTS, &payload.subject_kind);
+    problems.token_opt("sentiment", crate::rules::engagement::SENTIMENTS, payload.sentiment.as_deref());
     problems.require_token("kind", tokens::ACTIVITY_KINDS, &payload.kind);
     problems.require_text("summary", &payload.summary);
     problems.ref_opt("actor_ref", entity_ref::EntityType::Worker, payload.actor_ref.as_deref());
@@ -291,6 +295,7 @@ async fn create_activity(
     let row = activities::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
         subject_kind: ActiveValue::set(payload.subject_kind.clone()),
+        sentiment: ActiveValue::set(payload.sentiment.clone()),
         subject_pid: ActiveValue::set(payload.subject_pid),
         kind: ActiveValue::set(payload.kind.clone()),
         occurred_at: ActiveValue::set(occurred_at),

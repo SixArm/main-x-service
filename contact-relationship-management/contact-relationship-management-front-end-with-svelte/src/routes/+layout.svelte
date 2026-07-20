@@ -47,6 +47,8 @@
   <a href="/followups">{t("nav.followups")}</a>
   <a href="/executive">{t("nav.executive")}</a>
   <a href="/dpo">{t("nav.dpo")}</a>
+  <a href="/engagement">{t("nav.engagement")}</a>
+  <a href="/partners">{t("nav.partners")}</a>
   <span class="spacer"></span>
   <label class="locale">
     <span class="visually-hidden">{t("chrome.language")}</span>

@@ -11,12 +11,13 @@
   let overdue = $state<Followup[] | null>(null);
   let upcoming = $state<Followup[]>([]);
   let note = $state("");
+  let kindFilter = $state("");
   let error = $state<string | null>(null);
 
   $effect(() => {
     void (async () => {
       try {
-        const view = await followups();
+        const view = await followups(kindFilter || undefined);
         overdue = view.overdue;
         upcoming = view.upcoming_30d;
         note = view.note;
@@ -45,6 +46,24 @@
 <h1>{t("nav.followups")}</h1>
 {#if error}<p class="error" data-testid="error">{error}</p>{/if}
 {#if note}<p class="muted">{note}</p>{/if}
+
+<p>
+  <label>
+    <select
+      data-testid="kind-filter"
+      value={kindFilter}
+      onchange={(event) => {
+        kindFilter = event.currentTarget.value;
+      }}
+    >
+      <option value="">(all kinds)</option>
+      {#each ["call", "email", "meeting", "note", "task"] as kind (kind)}
+        <option value={kind}>{kind}</option>
+      {/each}
+    </select>
+    <span class="muted">renewals convention: due-dated task activities</span>
+  </label>
+</p>
 
 {#if overdue !== null}
   <h2>Overdue</h2>

@@ -75,6 +75,15 @@ describe("api path map", () => {
     await crm.forecastTrends();
     await crm.slaRegister();
     await crm.dpo();
+    await crm.followups("task");
+    await crm.cadence(30);
+    await crm.engagementWorkload();
+    await crm.funnel("p1");
+    await crm.membersHealth();
+    await crm.consentByAccount();
+    await crm.stakeholdersView();
+    await crm.partnershipsRegister();
+    await crm.membershipsView(90);
     expect(calls).toEqual([
       "/api/proxy/contacts",
       "/api/proxy/contacts/c1",
@@ -92,6 +101,15 @@ describe("api path map", () => {
       "/api/proxy/insights/forecast-trends",
       "/api/proxy/insights/sla",
       "/api/proxy/insights/dpo",
+      "/api/proxy/insights/followups?kind=task",
+      "/api/proxy/insights/cadence?days=30",
+      "/api/proxy/insights/engagement",
+      "/api/proxy/insights/funnel?pipeline=p1",
+      "/api/proxy/insights/members",
+      "/api/proxy/insights/consent-by-account",
+      "/api/proxy/insights/stakeholders",
+      "/api/proxy/insights/partnerships",
+      "/api/proxy/insights/memberships?days=90",
     ]);
     vi.unstubAllGlobals();
   });

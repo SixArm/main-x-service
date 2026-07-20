@@ -16,6 +16,7 @@ mod m20220101_000003_marketing;
 mod m20220101_000004_support;
 mod m20220101_000005_audit_logs;
 mod m20220101_000006_event_outbox;
+mod m20260720_000007_engagement;
 
 /// The crate's migrator.
 pub struct Migrator;
@@ -31,6 +32,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000004_support::Migration),
             Box::new(m20220101_000005_audit_logs::Migration),
             Box::new(m20220101_000006_event_outbox::Migration),
+            Box::new(m20260720_000007_engagement::Migration),
             // inject-above (do not remove this comment)
         ]
     }

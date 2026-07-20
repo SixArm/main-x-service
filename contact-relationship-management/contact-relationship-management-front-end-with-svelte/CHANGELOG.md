@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — engagement + partners areas (CRM-T20, 2026-07-20)
+
+- `/engagement` (cadence aging, workload with recorded sentiment,
+  member health with the silent list) and `/partners` (stakeholder
+  register + power–interest grid, partnership register, membership
+  renewals). The deal board gains a pipeline selector + the honest
+  funnel strip; follow-ups gains a kind filter; DPO gains
+  consent-by-account. Nine client functions with path pins; three new
+  Playwright specs + extended stubs.
+
 ### Added — boards + insight areas (CRM-T19, 2026-07-20)
 
 - `/leads/board` and `/tickets/board` (SVAR Kanban; drag = the

@@ -23,6 +23,9 @@ pub struct Model {
     pub preferred_channel: String,
     pub marketing_consent: String,
     pub consent_changed_at: Option<DateTimeWithTimeZone>,
+    pub stakeholder_role: Option<String>,
+    pub influence: Option<i32>,
+    pub interest: Option<i32>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 

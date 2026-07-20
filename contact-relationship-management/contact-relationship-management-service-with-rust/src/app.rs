@@ -86,6 +86,7 @@ impl Hooks for App {
             .add_route(controllers::support::routes())
             .add_route(controllers::dashboards::routes())
             .add_route(controllers::insights::routes())
+            .add_route(controllers::engagement::routes())
             .add_route(controllers::audits::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())

@@ -1,12 +1,14 @@
-//! `SeaORM` Entity -- `activities`. One interaction, attached to any relationship object (CRM-R2).
+//! `SeaORM` Entity — `partnerships`. Innovation-partnership records on
+//! an account (kind + a scouting→pilot→scaled→retired lifecycle).
 
+// SeaORM-generated entity shape: documented by the migration.
 #![allow(missing_docs)]
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "activities")]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+#[sea_orm(table_name = "partnerships")]
 pub struct Model {
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
@@ -14,17 +16,15 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub pid: Uuid,
-    pub subject_kind: String,
-    pub subject_pid: Uuid,
+    pub account_pid: Uuid,
     pub kind: String,
-    pub occurred_at: DateTimeWithTimeZone,
-    pub actor_ref: Option<String>,
+    pub stage: String,
     pub summary: String,
-    pub due_on: Option<Date>,
-    pub done: bool,
-    pub sentiment: Option<String>,
+    pub started_on: Option<Date>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}

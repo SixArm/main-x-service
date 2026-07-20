@@ -8,6 +8,7 @@ use loco_rs::prelude::*;
 pub mod audits;
 pub mod dashboards;
 pub mod docs;
+pub mod engagement;
 pub mod insights;
 pub mod marketing;
 pub mod metrics;

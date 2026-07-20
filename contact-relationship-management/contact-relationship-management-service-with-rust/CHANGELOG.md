@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — engagement / partnerships / confederation (CRM-T20, 2026-07-20)
+
+- Declared stakeholder typing (role + power–interest 1–5 on contacts;
+  role on accounts), recorded activity sentiment, the forward-only
+  partnership lifecycle, per-account memberships, and working groups
+  with derived activity feeds (`controllers/engagement.rs`).
+- Nine new derived views (`controllers/insights.rs`): cadence,
+  engagement workload, the audit-derived pipeline funnel, member
+  health, consent-by-account, the stakeholder register + grid, the
+  partnership register, membership renewals; follow-ups gains a
+  `kind` filter (renewals convention).
+
 ### Added — insight views (CRM-T19, 2026-07-20)
 
 - `controllers/insights.rs`: stale-deal aging (from stage-change

@@ -6,17 +6,20 @@
   upstream). Also the SLA register lives with support, not here.
 -->
 <script lang="ts">
-  import { dpo } from "$lib/api/crm";
+  import { consentByAccount, dpo } from "$lib/api/crm";
   import { t } from "$lib/i18n.svelte";
 
   type DpoView = Awaited<ReturnType<typeof dpo>>;
+  type ByAccount = Awaited<ReturnType<typeof consentByAccount>>;
   let view = $state<DpoView | null>(null);
+  let byAccount = $state<ByAccount | null>(null);
   let error = $state<string | null>(null);
 
   $effect(() => {
     void (async () => {
       try {
         view = await dpo();
+        byAccount = await consentByAccount();
       } catch (cause) {
         error = cause instanceof Error ? cause.message : String(cause);
       }
@@ -53,6 +56,30 @@
       {/each}
     </tbody>
   </table>
+
+  <h2>Consent by account</h2>
+  {#if byAccount}
+    <table data-testid="dpo-by-account">
+      <thead><tr><th>Account</th><th>Coverage</th><th>Withdrawals ({byAccount.window_days}d)</th></tr></thead>
+      <tbody>
+        {#each byAccount.accounts as row (row.pid)}
+          <tr>
+            <td>{row.display_name}</td>
+            <td>
+              {#each Object.entries(row.consent_coverage) as [state, count] (state)}
+                {state}: {count}&nbsp;
+              {:else}
+                <span class="muted">no contacts</span>
+              {/each}
+            </td>
+            <td>{row.withdrawals_in_window}</td>
+          </tr>
+        {:else}
+          <tr><td colspan="3" class="muted">No accounts.</td></tr>
+        {/each}
+      </tbody>
+    </table>
+  {/if}
 
   <h2>Duplicate contact rows</h2>
   <table data-testid="dpo-duplicates">

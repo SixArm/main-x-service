@@ -1,12 +1,14 @@
-//! `SeaORM` Entity -- `accounts`. One relationship wrapper over an `organization:` record (CRM-R1).
+//! `SeaORM` Entity — `working_groups`. Cross-member collaboration
+//! groups (roster in `working_group_members`).
 
+// SeaORM-generated entity shape: documented by the migration.
 #![allow(missing_docs)]
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "accounts")]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+#[sea_orm(table_name = "working_groups")]
 pub struct Model {
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
@@ -14,14 +16,12 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub pid: Uuid,
-    pub organization_ref: String,
-    pub owner_ref: Option<String>,
-    pub display_name: String,
-    pub tier: String,
-    pub industry: Option<String>,
-    pub stakeholder_role: Option<String>,
+    pub name: String,
+    pub purpose: Option<String>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}

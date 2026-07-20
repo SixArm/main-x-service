@@ -41,6 +41,8 @@ export const LOCALE_KEY = "mxi.crm.locale";
 // Every translatable UI string, keyed by a stable dotted key.
 const STRINGS = {
   en: {
+    "nav.engagement": "Engagement",
+    "nav.partners": "Partners",
     "nav.followups": "Follow-ups",
     "nav.executive": "Executive",
     "nav.dpo": "DPO",
@@ -95,6 +97,8 @@ const STRINGS = {
     "article.search": "Search articles",
   },
   cy: {
+    "nav.engagement": "Ymgysylltu",
+    "nav.partners": "Partneriaid",
     "nav.followups": "Dilyniannau",
     "nav.executive": "Gweithredol",
     "nav.dpo": "DPO",
@@ -149,6 +153,8 @@ const STRINGS = {
     "article.search": "Chwilio erthyglau",
   },
   es: {
+    "nav.engagement": "Compromiso",
+    "nav.partners": "Socios",
     "nav.followups": "Seguimientos",
     "nav.executive": "Ejecutivo",
     "nav.dpo": "DPO",
@@ -203,6 +209,8 @@ const STRINGS = {
     "article.search": "Buscar artículos",
   },
   fr: {
+    "nav.engagement": "Engagement",
+    "nav.partners": "Partenaires",
     "nav.followups": "Relances",
     "nav.executive": "Direction",
     "nav.dpo": "DPO",
@@ -257,6 +265,8 @@ const STRINGS = {
     "article.search": "Rechercher des articles",
   },
   de: {
+    "nav.engagement": "Engagement",
+    "nav.partners": "Partner",
     "nav.followups": "Wiedervorlagen",
     "nav.executive": "Führung",
     "nav.dpo": "DPO",
@@ -311,6 +321,8 @@ const STRINGS = {
     "article.search": "Artikel suchen",
   },
   ar: {
+    "nav.engagement": "التفاعل",
+    "nav.partners": "الشركاء",
     "nav.followups": "المتابعات",
     "nav.executive": "التنفيذية",
     "nav.dpo": "حماية البيانات",
@@ -365,6 +377,8 @@ const STRINGS = {
     "article.search": "بحث المقالات",
   },
   ru: {
+    "nav.engagement": "Вовлечённость",
+    "nav.partners": "Партнёры",
     "nav.followups": "Напоминания",
     "nav.executive": "Руководство",
     "nav.dpo": "DPO",
@@ -419,6 +433,8 @@ const STRINGS = {
     "article.search": "Поиск статей",
   },
   hi: {
+    "nav.engagement": "सहभागिता",
+    "nav.partners": "साझेदार",
     "nav.followups": "फ़ॉलो-अप",
     "nav.executive": "कार्यकारी",
     "nav.dpo": "DPO",
@@ -473,6 +489,8 @@ const STRINGS = {
     "article.search": "लेख खोजें",
   },
   zh: {
+    "nav.engagement": "互动",
+    "nav.partners": "伙伴",
     "nav.followups": "跟进",
     "nav.executive": "高管",
     "nav.dpo": "数据保护",
@@ -527,6 +545,8 @@ const STRINGS = {
     "article.search": "搜索文章",
   },
   bn: {
+    "nav.engagement": "সম্পৃক্ততা",
+    "nav.partners": "অংশীদার",
     "nav.followups": "ফলো-আপ",
     "nav.executive": "নির্বাহী",
     "nav.dpo": "ডিপিও",
@@ -581,6 +601,8 @@ const STRINGS = {
     "article.search": "নিবন্ধ খুঁজুন",
   },
   pt: {
+    "nav.engagement": "Engajamento",
+    "nav.partners": "Parceiros",
     "nav.followups": "Follow-ups",
     "nav.executive": "Executivo",
     "nav.dpo": "DPO",
@@ -635,6 +657,8 @@ const STRINGS = {
     "article.search": "Pesquisar artigos",
   },
   id: {
+    "nav.engagement": "Keterlibatan",
+    "nav.partners": "Mitra",
     "nav.followups": "Tindak lanjut",
     "nav.executive": "Eksekutif",
     "nav.dpo": "DPO",
@@ -689,6 +713,8 @@ const STRINGS = {
     "article.search": "Cari artikel",
   },
   ur: {
+    "nav.engagement": "مشغولیت",
+    "nav.partners": "شراکت دار",
     "nav.followups": "فالو اپ",
     "nav.executive": "ایگزیکٹو",
     "nav.dpo": "ڈی پی او",

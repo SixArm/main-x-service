@@ -168,3 +168,27 @@ code + tests in one PR.
   green — full `--ignored` suite 7/7 vs Postgres 18; clippy pedantic
   clean; svelte-check 0; vitest 5; Playwright 9.
 
+- [x] CRM-T20 (2026-07-20) **Engagement / partnership / confederation
+  round.** Migration `m20260720_000007_engagement`: declared
+  stakeholder typing (`contacts.stakeholder_role` + power–interest
+  1–5, `accounts.stakeholder_role` — all nullable; undeclared stays
+  undeclared), recorded `activities.sentiment`
+  (positive/neutral/negative; validated, never inferred), and the
+  `partnerships` (forward-only scouting→pilot→scaled + retire
+  lifecycle in `rules::engagement`), `memberships` (one per account;
+  active/lapsed + renewal_on), `working_groups` (+ roster) tables.
+  New declared-data endpoints in `controllers/engagement.rs`; nine
+  derived views join `controllers/insights.rs`: cadence (untouched
+  contacts/accounts + no-next-touch), engagement workload (kinds +
+  recorded sentiment), pipeline funnel (entered per stage from
+  `to_stage` audits; honest ratios), member health (+ silent list),
+  consent-by-account, the stakeholder register + grid (declared
+  scores only), the partnership register, membership renewals; the
+  follow-ups view gains a `kind` filter (the renewals convention).
+  Front-end: `/engagement` + `/partners` pages, deal-board pipeline
+  selector + funnel strip, follow-ups kind filter, DPO
+  consent-by-account. **Acceptance:** lifecycle/grid pure pins; the
+  seeded engagement round-trip green first run — full `--ignored`
+  suite 8/8 vs Postgres 18; clippy pedantic clean; svelte-check 0;
+  vitest 5; Playwright 12.
+

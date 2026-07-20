@@ -58,6 +58,21 @@ test("deal board renders stage columns and the forecast strip", async ({ page })
   await page.route("**/api/proxy/pipelines", (route) =>
     route.fulfill({ json: [{ pipeline: { pid: "p1", name: "New Business" }, stages: STAGES }] }),
   );
+  await page.route("**/api/proxy/insights/funnel**", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        pipeline: { pid: "p1", name: "New Business" },
+        derivation: "entered from recorded to_stage audits",
+        stages: [
+          { stage: "Qualification", position: 0, is_won: false, is_lost: false,
+            entered: 4, conversion_from_previous: null },
+          { stage: "Proposal", position: 1, is_won: false, is_lost: false,
+            entered: 2, conversion_from_previous: { numerator: 2, denominator: 4, value: 0.5 } },
+        ],
+      },
+    }),
+  );
   await page.route("**/api/proxy/deals?pipeline=p1", (route) =>
     route.fulfill({ json: [DEAL] }),
   );
@@ -234,6 +249,16 @@ test("executive area renders the pack, hygiene findings, and trends", async ({ p
 });
 
 test("dpo area renders coverage, sources, and duplicate hygiene", async ({ page }) => {
+  await page.route("**/api/proxy/insights/consent-by-account", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z", window_days: 30,
+        note: "coverage counts verbatim",
+        accounts: [{ pid: "ac1", display_name: "Meridian University",
+          consent_coverage: { granted: 3 }, withdrawals_in_window: 1 }],
+      },
+    }),
+  );
   await page.route("**/api/proxy/insights/dpo", (route) =>
     route.fulfill({
       json: {
@@ -253,4 +278,116 @@ test("dpo area renders coverage, sources, and duplicate hygiene", async ({ page 
   await expect(page.getByTestId("dpo-tiles").getByText("consent: granted")).toBeVisible();
   await expect(page.getByTestId("dpo-sources").getByText("web form")).toBeVisible();
   await expect(page.getByTestId("dpo-duplicates").getByText("person:abc")).toBeVisible();
+});
+
+test("deal board funnel strip shows honest conversion ratios", async ({ page }) => {
+  await page.route("**/api/proxy/pipelines", (route) =>
+    route.fulfill({ json: [{ pipeline: { pid: "p1", name: "New Business" }, stages: STAGES }] }),
+  );
+  await page.route("**/api/proxy/deals**", (route) => route.fulfill({ json: [DEAL] }));
+  await page.route("**/api/proxy/insights/funnel**", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        pipeline: { pid: "p1", name: "New Business" },
+        derivation: "entered from recorded to_stage audits",
+        stages: [
+          { stage: "Qualification", position: 0, is_won: false, is_lost: false,
+            entered: 4, conversion_from_previous: null },
+          { stage: "Proposal", position: 1, is_won: false, is_lost: false,
+            entered: 2, conversion_from_previous: { numerator: 2, denominator: 4, value: 0.5 } },
+        ],
+      },
+    }),
+  );
+  await page.goto("/deals");
+  await expect(page.getByTestId("pipeline-select")).toBeVisible();
+  await expect(page.getByTestId("deal-funnel").getByText("50% (2/4)")).toBeVisible();
+});
+
+test("engagement area renders cadence, workload, and member health", async ({ page }) => {
+  await page.route("**/api/proxy/insights/cadence**", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        derivation: "touch = a recorded activity",
+        threshold_days: 30,
+        untouched_contacts: [{ pid: "c9", display_name: "Silent Sam",
+          stakeholder_role: "regulator", days_since_touch: 44, has_next_touch: false }],
+        untouched_accounts: [],
+        contacts_without_next_touch: 5,
+      },
+    }),
+  );
+  await page.route("**/api/proxy/insights/engagement**", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z", window_days: 90, touches: 12,
+        per_recorder_month: { "worker:x 2026-07": 12 },
+        per_kind: { meeting: 7, call: 5 },
+        sentiment: { positive: 4, unrecorded: 8 },
+        note: "recorded declarations only",
+      },
+    }),
+  );
+  await page.route("**/api/proxy/insights/members**", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        derivation: "account touch includes its contacts' activities",
+        threshold_days: 30, silent_accounts: 1,
+        accounts: [{ pid: "ac1", display_name: "Meridian University", tier: "standard",
+          stakeholder_role: "partner",
+          membership: { status: "active", joined_on: "2024-01-01", renewal_on: "2026-08-01" },
+          contacts: 3, days_since_touch: 2, silent: false,
+          open_followups: 1, open_tickets: 0 }],
+      },
+    }),
+  );
+  await page.goto("/engagement");
+  await expect(page.getByTestId("cadence-contacts").getByText("Silent Sam")).toBeVisible();
+  await expect(page.getByTestId("workload-sentiment").getByText("unrecorded")).toBeVisible();
+  await expect(page.getByTestId("member-health").getByText("Meridian University")).toBeVisible();
+});
+
+test("partners area renders the register, grid, partnerships, and renewals", async ({ page }) => {
+  await page.route("**/api/proxy/insights/stakeholders", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        note: "declared, never inferred",
+        by_role: { partner: [{ pid: "c1", display_name: "Prof Reyes",
+          marketing_consent: "granted", influence: 4, interest: 5, days_since_touch: 3 }] },
+        grid: { p4i5: 1 },
+        stakeholders_without_grid_scores: 0,
+        undeclared_contacts: 7,
+        account_roles: [{ pid: "ac1", display_name: "Meridian University", role: "partner" }],
+      },
+    }),
+  );
+  await page.route("**/api/proxy/insights/partnerships", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z",
+        by_kind: { university: 1 }, by_stage: { pilot: 1 },
+        register: [{ pid: "pn1", account_pid: "ac1", account: "Meridian University",
+          kind: "university", stage: "pilot", summary: "Joint ML lab", started_on: null }],
+      },
+    }),
+  );
+  await page.route("**/api/proxy/insights/memberships**", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-20T00:00:00Z", window_days: 90, memberships: 1,
+        renewals_due: [{ pid: "m1", account: "Meridian University",
+          status: "active", joined_on: "2024-01-01", renewal_on: "2026-08-01" }],
+        lapsed: [],
+      },
+    }),
+  );
+  await page.goto("/partners");
+  await expect(page.getByTestId("stakeholder-register").getByText("Prof Reyes")).toBeVisible();
+  await expect(page.getByTestId("stakeholder-grid")).toBeVisible();
+  await expect(page.getByTestId("partnership-register").getByText("Joint ML lab")).toBeVisible();
+  await expect(page.getByTestId("membership-renewals").getByText("2026-08-01")).toBeVisible();
 });

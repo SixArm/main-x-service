@@ -1,23 +1,29 @@
 <script lang="ts">
   import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
   import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
-  import { forecast, listDeals, listPipelines, money, moveDeal } from "$lib/api/crm";
+  import { forecast, funnel, listDeals, listPipelines, money, moveDeal } from "$lib/api/crm";
   import { i18n, t } from "$lib/i18n.svelte";
   import type { Deal, Stage } from "$lib/api/crm";
 
   let stages = $state<Stage[]>([]);
   let deals = $state<Deal[] | null>(null);
   let totals = $state<Record<string, number>>({});
+  let pipelines = $state<Awaited<ReturnType<typeof listPipelines>>>([]);
+  let selectedPipeline = $state("");
+  let stageFunnel = $state<Awaited<ReturnType<typeof funnel>> | null>(null);
   let error = $state<string | null>(null);
   let actionError = $state<string | null>(null);
 
   async function load() {
     try {
-      const pipelines = await listPipelines();
-      const first = pipelines[0];
-      stages = first?.stages ?? [];
-      deals = first ? await listDeals(first.pipeline.pid) : [];
+      pipelines = await listPipelines();
+      const active =
+        pipelines.find((p) => p.pipeline.pid === selectedPipeline) ?? pipelines[0];
+      selectedPipeline = active?.pipeline.pid ?? "";
+      stages = active?.stages ?? [];
+      deals = active ? await listDeals(active.pipeline.pid) : [];
       totals = (await forecast()).totals_minor;
+      stageFunnel = active ? await funnel(active.pipeline.pid) : null;
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
     }
@@ -73,6 +79,23 @@
 
 <h1>{t("deal.board")}</h1>
 
+<p>
+  <label>
+    <select
+      data-testid="pipeline-select"
+      value={selectedPipeline}
+      onchange={(event) => {
+        selectedPipeline = event.currentTarget.value;
+        void load();
+      }}
+    >
+      {#each pipelines as entry (entry.pipeline.pid)}
+        <option value={entry.pipeline.pid}>{entry.pipeline.name}</option>
+      {/each}
+    </select>
+  </label>
+</p>
+
 <p data-testid="forecast">
   {t("dash.forecast")}:
   {#each Object.entries(totals) as [currency, minor] (currency)}
@@ -101,6 +124,32 @@
       />
     </Willow>
   </div>
+{/if}
+
+{#if stageFunnel}
+  <h2>Funnel — {stageFunnel.pipeline.name}</h2>
+  <p class="muted">{stageFunnel.derivation}</p>
+  <table data-testid="deal-funnel">
+    <thead><tr><th>Stage</th><th>Entered</th><th>Conversion</th></tr></thead>
+    <tbody>
+      {#each stageFunnel.stages as row (row.stage)}
+        <tr>
+          <td>{row.stage}{row.is_won ? " ✓" : row.is_lost ? " ✗" : ""}</td>
+          <td>{row.entered}</td>
+          <td>
+            {#if row.conversion_from_previous}
+              {row.conversion_from_previous.value === null
+                ? "—"
+                : `${(row.conversion_from_previous.value * 100).toFixed(0)}%`}
+              ({row.conversion_from_previous.numerator}/{row.conversion_from_previous.denominator})
+            {:else}
+              —
+            {/if}
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
 {/if}
 
 <style>
